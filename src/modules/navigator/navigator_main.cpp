@@ -286,13 +286,14 @@ Navigator::task_main()
 			/* timed out - periodic check for _task_should_exit, etc. */
 			if (global_pos_available_once) {
 				global_pos_available_once = false;
+				PX4_WARN("global position timeout");
 			}
 
 			/* Let the loop run anyway, don't do `continue` here. */
 
 		} else if (pret < 0) {
 			/* this is undesirable but not much we can do - might want to flag unhappy status */
-			PX4_ERR("poll error %d, %d", pret, errno);
+			PX4_ERR("nav: poll error %d, %d", pret, errno);
 			usleep(10000);
 			continue;
 
@@ -467,15 +468,15 @@ Navigator::task_main()
 				int land_start = _mission.find_offboard_land_start();
 
 				if (land_start != -1) {
-					vehicle_command_s vcmd = {};
-					vcmd.target_system = get_vstatus()->system_id;
-					vcmd.target_component = get_vstatus()->component_id;
-					vcmd.command = vehicle_command_s::VEHICLE_CMD_MISSION_START;
-					vcmd.param1 = land_start;
-					vcmd.param2 = 0;
+					vehicle_command_s cmd_mission_start = {};
+					cmd_mission_start.timestamp = hrt_absolute_time();
+					cmd_mission_start.target_system = get_vstatus()->system_id;
+					cmd_mission_start.target_component = get_vstatus()->component_id;
+					cmd_mission_start.command = vehicle_command_s::VEHICLE_CMD_MISSION_START;
+					cmd_mission_start.param1 = land_start;
+					cmd_mission_start.param2 = 0;
 
-					vcmd.timestamp = hrt_absolute_time();
-					publish_vehicle_cmd(vcmd);
+					publish_vehicle_cmd(cmd_mission_start);
 
 				} else {
 					PX4_WARN("planned landing not available");
@@ -565,8 +566,15 @@ Navigator::task_main()
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_RTL:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_rtl;
+
+			if (_rtl.mission_landing()) {
+				if (_mission.land()) {
+					_navigation_mode = &_mission;
+				}
+			}
+
+			_pos_sp_triplet_published_invalid_once = false;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:

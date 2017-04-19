@@ -67,6 +67,7 @@ Mission::Mission(Navigator *navigator, const char *name) :
 	_param_yawmode(this, "MIS_YAWMODE", false),
 	_param_force_vtol(this, "NAV_FORCE_VT", false),
 	_param_fw_climbout_diff(this, "FW_CLMBOUT_DIFF", false),
+	_param_rtl_land_type(this, "RTL_LAND_TYPE", false),
 	_missionFeasibilityChecker(navigator)
 {
 	updateParams();
@@ -237,12 +238,10 @@ Mission::set_current_offboard_mission_index(unsigned index)
 		set_current_offboard_mission_item();
 
 		// update mission items if already in active mission
-		if (_navigator->is_planned_mission()) {
-			// prevent following "previous - current" line
-			_navigator->get_position_setpoint_triplet()->previous.valid = false;
-			_navigator->get_position_setpoint_triplet()->current.valid = false;
-			set_mission_items();
-		}
+		// prevent following "previous - current" line
+		_navigator->get_position_setpoint_triplet()->previous.valid = false;
+		_navigator->get_position_setpoint_triplet()->current.valid = false;
+		set_mission_items();
 
 		return true;
 	}
@@ -262,7 +261,7 @@ Mission::find_offboard_land_start()
 	dm_item_t dm_current = DM_KEY_WAYPOINTS_OFFBOARD(_offboard_mission.dataman_id);
 
 	for (size_t i = 0; i < _offboard_mission.count; i++) {
-		struct mission_item_s missionitem;
+		struct mission_item_s missionitem = {};
 		const ssize_t len = sizeof(missionitem);
 
 		if (dm_read(dm_current, i, &missionitem, len) != len) {
@@ -271,11 +270,43 @@ Mission::find_offboard_land_start()
 		}
 
 		if (missionitem.nav_cmd == NAV_CMD_DO_LAND_START) {
+			_land_start_index = i;
 			return i;
 		}
 	}
 
 	return -1;
+}
+
+bool
+Mission::land()
+{
+	// if not currently landing, jump to do_land_start
+	if (_navigator->get_mission_result()->landing) {
+		return true;
+
+	} else {
+		dm_item_t dm_current = DM_KEY_WAYPOINTS_OFFBOARD(_offboard_mission.dataman_id);
+
+		for (size_t i = 0; i < _offboard_mission.count; i++) {
+			struct mission_item_s missionitem = {};
+			const ssize_t len = sizeof(missionitem);
+
+			if (dm_read(dm_current, i, &missionitem, len) != len) {
+				/* not supposed to happen unless the datamanager can't access the SD card, etc. */
+				return false;
+			}
+
+			if (missionitem.nav_cmd == NAV_CMD_DO_LAND_START) {
+				if (set_current_offboard_mission_index(i)) {
+					_navigator->get_mission_result()->landing = true;
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
 }
 
 void
@@ -362,6 +393,8 @@ Mission::update_offboard_mission()
 
 			/* reset work item if new mission has been accepted */
 			_work_item_type = WORK_ITEM_TYPE_DEFAULT;
+
+			_land_start_index = find_offboard_land_start();
 		}
 
 	} else {
@@ -1120,7 +1153,7 @@ void
 Mission::do_abort_landing()
 {
 	// Abort FW landing
-	//  turn the land waypoint into a loiter and stay there
+	//  first climb out then loiter over intended landing location
 
 	if (_mission_item.nav_cmd != NAV_CMD_LAND) {
 		return;
@@ -1129,39 +1162,46 @@ Mission::do_abort_landing()
 	// loiter at the larger of MIS_LTRMIN_ALT above the landing point
 	//  or 2 * FW_CLMBOUT_DIFF above the current altitude
 	float alt_landing = get_absolute_altitude_for_item(_mission_item);
+	float min_climbout = _navigator->get_global_position()->alt + (2 * _param_fw_climbout_diff.get());
+	float alt_sp = math::max(alt_landing + _param_loiter_min_alt.get(), min_climbout);
 
-	// ignore _param_loiter_min_alt if smaller then 0 (-1)
-	float alt_sp;
-
-	if (_param_loiter_min_alt.get() > 0.0f) {
-		alt_sp = math::max(alt_landing + _param_loiter_min_alt.get(),
-				   _navigator->get_global_position()->alt + (2 * _param_fw_climbout_diff.get()));
-
-	} else {
-		alt_sp = math::max(alt_landing, _navigator->get_global_position()->alt + (2 * _param_fw_climbout_diff.get()));
-	}
-
+	// turn current landing waypoint into an indefinite loiter
 	_mission_item.nav_cmd = NAV_CMD_LOITER_UNLIMITED;
 	_mission_item.altitude_is_relative = false;
 	_mission_item.altitude = alt_sp;
-	_mission_item.yaw = NAN;
 	_mission_item.loiter_radius = _navigator->get_loiter_radius();
-	_mission_item.nav_cmd = NAV_CMD_LOITER_UNLIMITED;
 	_mission_item.acceptance_radius = _navigator->get_acceptance_radius();
 	_mission_item.autocontinue = false;
 	_mission_item.origin = ORIGIN_ONBOARD;
 
 	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	mission_item_to_position_setpoint(&_mission_item, &pos_sp_triplet->current);
-
 	_navigator->set_position_setpoint_triplet_updated();
 
 	mavlink_log_info(_navigator->get_mavlink_log_pub(), "Holding at %dm above landing.", (int)(alt_sp - alt_landing));
 
-	// move mission index back 1 (landing approach point) so that re-entering
-	//  the mission doesn't try to land from the loiter above land
-	// TODO: reset index to MAV_CMD_DO_LAND_START
-	_current_offboard_mission_index -= 1;
+	// reset mission index to start of landing
+	int land_start_index = find_offboard_land_start();
+
+	if (land_start_index != -1) {
+		_current_offboard_mission_index = land_start_index;
+
+	} else {
+		// move mission index back (landing approach point)
+		_current_offboard_mission_index -= 1;
+	}
+
+	// send reposition cmd to get out of mission
+	struct vehicle_command_s vcmd = {};
+	mission_item_to_vehicle_command(&_mission_item, &vcmd);
+	vcmd.command = vehicle_command_s::VEHICLE_CMD_DO_REPOSITION;
+	vcmd.param1 = -1;
+	vcmd.param2 = 1;
+	vcmd.param5 = _mission_item.lat;
+	vcmd.param6 = _mission_item.lon;
+	vcmd.param7 = alt_sp;
+
+	_navigator->publish_vehicle_cmd(vcmd);
 }
 
 bool
@@ -1363,6 +1403,19 @@ Mission::set_current_offboard_mission_item()
 {
 	_navigator->get_mission_result()->reached = false;
 	_navigator->get_mission_result()->finished = false;
+
+	// update mission result landing
+	const bool landed = _navigator->get_land_detected()->landed;
+	const bool do_land_start = (_current_offboard_mission_index >= _land_start_index);
+	const bool on_landing = (_mission_item.nav_cmd == NAV_CMD_LAND);
+
+	if (!landed && (do_land_start || on_landing)) {
+		_navigator->get_mission_result()->landing = true;
+
+	} else {
+		_navigator->get_mission_result()->landing = false;
+	}
+
 	_navigator->get_mission_result()->seq_current = _current_offboard_mission_index;
 	_navigator->set_mission_result_updated();
 
@@ -1382,7 +1435,9 @@ Mission::check_mission_valid(bool force)
 	if ((!_home_inited && _navigator->home_position_valid()) || force) {
 
 		_navigator->get_mission_result()->valid =
-			_missionFeasibilityChecker.checkMissionFeasible(_offboard_mission, _param_dist_1wp.get(), false);
+			_missionFeasibilityChecker.checkMissionFeasible(_offboard_mission,
+					_param_dist_1wp.get(),
+					(_param_rtl_land_type.get() == 1));
 
 		_navigator->get_mission_result()->seq_total = _offboard_mission.count;
 		_navigator->increment_mission_instance_count();

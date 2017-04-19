@@ -1,29 +1,22 @@
 machine:
-  xcode:
-    version: 8.2
+  services:
+    - docker
 
 checkout:
   post:
-    # workaround for known git bug where attempting to fetch a missing commit fails early on the first try
-    - git submodule update --init --recursive || true
+    # workaround for known git bug where attempting to fetch a mission commit fails too early
+    - git submodule update --init || true
     - git submodule sync --recursive
-    - git submodule deinit -f . && rm -rf .git/modules
-    - git submodule update --init --recursive --force
-
-dependencies:
-  pre:
-    # PX4 OSX instructions 2017-04-28: https://dev.px4.io/en/setup/dev_env_mac.html
-
-    # After installing Homebrew, copy these commands to your shell:
-    - brew tap PX4/px4
-    - brew update
-    - brew install genromfs gcc-arm-none-eabi ninja
-
-    # Then install the required python packages:
-    - sudo -H easy_install pip
-    - sudo -H pip install empy jinja2
+    - git submodule update --init --recursive
 
 test:
   override:
-    - make tests
-    - make px4fmu-v3_default
+    - ./Tools/docker_run.sh 'make posix_sitl_default'
+    - ./Tools/docker_run.sh 'make px4fmu-v4_default'
+    - ./Tools/docker_run.sh 'make tests'
+
+general:
+  artifacts:
+    - "build_px4fmu-v4_default/parameters.xml"
+    - "build_px4fmu-v4_default/airframes.xml"
+    - "build_px4fmu-v4_default/src/firmware/nuttx/px4fmu-v4_default.px4"

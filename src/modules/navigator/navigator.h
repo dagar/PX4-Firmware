@@ -88,7 +88,7 @@ public:
 	 *
 	 * @return		OK on success.
 	 */
-	int			start();
+	int		start();
 
 	/**
 	 * Display the navigator status.
@@ -220,6 +220,7 @@ public:
 	void 		set_mission_failure(const char *reason);
 
 	bool		is_planned_mission() { return _navigation_mode == &_mission; }
+	bool		planned_mission_landing() { return is_planned_mission() && _mission_result.landing; }
 
 	bool		abort_landing();
 
