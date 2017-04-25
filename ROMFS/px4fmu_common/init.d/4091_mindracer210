@@ -1,0 +1,48 @@
+#!nsh
+#
+# @name MindRacer 210 Quad
+#
+# @type Quadrotor x
+#
+# @board px4fmu-v1 exclude
+# @board px4fmu-v2 exclude
+# @board px4fmu-v3 exclude
+# @board px4fmu-v4 exclude
+# @board px4fmu-v4pro exclude
+# @board px4fmu-v5 exclude
+# @board aerofc-v1 exclude
+#
+# @maintainer Henry Zhang <zhanghui629@gmail.com>
+#
+
+sh /etc/init.d/4001_quad_x
+
+if [ $AUTOCNF == yes ]
+then
+	param set BAT_A_PER_V 15.39103031
+	param set BAT_N_CELLS 4
+	param set BAT_V_DIV 10.17793941
+
+	param set MC_RATT_TH 1.00
+
+	param set MC_PITCH_P 2.0
+	param set MC_PITCH_TC 0.23
+	param set MC_PITCHRATE_D 0.003
+	param set MC_PITCHRATE_I 0.05
+	param set MC_PITCHRATE_P 0.03
+
+	param set MC_ROLL_P 2.0
+	param set MC_ROLL_TC 0.23
+	param set MC_ROLLRATE_D 0.003
+	param set MC_ROLLRATE_I 0.05
+	param set MC_ROLLRATE_P 0.03
+
+	param set MC_YAW_P 1.40
+	param set MC_YAWRATE_P 0.08
+
+	param set MPC_Z_FF 0.20
+
+	param set PWM_DISARMED 900
+	param set PWM_MAX 1950
+	param set PWM_MIN 1050
+fi
