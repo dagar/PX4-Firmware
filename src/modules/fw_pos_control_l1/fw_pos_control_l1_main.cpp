@@ -147,6 +147,7 @@ private:
 	bool		_task_should_exit{false};		///< if true, sensor task should exit */
 	bool		_task_running{false};			///< if true, task is running in its mainloop */
 
+	int		_att_sub{-1};
 	int		_global_pos_sub{-1};
 	int		_pos_sp_triplet_sub{-1};
 	int		_ctrl_state_sub{-1};			///< control state subscription */
@@ -167,6 +168,7 @@ private:
 	struct fw_pos_ctrl_status_s		_fw_pos_ctrl_status {};		///< navigation capabilities */
 	struct manual_control_setpoint_s	_manual {};			///< r/c channel data */
 	struct position_setpoint_triplet_s	_pos_sp_triplet {};		///< triplet of mission items */
+	struct vehicle_attitude_s	_att {};			///< vehicle attitude setpoint */
 	struct vehicle_attitude_setpoint_s	_att_sp {};			///< vehicle attitude setpoint */
 	struct vehicle_command_s		_vehicle_command {};		///< vehicle commands */
 	struct vehicle_control_mode_s		_control_mode {};		///< control mode */
@@ -386,6 +388,7 @@ private:
 	void		vehicle_control_mode_poll();
 	void		vehicle_land_detected_poll();
 	void		vehicle_status_poll();
+	void		vehicle_attitude_poll();
 
 	// publish navigation capabilities
 	void		fw_pos_ctrl_status_publish();
@@ -784,8 +787,30 @@ FixedwingPositionControl::control_state_poll()
 		}
 	}
 
+	/* update TECS state */
+	_tecs.enable_airspeed(_airspeed_valid);
+}
+
+void
+FixedwingPositionControl::vehicle_attitude_poll()
+{
+	/* check if there is a new position */
+	bool attitude_updated;
+	orb_check(_att_sub, &attitude_updated);
+
+	if (attitude_updated) {
+		orb_copy(ORB_ID(vehicle_attitude), _att_sub, &_att);
+
+	} else {
+
+		/* no airspeed updates for one second */
+		if (_airspeed_valid && (hrt_absolute_time() - _airspeed_last_received) > 1e6) {
+			_airspeed_valid = false;
+		}
+	}
+
 	/* set rotation matrix and euler angles */
-	math::Quaternion q_att(_ctrl_state.q);
+	math::Quaternion q_att(_att.q);
 	_R_nb = q_att.to_dcm();
 
 	math::Vector<3> euler_angles;
@@ -793,9 +818,6 @@ FixedwingPositionControl::control_state_poll()
 	_roll    = euler_angles(0);
 	_pitch   = euler_angles(1);
 	_yaw     = euler_angles(2);
-
-	/* update TECS state */
-	_tecs.enable_airspeed(_airspeed_valid);
 }
 
 void
@@ -1532,7 +1554,7 @@ FixedwingPositionControl::control_position(const math::Vector<2> &curr_pos, cons
 
 			if (_runway_takeoff.runwayTakeoffEnabled()) {
 				if (!_runway_takeoff.isInitialized()) {
-					Eulerf euler(Quatf(_ctrl_state.q));
+					Eulerf euler(Quatf(_att.q));
 					_runway_takeoff.init(euler.psi(), _global_pos.lat, _global_pos.lon);
 
 					/* need this already before takeoff is detected
@@ -1746,7 +1768,7 @@ FixedwingPositionControl::control_position(const math::Vector<2> &curr_pos, cons
 		    fabsf(_manual.r) < HDG_HOLD_MAN_INPUT_THRESH) {
 
 			/* heading / roll is zero, lock onto current heading */
-			if (fabsf(_ctrl_state.yaw_rate) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
+			if (fabsf(_att.yawspeed) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
 				// little yaw movement, lock to current heading
 				_yaw_lock_engaged = true;
 
@@ -1985,12 +2007,16 @@ FixedwingPositionControl::task_main()
 	_global_pos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_ctrl_state_sub = orb_subscribe(ORB_ID(control_state));
+	_att_sub = orb_subscribe(ORB_ID(control_state));
 	_control_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
 	_vehicle_command_sub = orb_subscribe(ORB_ID(vehicle_command));
 	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
+
+	/* rate limit control mode updates to 50Hz */
+	orb_set_interval(_att_sub, 20);
 
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);

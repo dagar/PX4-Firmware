@@ -699,13 +699,6 @@ void Ekf2::task_main()
 				control_state_s ctrl_state = {};
 				ctrl_state.timestamp = _replay_mode ? now : hrt_absolute_time();
 
-				ctrl_state.roll_rate = gyro_rad[0];
-				ctrl_state.pitch_rate = gyro_rad[1];
-				ctrl_state.yaw_rate = gyro_rad[2];
-				ctrl_state.roll_rate_bias = gyro_bias[0];
-				ctrl_state.pitch_rate_bias = gyro_bias[1];
-				ctrl_state.yaw_rate_bias = gyro_bias[2];
-
 				// Velocity in body frame
 				Vector3f v_n(velocity);
 				matrix::Dcm<float> R_to_body(q.inversed());
@@ -715,16 +708,8 @@ void Ekf2::task_main()
 				ctrl_state.z_vel = v_b(2);
 
 				// Local Position NED
-				float position[3];
-				_ekf.get_position(position);
-				ctrl_state.x_pos = position[0];
-				ctrl_state.y_pos = position[1];
-				ctrl_state.z_pos = position[2];
-
-				// Attitude quaternion
-				q.copyTo(ctrl_state.q);
-
-				_ekf.get_quat_reset(&ctrl_state.delta_q_reset[0], &ctrl_state.quat_reset_counter);
+				//float position[3];
+				//_ekf.get_position(position);
 
 				// Acceleration data
 				matrix::Vector<float, 3> acceleration(sensors.accelerometer_m_s2);
@@ -778,11 +763,16 @@ void Ekf2::task_main()
 				struct vehicle_attitude_s att = {};
 				att.timestamp = _replay_mode ? now : hrt_absolute_time();
 
+				_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
 				q.copyTo(att.q);
 
 				att.rollspeed = gyro_rad[0];
 				att.pitchspeed = gyro_rad[1];
 				att.yawspeed = gyro_rad[2];
+
+				att.roll_rate_bias = gyro_bias[0];
+				att.pitch_rate_bias = gyro_bias[1];
+				att.yaw_rate_bias = gyro_bias[2];
 
 				// publish vehicle attitude data
 				if (_att_pub == nullptr) {
@@ -896,8 +886,6 @@ void Ekf2::task_main()
 
 				// TODO use innovatun consistency check timouts to set this
 				global_pos.dead_reckoning = false; // True if this position is estimated through dead-reckoning
-
-				global_pos.pressure_alt = sensors.baro_alt_meter; // Pressure altitude AMSL (m)
 
 				if (_vehicle_global_position_pub == nullptr) {
 					_vehicle_global_position_pub = orb_advertise(ORB_ID(vehicle_global_position), &global_pos);

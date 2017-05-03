@@ -461,6 +461,11 @@ void AttitudeEstimatorQ::task_main()
 		att.pitchspeed = _rates(1);
 		att.yawspeed = _rates(2);
 
+		/* TODO get bias estimates from estimator */
+		att.roll_rate_bias = 0.0f;
+		att.pitch_rate_bias = 0.0f;
+		att.yaw_rate_bias = 0.0f;
+
 		memcpy(&att.q[0], _q.data, sizeof(att.q));
 
 		/* the instance count is not used here */
@@ -472,25 +477,9 @@ void AttitudeEstimatorQ::task_main()
 
 			ctrl_state.timestamp = sensors.timestamp;
 
-			/* attitude quaternions for control state */
-			ctrl_state.q[0] = _q(0);
-			ctrl_state.q[1] = _q(1);
-			ctrl_state.q[2] = _q(2);
-			ctrl_state.q[3] = _q(3);
-
 			ctrl_state.x_acc = _accel(0);
 			ctrl_state.y_acc = _accel(1);
 			ctrl_state.z_acc = _accel(2);
-
-			/* attitude rates for control state */
-			ctrl_state.roll_rate = _rates(0);
-			ctrl_state.pitch_rate = _rates(1);
-			ctrl_state.yaw_rate = _rates(2);
-
-			/* TODO get bias estimates from estimator */
-			ctrl_state.roll_rate_bias = 0.0f;
-			ctrl_state.pitch_rate_bias = 0.0f;
-			ctrl_state.yaw_rate_bias = 0.0f;
 
 			ctrl_state.airspeed_valid = false;
 

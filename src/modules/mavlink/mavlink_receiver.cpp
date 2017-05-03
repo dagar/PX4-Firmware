@@ -1137,9 +1137,9 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 	vision_position.vy = pos.vy;
 	vision_position.vz = pos.vz;
 
-	vision_position.ax = pos.ax;
-	vision_position.ay = pos.ay;
-	vision_position.az = pos.az;
+	//vision_position.ax = pos.ax;
+	//vision_position.ay = pos.ay;
+	//vision_position.az = pos.az;
 
 	// Low risk change for now. TODO : full covariance matrix
 	vision_position.eph = sqrtf(fmaxf(pos.covariance[0], pos.covariance[9]));
@@ -2158,9 +2158,6 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		hil_global_pos.lat = hil_state.lat / ((double)1e7);
 		hil_global_pos.lon = hil_state.lon / ((double)1e7);
 		hil_global_pos.alt = hil_state.alt / 1000.0f;
-		hil_global_pos.vel_n = hil_state.vx / 100.0f;
-		hil_global_pos.vel_e = hil_state.vy / 100.0f;
-		hil_global_pos.vel_d = hil_state.vz / 100.0f;
 		hil_global_pos.yaw = euler.psi();
 		hil_global_pos.eph = 2.0f;
 		hil_global_pos.epv = 4.0f;
@@ -2279,13 +2276,6 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 	//Time
 	ctrl_state.timestamp = hrt_absolute_time();
 
-	//Roll Rates:
-	//ctrl_state: body angular rate (rad/s, x forward/y right/z down)
-	//hil_state : body frame angular speed (rad/s)
-	ctrl_state.roll_rate = hil_state.rollspeed;
-	ctrl_state.pitch_rate = hil_state.pitchspeed;
-	ctrl_state.yaw_rate = hil_state.yawspeed;
-
 	// Local Position NED:
 	//ctrl_state: position in local earth frame
 	//hil_state : Latitude/Longitude expressed as * 1E7
@@ -2294,12 +2284,6 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 	double lat = hil_state.lat * 1e-7;
 	double lon = hil_state.lon * 1e-7;
 	map_projection_project(&_hil_local_proj_ref, lat, lon, &x, &y);
-	ctrl_state.x_pos = x;
-	ctrl_state.y_pos = y;
-	ctrl_state.z_pos = hil_state.alt / 1000.0f;
-
-	// Attitude quaternion
-	q.copyTo(ctrl_state.q);
 
 	// Velocity
 	//ctrl_state: velocity in body frame (x forward/y right/z down)

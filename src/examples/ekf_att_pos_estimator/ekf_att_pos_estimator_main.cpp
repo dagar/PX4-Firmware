@@ -853,33 +853,14 @@ void AttitudePositionEstimatorEKF::publishControlState()
 	Vector3f v_n(_ekf->states[4], _ekf->states[5], _ekf->states[6]);
 	Vector3f v_n_var(_ekf->P[4][4], _ekf->P[5][5], _ekf->P[6][6]);
 	Vector3f v_b = _ekf->Tnb * v_n;
-	Vector3f v_b_var = _ekf->Tnb * v_n_var;
+	//Vector3f v_b_var = _ekf->Tnb * v_n_var;
 
 	_ctrl_state.x_vel = v_b.x;
 	_ctrl_state.y_vel = v_b.y;
 	_ctrl_state.z_vel = v_b.z;
 
-	_ctrl_state.vel_variance[0] = v_b_var.x;
-	_ctrl_state.vel_variance[1] = v_b_var.y;
-	_ctrl_state.vel_variance[2] = v_b_var.z;
-
-	/* Local Position */
-	_ctrl_state.x_pos = _ekf->states[7];
-	_ctrl_state.y_pos = _ekf->states[8];
-
-	// XXX need to announce change of Z reference somehow elegantly
-	_ctrl_state.z_pos = _ekf->states[9] - _filter_ref_offset;
-
-	_ctrl_state.pos_variance[0] = _ekf->P[7][7];
-	_ctrl_state.pos_variance[1] = _ekf->P[8][8];
-	_ctrl_state.pos_variance[2] = _ekf->P[9][9];
-
 	/* Attitude */
 	_ctrl_state.timestamp = _last_sensor_timestamp;
-	_ctrl_state.q[0] = _ekf->states[0];
-	_ctrl_state.q[1] = _ekf->states[1];
-	_ctrl_state.q[2] = _ekf->states[2];
-	_ctrl_state.q[3] = _ekf->states[3];
 
 	// use estimated velocity for airspeed estimate
 	if (_parameters.airspeed_mode == control_state_s::AIRSPD_MODE_MEAS) {
@@ -902,23 +883,10 @@ void AttitudePositionEstimatorEKF::publishControlState()
 		// will handle this assuming always trim airspeed
 	}
 
-	/* Attitude Rates */
-	_ctrl_state.roll_rate = _LP_att_P.apply(_ekf->dAngIMU.x / _ekf->dtIMU) - _ekf->states[10] / _ekf->dtIMUfilt;
-	_ctrl_state.pitch_rate = _LP_att_Q.apply(_ekf->dAngIMU.y / _ekf->dtIMU) - _ekf->states[11] / _ekf->dtIMUfilt;
-	_ctrl_state.yaw_rate = _LP_att_R.apply(_ekf->dAngIMU.z / _ekf->dtIMU) - _ekf->states[12] / _ekf->dtIMUfilt;
-
-	/* Gyro bias estimates */
-	_ctrl_state.roll_rate_bias = _ekf->states[10] / _ekf->dtIMUfilt;
-	_ctrl_state.pitch_rate_bias = _ekf->states[11] / _ekf->dtIMUfilt;
-	_ctrl_state.yaw_rate_bias = _ekf->states[12] / _ekf->dtIMUfilt;
-
 	/* Guard from bad data */
 	if (!PX4_ISFINITE(_ctrl_state.x_vel) ||
 	    !PX4_ISFINITE(_ctrl_state.y_vel) ||
-	    !PX4_ISFINITE(_ctrl_state.z_vel) ||
-	    !PX4_ISFINITE(_ctrl_state.x_pos) ||
-	    !PX4_ISFINITE(_ctrl_state.y_pos) ||
-	    !PX4_ISFINITE(_ctrl_state.z_pos)) {
+	    !PX4_ISFINITE(_ctrl_state.z_vel)) {
 		// bad data, abort publication
 		return;
 	}
@@ -1023,9 +991,6 @@ void AttitudePositionEstimatorEKF::publishGlobalPosition()
 	} else {
 		_global_pos.terrain_alt_valid = false;
 	}
-
-	/* baro altitude */
-	_global_pos.pressure_alt = _ekf->baroHgt;
 
 	_global_pos.yaw = _local_pos.yaw;
 
