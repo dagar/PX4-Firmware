@@ -37,124 +37,96 @@
  * Controller library code
  */
 
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "BlockParam.hpp"
 
-#include <containers/List.hpp>
+#include "Block.hpp"
+
+#include <cstring>
 
 namespace control
 {
 
-BlockParamBase::BlockParamBase(Block *parent, const char *name, bool parent_prefix) :
-	_handle(PARAM_INVALID)
+template <class T>
+void BlockParam<T>::init(Block *parent, const char *name, bool parent_prefix)
 {
-	char fullname[blockNameLengthMax];
+	// 16 character param name + NULL terminated
+	constexpr size_t name_length = 17;
+	char fullname[name_length];
 
 	if (parent == nullptr) {
-		strncpy(fullname, name, blockNameLengthMax);
+		strncpy(fullname, name, name_length);
 
 	} else {
-		char parentName[blockNameLengthMax];
-		parent->getName(parentName, blockNameLengthMax);
+		char parentName[name_length];
+		parent->getName(parentName, name_length);
 
-		if (!strcmp(name, "")) {
-			strncpy(fullname, parentName, blockNameLengthMax);
+		if (strcmp(name, "") == 0) {
+			strncpy(fullname, parentName, name_length);
 			// ensure string is terminated
 			fullname[sizeof(fullname) - 1] = '\0';
 
 		} else if (parent_prefix) {
-			snprintf(fullname, blockNameLengthMax, "%s_%s", parentName, name);
+			snprintf(fullname, name_length, "%s_%s", parentName, name);
 
 		} else {
-			strncpy(fullname, name, blockNameLengthMax);
+			strncpy(fullname, name, name_length);
 			// ensure string is terminated
 			fullname[sizeof(fullname) - 1] = '\0';
 		}
-
-		parent->getParams().add(this);
 	}
 
 	_handle = param_find(fullname);
 
 	if (_handle == PARAM_INVALID) {
-		printf("error finding param: %s\n", fullname);
+		PX4_ERR("error finding param: %s\n", fullname);
+
+	} else {
+		// handle valid
+
+		// check that param type matches BlockParam
+		if (block_type() != param_type(_handle)) {
+			PX4_ERR("error BlockParam type mismatch: %s\n", fullname);
+		}
+
+		// add to Block
+		if (parent != nullptr) {
+			parent->addParam(this);
+		}
+
+		update();
 	}
 };
 
-template <class T>
-BlockParam<T>::BlockParam(Block *block, const char *name,
-			  bool parent_prefix) :
-	BlockParamBase(block, name, parent_prefix),
-	_val()
+template <> param_type_e BlockParam<int32_t>::block_type() const { return PARAM_TYPE_INT32; }
+template <> param_type_e BlockParam<int32_t &>::block_type() const { return PARAM_TYPE_INT32; }
+
+template <> param_type_e BlockParam<float>::block_type() const { return PARAM_TYPE_FLOAT; }
+template <> param_type_e BlockParam<float &>::block_type() const { return PARAM_TYPE_FLOAT; }
+
+template <>
+BlockParam<int32_t>::BlockParam(Block *parent, const char *name, bool parent_prefix) : _val(0)
 {
-	update();
+	init(parent, name, parent_prefix);
 }
 
-template <class T>
-void BlockParam<T>::set(T val)
+template <>
+BlockParam<float>::BlockParam(Block *parent, const char *name, bool parent_prefix) : _val(0.0f)
 {
-	_val = val;
+	init(parent, name, parent_prefix);
 }
 
-template <class T>
-void BlockParam<T>::update()
+template <>
+BlockParam<int32_t &>::BlockParam(Block *parent, const char *name, bool parent_prefix, int32_t &external_val)
+	: _val(external_val)
 {
-	if (_handle != PARAM_INVALID) {
-		param_get(_handle, &_val);
-	}
+	init(parent, name, parent_prefix);
 }
 
-template <class T>
-void BlockParam<T>::commit()
+template <>
+BlockParam<float &>::BlockParam(Block *parent, const char *name, bool parent_prefix, float &external_val)
+	: _val(external_val)
 {
-	if (_handle != PARAM_INVALID) { param_set(_handle, &_val); }
+	init(parent, name, parent_prefix);
 }
-
-template <class T>
-void BlockParam<T>::commit_no_notification()
-{
-	if (_handle != PARAM_INVALID) { param_set_no_notification(_handle, &_val); }
-}
-
-template <class T>
-BlockParam<T>::~BlockParam() {};
-
-template class __EXPORT BlockParam<float>;
-template class __EXPORT BlockParam<int>;
-
-
-template <class T>
-BlockParamExt<T>::BlockParamExt(Block *block, const char *name,
-				bool parent_prefix, T &extern_val) :
-	BlockParam<T>(block, name, parent_prefix),
-	_extern_val(extern_val)
-{
-	update();
-}
-
-template <class T>
-void BlockParamExt<T>::set(T val)
-{
-	this->_val = val;
-	_extern_val = val;
-}
-
-template <class T>
-void BlockParamExt<T>::update()
-{
-	if (this->_handle != PARAM_INVALID) {
-		param_get(this->_handle, &this->_val);
-		_extern_val = this->_val;
-	}
-}
-
-template <class T>
-BlockParamExt<T>::~BlockParamExt() {};
-
-template class __EXPORT BlockParamExt<float>;
-template class __EXPORT BlockParamExt<int>;
 
 } // namespace control

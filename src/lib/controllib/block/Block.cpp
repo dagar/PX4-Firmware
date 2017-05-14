@@ -37,70 +37,94 @@
  * Controller library code
  */
 
-#include <math.h>
-#include <string.h>
-#include <stdio.h>
-
-#include <uORB/Subscription.hpp>
-#include <uORB/Publication.hpp>
-
 #include "Block.hpp"
 #include "BlockParam.hpp"
+
+#include <cmath>
+#include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
 
 namespace control
 {
 
 Block::Block(SuperBlock *parent, const char *name) :
-	_name(name),
 	_parent(parent),
-	_dt(0),
-	_subscriptions(),
-	_params()
+	_name(name)
 {
 	if (getParent() != nullptr) {
 		getParent()->getChildren().add(this);
 	}
 }
 
-void Block::getName(char *buf, size_t n)
+void Block::getName(char *name, size_t n)
 {
 	if (getParent() == nullptr) {
-		strncpy(buf, _name, n);
+		strncpy(name, _name, n);
 		// ensure string is terminated
-		buf[n - 1] = '\0';
+		name[n - 1] = '\0';
 
 	} else {
 		char parentName[blockNameLengthMax];
 		getParent()->getName(parentName, n);
 
-		if (!strcmp(_name, "")) {
-			strncpy(buf, parentName, n);
+		if (strcmp(_name, "") == 0) {
+			strncpy(name, parentName, n);
 			// ensure string is terminated
-			buf[n - 1] = '\0';
+			name[n - 1] = '\0';
 
 		} else {
-			snprintf(buf, n, "%s_%s", parentName, _name);
+			snprintf(name, n, "%s_%s", parentName, _name);
 		}
 	}
 }
 
 void Block::updateParams()
 {
-	BlockParamBase *param = getParams().getHead();
-	int count = 0;
+	// update int32 params
+	//BlockParamInt *paramInt = _paramsInt.getHead();
+	//int count = 0;
 
-	while (param != nullptr) {
-		if (count++ > maxParamsPerBlock) {
-			char name[blockNameLengthMax];
-			getName(name, blockNameLengthMax);
-			printf("exceeded max params for block: %s\n", name);
-			break;
-		}
 
-		//printf("updating param: %s\n", param->getName());
-		param->update();
-		param = param->getSibling();
+	for (const auto &dummy : _paramsInt) {
+		dummy->update();
 	}
+
+//
+//	for (auto it = _paramsInt2.begin(); it != _paramsInt2.end(); ++it) {
+//
+//	}
+//
+//
+//	while (paramInt != nullptr) {
+//		if (count++ > maxParamsPerBlock) {
+//			char name[blockNameLengthMax];
+//			getName(name, blockNameLengthMax);
+//			PX4_ERR("exceeded max int params for block: %s\n", name);
+//			break;
+//		}
+//
+//		//printf("updating param: %s\n", param->getName());
+//		paramInt->update();
+//		//paramInt = paramInt->getSibling();
+//	}
+
+
+//	// update float params
+//	BlockParamFloat *paramFloat = _paramsFloat.getHead();
+//	count = 0;
+//
+//	while (paramFloat != nullptr) {
+//		if (count++ > maxParamsPerBlock) {
+//			char name[blockNameLengthMax];
+//			getName(name, blockNameLengthMax);
+//			PX4_ERR("exceeded max float params for block: %s\n", name);
+//			break;
+//		}
+//
+//		//printf("updating param: %s\n", param->getName());
+//		paramFloat->update();
+//		paramFloat = paramFloat->getSibling();
+//	}
 }
 
 void Block::updateSubscriptions()
@@ -112,7 +136,7 @@ void Block::updateSubscriptions()
 		if (count++ > maxSubscriptionsPerBlock) {
 			char name[blockNameLengthMax];
 			getName(name, blockNameLengthMax);
-			printf("exceeded max subscriptions for block: %s\n", name);
+			PX4_ERR("exceeded max subscriptions for block: %s\n", name);
 			break;
 		}
 
@@ -130,7 +154,7 @@ void Block::updatePublications()
 		if (count++ > maxPublicationsPerBlock) {
 			char name[blockNameLengthMax];
 			getName(name, blockNameLengthMax);
-			printf("exceeded max publications for block: %s\n", name);
+			PX4_ERR("exceeded max publications for block: %s\n", name);
 			break;
 		}
 
@@ -149,7 +173,7 @@ void SuperBlock::setDt(float dt)
 		if (count++ > maxChildrenPerBlock) {
 			char name[blockNameLengthMax];
 			getName(name, blockNameLengthMax);
-			printf("exceeded max children for block: %s\n", name);
+			PX4_ERR("exceeded max children for block: %s\n", name);
 			break;
 		}
 
@@ -167,7 +191,7 @@ void SuperBlock::updateChildParams()
 		if (count++ > maxChildrenPerBlock) {
 			char name[blockNameLengthMax];
 			getName(name, blockNameLengthMax);
-			printf("exceeded max children for block: %s\n", name);
+			PX4_ERR("exceeded max children for block: %s\n", name);
 			break;
 		}
 
@@ -185,7 +209,7 @@ void SuperBlock::updateChildSubscriptions()
 		if (count++ > maxChildrenPerBlock) {
 			char name[blockNameLengthMax];
 			getName(name, blockNameLengthMax);
-			printf("exceeded max children for block: %s\n", name);
+			PX4_ERR("exceeded max children for block: %s\n", name);
 			break;
 		}
 
@@ -203,7 +227,7 @@ void SuperBlock::updateChildPublications()
 		if (count++ > maxChildrenPerBlock) {
 			char name[blockNameLengthMax];
 			getName(name, blockNameLengthMax);
-			printf("exceeded max children for block: %s\n", name);
+			PX4_ERR("exceeded max children for block: %s\n", name);
 			break;
 		}
 
@@ -217,4 +241,5 @@ void SuperBlock::updateChildPublications()
 
 template class List<uORB::SubscriptionNode *>;
 template class List<uORB::PublicationNode *>;
-template class List<control::BlockParamBase *>;
+//template class List<control::BlockParamInt *>;
+//template class List<control::BlockParamFloat *>;

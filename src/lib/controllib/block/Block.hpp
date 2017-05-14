@@ -39,104 +39,117 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <inttypes.h>
-
 #include <containers/List.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <controllib/block/BlockParam.hpp>
 
+#include <forward_list>
+
 namespace control
 {
 
-static const uint16_t maxChildrenPerBlock = 100;
-static const uint16_t maxParamsPerBlock = 100;
-static const uint16_t maxSubscriptionsPerBlock = 100;
-static const uint16_t maxPublicationsPerBlock = 100;
-static const uint8_t blockNameLengthMax = 40;
+static constexpr uint8_t maxChildrenPerBlock = 100;
+static constexpr uint8_t maxParamsPerBlock = 100;
+static constexpr uint8_t maxSubscriptionsPerBlock = 100;
+static constexpr uint8_t maxPublicationsPerBlock = 100;
+static constexpr uint8_t blockNameLengthMax = 40;
 
 // forward declaration
-class BlockParamBase;
 class SuperBlock;
 
 /**
  */
-class __EXPORT Block :
-	public ListNode<Block *>
+class __EXPORT Block : public ListNode<Block *>
 {
 public:
-	friend class BlockParamBase;
-// methods
 	Block(SuperBlock *parent, const char *name);
-	void getName(char *name, size_t n);
-	virtual ~Block() {};
+
+	virtual ~Block() = default;
+
+	Block(const control::Block &) = delete;
+	Block operator=(const control::Block &) = delete;
+
 	virtual void updateParams();
 	virtual void updateSubscriptions();
 	virtual void updatePublications();
+
+	void getName(char *name, size_t n);
+
 	virtual void setDt(float dt) { _dt = dt; }
-// accessors
 	float getDt() { return _dt; }
+
+	void addParam(BlockParamInt *param) { _paramsInt.push_front(param); }
+	void addParam(BlockParamFloat *param) { _paramsFloat.push_front(param); }
+	void addParam(BlockParamExtInt *param) { _paramsExtInt.push_front(param); }
+	void addParam(BlockParamExtFloat *param) { _paramsExtFloat.push_front(param); }
+
 protected:
-// accessors
+
 	SuperBlock *getParent() { return _parent; }
 	List<uORB::SubscriptionNode *> &getSubscriptions() { return _subscriptions; }
 	List<uORB::PublicationNode *> &getPublications() { return _publications; }
-	List<BlockParamBase *> &getParams() { return _params; }
-// attributes
-	const char *_name;
+
 	SuperBlock *_parent;
-	float _dt;
+	const char *_name;
+
+	float _dt{0.0f};
+
 	List<uORB::SubscriptionNode *> _subscriptions;
 	List<uORB::PublicationNode *> _publications;
-	List<BlockParamBase *> _params;
 
-private:
-	/* this class has pointer data members and should not be copied (private constructor) */
-	Block(const control::Block &);
-	Block operator=(const control::Block &);
+	std::forward_list<BlockParamInt *> _paramsInt;
+	std::forward_list<BlockParamFloat *> _paramsFloat;
+	std::forward_list<BlockParamExtInt *> _paramsExtInt;
+	std::forward_list<BlockParamExtFloat *> _paramsExtFloat;
+
 };
 
-class __EXPORT SuperBlock :
-	public Block
+class __EXPORT SuperBlock : public Block
 {
 public:
 	friend class Block;
-// methods
+
 	SuperBlock(SuperBlock *parent, const char *name) :
 		Block(parent, name),
 		_children()
 	{
 	}
-	virtual ~SuperBlock() {};
+
+	virtual ~SuperBlock() = default;
+
 	virtual void setDt(float dt);
+
 	virtual void updateParams()
 	{
 		Block::updateParams();
 
-		if (getChildren().getHead() != NULL) { updateChildParams(); }
+		if (getChildren().getHead() != nullptr) { updateChildParams(); }
 	}
+
 	virtual void updateSubscriptions()
 	{
 		Block::updateSubscriptions();
 
-		if (getChildren().getHead() != NULL) { updateChildSubscriptions(); }
+		if (getChildren().getHead() != nullptr) { updateChildSubscriptions(); }
 	}
+
 	virtual void updatePublications()
 	{
 		Block::updatePublications();
 
-		if (getChildren().getHead() != NULL) { updateChildPublications(); }
+		if (getChildren().getHead() != nullptr) { updateChildPublications(); }
 	}
+
 protected:
-// methods
+
 	List<Block *> &getChildren() { return _children; }
+
 	void updateChildParams();
 	void updateChildSubscriptions();
 	void updateChildPublications();
-// attributes
+
 	List<Block *> _children;
 };
-
 
 } // namespace control

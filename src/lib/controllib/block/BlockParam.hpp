@@ -41,9 +41,7 @@
 
 #include <systemlib/param/param.h>
 
-#include "Block.hpp"
-#include <containers/List.hpp>
-#include <cstddef>	// NULL
+#include <type_traits>
 
 namespace control
 {
@@ -51,82 +49,55 @@ namespace control
 class Block;
 
 /**
- * A base class for block params that enables traversing linked list.
+ * Parameters that are tied to blocks for updating and naming.
  */
-class __EXPORT BlockParamBase : public ListNode<BlockParamBase *>
-{
-public:
-	/**
-	 * Instantiate a block param base.
-	 *
-	 * @param parent_prefix Set to true to include the parent name in the parameter name
-	 */
-	BlockParamBase(Block *parent, const char *name, bool parent_prefix = true);
-	virtual ~BlockParamBase() {};
-	virtual void update() = 0;
-	const char *getName() { return param_name(_handle); }
-protected:
-	param_t _handle;
-};
-
-/**
- * Parameters that are tied to blocks for updating and nameing.
- */
-
 template <class T>
-class BlockParam : public BlockParamBase
+class __EXPORT BlockParam
 {
 public:
-	BlockParam(Block *block, const char *name,
-		   bool parent_prefix = true);
+
+	explicit BlockParam(Block *parent, const char *name, bool parent_prefix = true);
+	explicit BlockParam(Block *parent, const char *name, bool parent_prefix, T &&external_val);
+
+	void init(Block *parent, const char *name, bool parent_prefix);
+
+	~BlockParam() = default;
+
+	// no copy, assignment, move, move assignment
 	BlockParam(const BlockParam &) = delete;
 	BlockParam &operator=(const BlockParam &) = delete;
+	BlockParam(BlockParam &&) = delete;
+	BlockParam &operator=(BlockParam &&) = delete;
 
-	inline T get() const { return _val; }
+	param_type_e block_type() const;
+
+	T get() const { return _val; }
+	const char *getName() { return param_name(_handle); }
 
 	/**
 	 * Store the parameter value to the parameter storage (@see param_set())
 	 */
-	void commit();
+	void commit() { param_set(_handle, &_val); }
 
 	/**
 	 * Store the parameter value to the parameter storage, w/o notifying the system (@see param_set_no_notification())
 	 */
-	void commit_no_notification();
+	void commit_no_notification() { param_set_no_notification(_handle, &_val); }
 
-	void set(T val);
-	void update() override;
-	virtual ~BlockParam();
+	void set(T val) { _val = val; }
+
+	bool update() { return (param_get(_handle, &_val) == 0); }
+
 protected:
 	T _val;
+
+	param_t _handle{PARAM_INVALID};
 };
 
 typedef BlockParam<float> BlockParamFloat;
-typedef BlockParam<int> BlockParamInt;
+typedef BlockParam<int32_t> BlockParamInt;
 
-
-/**
- * Same as BlockParam, but in addition with a pointer to an external field that will be
- * set to the value of the parameter.
- * (BlockParam should be prefered over this)
- */
-template <class T>
-class BlockParamExt : public BlockParam<T>
-{
-public:
-	BlockParamExt(Block *block, const char *name,
-		      bool parent_prefix, T &extern_val);
-	BlockParamExt(const BlockParamExt &) = delete;
-	BlockParamExt &operator=(const BlockParamExt &) = delete;
-
-	void set(T val);
-	void update() override;
-	virtual ~BlockParamExt();
-protected:
-	T &_extern_val;
-};
-
-typedef BlockParamExt<float> BlockParamExtFloat;
-typedef BlockParamExt<int> BlockParamExtInt;
+typedef BlockParam<float &> BlockParamExtFloat;
+typedef BlockParam<int32_t &> BlockParamExtInt;
 
 } // namespace control
