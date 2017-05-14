@@ -85,9 +85,9 @@ void Block::updateParams()
 	//int count = 0;
 
 
-	for (const auto &dummy : _paramsInt) {
-		dummy->update();
-	}
+	//for (const auto &dummy : _paramsInt) {
+	//	dummy->update();
+	//}
 
 //
 //	for (auto it = _paramsInt2.begin(); it != _paramsInt2.end(); ++it) {
