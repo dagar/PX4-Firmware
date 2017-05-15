@@ -79,10 +79,10 @@ public:
 	virtual void setDt(float dt) { _dt = dt; }
 	float getDt() { return _dt; }
 
-	void addParam(BlockParamInt *param) { /*_paramsInt.push_front(param);*/ }
-	void addParam(BlockParamFloat *param) { /*_paramsFloat.push_front(param);*/ }
-	void addParam(BlockParamExtInt *param) { /*_paramsExtInt.push_front(param);*/ }
-	void addParam(BlockParamExtFloat *param) { /*_paramsExtFloat.push_front(param);*/ }
+	void addParam(BlockParamInt *param) { _paramsInt.push_front(param); }
+	void addParam(BlockParamFloat *param) { _paramsFloat.push_front(param); }
+	void addParam(BlockParamExtInt *param) { _paramsExtInt.push_front(param); }
+	void addParam(BlockParamExtFloat *param) { _paramsExtFloat.push_front(param); }
 
 protected:
 
@@ -98,10 +98,10 @@ protected:
 	List<uORB::SubscriptionNode *> _subscriptions;
 	List<uORB::PublicationNode *> _publications;
 
-	//std::forward_list<BlockParamInt *> _paramsInt;
-	//std::forward_list<BlockParamFloat *> _paramsFloat;
-	//std::forward_list<BlockParamExtInt *> _paramsExtInt;
-	//std::forward_list<BlockParamExtFloat *> _paramsExtFloat;
+	std::forward_list<BlockParamInt *> _paramsInt;
+	std::forward_list<BlockParamFloat *> _paramsFloat;
+	std::forward_list<BlockParamExtInt *> _paramsExtInt;
+	std::forward_list<BlockParamExtFloat *> _paramsExtFloat;
 
 };
 
