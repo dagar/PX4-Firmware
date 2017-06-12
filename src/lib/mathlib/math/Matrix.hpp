@@ -460,16 +460,6 @@ public:
 		memcpy(data, d, sizeof(data));
 	}
 
-#if defined(__PX4_ROS)
-	/**
-	 * set data from boost::array
-	 */
-	void set(const boost::array<float, 9ul> d)
-	{
-		set(static_cast<const float *>(d.data()));
-	}
-#endif
-
 	/**
 	 * set to value
 	 */

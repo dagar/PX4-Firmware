@@ -56,12 +56,8 @@
 
 bool mc_att_control_thread_running = false;     /**< Deamon status flag */
 
-#if defined(__PX4_ROS)
-int main(int argc, char **argv)
-#else
 int mc_att_control_start_main(int argc, char **argv);  // Prototype for missing declearation error with nuttx
 int mc_att_control_start_main(int argc, char **argv)
-#endif
 {
 	px4::init(argc, argv, "mc_att_control_m");
 

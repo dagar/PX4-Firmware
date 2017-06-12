@@ -449,15 +449,7 @@ public:
 		data[0] = d[0];
 		data[1] = d[1];
 	}
-#if defined(__PX4_ROS)
-	/**
-	 * set data from boost::array
-	 */
-	void set(const boost::array<float, 2ul> d)
-	{
-		set(static_cast<const float *>(d.data()));
-	}
-#endif
+
 	/**
 	 * set to value
 	 */
@@ -501,15 +493,6 @@ public:
 		data[1] = y;
 		data[2] = z;
 	}
-#if defined(__PX4_ROS)
-	/**
-	 * set data from boost::array
-	 */
-	void set(const boost::array<float, 3ul> d)
-	{
-		set(static_cast<const float *>(d.data()));
-	}
-#endif
 
 	/**
 	 * set data

@@ -41,35 +41,7 @@
 
 #include <stdbool.h>
 
-#if defined(__PX4_ROS)
-/*
- * Building for running within the ROS environment
- */
-
-#ifdef __cplusplus
-#include "ros/ros.h"
-#include <px4_rc_channels.h>
-#include <px4_vehicle_attitude.h>
-#include <px4_vehicle_attitude_setpoint.h>
-#include <px4_manual_control_setpoint.h>
-#include <px4_actuator_controls.h>
-#include <px4_vehicle_rates_setpoint.h>
-#include <px4_mc_virtual_rates_setpoint.h>
-#include <px4_vehicle_attitude.h>
-#include <px4_control_state.h>
-#include <px4_vehicle_control_mode.h>
-#include <px4_actuator_armed.h>
-#include <px4_parameter_update.h>
-#include <px4_vehicle_status.h>
-#include <px4_vehicle_local_position_setpoint.h>
-#include <px4_vehicle_global_velocity_setpoint.h>
-#include <px4_vehicle_local_position.h>
-#include <px4_position_setpoint_triplet.h>
-#include <px4_offboard_control_mode.h>
-#include <px4_vehicle_force_setpoint.h>
-#endif
-
-#elif defined(__PX4_NUTTX)
+#if defined(__PX4_NUTTX)
 /*
  * Building for NuttX
  */
@@ -80,6 +52,7 @@
 #include <systemlib/systemlib.h>
 
 #elif defined(__PX4_POSIX) && !defined(__PX4_QURT)
+
 #include <string.h>
 #include <assert.h>
 #include <uORB/uORB.h>
@@ -89,7 +62,9 @@
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
 #include <systemlib/systemlib.h>
+
 #elif defined(__PX4_QURT)
+
 #include <string.h>
 #include <assert.h>
 #include <uORB/uORB.h>
@@ -99,6 +74,7 @@
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
 #include <systemlib/systemlib.h>
+
 #else
 #error "No target platform defined"
 #endif

@@ -32,9 +32,7 @@
 ############################################################################
 
 # this includes the generated topics directory
-include_directories(
-	${CMAKE_CURRENT_BINARY_DIR}
-	)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 link_libraries(msg_gen)
 

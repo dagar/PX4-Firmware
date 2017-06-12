@@ -41,9 +41,7 @@
 
 #include <stdint.h>
 
-#if defined(__PX4_ROS)
-#error "ADC not supported in ROS"
-#elif defined(__PX4_NUTTX)
+#if defined(__PX4_NUTTX)
 /*
  * Building for NuttX
  */

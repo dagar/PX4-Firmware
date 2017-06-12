@@ -45,6 +45,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <cstring>
 
 #ifdef CONFIG_DISABLE_POLL
 # error This driver is not compatible with CONFIG_DISABLE_POLL
