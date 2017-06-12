@@ -45,6 +45,8 @@
 
 #include "LandDetector.h"
 
+#include <uORB/topics/parameter_update.h>
+
 
 namespace land_detector
 {

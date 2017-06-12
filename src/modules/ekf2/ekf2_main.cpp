@@ -81,6 +81,7 @@
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/sensor_selection.h>
+#include <uORB/topics/parameter_update.h>
 
 #include <ecl/EKF/ekf.h>
 

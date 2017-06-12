@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-set(msg_file_names
+set(msg_files
 	actuator_armed.msg
 	actuator_controls.msg
 	actuator_direct.msg
@@ -40,8 +40,8 @@ set(msg_file_names
 	airspeed.msg
 	att_pos_mocap.msg
 	battery_status.msg
-	camera_trigger.msg
 	camera_capture.msg
+	camera_trigger.msg
 	collision_report.msg
 	commander_state.msg
 	control_state.msg
@@ -91,10 +91,10 @@ set(msg_file_names
 	sensor_baro.msg
 	sensor_combined.msg
 	sensor_correction.msg
-	sensor_selection.msg
 	sensor_gyro.msg
 	sensor_mag.msg
 	sensor_preflight.msg
+	sensor_selection.msg
 	servorail_status.msg
 	subsystem_info.msg
 	system_power.msg
@@ -128,17 +128,50 @@ set(msg_file_names
 	wind_estimate.msg
 	)
 
-# Get absolute paths
-set(msg_files)
-set(msg_include_paths)
+if (NOT VERBOSE)
+	set(QUIET "-q")
+endif()
 
-foreach(msg_file ${msg_file_names})
-	list(APPEND msg_files ${CMAKE_CURRENT_SOURCE_DIR}/${msg_file})
+# headers
+set(msg_file_list)
+set(msg_h_files)
+set(msg_cpp_files ${PX4_BINARY_DIR}/topics_sources/uORBTopics.cpp)
+foreach(msg_file ${msg_files})
+	list(APPEND msg_file_list ${PX4_SOURCE_DIR}/msg/${msg_file})
+	get_filename_component(msg ${msg_file} NAME_WE)
+
+	list(APPEND msg_h_files ${PX4_BINARY_DIR}/uORB/topics/${msg}.h)
+	list(APPEND msg_cpp_files ${PX4_BINARY_DIR}/topics_sources/${msg}.cpp)
+
+	set_source_files_properties(${PX4_BINARY_DIR}/uORB/topics/${msg}.h PROPERTIES GENERATED TRUE)
+	set_source_files_properties(${PX4_BINARY_DIR}/topics_sources/${msg}.cpp PROPERTIES GENERATED TRUE)
 endforeach()
 
-list(APPEND msg_include_paths ${CMAKE_CURRENT_SOURCE_DIR})
-set(msg_include_paths ${msg_include_paths} PARENT_SCOPE)
+add_custom_command(OUTPUT ${msg_h_files}
+	COMMAND ${PYTHON_EXECUTABLE} Tools/px_generate_uorb_topic_files.py
+		--headers
+		-q
+		-d ${PX4_SOURCE_DIR}/msg
+		-e ${PX4_SOURCE_DIR}/msg/templates/uorb
+		-o ${PX4_BINARY_DIR}/uORB/topics
+		-t ${PX4_BINARY_DIR}/topics_temporary/headers
+	DEPENDS ${msg_file_list}
+	WORKING_DIRECTORY ${PX4_SOURCE_DIR}
+	COMMENT "Generating uORB topic headers"
+	)
 
-set(msg_files ${msg_files} PARENT_SCOPE)
+add_custom_command(OUTPUT ${msg_cpp_files}
+	COMMAND ${PYTHON_EXECUTABLE} Tools/px_generate_uorb_topic_files.py
+		--sources
+		-q
+		-d ${PX4_SOURCE_DIR}/msg
+		-e ${PX4_SOURCE_DIR}/msg/templates/uorb
+		-o ${PX4_BINARY_DIR}/topics_sources
+		-t ${PX4_BINARY_DIR}/topics_temporary/source
+	DEPENDS ${msg_file_list}
+	WORKING_DIRECTORY ${PX4_SOURCE_DIR}
+	COMMENT "Generating c++ uORB topic files"
+	)
 
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+px4_add_library(msg_gen ${msg_cpp_files} ${msg_h_files})
+add_dependencies(msg_gen prebuild_targets)

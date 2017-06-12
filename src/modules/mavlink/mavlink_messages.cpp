@@ -91,6 +91,7 @@
 #include <uORB/topics/wind_estimate.h>
 #include <uORB/topics/mount_orientation.h>
 #include <uORB/topics/collision_report.h>
+#include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/uORB.h>
 
 

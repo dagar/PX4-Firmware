@@ -59,6 +59,7 @@
 #include <uORB/topics/wind_estimate.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/distance_sensor.h>
+#include <uORB/topics/parameter_update.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_gyro.h>
