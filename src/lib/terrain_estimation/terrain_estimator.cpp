@@ -36,6 +36,7 @@
  * A terrain estimation kalman filter.
  */
 
+#include <px4_defines.h>
 #include "terrain_estimator.h"
 #include <geo/geo.h>
 
@@ -47,7 +48,6 @@ TerrainEstimator::TerrainEstimator() :
 	_time_last_distance(0),
 	_time_last_gps(0)
 {
-	memset(&_x._data[0], 0, sizeof(_x._data));
 	_u_z = 0.0f;
 	_P.setIdentity();
 }
@@ -185,7 +185,7 @@ void TerrainEstimator::measurement_update(uint64_t time_ref, const struct vehicl
 	}
 
 	if (reinit) {
-		memset(&_x._data[0], 0, sizeof(_x._data));
+		_x.setZero();
 		_P.setZero();
 		_P(0, 0) = _P(1, 1) = _P(2, 2) = 0.1f;
 	}

@@ -85,6 +85,7 @@ px4_add_module(
 		-Wno-missing-declarations
 		-Wno-double-promotion
 		-Wno-unknown-warning-option
+		-Wno-array-bounds
 	SRCS ${srcs}
 	DEPENDS
 		platforms__common

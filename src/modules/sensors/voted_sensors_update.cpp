@@ -135,10 +135,10 @@ void VotedSensorsUpdate::parameters_update()
 {
 	get_rot_matrix((enum Rotation)_parameters.board_rotation, &_board_rotation);
 	/* fine tune board offset */
-	math::Matrix<3, 3> board_rotation_offset;
-	board_rotation_offset.from_euler(M_DEG_TO_RAD_F * _parameters.board_offset[0],
+	matrix::Dcmf board_rotation_offset(matrix::Eulerf(
+					 M_DEG_TO_RAD_F * _parameters.board_offset[0],
 					 M_DEG_TO_RAD_F * _parameters.board_offset[1],
-					 M_DEG_TO_RAD_F * _parameters.board_offset[2]);
+					 M_DEG_TO_RAD_F * _parameters.board_offset[2]));
 
 	_board_rotation = board_rotation_offset * _board_rotation;
 

@@ -39,6 +39,7 @@
  * @author Beat Küng <beat-kueng@gmx.net>
  */
 
+#include <px4_defines.h>
 #include <mathlib/mathlib.h>
 #include <uORB/topics/sensor_gyro.h>
 #include "gyro.h"

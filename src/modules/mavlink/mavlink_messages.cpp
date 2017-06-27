@@ -1618,7 +1618,7 @@ protected:
 			vmsg.y = vpos.y;
 			vmsg.z = vpos.z;
 			math::Quaternion q(vatt.q);
-			math::Vector<3> rpy = q.to_euler();
+			matrix::Eulerf rpy(q);
 			vmsg.roll = rpy(0);
 			vmsg.pitch = rpy(1);
 			vmsg.yaw = rpy(2);

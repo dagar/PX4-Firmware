@@ -663,8 +663,7 @@ MulticopterPositionControl::poll_subscriptions()
 		/* get current rotation matrix and euler angles from control state quaternions */
 		math::Quaternion q_att(_ctrl_state.q[0], _ctrl_state.q[1], _ctrl_state.q[2], _ctrl_state.q[3]);
 		_R = q_att.to_dcm();
-		math::Vector<3> euler_angles;
-		euler_angles = _R.to_euler();
+		matrix::Eulerf euler_angles(_R);
 		_yaw = euler_angles(2);
 
 		if (_control_mode.flag_control_manual_enabled) {
@@ -674,7 +673,7 @@ MulticopterPositionControl::poll_subscriptions()
 							 _ctrl_state.delta_q_reset[3]);
 
 				// we only extract the heading change from the delta quaternion
-				math::Vector<3> delta_euler = delta_q.to_euler();
+				matrix::Eulerf delta_euler(delta_q);
 				_att_sp.yaw_body += delta_euler(2);
 			}
 		}

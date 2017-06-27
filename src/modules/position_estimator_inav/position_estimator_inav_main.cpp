@@ -235,11 +235,9 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 	float z_est[2] = { 0.0f, 0.0f };	// pos, vel
 
 	float est_buf[EST_BUF_SIZE][3][2];	// estimated position buffer
-	float R_buf[EST_BUF_SIZE][3][3];	// rotation matrix buffer
-	float R_gps[3][3];					// rotation matrix for GPS correction moment
+	matrix::Dcm<float> R_buf[EST_BUF_SIZE];	// rotation matrix buffer
+	matrix::Dcm<float> R_gps;					// rotation matrix for GPS correction moment
 	memset(est_buf, 0, sizeof(est_buf));
-	memset(R_buf, 0, sizeof(R_buf));
-	memset(R_gps, 0, sizeof(R_gps));
 	int buf_ptr = 0;
 
 	static const float min_eph_epv = 2.0f;	// min EPH/EPV, used for weight calculation
@@ -934,7 +932,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 						}
 
 						/* save rotation matrix at this moment */
-						memcpy(R_gps, R_buf[est_i], sizeof(R_gps));
+						R_gps = R_buf[est_i];
 
 						w_gps_xy = min_eph_epv / fmaxf(min_eph_epv, gps.eph);
 						w_gps_z = min_eph_epv / fmaxf(min_eph_epv, gps.epv);
@@ -1076,7 +1074,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			float c = 0.0f;
 
 			for (int j = 0; j < 3; j++) {
-				c += R_gps[j][i] * accel_bias_corr[j];
+				c += R_gps(j, i) * accel_bias_corr[j];
 			}
 
 			if (PX4_ISFINITE(c)) {
@@ -1317,7 +1315,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			est_buf[buf_ptr][2][1] = z_est[1];
 
 			/* push current rotation matrix to buffer */
-			memcpy(R_buf[buf_ptr], &R._data[0][0], sizeof(R._data));
+			R_buf[buf_ptr] = R;
 
 			buf_ptr++;
 

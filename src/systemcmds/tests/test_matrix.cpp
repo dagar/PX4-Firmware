@@ -359,14 +359,15 @@ template class matrix::SquareMatrix<float, 3>;
 
 bool MatrixTest::inverseTests()
 {
-	float data[9] = {0, 2, 3,
-			 4, 5, 6,
-			 7, 8, 10
+	float data[3][3] = {
+			{0, 2, 3},
+			{4, 5, 6},
+			{7, 8, 10}
 			};
-	float data_check[9] = {
-		-0.4f, -0.8f,  0.6f,
-		-0.4f,  4.2f, -2.4f,
-		0.6f, -2.8f,  1.6f
+	float data_check[3][3] = {
+			{-0.4f, -0.8f,  0.6f},
+			{-0.4f,  4.2f, -2.4f},
+			{0.6f, -2.8f,  1.6f}
 	};
 
 	SquareMatrix<float, 3> A(data);
@@ -397,16 +398,18 @@ bool MatrixTest::matrixAssignmentTests()
 	m(2, 1) = 8;
 	m(2, 2) = 9;
 
-	float data[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+	float data[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
 	Matrix3f m2(data);
 
 	double eps = 1e-6f;
 
-	for (int i = 0; i < 9; i++) {
-		ut_test(fabs(data[i] - m2.data()[i]) < eps);
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			ut_test(fabs(data[i][j] - m2(i, j)) < eps);
+		}
 	}
 
-	float data_times_2[9] = {2, 4, 6, 8, 10, 12, 14, 16, 18};
+	float data_times_2[3][3] = {{2, 4, 6}, {8, 10, 12}, {14, 16, 18}};
 	Matrix3f m3(data_times_2);
 
 	ut_test(isEqual(m, m2));
@@ -417,7 +420,7 @@ bool MatrixTest::matrixAssignmentTests()
 
 	m2 /= 2;
 	m2 -= 1;
-	float data_minus_1[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+	float data_minus_1[3][3] = {{0, 1, 2}, {3, 4, 5}, {6, 7, 8}};
 	ut_test(isEqual(Matrix3f(data_minus_1), m2));
 
 	m2 += 1;
@@ -427,16 +430,16 @@ bool MatrixTest::matrixAssignmentTests()
 
 	ut_test(isEqual(m3, m2));
 
-	float data_row_02_swap[9] = {
-		7, 8, 9,
-		4, 5, 6,
-		1, 2, 3,
+	float data_row_02_swap[3][3] = {
+		{7, 8, 9},
+		{4, 5, 6},
+		{1, 2, 3}
 	};
 
-	float data_col_02_swap[9] = {
-		3, 2, 1,
-		6, 5, 4,
-		9, 8, 7
+	float data_col_02_swap[3][3] = {
+		{3, 2, 1},
+		{6, 5, 4},
+		{9, 8, 7}
 	};
 
 	Matrix3f m4(data);
@@ -466,9 +469,9 @@ bool MatrixTest::matrixAssignmentTests()
 
 bool MatrixTest::matrixMultTests()
 {
-	float data[9] = {1, 0, 0, 0, 1, 0, 1, 0, 1};
+	float data[3][3] = {{1, 0, 0}, {0, 1, 0}, {1, 0, 1}};
 	Matrix3f A(data);
-	float data_check[9] = {1, 0, 0, 0, 1, 0, -1, 0, 1};
+	float data_check[3][3] = {{1, 0, 0}, {0, 1, 0}, {-1, 0, 1}};
 	Matrix3f A_I(data_check);
 	Matrix3f I;
 	I.setIdentity();
@@ -490,10 +493,10 @@ bool MatrixTest::matrixMultTests()
 
 bool MatrixTest::matrixScalarMultTests()
 {
-	float data[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+	float data[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
 	Matrix3f A(data);
 	A = A * 2;
-	float data_check[9] = {2, 4, 6, 8, 10, 12, 14, 16, 18};
+	float data_check[3][3] = {{2, 4, 6}, {8, 10, 12}, {14, 16, 18}};
 	Matrix3f A_check(data_check);
 	ut_test(isEqual(A, A_check));
 
@@ -524,31 +527,31 @@ bool MatrixTest::setIdentityTests()
 
 bool MatrixTest::sliceTests()
 {
-	float data[9] = {0, 2, 3,
-			 4, 5, 6,
-			 7, 8, 10
+	float data[3][3] = {{0, 2, 3},
+			 {4, 5, 6},
+			 {7, 8, 10}
 			};
-	float data_check[6] = {
-		4, 5, 6,
-		7, 8, 10
+	float data_check[2][3] = {
+		{4, 5, 6},
+		{7, 8, 10}
 	};
 	SquareMatrix<float, 3> A(data);
 	Matrix<float, 2, 3> B_check(data_check);
 	Matrix<float, 2, 3> B(A.slice<2, 3>(1, 0));
 	ut_test(isEqual(B, B_check));
 
-	float data_2[4] = {
-		11, 12,
-		13, 14
+	float data_2[2][2] = {
+		{11, 12},
+		{13, 14}
 	};
 
 	Matrix<float, 2, 2> C(data_2);
 	A.set(C, 1, 1);
 
-	float data_2_check[9] = {
-		0, 2, 3,
-		4, 11, 12,
-		7, 13, 14
+	float data_2_check[3][3] = {
+		{0, 2, 3},
+		{4, 11, 12},
+		{7, 13, 14}
 	};
 	Matrix<float, 3, 3> D(data_2_check);
 	ut_test(isEqual(A, D));
@@ -559,19 +562,19 @@ bool MatrixTest::sliceTests()
 
 bool MatrixTest::squareMatrixTests()
 {
-	float data[9] = {1, 2, 3,
-			 4, 5, 6,
-			 7, 8, 10
+	float data[3][3] = {{1, 2, 3},
+			 {4, 5, 6},
+			 {7, 8, 10}
 			};
 	SquareMatrix<float, 3> A(data);
 	Vector3<float> diag_check(1, 5, 10);
 
 	ut_test(isEqual(A.diag(), diag_check));
 
-	float data_check[9] = {
-		1.01158503f,  0.02190432f,  0.03238144f,
-		0.04349195f,  1.05428524f,  0.06539627f,
-		0.07576783f,  0.08708946f,  1.10894048f
+	float data_check[3][3] = {
+		{1.01158503f,  0.02190432f,  0.03238144f},
+		{0.04349195f,  1.05428524f,  0.06539627f},
+		{0.07576783f,  0.08708946f,  1.10894048f}
 	};
 
 	float dt = 0.01f;
@@ -586,10 +589,10 @@ bool MatrixTest::squareMatrixTests()
 
 bool MatrixTest::transposeTests()
 {
-	float data[6] = {1, 2, 3, 4, 5, 6};
+	float data[2][3] = {{1, 2, 3}, {4, 5, 6}};
 	Matrix<float, 2, 3> A(data);
 	Matrix<float, 3, 2> A_T = A.transpose();
-	float data_check[6] = {1, 4, 2, 5, 3, 6};
+	float data_check[3][2] = {{1, 4}, {2, 5}, {3, 6}};
 	Matrix<float, 3, 2> A_T_check(data_check);
 	ut_test(isEqual(A_T, A_T_check));
 
@@ -702,7 +705,7 @@ bool MatrixTest::dcmRenormTests()
 
 	if (verbose) {
 		for (int row = 0; row < 3; row++) {
-			matrix::Vector3f rvec(A._data[row]);
+			matrix::Vector3f rvec(A(row, 0), A(row, 1), A(row, 2));
 			err += fabsf(1.0f - rvec.length());
 		}
 
@@ -714,7 +717,7 @@ bool MatrixTest::dcmRenormTests()
 	err = 0.0f;
 
 	for (int row = 0; row < 3; row++) {
-		matrix::Vector3f rvec(A._data[row]);
+		matrix::Vector3f rvec(A(row, 0), A(row, 1), A(row, 2));
 		err += fabsf(1.0f - rvec.length());
 	}
 

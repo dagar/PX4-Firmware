@@ -579,10 +579,10 @@ calibrate_return read_accelerometer_avg(int sensor_correction_sub, int (&subs)[m
 	param_get(board_offset_y, &board_offset[1]);
 	param_get(board_offset_z, &board_offset[2]);
 
-	math::Matrix<3, 3> board_rotation_offset;
-	board_rotation_offset.from_euler(M_DEG_TO_RAD_F * board_offset[0],
+	matrix::Dcmf board_rotation_offset(matrix::Eulerf(
+			M_DEG_TO_RAD_F * board_offset[0],
 			M_DEG_TO_RAD_F * board_offset[1],
-			M_DEG_TO_RAD_F * board_offset[2]);
+			M_DEG_TO_RAD_F * board_offset[2]));
 
 	int32_t board_rotation_int;
 	param_get(board_rotation_h, &(board_rotation_int));
