@@ -74,7 +74,7 @@
 #include <systemlib/param/param.h>
 #include <systemlib/circuit_breaker.h>
 #include <systemlib/mavlink_log.h>
-#include <systemlib/battery.h>
+#include <systemlib/battery.hpp>
 
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
@@ -83,7 +83,6 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/rc_channels.h>
-#include <uORB/topics/battery_status.h>
 #include <uORB/topics/servorail_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/multirotor_motor_limits.h>
@@ -1784,8 +1783,6 @@ PX4IO::io_handle_battery(uint16_t vbatt, uint16_t ibatt)
 		return;
 	}
 
-	battery_status_s	battery_status;
-
 	const hrt_abstime timestamp = hrt_absolute_time();
 	/* voltage is scaled to mV */
 	const float voltage_v = vbatt / 1000.0f;
@@ -1797,17 +1794,9 @@ PX4IO::io_handle_battery(uint16_t vbatt, uint16_t ibatt)
 	float current_a = ibatt * (3.3f / 4096.0f) * _battery_amp_per_volt;
 	current_a += _battery_amp_bias;
 
-	_battery.updateBatteryStatus(timestamp, voltage_v, current_a, _last_throttle, _armed, &battery_status);
-
 	/* the announced battery status would conflict with the simulated battery status in HIL */
 	if (!(_pub_blocked)) {
-		/* lazily publish the battery voltage */
-		if (_to_battery != nullptr) {
-			orb_publish(ORB_ID(battery_status), _to_battery, &battery_status);
-
-		} else {
-			_to_battery = orb_advertise(ORB_ID(battery_status), &battery_status);
-		}
+		_battery.updateBatteryStatus(timestamp, voltage_v, current_a, _last_throttle, _armed);
 	}
 }
 

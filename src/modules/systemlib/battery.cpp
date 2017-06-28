@@ -39,7 +39,7 @@
  * @author Julian Oes <julian@oes.ch>
  */
 
-#include "battery.h"
+#include "battery.hpp"
 
 Battery::Battery() :
 	SuperBlock(nullptr, "BAT"),
@@ -52,6 +52,7 @@ Battery::Battery() :
 	_param_low_thr(this, "LOW_THR"),
 	_param_crit_thr(this, "CRIT_THR"),
 	_param_emergency_thr(this, "EMERGEN_THR"),
+	_pub_battery_status(ORB_ID(battery_status), -1, &getPublications()),
 	_voltage_filtered_v(-1.0f),
 	_discharged_mah(0.0f),
 	_remaining_voltage(1.0f),
@@ -65,29 +66,28 @@ Battery::Battery() :
 	updateParams();
 }
 
-Battery::~Battery()
-{
-}
-
 void
-Battery::reset(battery_status_s *battery_status)
+Battery::reset()
 {
-	memset(battery_status, 0, sizeof(*battery_status));
-	battery_status->current_a = -1.0f;
-	battery_status->remaining = 1.0f;
-	battery_status->scale = 1.0f;
-	battery_status->cell_count = _param_n_cells.get();
+	battery_status_s &battery_status = _pub_battery_status.get();
+	battery_status.current_a = -1.0f;
+	battery_status.remaining = 1.0f;
+	battery_status.scale = 1.0f;
+	battery_status.cell_count = _param_n_cells.get();
 	// TODO: check if it is sane to reset warning to NONE
-	battery_status->warning = battery_status_s::BATTERY_WARNING_NONE;
-	battery_status->connected = false;
+	battery_status.warning = battery_status_s::BATTERY_WARNING_NONE;
+	battery_status.connected = false;
 }
 
 void
 Battery::updateBatteryStatus(hrt_abstime timestamp, float voltage_v, float current_a, float throttle_normalized,
-			     bool armed, battery_status_s *battery_status)
+			     bool armed)
 {
-	reset(battery_status);
-	battery_status->timestamp = timestamp;
+	battery_status_s &battery_status = _pub_battery_status.get();
+
+	reset();
+
+	battery_status.timestamp = timestamp;
 	filterVoltage(voltage_v);
 	filterCurrent(current_a);
 	sumDischarged(timestamp, current_a);
@@ -96,15 +96,17 @@ Battery::updateBatteryStatus(hrt_abstime timestamp, float voltage_v, float curre
 	computeScale();
 
 	if (_voltage_filtered_v > 2.1f) {
-		battery_status->voltage_v = voltage_v;
-		battery_status->voltage_filtered_v = _voltage_filtered_v;
-		battery_status->scale = _scale;
-		battery_status->current_a = current_a;
-		battery_status->current_filtered_a = _current_filtered_a;
-		battery_status->discharged_mah = _discharged_mah;
-		battery_status->warning = _warning;
-		battery_status->remaining = _remaining;
-		battery_status->connected = true;
+		battery_status.voltage_v = voltage_v;
+		battery_status.voltage_filtered_v = _voltage_filtered_v;
+		battery_status.scale = _scale;
+		battery_status.current_a = current_a;
+		battery_status.current_filtered_a = _current_filtered_a;
+		battery_status.discharged_mah = _discharged_mah;
+		battery_status.warning = _warning;
+		battery_status.remaining = _remaining;
+		battery_status.connected = true;
+
+		_pub_battery_status.update();
 	}
 }
 

@@ -33,7 +33,7 @@
 
 #include <stdint.h>
 
-#include <systemlib/battery.h>
+#include <systemlib/battery.hpp>
 
 #include <drivers/device/device.h>
 #include <drivers/device/ringbuffer.h>

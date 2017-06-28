@@ -76,7 +76,7 @@
 #include <systemlib/param/param.h>
 #include <systemlib/err.h>
 #include <systemlib/perf_counter.h>
-#include <systemlib/battery.h>
+#include <systemlib/battery.hpp>
 
 #include <conversion/rotation.h>
 
@@ -173,7 +173,6 @@ private:
 	int 		_params_sub;			/**< notification of parameter updates */
 
 	orb_advert_t	_sensor_pub;			/**< combined sensor data topic */
-	orb_advert_t	_battery_pub;			/**< battery status */
 	orb_advert_t	_airspeed_pub;			/**< airspeed */
 	orb_advert_t	_diff_pres_pub;			/**< differential_pressure */
 	orb_advert_t	_sensor_preflight;		/**< sensor preflight topic */
@@ -182,7 +181,6 @@ private:
 
 	DataValidator	_airspeed_validator;		/**< data validator to monitor airspeed */
 
-	struct battery_status_s _battery_status;	/**< battery status */
 	struct differential_pressure_s _diff_pres;
 	struct airspeed_s _airspeed;
 
@@ -263,7 +261,6 @@ Sensors::Sensors(bool hil_enabled) :
 
 	/* publications */
 	_sensor_pub(nullptr),
-	_battery_pub(nullptr),
 	_airspeed_pub(nullptr),
 	_diff_pres_pub(nullptr),
 	_sensor_preflight(nullptr),
@@ -515,8 +512,7 @@ Sensors::adc_poll(struct sensor_combined_s &raw)
 						_diff_pres.temperature = -1000.0f;
 
 						int instance;
-						orb_publish_auto(ORB_ID(differential_pressure), &_diff_pres_pub, &_diff_pres, &instance,
-								 ORB_PRIO_DEFAULT);
+						orb_publish_auto(ORB_ID(differential_pressure), &_diff_pres_pub, &_diff_pres, &instance, ORB_PRIO_DEFAULT);
 					}
 
 #endif
@@ -527,14 +523,10 @@ Sensors::adc_poll(struct sensor_combined_s &raw)
 				actuator_controls_s ctrl;
 				orb_copy(ORB_ID(actuator_controls_0), _actuator_ctrl_0_sub, &ctrl);
 				_battery.updateBatteryStatus(t, bat_voltage_v, bat_current_a, ctrl.control[actuator_controls_s::INDEX_THROTTLE],
-							     _armed, &_battery_status);
-
-				int instance;
-				orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &_battery_status, &instance, ORB_PRIO_DEFAULT);
+							     _armed);
 			}
 
 			_last_adc = t;
-
 		}
 	}
 }
@@ -579,7 +571,7 @@ Sensors::task_main()
 
 	_actuator_ctrl_0_sub = orb_subscribe(ORB_ID(actuator_controls_0));
 
-	_battery.reset(&_battery_status);
+	_battery.reset();
 
 	/* get a set of initial values */
 	_voted_sensors_update.sensors_poll(raw);

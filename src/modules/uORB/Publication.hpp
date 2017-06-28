@@ -63,8 +63,7 @@ public:
 	 * @param priority The priority for multi pub/sub, 0-based, -1 means
 	 * 	don't publish as multi
 	 */
-	PublicationBase(const struct orb_metadata *meta,
-			int priority = -1);
+	PublicationBase(const struct orb_metadata *meta, int priority = -1);
 
 	/**
 	 * Update the struct

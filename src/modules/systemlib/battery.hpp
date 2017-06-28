@@ -43,8 +43,9 @@
 
 #include <controllib/blocks.hpp>
 #include <controllib/block/BlockParam.hpp>
-#include <uORB/topics/battery_status.h>
 #include <drivers/drv_hrt.h>
+#include <uORB/Publication.hpp>
+#include <uORB/topics/battery_status.h>
 
 
 class Battery : public control::SuperBlock
@@ -58,12 +59,12 @@ public:
 	/**
 	 * Destructor
 	 */
-	~Battery();
+	~Battery() = default;
 
 	/**
 	 * Reset all battery stats and report invalid/nothing.
 	 */
-	void reset(battery_status_s *battery_status);
+	void reset();
 
 	/**
 	 * Get the battery cell count
@@ -88,7 +89,7 @@ public:
 	 * @param throttle_normalized: throttle from 0 to 1
 	 */
 	void updateBatteryStatus(hrt_abstime timestamp, float voltage_v, float current_a, float throttle_normalized,
-				 bool armed, battery_status_s *status);
+				 bool armed);
 
 private:
 	void filterVoltage(float voltage_v);
@@ -107,6 +108,8 @@ private:
 	control::BlockParamFloat _param_low_thr;
 	control::BlockParamFloat _param_crit_thr;
 	control::BlockParamFloat _param_emergency_thr;
+
+	uORB::Publication<battery_status_s> _pub_battery_status;
 
 	float _voltage_filtered_v;
 	float _current_filtered_a;

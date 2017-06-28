@@ -60,7 +60,6 @@
 #include <systemlib/err.h>
 
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/battery_status.h>
 #include <uORB/topics/input_rc.h>
 
 #include <board_config.h>
@@ -100,7 +99,6 @@ Syslink::Syslink() :
 	_fd(0),
 	_queue(2, sizeof(syslink_message_t)),
 	_writebuffer(16, sizeof(crtp_message_t)),
-	_battery_pub(nullptr),
 	_rc_pub(nullptr),
 	_cmd_pub(nullptr),
 	_rssi(RC_INPUT_RSSI_MAX),
@@ -293,7 +291,7 @@ Syslink::task_main()
 	_memory = new SyslinkMemory(this);
 	_memory->init();
 
-	_battery.reset(&_battery_status);
+	_battery.reset();
 
 
 	//	int ret;
@@ -414,29 +412,18 @@ Syslink::handle_message(syslink_message_t *msg)
 		memcpy(&vbat, &msg->data[1], sizeof(float));
 		//memcpy(&iset, &msg->data[5], sizeof(float));
 
-		_battery.updateBatteryStatus(t, vbat, -1, 0, false, &_battery_status);
-
+		_battery.updateBatteryStatus(t, vbat, -1, 0, false);
 
 		// Update battery charge state
 		if (charging) {
 			_bstate = BAT_CHARGING;
-		}
 
-		/* With the usb plugged in and battery disconnected, it appears to be charged. The voltage check ensures that a battery is connected  */
-		else if (powered && !charging && _battery_status.voltage_filtered_v > 3.7f) {
+		} else if (powered && !charging && _battery_status.voltage_filtered_v > 3.7f) {
+			/* With the usb plugged in and battery disconnected, it appears to be charged. The voltage check ensures that a battery is connected  */
 			_bstate = BAT_CHARGED;
 
 		} else {
 			_bstate = BAT_DISCHARGING;
-		}
-
-
-		// announce the battery status if needed, just publish else
-		if (_battery_pub != nullptr) {
-			orb_publish(ORB_ID(battery_status), _battery_pub, &_battery_status);
-
-		} else {
-			_battery_pub = orb_advertise(ORB_ID(battery_status), &_battery_status);
 		}
 
 	} else if (msg->type == SYSLINK_RADIO_RSSI) {

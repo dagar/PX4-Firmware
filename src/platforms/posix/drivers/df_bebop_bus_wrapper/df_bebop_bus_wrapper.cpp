@@ -54,7 +54,7 @@
 #include <uORB/topics/esc_status.h>
 
 #include <systemlib/mixer/mixer.h>
-#include <systemlib/battery.h>
+#include <systemlib/battery.hpp>
 
 #include <bebop_bus/BebopBus.hpp>
 #include <DevMgr.hpp>
@@ -196,19 +196,13 @@ int DfBebopBusWrapper::set_esc_speeds(const float speed_scaled[4])
 
 int DfBebopBusWrapper::_publish(struct bebop_state_data &data)
 {
-
-	battery_status_s battery_report;
 	const hrt_abstime timestamp = hrt_absolute_time();
-
-	// TODO Check if this is the right way for the Bebop
-	// We don't have current measurements
-	_battery.updateBatteryStatus(timestamp, data.battery_voltage_v, 0.0, _last_throttle, _armed, &battery_report);
 
 	esc_status_s esc_status = {};
 
 	uint16_t esc_speed_setpoint_rpm[4] = {};
 	BebopBus::_get_esc_speed_setpoint(esc_speed_setpoint_rpm);
-	esc_status.timestamp = hrt_absolute_time();
+	esc_status.timestamp = timestamp;
 	esc_status.esc_count = 4;
 
 	for (int i = 0; i < 4; i++) {
@@ -220,13 +214,9 @@ int DfBebopBusWrapper::_publish(struct bebop_state_data &data)
 	// TODO: when is this ever blocked?
 	if (!(m_pub_blocked)) {
 
-		if (_battery_topic == nullptr) {
-			_battery_topic = orb_advertise_multi(ORB_ID(battery_status), &battery_report,
-							     &_battery_orb_class_instance, ORB_PRIO_LOW);
-
-		} else {
-			orb_publish(ORB_ID(battery_status), _battery_topic, &battery_report);
-		}
+		// TODO Check if this is the right way for the Bebop
+		// We don't have current measurements
+		_battery.updateBatteryStatus(timestamp, data.battery_voltage_v, 0.0, _last_throttle, _armed);
 
 		if (_esc_topic == nullptr) {
 			_esc_topic = orb_advertise(ORB_ID(esc_status), &esc_status);
@@ -234,7 +224,6 @@ int DfBebopBusWrapper::_publish(struct bebop_state_data &data)
 		} else {
 			orb_publish(ORB_ID(esc_status), _esc_topic, &esc_status);
 		}
-
 	}
 
 	return 0;

@@ -327,15 +327,9 @@ void Simulator::handle_message(mavlink_message_t *msg, bool publish)
 				vbatt = cellcount * batt_voltage_loaded;
 			}
 
-			battery_status_s battery_status = {};
-
 			// TODO: don't hard-code throttle.
 			const float throttle = 0.5f;
-			_battery.updateBatteryStatus(now, vbatt, ibatt, throttle, armed, &battery_status);
-
-			// publish the battery voltage
-			int batt_multi;
-			orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &battery_status, &batt_multi, ORB_PRIO_HIGH);
+			_battery.updateBatteryStatus(now, vbatt, ibatt, throttle, armed);
 		}
 		break;
 

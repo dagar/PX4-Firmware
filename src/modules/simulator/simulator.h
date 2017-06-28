@@ -45,7 +45,6 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/battery_status.h>
 #include <drivers/drv_accel.h>
 #include <drivers/drv_gyro.h>
 #include <drivers/drv_baro.h>
@@ -53,7 +52,7 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_rc_input.h>
 #include <systemlib/perf_counter.h>
-#include <systemlib/battery.h>
+#include <systemlib/battery.hpp>
 #include <uORB/uORB.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/distance_sensor.h>
