@@ -31,252 +31,20 @@
  *
  ****************************************************************************/
 
-/**
- * @file sensors.cpp
- *
- * PX4 Flight Core transitional mapping layer.
- *
- * This app / class mapps the PX4 middleware layer / drivers to the application
- * layer of the PX4 Flight Core. Individual sensors can be accessed directly as
- * well instead of relying on the sensor_combined topic.
- *
- * @author Lorenz Meier <lorenz@px4.io>
- * @author Julian Oes <julian@oes.ch>
- * @author Thomas Gubler <thomas@px4.io>
- * @author Anton Babushkin <anton@px4.io>
- */
-
-#include <board_config.h>
-
-#include <px4_adc.h>
-#include <px4_config.h>
-#include <px4_posix.h>
-#include <px4_tasks.h>
-#include <px4_time.h>
-
-#include <fcntl.h>
-#include <poll.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <errno.h>
-#include <math.h>
-#include <mathlib/mathlib.h>
-
-#include <drivers/drv_hrt.h>
-#include <drivers/drv_rc_input.h>
-#include <drivers/drv_adc.h>
-#include <drivers/drv_airspeed.h>
-#include <drivers/drv_px4flow.h>
-
-#include <systemlib/airspeed.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
-#include <systemlib/err.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/battery.h>
-
-#include <conversion/rotation.h>
-
-#include <uORB/uORB.h>
-#include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/vehicle_control_mode.h>
-#include <uORB/topics/parameter_update.h>
-#include <uORB/topics/battery_status.h>
-#include <uORB/topics/differential_pressure.h>
-#include <uORB/topics/airspeed.h>
-#include <uORB/topics/sensor_preflight.h>
-
-#include <DevMgr.hpp>
-
-#include "parameters.h"
-#include "rc_update.h"
-#include "voted_sensors_update.h"
-
-using namespace DriverFramework;
-using namespace sensors;
-
-/**
- * Analog layout:
- * FMU:
- * IN2 - battery voltage
- * IN3 - battery current
- * IN4 - 5V sense
- * IN10 - spare (we could actually trim these from the set)
- * IN11 - spare on FMUv2 & v3, RC RSSI on FMUv4
- * IN12 - spare (we could actually trim these from the set)
- * IN13 - aux1 on FMUv2, unavaible on v3 & v4
- * IN14 - aux2 on FMUv2, unavaible on v3 & v4
- * IN15 - pressure sensor on FMUv2, unavaible on v3 & v4
- *
- * IO:
- * IN4 - servo supply rail
- * IN5 - analog RSSI on FMUv2 & v3
- *
- * The channel definitions (e.g., ADC_BATTERY_VOLTAGE_CHANNEL, ADC_BATTERY_CURRENT_CHANNEL, and ADC_AIRSPEED_VOLTAGE_CHANNEL) are defined in board_config.h
- */
-
-
-/**
- * HACK - true temperature is much less than indicated temperature in baro,
- * subtract 5 degrees in an attempt to account for the electrical upheating of the PCB
- */
-#define PCB_TEMP_ESTIMATE_DEG		5.0f
-#define STICK_ON_OFF_LIMIT		0.75f
-
-/**
- * Sensor app start / stop handling function
- *
- * @ingroup apps
- */
-extern "C" __EXPORT int sensors_main(int argc, char *argv[]);
-
-class Sensors
-{
-public:
-	/**
-	 * Constructor
-	 */
-	Sensors(bool hil_enabled);
-
-	/**
-	 * Destructor, also kills the sensors task.
-	 */
-	~Sensors();
-
-	/**
-	 * Start the sensors task.
-	 *
-	 * @return		OK on success.
-	 */
-	int		start();
-
-
-	void	print_status();
-
-private:
-	DevHandle 	_h_adc;				/**< ADC driver handle */
-
-	hrt_abstime	_last_adc;			/**< last time we took input from the ADC */
-
-	volatile bool 	_task_should_exit;		/**< if true, sensor task should exit */
-	int 		_sensors_task;			/**< task handle for sensor task */
-
-	const bool	_hil_enabled;			/**< if true, HIL is active */
-	bool		_armed;				/**< arming status of the vehicle */
-
-	int		_actuator_ctrl_0_sub;		/**< attitude controls sub */
-	int		_diff_pres_sub;			/**< raw differential pressure subscription */
-	int		_vcontrol_mode_sub;		/**< vehicle control mode subscription */
-	int 		_params_sub;			/**< notification of parameter updates */
-
-	orb_advert_t	_sensor_pub;			/**< combined sensor data topic */
-	orb_advert_t	_battery_pub;			/**< battery status */
-	orb_advert_t	_airspeed_pub;			/**< airspeed */
-	orb_advert_t	_diff_pres_pub;			/**< differential_pressure */
-	orb_advert_t	_sensor_preflight;		/**< sensor preflight topic */
-
-	perf_counter_t	_loop_perf;			/**< loop performance counter */
-
-	DataValidator	_airspeed_validator;		/**< data validator to monitor airspeed */
-
-	struct battery_status_s _battery_status;	/**< battery status */
-	struct differential_pressure_s _diff_pres;
-	struct airspeed_s _airspeed;
-
-	Battery		_battery;			/**< Helper lib to publish battery_status topic. */
-
-	Parameters		_parameters;			/**< local copies of interesting parameters */
-	ParameterHandles	_parameter_handles;		/**< handles for interesting parameters */
-
-	RCUpdate		_rc_update;
-	VotedSensorsUpdate _voted_sensors_update;
-
-
-	/**
-	 * Update our local parameter cache.
-	 */
-	int		parameters_update();
-
-	/**
-	 * Do adc-related initialisation.
-	 */
-	int		adc_init();
-
-	/**
-	 * Poll the differential pressure sensor for updated data.
-	 *
-	 * @param raw			Combined sensor data structure into which
-	 *				data should be returned.
-	 */
-	void		diff_pres_poll(struct sensor_combined_s &raw);
-
-	/**
-	 * Check for changes in vehicle control mode.
-	 */
-	void		vehicle_control_mode_poll();
-
-	/**
-	 * Check for changes in parameters.
-	 */
-	void 		parameter_update_poll(bool forced = false);
-
-	/**
-	 * Poll the ADC and update readings to suit.
-	 *
-	 * @param raw			Combined sensor data structure into which
-	 *				data should be returned.
-	 */
-	void		adc_poll(struct sensor_combined_s &raw);
-
-	/**
-	 * Shim for calling task_main from task_create.
-	 */
-	static void	task_main_trampoline(int argc, char *argv[]);
-
-	/**
-	 * Main sensor collection task.
-	 */
-	void		task_main();
-};
+#include "Sensors.hpp"
 
 namespace sensors
 {
-
 Sensors	*g_sensors = nullptr;
 }
 
 Sensors::Sensors(bool hil_enabled) :
-	_last_adc(0),
-
-	_task_should_exit(true),
-	_sensors_task(-1),
 	_hil_enabled(hil_enabled),
-	_armed(false),
-
-	_actuator_ctrl_0_sub(-1),
-	_diff_pres_sub(-1),
-	_vcontrol_mode_sub(-1),
-	_params_sub(-1),
-
-	/* publications */
-	_sensor_pub(nullptr),
-	_battery_pub(nullptr),
-	_airspeed_pub(nullptr),
-	_diff_pres_pub(nullptr),
-	_sensor_preflight(nullptr),
-
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "sensors")),
-
 	_rc_update(_parameters),
 	_voted_sensors_update(_parameters, hil_enabled)
 {
-	memset(&_diff_pres, 0, sizeof(_diff_pres));
-	memset(&_parameters, 0, sizeof(_parameters));
-
 	initialize_parameter_handles(_parameter_handles);
 
 	_airspeed_validator.set_timeout(300000);
@@ -347,7 +115,6 @@ Sensors::parameters_update()
 
 	return ret;
 }
-
 
 int
 Sensors::adc_init()
@@ -454,7 +221,7 @@ Sensors::parameter_update_poll(bool forced)
 }
 
 void
-Sensors::adc_poll(struct sensor_combined_s &raw)
+Sensors::adc_poll()
 {
 	/* only read if not in HIL mode */
 	if (_hil_enabled) {
@@ -548,7 +315,6 @@ Sensors::task_main_trampoline(int argc, char *argv[])
 void
 Sensors::task_main()
 {
-
 	int ret = 0;
 
 	if (!_hil_enabled) {
@@ -557,12 +323,10 @@ Sensors::task_main()
 #endif
 	}
 
-	struct sensor_combined_s raw = {};
-
-	struct sensor_preflight_s preflt = {};
+	sensor_combined_s raw = {};
+	sensor_preflight_s preflt = {};
 
 	_rc_update.init();
-
 	_voted_sensors_update.init(raw);
 
 	/* (re)load params and calibration */
@@ -572,11 +336,8 @@ Sensors::task_main()
 	 * do subscriptions
 	 */
 	_diff_pres_sub = orb_subscribe(ORB_ID(differential_pressure));
-
 	_vcontrol_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
-
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
-
 	_actuator_ctrl_0_sub = orb_subscribe(ORB_ID(actuator_controls_0));
 
 	_battery.reset(&_battery_status);
@@ -593,14 +354,12 @@ Sensors::task_main()
 
 	/* advertise the sensor_preflight topic and make the initial publication */
 	preflt.accel_inconsistency_m_s_s = 0.0f;
-
 	preflt.gyro_inconsistency_rad_s = 0.0f;
 
-	_sensor_preflight = orb_advertise(ORB_ID(sensor_preflight), &preflt);
+	_sensor_preflight_pub = orb_advertise(ORB_ID(sensor_preflight), &preflt);
 
 	/* wakeup source */
 	px4_pollfd_struct_t poll_fds = {};
-
 	poll_fds.events = POLLIN;
 
 	_task_should_exit = false;
@@ -634,17 +393,9 @@ Sensors::task_main()
 
 		perf_begin(_loop_perf);
 
-		/* check vehicle status for changes to publication state */
-		vehicle_control_mode_poll();
-
 		/* the timestamp of the raw struct is updated by the gyro_poll() method (this makes the gyro
 		 * a mandatory sensor) */
 		_voted_sensors_update.sensors_poll(raw);
-
-		/* check battery voltage */
-		adc_poll(raw);
-
-		diff_pres_poll(raw);
 
 		if (raw.timestamp > 0) {
 
@@ -660,12 +411,19 @@ Sensors::task_main()
 			if (!_armed) {
 				_voted_sensors_update.calc_accel_inconsistency(preflt);
 				_voted_sensors_update.calc_gyro_inconsistency(preflt);
-				orb_publish(ORB_ID(sensor_preflight), _sensor_preflight, &preflt);
-
+				orb_publish(ORB_ID(sensor_preflight), _sensor_preflight_pub, &preflt);
 			}
 
 			//_voted_sensors_update.check_vibration(); //disabled for now, as it does not seem to be reliable
 		}
+
+		/* check battery voltage */
+		adc_poll();
+
+		diff_pres_poll(raw);
+
+		/* check vehicle status for changes to publication state */
+		vehicle_control_mode_poll();
 
 		/* keep adding sensors as long as we are not armed,
 		 * when not adding sensors poll for param updates
@@ -675,7 +433,6 @@ Sensors::task_main()
 			last_config_update = hrt_absolute_time();
 
 		} else {
-
 			/* check parameters for updates */
 			parameter_update_poll();
 
@@ -693,6 +450,7 @@ Sensors::task_main()
 	orb_unsubscribe(_vcontrol_mode_sub);
 	orb_unsubscribe(_params_sub);
 	orb_unsubscribe(_actuator_ctrl_0_sub);
+
 	orb_unadvertise(_sensor_pub);
 
 	_rc_update.deinit();

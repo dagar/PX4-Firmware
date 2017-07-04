@@ -74,7 +74,6 @@ public:
 	int set_sensor_id_accel(uint32_t device_id, int topic_instance);
 	int set_sensor_id_baro(uint32_t device_id, int topic_instance);
 
-
 	/**
 	 * Apply Thermal corrections to gyro (& other) sensor data.
 	 * @param topic_instance uORB topic instance

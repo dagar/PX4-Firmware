@@ -45,13 +45,13 @@
 #include "LandDetector.h"
 
 #include <systemlib/param/param.h>
+#include <uORB/topics/accel_corrected.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
+#include <uORB/topics/gyro_corrected.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_local_position.h>
 
@@ -95,7 +95,7 @@ private:
 		param_t manual_stick_down_threshold;
 		param_t altitude_max;
 		param_t manual_stick_up_position_takeoff_threshold;
-	} _paramHandle;
+	} _paramHandle{};
 
 	struct {
 		float maxClimbRate;
@@ -110,28 +110,28 @@ private:
 		float manual_stick_down_threshold;
 		float altitude_max;
 		float manual_stick_up_position_takeoff_threshold;
-	} _params;
+	} _params{};
 
-	int _vehicleLocalPositionSub;
-	int _actuatorsSub;
-	int _armingSub;
-	int _attitudeSub;
-	int _manualSub;
-	int _sensor_combined_sub;
-	int _vehicle_control_mode_sub;
-	int _battery_sub;
+	int _vehicleLocalPositionSub{-1};
+	int _actuatorsSub{-1};
+	int _armingSub{-1};
+	int _manualSub{-1};
+	int _accel_corrected_sub{-1};
+	int _vehicle_control_mode_sub{-1};
+	int _battery_sub{-1};
+	int _gyro_corrected_sub{-1};
 
-	struct vehicle_local_position_s		_vehicleLocalPosition;
-	struct actuator_controls_s		_actuators;
-	struct actuator_armed_s			_arming;
-	struct vehicle_attitude_s		_vehicleAttitude;
-	struct manual_control_setpoint_s	_manual;
-	struct sensor_combined_s			_sensors;
-	struct vehicle_control_mode_s		_control_mode;
-	struct battery_status_s _battery;
+	vehicle_local_position_s		_vehicleLocalPosition{};
+	actuator_controls_s		_actuators{};
+	actuator_armed_s			_arming{};
+	manual_control_setpoint_s	_manual{};
+	accel_corrected_s			_accel{};
+	vehicle_control_mode_s		_control_mode{};
+	battery_status_s			_battery{};
+	gyro_corrected_s			_gyro{};
 
-	uint64_t _min_trust_start;		///< timestamp when minimum trust was applied first
-	uint64_t _arming_time;
+	uint64_t _min_trust_start{0};		///< timestamp when minimum trust was applied first
+	uint64_t _arming_time{0};
 
 	/* get control mode dependent pilot throttle threshold with which we should quit landed state and take off */
 	float _get_takeoff_throttle();

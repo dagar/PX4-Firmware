@@ -7,8 +7,7 @@
 
 int32 RELATIVE_TIMESTAMP_INVALID = 2147483647 # (0x7fffffff) If one of the relative timestamps is set to this value, it means the associated sensor values are invalid
 
-
-# gyro timstamp is equal to the timestamp of the message
+# gyro timestamp is equal to the timestamp of the message
 float32[3] gyro_rad			# average angular rate measured in the XYZ body frame in rad/s over the last gyro sampling period
 float32 gyro_integral_dt		# gyro measurement sampling period in s
 

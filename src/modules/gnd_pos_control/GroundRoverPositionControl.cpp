@@ -66,8 +66,8 @@ GroundRoverPositionControl	*g_control = nullptr;
 GroundRoverPositionControl::GroundRoverPositionControl() :
 	/* performance counters */
 	_sub_attitude(ORB_ID(vehicle_attitude), 0, 0, nullptr),
-	_sub_sensors(ORB_ID(sensor_combined), 0, 0, nullptr),
-	_loop_perf(perf_alloc(PC_ELAPSED, "fw l1 control"))
+	_sub_accel(ORB_ID(accel_corrected), 0, 0, nullptr),
+	_loop_perf(perf_alloc(PC_ELAPSED, "rover position control")) // TODO : do we even need these perf counters
 {
 	_parameter_handles.l1_period = param_find("GND_L1_PERIOD");
 	_parameter_handles.l1_damping = param_find("GND_L1_DAMPING");
@@ -257,9 +257,9 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			const Vector3f vel = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
 
 			const float x_vel = vel(0);
-			const float x_acc = _sub_sensors.get().accelerometer_m_s2[0];
+			const float x_acc = _sub_accel.get().x;
 
-			//Compute airspeed control out and just scale it as a constant
+			// Compute airspeed control out and just scale it as a constant
 			mission_throttle = _parameters.throttle_speed_scaler
 					   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
 
@@ -410,7 +410,7 @@ GroundRoverPositionControl::task_main()
 			manual_control_setpoint_poll();
 			position_setpoint_triplet_poll();
 			_sub_attitude.update();
-			_sub_sensors.update();
+			_sub_accel.update();
 
 			math::Vector<3> ground_speed(_global_pos.vel_n, _global_pos.vel_e,  _global_pos.vel_d);
 			math::Vector<2> current_position((float)_global_pos.lat, (float)_global_pos.lon);

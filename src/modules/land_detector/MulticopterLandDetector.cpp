@@ -49,27 +49,7 @@
 namespace land_detector
 {
 
-MulticopterLandDetector::MulticopterLandDetector() :
-	_paramHandle(),
-	_params(),
-	_vehicleLocalPositionSub(-1),
-	_actuatorsSub(-1),
-	_armingSub(-1),
-	_attitudeSub(-1),
-	_manualSub(-1),
-	_sensor_combined_sub(-1),
-	_vehicle_control_mode_sub(-1),
-	_battery_sub(-1),
-	_vehicleLocalPosition{},
-	_actuators{},
-	_arming{},
-	_vehicleAttitude{},
-	_manual{},
-	_sensors{},
-	_control_mode{},
-	_battery{},
-	_min_trust_start(0),
-	_arming_time(0)
+MulticopterLandDetector::MulticopterLandDetector()
 {
 	_paramHandle.maxRotation = param_find("LNDMC_ROT_MAX");
 	_paramHandle.maxVelocity = param_find("LNDMC_XY_VEL_MAX");
@@ -87,28 +67,28 @@ MulticopterLandDetector::MulticopterLandDetector() :
 
 void MulticopterLandDetector::_initialize_topics()
 {
-	// subscribe to position, attitude, arming and velocity changes
+	// subscribe to position, arming and velocity changes
 	_vehicleLocalPositionSub = orb_subscribe(ORB_ID(vehicle_local_position));
-	_attitudeSub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_actuatorsSub = orb_subscribe(ORB_ID(actuator_controls_0));
 	_armingSub = orb_subscribe(ORB_ID(actuator_armed));
 	_parameterSub = orb_subscribe(ORB_ID(parameter_update));
 	_manualSub = orb_subscribe(ORB_ID(manual_control_setpoint));
-	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
+	_accel_corrected_sub = orb_subscribe(ORB_ID(accel_corrected));
 	_vehicle_control_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
 	_battery_sub = orb_subscribe(ORB_ID(battery_status));
+	_gyro_corrected_sub = orb_subscribe(ORB_ID(gyro_corrected));
 }
 
 void MulticopterLandDetector::_update_topics()
 {
 	_orb_update(ORB_ID(vehicle_local_position), _vehicleLocalPositionSub, &_vehicleLocalPosition);
-	_orb_update(ORB_ID(vehicle_attitude), _attitudeSub, &_vehicleAttitude);
 	_orb_update(ORB_ID(actuator_controls_0), _actuatorsSub, &_actuators);
 	_orb_update(ORB_ID(actuator_armed), _armingSub, &_arming);
 	_orb_update(ORB_ID(manual_control_setpoint), _manualSub, &_manual);
-	_orb_update(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensors);
+	_orb_update(ORB_ID(accel_corrected), _accel_corrected_sub, &_accel);
 	_orb_update(ORB_ID(vehicle_control_mode), _vehicle_control_mode_sub, &_control_mode);
 	_orb_update(ORB_ID(battery_status), _battery_sub, &_battery);
+	_orb_update(ORB_ID(gyro_corrected), _gyro_corrected_sub, &_gyro);
 }
 
 void MulticopterLandDetector::_update_params()
@@ -137,14 +117,12 @@ bool MulticopterLandDetector::_get_freefall_state()
 		return false;
 	}
 
-	if (_sensors.timestamp == 0) {
+	if (_accel.timestamp == 0) {
 		// _sensors is not valid yet, we have to assume we're not falling.
 		return false;
 	}
 
-	float acc_norm = _sensors.accelerometer_m_s2[0] * _sensors.accelerometer_m_s2[0]
-			 + _sensors.accelerometer_m_s2[1] * _sensors.accelerometer_m_s2[1]
-			 + _sensors.accelerometer_m_s2[2] * _sensors.accelerometer_m_s2[2];
+	float acc_norm = _accel.x * _accel.x + _accel.y * _accel.y + _accel.z * _accel.z;
 	acc_norm = sqrtf(acc_norm);	//norm of specific force. Should be close to 9.8 m/s^2 when landed.
 
 	return (acc_norm < _params.freefall_acc_threshold);	//true if we are currently falling
@@ -244,9 +222,8 @@ bool MulticopterLandDetector::_get_landed_state()
 	// Next look if all rotation angles are not moving.
 	float maxRotationScaled = _params.maxRotation_rad_s * armThresholdFactor;
 
-	bool rotating = (fabsf(_vehicleAttitude.rollspeed)  > maxRotationScaled) ||
-			(fabsf(_vehicleAttitude.pitchspeed) > maxRotationScaled) ||
-			(fabsf(_vehicleAttitude.yawspeed) > maxRotationScaled);
+	bool rotating = (fabsf(_gyro.x) > maxRotationScaled) || (fabsf(_gyro.y) > maxRotationScaled)
+			|| (fabsf(_gyro.z) > maxRotationScaled);
 
 	if (_ground_contact_hysteresis.get_state() && _has_minimal_thrust() && !rotating &&
 	    (!horizontalMovement || !_has_position_lock())) {

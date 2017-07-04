@@ -1112,15 +1112,10 @@ MavlinkReceiver::handle_message_attitude_quaternion_cov(mavlink_message_t *msg)
 	vision_attitude.q[2] = att.q[2];
 	vision_attitude.q[3] = att.q[3];
 
-	vision_attitude.rollspeed = att.rollspeed;
-	vision_attitude.pitchspeed = att.pitchspeed;
-	vision_attitude.yawspeed = att.yawspeed;
-
 	// TODO : full covariance matrix
 
 	int instance_id = 0;
 	orb_publish_auto(ORB_ID(vehicle_vision_attitude), &_vision_attitude_pub, &vision_attitude, &instance_id, ORB_PRIO_HIGH);
-
 }
 
 void
@@ -1132,9 +1127,6 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 	struct vehicle_local_position_s vision_position = {};
 
 	vision_position.timestamp = sync_stamp(pos.time_usec);
-
-	// Use the estimator type to identify the external estimate
-	vision_position.estimator_type = pos.estimator_type;
 
 	vision_position.xy_valid = true;
 	vision_position.z_valid = true;
@@ -1172,9 +1164,6 @@ MavlinkReceiver::handle_message_vision_position_estimate(mavlink_message_t *msg)
 	mavlink_msg_vision_position_estimate_decode(msg, &pos);
 
 	struct vehicle_local_position_s vision_position = {};
-
-	// Use the estimator type to identify the simple vision estimate
-	vision_position.estimator_type = MAV_ESTIMATOR_TYPE_VISION;
 
 	vision_position.timestamp = sync_stamp(pos.usec);
 	vision_position.x = pos.x;
@@ -2160,7 +2149,6 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 	/* global position */
 	{
 		struct vehicle_global_position_s hil_global_pos = {};
-		matrix::Eulerf euler = matrix::Quatf(hil_attitude.q);
 
 		hil_global_pos.timestamp = timestamp;
 		hil_global_pos.lat = hil_state.lat / ((double)1e7);
@@ -2169,7 +2157,6 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		hil_global_pos.vel_n = hil_state.vx / 100.0f;
 		hil_global_pos.vel_e = hil_state.vy / 100.0f;
 		hil_global_pos.vel_d = hil_state.vz / 100.0f;
-		hil_global_pos.yaw = euler.psi();
 		hil_global_pos.eph = 2.0f;
 		hil_global_pos.epv = 4.0f;
 

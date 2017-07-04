@@ -758,6 +758,7 @@ protected:
 			msg.roll = euler.phi();
 			msg.pitch = euler.theta();
 			msg.yaw = euler.psi();
+
 			msg.rollspeed = att.rollspeed;
 			msg.pitchspeed = att.pitchspeed;
 			msg.yawspeed = att.yawspeed;
