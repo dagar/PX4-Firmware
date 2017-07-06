@@ -42,24 +42,32 @@
 namespace uORB
 {
 
-SubscriptionBase::SubscriptionBase(const struct orb_metadata *meta,
-				   unsigned interval, unsigned instance) :
+SubscriptionBase::SubscriptionBase(const struct orb_metadata *meta, unsigned interval, int instance) :
 	_meta(meta),
-	_instance(instance),
-	_handle()
+	_instance(instance)
 {
 	if (_instance > 0) {
-		_handle =  orb_subscribe_multi(
-				   getMeta(), instance);
+		_handle = orb_subscribe_multi(_meta, instance);
 
 	} else {
-		_handle =  orb_subscribe(getMeta());
+		_handle = orb_subscribe(_meta);
 	}
 
-	if (_handle < 0) { PX4_ERR("sub failed"); }
+	if (_handle < 0) {
+		PX4_ERR("sub failed");
+	}
 
 	if (interval > 0) {
 		orb_set_interval(getHandle(), interval);
+	}
+}
+
+SubscriptionBase::~SubscriptionBase()
+{
+	int ret = orb_unsubscribe(_handle);
+
+	if (ret != PX4_OK) {
+		PX4_ERR("orb unsubscribe failed");
 	}
 }
 
@@ -68,25 +76,28 @@ bool SubscriptionBase::updated()
 	bool isUpdated = false;
 	int ret = orb_check(_handle, &isUpdated);
 
-	if (ret != PX4_OK) { PX4_ERR("orb check failed"); }
+	if (ret != PX4_OK) {
+		PX4_ERR("orb check failed");
+		isUpdated = false;
+	}
 
 	return isUpdated;
 }
 
-void SubscriptionBase::update(void *data)
+bool SubscriptionBase::update(void *data)
 {
 	if (updated()) {
 		int ret = orb_copy(_meta, _handle, data);
 
-		if (ret != PX4_OK) { PX4_ERR("orb copy failed"); }
+		if (ret == PX4_OK) {
+			return true;
+
+		} else {
+			PX4_ERR("orb copy failed");
+		}
 	}
-}
 
-SubscriptionBase::~SubscriptionBase()
-{
-	int ret = orb_unsubscribe(_handle);
-
-	if (ret != PX4_OK) { PX4_ERR("orb unsubscribe failed"); }
+	return false;
 }
 
 } // namespace uORB

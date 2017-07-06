@@ -75,6 +75,7 @@ navigator start
 ekf2 start
 vtol_att_control start
 mc_pos_control start
+mc_rate_control start
 mc_att_control start
 fw_pos_control_l1 start
 fw_att_control start

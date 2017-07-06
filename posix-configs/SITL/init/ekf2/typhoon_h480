@@ -58,6 +58,7 @@ land_detector start multicopter
 navigator start
 ekf2 start
 mc_pos_control start
+mc_rate_control start
 mc_att_control start
 mixer load /dev/pwm_output0 ROMFS/px4fmu_common/mixers/hexa_x.main.mix
 mixer append /dev/pwm_output0 ROMFS/px4fmu_common/mixers/mount_legs.aux.mix

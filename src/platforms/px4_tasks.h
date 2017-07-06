@@ -109,11 +109,17 @@ typedef struct {
 // they should be the first to run on an update, using the current sensor
 // data and the *previous* attitude reference from the position controller
 // which typically runs at a slower rate
-#define SCHED_PRIORITY_ATTITUDE_CONTROL		(SCHED_PRIORITY_MAX - 4)
+#define SCHED_PRIORITY_RATE_CONTROL		(SCHED_PRIORITY_MAX - 3)
+
+// Attitude controllers typically are in a blocking wait on driver data
+// they should be the first to run on an update, using the current sensor
+// data and the *previous* attitude reference from the position controller
+// which typically runs at a slower rate
+#define SCHED_PRIORITY_ATTITUDE_CONTROL		(SCHED_PRIORITY_RATE_CONTROL - 1)
 
 // Actuator outputs should run before right after the attitude controller
 // updated
-#define SCHED_PRIORITY_ACTUATOR_OUTPUTS		(SCHED_PRIORITY_ATTITUDE_CONTROL + 1)
+#define SCHED_PRIORITY_ACTUATOR_OUTPUTS		(SCHED_PRIORITY_RATE_CONTROL + 1)
 
 // Position controllers typically are in a blocking wait on estimator data
 // so when new sensor data is available they will run last. Keeping them

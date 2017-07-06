@@ -38,6 +38,8 @@ then
 fi
 #---------------------------------------
 
+mc_rate_control start
+
 mc_att_control start
 
 mc_pos_control start

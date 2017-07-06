@@ -52,6 +52,7 @@ set(config_module_list
 	# Vehicle Control
 	#
 	modules/mc_att_control
+	modules/mc_rate_control
 	modules/mc_pos_control
 
 	#

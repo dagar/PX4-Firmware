@@ -208,7 +208,7 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	result = orb_publish(meta, advertiser, data);
 
 	if (result == ERROR) {
-		PX4_WARN("orb_publish failed");
+		PX4_WARN("publish %s failed", meta->o_name);
 		return nullptr;
 	}
 
