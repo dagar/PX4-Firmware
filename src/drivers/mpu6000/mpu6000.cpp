@@ -2084,13 +2084,18 @@ MPU6000::measure()
 	_accel_reports->force(&arb);
 	_gyro_reports->force(&grb);
 
+	if (gyro_notify) {
+		_gyro->parent_poll_notify();
+	}
+
+	if (gyro_notify && !(_pub_blocked)) {
+		/* publish it */
+		orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
+	}
+
 	/* notify anyone waiting for data */
 	if (accel_notify) {
 		poll_notify(POLLIN);
-	}
-
-	if (gyro_notify) {
-		_gyro->parent_poll_notify();
 	}
 
 	if (accel_notify && !(_pub_blocked)) {
@@ -2098,11 +2103,6 @@ MPU6000::measure()
 		perf_begin(_controller_latency_perf);
 		/* publish it */
 		orb_publish(ORB_ID(sensor_accel), _accel_topic, &arb);
-	}
-
-	if (gyro_notify && !(_pub_blocked)) {
-		/* publish it */
-		orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
 	}
 
 	/* stop measuring */

@@ -103,7 +103,7 @@ typedef struct {
 
 // Fast drivers - they need to run as quickly as possible to minimize control
 // latency.
-#define SCHED_PRIORITY_FAST_DRIVER		(SCHED_PRIORITY_MAX - 0)
+#define SCHED_PRIORITY_FAST_DRIVER		(SCHED_PRIORITY_MAX)
 
 // Attitude controllers typically are in a blocking wait on driver data
 // they should be the first to run on an update, using the current sensor
@@ -113,25 +113,25 @@ typedef struct {
 
 // Actuator outputs should run before right after the attitude controller
 // updated
-#define SCHED_PRIORITY_ACTUATOR_OUTPUTS		(SCHED_PRIORITY_MAX - 4)
+#define SCHED_PRIORITY_ACTUATOR_OUTPUTS		(SCHED_PRIORITY_ATTITUDE_CONTROL + 1)
 
 // Position controllers typically are in a blocking wait on estimator data
 // so when new sensor data is available they will run last. Keeping them
 // on a high priority ensures that they are the first process to be run
 // when the estimator updates.
-#define SCHED_PRIORITY_POSITION_CONTROL		(SCHED_PRIORITY_MAX - 5)
+#define SCHED_PRIORITY_POSITION_CONTROL		(SCHED_PRIORITY_MAX - 7)
+
+// The sensor hub conditions sensor data. It is not the fastest component
+// in the controller chain, but provides easy-to-use data to the more
+// complex downstream consumers
+#define SCHED_PRIORITY_SENSOR_HUB		(SCHED_PRIORITY_MAX - 6)
 
 // Estimators should run after the attitude controller but before anything
 // else in the system. They wait on sensor data which is either coming
 // from the sensor hub or from a driver. Keeping this class at a higher
 // priority ensures that the estimator runs first if it can, but will
 // wait for the sensor hub if its data is coming from it.
-#define SCHED_PRIORITY_ESTIMATOR		(SCHED_PRIORITY_MAX - 5)
-
-// The sensor hub conditions sensor data. It is not the fastest component
-// in the controller chain, but provides easy-to-use data to the more
-// complex downstream consumers
-#define SCHED_PRIORITY_SENSOR_HUB		(SCHED_PRIORITY_MAX - 6)
+#define SCHED_PRIORITY_ESTIMATOR		(SCHED_PRIORITY_SENSOR_HUB + 1)
 
 // The log capture (which stores log data into RAM) should run faster
 // than other components, but should not run before the control pipeline

@@ -306,7 +306,7 @@ private:
 	int			set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
 	int			pwm_ioctl(file *filp, int cmd, unsigned long arg);
 	void		update_pwm_rev_mask();
-	void		publish_pwm_outputs(uint16_t *values, size_t numvalues);
+	void		publish_pwm_outputs(uint16_t *values, size_t numvalues, uint64_t timestamp_sample);
 	void		update_pwm_out_state(bool on);
 	void		pwm_output_set(unsigned i, unsigned value);
 	void		update_params();
@@ -947,11 +947,12 @@ PX4FMU::update_pwm_trims()
 }
 
 void
-PX4FMU::publish_pwm_outputs(uint16_t *values, size_t numvalues)
+PX4FMU::publish_pwm_outputs(uint16_t *values, size_t numvalues, uint64_t timestamp_sample)
 {
 	actuator_outputs_s outputs = {};
 	outputs.noutputs = numvalues;
 	outputs.timestamp = hrt_absolute_time();
+	outputs.timestamp_sample = timestamp_sample;
 
 	for (size_t i = 0; i < _max_actuators; ++i) {
 		outputs.output[i] = i < numvalues ? (float)values[i] : 0;
@@ -1316,7 +1317,7 @@ PX4FMU::run()
 				}
 
 				if (_mot_t_max > FLT_EPSILON) {
-					// maximum value the ouputs of the multirotor mixer are allowed to change in this cycle
+					// maximum value the outputs of the multirotor mixer are allowed to change in this cycle
 					// factor 2 is needed because actuator ouputs are in the range [-1,1]
 					float delta_out_max = 2.0f * 1000.0f * dt / (_max_pwm[0] - _min_pwm[0]) / _mot_t_max;
 					_mixers->set_max_delta_out_once(delta_out_max);
@@ -1329,21 +1330,6 @@ PX4FMU::run()
 				/* do mixing */
 				float outputs[_max_actuators];
 				size_t mixed_num_outputs = _mixers->mix(outputs, _num_outputs, NULL);
-
-				/* publish mixer status */
-				multirotor_motor_limits_s multirotor_motor_limits = {};
-				multirotor_motor_limits.saturation_status = _mixers->get_saturation_status();
-
-				if (_to_mixer_status == nullptr) {
-					/* publish limits */
-					int instance = _class_instance;
-					_to_mixer_status = orb_advertise_multi(ORB_ID(multirotor_motor_limits), &multirotor_motor_limits, &instance,
-									       ORB_PRIO_DEFAULT);
-
-				} else {
-					orb_publish(ORB_ID(multirotor_motor_limits), _to_mixer_status, &multirotor_motor_limits);
-
-				}
 
 				/* disable unused ports by setting their output to NaN */
 				for (size_t i = 0; i < sizeof(outputs) / sizeof(outputs[0]); i++) {
@@ -1386,7 +1372,22 @@ PX4FMU::run()
 					up_pwm_update();
 				}
 
-				publish_pwm_outputs(pwm_limited, mixed_num_outputs);
+				publish_pwm_outputs(pwm_limited, mixed_num_outputs, _controls[0].timestamp_sample);
+
+				/* publish mixer status */
+				multirotor_motor_limits_s multirotor_motor_limits = {};
+				multirotor_motor_limits.saturation_status = _mixers->get_saturation_status();
+
+				if (_to_mixer_status == nullptr) {
+					/* publish limits */
+					int instance = _class_instance;
+					_to_mixer_status = orb_advertise_multi(ORB_ID(multirotor_motor_limits), &multirotor_motor_limits, &instance,
+									       ORB_PRIO_DEFAULT);
+
+				} else {
+					orb_publish(ORB_ID(multirotor_motor_limits), _to_mixer_status, &multirotor_motor_limits);
+				}
+
 				perf_end(_ctl_latency);
 			}
 		}

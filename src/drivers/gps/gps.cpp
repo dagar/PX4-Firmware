@@ -36,32 +36,13 @@
  * Driver for the GPS on a serial/spi port
  */
 
-#ifdef __PX4_NUTTX
-#include <nuttx/clock.h>
-#include <nuttx/arch.h>
-#endif
-
-
-#include <termios.h>
-
-#ifndef __PX4_QURT
-#include <poll.h>
-#endif
-
-
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <poll.h>
-#include <errno.h>
-#include <stdio.h>
+#include <termios.h>
+
 #include <math.h>
-#include <unistd.h>
 #include <px4_config.h>
 #include <px4_getopt.h>
 #include <px4_module.h>
