@@ -612,8 +612,16 @@ Navigator::task_main()
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_RTL:
+
+			// if RTL is set to use a mission landing and mission has a planned landing, then use MISSION
+			if (_rtl.mission_landing() && _mission.land()) {
+				_navigation_mode = &_mission;
+
+			} else {
+				_navigation_mode = &_rtl;
+			}
+
 			_pos_sp_triplet_published_invalid_once = false;
-			_navigation_mode = &_rtl;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:
@@ -848,8 +856,6 @@ Navigator::reset_triplets()
 	_pos_sp_triplet.next.valid = false;
 	_pos_sp_triplet_updated = true;
 }
-
-
 
 float
 Navigator::get_cruising_throttle()
