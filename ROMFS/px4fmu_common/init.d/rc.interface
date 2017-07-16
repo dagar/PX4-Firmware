@@ -121,19 +121,32 @@ then
 	fi
 fi
 
-# This is a FMUv2+ thing
+#
+# If mount (gimbal) control is enabled and output mode is AUX, set the aux
+# mixer to mount (override the airframe-specific MIXER_AUX setting)
+#
+if param compare MNT_MODE_IN -1
+then
+else
+	if param compare MNT_MODE_OUT 0
+	then
+		set MIXER_AUX mount
+	fi
+fi
+
+# clear MIXER_AUX for boards with no AUX
+
 if ver hwcmp PX4FMU_V1
 then
 	set MIXER_AUX none
 fi
 
-# MindPX has no aux mixer
-if ver hwcmp MINDPX_V2
+if ver hwcmp PX4FMU_V4
 then
 	set MIXER_AUX none
 fi
 
-if ver hwcmp CRAZYFLIE
+if ver hwcmp PX4FMU_V5
 then
 	set MIXER_AUX none
 fi
@@ -143,7 +156,18 @@ then
 	set MIXER_AUX none
 fi
 
-if ver hwcmp PX4FMU_V5
+if ver hwcmp AEROFC_V1
+then
+	set MIXER_AUX none
+fi
+
+if ver hwcmp CRAZYFLIE
+then
+	set MIXER_AUX none
+fi
+
+# MindPX has no aux mixer
+if ver hwcmp MINDPX_V2
 then
 	set MIXER_AUX none
 fi
