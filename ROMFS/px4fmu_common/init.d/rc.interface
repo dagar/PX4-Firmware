@@ -9,6 +9,162 @@
 #  Otherwise, the variable name goes to the end of the argument.
 #
 
+# OUTPUT DEVICE default
+set OUTPUT_DEV /dev/pwm_output0
+
+# Set default output if not set
+if [ $OUTPUT_MODE == none ]
+then
+	if [ $USE_IO == yes ]
+	then
+		set OUTPUT_MODE io
+	else
+		set OUTPUT_MODE fmu
+	fi
+fi
+
+if [ $OUTPUT_MODE == io -a $IO_PRESENT != yes ]
+then
+	# Need IO for output but it not present, disable output
+	set OUTPUT_MODE none
+
+	# Avoid using ttyS0 for MAVLink on FMUv1
+	if ver hwcmp PX4FMU_V1
+	then
+		set FMU_MODE serial
+	fi
+fi
+
+if [ $OUTPUT_MODE == ardrone ]
+then
+	set FMU_MODE gpio_serial
+	ardrone_interface start -d /dev/ttyS1
+fi
+
+if [ $OUTPUT_MODE == tap_esc ]
+then
+	set FMU_MODE rcin
+	set OUTPUT_DEV /dev/tap_esc
+fi
+
+# If OUTPUT_MODE == none then something is wrong with setup and we shouldn't try to enable output
+if [ $OUTPUT_MODE != none ]
+then
+	if [ $OUTPUT_MODE == uavcan_esc ]
+	then
+		if param compare UAVCAN_ENABLE 0
+		then
+			echo "OVERRIDING UAVCAN_ENABLE = 3" >> $LOG_FILE
+			param set UAVCAN_ENABLE 3
+		fi
+	fi
+
+	if [ $OUTPUT_MODE == io -o $OUTPUT_MODE == uavcan_esc ]
+	then
+		if px4io start
+		then
+			sh /etc/init.d/rc.io
+		else
+			echo "PX4IO start failed" >> $LOG_FILE
+			tone_alarm $TUNE_ERR
+		fi
+	fi
+
+	if [ $OUTPUT_MODE == fmu -o $OUTPUT_MODE == ardrone ]
+	then
+		if fmu mode_$FMU_MODE
+		then
+		else
+			echo "FMU start failed" >> $LOG_FILE
+			tone_alarm $TUNE_ERR
+		fi
+
+		if ver hwcmp PX4FMU_V1
+		then
+			if [ $FMU_MODE == pwm -o $FMU_MODE == gpio ]
+			then
+				set TTYS1_BUSY yes
+			fi
+			if [ $FMU_MODE == pwm_gpio -o $OUTPUT_MODE == ardrone ]
+			then
+				set TTYS1_BUSY yes
+			fi
+		fi
+	fi
+
+	if [ $OUTPUT_MODE == mkblctrl ]
+	then
+		set OUTPUT_DEV /dev/mkblctrl0
+
+		set MKBLCTRL_ARG ""
+		if [ $MKBLCTRL_MODE == x ]
+		then
+			set MKBLCTRL_ARG "-mkmode x"
+		fi
+		if [ $MKBLCTRL_MODE == + ]
+		then
+			set MKBLCTRL_ARG "-mkmode +"
+		fi
+
+		if mkblctrl $MKBLCTRL_ARG
+		then
+		else
+			echo "MK start failed" >> $LOG_FILE
+			tone_alarm $TUNE_ERR
+		fi
+		unset MKBLCTRL_ARG
+	fi
+	unset MK_MODE
+
+	if [ $OUTPUT_MODE == hil ]
+	then
+		if pwm_out_sim mode_pwm16
+		then
+		else
+			tone_alarm $TUNE_ERR
+		fi
+	fi
+
+	#
+	# Start IO or FMU for RC PPM input if needed
+	#
+	if [ $IO_PRESENT == yes ]
+	then
+		if [ $OUTPUT_MODE != io ]
+		then
+			if px4io start
+			then
+				sh /etc/init.d/rc.io
+			else
+				echo "PX4IO start failed" >> $LOG_FILE
+				tone_alarm $TUNE_ERR
+			fi
+		fi
+	else
+		if [ $OUTPUT_MODE != fmu -a $OUTPUT_MODE != ardrone ]
+		then
+			if fmu mode_${FMU_MODE}
+			then
+			else
+				echo "FMU mode_${FMU_MODE} start failed" >> $LOG_FILE
+				tone_alarm $TUNE_ERR
+			fi
+
+			if ver hwcmp PX4FMU_V1
+			then
+				if [ $FMU_MODE == pwm -o $FMU_MODE == gpio ]
+				then
+					set TTYS1_BUSY yes
+				fi
+				if [ $FMU_MODE == pwm_gpio -o $OUTPUT_MODE == ardrone ]
+				then
+					set TTYS1_BUSY yes
+				fi
+			fi
+		fi
+	fi
+fi
+
 set SDCARD_MIXERS_PATH /fs/microsd/etc/mixers
 
 if [ $MIXER != none -a $MIXER != skip ]
@@ -49,22 +205,9 @@ then
 		set MIXER_FILE ${SDCARD_MIXERS_PATH}/${MIXER}.main.mix
 	fi
 
-	# OUTPUT DEVICE
-	set OUTPUT_DEV /dev/pwm_output0
-
-	if [ $OUTPUT_MODE == mkblctrl ]
-	then
-		set OUTPUT_DEV /dev/mkblctrl0
-	fi
-
 	if [ $OUTPUT_MODE == uavcan_esc ]
 	then
 		set OUTPUT_DEV /dev/uavcan/esc
-	fi
-
-	if [ $OUTPUT_MODE == tap_esc ]
-	then
-		set OUTPUT_DEV /dev/tap_esc
 	fi
 
 	if mixer load ${OUTPUT_DEV} ${MIXER_FILE}
