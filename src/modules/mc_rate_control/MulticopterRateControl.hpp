@@ -57,6 +57,8 @@
 #include <drivers/drv_hrt.h>
 #include <lib/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
+#include <lib/mathlib/math/filter/FOAWDifferentiator.hpp>
+#include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_posix.h>
@@ -189,6 +191,19 @@ private:
 	math::Matrix<3, 3>	_I;			/**< identity matrix */
 
 	math::Matrix<3, 3>	_board_rotation = {};	/**< rotation matrix for the orientation that the board is mounted */
+
+	// FOWA differentiator (dt, noise amplitude)
+	math::FOAWDifferentiator _foaw_rollrate{0.004f, 0.025f};
+	math::FOAWDifferentiator _foaw_pitchrate{0.004f, 0.025f};
+	math::FOAWDifferentiator _foaw_yawrate{0.004f, 0.025f};
+	math::FOAWDifferentiator _diff_gyo_lpf{0.004f, 0.0075f};
+	math::LowPassFilter2p _gyro_filter{250.0f, 100.0f};
+
+	float _raw_diff{0.0f};
+	float _raw_diff_gyro_lpf{0.0f};
+	float _rates_lpf{0.0f};
+	float _rates_lpf_prev{0.0f};
+	float _foaw_diff_gyro_lpf{0.0f};
 
 	struct {
 		param_t roll_rate_p;
