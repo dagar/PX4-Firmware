@@ -535,7 +535,7 @@ then
 
 		if [ $OUTPUT_MODE == fmu -o $OUTPUT_MODE == ardrone ]
 		then
-			if fmu start -t mode_$FMU_MODE
+			if fmu task mode_$FMU_MODE
 			then
 			else
 				echo "FMU start failed" >> $LOG_FILE
@@ -1034,7 +1034,7 @@ then
 		then
 			# On Pixracer use Telem 2 port (TL2).
 			snapdragon_rc_pwm start -d /dev/ttyS2
-			fmu start -t mode_pwm4
+			fmu task mode_pwm4
 		fi
 
 		pwm failsafe -c 1234 -p 900
