@@ -12,6 +12,57 @@
 # OUTPUT DEVICE default
 set OUTPUT_DEV /dev/pwm_output0
 
+if [ $HIL == yes ]
+then
+	set OUTPUT_MODE hil
+	if ver hwcmp PX4FMU_V1
+	then
+		set FMU_MODE serial
+	fi
+fi
+
+if param greater TRIG_MODE 0
+then
+	# We ONLY support trigger on pins 5 and 6 when simultanously using AUX for actuator output
+	if param compare TRIG_PINS 56
+	then
+		# clear pins 5 and 6
+		set FMU_MODE pwm4
+		set AUX_MODE pwm4
+	else
+		set FMU_MODE none
+		set AUX_MODE none
+	fi
+	camera_trigger start
+
+	param set CAM_FBACK_MODE 1
+	camera_feedback start
+fi
+
+#
+# Check if UAVCAN is enabled, default to it for ESCs
+#
+
+#
+# Starting stuff according to UAVCAN_ENABLE value
+#
+if param greater UAVCAN_ENABLE 0
+then
+	if param greater UAVCAN_ENABLE 2
+	then
+		set OUTPUT_MODE uavcan_esc
+		set OUTPUT_DEV /dev/uavcan/esc
+	fi
+
+	if uavcan start
+	then
+		set LOGGER_BUF 7
+		uavcan start fw
+	else
+		tone_alarm ${TUNE_ERR}
+	fi
+fi
+
 # Set default output if not set
 if [ $OUTPUT_MODE == none ]
 then
@@ -203,11 +254,6 @@ then
 	if [ -f ${SDCARD_MIXERS_PATH}/${MIXER}.main.mix ]
 	then
 		set MIXER_FILE ${SDCARD_MIXERS_PATH}/${MIXER}.main.mix
-	fi
-
-	if [ $OUTPUT_MODE == uavcan_esc ]
-	then
-		set OUTPUT_DEV /dev/uavcan/esc
 	fi
 
 	if mixer load ${OUTPUT_DEV} ${MIXER_FILE}

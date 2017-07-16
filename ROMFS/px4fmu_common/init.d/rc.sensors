@@ -3,6 +3,8 @@
 # Standard startup script for PX4FMU v1, v2, v3, v4 onboard sensor drivers.
 #
 
+gps start
+
 if ver hwcmp PX4FMU_V1
 then
 	if ms5611 start
@@ -427,6 +429,10 @@ fi
 # Sensors on the PWM interface bank
 if param compare SENS_EN_LL40LS 1
 then
+	# clear pins 5 and 6
+	set FMU_MODE pwm4
+	set AUX_MODE pwm4
+
 	if pwm_input start
 	then
 		if ll40ls start pwm

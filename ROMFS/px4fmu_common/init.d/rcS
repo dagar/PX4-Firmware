@@ -68,10 +68,10 @@ then
 			hardfault_log reset
 			tone_alarm stop
 		fi
-  else
-    # Start playing the startup tune
-    tone_alarm start
- fi
+else
+	# Start playing the startup tune
+	tone_alarm start
+fi
 else
 	tone_alarm MBAGP
 	if mkfatfs /dev/mmcsd0
@@ -195,6 +195,7 @@ then
 	set FAILSAFE none
 	set USE_IO yes
 	set LOGGER_BUF 16
+	set TTYS1_BUSY no
 
 	#
 	# Set USE_IO flag
@@ -349,19 +350,6 @@ then
 		fi
 	fi
 
-
-
-	if [ $HIL == yes ]
-	then
-		set OUTPUT_MODE hil
-		if ver hwcmp PX4FMU_V1
-		then
-			set FMU_MODE serial
-		fi
-	else
-		gps start
-	fi
-
 	set DATAMAN_OPT ""
 	if ver hwcmp AEROFC_V1
 	then
@@ -389,71 +377,6 @@ then
 	else
 		sh /etc/init.d/rc.sensors
 		commander start
-	fi
-	unset HIL
-
-	if send_event start
-	then
-	fi
-
-	#
-	# Start CPU load monitor
-	#
-	load_mon start
-
-	#
-	# Start primary output
-	#
-	set TTYS1_BUSY no
-
-	#
-	# Check if UAVCAN is enabled, default to it for ESCs
-	#
-	if param greater UAVCAN_ENABLE 2
-	then
-		set OUTPUT_MODE uavcan_esc
-	fi
-
-	# Sensors on the PWM interface bank
-	if param compare SENS_EN_LL40LS 1
-	then
-		# clear pins 5 and 6
-		set FMU_MODE pwm4
-		set AUX_MODE pwm4
-	fi
-	if param greater TRIG_MODE 0
-	then
-		# We ONLY support trigger on pins 5 and 6 when simultanously using AUX for actuator output
-		if param compare TRIG_PINS 56
-		then
-			# clear pins 5 and 6
-			set FMU_MODE pwm4
-			set AUX_MODE pwm4
-		else
-			set FMU_MODE none
-			set AUX_MODE none
-		fi
-		camera_trigger start
-
-		param set CAM_FBACK_MODE 1
-		camera_feedback start
-	fi
-
-	# start mavlink
-	sh /etc/init.d/rc.mavlink
-
-	#
-	# Starting stuff according to UAVCAN_ENABLE value
-	#
-	if param greater UAVCAN_ENABLE 0
-	then
-		if uavcan start
-		then
-			set LOGGER_BUF 7
-			uavcan start fw
-		else
-			tone_alarm ${TUNE_ERR}
-		fi
 	fi
 
 	# Fixed wing setup
@@ -492,20 +415,10 @@ then
 		echo "No autostart ID found"
 	fi
 
-	unset MAV_TYPE
-	unset MIXER
-	unset MIXER_AUX
-	unset OUTPUT_MODE
-	unset AUX_MODE
-
-	#
-	# Logging
-	#
+	sh /etc/init.d/rc.mavlink
 	sh /etc/init.d/rc.logging
-
-	#
-	# Start the navigator
-	#
+	send_event start
+	load_mon start
 	navigator start
 
 	# Start any custom addons
@@ -574,6 +487,12 @@ fi
 
 # There is no further script processing, so we can free some RAM
 # XXX potentially unset all script variables.
+unset MAV_TYPE
+unset MIXER
+unset MIXER_AUX
+unset OUTPUT_MODE
+unset AUX_MODE
+unset HIL
 unset TUNE_ERR
 
 # Boot is complete, inform MAVLink app(s) that the system is now fully up and running
