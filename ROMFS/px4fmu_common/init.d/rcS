@@ -256,10 +256,8 @@ then
 	#
 	# Set parameters and env variables for selected AUTOSTART
 	#
-	if param compare SYS_AUTOSTART 0
+	if param greater SYS_AUTOSTART 0
 	then
-		ekf2 start
-	else
 		sh /etc/init.d/rc.autostart
 	fi
 	unset MODE
@@ -413,13 +411,15 @@ then
 	if [ $VEHICLE_TYPE == none ]
 	then
 		echo "No autostart ID found"
+
+		ekf2 start
 	fi
 
-	sh /etc/init.d/rc.mavlink
-	sh /etc/init.d/rc.logging
 	send_event start
 	load_mon start
 	navigator start
+	sh /etc/init.d/rc.mavlink
+	sh /etc/init.d/rc.logging
 
 	# Start any custom addons
 	set FEXTRAS /fs/microsd/etc/extras.txt
@@ -481,9 +481,7 @@ then
 		then
 		fi
 	fi
-
-# End of autostart
-fi
+fi # End of autostart
 
 # There is no further script processing, so we can free some RAM
 # XXX potentially unset all script variables.
