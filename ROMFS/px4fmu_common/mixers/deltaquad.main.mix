@@ -1,5 +1,8 @@
-# VTOL quad X mixer for PX4FMU
+# DeltaQuad mixer for PX4FMU
 #=============================
+
+Quad motors 1 - 4
+-------------
 
 R: 4x 10000 10000 10000 0
 
@@ -11,10 +14,16 @@ Three scalers total (output, roll, pitch).
 On the assumption that the two elevon servos are physically reversed, the pitch
 input is inverted between the two servos.
 
+5: right 
+-------------
+
 M: 2
 O:      10000  10000      0 -10000  10000
 S: 1 0  -8000  -8000      0 -10000  10000
 S: 1 1   8000   8000      0 -10000  10000
+
+6: left
+-------------
 
 M: 2
 O:      10000  10000      0 -10000  10000
@@ -22,9 +31,7 @@ S: 1 0  -8000  -8000      0 -10000  10000
 S: 1 1  -8000  -8000      0 -10000  10000
 
 
-
-
-Motor speed mixer
+7: Motor speed mixer
 -----------------
 Two scalers total (output, thrust).
 
@@ -35,10 +42,7 @@ M: 1
 O:      10000  10000      0 -10000  10000
 S: 1 3      0  20000 -10000 -10000  10000
 
-
-
-
-Reverse thrust (brake) mixer
+8: Reverse thrust (brake) mixer
 -----------------
 
 M: 1
