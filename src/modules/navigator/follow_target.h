@@ -116,8 +116,6 @@ private:
 	control::BlockParamFloat 	_param_tracking_dist;
 	control::BlockParamInt 		_param_tracking_side;
 	control::BlockParamFloat 	_param_tracking_resp;
-	control::BlockParamFloat 	_param_yaw_auto_max;
-
 
 	FollowTargetState _follow_target_state;
 	int _follow_target_position;
@@ -141,7 +139,6 @@ private:
 	follow_target_s _previous_target_motion;
 	float _yaw_rate;
 	float _responsiveness;
-	float _yaw_auto_max;
 	float _yaw_angle;
 
 	// Mavlink defined motion reporting capabilities

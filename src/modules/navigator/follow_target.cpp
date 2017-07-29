@@ -63,7 +63,6 @@ FollowTarget::FollowTarget(Navigator *navigator, const char *name) :
 	_param_tracking_dist(this, "NAV_FT_DST", false),
 	_param_tracking_side(this, "NAV_FT_FS", false),
 	_param_tracking_resp(this, "NAV_FT_RS", false),
-	_param_yaw_auto_max(this, "MC_YAWRAUTO_MAX", false),
 	_follow_target_state(SET_WAIT_FOR_TARGET_POSITION),
 	_follow_target_position(FOLLOW_FROM_BEHIND),
 	_follow_target_sub(-1),
@@ -75,7 +74,6 @@ FollowTarget::FollowTarget(Navigator *navigator, const char *name) :
 	_previous_target_motion(),
 	_yaw_rate(0.0F),
 	_responsiveness(0.0F),
-	_yaw_auto_max(0.0F),
 	_yaw_angle(0.0F)
 {
 	updateParams();
@@ -103,8 +101,6 @@ void FollowTarget::on_activation()
 	_follow_offset = _param_tracking_dist.get() < 1.0F ? 1.0F : _param_tracking_dist.get();
 
 	_responsiveness = math::constrain((float) _param_tracking_resp.get(), .1F, 1.0F);
-
-	_yaw_auto_max = math::radians(_param_yaw_auto_max.get());
 
 	_follow_target_position = _param_tracking_side.get();
 
@@ -229,11 +225,7 @@ void FollowTarget::on_active()
 						_current_target_motion.lat,
 						_current_target_motion.lon);
 
-				_yaw_rate = (_yaw_angle - _navigator->get_global_position()->yaw) / (dt_ms / 1000.0F);
-
-				_yaw_rate = _wrap_pi(_yaw_rate);
-
-				_yaw_rate = math::constrain(_yaw_rate, -1.0F * _yaw_auto_max, _yaw_auto_max);
+				_yaw_rate = _wrap_pi(_yaw_angle - _navigator->get_global_position()->yaw) / (dt_ms / 1000.0F);
 
 			} else {
 				_yaw_angle = _yaw_rate = NAN;
