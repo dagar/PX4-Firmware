@@ -39,12 +39,11 @@
  */
 
 /**
- * Camera feedback mode
+ * Camera trigger feedback enabled
  *
  * Sets the camera feedback mode.
  *
- * @value 0 Disabled
- * @value 1 Feedback on trigger
+ * @boolean
  * @min 0
  * @max 1
  * @group Camera Control
