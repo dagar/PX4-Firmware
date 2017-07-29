@@ -219,44 +219,18 @@ then
 	#
 	if param compare SYS_USE_IO 1
 	then
-		if ver hwcmp PX4FMU_V4
-		then
-			set USE_IO no
-		fi
-
-		if ver hwcmp PX4FMU_V5
-		then
-			set USE_IO no
-			set MAVLINK_COMPANION_DEVICE /dev/ttyS3
-		fi
-
-		if ver hwcmp MINDPX_V2
-		then
-			set USE_IO no
-		fi
-
-		if ver hwcmp CRAZYFLIE
-		then
-			set USE_IO no
-
-			if param compare SYS_AUTOSTART 0
-			then
-				param set SYS_AUTOSTART 4900
-				set AUTOCNF yes
-			fi
-		fi
-
-		if ver hwcmp AEROFC_V1
-		then
-			set USE_IO no
-		fi
-
-		if ver hwcmp AEROCORE2
-		then
-			set USE_IO no
-		fi
+		set USE_IO yes
 	else
 		set USE_IO no
+	fi
+
+	if ver hwcmp CRAZYFLIE
+	then
+		if param compare SYS_AUTOSTART 0
+		then
+			param set SYS_AUTOSTART 4900
+			set AUTOCNF yes
+		fi
 	fi
 
 	if ver hwcmp AEROFC_V1
@@ -648,6 +622,11 @@ then
 		mavlink start ${MAVLINK_F}
 	fi
 	unset MAVLINK_F
+
+	if ver hwcmp PX4FMU_V5
+	then
+		set MAVLINK_COMPANION_DEVICE /dev/ttyS3
+	fi
 
 	#
 	# MAVLink onboard / TELEM2
