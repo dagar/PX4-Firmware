@@ -416,7 +416,7 @@ void
 BMI160::_set_dlpf_filter(uint16_t bandwidth)
 {
 	_dlpf_freq = 0;
-	bandwidth = bandwidth;   //TO BE IMPLEMENTED
+	//bandwidth = bandwidth;   //TO BE IMPLEMENTED
 	/*uint8_t setbits = BW_SCAL_ODR_BW_XL;
 	uint8_t clearbits = BW_XL_50_HZ;
 
@@ -1131,7 +1131,7 @@ BMI160::measure()
 
 	check_registers();
 
-	if ((!(status && (0x80)))  && (!(status && (0x04)))) {
+	if ((!(status & (0x80))) && (!(status & (0x04)))) {
 		perf_end(_sample_perf);
 		perf_count(_duplicates);
 		_got_duplicate = true;

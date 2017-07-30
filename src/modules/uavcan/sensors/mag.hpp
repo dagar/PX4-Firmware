@@ -54,7 +54,7 @@ public:
 	int init() override;
 
 private:
-	ssize_t	read(struct file *filp, char *buffer, size_t buflen);
+	ssize_t	read(struct file *filp, char *buffer, size_t buflen) override;
 	int ioctl(struct file *filp, int cmd, unsigned long arg) override;
 
 	void mag_sub_cb(const uavcan::ReceivedDataStructure<uavcan::equipment::ahrs::MagneticFieldStrength> &msg);

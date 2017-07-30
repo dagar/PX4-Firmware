@@ -186,10 +186,10 @@ public:
 
 	static int fake(int argc, char *argv[]);
 
-	virtual int	ioctl(file *filp, int cmd, unsigned long arg);
-	virtual ssize_t	write(file *filp, const char *buffer, size_t len);
+	int	ioctl(file *filp, int cmd, unsigned long arg) override;
+	ssize_t	write(file *filp, const char *buffer, size_t len) override;
 
-	virtual int	init();
+	int init() override;
 
 	void dsm_bind_ioctl();
 

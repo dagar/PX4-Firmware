@@ -66,8 +66,8 @@ static int _esc_sub = -1;
 static orb_advert_t _esc_pub = nullptr;
 
 static bool _home_position_set = false;
-static double _home_lat = 0.0d;
-static double _home_lon = 0.0d;
+static double _home_lat = 0.0;
+static double _home_lon = 0.0;
 
 void
 init_sub_messages(void)
@@ -244,7 +244,7 @@ build_gps_response(uint8_t *buffer, size_t *size)
 		msg.gps_speed_H = (uint8_t)(speed >> 8) & 0xff;
 
 		/* Get latitude in degrees, minutes and seconds */
-		double lat = ((double)(gps.lat)) * 1e-7d;
+		double lat = ((double)(gps.lat)) * 1e-7;
 
 		/* Set the N or S specifier */
 		msg.latitude_ns = 0;
@@ -267,7 +267,7 @@ build_gps_response(uint8_t *buffer, size_t *size)
 		msg.latitude_sec_H = (uint8_t)(lat_sec >> 8) & 0xff;
 
 		/* Get longitude in degrees, minutes and seconds */
-		double lon = ((double)(gps.lon)) * 1e-7d;
+		double lon = ((double)(gps.lon)) * 1e-7;
 
 		/* Set the E or W specifier */
 		msg.longitude_ew = 0;
@@ -329,8 +329,8 @@ convert_to_degrees_minutes_seconds(double val, int *deg, int *min, int *sec)
 	*deg = (int)val;
 
 	double delta = val - *deg;
-	const double min_d = delta * 60.0d;
+	const double min_d = delta * 60.0;
 	*min = (int)min_d;
 	delta = min_d - *min;
-	*sec = (int)(delta * 10000.0d);
+	*sec = (int)(delta * 10000.0);
 }

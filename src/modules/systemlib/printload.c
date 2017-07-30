@@ -325,8 +325,8 @@ void print_load_buffer(uint64_t t, char *buffer, int buffer_length, print_load_c
 
 #endif
 	snprintf(buffer, buffer_length, "Uptime: %.3fs total, %.3fs idle",
-		 (double)curr_time_us / 1000000.d,
-		 (double)idle_time_us / 1000000.d);
+		 (double)curr_time_us / 1000000,
+		 (double)idle_time_us / 1000000);
 	cb(user);
 
 	print_state->interval_start_time = print_state->new_time;

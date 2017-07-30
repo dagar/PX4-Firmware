@@ -342,8 +342,22 @@ function(px4_add_common_flags)
 		)
 
 	if (${CMAKE_C_COMPILER_ID} MATCHES ".*Clang.*")
+		if ("${OS}" STREQUAL "nuttx")
+			list(APPEND warnings
+				-Wno-unused-const-variable
+				-Wno-varargs
+				-Wno-address-of-packed-member
+				-Wno-unknown-warning-option
+				-Wno-gnu-designator
+				-Wno-unused-private-field
+				-Wno-unused-function
+				-Wno-typedef-redefinition
+				-Wno-strncat-size
+				-Wno-unicode-whitespace
+				-Wno-constant-conversion
+			)
 		# QuRT 6.4.X compiler identifies as Clang but does not support this option
-		if (NOT ${OS} STREQUAL "qurt")
+		elseif (NOT ${OS} STREQUAL "qurt")
 			list(APPEND warnings
 				-Qunused-arguments
 				-Wno-unused-const-variable
@@ -404,10 +418,20 @@ function(px4_add_common_flags)
 
 	# regular Clang or AppleClang
 	if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-		# force color for clang (needed for clang + ccache)
-		list(APPEND _optimization_flags
-			-fcolor-diagnostics
-		)
+		if (${OS} STREQUAL "nuttx")
+			list(APPEND _optimization_flags
+				-fshort-enums
+			)
+			list(APPEND cxx_warnings
+				-Wno-overloaded-virtual
+				-Wno-c++11-extensions
+			)
+		else()
+			# force color for clang (needed for clang + ccache)
+			list(APPEND _optimization_flags
+				-fcolor-diagnostics
+			)
+		endif()
 	else()
 		list(APPEND _optimization_flags
 			-fno-strength-reduce

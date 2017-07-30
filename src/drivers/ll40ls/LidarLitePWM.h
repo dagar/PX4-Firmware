@@ -66,7 +66,7 @@ public:
 	int init() override;
 
 	ssize_t read(struct file *filp, char *buffer, size_t buflen) override;
-	int	ioctl(struct file *filp, int cmd, unsigned long arg);
+	int	ioctl(struct file *filp, int cmd, unsigned long arg) override;
 
 	void start() override;
 

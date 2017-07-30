@@ -457,6 +457,8 @@ function(px4_nuttx_add_romfs)
 	endforeach()
 	add_custom_target(collect_extras DEPENDS ${extras})
 
+	string(REPLACE ";" "\ " gcc_c_flags_2 "${gcc_c_flags}")
+
 	add_custom_command(OUTPUT romfs.o
 		COMMAND cmake -E remove_directory ${romfs_temp_dir}
 		COMMAND cmake -E copy_directory ${romfs_src_dir} ${romfs_temp_dir}
@@ -472,9 +474,9 @@ function(px4_nuttx_add_romfs)
 			-d ${romfs_temp_dir} -V "NSHInitVol"
 		#COMMAND cmake -E remove_directory ${romfs_temp_dir}
 		COMMAND ${PYTHON_EXECUTABLE} ${bin_to_obj}
-			--ld ${LD} --c_flags ${CMAKE_C_FLAGS}
+			--ld ${LD} --c_flags  ${gcc_c_flags_2}
 			--include_path "${PX4_SOURCE_DIR}/src/include"
-			--c_compiler ${CMAKE_C_COMPILER}
+			--c_compiler arm-none-eabi-gcc
 			--nm ${NM} --objcopy ${OBJCOPY}
 			--obj romfs.o
 			--var romfs_img
@@ -549,6 +551,9 @@ function(px4_os_add_flags)
 		LINK_DIRS ${LINK_DIRS}
 		DEFINITIONS ${DEFINITIONS})
 
+	set(gcc_c_flags)
+	list(APPEND gcc_c_flags ${c_flags})
+
 	set(nuttx_export_root ${PX4_BINARY_DIR}/${BOARD}/NuttX)
 	set(nuttx_export_dir ${nuttx_export_root}/nuttx/nuttx-export)
 	set(added_include_dirs
@@ -559,9 +564,11 @@ function(px4_os_add_flags)
 		${nuttx_export_dir}/arch/armv7-m
 		${nuttx_export_root}/apps/include
 		)
+
 	set(added_link_dirs
 		${nuttx_export_dir}/libs
 		)
+
 	set(added_definitions
 		-D__PX4_NUTTX
 		)
@@ -574,10 +581,25 @@ function(px4_os_add_flags)
 		-nodefaultlibs
 		-nostdlib
 		)
+
+	if (${CMAKE_C_COMPILER_ID} MATCHES ".*Clang.*")
+		list(APPEND gcc_c_flags ${added_c_flags})
+
+		list(APPEND added_c_flags
+			-nostdinc
+			)
+	endif()
+
 	set(added_cxx_flags
 		-nodefaultlibs
 		-nostdlib
 		)
+
+	if (${CMAKE_CXX_COMPILER_ID} MATCHES ".*Clang.*")
+		list(APPEND added_cxx_flags
+			-nostdinc
+			)
+	endif()
 
 	set(added_optimization_flags)
 
@@ -589,11 +611,15 @@ function(px4_os_add_flags)
 			-finstrument-functions
 			-ffixed-r10
 			)
+		list(APPEND gcc_c_flags ${intrument_flags})
 		list(APPEND c_flags ${instrument_flags})
 		list(APPEND cxx_flags ${instrument_flags})
 	endif()
 
 	set(cpu_flags)
+	set(clang_c_flags)
+	set(clang_cxx_flags)
+
 	if (${config_nuttx_hw} STREQUAL "m7")
 		set(cpu_flags
 			-mcpu=cortex-m7
@@ -616,10 +642,57 @@ function(px4_os_add_flags)
 			-march=armv7-m
 			)
 	endif()
-	list(APPEND c_flags ${cpu_flags})
-	list(APPEND cxx_flags ${cpu_flags})
+
+	list(APPEND gcc_c_flags ${cpu_flags})
+
+	if (${CMAKE_C_COMPILER_ID} MATCHES ".*Clang.*" OR ${CMAKE_CXX_COMPILER_ID} MATCHES ".*Clang.*")
+		set(gcc_paths ${PX4_SOURCE_DIR}/cmake/nuttx/gcc_paths.py)
+		set(gcc_cpu_flags)
+		string(REPLACE ";" "\ " gcc_cpu_flags "${cpu_flags}")
+
+		execute_process(COMMAND ${PYTHON_EXECUTABLE} ${gcc_paths}
+			--c_flags ${gcc_cpu_flags}
+			--c_compiler arm-none-eabi-gcc
+			--lib_paths
+			OUTPUT_VARIABLE gcc_link_dirs
+		)
+
+		execute_process(COMMAND ${PYTHON_EXECUTABLE} ${gcc_paths}
+				--c_flags ${gcc_cpu_flags}
+				--c_compiler arm-none-eabi-gcc
+				--inc_paths
+				OUTPUT_VARIABLE gcc_c_inc_dirs
+			)
+
+		if (${CMAKE_CXX_COMPILER_ID} MATCHES ".*Clang.*")
+			execute_process(COMMAND ${PYTHON_EXECUTABLE} ${gcc_paths}
+				--c_flags ${gcc_cpu_flags}
+				--c_compiler arm-none-eabi-gcc
+				--inc_paths
+				--cxx
+				OUTPUT_VARIABLE gcc_cxx_inc_dirs
+			)
+		endif()
+
+		list(APPEND gcc_c_flags ${cpu_flags})
+		list(APPEND cpu_flags
+			-m32
+			-target arm-none-eabi
+			-fno-builtin
+		)
+
+		set(clang_c_flags ${gcc_c_inc_dirs} -ccc-gcc-name arm-none-eabi-gcc)
+		set(clang_cxx_flags ${gcc_cxx_inc_dirs} -ccc-gcc-name arm-none-eabi-gcc)
+		string(REPLACE " " ";" gcc_link_dirs_list "${gcc_link_dirs}")
+		list(APPEND added_link_dirs ${gcc_link_dirs_list})
+	endif()
+
+	list(APPEND c_flags ${cpu_flags} ${clang_c_flags})
+	list(APPEND cxx_flags ${cpu_flags} ${clang_cxx_flags} ${clang_c_flags})
 
 	# output
+	set(gcc_c_flags "${gcc_c_flags}" PARENT_SCOPE)
+
 	foreach(var ${inout_vars})
 		string(TOLOWER ${var} lower_var)
 		set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)
