@@ -138,7 +138,7 @@ private:
 
 	void init_offboard_mission();
 
-	int update_active_mission(int dataman_id, unsigned count, int seq);
+	bool update_active_mission(int dataman_id, unsigned count, int seq);
 
 	/**
 	 *  @brief Sends an waypoint ack message

@@ -54,7 +54,7 @@ typedef enum {
 	DM_KEY_SAFE_POINTS = 0,		/* Safe points coordinates, safe point 0 is home point */
 	DM_KEY_FENCE_POINTS,		/* Fence vertex coordinates */
 	DM_KEY_WAYPOINTS_OFFBOARD_0,	/* Mission way point coordinates sent over mavlink */
-	DM_KEY_WAYPOINTS_OFFBOARD_1,	/* (alernate between 0 and 1) */
+	DM_KEY_WAYPOINTS_OFFBOARD_1,	/* (alternate between 0 and 1) */
 	DM_KEY_WAYPOINTS_ONBOARD,	/* Mission way point coordinates generated onboard */
 	DM_KEY_MISSION_STATE,		/* Persistent mission state */
 	DM_KEY_COMPAT,
@@ -116,48 +116,35 @@ struct dataman_compat_s {
 
 #define DM_COMPAT_KEY ((DM_COMPAT_VERSION << 32) + (sizeof(struct mission_item_s) << 24) + (sizeof(struct mission_s) << 16) + (sizeof(struct fence_vertex_s) << 8) + sizeof(struct dataman_compat_s))
 
-/** Retrieve from the data manager store */
-__EXPORT ssize_t
-dm_read(
-	dm_item_t item,			/* The item type to retrieve */
-	unsigned index,			/* The index of the item */
-	void *buffer,			/* Pointer to caller data buffer */
-	size_t buflen			/* Length in bytes of data to retrieve */
-);
+/** Retrieve from the data manager store
+ * @param item The item type to retrieve
+ * @param index The index of the item
+ * @param buffer Pointer to caller data buffer
+ * @param buflen Length in bytes of data to retrieve
+ */
+__EXPORT ssize_t dm_read(dm_item_t item, unsigned index, void *buffer, size_t buflen);
 
-/** write to the data manager store */
-__EXPORT ssize_t
-dm_write(
-	dm_item_t  item,		/* The item type to store */
-	unsigned index,			/* The index of the item */
-	dm_persitence_t persistence,	/* The persistence level of this item */
-	const void *buffer,		/* Pointer to caller data buffer */
-	size_t buflen			/* Length in bytes of data to retrieve */
-);
+/** write to the data manager store
+ * @param item The item type to store
+ * @param index The index of the item
+ * @param persistence The persistence level of this item
+ * @param buffer Pointer to caller data buffer
+ * @param buflen Length in bytes of data to retrieve
+ */
+__EXPORT ssize_t dm_write(dm_item_t  item, unsigned index, dm_persitence_t persistence, const void *buffer,
+			  size_t buflen);
 
 /** Lock all items of this type */
-__EXPORT void
-dm_lock(
-	dm_item_t item			/* The item type to clear */
-);
+__EXPORT void dm_lock(dm_item_t item);
 
 /** Unlock all items of this type */
-__EXPORT void
-dm_unlock(
-	dm_item_t item			/* The item type to clear */
-);
+__EXPORT void dm_unlock(dm_item_t item);
 
 /** Erase all items of this type */
-__EXPORT int
-dm_clear(
-	dm_item_t item			/* The item type to clear */
-);
+__EXPORT int dm_clear(dm_item_t item);
 
 /** Tell the data manager about the type of the last reset */
-__EXPORT int
-dm_restart(
-	dm_reset_reason restart_type	/* The last reset type */
-);
+__EXPORT int dm_restart(dm_reset_reason restart_type);
 
 #if defined(FLASH_BASED_DATAMAN)
 typedef struct dm_sector_descriptor_t {
@@ -173,10 +160,7 @@ typedef struct dm_sector_descriptor_t {
  * instructions or the CPU will held for sometime during Flash erase and write
  * and this could cause your drone to fall.
  */
-__EXPORT int
-dm_flash_sector_description_set(
-	const dm_sector_descriptor_t *description
-);
+__EXPORT int dm_flash_sector_description_set(const dm_sector_descriptor_t *description);
 #endif
 
 #ifdef __cplusplus

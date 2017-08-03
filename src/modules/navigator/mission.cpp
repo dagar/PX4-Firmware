@@ -60,16 +60,59 @@
 
 Mission::Mission(Navigator *navigator, const char *name) :
 	MissionBlock(navigator, name),
-	_param_onboard_enabled(this, "MIS_ONBOARD_EN", false),
 	_param_takeoff_alt(this, "MIS_TAKEOFF_ALT", false),
 	_param_dist_1wp(this, "MIS_DIST_1WP", false),
 	_param_altmode(this, "MIS_ALTMODE", false),
 	_param_yawmode(this, "MIS_YAWMODE", false),
 	_param_force_vtol(this, "NAV_FORCE_VT", false),
-	_param_fw_climbout_diff(this, "FW_CLMBOUT_DIFF", false),
-	_missionFeasibilityChecker(navigator)
+	_param_fw_climbout_diff(this, "FW_CLMBOUT_DIFF", false)
 {
 	updateParams();
+
+	/* load missions from storage */
+	dm_lock(DM_KEY_MISSION_STATE);
+
+	/* read current state */
+	mission_s mission = {};
+
+	if (dm_read(DM_KEY_MISSION_STATE, 0, &mission, sizeof(mission_s)) == sizeof(mission_s)) {
+		if (mission.dataman_id >= 0 && mission.dataman_id <= 1) {
+			if (mission.count > 0) {
+				mavlink_log_info(_navigator->get_mavlink_log_pub(), "Mission #%d loaded, %u WPs, curr: %d",
+						 mission.dataman_id, mission.count, mission.current_seq);
+			}
+
+			/* On init let's check the mission, maybe there is already one available. */
+			if (mission_valid(mission)) {
+				_mission = mission;
+				_mission.current_seq = mission.current_seq;
+			}
+
+		} else {
+			const char *missionfail = "reading mission state failed";
+			PX4_ERR("%s", missionfail);
+			mavlink_log_critical(_navigator->get_mavlink_log_pub(), missionfail);
+
+			/* initialize mission state in dataman */
+			mission.timestamp = hrt_absolute_time();
+			mission.dataman_id = 0;
+			mission.count = 0;
+			mission.current_seq = 0;
+
+			dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
+		}
+	}
+
+	dm_unlock(DM_KEY_MISSION_STATE);
+
+	_onboard_mission_sub = orb_subscribe(ORB_ID(onboard_mission));
+	_offboard_mission_sub = orb_subscribe(ORB_ID(offboard_mission));
+}
+
+Mission::~Mission()
+{
+	orb_unsubscribe(_onboard_mission_sub);
+	orb_unsubscribe(_offboard_mission_sub);
 }
 
 void
@@ -80,56 +123,17 @@ Mission::on_inactive()
 	 * is used for missions such as RTL. */
 	_navigator->set_cruising_speed();
 
+	update_mission();
+
 	/* Without home a mission can't be valid yet anyway, let's wait. */
 	if (!_navigator->home_position_valid()) {
 		return;
 	}
 
-	if (_inited) {
-		/* check if missions have changed so that feedback to ground station is given */
-		bool onboard_updated = false;
-		orb_check(_navigator->get_onboard_mission_sub(), &onboard_updated);
-
-		if (onboard_updated) {
-			update_onboard_mission();
-		}
-
-		bool offboard_updated = false;
-		orb_check(_navigator->get_offboard_mission_sub(), &offboard_updated);
-
-		if (offboard_updated) {
-			update_offboard_mission();
-		}
-
-		/* reset the current offboard mission if needed */
-		if (need_to_reset_mission(false)) {
-			reset_offboard_mission(_offboard_mission);
-			update_offboard_mission();
-			_navigator->reset_cruising_speed();
-		}
-
-	} else {
-
-		/* load missions from storage */
-		mission_s mission_state = {};
-
-		dm_lock(DM_KEY_MISSION_STATE);
-
-		/* read current state */
-		int read_res = dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s));
-
-		dm_unlock(DM_KEY_MISSION_STATE);
-
-		if (read_res == sizeof(mission_s)) {
-			_offboard_mission.dataman_id = mission_state.dataman_id;
-			_offboard_mission.count = mission_state.count;
-			_current_offboard_mission_index = mission_state.current_seq;
-		}
-
-		/* On init let's check the mission, maybe there is already one available. */
-		check_mission_valid(false);
-
-		_inited = true;
+	/* reset the current offboard mission if needed */
+	if (need_to_reset_mission(false)) {
+		reset_mission(_mission);
+		_navigator->reset_cruising_speed();
 	}
 
 	/* require takeoff after non-loiter or landing */
@@ -150,33 +154,16 @@ Mission::on_activation()
 void
 Mission::on_active()
 {
-	check_mission_valid(false);
-
-	/* check if anything has changed */
-	bool onboard_updated = false;
-	orb_check(_navigator->get_onboard_mission_sub(), &onboard_updated);
-
-	if (onboard_updated) {
-		update_onboard_mission();
-	}
-
-	bool offboard_updated = false;
-	orb_check(_navigator->get_offboard_mission_sub(), &offboard_updated);
-
-	if (offboard_updated) {
-		update_offboard_mission();
-	}
+	mission_valid(_mission);
 
 	/* reset the current offboard mission if needed */
 	if (need_to_reset_mission(true)) {
-		reset_offboard_mission(_offboard_mission);
-		update_offboard_mission();
+		reset_mission(_mission);
 		_navigator->reset_cruising_speed();
-		offboard_updated = true;
 	}
 
-	/* reset mission items if needed */
-	if (onboard_updated || offboard_updated) {
+	/* check if anything has changed */
+	if (update_mission()) {
 		set_mission_items();
 	}
 
@@ -196,7 +183,6 @@ Mission::on_active()
 		}
 
 	} else if (_mission_type != MISSION_TYPE_NONE && _param_altmode.get() == MISSION_ALTMODE_FOH) {
-
 		altitude_sp_foh_update();
 
 	} else {
@@ -229,12 +215,12 @@ Mission::on_active()
 }
 
 bool
-Mission::set_current_offboard_mission_index(unsigned index)
+Mission::set_current_mission_index(unsigned index)
 {
-	if (index < _offboard_mission.count) {
+	if (index < _mission.count) {
 
-		_current_offboard_mission_index = index;
-		set_current_offboard_mission_item();
+		_mission.current_seq = index;
+		set_current_mission_item();
 
 		// update mission items if already in active mission
 		if (_navigator->is_planned_mission()) {
@@ -259,10 +245,10 @@ Mission::find_offboard_land_start()
 	 * TODO: implement full spec and find closest landing point geographically
 	 */
 
-	dm_item_t dm_current = DM_KEY_WAYPOINTS_OFFBOARD(_offboard_mission.dataman_id);
+	dm_item_t dm_current = DM_KEY_WAYPOINTS_OFFBOARD(_mission.dataman_id);
 
-	for (size_t i = 0; i < _offboard_mission.count; i++) {
-		struct mission_item_s missionitem = {};
+	for (size_t i = 0; i < _mission.count; i++) {
+		mission_item_s missionitem = {};
 		const ssize_t len = sizeof(missionitem);
 
 		if (dm_read(dm_current, i, &missionitem, len) != len) {
@@ -278,105 +264,61 @@ Mission::find_offboard_land_start()
 	return -1;
 }
 
-void
-Mission::update_onboard_mission()
+bool
+Mission::update_mission()
 {
-	if (orb_copy(ORB_ID(onboard_mission), _navigator->get_onboard_mission_sub(), &_onboard_mission) == OK) {
-		/* accept the current index set by the onboard mission if it is within bounds */
-		if (_onboard_mission.current_seq >= 0
-		    && _onboard_mission.current_seq < (int)_onboard_mission.count) {
+	const orb_metadata *orb_meta = nullptr;
+	int mission_sub = -1;
+	bool updated = false;
 
-			_current_onboard_mission_index = _onboard_mission.current_seq;
+	/* check if missions have changed so that feedback to ground station is given */
+	if (orb_check(_onboard_mission_sub, &updated)) {
+		orb_meta = ORB_ID(onboard_mission);
+		mission_sub = _onboard_mission_sub;
 
-		} else {
-			/* if less WPs available, reset to first WP */
-			if (_current_onboard_mission_index >= (int)_onboard_mission.count) {
-				_current_onboard_mission_index = 0;
-				/* if not initialized, set it to 0 */
-
-			} else if (_current_onboard_mission_index < 0) {
-				_current_onboard_mission_index = 0;
-			}
-
-			/* otherwise, just leave it */
-		}
-
-		// XXX check validity here as well
-		_navigator->get_mission_result()->valid = true;
-		/* reset mission failure if we have an updated valid mission */
-		_navigator->get_mission_result()->failure = false;
-
-		/* reset reached info as well */
-		_navigator->get_mission_result()->reached = false;
-		_navigator->get_mission_result()->seq_reached = 0;
-		_navigator->get_mission_result()->seq_total = _onboard_mission.count;
-
-		/* reset work item if new mission has been accepted */
-		_work_item_type = WORK_ITEM_TYPE_DEFAULT;
-		_navigator->increment_mission_instance_count();
-		_navigator->set_mission_result_updated();
-
-	} else {
-		_onboard_mission.count = 0;
-		_onboard_mission.current_seq = 0;
-		_current_onboard_mission_index = 0;
+	} else if (orb_check(_offboard_mission_sub, &updated)) {
+		orb_meta = ORB_ID(offboard_mission);
+		mission_sub = _offboard_mission_sub;
 	}
-}
 
-void
-Mission::update_offboard_mission()
-{
-	bool failed = true;
+	bool valid = false;
+	mission_s new_mission = {};
 
-	if (orb_copy(ORB_ID(offboard_mission), _navigator->get_offboard_mission_sub(), &_offboard_mission) == OK) {
+	if (updated && (orb_copy(orb_meta, mission_sub, &new_mission) == PX4_OK)) {
+		valid = mission_valid(new_mission);
 
-		/* determine current index */
-		if (_offboard_mission.current_seq >= 0 && _offboard_mission.current_seq < (int)_offboard_mission.count) {
-			_current_offboard_mission_index = _offboard_mission.current_seq;
+		if (valid) {
+			_mission = new_mission;
 
-		} else {
-			/* if less items available, reset to first item */
-			if (_current_offboard_mission_index >= (int)_offboard_mission.count) {
-				_current_offboard_mission_index = 0;
+			/* determine current index */
+			_mission.current_seq = math::constrain(new_mission.current_seq, 0, (int)new_mission.count - 1);
 
-			} else if (_current_offboard_mission_index < 0) {
-				/* if not initialized, set it to 0 */
-				_current_offboard_mission_index = 0;
-			}
-
-			/* otherwise, just leave it */
-		}
-
-		check_mission_valid(true);
-
-		failed = !_navigator->get_mission_result()->valid;
-
-		if (!failed) {
 			/* reset mission failure if we have an updated valid mission */
 			_navigator->get_mission_result()->failure = false;
 
 			/* reset reached info as well */
 			_navigator->get_mission_result()->reached = false;
 			_navigator->get_mission_result()->seq_reached = 0;
-			_navigator->get_mission_result()->seq_total = _offboard_mission.count;
+			_navigator->get_mission_result()->seq_total = _mission.count;
+			_navigator->get_mission_result()->instance_count++;
+			_navigator->get_mission_result()->valid = valid;
+
+			_navigator->set_mission_result_updated();
 
 			/* reset work item if new mission has been accepted */
 			_work_item_type = WORK_ITEM_TYPE_DEFAULT;
+
+			set_current_mission_item();
+
+		} else {
+			PX4_WARN("mission check failed");
 		}
 
 	} else {
-		PX4_WARN("offboard mission update failed, handle: %d", _navigator->get_offboard_mission_sub());
+		PX4_WARN("mission update failed, handle: %d", mission_sub);
 	}
 
-	if (failed) {
-		_offboard_mission.count = 0;
-		_offboard_mission.current_seq = 0;
-		_current_offboard_mission_index = 0;
-
-		PX4_WARN("mission check failed");
-	}
-
-	set_current_offboard_mission_item();
+	return updated && valid;
 }
 
 
@@ -389,12 +331,9 @@ Mission::advance_mission()
 	}
 
 	switch (_mission_type) {
-	case MISSION_TYPE_ONBOARD:
-		_current_onboard_mission_index++;
-		break;
-
 	case MISSION_TYPE_OFFBOARD:
-		_current_offboard_mission_index++;
+	case MISSION_TYPE_ONBOARD:
+		_mission.current_seq++;
 		break;
 
 	case MISSION_TYPE_NONE:
@@ -404,7 +343,7 @@ Mission::advance_mission()
 }
 
 float
-Mission::get_absolute_altitude_for_item(struct mission_item_s &mission_item)
+Mission::get_absolute_altitude_for_item(mission_item_s &mission_item)
 {
 	if (mission_item.altitude_is_relative) {
 		return mission_item.altitude + _navigator->get_home_position()->alt;
@@ -418,22 +357,21 @@ void
 Mission::set_mission_items()
 {
 	/* reset the altitude foh (first order hold) logic, if altitude foh is enabled (param) a new foh element starts now */
-	altitude_sp_foh_reset();
+	_min_current_sp_distance_xy = FLT_MAX;
 
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	/* the home dist check provides user feedback, so we initialize it to this */
 	bool user_feedback_done = false;
 
 	/* mission item that comes after current if available */
-	struct mission_item_s mission_item_next_position;
+	mission_item_s mission_item_next_position;
 	bool has_next_position_item = false;
 
 	work_item_type new_work_item_type = WORK_ITEM_TYPE_DEFAULT;
 
 	/* try setting onboard mission item */
-	if (_param_onboard_enabled.get()
-	    && prepare_mission_items(true, &_mission_item, &mission_item_next_position, &has_next_position_item)) {
+	if (prepare_mission_items(true, &_mission_item, &mission_item_next_position, &has_next_position_item)) {
 
 		/* if mission type changed, notify */
 		if (_mission_type != MISSION_TYPE_ONBOARD) {
@@ -533,7 +471,7 @@ Mission::set_mission_items()
 			new_work_item_type = WORK_ITEM_TYPE_TAKEOFF;
 
 			/* use current mission item as next position item */
-			memcpy(&mission_item_next_position, &_mission_item, sizeof(struct mission_item_s));
+			mission_item_next_position = _mission_item;
 			mission_item_next_position.nav_cmd = NAV_CMD_WAYPOINT;
 			has_next_position_item = true;
 
@@ -559,8 +497,10 @@ Mission::set_mission_items()
 
 			/* if there is no need to do a takeoff but we have a takeoff item, treat is as waypoint */
 			_mission_item.nav_cmd = NAV_CMD_WAYPOINT;
+
 			/* ignore yaw here, otherwise it might yaw before heading_sp_update takes over */
 			_mission_item.yaw = NAN;
+
 			/* since _mission_item.time_inside and and _mission_item.pitch_min build a union, we need to set time_inside to zero
 			 * since in NAV_CMD_TAKEOFF mode there is currently no time_inside.
 			 * Note also that resetting time_inside to zero will cause pitch_min to be zero as well.
@@ -590,8 +530,10 @@ Mission::set_mission_items()
 		    new_work_item_type == WORK_ITEM_TYPE_DEFAULT) {
 
 			_mission_item.nav_cmd = NAV_CMD_WAYPOINT;
+
 			/* ignore yaw here, otherwise it might yaw before heading_sp_update takes over */
 			_mission_item.yaw = NAN;
+
 			/* since _mission_item.time_inside and and _mission_item.pitch_min build a union, we need to set time_inside to zero
 			 * since in NAV_CMD_TAKEOFF mode there is currently no time_inside.
 			 */
@@ -639,7 +581,7 @@ Mission::set_mission_items()
 			new_work_item_type = WORK_ITEM_TYPE_MOVE_TO_LAND;
 
 			/* use current mission item as next position item */
-			memcpy(&mission_item_next_position, &_mission_item, sizeof(struct mission_item_s));
+			mission_item_next_position = _mission_item;
 			has_next_position_item = true;
 
 			float altitude = _navigator->get_global_position()->alt;
@@ -679,7 +621,7 @@ Mission::set_mission_items()
 			new_work_item_type = WORK_ITEM_TYPE_MOVE_TO_LAND;
 
 			/* use current mission item as next position item */
-			memcpy(&mission_item_next_position, &_mission_item, sizeof(struct mission_item_s));
+			mission_item_next_position = _mission_item;
 			has_next_position_item = true;
 
 			/*
@@ -702,14 +644,6 @@ Mission::set_mission_items()
 			_mission_item.autocontinue = true;
 			_mission_item.time_inside = 0.0f;
 			_mission_item.disable_mc_yaw = true;
-		}
-
-		/* we just moved to the landing waypoint, now descend */
-		if (_work_item_type == WORK_ITEM_TYPE_MOVE_TO_LAND &&
-		    new_work_item_type == WORK_ITEM_TYPE_DEFAULT) {
-
-			new_work_item_type = WORK_ITEM_TYPE_DEFAULT;
-			/* XXX: noop */
 		}
 
 		/* ignore yaw for landing items */
@@ -796,7 +730,7 @@ Mission::set_mission_items()
 	reset_mission_item_reached();
 
 	if (_mission_type == MISSION_TYPE_OFFBOARD) {
-		set_current_offboard_mission_item();
+		set_current_mission_item();
 	}
 
 	if (_mission_item.autocontinue && get_time_inside(_mission_item) < FLT_EPSILON) {
@@ -896,7 +830,7 @@ Mission::do_need_move_to_takeoff()
 }
 
 void
-Mission::copy_positon_if_valid(struct mission_item_s *mission_item, struct position_setpoint_s *setpoint)
+Mission::copy_positon_if_valid(mission_item_s *mission_item, position_setpoint_s *setpoint)
 {
 	if (setpoint->valid && setpoint->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
 		mission_item->lat = setpoint->lat;
@@ -913,7 +847,7 @@ Mission::copy_positon_if_valid(struct mission_item_s *mission_item, struct posit
 }
 
 void
-Mission::set_align_mission_item(struct mission_item_s *mission_item, struct mission_item_s *mission_item_next)
+Mission::set_align_mission_item(mission_item_s *mission_item, mission_item_s *mission_item_next)
 {
 	mission_item->nav_cmd = NAV_CMD_WAYPOINT;
 	copy_positon_if_valid(mission_item, &(_navigator->get_position_setpoint_triplet()->current));
@@ -929,7 +863,7 @@ Mission::set_align_mission_item(struct mission_item_s *mission_item, struct miss
 }
 
 float
-Mission::calculate_takeoff_altitude(struct mission_item_s *mission_item)
+Mission::calculate_takeoff_altitude(mission_item_s *mission_item)
 {
 	/* calculate takeoff altitude */
 	float takeoff_alt = get_absolute_altitude_for_item(*mission_item);
@@ -959,7 +893,7 @@ Mission::heading_sp_update()
 		return;
 	}
 
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	/* Don't change setpoint if last and current waypoint are not valid */
 	if (!pos_sp_triplet->current.valid) {
@@ -1030,7 +964,7 @@ Mission::heading_sp_update()
 void
 Mission::altitude_sp_foh_update()
 {
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	/* Don't change setpoint if last and current waypoint are not valid
 	 * or if the previous altitude isn't from a position or loiter setpoint
@@ -1093,21 +1027,16 @@ Mission::altitude_sp_foh_update()
 }
 
 void
-Mission::altitude_sp_foh_reset()
-{
-	_min_current_sp_distance_xy = FLT_MAX;
-}
-
-void
 Mission::cruising_speed_sp_update()
 {
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	const float cruising_speed = _navigator->get_cruising_speed();
 
 	/* Don't change setpoint if the current waypoint is not valid */
 	if (!pos_sp_triplet->current.valid ||
 	    fabsf(pos_sp_triplet->current.cruising_speed - cruising_speed) < FLT_EPSILON) {
+
 		return;
 	}
 
@@ -1141,7 +1070,7 @@ Mission::do_abort_landing()
 	_mission_item.autocontinue = false;
 	_mission_item.origin = ORIGIN_ONBOARD;
 
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	mission_item_to_position_setpoint(&_mission_item, &pos_sp_triplet->current);
 	_navigator->set_position_setpoint_triplet_updated();
 
@@ -1152,11 +1081,11 @@ Mission::do_abort_landing()
 	int land_start_index = find_offboard_land_start();
 
 	if (land_start_index != -1) {
-		_current_offboard_mission_index = land_start_index;
+		_mission.current_seq = land_start_index;
 
 	} else {
 		// move mission index back (landing approach point)
-		_current_offboard_mission_index -= 1;
+		_mission.current_seq -= 1;
 	}
 
 	// send reposition cmd to get out of mission
@@ -1174,8 +1103,8 @@ Mission::do_abort_landing()
 }
 
 bool
-Mission::prepare_mission_items(bool onboard, struct mission_item_s *mission_item,
-			       struct mission_item_s *next_position_mission_item, bool *has_next_position_item)
+Mission::prepare_mission_items(bool onboard, mission_item_s *mission_item,
+			       mission_item_s *next_position_mission_item, bool *has_next_position_item)
 {
 	bool first_res = false;
 	int offset = 1;
@@ -1200,51 +1129,48 @@ Mission::prepare_mission_items(bool onboard, struct mission_item_s *mission_item
 }
 
 bool
-Mission::read_mission_item(bool onboard, int offset, struct mission_item_s *mission_item)
+Mission::read_mission_item(bool onboard, int offset, mission_item_s *mission_item)
 {
-	/* select onboard/offboard mission */
-	int *mission_index_ptr;
+	const int mission_count = _mission.count;
+
 	dm_item_t dm_item;
 
-	struct mission_s *mission = (onboard) ? &_onboard_mission : &_offboard_mission;
-	int current_index = (onboard) ? _current_onboard_mission_index : _current_offboard_mission_index;
-	int index_to_read = current_index + offset;
-
-	/* do not work on empty missions */
-	if (mission->count == 0) {
-		return false;
-	}
-
+	/* select onboard/offboard mission */
 	if (onboard) {
-		/* onboard mission */
-		mission_index_ptr = (offset == 0) ? &_current_onboard_mission_index : &index_to_read;
 		dm_item = DM_KEY_WAYPOINTS_ONBOARD;
 
 	} else {
-		/* offboard mission */
-		mission_index_ptr = (offset == 0) ? &_current_offboard_mission_index : &index_to_read;
-		dm_item = DM_KEY_WAYPOINTS_OFFBOARD(_offboard_mission.dataman_id);
+		dm_item = DM_KEY_WAYPOINTS_OFFBOARD(_mission.dataman_id);
 	}
+
+	/* do not work on empty missions */
+	if (mission_count == 0) {
+		return false;
+	}
+
+	int current_index = _mission.current_seq;
+	int index_to_read = current_index + offset;
+
+	int *mission_index_ptr = (offset == 0) ? &_mission.current_seq : &index_to_read;
 
 	/* Repeat this several times in case there are several DO JUMPS that we need to follow along, however, after
 	 * 10 iterations we have to assume that the DO JUMPS are probably cycling and give up. */
 	for (int i = 0; i < 10; i++) {
 
-		if (*mission_index_ptr < 0 || *mission_index_ptr >= (int)mission->count) {
+		if (*mission_index_ptr < 0 || *mission_index_ptr >= mission_count) {
 			/* mission item index out of bounds - if they are equal, we just reached the end */
-			if (*mission_index_ptr != (int)mission->count) {
+			if (*mission_index_ptr != mission_count) {
 				mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Mission item index out of bound, index: %d, max: %d.",
-						     *mission_index_ptr,
-						     (int)mission->count);
+						     *mission_index_ptr, mission_count);
 			}
 
 			return false;
 		}
 
-		const ssize_t len = sizeof(struct mission_item_s);
+		const ssize_t len = sizeof(mission_item_s);
 
 		/* read mission item to temp storage first to not overwrite current mission item if data damaged */
-		struct mission_item_s mission_item_tmp;
+		mission_item_s mission_item_tmp;
 
 		/* read mission item from datamanager */
 		if (dm_read(dm_item, *mission_index_ptr, &mission_item_tmp, len) != len) {
@@ -1265,11 +1191,11 @@ Mission::read_mission_item(bool onboard, int offset, struct mission_item_s *miss
 					(mission_item_tmp.do_jump_current_count)++;
 
 					/* save repeat count */
-					if (dm_write(dm_item, *mission_index_ptr, DM_PERSIST_POWER_ON_RESET,
-						     &mission_item_tmp, len) != len) {
-						/* not supposed to happen unless the datamanager can't access the
-						 * dataman */
+					if (dm_write(dm_item, *mission_index_ptr, DM_PERSIST_POWER_ON_RESET, &mission_item_tmp, len) != len) {
+
+						/* not supposed to happen unless the datamanager can't access the dataman */
 						mavlink_log_critical(_navigator->get_mavlink_log_pub(), "DO JUMP waypoint could not be written.");
+
 						return false;
 					}
 
@@ -1291,18 +1217,19 @@ Mission::read_mission_item(bool onboard, int offset, struct mission_item_s *miss
 
 		} else {
 			/* if it's not a DO_JUMP, then we were successful */
-			memcpy(mission_item, &mission_item_tmp, sizeof(struct mission_item_s));
+			memcpy(mission_item, &mission_item_tmp, sizeof(mission_item_s));
 			return true;
 		}
 	}
 
 	/* we have given up, we don't want to cycle forever */
 	mavlink_log_critical(_navigator->get_mavlink_log_pub(), "DO JUMP is cycling, giving up.");
+
 	return false;
 }
 
 void
-Mission::save_offboard_mission_state()
+Mission::save_mission_state()
 {
 	mission_s mission_state = {};
 
@@ -1310,36 +1237,36 @@ Mission::save_offboard_mission_state()
 	dm_lock(DM_KEY_MISSION_STATE);
 
 	/* read current state */
-	int read_res = dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s));
-
-	if (read_res == sizeof(mission_s)) {
+	if (dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s)) == sizeof(mission_s)) {
 		/* data read successfully, check dataman ID and items count */
-		if (mission_state.dataman_id == _offboard_mission.dataman_id && mission_state.count == _offboard_mission.count) {
-			/* navigator may modify only sequence, write modified state only if it changed */
-			if (mission_state.current_seq != _current_offboard_mission_index) {
-				if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
-					     sizeof(mission_s)) != sizeof(mission_s)) {
+		if ((mission_state.dataman_id == _mission.dataman_id) &&
+		    (mission_state.count == _mission.count) &&
+		    (mission_state.current_seq != _mission.current_seq)) {
 
-					warnx("ERROR: can't save mission state");
-					mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Can't save mission state.");
-				}
+			/* navigator may modify only sequence, write modified state only if it changed */
+			if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
+				     sizeof(mission_s)) != sizeof(mission_s)) {
+
+				PX4_ERR("ERROR: can't save mission state");
+				mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Can't save mission state.");
 			}
 		}
 
 	} else {
 		/* invalid data, this must not happen and indicates error in offboard_mission publisher */
-		mission_state.dataman_id = _offboard_mission.dataman_id;
-		mission_state.count = _offboard_mission.count;
-		mission_state.current_seq = _current_offboard_mission_index;
+		mission_state.timestamp = hrt_absolute_time();
+		mission_state.dataman_id = _mission.dataman_id;
+		mission_state.count = _mission.count;
+		mission_state.current_seq = _mission.current_seq;
 
-		warnx("ERROR: invalid mission state");
+		PX4_ERR("ERROR: invalid mission state");
 		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Invalid mission state.");
 
 		/* write modified state only if changed */
 		if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
 			     sizeof(mission_s)) != sizeof(mission_s)) {
 
-			warnx("ERROR: can't save mission state");
+			PX4_ERR("ERROR: can't save mission state");
 			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Can't save mission state.");
 		}
 	}
@@ -1355,6 +1282,7 @@ Mission::report_do_jump_mission_changed(int index, int do_jumps_remaining)
 	_navigator->get_mission_result()->item_do_jump_changed = true;
 	_navigator->get_mission_result()->item_changed_index = index;
 	_navigator->get_mission_result()->item_do_jump_remaining = do_jumps_remaining;
+
 	_navigator->set_mission_result_updated();
 }
 
@@ -1362,20 +1290,23 @@ void
 Mission::set_mission_item_reached()
 {
 	_navigator->get_mission_result()->reached = true;
-	_navigator->get_mission_result()->seq_reached = _current_offboard_mission_index;
+	_navigator->get_mission_result()->seq_reached = _mission.current_seq;
+
 	_navigator->set_mission_result_updated();
+
 	reset_mission_item_reached();
 }
 
 void
-Mission::set_current_offboard_mission_item()
+Mission::set_current_mission_item()
 {
 	_navigator->get_mission_result()->reached = false;
 	_navigator->get_mission_result()->finished = false;
-	_navigator->get_mission_result()->seq_current = _current_offboard_mission_index;
+	_navigator->get_mission_result()->seq_current = _mission.current_seq;
+
 	_navigator->set_mission_result_updated();
 
-	save_offboard_mission_state();
+	save_mission_state();
 }
 
 void
@@ -1385,23 +1316,15 @@ Mission::set_mission_finished()
 	_navigator->set_mission_result_updated();
 }
 
-void
-Mission::check_mission_valid(bool force)
+bool
+Mission::mission_valid(const mission_s &mission)
 {
-	if ((!_home_inited && _navigator->home_position_valid()) || force) {
-
-		_navigator->get_mission_result()->valid =
-			_missionFeasibilityChecker.checkMissionFeasible(_offboard_mission, _param_dist_1wp.get(), false);
-
-		_navigator->get_mission_result()->seq_total = _offboard_mission.count;
-		_navigator->increment_mission_instance_count();
-		_navigator->set_mission_result_updated();
-		_home_inited = _navigator->home_position_valid();
-	}
+	MissionFeasibilityChecker _missionFeasibilityChecker(_navigator);
+	return _missionFeasibilityChecker.checkMissionFeasible(mission, _param_dist_1wp.get(), false);
 }
 
 void
-Mission::reset_offboard_mission(struct mission_s &mission)
+Mission::reset_mission(mission_s &mission)
 {
 	dm_lock(DM_KEY_MISSION_STATE);
 
@@ -1415,10 +1338,9 @@ Mission::reset_offboard_mission(struct mission_s &mission)
 				dm_item_t dm_current = DM_KEY_WAYPOINTS_OFFBOARD(mission.dataman_id);
 
 				for (unsigned index = 0; index < mission.count; index++) {
-					struct mission_item_s item;
-					const ssize_t len = sizeof(struct mission_item_s);
+					mission_item_s item;
 
-					if (dm_read(dm_current, index, &item, len) != len) {
+					if (dm_read(dm_current, index, &item, sizeof(item)) != sizeof(item)) {
 						PX4_WARN("could not read mission item during reset");
 						break;
 					}
@@ -1426,7 +1348,7 @@ Mission::reset_offboard_mission(struct mission_s &mission)
 					if (item.nav_cmd == NAV_CMD_DO_JUMP) {
 						item.do_jump_current_count = 0;
 
-						if (dm_write(dm_current, index, DM_PERSIST_POWER_ON_RESET, &item, len) != len) {
+						if (dm_write(dm_current, index, DM_PERSIST_POWER_ON_RESET, &item, sizeof(item)) != sizeof(item)) {
 							PX4_WARN("could not save mission item during reset");
 							break;
 						}
@@ -1438,6 +1360,7 @@ Mission::reset_offboard_mission(struct mission_s &mission)
 			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Could not read mission.");
 
 			/* initialize mission state in dataman */
+			mission.timestamp = hrt_absolute_time();
 			mission.dataman_id = 0;
 			mission.count = 0;
 			mission.current_seq = 0;
@@ -1466,7 +1389,7 @@ Mission::need_to_reset_mission(bool active)
 }
 
 void
-Mission::generate_waypoint_from_heading(struct position_setpoint_s *setpoint, float yaw)
+Mission::generate_waypoint_from_heading(position_setpoint_s *setpoint, float yaw)
 {
 	waypoint_from_heading_and_distance(
 		_navigator->get_global_position()->lat,

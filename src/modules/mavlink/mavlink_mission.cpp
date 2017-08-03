@@ -87,7 +87,8 @@ MavlinkMissionManager::MavlinkMissionManager(Mavlink *mavlink) :
 	_mission_result_sub(-1),
 	_offboard_mission_pub(nullptr),
 	_slow_rate_limiter(100 * 1000), // Rate limit sending of the current WP sequence to 10 Hz
-	_verbose(mavlink->verbose()),
+	//_verbose(mavlink->verbose()),
+	_verbose(true),
 	_mavlink(mavlink)
 {
 	_offboard_mission_sub = orb_subscribe(ORB_ID(offboard_mission));
@@ -135,14 +136,63 @@ MavlinkMissionManager::init_offboard_mission()
 /**
  * Write new mission state to dataman and publish offboard_mission topic to notify navigator about changes.
  */
-int
+bool
 MavlinkMissionManager::update_active_mission(int dataman_id, unsigned count, int seq)
 {
-	struct mission_s mission;
+	// current mission_result
+	mission_result_s mission_result = {};
+	orb_copy(ORB_ID(mission_result), _mission_result_sub, &mission_result);
 
+	mission_s mission;
+
+	mission.timestamp = hrt_absolute_time();
 	mission.dataman_id = dataman_id;
 	mission.count = count;
 	mission.current_seq = seq;
+
+	/* mission state saved successfully, publish offboard_mission topic */
+	if (_offboard_mission_pub == nullptr) {
+		_offboard_mission_pub = orb_advertise(ORB_ID(mission), &mission);
+
+	} else {
+		orb_publish(ORB_ID(mission), _offboard_mission_pub, &mission);
+	}
+
+	px4_pollfd_struct_t fds[1] = {};
+	fds[0].fd = _mission_result_sub;
+	fds[0].events = POLLIN;
+
+	int ret = px4_poll(fds, sizeof(fds) / sizeof(fds[0]), 1000);
+
+	if (!(fds[0].revents & POLLIN)) {
+		// no new data
+		PX4_WARN("mission_result no new data");
+	}
+
+	if (ret < 0) {
+		// Poll error, sleep and try again
+		PX4_WARN("mission_result Poll error, sleep and try again");
+		return false;
+
+	} else if (ret == 0) {
+		// Poll timeout or no new data, do nothing
+		PX4_WARN("mission_result timeout or no new data");
+		return false;
+	}
+
+	// new mission_result
+	mission_result_s mission_result_new = {};
+	orb_copy(ORB_ID(mission_result), _mission_result_sub, &mission_result_new);
+
+	if (mission_result_new.instance_count <= mission_result.instance_count) {
+		PX4_WARN("mission result not updated");
+		return false;
+	}
+
+	if (!mission_result_new.valid) {
+		PX4_WARN("mission result not valid");
+		return false;
+	}
 
 	/* update mission state in dataman */
 	int res = dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
@@ -154,24 +204,16 @@ MavlinkMissionManager::update_active_mission(int dataman_id, unsigned count, int
 		_current_seq = seq;
 		_my_dataman_id = _dataman_id;
 
-		/* mission state saved successfully, publish offboard_mission topic */
-		if (_offboard_mission_pub == nullptr) {
-			_offboard_mission_pub = orb_advertise(ORB_ID(offboard_mission), &mission);
-
-		} else {
-			orb_publish(ORB_ID(offboard_mission), _offboard_mission_pub, &mission);
-		}
-
-		return PX4_OK;
+		return true;
 
 	} else {
-		warnx("WPM: ERROR: can't save mission state");
+		PX4_WARN("WPM: ERROR: can't save mission state");
 
 		if (_filesystem_errcount++ < FILESYSTEM_ERRCOUNT_NOTIFY_LIMIT) {
 			_mavlink->send_statustext_critical("Mission storage: Unable to write to microSD");
 		}
 
-		return PX4_ERROR;
+		return false;
 	}
 }
 
@@ -186,7 +228,7 @@ MavlinkMissionManager::send_mission_ack(uint8_t sysid, uint8_t compid, uint8_t t
 
 	mavlink_msg_mission_ack_send_struct(_mavlink->get_channel(), &wpa);
 
-	if (_verbose) { warnx("WPM: Send MISSION_ACK type %u to ID %u", wpa.type, wpa.target_system); }
+	if (_verbose) { PX4_WARN("WPM: Send MISSION_ACK type %u to ID %u", wpa.type, wpa.target_system); }
 }
 
 
@@ -204,7 +246,7 @@ MavlinkMissionManager::send_mission_current(uint16_t seq)
 		/* don't broadcast if no WPs */
 
 	} else {
-		if (_verbose) { warnx("WPM: Send MISSION_CURRENT ERROR: seq %u out of bounds", seq); }
+		if (_verbose) { PX4_WARN("WPM: Send MISSION_CURRENT ERROR: seq %u out of bounds", seq); }
 
 		_mavlink->send_statustext_critical("ERROR: wp index out of bounds");
 	}
@@ -224,7 +266,7 @@ MavlinkMissionManager::send_mission_count(uint8_t sysid, uint8_t compid, uint16_
 
 	mavlink_msg_mission_count_send_struct(_mavlink->get_channel(), &wpc);
 
-	if (_verbose) { warnx("WPM: Send MISSION_COUNT %u to ID %u", wpc.count, wpc.target_system); }
+	if (_verbose) { PX4_WARN("WPM: Send MISSION_COUNT %u to ID %u", wpc.count, wpc.target_system); }
 }
 
 
@@ -275,7 +317,7 @@ MavlinkMissionManager::send_mission_item(uint8_t sysid, uint8_t compid, uint16_t
 			_mavlink->send_statustext_critical("Mission storage: Unable to read from microSD");
 		}
 
-		if (_verbose) { warnx("WPM: Send MISSION_ITEM ERROR: could not read seq %u from dataman ID %i", seq, _dataman_id); }
+		if (_verbose) { PX4_WARN("WPM: Send MISSION_ITEM ERROR: could not read seq %u from dataman ID %i", seq, _dataman_id); }
 	}
 }
 
@@ -315,7 +357,7 @@ MavlinkMissionManager::send_mission_request(uint8_t sysid, uint8_t compid, uint1
 	} else {
 		_mavlink->send_statustext_critical("ERROR: Waypoint index exceeds list capacity");
 
-		if (_verbose) { warnx("WPM: Send MISSION_REQUEST ERROR: seq %u exceeds list capacity", seq); }
+		if (_verbose) { PX4_WARN("WPM: Send MISSION_REQUEST ERROR: seq %u exceeds list capacity", seq); }
 	}
 }
 
@@ -329,7 +371,7 @@ MavlinkMissionManager::send_mission_item_reached(uint16_t seq)
 
 	mavlink_msg_mission_item_reached_send_struct(_mavlink->get_channel(), &wp_reached);
 
-	if (_verbose) { warnx("WPM: Send MISSION_ITEM_REACHED reached_seq %u", wp_reached.seq); }
+	if (_verbose) { PX4_WARN("WPM: Send MISSION_ITEM_REACHED reached_seq %u", wp_reached.seq); }
 }
 
 
@@ -345,7 +387,7 @@ MavlinkMissionManager::send(const hrt_abstime now)
 
 		_current_seq = mission_result.seq_current;
 
-		if (_verbose) { warnx("WPM: got mission result, new current_seq: %d", _current_seq); }
+		if (_verbose) { PX4_WARN("WPM: got mission result, new current_seq: %d", _current_seq); }
 
 		if (mission_result.reached) {
 			_time_last_reached = now;
@@ -385,13 +427,13 @@ MavlinkMissionManager::send(const hrt_abstime now)
 		   && hrt_elapsed_time(&_time_last_sent) > _retry_timeout) {
 		if (_transfer_seq == 0) {
 			/* try to send items count again after timeout */
-			if (_verbose) { warnx("WPM: send count timeout"); }
+			if (_verbose) { PX4_WARN("WPM: send count timeout"); }
 
 			send_mission_count(_transfer_partner_sysid, _transfer_partner_compid, _transfer_count);
 
 		} else {
 			/* try to send item again after timeout */
-			if (_verbose) { warnx("WPM: item re-send timeout"); }
+			if (_verbose) { PX4_WARN("WPM: item re-send timeout"); }
 
 			send_mission_item(_transfer_partner_sysid, _transfer_partner_compid, _transfer_seq - 1);
 		}
@@ -400,7 +442,7 @@ MavlinkMissionManager::send(const hrt_abstime now)
 		   && hrt_elapsed_time(&_time_last_recv) > _action_timeout) {
 		_mavlink->send_statustext_critical("Operation timeout");
 
-		if (_verbose) { warnx("WPM: Last operation (state=%u) timed out, changing state to MAVLINK_WPM_STATE_IDLE", _state); }
+		if (_verbose) { PX4_WARN("WPM: Last operation (state=%u) timed out, changing state to MAVLINK_WPM_STATE_IDLE", _state); }
 
 		_state = MAVLINK_WPM_STATE_IDLE;
 
@@ -473,12 +515,12 @@ MavlinkMissionManager::handle_mission_ack(const mavlink_message_t *msg)
 				_time_last_recv = hrt_absolute_time();
 
 				if (_transfer_seq == _count) {
-					if (_verbose) { warnx("WPM: MISSION_ACK OK all items sent, switch to state IDLE"); }
+					if (_verbose) { PX4_WARN("WPM: MISSION_ACK OK all items sent, switch to state IDLE"); }
 
 				} else {
 					_mavlink->send_statustext_critical("WPM: ERR: not all items sent -> IDLE");
 
-					if (_verbose) { warnx("WPM: MISSION_ACK ERROR: not all items sent, switch to state IDLE anyway"); }
+					if (_verbose) { PX4_WARN("WPM: MISSION_ACK ERROR: not all items sent, switch to state IDLE anyway"); }
 				}
 
 				_state = MAVLINK_WPM_STATE_IDLE;
@@ -498,7 +540,7 @@ MavlinkMissionManager::handle_mission_ack(const mavlink_message_t *msg)
 			_mavlink->send_statustext_critical("REJ. WP CMD: partner id mismatch");
 
 			if (_verbose) {
-				warnx("WPM: MISSION_ACK ERR: ID mismatch");
+				PX4_WARN("WPM: MISSION_ACK ERR: ID mismatch");
 			}
 		}
 	}
@@ -516,23 +558,23 @@ MavlinkMissionManager::handle_mission_set_current(const mavlink_message_t *msg)
 			_time_last_recv = hrt_absolute_time();
 
 			if (wpc.seq < _count) {
-				if (update_active_mission(_dataman_id, _count, wpc.seq) == PX4_OK) {
-					if (_verbose) { warnx("WPM: MISSION_SET_CURRENT seq=%d OK", wpc.seq); }
+				if (update_active_mission(_dataman_id, _count, wpc.seq)) {
+					if (_verbose) { PX4_WARN("WPM: MISSION_SET_CURRENT seq=%d OK", wpc.seq); }
 
 				} else {
-					if (_verbose) { warnx("WPM: MISSION_SET_CURRENT seq=%d ERROR", wpc.seq); }
+					if (_verbose) { PX4_WARN("WPM: MISSION_SET_CURRENT seq=%d ERROR", wpc.seq); }
 
 					_mavlink->send_statustext_critical("WPM: WP CURR CMD: Error setting ID");
 				}
 
 			} else {
-				if (_verbose) { warnx("WPM: MISSION_SET_CURRENT seq=%d ERROR: not in list", wpc.seq); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_SET_CURRENT seq=%d ERROR: not in list", wpc.seq); }
 
 				_mavlink->send_statustext_critical("WPM: WP CURR CMD: Not in list");
 			}
 
 		} else {
-			if (_verbose) { warnx("WPM: MISSION_SET_CURRENT ERROR: busy"); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_SET_CURRENT ERROR: busy"); }
 
 			_mavlink->send_statustext_critical("WPM: IGN WP CURR CMD: Busy");
 		}
@@ -557,16 +599,16 @@ MavlinkMissionManager::handle_mission_request_list(const mavlink_message_t *msg)
 			_transfer_partner_compid = msg->compid;
 
 			if (_count > 0) {
-				if (_verbose) { warnx("WPM: MISSION_REQUEST_LIST OK, %u mission items to send", _transfer_count); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_REQUEST_LIST OK, %u mission items to send", _transfer_count); }
 
 			} else {
-				if (_verbose) { warnx("WPM: MISSION_REQUEST_LIST OK nothing to send, mission is empty"); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_REQUEST_LIST OK nothing to send, mission is empty"); }
 			}
 
 			send_mission_count(msg->sysid, msg->compid, _count);
 
 		} else {
-			if (_verbose) { warnx("WPM: MISSION_REQUEST_LIST ERROR: busy"); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_REQUEST_LIST ERROR: busy"); }
 
 			_mavlink->send_statustext_critical("IGN REQUEST LIST: Busy");
 		}
@@ -611,22 +653,22 @@ MavlinkMissionManager::handle_mission_request_both(const mavlink_message_t *msg)
 
 				/* _transfer_seq contains sequence of expected request */
 				if (wpr.seq == _transfer_seq && _transfer_seq < _transfer_count) {
-					if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) seq %u from ID %u", wpr.seq, msg->sysid); }
+					if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) seq %u from ID %u", wpr.seq, msg->sysid); }
 
 					_transfer_seq++;
 
 				} else if (wpr.seq == _transfer_seq - 1) {
-					if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) seq %u from ID %u (again)", wpr.seq, msg->sysid); }
+					if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) seq %u from ID %u (again)", wpr.seq, msg->sysid); }
 
 				} else {
 					if (_transfer_seq > 0 && _transfer_seq < _transfer_count) {
-						if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u from ID %u unexpected, must be %i or %i", wpr.seq, msg->sysid, _transfer_seq - 1, _transfer_seq); }
+						if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u from ID %u unexpected, must be %i or %i", wpr.seq, msg->sysid, _transfer_seq - 1, _transfer_seq); }
 
 					} else if (_transfer_seq <= 0) {
-						if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u from ID %u unexpected, must be %i", wpr.seq, msg->sysid, _transfer_seq); }
+						if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u from ID %u unexpected, must be %i", wpr.seq, msg->sysid, _transfer_seq); }
 
 					} else {
-						if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u from ID %u unexpected, must be %i", wpr.seq, msg->sysid, _transfer_seq - 1); }
+						if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u from ID %u unexpected, must be %i", wpr.seq, msg->sysid, _transfer_seq - 1); }
 					}
 
 					_state = MAVLINK_WPM_STATE_IDLE;
@@ -641,7 +683,7 @@ MavlinkMissionManager::handle_mission_request_both(const mavlink_message_t *msg)
 					send_mission_item(_transfer_partner_sysid, _transfer_partner_compid, wpr.seq);
 
 				} else {
-					if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u out of bound [%u, %u]", (unsigned)wpr.seq, (unsigned)wpr.seq, (unsigned)_count - 1); }
+					if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: seq %u out of bound [%u, %u]", (unsigned)wpr.seq, (unsigned)wpr.seq, (unsigned)_count - 1); }
 
 					_state = MAVLINK_WPM_STATE_IDLE;
 
@@ -650,13 +692,13 @@ MavlinkMissionManager::handle_mission_request_both(const mavlink_message_t *msg)
 				}
 
 			} else if (_state == MAVLINK_WPM_STATE_IDLE) {
-				if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: no transfer"); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: no transfer"); }
 
 				// Silently ignore this as some OSDs have buggy mission protocol implementations
 				//_mavlink->send_statustext_critical("IGN MISSION_ITEM_REQUEST(_INT): No active transfer");
 
 			} else {
-				if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: busy (state %d).", _state); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: busy (state %d).", _state); }
 
 				_mavlink->send_statustext_critical("WPM: REJ. CMD: Busy");
 			}
@@ -664,7 +706,7 @@ MavlinkMissionManager::handle_mission_request_both(const mavlink_message_t *msg)
 		} else {
 			_mavlink->send_statustext_critical("WPM: REJ. CMD: partner id mismatch");
 
-			if (_verbose) { warnx("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: rejected, partner ID mismatch"); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_ITEM_REQUEST(_INT) ERROR: rejected, partner ID mismatch"); }
 		}
 	}
 }
@@ -688,7 +730,7 @@ MavlinkMissionManager::handle_mission_count(const mavlink_message_t *msg)
 			_transfer_in_progress = true;
 
 			if (wpc.count > _max_count) {
-				if (_verbose) { warnx("WPM: MISSION_COUNT ERROR: too many waypoints (%d), supported: %d", wpc.count, _max_count); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_COUNT ERROR: too many waypoints (%d), supported: %d", wpc.count, _max_count); }
 
 				send_mission_ack(_transfer_partner_sysid, _transfer_partner_compid, MAV_MISSION_NO_SPACE);
 				_transfer_in_progress = false;
@@ -696,17 +738,21 @@ MavlinkMissionManager::handle_mission_count(const mavlink_message_t *msg)
 			}
 
 			if (wpc.count == 0) {
-				if (_verbose) { warnx("WPM: MISSION_COUNT 0, clearing waypoints list and staying in state MAVLINK_WPM_STATE_IDLE"); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_COUNT 0, clearing waypoints list and staying in state MAVLINK_WPM_STATE_IDLE"); }
 
 				/* alternate dataman ID anyway to let navigator know about changes */
-				update_active_mission(_dataman_id == 0 ? 1 : 0, 0, 0);
+				if (update_active_mission(_dataman_id == 0 ? 1 : 0, 0, 0)) {
+					send_mission_ack(_transfer_partner_sysid, _transfer_partner_compid, MAV_MISSION_ACCEPTED);
 
-				send_mission_ack(_transfer_partner_sysid, _transfer_partner_compid, MAV_MISSION_ACCEPTED);
+				} else {
+					send_mission_ack(_transfer_partner_sysid, _transfer_partner_compid, MAV_MISSION_ERROR);
+				}
+
 				_transfer_in_progress = false;
 				return;
 			}
 
-			if (_verbose) { warnx("WPM: MISSION_COUNT %u from ID %u, changing state to MAVLINK_WPM_STATE_GETLIST", wpc.count, msg->sysid); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_COUNT %u from ID %u, changing state to MAVLINK_WPM_STATE_GETLIST", wpc.count, msg->sysid); }
 
 			_state = MAVLINK_WPM_STATE_GETLIST;
 			_transfer_seq = 0;
@@ -721,17 +767,17 @@ MavlinkMissionManager::handle_mission_count(const mavlink_message_t *msg)
 
 			if (_transfer_seq == 0) {
 				/* looks like our MISSION_REQUEST was lost, try again */
-				if (_verbose) { warnx("WPM: MISSION_COUNT %u from ID %u (again)", wpc.count, msg->sysid); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_COUNT %u from ID %u (again)", wpc.count, msg->sysid); }
 
 			} else {
-				if (_verbose) { warnx("WPM: MISSION_COUNT ERROR: busy, already receiving seq %u", _transfer_seq); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_COUNT ERROR: busy, already receiving seq %u", _transfer_seq); }
 
 				_mavlink->send_statustext_critical("WPM: REJ. CMD: Busy");
 				return;
 			}
 
 		} else {
-			if (_verbose) { warnx("WPM: MISSION_COUNT ERROR: busy, state %i", _state); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_COUNT ERROR: busy, state %i", _state); }
 
 			_mavlink->send_statustext_critical("WPM: IGN MISSION_COUNT: Busy");
 			return;
@@ -779,20 +825,20 @@ MavlinkMissionManager::handle_mission_item_both(const mavlink_message_t *msg)
 			_time_last_recv = hrt_absolute_time();
 
 			if (wp.seq != _transfer_seq) {
-				if (_verbose) { warnx("WPM: MISSION_ITEM ERROR: seq %u was not the expected %u", wp.seq, _transfer_seq); }
+				if (_verbose) { PX4_WARN("WPM: MISSION_ITEM ERROR: seq %u was not the expected %u", wp.seq, _transfer_seq); }
 
 				/* don't send request here, it will be performed in eventloop after timeout */
 				return;
 			}
 
 		} else if (_state == MAVLINK_WPM_STATE_IDLE) {
-			if (_verbose) { warnx("WPM: MISSION_ITEM ERROR: no transfer"); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_ITEM ERROR: no transfer"); }
 
 			_mavlink->send_statustext_critical("IGN MISSION_ITEM: No transfer");
 			return;
 
 		} else {
-			if (_verbose) { warnx("WPM: MISSION_ITEM ERROR: busy, state %i", _state); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_ITEM ERROR: busy, state %i", _state); }
 
 			_mavlink->send_statustext_critical("IGN MISSION_ITEM: Busy");
 			return;
@@ -803,7 +849,7 @@ MavlinkMissionManager::handle_mission_item_both(const mavlink_message_t *msg)
 		int ret = parse_mavlink_mission_item(&wp, &mission_item);
 
 		if (ret != PX4_OK) {
-			if (_verbose) { warnx("WPM: MISSION_ITEM ERROR: seq %u invalid item", wp.seq); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_ITEM ERROR: seq %u invalid item", wp.seq); }
 
 			_mavlink->send_statustext_critical("IGN MISSION_ITEM: Busy");
 
@@ -816,8 +862,9 @@ MavlinkMissionManager::handle_mission_item_both(const mavlink_message_t *msg)
 		dm_item_t dm_item = DM_KEY_WAYPOINTS_OFFBOARD(_transfer_dataman_id);
 
 		if (dm_write(dm_item, wp.seq, DM_PERSIST_POWER_ON_RESET, &mission_item,
-			     sizeof(struct mission_item_s)) != sizeof(struct mission_item_s)) {
-			if (_verbose) { warnx("WPM: MISSION_ITEM ERROR: error writing seq %u to dataman ID %i", wp.seq, _transfer_dataman_id); }
+			     sizeof(mission_item_s)) != sizeof(mission_item_s)) {
+
+			if (_verbose) { PX4_WARN("WPM: MISSION_ITEM ERROR: error writing seq %u to dataman ID %i", wp.seq, _transfer_dataman_id); }
 
 			send_mission_ack(_transfer_partner_sysid, _transfer_partner_compid, MAV_MISSION_ERROR);
 			_mavlink->send_statustext_critical("Unable to write on micro SD");
@@ -831,17 +878,17 @@ MavlinkMissionManager::handle_mission_item_both(const mavlink_message_t *msg)
 			_transfer_current_seq = wp.seq;
 		}
 
-		if (_verbose) { warnx("WPM: MISSION_ITEM seq %u received", wp.seq); }
+		if (_verbose) { PX4_WARN("WPM: MISSION_ITEM seq %u received", wp.seq); }
 
 		_transfer_seq = wp.seq + 1;
 
 		if (_transfer_seq == _transfer_count) {
 			/* got all new mission items successfully */
-			if (_verbose) { warnx("WPM: MISSION_ITEM got all %u items, current_seq=%u, changing state to MAVLINK_WPM_STATE_IDLE", _transfer_count, _transfer_current_seq); }
+			if (_verbose) { PX4_WARN("WPM: MISSION_ITEM got all %u items, current_seq=%u, changing state to MAVLINK_WPM_STATE_IDLE", _transfer_count, _transfer_current_seq); }
 
 			_state = MAVLINK_WPM_STATE_IDLE;
 
-			if (update_active_mission(_transfer_dataman_id, _transfer_count, _transfer_current_seq) == PX4_OK) {
+			if (update_active_mission(_transfer_dataman_id, _transfer_count, _transfer_current_seq)) {
 				send_mission_ack(_transfer_partner_sysid, _transfer_partner_compid, MAV_MISSION_ACCEPTED);
 
 			} else {
@@ -870,8 +917,8 @@ MavlinkMissionManager::handle_mission_clear_all(const mavlink_message_t *msg)
 			/* don't touch mission items storage itself, but only items count in mission state */
 			_time_last_recv = hrt_absolute_time();
 
-			if (update_active_mission(_dataman_id == 0 ? 1 : 0, 0, 0) == PX4_OK) {
-				if (_verbose) { warnx("WPM: CLEAR_ALL OK"); }
+			if (update_active_mission(_dataman_id == 0 ? 1 : 0, 0, 0)) {
+				if (_verbose) { PX4_WARN("WPM: CLEAR_ALL OK"); }
 
 				send_mission_ack(_transfer_partner_sysid, _transfer_partner_compid, MAV_MISSION_ACCEPTED);
 
@@ -882,7 +929,7 @@ MavlinkMissionManager::handle_mission_clear_all(const mavlink_message_t *msg)
 		} else {
 			_mavlink->send_statustext_critical("WPM: IGN CLEAR CMD: Busy");
 
-			if (_verbose) { warnx("WPM: CLEAR_ALL IGNORED: busy"); }
+			if (_verbose) { PX4_WARN("WPM: CLEAR_ALL IGNORED: busy"); }
 		}
 	}
 }
@@ -1204,7 +1251,7 @@ MavlinkMissionManager::format_mavlink_mission_item(const struct mission_item_s *
 void MavlinkMissionManager::check_active_mission()
 {
 	if (!(_my_dataman_id == _dataman_id)) {
-		if (_verbose) { warnx("WPM: New mission detected (possibly over different Mavlink instance) Updating"); }
+		if (_verbose) { PX4_WARN("WPM: New mission detected (possibly over different Mavlink instance) Updating"); }
 
 		_my_dataman_id = _dataman_id;
 		this->send_mission_count(_transfer_partner_sysid, _transfer_partner_compid, _count);

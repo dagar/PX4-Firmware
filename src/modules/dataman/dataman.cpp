@@ -73,8 +73,7 @@ __EXPORT int dataman_main(int argc, char *argv[]);
 __END_DECLS
 
 /* Private File based Operations */
-static ssize_t _file_write(dm_item_t item, unsigned index, dm_persitence_t persistence, const void *buf,
-			   size_t count);
+static ssize_t _file_write(dm_item_t item, unsigned index, dm_persitence_t persistence, const void *buf, size_t count);
 static ssize_t _file_read(dm_item_t item, unsigned index, void *buf, size_t count);
 static int  _file_clear(dm_item_t item);
 static int  _file_restart(dm_reset_reason reason);
@@ -82,8 +81,7 @@ static int _file_initialize(unsigned max_offset);
 static void _file_shutdown();
 
 /* Private Ram based Operations */
-static ssize_t _ram_write(dm_item_t item, unsigned index, dm_persitence_t persistence, const void *buf,
-			  size_t count);
+static ssize_t _ram_write(dm_item_t item, unsigned index, dm_persitence_t persistence, const void *buf, size_t count);
 static ssize_t _ram_read(dm_item_t item, unsigned index, void *buf, size_t count);
 static int  _ram_clear(dm_item_t item);
 static int  _ram_restart(dm_reset_reason reason);

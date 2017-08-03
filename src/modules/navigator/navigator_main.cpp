@@ -63,7 +63,6 @@
 #include <uORB/topics/fence.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
 #include <uORB/topics/home_position.h>
-#include <uORB/topics/mission.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/uORB.h>
@@ -500,7 +499,7 @@ Navigator::task_main()
 				if (get_mission_result()->valid &&
 				    PX4_ISFINITE(cmd.param1) && (cmd.param1 >= 0) && (cmd.param1 < _mission_result.seq_total)) {
 
-					_mission.set_current_offboard_mission_index(cmd.param1);
+					_mission.set_current_mission_index(cmd.param1);
 				}
 
 			} else if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_PAUSE_CONTINUE) {
