@@ -107,12 +107,16 @@ then
 	param set SYS_COMPANION 57600
 fi
 
-set MIXER quad_x
+set MIXER deltaquad
 set PWM_OUT 1234
 set PWM_RATE 400
 
-set MIXER_AUX vtol_delta
-set PWM_ACHDIS 3
+param set PWM_MAIN5_DIS 1500
+param set PWM_MAIN6_DIS 1500
+param set PWM_MAIN7_DIS 900
+param set PWM_MAIN8_DIS 900
+
+set MIXER_AUX deltaquad
 set PWM_AUX_DISARMED 950
 
 set MAV_TYPE 22

@@ -100,6 +100,50 @@ then
 		then
 			pwm max -c ${PWM_OUT} -p ${PWM_MAX}
 		fi
+
+		#
+		# Per channel disarmed settings
+		#
+		if param greater PWM_MAIN1_DIS 0
+		then
+			pwm disarmed -c 1 -p p:PWM_MAIN1_DIS
+		fi
+
+		if param greater PWM_MAIN2_DIS 0
+		then
+			pwm disarmed -c 2 -p p:PWM_MAIN2_DIS
+		fi
+
+		if param greater PWM_MAIN3_DIS 0
+		then
+			pwm disarmed -c 3 -p p:PWM_MAIN3_DIS
+		fi
+
+		if param greater PWM_MAIN4_DIS 0
+		then
+			pwm disarmed -c 4 -p p:PWM_MAIN4_DIS
+		fi
+
+		if param greater PWM_MAIN5_DIS 0
+		then
+			pwm disarmed -c 5 -p p:PWM_MAIN5_DIS
+		fi
+
+		if param greater PWM_MAIN6_DIS 0
+		then
+			pwm disarmed -c 6 -p p:PWM_MAIN6_DIS
+		fi
+
+		if param greater PWM_MAIN7_DIS 0
+		then
+			pwm disarmed -c 7 -p p:PWM_MAIN7_DIS
+		fi
+
+		if param greater PWM_MAIN8_DIS 0
+		then
+			pwm disarmed -c 8 -p p:PWM_MAIN8_DIS
+		fi
+
 	fi
 
 	if [ $FAILSAFE != none ]
@@ -227,6 +271,42 @@ then
 		then
 			pwm disarmed -c ${PWM_ACHDIS} -p ${PWM_AUX_DISARMED} -d ${OUTPUT_AUX_DEV}
 		fi
+		
+		#
+		# Per channel disarmed settings
+		#
+		if param greater PWM_AUX1_DIS 0
+		then
+			pwm disarmed -c 1 -p p:PWM_AUX1_DIS -d ${OUTPUT_AUX_DEV}
+		fi
+
+		if param greater PWM_AUX2_DIS 0
+		then
+			pwm disarmed -c 2 -p p:PWM_AUX2_DIS -d ${OUTPUT_AUX_DEV}
+		fi
+
+		if param greater PWM_AUX3_DIS 0
+		then
+			pwm disarmed -c 3 -p p:PWM_AUX3_DIS -d ${OUTPUT_AUX_DEV}
+		fi
+
+		if param greater PWM_AUX4_DIS 0
+		then
+			pwm disarmed -c 4 -p p:PWM_AUX4_DIS -d ${OUTPUT_AUX_DEV}
+		fi
+
+		if param greater PWM_AUX5_DIS 0
+		then
+			pwm disarmed -c 5 -p p:PWM_AUX5_DIS -d ${OUTPUT_AUX_DEV}
+		fi
+
+		if param greater PWM_AUX6_DIS 0
+		then
+			pwm disarmed -c 6 -p p:PWM_AUX6_DIS -d ${OUTPUT_AUX_DEV}
+		fi
+
+
+
 
 		if [ $FAILSAFE_AUX != none ]
 		then
