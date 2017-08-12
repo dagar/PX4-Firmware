@@ -40,7 +40,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 /* Is network initialization debug forced on? */
 
@@ -59,7 +59,7 @@
 #include <semaphore.h>
 #include <signal.h>
 #include <assert.h>
-#include <debug.h>
+
 
 #include <net/if.h>
 #include <arpa/inet.h>

@@ -1,0 +1,68 @@
+
+#ifndef NSH_CONFIG_H_
+#define NSH_CONFIG_H_
+
+//#define CONFIG_NSH_ARCHINIT 1
+#define CONFIG_NSH_ARCHROMFS 1
+#define CONFIG_NSH_ARGCAT 1
+
+// fix this
+//#define CONFIG_NSH_BUILTIN_APPS 1
+
+#define CONFIG_NSH_CMDPARMS 1
+#define CONFIG_NSH_CODECS_BUFSIZE 128
+#define CONFIG_NSH_CONSOLE 1
+#define CONFIG_NSH_DISABLE_IFUPDOWN 1
+#define CONFIG_NSH_DISABLE_LOSMART 1
+#define CONFIG_NSH_FATDEVNO 1
+#define CONFIG_NSH_FATMOUNTPT "/tmp"
+#define CONFIG_NSH_FATNSECTORS 1024
+#define CONFIG_NSH_FATSECTSIZE 512
+#define CONFIG_NSH_FILEIOSIZE 512
+#define CONFIG_NSH_INITSCRIPT "init.d/rcS"
+#define CONFIG_NSH_LIBRARY 1
+#define CONFIG_NSH_LINELEN 128
+#define CONFIG_NSH_MAXARGUMENTS 12
+#define CONFIG_NSH_MMCSDMINOR 0
+#define CONFIG_NSH_MMCSDSLOTNO 0
+#define CONFIG_NSH_NESTDEPTH 8
+#define CONFIG_NSH_PROC_MOUNTPOINT "/proc"
+#define CONFIG_NSH_READLINE 1
+#define CONFIG_NSH_ROMFSDEVNO 0
+#define CONFIG_NSH_ROMFSETC 1
+#define CONFIG_NSH_ROMFSMOUNTPT "/etc"
+#define CONFIG_NSH_ROMFSSECTSIZE 128
+#define CONFIG_NSH_STRERROR 1
+
+// reconsider
+#define CONFIG_NSH_DISABLE_FREE
+
+#define CONFIG_NFILE_DESCRIPTORS 53
+#define CONFIG_NFILE_STREAMS 8
+#define CONFIG_FS_ROMFS 1
+#define CONFIG_LIB_BOARDCTL 1
+
+
+
+#define CODE
+#define FAR
+
+#define OK 0
+#define ERROR -1
+#define TRUE 1
+#define FALSE 0
+
+#define DTYPE_DIRECTORY 0x08
+#define DIRENT_ISDIRECTORY(dtype) (((dtype) & DTYPE_DIRECTORY) != 0 )
+
+#define sched_lock()
+#define sched_unlock()
+
+#define zalloc(X) calloc(1, X)
+
+#define DEBUGASSERT(f)
+#define _info(x...)
+
+typedef void* pthread_addr_t;
+
+#endif /* NSH_CONFIG_H_ */

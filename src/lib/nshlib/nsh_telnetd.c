@@ -37,10 +37,10 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <stdio.h>
-#include <debug.h>
+
 
 #include <arpa/inet.h>
 

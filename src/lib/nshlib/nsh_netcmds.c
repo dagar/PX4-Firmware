@@ -37,7 +37,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #ifdef CONFIG_NET
 
@@ -56,7 +56,7 @@
 #include <netdb.h>       /* Needed for gethostbyname */
 #include <libgen.h>      /* Needed for basename */
 #include <errno.h>
-#include <debug.h>
+
 
 #if defined(CONFIG_LIBC_NETDB) && defined(CONFIG_NETDB_DNSCLIENT)
 #  ifndef CONFIG_NSH_DISABLE_NSLOOKUP

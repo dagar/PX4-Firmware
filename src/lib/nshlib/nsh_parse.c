@@ -37,19 +37,18 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
-#include <debug.h>
 
 #ifdef CONFIG_NSH_CMDPARMS
 #  include <sys/stat.h>
 #endif
 
-#include <nuttx/version.h>
+//#include <nuttx/version.h>
 #include "nshlib/nshlib.h"
 
 #include "nsh.h"

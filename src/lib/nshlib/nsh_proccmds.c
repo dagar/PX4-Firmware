@@ -37,7 +37,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +47,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "nsh.h"
 #include "nsh_console.h"

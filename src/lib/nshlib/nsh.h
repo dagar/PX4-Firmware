@@ -40,7 +40,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <sys/types.h>
 
@@ -54,7 +54,7 @@
 #  include <string.h>
 #endif
 
-#include <nuttx/usb/usbdev_trace.h>
+//#include <nuttx/usb/usbdev_trace.h>
 
 /****************************************************************************
  * Pre-processor Definitions

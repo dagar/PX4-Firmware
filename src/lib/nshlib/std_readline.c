@@ -1,7 +1,7 @@
 /****************************************************************************
- * apps/nshlib/nsh_usbtrace.c
+ * apps/system/readline/std_readline.c
  *
- *   Copyright (C) 2014 Gregory Nutt. All rights reserved.
+ *   Copyright (C) 2013 Gregory Nutt. All rights reserved.
  *   Author: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,100 +37,120 @@
  * Included Files
  ****************************************************************************/
 
-#include "nsh_config.h"
+#include <nuttx/config.h>
 
-#include <stdio.h>
+#include <sys/types.h>
+#include <nuttx/arch.h>
+#include "system/readline.h"
 
-
-#include <nuttx/usb/usbdev_trace.h>
-
-#ifdef CONFIG_NSH_USBDEV_TRACE
+#include "readline.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
 /****************************************************************************
- * Private Types
+ * Private Type Declarations
  ****************************************************************************/
 
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
 
-/****************************************************************************
- * Private Data
- ****************************************************************************/
+static int  readline_getc(FAR struct rl_common_s *vtbl);
+static void readline_putc(FAR struct rl_common_s *vtbl, int ch);
+static void readline_write(FAR struct rl_common_s *vtbl,
+                           FAR const char *buffer, size_t buflen);
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
 /****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static const struct rl_common_s g_stdreadline =
+{
+  readline_getc
+#ifdef CONFIG_READLINE_ECHO
+  , readline_putc
+  , readline_write
+#endif
+};
+
+/****************************************************************************
  * Private Functions
  ****************************************************************************/
 
 /****************************************************************************
- * Name: nsh_tracecallback
+ * Name: readline_getc
  ****************************************************************************/
 
-/****************************************************************************
- * Name: nsh_tracecallback
- *
- * Description:
- *   This is part of the USB trace logic
- *
- ****************************************************************************/
-
-static int usbtrace_syslog(FAR const char *fmt, ...)
+static int readline_getc(FAR struct rl_common_s *vtbl)
 {
-  va_list ap;
-  int ret;
-
-  /* Let vsyslog do the real work */
-
-  va_start(ap, fmt);
-  ret = vsyslog(LOG_INFO, fmt, ap);
-  va_end(ap);
-  return ret;
+  return up_getc();
 }
 
 /****************************************************************************
- * Name: nsh_tracecallback
- *
- * Description:
- *   This is part of the USB trace logic
- *
+ * Name: readline_putc
  ****************************************************************************/
 
-static int nsh_tracecallback(struct usbtrace_s *trace, void *arg)
+#ifdef CONFIG_READLINE_ECHO
+static void readline_putc(FAR struct rl_common_s *vtbl, int ch)
 {
-  usbtrace_trprintf(usbtrace_syslog, trace->event, trace->value);
-  return 0;
+  up_putc(ch);
 }
+#endif
+
+/****************************************************************************
+ * Name: readline_write
+ ****************************************************************************/
+
+#ifdef CONFIG_READLINE_ECHO
+static void readline_write(FAR struct rl_common_s *vtbl,
+                           FAR const char *buffer, size_t buflen)
+{
+  for (; buflen > 0; buflen--)
+    {
+     up_putc(*buffer++);
+    }
+}
+#endif
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
 /****************************************************************************
- * Name: nsh_usbtrace
+ * Name: std_readline
  *
- * Description:
- *   The function is called from the nsh_session() to dump USB data to the
- *   SYSLOG device.
+ *   readline() reads in at most one less than 'buflen' characters from
+ *   'stdin' and stores them into the buffer pointed to by 'buf'.
+ *   Characters are echoed on 'stdout'.  Reading stops after an EOF or a
+ *   newline.  If a newline is read, it is stored into the buffer.  A null
+ *   terminator is stored after the last character in the buffer.
+ *
+ *   This version of realine assumes that we are reading and writing to
+ *   a VT100 console.  This will not work well if 'stdin' or 'stdout'
+ *   corresponds to a raw byte steam.
+ *
+ *   This function is inspired by the GNU readline but is an entirely
+ *   different creature.
  *
  * Input Parameters:
- *   None
+ *   buf       - The user allocated buffer to be filled.
+ *   buflen    - the size of the buffer.
  *
- * Returned Values:
- *   None
+ * Returned values:
+ *   On success, the (positive) number of bytes transferred is returned.
+ *   EOF is returned to indicate either an end of file condition or a
+ *   failure.
  *
  ****************************************************************************/
 
-void nsh_usbtrace(void)
+ssize_t std_readline(FAR char *buf, int buflen)
 {
-  (void)usbtrace_enumerate(nsh_tracecallback, NULL);
+  return readline_common((FAR struct rl_common_s *)&g_stdreadline,
+                         buf, buflen);
 }
-
-#endif /* CONFIG_NSH_USBDEV_TRACE */

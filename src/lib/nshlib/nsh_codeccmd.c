@@ -39,7 +39,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 #ifdef CONFIG_NETUTILS_CODECS
 
 #include <sys/stat.h>
@@ -53,7 +53,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <errno.h>
-#include <debug.h>
+
 
 #if defined(CONFIG_NSH_DISABLE_URLENCODE) && defined(CONFIG_NSH_DISABLE_URLDECODE)
 #  undef CONFIG_CODECS_URLCODE

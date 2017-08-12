@@ -37,7 +37,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -48,7 +48,7 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+
 
 #include "nsh.h"
 #include "nsh_console.h"
@@ -183,8 +183,8 @@ static ssize_t nsh_consolewrite(FAR struct nsh_vtbl_s *vtbl,
   ret = fwrite(buffer, 1, nbytes, pstate->cn_outstream);
   if (ret < 0)
     {
-      _err("ERROR: [%d] Failed to send buffer: %d\n",
-          pstate->cn_outfd, errno);
+      //_err("ERROR: [%d] Failed to send buffer: %d\n",
+      //    pstate->cn_outfd, errno);
     }
   return ret;
 #else

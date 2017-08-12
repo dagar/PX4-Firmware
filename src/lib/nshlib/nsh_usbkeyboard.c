@@ -37,14 +37,14 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
-#include <debug.h>
+
 
 #include "nsh.h"
 #include "nsh_console.h"

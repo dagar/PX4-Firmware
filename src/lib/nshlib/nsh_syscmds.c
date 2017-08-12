@@ -37,9 +37,9 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
-#include <sys/boardctl.h>
+//#include <sys/boardctl.h>
 #include <sys/utsname.h>
 #include <stdlib.h>
 #include <string.h>

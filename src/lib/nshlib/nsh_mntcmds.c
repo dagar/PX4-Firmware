@@ -37,7 +37,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <sys/types.h>
 #include <sys/mount.h>
@@ -48,7 +48,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <debug.h>
+
 
 #include <netinet/in.h>
 #include <arpa/inet.h>

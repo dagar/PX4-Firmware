@@ -1,7 +1,7 @@
 /****************************************************************************
- * apps/nshlib/nsh_usbtrace.c
+ * examples/nsh/nsh_main.c
  *
- *   Copyright (C) 2014 Gregory Nutt. All rights reserved.
+ *   Copyright (C) 2007-2013 Gregory Nutt. All rights reserved.
  *   Author: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,16 +39,39 @@
 
 #include "nsh_config.h"
 
+#include <sys/stat.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <sched.h>
+#include <errno.h>
 
+#include <nuttx/arch.h>
 
-#include <nuttx/usb/usbdev_trace.h>
+#if defined(CONFIG_FS_BINFS) && (CONFIG_BUILTIN)
+#  include <nuttx/binfmt/builtin.h>
+#endif
 
-#ifdef CONFIG_NSH_USBDEV_TRACE
+#if defined(CONFIG_LIBC_EXECFUNCS) && defined(CONFIG_EXECFUNCS_SYMTAB)
+#  include <nuttx/binfmt/symtab.h>
+#endif
+
+#include "nshlib/nshlib.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* C++ initialization requires CXX initializer support */
+
+#if !defined(CONFIG_HAVE_CXX) || !defined(CONFIG_HAVE_CXXINITIALIZE)
+#  undef CONFIG_EXAMPLES_NSH_CXXINITIALIZE
+#endif
+
+/* The NSH telnet console requires networking support (and TCP/IP) */
+
+#ifndef CONFIG_NET
+#  undef CONFIG_NSH_TELNET
+#endif
 
 /****************************************************************************
  * Private Types
@@ -66,71 +89,103 @@
  * Public Data
  ****************************************************************************/
 
+/* If posix_spawn() is enabled as required for CONFIG_NSH_FILE_APPS, then
+ * a symbol table is needed by the internals of posix_spawn().  The symbol
+ * table is needed to support ELF and NXFLAT binaries to dynamically link to
+ * the base code.  However, if only the BINFS file system is supported, then
+ * no Makefile is needed.
+ *
+ * This is a kludge to plug the missing file system in the case where BINFS
+ * is used.  REVISIT:  This will, of course, be in the way if you want to
+ * support ELF or NXFLAT binaries!
+ */
+
+#if defined(CONFIG_LIBC_EXECFUNCS) && defined(CONFIG_EXECFUNCS_SYMTAB)
+const struct symtab_s CONFIG_EXECFUNCS_SYMTAB[1];
+#endif
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
-/****************************************************************************
- * Name: nsh_tracecallback
- ****************************************************************************/
-
-/****************************************************************************
- * Name: nsh_tracecallback
- *
- * Description:
- *   This is part of the USB trace logic
- *
- ****************************************************************************/
-
-static int usbtrace_syslog(FAR const char *fmt, ...)
-{
-  va_list ap;
-  int ret;
-
-  /* Let vsyslog do the real work */
-
-  va_start(ap, fmt);
-  ret = vsyslog(LOG_INFO, fmt, ap);
-  va_end(ap);
-  return ret;
-}
-
-/****************************************************************************
- * Name: nsh_tracecallback
- *
- * Description:
- *   This is part of the USB trace logic
- *
- ****************************************************************************/
-
-static int nsh_tracecallback(struct usbtrace_s *trace, void *arg)
-{
-  usbtrace_trprintf(usbtrace_syslog, trace->event, trace->value);
-  return 0;
-}
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
 /****************************************************************************
- * Name: nsh_usbtrace
- *
- * Description:
- *   The function is called from the nsh_session() to dump USB data to the
- *   SYSLOG device.
- *
- * Input Parameters:
- *   None
- *
- * Returned Values:
- *   None
- *
+ * Name: nsh_main
  ****************************************************************************/
 
-void nsh_usbtrace(void)
+#ifdef CONFIG_BUILD_KERNEL
+int main(int argc, FAR char *argv[])
+#else
+int nsh_main(int argc, char *argv[])
+#endif
 {
-  (void)usbtrace_enumerate(nsh_tracecallback, NULL);
-}
+  int exitval = 0;
+  int ret;
 
-#endif /* CONFIG_NSH_USBDEV_TRACE */
+  /* Call all C++ static constructors */
+
+#if defined(CONFIG_EXAMPLES_NSH_CXXINITIALIZE)
+  up_cxxinitialize();
+#endif
+
+  /* Make sure that we are using our symbol table */
+
+#if defined(CONFIG_LIBC_EXECFUNCS) && defined(CONFIG_EXECFUNCS_SYMTAB)
+  exec_setsymtab(CONFIG_EXECFUNCS_SYMTAB, 0);
+#endif
+
+  /* Register the BINFS file system */
+
+#if defined(CONFIG_FS_BINFS) && (CONFIG_BUILTIN)
+  ret = builtin_initialize();
+  if (ret < 0)
+    {
+     fprintf(stderr, "ERROR: builtin_initialize failed: %d\n", ret);
+     exitval = 1;
+   }
+#endif
+
+  /* Initialize the NSH library */
+
+  nsh_initialize();
+
+  /* If the Telnet console is selected as a front-end, then start the
+   * Telnet daemon.
+   */
+
+#ifdef CONFIG_NSH_TELNET
+  ret = nsh_telnetstart();
+  if (ret < 0)
+    {
+     /* The daemon is NOT running.  Report the the error then fail...
+      * either with the serial console up or just exiting.
+      */
+
+     fprintf(stderr, "ERROR: Failed to start TELNET daemon: %d\n", ret);
+     exitval = 1;
+   }
+#endif
+
+  /* If the serial console front end is selected, then run it on this thread */
+
+#ifdef CONFIG_NSH_CONSOLE
+  ret = nsh_consolemain(0, NULL);
+
+  /* nsh_consolemain() should not return.  So if we get here, something
+   * is wrong.
+   */
+
+#if CONFIG_NFILE_DESCRIPTORS > 0
+  fprintf(stderr, "ERROR: nsh_consolemain() returned: %d\n", ret);
+#else
+  printf("ERROR: nsh_consolemain() returned: %d\n", ret);
+#endif
+
+  exitval = 1;
+#endif
+
+  return exitval;
+}

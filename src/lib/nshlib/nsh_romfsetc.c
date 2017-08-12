@@ -37,10 +37,10 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <sys/mount.h>
-#include <debug.h>
+
 #include <errno.h>
 
 #include <nuttx/drivers/ramdisk.h>

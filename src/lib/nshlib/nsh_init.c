@@ -37,11 +37,11 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
-#include <sys/boardctl.h>
+//#include <sys/boardctl.h>
 
-#include "system/readline.h"
+//#include "system/readline.h"
 #include "nshlib/nshlib.h"
 
 #include "nsh.h"

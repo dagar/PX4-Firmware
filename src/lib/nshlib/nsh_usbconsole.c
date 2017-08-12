@@ -37,7 +37,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
+#include "nsh_config.h"
 
 #include <sys/boardctl.h>
 
@@ -46,7 +46,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
-#include <debug.h>
+
 
 #ifdef CONFIG_CDCACM
 #  include <nuttx/usb/cdcacm.h>

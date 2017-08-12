@@ -1,7 +1,7 @@
 /****************************************************************************
- * apps/nshlib/nsh_usbtrace.c
+ * apps/system/readline/readline.h
  *
- *   Copyright (C) 2014 Gregory Nutt. All rights reserved.
+ *   Copyright (C) 2013, 2015 Gregory Nutt. All rights reserved.
  *   Author: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,104 +33,93 @@
  *
  ****************************************************************************/
 
+#ifndef __APPS_SYSTEM_READLINE_READLINE_H
+#define __APPS_SYSTEM_READLINE_READLINE_H 1
+
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include "nsh_config.h"
 
-#include <stdio.h>
-
-
-#include <nuttx/usb/usbdev_trace.h>
-
-#ifdef CONFIG_NSH_USBDEV_TRACE
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-/****************************************************************************
- * Private Types
- ****************************************************************************/
+/* Some environments may return CR as end-of-line, others LF, and others
+ * both.  If not specified, the logic here assumes either (but not both) as
+ * the default.
+ */
+
+#if defined(CONFIG_EOL_IS_CR)
+#  undef  CONFIG_EOL_IS_LF
+#  undef  CONFIG_EOL_IS_BOTH_CRLF
+#  undef  CONFIG_EOL_IS_EITHER_CRLF
+#elif defined(CONFIG_EOL_IS_LF)
+#  undef  CONFIG_EOL_IS_CR
+#  undef  CONFIG_EOL_IS_BOTH_CRLF
+#  undef  CONFIG_EOL_IS_EITHER_CRLF
+#elif defined(CONFIG_EOL_IS_BOTH_CRLF)
+#  undef  CONFIG_EOL_IS_CR
+#  undef  CONFIG_EOL_IS_LF
+#  undef  CONFIG_EOL_IS_EITHER_CRLF
+#elif defined(CONFIG_EOL_IS_EITHER_CRLF)
+#  undef  CONFIG_EOL_IS_CR
+#  undef  CONFIG_EOL_IS_LF
+#  undef  CONFIG_EOL_IS_BOTH_CRLF
+#else
+#  undef  CONFIG_EOL_IS_CR
+#  undef  CONFIG_EOL_IS_LF
+#  undef  CONFIG_EOL_IS_BOTH_CRLF
+#  define CONFIG_EOL_IS_EITHER_CRLF 1
+#endif
+
+/* Helper macros */
+
+#define RL_GETC(v)      ((v)->rl_getc(v))
+#define RL_PUTC(v,ch)   ((v)->rl_putc(v,ch))
+#define RL_WRITE(v,b,s) ((v)->rl_write(v,b,s))
 
 /****************************************************************************
- * Private Function Prototypes
+ * Public Type Declarations
  ****************************************************************************/
 
-/****************************************************************************
- * Private Data
- ****************************************************************************/
+struct rl_common_s
+{
+   int  (*rl_getc)(FAR struct rl_common_s *vtbl);
+#ifdef CONFIG_READLINE_ECHO
+   void (*rl_putc)(FAR struct rl_common_s *vtbl, int ch);
+   void (*rl_write)(FAR struct rl_common_s *vtbl, FAR const char *buffer,
+                    size_t buflen);
+#endif
+};
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
 /****************************************************************************
- * Private Functions
+ * Public Function Prototypes
  ****************************************************************************/
 
 /****************************************************************************
- * Name: nsh_tracecallback
- ****************************************************************************/
-
-/****************************************************************************
- * Name: nsh_tracecallback
+ * Name: readline_common
  *
- * Description:
- *   This is part of the USB trace logic
- *
- ****************************************************************************/
-
-static int usbtrace_syslog(FAR const char *fmt, ...)
-{
-  va_list ap;
-  int ret;
-
-  /* Let vsyslog do the real work */
-
-  va_start(ap, fmt);
-  ret = vsyslog(LOG_INFO, fmt, ap);
-  va_end(ap);
-  return ret;
-}
-
-/****************************************************************************
- * Name: nsh_tracecallback
- *
- * Description:
- *   This is part of the USB trace logic
- *
- ****************************************************************************/
-
-static int nsh_tracecallback(struct usbtrace_s *trace, void *arg)
-{
-  usbtrace_trprintf(usbtrace_syslog, trace->event, trace->value);
-  return 0;
-}
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
-/****************************************************************************
- * Name: nsh_usbtrace
- *
- * Description:
- *   The function is called from the nsh_session() to dump USB data to the
- *   SYSLOG device.
+ *   Common logic shared by readline and std_readline().
  *
  * Input Parameters:
- *   None
+ *   buf       - The user allocated buffer to be filled.
+ *   buflen    - the size of the buffer.
+ *   instream  - The stream to read characters from
+ *   outstream - The stream to each characters to.
  *
- * Returned Values:
- *   None
+ * Returned values:
+ *   On success, the (positive) number of bytes transferred is returned.
+ *   EOF is returned to indicate either an end of file condition or a
+ *   failure.
  *
  ****************************************************************************/
 
-void nsh_usbtrace(void)
-{
-  (void)usbtrace_enumerate(nsh_tracecallback, NULL);
-}
+ssize_t readline_common(FAR struct rl_common_s *vtbl, FAR char *buf, int buflen);
 
-#endif /* CONFIG_NSH_USBDEV_TRACE */
+#endif /* __APPS_SYSTEM_READLINE_READLINE_H */

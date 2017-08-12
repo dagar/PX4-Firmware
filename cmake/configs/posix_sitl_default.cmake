@@ -121,6 +121,7 @@ set(config_module_list
 	lib/led
 	lib/mathlib
 	lib/mathlib/math/filter
+	lib/nshlib
 	lib/rc
 	lib/runway_takeoff
 	lib/tailsitter_recovery
