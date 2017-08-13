@@ -170,10 +170,6 @@ public:
 
 	virtual int	init();
 
-#ifdef RC_SERIAL_PORT
-	void		dsm_bind_ioctl();
-#endif /* RC_SERIAL_PORT */
-
 	int		set_mode(Mode mode);
 	Mode		get_mode() { return _mode; }
 
@@ -1737,20 +1733,6 @@ void PX4FMU::update_params()
 		update_pwm_trims();
 
 		param_t param_handle;
-
-#ifdef RC_SERIAL_PORT
-		int32_t dsm_bind_val;
-
-		/* see if bind parameter has been set, and reset it to -1 */
-		param_get(param_handle = param_find("RC_DSM_BIND"), &dsm_bind_val);
-
-		if (dsm_bind_val > -1) {
-			dsm_bind_ioctl(dsm_bind_val);
-			dsm_bind_val = -1;
-			param_set(param_handle, &dsm_bind_val);
-		}
-
-#endif /* RC_SERIAL_PORT */
 
 		// maximum motor slew rate parameter
 		param_handle = param_find("MOT_SLEW_MAX");
