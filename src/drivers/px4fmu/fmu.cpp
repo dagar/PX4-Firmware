@@ -70,6 +70,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/safety.h>
 #include <uORB/topics/vehicle_command.h>
+#include <uORB/topics/vehicle_status.h>
 
 #ifdef HRT_PPM_CHANNEL
 # include <systemlib/ppm_decode.h>
@@ -218,6 +219,8 @@ private:
 
 #ifdef RC_SERIAL_PORT
 	int		_vehicle_cmd_sub {-1};
+	int		_vehicle_status_sub{-1};
+	bool	_rc_enabled{true};
 #endif /* RC_SERIAL_PORT */
 
 #ifdef ADC_RC_RSSI_CHANNEL
@@ -448,6 +451,7 @@ PX4FMU::~PX4FMU()
 #endif /* ADC_RC_RSSI_CHANNEL */
 #ifdef RC_SERIAL_PORT
 	orb_unsubscribe(_vehicle_cmd_sub);
+	orb_unsubscribe(_vehicle_status_sub);
 	dsm_deinit();
 #endif /* RC_SERIAL_PORT */
 
@@ -517,6 +521,7 @@ PX4FMU::init()
 #  endif /* RF_RADIO_POWER_CONTROL */
 
 	_vehicle_cmd_sub = orb_subscribe(ORB_ID(vehicle_command));
+	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 
 	// dsm_init sets some file static variables and returns a file descriptor
 	_rcs_fd = dsm_init(RC_SERIAL_PORT);
@@ -1441,8 +1446,24 @@ void PX4FMU::update_rc()
 #ifdef RC_SERIAL_PORT
 	hrt_abstime cycle_timestamp = hrt_absolute_time();
 
-	/* vehicle command */
 	bool updated = false;
+
+	// vehicle status
+	orb_check(_vehicle_status_sub, &updated);
+
+	if (updated) {
+		vehicle_status_s status;
+
+		if (orb_copy(ORB_ID(vehicle_command), _vehicle_status_sub, &status) == OK) {
+			_rc_enabled = (status.rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT);
+		}
+	}
+
+	if (!_rc_enabled) {
+		return;
+	}
+
+	// vehicle command
 	orb_check(_vehicle_cmd_sub, &updated);
 
 	if (updated) {
