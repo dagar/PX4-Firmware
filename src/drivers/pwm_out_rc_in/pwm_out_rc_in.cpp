@@ -415,7 +415,7 @@ void task_main(int argc, char *argv[])
 			_outputs.timestamp = _controls.timestamp;
 
 			/* do mixing */
-			_outputs.noutputs = _mixer->mix(_outputs.output, 0 /* not used */, NULL);
+			_outputs.noutputs = _mixer->mix(_outputs.output, 0);
 
 			/* disable unused ports by setting their output to NaN */
 			for (size_t i = _outputs.noutputs; i < sizeof(_outputs.output) / sizeof(_outputs.output[0]); i++) {
