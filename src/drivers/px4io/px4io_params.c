@@ -39,9 +39,6 @@
  * @author Lorenz Meier <lorenz@px4.io>
  */
 
-#include <px4_config.h>
-#include <systemlib/param/param.h>
-
 /**
  * S.BUS out
  *
@@ -51,3 +48,94 @@
  * @group PWM Outputs
  */
 PARAM_DEFINE_INT32(PWM_SBUS_MODE, 0);
+
+/**
+ * PWM input channel that provides RSSI.
+ *
+ * 0: do not read RSSI from input channel
+ * 1-18: read RSSI from specified input channel
+ *
+ * Specify the range for RSSI input with RC_RSSI_PWM_MIN and RC_RSSI_PWM_MAX parameters.
+ *
+ * @min 0
+ * @max 18
+ * @value 0 Unassigned
+ * @value 1 Channel 1
+ * @value 2 Channel 2
+ * @value 3 Channel 3
+ * @value 4 Channel 4
+ * @value 5 Channel 5
+ * @value 6 Channel 6
+ * @value 7 Channel 7
+ * @value 8 Channel 8
+ * @value 9 Channel 9
+ * @value 10 Channel 10
+ * @value 11 Channel 11
+ * @value 12 Channel 12
+ * @value 13 Channel 13
+ * @value 14 Channel 14
+ * @value 15 Channel 15
+ * @value 16 Channel 16
+ * @value 17 Channel 17
+ * @value 18 Channel 18
+ * @group Radio Calibration
+ *
+ */
+PARAM_DEFINE_INT32(RC_RSSI_PWM_CHAN, 0);
+
+/**
+ * Max input value for RSSI reading.
+ *
+ * Only used if RC_RSSI_PWM_CHAN > 0
+ *
+ * @min 0
+ * @max 2000
+ * @group Radio Calibration
+ *
+ */
+PARAM_DEFINE_INT32(RC_RSSI_PWM_MAX, 1000);
+
+/**
+ * Min input value for RSSI reading.
+ *
+ * Only used if RC_RSSI_PWM_CHAN > 0
+ *
+ * @min 0
+ * @max 2000
+ * @group Radio Calibration
+ *
+ */
+PARAM_DEFINE_INT32(RC_RSSI_PWM_MIN, 2000);
+
+/**
+ * Relay control of relay 1 mapped to the Spektrum receiver power supply
+ *
+ * @min 0
+ * @max 1
+ * @value 0 Disabled
+ * @value 1 Relay controls DSM power
+ * @group Radio Calibration
+ */
+PARAM_DEFINE_INT32(RC_RL1_DSM_VCC, 0); /* Relay 1 controls DSM VCC */
+
+/**
+ * Scaling factor for battery voltage sensor on PX4IO.
+ *
+ * @min 1
+ * @max 100000
+ * @group Battery Calibration
+ */
+PARAM_DEFINE_INT32(BAT_V_SCALE_IO, 10000);
+
+/**
+ * Set usage of IO board
+ *
+ * Can be used to use a standard startup script but with a FMU only set-up. Set to 0 to force the FMU only set-up.
+ *
+ * @boolean
+ * @min 0
+ * @max 1
+ * @reboot_required true
+ * @group System
+ */
+PARAM_DEFINE_INT32(SYS_USE_IO, 1);
