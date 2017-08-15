@@ -45,10 +45,8 @@
 
 #include "LandDetector.h"
 
-
 namespace land_detector
 {
-
 
 LandDetector::LandDetector() :
 	_landDetectedPub(nullptr),
@@ -61,12 +59,14 @@ LandDetector::LandDetector() :
 	_ground_contact_hysteresis(true),
 	_total_flight_time{0},
 	_takeoff_time{0},
-	_work{}
+	_work{},
+	_cycle_perf(perf_alloc(PC_ELAPSED, "land_cycle"))
 {
 }
 
 LandDetector::~LandDetector()
 {
+	perf_free(_cycle_perf);
 }
 
 int LandDetector::start()
@@ -85,6 +85,8 @@ LandDetector::_cycle_trampoline(void *arg)
 
 void LandDetector::_cycle()
 {
+	perf_begin(_cycle_perf);
+
 	if (!_object) { // not initialized yet
 		// Advertise the first land detected uORB.
 		_landDetected.timestamp = hrt_absolute_time();
@@ -152,6 +154,8 @@ void LandDetector::_cycle()
 		orb_publish_auto(ORB_ID(vehicle_land_detected), &_landDetectedPub, &_landDetected,
 				 &instance, ORB_PRIO_DEFAULT);
 	}
+
+	perf_end(_cycle_perf);
 
 	if (!should_exit()) {
 
