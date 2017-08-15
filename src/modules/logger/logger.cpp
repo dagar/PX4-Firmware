@@ -912,7 +912,7 @@ void Logger::run()
 
 			/* Check if parameters have changed */
 			// this needs to change to a timestamped record to record a history of parameter changes
-			if (parameter_update_sub.check_updated()) {
+			if (parameter_update_sub.updated()) {
 				parameter_update_sub.update();
 				write_changed_parameters();
 			}
