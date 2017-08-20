@@ -299,7 +299,6 @@ CDev::poll(file_t *filp, struct pollfd *fds, bool setup)
 	/*
 	 * Lock against pollnotify() (and possibly other callers)
 	 */
-	lock();
 
 	if (setup) {
 		/*
@@ -333,8 +332,6 @@ CDev::poll(file_t *filp, struct pollfd *fds, bool setup)
 		 */
 		ret = remove_poll_waiter(fds);
 	}
-
-	unlock();
 
 	return ret;
 }
@@ -376,6 +373,8 @@ CDev::poll_state(file_t *filp)
 int
 CDev::store_poll_waiter(struct pollfd *fds)
 {
+	lock();
+
 	/*
 	 * Look for a free slot.
 	 */
@@ -384,6 +383,7 @@ CDev::store_poll_waiter(struct pollfd *fds)
 
 			/* save the pollfd */
 			_pollset[i] = fds;
+			unlock();
 
 			return OK;
 		}
@@ -411,6 +411,9 @@ CDev::store_poll_waiter(struct pollfd *fds)
 	_pollset = new_pollset;
 	_pollset[_max_pollwaiters] = fds;
 	_max_pollwaiters = new_count;
+
+	unlock();
+
 	return OK;
 }
 
