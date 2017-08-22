@@ -274,8 +274,8 @@ function(px4_nuttx_add_export)
 	set(nuttx_export_stamp ${PX4_BINARY_DIR}/${CONFIG}/nuttx_export.stamp)
 
 	# copy
-	file(GLOB_RECURSE nuttx_all_files ${PX4_SOURCE_DIR}/NuttX/*)
-	file(RELATIVE_PATH nuttx_cp_src ${PX4_BINARY_DIR} ${PX4_SOURCE_DIR}/NuttX)
+	file(GLOB_RECURSE nuttx_all_files ${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/*)
+	file(RELATIVE_PATH nuttx_cp_src ${PX4_BINARY_DIR} ${PX4_SOURCE_DIR}/platforms/nuttx/NuttX)
 	add_custom_command(OUTPUT ${nuttx_copy_stamp}
 		COMMAND ${MKDIR} -p ${nuttx_build_src}
 		COMMAND rsync -rp --inplace --delete --exclude=.git --exclude=nuttx-export ${nuttx_cp_src}/ ${CONFIG}/NuttX/
