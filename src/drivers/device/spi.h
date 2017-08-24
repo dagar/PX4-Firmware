@@ -53,7 +53,7 @@ namespace device __EXPORT
 #ifdef __PX4_NUTTX
 class __EXPORT SPI : public CDev
 #else
-class __EXPORT SPI : public VDev
+class __EXPORT SPI : public CDev
 #endif
 {
 protected:

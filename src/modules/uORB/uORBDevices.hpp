@@ -38,16 +38,10 @@
 
 
 #ifdef __PX4_NUTTX
+
 #include <string.h>
 #include <stdlib.h>
 #include "ORBMap.hpp"
-
-namespace device
-{
-//type mappings to NuttX
-typedef ::file file_t;
-typedef CDev VDev;
-}
 
 #else
 
@@ -55,8 +49,6 @@ typedef CDev VDev;
 #include <map>
 
 #endif /* __PX4_NUTTX */
-
-
 
 namespace uORB
 {
@@ -68,7 +60,7 @@ class Manager;
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public device::VDev
+class uORB::DeviceNode : public device::CDev
 {
 public:
 	DeviceNode(const struct orb_metadata *meta, const char *name, const char *path,
@@ -277,7 +269,7 @@ private:
  * Used primarily to create new objects via the ORBIOCCREATE
  * ioctl.
  */
-class uORB::DeviceMaster : public device::VDev
+class uORB::DeviceMaster : public device::CDev
 {
 public:
 	virtual int   ioctl(device::file_t *filp, int cmd, unsigned long arg);
