@@ -40,9 +40,15 @@
 #ifndef _DEVICE_I2C_H
 #define _DEVICE_I2C_H
 
-#include "device.h"
+#include "../CDev.hpp"
+#include "../Device.hpp"
 
 #include <px4_i2c.h>
+#ifdef __PX4_LINUX
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#endif
+#include <string>
 
 namespace device __EXPORT
 {
@@ -55,10 +61,11 @@ class __EXPORT I2C : public CDev
 
 public:
 
-	/**
-	 * Get the address
-	 */
-	int16_t		get_address() const { return _address; }
+	// no copy, assignment, move, move assignment
+	I2C(const I2C &) = delete;
+	I2C &operator=(const I2C &) = delete;
+	I2C(I2C &&) = delete;
+	I2C &operator=(I2C &&) = delete;
 
 	static int	set_bus_clock(unsigned bus, unsigned clock_hz);
 
@@ -69,29 +76,18 @@ protected:
 	 * The number of times a read or write operation will be retried on
 	 * error.
 	 */
-	unsigned		_retries;
-
-	/**
-	 * The I2C bus number the device is attached to.
-	 */
-	int			_bus;
+	unsigned		_retries{0};
 
 	/**
 	 * @ Constructor
 	 *
-	 * @param name		Driver name
 	 * @param devname	Device node name
 	 * @param bus		I2C bus on which the device lives
 	 * @param address	I2C bus address, or zero if set_address will be used
 	 * @param frequency	I2C bus frequency for the device (currently not used)
-	 * @param irq		Interrupt assigned to the device (or zero if none)
 	 */
-	I2C(const char *name,
-	    const char *devname,
-	    int bus,
-	    uint16_t address,
-	    uint32_t frequency,
-	    int irq = 0);
+	I2C(const char *name, const char *devname, int bus, uint16_t address, uint32_t frequency = 0);
+
 	virtual ~I2C();
 
 	virtual int	init();
@@ -100,6 +96,10 @@ protected:
 	 * Check for the presence of the device on the bus.
 	 */
 	virtual int	probe();
+
+	virtual ssize_t	read(device::file_t *handlep, char *buffer, size_t buflen);
+	virtual ssize_t	write(device::file_t *handlep, const char *buffer, size_t buflen);
+	virtual int	ioctl(device::file_t *filep, int cmd, unsigned long arg);
 
 	/**
 	 * Perform an I2C transaction to the device.
@@ -113,40 +113,10 @@ protected:
 	 * @return		OK if the transfer was successful, -errno
 	 *			otherwise.
 	 */
-	int		transfer(const uint8_t *send, unsigned send_len,
-				 uint8_t *recv, unsigned recv_len);
-
-	/**
-	 * Perform a multi-part I2C transaction to the device.
-	 *
-	 * @param msgv		An I2C message vector.
-	 * @param msgs		The number of entries in the message vector.
-	 * @return		OK if the transfer was successful, -errno
-	 *			otherwise.
-	 */
-	int		transfer(px4_i2c_msg_t *msgv, unsigned msgs);
-
-	/**
-	 * Change the bus address.
-	 *
-	 * Most often useful during probe() when the driver is testing
-	 * several possible bus addresses.
-	 *
-	 * @param address	The new bus address to set.
-	 */
-	void		set_address(uint16_t address)
-	{
-		_address = address;
-		_device_id.devid_s.address = _address;
-	}
+	int		transfer(const uint8_t *send, unsigned send_len, uint8_t *recv, unsigned recv_len);
 
 private:
-	uint16_t		_address;
-	uint32_t		_frequency;
-	px4_i2c_dev_t		*_dev;
-
-	I2C(const device::I2C &);
-	I2C operator=(const device::I2C &);
+	int 			_fd{-1};
 };
 
 } // namespace device

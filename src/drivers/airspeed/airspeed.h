@@ -38,47 +38,20 @@
  * Generic driver for airspeed sensors connected via I2C.
  */
 
+#include <drivers/device/i2c.h>
+#include <drivers/device/ringbuffer.h>
+#include <drivers/drv_airspeed.h>
+#include <drivers/drv_hrt.h>
 #include <px4_config.h>
 #include <px4_defines.h>
-
-#include <drivers/device/i2c.h>
-
-#include <sys/types.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <semaphore.h>
-#include <string.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <errno.h>
-#include <stdio.h>
-#include <math.h>
-#include <unistd.h>
-
-#ifdef __PX4_NUTTX
-#include <nuttx/arch.h>
-#include <nuttx/wqueue.h>
-#include <nuttx/clock.h>
-#
-#else
 #include <px4_workqueue.h>
-#endif
-
-#include <arch/board/board.h>
-
 #include <systemlib/airspeed.h>
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
 #include <systemlib/perf_counter.h>
-
-#include <drivers/drv_airspeed.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/device/ringbuffer.h>
-
-#include <uORB/uORB.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/subsystem_info.h>
+#include <uORB/uORB.h>
 
 /* Default I2C bus */
 static constexpr uint8_t PX4_I2C_BUS_DEFAULT = PX4_I2C_BUS_EXPANSION;
@@ -91,12 +64,12 @@ class __EXPORT Airspeed : public device::I2C
 {
 public:
 	Airspeed(int bus, int address, unsigned conversion_interval, const char *path);
-	virtual ~Airspeed();
+	~Airspeed() override;
 
-	virtual int	init();
+	int init() override;
 
-	virtual ssize_t	read(device::file_t *filp, char *buffer, size_t buflen);
-	virtual int	ioctl(device::file_t *filp, int cmd, unsigned long arg);
+	ssize_t	read(device::file_t *filp, char *buffer, size_t buflen) override;
+	int	ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
 
 	/**
 	 * Diagnostics - print some basic information about the driver.

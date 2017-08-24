@@ -102,6 +102,13 @@ typedef struct {
 	void   *priv;     	/* For use by drivers */
 } px4_pollfd_struct_t;
 
+struct file_operations {
+	// empty on POSIX
+};
+
+__EXPORT int		register_driver(const char *name, const struct file_operations *fops, mode_t mode, void *data);
+__EXPORT int		unregister_driver(const char *name);
+
 __EXPORT int 		px4_open(const char *path, int flags, ...);
 __EXPORT int 		px4_close(int fd);
 __EXPORT ssize_t	px4_read(int fd, void *buffer, size_t buflen);
@@ -134,10 +141,8 @@ extern int px4_errno;
 
 __EXPORT void		px4_show_devices(void);
 __EXPORT void		px4_show_files(void);
-__EXPORT const char 	*px4_get_device_names(unsigned int *handle);
 
 __EXPORT void		px4_show_topics(void);
-__EXPORT const char 	*px4_get_topic_names(unsigned int *handle);
 
 #ifndef __PX4_QURT
 /*

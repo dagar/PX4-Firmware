@@ -45,10 +45,11 @@
  * non-interrupt-mode client.
  */
 
+#include "SPI.hpp"
+
 #include <px4_config.h>
 #include <nuttx/arch.h>
 #include <stm32_spi.h>
-#include "spi.h"
 
 #ifndef CONFIG_SPI_EXCHANGE
 # error This driver requires CONFIG_SPI_EXCHANGE
@@ -62,10 +63,9 @@ SPI::SPI(const char *name,
 	 int bus,
 	 enum spi_dev_e device,
 	 enum spi_mode_e mode,
-	 uint32_t frequency,
-	 int irq) :
+	 uint32_t frequency) :
 	// base class
-	CDev(name, devname, irq),
+	CDev(name, devname),
 	// public
 	// protected
 	locking_mode(LOCK_PREEMPTION),

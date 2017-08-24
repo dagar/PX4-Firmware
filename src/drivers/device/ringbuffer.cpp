@@ -38,7 +38,10 @@
  */
 
 #include "ringbuffer.h"
+
 #include <string.h>
+
+#include <px4_defines.h>
 
 namespace ringbuffer
 {
@@ -408,13 +411,13 @@ RingBuffer::resize(unsigned new_size)
 void
 RingBuffer::print_info(const char *name)
 {
-	printf("%s	%u/%lu (%u/%u @ %p)\n",
-	       name,
-	       _num_items,
-	       (unsigned long)_num_items * _item_size,
-	       _head,
-	       _tail,
-	       _buf);
+	PX4_INFO("%s	%u/%lu (%u/%u @ %p)",
+		 name,
+		 _num_items,
+		 (unsigned long)_num_items * _item_size,
+		 _head,
+		 _tail,
+		 _buf);
 }
 
 } // namespace ringbuffer

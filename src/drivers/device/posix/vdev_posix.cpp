@@ -40,8 +40,9 @@
 #include <px4_log.h>
 #include <px4_posix.h>
 #include <px4_time.h>
-#include "device.h"
-#include "vfile.h"
+#include "../Device.hpp"
+#include "VFile.hpp"
+#include "DevMgr.hpp"
 
 #include <hrt_work.h>
 #include <stdlib.h>
@@ -49,10 +50,18 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <string>
+#include <map>
 
 using namespace device;
+using namespace DriverFramework;
+using namespace std;
 
+static map<string, void *> devmap;
+
+pthread_mutex_t devmutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t filemutex = PTHREAD_MUTEX_INITIALIZER;
+
 px4_sem_t lockstep_sem;
 bool sim_lockstep = false;
 volatile bool sim_delay = false;
@@ -60,19 +69,59 @@ volatile bool sim_delay = false;
 extern "C" {
 
 #define PX4_MAX_FD 300
+#define PX4_MAX_DEV 500
+
 	static device::file_t *filemap[PX4_MAX_FD] = {};
 
-	int px4_errno;
-
-	inline bool valid_fd(int fd)
+	int register_driver(const char *name, const struct file_operations *vdev_fops, mode_t mode, void *data)
 	{
-		pthread_mutex_lock(&filemutex);
-		bool ret = (fd < PX4_MAX_FD && fd >= 0 && filemap[fd] != nullptr);
-		pthread_mutex_unlock(&filemutex);
+		PX4_DEBUG("VDev::register_driver %s", name);
+		int ret = 0;
+
+		if (name == nullptr || data == nullptr) {
+			return -EINVAL;
+		}
+
+		pthread_mutex_lock(&devmutex);
+
+		// Make sure the device does not already exist
+		auto item = devmap.find(name);
+
+		if (item != devmap.end()) {
+			pthread_mutex_unlock(&devmutex);
+			return -EEXIST;
+		}
+
+		devmap[name] = (void *)data;
+		PX4_DEBUG("Registered DEV %s", name);
+
+		pthread_mutex_unlock(&devmutex);
+
 		return ret;
 	}
 
-	inline CDev *get_vdev(int fd)
+	int unregister_driver(const char *name)
+	{
+		PX4_DEBUG("unregister_driver %s", name);
+		int ret = -EINVAL;
+
+		if (name == nullptr) {
+			return -EINVAL;
+		}
+
+		pthread_mutex_lock(&devmutex);
+
+		if (devmap.erase(name) > 0) {
+			PX4_DEBUG("Unregistered DEV %s", name);
+			ret = 0;
+		}
+
+		pthread_mutex_unlock(&devmutex);
+
+		return ret;
+	}
+
+	static CDev *get_vdev(int fd)
 	{
 		pthread_mutex_lock(&filemutex);
 		bool valid = (fd < PX4_MAX_FD && fd >= 0 && filemap[fd] != nullptr);
@@ -89,10 +138,29 @@ extern "C" {
 		return dev;
 	}
 
+	static CDev *getDev(const char *path)
+	{
+		PX4_DEBUG("VDev::getDev");
+
+		pthread_mutex_lock(&devmutex);
+
+		auto item = devmap.find(path);
+
+		if (item != devmap.end()) {
+			pthread_mutex_unlock(&devmutex);
+			return (CDev *)item->second;
+		}
+
+		pthread_mutex_unlock(&devmutex);
+
+		return nullptr;
+	}
+
+
 	int px4_open(const char *path, int flags, ...)
 	{
 		PX4_DEBUG("px4_open");
-		CDev *dev = CDev::getDev(path);
+		CDev *dev = getDev(path);
 		int ret = 0;
 		int i;
 		mode_t mode;
@@ -141,8 +209,7 @@ extern "C" {
 				PX4_BACKTRACE();
 #endif
 
-				PX4_WARN("%s: exceeded maximum number of file descriptors, accessing %s",
-					 thread_name, path);
+				PX4_WARN("%s: exceeded maximum number of file descriptors, accessing %s", thread_name, path);
 				ret = -ENOENT;
 			}
 
@@ -151,7 +218,6 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
 			return -1;
 		}
 
@@ -182,7 +248,6 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
 			ret = PX4_ERROR;
 		}
 
@@ -204,7 +269,6 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
 			ret = PX4_ERROR;
 		}
 
@@ -226,7 +290,6 @@ extern "C" {
 		}
 
 		if (ret < 0) {
-			px4_errno = -ret;
 			ret = PX4_ERROR;
 		}
 
@@ -245,10 +308,6 @@ extern "C" {
 
 		} else {
 			ret = -EINVAL;
-		}
-
-		if (ret < 0) {
-			px4_errno = -ret;
 		}
 
 		return ret;
@@ -396,23 +455,69 @@ extern "C" {
 			return -1;
 		}
 
-		CDev *dev = CDev::getDev(pathname);
+		CDev *dev = getDev(pathname);
 		return (dev != nullptr) ? 0 : -1;
 	}
 
 	void px4_show_devices()
 	{
-		CDev::showDevices();
+		int i = 0;
+		PX4_INFO("PX4 Devices:");
+
+		pthread_mutex_lock(&devmutex);
+
+		for (const auto &dev : devmap) {
+			if (strncmp(dev.first.c_str(), "/dev/", 5) == 0) {
+				PX4_INFO("   %s", dev.first.c_str());
+			}
+		}
+
+		pthread_mutex_unlock(&devmutex);
+
+		PX4_INFO("DF Devices:");
+		const char *dev_path;
+		unsigned int index = 0;
+		i = 0;
+
+		do {
+			// Each look increments index and returns -1 if end reached
+			i = DevMgr::getNextDeviceName(index, &dev_path);
+
+			if (i == 0) {
+				PX4_INFO("   %s", dev_path);
+			}
+		} while (i == 0);
 	}
 
 	void px4_show_topics()
 	{
-		CDev::showTopics();
+		PX4_INFO("Devices:");
+
+		pthread_mutex_lock(&devmutex);
+
+		for (const auto &dev : devmap) {
+			if (strncmp(dev.first.c_str(), "/obj/", 5) == 0) {
+				PX4_INFO("   %s", dev.first.c_str());
+			}
+		}
+
+		pthread_mutex_unlock(&devmutex);
 	}
 
 	void px4_show_files()
 	{
-		CDev::showFiles();
+		PX4_INFO("Files:");
+
+		pthread_mutex_lock(&devmutex);
+
+		for (const auto &dev : devmap) {
+			if (strncmp(dev.first.c_str(), "/obj/", 5) != 0 &&
+			    strncmp(dev.first.c_str(), "/dev/", 5) != 0) {
+				PX4_INFO("   %s", dev.first.c_str());
+			}
+		}
+
+		pthread_mutex_unlock(&devmutex);
 	}
 
 	void px4_enable_sim_lockstep()
@@ -441,6 +546,4 @@ extern "C" {
 	{
 		return sim_delay;
 	}
-
 }
-

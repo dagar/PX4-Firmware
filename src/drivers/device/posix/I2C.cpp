@@ -40,7 +40,10 @@
  *       that is supplied.  Should we just depend on the bus knowing?
  */
 
-#include "i2c.h"
+#include "I2C.hpp"
+
+#include "drivers/drv_device.h"
+
 #ifdef __PX4_LINUX
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
@@ -57,25 +60,12 @@
 
 static constexpr const int simulate = PX4_SIMULATE_I2C;
 
-
 namespace device
 {
 
-I2C::I2C(const char *name,
-	 const char *devname,
-	 int bus,
-	 uint16_t address) :
-	// base class
-	CDev(name, devname),
-	// public
-	// protected
-	_retries(0),
-	// private
-	_bus(bus),
-	_address(address),
-	_fd(-1)
+I2C::I2C(const char *name, const char *devname, int bus, uint16_t address, uint32_t frequency) :
+	CDev(name, devname)
 {
-	//warnx("I2C::I2C name = %s devname = %s", name, devname);
 	// fill in _device_id fields for a I2C device
 	_device_id.devid_s.bus_type = DeviceBusType_I2C;
 	_device_id.devid_s.bus = bus;
@@ -118,12 +108,11 @@ I2C::init()
 
 		// Open the actual I2C device
 		char dev_path[16];
-		snprintf(dev_path, sizeof(dev_path), "/dev/i2c-%i", _bus);
+		snprintf(dev_path, sizeof(dev_path), "/dev/i2c-%i", get_device_bus());
 		_fd = ::open(dev_path, O_RDWR);
 
 		if (_fd < 0) {
 			PX4_ERR("could not open %s", dev_path);
-			px4_errno = errno;
 			return PX4_ERROR;
 		}
 
@@ -131,6 +120,13 @@ I2C::init()
 	}
 
 	return ret;
+}
+
+int
+I2C::probe()
+{
+	// Assume the device is too stupid to be discoverable.
+	return OK;
 }
 
 int
@@ -146,7 +142,7 @@ I2C::transfer(const uint8_t *send, unsigned send_len, uint8_t *recv, unsigned re
 	unsigned retry_count = 0;
 
 	if (_fd < 0) {
-		warnx("I2C device not opened");
+		PX4_WARN("I2C device not opened");
 		return 1;
 	}
 
@@ -155,7 +151,7 @@ I2C::transfer(const uint8_t *send, unsigned send_len, uint8_t *recv, unsigned re
 		msgs = 0;
 
 		if (send_len > 0) {
-			msgv[msgs].addr = _address;
+			msgv[msgs].addr = get_device_address();
 			msgv[msgs].flags = 0;
 			msgv[msgs].buf = const_cast<uint8_t *>(send);
 			msgv[msgs].len = send_len;
@@ -163,7 +159,7 @@ I2C::transfer(const uint8_t *send, unsigned send_len, uint8_t *recv, unsigned re
 		}
 
 		if (recv_len > 0) {
-			msgv[msgs].addr = _address;
+			msgv[msgs].addr = get_device_address();
 			msgv[msgs].flags = I2C_M_READ;
 			msgv[msgs].buf = recv;
 			msgv[msgs].len = recv_len;
@@ -178,14 +174,13 @@ I2C::transfer(const uint8_t *send, unsigned send_len, uint8_t *recv, unsigned re
 		packets.nmsgs = msgs;
 
 		if (simulate) {
-			//warnx("I2C SIM: transfer_4 on %s", get_devname());
 			ret = PX4_OK;
 
 		} else {
 			ret = ::ioctl(_fd, I2C_RDWR, (unsigned long)&packets);
 
 			if (ret < 0) {
-				warnx("I2C transfer failed");
+				PX4_WARN("I2C transfer failed");
 				return 1;
 			}
 		}
@@ -201,71 +196,11 @@ I2C::transfer(const uint8_t *send, unsigned send_len, uint8_t *recv, unsigned re
 #endif
 }
 
-int
-I2C::transfer(struct i2c_msg *msgv, unsigned msgs)
-{
-#ifndef __PX4_LINUX
-	return 1;
-#else
-	struct i2c_rdwr_ioctl_data packets;
-	int ret;
-	unsigned retry_count = 0;
-
-	/* force the device address into the message vector */
-	for (unsigned i = 0; i < msgs; i++) {
-		msgv[i].addr = _address;
-	}
-
-	do {
-		packets.msgs  = msgv;
-		packets.nmsgs = msgs;
-
-		if (simulate) {
-			warnx("I2C SIM: transfer_2 on %s", get_devname());
-			ret = PX4_OK;
-
-		} else {
-			ret = ::ioctl(_fd, I2C_RDWR, (unsigned long)&packets);
-		}
-
-		if (ret < 0) {
-			warnx("I2C transfer failed");
-			return 1;
-		}
-
-		/* success */
-		if (ret == PX4_OK) {
-			break;
-		}
-
-	} while (retry_count++ < _retries);
-
-	return ret;
-#endif
-}
-
-int I2C::ioctl(device::file_t *filp, int cmd, unsigned long arg)
-{
-	//struct i2c_rdwr_ioctl_data *packets = (i2c_rdwr_ioctl_data *)(void *)arg;
-	switch (cmd) {
-#ifdef __PX4_LINUX
-
-	case I2C_RDWR:
-		warnx("Use I2C::transfer, not ioctl");
-		return 0;
-#endif
-
-	default:
-		/* give it to the superclass */
-		return CDev::ioctl(filp, cmd, arg);
-	}
-}
-
-ssize_t	I2C::read(file_t *filp, char *buffer, size_t buflen)
+ssize_t	I2C::read(device::file_t *filp, char *buffer, size_t buflen)
 {
 	if (simulate) {
 		// FIXME no idea what this should be
-		warnx("2C SIM I2C::read");
+		PX4_WARN("2C SIM I2C::read");
 		return 0;
 	}
 
@@ -279,7 +214,7 @@ ssize_t	I2C::read(file_t *filp, char *buffer, size_t buflen)
 ssize_t	I2C::write(file_t *filp, const char *buffer, size_t buflen)
 {
 	if (simulate) {
-		warnx("2C SIM I2C::write");
+		PX4_WARN("2C SIM I2C::write");
 		return buflen;
 	}
 
@@ -288,6 +223,36 @@ ssize_t	I2C::write(file_t *filp, const char *buffer, size_t buflen)
 #else
 	return buflen;
 #endif
+}
+
+int
+I2C::ioctl(device::file_t *filep, int cmd, unsigned long arg)
+{
+	PX4_DEBUG("I2C::ioctl");
+
+	int ret = -ENODEV;
+
+	switch (cmd) {
+	case DEVIOCGDEVICEID: {
+			unsigned long dev_id = get_device_id();
+			*(void **)(uintptr_t)arg = (void *)dev_id;
+			ret = PX4_OK;
+		}
+		break;
+#ifdef __PX4_LINUX
+
+	case I2C_RDWR:
+		PX4_WARN("Use I2C::transfer, not ioctl");
+		ret = 0;
+		break;
+#endif
+
+	default:
+		ret = CDev::ioctl(filep, cmd, arg);
+		break;
+	}
+
+	return ret;
 }
 
 } // namespace device

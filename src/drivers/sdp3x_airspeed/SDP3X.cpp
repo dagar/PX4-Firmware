@@ -58,7 +58,7 @@ bool
 SDP3X::init_sdp3x()
 {
 	// step 1 - reset on broadcast
-	uint16_t prev_addr = get_address();
+	uint16_t prev_addr = get_device_address();
 	set_address(SDP3X_RESET_ADDR);
 	uint8_t reset_cmd = SDP3X_RESET_CMD;
 	int ret = transfer(&reset_cmd, 1, nullptr, 0);

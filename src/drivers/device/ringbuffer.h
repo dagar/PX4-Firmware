@@ -39,9 +39,8 @@
 
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
+#include <cstdint>
+#include <cstddef>
 
 namespace ringbuffer __EXPORT
 {
@@ -50,7 +49,7 @@ class RingBuffer
 {
 public:
 	RingBuffer(unsigned num_items, size_t item_size);
-	virtual ~RingBuffer();
+	~RingBuffer();
 
 	/**
 	 * Put an item into the buffer.

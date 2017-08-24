@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
+ *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,28 +32,35 @@
  ****************************************************************************/
 
 /**
- * @file vfile.cpp
- * Virtual file
+ * @file SPI.hpp
  *
- * @author Mark Charlebois <charlebm@gmail.com>
+ * Base class for devices connected via SPI.
  */
 
-#include <px4_tasks.h>
-#include <drivers/drv_device.h>
-#include "device.h"
-#include <unistd.h>
-#include <stdio.h>
+#ifndef _DEVICE_SPI_H
+#define _DEVICE_SPI_H
 
-class VFile : public device::CDev
+#include "../CDev.hpp"
+
+#include <px4_spi.h>
+
+#error "SPI not implemented"
+
+namespace device __EXPORT
 {
-public:
 
-	static VFile *createFile(const char *fname, mode_t mode);
-	~VFile() {}
+/**
+ * Abstract class for character device on SPI
+ */
+class __EXPORT SPI : public CDev
+{
 
-	virtual ssize_t write(device::file_t *handlep, const char *buffer, size_t buflen);
 
-private:
-	VFile(const char *fname, mode_t mode);
-	VFile(const VFile &);
+
+
+
 };
+
+} // namespace device
+
+#endif /* _DEVICE_SPI_H */

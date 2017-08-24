@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,81 +32,34 @@
  ****************************************************************************/
 
 /**
- * @file sim.h
+ * @file vdev_file.cpp
+ * Virtual file
  *
- * Base class for devices on simulation bus.
+ * @author Mark Charlebois <charlebm@gmail.com>
  */
 
-#pragma once
+#include "VFile.hpp"
 
-#include "vdev.h"
+#include <stdio.h>
 
-namespace device __EXPORT
+using namespace device;
+
+VFile::VFile(const char *fname, mode_t mode) :
+	CDev("vfile", fname)
 {
+}
 
-/**
- * Abstract class for character device on SIM
- */
-class __EXPORT SIM : public Device
+VFile *VFile::createFile(const char *fname, mode_t mode)
 {
+	VFile *me = new VFile(fname, mode);
+	register_driver(fname, nullptr, 0666, me);
+	return me;
+}
 
-public:
+ssize_t VFile::write(device::file_t *handlep, const char *buffer, size_t buflen)
+{
+	// ignore what was written, but let pollers know something was written
+	poll_notify(POLLIN);
 
-	/**
-	 * Get the address
-	 */
-	int16_t		get_address() const { return _address; }
-
-protected:
-	/**
-	 * The number of times a read or write operation will be retried on
-	 * error.
-	 */
-	unsigned		_retries;
-
-	/**
-	 * The SIM bus number the device is attached to.
-	 */
-	int			_bus;
-
-	/**
-	 * @ Constructor
-	 *
-	 * @param name		Driver name
-	 * @param devname	Device node name
-	 * @param bus		SIM bus on which the device lives
-	 * @param address	SIM bus address, or zero if set_address will be used
-	 */
-	SIM(const char *name,
-	    const char *devname,
-	    int bus,
-	    uint16_t address);
-	virtual ~SIM();
-
-	virtual int	init();
-
-	/**
-	 * Perform an SIM transaction to the device.
-	 *
-	 * At least one of send_len and recv_len must be non-zero.
-	 *
-	 * @param send		Pointer to bytes to send.
-	 * @param send_len	Number of bytes to send.
-	 * @param recv		Pointer to buffer for bytes received.
-	 * @param recv_len	Number of bytes to receive.
-	 * @return		OK if the transfer was successful, -errno
-	 *			otherwise.
-	 */
-	virtual int	transfer(const uint8_t *send, unsigned send_len,
-				 uint8_t *recv, unsigned recv_len);
-
-private:
-	uint16_t		_address;
-	const char 		*_devname;
-
-	SIM(const device::SIM &);
-	SIM operator=(const device::SIM &);
-};
-
-} // namespace device
-
+	return buflen;
+}
