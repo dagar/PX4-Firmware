@@ -122,7 +122,6 @@ MEASAirspeed::MEASAirspeed(int bus, int address, const char *path) : Airspeed(bu
 	_t_system_power(-1),
 	system_power{}
 {
-	_debug_enabled = true;
 	_device_id.devid_s.devtype = DRV_DIFF_PRESS_DEVTYPE_MS4525;
 }
 
@@ -414,18 +413,20 @@ start(int i2c_bus)
 
 	/* both versions failed if the init for the MS5525DSO fails, give up */
 	if (OK != g_dev->Airspeed::init()) {
-		PX4_WARN("init fail");
+		PX4_ERR("airspeed init failed");
 		goto fail;
 	}
 
 	/* set the poll rate to default, starts automatic data collection */
-	fd = open(PATH_MS4525, O_RDONLY);
+	fd = px4_open(PATH_MS4525, O_RDONLY);
 
 	if (fd < 0) {
+		PX4_ERR("unable to open MS4525");
 		goto fail;
 	}
 
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
+	if (px4_ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
+		PX4_ERR("unable to set sensor poll rate");
 		goto fail;
 	}
 
@@ -469,7 +470,7 @@ test()
 	ssize_t sz;
 	int ret;
 
-	int fd = open(PATH_MS4525, O_RDONLY);
+	int fd = px4_open(PATH_MS4525, O_RDONLY);
 
 	if (fd < 0) {
 		PX4_ERR("%s open failed (try 'meas_airspeed start' if the driver is not running", PATH_MS4525);
@@ -486,7 +487,7 @@ test()
 	PX4_INFO("diff pressure: %d pa", (int)report.differential_pressure_filtered_pa);
 
 	/* start the sensor polling at 2Hz */
-	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, 2)) {
+	if (OK != px4_ioctl(fd, SENSORIOCSPOLLRATE, 2)) {
 		PX4_ERR("failed to set 2Hz poll rate");
 	}
 
@@ -516,7 +517,7 @@ test()
 	}
 
 	/* reset the sensor polling to its default rate */
-	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT)) {
+	if (OK != px4_ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT)) {
 		PX4_ERR("failed to set default rate");
 	}
 }
@@ -527,17 +528,17 @@ test()
 void
 reset()
 {
-	int fd = open(PATH_MS4525, O_RDONLY);
+	int fd = px4_open(PATH_MS4525, O_RDONLY);
 
 	if (fd < 0) {
 		PX4_ERR("failed ");
 	}
 
-	if (ioctl(fd, SENSORIOCRESET, 0) < 0) {
+	if (px4_ioctl(fd, SENSORIOCRESET, 0) < 0) {
 		PX4_ERR("driver reset failed");
 	}
 
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
+	if (px4_ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
 		PX4_ERR("driver poll restart failed");
 	}
 }

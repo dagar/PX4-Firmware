@@ -107,6 +107,7 @@ Airspeed::init()
 
 	/* do I2C init (and probe) first */
 	if (I2C::init() != OK) {
+		PX4_WARN("I2C init failed");
 		goto out;
 	}
 
@@ -114,6 +115,7 @@ Airspeed::init()
 	_reports = new ringbuffer::RingBuffer(2, sizeof(differential_pressure_s));
 
 	if (_reports == nullptr) {
+		PX4_WARN("unable to allocate reports");
 		goto out;
 	}
 

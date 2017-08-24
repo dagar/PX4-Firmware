@@ -75,12 +75,12 @@ CDev::CDev(const char *name,
 	_open_count(0),
 	_pollset(nullptr)
 {
-	PX4_DEBUG("CDev::CDev");
+	DEVICE_DEBUG("CDev::CDev");
 }
 
 CDev::~CDev()
 {
-	PX4_DEBUG("CDev::~CDev");
+	DEVICE_DEBUG("CDev::~CDev");
 
 	if (_registered) {
 		unregister_driver(_devname);
@@ -94,7 +94,7 @@ CDev::~CDev()
 int
 CDev::register_class_devname(const char *class_devname)
 {
-	PX4_DEBUG("CDev::register_class_devname %s", class_devname);
+	DEVICE_DEBUG("CDev::register_class_devname %s", class_devname);
 
 	if (class_devname == nullptr) {
 		return -EINVAL;
@@ -123,7 +123,7 @@ CDev::register_class_devname(const char *class_devname)
 int
 CDev::register_driver(const char *name, void *data)
 {
-	PX4_DEBUG("CDev::register_driver %s", name);
+	DEVICE_DEBUG("CDev::register_driver %s", name);
 	int ret = 0;
 
 	if (name == nullptr || data == nullptr) {
@@ -141,7 +141,7 @@ CDev::register_driver(const char *name, void *data)
 	}
 
 	devmap[name] = (void *)data;
-	PX4_DEBUG("Registered DEV %s", name);
+	DEVICE_DEBUG("Registered DEV %s", name);
 
 	pthread_mutex_unlock(&devmutex);
 
@@ -151,7 +151,7 @@ CDev::register_driver(const char *name, void *data)
 int
 CDev::unregister_driver(const char *name)
 {
-	PX4_DEBUG("CDev::unregister_driver %s", name);
+	DEVICE_DEBUG("CDev::unregister_driver %s", name);
 	int ret = -EINVAL;
 
 	if (name == nullptr) {
@@ -161,7 +161,7 @@ CDev::unregister_driver(const char *name)
 	pthread_mutex_lock(&devmutex);
 
 	if (devmap.erase(name) > 0) {
-		PX4_DEBUG("Unregistered DEV %s", name);
+		DEVICE_DEBUG("Unregistered DEV %s", name);
 		ret = 0;
 	}
 
@@ -173,7 +173,7 @@ CDev::unregister_driver(const char *name)
 int
 CDev::unregister_class_devname(const char *class_devname, unsigned class_instance)
 {
-	PX4_DEBUG("CDev::unregister_class_devname");
+	DEVICE_DEBUG("CDev::unregister_class_devname");
 	char name[32];
 	snprintf(name, sizeof(name), "%s%u", class_devname, class_instance);
 	int ret = -EINVAL;
@@ -182,7 +182,7 @@ CDev::unregister_class_devname(const char *class_devname, unsigned class_instanc
 	pthread_mutex_lock(&devmutex);
 
 	if (devmap.erase(name) > 0) {
-		PX4_DEBUG("Unregistered class DEV %s", name);
+		DEVICE_DEBUG("Unregistered class DEV %s", name);
 		ret = 0;
 	}
 
@@ -194,7 +194,7 @@ CDev::unregister_class_devname(const char *class_devname, unsigned class_instanc
 int
 CDev::init()
 {
-	PX4_DEBUG("CDev::init");
+	DEVICE_DEBUG("CDev::init");
 
 	// base class init first
 	int ret = Device::init();
@@ -224,7 +224,7 @@ out:
 int
 CDev::open(file_t *filep)
 {
-	PX4_DEBUG("CDev::open");
+	DEVICE_DEBUG("CDev::open");
 	int ret = PX4_OK;
 
 	lock();
@@ -249,14 +249,14 @@ CDev::open(file_t *filep)
 int
 CDev::open_first(file_t *filep)
 {
-	PX4_DEBUG("CDev::open_first");
+	DEVICE_DEBUG("CDev::open_first");
 	return PX4_OK;
 }
 
 int
 CDev::close(file_t *filep)
 {
-	PX4_DEBUG("CDev::close");
+	DEVICE_DEBUG("CDev::close");
 	int ret = PX4_OK;
 
 	lock();
@@ -282,35 +282,35 @@ CDev::close(file_t *filep)
 int
 CDev::close_last(file_t *filep)
 {
-	PX4_DEBUG("CDev::close_last");
+	DEVICE_DEBUG("CDev::close_last");
 	return PX4_OK;
 }
 
 ssize_t
 CDev::read(file_t *filep, char *buffer, size_t buflen)
 {
-	PX4_DEBUG("CDev::read");
+	DEVICE_DEBUG("CDev::read");
 	return -ENOSYS;
 }
 
 ssize_t
 CDev::write(file_t *filep, const char *buffer, size_t buflen)
 {
-	PX4_DEBUG("CDev::write");
+	DEVICE_DEBUG("CDev::write");
 	return -ENOSYS;
 }
 
 off_t
 CDev::seek(file_t *filep, off_t offset, int whence)
 {
-	PX4_DEBUG("CDev::seek");
+	DEVICE_DEBUG("CDev::seek");
 	return -ENOSYS;
 }
 
 int
 CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 {
-	PX4_DEBUG("CDev::ioctl");
+	DEVICE_DEBUG("CDev::ioctl");
 	int ret = -ENOTTY;
 
 	switch (cmd) {
@@ -344,7 +344,7 @@ CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 int
 CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 {
-	PX4_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
+	DEVICE_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
 	int ret = PX4_OK;
 
 	/*
@@ -358,7 +358,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 		 * benefit.
 		 */
 		fds->priv = (void *)filep;
-		PX4_DEBUG("CDev::poll: fds->priv = %p", filep);
+		DEVICE_DEBUG("CDev::poll: fds->priv = %p", filep);
 
 		/*
 		 * Handle setup requests.
@@ -397,7 +397,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 void
 CDev::poll_notify(pollevent_t events)
 {
-	PX4_DEBUG("CDev::poll_notify events = %0x", events);
+	DEVICE_DEBUG("CDev::poll_notify events = %0x", events);
 
 	/* lock against poll() as well as other wakeups */
 	lock();
@@ -414,14 +414,14 @@ CDev::poll_notify(pollevent_t events)
 void
 CDev::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
 {
-	PX4_DEBUG("CDev::poll_notify_one");
+	DEVICE_DEBUG("CDev::poll_notify_one");
 	int value;
 	px4_sem_getvalue(fds->sem, &value);
 
 	/* update the reported event set */
 	fds->revents |= fds->events & events;
 
-	PX4_DEBUG(" Events fds=%p %0x %0x %0x %d", fds, fds->revents, fds->events, events, value);
+	DEVICE_DEBUG(" Events fds=%p %0x %0x %0x %d", fds, fds->revents, fds->events, events, value);
 
 	/* if the state is now interesting, wake the waiter if it's still asleep */
 	/* XXX semcount check here is a vile hack; counting semphores should not be abused as cvars */
@@ -433,7 +433,7 @@ CDev::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
 pollevent_t
 CDev::poll_state(file_t *filep)
 {
-	PX4_DEBUG("CDev::poll_notify");
+	DEVICE_DEBUG("CDev::poll_notify");
 	/* by default, no poll events to report */
 	return 0;
 }
@@ -444,7 +444,7 @@ CDev::store_poll_waiter(px4_pollfd_struct_t *fds)
 	/*
 	 * Look for a free slot.
 	 */
-	PX4_DEBUG("CDev::store_poll_waiter");
+	DEVICE_DEBUG("CDev::store_poll_waiter");
 
 	for (unsigned i = 0; i < _max_pollwaiters; i++) {
 		if (nullptr == _pollset[i]) {
@@ -484,7 +484,7 @@ CDev::store_poll_waiter(px4_pollfd_struct_t *fds)
 int
 CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
 {
-	PX4_DEBUG("CDev::remove_poll_waiter");
+	DEVICE_DEBUG("CDev::remove_poll_waiter");
 
 	for (unsigned i = 0; i < _max_pollwaiters; i++) {
 		if (fds == _pollset[i]) {
@@ -501,7 +501,7 @@ CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
 
 CDev *CDev::getDev(const char *path)
 {
-	PX4_DEBUG("CDev::getDev");
+	//DEVICE_DEBUG("CDev::getDev");
 
 	pthread_mutex_lock(&devmutex);
 
