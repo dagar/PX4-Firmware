@@ -164,10 +164,10 @@ function(px4_generate_messages)
 			)
 
 		target_include_directories(${TARGET}
-			PRIVATE "${PX4_SOURCE_DIR}/src/lib/micro-CDR/include"
-			PRIVATE "${PX4_BINARY_DIR}/src/lib/micro-CDR/include/microcdr"
+			PRIVATE ${PX4_SOURCE_DIR}/src/lib/micro-CDR/include
+			PRIVATE ${PX4_BINARY_DIR}/src/lib/micro-CDR/include/microcdr
 			)
-		target_link_libraries(${TARGET} lib__micro-CDR)
+		target_link_libraries(${TARGET} PRIVATE lib__micro-CDR)
     endif()
 endfunction()
 

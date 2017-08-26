@@ -1,3 +1,6 @@
+
+#ifdef CONFIG_BOARD_CRASHDUMP
+
 #include <px4_config.h>
 #include <px4_tasks.h>
 
@@ -166,3 +169,5 @@ __EXPORT void board_crashdump(uintptr_t currentsp, FAR void *tcb, FAR const uint
 	board_reset(0);
 #endif
 }
+
+#endif /* CONFIG_BOARD_CRASHDUMP */

@@ -55,22 +55,28 @@ add_custom_command(OUTPUT apps_copy.stamp
 	)
 set(APPS_DIR ${CMAKE_CURRENT_BINARY_DIR}/apps)
 
+message(STATUS "DEPENDS ${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig")
+message(STATUS "OUTPUT ${NUTTX_DIR}/Make.defs")
+
+
 # copy PX4 board config into nuttx
 file(GLOB_RECURSE board_config_files ${NUTTX_CONFIG_DIR}/${BOARD})
-add_custom_command(
-	OUTPUT
-		${NUTTX_DIR}/PX4_Config.mk
-		${NUTTX_DIR}/PX4_Warnings.mk
-		${NUTTX_DIR}/configs/${BOARD}/${nuttx_config_type}/defconfig
-		${NUTTX_DIR}/.config
+add_custom_command(OUTPUT
+					${NUTTX_DIR}/PX4_Config.mk
+					${NUTTX_DIR}/PX4_Warnings.mk
+					${NUTTX_DIR}/.config
+					${NUTTX_DIR}/Make.defs
+					${NUTTX_DIR}/configs/${BOARD}/${nuttx_config_type}/defconfig
 	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_CONFIG_DIR}/PX4_Config.mk ${NUTTX_DIR}/PX4_Config.mk
 	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_CONFIG_DIR}/PX4_Warnings.mk ${NUTTX_DIR}/PX4_Warnings.mk
+	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig ${NUTTX_DIR}/.config
+	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/Make.defs ${NUTTX_DIR}/Make.defs
 	COMMAND ${cp_cmd} ${cp_opts} ${NUTTX_CONFIG_DIR}/${BOARD} ${NUTTX_DIR}/configs/
-	COMMAND rm -rf ${NUTTX_DIR}/.config && sh configure.sh ${BOARD}/${nuttx_config_type} > /dev/null || true
 	DEPENDS
 		${NUTTX_CONFIG_DIR}/PX4_Config.mk
 		${NUTTX_CONFIG_DIR}/PX4_Warnings.mk
 		${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig
+		${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/Make.defs
 		${board_config_files}
 		nuttx_copy.stamp apps_copy.stamp
 	WORKING_DIRECTORY ${NUTTX_DIR}/tools
@@ -86,37 +92,43 @@ add_custom_command(OUTPUT ${NUTTX_DIR}/include/nuttx/version.h ${NUTTX_DIR}/incl
 	)
 add_custom_target(nuttx_context DEPENDS ${NUTTX_DIR}/include/nuttx/version.h)
 
+# library of NuttX libraries
+add_library(nuttx_build INTERFACE)
+
+# builtins
+if ("${BOARD}" MATCHES "px4io")
+	# no apps for px4io
+	set(nuttx_builtin_list)
+else()
+	# add additional commands to nuttx builtins
+	set(builtin_registry ${APPS_DIR}/builtin/registry)
+	set(nuttx_builtin_list)
+	foreach(module ${module_libraries})
+		get_target_property(MAIN ${module} MAIN)
+		get_target_property(STACK_MAIN ${module} STACK_MAIN)
+		get_target_property(PRIORITY ${module} PRIORITY)
+
+		if(MAIN)
+			add_custom_command(OUTPUT ${builtin_registry}/${MAIN}_main.bdat
+				COMMAND echo "{ \"${MAIN}\", ${PRIORITY}, ${STACK_MAIN}, ${MAIN}_main }," > ${builtin_registry}/${MAIN}_main.bdat
+				VERBATIM
+				)
+			list(APPEND nuttx_builtin_list ${builtin_registry}/${MAIN}_main.bdat)
+
+			add_custom_command(OUTPUT ${builtin_registry}/${MAIN}_main.pdat
+				COMMAND echo "int ${MAIN}_main(int argc, char *argv[]);" > ${builtin_registry}/${MAIN}_main.pdat
+				VERBATIM
+				)
+			list(APPEND nuttx_builtin_list ${builtin_registry}/${MAIN}_main.pdat)
+		endif()
+	endforeach()
+endif()
+
 # APPS
-
-# add additional commands to nuttx builtins
-set(builtin_registry ${APPS_DIR}/builtin/registry)
-set(nuttx_builtin_list)
-foreach(module ${module_libraries})
-	get_target_property(MAIN ${module} MAIN)
-	get_target_property(STACK_MAIN ${module} STACK_MAIN)
-	get_target_property(PRIORITY ${module} PRIORITY)
-
-	if(MAIN)
-		add_custom_command(OUTPUT ${builtin_registry}/${MAIN}_main.bdat
-			COMMAND echo "{ \"${MAIN}\", ${PRIORITY}, ${STACK_MAIN}, ${MAIN}_main }," > ${builtin_registry}/${MAIN}_main.bdat
-			VERBATIM
-			)
-		list(APPEND nuttx_builtin_list ${builtin_registry}/${MAIN}_main.bdat)
-
-		add_custom_command(OUTPUT ${builtin_registry}/${MAIN}_main.pdat
-			COMMAND echo "int ${MAIN}_main(int argc, char *argv[]);" > ${builtin_registry}/${MAIN}_main.pdat
-			VERBATIM
-			)
-		list(APPEND nuttx_builtin_list ${builtin_registry}/${MAIN}_main.pdat)
-	endif()
-endforeach()
 
 # libapps.a
 add_custom_command(OUTPUT ${APPS_DIR}/libapps.a
-		${APPS_DIR}/nshlib/.built
-		${APPS_DIR}/builtin/.built
-		${APPS_DIR}/builtin/builtin_list.h
-		${APPS_DIR}/builtin/builtin_proto.h
+		${APPS_DIR}/platform/.built
 	COMMAND make --silent --no-print-directory -C ../apps TOPDIR="${NUTTX_DIR}" libapps.a > /dev/null
 	DEPENDS nuttx_context ${nuttx_builtin_list}
 	WORKING_DIRECTORY ${NUTTX_DIR}
@@ -124,6 +136,8 @@ add_custom_command(OUTPUT ${APPS_DIR}/libapps.a
 add_custom_target(nuttx_apps_build DEPENDS ${APPS_DIR}/libapps.a)
 add_library(nuttx_apps STATIC IMPORTED GLOBAL)
 set_property(TARGET nuttx_apps PROPERTY IMPORTED_LOCATION ${APPS_DIR}/libapps.a)
+
+target_link_libraries(nuttx_build INTERFACE nuttx_apps)
 
 # libboard.a
 add_custom_command(OUTPUT ${NUTTX_DIR}/arch/arm/src/board/libboard.a
@@ -134,9 +148,9 @@ add_custom_command(OUTPUT ${NUTTX_DIR}/arch/arm/src/board/libboard.a
 add_custom_target(nuttx_board_build DEPENDS ${NUTTX_DIR}/arch/arm/src/board/libboard.a)
 add_library(nuttx_board STATIC IMPORTED GLOBAL)
 set_property(TARGET nuttx_board PROPERTY IMPORTED_LOCATION ${NUTTX_DIR}/arch/arm/src/board/libboard.a)
+target_link_libraries(nuttx_build INTERFACE nuttx_board)
 
 # helper for all targets
-add_custom_target(nuttx_build DEPENDS nuttx_board_build nuttx_apps_build)
 function(add_nuttx_dir nuttx_lib nuttx_lib_dir kernel extra)
 	file(GLOB_RECURSE nuttx_lib_files
 		LIST_DIRECTORIES false
@@ -152,6 +166,8 @@ function(add_nuttx_dir nuttx_lib nuttx_lib_dir kernel extra)
 	add_library(nuttx_${nuttx_lib} STATIC IMPORTED GLOBAL)
 	set_property(TARGET nuttx_${nuttx_lib} PROPERTY IMPORTED_LOCATION ${NUTTX_DIR}/${nuttx_lib_dir}/lib${nuttx_lib}.a)
 	add_dependencies(nuttx_build nuttx_${nuttx_lib}_build)
+
+	target_link_libraries(nuttx_build INTERFACE nuttx_${nuttx_lib})
 endfunction()
 
 # add_nuttx_dir(NAME DIRECTORY KERNEL EXTRA)
@@ -166,6 +182,7 @@ add_nuttx_dir(sched sched y -D__KERNEL__)
 add_nuttx_dir(c libc n "")
 add_nuttx_dir(cxx libxx n "")
 add_nuttx_dir(mm mm n "")
+
 
 # oldconfig helper
 add_custom_target(oldconfig

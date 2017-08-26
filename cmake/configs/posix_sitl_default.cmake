@@ -3,7 +3,7 @@ include(posix/px4_impl_posix)
 set(CMAKE_TOOLCHAIN_FILE ${PX4_SOURCE_DIR}/cmake/toolchains/Toolchain-native.cmake)
 
 set(config_module_list
-	drivers/boards/sitl
+	drivers/boards
 	drivers/camera_trigger
 	drivers/device
 	drivers/gps

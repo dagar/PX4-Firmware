@@ -10,7 +10,7 @@ set(config_module_list
 	drivers/stm32
 	drivers/led
 	drivers/px4fmu
-	drivers/boards/crazyflie
+	drivers/boards
 	drivers/mpu9250
 	drivers/lps25h
 	drivers/gps

@@ -239,6 +239,27 @@ function(px4_os_prebuild_targets)
 			ARGN ${ARGN})
 
 	add_custom_target(${OUT} DEPENDS nuttx_context)
+
+	# parse nuttx config options for cmake
+	file(STRINGS ${PX4_SOURCE_DIR}/nuttx-configs/${BOARD}/${nuttx_config_type}/defconfig ConfigContents)
+	foreach(NameAndValue ${ConfigContents})
+		# Strip leading spaces
+		string(REGEX REPLACE "^[ ]+" "" NameAndValue ${NameAndValue})
+
+		# Find variable name
+		string(REGEX MATCH "^CONFIG[^=]+" Name ${NameAndValue})
+
+		if (Name)
+			# Find the value
+			string(REPLACE "${Name}=" "" Value ${NameAndValue})
+
+			# remove extra quotes
+			string(REPLACE "\"" "" Value ${Value})
+
+			# Set the variable
+			set(${Name} ${Value} PARENT_SCOPE)
+		endif()
+	endforeach()
 endfunction()
 
 #=============================================================================

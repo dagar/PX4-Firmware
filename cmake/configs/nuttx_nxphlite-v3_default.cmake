@@ -15,7 +15,7 @@ set(config_module_list
 #NOT Supported	drivers/bma180
 #NOT Supported	drivers/bmi160
 	drivers/bmp280
-	drivers/boards/nxphlite-v3
+	drivers/boards
 	drivers/bst
 	drivers/camera_trigger
 	drivers/device
@@ -217,11 +217,6 @@ set(config_module_list
 set(config_extra_builtin_cmds
 	serdis
 	sercon
-	)
-
-set(config_extra_libs
-##NO CAN YET	uavcan
-##NO CAN YET	uavcan_stm32_driver
 	)
 
 set(config_io_extra_libs

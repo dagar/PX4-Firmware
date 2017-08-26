@@ -109,6 +109,11 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 set(PX4_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(PX4_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
+define_property(GLOBAL PROPERTY PX4_LIBRARIES
+                 BRIEF_DOCS "PX4 libs"
+                 FULL_DOCS "List of all PX4 module libraries"
+                 )
+
 #=============================================================================
 # configuration
 #
@@ -347,7 +352,6 @@ px4_join(OUT CMAKE_C_FLAGS LIST "${CMAKE_C_FLAGS};${c_flags};${optimization_flag
 px4_join(OUT CMAKE_CXX_FLAGS LIST "${CMAKE_CXX_FLAGS};${cxx_flags};${optimization_flags}" GLUE " ")
 
 include_directories(${include_dirs})
-#message("INCLUDE_DIRS=${include_dirs}")
 link_directories(${link_dirs})
 add_definitions(${definitions})
 
@@ -418,7 +422,6 @@ endif()
 #=============================================================================
 # subdirectories
 #
-set(module_libraries)
 foreach(module ${config_module_list})
 	string(REGEX MATCH "^[./]" external_module ${module})
 	if (external_module)
@@ -428,12 +431,7 @@ foreach(module ${config_module_list})
 	else()
 		add_subdirectory(src/${module})
 	endif()
-	px4_mangle_name(${module} mangled_name)
-	list(APPEND module_libraries ${mangled_name})
 endforeach()
-
-# Keep track of external shared libs required for modules
-set(module_external_libraries "${module_external_libraries}" CACHE INTERNAL "module_external_libraries")
 
 add_subdirectory(src/firmware/${OS})
 

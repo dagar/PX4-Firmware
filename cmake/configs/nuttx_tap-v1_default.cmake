@@ -14,7 +14,7 @@ set(config_module_list
 	drivers/stm32/tone_alarm
 	drivers/led
 	drivers/px4fmu
-	drivers/boards/tap-v1
+	drivers/boards
 	drivers/rgbled_pwm
 	drivers/tap_esc
 	drivers/mpu6000

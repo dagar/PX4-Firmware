@@ -1,7 +1,6 @@
 
 function(px4_add_sitl_app)
-px4_parse_function_args(
-			NAME px4_add_sitl_app
+px4_parse_function_args(NAME px4_add_sitl_app
 			ONE_VALUE APP_NAME MAIN_SRC UPLOAD_NAME
 			REQUIRED APP_NAME MAIN_SRC
 			ARGN ${ARGN}
@@ -27,7 +26,6 @@ px4_parse_function_args(
 			pthread m
 			)
 	endif()
-
 endfunction()
 
 #=============================================================================

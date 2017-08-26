@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,15 +30,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE drivers__boards__px4fmu-v4pro
-	SRCS
-		px4fmu_can.c
-		px4fmu_init.c
-		px4fmu_timer_config.c
-		px4fmu_spi.c
-		px4fmu_usb.c
-		px4fmu_led.c
-	DEPENDS
-		platforms__common
+
+px4_add_library(board_stm32
+	board_identity.c
+	board_mcu_version.c
+	board_reset.c
 	)
+add_dependencies(board_stm32 nuttx_build)

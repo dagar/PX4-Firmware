@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,15 +30,20 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE drivers__boards__px4fmu-v4pro
-	SRCS
-		px4fmu_can.c
-		px4fmu_init.c
-		px4fmu_timer_config.c
-		px4fmu_spi.c
-		px4fmu_usb.c
-		px4fmu_led.c
-	DEPENDS
-		platforms__common
-	)
+
+if (${OS} MATCHES "nuttx")
+	px4_add_library(boards_common
+		board_crashdump.c
+		board_dma_alloc.c
+		board_gpio_init.c
+		)
+	add_dependencies(boards_common nuttx_build)
+
+	if (${CONFIG_ARCH_CHIP} MATCHES "kinetis")
+		add_subdirectory(kinetis)
+	elseif (${CONFIG_ARCH_CHIP} MATCHES "samv7")
+		add_subdirectory(samv7)
+	elseif (${CONFIG_ARCH_CHIP} MATCHES "stm32")
+		add_subdirectory(stm32)
+	endif()
+endif()

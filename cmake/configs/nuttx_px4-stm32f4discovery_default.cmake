@@ -9,7 +9,7 @@ set(config_module_list
 	drivers/device
 	drivers/stm32
 	drivers/led
-	drivers/boards/px4-stm32f4discovery
+	drivers/boards
 
 	#
 	# System commands

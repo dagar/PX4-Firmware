@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,14 +31,15 @@
 #
 ############################################################################
 px4_add_module(
-	MODULE drivers__boards__px4fmu-v4pro
+	MODULE drivers__boards__px4fmu-v3
+	COMPILE_FLAGS
 	SRCS
-		px4fmu_can.c
-		px4fmu_init.c
-		px4fmu_timer_config.c
-		px4fmu_spi.c
-		px4fmu_usb.c
-		px4fmu_led.c
+		../px4fmu-v2/px4fmu_can.c
+		../px4fmu-v2/px4fmu2_init.c
+		../px4fmu-v2/px4fmu_timer_config.c
+		../px4fmu-v2/px4fmu_spi.c
+		../px4fmu-v2/px4fmu_usb.c
+		../px4fmu-v2/px4fmu2_led.c
 	DEPENDS
 		platforms__common
 	)

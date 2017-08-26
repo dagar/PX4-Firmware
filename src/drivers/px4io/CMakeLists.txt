@@ -44,4 +44,35 @@ px4_add_module(
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+
+# include the px4io binary in ROMFS
+message(STATUS "ROMFS including IO: ${config_io_board}")
+
+set(fw_io_exe "${PX4_SOURCE_DIR}/build/${config_io_board}_default/nuttx_${config_io_board}_default.elf")
+set(fw_io_bin "${PX4_BINARY_DIR}/ROMFS/${config_romfs_root}/extras/${config_io_board}.bin")
+set(fw_io_bin ${fw_io_bin} PARENT_SCOPE)
+
+file(GLOB_RECURSE px4io_driver_files ${PX4_SOURCE_DIR}/src/drivers/boards/${config_io_board}/*)
+file(GLOB_RECURSE px4io_config_files ${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/configs/${config_io_board}/*)
+file(GLOB_RECURSE px4io_firmware_files ${PX4_SOURCE_DIR}/src/modules/px4iofirmware/*)
+file(GLOB_RECURSE px4io_rc_files ${PX4_SOURCE_DIR}/src/lib/rc/*)
+add_custom_command(OUTPUT ${fw_io_exe}
+	COMMAND make --no-print-directory ${config_io_board}_default
+	DEPENDS ${px4io_driver_files} ${px4io_config_files} ${px4io_firmware_files} ${px4io_rc_files}
+	WORKING_DIRECTORY ${PX4_SOURCE_DIR}
+	COMMENT "Building ${config_io_board}"
+	USES_TERMINAL
+	)
+add_custom_command(OUTPUT ${fw_io_bin}
+	COMMAND mkdir -p ${PX4_BINARY_DIR}/ROMFS/${config_romfs_root}/extras/
+	COMMAND ${OBJCOPY} -O binary ${fw_io_exe} ${fw_io_bin}
+	DEPENDS
+		${fw_io_exe}
+		${romfs_temp_dir}/init.d/rcS
+		${romfs_temp_dir}/init.d/rc.autostart
+	COMMENT "Copying ${config_io_board} to ROMFS extras"
+	)
+
+list(APPEND romfs_dependencies
+	${fw_io_bin}
+	)

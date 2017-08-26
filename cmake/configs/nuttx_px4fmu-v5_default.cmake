@@ -14,7 +14,7 @@ set(config_module_list
 	drivers/bmi055
 	drivers/bmi160
 	drivers/bmp280
-	drivers/boards/px4fmu-v5
+	drivers/boards
 	drivers/bst
 	drivers/camera_trigger
 	drivers/device

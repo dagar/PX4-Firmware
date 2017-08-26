@@ -13,7 +13,7 @@ set(config_module_list
 	drivers/led
 	drivers/px4fmu
 	drivers/px4io
-	drivers/boards/px4fmu-v1
+	drivers/boards
 	drivers/ardrone_interface
 	drivers/rgbled
 	drivers/mpu6000

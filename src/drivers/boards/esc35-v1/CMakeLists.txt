@@ -69,7 +69,6 @@ endif()
 
 px4_add_module(
 	MODULE drivers__boards__esc35-v1
-	COMPILE_FLAGS
 	SRCS ${SRCS}
 	DEPENDS
 		platforms__common

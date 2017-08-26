@@ -14,7 +14,7 @@ set(config_module_list
 	drivers/stm32/tone_alarm
 	drivers/led
 	drivers/px4fmu
-	drivers/boards/mindpx-v2
+	drivers/boards
 	drivers/rgbled
 	#drivers/rgbled_pwm
 	drivers/mpu6000

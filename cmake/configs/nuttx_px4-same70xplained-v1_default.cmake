@@ -17,7 +17,7 @@ set(config_module_list
 	drivers/led
 	drivers/px4fmu
 #WIP 	drivers/px4io
-	drivers/boards/px4-same70xplained-v1
+	drivers/boards
 	drivers/rgbled
 	drivers/mpu6000
 	drivers/mpu9250
@@ -177,11 +177,6 @@ set(config_module_list
 set(config_extra_builtin_cmds
 	serdis
 	sercon
-	)
-
- set(config_extra_libs
-#	uavcan
-#	uavcan_stm32_driver
 	)
 
 set(config_io_extra_libs

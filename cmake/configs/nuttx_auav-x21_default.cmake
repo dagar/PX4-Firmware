@@ -15,7 +15,7 @@ set(config_module_list
 	drivers/led
 	drivers/px4fmu
 	drivers/px4io
-	drivers/boards/auav-x21
+	drivers/boards
 	drivers/rgbled
 	drivers/mpu6000
 	drivers/mpu9250

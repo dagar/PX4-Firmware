@@ -12,7 +12,7 @@ set(config_module_list
 	drivers/stm32
 	drivers/led
 	drivers/px4fmu
-	drivers/boards/aerofc-v1
+	drivers/boards
 	drivers/tap_esc
 	drivers/mpu9250
 	drivers/ms5611

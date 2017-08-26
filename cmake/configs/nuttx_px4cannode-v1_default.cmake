@@ -31,7 +31,7 @@ set(config_module_list
 
 	drivers/stm32
 	drivers/led
-	drivers/boards/px4cannode-v1
+	drivers/boards
 
 	#
 	# System commands

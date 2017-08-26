@@ -17,7 +17,7 @@ set(config_module_list
 	drivers/led
 	drivers/px4fmu
 	drivers/px4io
-	drivers/boards/px4fmu-v2
+	drivers/boards
 	drivers/rgbled
 	drivers/mpu6000
 #TO FIT	drivers/mpu9250

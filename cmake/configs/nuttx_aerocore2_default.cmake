@@ -14,7 +14,7 @@ set(config_module_list
 	drivers/stm32/tone_alarm
 	drivers/led
 	drivers/px4fmu
-	drivers/boards/aerocore2
+	drivers/boards
 	drivers/lsm303d
 	drivers/l3gd20
 	drivers/ms5611
