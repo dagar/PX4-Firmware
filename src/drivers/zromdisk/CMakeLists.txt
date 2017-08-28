@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2016 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,41 +30,12 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+add_library(drivers_zromdisk drv_zromdisk.cpp)
+add_dependencies(drivers_zromdisk platforms__common)
 
-set(SRCS)
-
-list(APPEND SRCS
-	ringbuffer.cpp
-	integrator.cpp
-)
-
-if(${OS} STREQUAL "nuttx")
-	list(APPEND SRCS
-		device_nuttx.cpp
-		BDev.cpp
-		cdev.cpp
-	)
-	if ("${CONFIG_I2C}" STREQUAL "y")
-		list(APPEND SRCS i2c_nuttx.cpp)
-	endif()
-	if ("${CONFIG_SPI}" STREQUAL "y")
-		list(APPEND SRCS spi.cpp)
-	endif()
-else()
-	list(APPEND SRCS
-		device_posix.cpp
-		vdev.cpp
-		vfile.cpp
-		vdev_posix.cpp
-		i2c_posix.cpp
-		sim.cpp
-	)
-
-endif()
-
-px4_add_module(
-	MODULE drivers__device
-	SRCS ${SRCS}
+add_custom_command(OUTPUT romfs.gz
+	COMMAND cc ${CMAKE_CURRENT_SOURCE_DIR}/zromdisk_compress.c -o zromdisk_compress
+	COMMAND ./zromdisk_compress e ${PX4_BINARY_DIR}/ROMFS/romfs.img romfs.gz
 	DEPENDS
-		platforms__common
 	)
+add_custom_target(compress_romfs DEPENDS romfs.gz)

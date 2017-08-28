@@ -53,6 +53,8 @@ set(config_module_list
 	drivers/tap_esc
 	drivers/trone
 	drivers/vmount
+	drivers/zromdisk
+
 	modules/sensors
 
 	#
