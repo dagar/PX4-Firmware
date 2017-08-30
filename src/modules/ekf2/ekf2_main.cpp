@@ -41,53 +41,39 @@
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_module.h>
-#include <px4_tasks.h>
 #include <px4_posix.h>
+#include <px4_tasks.h>
 #include <px4_time.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <math.h>
-#include <poll.h>
-#include <time.h>
-#include <float.h>
 
-#include <arch/board/board.h>
-#include <systemlib/param/param.h>
-#include <systemlib/err.h>
-#include <systemlib/systemlib.h>
-#include <mathlib/mathlib.h>
-#include <mathlib/math/filter/LowPassFilter2p.hpp>
-#include <platforms/px4_defines.h>
-#include <drivers/drv_hrt.h>
 #include <controllib/blocks.hpp>
+#include <drivers/drv_hrt.h>
+#include <mathlib/mathlib.h>
 
-#include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/sensor_selection.h>
-#include <uORB/topics/sensor_bias.h>
-#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/Publication.hpp>
 #include <uORB/topics/airspeed.h>
-#include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/vehicle_local_position.h>
-#include <uORB/topics/vehicle_global_position.h>
-#include <uORB/topics/wind_estimate.h>
-#include <uORB/topics/estimator_status.h>
+#include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/ekf2_innovations.h>
 #include <uORB/topics/ekf2_replay.h>
 #include <uORB/topics/ekf2_timestamps.h>
+#include <uORB/topics/ekf2_innovations.h>
+#include <uORB/topics/estimator_status.h>
 #include <uORB/topics/optical_flow.h>
-#include <uORB/topics/distance_sensor.h>
-#include <uORB/topics/vehicle_land_detected.h>
-#include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/sensor_selection.h>
-#include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/sensor_baro.h>
+#include <uORB/topics/sensor_bias.h>
+#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/sensor_selection.h>
+#include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/vehicle_land_detected.h>
+#include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/wind_estimate.h>
 
 #include <ecl/EKF/ekf.h>
 
+using uORB::Publication;
 
 extern "C" __EXPORT int ekf2_main(int argc, char *argv[]);
 
@@ -96,8 +82,7 @@ class Ekf2 : public control::SuperBlock, public ModuleBase<Ekf2>
 {
 public:
 	Ekf2();
-
-	~Ekf2();
+	~Ekf2() = default;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -154,7 +139,7 @@ private:
 	// Used to check, save and use learned magnetometer biases
 	hrt_abstime _last_magcal_us = 0;	///< last time the EKF was operating a mode that estimates magnetomer biases (uSec)
 	hrt_abstime _total_cal_time_us = 0;	///< accumulated calibration time since the last save
-	hrt_abstime _last_time_slip_us = 0;	///< Last time slip (uSec)
+
 	float _last_valid_mag_cal[3] = {};	///< last valid XYZ magnetometer bias estimates (mGauss)
 	bool _valid_cal_available[3] = {};	///< true when an unsaved valid calibration for the XYZ magnetometer bias is available
 	float _last_valid_variance[3] = {};	///< variances for the last valid magnetometer XYZ bias estimates (mGauss**2)
@@ -169,15 +154,16 @@ private:
 	const float _hgt_innov_spike_lim = 2.0f * _hgt_innov_test_lim;	///< preflight position innovation spike limit (m)
 	bool _vel_innov_preflt_fail = false;	///< true if the norm of the filtered innovation vector is too large before flight
 
-	orb_advert_t _att_pub;
-	orb_advert_t _lpos_pub;
-	orb_advert_t _vehicle_global_position_pub;
-	orb_advert_t _wind_pub;
-	orb_advert_t _estimator_status_pub;
-	orb_advert_t _estimator_innovations_pub;
-	orb_advert_t _replay_pub;
-	orb_advert_t _ekf2_timestamps_pub;
-	orb_advert_t _sensor_bias_pub;
+	Publication<ekf2_innovations_s> _ekf2_innovations_pub;
+	Publication<estimator_status_s> _estimator_status_pub;
+	Publication<sensor_bias_s> _sensor_bias_pub;
+	Publication<vehicle_attitude_s> _vehicle_attitude_pub;
+	Publication<vehicle_global_position_s> _vehicle_global_position_pub;
+	Publication<vehicle_local_position_s> _vehicle_local_position;
+	Publication<wind_estimate_s> _wind_estimate_pub;
+
+	orb_advert_t _replay_pub{nullptr};
+	orb_advert_t _ekf2_timestamps_pub{nullptr};
 
 	// Used to correct baro data for positional errors
 	Vector3f _vel_body_wind = {};	// XYZ velocity relative to wind in body frame (m/s)
@@ -340,15 +326,13 @@ Ekf2::Ekf2():
 	SuperBlock(nullptr, "EKF"),
 	_replay_mode(false),
 	_publish_replay_mode(0),
-	_att_pub(nullptr),
-	_lpos_pub(nullptr),
-	_vehicle_global_position_pub(nullptr),
-	_wind_pub(nullptr),
-	_estimator_status_pub(nullptr),
-	_estimator_innovations_pub(nullptr),
-	_replay_pub(nullptr),
-	_ekf2_timestamps_pub(nullptr),
-	_sensor_bias_pub(nullptr),
+	_ekf2_innovations_pub(ORB_ID(ekf2_innovations), -1, &getPublications()),
+	_estimator_status_pub(ORB_ID(estimator_status), -1, &getPublications()),
+	_sensor_bias_pub(ORB_ID(sensor_bias), -1, &getPublications()),
+	_vehicle_attitude_pub(ORB_ID(vehicle_attitude), -1, &getPublications()),
+	_vehicle_global_position_pub(ORB_ID(vehicle_global_position), -1, &getPublications()),
+	_vehicle_local_position(ORB_ID(vehicle_local_position), -1, &getPublications()),
+	_wind_estimate_pub(ORB_ID(wind_estimate), -1, &getPublications()),
 	_params(_ekf.getParamHandle()),
 	_obs_dt_min_ms(this, "EKF2_MIN_OBS_DT", false, _params->sensor_interval_min_ms),
 	_mag_delay_ms(this, "EKF2_MAG_DELAY", false, _params->mag_delay_ms),
@@ -452,19 +436,13 @@ Ekf2::Ekf2():
 	_K_pstatic_coef_y(this, "EKF2_PCOEF_Y", false),
 	_K_pstatic_coef_z(this, "EKF2_PCOEF_Z", false)
 {
-
-}
-
-Ekf2::~Ekf2()
-{
-
 }
 
 int Ekf2::print_status()
 {
 	PX4_INFO("local position OK %s", (_ekf.local_position_is_valid()) ? "yes" : "no");
 	PX4_INFO("global position OK %s", (_ekf.global_position_is_valid()) ? "yes" : "no");
-	PX4_INFO("time slip: %" PRIu64 " us", _last_time_slip_us);
+	PX4_INFO("time slip: %.6f s", (double)_estimator_status_pub.get().time_slip);
 	return 0;
 }
 
@@ -862,8 +840,6 @@ void Ekf2::run()
 			// In-run bias estimates
 			float gyro_bias[3];
 			_ekf.get_gyro_bias(gyro_bias);
-			float accel_bias[3];
-			_ekf.get_accel_bias(accel_bias);
 
 			// Calculate wind-compensated velocity in body frame
 			Vector3f v_wind_comp(velocity);
@@ -874,7 +850,7 @@ void Ekf2::run()
 
 			{
 				// generate vehicle attitude quaternion data
-				struct vehicle_attitude_s att = {};
+				vehicle_attitude_s &att = _vehicle_attitude_pub.get();
 				att.timestamp = now;
 
 				q.copyTo(att.q);
@@ -885,16 +861,11 @@ void Ekf2::run()
 				att.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
 
 				// publish vehicle attitude data
-				if (_att_pub == nullptr) {
-					_att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
-
-				} else {
-					orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
-				}
+				_vehicle_attitude_pub.update();
 			}
 
 			// generate vehicle local position data
-			struct vehicle_local_position_s lpos = {};
+			vehicle_local_position_s &lpos = _vehicle_local_position.get();
 
 			lpos.timestamp = now;
 
@@ -917,6 +888,7 @@ void Ekf2::run()
 
 			// Position of local NED origin in GPS / WGS84 frame
 			struct map_projection_reference_s ekf_origin = {};
+
 			// true if position (x,y,z) has a valid WGS-84 global reference (ref_lat, ref_lon, alt)
 			lpos.xy_global = lpos.z_global = _ekf.get_ekf_origin(&lpos.ref_timestamp, &ekf_origin, &lpos.ref_alt);
 			lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
@@ -926,8 +898,9 @@ void Ekf2::run()
 			matrix::Eulerf euler(q);
 			lpos.yaw = euler.psi();
 
-			float terrain_vpos;
 			lpos.dist_bottom_valid = _ekf.get_terrain_valid();
+
+			float terrain_vpos;
 			_ekf.get_terrain_vert_pos(&terrain_vpos);
 			lpos.dist_bottom = terrain_vpos - position[2]; // Distance to bottom surface (ground) in meters
 
@@ -949,16 +922,11 @@ void Ekf2::run()
 			_ekf.get_velNE_reset(&lpos.delta_vxy[0], &lpos.vxy_reset_counter);
 
 			// publish vehicle local position data
-			if (_lpos_pub == nullptr) {
-				_lpos_pub = orb_advertise(ORB_ID(vehicle_local_position), &lpos);
-
-			} else {
-				orb_publish(ORB_ID(vehicle_local_position), _lpos_pub, &lpos);
-			}
+			_vehicle_local_position.update();
 
 			if (_ekf.global_position_is_valid() && !_vel_innov_preflt_fail) {
 				// generate and publish global position data
-				struct vehicle_global_position_s global_pos = {};
+				vehicle_global_position_s &global_pos = _vehicle_global_position_pub.get();
 
 				global_pos.timestamp = now;
 
@@ -1001,23 +969,21 @@ void Ekf2::run()
 
 				global_pos.dead_reckoning = _ekf.inertial_dead_reckoning(); // True if this position is estimated through dead-reckoning
 
-				if (_vehicle_global_position_pub == nullptr) {
-					_vehicle_global_position_pub = orb_advertise(ORB_ID(vehicle_global_position), &global_pos);
-
-				} else {
-					orb_publish(ORB_ID(vehicle_global_position), _vehicle_global_position_pub, &global_pos);
-				}
+				_vehicle_global_position_pub.update();
 			}
 
-			// publish all corrected sensor readings and bias estimates after mag calibration is updated above
 			{
-				struct sensor_bias_s bias = {};
+				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
+				sensor_bias_s &bias = _sensor_bias_pub.get();
 
 				bias.timestamp = now;
 
 				bias.gyro_x = sensors.gyro_rad[0] - gyro_bias[0];
 				bias.gyro_y = sensors.gyro_rad[1] - gyro_bias[1];
 				bias.gyro_z = sensors.gyro_rad[2] - gyro_bias[2];
+
+				float accel_bias[3];
+				_ekf.get_accel_bias(accel_bias);
 
 				bias.accel_x = sensors.accelerometer_m_s2[0] - accel_bias[0];
 				bias.accel_y = sensors.accelerometer_m_s2[1] - accel_bias[1];
@@ -1039,17 +1005,13 @@ void Ekf2::run()
 				bias.mag_y_bias = _last_valid_mag_cal[1];
 				bias.mag_z_bias = _last_valid_mag_cal[2];
 
-				if (_sensor_bias_pub == nullptr) {
-					_sensor_bias_pub = orb_advertise(ORB_ID(sensor_bias), &bias);
-
-				} else {
-					orb_publish(ORB_ID(sensor_bias), _sensor_bias_pub, &bias);
-				}
+				_sensor_bias_pub.update();
 			}
 
-			// publish estimator status
 			{
-				struct estimator_status_s status = {};
+				// publish estimator status
+				estimator_status_s &status = _estimator_status_pub.get();
+
 				status.timestamp = now;
 				_ekf.get_state_delayed(status.states);
 				_ekf.get_covariances(status.covariances);
@@ -1069,18 +1031,12 @@ void Ekf2::run()
 				// monitor time slippage
 				if (start_time_us != 0 && now > start_time_us) {
 					status.time_slip = (float)(1e-6 * ((double)(now - start_time_us) - (double) integrated_time_us));
-					_last_time_slip_us = (now - start_time_us) - integrated_time_us;
 
 				} else {
 					status.time_slip = 0.0f;
 				}
 
-				if (_estimator_status_pub == nullptr) {
-					_estimator_status_pub = orb_advertise(ORB_ID(estimator_status), &status);
-
-				} else {
-					orb_publish(ORB_ID(estimator_status), _estimator_status_pub, &status);
-				}
+				_estimator_status_pub.update();
 
 				/* Check and save learned magnetometer bias estimates */
 
@@ -1161,24 +1117,21 @@ void Ekf2::run()
 				}
 
 				// Publish wind estimate
-				struct wind_estimate_s wind_estimate = {};
+				wind_estimate_s &wind_estimate = _wind_estimate_pub.get();
+
 				wind_estimate.timestamp = now;
 				wind_estimate.windspeed_north = status.states[22];
 				wind_estimate.windspeed_east = status.states[23];
 				wind_estimate.variance_north = status.covariances[22];
 				wind_estimate.variance_east = status.covariances[23];
 
-				if (_wind_pub == nullptr) {
-					_wind_pub = orb_advertise(ORB_ID(wind_estimate), &wind_estimate);
-
-				} else {
-					orb_publish(ORB_ID(wind_estimate), _wind_pub, &wind_estimate);
-				}
+				_wind_estimate_pub.update();
 			}
 
-			// publish estimator innovation data
 			{
-				struct ekf2_innovations_s innovations = {};
+				// publish estimator innovation data
+				ekf2_innovations_s innovations = _ekf2_innovations_pub.get();
+
 				innovations.timestamp = now;
 				_ekf.get_vel_pos_innov(&innovations.vel_pos_innov[0]);
 				_ekf.get_mag_innov(&innovations.mag_innov[0]);
@@ -1221,27 +1174,14 @@ void Ekf2::run()
 					_vel_innov_preflt_fail = false;
 				}
 
-				if (_estimator_innovations_pub == nullptr) {
-					_estimator_innovations_pub = orb_advertise(ORB_ID(ekf2_innovations), &innovations);
-
-				} else {
-					orb_publish(ORB_ID(ekf2_innovations), _estimator_innovations_pub, &innovations);
-				}
-
+				_ekf2_innovations_pub.update();
 			}
 
 		} else if (_replay_mode) {
 			// in replay mode we have to tell the replay module not to wait for an update
 			// we do this by publishing an attitude with zero timestamp
-			struct vehicle_attitude_s att = {};
-			att.timestamp = now;
-
-			if (_att_pub == nullptr) {
-				_att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
-
-			} else {
-				orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
-			}
+			_vehicle_attitude_pub.get().timestamp = now;
+			_vehicle_attitude_pub.update();
 		}
 
 		// publish ekf2_timestamps (using 0.1 ms relative timestamps)
