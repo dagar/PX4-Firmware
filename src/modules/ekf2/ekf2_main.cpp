@@ -1002,6 +1002,29 @@ void Ekf2::run()
 				bias.mag_y = sensors.magnetometer_ga[1] - (_last_valid_mag_cal[1] / 1000.0f); // mGauss -> Gauss
 				bias.mag_z = sensors.magnetometer_ga[2] - (_last_valid_mag_cal[2] / 1000.0f); // mGauss -> Gauss
 
+				bool update = false;
+
+				if ((bias.gyro_x_bias - gyro_bias[0] > FLT_EPSILON)
+				    || (bias.gyro_y_bias - gyro_bias[1] > FLT_EPSILON)
+				    || (bias.gyro_z_bias - gyro_bias[2] > FLT_EPSILON)) {
+
+					update = true;
+				}
+
+				if ((bias.accel_x_bias - accel_bias[0] > FLT_EPSILON)
+				    || (bias.accel_y_bias - accel_bias[1] > FLT_EPSILON)
+				    || (bias.accel_z_bias - accel_bias[2] > FLT_EPSILON)) {
+
+					update = true;
+				}
+
+				if ((bias.mag_x_bias - _last_valid_mag_cal[0] > FLT_EPSILON)
+				    || (bias.mag_y_bias - _last_valid_mag_cal[1] > FLT_EPSILON)
+				    || (bias.mag_z_bias - _last_valid_mag_cal[2] > FLT_EPSILON)) {
+
+					update = true;
+				}
+
 				bias.gyro_x_bias = gyro_bias[0];
 				bias.gyro_y_bias = gyro_bias[1];
 				bias.gyro_z_bias = gyro_bias[2];
@@ -1014,7 +1037,9 @@ void Ekf2::run()
 				bias.mag_y_bias = _last_valid_mag_cal[1];
 				bias.mag_z_bias = _last_valid_mag_cal[2];
 
-				_sensor_bias_pub.update();
+				if (update) {
+					_sensor_bias_pub.update();
+				}
 			}
 
 			{
