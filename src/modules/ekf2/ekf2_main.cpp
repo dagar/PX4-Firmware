@@ -45,10 +45,11 @@
 #include <px4_tasks.h>
 #include <px4_time.h>
 
+#include <cfloat>
+
 #include <controllib/blocks.hpp>
 #include <drivers/drv_hrt.h>
 #include <mathlib/mathlib.h>
-
 #include <uORB/Publication.hpp>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/distance_sensor.h>
@@ -144,14 +145,19 @@ private:
 	float _last_valid_variance[3] = {};	///< variances for the last valid magnetometer XYZ bias estimates (mGauss**2)
 
 	// Used to filter velocity innovations during pre-flight checks
+	bool _vel_innov_preflt_fail = false;	///< true if the norm of the filtered innovation vector is too large before flight
 	Vector3f _vel_innov_lpf_ned = {};	///< Preflight low pass filtered velocity innovations (m/sec)
 	float _hgt_innov_lpf = 0.0f;		///< Preflight low pass filtered height innovation (m)
-	const float _innov_lpf_tau_inv = 0.2f;	///< Preflight low pass filter time constant inverse (1/sec)
-	const float _vel_innov_test_lim = 0.5f;	///< Maximum permissible velocity innovation to pass pre-flight checks (m/sec)
-	const float _hgt_innov_test_lim = 1.5f;	///< Maximum permissible height innovation to pass pre-flight checks (m)
-	const float _vel_innov_spike_lim = 2.0f * _vel_innov_test_lim;	///< preflight velocity innovation spike limit (m/sec)
-	const float _hgt_innov_spike_lim = 2.0f * _hgt_innov_test_lim;	///< preflight position innovation spike limit (m)
-	bool _vel_innov_preflt_fail = false;	///< true if the norm of the filtered innovation vector is too large before flight
+	static constexpr float _innov_lpf_tau_inv = 0.2f;	///< Preflight low pass filter time constant inverse (1/sec)
+
+	static constexpr float _vel_innov_test_lim =
+		0.5f;	///< Maximum permissible velocity innovation to pass pre-flight checks (m/sec)
+	static constexpr float _hgt_innov_test_lim =
+		1.5f;	///< Maximum permissible height innovation to pass pre-flight checks (m)
+	static constexpr float _vel_innov_spike_lim = 2.0f *
+			_vel_innov_test_lim;	///< preflight velocity innovation spike limit (m/sec)
+	static constexpr float _hgt_innov_spike_lim = 2.0f *
+			_hgt_innov_test_lim;	///< preflight position innovation spike limit (m)
 
 	Publication<ekf2_innovations_s> _ekf2_innovations_pub;
 	Publication<ekf2_timestamps_s> _ekf2_timestamps_pub;
@@ -886,12 +892,19 @@ void Ekf2::run()
 			lpos.v_z_valid = !_vel_innov_preflt_fail;
 
 			// Position of local NED origin in GPS / WGS84 frame
-			struct map_projection_reference_s ekf_origin = {};
+			map_projection_reference_s ekf_origin = {};
+			uint64_t origin_time = 0;
 
 			// true if position (x,y,z) has a valid WGS-84 global reference (ref_lat, ref_lon, alt)
-			lpos.xy_global = lpos.z_global = _ekf.get_ekf_origin(&lpos.ref_timestamp, &ekf_origin, &lpos.ref_alt);
-			lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
-			lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
+			const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin, &lpos.ref_alt);
+			lpos.xy_global = ekf_origin_valid;
+			lpos.z_global = ekf_origin_valid;
+
+			if (ekf_origin_valid && lpos.ref_timestamp != origin_time) {
+				lpos.ref_timestamp = origin_time;
+				lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
+				lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
+			}
 
 			// The rotation of the tangent plane vs. geographical north
 			matrix::Eulerf euler(q);
@@ -929,17 +942,14 @@ void Ekf2::run()
 
 				global_pos.timestamp = now;
 
-				double est_lat, est_lon, lat_pre_reset, lon_pre_reset;
-				map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &est_lat, &est_lon);
-				global_pos.lat = est_lat; // Latitude in degrees
-				global_pos.lon = est_lon; // Longitude in degrees
-				map_projection_reproject(&ekf_origin, lpos.x - lpos.delta_xy[0], lpos.y - lpos.delta_xy[1], &lat_pre_reset,
-							 &lon_pre_reset);
-				global_pos.delta_lat_lon[0] = est_lat - lat_pre_reset;
-				global_pos.delta_lat_lon[1] = est_lon - lon_pre_reset;
+				if (lpos.delta_xy[0] > FLT_EPSILON || lpos.delta_xy[1] > FLT_EPSILON) {
+					map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
+				}
+
 				global_pos.lat_lon_reset_counter = lpos.xy_reset_counter;
 
 				global_pos.alt = -position[2] + lpos.ref_alt; // Altitude AMSL in meters
+
 				_ekf.get_posD_reset(&global_pos.delta_alt, &global_pos.alt_reset_counter);
 				// global altitude has opposite sign of local down position
 				global_pos.delta_alt *= -1.0f;
@@ -1116,16 +1126,18 @@ void Ekf2::run()
 					}
 				}
 
-				// publish wind estimate
-				wind_estimate_s &wind_estimate = _wind_estimate_pub.get();
+				{
+					// publish wind estimate
+					wind_estimate_s &wind_estimate = _wind_estimate_pub.get();
 
-				wind_estimate.timestamp = now;
-				wind_estimate.windspeed_north = status.states[22];
-				wind_estimate.windspeed_east = status.states[23];
-				wind_estimate.variance_north = status.covariances[22];
-				wind_estimate.variance_east = status.covariances[23];
+					wind_estimate.timestamp = now;
+					wind_estimate.windspeed_north = velNE_wind[0];
+					wind_estimate.windspeed_east = velNE_wind[1];
+					wind_estimate.variance_north = status.covariances[22];
+					wind_estimate.variance_east = status.covariances[23];
 
-				_wind_estimate_pub.update();
+					_wind_estimate_pub.update();
+				}
 			}
 
 			{
@@ -1155,6 +1167,7 @@ void Ekf2::run()
 
 				// calculate noise filtered velocity innovations which are used for pre-flight checking
 				if (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
+
 					float alpha = math::constrain(sensors.accelerometer_integral_dt / 1.e6f * _innov_lpf_tau_inv, 0.0f, 1.0f);
 					float beta = 1.0f - alpha;
 					_vel_innov_lpf_ned(0) = beta * _vel_innov_lpf_ned(0) + alpha * math::constrain(innovations.vel_pos_innov[0],
@@ -1165,8 +1178,14 @@ void Ekf2::run()
 								-_vel_innov_spike_lim, _vel_innov_spike_lim);
 					_hgt_innov_lpf = beta * _hgt_innov_lpf + alpha * math::constrain(innovations.vel_pos_innov[5], -_hgt_innov_spike_lim,
 							 _hgt_innov_spike_lim);
-					_vel_innov_preflt_fail = ((_vel_innov_lpf_ned.norm() > _vel_innov_test_lim)
-								  || (fabsf(_hgt_innov_lpf) > _hgt_innov_test_lim));
+
+					if ((_vel_innov_lpf_ned.norm() > _vel_innov_test_lim) || (fabsf(_hgt_innov_lpf) > _hgt_innov_test_lim)) {
+						_vel_innov_preflt_fail = true;
+
+					} else {
+						_vel_innov_preflt_fail = false;
+					}
+
 
 				} else {
 					_vel_innov_lpf_ned.zero();
