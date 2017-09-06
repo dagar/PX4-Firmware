@@ -47,18 +47,16 @@
 #include "navigator_mode.h"
 #include "mission_block.h"
 
-class Land : public MissionBlock
+class Land final : public MissionBlock
 {
 public:
 	Land(Navigator *navigator, const char *name);
 
-	~Land();
+	~Land() = default;
 
-	virtual void on_inactive();
-
-	virtual void on_activation();
-
-	virtual void on_active();
+	void on_inactive() override;
+	void on_activation() override;
+	void on_active() override;
 
 };
 

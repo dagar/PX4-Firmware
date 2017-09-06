@@ -78,7 +78,6 @@ FollowTarget::FollowTarget(Navigator *navigator, const char *name) :
 	_yaw_auto_max(0.0F),
 	_yaw_angle(0.0F)
 {
-	updateParams();
 	_current_target_motion = {};
 	_previous_target_motion =  {};
 	_current_vel.zero();
@@ -87,10 +86,6 @@ FollowTarget::FollowTarget(Navigator *navigator, const char *name) :
 	_target_distance.zero();
 	_target_position_offset.zero();
 	_target_position_delta.zero();
-}
-
-FollowTarget::~FollowTarget()
-{
 }
 
 void FollowTarget::on_inactive()

@@ -50,18 +50,16 @@
 
 class Navigator;
 
-class DataLinkLoss : public MissionBlock
+class DataLinkLoss final : public MissionBlock
 {
 public:
 	DataLinkLoss(Navigator *navigator, const char *name);
 
-	~DataLinkLoss();
+	~DataLinkLoss() = default;
 
-	virtual void on_inactive();
-
-	virtual void on_activation();
-
-	virtual void on_active();
+	void on_inactive() override;
+	void on_activation() override;
+	void on_active() override;
 
 private:
 	/* Params */

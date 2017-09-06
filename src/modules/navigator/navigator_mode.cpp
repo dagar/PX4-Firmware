@@ -44,11 +44,11 @@
 
 NavigatorMode::NavigatorMode(Navigator *navigator, const char *name) :
 	SuperBlock(navigator, name),
-	_navigator(navigator),
-	_active(false)
+	_navigator(navigator)
 {
 	/* load initial params */
 	updateParams();
+
 	/* set initial mission items */
 	on_inactivation();
 	on_inactive();
@@ -80,26 +80,4 @@ NavigatorMode::run(bool active)
 	}
 
 	_active = active;
-}
-
-void
-NavigatorMode::on_inactive()
-{
-}
-
-void
-NavigatorMode::on_inactivation()
-{
-}
-
-void
-NavigatorMode::on_activation()
-{
-	/* invalidate position setpoint by default */
-	_navigator->get_position_setpoint_triplet()->current.valid = false;
-}
-
-void
-NavigatorMode::on_active()
-{
 }

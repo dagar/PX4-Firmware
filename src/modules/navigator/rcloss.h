@@ -50,18 +50,16 @@
 
 class Navigator;
 
-class RCLoss : public MissionBlock
+class RCLoss final : public MissionBlock
 {
 public:
 	RCLoss(Navigator *navigator, const char *name);
 
-	~RCLoss();
+	~RCLoss() = default;
 
-	virtual void on_inactive();
-
-	virtual void on_activation();
-
-	virtual void on_active();
+	void on_inactive() override;
+	void on_activation() override;
+	void on_active() override;
 
 private:
 	/* Params */

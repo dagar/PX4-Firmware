@@ -51,7 +51,6 @@
 #include <drivers/drv_hrt.h>
 #include <geo/geo.h>
 #include <mathlib/mathlib.h>
-#include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_posix.h>
 #include <px4_tasks.h>
@@ -65,7 +64,6 @@
 #include <uORB/topics/mission.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/uORB.h>
 #include <uORB/uORB.h>
 
 /**
@@ -305,7 +303,7 @@ Navigator::task_main()
 			}
 		}
 
-		/* local position updated */
+		/* global position updated */
 		orb_check(_global_pos_sub, &updated);
 
 		if (updated) {
@@ -388,11 +386,11 @@ Navigator::task_main()
 					rep->current.yaw = NAN;
 				}
 
-				// Position change with optional altitude change
 				if (PX4_ISFINITE(cmd.param5) && PX4_ISFINITE(cmd.param6)) {
 					rep->current.lat = (cmd.param5 < 1000) ? cmd.param5 : cmd.param5 / (double)1e7;
 					rep->current.lon = (cmd.param6 < 1000) ? cmd.param6 : cmd.param6 / (double)1e7;
 
+					// Position change with optional altitude change
 					if (PX4_ISFINITE(cmd.param7)) {
 						rep->current.alt = cmd.param7;
 
@@ -400,18 +398,17 @@ Navigator::task_main()
 						rep->current.alt = get_global_position()->alt;
 					}
 
-					// Altitude without position change
-
 				} else if (PX4_ISFINITE(cmd.param7) && curr->current.valid
 					   && PX4_ISFINITE(curr->current.lat)
 					   && PX4_ISFINITE(curr->current.lon)) {
+
+					// Altitude without position change
 					rep->current.lat = curr->current.lat;
 					rep->current.lon = curr->current.lon;
 					rep->current.alt = cmd.param7;
 
-					// All three set to NaN - hold in current position
-
 				} else {
+					// All three set to NaN - hold in current position
 					rep->current.lat = get_global_position()->lat;
 					rep->current.lon = get_global_position()->lon;
 					rep->current.alt = get_global_position()->alt;
@@ -466,23 +463,15 @@ Navigator::task_main()
 				int land_start = _mission.find_offboard_land_start();
 
 				if (land_start != -1) {
-					struct vehicle_command_s vcmd = {
-						.timestamp = hrt_absolute_time(),
-						.param5 = 0.0f,
-						.param6 = 0.0f,
-						.param1 = (float)land_start,
-						.param2 = 0.0f,
-						.param3 = 0.0f,
-						.param4 = 0.0f,
-						.param7 = 0.0f,
-						.command = vehicle_command_s::VEHICLE_CMD_MISSION_START,
-						.target_system = (uint8_t)get_vstatus()->system_id,
-						.target_component = (uint8_t)get_vstatus()->component_id,
-						.source_system = (uint8_t)get_vstatus()->system_id,
-						.source_component = (uint8_t)get_vstatus()->component_id
-					};
+					vehicle_command_s cmd_mission_start = {};
+					cmd_mission_start.timestamp = hrt_absolute_time();
+					cmd_mission_start.target_system = get_vstatus()->system_id;
+					cmd_mission_start.target_component = get_vstatus()->component_id;
+					cmd_mission_start.command = vehicle_command_s::VEHICLE_CMD_MISSION_START;
+					cmd_mission_start.param1 = land_start;
+					cmd_mission_start.param2 = 0;
 
-					publish_vehicle_cmd(vcmd);
+					publish_vehicle_cmd(cmd_mission_start);
 
 				} else {
 					PX4_WARN("planned landing not available");
@@ -553,59 +542,50 @@ Navigator::task_main()
 		}
 
 		/* Do stuff according to navigation state set by commander */
+		const NavigatorMode *navigation_mode_prev = _navigation_mode;
+
 		switch (_vstatus.nav_state) {
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_mission;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_loiter;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_RCRECOVER:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_rcLoss;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_RTL:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_rtl;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_takeoff;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_LAND:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_land;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_DESCEND:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_land;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_RTGS:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_dataLinkLoss;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_LANDENGFAIL:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_engineFailure;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_LANDGPSFAIL:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_gpsFailure;
 			break;
 
 		case vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = &_follow_target;
 			break;
 
@@ -617,14 +597,18 @@ Navigator::task_main()
 		case vehicle_status_s::NAVIGATION_STATE_OFFBOARD:
 		case vehicle_status_s::NAVIGATION_STATE_STAB:
 		default:
-			_pos_sp_triplet_published_invalid_once = false;
 			_navigation_mode = nullptr;
+
+			_pos_sp_triplet.previous.valid = false;
+			_pos_sp_triplet.current.valid = false;
+			_pos_sp_triplet.next.valid = false;
+
 			_can_loiter_at_sp = false;
 			break;
 		}
 
 		/* iterate through navigation modes and set active/inactive for each */
-		for (unsigned int i = 0; i < NAVIGATOR_MODE_ARRAY_SIZE; i++) {
+		for (unsigned i = 0; i < NAVIGATOR_MODE_ARRAY_SIZE; i++) {
 			_navigation_mode_array[i]->run(_navigation_mode == _navigation_mode_array[i]);
 		}
 
@@ -633,31 +617,24 @@ Navigator::task_main()
 		    !((_vstatus.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF)
 		      || (_vstatus.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION))) {
 
-			_pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_IDLE;
+			if (_pos_sp_triplet.current.type != position_setpoint_s::SETPOINT_TYPE_IDLE) {
+				_pos_sp_triplet_updated = true;
+			}
+
+			_pos_sp_triplet.previous.valid = false;
 			_pos_sp_triplet.current.valid = true;
-			_pos_sp_triplet.previous.valid = false;
+			_pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_IDLE;
 			_pos_sp_triplet.next.valid = false;
-
 		}
 
-		/* if nothing is running, set position setpoint triplet invalid once */
-		if (_navigation_mode == nullptr && !_pos_sp_triplet_published_invalid_once) {
-			_pos_sp_triplet_published_invalid_once = true;
-			_pos_sp_triplet.previous.valid = false;
-			_pos_sp_triplet.current.valid = false;
-			_pos_sp_triplet.next.valid = false;
-			_pos_sp_triplet_updated = true;
-		}
+		const bool nav_mode_changed = (navigation_mode_prev != _navigation_mode);
 
-		if (_pos_sp_triplet_updated) {
-			_pos_sp_triplet.timestamp = hrt_absolute_time();
+		if (_pos_sp_triplet_updated || nav_mode_changed) {
 			publish_position_setpoint_triplet();
-			_pos_sp_triplet_updated = false;
 		}
 
-		if (_mission_result_updated) {
+		if (_mission_result_updated || nav_mode_changed) {
 			publish_mission_result();
-			_mission_result_updated = false;
 		}
 
 		perf_end(_loop_perf);
@@ -695,7 +672,7 @@ Navigator::start()
 					     nullptr);
 
 	if (_navigator_task < 0) {
-		warn("task start failed");
+		PX4_WARN("task start failed");
 		return -errno;
 	}
 
@@ -705,18 +682,6 @@ Navigator::start()
 void
 Navigator::status()
 {
-	/* TODO: add this again */
-	// PX4_INFO("Global position is %svalid", _global_pos_valid ? "" : "in");
-
-	// if (_global_pos.global_valid) {
-	// 	PX4_INFO("Longitude %5.5f degrees, latitude %5.5f degrees", _global_pos.lon, _global_pos.lat);
-	// 	PX4_INFO("Altitude %5.5f meters, altitude above home %5.5f meters",
-	// 	      (double)_global_pos.alt, (double)(_global_pos.alt - _home_pos.alt));
-	// 	PX4_INFO("Ground velocity in m/s, N %5.5f, E %5.5f, D %5.5f",
-	// 	      (double)_global_pos.vel_n, (double)_global_pos.vel_e, (double)_global_pos.vel_d);
-	// 	PX4_INFO("Compass heading in degrees %5.5f", (double)(_global_pos.yaw * M_RAD_TO_DEG_F));
-	// }
-
 	_geofence.printStatus();
 
 }
@@ -724,10 +689,7 @@ Navigator::status()
 void
 Navigator::publish_position_setpoint_triplet()
 {
-	/* do not publish an empty triplet */
-	if (!_pos_sp_triplet.current.valid) {
-		return;
-	}
+	_pos_sp_triplet.timestamp = hrt_absolute_time();
 
 	/* lazily publish the position setpoint triplet only once available */
 	if (_pos_sp_triplet_pub != nullptr) {
@@ -736,6 +698,8 @@ Navigator::publish_position_setpoint_triplet()
 	} else {
 		_pos_sp_triplet_pub = orb_advertise(ORB_ID(position_setpoint_triplet), &_pos_sp_triplet);
 	}
+
+	_pos_sp_triplet_updated = false;
 }
 
 float
@@ -941,6 +905,8 @@ Navigator::publish_mission_result()
 	_mission_result.item_changed_index = 0;
 	_mission_result.item_do_jump_remaining = 0;
 	_mission_result.valid = true;
+
+	_mission_result_updated = false;
 }
 
 void
@@ -954,20 +920,6 @@ Navigator::publish_geofence_result()
 	} else {
 		/* advertise and publish */
 		_geofence_result_pub = orb_advertise(ORB_ID(geofence_result), &_geofence_result);
-	}
-}
-
-void
-Navigator::publish_att_sp()
-{
-	/* lazily publish the attitude sp only once available */
-	if (_att_sp_pub != nullptr) {
-		/* publish att sp*/
-		orb_publish(ORB_ID(vehicle_attitude_setpoint), _att_sp_pub, &_att_sp);
-
-	} else {
-		/* advertise and publish */
-		_att_sp_pub = orb_advertise(ORB_ID(vehicle_attitude_setpoint), &_att_sp);
 	}
 }
 

@@ -42,15 +42,6 @@
 #ifndef NAVIGATOR_MODE_H
 #define NAVIGATOR_MODE_H
 
-#include <drivers/drv_hrt.h>
-
-#include <controllib/blocks.hpp>
-#include <controllib/block/BlockParam.hpp>
-
-#include <dataman/dataman.h>
-
-#include <uORB/topics/position_setpoint_triplet.h>
-
 class Navigator;
 
 class NavigatorMode : public control::SuperBlock
@@ -58,33 +49,37 @@ class NavigatorMode : public control::SuperBlock
 public:
 	NavigatorMode(Navigator *navigator, const char *name);
 	virtual ~NavigatorMode() = default;
-	NavigatorMode(const NavigatorMode &) = delete;
-	NavigatorMode operator=(const NavigatorMode &) = delete;
 
 	void run(bool active);
 
 	/**
+	 * This function is called while the mode is active
+	 */
+	virtual void on_active() = 0;
+
+	/**
 	 * This function is called while the mode is inactive
 	 */
-	virtual void on_inactive();
+	virtual void on_inactive() {};
 
 	/**
 	 * This function is called one time when mode becomes active, pos_sp_triplet must be initialized here
 	 */
-	virtual void on_activation();
+	virtual void on_activation() {};
 
 	/**
 	 * This function is called one time when mode becomes inactive
 	 */
-	virtual void on_inactivation();
-
-	/**
-	 * This function is called while the mode is active
-	 */
-	virtual void on_active();
+	virtual void on_inactivation() {};
 
 protected:
 	Navigator *_navigator{nullptr};
+
+	// no copy, assignment, move, move assignment
+	NavigatorMode(const NavigatorMode &) = delete;
+	NavigatorMode &operator=(const NavigatorMode &) = delete;
+	NavigatorMode(NavigatorMode &&) = delete;
+	NavigatorMode &operator=(NavigatorMode &&) = delete;
 
 private:
 	bool _active{false};

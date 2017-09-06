@@ -50,18 +50,16 @@
 
 class Navigator;
 
-class EngineFailure : public MissionBlock
+class EngineFailure final : public MissionBlock
 {
 public:
 	EngineFailure(Navigator *navigator, const char *name);
 
-	~EngineFailure();
+	~EngineFailure() = default;
 
-	virtual void on_inactive();
-
-	virtual void on_activation();
-
-	virtual void on_active();
+	void on_inactive() override;
+	void on_activation() override;
+	void on_active() override;
 
 private:
 	enum EFState {

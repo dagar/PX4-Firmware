@@ -62,9 +62,6 @@ GpsFailure::GpsFailure(Navigator *navigator, const char *name) :
 	_gpsf_state(GPSF_STATE_NONE),
 	_timestamp_activation(0)
 {
-	/* load initial params */
-	updateParams();
-
 	/* initial reset */
 	on_inactive();
 }
@@ -95,6 +92,7 @@ GpsFailure::on_active()
 			/* Position controller does not run in this mode:
 			 * navigator has to publish an attitude setpoint */
 			vehicle_attitude_setpoint_s att_sp = {};
+			att_sp.timestamp = hrt_absolute_time();
 
 			const float roll_sp = math::radians(_param_openlooploiter_roll.get());
 			const float pitch_sp = math::radians(_param_openlooploiter_pitch.get());
@@ -108,14 +106,19 @@ GpsFailure::on_active()
 			q.copyTo(att_sp.q_d);
 			att_sp.q_d_valid = true;
 
-			*_navigator->get_att_sp() = att_sp;
+			/* lazily publish the attitude sp only once available */
+			if (_att_sp_pub != nullptr) {
+				/* publish att sp*/
+				orb_publish(ORB_ID(vehicle_attitude_setpoint), _att_sp_pub, &att_sp);
 
-			_navigator->publish_att_sp();
+			} else {
+				/* advertise and publish */
+				_att_sp_pub = orb_advertise(ORB_ID(vehicle_attitude_setpoint), &att_sp);
+			}
 
-			/* Measure time */
-			hrt_abstime elapsed = hrt_elapsed_time(&_timestamp_activation);
+			if ((_param_loitertime.get() > FLT_EPSILON) &&
+			    (hrt_elapsed_time(&_timestamp_activation) > _param_loitertime.get() * 1e6f)) {
 
-			if ((_param_loitertime.get() > FLT_EPSILON) && (elapsed > _param_loitertime.get() * 1e6f)) {
 				/* no recovery, advance the state machine */
 				PX4_WARN("GPS not recovered, switching to next GPS failure state");
 				advance_gpsf();
@@ -149,7 +152,7 @@ GpsFailure::set_gpsf_item()
 			/* Request flight termination from commander */
 			_navigator->get_mission_result()->flight_termination = true;
 			_navigator->set_mission_result_updated();
-			PX4_WARN("gps fail: request flight termination");
+			PX4_WARN("GPS failure: request flight termination");
 		}
 		break;
 

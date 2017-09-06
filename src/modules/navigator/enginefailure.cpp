@@ -47,7 +47,6 @@
 #include <navigator/navigation.h>
 
 #include <uORB/uORB.h>
-#include <uORB/topics/mission.h>
 
 #include "navigator.h"
 #include "enginefailure.h"
@@ -58,14 +57,8 @@ EngineFailure::EngineFailure(Navigator *navigator, const char *name) :
 	MissionBlock(navigator, name),
 	_ef_state(EF_STATE_NONE)
 {
-	/* load initial params */
-	updateParams();
 	/* initial reset */
 	on_inactive();
-}
-
-EngineFailure::~EngineFailure()
-{
 }
 
 void

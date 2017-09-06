@@ -53,7 +53,7 @@
 
 class Navigator;
 
-class RTL : public MissionBlock
+class RTL final : public MissionBlock
 {
 public:
 	RTL(Navigator *navigator, const char *name);

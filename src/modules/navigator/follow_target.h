@@ -47,7 +47,7 @@
 #include "navigator_mode.h"
 #include "mission_block.h"
 
-class FollowTarget : public MissionBlock
+class FollowTarget final : public MissionBlock
 {
 
 public:
@@ -56,7 +56,7 @@ public:
 	FollowTarget(const FollowTarget &) = delete;
 	FollowTarget &operator=(const FollowTarget &) = delete;
 
-	~FollowTarget();
+	~FollowTarget() = default;
 
 	void on_inactive() override;
 	void on_activation() override;
@@ -84,7 +84,7 @@ private:
 		FOLLOW_FROM_LEFT
 	};
 
-	float _follow_position_matricies[4][9] = {
+	const float _follow_position_matricies[4][9] = {
 		{
 			1.0F,  -1.0F, 0.0F,
 			1.0F,   1.0F, 0.0F,
@@ -118,7 +118,6 @@ private:
 	control::BlockParamFloat 	_param_tracking_resp;
 	control::BlockParamFloat 	_param_yaw_auto_max;
 
-
 	FollowTargetState _follow_target_state;
 	int _follow_target_position;
 
@@ -139,6 +138,7 @@ private:
 
 	follow_target_s _current_target_motion;
 	follow_target_s _previous_target_motion;
+
 	float _yaw_rate;
 	float _responsiveness;
 	float _yaw_auto_max;

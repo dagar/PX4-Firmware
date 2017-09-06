@@ -59,9 +59,6 @@ RTL::RTL(Navigator *navigator, const char *name) :
 	_param_land_delay(this, "RTL_LAND_DELAY", false),
 	_param_rtl_min_dist(this, "RTL_MIN_DIST", false)
 {
-	/* load initial params */
-	updateParams();
-
 	/* initial reset */
 	on_inactive();
 }

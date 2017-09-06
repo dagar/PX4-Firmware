@@ -106,12 +106,6 @@ public:
 	 */
 	void		publish_geofence_result();
 
-	/**
-	 * Publish the attitude sp, only to be used in very special modes when position control is deactivated
-	 * Example: mode that is triggered on gps failure
-	 */
-	void		publish_att_sp();
-
 	void		publish_vehicle_cmd(const struct vehicle_command_s &vcmd);
 
 	/**
@@ -130,7 +124,6 @@ public:
 	struct position_setpoint_triplet_s *get_position_setpoint_triplet() { return &_pos_sp_triplet; }
 	struct position_setpoint_triplet_s *get_reposition_triplet() { return &_reposition_triplet; }
 	struct position_setpoint_triplet_s *get_takeoff_triplet() { return &_takeoff_triplet; }
-	struct vehicle_attitude_setpoint_s *get_att_sp() { return &_att_sp; }
 	struct vehicle_global_position_s *get_global_position() { return &_global_pos; }
 	struct vehicle_gps_position_s *get_gps_position() { return &_gps_pos; }
 	struct vehicle_land_detected_s *get_land_detected() { return &_land_detected; }
@@ -239,7 +232,6 @@ private:
 	int		_vehicle_command_sub{-1};	/**< vehicle commands (onboard and offboard) */
 	int		_vstatus_sub{-1};		/**< vehicle status subscription */
 
-	orb_advert_t	_att_sp_pub{nullptr};
 	orb_advert_t	_geofence_result_pub{nullptr};
 	orb_advert_t	_mission_result_pub{nullptr};
 	orb_advert_t	_pos_sp_triplet_pub{nullptr};
@@ -253,7 +245,6 @@ private:
 	position_setpoint_triplet_s			_reposition_triplet{};	/**< triplet for non-mission direct position command */
 	position_setpoint_triplet_s			_takeoff_triplet{};	/**< triplet for non-mission direct takeoff command */
 	sensor_combined_s				_sensor_combined{};	/**< sensor values */
-	vehicle_attitude_setpoint_s			_att_sp{};
 	vehicle_global_position_s			_global_pos{};		/**< global vehicle position */
 	vehicle_gps_position_s				_gps_pos{};		/**< gps position */
 	vehicle_land_detected_s				_land_detected{};	/**< vehicle land_detected */
@@ -269,10 +260,10 @@ private:
 
 	bool		_can_loiter_at_sp{false};			/**< flags if current position SP can be used to loiter */
 	bool		_pos_sp_triplet_updated{false};		/**< flags if position SP triplet needs to be published */
-	bool 		_pos_sp_triplet_published_invalid_once{false};	/**< flags if position SP triplet has been published once to UORB */
 	bool		_mission_result_updated{false};		/**< flags if mission result has seen an update */
 
 	NavigatorMode	*_navigation_mode{nullptr};		/**< abstract pointer to current navigation mode class */
+
 	Mission		_mission;			/**< class that handles the missions */
 	Loiter		_loiter;			/**< class that handles loiter */
 	Takeoff		_takeoff;			/**< class for handling takeoff commands */

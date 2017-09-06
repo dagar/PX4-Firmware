@@ -44,9 +44,9 @@
 #include "navigator_mode.h"
 
 #include <navigator/navigation.h>
+#include <drivers/drv_hrt.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/follow_target.h>
-#include <uORB/topics/mission.h>
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_global_position.h>
@@ -69,6 +69,15 @@ public:
 	static bool item_contains_position(const struct mission_item_s *item);
 
 protected:
+
+	enum mission_yaw_mode {
+		MISSION_YAWMODE_NONE = 0,
+		MISSION_YAWMODE_FRONT_TO_WAYPOINT = 1,
+		MISSION_YAWMODE_FRONT_TO_HOME = 2,
+		MISSION_YAWMODE_BACK_TO_HOME = 3,
+		MISSION_YAWMODE_MAX = 4
+	};
+
 	/**
 	 * Check if mission item has been reached
 	 * @return true if successfully reached

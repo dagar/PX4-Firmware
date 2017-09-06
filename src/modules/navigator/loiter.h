@@ -47,26 +47,16 @@
 #include "navigator_mode.h"
 #include "mission_block.h"
 
-class Loiter : public MissionBlock
+class Loiter final : public MissionBlock
 {
 public:
 	Loiter(Navigator *navigator, const char *name);
 
-	~Loiter();
+	~Loiter() = default;
 
-	virtual void on_inactive();
-
-	virtual void on_activation();
-
-	virtual void on_active();
-
-	enum mission_yaw_mode {
-		MISSION_YAWMODE_NONE = 0,
-		MISSION_YAWMODE_FRONT_TO_WAYPOINT = 1,
-		MISSION_YAWMODE_FRONT_TO_HOME = 2,
-		MISSION_YAWMODE_BACK_TO_HOME = 3,
-		MISSION_YAWMODE_MAX = 4
-	};
+	void on_inactive() override;
+	void on_activation() override;
+	void on_active() override;
 
 private:
 	/**

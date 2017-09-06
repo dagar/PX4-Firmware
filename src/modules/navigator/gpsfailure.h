@@ -51,11 +51,11 @@
 
 class Navigator;
 
-class GpsFailure : public MissionBlock
+class GpsFailure final : public MissionBlock
 {
 public:
 	GpsFailure(Navigator *navigator, const char *name);
-	~GpsFailure() = default;;
+	~GpsFailure() = default;
 
 	void on_inactive() override;
 	void on_activation() override;
@@ -76,6 +76,8 @@ private:
 	} _gpsf_state{GPSF_STATE_NONE};
 
 	hrt_abstime _timestamp_activation{0}; //*< timestamp when this mode was activated */
+
+	orb_advert_t	_att_sp_pub{nullptr};
 
 	/**
 	 * Set the GPSF item
