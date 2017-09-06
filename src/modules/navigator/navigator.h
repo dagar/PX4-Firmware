@@ -66,7 +66,6 @@
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_global_position.h>
-#include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/uORB.h>
@@ -96,17 +95,7 @@ public:
 	 */
 	void		status();
 
-	/**
-	 * Load fence from file
-	 */
-	void		load_fence_from_file(const char *filename);
-
-	/**
-	 * Publish the geofence result
-	 */
-	void		publish_geofence_result();
-
-	void		publish_vehicle_cmd(const struct vehicle_command_s &vcmd);
+	void		publish_vehicle_cmd(vehicle_command_s &vcmd);
 
 	/**
 	 * Setters
@@ -125,7 +114,6 @@ public:
 	struct position_setpoint_triplet_s *get_reposition_triplet() { return &_reposition_triplet; }
 	struct position_setpoint_triplet_s *get_takeoff_triplet() { return &_takeoff_triplet; }
 	struct vehicle_global_position_s *get_global_position() { return &_global_pos; }
-	struct vehicle_gps_position_s *get_gps_position() { return &_gps_pos; }
 	struct vehicle_land_detected_s *get_land_detected() { return &_land_detected; }
 	struct vehicle_local_position_s *get_local_position() { return &_local_pos; }
 	struct vehicle_status_s *get_vstatus() { return &_vstatus; }
@@ -221,32 +209,26 @@ private:
 
 	int		_fw_pos_ctrl_status_sub{-1};	/**< notification of vehicle capabilities updates */
 	int		_global_pos_sub{-1};		/**< global position subscription */
-	int		_gps_pos_sub{-1};		/**< gps position subscription */
 	int		_home_pos_sub{-1};		/**< home position subscription */
 	int		_land_detected_sub{-1};		/**< vehicle land detected subscription */
 	int		_local_pos_sub{-1};		/**< local position subscription */
 	int		_offboard_mission_sub{-1};	/**< offboard mission subscription */
 	int		_onboard_mission_sub{-1};	/**< onboard mission subscription */
 	int		_param_update_sub{-1};		/**< param update subscription */
-	int		_sensor_combined_sub{-1};	/**< sensor combined subscription */
 	int		_vehicle_command_sub{-1};	/**< vehicle commands (onboard and offboard) */
 	int		_vstatus_sub{-1};		/**< vehicle status subscription */
 
-	orb_advert_t	_geofence_result_pub{nullptr};
 	orb_advert_t	_mission_result_pub{nullptr};
 	orb_advert_t	_pos_sp_triplet_pub{nullptr};
 	orb_advert_t	_vehicle_cmd_pub{nullptr};
 
 	fw_pos_ctrl_status_s				_fw_pos_ctrl_status{};	/**< fixed wing navigation capabilities */
-	geofence_result_s				_geofence_result{};
 	home_position_s					_home_pos{};		/**< home position for RTL */
 	mission_result_s				_mission_result{};
 	position_setpoint_triplet_s			_pos_sp_triplet{};	/**< triplet of position setpoints */
 	position_setpoint_triplet_s			_reposition_triplet{};	/**< triplet for non-mission direct position command */
 	position_setpoint_triplet_s			_takeoff_triplet{};	/**< triplet for non-mission direct takeoff command */
-	sensor_combined_s				_sensor_combined{};	/**< sensor values */
 	vehicle_global_position_s			_global_pos{};		/**< global vehicle position */
-	vehicle_gps_position_s				_gps_pos{};		/**< gps position */
 	vehicle_land_detected_s				_land_detected{};	/**< vehicle land_detected */
 	vehicle_local_position_s			_local_pos{};		/**< local vehicle position */
 	vehicle_status_s				_vstatus{};		/**< vehicle status */
@@ -256,7 +238,6 @@ private:
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
 	Geofence	_geofence;			/**< class that handles the geofence */
-	bool		_geofence_violation_warning_sent{false}; /**< prevents spaming to mavlink */
 
 	bool		_can_loiter_at_sp{false};			/**< flags if current position SP can be used to loiter */
 	bool		_pos_sp_triplet_updated{false};		/**< flags if position SP triplet needs to be published */
@@ -290,11 +271,9 @@ private:
 	// update subscriptions
 	void		fw_pos_ctrl_status_update(bool force = false);
 	void		global_position_update();
-	void		gps_position_update();
 	void		home_position_update(bool force = false);
 	void		local_position_update();
 	void		params_update();
-	void		sensor_combined_update();
 	void		vehicle_land_detected_update();
 	void		vehicle_status_update();
 

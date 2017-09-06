@@ -54,9 +54,6 @@
 #include <px4_defines.h>
 #include <px4_posix.h>
 #include <px4_tasks.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <systemlib/mavlink_log.h>
 #include <systemlib/systemlib.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
@@ -72,8 +69,6 @@
  * @ingroup apps
  */
 extern "C" __EXPORT int navigator_main(int argc, char *argv[]);
-
-#define GEOFENCE_CHECK_INTERVAL 200000
 
 namespace navigator
 {
@@ -152,18 +147,6 @@ Navigator::local_position_update()
 }
 
 void
-Navigator::gps_position_update()
-{
-	orb_copy(ORB_ID(vehicle_gps_position), _gps_pos_sub, &_gps_pos);
-}
-
-void
-Navigator::sensor_combined_update()
-{
-	orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &_sensor_combined);
-}
-
-void
 Navigator::home_position_update(bool force)
 {
 	bool updated = false;
@@ -221,22 +204,9 @@ Navigator::task_main_trampoline(int argc, char *argv[])
 void
 Navigator::task_main()
 {
-	bool have_geofence_position_data = false;
-
-	/* Try to load the geofence:
-	 * if /fs/microsd/etc/geofence.txt load from this file */
-	struct stat buffer;
-
-	if (stat(GEOFENCE_FILENAME, &buffer) == 0) {
-		PX4_INFO("Loading geofence from %s", GEOFENCE_FILENAME);
-		_geofence.loadFromFile(GEOFENCE_FILENAME);
-	}
-
 	/* do subscriptions */
 	_global_pos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
 	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
-	_gps_pos_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
-	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
 	_fw_pos_ctrl_status_sub = orb_subscribe(ORB_ID(fw_pos_ctrl_status));
 	_vstatus_sub = orb_subscribe(ORB_ID(vehicle_status));
 	_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
@@ -251,8 +221,6 @@ Navigator::task_main()
 	vehicle_land_detected_update();
 	global_position_update();
 	local_position_update();
-	gps_position_update();
-	sensor_combined_update();
 	home_position_update(true);
 	fw_pos_ctrl_status_update(true);
 	params_update();
@@ -292,33 +260,11 @@ Navigator::task_main()
 
 		bool updated;
 
-		/* gps updated */
-		orb_check(_gps_pos_sub, &updated);
-
-		if (updated) {
-			gps_position_update();
-
-			if (_geofence.getSource() == Geofence::GF_SOURCE_GPS) {
-				have_geofence_position_data = true;
-			}
-		}
-
 		/* global position updated */
 		orb_check(_global_pos_sub, &updated);
 
 		if (updated) {
 			global_position_update();
-
-			if (_geofence.getSource() == Geofence::GF_SOURCE_GLOBALPOS) {
-				have_geofence_position_data = true;
-			}
-		}
-
-		/* sensors combined updated */
-		orb_check(_sensor_combined_sub, &updated);
-
-		if (updated) {
-			sensor_combined_update();
 		}
 
 		/* parameters updated */
@@ -464,9 +410,6 @@ Navigator::task_main()
 
 				if (land_start != -1) {
 					vehicle_command_s cmd_mission_start = {};
-					cmd_mission_start.timestamp = hrt_absolute_time();
-					cmd_mission_start.target_system = get_vstatus()->system_id;
-					cmd_mission_start.target_component = get_vstatus()->component_id;
 					cmd_mission_start.command = vehicle_command_s::VEHICLE_CMD_MISSION_START;
 					cmd_mission_start.param1 = land_start;
 					cmd_mission_start.param2 = 0;
@@ -504,42 +447,7 @@ Navigator::task_main()
 			}
 		}
 
-		/* Check geofence violation */
-		static hrt_abstime last_geofence_check = 0;
-
-		if (have_geofence_position_data &&
-		    (_geofence.getGeofenceAction() != geofence_result_s::GF_ACTION_NONE) &&
-		    (hrt_elapsed_time(&last_geofence_check) > GEOFENCE_CHECK_INTERVAL)) {
-
-			bool inside = _geofence.check(_global_pos, _gps_pos, _sensor_combined.baro_alt_meter, _home_pos,
-						      home_position_valid());
-			last_geofence_check = hrt_absolute_time();
-			have_geofence_position_data = false;
-
-			_geofence_result.timestamp = hrt_absolute_time();
-			_geofence_result.geofence_action = _geofence.getGeofenceAction();
-			_geofence_result.home_required = _geofence.isHomeRequired();
-
-			if (!inside) {
-				/* inform other apps via the mission result */
-				_geofence_result.geofence_violated = true;
-
-				/* Issue a warning about the geofence violation once */
-				if (!_geofence_violation_warning_sent) {
-					mavlink_log_critical(&_mavlink_log_pub, "Geofence violation");
-					_geofence_violation_warning_sent = true;
-				}
-
-			} else {
-				/* inform other apps via the mission result */
-				_geofence_result.geofence_violated = false;
-
-				/* Reset the _geofence_violation_warning_sent field */
-				_geofence_violation_warning_sent = false;
-			}
-
-			publish_geofence_result();
-		}
+		_geofence.check();
 
 		/* Do stuff according to navigation state set by commander */
 		const NavigatorMode *navigation_mode_prev = _navigation_mode;
@@ -642,8 +550,6 @@ Navigator::task_main()
 
 	orb_unsubscribe(_global_pos_sub);
 	orb_unsubscribe(_local_pos_sub);
-	orb_unsubscribe(_gps_pos_sub);
-	orb_unsubscribe(_sensor_combined_sub);
 	orb_unsubscribe(_fw_pos_ctrl_status_sub);
 	orb_unsubscribe(_vstatus_sub);
 	orb_unsubscribe(_land_detected_sub);
@@ -683,7 +589,6 @@ void
 Navigator::status()
 {
 	_geofence.printStatus();
-
 }
 
 void
@@ -795,12 +700,6 @@ Navigator::get_acceptance_radius(float mission_item_radius)
 	return radius;
 }
 
-void
-Navigator::load_fence_from_file(const char *filename)
-{
-	_geofence.loadFromFile(filename);
-}
-
 bool
 Navigator::abort_landing()
 {
@@ -868,9 +767,6 @@ int navigator_main(int argc, char *argv[])
 	} else if (!strcmp(argv[1], "status")) {
 		navigator::g_navigator->status();
 
-	} else if (!strcmp(argv[1], "fencefile")) {
-		navigator::g_navigator->load_fence_from_file(GEOFENCE_FILENAME);
-
 	} else {
 		usage();
 		return 1;
@@ -910,22 +806,17 @@ Navigator::publish_mission_result()
 }
 
 void
-Navigator::publish_geofence_result()
+Navigator::publish_vehicle_cmd(vehicle_command_s &vcmd)
 {
-	/* lazily publish the geofence result only once available */
-	if (_geofence_result_pub != nullptr) {
-		/* publish mission result */
-		orb_publish(ORB_ID(geofence_result), _geofence_result_pub, &_geofence_result);
+	vcmd.timestamp = hrt_absolute_time();
 
-	} else {
-		/* advertise and publish */
-		_geofence_result_pub = orb_advertise(ORB_ID(geofence_result), &_geofence_result);
-	}
-}
+	vcmd.target_system = get_vstatus()->system_id;
+	vcmd.target_component = get_vstatus()->component_id;
+	vcmd.source_system = get_vstatus()->system_id;
+	vcmd.source_component = get_vstatus()->component_id;
+	vcmd.confirmation = false;
+	vcmd.from_external = false;
 
-void
-Navigator::publish_vehicle_cmd(const struct vehicle_command_s &vcmd)
-{
 	if (_vehicle_cmd_pub != nullptr) {
 		orb_publish(ORB_ID(vehicle_command), _vehicle_cmd_pub, &vcmd);
 

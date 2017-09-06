@@ -41,19 +41,21 @@
 #ifndef GEOFENCE_H_
 #define GEOFENCE_H_
 
+#include "navigation.h"
+
 #include <cfloat>
 
-#include <controllib/blocks.hpp>
-#include <controllib/block/BlockParam.hpp>
-#include <controllib/blocks.hpp>
+#include <controllib/block/Block.hpp>
 #include <drivers/drv_hrt.h>
 #include <geo/geo.h>
 #include <px4_defines.h>
+#include <uORB/topics/geofence_result.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
 
 #define GEOFENCE_FILENAME PX4_ROOTFSDIR"/fs/microsd/etc/geofence.txt"
+#define GEOFENCE_CHECK_INTERVAL 200000
 
 class Navigator;
 
@@ -61,9 +63,6 @@ class Geofence final : public control::SuperBlock
 {
 public:
 	Geofence(Navigator *navigator);
-	Geofence(const Geofence &) = delete;
-	Geofence &operator=(const Geofence &) = delete;
-
 	~Geofence();
 
 	/* Altitude mode, corresponding to the param GF_ALTMODE */
@@ -89,20 +88,16 @@ public:
 	 *
 	 * @return true: system is obeying fence, false: system is violating fence
 	 */
-	bool check(const struct vehicle_global_position_s &global_position,
-		   const struct vehicle_gps_position_s &gps_position, float baro_altitude_amsl,
-		   const struct home_position_s home_pos, bool home_position_set);
+	void check();
 
 	/**
 	 * Return whether a mission item obeys the geofence.
 	 *
 	 * @return true: system is obeying fence, false: system is violating fence
 	 */
-	bool check(const struct mission_item_s &mission_item);
+	bool check(const mission_item_s &mission_item);
 
 	int clearDm();
-
-	bool valid();
 
 	/**
 	 * Load a single inclusion polygon, replacing any already existing polygons.
@@ -125,11 +120,8 @@ public:
 	 */
 	int loadFromFile(const char *filename);
 
-	bool isEmpty() { return _num_polygons == 0; }
-
-	int getAltitudeMode() { return _param_altitude_mode.get(); }
-	int getSource() { return _param_source.get(); }
-	int getGeofenceAction() { return _param_action.get(); }
+	int getAltitudeMode() const { return _param_altitude_mode.get(); }
+	int getSource() const { return _param_source.get(); }
 
 	bool isHomeRequired();
 
@@ -140,6 +132,10 @@ public:
 
 private:
 	Navigator	*_navigator{nullptr};
+
+	int _sensor_combined_sub{-1};
+
+	uORB::Publication<geofence_result_s> _result_pub;
 
 	hrt_abstime _last_horizontal_range_warning{0};
 	hrt_abstime _last_vertical_range_warning{0};
@@ -171,6 +167,8 @@ private:
 	int _outside_counter{0};
 	uint16_t _update_counter{0}; ///< dataman update counter: if it does not match, we polygon data was updated
 
+	bool isEmpty() { return _num_polygons == 0; }
+
 	/**
 	 * implementation of updateFence(), but without locking
 	 */
@@ -196,9 +194,6 @@ private:
 	 */
 	bool checkAll(double lat, double lon, float altitude);
 
-	bool checkAll(const struct vehicle_global_position_s &global_position);
-	bool checkAll(const struct vehicle_global_position_s &global_position, float baro_altitude_amsl);
-
 	/**
 	 * Check if a single point is within a polygon
 	 * @return true if within polygon
@@ -211,6 +206,7 @@ private:
 	 * @return true if within polygon the circle
 	 */
 	bool insideCircle(const PolygonInfo &polygon, double lat, double lon, float altitude);
+
 };
 
 #endif /* GEOFENCE_H_ */

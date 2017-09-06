@@ -48,8 +48,6 @@
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/uORB.h>
 
-static constexpr float DELAY_SIGMA = 0.01f;
-
 RTL::RTL(Navigator *navigator, const char *name) :
 	MissionBlock(navigator, name),
 	_rtl_state(RTL_STATE_NONE),
@@ -237,7 +235,7 @@ RTL::set_rtl_item()
 		}
 
 	case RTL_STATE_LOITER: {
-			bool autoland = _param_land_delay.get() > -DELAY_SIGMA;
+			bool autoland = (_param_land_delay.get() > 0.0f);
 
 			_mission_item.lat = _navigator->get_home_position()->lat;
 			_mission_item.lon = _navigator->get_home_position()->lon;
@@ -318,11 +316,11 @@ RTL::advance_rtl()
 	case RTL_STATE_DESCEND:
 
 		/* only go to land if autoland is enabled */
-		if (_param_land_delay.get() < -DELAY_SIGMA || _param_land_delay.get() > DELAY_SIGMA) {
-			_rtl_state = RTL_STATE_LOITER;
+		if (_param_land_delay.get() > 0.0f) {
+			_rtl_state = RTL_STATE_LAND;
 
 		} else {
-			_rtl_state = RTL_STATE_LAND;
+			_rtl_state = RTL_STATE_LOITER;
 		}
 
 		break;

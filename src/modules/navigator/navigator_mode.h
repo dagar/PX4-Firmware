@@ -42,6 +42,8 @@
 #ifndef NAVIGATOR_MODE_H
 #define NAVIGATOR_MODE_H
 
+#include <controllib/block/Block.hpp>
+
 class Navigator;
 
 class NavigatorMode : public control::SuperBlock

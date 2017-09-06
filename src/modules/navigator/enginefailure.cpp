@@ -36,22 +36,11 @@
 *
 * @author Thomas Gubler <thomasgubler@gmail.com>
 */
-#include <string.h>
-#include <stdlib.h>
-#include <math.h>
-#include <fcntl.h>
+#include "enginefailure.h"
+#include "navigator.h"
 
 #include <systemlib/mavlink_log.h>
-#include <systemlib/err.h>
 #include <geo/geo.h>
-#include <navigator/navigation.h>
-
-#include <uORB/uORB.h>
-
-#include "navigator.h"
-#include "enginefailure.h"
-
-#define DELAY_SIGMA	0.01f
 
 EngineFailure::EngineFailure(Navigator *navigator, const char *name) :
 	MissionBlock(navigator, name),

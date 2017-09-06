@@ -51,8 +51,6 @@
 using matrix::Eulerf;
 using matrix::Quatf;
 
-static constexpr float DELAY_SIGMA = 0.01f;
-
 GpsFailure::GpsFailure(Navigator *navigator, const char *name) :
 	MissionBlock(navigator, name),
 	_param_loitertime(this, "LT"),

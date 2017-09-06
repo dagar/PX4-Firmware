@@ -166,30 +166,28 @@ MissionFeasibilityChecker::checkGeofence(dm_item_t dm_current, size_t nMissionIt
 	}
 
 	/* Check if all mission items are inside the geofence (if we have a valid geofence) */
-	if (geofence.valid()) {
-		for (size_t i = 0; i < nMissionItems; i++) {
-			struct mission_item_s missionitem = {};
-			const ssize_t len = sizeof(missionitem);
+	for (size_t i = 0; i < nMissionItems; i++) {
+		struct mission_item_s missionitem = {};
+		const ssize_t len = sizeof(missionitem);
 
-			if (dm_read(dm_current, i, &missionitem, len) != len) {
-				/* not supposed to happen unless the datamanager can't access the SD card, etc. */
-				return false;
-			}
+		if (dm_read(dm_current, i, &missionitem, len) != len) {
+			/* not supposed to happen unless the datamanager can't access the SD card, etc. */
+			return false;
+		}
 
-			if (missionitem.altitude_is_relative && !home_valid) {
-				mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Geofence requires valid home position");
-				return false;
-			}
+		if (missionitem.altitude_is_relative && !home_valid) {
+			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Geofence requires valid home position");
+			return false;
+		}
 
-			// Geofence function checks against home altitude amsl
-			missionitem.altitude = missionitem.altitude_is_relative ? missionitem.altitude + home_alt : missionitem.altitude;
+		// Geofence function checks against home altitude amsl
+		missionitem.altitude = missionitem.altitude_is_relative ? missionitem.altitude + home_alt : missionitem.altitude;
 
-			if (MissionBlock::item_contains_position(&missionitem) &&
-			    !geofence.check(missionitem)) {
+		if (MissionBlock::item_contains_position(&missionitem) &&
+		    !geofence.check(missionitem)) {
 
-				mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Geofence violation for waypoint %d", i + 1);
-				return false;
-			}
+			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Geofence violation for waypoint %d", i + 1);
+			return false;
 		}
 	}
 

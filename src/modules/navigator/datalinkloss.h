@@ -40,12 +40,6 @@
 #ifndef NAVIGATOR_DATALINKLOSS_H
 #define NAVIGATOR_DATALINKLOSS_H
 
-#include <controllib/blocks.hpp>
-#include <controllib/block/BlockParam.hpp>
-
-#include <uORB/Subscription.hpp>
-
-#include "navigator_mode.h"
 #include "mission_block.h"
 
 class Navigator;

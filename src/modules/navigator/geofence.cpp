@@ -42,6 +42,7 @@
 #include "navigator.h"
 
 #include <ctype.h>
+#include <sys/stat.h>
 
 #include <dataman/dataman.h>
 #include <drivers/drv_hrt.h>
@@ -56,6 +57,7 @@
 Geofence::Geofence(Navigator *navigator) :
 	SuperBlock(navigator, "GF"),
 	_navigator(navigator),
+	_result_pub(ORB_ID(geofence_result), -1, &getPublications()),
 	_param_action(this, "GF_ACTION", false),
 	_param_altitude_mode(this, "GF_ALTMODE", false),
 	_param_source(this, "GF_SOURCE", false),
@@ -63,12 +65,25 @@ Geofence::Geofence(Navigator *navigator) :
 	_param_max_hor_distance(this, "GF_MAX_HOR_DIST", false),
 	_param_max_ver_distance(this, "GF_MAX_VER_DIST", false)
 {
+	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
+
+	/* Try to load the geofence:
+	 * if /fs/microsd/etc/geofence.txt load from this file */
+	struct stat buffer;
+
+	if (stat(GEOFENCE_FILENAME, &buffer) == 0) {
+		PX4_INFO("Loading geofence from %s", GEOFENCE_FILENAME);
+		loadFromFile(GEOFENCE_FILENAME);
+	}
+
 	// we assume there's no concurrent fence update on startup
 	_updateFence();
 }
 
 Geofence::~Geofence()
 {
+	orb_unsubscribe(_sensor_combined_sub);
+
 	if (_polygons) {
 		delete[](_polygons);
 	}
@@ -91,7 +106,6 @@ void Geofence::updateFence()
 
 void Geofence::_updateFence()
 {
-
 	// initialize fence points count
 	mission_stats_entry_s stats;
 	int ret = dm_read(DM_KEY_FENCE_POINTS, 0, &stats, sizeof(mission_stats_entry_s));
@@ -178,52 +192,85 @@ void Geofence::_updateFence()
 			++current_seq;
 			break;
 		}
+	}
+}
 
+void Geofence::check()
+{
+	// only check if an action is configured
+	if (_param_action.get() == geofence_result_s::GF_ACTION_NONE) {
+		return;
 	}
 
-}
+	// TODO: dagar finish this
 
-bool Geofence::checkAll(const struct vehicle_global_position_s &global_position)
-{
-	return checkAll(global_position.lat, global_position.lon, global_position.alt);
-}
+	// only store subscriptions
+	// only copy data when needed
+	// if copy fails then don't restart counter (recheck next iteration)
 
-bool Geofence::checkAll(const struct vehicle_global_position_s &global_position, float baro_altitude_amsl)
-{
-	return checkAll(global_position.lat, global_position.lon, baro_altitude_amsl);
-}
+	bool have_geofence_position_data = true;
+	static hrt_abstime last_geofence_check = 0;
 
+	if (have_geofence_position_data &&
+	    (hrt_elapsed_time(&last_geofence_check) > GEOFENCE_CHECK_INTERVAL)) {
 
-bool Geofence::check(const struct vehicle_global_position_s &global_position,
-		     const struct vehicle_gps_position_s &gps_position, float baro_altitude_amsl,
-		     const struct home_position_s home_pos, bool home_position_set)
-{
+		last_geofence_check = hrt_absolute_time();
+		have_geofence_position_data = false;
+	} else {
+		return;
+	}
+
+	bool inside = true;
+
 	if (getAltitudeMode() == Geofence::GF_ALT_MODE_WGS84) {
 		if (getSource() == Geofence::GF_SOURCE_GLOBALPOS) {
-			return checkAll(global_position);
+			inside = checkAll(global_position.lat, global_position.lon, global_position.alt);
 
 		} else {
-			return checkAll((double)gps_position.lat * 1.0e-7, (double)gps_position.lon * 1.0e-7,
-					(double)gps_position.alt * 1.0e-3);
+			inside = checkAll(gps_position.lat * 1.0e-7, gps_position.lon * 1.0e-7, gps_position.alt * 1.0e-3);
 		}
 
 	} else {
+		/* using barometer altitude from sensor_combined */
+		sensor_combined_s sensors = {};
+		if (orb_copy(ORB_ID(sensor_combined), _sensor_combined_sub, &sensors) != PX4_OK) {
+			PX4_ERR("Geofence failed to get barometer altitude");
+			return;
+		}
+
 		if (getSource() == Geofence::GF_SOURCE_GLOBALPOS) {
-			return checkAll(global_position, baro_altitude_amsl);
+			inside = checkAll(global_position.lat, global_position.lon, sensors.baro_alt_meter);
 
 		} else {
-			return checkAll((double)gps_position.lat * 1.0e-7, (double)gps_position.lon * 1.0e-7,
-					baro_altitude_amsl);
+			inside = checkAll(gps_position.lat * 1.0e-7, gps_position.lon * 1.0e-7, sensors.baro_alt_meter);
 		}
+	}
+
+	const bool was_inside = !_result_pub.get().geofence_violated;
+
+	if (!inside && was_inside) {
+		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Geofence violation");
+	}
+
+	// only publish changes
+	if (inside != was_inside) {
+		geofence_result_s &result = _result_pub.get();
+
+		result.timestamp = hrt_absolute_time();
+		result.geofence_violated = !inside;
+		result.geofence_action = _param_action.get();
+		result.home_required = isHomeRequired();
+
+		_result_pub.update();
 	}
 }
 
-bool Geofence::check(const struct mission_item_s &mission_item)
+bool Geofence::check(const mission_item_s &mission_item)
 {
 	return checkAll(mission_item.lat, mission_item.lon, mission_item.altitude);
 }
 
-bool Geofence::checkAll(double lat, double lon, float altitude)
+bool Geofence::checkAll(double lat, double lon, const float altitude)
 {
 	bool inside_fence = true;
 
@@ -232,9 +279,9 @@ bool Geofence::checkAll(double lat, double lon, float altitude)
 		const float max_horizontal_distance = _param_max_hor_distance.get();
 		const float max_vertical_distance = _param_max_ver_distance.get();
 
-		const double home_lat = _navigator->get_home_position()->lat;
-		const double home_lon = _navigator->get_home_position()->lon;
-		const double home_alt = _navigator->get_home_position()->alt;
+		double home_lat = _navigator->get_home_position()->lat;
+		double home_lon = _navigator->get_home_position()->lon;
+		double home_alt = _navigator->get_home_position()->alt;
 
 		float dist_xy = -1.0f;
 		float dist_z = -1.0f;
@@ -282,8 +329,7 @@ bool Geofence::checkAll(double lat, double lon, float altitude)
 	}
 }
 
-
-bool Geofence::checkPolygons(double lat, double lon, float altitude)
+bool Geofence::checkPolygons(double lat, double lon, const float altitude)
 {
 	// the following uses dm_read, so first we try to lock all items. If that fails, it (most likely) means
 	// the data is currently being updated (via a mavlink geofence transfer), and we do not check for a violation now
@@ -313,7 +359,6 @@ bool Geofence::checkPolygons(double lat, double lon, float altitude)
 			return false;
 		}
 	}
-
 
 	/* Horizontal check: iterate all polygons & circles */
 	bool outside_exclusion = true;
@@ -360,9 +405,8 @@ bool Geofence::checkPolygons(double lat, double lon, float altitude)
 	return (!had_inclusion_areas || inside_inclusion) && outside_exclusion;
 }
 
-bool Geofence::insidePolygon(const PolygonInfo &polygon, double lat, double lon, float altitude)
+bool Geofence::insidePolygon(const PolygonInfo &polygon, double lat, double lon, const float altitude)
 {
-
 	/* Adaptation of algorithm originally presented as
 	 * PNPOLY - Point Inclusion in Polygon Test
 	 * W. Randolph Franklin (WRF)
@@ -404,7 +448,6 @@ bool Geofence::insidePolygon(const PolygonInfo &polygon, double lat, double lon,
 
 bool Geofence::insideCircle(const PolygonInfo &polygon, double lat, double lon, float altitude)
 {
-
 	mission_fence_point_s circle_point;
 
 	if (dm_read(DM_KEY_FENCE_POINTS, polygon.dataman_index, &circle_point,
@@ -430,12 +473,6 @@ bool Geofence::insideCircle(const PolygonInfo &polygon, double lat, double lon, 
 	map_projection_project(&_projection_reference, circle_point.lat, circle_point.lon, &x2, &y2);
 	float dx = x1 - x2, dy = y1 - y2;
 	return dx * dx + dy * dy < circle_point.circle_radius * circle_point.circle_radius;
-}
-
-bool
-Geofence::valid()
-{
-	return true; // always valid
 }
 
 int
@@ -498,7 +535,7 @@ Geofence::loadFromFile(const char *filename)
 					goto error;
 				}
 
-//				PX4_INFO("Geofence DMS: %.5lf %.5lf %.5lf ; %.5lf %.5lf %.5lf", lat_d, lat_m, lat_s, lon_d, lon_m, lon_s);
+				// PX4_INFO("Geofence DMS: %.5lf %.5lf %.5lf ; %.5lf %.5lf %.5lf", lat_d, lat_m, lat_s, lon_d, lon_m, lon_s);
 
 				vertex.lat = lat_d + lat_m / 60.0 + lat_s / 3600.0;
 				vertex.lon = lon_d + lon_m / 60.0 + lon_s / 3600.0;
@@ -574,9 +611,9 @@ int Geofence::clearDm()
 
 bool Geofence::isHomeRequired()
 {
-	bool max_horizontal_enabled = (_param_max_hor_distance.get() > FLT_EPSILON);
-	bool max_vertical_enabled = (_param_max_ver_distance.get() > FLT_EPSILON);
-	bool geofence_action_rtl = (getGeofenceAction() == geofence_result_s::GF_ACTION_RTL);
+	const bool max_horizontal_enabled = (_param_max_hor_distance.get() > FLT_EPSILON);
+	const bool max_vertical_enabled = (_param_max_ver_distance.get() > FLT_EPSILON);
+	const bool geofence_action_rtl = (_param_action.get() == geofence_result_s::GF_ACTION_RTL);
 
 	return max_horizontal_enabled || max_vertical_enabled || geofence_action_rtl;
 }

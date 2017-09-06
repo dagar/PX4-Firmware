@@ -37,23 +37,15 @@
  * @author Thomas Gubler <thomasgubler@gmail.com>
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <math.h>
-#include <fcntl.h>
+#include "datalinkloss.h"
+#include "navigator.h"
 
 #include <systemlib/mavlink_log.h>
-#include <systemlib/err.h>
 #include <geo/geo.h>
 #include <navigator/navigation.h>
 
 #include <uORB/uORB.h>
 #include <uORB/topics/home_position.h>
-
-#include "navigator.h"
-#include "datalinkloss.h"
-
-#define DELAY_SIGMA	0.01f
 
 DataLinkLoss::DataLinkLoss(Navigator *navigator, const char *name) :
 	MissionBlock(navigator, name),
