@@ -410,61 +410,70 @@ MissionBlock::reset_mission_item_reached()
 }
 
 void
-MissionBlock::mission_item_to_vehicle_command(const struct mission_item_s *item, struct vehicle_command_s *cmd)
+MissionBlock::mission_item_to_vehicle_command(const mission_item_s &item)
 {
+	vehicle_command_s vcmd = {};
+
+	vcmd.timestamp = hrt_absolute_time();
+
 	// we're expecting a mission command item here so assign the "raw" inputs to the command
 	// (MAV_FRAME_MISSION mission item)
-	cmd->param1 = item->params[0];
-	cmd->param2 = item->params[1];
-	cmd->param3 = item->params[2];
-	cmd->param4 = item->params[3];
-	cmd->param5 = item->params[4];
-	cmd->param6 = item->params[5];
-	cmd->param7 = item->params[6];
-	cmd->command = item->nav_cmd;
-
-	cmd->target_system = _navigator->get_vstatus()->system_id;
+	vcmd.param1 = item.params[0];
+	vcmd.param2 = item.params[1];
+	vcmd.param3 = item.params[2];
+	vcmd.param4 = item.params[3];
+	vcmd.param5 = item.params[4];
+	vcmd.param6 = item.params[5];
+	vcmd.param7 = item.params[6];
+	vcmd.command = item.nav_cmd;
 
 	// The camera commands are not processed on the autopilot but will be
 	// sent to the mavlink links to other components.
-	switch (item->nav_cmd) {
+	switch (item.nav_cmd) {
 	case NAV_CMD_IMAGE_START_CAPTURE:
 	case NAV_CMD_IMAGE_STOP_CAPTURE:
 	case NAV_CMD_VIDEO_START_CAPTURE:
 	case NAV_CMD_VIDEO_STOP_CAPTURE:
-		cmd->target_component = 100; // MAV_COMP_ID_CAMERA
+		vcmd.target_component = 100; // MAV_COMP_ID_CAMERA
 		break;
 
 	default:
-		cmd->target_component = _navigator->get_vstatus()->component_id;
+		vcmd.target_component = _navigator->get_vstatus()->component_id;
 		break;
 	}
 
-	cmd->source_system = _navigator->get_vstatus()->system_id;
-	cmd->source_component = _navigator->get_vstatus()->component_id;
-	cmd->confirmation = false;
+	vcmd.source_system = _navigator->get_vstatus()->system_id;
+	vcmd.source_component = _navigator->get_vstatus()->component_id;
+	vcmd.confirmation = false;
+
+	if (_navigator->get_vehicle_cmd_pub() != nullptr) {
+		orb_publish(ORB_ID(vehicle_command), _navigator->get_vehicle_cmd_pub(), &vcmd);
+
+	} else {
+		_navigator->get_vehicle_cmd_pub() = orb_advertise_queue(ORB_ID(vehicle_command), &vcmd,
+						    vehicle_command_s::ORB_QUEUE_LENGTH);
+	}
 }
 
 void
-MissionBlock::issue_command(const struct mission_item_s *item)
+MissionBlock::issue_command(const mission_item_s &item)
 {
-
 	if (item_contains_position(item)) {
 		return;
 	}
 
 	// NAV_CMD_DO_LAND_START is only a marker
-	if (item->nav_cmd == NAV_CMD_DO_LAND_START) {
+	if (item.nav_cmd == NAV_CMD_DO_LAND_START) {
 		return;
 	}
 
-	if (item->nav_cmd == NAV_CMD_DO_SET_SERVO) {
+	if (item.nav_cmd == NAV_CMD_DO_SET_SERVO) {
 		PX4_INFO("do_set_servo command");
 		// XXX: we should issue a vehicle command and handle this somewhere else
 		_actuators = {};
 		// params[0] actuator number to be set 0..5 (corresponds to AUX outputs 1..6)
 		// params[1] new value for selected actuator in ms 900...2000
-		_actuators.control[(int)item->params[0]] = 1.0f / 2000 * -item->params[1];
+		_actuators.control[(int)item.params[0]] = 1.0f / 2000 * -item.params[1];
 		_actuators.timestamp = hrt_absolute_time();
 
 		if (_actuator_pub != nullptr) {
@@ -475,16 +484,8 @@ MissionBlock::issue_command(const struct mission_item_s *item)
 		}
 
 	} else {
-		const hrt_abstime now = hrt_absolute_time();
-
-		struct vehicle_command_s cmd = {
-			.timestamp = now
-		};
-
-		mission_item_to_vehicle_command(item, &cmd);
-		_action_start = now;
-
-		_navigator->publish_vehicle_cmd(cmd);
+		mission_item_to_vehicle_command(item);
+		_action_start = hrt_absolute_time();
 	}
 }
 
@@ -499,41 +500,41 @@ MissionBlock::get_time_inside(const struct mission_item_s &item)
 }
 
 bool
-MissionBlock::item_contains_position(const struct mission_item_s *item)
+MissionBlock::item_contains_position(const mission_item_s &item)
 {
-	return item->nav_cmd == NAV_CMD_WAYPOINT ||
-	       item->nav_cmd == NAV_CMD_LOITER_UNLIMITED ||
-	       item->nav_cmd == NAV_CMD_LOITER_TIME_LIMIT ||
-	       item->nav_cmd == NAV_CMD_LAND ||
-	       item->nav_cmd == NAV_CMD_TAKEOFF ||
-	       item->nav_cmd == NAV_CMD_LOITER_TO_ALT ||
-	       item->nav_cmd == NAV_CMD_VTOL_TAKEOFF ||
-	       item->nav_cmd == NAV_CMD_VTOL_LAND;
+	return item.nav_cmd == NAV_CMD_WAYPOINT ||
+	       item.nav_cmd == NAV_CMD_LOITER_UNLIMITED ||
+	       item.nav_cmd == NAV_CMD_LOITER_TIME_LIMIT ||
+	       item.nav_cmd == NAV_CMD_LAND ||
+	       item.nav_cmd == NAV_CMD_TAKEOFF ||
+	       item.nav_cmd == NAV_CMD_LOITER_TO_ALT ||
+	       item.nav_cmd == NAV_CMD_VTOL_TAKEOFF ||
+	       item.nav_cmd == NAV_CMD_VTOL_LAND;
 }
 
 bool
-MissionBlock::mission_item_to_position_setpoint(const struct mission_item_s *item, struct position_setpoint_s *sp)
+MissionBlock::mission_item_to_position_setpoint(const mission_item_s &item, position_setpoint_s *sp)
 {
 	/* don't change the setpoint for non-position items */
 	if (!item_contains_position(item)) {
 		return false;
 	}
 
-	sp->lat = item->lat;
-	sp->lon = item->lon;
-	sp->alt = item->altitude_is_relative ? item->altitude + _navigator->get_home_position()->alt : item->altitude;
-	sp->yaw = item->yaw;
-	sp->yaw_valid = PX4_ISFINITE(item->yaw);
-	sp->loiter_radius = (fabsf(item->loiter_radius) > NAV_EPSILON_POSITION) ? fabsf(item->loiter_radius) :
+	sp->lat = item.lat;
+	sp->lon = item.lon;
+	sp->alt = item.altitude_is_relative ? item.altitude + _navigator->get_home_position()->alt : item.altitude;
+	sp->yaw = item.yaw;
+	sp->yaw_valid = PX4_ISFINITE(item.yaw);
+	sp->loiter_radius = (fabsf(item.loiter_radius) > NAV_EPSILON_POSITION) ? fabsf(item.loiter_radius) :
 			    _navigator->get_loiter_radius();
-	sp->loiter_direction = (item->loiter_radius > 0) ? 1 : -1;
-	sp->acceptance_radius = item->acceptance_radius;
-	sp->disable_mc_yaw_control = item->disable_mc_yaw;
+	sp->loiter_direction = (item.loiter_radius > 0) ? 1 : -1;
+	sp->acceptance_radius = item.acceptance_radius;
+	sp->disable_mc_yaw_control = item.disable_mc_yaw;
 
 	sp->cruising_speed = _navigator->get_cruising_speed();
 	sp->cruising_throttle = _navigator->get_cruising_throttle();
 
-	switch (item->nav_cmd) {
+	switch (item.nav_cmd) {
 	case NAV_CMD_IDLE:
 		sp->type = position_setpoint_s::SETPOINT_TYPE_IDLE;
 		break;
@@ -550,7 +551,7 @@ MissionBlock::mission_item_to_position_setpoint(const struct mission_item_s *ite
 			sp->type = position_setpoint_s::SETPOINT_TYPE_TAKEOFF;
 
 			// set pitch and ensure that the hold time is zero
-			sp->pitch_min = item->pitch_min;
+			sp->pitch_min = item.pitch_min;
 		}
 
 		break;

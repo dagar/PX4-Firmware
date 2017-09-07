@@ -112,7 +112,7 @@ public:
 	 */
 	void		publish_att_sp();
 
-	void		publish_vehicle_cmd(const struct vehicle_command_s &vcmd);
+	void		publish_vehicle_cmd(const vehicle_command_s &vcmd);
 
 	/**
 	 * Setters
@@ -132,17 +132,19 @@ public:
 	struct position_setpoint_triplet_s *get_takeoff_triplet() { return &_takeoff_triplet; }
 	struct vehicle_attitude_setpoint_s *get_att_sp() { return &_att_sp; }
 	struct vehicle_global_position_s *get_global_position() { return &_global_pos; }
-	struct vehicle_gps_position_s *get_gps_position() { return &_gps_pos; }
 	struct vehicle_land_detected_s *get_land_detected() { return &_land_detected; }
 	struct vehicle_local_position_s *get_local_position() { return &_local_pos; }
 	struct vehicle_status_s *get_vstatus() { return &_vstatus; }
-	struct vehicle_roi_s *get_vroi() { return &_vroi; }
+
+	const vehicle_roi_s &get_vroi() { return _vroi; }
 
 	bool home_position_valid() { return (_home_pos.timestamp > 0); }
 
 	int		get_onboard_mission_sub() { return _onboard_mission_sub; }
 	int		get_offboard_mission_sub() { return _offboard_mission_sub; }
+
 	Geofence	&get_geofence() { return _geofence; }
+
 	bool		get_can_loiter_at_sp() { return _can_loiter_at_sp; }
 	float		get_loiter_radius() { return _param_loiter_radius.get(); }
 
@@ -210,7 +212,9 @@ public:
 	 * @return the distance at which the next waypoint should be used
 	 */
 	float		get_acceptance_radius(float mission_item_radius);
+
 	orb_advert_t	*get_mavlink_log_pub() { return &_mavlink_log_pub; }
+	orb_advert_t	&get_vehicle_cmd_pub() { return _vehicle_cmd_pub; }
 
 	void		increment_mission_instance_count() { _mission_instance_count++; }
 
@@ -239,27 +243,28 @@ private:
 	int		_sensor_combined_sub{-1};	/**< sensor combined subscription */
 	int		_vehicle_command_sub{-1};	/**< vehicle commands (onboard and offboard) */
 	int		_vstatus_sub{-1};		/**< vehicle status subscription */
-	int		_vehicle_roi_sub{-1};		/**< vehicle ROI subscription */
 
 	orb_advert_t	_att_sp_pub{nullptr};
 	orb_advert_t	_geofence_result_pub{nullptr};
 	orb_advert_t	_mission_result_pub{nullptr};
 	orb_advert_t	_pos_sp_triplet_pub{nullptr};
 	orb_advert_t	_vehicle_cmd_pub{nullptr};
+	orb_advert_t	_roi_pub{nullptr};
+	orb_advert_t	_vehicle_cmd_ack_pub{nullptr};
 
-	fw_pos_ctrl_status_s			_fw_pos_ctrl_status{};	/**< fixed wing navigation capabilities */
+	fw_pos_ctrl_status_s				_fw_pos_ctrl_status{};	/**< fixed wing navigation capabilities */
 	geofence_result_s				_geofence_result{};
 	home_position_s					_home_pos{};		/**< home position for RTL */
 	mission_result_s				_mission_result{};
-	position_setpoint_triplet_s		_pos_sp_triplet{};	/**< triplet of position setpoints */
-	position_setpoint_triplet_s		_reposition_triplet{};	/**< triplet for non-mission direct position command */
-	position_setpoint_triplet_s		_takeoff_triplet{};	/**< triplet for non-mission direct takeoff command */
+	position_setpoint_triplet_s			_pos_sp_triplet{};	/**< triplet of position setpoints */
+	position_setpoint_triplet_s			_reposition_triplet{};	/**< triplet for non-mission direct position command */
+	position_setpoint_triplet_s			_takeoff_triplet{};	/**< triplet for non-mission direct takeoff command */
 	sensor_combined_s				_sensor_combined{};	/**< sensor values */
-	vehicle_attitude_setpoint_s		_att_sp{};
-	vehicle_global_position_s		_global_pos{};		/**< global vehicle position */
-	vehicle_gps_position_s			_gps_pos{};		/**< gps position */
-	vehicle_land_detected_s			_land_detected{};	/**< vehicle land_detected */
-	vehicle_local_position_s		_local_pos;		/**< local vehicle position */
+	vehicle_attitude_setpoint_s			_att_sp{};
+	vehicle_global_position_s			_global_pos{};		/**< global vehicle position */
+	vehicle_gps_position_s				_gps_pos{};		/**< gps position */
+	vehicle_land_detected_s				_land_detected{};	/**< vehicle land_detected */
+	vehicle_local_position_s			_local_pos{};		/**< local vehicle position */
 	vehicle_status_s				_vstatus{};		/**< vehicle status */
 	vehicle_roi_s					_vroi{};		/**< vehicle ROI */
 
@@ -309,7 +314,6 @@ private:
 	void		sensor_combined_update();
 	void		vehicle_land_detected_update();
 	void		vehicle_status_update();
-	void		vehicle_roi_update();
 
 	/**
 	 * Shim for calling task_main from task_create.
@@ -335,5 +339,7 @@ private:
 	 * Publish the mission result so commander and mavlink know what is going on
 	 */
 	void		publish_mission_result();
+
+	void		publish_vehicle_command_ack(const vehicle_command_s &cmd, uint8_t result);
 };
 #endif
