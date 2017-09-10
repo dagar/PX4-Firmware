@@ -607,7 +607,9 @@ void Mavlink::mavlink_update_system()
 		_param_system_type = param_find("MAV_TYPE");
 		_param_use_hil_gps = param_find("MAV_USEHILGPS");
 		_param_forward_externalsp = param_find("MAV_FWDEXTSP");
+#ifdef __PX4_POSIX
 		_param_broadcast = param_find("MAV_BROADCAST");
+#endif /* __PX4_POSIX */
 	}
 
 	/* update system and component id */
@@ -656,7 +658,9 @@ void Mavlink::mavlink_update_system()
 	int32_t forward_externalsp;
 	param_get(_param_forward_externalsp, &forward_externalsp);
 
+#ifdef __PX4_POSIX
 	param_get(_param_broadcast, &_broadcast_mode);
+#endif /* __PX4_POSIX */
 
 	_forward_externalsp = (bool)forward_externalsp;
 }
