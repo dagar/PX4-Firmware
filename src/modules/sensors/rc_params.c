@@ -81,6 +81,8 @@ PARAM_DEFINE_FLOAT(RC1_MAX, 2000.0f);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC1_REV, 1.0f);
@@ -140,6 +142,8 @@ PARAM_DEFINE_FLOAT(RC2_MAX, 2000.0f);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC2_REV, 1.0f);
@@ -199,6 +203,8 @@ PARAM_DEFINE_FLOAT(RC3_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC3_REV, 1.0f);
@@ -258,6 +264,8 @@ PARAM_DEFINE_FLOAT(RC4_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC4_REV, 1.0f);
@@ -317,6 +325,8 @@ PARAM_DEFINE_FLOAT(RC5_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC5_REV, 1.0f);
@@ -375,6 +385,8 @@ PARAM_DEFINE_FLOAT(RC6_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC6_REV, 1.0f);
@@ -433,6 +445,8 @@ PARAM_DEFINE_FLOAT(RC7_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC7_REV, 1.0f);
@@ -491,6 +505,8 @@ PARAM_DEFINE_FLOAT(RC8_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC8_REV, 1.0f);
@@ -549,6 +565,8 @@ PARAM_DEFINE_FLOAT(RC9_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC9_REV, 1.0f);
@@ -607,6 +625,8 @@ PARAM_DEFINE_FLOAT(RC10_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC10_REV, 1.0f);
@@ -665,6 +685,8 @@ PARAM_DEFINE_FLOAT(RC11_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC11_REV, 1.0f);
@@ -723,6 +745,8 @@ PARAM_DEFINE_FLOAT(RC12_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC12_REV, 1.0f);
@@ -781,6 +805,8 @@ PARAM_DEFINE_FLOAT(RC13_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC13_REV, 1.0f);
@@ -839,6 +865,8 @@ PARAM_DEFINE_FLOAT(RC14_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC14_REV, 1.0f);
@@ -897,6 +925,8 @@ PARAM_DEFINE_FLOAT(RC15_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC15_REV, 1.0f);
@@ -955,6 +985,8 @@ PARAM_DEFINE_FLOAT(RC16_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC16_REV, 1.0f);
@@ -1013,6 +1045,8 @@ PARAM_DEFINE_FLOAT(RC17_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC17_REV, 1.0f);
@@ -1071,6 +1105,8 @@ PARAM_DEFINE_FLOAT(RC18_MAX, 2000);
  *
  * @min -1.0
  * @max 1.0
+ * @value -1.0 Reverse
+ * @value 1.0 Normal
  * @group Radio Calibration
  */
 PARAM_DEFINE_FLOAT(RC18_REV, 1.0f);
@@ -2165,7 +2201,7 @@ PARAM_DEFINE_FLOAT(RC_STAB_TH, 0.5f);
 PARAM_DEFINE_FLOAT(RC_MAN_TH, 0.5f);
 
 /**
- * Sample rate of the remote control values for the low pass filter on roll,pitch, yaw and throttle
+ * Sample rate of the remote control values for the low pass filter on roll, pitch, yaw and throttle
  *
  * Has an influence on the cutoff frequency precision.
  *
@@ -2176,7 +2212,7 @@ PARAM_DEFINE_FLOAT(RC_MAN_TH, 0.5f);
 PARAM_DEFINE_FLOAT(RC_FLT_SMP_RATE, 50.0f);
 
 /**
- * Cutoff frequency for the low pass filter on roll,pitch, yaw and throttle
+ * Cutoff frequency for the low pass filter on roll, pitch, yaw and throttle
  *
  * Does not get set unless below RC_FLT_SMP_RATE/2 because of filter instability characteristics.
  *
