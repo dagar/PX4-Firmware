@@ -45,6 +45,7 @@
  * @group Sensor Thermal Compensation
  * @min 0
  * @max 1
+ * @boolean
  */
 PARAM_DEFINE_INT32(TC_G_ENABLE, 0);
 

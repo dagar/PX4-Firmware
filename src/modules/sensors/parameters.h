@@ -233,12 +233,12 @@ struct ParameterHandles {
  * initialize ParameterHandles struct
  * @return 0 on succes, <0 on error
  */
-int initialize_parameter_handles(ParameterHandles &parameter_handles);
+void initialize_parameter_handles(ParameterHandles &parameter_handles);
 
 
 /**
  * Read out the parameters using the handles into the parameters struct.
- * @return 0 on succes, <0 on error
+ * @return 0 on success, <0 on error
  */
 int update_parameters(const ParameterHandles &parameter_handles, Parameters &parameters);
 
