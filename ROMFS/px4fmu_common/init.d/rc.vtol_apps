@@ -5,6 +5,31 @@
 #
 #
 
+if [ $MAV_TYPE == none ]
+then
+	# Use mixer to detect vehicle type
+	if [ $MIXER == caipirinha_vtol ]
+	then
+		set MAV_TYPE 19
+	fi
+	if [ $MIXER == firefly6 ]
+	then
+		set MAV_TYPE 21
+	fi
+	if [ $MIXER == quad_x_pusher_vtol ]
+	then
+		set MAV_TYPE 22
+	fi
+fi
+
+# Still no MAV_TYPE found
+if [ $MAV_TYPE == none ]
+then
+	echo "Unknown MAV_TYPE"
+	param set MAV_TYPE 19
+else
+	param set MAV_TYPE ${MAV_TYPE}
+fi
 
 #---------------------------------------
 # Estimator group selction
@@ -45,6 +70,7 @@ mc_att_control start
 mc_pos_control start
 fw_att_control start
 fw_pos_control_l1 start
+navigator start
 
 #
 # Start Land Detector

@@ -54,10 +54,10 @@ fi
 
 set MIXER quad_x
 set PWM_OUT 1234
-set PWM_RATE 400
+param set PWM_RATE 400
 
 set MIXER_AUX vtol_delta
-set PWM_ACHDIS 3
-set PWM_AUX_DISARMED 950
+
+param set PWM_AUX_DIS3 950
 
 set MAV_TYPE 22

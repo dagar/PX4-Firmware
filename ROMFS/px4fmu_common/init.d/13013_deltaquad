@@ -110,7 +110,7 @@ fi
 
 set MIXER deltaquad
 set PWM_OUT 1234
-set PWM_RATE 400
+param set PWM_RATE 400
 
 param set PWM_MAIN_DIS5 1500
 param set PWM_MAIN_DIS6 1500
@@ -119,6 +119,6 @@ param set PWM_MAIN_DIS8 900
 
 set MIXER_AUX pass
 set PWM_AUX_OUT 12345
-set PWM_AUX_DISARMED 950
+param set PWM_AUX_DISARMED 950
 
 set MAV_TYPE 22

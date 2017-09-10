@@ -37,10 +37,9 @@ px4_add_module(
 	COMPILE_FLAGS
 	SRCS
 		px4io.cpp
-		px4io_uploader.cpp
-		px4io_serial.cpp
 		px4io_i2c.cpp
-		px4io_params.c
+		px4io_serial.cpp
+		px4io_uploader.cpp
 	DEPENDS
 		platforms__common
 	)

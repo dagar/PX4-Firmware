@@ -4,6 +4,56 @@
 # att & pos estimator, att & pos control.
 #
 
+# set MAV_TYPE
+if [ $MAV_TYPE == none ]
+then
+	# Use mixer to detect vehicle type
+	if [ $MIXER == quad_x -o $MIXER == quad_+ ]
+	then
+		set MAV_TYPE 2
+	fi
+	if [ $MIXER == quad_w -o $MIXER == quad_dc ]
+	then
+		set MAV_TYPE 2
+	fi
+	if [ $MIXER == quad_h ]
+	then
+		set MAV_TYPE 2
+	fi
+	if [ $MIXER == coax ]
+	then
+		set MAV_TYPE 3
+	fi
+	if [ $MIXER == tri_y_yaw- -o $MIXER == tri_y_yaw+ ]
+	then
+		set MAV_TYPE 15
+	fi
+	if [ $MIXER == hexa_x -o $MIXER == hexa_+ ]
+	then
+		set MAV_TYPE 13
+	fi
+	if [ $MIXER == hexa_cox ]
+	then
+		set MAV_TYPE 13
+	fi
+	if [ $MIXER == octo_x -o $MIXER == octo_+ ]
+	then
+		set MAV_TYPE 14
+	fi
+	if [ $MIXER == octo_cox -o $MIXER == octo_cox_w ]
+	then
+		set MAV_TYPE 14
+	fi
+fi
+
+# Still no MAV_TYPE found
+if [ $MAV_TYPE == none ]
+then
+	echo "Unknown MAV_TYPE"
+	param set MAV_TYPE 2
+else
+	param set MAV_TYPE ${MAV_TYPE}
+fi
 
 #---------------------------------------
 # Estimator group selction
@@ -39,8 +89,8 @@ fi
 #---------------------------------------
 
 mc_att_control start
-
 mc_pos_control start
+navigator start
 
 #
 # Start Land Detector

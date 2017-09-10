@@ -50,7 +50,9 @@ then
 	param set PWM_MAX 2100
 	param set MIS_TAKEOFF_ALT 50
 	param set NAV_LOITER_RAD 30
+	
+	# set disarmed value for the ESC (channel 4)
+    param set PWM_MAIN_DIS4 1000
 fi
 
 set MIXER caipi
-set PWM_OUT 1234

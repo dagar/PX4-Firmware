@@ -45,6 +45,16 @@
 PARAM_DEFINE_INT32(SYS_USE_IO, 1);
 
 /**
+ * S.BUS out
+ *
+ * Set to 1 to enable S.BUS version 1 output instead of RSSI.
+ *
+ * @boolean
+ * @group PWM Outputs
+ */
+PARAM_DEFINE_INT32(PWM_SBUS_MODE, 0);
+
+/**
  * PWM input channel that provides RSSI.
  *
  * 0: do not read RSSI from input channel

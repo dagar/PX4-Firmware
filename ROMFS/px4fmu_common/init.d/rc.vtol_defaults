@@ -4,10 +4,6 @@ set VEHICLE_TYPE vtol
 
 if [ $AUTOCNF == yes ]
 then
-	param set MC_ROLL_P 6.0
-	param set MC_PITCH_P 6.0
-	param set MC_YAW_P 4
-
 	#
 	# Default parameters for mission and position handling
 	#
@@ -19,7 +15,8 @@ then
 	param set MIS_YAW_TMT 10
 	param set MPC_ACC_HOR_MAX 2.0
 	param set RTL_LAND_DELAY 0
+	
+	# default ESCs on MAIN, servos on AUX
+	param set PWM_RATE 400
+	param set PWM_AUX_RATE 50
 fi
-
-# set environment variables (!= parameters)
-set PWM_RATE 400

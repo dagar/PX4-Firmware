@@ -56,8 +56,6 @@ if ver hwcmp PX4FMU_V2
 then
 	# External I2C bus
 	hmc5883 -C -T -X start
-
-	# External I2C bus
 	lis3mdl -X start
 
 	# Internal I2C bus
@@ -129,6 +127,9 @@ then
 		l3gd20 start
 		lsm303d start
 	fi
+	
+	# Check for flow sensor - as it is a background task, launch it last
+	px4flow start &
 fi
 
 if ver hwcmp PX4FMU_V4
@@ -172,6 +173,11 @@ then
 
 	# expansion i2c used for BMP280
 	bmp280 -I start
+	
+	frsky_telemetry start -d /dev/ttyS6
+	
+	# Check for flow sensor
+	px4flow start &
 fi
 
 if ver hwcmp MINDPX_V2
@@ -184,6 +190,10 @@ then
 	mpu9250 -s -R 8 start
 	lsm303d -R 10 start
 	l3gd20 -R 14 start
+	
+	frsky_telemetry start -d /dev/ttyS6
+	
+	px4flow start &
 fi
 
 if ver hwcmp CRAZYFLIE
@@ -227,6 +237,9 @@ then
 
 	# Possible external compasses
 	hmc5883 -C -T -X start
+	
+	# Check for flow sensor - as it is a background task, launch it last
+	px4flow start &
 fi
 
 if ver hwcmp PX4FMU_V5
@@ -266,25 +279,43 @@ fi
 # Optional drivers
 #
 
-sdp3x_airspeed start
-sdp3x_airspeed start -b 2
-
-# Pixhawk 2.1 has a MS5611 on I2C which gets wrongly
-# detected as MS5525 because the chip manufacturer was so
-# clever to assign the same I2C address and skip a WHO_AM_I
-# register.
-if [ $BOARD_FMUV3 == 21 ]
+if [ ${VEHICLE_TYPE} == fw -o ${VEHICLE_TYPE} == vtol ]
 then
-	ms5525_airspeed start -b 2
-else
-	ms5525_airspeed start
+	if param compare CBRK_AIRSPD_CHK 0
+	then
+		if param compare FW_ARSP_MODE 0
+		then
+			if sdp3x_airspeed start
+			then
+			else
+				sdp3x_airspeed start -b 2
+			fi
+
+			# Pixhawk 2.1 has a MS5611 on I2C which gets wrongly
+			# detected as MS5525 because the chip manufacturer was so
+			# clever to assign the same I2C address and skip a WHO_AM_I
+			# register.
+			if [ $BOARD_FMUV3 == 21 ]
+			then
+				ms5525_airspeed start -b 2
+			else
+				ms5525_airspeed start
+			fi
+
+			if ms4525_airspeed start
+			then
+			else
+				ms4525_airspeed start -b 2
+			fi
+
+			if ets_airspeed start
+			then
+			else
+				ets_airspeed start -b 1
+			fi
+		fi
+	fi
 fi
-
-ms4525_airspeed start
-ms4525_airspeed start -b 2
-
-ets_airspeed start
-ets_airspeed start -b 1
 
 # Sensors on the PWM interface bank
 if param compare SENS_EN_LL40LS 1

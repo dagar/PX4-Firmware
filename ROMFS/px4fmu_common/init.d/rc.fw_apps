@@ -21,6 +21,7 @@ ekf2 start
 #
 fw_att_control start
 fw_pos_control_l1 start
+navigator start
 
 #
 # Start Land Detector

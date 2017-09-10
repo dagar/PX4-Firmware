@@ -16,7 +16,7 @@ ekf2 start
 #
 gnd_att_control start
 gnd_pos_control start
-
+navigator start
 
 #
 # Start Land Detector

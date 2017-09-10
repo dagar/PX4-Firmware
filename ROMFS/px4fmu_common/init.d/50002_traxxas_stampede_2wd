@@ -56,7 +56,7 @@ set MAV_TYPE 10
 set MIXER stampede
 
 # Provide ESC a constant 1500 us pulse
-set PWM_DISARMED 1500
+param set PWM_DISARMED 1500
 set PWM_MAIN_REV2 1
-set PWM_MAX 2000
+param set PWM_MAX 2000
 set PWM_MIN 1000

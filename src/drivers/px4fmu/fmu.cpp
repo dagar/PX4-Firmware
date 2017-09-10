@@ -988,39 +988,11 @@ PX4FMU::publish_pwm_outputs(uint16_t *values, size_t numvalues)
 int
 PX4FMU::task_spawn(int argc, char *argv[])
 {
-	bool run_as_task = false;
-	bool error_flag = false;
+	int32_t sys_fmu_task = 0;
+	param_get(param_find("SYS_FMU_TASK"), &sys_fmu_task);
 
-	int myoptind = 1;
-	int ch;
-	const char *myoptarg = nullptr;
-
-	while ((ch = px4_getopt(argc, argv, "t", &myoptind, &myoptarg)) != EOF) {
-		switch (ch) {
-		case 't':
-			run_as_task = true;
-			break;
-
-		case '?':
-			error_flag = true;
-			break;
-
-		default:
-			PX4_WARN("unrecognized flag");
-			error_flag = true;
-			break;
-		}
-	}
-
-	if (error_flag) {
-		return -1;
-	}
-
-
-	if (!run_as_task) {
-
+	if (sys_fmu_task == 0) {
 		/* schedule a cycle to start things */
-
 		int ret = work_queue(HPWORK, &_work, (worker_t)&PX4FMU::cycle_trampoline, nullptr, 0);
 
 		if (ret < 0) {
@@ -1030,9 +1002,7 @@ PX4FMU::task_spawn(int argc, char *argv[])
 		_task_id = task_id_is_work_queue;
 
 	} else {
-
 		/* start the IO interface task */
-
 		_task_id = px4_task_spawn_cmd("fmu",
 					      SCHED_DEFAULT,
 					      SCHED_PRIORITY_ACTUATOR_OUTPUTS,
@@ -3453,7 +3423,7 @@ callback with ioctl calls.
 
 ### Implementation
 By default the module runs on the work queue, to reduce RAM usage. It can also be run in its own thread,
-specified via start flag -t, to reduce latency.
+specified via the parameter SYS_FMU_TASK, to reduce latency.
 When running on the work queue, it schedules at a fixed frequency, and the pwm rate limits the update rate of
 the actuator_controls topics. In case of running in its own thread, the module polls on the actuator_controls topic.
 Additionally the pwm rate defines the lower-level IO timer rates.
@@ -3474,7 +3444,6 @@ mixer files.
 
 	PRINT_MODULE_USAGE_NAME("fmu", "driver");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("start", "Start the task (without any mode set, use any of the mode_* cmds)");
-	PRINT_MODULE_USAGE_PARAM_FLAG('t', "Run as separate task instead of the work queue", true);
 
 	PRINT_MODULE_USAGE_PARAM_COMMENT("All of the mode_* commands will start the fmu if not running already");
 
@@ -3518,8 +3487,8 @@ int PX4FMU::print_status()
 		PX4_INFO("Max update rate: %i Hz", _current_update_rate);
 	}
 
-	PX4_INFO("RC scan state: %s", RC_SCAN_STRING[_rc_scan_state]);
 #ifdef RC_SERIAL_PORT
+	PX4_INFO("RC scan state: %s", RC_SCAN_STRING[_rc_scan_state]);
 	PX4_INFO("SBUS frame drops: %u", sbus_dropped_frames());
 #endif
 	const char *mode_str = nullptr;

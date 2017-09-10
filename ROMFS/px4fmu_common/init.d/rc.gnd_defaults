@@ -4,9 +4,14 @@ set VEHICLE_TYPE ugv
 
 if [ $AUTOCNF == yes ]
 then
-#
-# Default parameters for UGVs
-#
+	#
+	# Default parameters for UGVs
+	#
+
+	param set MAV_TYPE 10
+
+	param set MAV_TYPE ${MAV_TYPE}
+
 	param set NAV_DLL_ACT 0
 	param set NAV_ACC_RAD 2.0
 	
@@ -15,6 +20,11 @@ then
 
 	param set MIS_LTRMIN_ALT 0.01
 	param set MIS_TAKEOFF_ALT 0.01
+	
+	# PWM Hz - 50 Hz is the normal rate in RC cars, higher rates
+	# may damage analog servos.
+	param set PWM_RATE 50
+	param set PWM_AUX_RATE 50
 fi
 
 # Enable servo output on pins 3 and 4 (steering and thrust)
@@ -22,11 +32,6 @@ fi
 # and need to be set together.
 set PWM_OUT 1234
 
-# PWM Hz - 50 Hz is the normal rate in RC cars, higher rates
-# may damage analog servos.
-set PWM_RATE 50
-
 # This is the gimbal pass mixer
 set MIXER_AUX pass
-set PWM_AUX_RATE 50
 set PWM_AUX_OUT 1234
