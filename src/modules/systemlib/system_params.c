@@ -162,9 +162,10 @@ PARAM_DEFINE_INT32(SYS_STCK_EN, 1);
  *
  * default (0, no calibration)
  *
- * @group System
+ * @group Thermal Compensation
  * @min 0
  * @max 1
+ * @boolean
  */
 PARAM_DEFINE_INT32(SYS_CAL_GYRO, 0);
 
@@ -177,9 +178,10 @@ PARAM_DEFINE_INT32(SYS_CAL_GYRO, 0);
  *
  * default (0, no calibration)
  *
- * @group System
+ * @group Thermal Compensation
  * @min 0
  * @max 1
+ * @boolean
  */
 PARAM_DEFINE_INT32(SYS_CAL_ACCEL, 0);
 
@@ -192,9 +194,10 @@ PARAM_DEFINE_INT32(SYS_CAL_ACCEL, 0);
  *
  * default (0, no calibration)
  *
- * @group System
+ * @group Thermal Compensation
  * @min 0
  * @max 1
+ * @boolean
  */
 PARAM_DEFINE_INT32(SYS_CAL_BARO, 0);
 
@@ -205,9 +208,9 @@ PARAM_DEFINE_INT32(SYS_CAL_BARO, 0);
  * Calibration will complete for each sensor when the temperature increase above the starting temperature exceeds the value set by SYS_CAL_TDEL.
  * If the temperature rise is insufficient, the calibration will continue indefinitely and the board will need to be repowered to exit.
  *
- * @unit deg C
+ * @unit C
  * @min 10
- * @group System
+ * @group Thermal Compensation
  */
 PARAM_DEFINE_INT32(SYS_CAL_TDEL, 24);
 
@@ -216,8 +219,8 @@ PARAM_DEFINE_INT32(SYS_CAL_TDEL, 24);
  *
  * Temperature calibration for each sensor will ignore data if the temperature is lower than the value set by SYS_CAL_TMIN.
  *
- * @unit deg C
- * @group System
+ * @unit C
+ * @group Thermal Compensation
  */
 PARAM_DEFINE_INT32(SYS_CAL_TMIN, 5);
 
@@ -226,7 +229,7 @@ PARAM_DEFINE_INT32(SYS_CAL_TMIN, 5);
  *
  * Temperature calibration will not start if the temperature of any sensor is higher than the value set by SYS_CAL_TMAX.
  *
- * @unit deg C
- * @group System
+ * @unit C
+ * @group Thermal Compensation
  */
 PARAM_DEFINE_INT32(SYS_CAL_TMAX, 10);
