@@ -209,7 +209,7 @@ private:
 		float slow_land_alt2;
 		uint32_t alt_mode;
 
-		int opt_recover;
+		bool opt_recover;
 
 		math::Vector<3> pos_p;
 		math::Vector<3> vel_p;
@@ -492,7 +492,6 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_params_handles.acc_up_max = param_find("MPC_ACC_UP_MAX");
 	_params_handles.acc_down_max = param_find("MPC_ACC_DOWN_MAX");
 	_params_handles.alt_mode = param_find("MPC_ALT_MODE");
-	_params_handles.opt_recover = param_find("VT_OPT_RECOV_EN");
 
 	/* fetch initial parameter values */
 	parameters_update(true);
@@ -611,9 +610,11 @@ MulticopterPositionControl::parameters_update(bool force)
 		param_get(_params_handles.alt_mode, &v_i);
 		_params.alt_mode = v_i;
 
-		int i;
-		param_get(_params_handles.opt_recover, &i);
-		_params.opt_recover = i;
+		if (_vehicle_status.is_vtol) {
+			int32_t i = 0;
+			param_get(_params_handles.opt_recover, &i);
+			_params.opt_recover = (i == 1);
+		}
 
 		/* mc attitude control parameters*/
 		/* manual control scale */
@@ -649,6 +650,9 @@ MulticopterPositionControl::poll_subscriptions()
 		if (!_attitude_setpoint_id) {
 			if (_vehicle_status.is_vtol) {
 				_attitude_setpoint_id = ORB_ID(mc_virtual_attitude_setpoint);
+
+				_params_handles.opt_recover = param_find("VT_OPT_RECOV_EN");
+				parameters_update(true);
 
 			} else {
 				_attitude_setpoint_id = ORB_ID(vehicle_attitude_setpoint);
@@ -2103,7 +2107,7 @@ MulticopterPositionControl::generate_attitude_setpoint(float dt)
 		_att_sp.pitch_body = -_manual.x * _params.man_tilt_max;
 
 		/* only if optimal recovery is not used, modify roll/pitch */
-		if (_params.opt_recover <= 0) {
+		if (!(_vehicle_status.is_vtol && _params.opt_recover)) {
 			// construct attitude setpoint rotation matrix. modify the setpoints for roll
 			// and pitch such that they reflect the user's intention even if a yaw error
 			// (yaw_sp - yaw) is present. In the presence of a yaw error constructing a rotation matrix
