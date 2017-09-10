@@ -222,7 +222,6 @@ int initialize_parameter_handles(ParameterHandles &parameter_handles)
 	(void)param_find("CAL_ACC2_ZOFF");
 	(void)param_find("CAL_ACC2_ZSCALE");
 
-	(void)param_find("SYS_PARAM_VER");
 	(void)param_find("SYS_AUTOSTART");
 	(void)param_find("SYS_AUTOCONFIG");
 	(void)param_find("SYS_HITL");

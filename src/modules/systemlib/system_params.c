@@ -147,18 +147,6 @@ PARAM_DEFINE_INT32(SYS_MC_EST_GROUP, 2);
 PARAM_DEFINE_INT32(SYS_COMPANION, 157600);
 
 /**
- * Parameter version
- *
- * This monotonically increasing number encodes the parameter compatibility set.
- * whenever it increases parameters might not be backwards compatible and
- * ground control stations should suggest a fresh configuration.
- *
- * @min 0
- * @group System
- */
-PARAM_DEFINE_INT32(SYS_PARAM_VER, 1);
-
-/**
  * SD logger
  *
  * @value 0 sdlog2 (legacy)
