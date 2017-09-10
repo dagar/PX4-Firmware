@@ -1006,6 +1006,7 @@ PARAM_DEFINE_FLOAT(BAT_V_DIV, -1.0);
  * the board default.
  *
  * @group Battery Calibration
+ * @unit A/V
  * @decimal 8
  */
 PARAM_DEFINE_FLOAT(BAT_A_PER_V, -1.0);
