@@ -311,7 +311,7 @@ void VotedSensorsUpdate::parameters_update()
 
 			int32_t device_id = 0;
 			(void)sprintf(str, "CAL_GYRO%u_ID", i);
-			(void)param_set(param_find(str), &device_id);
+			(void)param_set_no_notification(param_find(str), &device_id);
 		}
 	}
 
@@ -393,7 +393,7 @@ void VotedSensorsUpdate::parameters_update()
 
 			int32_t device_id = 0;
 			(void)sprintf(str, "CAL_ACC%u_ID", i);
-			(void)param_set(param_find(str), &device_id);
+			(void)param_set_no_notification(param_find(str), &device_id);
 		}
 	}
 

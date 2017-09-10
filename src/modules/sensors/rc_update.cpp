@@ -243,7 +243,7 @@ RCUpdate::set_params_from_rc(const ParameterHandles &parameter_handles)
 			float param_val = math::constrain(
 						  _rc_parameter_map.value0[i] + _rc_parameter_map.scale[i] * rc_val,
 						  _rc_parameter_map.value_min[i], _rc_parameter_map.value_max[i]);
-			param_set(parameter_handles.rc_param[i], &param_val);
+			param_set_no_notification(parameter_handles.rc_param[i], &param_val);
 		}
 	}
 }
