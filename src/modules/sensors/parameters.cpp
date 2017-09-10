@@ -172,14 +172,6 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 	(void)param_find("CAL_MAG3_ROT");
 	(void)param_find("CAL_MAG_SIDES");
 
-	(void)param_find("PWM_AUX_DISARMED");
-	(void)param_find("PWM_AUX_MAX");
-	(void)param_find("PWM_AUX_MIN");
-	(void)param_find("PWM_DISARMED");
-	(void)param_find("PWM_MAX");
-	(void)param_find("PWM_MIN");
-	(void)param_find("PWM_RATE");
-
 	(void)param_find("RC_CHAN_CNT");
 
 	(void)param_find("SYS_AUTOCONFIG");
