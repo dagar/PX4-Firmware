@@ -31,5 +31,5 @@ set PWM_AUX_OUT 123
 
 if [ $AUTOCNF == yes ]
 then
-	param set pwm_main_dis3 950
+	param set PWM_MAIN_DIS3 950
 fi
