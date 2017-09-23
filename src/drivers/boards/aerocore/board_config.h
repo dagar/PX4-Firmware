@@ -231,9 +231,6 @@ __BEGIN_DECLS
  ****************************************************************************************************/
 
 extern void stm32_spiinitialize(void);
-#define board_spi_reset(ms)
-
-#define board_peripheral_reset(ms)
 
 #include "../common/board_common.h"
 

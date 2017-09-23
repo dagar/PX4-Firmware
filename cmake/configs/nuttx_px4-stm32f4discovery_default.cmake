@@ -17,6 +17,7 @@ set(config_module_list
 	# System commands
 	#
 	systemcmds/bl_update
+	systemcmds/i2c
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf

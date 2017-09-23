@@ -63,23 +63,25 @@ set(config_module_list
 	# System commands
 	#
 	systemcmds/bl_update
+	systemcmds/config
+	systemcmds/dumpfile
+	systemcmds/esc_calib
+	systemcmds/hardfault_log
+	systemcmds/i2c
 	systemcmds/led_control
 	systemcmds/mixer
+	systemcmds/motor_ramp
+	systemcmds/mtd
+	systemcmds/nshterm
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
-	systemcmds/esc_calib
-	systemcmds/hardfault_log
 	systemcmds/reboot
-	systemcmds/topic_listener
-	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
-	systemcmds/mtd
-	systemcmds/dumpfile
-	systemcmds/ver
 	systemcmds/sd_bench
-	systemcmds/motor_ramp
+	systemcmds/spi
+	systemcmds/top
+	systemcmds/topic_listener
+	systemcmds/ver
 
 	#
 	# Testing

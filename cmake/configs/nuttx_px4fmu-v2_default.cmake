@@ -63,6 +63,7 @@ set(config_module_list
 	#systemcmds/dumpfile
 	#systemcmds/esc_calib
 	systemcmds/hardfault_log
+	systemcmds/i2c
 	systemcmds/mixer
 	#systemcmds/motor_ramp
 	systemcmds/mtd
@@ -72,6 +73,7 @@ set(config_module_list
 	systemcmds/pwm
 	systemcmds/reboot
 	#systemcmds/sd_bench
+	systemcmds/spi
 	systemcmds/top
 	#systemcmds/topic_listener
 	systemcmds/ver

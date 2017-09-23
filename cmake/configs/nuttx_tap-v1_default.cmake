@@ -34,6 +34,7 @@ set(config_module_list
 	#
 	systemcmds/bl_update
 	systemcmds/led_control
+	systemcmds/i2c
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf

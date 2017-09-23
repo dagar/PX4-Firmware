@@ -41,7 +41,6 @@
 
 #include <board_config.h>
 #include <drivers/device/device.h>
-#include <drivers/device/i2c.h>
 #include <drivers/drv_gpio.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_input_capture.h>
@@ -56,6 +55,7 @@
 #include <px4_getopt.h>
 #include <px4_log.h>
 #include <px4_module.h>
+#include <px4_workqueue.h>
 #include <systemlib/board_serial.h>
 #include <systemlib/circuit_breaker.h>
 #include <systemlib/mixer/mixer.h>
@@ -167,11 +167,6 @@ public:
 	int		set_mode(Mode mode);
 	Mode		get_mode() { return _mode; }
 
-	int		set_pwm_alt_rate(unsigned rate);
-	int		set_pwm_alt_channels(uint32_t channels);
-
-	static int	set_i2c_bus_clock(unsigned bus, unsigned clock_hz);
-
 	static void	capture_trampoline(void *context, uint32_t chan_index,
 					   hrt_abstime edge_time, uint32_t edge_state,
 					   uint32_t overflow);
@@ -211,7 +206,7 @@ private:
 	unsigned	_pwm_alt_rate;
 	uint32_t	_pwm_alt_rate_channels;
 	unsigned	_current_update_rate;
-	bool 		_run_as_task;
+	const bool 		_run_as_task;
 	static struct work_s	_work;
 	int		_vehicle_cmd_sub;
 	int		_armed_sub;
@@ -271,7 +266,6 @@ private:
 	}
 
 	static void	cycle_trampoline(void *arg);
-	int 		start();
 
 	static int	control_callback(uintptr_t handle,
 					 uint8_t control_group,
@@ -297,8 +291,7 @@ private:
 	static const GPIOConfig	_gpio_tab[];
 	static const unsigned	_ngpio;
 #endif
-	static void		sensor_reset(int ms);
-	static void		peripheral_reset(int ms);
+
 	int		gpio_reset(void);
 	int		gpio_set_function(uint32_t gpios, int function);
 	int		gpio_write(uint32_t gpios, int function);
@@ -832,24 +825,6 @@ PX4FMU::set_pwm_rate(uint32_t rate_map, unsigned default_rate, unsigned alt_rate
 	return OK;
 }
 
-int
-PX4FMU::set_pwm_alt_rate(unsigned rate)
-{
-	return set_pwm_rate(_pwm_alt_rate_channels, _pwm_default_rate, rate);
-}
-
-int
-PX4FMU::set_pwm_alt_channels(uint32_t channels)
-{
-	return set_pwm_rate(channels, _pwm_default_rate, _pwm_alt_rate);
-}
-
-int
-PX4FMU::set_i2c_bus_clock(unsigned bus, unsigned clock_hz)
-{
-	return device::I2C::set_bus_clock(bus, clock_hz);
-}
-
 void
 PX4FMU::subscribe()
 {
@@ -931,37 +906,10 @@ PX4FMU::update_pwm_trims()
 int
 PX4FMU::task_spawn(int argc, char *argv[])
 {
-	bool run_as_task = false;
-	bool error_flag = false;
+	int32_t sys_fmu_task = 0;
+	param_get(param_find("SYS_FMU_TASK"), &sys_fmu_task);
 
-	int myoptind = 1;
-	int ch;
-	const char *myoptarg = nullptr;
-
-	while ((ch = px4_getopt(argc, argv, "t", &myoptind, &myoptarg)) != EOF) {
-		switch (ch) {
-		case 't':
-			run_as_task = true;
-			break;
-
-		case '?':
-			error_flag = true;
-			break;
-
-		default:
-			PX4_WARN("unrecognized flag");
-			error_flag = true;
-			break;
-		}
-	}
-
-	if (error_flag) {
-		return -1;
-	}
-
-
-	if (!run_as_task) {
-
+	if (sys_fmu_task == 0) {
 		/* schedule a cycle to start things */
 		int ret = work_queue(HPWORK, &_work, (worker_t)&PX4FMU::cycle_trampoline, nullptr, 0);
 
@@ -972,9 +920,7 @@ PX4FMU::task_spawn(int argc, char *argv[])
 		_task_id = task_id_is_work_queue;
 
 	} else {
-
 		/* start the IO interface task */
-
 		_task_id = px4_task_spawn_cmd("fmu",
 					      SCHED_DEFAULT,
 					      SCHED_PRIORITY_ACTUATOR_OUTPUTS,
@@ -1750,12 +1696,8 @@ void PX4FMU::update_params()
 	}
 }
 
-
 int
-PX4FMU::control_callback(uintptr_t handle,
-			 uint8_t control_group,
-			 uint8_t control_index,
-			 float &input)
+PX4FMU::control_callback(uintptr_t handle, uint8_t control_group, uint8_t control_index, float &input)
 {
 	const actuator_controls_s *controls = (actuator_controls_s *)handle;
 
@@ -2526,26 +2468,6 @@ PX4FMU::write(file *filp, const char *buffer, size_t len)
 	return count * 2;
 }
 
-void
-PX4FMU::sensor_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 1;
-	}
-
-	board_spi_reset(ms);
-}
-
-void
-PX4FMU::peripheral_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 10;
-	}
-
-	board_peripheral_reset(ms);
-}
-
 int
 PX4FMU::gpio_reset(void)
 {
@@ -2816,14 +2738,6 @@ PX4FMU::gpio_ioctl(struct file *filp, int cmd, unsigned long arg)
 		ret = gpio_reset();
 		break;
 
-	case GPIO_SENSOR_RAIL_RESET:
-		sensor_reset(arg);
-		break;
-
-	case GPIO_PERIPHERAL_RAIL_RESET:
-		peripheral_reset(arg);
-		break;
-
 	case GPIO_SET_OUTPUT:
 	case GPIO_SET_OUTPUT_LOW:
 	case GPIO_SET_OUTPUT_HIGH:
@@ -2964,11 +2878,6 @@ bind_spektrum()
 	ioctl(fd, DSM_BIND_START, DSMX8_BIND_PULSES);
 
 	close(fd);
-}
-
-int fmu_new_i2c_speed(unsigned bus, unsigned clock_hz)
-{
-	return PX4FMU::set_i2c_bus_clock(bus, clock_hz);
 }
 
 } // namespace
@@ -3225,50 +3134,6 @@ int PX4FMU::custom_command(int argc, char *argv[])
 		return 0;
 	}
 
-	/* does not operate on a FMU instance */
-	if (!strcmp(verb, "i2c")) {
-		if (argc > 2) {
-			int bus = strtol(argv[1], 0, 0);
-			int clock_hz = strtol(argv[2], 0, 0);
-			int ret = fmu_new_i2c_speed(bus, clock_hz);
-
-			if (ret) {
-				PX4_ERR("setting I2C clock failed");
-			}
-
-			return ret;
-		}
-
-		return print_usage("not enough arguments");
-	}
-
-	if (!strcmp(verb, "sensor_reset")) {
-		if (argc > 1) {
-			int reset_time = strtol(argv[1], nullptr, 0);
-			sensor_reset(reset_time);
-
-		} else {
-			sensor_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
-	if (!strcmp(verb, "peripheral_reset")) {
-		if (argc > 2) {
-			int reset_time = strtol(argv[2], 0, 0);
-			peripheral_reset(reset_time);
-
-		} else {
-			peripheral_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
-
 	/* start the FMU if not running */
 	if (!is_running()) {
 		int ret = PX4FMU::task_spawn(argc, argv);
@@ -3298,7 +3163,6 @@ int PX4FMU::custom_command(int argc, char *argv[])
 #endif
 
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
-
 
 	} else if (!strcmp(verb, "mode_pwm4")) {
 		new_mode = PORT_PWM4;
@@ -3363,7 +3227,7 @@ callback with ioctl calls.
 
 ### Implementation
 By default the module runs on the work queue, to reduce RAM usage. It can also be run in its own thread,
-specified via start flag -t, to reduce latency.
+specified via the parameter SYS_FMU_TASK, to reduce latency.
 When running on the work queue, it schedules at a fixed frequency, and the pwm rate limits the update rate of
 the actuator_controls topics. In case of running in its own thread, the module polls on the actuator_controls topic.
 Additionally the pwm rate defines the lower-level IO timer rates.
@@ -3384,7 +3248,6 @@ mixer files.
 
 	PRINT_MODULE_USAGE_NAME("fmu", "driver");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("start", "Start the task (without any mode set, use any of the mode_* cmds)");
-	PRINT_MODULE_USAGE_PARAM_FLAG('t', "Run as separate task instead of the work queue", true);
 
 	PRINT_MODULE_USAGE_PARAM_COMMENT("All of the mode_* commands will start the fmu if not running already");
 
@@ -3403,14 +3266,6 @@ mixer files.
 #endif
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("bind", "Send a DSM bind command (module must be running)");
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("sensor_reset", "Do a sensor reset (SPI bus)");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-	PRINT_MODULE_USAGE_COMMAND_DESCR("peripheral_reset", "Reset board peripherals");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("i2c", "Configure I2C clock rate");
-	PRINT_MODULE_USAGE_ARG("<bus_id> <rate>", "Specify the bus id (>=0) and rate in Hz", false);
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("test", "Test inputs and outputs");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("fake", "Arm and send an actuator controls command");

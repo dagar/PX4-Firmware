@@ -285,17 +285,6 @@ extern void stm32_spiinitialize(void);
 extern int stm32_spi_bus_initialize(void);
 
 /****************************************************************************************************
- * Name: board_spi_reset board_peripheral_reset
- *
- * Description:
- *   Called to reset SPI and the perferal bus
- *
- ****************************************************************************************************/
-
-#define board_spi_reset(ms)
-#define board_peripheral_reset(ms)
-
-/****************************************************************************************************
  * Name: stm32_usbinitialize
  *
  * Description:

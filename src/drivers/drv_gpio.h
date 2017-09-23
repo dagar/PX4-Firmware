@@ -92,10 +92,6 @@
 /** read all the GPIOs and return their values in *(uint32_t *)arg */
 #define GPIO_GET	GPIOC(12)
 
-#define GPIO_SENSOR_RAIL_RESET	GPIOC(13)
-
-#define GPIO_PERIPHERAL_RAIL_RESET	GPIOC(14)
-
 /** configure the board GPIOs in (arg) as outputs, initially low */
 #define GPIO_SET_OUTPUT_LOW	GPIOC(15)
 

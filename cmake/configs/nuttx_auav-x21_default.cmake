@@ -60,6 +60,7 @@ set(config_module_list
 	systemcmds/dumpfile
 	systemcmds/esc_calib
 	systemcmds/led_control
+	systemcmds/i2c
 	systemcmds/mixer
 	systemcmds/hardfault_log
 	systemcmds/motor_ramp
@@ -70,6 +71,7 @@ set(config_module_list
 	systemcmds/pwm
 	systemcmds/reboot
 	systemcmds/sd_bench
+	systemcmds/spi
 	systemcmds/top
 	systemcmds/topic_listener
 	systemcmds/ver

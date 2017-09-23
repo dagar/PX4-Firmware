@@ -371,10 +371,6 @@ void board_spi_reset(int ms);
 
 extern void stm32_usbinitialize(void);
 
-
-#define board_peripheral_reset(ms)
-
-
 #include "../common/board_common.h"
 
 #endif /* __ASSEMBLY__ */

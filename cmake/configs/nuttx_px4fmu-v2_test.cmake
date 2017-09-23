@@ -61,6 +61,7 @@ set(config_module_list
 	systemcmds/dumpfile
 	#systemcmds/esc_calib
 #TO FIT	systemcmds/hardfault_log
+	systemcmds/i2c
 	systemcmds/mixer
 	systemcmds/motor_ramp
 	systemcmds/mtd

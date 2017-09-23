@@ -28,6 +28,7 @@ set(config_module_list
 	#
 	# System commands
 	#
+	systemcmds/i2c
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf
