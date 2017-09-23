@@ -33,9 +33,8 @@ fi
 
 set MIXER quad_h
 
-set PWM_RATE 50
+param set PWM_RATE 50
 set PWM_OUT 1234
 
 set MIXER_AUX pass
-set PWM_AUX_RATE 50
-set PWM_AUX_OUT 1234
+set PWM_OUT_AUX 1234

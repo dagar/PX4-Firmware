@@ -27,13 +27,10 @@ then
 	param set MIS_LTRMIN_ALT 25
 	param set MIS_TAKEOFF_ALT 25
 
-	param set PWM_RATE 50
-
 	# FW takeoff acceleration can easily exceed ublox GPS 2G default
 	param set GPS_UBX_DYNMODEL 8
 fi
 
 # This is the gimbal pass mixer
 set MIXER_AUX pass
-set PWM_AUX_RATE 50
-set PWM_AUX_OUT 1234
+set PWM_OUT_AUX 1234

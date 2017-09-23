@@ -229,13 +229,6 @@ int initialize_parameter_handles(ParameterHandles &parameter_handles)
 	(void)param_find("SYS_AUTOSTART");
 	(void)param_find("SYS_AUTOCONFIG");
 	(void)param_find("SYS_HITL");
-	(void)param_find("PWM_RATE");
-	(void)param_find("PWM_MIN");
-	(void)param_find("PWM_MAX");
-	(void)param_find("PWM_DISARMED");
-	(void)param_find("PWM_AUX_MIN");
-	(void)param_find("PWM_AUX_MAX");
-	(void)param_find("PWM_AUX_DISARMED");
 	(void)param_find("TRIG_MODE");
 	(void)param_find("UAVCAN_ENABLE");
 	(void)param_find("SYS_MC_EST_GROUP");

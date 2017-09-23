@@ -46,3 +46,4 @@ fi
 
 param set SYS_HITL 1
 set MIXER AERT
+param set PWM_MAIN_DIS4 1000

@@ -35,7 +35,7 @@ then
 	param set MC_YAWRATE_FF 0.0
 
 	param set VT_MOT_COUNT 2
-	param set VT_IDLE_PWM_MC  1080
+	param set VT_IDLE_PWM_MC 1080
 	param set VT_TYPE 0
 	param set MAV_TYPE 19
 fi

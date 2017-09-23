@@ -45,8 +45,5 @@ then
 	param set CBRK_USB_CHK 197848
 fi
 
-set PWM_MIN none
-set PWM_MAX none
-set PWM_DISARMED none
 # Will run the motors at 328.125 kHz (recommended)
-set PWM_RATE 3921
+param set PWM_RATE 3921

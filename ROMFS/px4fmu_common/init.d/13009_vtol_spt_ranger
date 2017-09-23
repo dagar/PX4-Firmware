@@ -70,18 +70,17 @@ then
 
     param set NAV_ACC_RAD 3.0
 
-    param set PWM_AUX_REV1    1
-    param set PWM_AUX_REV2    1
-    param set PWM_AUX_REV3    1
-    param set PWM_AUX_REV4    1
+    param set PWM_AUX_REV1 1
+    param set PWM_AUX_REV2 1
+    param set PWM_AUX_REV3 1
+    param set PWM_AUX_REV4 1
 fi
 
 set MIXER quad_x
 set PWM_OUT 1234
-set PWM_RATE 400
+param set PWM_RATE 400
 
 set MIXER_AUX vtol_AAERT
-set PWM_ACHDIS 5
-set PWM_AUX_DISARMED 950
+param set PWM_AUX_DIS5 950
 
 set MAV_TYPE 22

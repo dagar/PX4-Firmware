@@ -78,6 +78,6 @@ fi
 
 set MIXER vtol_convergence
 set PWM_OUT 1234
-set PWM_RATE 400
+param set PWM_RATE 400
 
 set MAV_TYPE 21

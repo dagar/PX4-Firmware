@@ -47,7 +47,6 @@ then
 	param set PWM_MIN 1075
 	param set PWM_RATE 400
 	param set PWM_DISARMED 900
-	param set FAILSAFE 100
 
 	# param set NAV_RCL_ACT 6 # Lockdown
 

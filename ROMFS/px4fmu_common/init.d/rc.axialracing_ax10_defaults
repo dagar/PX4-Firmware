@@ -16,10 +16,6 @@ then
 	param set PWM_MAX 1800
 fi
 
-# PWM Hz - 50 Hz is the normal rate in RC cars, higher rates
-# may damage analog servos.
-set PWM_RATE 50
-
 # Enable servo output on pins 3 and 4 (steering and thrust)
 # but also include 1+2 as they form together one output group
 # and need to be set together.

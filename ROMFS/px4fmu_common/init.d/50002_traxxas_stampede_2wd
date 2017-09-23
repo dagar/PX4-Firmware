@@ -48,15 +48,14 @@ then
 	param set GND_SPEED_IMAX 0.125
 	param set GND_SPEED_THR_SC 1
 
+	# Provide ESC a constant 1500 us pulse
+	param set PWM_DISARMED 1500
 fi
 
 # Configure this as ugv
 set MAV_TYPE 10
+
 # Set mixer
 set MIXER stampede
 
-# Provide ESC a constant 1500 us pulse
-set PWM_DISARMED 1500
-set PWM_MAIN_REV2 1
-set PWM_MAX 2000
-set PWM_MIN 1000
+param set PWM_MAIN_REV2 1
