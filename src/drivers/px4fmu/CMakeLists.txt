@@ -36,7 +36,7 @@ px4_add_module(
 	STACK_MAIN 1200
 	COMPILE_FLAGS
 	SRCS
-		fmu.cpp
+		PX4FMU.cpp
 	DEPENDS
 		platforms__common
 	)
