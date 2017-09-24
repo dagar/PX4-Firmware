@@ -88,9 +88,9 @@ RCInput::fill_rc_in(uint16_t raw_rc_count_local,
 		    hrt_abstime now, bool frame_drop, bool failsafe,
 		    unsigned frame_drops, uint8_t input_source, int rssi = -1)
 {
+	const input_rc_s previous_input_rc = _rc_in;
+
 	_rc_in.channel_count = raw_rc_count_local;
-
-
 
 	if (_rc_in.channel_count > input_rc_s::RC_INPUT_MAX_CHANNELS) {
 		_rc_in.channel_count = input_rc_s::RC_INPUT_MAX_CHANNELS;
@@ -106,8 +106,6 @@ RCInput::fill_rc_in(uint16_t raw_rc_count_local,
 		}
 	}
 
-	_rc_in.timestamp = now;
-	_rc_in.timestamp_last_signal = _rc_in.timestamp;
 	_rc_in.input_source = input_source;
 
 	/* fake rssi if no value was provided */
@@ -144,13 +142,20 @@ RCInput::fill_rc_in(uint16_t raw_rc_count_local,
 	_rc_in.rc_lost_frame_count = frame_drops;
 	_rc_in.rc_total_frame_count = 0;
 
-	/* lazily advertise on first publication */
-	if (_to_input_rc == nullptr) {
-		int instance;
-		_to_input_rc = orb_advertise_multi(ORB_ID(input_rc), &_rc_in, &instance, ORB_PRIO_DEFAULT);
+	// publish changes immediately or new data at 10 Hz
+	if ((memcmp(&previous_input_rc, &_rc_in, sizeof(input_rc_s)) != 0) || (hrt_elapsed_time(&_rc_in.timestamp) > 100000)) {
 
-	} else {
-		orb_publish(ORB_ID(input_rc), _to_input_rc, &_rc_in);
+		_rc_in.timestamp = now;
+
+		/* lazily advertise on first publication */
+		if (_to_input_rc == nullptr) {
+			int instance;
+			_to_input_rc = orb_advertise_multi(ORB_ID(input_rc), &_rc_in, &instance, ORB_PRIO_DEFAULT);
+
+		} else {
+			orb_publish(ORB_ID(input_rc), _to_input_rc, &_rc_in);
+		}
+
 	}
 
 	_rc_scan_locked = true;
@@ -299,6 +304,7 @@ RCInput::cycle()
 
 				if (rc_updated) {
 					// we have a new SBUS frame. Publish it.
+					_rc_in.timestamp_last_signal = cycle_timestamp;
 					fill_rc_in(raw_rc_count, raw_rc_values, cycle_timestamp, sbus_frame_drop, sbus_failsafe, frame_drops,
 						   input_rc_s::RC_INPUT_SOURCE_PX4FMU_SBUS);
 				}
@@ -333,6 +339,7 @@ RCInput::cycle()
 
 				if (rc_updated) {
 					// we have a new DSM frame. Publish it.
+					_rc_in.timestamp_last_signal = cycle_timestamp;
 					fill_rc_in(raw_rc_count, raw_rc_values, cycle_timestamp, false, false, frame_drops,
 						   input_rc_s::RC_INPUT_SOURCE_PX4FMU_DSM);
 				}
@@ -378,6 +385,7 @@ RCInput::cycle()
 				// The only way to detect RC loss is therefore to look at the lost_count.
 				if (rc_updated && lost_count == 0) {
 					// we have a new ST24 frame. Publish it.
+					_rc_in.timestamp_last_signal = cycle_timestamp;
 					fill_rc_in(raw_rc_count, raw_rc_values, cycle_timestamp, false, false, 0, input_rc_s::RC_INPUT_SOURCE_PX4FMU_ST24,
 						   st24_rssi);
 				}
@@ -421,6 +429,7 @@ RCInput::cycle()
 
 				if (rc_updated) {
 					// we have a new SUMD frame. Publish it.
+					_rc_in.timestamp_last_signal = cycle_timestamp;
 					fill_rc_in(raw_rc_count, raw_rc_values, cycle_timestamp, false, sumd_failsafe, 0,
 						   input_rc_s::RC_INPUT_SOURCE_PX4FMU_SUMD, sumd_rssi);
 				}
@@ -451,6 +460,7 @@ RCInput::cycle()
 			if ((ppm_last_valid_decode != _rc_in.timestamp_last_signal) && (ppm_decoded_channels > 3)) {
 
 				rc_updated = true;
+
 				_rc_in.rc_ppm_frame_length = ppm_frame_length;
 				_rc_in.timestamp_last_signal = ppm_last_valid_decode;
 

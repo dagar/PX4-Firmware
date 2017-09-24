@@ -33,8 +33,6 @@
 
 #include "SafetyButton.hpp"
 
-work_s	SafetyButton::_work = {};
-
 SafetyButton::~SafetyButton()
 {
 	orb_unsubscribe(_armed_sub);
@@ -62,7 +60,6 @@ SafetyButton::safety_check_button(void)
 	 * length in all cases of the if/else struct below.
 	 */
 	if (safety_button_pressed && !_safety_off) {
-
 		if (counter < CYCLE_COUNT) {
 			counter++;
 
@@ -73,12 +70,11 @@ SafetyButton::safety_check_button(void)
 		}
 
 	} else if (safety_button_pressed && _safety_off) {
-
 		if (counter < CYCLE_COUNT) {
 			counter++;
 
 		} else if (counter == CYCLE_COUNT) {
-			/* change to disarmed state and notify the FMU */
+			/* change to disarmed state */
 			_safety_off = false;
 			counter++;
 		}
@@ -87,7 +83,7 @@ SafetyButton::safety_check_button(void)
 		counter = 0;
 	}
 
-#endif
+#endif /* GPIO_BTN_SAFETY */
 }
 
 void
@@ -114,7 +110,6 @@ SafetyButton::flash_safety_button()
 
 	} else {
 		pattern = LED_PATTERN_FMU_OK_TO_ARM;
-
 	}
 
 	/* Turn the LED on if we have a 1 at the current bit position */
@@ -124,7 +119,7 @@ SafetyButton::flash_safety_button()
 		blink_counter = 0;
 	}
 
-#endif
+#endif /* GPIO_BTN_SAFETY */
 }
 
 int
@@ -162,7 +157,6 @@ void
 SafetyButton::cycle()
 {
 	if (_object == nullptr) { // not initialized yet
-
 		_safety_disabled = circuit_breaker_enabled("CBRK_IO_SAFETY", CBRK_IO_SAFETY_KEY);
 		_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
 		_object = this;
@@ -181,6 +175,8 @@ SafetyButton::cycle()
 
 #ifdef GPIO_BTN_SAFETY
 
+	const bool previous_safety_off = _safety_off;
+
 	if (_safety_disabled) {
 		_safety_off = true;
 
@@ -192,36 +188,36 @@ SafetyButton::cycle()
 	/* Make the safety button flash anyway, no matter if it's used or not. */
 	flash_safety_button();
 
-	struct safety_s safety = {};
+	safety_s safety = {};
 	safety.timestamp = hrt_absolute_time();
+	safety.safety_switch_available = true;
 
 	if (_safety_off) {
 		safety.safety_off = true;
-		safety.safety_switch_available = true;
 
 	} else {
 		safety.safety_off = false;
-		safety.safety_switch_available = true;
 	}
 
 	/* lazily publish the safety status */
 	if (_to_safety != nullptr) {
-		orb_publish(ORB_ID(safety), _to_safety, &safety);
+		if (safety.safety_switch_available && (previous_safety_off != safety.safety_off)) {
+			orb_publish(ORB_ID(safety), _to_safety, &safety);
+		}
 
 	} else {
 		_to_safety = orb_advertise(ORB_ID(safety), &safety);
 	}
 
-#endif
+#endif /* GPIO_BTN_SAFETY */
 
-	if (!should_exit()) {
+	if (should_exit()) {
+		exit_and_cleanup();
 
+	} else {
 		// Schedule next cycle.
 		work_queue(HPWORK, &_work, (worker_t)&SafetyButton::cycle_trampoline, this,
 			   USEC2TICK(1000000 / SAFETY_BUTTON_UPDATE_RATE_HZ));
-
-	} else {
-		exit_and_cleanup();
 	}
 }
 

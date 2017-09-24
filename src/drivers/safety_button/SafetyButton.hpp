@@ -86,7 +86,7 @@ private:
 	/* safety switch must be held for 1 second to activate */
 	static constexpr uint8_t CYCLE_COUNT = 10;
 
-	static struct work_s	_work;
+	struct work_s	_work {};
 
 	int		_armed_sub{-1};
 	bool	_armed{false};
