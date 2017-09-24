@@ -164,9 +164,7 @@ SafetyButton::cycle()
 	if (_object == nullptr) { // not initialized yet
 
 		_safety_disabled = circuit_breaker_enabled("CBRK_IO_SAFETY", CBRK_IO_SAFETY_KEY);
-
 		_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
-
 		_object = this;
 	}
 
@@ -183,8 +181,6 @@ SafetyButton::cycle()
 
 #ifdef GPIO_BTN_SAFETY
 
-	struct safety_s safety = {};
-
 	if (_safety_disabled) {
 		_safety_off = true;
 
@@ -196,6 +192,7 @@ SafetyButton::cycle()
 	/* Make the safety button flash anyway, no matter if it's used or not. */
 	flash_safety_button();
 
+	struct safety_s safety = {};
 	safety.timestamp = hrt_absolute_time();
 
 	if (_safety_off) {

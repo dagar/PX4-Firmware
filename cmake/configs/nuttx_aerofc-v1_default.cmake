@@ -10,52 +10,53 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
-	drivers/stm32
-	drivers/led
-	drivers/px4fmu
+	drivers/aerofc_adc
 	drivers/boards/aerofc-v1
-	drivers/tap_esc
+	drivers/device
+	drivers/gps
+	drivers/hmc5883
+	drivers/ist8310
+	drivers/led
+	drivers/ll40ls
 	drivers/mpu9250
 	drivers/ms5611
-	drivers/hmc5883
-	drivers/gps
-	drivers/ist8310
-	drivers/ll40ls
-	drivers/aerofc_adc
+	drivers/px4fmu
+	drivers/rc_input
+	drivers/stm32
+	drivers/tap_esc
 	modules/sensors
 
 	#
 	# System commands
 	#
+	systemcmds/config
+	systemcmds/dumpfile
 	systemcmds/i2c
 	systemcmds/mixer
+	systemcmds/motor_test
+	systemcmds/nshterm
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
-	systemcmds/motor_test
 	systemcmds/reboot
 	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
-	systemcmds/dumpfile
 	systemcmds/ver
 
 	#
 	# General system control
 	#
 	modules/commander
-	modules/load_mon
-	modules/navigator
-	modules/mavlink
 	modules/land_detector
+	modules/load_mon
+	modules/mavlink
+	modules/navigator
 
 	#
 	# Estimation modules
 	#
 	modules/attitude_estimator_q
-	modules/local_position_estimator
 	modules/ekf2
+	modules/local_position_estimator
 
 	#
 	# Vehicle Control
@@ -71,29 +72,29 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
+	modules/dataman
 	modules/systemlib
 	modules/systemlib/mixer
+	modules/systemlib/param
 	modules/uORB
-	modules/dataman
 
 	#
 	# Libraries
 	#
 	lib/controllib
-	lib/mathlib
-	lib/mathlib/math/filter
+	lib/conversion
+	lib/DriverFramework/framework
 	lib/ecl
 	lib/geo
 	lib/geo_lookup
-	lib/conversion
+	lib/mathlib
+	lib/mathlib/math/filter
+	lib/micro-CDR
+	lib/rc
 	lib/tailsitter_recovery
 	lib/version
-	lib/DriverFramework/framework
-	lib/rc
-	platforms/nuttx
-	lib/micro-CDR
 	platforms/common
+	platforms/nuttx
 	platforms/nuttx/px4_layer
 )
 

@@ -105,11 +105,6 @@ then
 	set MIXER_AUX none
 fi
 
-if ver hwcmp AEROFC_V1
-then
-	set MIXER_AUX none
-fi
-
 if ver hwcmp PX4FMU_V4
 then
 	set MIXER_AUX none

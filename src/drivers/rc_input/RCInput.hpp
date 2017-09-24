@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2017, 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2015, 2017 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,41 +31,49 @@
  *
  ****************************************************************************/
 
-#ifndef SAFETYBUTTON_HPP_
-#define SAFETYBUTTON_HPP_
+#ifndef RCINPUT_HPP_
+#define RCINPUT_HPP_
 
-#include <cfloat>
-
-#include <board_config.h>
+#include <drivers/drv_gpio.h>
 #include <drivers/drv_hrt.h>
+#include <drivers/drv_rc_input.h>
+#include <lib/rc/dsm.h>
+#include <lib/rc/sbus.h>
+#include <lib/rc/st24.h>
+#include <lib/rc/sumd.h>
+#include <px4_config.h>
+#include <px4_getopt.h>
+#include <px4_log.h>
 #include <px4_module.h>
 #include <px4_workqueue.h>
-#include <systemlib/circuit_breaker.h>
 #include <systemlib/systemlib.h>
 #include <uORB/topics/actuator_armed.h>
-#include <uORB/topics/safety.h>
+#include <uORB/topics/adc_report.h>
+#include <uORB/topics/input_rc.h>
+#include <uORB/topics/vehicle_command.h>
 
-/*
- * Define the various LED flash sequences for each system state.
- */
-#define LED_PATTERN_FMU_OK_TO_ARM 		0x0003		/**< slow blinking			*/
-#define LED_PATTERN_FMU_REFUSE_TO_ARM 	0x5555		/**< fast blinking			*/
-#define LED_PATTERN_IO_ARMED 			0x5050		/**< long off, then double blink 	*/
-#define LED_PATTERN_FMU_ARMED 			0x5500		/**< long off, then quad blink 		*/
-#define LED_PATTERN_IO_FMU_ARMED 		0xffff		/**< constantly on			*/
+#ifdef HRT_PPM_CHANNEL
+# include <systemlib/ppm_decode.h>
+#endif
 
-class SafetyButton : public ModuleBase<SafetyButton>
+class RCInput : public ModuleBase<RCInput>
 {
 public:
 
-	SafetyButton() = default;
-	virtual ~SafetyButton();
+	RCInput() = default;
+	virtual ~RCInput();
+
+	// no copy, assignment, move, move assignment
+	RCInput(const RCInput &) = delete;
+	RCInput &operator=(const RCInput &) = delete;
+	RCInput(RCInput &&) = delete;
+	RCInput &operator=(RCInput &&) = delete;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
 
 	/** @see ModuleBase */
-	static SafetyButton *instantiate(int argc, char *argv[]);
+	static RCInput *instantiate(int argc, char *argv[]);
 
 	/** @see ModuleBase */
 	static int custom_command(int argc, char *argv[]);
@@ -78,30 +86,70 @@ public:
 	 */
 	void cycle();
 
+	/** @see ModuleBase::print_status() */
+	int print_status() override;
+
 private:
 
 	/** Run main loop at this rate in Hz. */
-	static constexpr uint32_t SAFETY_BUTTON_UPDATE_RATE_HZ = 10;
+	static constexpr uint32_t RC_INPUT_UPDATE_RATE_HZ = 200;
 
-	/* safety switch must be held for 1 second to activate */
-	static constexpr uint8_t CYCLE_COUNT = 10;
+	enum RC_SCAN {
+		RC_SCAN_PPM = 0,
+		RC_SCAN_SBUS,
+		RC_SCAN_DSM,
+		RC_SCAN_SUMD,
+		RC_SCAN_ST24
+	} _rc_scan_state{RC_SCAN_SBUS};
+
+	char const *RC_SCAN_STRING[5] = {
+		"PPM",
+		"SBUS",
+		"DSM",
+		"SUMD",
+		"ST24"
+	};
+
+	void dsm_bind_start(int dsmMode);
+
+	hrt_abstime _rc_scan_begin{0};
+	bool _rc_scan_locked{false};
 
 	static struct work_s	_work;
 
+	// subscriptions
 	int		_armed_sub{-1};
+	int		_vehicle_cmd_sub{-1};
+
+#ifdef ADC_RC_RSSI_CHANNEL
+	int		_adc_sub {-1};
+#endif /* ADC_RC_RSSI_CHANNEL */
+
 	bool	_armed{false};
 
-	bool		_safety_off{true};
-	bool		_safety_disabled{false};
+	// publications
+	input_rc_s		_rc_in{};
+	orb_advert_t	_to_input_rc{nullptr};
 
-	orb_advert_t		_to_safety{nullptr};
+	float		_analog_rc_rssi_volt{-1.0f};
+	bool		_analog_rc_rssi_stable{false};
+
+
+
+	int		_rcs_fd{-1};
 
 	static void	cycle_trampoline(void *arg);
 	int 		start();
 
-	void safety_check_button();
-	void flash_safety_button();
+	void fill_rc_in(uint16_t raw_rc_count_local,
+			uint16_t raw_rc_values_local[input_rc_s::RC_INPUT_MAX_CHANNELS],
+			hrt_abstime now, bool frame_drop, bool failsafe,
+			unsigned frame_drops, uint8_t input_source, int rssi);
+
+	void set_rc_scan_state(RC_SCAN _rc_scan_state);
+	void rc_io_invert();
+	void rc_io_invert(bool invert);
 };
 
 
-#endif /* SAFETYBUTTON_HPP_ */
+#endif /* RCINPUT_HPP_ */

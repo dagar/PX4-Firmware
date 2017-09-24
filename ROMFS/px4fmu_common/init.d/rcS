@@ -176,25 +176,36 @@ then
 	set MAVLINK_F default
 	set MAVLINK_COMPANION_DEVICE /dev/ttyS2
 	set MAV_TYPE none
+	set LOGGER_ARGS
 	set LOGGER_BUF 16
+
+	if ver hwcmp PX4FMU_V2
+	then
+		param set SYS_FMU_MODE 2
+	fi
 
 	if ver hwcmp PX4FMU_V4
 	then
-		param set SYS_FMU_TASK 1
+		param set SYS_FMU_MODE 1
 	fi
 
 	if ver hwcmp PX4FMU_V4PRO
 	then
-		param set SYS_FMU_TASK 1
+		param set SYS_FMU_MODE 1
 	fi
 
 	if ver hwcmp PX4FMU_V5
 	then
-		param set SYS_FMU_TASK 1
+		param set SYS_FMU_MODE 1
 		set MAVLINK_COMPANION_DEVICE /dev/ttyS3
 
 		set LOGGER_BUF 64
 		param set SDLOG_MODE 2
+	fi
+
+	if ver hwcmp AUAV_X21
+	then
+		param set SYS_FMU_MODE 2
 	fi
 
 	if ver hwcmp CRAZYFLIE
@@ -342,11 +353,6 @@ then
 	then
 		# Need IO for output but it not present, disable output
 		set OUTPUT_MODE none
-	fi
-
-	if [ $OUTPUT_MODE == tap_esc ]
-	then
-		set FMU_MODE rcin
 	fi
 
 	set DATAMAN_OPT ""
@@ -519,11 +525,6 @@ then
 			mavlink start -r 20000 -m config -b 921600 -d /dev/ttyS0
 		fi
 
-		if ver hwcmp AEROFC_V1
-		then
-			set MAVLINK_F "-r 1200 -d /dev/ttyS3"
-		fi
-
 		if ver hwcmp CRAZYFLIE
 		then
 			# Avoid using either of the two available serials
@@ -636,6 +637,7 @@ then
 
 	if ver hwcmp PX4FMU_V4
 	then
+		rc_input start;
 		safety_button start;
 
 		# Check for flow sensor - as it is a background task, launch it last
@@ -656,6 +658,7 @@ then
 	if ver hwcmp AEROFC_V1
 	then
 		# don't start mavlink ttyACM0 on aerofc_v1
+		rc_input start
 	else
 		# Start MAVLink
 		mavlink start -r 800000 -d /dev/ttyACM0 -m config -x
@@ -668,8 +671,6 @@ then
 	then
 		sdlog2 start -r 100 -a -b 9 -t
 	else
-		set LOGGER_ARGS ""
-
 		if param compare SDLOG_MODE 1
 		then
 			set LOGGER_ARGS "-e"
@@ -678,11 +679,6 @@ then
 		if param compare SDLOG_MODE 2
 		then
 			set LOGGER_ARGS "-f"
-		fi
-
-		if ver hwcmp AEROFC_V1
-		then
-			set LOGGER_ARGS "-m mavlink"
 		fi
 
 		logger start -b ${LOGGER_BUF} -t ${LOGGER_ARGS}

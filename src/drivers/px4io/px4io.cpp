@@ -66,6 +66,7 @@
 #include <drivers/drv_gpio.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
+#include <lib/rc/dsm.h>
 
 #include <systemlib/mixer/mixer.h>
 #include <systemlib/perf_counter.h>
