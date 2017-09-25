@@ -384,7 +384,7 @@ test()
 		return PX4_ERROR;
 	}
 
-	errx(0, "PASS");
+	return 0;
 }
 
 /**
