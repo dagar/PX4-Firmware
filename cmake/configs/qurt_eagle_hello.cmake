@@ -38,7 +38,6 @@ set(config_module_list
 	#
     # Libraries
     #
-	lib/micro-CDR
 
 	#
 	# QuRT port

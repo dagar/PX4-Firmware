@@ -34,6 +34,7 @@
 /// @file mavlink_ftp.cpp
 ///	@author px4dev, Don Gagne <don@thegagnes.com>
 
+#include <cstring>
 #include <crc32.h>
 #include <unistd.h>
 #include <stdio.h>

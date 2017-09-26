@@ -108,8 +108,8 @@ set(config_module_list
 	modules/systemlib/mixer
 	modules/uORB
 
-        # micro RTPS
-        modules/micrortps_bridge/micrortps_client
+	# micro RTPS
+	modules/micrortps_bridge/micrortps_client
 
 	#
 	# Libraries
@@ -185,7 +185,6 @@ set(config_module_list
 	examples/ekf_att_pos_estimator
 
 	# micro-RTPS
-	lib/micro-CDR
 )
 
 set(config_rtps_send_topics
@@ -225,4 +224,3 @@ if(REPLAY_FILE)
 	message("Building with uorb publisher rules support")
 	add_definitions(-DORB_USE_PUBLISHER_RULES)
 endif()
-

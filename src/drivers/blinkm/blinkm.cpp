@@ -95,6 +95,7 @@
 
 #include <px4_config.h>
 
+#include <strings.h>
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>

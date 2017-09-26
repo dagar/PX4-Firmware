@@ -38,23 +38,20 @@
  * Driver for the Eagle Tree Airspeed V3 connected via I2C.
  */
 
-#include <px4_config.h>
-
+#include <drivers/airspeed/airspeed.h>
 #include <drivers/device/i2c.h>
-
+#include <drivers/device/ringbuffer.h>
+#include <drivers/drv_airspeed.h>
+#include <drivers/drv_hrt.h>
+#include <px4_config.h>
+#include <string.h>
 #include <systemlib/airspeed.h>
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
 #include <systemlib/perf_counter.h>
-
-#include <drivers/drv_airspeed.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/device/ringbuffer.h>
-
-#include <uORB/uORB.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/subsystem_info.h>
-#include <drivers/airspeed/airspeed.h>
+#include <uORB/uORB.h>
 
 /* I2C bus address */
 #define I2C_ADDRESS	0x75	/* 7-bit address. 8-bit address is 0xEA */
