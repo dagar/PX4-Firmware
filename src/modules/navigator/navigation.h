@@ -90,6 +90,23 @@ enum NAV_CMD {
 	NAV_CMD_INVALID = UINT16_MAX /* ensure that casting a large number results in a specific error */
 };
 
+/* compatible to mavlink MAV_CMD */
+enum NAV_FRAME {
+	NAV_FRAME_GLOBAL = 0, /* Global coordinate frame, WGS84 coordinate system. First value / x: latitude, second value / y: longitude, third value / z: positive altitude over mean sea level (MSL) | */
+	NAV_FRAME_LOCAL_NED = 1, /* Local coordinate frame, Z-up (x: north, y: east, z: down). | */
+	NAV_FRAME_MISSION = 2, /* NOT a coordinate frame, indicates a mission command. | */
+	NAV_FRAME_GLOBAL_RELATIVE_ALT = 3, /* Global coordinate frame, WGS84 coordinate system, relative altitude over ground with respect to the home position. First value / x: latitude, second value / y: longitude, third value / z: positive altitude with 0 being at the altitude of the home location. | */
+	NAV_FRAME_LOCAL_ENU = 4, /* Local coordinate frame, Z-down (x: east, y: north, z: up) | */
+	NAV_FRAME_GLOBAL_INT = 5, /* Global coordinate frame, WGS84 coordinate system. First value / x: latitude in degrees*1.0e-7, second value / y: longitude in degrees*1.0e-7, third value / z: positive altitude over mean sea level (MSL) | */
+	NAV_FRAME_GLOBAL_RELATIVE_ALT_INT = 6, /* Global coordinate frame, WGS84 coordinate system, relative altitude over ground with respect to the home position. First value / x: latitude in degrees*10e-7, second value / y: longitude in degrees*10e-7, third value / z: positive altitude with 0 being at the altitude of the home location. | */
+	NAV_FRAME_LOCAL_OFFSET_NED = 7, /* Offset to the current local frame. Anything expressed in this frame should be added to the current local frame position. | */
+	NAV_FRAME_BODY_NED = 8, /* Setpoint in body NED frame. This makes sense if all position control is externalized - e.g. useful to command 2 m/s^2 acceleration to the right. | */
+	NAV_FRAME_BODY_OFFSET_NED = 9, /* Offset in body NED frame. This makes sense if adding setpoints to the current flight path, to avoid an obstacle - e.g. useful to command 2 m/s^2 acceleration to the east. | */
+	NAV_FRAME_GLOBAL_TERRAIN_ALT = 10, /* Global coordinate frame with above terrain level altitude. WGS84 coordinate system, relative altitude over terrain with respect to the waypoint coordinate. First value / x: latitude in degrees, second value / y: longitude in degrees, third value / z: positive altitude in meters with 0 being at ground level in terrain model. | */
+	NAV_FRAME_GLOBAL_TERRAIN_ALT_INT = 11, /* Global coordinate frame with above terrain level altitude. WGS84 coordinate system, relative altitude over terrain with respect to the waypoint coordinate. First value / x: latitude in degrees*10e-7, second value / y: longitude in degrees*10e-7, third value / z: positive altitude in meters with 0 being at ground level in terrain model. | */
+	NAV_FRAME_ENUM_END = 12, /*  | */
+};
+
 enum ORIGIN {
 	ORIGIN_MAVLINK = 0,
 	ORIGIN_ONBOARD
@@ -154,11 +171,6 @@ struct navigator_item_s {
  */
 #pragma pack(push, 1)
 struct mission_item_s {
-	double lat;			/**< latitude in degrees				*/
-	double lon;			/**< longitude in degrees				*/
-	float x;			/**< local position x in meters */
-	float y;			/**< local position y in meters */
-	float z;			/**< local position z in meters */
 	union {
 		struct {
 			union {
@@ -169,9 +181,20 @@ struct mission_item_s {
 			float acceptance_radius;	/**< default radius in which the mission is accepted as reached in meters */
 			float loiter_radius;		/**< loiter radius in meters, 0 for a VTOL to hover, negative for counter-clockwise */
 			float yaw;					/**< in radians NED -PI..+PI, NAN means don't change yaw		*/
-			float ___lat_float;			/**< padding */
-			float ___lon_float;			/**< padding */
-			float altitude;				/**< altitude in meters	(AMSL)			*/
+			union {
+				float lat;
+				int32_t lat_int;
+				float x;
+			};
+			union {
+				float lon;
+				int32_t lon_int;
+				float y;
+			};
+			union {
+				float altitude;		/**< altitude in meters	(AMSL)			*/
+				float z;
+			};
 		};
 		float params[7];				/**< array to store mission command values for MAV_FRAME_MISSION ***/
 	};
