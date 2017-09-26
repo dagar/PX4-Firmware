@@ -86,16 +86,16 @@
 #define PX4IO_P_CONFIG_PROTOCOL_VERSION		0	/* PX4IO_PROTOCOL_VERSION */
 #define PX4IO_P_CONFIG_HARDWARE_VERSION		1	/* magic numbers TBD */
 #define PX4IO_P_CONFIG_BOOTLOADER_VERSION	2	/* get this how? */
-#define PX4IO_P_CONFIG_MAX_TRANSFER			3	/* maximum I2C transfer size */
+#define PX4IO_P_CONFIG_MAX_TRANSFER		3	/* maximum transfer size */
 #define PX4IO_P_CONFIG_CONTROL_COUNT		4	/* hardcoded max control count supported */
 #define PX4IO_P_CONFIG_ACTUATOR_COUNT		5	/* hardcoded max actuator output count */
 #define PX4IO_P_CONFIG_RC_INPUT_COUNT		6	/* hardcoded max R/C input count supported */
 #define PX4IO_P_CONFIG_ADC_INPUT_COUNT		7	/* hardcoded max ADC inputs */
-#define PX4IO_P_CONFIG_RELAY_COUNT			8	/* hardcoded # of relay outputs */
-#define PX4IO_MAX_TRANSFER_LEN				64
+
+#define PX4IO_MAX_TRANSFER_LEN			64
 
 /* dynamic status page */
-#define PX4IO_PAGE_STATUS		1
+#define PX4IO_PAGE_STATUS			1
 #define PX4IO_P_STATUS_FREEMEM			0
 #define PX4IO_P_STATUS_CPULOAD			1
 
@@ -118,31 +118,25 @@
 #define PX4IO_P_STATUS_FLAGS_RC_SUMD		(1 << 15) /* SUMD input is valid */
 
 #define PX4IO_P_STATUS_ALARMS			3	 /* alarm flags - alarms latch, write 1 to a bit to clear it */
-#define PX4IO_P_STATUS_ALARMS_VBATT_LOW		(1 << 0) /* [1] VBatt is very close to regulator dropout */
-#define PX4IO_P_STATUS_ALARMS_TEMPERATURE	(1 << 1) /* board temperature is high */
-#define PX4IO_P_STATUS_ALARMS_SERVO_CURRENT	(1 << 2) /* [1] servo current limit was exceeded */
-#define PX4IO_P_STATUS_ALARMS_ACC_CURRENT	(1 << 3) /* [1] accessory current limit was exceeded */
-#define PX4IO_P_STATUS_ALARMS_FMU_LOST		(1 << 4) /* timed out waiting for controls from FMU */
-#define PX4IO_P_STATUS_ALARMS_RC_LOST		(1 << 5) /* timed out waiting for RC input */
-#define PX4IO_P_STATUS_ALARMS_PWM_ERROR		(1 << 6) /* PWM configuration or output was bad */
-#define PX4IO_P_STATUS_ALARMS_VSERVO_FAULT	(1 << 7) /* [2] VServo was out of the valid range (2.5 - 5.5 V) */
+#define PX4IO_P_STATUS_ALARMS_TEMPERATURE	(1 << 0) /* board temperature is high */
+#define PX4IO_P_STATUS_ALARMS_FMU_LOST		(1 << 1) /* timed out waiting for controls from FMU */
+#define PX4IO_P_STATUS_ALARMS_RC_LOST		(1 << 2) /* timed out waiting for RC input */
+#define PX4IO_P_STATUS_ALARMS_PWM_ERROR		(1 << 3) /* PWM configuration or output was bad */
+#define PX4IO_P_STATUS_ALARMS_VSERVO_FAULT	(1 << 4) /* [2] VServo was out of the valid range (2.5 - 5.5 V) */
 
-#define PX4IO_P_STATUS_VBATT			4	/* [1] battery voltage in mV */
-#define PX4IO_P_STATUS_IBATT			5	/* [1] battery current (raw ADC) */
-#define PX4IO_P_STATUS_VSERVO			6	/* [2] servo rail voltage in mV */
-#define PX4IO_P_STATUS_VRSSI			7	/* [2] RSSI voltage */
-#define PX4IO_P_STATUS_PRSSI			8	/* [2] RSSI PWM value */
-
-#define PX4IO_P_STATUS_MIXER			9	 /* mixer actuator limit flags */
+#define PX4IO_P_STATUS_VSERVO			4	/* [2] servo rail voltage in mV */
+#define PX4IO_P_STATUS_VRSSI			5	/* [2] RSSI voltage */
+#define PX4IO_P_STATUS_PRSSI			6	/* [2] RSSI PWM value */
+#define PX4IO_P_STATUS_MIXER			7	 /* mixer actuator limit flags */
 
 /* array of post-mix actuator outputs, -10000..10000 */
-#define PX4IO_PAGE_ACTUATORS		2		/* 0..CONFIG_ACTUATOR_COUNT-1 */
+#define PX4IO_PAGE_ACTUATORS			2	/* 0..CONFIG_ACTUATOR_COUNT-1 */
 
 /* array of PWM servo output values, microseconds */
-#define PX4IO_PAGE_SERVOS		3		/* 0..CONFIG_ACTUATOR_COUNT-1 */
+#define PX4IO_PAGE_SERVOS			3	/* 0..CONFIG_ACTUATOR_COUNT-1 */
 
 /* array of raw RC input values, microseconds */
-#define PX4IO_PAGE_RAW_RC_INPUT		4
+#define PX4IO_PAGE_RAW_RC_INPUT			4
 #define PX4IO_P_RAW_RC_COUNT			0	/* number of valid channels */
 #define PX4IO_P_RAW_RC_FLAGS			1	/* RC detail status flags */
 #define PX4IO_P_RAW_RC_FLAGS_FRAME_DROP		(1 << 0) /* single frame drop */
@@ -193,9 +187,7 @@
 #define PX4IO_P_SETUP_PWM_RATES			2	/* bitmask, 0 = low rate, 1 = high rate */
 #define PX4IO_P_SETUP_PWM_DEFAULTRATE		3	/* 'low' PWM frame output rate in Hz */
 #define PX4IO_P_SETUP_PWM_ALTRATE		4	/* 'high' PWM frame output rate in Hz */
-#define PX4IO_P_SETUP_RELAYS_PAD		5
 
-#define PX4IO_P_SETUP_VBATT_SCALE		6	/* hardware rev [1] battery voltage correction factor (float) */
 #define PX4IO_P_SETUP_VSERVO_SCALE		6	/* hardware rev [2] servo voltage correction factor (float) */
 #define PX4IO_P_SETUP_DSM			7	/* DSM bind state */
 enum {							/* DSM bind states */

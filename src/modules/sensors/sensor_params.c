@@ -866,7 +866,6 @@ PARAM_DEFINE_FLOAT(SENS_DPRES_ANSC, 0);
  */
 PARAM_DEFINE_FLOAT(SENS_BARO_QNH, 1013.25f);
 
-
 /**
  * Board rotation
  *
@@ -961,19 +960,6 @@ PARAM_DEFINE_FLOAT(SENS_BOARD_X_OFF, 0.0f);
 PARAM_DEFINE_FLOAT(SENS_BOARD_Z_OFF, 0.0f);
 
 /**
- * Select primary magnetometer.
- * DEPRECATED, only used on V1 hardware
- *
- * @min 0
- * @max 2
- * @value 0 Auto-select Mag
- * @value 1 External is primary Mag
- * @value 2 Internal is primary Mag
- * @group Sensor Calibration
- */
-PARAM_DEFINE_INT32(SENS_EXT_MAG, 0);
-
-/**
  * Threshold (of RMS) to warn about high vibration levels
  *
  * @group Sensor Calibration
@@ -982,15 +968,6 @@ PARAM_DEFINE_INT32(SENS_EXT_MAG, 0);
  * @decimal 2
  */
 PARAM_DEFINE_FLOAT(ATT_VIBE_THRESH, 0.2f);
-
-/**
- * Scaling factor for battery voltage sensor on PX4IO.
- *
- * @min 1
- * @max 100000
- * @group Battery Calibration
- */
-PARAM_DEFINE_INT32(BAT_V_SCALE_IO, 10000);
 
 /**
  * Scaling from ADC counts to volt on the ADC input (battery voltage)

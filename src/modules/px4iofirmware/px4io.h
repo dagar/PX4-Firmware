@@ -164,7 +164,6 @@ extern pwm_limit_t pwm_limit;
 #define LED_RING(_s)			px4_arch_gpiowrite(GPIO_LED4, (_s))
 
 
-# define PX4IO_RELAY_CHANNELS		0
 # define ENABLE_SBUS_OUT(_s)		px4_arch_gpiowrite(GPIO_SBUS_OENABLE, !(_s))
 
 # define VDD_SERVO_FAULT		(!px4_arch_gpioread(GPIO_SERVO_FAULT_DETECT))

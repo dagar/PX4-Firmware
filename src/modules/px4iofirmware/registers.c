@@ -71,7 +71,6 @@ static const uint16_t	r_page_config[] = {
 	[PX4IO_P_CONFIG_ACTUATOR_COUNT]		= PX4IO_SERVO_COUNT,
 	[PX4IO_P_CONFIG_RC_INPUT_COUNT]		= PX4IO_RC_INPUT_CHANNELS,
 	[PX4IO_P_CONFIG_ADC_INPUT_COUNT]	= PX4IO_ADC_CHANNEL_COUNT,
-	[PX4IO_P_CONFIG_RELAY_COUNT]		= PX4IO_RELAY_CHANNELS,
 };
 
 /**
@@ -84,8 +83,6 @@ volatile uint16_t	r_page_status[] = {
 	[PX4IO_P_STATUS_CPULOAD]		= 0,
 	[PX4IO_P_STATUS_FLAGS]			= 0,
 	[PX4IO_P_STATUS_ALARMS]			= 0,
-	[PX4IO_P_STATUS_VBATT]			= 0,
-	[PX4IO_P_STATUS_IBATT]			= 0,
 	[PX4IO_P_STATUS_VSERVO]			= 0,
 	[PX4IO_P_STATUS_VRSSI]			= 0,
 	[PX4IO_P_STATUS_PRSSI]			= 0,
@@ -160,12 +157,7 @@ volatile uint16_t	r_page_setup[] = {
 	[PX4IO_P_SETUP_PWM_ALTRATE]		= 200,
 	[PX4IO_P_SETUP_SBUS_RATE]		= 72,
 	/* this is unused, but we will pad it for readability (the compiler pads it automatically) */
-	[PX4IO_P_SETUP_RELAYS_PAD]		= 0,
-#ifdef ADC_VSERVO
 	[PX4IO_P_SETUP_VSERVO_SCALE]		= 10000,
-#else
-	[PX4IO_P_SETUP_VBATT_SCALE]		= 10000,
-#endif
 	[PX4IO_P_SETUP_SET_DEBUG]		= 0,
 	[PX4IO_P_SETUP_REBOOT_BL]		= 0,
 	[PX4IO_P_SETUP_CRC ...(PX4IO_P_SETUP_CRC + 1)] = 0,
@@ -199,7 +191,6 @@ volatile uint16_t	r_page_setup[] = {
 		PX4IO_P_SETUP_ARMING_TERMINATION_FAILSAFE | \
 		PX4IO_P_SETUP_ARMING_OVERRIDE_IMMEDIATE)
 #define PX4IO_P_SETUP_RATES_VALID	((1 << PX4IO_SERVO_COUNT) - 1)
-#define PX4IO_P_SETUP_RELAYS_VALID	((1 << PX4IO_RELAY_CHANNELS) - 1)
 
 /**
  * PAGE 101
@@ -635,10 +626,6 @@ registers_set_one(uint8_t page, uint8_t offset, uint16_t value)
 			pwm_configure_rates(r_setup_pwm_rates, r_setup_pwm_defaultrate, value);
 			break;
 
-		case PX4IO_P_SETUP_VBATT_SCALE:
-			r_page_setup[PX4IO_P_SETUP_VBATT_SCALE] = value;
-			break;
-
 		case PX4IO_P_SETUP_SET_DEBUG:
 			r_page_setup[PX4IO_P_SETUP_SET_DEBUG] = value;
 			isr_debug(0, "set debug %u\n", (unsigned)r_page_setup[PX4IO_P_SETUP_SET_DEBUG]);
@@ -860,49 +847,6 @@ registers_get(uint8_t page, uint8_t offset, uint16_t **values, unsigned *num_val
 
 		/* PX4IO_P_STATUS_ALARMS maintained externally */
 
-#ifdef ADC_VBATT
-		/* PX4IO_P_STATUS_VBATT */
-		{
-			/*
-			 * Coefficients here derived by measurement of the 5-16V
-			 * range on one unit, validated on sample points of another unit
-			 *
-			 * Data in Tools/tests-host/data folder.
-			 *
-			 * measured slope = 0.004585267878277 (int: 4585)
-			 * nominal theoretic slope: 0.00459340659 (int: 4593)
-			 * intercept = 0.016646394188076 (int: 16646)
-			 * nominal theoretic intercept: 0.00 (int: 0)
-			 *
-			 */
-			unsigned counts = adc_measure(ADC_VBATT);
-
-			if (counts != 0xffff) {
-				unsigned mV = (166460 + (counts * 45934)) / 10000;
-				unsigned corrected = (mV * r_page_setup[PX4IO_P_SETUP_VBATT_SCALE]) / 10000;
-
-				r_page_status[PX4IO_P_STATUS_VBATT] = corrected;
-			}
-		}
-
-#endif
-#ifdef ADC_IBATT
-		/* PX4IO_P_STATUS_IBATT */
-		{
-			/*
-			  note that we have no idea what sort of
-			  current sensor is attached, so we just
-			  return the raw 12 bit ADC value and let the
-			  FMU sort it out, with user selectable
-			  configuration for their sensor
-			 */
-			unsigned counts = adc_measure(ADC_IBATT);
-
-			if (counts != 0xffff) {
-				r_page_status[PX4IO_P_STATUS_IBATT] = counts;
-			}
-		}
-#endif
 #ifdef ADC_VSERVO
 		/* PX4IO_P_STATUS_VSERVO */
 		{
@@ -914,6 +858,7 @@ registers_get(uint8_t page, uint8_t offset, uint16_t **values, unsigned *num_val
 				r_page_status[PX4IO_P_STATUS_VSERVO] = mV;
 			}
 		}
+
 #endif
 #ifdef ADC_RSSI
 		/* PX4IO_P_STATUS_VRSSI */
@@ -934,12 +879,6 @@ registers_get(uint8_t page, uint8_t offset, uint16_t **values, unsigned *num_val
 
 	case PX4IO_PAGE_RAW_ADC_INPUT:
 		memset(r_page_scratch, 0, sizeof(r_page_scratch));
-#ifdef ADC_VBATT
-		r_page_scratch[0] = adc_measure(ADC_VBATT);
-#endif
-#ifdef ADC_IBATT
-		r_page_scratch[1] = adc_measure(ADC_IBATT);
-#endif
 
 #ifdef ADC_VSERVO
 		r_page_scratch[0] = adc_measure(ADC_VSERVO);
