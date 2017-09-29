@@ -107,17 +107,6 @@ else
 	BUILD_DIR_SUFFIX :=
 endif
 
-# NuttX verbose output
-ifdef VN
-	export PX4_NUTTX_BUILD_VERBOSE=1
-	export V=1
-endif
-
-# NuttX verbose patches output
-ifdef VNP
-	export PX4_NUTTX_PATCHES_VERBOSE=1
-endif
-
 # additional config parameters passed to cmake
 CMAKE_ARGS :=
 ifdef EXTERNAL_MODULES_LOCATION
@@ -146,7 +135,8 @@ define colorecho
 endef
 
 # Get a list of all config targets.
-ALL_CONFIG_TARGETS := $(basename $(shell find "$(SRC_DIR)/cmake/configs" ! -name '*_common*' ! -name '*_sdflight_*' -name '*.cmake' -print | sed  -e 's:^.*/::' | sort))
+ALL_CONFIG_TARGETS := $(shell ls $(SRC_DIR)/platforms/*/boards/*/*/*.cmake | sed -e "s:$(SRC_DIR)/platforms/\(.*\)/boards/\(.*\):\1_\2:" -e "s~/\(.*\)\.cmake~/\1~" -e "s~/~_~g")
+
 # Strip off leading nuttx_
 NUTTX_CONFIG_TARGETS := $(patsubst nuttx_%,%,$(filter nuttx_%,$(ALL_CONFIG_TARGETS)))
 
@@ -358,17 +348,17 @@ cppcheck: posix_sitl_default
 check_stack: px4fmu-v3_default
 	@echo "Checking worst case stack usage with avstack.pl ..."
 	@echo " "
-	@cd build_px4fmu-v3_default/ && mkdir -p stack_usage && $(SRC_DIR)/Tools/stack_usage/avstack.pl `find . -name *.obj` > stack_usage/avstack_output.txt 2> stack_usage/avstack_errors.txt
-	@head -n 10 build_px4fmu-v3_default/stack_usage/avstack_output.txt | c++filt
+	@cd build/px4fmu-v3_default/ && mkdir -p stack_usage && $(SRC_DIR)/Tools/stack_usage/avstack.pl `find . -name *.obj` > stack_usage/avstack_output.txt 2> stack_usage/avstack_errors.txt
+	@head -n 10 build/px4fmu-v3_default/stack_usage/avstack_output.txt | c++filt
 	@echo " "
 	@echo "Checking worst case stack usage with checkstack.pl ..."
 	@echo " "
 	@echo "Top 10:"
-	@cd build_px4fmu-v3_default/ && mkdir -p stack_usage && arm-none-eabi-objdump -d src/firmware/nuttx/firmware_nuttx | $(SRC_DIR)/Tools/stack_usage/checkstack.pl arm 0 > stack_usage/checkstack_output.txt 2> stack_usage/checkstack_errors.txt
-	@head -n 10 build_px4fmu-v3_default/stack_usage/checkstack_output.txt | c++filt
+	@cd build/px4fmu-v3_default/ && mkdir -p stack_usage && arm-none-eabi-objdump -d src/firmware/nuttx/firmware_nuttx | $(SRC_DIR)/Tools/stack_usage/checkstack.pl arm 0 > stack_usage/checkstack_output.txt 2> stack_usage/checkstack_errors.txt
+	@head -n 10 build/px4fmu-v3_default/stack_usage/checkstack_output.txt | c++filt
 	@echo " "
 	@echo "Symbols with 'main', 'thread' or 'task':"
-	@cat build_px4fmu-v3_default/stack_usage/checkstack_output.txt | c++filt | grep -E 'thread|main|task'
+	@cat build/px4fmu-v3_default/stack_usage/checkstack_output.txt | c++filt | grep -E 'thread|main|task'
 
 # Cleanup
 # --------------------------------------------------------------------
@@ -401,13 +391,7 @@ distclean: submodulesclean gazeboclean
 	$(if $(filter $(FIRST_ARG),$@), \
 		$(error "$@ cannot be the first argument. Use '$(MAKE) help|list_config_targets' to get a list of all possible [configuration] targets."),@#)
 
-CONFIGS:=$(shell ls cmake/configs | sed -e "s~.*/~~" | sed -e "s~\..*~~")
-
-#help:
-#	@echo
-#	@echo "Type 'make ' and hit the tab key twice to see a list of the available"
-#	@echo "build configurations."
-#	@echo
+CONFIGS:=$(shell ls platforms/*/boards/*/*/*.cmake | sed -e "s~.*/~~" | sed -e "s~\..*~~")
 
 empty :=
 space := $(empty) $(empty)

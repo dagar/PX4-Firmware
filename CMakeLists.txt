@@ -126,14 +126,14 @@ set(CONFIG "posix_sitl_default" CACHE STRING "desired configuration")
 
 string(REPLACE "_" ";" config_args ${CONFIG})
 list(GET config_args 0 OS)
-list(GET config_args 1 BOARD)
-list(GET config_args 2 LABEL)
-set(target_name "${OS}-${BOARD}-${LABEL}")
+list(GET config_args 1 VENDOR)
+list(GET config_args 2 BOARD)
+list(GET config_args 3 LABEL)
+set(target_name "${OS}_${VENDOR}${BOARD}_${LABEL}")
 
 file(GLOB_RECURSE configs RELATIVE cmake/configs "cmake/configs/*.cmake")
 set_property(CACHE CONFIG PROPERTY STRINGS ${configs})
 
-set(THREADS "4" CACHE STRING "number of threads to use for external build processes")
 set(DEBUG_PORT "/dev/ttyACM0" CACHE STRING "debugging port")
 set(EXTERNAL_MODULES_LOCATION "" CACHE STRING "External modules source location")
 
@@ -141,9 +141,14 @@ if (NOT EXTERNAL_MODULES_LOCATION STREQUAL "")
 	get_filename_component(EXTERNAL_MODULES_LOCATION "${EXTERNAL_MODULES_LOCATION}" ABSOLUTE)
 endif()
 
-list(APPEND CMAKE_MODULE_PATH "${PX4_SOURCE_DIR}/cmake")
-set(config_module "configs/${CONFIG}")
-include(${config_module})
+list(APPEND CMAKE_MODULE_PATH
+	${PX4_SOURCE_DIR}/cmake
+	${PX4_SOURCE_DIR}/platforms/${OS}/cmake
+	)
+
+include(px4_os_impl)
+
+include(${PX4_SOURCE_DIR}/platforms/${OS}/boards/${VENDOR}/${BOARD}/${LABEL}.cmake)
 
 include(common/coverage)
 include(common/sanitizers)
@@ -331,9 +336,7 @@ message(STATUS "C++ compiler: ${cxx_compiler_version_short}")
 #=============================================================================
 # external libraries
 #
-px4_os_prebuild_targets(OUT prebuild_targets
-	BOARD ${BOARD}
-	THREADS ${THREADS})
+px4_os_prebuild_targets(OUT prebuild_targets BOARD ${BOARD})
 
 #=============================================================================
 # build flags
@@ -427,7 +430,7 @@ foreach(module ${config_module_list})
 	endif()
 endforeach()
 
-add_subdirectory(src/firmware/${OS})
+add_subdirectory(platforms)
 
 #=============================================================================
 # generate custom target to print for all executable and module cmake targets
