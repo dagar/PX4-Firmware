@@ -61,8 +61,7 @@
 #include <board_config.h>
 
 #include <drivers/drv_led.h>
-#include <lib/led/led.h>
-
+#include <ledcontroller/led.h>
 #include "uORB/topics/parameter_update.h"
 
 #define RGBLED_ONTIME 120

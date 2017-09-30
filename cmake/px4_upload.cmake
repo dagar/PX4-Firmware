@@ -94,10 +94,12 @@ function(px4_add_upload)
 				"COM${port}")
 		endforeach()
 	endif()
-	px4_join(OUT serial_ports LIST "${serial_ports}" GLUE ",")
+
+	string(REPLACE ";" "," _TMP_STR "serial_ports")
+	set(serial_ports ${_TMP_STR} PARENT_SCOPE)
+	
 	add_custom_target(${OUT}
-		COMMAND ${PYTHON_EXECUTABLE}
-			${PX4_SOURCE_DIR}/Tools/px_uploader.py --port ${serial_ports} ${BUNDLE}
+		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/Tools/px_uploader.py --port ${serial_ports} ${BUNDLE}
 		DEPENDS ${BUNDLE}
 		WORKING_DIRECTORY ${PX4_BINARY_DIR}
 		COMMENT "uploading ${BUNDLE}"

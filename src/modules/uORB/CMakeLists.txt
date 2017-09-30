@@ -47,6 +47,5 @@ px4_add_module(
 		uORBManager.cpp
 		uORBUtils.cpp
 	DEPENDS
-		platforms__common
 	)
 target_link_libraries(modules__uORB uorb_msgs)

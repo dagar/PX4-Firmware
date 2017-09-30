@@ -62,7 +62,6 @@ px4_add_module(
 	SRCS
 		${SIMULATOR_SRCS}
 	DEPENDS
-		platforms__common
 		git_jmavsim
 		git_gazebo
 	)

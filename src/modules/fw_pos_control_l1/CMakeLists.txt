@@ -39,11 +39,10 @@ px4_add_module(
 		FixedwingPositionControl.cpp
 		Landingslope.cpp
 	DEPENDS
-		platforms__common
 		git_ecl
-		external_lgpl
-		lib__ecl
 	)
 
 add_subdirectory(launchdetection)
 add_subdirectory(runway_takeoff)
+
+target_link_libraries(modules__fw_pos_control_l1 PRIVATE ecl launchdetection runway_takeoff external_lgpl)

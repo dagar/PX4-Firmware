@@ -529,7 +529,7 @@ __EXPORT void board_on_reset(int status);
 #if defined(BOARD_HAS_NO_RESET)
 #  define board_system_reset(status)
 #else
-__EXPORT void board_system_reset(int status) noreturn_function;
+__EXPORT void board_system_reset(int status) __attribute__((noreturn));
 #endif
 
 /************************************************************************************

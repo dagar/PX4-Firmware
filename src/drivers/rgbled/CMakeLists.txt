@@ -37,7 +37,6 @@ px4_add_module(
 	SRCS
 		rgbled.cpp
 	DEPENDS
-		platforms__common
 		led
 	)
 # vim: set noet ft=cmake fenc=utf-8 ff=unix :

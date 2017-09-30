@@ -31,6 +31,8 @@
 #
 ############################################################################
 
+px4_find_python_module(jinja2 REQUIRED)
+
 set(SRCS)
 if ("${CONFIG_SHMEM}" STREQUAL "1")
 	message(STATUS "parameters shared memory enabled")

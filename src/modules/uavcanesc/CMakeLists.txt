@@ -78,7 +78,6 @@ px4_add_module(
 		${PX4_SOURCE_DIR}/src/lib/flashparams/flashparams.c
 		${PX4_SOURCE_DIR}/src/lib/flashparams/flashfs.c
 	DEPENDS
-		platforms__common
 		uavcan
 	)
 

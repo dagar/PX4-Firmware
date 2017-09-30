@@ -77,7 +77,6 @@ px4_add_module(
 		uavcannode_params.c
 
 	DEPENDS
-		platforms__common
 		uavcan
 	)
 

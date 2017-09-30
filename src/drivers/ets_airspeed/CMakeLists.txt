@@ -37,7 +37,4 @@ px4_add_module(
 	COMPILE_FLAGS
 	SRCS
 		ets_airspeed.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

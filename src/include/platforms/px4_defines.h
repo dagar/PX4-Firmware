@@ -73,7 +73,6 @@
  * Building for running within the ROS environment.
  ****************************************************************************/
 
-#define noreturn_function
 #ifdef __cplusplus
 #include "ros/ros.h"
 #endif

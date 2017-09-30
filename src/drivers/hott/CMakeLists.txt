@@ -30,15 +30,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-list(APPEND MODULE_CFLAGS -Wframe-larger-than=1100)
-px4_add_module(
-	MODULE drivers__hott
-	COMPILE_FLAGS
-	SRCS
-		messages.cpp
-		comms.cpp
-	DEPENDS
-		platforms__common
+
+px4_add_library(hott
+	messages.cpp
+	comms.cpp
 	)
 
 add_subdirectory(hott_sensors)

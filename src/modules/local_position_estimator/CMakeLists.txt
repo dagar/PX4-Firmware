@@ -36,7 +36,6 @@ px4_add_module(
 	COMPILE_FLAGS
 		-Wno-sign-compare # TODO: fix all sign-compare
 	STACK_MAIN 5700
-	STACK_MAX 13000
 	SRCS
 		local_position_estimator_main.cpp
 		BlockLocalPositionEstimator.cpp
@@ -48,7 +47,4 @@ px4_add_module(
 		sensors/vision.cpp
 		sensors/mocap.cpp
 		sensors/land.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

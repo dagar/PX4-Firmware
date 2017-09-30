@@ -39,7 +39,4 @@ px4_add_module(
 		navio_sysfs.cpp
 		linux_pwm_out.cpp
 		ocpoc_mmap.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

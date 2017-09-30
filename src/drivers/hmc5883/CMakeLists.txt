@@ -39,7 +39,4 @@ px4_add_module(
 		hmc5883_i2c.cpp
 		hmc5883_spi.cpp
 		hmc5883.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

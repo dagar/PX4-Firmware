@@ -38,7 +38,4 @@ px4_add_module(
 	SRCS
 		SF0XTest.cpp
 		../sf0x_parser.cpp
-	DEPENDS
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 
+	) 

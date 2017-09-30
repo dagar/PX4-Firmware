@@ -36,7 +36,4 @@ px4_add_module(
 	STACK_MAIN 2000
 	SRCS
 		matlab_csv_serial.c
-	DEPENDS
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 
+	) 

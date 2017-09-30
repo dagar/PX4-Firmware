@@ -37,7 +37,4 @@ px4_add_module(
 		mc_pos_control_main.cpp
 		mc_pos_control_start_nuttx.cpp
 		mc_pos_control.cpp
-	DEPENDS
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 
+	) 

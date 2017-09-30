@@ -150,7 +150,6 @@ foreach(viewer ${viewers})
 	endforeach()
 endforeach()
 
-px4_join(OUT posix_vmd_make_target_list LIST ${all_posix_vmd_make_targets} GLUE "\\n")
 add_custom_target(list_vmd_make_targets
 	COMMAND sh -c "printf \"${posix_vmd_make_target_list}\\n\""
 	COMMENT "List of acceptable '${CONFIG}' <viewer_model_debugger> targets:"

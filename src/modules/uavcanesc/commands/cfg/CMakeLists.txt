@@ -34,7 +34,6 @@
 px4_add_module(
 	MODULE modules__uavcanesc__commands__cfg
 	MAIN cfg
-	STACK_MAIN 1024
 	COMPILE_FLAGS
 		-Wno-deprecated-declarations
 		-O3
@@ -42,7 +41,6 @@ px4_add_module(
 	 esc_cfg.cpp
 
 	DEPENDS
-		platforms__common
 	)
 
 ## vim: set noet ft=cmake fenc=utf-8 ff=unix :

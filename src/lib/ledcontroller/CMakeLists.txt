@@ -31,4 +31,4 @@
 #
 ############################################################################
 
-px4_add_library(led led.cpp)
+px4_add_library(ledcontroller led.cpp)

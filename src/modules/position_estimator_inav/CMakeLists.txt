@@ -35,13 +35,12 @@ px4_add_module(
 	MODULE modules__position_estimator_inav
 	MAIN position_estimator_inav
 	STACK_MAIN 1200
-	STACK_MAX 4000
 	COMPILE_FLAGS
 	SRCS
 		position_estimator_inav_main.cpp
 		inertial_filter.cpp
 	DEPENDS
-		platforms__common
 	)
 
 add_subdirectory(terrain_estimation)
+target_link_libraries(modules__position_estimator_inav terrain_estimation)

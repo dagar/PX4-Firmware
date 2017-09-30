@@ -118,83 +118,24 @@ endfunction()
 #
 #	Set the nuttx build flags.
 #
-#	Usage:
-#		px4_os_add_flags(
-#			C_FLAGS <inout-variable>
-#			CXX_FLAGS <inout-variable>
-#			OPTIMIZATION_FLAGS <inout-variable>
-#			EXE_LINKER_FLAGS <inout-variable>
-#			INCLUDE_DIRS <inout-variable>
-#			LINK_DIRS <inout-variable>
-#			DEFINITIONS <inout-variable>)
-#
-#	Input:
-#		BOARD					: flags depend on board/nuttx config
-#
-#	Input/Output: (appends to existing variable)
-#		C_FLAGS					: c compile flags variable
-#		CXX_FLAGS				: c++ compile flags variable
-#		OPTIMIZATION_FLAGS			: optimization compile flags variable
-#		EXE_LINKER_FLAGS			: executable linker flags variable
-#		INCLUDE_DIRS				: include directories
-#		LINK_DIRS				: link directories
-#		DEFINITIONS				: definitions
-#
-#	Note that EXE_LINKER_FLAGS is not suitable for adding libraries because
-#	these flags are added before any of the object files and static libraries.
-#	Add libraries in src/firmware/nuttx/CMakeLists.txt.
-#
-#	Example:
-#		px4_os_add_flags(
-#			C_FLAGS CMAKE_C_FLAGS
-#			CXX_FLAGS CMAKE_CXX_FLAGS
-#			OPTIMIZATION_FLAGS optimization_flags
-#			EXE_LINKER_FLAG CMAKE_EXE_LINKER_FLAGS
-#			INCLUDES <list>)
-#
 function(px4_os_add_flags)
 
-	set(inout_vars
-		C_FLAGS CXX_FLAGS OPTIMIZATION_FLAGS EXE_LINKER_FLAGS INCLUDE_DIRS LINK_DIRS DEFINITIONS)
-
-	px4_parse_function_args(
-		NAME px4_os_add_flags
-		ONE_VALUE ${inout_vars} BOARD
-		REQUIRED ${inout_vars} BOARD
-		ARGN ${ARGN})
-
-	set(added_include_dirs
+	include_directories(
 		${PX4_BINARY_DIR}/NuttX/nuttx/arch/arm/src/armv7-m
 		${PX4_BINARY_DIR}/NuttX/nuttx/arch/arm/src/chip
 		${PX4_BINARY_DIR}/NuttX/nuttx/arch/arm/src/common
 		${PX4_BINARY_DIR}/NuttX/nuttx/include
 		${PX4_BINARY_DIR}/NuttX/nuttx/include/cxx
-		${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/apps/include
-		${PX4_SOURCE_DIR}/platforms/nuttx/boards/${VENDOR}/${BOARD}/src
-		${PX4_SOURCE_DIR}/platforms/nuttx/src/common/
+		${PX4_BINARY_DIR}/NuttX/apps/include
 		)
 
-	#set(added_exe_linker_flags)
-	#set(added_link_dirs ${nuttx_export_dir}/libs)
-	set(added_definitions -D__PX4_NUTTX)
+	add_definitions(-D__PX4_NUTTX -D__DF_NUTTX)
 
-	list(APPEND added_definitions -D__DF_NUTTX)
-
-	if("${config_nuttx_hw_stack_check_${BOARD}}" STREQUAL "y")
-		set(instrument_flags
-			-finstrument-functions
-			-ffixed-r10
-			)
-		list(APPEND c_flags ${instrument_flags})
-		list(APPEND cxx_flags ${instrument_flags})
+	if("${CONFIG_ARMV7M_STACKCHECK}" STREQUAL "y")
+		message(STATUS "enabling ARMV7 stack check")
+		add_compile_options(-finstrument-functions -ffixed-r10)
 	endif()
 
-	# output
-	foreach(var ${inout_vars})
-		string(TOLOWER ${var} lower_var)
-		set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)
-		#message(STATUS "nuttx: set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)")
-	endforeach()
 endfunction()
 
 #=============================================================================

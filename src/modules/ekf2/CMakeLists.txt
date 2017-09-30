@@ -36,11 +36,9 @@ px4_add_module(
 	COMPILE_FLAGS
 		-Wno-sign-compare # TODO: fix all sign-compare
 	STACK_MAIN 2500
-	STACK_MAX 4000
 	SRCS
 		ekf2_main.cpp
 	DEPENDS
-		platforms__common
 		git_ecl
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+target_link_libraries(modules__ekf2 PRIVATE ecl)

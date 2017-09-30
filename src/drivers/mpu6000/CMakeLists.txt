@@ -39,7 +39,4 @@ px4_add_module(
 		mpu6000.cpp
 		mpu6000_i2c.cpp
 		mpu6000_spi.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

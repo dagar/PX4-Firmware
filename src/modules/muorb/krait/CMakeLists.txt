@@ -43,7 +43,4 @@ px4_add_module(
 		uORBKraitFastRpcChannel.cpp
 		px4muorb_KraitRpcWrapper.cpp
 		muorb_main.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

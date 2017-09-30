@@ -69,7 +69,7 @@
 #
 # * Avoid use of global variables in functions. Functions in a nested
 #	scope may use global variables, but this makes it difficult to
-#	resuse functions.
+#	reuse functions.
 #
 # Included CMake Files
 # ---------------------------------------------------------------------------
@@ -262,35 +262,6 @@ if (CATKIN_DEVEL_PREFIX)
 endif()
 
 find_package(PythonInterp REQUIRED)
-px4_find_python_module(jinja2 REQUIRED)
-
-#=============================================================================
-# check required toolchain variables
-#
-
-set(required_variables CMAKE_C_COMPILER_ID CMAKE_CXX_COMPILER_ID)
-foreach(var ${required_variables})
-	if (NOT ${var})
-		message(FATAL_ERROR "Toolchain/config must define ${var}")
-	endif()
-endforeach()
-
-# print full c compiler version
-execute_process(COMMAND ${CMAKE_C_COMPILER} --version
-		OUTPUT_VARIABLE c_compiler_version
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-STRING(REGEX MATCH "[^\n]*" c_compiler_version_short ${c_compiler_version})
-message(STATUS "C compiler: ${c_compiler_version_short}")
-
-# print full c++ compiler version
-execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version
-		OUTPUT_VARIABLE cxx_compiler_version
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-STRING(REGEX MATCH "[^\n]*" cxx_compiler_version_short ${cxx_compiler_version})
-message(STATUS "C++ compiler: ${cxx_compiler_version_short}")
-
 
 #=============================================================================
 # require px4 module interface
@@ -304,38 +275,12 @@ else()
 endif()
 
 # common compiler flags
-px4_add_common_flags(
-	BOARD ${BOARD}
-	C_FLAGS ${C_FLAGS}
-	CXX_FLAGS ${CXX_FLAGS}
-	OPTIMIZATION_FLAGS ${OPTIMIZATION_FLAGS}
-	EXE_LINKER_FLAGS ${EXE_LINKER_FLAGS}
-	INCLUDE_DIRS ${INCLUDE_DIRS}
-	LINK_DIRS ${LINK_DIRS}
-	DEFINITIONS ${DEFINITIONS}
-	)
+px4_add_common_flags()
 
 # px4_os_add_flags
 if (COMMAND px4_os_add_flags)
-
 	# build flags
-	px4_os_add_flags(
-		BOARD ${BOARD}
-		C_FLAGS c_flags
-		CXX_FLAGS cxx_flags
-		OPTIMIZATION_FLAGS optimization_flags
-		EXE_LINKER_FLAGS exe_linker_flags
-		INCLUDE_DIRS include_dirs
-		LINK_DIRS link_dirs
-		DEFINITIONS definitions)
-	
-	px4_join(OUT CMAKE_EXE_LINKER_FLAGS LIST "${CMAKE_EXE_LINKER_FLAGS};${exe_linker_flags}" GLUE " ")
-	px4_join(OUT CMAKE_C_FLAGS LIST "${CMAKE_C_FLAGS};${c_flags};${optimization_flags}" GLUE " ")
-	px4_join(OUT CMAKE_CXX_FLAGS LIST "${CMAKE_CXX_FLAGS};${cxx_flags};${optimization_flags}" GLUE " ")
-	
-	include_directories(${include_dirs})
-	link_directories(${link_dirs})
-	add_definitions(${definitions})
+	px4_os_add_flags()
 else()
 	message(FATAL_ERROR "${config_module} must implement px4_os_add_flags")
 endif()
@@ -363,31 +308,12 @@ endif()
 
 px4_add_git_submodule(TARGET git_driverframework PATH "src/lib/DriverFramework")
 
-# List the DriverFramework drivers
-if (DEFINED config_df_driver_list)
-	message("DF Drivers: ${config_df_driver_list}")
-endif()
-
 set(df_driver_libs)
 foreach(driver ${config_df_driver_list})
 	add_subdirectory(src/lib/DriverFramework/drivers/${driver})
 	list(APPEND df_driver_libs df_${driver})
 	message("Adding DF driver: ${driver}")
 endforeach()
-
-#=============================================================================
-# external projects
-#
-
-set(ep_base ${PX4_BINARY_DIR}/external)
-set_property(DIRECTORY PROPERTY EP_BASE ${ep_base})
-
-# add external project install folders to build
-link_directories(${ep_base}/Install/lib)
-include_directories(${ep_base}/Install/include)
-# add the directories so cmake won't warn
-execute_process(COMMAND cmake -E make_directory ${ep_base}/Install/lib)
-execute_process(COMMAND cmake -E make_directory ${ep_base}/Install/include)
 
 #=============================================================================
 # external modules
@@ -418,7 +344,6 @@ px4_add_git_submodule(TARGET git_ecl PATH "src/lib/ecl")
 add_subdirectory(msg)
 add_subdirectory(src/lib/common)
 add_subdirectory(src/lib/device)
-add_subdirectory(src/lib/DriverFramework/framework)
 add_subdirectory(src/lib/version)
 
 foreach(module ${config_module_list})
@@ -433,18 +358,3 @@ foreach(module ${config_module_list})
 endforeach()
 
 add_subdirectory(platforms)
-
-#=============================================================================
-# generate custom target to print for all executable and module cmake targets
-#
-if (all_posix_cmake_targets)
-	list(SORT all_posix_cmake_targets)
-	px4_join(OUT posix_cmake_target_list LIST ${all_posix_cmake_targets} GLUE "\\n")
-	add_custom_target(list_cmake_targets
-		COMMAND sh -c "printf \"${posix_cmake_target_list}\\n\""
-		COMMENT "List of cmake targets that can be matched by PX4_NO_OPTIMIZATION:"
-		VERBATIM
-		)
-endif()
-
-# vim: set noet fenc=utf-8 ff=unix ft=cmake :

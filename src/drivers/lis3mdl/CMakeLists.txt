@@ -39,7 +39,4 @@ px4_add_module(
 		lis3mdl_i2c.cpp
 		lis3mdl_spi.cpp
 		lis3mdl.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

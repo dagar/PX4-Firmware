@@ -109,50 +109,8 @@ endfunction()
 #
 #	Set the posix build flags.
 #
-#	Usage:
-#		px4_os_add_flags(
-#			C_FLAGS <inout-variable>
-#			CXX_FLAGS <inout-variable>
-#			OPTIMIZATION_FLAGS <inout-variable>
-#			EXE_LINKER_FLAGS <inout-variable>
-#			INCLUDE_DIRS <inout-variable>
-#			LINK_DIRS <inout-variable>
-#			DEFINITIONS <inout-variable>)
-#
-#	Input:
-#		BOARD					: flags depend on board/posix config
-#
-#	Input/Output: (appends to existing variable)
-#		C_FLAGS					: c compile flags variable
-#		CXX_FLAGS				: c++ compile flags variable
-#		OPTIMIZATION_FLAGS			: optimization compile flags variable
-#		EXE_LINKER_FLAGS			: executable linker flags variable
-#		INCLUDE_DIRS				: include directories
-#		LINK_DIRS				: link directories
-#		DEFINITIONS				: definitions
-#
-#	Note that EXE_LINKER_FLAGS is not suitable for adding libraries because
-#	these flags are added before any of the object files and static libraries.
-#	Add libraries in src/firmware/posix/CMakeLists.txt.
-#
-#	Example:
-#		px4_os_add_flags(
-#			C_FLAGS CMAKE_C_FLAGS
-#			CXX_FLAGS CMAKE_CXX_FLAGS
-#			OPTIMIZATION_FLAGS optimization_flags
-#			EXE_LINKER_FLAG CMAKE_EXE_LINKER_FLAGS
-#			INCLUDES <list>)
 #
 function(px4_os_add_flags)
-
-	set(inout_vars
-		C_FLAGS CXX_FLAGS OPTIMIZATION_FLAGS EXE_LINKER_FLAGS INCLUDE_DIRS LINK_DIRS DEFINITIONS)
-
-	px4_parse_function_args(
-		NAME px4_os_add_flags
-		ONE_VALUE ${inout_vars} BOARD
-		REQUIRED ${inout_vars} BOARD
-		ARGN ${ARGN})
 
 	# This block sets added_definitions and added_cxx_flags.
 	if(UNIX AND APPLE)
@@ -160,7 +118,6 @@ function(px4_os_add_flags)
 			-D__PX4_POSIX
 			-D__PX4_DARWIN
 			-D__DF_DARWIN
-			-Dnoreturn_function=__attribute__\(\(noreturn\)\)
 			)
 
 		set(added_cxx_flags)
@@ -186,7 +143,6 @@ function(px4_os_add_flags)
 			-D__PX4_POSIX
 			-D__PX4_LINUX
 			-D__DF_LINUX
-			-Dnoreturn_function=__attribute__\(\(noreturn\)\)
 			)
 
 		# Use -pthread For linux/g++.

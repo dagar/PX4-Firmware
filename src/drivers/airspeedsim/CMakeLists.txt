@@ -40,7 +40,4 @@ px4_add_module(
 	SRCS
 		airspeedsim.cpp
 		meas_airspeed_sim.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

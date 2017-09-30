@@ -34,7 +34,6 @@
 px4_add_module(
 	MODULE modules__uavcanesc__commands__stat
 	MAIN cfg
-	STACK_MAIN 1024
 	COMPILE_FLAGS
 		-Wno-deprecated-declarations
 		-O3
@@ -42,7 +41,6 @@ px4_add_module(
 	 esc_stat.cpp
 
 	DEPENDS
-		platforms__common
 
 	)
 

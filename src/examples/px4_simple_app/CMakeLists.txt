@@ -36,7 +36,4 @@ px4_add_module(
 	STACK_MAIN 2000
 	SRCS
 		px4_simple_app.c
-	DEPENDS
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 
+	) 

@@ -37,7 +37,6 @@ px4_add_module(
 	SRCS
 		linux_gpio.cpp
 	DEPENDS
-		platforms__common
 	)
 
 #add_subdirectory(test)

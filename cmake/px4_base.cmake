@@ -38,10 +38,8 @@
 # 	utility functions
 #
 #		* px4_parse_function_args
-#		* px4_join
 #		* px4_add_module
 #		* px4_add_common_flags
-#		* px4_add_optimization_flags_for_target
 #		* px4_add_library
 #
 
@@ -113,39 +111,6 @@ endfunction()
 
 #=============================================================================
 #
-#	px4_join
-#
-#	This function joins a list with a given separator. If list is not
-#	passed, or is sent "", this will return the empty string.
-#
-#	Usage:
-#		px4_join(OUT ${OUT} [ LIST ${LIST} ] GLUE ${GLUE})
-#
-#	Input:
-#		LIST		: list to join
-#		GLUE		: separator to use
-#
-#	Output:
-#		OUT			: joined list
-#
-#	Example:
-#		px4_join(OUT test_join LIST a b c GLUE ";")
-#		test_join would then be:
-#			"a;b;c"
-#
-function(px4_join)
-	px4_parse_function_args(
-		NAME px4_join
-		ONE_VALUE OUT GLUE
-		MULTI_VALUE LIST
-		REQUIRED GLUE OUT
-		ARGN ${ARGN})
-	string (REPLACE ";" "${GLUE}" _TMP_STR "${LIST}")
-	set(${OUT} ${_TMP_STR} PARENT_SCOPE)
-endfunction()
-
-#=============================================================================
-#
 #	px4_add_module
 #
 #	This function builds a static library from a module description.
@@ -177,8 +142,7 @@ endfunction()
 #		px4_add_module(MODULE test
 #			SRCS
 #				file.cpp
-#			STACK_MAIN 1024
-#			DEPENDS
+#		#			DEPENDS
 #				git_nuttx
 #			)
 #
@@ -189,39 +153,28 @@ function(px4_add_module)
 		ONE_VALUE MODULE MAIN STACK_MAIN PRIORITY
 		MULTI_VALUE COMPILE_FLAGS SRCS INCLUDES DEPENDS
 		OPTIONS EXTERNAL
-		REQUIRED MODULE
+		REQUIRED MAIN MODULE
 		ARGN ${ARGN})
 
 	px4_add_library(${MODULE} STATIC EXCLUDE_FROM_ALL ${SRCS})
 
 	# set defaults if not set
-	set(MAIN_DEFAULT MAIN-NOTFOUND)
-	set(STACK_MAIN_DEFAULT 1024)
-	set(PRIORITY_DEFAULT SCHED_PRIORITY_DEFAULT)
-
-	# default stack max to stack main
-	if(NOT STACK_MAIN AND STACK)
-		set(STACK_MAIN ${STACK})
-		message(AUTHOR_WARNING "STACK deprecated, USE STACK_MAIN instead!")
+	set_target_properties(${MODULE} PROPERTIES MAIN ${MAIN})
+	
+	if(NOT STACK_MAIN)
+		set(STACK_MAIN 1024)
 	endif()
+	set_target_properties(${MODULE} PROPERTIES STACK_MAIN ${STACK_MAIN})
+	
+	if(NOT SCHED_PRIORITY_DEFAULT)
+		set(SCHED_PRIORITY_DEFAULT SCHED_PRIORITY_DEFAULT)
+	endif()
+	set_target_properties(${MODULE} PROPERTIES SCHED_PRIORITY_DEFAULT ${SCHED_PRIORITY_DEFAULT})
 
-	foreach(property MAIN STACK_MAIN PRIORITY)
-		if(NOT ${property})
-			set(${property} ${${property}_DEFAULT})
-		endif()
-		set_target_properties(${MODULE} PROPERTIES ${property} ${${property}})
-	endforeach()
-
-	if(MAIN)
-		target_compile_definitions(${MODULE}
+	target_compile_definitions(${MODULE}
 			PRIVATE PX4_MAIN=${MAIN}_app_main
 			PRIVATE MODULE_NAME=${MAIN}
 			)
-	else()
-		target_compile_definitions(${MODULE}
-			PRIVATE MODULE_NAME=${MODULE}
-			)
-	endif()
 
 	if(INCLUDES)
 		target_include_directories(${MODULE} PRIVATE ${INCLUDES})
@@ -235,16 +188,6 @@ function(px4_add_module)
 		target_compile_options(${MODULE} PRIVATE ${COMPILE_FLAGS})
 	endif()
 
-	# store module properties in target
-	# STACK_MAIN, MAIN, PRIORITY are PX4 specific
-	if(COMPILE_FLAGS AND ${_no_optimization_for_target})
-		px4_strip_optimization(COMPILE_FLAGS ${COMPILE_FLAGS})
-	endif()
-	foreach (prop STACK_MAIN MAIN PRIORITY)
-		if (${prop})
-			set_target_properties(${MODULE} PROPERTIES ${prop} ${${prop}})
-		endif()
-	endforeach()
 endfunction()
 
 #=============================================================================
@@ -253,20 +196,10 @@ endfunction()
 #
 #	Set the default build flags.
 #
-#	Usage:
-#		px4_add_common_flags()
-#
-#	Input:
-#		BOARD					: board
-#
-#	Input/Output: (appends to existing variable)
-#
-#	Example:
-#		px4_add_common_flags()
-#
 function(px4_add_common_flags)
 
 	add_compile_options(
+		# warnings
 		-Wall
 		-Warray-bounds
 		-Wdisabled-optimization
@@ -285,121 +218,68 @@ function(px4_add_common_flags)
 		-Wuninitialized
 		-Wunknown-pragmas
 		-Wunused-variable
+		-Wunused-but-set-variable
+		-Wformat=1
+		-Wdouble-promotion
 
+		# disabled warnings
 		-Wno-unused-parameter
-		)
 
-	if (${CMAKE_C_COMPILER_ID} MATCHES ".*Clang.*")
-		# QuRT 6.4.X compiler identifies as Clang but does not support this option
-		if (NOT ${OS} STREQUAL "qurt")
-			list(APPEND warnings
-				-Qunused-arguments
-				-Wno-unused-const-variable
-				-Wno-varargs
-				-Wno-address-of-packed-member
-				-Wno-unknown-warning-option
-				-Wunused-but-set-variable
-				#-Wdouble-promotion # needs work first
-			)
-		endif()
-	else()
-		list(APPEND warnings
-			-Wunused-but-set-variable
-			-Wformat=1
-			-Wdouble-promotion
-		)
-	endif()
-
-	set(_optimization_flags
+		# optimizations
+		-fvisibility=hidden
 		-fno-strict-aliasing
 		-fomit-frame-pointer
 		-funsafe-math-optimizations
 		-ffunction-sections
 		-fdata-sections
+
+		-include visibility.h
 		)
 
-	set(c_warnings
+	if (${CMAKE_C_COMPILER_ID} MATCHES ".*Clang.*")
+		add_compile_options(
+			-fcolor-diagnostics
+			-Qunused-arguments
+			-Wno-unused-const-variable
+			-Wno-varargs
+			-Wno-address-of-packed-member
+			-Wno-unknown-warning-option
+			-Wunused-but-set-variable
+		)
+	else()
+		add_compile_options(
+			-fdiagnostics-color=always
+			-fno-strength-reduce
+			-fno-builtin-printf
+		)
+	endif()
+
+	set(c_flags
 		-Wbad-function-cast
 		-Wstrict-prototypes
 		-Wmissing-prototypes
 		-Wnested-externs
-		)
-
-	set(c_compile_flags
-		-g
-		-std=gnu99
+		
 		-fno-common
 		)
+	add_compile_options($<$<COMPILE_LANGUAGE:C>:${c_flags}>)
 
-	set(cxx_warnings
+	set(cxx_flags
 		-Wno-missing-field-initializers
 		-Wreorder
-		)
-
-	set(cxx_compile_flags
-		-g
+		
+		-fcheck-new
 		-fno-exceptions
 		-fno-rtti
-		-std=gnu++11
 		-fno-threadsafe-statics
+
 		-DCONFIG_WCHAR_BUILTIN
 		-D__CUSTOM_FILE_IO__
 		)
-
-	# regular Clang or AppleClang
-	if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-		# force color for clang (needed for clang + ccache)
-		list(APPEND _optimization_flags
-			-fcolor-diagnostics
-		)
-	else()
-		list(APPEND _optimization_flags
-			-fno-strength-reduce
-			-fno-builtin-printf
-		)
-
-		# -fcheck-new is a no-op for Clang in general
-		# and has no effect, but can generate a compile
-		# error for some OS
-		list(APPEND cxx_compile_flags
-			-fcheck-new
-		)
-	endif()
-
-	if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-		if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.9)
-			# force color for gcc > 4.9
-			list(APPEND _optimization_flags
-				-fdiagnostics-color=always
-			)
-		endif()
-	endif()
-
-	set(visibility_flags
-		-fvisibility=hidden
-		-include visibility.h
-		)
-
-	set(added_c_flags
-		${c_compile_flags}
-		${warnings}
-		${c_warnings}
-		${visibility_flags}
-		)
-
-	set(added_cxx_flags
-		${cxx_compile_flags}
-		${warnings}
-		${cxx_warnings}
-		${visibility_flags}
-		)
-
-	set(added_optimization_flags
-		${_optimization_flags}
-		)
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>)
 
 	# TODO: cleanup and start using INTERFACE_INCLUDE_DIRECTORIES
-	set(added_include_dirs
+	include_directories(
 		${PX4_BINARY_DIR}
 		${PX4_BINARY_DIR}/src
 		${PX4_BINARY_DIR}/src/modules
@@ -415,69 +295,11 @@ function(px4_add_common_flags)
 		${PX4_SOURCE_DIR}/src/modules
 		)
 
-	set(added_link_dirs) # none used currently
-	set(added_exe_linker_flags)
-
-	string(TOUPPER ${BOARD} board_upper)
-	string(REPLACE "-" "_" board_config ${board_upper})
-
-	set(added_definitions
+	add_definitions(
 		-DCONFIG_ARCH_BOARD_${board_config}
 		-D__STDC_FORMAT_MACROS
 		)
 
-	# output
-	foreach(var ${inout_vars})
-		string(TOLOWER ${var} lower_var)
-		set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)
-		#message(STATUS "set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)")
-	endforeach()
-
-endfunction()
-
-#=============================================================================
-#
-#	px4_strip_optimization
-#
-function(px4_strip_optimization name)
-	set(_compile_flags)
-	separate_arguments(_args UNIX_COMMAND ${ARGN})
-	foreach(_flag ${_args})
-		if(NOT "${_flag}" MATCHES "^-O")
-			set(_compile_flags "${_compile_flags} ${_flag}")
-		endif()
-	endforeach()
-	string(STRIP "${_compile_flags}" _compile_flags)
-	set(${name} "${_compile_flags}" PARENT_SCOPE)
-endfunction()
-
-#=============================================================================
-#
-#	px4_add_optimization_flags_for_target
-#
-set(all_posix_cmake_targets "" CACHE INTERNAL "All cmake targets for which optimization can be suppressed")
-function(px4_add_optimization_flags_for_target target)
-	set(_no_optimization_for_target FALSE)
-	# If the current CONFIG is posix_sitl_* then suppress optimization for certain targets.
-	if(CONFIG MATCHES "^posix_sitl_")
-		foreach(_regexp $ENV{PX4_NO_OPTIMIZATION})
-			if("${target}" MATCHES "${_regexp}")
-				set(_no_optimization_for_target TRUE)
-				set(_matched_regexp "${_regexp}")
-			endif()
-		endforeach()
-		# Create a full list of targets that optimization can be suppressed for.
-		list(APPEND all_posix_cmake_targets ${target})
-		set(all_posix_cmake_targets ${all_posix_cmake_targets} CACHE INTERNAL "All cmake targets for which optimization can be suppressed")
-	endif()
-	if(NOT ${_no_optimization_for_target})
-		target_compile_options(${target} PRIVATE ${optimization_flags})
-	else()
-		message(STATUS "Disabling optimization for target '${target}' because it matches the regexp '${_matched_regexp}' in env var PX4_NO_OPTIMIZATION")
-		target_compile_options(${target} PRIVATE -O0)
-	endif()
-	# Pass variable to the parent px4_add_library.
-	set(_no_optimization_for_target ${_no_optimization_for_target} PARENT_SCOPE)
 endfunction()
 
 #=============================================================================
@@ -490,10 +312,6 @@ function(px4_add_library target)
 	add_library(${target} ${ARGN})
 
 	add_dependencies(${target} prebuild_targets)
-
-	px4_add_optimization_flags_for_target(${target})
-	# Pass variable to the parent px4_add_module.
-	set(_no_optimization_for_target ${_no_optimization_for_target} PARENT_SCOPE)
 
 	set_property(GLOBAL APPEND PROPERTY PX4_LIBRARIES ${target})
 endfunction()
@@ -532,9 +350,5 @@ function(px4_find_python_module module)
 		\n\tsudo apt-get install python-${module} \
 		\nor for all other OSs/debian: \
 		\n\tsudo -H pip install ${module}\n" PY_${module_upper})
-	#if (NOT PY_${module}_FOUND)
-		#message(FATAL_ERROR "python module not found, exiting")
-	#endif()
-endfunction(px4_find_python_module)
 
-# vim: set noet fenc=utf-8 ff=unix nowrap:
+endfunction(px4_find_python_module)

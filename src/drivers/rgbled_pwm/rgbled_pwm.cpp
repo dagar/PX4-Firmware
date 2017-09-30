@@ -60,8 +60,8 @@
 #include <board_config.h>
 
 #include <drivers/drv_led.h>
-#include <lib/led/led.h>
 #include <device/device.h>
+#include <ledcontroller/led.h>
 
 #define RGBLED_ONTIME 120
 #define RGBLED_OFFTIME 120

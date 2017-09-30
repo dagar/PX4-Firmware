@@ -36,7 +36,7 @@
  */
 
 
-#include "led.h"
+#include <ledcontroller/led.h>
 
 int LedController::init(int led_control_sub)
 {

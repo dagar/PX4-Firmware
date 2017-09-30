@@ -39,7 +39,4 @@ px4_add_module(
 		LidarLite.cpp
 		LidarLiteI2C.cpp
 		LidarLitePWM.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

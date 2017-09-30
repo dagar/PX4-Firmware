@@ -65,7 +65,7 @@ macro(PX4_ADD_MODULES_CORE)
 		lib/external_lgpl
 		lib/geo
 		lib/geo_lookup
-		lib/led
+		lib/ledcontroller
 		lib/log
 		lib/mathlib
 		lib/mixer
