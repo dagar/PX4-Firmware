@@ -42,12 +42,11 @@
 
 #pragma once
 
+#include "hysteresis/Hysteresis.hpp"
 #include <px4_workqueue.h>
 #include <px4_module.h>
-#include <systemlib/hysteresis/hysteresis.h>
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
-#include <uORB/uORB.h>
+#include "param/param.h"
+#include "perf/perf_counter.h"
 #include <uORB/topics/vehicle_land_detected.h>
 
 namespace land_detector
@@ -153,10 +152,10 @@ protected:
 
 	LandDetectionState _state{LandDetectionState::LANDED};
 
-	systemlib::Hysteresis _freefall_hysteresis{false};
-	systemlib::Hysteresis _landed_hysteresis{true};
-	systemlib::Hysteresis _maybe_landed_hysteresis{true};
-	systemlib::Hysteresis _ground_contact_hysteresis{true};
+	Hysteresis _freefall_hysteresis{false};
+	Hysteresis _landed_hysteresis{true};
+	Hysteresis _maybe_landed_hysteresis{true};
+	Hysteresis _ground_contact_hysteresis{true};
 
 private:
 	static void _cycle_trampoline(void *arg);

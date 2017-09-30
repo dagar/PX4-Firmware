@@ -49,7 +49,6 @@
 #include "tests_main.h"
 
 #include <drivers/drv_adc.h>
-#include <systemlib/err.h>
 
 /****************************************************************************
  * Pre-processor Definitions

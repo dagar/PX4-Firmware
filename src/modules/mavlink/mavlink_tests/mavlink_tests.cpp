@@ -35,7 +35,6 @@
  * @file mavlink_ftp_tests.cpp
  */
 
-#include <systemlib/err.h>
 
 #include "mavlink_ftp_test.h"
 

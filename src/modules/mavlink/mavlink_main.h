@@ -51,15 +51,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <drivers/device/device.h>
+#include <device/device.h>
 #endif
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
+#include <param/param.h>
+#include <perf/perf_counter.h>
 #include <pthread.h>
-#include <systemlib/mavlink_log.h>
-#include <drivers/device/ringbuffer.h>
+#include "log/mavlink_log.h"
+#include <device/ringbuffer.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/mission.h>
 #include <uORB/topics/mission_result.h>
 #include <uORB/topics/telemetry_status.h>

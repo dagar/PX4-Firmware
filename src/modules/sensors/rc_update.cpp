@@ -43,7 +43,6 @@
 #include <float.h>
 #include <errno.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/manual_control_setpoint.h>
 

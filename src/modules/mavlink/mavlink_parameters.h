@@ -41,10 +41,9 @@
 
 #pragma once
 
-#include <systemlib/param/param.h>
+#include <param/param.h>
 
 #include "mavlink_bridge_header.h"
-#include <uORB/uORB.h>
 #include <uORB/topics/rc_parameter_map.h>
 #include <uORB/topics/uavcan_parameter_request.h>
 #include <drivers/drv_hrt.h>

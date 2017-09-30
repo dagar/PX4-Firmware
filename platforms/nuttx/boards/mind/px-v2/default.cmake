@@ -7,10 +7,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
-	drivers/stm32
-	drivers/stm32/adc
-	drivers/stm32/tone_alarm
 	drivers/led
 	drivers/px4fmu
 	drivers/rgbled
@@ -32,10 +28,7 @@ set(config_module_list
 	drivers/gps
 	drivers/pwm_out_sim
 	#drivers/hott
-	#drivers/hott/hott_telemetry
-	#drivers/hott/hott_sensors
 	drivers/blinkm
-	drivers/airspeed
 	drivers/ets_airspeed
 	drivers/ms4525_airspeed
 	drivers/ms5525_airspeed
@@ -47,27 +40,20 @@ set(config_module_list
 	#drivers/oreoled
 	drivers/vmount
 	drivers/pwm_input
-	drivers/camera_trigger
+	modules/camera_trigger
 	drivers/bst
 	drivers/snapdragon_rc_pwm
 
 	#
 	# System commands
 	#
-	systemcmds/bl_update
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
 	systemcmds/esc_calib
 	systemcmds/led_control
-	systemcmds/hardfault_log
-	systemcmds/reboot
 	systemcmds/topic_listener
-	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
-	systemcmds/mtd
 	systemcmds/dumpfile
 	systemcmds/ver
 	systemcmds/sd_bench
@@ -126,9 +112,9 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
+	lib/param
+	lib/systemlib
+	lib/mixer
 	modules/uORB
 	modules/dataman
 
@@ -140,24 +126,16 @@ set(config_module_list
 	#
 	lib/controllib
 	lib/mathlib
-	lib/mathlib/math/filter
 	lib/rc
 	lib/ecl
 	lib/external_lgpl
 	lib/geo
 	lib/geo_lookup
 	lib/conversion
-	lib/launchdetection
 	lib/led
-	lib/terrain_estimation
-	lib/runway_takeoff
-	lib/tailsitter_recovery
 	lib/version
-	lib/DriverFramework/framework
-	lib/micro-CDR
 
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
+
 
 	#
 	# OBC challenge
@@ -191,9 +169,6 @@ set(config_module_list
 
 	# Hardware test
 	#examples/hwtest
-
-	# EKF
-	#examples/ekf_att_pos_estimator
 )
 
 set(config_rtps_send_topics

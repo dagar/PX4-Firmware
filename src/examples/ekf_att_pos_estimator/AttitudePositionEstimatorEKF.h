@@ -43,7 +43,6 @@
 
 #pragma once
 
-#include <uORB/uORB.h>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_local_position.h>
@@ -69,7 +68,6 @@
 
 #include <geo/geo.h>
 #include <terrain_estimation/terrain_estimator.h>
-#include <systemlib/perf_counter.h>
 #include "estimator_22states.h"
 
 #include <controllib/blocks.hpp>

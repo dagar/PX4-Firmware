@@ -44,7 +44,6 @@
 
 #include <drivers/drv_hrt.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/actuator_armed.h>

@@ -55,7 +55,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/debug_key_value.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
@@ -69,8 +68,6 @@
 #include <lib/mathlib/mathlib.h>
 #include <lib/geo/geo.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
 
 #ifdef __cplusplus
 extern "C" {

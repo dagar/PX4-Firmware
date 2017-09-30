@@ -70,11 +70,7 @@
 #include <arch/board/board.h>
 #include <drivers/drv_hrt.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/err.h>
-#include <systemlib/param/param.h>
 #include <drivers/drv_gps.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/satellite_info.h>
 #include <uORB/topics/gps_inject_data.h>

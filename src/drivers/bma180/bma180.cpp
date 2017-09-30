@@ -53,8 +53,6 @@
 #include <math.h>
 #include <unistd.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
 #include <nuttx/arch.h>
 #include <nuttx/wqueue.h>
 #include <nuttx/clock.h>
@@ -62,9 +60,9 @@
 #include <drivers/drv_hrt.h>
 #include <board_config.h>
 
-#include <drivers/device/spi.h>
+#include <device/spi.h>
 #include <drivers/drv_accel.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/ringbuffer.h>
 
 #define ACCEL_DEVICE_PATH	"/dev/bma180"
 

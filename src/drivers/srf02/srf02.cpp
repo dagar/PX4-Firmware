@@ -41,7 +41,7 @@
 #include <px4_defines.h>
 #include <px4_getopt.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -61,14 +61,13 @@
 #include <nuttx/wqueue.h>
 #include <nuttx/clock.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_range_finder.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/ringbuffer.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/distance_sensor.h>
 

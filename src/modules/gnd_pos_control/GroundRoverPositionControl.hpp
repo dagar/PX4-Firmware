@@ -52,8 +52,9 @@
 #include <ecl/l1/ecl_l1_pos_controller.h>
 #include <geo/geo.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/pid/pid.h>
+#include "pid/pid.h"
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/fw_pos_ctrl_status.h>
 #include <uORB/topics/manual_control_setpoint.h>
@@ -64,7 +65,6 @@
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_global_position.h>
-#include <uORB/uORB.h>
 
 using matrix::Dcmf;
 

@@ -44,7 +44,6 @@
 
 #include "LandDetector.h"
 
-#include <systemlib/param/param.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_attitude.h>

@@ -38,7 +38,6 @@
 #include <px4_posix.h>
 #include <errno.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/actuator_armed.h>
@@ -46,10 +45,9 @@
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
-#include <systemlib/mixer/mixer.h>
+#include "mixer/mixer.h"
 #include <systemlib/mixer/mixer_multirotor.generated.h>
-#include <systemlib/param/param.h>
-#include <systemlib/pwm_limit/pwm_limit.h>
+#include "pwm_limit/pwm_limit.h"
 #include <dev_fs_lib_serial.h>
 #include <v1.0/checksum.h>
 #include <v1.0/mavlink_types.h>

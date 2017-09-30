@@ -54,14 +54,13 @@
 #include <px4_tasks.h>
 #include <px4_posix.h>
 
-#include <arch/board/board.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
-#include <lib/geo/geo.h>
-#include <lib/mathlib/mathlib.h>
-#include <systemlib/err.h>
-#include <systemlib/param/param.h>
-#include <systemlib/systemlib.h>
+
+#include "geo/geo.h"
+#include "mathlib/mathlib.h"
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
 
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
@@ -79,7 +78,6 @@
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vtol_vehicle_status.h>
-#include <uORB/uORB.h>
 
 #include "tiltrotor.h"
 #include "tailsitter.h"

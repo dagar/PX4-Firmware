@@ -7,21 +7,17 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/airspeed
 	drivers/blinkm
 	drivers/bma180
 	drivers/bmi160
 	drivers/bmp280
 	drivers/bst
-	drivers/camera_trigger
-	drivers/device
+	modules/camera_trigger
 	drivers/ets_airspeed
 	drivers/frsky_telemetry
 	drivers/gps
 	drivers/hmc5883
 	drivers/hott
-	drivers/hott/hott_sensors
-	drivers/hott/hott_telemetry
 	drivers/led
 	drivers/lis3mdl
 	drivers/ll40ls
@@ -42,9 +38,6 @@ set(config_module_list
 	drivers/sf0x
 	drivers/snapdragon_rc_pwm
 	drivers/srf02
-	drivers/stm32
-	drivers/stm32/adc
-	drivers/stm32/tone_alarm
 	drivers/tap_esc
 	drivers/teraranger
 	modules/sensors
@@ -52,22 +45,15 @@ set(config_module_list
 	#
 	# System commands
 	#
-	systemcmds/bl_update
-	systemcmds/config
 	systemcmds/dumpfile
 	systemcmds/esc_calib
-	systemcmds/hardfault_log
 	systemcmds/led_control
 	systemcmds/mixer
 	systemcmds/motor_ramp
-	systemcmds/mtd
-	systemcmds/nshterm
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
-	systemcmds/reboot
 	systemcmds/sd_bench
-	systemcmds/top
 	systemcmds/topic_listener
 	systemcmds/ver
 
@@ -109,9 +95,9 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
+	lib/param
+	lib/systemlib
+	lib/mixer
 	modules/uORB
 	modules/dataman
 
@@ -120,24 +106,16 @@ set(config_module_list
 	#
 	lib/controllib
 	lib/mathlib
-	lib/mathlib/math/filter
 	lib/rc
 	lib/ecl
 	lib/external_lgpl
 	lib/geo
 	lib/geo_lookup
 	lib/conversion
-	lib/launchdetection
 	lib/led
-	lib/terrain_estimation
-	lib/runway_takeoff
-	lib/tailsitter_recovery
 	lib/version
-	lib/DriverFramework/framework
-	lib/micro-CDR
 
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
+
 
 	#
 	# OBC challenge

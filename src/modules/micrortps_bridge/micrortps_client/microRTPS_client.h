@@ -44,7 +44,6 @@
 #include <px4_posix.h>
 #include <px4_tasks.h>
 #include <px4_time.h>
-#include <uORB/uORB.h>
 
 #define BUFFER_SIZE 1024
 #define UPDATE_TIME_MS 0

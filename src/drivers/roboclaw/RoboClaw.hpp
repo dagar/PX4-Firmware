@@ -47,7 +47,7 @@
 #include <stdio.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/actuator_controls.h>
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 
 /**
  * This is a driver for the RoboClaw motor controller

@@ -61,11 +61,10 @@
 
 #include <debug.h>
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_hrt.h>
 #include <board_config.h>
 
-#include <systemlib/perf_counter.h>
 
 #include <modules/px4iofirmware/protocol.h>
 

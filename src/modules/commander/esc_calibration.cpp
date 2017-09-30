@@ -49,7 +49,6 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <systemlib/err.h>
 #include <fcntl.h>
 #include <px4_defines.h>
 #include <px4_posix.h>
@@ -57,9 +56,10 @@
 #include "drivers/drv_pwm_output.h"
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/vehicle_command.h>
-#include <uORB/uORB.h>
 #include <drivers/drv_hrt.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
+#include "param/param.h"
+#include <systemlib/err.h>
 
 int check_if_batt_disconnected(orb_advert_t *mavlink_log_pub) {
 	struct battery_status_s battery;

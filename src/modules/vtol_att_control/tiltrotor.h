@@ -41,7 +41,6 @@
 #ifndef TILTROTOR_H
 #define TILTROTOR_H
 #include "vtol_type.h"
-#include <systemlib/param/param.h>
 #include <drivers/drv_hrt.h>
 
 class Tiltrotor : public VtolType

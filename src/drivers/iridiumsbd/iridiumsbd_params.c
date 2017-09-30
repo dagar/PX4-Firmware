@@ -1,4 +1,3 @@
-#include <systemlib/param/param.h>
 
 /**
  * Satellite radio read interval

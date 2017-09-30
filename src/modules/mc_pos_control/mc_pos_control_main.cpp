@@ -54,7 +54,7 @@
 #include <px4_tasks.h>
 #include <px4_posix.h>
 #include <drivers/drv_hrt.h>
-#include <systemlib/hysteresis/hysteresis.h>
+#include <systemlib/err.h>
 
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/manual_control_setpoint.h>
@@ -71,10 +71,11 @@
 #include <float.h>
 #include <lib/geo/geo.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 
 #include <controllib/blocks.hpp>
 #include <controllib/block/BlockParam.hpp>
+#include "hysteresis/Hysteresis.hpp"
 
 #define SIGMA_SINGLE_OP			0.000001f
 #define SIGMA_NORM			0.001f
@@ -182,7 +183,7 @@ private:
 	control::BlockDerivative _vel_y_deriv;
 	control::BlockDerivative _vel_z_deriv;
 
-	systemlib::Hysteresis _manual_direction_change_hysteresis;
+	Hysteresis _manual_direction_change_hysteresis;
 
 	math::LowPassFilter2p _filter_manual_pitch;
 	math::LowPassFilter2p _filter_manual_roll;

@@ -48,7 +48,7 @@
 #include <fw_pos_control_l1/Landingslope.hpp>
 #include <geo/geo.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 
 bool
 MissionFeasibilityChecker::checkMissionFeasible(const mission_s &mission, float max_waypoint_distance,

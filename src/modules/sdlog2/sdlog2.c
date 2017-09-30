@@ -58,11 +58,12 @@
 #include <sys/statfs.h>
 #endif
 #include <ctype.h>
-#include <systemlib/err.h>
 #include <drivers/drv_hrt.h>
 #include <math.h>
 
-#include <uORB/uORB.h>
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
@@ -101,11 +102,8 @@
 #include <uORB/topics/cpuload.h>
 #include <uORB/topics/task_stack_info.h>
 
-#include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
 #include <systemlib/printload.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <version/version.h>
 
 #include "logbuffer.h"

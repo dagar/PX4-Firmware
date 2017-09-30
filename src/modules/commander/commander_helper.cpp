@@ -51,13 +51,13 @@
 #include <math.h>
 #include <string.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/led_control.h>
+#include "log/mavlink_log.h"
+#include "param/param.h"
 #include <systemlib/err.h>
-#include <systemlib/param/param.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_tone_alarm.h>
 

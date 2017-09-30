@@ -40,7 +40,7 @@
  */
 #pragma once
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_range_finder.h>
 
 /* Device limits */

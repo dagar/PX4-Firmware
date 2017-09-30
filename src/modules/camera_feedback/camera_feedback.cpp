@@ -92,7 +92,6 @@ CameraFeedback::~CameraFeedback()
 int
 CameraFeedback::start()
 {
-
 	ASSERT(_main_task == -1);
 
 	/* start the task */
@@ -104,7 +103,7 @@ CameraFeedback::start()
 					nullptr);
 
 	if (_main_task < 0) {
-		warn("task start failed");
+		PX4_ERR("task start failed");
 		return -errno;
 	}
 

@@ -53,8 +53,9 @@
 #include <ecl/attitude_fw/ecl_yaw_controller.h>
 #include <geo/geo.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
+#include <param/param.h>
+#include <perf/perf_counter.h>
+#include <systemlib/err.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/airspeed.h>

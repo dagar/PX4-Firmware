@@ -1,5 +1,5 @@
 #include "../BlockLocalPositionEstimator.hpp"
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <matrix/math.hpp>
 
 extern orb_advert_t mavlink_log_pub;

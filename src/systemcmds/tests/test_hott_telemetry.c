@@ -48,7 +48,6 @@
 #include <px4_defines.h>
 #include <px4_log.h>
 #include <sys/types.h>
-#include <systemlib/err.h>
 
 #include <errno.h>
 #include <fcntl.h>

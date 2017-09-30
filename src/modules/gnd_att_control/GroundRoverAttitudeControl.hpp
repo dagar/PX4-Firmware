@@ -48,9 +48,9 @@
 
 #include <drivers/drv_hrt.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/param/param.h>
-#include <systemlib/pid/pid.h>
-#include <systemlib/perf_counter.h>
+#include "perf/perf_counter.h"
+#include "pid/pid.h"
+#include "systemlib/err.h"
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/manual_control_setpoint.h>
@@ -59,7 +59,6 @@
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
-#include <uORB/uORB.h>
 
 using matrix::Eulerf;
 using matrix::Quatf;

@@ -39,7 +39,6 @@
  *
  */
 
-#include <systemlib/err.h>
 #include <unit_test.h>
 #include <mathlib/mathlib.h>
 

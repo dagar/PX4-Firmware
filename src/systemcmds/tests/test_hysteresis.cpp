@@ -1,6 +1,5 @@
+#include <hysteresis/Hysteresis.hpp>
 #include <unit_test.h>
-
-#include <systemlib/hysteresis/hysteresis.h>
 
 class HysteresisTest : public UnitTest
 {
@@ -39,7 +38,7 @@ bool HysteresisTest::run_tests()
 
 bool HysteresisTest::_init_false()
 {
-	systemlib::Hysteresis hysteresis(false);
+	Hysteresis hysteresis(false);
 	ut_assert_false(hysteresis.get_state());
 
 	return true;
@@ -47,7 +46,7 @@ bool HysteresisTest::_init_false()
 
 bool HysteresisTest::_init_true()
 {
-	systemlib::Hysteresis hysteresis(true);
+	Hysteresis hysteresis(true);
 	ut_assert_true(hysteresis.get_state());
 
 	return true;
@@ -56,7 +55,7 @@ bool HysteresisTest::_init_true()
 bool HysteresisTest::_zero_case()
 {
 	// Default is 0 hysteresis.
-	systemlib::Hysteresis hysteresis(false);
+	Hysteresis hysteresis(false);
 	ut_assert_false(hysteresis.get_state());
 
 	// Change and see result immediately.
@@ -78,7 +77,7 @@ bool HysteresisTest::_zero_case()
 bool HysteresisTest::_change_after_time()
 {
 
-	systemlib::Hysteresis hysteresis(false);
+	Hysteresis hysteresis(false);
 	hysteresis.set_hysteresis_time_from(false, 5000 * f);
 	hysteresis.set_hysteresis_time_from(true, 3000 * f);
 
@@ -107,7 +106,7 @@ bool HysteresisTest::_change_after_time()
 
 bool HysteresisTest::_hysteresis_changed()
 {
-	systemlib::Hysteresis hysteresis(false);
+	Hysteresis hysteresis(false);
 	hysteresis.set_hysteresis_time_from(true, 2000 * f);
 	hysteresis.set_hysteresis_time_from(false, 5000 * f);
 
@@ -139,7 +138,7 @@ bool HysteresisTest::_hysteresis_changed()
 
 bool HysteresisTest::_change_after_multiple_sets()
 {
-	systemlib::Hysteresis hysteresis(false);
+	Hysteresis hysteresis(false);
 	hysteresis.set_hysteresis_time_from(true, 5000 * f);
 	hysteresis.set_hysteresis_time_from(false, 5000 * f);
 
@@ -168,7 +167,7 @@ bool HysteresisTest::_change_after_multiple_sets()
 
 bool HysteresisTest::_take_change_back()
 {
-	systemlib::Hysteresis hysteresis(false);
+	Hysteresis hysteresis(false);
 	hysteresis.set_hysteresis_time_from(false, 5000 * f);
 
 	// Change to true.

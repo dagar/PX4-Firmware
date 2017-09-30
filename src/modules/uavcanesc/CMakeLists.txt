@@ -75,8 +75,8 @@ px4_add_module(
 		indication_controller.cpp
 		led.cpp
 		uavcanesc_params.c
-		${PX4_SOURCE_DIR}/src/modules/systemlib/flashparams/flashparams.c
-		${PX4_SOURCE_DIR}/src/modules/systemlib/flashparams/flashfs.c
+		${PX4_SOURCE_DIR}/src/lib/flashparams/flashparams.c
+		${PX4_SOURCE_DIR}/src/lib/flashparams/flashfs.c
 	DEPENDS
 		platforms__common
 		uavcan

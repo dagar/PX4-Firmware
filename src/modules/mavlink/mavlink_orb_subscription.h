@@ -41,7 +41,7 @@
 #ifndef MAVLINK_ORB_SUBSCRIPTION_H_
 #define MAVLINK_ORB_SUBSCRIPTION_H_
 
-#include <systemlib/uthash/utlist.h>
+#include <uthash/utlist.h>
 #include <drivers/drv_hrt.h>
 #include "uORB/uORB.h"	// orb_id_t
 

@@ -38,7 +38,6 @@
  */
 
 #include "esc.hpp"
-#include <systemlib/err.h>
 #include <drivers/drv_hrt.h>
 
 #define MOTOR_BIT(x) (1<<(x))

@@ -41,7 +41,6 @@
 
 #include "gnss.hpp"
 #include <drivers/drv_hrt.h>
-#include <systemlib/err.h>
 #include <mathlib/mathlib.h>
 
 const char *const UavcanGnssBridge::NAME = "gnss";

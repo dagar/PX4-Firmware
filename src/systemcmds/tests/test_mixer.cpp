@@ -52,14 +52,10 @@
 #include <limits.h>
 #include <math.h>
 
-#include <systemlib/err.h>
-#include <systemlib/mixer/mixer.h>
-#include <systemlib/pwm_limit/pwm_limit.h>
+#include "mixer/mixer.h"
+#include "pwm_limit/pwm_limit.h"
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
-#include <px4iofirmware/mixer.h>
-#include <px4iofirmware/protocol.h>
-
 #include <uORB/topics/actuator_controls.h>
 
 #include "tests_main.h"
@@ -247,7 +243,7 @@ bool MixerTest::load_mixer(const char *filename, unsigned expected_count, bool v
 	}
 
 	// Test a number of chunk sizes
-	for (unsigned chunk_size = 6; chunk_size < PX4IO_MAX_TRANSFER_LEN + 1; chunk_size++) {
+	for (unsigned chunk_size = 6; chunk_size < 64 + 1; chunk_size++) {
 		bool ret = load_mixer(filename, buf, loaded, expected_count, chunk_size, verbose);
 
 		if (!ret) {
@@ -294,7 +290,7 @@ bool MixerTest::load_mixer(const char *filename, const char *buf, unsigned loade
 
 	/* reset, load in chunks */
 	mixer_group.reset();
-	char mixer_text[PX4IO_MAX_MIXER_LENGHT];		/* large enough for one mixer */
+	char mixer_text[230];		/* large enough for one mixer */
 
 	unsigned mixer_text_length = 0;
 	unsigned transmitted = 0;
@@ -306,8 +302,8 @@ bool MixerTest::load_mixer(const char *filename, const char *buf, unsigned loade
 
 		/* check for overflow - this would be really fatal */
 		if ((mixer_text_length + text_length + 1) > sizeof(mixer_text)) {
-			PX4_ERR("Mixer text length overflow for file: %s. Is PX4IO_MAX_MIXER_LENGHT too small? (curr len: %d)", filename,
-				PX4IO_MAX_MIXER_LENGHT);
+			PX4_ERR("Mixer text length overflow for file: %s. Is 230 too small? (curr len: %d)", filename,
+				230);
 			return false;
 		}
 

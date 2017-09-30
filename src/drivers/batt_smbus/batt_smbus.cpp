@@ -62,20 +62,15 @@
 
 #include <board_config.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
-#include <systemlib/systemlib.h>
-
-#include <uORB/uORB.h>
 #include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/battery_status.h>
 
 #include <float.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_batt_smbus.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/ringbuffer.h>
 
 #define BATT_SMBUS_ADDR_MIN             0x08	///< lowest possible address
 #define BATT_SMBUS_ADDR_MAX             0x7F	///< highest possible address

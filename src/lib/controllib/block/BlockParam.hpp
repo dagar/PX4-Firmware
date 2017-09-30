@@ -41,9 +41,10 @@
 
 #include "Block.hpp"
 
-#include <containers/List.hpp>
-#include <px4_defines.h>
-#include <systemlib/param/param.h>
+#include "px4_defines.h"
+
+#include "containers/List.hpp"
+#include "param/param.h"
 
 namespace control
 {

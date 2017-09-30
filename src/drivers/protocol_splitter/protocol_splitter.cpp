@@ -40,7 +40,7 @@
  *    /dev/rtps
  */
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <px4_sem.hpp>
 #include <px4_log.h>
 

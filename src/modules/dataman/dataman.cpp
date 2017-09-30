@@ -51,7 +51,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <systemlib/err.h>
 #include <queue.h>
 #include <string.h>
 #include <semaphore.h>
@@ -60,7 +59,6 @@
 #include <drivers/drv_hrt.h>
 
 #include "dataman.h"
-#include <systemlib/param/param.h>
 
 #if defined(FLASH_BASED_DATAMAN)
 #include <nuttx/clock.h>

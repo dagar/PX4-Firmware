@@ -53,7 +53,6 @@
 #include <errno.h>
 #include <math.h>
 
-#include <systemlib/perf_counter.h>
 #include <lib/mathlib/mathlib.h>
 
 

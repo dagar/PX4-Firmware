@@ -31,6 +31,8 @@
 #
 ############################################################################
 
+px4_add_git_submodule(TARGET git_uavcan PATH "${PX4_SOURCE_DIR}/src/modules/uavcan/libuavcan")
+
 set(UAVCAN_USE_CPP03 ON CACHE BOOL "uavcan cpp03")
 set(UAVCAN_PLATFORM stm32 CACHE STRING "uavcan platform")
 
@@ -81,6 +83,7 @@ px4_add_module(
 		sensors/baro.cpp
 
 	DEPENDS
+		git_uavcan
 		platforms__common
 		uavcan
 	)

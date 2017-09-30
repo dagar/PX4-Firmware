@@ -49,14 +49,13 @@
 #include <sys/types.h>
 
 #include <board_config.h>
-#include <drivers/device/i2c.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/i2c.h>
+#include <device/ringbuffer.h>
 #include <drivers/drv_irlock.h>
 #include <drivers/drv_hrt.h>
 
 #include <nuttx/clock.h>
 #include <nuttx/wqueue.h>
-#include <systemlib/err.h>
 
 /** Configuration Constants **/
 #define IRLOCK_I2C_BUS			PX4_I2C_BUS_EXPANSION

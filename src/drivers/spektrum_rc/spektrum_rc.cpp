@@ -47,7 +47,6 @@
 #include <drivers/drv_rc_input.h>
 #include <drivers/drv_hrt.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/input_rc.h>
 
 // Snapdraogon: use J12 (next to J13, power module side)

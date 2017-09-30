@@ -49,7 +49,6 @@
 #include <errno.h>
 #include <nshlib/nshlib.h>
 #include <fcntl.h>
-#include <systemlib/err.h>
 #include <drivers/drv_hrt.h>
 
 __EXPORT int nshterm_main(int argc, char *argv[]);

@@ -42,7 +42,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include <uORB/uORB.h>
 #include <uORB/uORBTopics.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/log_message.h>
@@ -59,7 +58,7 @@
 #include <px4_sem.h>
 #include <px4_shutdown.h>
 #include <px4_tasks.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <replay/definitions.hpp>
 #include <version/version.h>
 

@@ -19,8 +19,6 @@
 #include <getopt.h>
 #include <px4_log.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
 #include <nuttx/wqueue.h>
 #include <systemlib/conversions.h>
 
@@ -30,9 +28,9 @@
 #include <board_config.h>
 #include <drivers/drv_hrt.h>
 
-#include <drivers/device/ringbuffer.h>
-#include <drivers/device/integrator.h>
-#include <drivers/device/i2c.h>
+#include <device/ringbuffer.h>
+#include <device/integrator.h>
+#include <device/i2c.h>
 #include <drivers/drv_mag.h>
 #include <mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/conversion/rotation.h>

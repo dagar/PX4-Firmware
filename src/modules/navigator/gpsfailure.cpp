@@ -40,10 +40,9 @@
 #include "gpsfailure.h"
 #include "navigator.h"
 
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <geo/geo.h>
 #include <navigator/navigation.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/mission.h>
 #include <uORB/topics/home_position.h>
 #include <mathlib/mathlib.h>

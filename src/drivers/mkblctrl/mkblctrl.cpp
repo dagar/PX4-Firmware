@@ -43,8 +43,7 @@
 
 #include <px4_config.h>
 #include <px4_tasks.h>
-#include <drivers/device/i2c.h>
-#include <systemlib/param/param.h>
+#include <device/i2c.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -59,28 +58,29 @@
 #include <math.h>
 #include <unistd.h>
 
+#include "param/param.h"
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include <nuttx/arch.h>
 #include <nuttx/i2c/i2c_master.h>
 
 #include <board_config.h>
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_pwm_output.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_rc_input.h>
 #include <drivers/drv_mixer.h>
 #include <drivers/drv_tone_alarm.h>
 
-#include <systemlib/systemlib.h>
-#include <systemlib/err.h>
-#include <systemlib/mixer/mixer.h>
+#include "mixer/mixer.h"
 
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/esc_status.h>
 
-#include <systemlib/err.h>
 
 #define I2C_BUS_SPEED					100000
 #define UPDATE_RATE						200

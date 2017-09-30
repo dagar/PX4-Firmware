@@ -34,7 +34,7 @@
 #ifndef _uORBCommon_hpp_
 #define _uORBCommon_hpp_
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_orb_dev.h>
 #include <systemlib/err.h>
 #include "uORB.h"

@@ -2,7 +2,6 @@
 
 #include <drivers/sf0x/sf0x_parser.h>
 
-#include <systemlib/err.h>
 
 #include <cstdio>
 #include <cstring>

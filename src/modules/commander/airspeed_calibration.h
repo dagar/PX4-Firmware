@@ -39,8 +39,7 @@
 #ifndef AIRSPEED_CALIBRATION_H_
 #define AIRSPEED_CALIBRATION_H_
 
-#include <stdint.h>
-#include <uORB/uORB.h>
+#include <uORB/topics/differential_pressure.h>
 
 int do_airspeed_calibration(orb_advert_t *mavlink_log_pub);
 

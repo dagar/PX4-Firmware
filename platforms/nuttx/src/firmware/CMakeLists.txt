@@ -1,8 +1,7 @@
-include(common/px4_upload)
 
 # add executable
 set(fw_name ${CONFIG}.elf)
-add_executable(${fw_name} ${PX4_SOURCE_DIR}/src/platforms/empty.c)
+add_executable(${fw_name} empty.c)
 add_dependencies(${fw_name} git_nuttx)
 
 get_property(module_libraries GLOBAL PROPERTY PX4_LIBRARIES)
@@ -64,6 +63,7 @@ if (TARGET parameters_xml AND TARGET airframes_xml)
 	add_custom_target(px4 ALL DEPENDS ${PX4_BINARY_DIR}/${CONFIG}.px4)
 
 	# upload helper
+	include(px4_upload)
 	if (${BOARD} STREQUAL "aerofc-v1")
 		px4_add_upload_aero(OUT upload OS ${OS} BOARD ${BOARD} BUNDLE ${fw_file})
 	else()
@@ -86,6 +86,7 @@ add_custom_target(check_weak
 	)
 
 # debugger helpers
+set(DEBUG_PORT "/dev/ttyACM0" CACHE STRING "debugging port")
 configure_file(gdbinit.in .gdbinit)
 
 add_custom_target(debug

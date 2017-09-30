@@ -1,6 +1,5 @@
 #include <unit_test.h>
 
-#include <systemlib/err.h>
 
 #include <stdio.h>
 #include <unistd.h>

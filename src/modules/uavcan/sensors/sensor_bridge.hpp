@@ -39,7 +39,7 @@
 
 #include <containers/List.hpp>
 #include <uavcan/uavcan.hpp>
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_orb_dev.h>
 
 /**

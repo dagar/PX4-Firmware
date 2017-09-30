@@ -51,17 +51,12 @@
 #include <math.h>
 
 // system libraries
-#include <systemlib/param/param.h>
-#include <systemlib/err.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/systemlib.h>
 #include <systemlib/circuit_breaker.h>
 // internal libraries
 #include <lib/mathlib/mathlib.h>
 #include <lib/geo/geo.h>
 
 // Include uORB and the required topics for this app
-#include <uORB/uORB.h>
 #include <uORB/topics/sensor_combined.h>                // this topics hold the acceleration data
 #include <uORB/topics/actuator_controls.h>              // this topic gives the actuators control input
 #include <uORB/topics/vehicle_attitude.h>                  // this topic holds the orientation of the hippocampus

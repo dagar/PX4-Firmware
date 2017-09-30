@@ -44,12 +44,13 @@
 
 #include <nuttx/wqueue.h>
 #include <nuttx/clock.h>
-#include <systemlib/perf_counter.h>
 
-#include <drivers/device/i2c.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/i2c.h>
+#include <device/ringbuffer.h>
 
-#include <uORB/uORB.h>
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include <uORB/topics/distance_sensor.h>
 
 

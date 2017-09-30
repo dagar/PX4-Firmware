@@ -44,12 +44,12 @@
 #include "LidarLiteI2C.h"
 #include "LidarLitePWM.h"
 #include <board_config.h>
-#include <systemlib/err.h>
 #include <fcntl.h>
 #include <cstdlib>
 #include <string.h>
 #include <stdio.h>
 #include <platforms/px4_getopt.h>
+#include "perf/perf_counter.h"
 
 #ifndef CONFIG_SCHED_WORKQUEUE
 # error This requires CONFIG_SCHED_WORKQUEUE.

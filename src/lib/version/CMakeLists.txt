@@ -31,6 +31,15 @@
 #
 ############################################################################
 
+# The URL for the elf file for crash logging
+if (DEFINED ENV{BUILD_URI})
+	set(BUILD_URI $ENV{BUILD_URI})
+else()
+	set(BUILD_URI "localhost")
+endif()
+
+add_definitions(-DBUILD_URI=${BUILD_URI})
+
 # check if px4 source is a git repo
 if (EXISTS ${PX4_SOURCE_DIR}/.git)
 	if (IS_DIRECTORY ${PX4_SOURCE_DIR}/.git)
@@ -62,13 +71,5 @@ add_custom_command(OUTPUT ${px4_git_ver_header}
 set_source_files_properties(${px4_git_ver_header} PROPERTIES GENERATED TRUE)
 add_custom_target(ver_gen ALL DEPENDS ${px4_git_ver_header})
 
-px4_add_module(
-	MODULE lib__version
-	COMPILE_FLAGS
-	SRCS
-		version.c
-	DEPENDS
-		ver_gen
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+px4_add_library(version version.c)
+add_dependencies(version ver_gen)

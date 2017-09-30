@@ -49,7 +49,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <math.h>
-#include <systemlib/err.h>
 
 #include <arch/board/board.h>
 

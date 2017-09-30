@@ -37,7 +37,7 @@
 
 #include <px4_config.h>
 #include <uavcan_stm32/uavcan_stm32.hpp>
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <uavcan/protocol/file/BeginFirmwareUpdate.hpp>
 #include <uavcan/node/timer.hpp>
 /**

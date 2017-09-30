@@ -37,16 +37,12 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
 	drivers/led
 	drivers/stm32
 
 	#
 	# System commands
 	#
-	systemcmds/config
-	systemcmds/reboot
-	systemcmds/top
 	systemcmds/param
 	systemcmds/ver
 
@@ -64,10 +60,8 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	lib/micro-CDR
 	lib/version
-	modules/systemlib
-	modules/systemlib/param
+	lib/systemlib
+	lib/param
 	modules/uORB
-	platforms/common
 )

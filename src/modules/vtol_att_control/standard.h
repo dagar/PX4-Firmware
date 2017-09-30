@@ -46,7 +46,6 @@
 #ifndef STANDARD_H
 #define STANDARD_H
 #include "vtol_type.h"
-#include <systemlib/param/param.h>
 #include <drivers/drv_hrt.h>
 
 class Standard : public VtolType

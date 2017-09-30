@@ -30,14 +30,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE lib__mathlib
-	COMPILE_FLAGS
-	SRCS
-		math/test/test.cpp
+
+px4_add_git_submodule(TARGET git_matrix PATH "${PX4_SOURCE_DIR}/src/lib/matrix")
+
+px4_add_library(mathlib
+		math/filter/LowPassFilter2p.cpp
 		math/Limits.cpp
 		math/matrix_alg.cpp
-	DEPENDS
-		platforms__common
+		math/test/test.cpp
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+	
+add_dependencies(mathlib git_matrix)

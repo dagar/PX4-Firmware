@@ -71,8 +71,6 @@
 #include <drivers/drv_board_led.h>
 
 #include <systemlib/cpuload.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/param/param.h>
 
 /****************************************************************************
  * Pre-Processor Definitions

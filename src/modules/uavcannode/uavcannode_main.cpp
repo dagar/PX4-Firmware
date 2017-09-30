@@ -44,10 +44,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <systemlib/err.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
-#include <systemlib/mixer/mixer.h>
+#include "mixer/mixer.h"
 #include <systemlib/board_serial.h>
 #include <version/version.h>
 __BEGIN_DECLS

@@ -63,15 +63,15 @@
 #include <cfloat>
 
 #include "Landingslope.hpp"
+#include "launchdetection/LaunchDetector.h"
+#include "runway_takeoff/RunwayTakeoff.h"
 
+#include "perf/perf_counter.h"
 #include <drivers/drv_hrt.h>
 #include <ecl/l1/ecl_l1_pos_controller.h>
 #include <external_lgpl/tecs/tecs.h>
 #include <geo/geo.h>
-#include <launchdetection/LaunchDetector.h>
 #include <mathlib/mathlib.h>
-#include <runway_takeoff/RunwayTakeoff.h>
-#include <systemlib/perf_counter.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
@@ -87,7 +87,6 @@
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
 
 static constexpr float HDG_HOLD_DIST_NEXT =

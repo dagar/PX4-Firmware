@@ -43,10 +43,8 @@
 #include <stdio.h>
 #include <poll.h>
 
-#include <systemlib/err.h>
 #include <drivers/drv_hrt.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/debug_key_value.h>
 #include <uORB/topics/debug_value.h>
 #include <uORB/topics/debug_vect.h>

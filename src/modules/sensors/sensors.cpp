@@ -67,16 +67,14 @@
 #include <drivers/drv_airspeed.h>
 #include <drivers/drv_px4flow.h>
 
-#include <systemlib/airspeed.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
-#include <systemlib/err.h>
-#include <systemlib/perf_counter.h>
+#include "airspeed/airspeed.h"
+#include "param/param.h"
+#include "perf/perf_counter.h"
 #include <systemlib/battery.h>
+#include <systemlib/err.h>
 
 #include <conversion/rotation.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/parameter_update.h>

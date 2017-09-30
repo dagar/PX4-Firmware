@@ -33,16 +33,17 @@
 
 #include <stdint.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf/perf_counter.h>
 #include <systemlib/conversions.h>
+#include <systemlib/err.h>
 
 #include <nuttx/wqueue.h>
 
 #include <board_config.h>
 #include <drivers/drv_hrt.h>
 
-#include <drivers/device/ringbuffer.h>
-#include <drivers/device/integrator.h>
+#include <device/ringbuffer.h>
+#include <device/integrator.h>
 #include <drivers/drv_accel.h>
 #include <drivers/drv_gyro.h>
 #include <drivers/drv_mag.h>

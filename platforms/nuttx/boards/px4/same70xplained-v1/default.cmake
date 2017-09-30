@@ -7,7 +7,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
 	drivers/samv7
 #WIP 	drivers/samv7/adc
 	drivers/samv7/tone_alarm
@@ -30,10 +29,7 @@ set(config_module_list
 	drivers/gps
 #WIP 	drivers/pwm_out_sim
 	drivers/hott
-	drivers/hott/hott_telemetry
-	drivers/hott/hott_sensors
 	drivers/blinkm
-	drivers/airspeed
 	drivers/ets_airspeed
 	drivers/frsky_telemetry
 	modules/sensors
@@ -42,7 +38,7 @@ set(config_module_list
 	drivers/oreoled
 ##	drivers/gimbal
 #WIP  	drivers/pwm_input
-#WIP  	drivers/camera_trigger
+#WIP  	modules/camera_trigger
 	drivers/bst
 	drivers/snapdragon_rc_pwm
 	drivers/lis3mdl
@@ -50,18 +46,13 @@ set(config_module_list
 	#
 	# System commands
 	#
-	systemcmds/bl_update
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
 	systemcmds/esc_calib
 #WIP systemcmds/hardfault_log
-	systemcmds/reboot
 	#systemcmds/topic_listener
-	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
 #	systemcmds/mtd Excluded until TWIHS works
 	systemcmds/dumpfile
 	systemcmds/ver
@@ -103,9 +94,9 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
+	lib/param
+	lib/systemlib
+	lib/mixer
 	modules/uORB
 	modules/dataman
 
@@ -114,7 +105,6 @@ set(config_module_list
 	#
 	lib/controllib
 	lib/mathlib
-	lib/mathlib/math/filter
 	lib/rc
 	lib/ecl
 	lib/external_lgpl
@@ -122,16 +112,9 @@ set(config_module_list
 	lib/geo_lookup
 	lib/conversion
 	lib/led
-	lib/DriverFramework/framework
-	lib/launchdetection
 	lib/version
-	lib/terrain_estimation
-	lib/runway_takeoff
-	lib/tailsitter_recovery
 
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
-	lib/micro-CDR
+
 
 	#
 	# OBC challenge

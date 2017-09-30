@@ -41,7 +41,6 @@
 
 #include <string.h>
 #include <cstdlib>
-#include <systemlib/err.h>
 
 extern bool mc_pos_control_thread_running;
 int mc_pos_control_daemon_task;             /**< Handle of deamon task / thread */

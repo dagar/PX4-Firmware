@@ -5,7 +5,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
 	drivers/stm32
 	drivers/led
 	drivers/px4fmu
@@ -17,20 +16,13 @@ set(config_module_list
 	#
 	# System commands
 	#
-	systemcmds/bl_update
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
 	systemcmds/esc_calib
-	systemcmds/reboot
-	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
-	systemcmds/mtd
 	systemcmds/dumpfile
 	systemcmds/ver
-	systemcmds/hardfault_log
 
 	#
 	# General system control
@@ -69,9 +61,9 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
+	lib/param
+	lib/systemlib
+	lib/mixer
 	modules/uORB
 	modules/dataman
 
@@ -80,23 +72,15 @@ set(config_module_list
 	#
 	lib/controllib
 	lib/mathlib
-	lib/mathlib/math/filter
 	lib/rc
 	lib/ecl
 	lib/external_lgpl
 	lib/geo
 	lib/geo_lookup
 	lib/conversion
-	lib/launchdetection
-	lib/terrain_estimation
-	lib/runway_takeoff
-	lib/tailsitter_recovery
 	lib/version
-	lib/DriverFramework/framework
-	lib/micro-CDR
 
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
+
 
 	#
 	# OBC challenge

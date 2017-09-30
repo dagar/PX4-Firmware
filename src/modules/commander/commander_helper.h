@@ -42,7 +42,6 @@
 #ifndef COMMANDER_HELPER_H_
 #define COMMANDER_HELPER_H_
 
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/vehicle_control_mode.h>

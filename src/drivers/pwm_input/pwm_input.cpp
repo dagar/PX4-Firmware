@@ -63,21 +63,22 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_range_finder.h>
 
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include "chip.h"
 #include "up_internal.h"
 #include "up_arch.h"
 
 #include "stm32_gpio.h"
 #include "stm32_tim.h"
-#include <systemlib/err.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/pwm_input.h>
 #include <uORB/topics/subsystem_info.h>
 
 #include <drivers/drv_device.h>
-#include <drivers/device/device.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/device.h>
+#include <device/ringbuffer.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>

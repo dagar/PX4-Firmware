@@ -42,8 +42,7 @@
 #ifndef ACCELEROMETER_CALIBRATION_H_
 #define ACCELEROMETER_CALIBRATION_H_
 
-#include <stdint.h>
-#include <uORB/uORB.h>
+#include <uORB/topics/sensor_accel.h>
 
 int do_accel_calibration(orb_advert_t *mavlink_log_pub);
 int do_level_calibration(orb_advert_t *mavlink_log_pub);

@@ -39,7 +39,7 @@
 
 #include "sensor_bridge.hpp"
 #include <drivers/drv_baro.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/ringbuffer.h>
 
 #include <uavcan/equipment/air_data/StaticPressure.hpp>
 #include <uavcan/equipment/air_data/StaticTemperature.hpp>

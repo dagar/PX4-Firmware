@@ -42,8 +42,7 @@
 
 #include <lib/mathlib/mathlib.h>
 #include <systemlib/px4_macros.h>
-#include <drivers/device/device.h>
-#include <uORB/uORB.h>
+#include <device/device.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/actuator_armed.h>
@@ -54,9 +53,8 @@
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
-#include <systemlib/mixer/mixer.h>
-#include <systemlib/param/param.h>
-#include <systemlib/pwm_limit/pwm_limit.h>
+#include "mixer/mixer.h"
+#include "pwm_limit/pwm_limit.h"
 
 #include "tap_esc_common.h"
 

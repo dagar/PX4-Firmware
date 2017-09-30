@@ -56,17 +56,14 @@
 #include <math.h>
 #include <unistd.h>
 #include <vector>
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/ringbuffer.h>
 #include <stdio.h>
-#include <uORB/uORB.h>
 #include <termios.h>
 
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_range_finder.h>
-#include <drivers/device/device.h>
+#include <device/device.h>
 
 #include <uORB/topics/distance_sensor.h>
 

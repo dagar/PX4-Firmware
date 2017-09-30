@@ -42,11 +42,9 @@
 
 #include <geo/geo.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/vtol_vehicle_status.h>
-#include <uORB/uORB.h>
 
 static constexpr float DELAY_SIGMA = 0.01f;
 

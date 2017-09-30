@@ -5,29 +5,23 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
 	drivers/stm32
 	drivers/led
 
 	#
 	# System commands
 	#
-	systemcmds/bl_update
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf
-	systemcmds/reboot
-	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
 	systemcmds/ver
 
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
+	lib/param
+	lib/systemlib
+	lib/mixer
 	modules/uORB
 
 	#
@@ -36,17 +30,13 @@ set(config_module_list
 	#lib/mathlib/CMSIS
 	lib/controllib
 	lib/mathlib
-	lib/mathlib/math/filter
 	lib/ecl
 	lib/external_lgpl
 	lib/geo
 	lib/conversion
 	lib/version
-	lib/DriverFramework/framework
-	lib/micro-CDR
 
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
+
 
 	#
 	# Demo apps

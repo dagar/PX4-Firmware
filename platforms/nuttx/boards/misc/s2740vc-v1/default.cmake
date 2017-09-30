@@ -43,9 +43,6 @@ set(config_module_list
 	#
 	# System commands
 	#
-	systemcmds/reboot
-	systemcmds/top
-	systemcmds/config
 	systemcmds/ver
 
 	#
@@ -55,14 +52,12 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
+	lib/param
+	lib/systemlib
 	lib/version
-	lib/micro-CDR
 
 	#
 	# Libraries
 	#
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
+
 )

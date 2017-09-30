@@ -62,7 +62,6 @@
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_roi.h>
-#include <uORB/uORB.h>
 
 class Navigator;
 

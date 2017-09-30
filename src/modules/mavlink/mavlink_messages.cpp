@@ -53,7 +53,7 @@
 #include <mathlib/mathlib.h>
 #include <px4_time.h>
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
@@ -96,7 +96,6 @@
 #include <uORB/topics/wind_estimate.h>
 #include <uORB/topics/mount_orientation.h>
 #include <uORB/topics/collision_report.h>
-#include <uORB/uORB.h>
 
 
 static uint16_t cm_uint16_from_m_float(float m);

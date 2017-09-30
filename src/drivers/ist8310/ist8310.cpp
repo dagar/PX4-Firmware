@@ -63,16 +63,13 @@
 
 #include <board_config.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 #include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/ringbuffer.h>
 #include <drivers/drv_device.h>
 
-#include <uORB/uORB.h>
 
 #include <float.h>
 #include <getopt.h>

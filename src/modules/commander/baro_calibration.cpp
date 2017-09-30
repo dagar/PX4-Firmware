@@ -45,8 +45,9 @@
 #include <drivers/drv_hrt.h>
 #include <uORB/topics/sensor_combined.h>
 #include <drivers/drv_baro.h>
-#include <systemlib/mavlink_log.h>
-#include <systemlib/param/param.h>
+#include "log/mavlink_log.h"
+#include "param/param.h"
+#include <systemlib/err.h>
 
 int do_baro_calibration(orb_advert_t *mavlink_log_pub)
 {

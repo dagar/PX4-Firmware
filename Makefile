@@ -123,7 +123,7 @@ endif
 define cmake-build
 +@$(eval BUILD_DIR = $(SRC_DIR)/build/$@$(BUILD_DIR_SUFFIX))
 +@if [ $(PX4_CMAKE_GENERATOR) = "Ninja" ] && [ -e $(BUILD_DIR)/Makefile ]; then rm -rf $(BUILD_DIR); fi
-+@if [ ! -e $(BUILD_DIR)/CMakeCache.txt ]; then mkdir -p $(BUILD_DIR) && cd $(BUILD_DIR) && cmake $(2)  -G"$(PX4_CMAKE_GENERATOR)" -DCONFIG=$(1) $(CMAKE_ARGS) || (rm -rf $(BUILD_DIR)); fi
++@if [ ! -e $(BUILD_DIR)/CMakeCache.txt ]; then mkdir -p $(BUILD_DIR) && cd $(BUILD_DIR) && cmake $(2) -G"$(PX4_CMAKE_GENERATOR)" -DCONFIG=$(1) $(CMAKE_ARGS) || (rm -rf $(BUILD_DIR)); fi
 +@(cd $(BUILD_DIR) && $(PX4_MAKE) $(PX4_MAKE_ARGS) $(ARGS))
 endef
 
@@ -135,10 +135,14 @@ define colorecho
 endef
 
 # Get a list of all config targets.
-ALL_CONFIG_TARGETS := $(shell ls $(SRC_DIR)/platforms/*/boards/*/*/*.cmake | sed -e "s:$(SRC_DIR)/platforms/\(.*\)/boards/\(.*\):\1_\2:" -e "s~/\(.*\)\.cmake~/\1~" -e "s~/~_~g")
+#ALL_CONFIG_TARGETS := $(shell ls $(SRC_DIR)/platforms/*/boards/*/*/*.cmake | sed -e "s:$(SRC_DIR)/platforms/\(.*\)/boards/\(.*\):\1_\2:" -e "s~/\(.*\)\.cmake~/\1~" -e "s~/~_~g")
+ALL_CONFIG_TARGETS := $(shell ls $(SRC_DIR)/platforms/*/boards/*/*/*.cmake | sed -e "s:$(SRC_DIR)/platforms/\(.*\)/boards/\(.*\):\1_\2:" -e "s~/\(.*\)\/~/\1_~" -e "s~/\(.*\)\.cmake~/\1~" -e "s~/~~g")
 
 # Strip off leading nuttx_
-NUTTX_CONFIG_TARGETS := $(patsubst nuttx_%,%,$(filter nuttx_%,$(ALL_CONFIG_TARGETS)))
+NUTTX_ALL_CONFIG_TARGETS := $(patsubst nuttx_%,%,$(filter nuttx_%,$(ALL_CONFIG_TARGETS)))
+
+# Strip off trailing _default
+NUTTX_CONFIG_TARGETS := $(patsubst %,%_default,$(filter $(NUTTX_CONFIG_TARGETS), %_default))
 
 # ADD CONFIGS HERE
 # --------------------------------------------------------------------
@@ -228,12 +232,12 @@ check_%:
 # --------------------------------------------------------------------
 .PHONY: parameters_metadata airframe_metadata module_documentation px4_metadata
 
-parameters_metadata: posix_sitl_default
-	@python $(SRC_DIR)/Tools/px_process_params.py -s $(SRC_DIR)/src --markdown
+parameters_metadata:
+	@${MAKE} posix_sitl_default parameters_markdown
 
 airframe_metadata:
-	@python $(SRC_DIR)/Tools/px_process_airframes.py -v -a $(SRC_DIR)/ROMFS/px4fmu_common/init.d --markdown
-	@python $(SRC_DIR)/Tools/px_process_airframes.py -v -a $(SRC_DIR)/ROMFS/px4fmu_common/init.d --xml
+	@${MAKE} posix_sitl_default parameters_xml
+	@${MAKE} posix_sitl_default parameters_markdown
 
 module_documentation:
 	@python $(SRC_DIR)/Tools/px_process_module_doc.py -v --markdown $(SRC_DIR)/modules --src-path $(SRC_DIR)/src

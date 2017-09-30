@@ -30,12 +30,5 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE lib__external_lgpl
-	COMPILE_FLAGS
-	SRCS
-		tecs/tecs.cpp
-	DEPENDS
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+
+px4_add_library(external_lgpl tecs/tecs.cpp)

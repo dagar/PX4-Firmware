@@ -50,7 +50,6 @@
 
 #include <arch/board/board.h>
 #include <drivers/drv_pwm_output.h>
-#include <systemlib/err.h>
 
 #include "tests_main.h"
 

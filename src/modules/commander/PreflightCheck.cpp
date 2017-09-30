@@ -51,10 +51,10 @@
 #include <math.h>
 #include <poll.h>
 
-#include <systemlib/err.h>
-#include <systemlib/param/param.h>
 #include <systemlib/rc_check.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
+#include "param/param.h"
+#include <systemlib/err.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mag.h>

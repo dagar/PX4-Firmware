@@ -39,7 +39,7 @@
 
 #include "voted_sensors_update.h"
 
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 
 #include <conversion/rotation.h>
 

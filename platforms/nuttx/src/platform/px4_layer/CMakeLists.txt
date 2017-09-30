@@ -35,7 +35,6 @@ px4_add_module(
 	COMPILE_FLAGS
 	SRCS
 		px4_nuttx_tasks.c
-		${PX4_SOURCE_DIR}/src/platforms/posix/px4_layer/px4_log.c
 	DEPENDS
 		platforms__common
 	)

@@ -51,7 +51,7 @@
 
 #include <arch/board/board.h>
 
-#include <drivers/device/spi.h>
+#include <device/spi.h>
 #include <drivers/drv_mag.h>
 #include <drivers/drv_device.h>
 

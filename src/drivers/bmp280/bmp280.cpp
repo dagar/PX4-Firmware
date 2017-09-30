@@ -61,13 +61,11 @@
 #include <board_config.h>
 #include <drivers/bmp280/bmp280.h>
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_baro.h>
 #include <drivers/drv_hrt.h>
-#include <drivers/device/ringbuffer.h>
+#include <device/ringbuffer.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
 
 
 enum BMP280_BUS {

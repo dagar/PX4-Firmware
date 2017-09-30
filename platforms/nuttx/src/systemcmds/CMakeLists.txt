@@ -1,0 +1,8 @@
+add_subdirectory(bl_update)
+add_subdirectory(config)
+add_subdirectory(hardfault_log)
+add_subdirectory(mtd)
+add_subdirectory(nshterm)
+add_subdirectory(reboot)
+add_subdirectory(top)
+add_subdirectory(usb_connected)

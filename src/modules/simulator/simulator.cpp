@@ -41,7 +41,6 @@
 #include <px4_time.h>
 #include <pthread.h>
 #include <poll.h>
-#include <systemlib/err.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

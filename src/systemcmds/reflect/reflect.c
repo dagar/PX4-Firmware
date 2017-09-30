@@ -46,7 +46,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
-#include <systemlib/err.h>
 
 __EXPORT int reflect_main(int argc, char *argv[]);
 

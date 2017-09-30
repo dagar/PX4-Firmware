@@ -45,9 +45,6 @@
 #include <stdbool.h>
 #include <poll.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/err.h>
-#include <systemlib/param/param.h>
 
 #include <px4_config.h>
 #include <px4_defines.h>
@@ -55,7 +52,6 @@
 #include <px4_posix.h>
 #include <drivers/drv_hrt.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/camera_trigger.h>
 #include <uORB/topics/camera_capture.h>
 #include <uORB/topics/vehicle_attitude.h>

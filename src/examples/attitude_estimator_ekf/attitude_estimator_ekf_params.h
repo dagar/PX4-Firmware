@@ -39,7 +39,6 @@
  * Parameters for EKF filter
  */
 
-#include <systemlib/param/param.h>
 
 struct attitude_estimator_ekf_params {
 	float r[3];

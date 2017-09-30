@@ -75,12 +75,13 @@
 #include <px4_time.h>
 #include <systemlib/circuit_breaker.h>
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
-#include <systemlib/param/param.h>
 #include <systemlib/rc_check.h>
 #include <systemlib/state_table.h>
 #include <float.h>
-#include <systemlib/hysteresis/hysteresis.h>
+#include "log/mavlink_log.h"
+#include "param/param.h"
+#include <systemlib/err.h>
+#include "hysteresis/Hysteresis.hpp"
 
 #include <board_config.h>
 
@@ -91,7 +92,6 @@
 #include <float.h>
 #include <matrix/math.hpp>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
@@ -197,7 +197,7 @@ static unsigned int leds_counter;
 /* To remember when last notification was sent */
 static uint64_t last_print_mode_reject_time = 0;
 
-static systemlib::Hysteresis auto_disarm_hysteresis(false);
+static Hysteresis auto_disarm_hysteresis(false);
 
 static float eph_threshold = 5.0f;	// Horizontal position error threshold (m)
 static float epv_threshold = 10.0f;	// Vertivcal position error threshold (m)

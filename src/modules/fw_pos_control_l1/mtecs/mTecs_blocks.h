@@ -44,7 +44,6 @@
 #pragma once
 
 #include <controllib/blocks.hpp>
-#include <systemlib/err.h>
 
 namespace fwPosctrl
 {

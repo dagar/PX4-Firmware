@@ -12,12 +12,7 @@
 .settings
 .swp
 .~lock.*
-Testing/
-Packages/*
-s3deploy-branch/
-s3deploy-archive/
 build/*
-build_*/
 core
 cscope.out
 cscope.in.out
@@ -33,19 +28,10 @@ tags
 .pydevproject
 .ropeproject
 *.orig
-src/modules/uORB/topics/*
-src/platforms/nuttx/px4_messages/*
-src/platforms/ros/px4_messages/*
 Firmware.zip
-*.generated.h
 .vagrant
 *.pretty
 xcode
-src/platforms/posix/px4_messages/
-src/platforms/posix-arm/px4_messages/
-src/platforms/qurt/px4_messages/
-ROMFS/*/*/rc.autostart
-rootfs/
 *.autosave
 CMakeLists.txt.user
 GPATH
@@ -63,14 +49,4 @@ cmake-build-*/
 .vscode
 
 posix-configs/SITL/init/test/*_generated
-
-parameters.md
-airframes.md
-airframes.xml
-/modules
-
-cppcheck-result.xml
-cppcheck
-
-scan-build
 

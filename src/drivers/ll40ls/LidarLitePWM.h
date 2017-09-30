@@ -48,14 +48,13 @@
 #include <nuttx/wqueue.h>
 #include <nuttx/clock.h>
 
-#include <drivers/device/ringbuffer.h>
-#include <systemlib/perf_counter.h>
+#include <device/ringbuffer.h>
 
-#include <uORB/uORB.h>
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include <uORB/topics/pwm_input.h>
 #include <uORB/topics/distance_sensor.h>
-
-
 
 class LidarLitePWM : public LidarLite, public device::CDev
 {

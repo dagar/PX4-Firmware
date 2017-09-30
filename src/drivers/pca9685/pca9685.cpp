@@ -49,7 +49,7 @@
 #include <px4_config.h>
 #include <px4_defines.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -65,11 +65,9 @@
 #include <nuttx/wqueue.h>
 #include <nuttx/clock.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
-#include <systemlib/systemlib.h>
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
 
-#include <uORB/uORB.h>
 #include <uORB/topics/actuator_controls.h>
 
 #include <board_config.h>

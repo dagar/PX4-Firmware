@@ -50,7 +50,6 @@
 #include <px4_config.h>
 #include <math.h>
 #include <float.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_armed.h>
@@ -64,13 +63,13 @@
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/distance_sensor.h>
 #include <poll.h>
-#include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
+#include "systemlib/err.h"
 #include <geo/geo.h>
 #include <drivers/drv_hrt.h>
 #include <platforms/px4_defines.h>
 
-#include <terrain_estimation/terrain_estimator.h>
+#include "terrain_estimation/terrain_estimator.h"
 #include "position_estimator_inav_params.h"
 #include "inertial_filter.h"
 

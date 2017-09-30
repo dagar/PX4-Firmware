@@ -47,7 +47,6 @@
 #include <fcntl.h>
 #include <termios.h>
 
-#include <systemlib/err.h>
 
 __EXPORT int dumpfile_main(int argc, char *argv[]);
 

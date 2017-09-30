@@ -39,8 +39,7 @@
 #ifndef BARO_CALIBRATION_H_
 #define BARO_CALIBRATION_H_
 
-#include <stdint.h>
-#include <uORB/uORB.h>
+#include <uORB/topics/sensor_baro.h>
 
 int do_baro_calibration(orb_advert_t *mavlink_log_pub);
 

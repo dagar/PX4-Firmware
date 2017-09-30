@@ -40,7 +40,6 @@
 #include <queue.h>
 
 #include <px4_defines.h>
-#include <systemlib/err.h>
 #include <drivers/drv_hrt.h>
 
 #include "mavlink_bridge_header.h"

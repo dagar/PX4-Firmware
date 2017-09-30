@@ -40,7 +40,6 @@
  * @author Beat Küng <beat-kueng@gmx.net>
  */
 
-#include <systemlib/param/param.h>
 #include <mathlib/mathlib.h>
 
 #include "common.h"

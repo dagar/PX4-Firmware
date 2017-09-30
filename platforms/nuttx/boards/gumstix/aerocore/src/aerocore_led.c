@@ -45,7 +45,6 @@
 #include "board_config.h"
 
 #include <arch/board/board.h>
-#include <systemlib/err.h>
 
 /*
  * Ideally we'd be able to get these from up_internal.h,

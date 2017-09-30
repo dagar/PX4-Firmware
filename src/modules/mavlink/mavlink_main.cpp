@@ -64,15 +64,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_hrt.h>
 #include <arch/board/board.h>
 
-#include <systemlib/param/param.h>
-#include <systemlib/err.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <geo/geo.h>
 #include <dataman/dataman.h>
 #include <version/version.h>

@@ -51,7 +51,6 @@
 #include <string.h>
 #include <time.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/err.h>
 #include <drivers/drv_hrt.h>
 
 #include "tests_main.h"

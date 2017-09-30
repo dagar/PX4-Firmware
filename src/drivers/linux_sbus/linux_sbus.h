@@ -49,7 +49,6 @@
 #include <px4_workqueue.h>
 #include <px4_defines.h>
 #include <drivers/drv_hrt.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/input_rc.h>
 /* The interval between each frame is 4700us, do not change it. */
 #define RCINPUT_MEASURE_INTERVAL_US 4700

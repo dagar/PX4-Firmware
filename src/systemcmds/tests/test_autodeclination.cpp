@@ -3,8 +3,7 @@
 #include <drivers/drv_hrt.h>
 #include <geo/geo.h>
 #include <px4iofirmware/px4io.h>
-#include <systemlib/err.h>
-#include <systemlib/mixer/mixer.h>
+#include "mixer/mixer.h"
 
 #include <math.h>
 #include <stdio.h>

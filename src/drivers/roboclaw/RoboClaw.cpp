@@ -49,8 +49,7 @@
 #include <fcntl.h>
 #include <termios.h>
 
-#include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <arch/board/board.h>
 
 #include <uORB/Publication.hpp>

@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-if(NOT GENERATE_RTPS_BRIDGE MATCHES "off")
+if(GENERATE_RTPS_BRIDGE)
 
 	find_program(FASTRTPSGEN fastrtpsgen PATHS $ENV{FASTRTPSGEN_DIR})
 	if(NOT FASTRTPSGEN)
@@ -116,8 +116,9 @@ if(NOT GENERATE_RTPS_BRIDGE MATCHES "off")
 			DEPENDS
 				platforms__common
 				topic_bridge_files
-				uorb_headers
+				uorb_headers_microcdr
 		)
 		target_link_libraries(modules__micrortps_bridge__micrortps_client PRIVATE lib__micro-CDR)
+		target_link_libraries(modules__micrortps_bridge__micrortps_client PRIVATE uorb_msgs_microcdr)
 	endif()
 endif()

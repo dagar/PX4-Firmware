@@ -46,15 +46,13 @@
 #include <px4_posix.h>
 #include <px4_shutdown.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/actuator_controls.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
+#include "log/mavlink_log.h"
+#include "param/param.h"
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_device.h>
 

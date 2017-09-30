@@ -52,26 +52,22 @@
 
 #include <px4_config.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 
 #include <board_config.h>
 
-#include <systemlib/airspeed.h>
-#include <systemlib/err.h>
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
+#include "airspeed/airspeed.h"
 
 #include <mathlib/math/filter/LowPassFilter2p.hpp>
 
 #include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/system_power.h>
 
-#include <drivers/airspeed/airspeed.h>
+#include <device/airspeed/airspeed.h>
 
 /* I2C bus address is 1010001x */
 #define I2C_ADDRESS_MS4525DO	0x28	/**< 7-bit address. Depends on the order code (this is for code "I") */

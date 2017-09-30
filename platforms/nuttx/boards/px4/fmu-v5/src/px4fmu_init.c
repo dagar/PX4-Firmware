@@ -76,13 +76,10 @@
 
 #include <systemlib/px4_macros.h>
 #include <systemlib/cpuload.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
 
 #include <systemlib/hardfault_log.h>
 
 #include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
 
 #include "up_internal.h"
 /****************************************************************************

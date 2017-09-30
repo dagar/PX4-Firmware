@@ -42,7 +42,7 @@
 #include <px4_config.h>
 #include <px4_getopt.h>
 #include <px4_workqueue.h>
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 #include <systemlib/err.h>
 #include <string.h>
 #include <stdlib.h>

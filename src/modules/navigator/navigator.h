@@ -41,6 +41,8 @@
 #ifndef NAVIGATOR_H
 #define NAVIGATOR_H
 
+#include "navigation.h"
+
 #include "datalinkloss.h"
 #include "enginefailure.h"
 #include "follow_target.h"
@@ -54,10 +56,12 @@
 #include "rtl.h"
 #include "takeoff.h"
 
-#include <controllib/block/BlockParam.hpp>
-#include <controllib/blocks.hpp>
-#include <navigator/navigation.h>
-#include <systemlib/perf_counter.h>
+#include "controllib/block/BlockParam.hpp"
+#include "controllib/blocks.hpp"
+#include "log/mavlink_log.h"
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include <uORB/topics/fw_pos_ctrl_status.h>
 #include <uORB/topics/geofence_result.h>
 #include <uORB/topics/mission.h>
@@ -69,7 +73,6 @@
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
-#include <uORB/uORB.h>
 
 /**
  * Number of navigation modes that need on_active/on_inactive calls

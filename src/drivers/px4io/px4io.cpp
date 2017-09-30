@@ -59,7 +59,7 @@
 
 #include <arch/board/board.h>
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_rc_input.h>
 #include <drivers/drv_pwm_output.h>
 #include <drivers/drv_sbus.h>
@@ -67,13 +67,9 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
 
-#include <systemlib/mixer/mixer.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
+#include "mixer/mixer.h"
 #include <systemlib/circuit_breaker.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <systemlib/battery.h>
 
 #include <uORB/topics/actuator_controls.h>

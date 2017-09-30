@@ -40,7 +40,7 @@ px4_add_module(
 	DEPENDS
 		platforms__common
 		git_ecl
-		lib__external_lgpl
+		external_lgpl
 		lib__ecl
 	)
 # vim: set noet ft=cmake fenc=utf-8 ff=unix :

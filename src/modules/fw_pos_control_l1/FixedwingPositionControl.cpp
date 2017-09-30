@@ -1894,7 +1894,7 @@ FixedwingPositionControl::start()
 					   nullptr);
 
 	if (_control_task < 0) {
-		warn("task start failed");
+		PX4_ERR("task start failed");
 		return -errno;
 	}
 
@@ -1916,7 +1916,7 @@ int fw_pos_control_l1_main(int argc, char *argv[])
 		}
 
 		if (OK != FixedwingPositionControl::start()) {
-			warn("start failed");
+			PX4_ERR("start failed");
 			return 1;
 		}
 

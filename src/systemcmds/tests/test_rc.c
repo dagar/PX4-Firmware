@@ -52,7 +52,6 @@
 #include <drivers/drv_pwm_output.h>
 #include <drivers/drv_rc_input.h>
 #include <drivers/drv_hrt.h>
-#include <systemlib/err.h>
 
 #include "tests_main.h"
 

@@ -36,10 +36,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_hrt.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/telemetry_status.h>
 
 typedef enum {

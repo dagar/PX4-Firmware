@@ -38,7 +38,6 @@
  */
 
 #include "hardpoint.hpp"
-#include <systemlib/err.h>
 
 UavcanHardpointController::UavcanHardpointController(uavcan::INode &node) :
 	_node(node),

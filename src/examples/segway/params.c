@@ -1,4 +1,3 @@
-#include <systemlib/param/param.h>
 
 // 16 is max name length
 PARAM_DEFINE_FLOAT(SEG_TH2V_P, 10.0f); // pitch to voltage

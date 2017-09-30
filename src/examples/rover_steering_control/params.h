@@ -38,6 +38,5 @@
  * Definition of parameters for fixedwing example
  */
 
-#include <systemlib/param/param.h>
 
 

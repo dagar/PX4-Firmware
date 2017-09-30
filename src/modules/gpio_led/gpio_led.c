@@ -49,15 +49,10 @@
 #include <px4_log.h>
 #include <nuttx/wqueue.h>
 #include <nuttx/clock.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/err.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/battery_status.h>
 #include <poll.h>
 #include <drivers/drv_gpio.h>
-#include <modules/px4iofirmware/protocol.h>
-
 
 #define CYCLE_RATE_HZ  5
 

@@ -58,15 +58,14 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <systemlib/mavlink_log.h>
-#include <systemlib/systemlib.h>
+#include "log/mavlink_log.h"
+#include <systemlib/err.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/mission.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/uORB.h>
 
 /**
  * navigator app start / stop handling function

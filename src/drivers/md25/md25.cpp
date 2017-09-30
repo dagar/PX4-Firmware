@@ -48,9 +48,8 @@
 #include <math.h>
 #include <string.h>
 
-#include <systemlib/err.h>
 #include <arch/board/board.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 
 #include <uORB/Publication.hpp>
 #include <uORB/topics/debug_key_value.h>

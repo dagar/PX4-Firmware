@@ -181,9 +181,60 @@ add_custom_command(OUTPUT ${uorb_sources}
 add_library(uorb_msgs STATIC EXCLUDE_FROM_ALL ${uorb_sources})
 add_dependencies(uorb_msgs uorb_headers prebuild_targets)
 
-# microCDR now part of uORB
-target_include_directories(uorb_msgs
-	PRIVATE ${PX4_SOURCE_DIR}/src/lib/micro-CDR/include
-	PRIVATE ${PX4_BINARY_DIR}/src/lib/micro-CDR/include/microcdr
+# micro-cdr serialization
+# if RTPS is enabled generate serialization code for each uORB message
+if (GENERATE_RTPS_BRIDGE)
+	set(uorb_headers_microcdr)
+	set(msg_out_path_microcdr ${PX4_BINARY_DIR}/uORB_microcdr/topics)
+	set(uorb_sources_microcdr)
+	set(msg_source_out_path_microcdr ${CMAKE_CURRENT_BINARY_DIR}/topics_microcdr_sources)
+	foreach(msg_file ${msg_files})
+		get_filename_component(msg ${msg_file} NAME_WE)
+		list(APPEND msg_list ${msg})
+		list(APPEND uorb_headers_microcdr ${msg_out_path_microcdr}/${msg}.h)
+		list(APPEND uorb_sources_microcdr ${msg_source_out_path_microcdr}/${msg}.cpp)
+	endforeach()
+
+	# Generate uORB headers
+	add_custom_command(OUTPUT ${uorb_headers_microcdr}
+		COMMAND ${PYTHON_EXECUTABLE} tools/px_generate_uorb_topic_files.py
+			--headers
+			-f ${msg_files}
+			-i ${CMAKE_CURRENT_SOURCE_DIR}
+			-o ${msg_out_path_microcdr}
+			-e templates/uorb_microcdr
+			-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/headers_microcdr
+			-q
+		DEPENDS ${msg_files}
+		COMMENT "Generating uORB microcdr topic headers"
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		VERBATIM
+		)
+	add_custom_target(uorb_headers_microcdr DEPENDS ${uorb_headers_microcdr})
+
+	# Generate uORB sources
+	add_custom_command(OUTPUT ${uorb_sources_microcdr}
+		COMMAND ${PYTHON_EXECUTABLE} tools/px_generate_uorb_topic_files.py
+			--sources
+			-f ${msg_files}
+			-i ${CMAKE_CURRENT_SOURCE_DIR}
+			-o ${msg_source_out_path_microcdr}
+			-e templates/uorb_microcdr
+			-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/sources_microcdr
+			-q
+		DEPENDS ${msg_files}
+		COMMENT "Generating uORB microcdr topic sources"
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		VERBATIM
+		)
+
+	add_library(uorb_msgs_microcdr STATIC EXCLUDE_FROM_ALL ${uorb_sources_microcdr})
+	add_dependencies(uorb_msgs_microcdr uorb_headers_microcdr)
+
+	# microCDR
+	target_include_directories(uorb_msgs_microcdr
+		PRIVATE ${PX4_SOURCE_DIR}/src/lib/micro-CDR/include
+		PRIVATE ${PX4_BINARY_DIR}/src/lib/micro-CDR/include/microcdr
 	)
-target_link_libraries(uorb_msgs PRIVATE lib__micro-CDR)
+	target_link_libraries(uorb_msgs_microcdr PRIVATE lib__micro-CDR)
+endif()

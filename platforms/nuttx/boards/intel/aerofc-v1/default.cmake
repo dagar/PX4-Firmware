@@ -7,7 +7,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
 	drivers/stm32
 	drivers/led
 	drivers/px4fmu
@@ -18,7 +17,6 @@ set(config_module_list
 	drivers/gps
 	drivers/ist8310
 	drivers/ll40ls
-	drivers/aerofc_adc
 	modules/sensors
 
 	#
@@ -29,10 +27,6 @@ set(config_module_list
 	systemcmds/perf
 	systemcmds/pwm
 	systemcmds/motor_test
-	systemcmds/reboot
-	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
 	systemcmds/dumpfile
 	systemcmds/ver
 
@@ -66,9 +60,9 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
+	lib/param
+	lib/systemlib
+	lib/mixer
 	modules/uORB
 	modules/dataman
 
@@ -77,15 +71,10 @@ set(config_module_list
 	#
 	lib/controllib
 	lib/mathlib
-	lib/mathlib/math/filter
 	lib/ecl
 	lib/geo
 	lib/geo_lookup
 	lib/conversion
-	lib/tailsitter_recovery
 	lib/version
-	lib/DriverFramework/framework
 	lib/rc
-	lib/micro-CDR
-	platforms/common
 )

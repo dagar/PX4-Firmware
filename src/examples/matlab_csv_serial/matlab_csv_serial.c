@@ -55,12 +55,8 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include <uORB/uORB.h>
 #include <drivers/drv_accel.h>
 #include <drivers/drv_gyro.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/systemlib.h>
-#include <systemlib/err.h>
 #include <poll.h>
 
 __EXPORT int matlab_csv_serial_main(int argc, char *argv[]);

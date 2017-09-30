@@ -108,16 +108,14 @@
 
 #include <px4_workqueue.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
-#include <systemlib/systemlib.h>
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
 
 #include <board_config.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 #include <drivers/drv_blinkm.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/vehicle_control_mode.h>

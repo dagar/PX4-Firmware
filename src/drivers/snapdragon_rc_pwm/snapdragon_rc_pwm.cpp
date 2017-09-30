@@ -47,6 +47,7 @@
 #include <px4_tasks.h>
 #include <px4_getopt.h>
 #include <px4_posix.h>
+#include <systemlib/err.h>
 #include <errno.h>
 #include <string.h>
 #include <termios.h>

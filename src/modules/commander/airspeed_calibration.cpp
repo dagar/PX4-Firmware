@@ -52,10 +52,9 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_airspeed.h>
 #include <uORB/topics/differential_pressure.h>
-#include <systemlib/mavlink_log.h>
-#include <systemlib/param/param.h>
+#include "log/mavlink_log.h"
+#include "param/param.h"
 #include <systemlib/err.h>
-#include <systemlib/airspeed.h>
 
 static const char *sensor_name = "airspeed";
 

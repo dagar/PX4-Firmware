@@ -43,7 +43,6 @@
 #include <px4_config.h>
 #include <drivers/drv_rc_input.h>
 
-#include <systemlib/param/param.h>
 #include <mathlib/mathlib.h>
 
 #include <uORB/topics/rc_parameter_map.h>

@@ -18,6 +18,6 @@ exec find src \
     -path src/modules/commander -prune -o \
     -path src/modules/micrortps_bridge/micrortps_agent -prune -o \
     -path src/modules/sdlog2 -prune -o \
-    -path src/modules/systemlib/uthash -prune -o \
+    -path src/modules/uthash -prune -o \
     -path src/modules/uavcan/libuavcan -prune -o \
     -type f \( -name "*.c" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) | grep $PATTERN

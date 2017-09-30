@@ -52,7 +52,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_control_mode.h>
@@ -67,10 +66,10 @@
 #include <mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/geo/geo.h>
 
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
+#include "param/param.h"
+#include "perf/perf_counter.h"
+#include "log/mavlink_log.h"
+#include "systemlib/err.h"
 
 extern "C" __EXPORT int attitude_estimator_q_main(int argc, char *argv[]);
 

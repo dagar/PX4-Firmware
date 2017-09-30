@@ -44,7 +44,6 @@
 
 #pragma once
 
-#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_gps_position.h>
 
 #include <uavcan/uavcan.hpp>

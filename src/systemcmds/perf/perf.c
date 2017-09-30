@@ -31,15 +31,13 @@
  *
  ****************************************************************************/
 
-
+#include "perf_counter.h"
 
 #include <px4_config.h>
 #include <px4_module.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-
-#include "systemlib/perf_counter.h"
 
 __EXPORT int perf_main(int argc, char *argv[]);
 

@@ -39,8 +39,7 @@
 #ifndef RC_CALIBRATION_H_
 #define RC_CALIBRATION_H_
 
-#include <stdint.h>
-#include <uORB/uORB.h>
+#include <uORB/topics/manual_control_setpoint.h>
 
 int do_trim_calibration(orb_advert_t *mavlink_log_pub);
 

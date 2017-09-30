@@ -47,9 +47,8 @@
 #include <float.h>
 
 #include <geo/geo.h>
-#include <systemlib/mavlink_log.h>
+#include "log/mavlink_log.h"
 #include <mathlib/mathlib.h>
-#include <uORB/uORB.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vtol_vehicle_status.h>

@@ -53,21 +53,24 @@
  * If rotation matrix setpoint is invalid it will be generated from Euler angles for compatibility with old position controllers.
  */
 
-#include <conversion/rotation.h>
+
+#include "tailsitter_recovery/tailsitter_recovery.h"
+
 #include <drivers/drv_hrt.h>
-#include <lib/geo/geo.h>
-#include <lib/mathlib/mathlib.h>
-#include <lib/tailsitter_recovery/tailsitter_recovery.h>
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_posix.h>
 #include <px4_tasks.h>
-#include <systemlib/circuit_breaker.h>
-#include <systemlib/err.h>
-#include <systemlib/mixer/mixer.h>
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/systemlib.h>
+
+#include "conversion/rotation.h"
+#include "geo/geo.h"
+#include "mathlib/mathlib.h"
+#include "mixer/mixer.h"
+#include "param/param.h"
+#include "perf/perf_counter.h"
+#include "systemlib/circuit_breaker.h"
+#include "systemlib/err.h"
+
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
@@ -83,7 +86,6 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/uORB.h>
 
 /**
  * Multicopter attitude control app start / stop handling function

@@ -41,7 +41,7 @@
 
 #include <nuttx/config.h>
 
-//#include <drivers/device/i2c.h>
+//#include <device/i2c.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -56,16 +56,12 @@
 #include <nuttx/wqueue.h>
 #include <drivers/drv_hrt.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/err.h>
-#include <systemlib/systemlib.h>
 
 #include <board_config.h>
 
 #include <drivers/drv_led.h>
 #include <lib/led/led.h>
-#include <drivers/device/device.h>
-#include <systemlib/err.h>
+#include <device/device.h>
 
 #define RGBLED_ONTIME 120
 #define RGBLED_OFFTIME 120

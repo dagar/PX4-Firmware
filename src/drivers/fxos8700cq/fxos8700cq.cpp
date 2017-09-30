@@ -58,17 +58,16 @@
 
 #include <px4_log.h>
 
-#include <systemlib/perf_counter.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/clock.h>
 
 #include <drivers/drv_hrt.h>
-#include <drivers/device/spi.h>
+#include <device/spi.h>
 #include <drivers/drv_accel.h>
 #include <drivers/drv_mag.h>
-#include <drivers/device/ringbuffer.h>
-#include <drivers/device/integrator.h>
+#include <device/ringbuffer.h>
+#include <device/integrator.h>
 
 #include <board_config.h>
 #include <mathlib/math/filter/LowPassFilter2p.hpp>

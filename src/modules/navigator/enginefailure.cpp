@@ -41,12 +41,10 @@
 #include <math.h>
 #include <fcntl.h>
 
-#include <systemlib/mavlink_log.h>
-#include <systemlib/err.h>
+#include "log/mavlink_log.h"
 #include <geo/geo.h>
 #include <navigator/navigation.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/mission.h>
 
 #include "navigator.h"

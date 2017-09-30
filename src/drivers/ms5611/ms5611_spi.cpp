@@ -49,7 +49,7 @@
 
 #include <arch/board/board.h>
 
-#include <drivers/device/spi.h>
+#include <device/spi.h>
 
 #include "ms5611.h"
 #include "board_config.h"

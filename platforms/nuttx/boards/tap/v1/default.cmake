@@ -7,10 +7,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/device
-	drivers/stm32
-	drivers/stm32/adc
-	drivers/stm32/tone_alarm
 	drivers/led
 	drivers/px4fmu
 	drivers/rgbled_pwm
@@ -19,7 +15,6 @@ set(config_module_list
 	drivers/ms5611
 	drivers/hmc5883
 	drivers/gps
-	drivers/airspeed
 	drivers/ms4525_airspeed
 	drivers/ms5525_airspeed
 	modules/sensors
@@ -28,19 +23,12 @@ set(config_module_list
 	#
 	# System commands
 	#
-	systemcmds/bl_update
 	systemcmds/led_control
 	systemcmds/mixer
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
-	systemcmds/hardfault_log
 	systemcmds/motor_test
-	systemcmds/reboot
-	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
-	systemcmds/mtd
 	systemcmds/dumpfile
 	systemcmds/ver
 	systemcmds/topic_listener
@@ -76,9 +64,9 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
+	lib/param
+	lib/systemlib
+	lib/mixer
 	modules/uORB
 	modules/dataman
 
@@ -87,22 +75,14 @@ set(config_module_list
 	#
 	lib/controllib
 	lib/mathlib
-	lib/mathlib/math/filter
 	lib/ecl
 	lib/external_lgpl
 	lib/geo
 	lib/geo_lookup
 	lib/conversion
-	lib/launchdetection
 	lib/led
 	lib/rc
-	lib/runway_takeoff
-	lib/tailsitter_recovery
-	lib/terrain_estimation
 	lib/version
-	lib/DriverFramework/framework
-	lib/micro-CDR
 
-	# had to add for cmake, not sure why wasn't in original config
-	platforms/common
+
 )

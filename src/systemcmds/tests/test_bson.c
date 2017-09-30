@@ -46,8 +46,7 @@
 #include <limits.h>
 #include <math.h>
 
-#include <systemlib/err.h>
-#include <systemlib/bson/tinybson.h>
+#include <tinybson/tinybson.h>
 
 #include "tests_main.h"
 

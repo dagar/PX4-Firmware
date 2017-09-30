@@ -36,8 +36,7 @@
 #include <nuttx/config.h>
 
 #include <uavcan_stm32/uavcan_stm32.hpp>
-#include <drivers/device/device.h>
-#include <systemlib/perf_counter.h>
+#include <device/device.h>
 
 #include <uavcan/node/sub_node.hpp>
 #include <uavcan/protocol/node_status_monitor.hpp>

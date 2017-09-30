@@ -46,9 +46,7 @@
 #include <math.h>
 #include <fcntl.h>
 
-#include <systemlib/err.h>
 
-#include <uORB/uORB.h>
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/follow_target.h>
 #include <lib/geo/geo.h>

@@ -56,8 +56,6 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/actuator_armed.h>
-#include <systemlib/err.h>
-#include <systemlib/perf_counter.h>
 #include <lib/mathlib/mathlib.h>
 #inlcude "mc_att_control_base.h"
 

@@ -49,6 +49,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include "PCA9685.h"
 
 #include <px4_log.h>

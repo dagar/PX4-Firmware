@@ -51,7 +51,7 @@
 
 #include <arch/board/board.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 #include <drivers/drv_accel.h>
 #include <drivers/drv_device.h>
 

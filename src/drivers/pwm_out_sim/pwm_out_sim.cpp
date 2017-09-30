@@ -67,14 +67,13 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <drivers/device/device.h>
+#include <device/device.h>
 #include <drivers/drv_pwm_output.h>
 #include <drivers/drv_gpio.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
 
-#include <systemlib/systemlib.h>
-#include <systemlib/mixer/mixer.h>
+#include "mixer/mixer.h"
 
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_armed.h>

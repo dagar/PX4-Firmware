@@ -50,7 +50,7 @@
 
 #include <arch/board/board.h>
 
-#include <drivers/device/i2c.h>
+#include <device/i2c.h>
 
 #include "mpl3115a2.h"
 

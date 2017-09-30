@@ -44,7 +44,6 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <systemlib/perf_counter.h>
 #include <string.h>
 #include <stdlib.h>
 #include <px4_getopt.h>
