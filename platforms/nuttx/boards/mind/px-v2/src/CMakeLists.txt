@@ -39,6 +39,4 @@ px4_add_module(
 		mindpx_spi.c
 		mindpx_usb.c
 		mindpx2_led.c
-	DEPENDS
-		platforms__common
 	)

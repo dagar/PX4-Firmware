@@ -39,6 +39,4 @@ px4_add_module(
 		auav_spi.c
 		auav_usb.c
 		auav_led.c
-	DEPENDS
-		platforms__common
 	)

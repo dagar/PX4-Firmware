@@ -39,8 +39,6 @@ px4_add_module(
 	SRCS
 		df_hmc5883_wrapper.cpp
 	DEPENDS
-		platforms__common
 		df_driver_framework
 		df_hmc5883
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

@@ -52,6 +52,7 @@
 #include <px4_config.h>
 #include <px4_tasks.h>
 #include "pid/pid.h"
+#include "systemlib/err.h"
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>

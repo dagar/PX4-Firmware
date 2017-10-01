@@ -108,6 +108,7 @@
 #include <drivers/drv_hrt.h>
 
 #include <systemlib/circuit_breaker.h>
+#include <systemlib/err.h>
 
 /* Check that tone alarm and HRT timers are different */
 #if defined(TONE_ALARM_TIMER)  && defined(HRT_TIMER)

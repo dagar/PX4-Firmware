@@ -96,7 +96,8 @@ protected:
 	 */
 	void update_status();
 
-	work_s			_work;
+	work_s			_work{};
+
 	bool			_sensor_ok;
 	bool			_last_published_sensor_ok;
 	uint32_t		_measure_ticks;

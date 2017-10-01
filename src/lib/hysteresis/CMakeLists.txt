@@ -31,4 +31,4 @@
 #
 ############################################################################
 
-px4_add_library(hysteresis hysteresis.cpp)
+px4_add_library(hysteresis Hysteresis.cpp)

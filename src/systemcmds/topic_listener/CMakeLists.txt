@@ -50,4 +50,3 @@ px4_add_module(
 	DEPENDS
 		generate_topic_listener
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

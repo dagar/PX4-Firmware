@@ -52,7 +52,6 @@
 #include <float.h>
 
 #include <unit_test.h>
-#include <px4iofirmware/protocol.h>
 
 int test_conv(int argc, char *argv[])
 {

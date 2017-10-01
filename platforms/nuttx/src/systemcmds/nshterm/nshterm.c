@@ -48,6 +48,7 @@
 #include <nshlib/nshlib.h>
 #include <fcntl.h>
 #include <drivers/drv_hrt.h>
+#include <systemlib/err.h>
 
 #include <uORB/topics/actuator_armed.h>
 

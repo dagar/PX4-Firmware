@@ -77,7 +77,6 @@
 
 #include <systemlib/hardfault_log.h>
 
-#include <systemlib/systemlib.h>
 
 /****************************************************************************
  * Pre-Processor Definitions

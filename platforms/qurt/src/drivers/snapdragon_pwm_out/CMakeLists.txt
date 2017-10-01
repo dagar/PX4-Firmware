@@ -33,10 +33,6 @@
 px4_add_module(
 	MODULE drivers__snapdragon_pwm_out
 	MAIN snapdragon_pwm_out
-	COMPILE_FLAGS
 	SRCS
 		snapdragon_pwm_out.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

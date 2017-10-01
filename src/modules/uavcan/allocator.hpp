@@ -37,6 +37,7 @@
 
 #pragma once
 
+#include <systemlib/err.h>
 #include <uavcan/uavcan.hpp>
 #include <uavcan/helpers/heap_based_pool_allocator.hpp>
 

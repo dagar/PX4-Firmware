@@ -54,6 +54,7 @@
 #include <uavcan/protocol/RestartNode.hpp>
 
 #include <device/device.h>
+#include <perf/perf_counter.h>
 
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>

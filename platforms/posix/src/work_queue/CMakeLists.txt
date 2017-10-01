@@ -32,7 +32,6 @@
 ############################################################################
 px4_add_module(
 	MODULE platforms__posix__work_queue
-	COMPILE_FLAGS
 	SRCS
 		hrt_thread.c
 		hrt_queue.c
@@ -48,7 +47,4 @@ px4_add_module(
 		sq_remfirst.c
 		sq_addafter.c
 		dq_rem.c
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

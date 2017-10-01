@@ -65,20 +65,20 @@ endforeach()
 
 set(cpu_flags)
 if (CMAKE_SYSTEM_PROCESSOR STREQUAL "cortex-m7")
-	add_compile_options(-mcpu=cortex-m7 -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard)
+	set(cpu_flags -mcpu=cortex-m7 -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard)
 elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "cortex-m4")
-	add_compile_options(-mcpu=cortex-m4 -mthumb -march=armv7e-m -mfpu=fpv4-sp-d16 -mfloat-abi=hard)
+	set(cpu_flags -mcpu=cortex-m4 -mthumb -march=armv7e-m -mfpu=fpv4-sp-d16 -mfloat-abi=hard)
 elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "cortex-m3")
-	add_compile_options(-mcpu=cortex-m3 -mthumb -march=armv7-m)
+	set(cpu_flags -mcpu=cortex-m3 -mthumb -march=armv7-m)
 else ()
 	message(FATAL_ERROR "Processor not recognised in toolchain file")
 endif()
 
+add_compile_options(${cpu_flags})
+link_libraries(${cpu_flags} -nodefaultlibs -nostdlib -Wl,--warn-common,--gc-sections)
 
-add_compile_options($<$<COMPILE_LANGUAGE:C>:-fno-common -ffunction-sections -fdata-sections>)
-add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-common -ffunction-sections -fdata-sections>)
 add_compile_options($<$<COMPILE_LANGUAGE:ASM>:-D__ASSEMBLY__>)
-link_libraries(-nodefaultlibs -nostdlib -Wl,--warn-common,--gc-sections)
+
 
 # where is the target environment 
 set(CMAKE_FIND_ROOT_PATH get_file_component(${C_COMPILER} PATH))

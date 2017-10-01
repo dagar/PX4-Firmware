@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "perf_counter.h"
+#include "perf/perf_counter.h"
 
 #include <px4_config.h>
 #include <px4_module.h>

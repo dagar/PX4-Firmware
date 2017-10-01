@@ -54,6 +54,7 @@
 #include "pid/pid.h"
 #include <geo/geo.h>
 #include <matrix/math.hpp>
+#include "systemlib/err.h"
 
 /* process-specific header files */
 #include "params.h"

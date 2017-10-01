@@ -46,4 +46,3 @@ px4_add_module(
 	DEPENDS
 		modules__uORB
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

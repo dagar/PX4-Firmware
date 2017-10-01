@@ -102,7 +102,7 @@ const struct {
 	{"mixer",		test_mixer,	OPT_NOJIGTEST},
 	{"autodeclination",	test_autodeclination,	0},
 	{"bson",		test_bson,	0},
-	{"conv",		test_conv, 0},
+	//{"conv",		test_conv, 0},
 	{"dataman",		test_dataman, OPT_NOJIGTEST | OPT_NOALLTEST},
 	{"file2",		test_file2,	OPT_NOJIGTEST},
 	{"float",		test_float,	0},

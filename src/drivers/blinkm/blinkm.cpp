@@ -105,6 +105,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <poll.h>
+#include <strings.h>
 
 #include <px4_workqueue.h>
 

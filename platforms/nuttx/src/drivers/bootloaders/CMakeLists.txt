@@ -31,10 +31,7 @@
 #
 ############################################################################
 
-px4_add_library(drivers_bootloaders
-		boot_app_shared.c
-	)
-add_dependencies(drivers_bootloaders platforms__common)
+px4_add_library(drivers_bootloaders boot_app_shared.c)
 
 include_directories(include)
 target_include_directories(drivers_bootloaders INTERFACE include)

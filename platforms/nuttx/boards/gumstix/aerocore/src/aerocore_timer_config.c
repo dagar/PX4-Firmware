@@ -45,7 +45,7 @@
 #include <stm32_gpio_out.h>
 #include <stm32_tim.h>
 
-#include <drivers/stm32/drv_io_timer.h>
+#include <stm32/drv_io_timer.h>
 #include <drivers/drv_pwm_output.h>
 
 #include "board_config.h"

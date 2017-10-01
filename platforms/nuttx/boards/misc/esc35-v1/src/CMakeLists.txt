@@ -48,6 +48,4 @@ px4_add_module(
 		esc35_init.c
 		esc35_led.c
 		esc35_usb.c
-	DEPENDS
-		platforms__common
 	)

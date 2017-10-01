@@ -37,24 +37,13 @@
  * Implementation of existing task API for NuttX
  */
 
-#include <px4_config.h>
+#include "board_config.h"
+
 #include <px4_tasks.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <sched.h>
-#include <signal.h>
-#include <unistd.h>
-#include <float.h>
-#include <string.h>
+#include <px4_log.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
-
-
-#include <px4_log.h>
-#include <systemlib/systemlib.h>
-
 
 void
 px4_systemreset(bool to_bootloader)

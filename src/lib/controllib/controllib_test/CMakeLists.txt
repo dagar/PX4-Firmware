@@ -39,4 +39,3 @@ px4_add_module(
 	DEPENDS
 	)
 
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

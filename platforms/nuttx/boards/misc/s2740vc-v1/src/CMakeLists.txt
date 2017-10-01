@@ -47,6 +47,4 @@ px4_add_module(
 	SRCS
 		s2740vc_init.c
 		s2740vc_can.c
-	DEPENDS
-		platforms__common
 	)

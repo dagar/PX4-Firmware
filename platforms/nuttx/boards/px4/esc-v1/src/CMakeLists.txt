@@ -37,6 +37,4 @@ px4_add_module(
 		px4esc_init.c
 		px4esc_led.c
 		px4esc_usb.c
-	DEPENDS
-		platforms__common
 	)

@@ -47,6 +47,8 @@
 #include <drivers/drv_hrt.h>
 #include <math.h>
 
+#include <systemlib/err.h>
+
 #include "BlockSegwayController.hpp"
 
 static bool thread_should_exit = false;     /**< Deamon exit flag */

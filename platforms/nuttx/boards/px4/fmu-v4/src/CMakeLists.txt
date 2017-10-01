@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-px4_add_library(
+px4_add_library(px4fmu_init
 		px4fmu_can.c
 		px4fmu_init.c
 		px4fmu_timer_config.c

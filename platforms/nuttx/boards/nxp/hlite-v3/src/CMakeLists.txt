@@ -42,6 +42,4 @@ px4_add_module(
 		nxphlite_spi.c
 		nxphlite_timer_config.c
 		nxphlite_usb.c
-	DEPENDS
-		platforms__common
 	)

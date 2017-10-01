@@ -40,4 +40,3 @@ px4_add_module(
 	)
 
 #add_subdirectory(test)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

@@ -31,11 +31,8 @@
 #
 ############################################################################
 
-px4_add_library(platforms__common
+px4_add_library(common
 		module.cpp
 		px4_getopt.c
 		shutdown.cpp
 	)
-
-add_dependencies(platforms__common prebuild_targets uorb_headers)
-

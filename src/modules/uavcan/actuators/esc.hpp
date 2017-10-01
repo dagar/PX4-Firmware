@@ -44,6 +44,9 @@
 
 #pragma once
 
+#include "perf/perf_counter.h"
+#include <systemlib/err.h>
+
 #include <uavcan/uavcan.hpp>
 #include <uavcan/equipment/esc/RawCommand.hpp>
 #include <uavcan/equipment/esc/Status.hpp>

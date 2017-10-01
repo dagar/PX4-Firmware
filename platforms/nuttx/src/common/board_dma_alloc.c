@@ -44,6 +44,8 @@
 #include <px4_config.h>
 #include "board_config.h"
 
+#include "perf/perf_counter.h"
+
 #include <stdint.h>
 #include <errno.h>
 #include <nuttx/mm/gran.h>

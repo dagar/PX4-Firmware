@@ -34,10 +34,6 @@ px4_add_module(
 	MODULE drivers__ocpoc_sbus_rc_in
 	MAIN ocpoc_sbus_rc_in
 	STACK_MAIN 1200
-	COMPILE_FLAGS
 	SRCS
 		ocpoc_sbus_rc_in.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

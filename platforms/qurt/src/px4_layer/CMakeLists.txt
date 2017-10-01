@@ -54,11 +54,7 @@ endif()
 
 px4_add_module(
 	MODULE platforms__qurt__px4_layer
-	COMPILE_FLAGS
 	SRCS
 		${QURT_LAYER_SRCS}
 		${CONFIG_SRC}
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

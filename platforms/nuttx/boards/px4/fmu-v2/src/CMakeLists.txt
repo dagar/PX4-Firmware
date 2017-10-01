@@ -39,6 +39,4 @@ px4_add_module(
 		px4fmu_spi.c
 		px4fmu_timer_config.c
 		px4fmu_usb.c
-	DEPENDS
-		platforms__common
 	)

@@ -39,6 +39,4 @@ px4_add_module(
 		px4flow_init.c
 		px4flow_led.c
 		px4flow_can.c
-	DEPENDS
-		platforms__common
 	)

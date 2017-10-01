@@ -40,6 +40,4 @@ px4_add_module(
 		px4same70xplained_usb.c
 		px4same70xplained_led.c
 		px4same70xplained_sdram.c
-	DEPENDS
-		platforms__common
 	)

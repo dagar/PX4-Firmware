@@ -54,6 +54,9 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include "perf/perf_counter.h"
+#include "systemlib/err.h"
+
 #include "../comms.h"
 #include "../messages.h"
 

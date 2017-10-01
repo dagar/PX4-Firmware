@@ -8,6 +8,7 @@ add_custom_command(OUTPUT ${PX4_BINARY_DIR}/airframes.xml
 		--board CONFIG_ARCH_BOARD_${BOARD} --xml
 	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/px_process_airframes.py
 	COMMENT "Creating airframes.xml"
+	WORKING_DIRECTORY ${PX4_BINARY_DIR}
 	)
 add_custom_target(airframes_xml DEPENDS ${PX4_BINARY_DIR}/airframes.xml)
 
@@ -17,6 +18,7 @@ add_custom_command(OUTPUT ${PX4_BINARY_DIR}/airframes.md
 		--board CONFIG_ARCH_BOARD_${BOARD} --markdown
 	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/px_process_airframes.py
 	COMMENT "Creating airframes.md"
+	WORKING_DIRECTORY ${PX4_BINARY_DIR}
 	)
 add_custom_target(airframes_markdown DEPENDS ${PX4_BINARY_DIR}/airframes.md)
 
@@ -38,7 +40,7 @@ add_custom_command(OUTPUT ${romfs_temp_dir}/init.d/rcS ${romfs_temp_dir}/init.d/
 		-a ${romfs_temp_dir}/init.d
 		-s ${romfs_temp_dir}/init.d/rc.autostart
 		--board ${BOARD}
-	COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/Tools/px_romfs_pruner.py
+	COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/px_romfs_pruner.py
 		--folder ${romfs_temp_dir} --board ${BOARD}
 	DEPENDS
 		${romfs_src_files}
@@ -66,6 +68,5 @@ add_custom_command(OUTPUT nsh_romfsimg.c
 	DEPENDS romfs.img
 	)
 
-add_library(romfs STATIC nsh_romfsimg.c)
-add_dependencies(romfs platforms__common)
+px4_add_library(romfs STATIC nsh_romfsimg.c)
 set_target_properties(romfs PROPERTIES LINKER_LANGUAGE C)

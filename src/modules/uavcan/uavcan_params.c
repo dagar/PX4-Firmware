@@ -35,8 +35,6 @@
  * @author Pavel Kirienko <pavel.kirienko@gmail.com>
  */
 
-#include <px4_config.h>
-
 /**
  * UAVCAN mode
  *

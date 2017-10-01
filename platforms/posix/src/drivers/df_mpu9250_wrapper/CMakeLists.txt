@@ -39,8 +39,6 @@ px4_add_module(
 	SRCS
 		df_mpu9250_wrapper.cpp
 	DEPENDS
-		platforms__common
 		df_driver_framework
 		df_mpu9250
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

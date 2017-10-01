@@ -49,8 +49,8 @@
 
 #include <mathlib/mathlib.h>
 
-#include <lib/ecl/validation/data_validator.h>
-#include <lib/ecl/validation/data_validator_group.h>
+#include "ecl/validation/data_validator.h"
+#include "ecl/validation/data_validator_group.h"
 
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_preflight.h>

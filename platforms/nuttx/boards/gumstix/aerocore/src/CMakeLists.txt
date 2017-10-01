@@ -37,6 +37,4 @@ px4_add_module(
 		aerocore_timer_config.c
 		aerocore_spi.c
 		aerocore_led.c
-	DEPENDS
-		platforms__common
 	)

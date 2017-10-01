@@ -64,6 +64,7 @@
 #include <mathlib/mathlib.h>
 #include <platforms/px4_config.h>
 #include <platforms/px4_tasks.h>
+#include <systemlib/err.h>
 
 
 /**
@@ -226,7 +227,7 @@ BottleDrop::start()
 					nullptr);
 
 	if (_main_task < 0) {
-		warn("task start failed");
+		PX4_ERR("task start failed");
 		return -errno;
 	}
 

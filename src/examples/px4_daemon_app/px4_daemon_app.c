@@ -45,7 +45,7 @@
 
 #include <px4_config.h>
 #include <px4_tasks.h>
-
+#include <systemlib/err.h>
 
 static bool thread_should_exit = false;		/**< daemon exit flag */
 static bool thread_running = false;		/**< daemon status flag */

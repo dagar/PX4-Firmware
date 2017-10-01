@@ -46,6 +46,4 @@ px4_add_module(
 		devices/src/ubx.cpp
 	DEPENDS
 		git_gps_devices
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

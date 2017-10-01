@@ -52,8 +52,6 @@ px4_add_module(
 	STACK_MAIN 1200
     SRCS
     	rc_receiver_main.cpp
-    DEPENDS
-            platforms__common
     )
 
 set(module_external_libraries

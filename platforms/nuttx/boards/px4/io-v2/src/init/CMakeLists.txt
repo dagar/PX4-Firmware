@@ -35,6 +35,4 @@ px4_add_module(
 	SRCS
 		px4io_init.c
 		px4io_timer_config.c
-	DEPENDS
-		platforms__common
 	)

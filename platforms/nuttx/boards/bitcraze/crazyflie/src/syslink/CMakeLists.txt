@@ -39,7 +39,4 @@ px4_add_module(
 		syslink_bridge.cpp
 		syslink_memory.cpp
 		syslink.c
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

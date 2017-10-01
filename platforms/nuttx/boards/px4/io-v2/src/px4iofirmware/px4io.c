@@ -53,7 +53,6 @@
 #include <drivers/drv_hrt.h>
 
 #include "pwm_limit/pwm_limit.h"
-#include <systemlib/systemlib.h>
 
 #include <stm32_uart.h>
 

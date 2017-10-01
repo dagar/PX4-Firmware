@@ -308,6 +308,8 @@ endif()
 
 px4_add_git_submodule(TARGET git_driverframework PATH "src/lib/DriverFramework")
 
+add_subdirectory(src/lib/DriverFramework/framework/src)
+
 set(df_driver_libs)
 foreach(driver ${config_df_driver_list})
 	add_subdirectory(src/lib/DriverFramework/drivers/${driver})
@@ -342,6 +344,8 @@ endif()
 px4_add_git_submodule(TARGET git_ecl PATH "src/lib/ecl")
 
 add_subdirectory(msg)
+add_dependencies(prebuild_targets uorb_headers)
+
 add_subdirectory(src/lib/common)
 add_subdirectory(src/lib/device)
 add_subdirectory(src/lib/version)

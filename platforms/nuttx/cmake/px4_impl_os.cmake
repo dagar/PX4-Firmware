@@ -127,9 +127,15 @@ function(px4_os_add_flags)
 		${PX4_BINARY_DIR}/NuttX/nuttx/include
 		${PX4_BINARY_DIR}/NuttX/nuttx/include/cxx
 		${PX4_BINARY_DIR}/NuttX/apps/include
+
+		${PX4_SOURCE_DIR}/platforms/nuttx/boards/${VENDOR}/${BOARD}/include
+		${PX4_SOURCE_DIR}/platforms/nuttx/src/common
 		)
 
 	add_definitions(-D__PX4_NUTTX -D__DF_NUTTX)
+
+	add_compile_options("$<$<COMPILE_LANGUAGE:C>:-std=gnu99>")
+	add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-std=gnu++11>")
 
 	if("${CONFIG_ARMV7M_STACKCHECK}" STREQUAL "y")
 		message(STATUS "enabling ARMV7 stack check")

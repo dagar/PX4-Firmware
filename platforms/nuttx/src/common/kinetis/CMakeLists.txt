@@ -36,4 +36,3 @@ px4_add_library(board_kinetis
 	board_mcu_version.c
 	board_reset.c
 	)
-add_dependencies(board_kinetis nuttx_build)

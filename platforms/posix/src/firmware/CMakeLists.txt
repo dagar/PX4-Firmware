@@ -64,14 +64,15 @@ elseif ("${BOARD}" STREQUAL "rpi")
 		)
 
 	file(GLOB RPI_CONFIG_FILES ${PX4_SOURCE_DIR}/posix-configs/rpi/*.config)
-	px4_add_scp_push(OUT ${UPLOAD_NAME}
-				OS ${OS}
-				BOARD ${BOARD}
-				FILES ${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}
-				${RPI_CONFIG_FILES}
-				${PX4_SOURCE_DIR}/ROMFS
-				DEPENDS ${APP_NAME}
-				DEST /home/pi)
+	
+	add_custom_target(upload
+		COMMAND ${PX4_SOURCE_DIR}/Tools/scp_upload.sh ${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME} ${RPI_CONFIG_FILES} ${PX4_SOURCE_DIR}/ROMFS /home/pi
+		DEPENDS ${APP_NAME}
+		WORKING_DIRECTORY ${PX4_BINARY_DIR}
+		COMMENT "uploading ${BUNDLE}"
+		VERBATIM
+		USES_TERMINAL
+		)
 
 elseif ("${BOARD}" STREQUAL "bebop")
 
@@ -98,14 +99,15 @@ elseif ("${BOARD}" STREQUAL "bebop")
 			pthread m
 			)
 	endif()
-
-	px4_add_adb_push_to_bebop(OUT ${UPLOAD_NAME}
-				OS ${OS}
-				BOARD ${BOARD}
-				FILES $<TARGET_FILE:px4>.stripped
-				DEPENDS ${APP_NAME}.stripped
-				DEST /usr/bin
-				)
+	
+	
+	add_custom_target(upload
+		COMMAND ${PX4_SOURCE_DIR}/Tools/adb_upload_to_bebop.sh $<TARGET_FILE:px4>.stripped /usr/bin
+		DEPENDS $<TARGET_FILE:px4>.stripped ${APP_NAME}.stripped
+		COMMENT "uploading ${BUNDLE}"
+		VERBATIM
+		USES_TERMINAL
+		)
 
 elseif (${BOARD} STREQUAL "sitl")
 	include(sitl_target)

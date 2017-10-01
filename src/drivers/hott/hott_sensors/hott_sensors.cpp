@@ -42,15 +42,17 @@
  */
 
 #include <fcntl.h>
-#include <px4_config.h>
-#include <px4_defines.h>
-#include <px4_tasks.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+
+#include <px4_config.h>
+#include <px4_defines.h>
+#include <px4_tasks.h>
+#include <systemlib/err.h>
 
 #include "../comms.h"
 #include "../messages.h"

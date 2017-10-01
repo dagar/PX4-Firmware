@@ -39,6 +39,4 @@ px4_add_module(
 		aerocore2_spi.c
 		aerocore2_usb.c
 		aerocore2_led.c
-	DEPENDS
-		platforms__common
 	)

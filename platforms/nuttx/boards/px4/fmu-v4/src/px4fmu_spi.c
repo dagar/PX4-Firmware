@@ -50,6 +50,7 @@
 
 #include <nuttx/spi/spi.h>
 #include <arch/board/board.h>
+#include <systemlib/err.h>
 
 #include <up_arch.h>
 #include <chip.h>
@@ -220,7 +221,7 @@ __EXPORT void board_spi_reset(int ms)
 
 	/* wait for the sensor rail to reach GND */
 	usleep(ms * 1000);
-	warnx("reset done, %d ms", ms);
+	warn("reset done, %d ms", ms);
 
 	/* re-enable power */
 

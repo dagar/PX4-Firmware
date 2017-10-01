@@ -30,17 +30,15 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE drivers__stm32
-	COMPILE_FLAGS
-	SRCS
+
+px4_add_library(stm32
 		drv_hrt.c
 		drv_io_timer.c
 		drv_pwm_servo.c
 		drv_pwm_trigger.c
 		drv_input_capture.c
 		drv_led_pwm.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+
+add_subdirectory(adc)
+add_subdirectory(tone_alarm)

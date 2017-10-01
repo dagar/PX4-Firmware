@@ -37,12 +37,10 @@ if(GENERATE_RTPS_BRIDGE)
 	if(NOT FASTRTPSGEN)
 		message(STATUS "WARNING: Unable to find fastrtpsgen. Building PX4 without RTPS bridge support")
 		px4_add_module(
-		    MODULE modules__micrortps_bridge__micrortps_client
-		    MAIN micrortps_client
-		    SRCS
-			microRTPS_client_dummy.cpp
-		    DEPENDS
-			platforms__common
+			MODULE modules__micrortps_bridge__micrortps_client
+			MAIN micrortps_client
+			SRCS
+				microRTPS_client_dummy.cpp
 		)
 		return()
 	endif()
@@ -114,7 +112,6 @@ if(GENERATE_RTPS_BRIDGE)
 				${CMAKE_CURRENT_BINARY_DIR}/micrortps_client/microRTPS_client.cpp
 				microRTPS_client_main.cpp
 			DEPENDS
-				platforms__common
 				topic_bridge_files
 				uorb_headers_microcdr
 		)

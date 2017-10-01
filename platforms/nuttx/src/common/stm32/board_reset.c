@@ -42,7 +42,6 @@
 #include <stm32_pwr.h>
 #include <nuttx/board.h>
 
-
 int board_set_bootload_mode(board_reset_e mode)
 {
 	uint32_t regvalue = 0;
@@ -65,7 +64,6 @@ int board_set_bootload_mode(board_reset_e mode)
 	stm32_pwr_enablebkp(false);
 	return OK;
 }
-
 
 void board_system_reset(int status)
 {

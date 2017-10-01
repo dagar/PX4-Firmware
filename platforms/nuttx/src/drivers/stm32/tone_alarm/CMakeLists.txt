@@ -33,10 +33,6 @@
 px4_add_module(
 	MODULE drivers__stm32__tone_alarm
 	MAIN tone_alarm
-	COMPILE_FLAGS
 	SRCS
 		tone_alarm.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

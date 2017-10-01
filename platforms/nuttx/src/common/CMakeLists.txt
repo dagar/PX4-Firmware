@@ -31,19 +31,20 @@
 #
 ############################################################################
 
-if (${OS} MATCHES "nuttx")
-	px4_add_library(boards_common
-		board_crashdump.c
-		board_dma_alloc.c
-		board_gpio_init.c
-		)
-	add_dependencies(boards_common nuttx_build)
+px4_add_library(boards_common
+	board_crashdump.c
+	board_dma_alloc.c
+	board_gpio_init.c
+	)
 
-	if (${CONFIG_ARCH_CHIP} MATCHES "kinetis")
-		add_subdirectory(kinetis)
-	elseif (${CONFIG_ARCH_CHIP} MATCHES "samv7")
-		add_subdirectory(samv7)
-	elseif (${CONFIG_ARCH_CHIP} MATCHES "stm32")
-		add_subdirectory(stm32)
-	endif()
+target_include_directories(boards_common INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+
+if (${CONFIG_ARCH_CHIP} MATCHES "kinetis")
+	add_subdirectory(kinetis)
+elseif (${CONFIG_ARCH_CHIP} MATCHES "samv7")
+	add_subdirectory(samv7)
+elseif (${CONFIG_ARCH_CHIP} MATCHES "stm32")
+	add_subdirectory(stm32)
 endif()
+
+target_link_libraries(boards_common board_${CONFIG_ARCH_CHIP})

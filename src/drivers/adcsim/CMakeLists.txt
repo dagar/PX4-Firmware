@@ -45,4 +45,3 @@ target_link_libraries(platforms__posix__drivers__adcsim
 	df_driver_framework
 )
 
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

@@ -74,7 +74,6 @@
 #include <systemlib/px4_macros.h>
 #include <systemlib/cpuload.h>
 #include <systemlib/hardfault_log.h>
-#include <systemlib/systemlib.h>
 
 /****************************************************************************
  * Pre-Processor Definitions

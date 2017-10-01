@@ -47,7 +47,7 @@
 #include <stm32_tim.h>
 
 #include <drivers/drv_pwm_output.h>
-#include <drivers/stm32/drv_io_timer.h>
+#include <stm32/drv_io_timer.h>
 
 #include "board_config.h"
 

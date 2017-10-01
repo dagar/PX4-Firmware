@@ -58,6 +58,7 @@
 #include <sys/statfs.h>
 #endif
 #include <ctype.h>
+#include <string.h>
 #include <drivers/drv_hrt.h>
 #include <math.h>
 

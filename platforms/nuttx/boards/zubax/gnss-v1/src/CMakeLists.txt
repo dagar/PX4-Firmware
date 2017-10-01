@@ -38,6 +38,4 @@ px4_add_module(
 	SRCS
 		zubax_gnss_init.c
 		zubax_gnss_led.c
-	DEPENDS
-		platforms__common
 	)

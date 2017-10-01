@@ -36,6 +36,4 @@ px4_add_module(
 		px4discovery_init.c
 		px4discovery_usb.c
 		px4discovery_led.c
-	DEPENDS
-		platforms__common
 	)

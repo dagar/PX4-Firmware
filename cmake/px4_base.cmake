@@ -142,7 +142,7 @@ endfunction()
 #		px4_add_module(MODULE test
 #			SRCS
 #				file.cpp
-#		#			DEPENDS
+#			DEPENDS
 #				git_nuttx
 #			)
 #
@@ -156,7 +156,9 @@ function(px4_add_module)
 		REQUIRED MAIN MODULE
 		ARGN ${ARGN})
 
-	px4_add_library(${MODULE} STATIC EXCLUDE_FROM_ALL ${SRCS})
+	add_library(${MODULE} STATIC EXCLUDE_FROM_ALL ${SRCS})
+	add_dependencies(${MODULE} prebuild_targets)
+	set_property(GLOBAL APPEND PROPERTY PX4_LIBRARIES ${MODULE})
 
 	# set defaults if not set
 	set_target_properties(${MODULE} PROPERTIES MAIN ${MAIN})
@@ -165,15 +167,12 @@ function(px4_add_module)
 		set(STACK_MAIN 1024)
 	endif()
 	set_target_properties(${MODULE} PROPERTIES STACK_MAIN ${STACK_MAIN})
-	
-	if(NOT SCHED_PRIORITY_DEFAULT)
-		set(SCHED_PRIORITY_DEFAULT SCHED_PRIORITY_DEFAULT)
-	endif()
-	set_target_properties(${MODULE} PROPERTIES SCHED_PRIORITY_DEFAULT ${SCHED_PRIORITY_DEFAULT})
+
+	set_target_properties(${MODULE} PROPERTIES PRIORITY SCHED_PRIORITY_DEFAULT)
 
 	target_compile_definitions(${MODULE}
 			PRIVATE PX4_MAIN=${MAIN}_app_main
-			PRIVATE MODULE_NAME=${MAIN}
+			PRIVATE MODULE_NAME="${MAIN}"
 			)
 
 	if(INCLUDES)
@@ -201,37 +200,40 @@ function(px4_add_common_flags)
 	add_compile_options(
 		# warnings
 		-Wall
+		-Wextra
+		-Werror
+
 		-Warray-bounds
 		-Wdisabled-optimization
-		-Werror
-		-Wextra
+		-Wdouble-promotion
 		-Wfatal-errors
 		-Wfloat-equal
 		-Wformat-security
+		-Wformat=1
 		-Winit-self
 		-Wlogical-op
 		-Wmissing-declarations
 		-Wmissing-field-initializers
-		#-Wmissing-include-dirs # TODO: fix and enable
 		-Wpointer-arith
 		-Wshadow
 		-Wuninitialized
 		-Wunknown-pragmas
-		-Wunused-variable
 		-Wunused-but-set-variable
-		-Wformat=1
-		-Wdouble-promotion
+		-Wunused-variable
+		#-Wmissing-include-dirs # TODO: fix and enable
+		#-Wconversion
 
 		# disabled warnings
 		-Wno-unused-parameter
 
 		# optimizations
-		-fvisibility=hidden
+		-fdata-sections
+		-ffunction-sections
+		-fno-common
 		-fno-strict-aliasing
 		-fomit-frame-pointer
 		-funsafe-math-optimizations
-		-ffunction-sections
-		-fdata-sections
+		-fvisibility=hidden
 
 		-include visibility.h
 		)
@@ -240,33 +242,31 @@ function(px4_add_common_flags)
 		add_compile_options(
 			-fcolor-diagnostics
 			-Qunused-arguments
-			-Wno-unused-const-variable
-			-Wno-varargs
 			-Wno-address-of-packed-member
 			-Wno-unknown-warning-option
+			-Wno-unused-const-variable
+			-Wno-varargs
 			-Wunused-but-set-variable
 		)
 	else()
 		add_compile_options(
 			-fdiagnostics-color=always
-			-fno-strength-reduce
 			-fno-builtin-printf
+			-fno-strength-reduce
 		)
 	endif()
 
 	set(c_flags
 		-Wbad-function-cast
-		-Wstrict-prototypes
 		-Wmissing-prototypes
 		-Wnested-externs
-		
-		-fno-common
+		-Wstrict-prototypes
 		)
-	add_compile_options($<$<COMPILE_LANGUAGE:C>:${c_flags}>)
+	add_compile_options("$<$<COMPILE_LANGUAGE:C>:${c_flags}>")
 
 	set(cxx_flags
-		-Wno-missing-field-initializers
 		-Wreorder
+		-Wno-missing-field-initializers
 		
 		-fcheck-new
 		-fno-exceptions
@@ -276,7 +276,7 @@ function(px4_add_common_flags)
 		-DCONFIG_WCHAR_BUILTIN
 		-D__CUSTOM_FILE_IO__
 		)
-	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>)
+	add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>")
 
 	# TODO: cleanup and start using INTERFACE_INCLUDE_DIRECTORIES
 	include_directories(
@@ -288,15 +288,14 @@ function(px4_add_common_flags)
 		${PX4_SOURCE_DIR}/src/include
 		${PX4_SOURCE_DIR}/src/include/platforms
 		${PX4_SOURCE_DIR}/src/lib
-		${PX4_SOURCE_DIR}/src/lib/log
 		${PX4_SOURCE_DIR}/src/lib/DriverFramework/framework/include
+		${PX4_SOURCE_DIR}/src/lib/log
 		${PX4_SOURCE_DIR}/src/lib/matrix
 		${PX4_SOURCE_DIR}/src/lib/systemlib
 		${PX4_SOURCE_DIR}/src/modules
 		)
 
 	add_definitions(
-		-DCONFIG_ARCH_BOARD_${board_config}
 		-D__STDC_FORMAT_MACROS
 		)
 
@@ -309,7 +308,9 @@ endfunction()
 #	Like add_library but with optimization flag fixup.
 #
 function(px4_add_library target)
-	add_library(${target} ${ARGN})
+	add_library(${target} STATIC EXCLUDE_FROM_ALL ${ARGN})
+
+	target_compile_definitions(${target} PRIVATE MODULE_NAME="${target}")
 
 	add_dependencies(${target} prebuild_targets)
 

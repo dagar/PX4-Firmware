@@ -34,7 +34,6 @@ px4_add_module(
 	MODULE drivers__fxos8700cq
 	MAIN fxos8700cq
 	STACK_MAIN 1200
-	COMPILE_FLAGS
 	SRCS
 		fxos8700cq.cpp
 	)

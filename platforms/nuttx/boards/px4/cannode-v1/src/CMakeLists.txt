@@ -39,6 +39,4 @@ px4_add_module(
 		px4cannode_init.c
 		px4cannode_led.c
 		px4cannode_spi.c
-	DEPENDS
-		platforms__common
 	)
