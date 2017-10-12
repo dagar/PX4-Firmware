@@ -124,9 +124,8 @@ then
 	if param load
 	then
 	else
-		if param reset
-		then
-		fi
+		# reset params if load failed
+		param reset
 	fi
 
 	#
@@ -196,17 +195,7 @@ then
 	set USE_IO no
 	set LOGGER_BUF 16
 
-	if ver hwcmp PX4FMU_V4
-	then
-		param set SYS_FMU_TASK 1
-	fi
-
-	if ver hwcmp PX4FMU_V4PRO
-	then
-		param set SYS_FMU_TASK 1
-	fi
-
-	if ver hwcmp PX4FMU_V5
+	if ver hwcmp PX4FMU_V4 PX4FMU_V4PRO PX4FMU_V5 NXPHLITE_V3
 	then
 		param set SYS_FMU_TASK 1
 	fi
@@ -230,11 +219,6 @@ then
 		# We don't allow changing AUTOSTART as it doesn't work in
 		# other configurations
 		param set SYS_AUTOSTART 4070
-	fi
-
-	if ver hwcmp NXPHLITE_V3
-	then
-		param set SYS_FMU_TASK 1
 	fi
 
 	#
@@ -563,36 +547,14 @@ then
 		fi
 	fi
 
-	if ver hwcmp PX4FMU_V4
+	if ver hwcmp PX4FMU_V4 MINDPX_V2
 	then
 		frsky_telemetry start -d /dev/ttyS6
 	fi
 
-	if ver hwcmp MINDPX_V2
-	then
-		frsky_telemetry start -d /dev/ttyS6
-	fi
-
-	if ver hwcmp PX4FMU_V2
+	if ver hwcmp PX4FMU_V2 PX4FMU_V4 PX4FMU_V4PRO MINDPX_V2
 	then
 		# Check for flow sensor - as it is a background task, launch it last
-		px4flow start &
-	fi
-
-	if ver hwcmp PX4FMU_V4
-	then
-		# Check for flow sensor - as it is a background task, launch it last
-		px4flow start &
-	fi
-
-	if ver hwcmp PX4FMU_V4PRO
-	then
-		# Check for flow sensor - as it is a background task, launch it last
-		px4flow start &
-	fi
-
-	if ver hwcmp MINDPX_V2
-	then
 		px4flow start &
 	fi
 
@@ -825,22 +787,15 @@ then
 	fi
 	unset FEXTRAS
 
-	if ver hwcmp CRAZYFLIE
+	if ver hwcmp AEROCORE2 CRAZYFLIE
 	then
-		# CF2 shouldn't have an sd card
+		# no sd cards in AEROCORE2 and CF2 shouldn't have an sd card
 	else
-
-		if ver hwcmp AEROCORE2
+		# Run no SD alarm
+		if [ $LOG_FILE == /dev/null ]
 		then
-			# AEROCORE2 shouldn't have an sd card
-		else
-
-			# Run no SD alarm
-			if [ $LOG_FILE == /dev/null ]
-			then
-				# Play SOS
-				tone_alarm error
-			fi
+			# Play SOS
+			tone_alarm error
 		fi
 	fi
 
