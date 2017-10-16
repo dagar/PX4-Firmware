@@ -38,7 +38,6 @@
  */
 
 #include <px4_defines.h>
-#include <px4_middleware.h>
 #include <drivers/drv_hrt.h>
 
 

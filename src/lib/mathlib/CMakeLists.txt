@@ -30,14 +30,20 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE lib__mathlib
-	COMPILE_FLAGS
-	SRCS
-		math/test/test.cpp
-		math/Limits.cpp
-		math/matrix_alg.cpp
-	DEPENDS
-		platforms__common
+px4_add_library(mathlib
+	math/matrix_alg.cpp
+	math/filter/LowPassFilter2p.cpp
+	math/test/test.cpp
+	math/Limits.cpp
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+
+target_include_directories(mathlib
+	PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}/math
+		${CMAKE_CURRENT_SOURCE_DIR}/math/filter
+		${CMAKE_CURRENT_SOURCE_DIR}/math/test
+		${CMAKE_CURRENT_SOURCE_DIR}/../matrix/
+	PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}
+	)

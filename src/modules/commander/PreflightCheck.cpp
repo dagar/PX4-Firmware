@@ -52,16 +52,15 @@
 #include <poll.h>
 
 #include <systemlib/err.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/rc_check.h>
-#include <systemlib/mavlink_log.h>
-
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mag.h>
 #include <drivers/drv_gyro.h>
 #include <drivers/drv_accel.h>
 #include <drivers/drv_baro.h>
 #include <drivers/drv_airspeed.h>
+#include <log/mavlink_log.h>
 
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/differential_pressure.h>

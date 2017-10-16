@@ -47,9 +47,7 @@
 #include <math.h>
 #include <string.h>
 
-#include <platforms/ros/eigen_math.h>
-
-#include <platforms/px4_defines.h>
+#include "eigen_math.h"
 
 namespace math
 {

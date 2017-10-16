@@ -103,10 +103,10 @@
 #include <uORB/topics/task_stack_info.h>
 
 #include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
-#include <systemlib/perf_counter.h>
+#include <parameters/param.h>
+#include <perf_counter/perf_counter.h>
 #include <systemlib/printload.h>
-#include <systemlib/mavlink_log.h>
+#include <log/mavlink_log.h>
 #include <version/version.h>
 
 #include "logbuffer.h"
@@ -2204,14 +2204,14 @@ int check_free_space()
 	}
 
 	/* use a threshold of 50 MiB */
-	if (statfs_buf.f_bavail < (px4_statfs_buf_f_bavail_t)(50 * 1024 * 1024 / statfs_buf.f_bsize)) {
+	if (statfs_buf.f_bavail < (50 * 1024 * 1024 / statfs_buf.f_bsize)) {
 		mavlink_log_critical(&mavlink_log_pub, "[blackbox] no space on MicroSD: %u MiB",
 			(unsigned int)(statfs_buf.f_bavail * statfs_buf.f_bsize) / (1024U * 1024U));
 		/* we do not need a flag to remember that we sent this warning because we will exit anyway */
 		return PX4_ERROR;
 
 	/* use a threshold of 100 MiB to send a warning */
-	} else if (!space_warning_sent && statfs_buf.f_bavail < (px4_statfs_buf_f_bavail_t)(100 * 1024 * 1024 / statfs_buf.f_bsize)) {
+	} else if (!space_warning_sent && statfs_buf.f_bavail < (100 * 1024 * 1024 / statfs_buf.f_bsize)) {
 		mavlink_log_critical(&mavlink_log_pub, "[blackbox] space on MicroSD low: %u MiB",
 			(unsigned int)(statfs_buf.f_bavail * statfs_buf.f_bsize) / (1024U * 1024U));
 		/* we don't want to flood the user with warnings */

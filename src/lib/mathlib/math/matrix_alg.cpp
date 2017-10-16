@@ -38,8 +38,9 @@
  * Matrix algebra on raw arrays
  */
 
+#include "mathlib.h"
+
 #include "matrix_alg.h"
-#include <px4_defines.h>
 
 /*
  *    Does matrix multiplication of two regular/square matrices

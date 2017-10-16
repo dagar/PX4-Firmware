@@ -107,7 +107,6 @@ if(GENERATE_RTPS_BRIDGE)
 				${msg_out_path}/micrortps_client/microRTPS_client.cpp
 				${msg_out_path}/micrortps_client/microRTPS_transport.cpp
 			DEPENDS
-				platforms__common
 				topic_bridge_files
 				uorb_headers_microcdr
 		)

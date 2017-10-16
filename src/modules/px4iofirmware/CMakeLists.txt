@@ -31,19 +31,13 @@
 #
 ############################################################################
 
-px4_add_module(
-	MODULE modules__px4iofirmware
-	SRCS
-		../systemlib/hx_stream.c
-		../systemlib/perf_counter.c
-		../systemlib/pwm_limit/pwm_limit.c
-		adc.c
-		controls.c
-		mixer.cpp
-		px4io.c
-		registers.c
-		safety.c
-		serial.c
-	DEPENDS
-		platforms__common
+px4_add_library(px4iofirmware
+	adc.c
+	controls.c
+	mixer.cpp
+	px4io.c
+	registers.c
+	safety.c
+	serial.c
 	)
+target_link_libraries(px4iofirmware PRIVATE hx_stream mixer perf_counter rc pwm_limit)

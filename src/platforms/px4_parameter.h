@@ -43,7 +43,7 @@
 #include <string>
 #else
 /* includes when building for NuttX */
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #endif
 
 namespace px4

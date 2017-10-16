@@ -39,7 +39,5 @@ px4_add_module(
 		drv_io_timer.c
 		drv_pwm_servo.c
 		drv_input_capture.c
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

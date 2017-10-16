@@ -41,7 +41,5 @@ px4_add_module(
 		ekf_att_pos_estimator_main.cpp
 		estimator_22states.cpp
 		estimator_utilities.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

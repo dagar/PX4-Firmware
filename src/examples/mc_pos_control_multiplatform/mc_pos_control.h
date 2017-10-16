@@ -41,7 +41,6 @@
 
 #pragma once
 
-#include <px4.h>
 #include <cstdio>
 #include <stdlib.h>
 #include <string.h>

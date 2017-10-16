@@ -38,7 +38,4 @@ px4_add_module(
 		publisher_main.cpp
 		publisher_start_nuttx.cpp
 		publisher_example.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

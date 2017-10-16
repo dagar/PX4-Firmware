@@ -38,7 +38,6 @@
  */
 
 #include <px4_config.h>
-#include <px4_defines.h>
 
 /* magic numbers from reference manual */
 

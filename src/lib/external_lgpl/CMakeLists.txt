@@ -30,12 +30,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE lib__external_lgpl
-	COMPILE_FLAGS
-	SRCS
-		tecs/tecs.cpp
-	DEPENDS
-		platforms__common
+
+add_library(external_lgpl tecs/tecs.cpp)
+add_dependencies(external_lgpl prebuild_targets)
+target_link_libraries(external_lgpl
+	PUBLIC mathlib
+	PRIVATE ecl_geo
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

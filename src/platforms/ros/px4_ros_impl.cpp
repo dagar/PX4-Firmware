@@ -37,8 +37,6 @@
  * PX4 Middleware Wrapper ROS Implementation
  */
 
-#include <px4.h>
-
 namespace px4
 {
 

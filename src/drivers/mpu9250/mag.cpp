@@ -51,7 +51,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 
 #include <board_config.h>
 #include <drivers/drv_hrt.h>

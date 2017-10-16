@@ -5,7 +5,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/stm32
 	drivers/stm32/adc
 	drivers/stm32/tone_alarm
 	drivers/led

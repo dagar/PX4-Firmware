@@ -8,11 +8,6 @@ px4_posix_generate_builtin_commands(
 	OUT apps
 	MODULE_LIST ${module_libraries})
 
-# Define build target
-set(APP_NAME px4)
-set(MAIN_SRC ${PX4_SOURCE_DIR}/src/platforms/posix/main.cpp)
-set(UPLOAD_NAME upload)
-
 if ("${BOARD}" STREQUAL "eagle" OR ("${BOARD}" STREQUAL "excelsior"))
 	include(fastrpc)
 	include(linux_app)
@@ -21,12 +16,12 @@ if ("${BOARD}" STREQUAL "eagle" OR ("${BOARD}" STREQUAL "excelsior"))
 
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-missing-prototypes -Wno-missing-declarations")
 	LINUX_APP(
-		APP_NAME ${APP_NAME}
+		APP_NAME px4
 		IDL_NAME px4muorb
 		APPS_DEST "/home/linaro"
 		SOURCES
 			px4muorb_stub.c
-			${MAIN_SRC}
+			main.cpp
 			apps.cpp
 		LINK_LIBS
 			-Wl,--start-group
@@ -37,29 +32,25 @@ if ("${BOARD}" STREQUAL "eagle" OR ("${BOARD}" STREQUAL "excelsior"))
 			-Wl,--end-group
 		)
 
-	px4_add_adb_push(OUT ${UPLOAD_NAME}
+	px4_add_adb_push(OUT upload
 				OS ${OS}
 				BOARD ${BOARD}
 				FILES $<TARGET_FILE:${APP_NAME}>
 				${PX4_SOURCE_DIR}/posix-configs/eagle/flight/mainapp.config
 				DEPENDS ${APP_NAME}
 				DEST /home/linaro)
+else()
 
-elseif ("${BOARD}" STREQUAL "rpi")
-
-	px4_add_executable(${APP_NAME}
-		${MAIN_SRC}
+	add_executable(px4
+		main.cpp
 		apps.cpp
 		)
+		
+	target_link_libraries(px4 PRIVATE ${module_libraries})
 
-	target_link_libraries(${APP_NAME}
-		-Wl,--start-group
-		${module_libraries}
-		df_driver_framework
-		${df_driver_libs}
-		pthread m rt
-		-Wl,--end-group
-		)
+endif()
+
+if ("${BOARD}" STREQUAL "rpi")
 
 	file(GLOB RPI_CONFIG_FILES ${PX4_SOURCE_DIR}/posix-configs/rpi/*.config)
 	px4_add_scp_push(OUT ${UPLOAD_NAME}
@@ -73,30 +64,6 @@ elseif ("${BOARD}" STREQUAL "rpi")
 
 elseif ("${BOARD}" STREQUAL "bebop")
 
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static")
-
-	px4_add_executable(${APP_NAME}
-		${MAIN_SRC}
-		apps.cpp
-		)
-
-	if (NOT APPLE)
-		target_link_libraries(${APP_NAME}
-			-Wl,--start-group
-			${module_libraries}
-			${df_driver_libs}
-			pthread m rt
-			-Wl,--end-group
-			)
-	else()
-		target_link_libraries(${APP_NAME}
-			${module_libraries}
-			${df_driver_libs}
-			pthread m
-			)
-	endif()
-
 	px4_add_adb_push_to_bebop(OUT ${UPLOAD_NAME}
 				OS ${OS}
 				BOARD ${BOARD}
@@ -109,28 +76,6 @@ elseif ("${BOARD}" STREQUAL "sitl")
 	include(./sitl_target.cmake)
 	include(./sitl_tests.cmake)
 
-else()
-
-	px4_add_executable(${APP_NAME}
-		${MAIN_SRC}
-		apps.cpp
-		)
-
-	if (NOT APPLE)
-		target_link_libraries(${APP_NAME}
-			-Wl,--start-group
-			${module_libraries}
-			${df_driver_libs}
-			pthread m rt
-			-Wl,--end-group
-			)
-	else()
-		target_link_libraries(${APP_NAME}
-			${module_libraries}
-			${df_driver_libs}
-			pthread m
-			)
-	endif()
 endif()
 
 #=============================================================================
@@ -145,4 +90,4 @@ add_custom_command(OUTPUT ${APP_NAME}.stripped
 			COMMAND ${STRIP_TOOL} -R .comment -R .gnu.version -o $<TARGET_FILE:px4>.stripped $<TARGET_FILE:px4>
 			DEPENDS px4
 			)
-add_custom_target(strip DEPENDS "${APP_NAME}.stripped")
+add_custom_target(strip DEPENDS ${APP_NAME}.stripped)

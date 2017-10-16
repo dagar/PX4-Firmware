@@ -77,8 +77,8 @@ px4_add_module(
 		uavcannode_params.c
 
 	DEPENDS
-		platforms__common
 		uavcan
+		version
 	)
 
 target_link_libraries(modules__uavcannode PUBLIC uavcan uavcan_stm32_driver)

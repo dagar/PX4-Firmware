@@ -30,11 +30,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE drivers__airspeed
-	COMPILE_FLAGS
-	SRCS
-		airspeed.cpp
-	DEPENDS
-		platforms__common
-	)
+
+px4_add_library(airspeed airspeed.cpp)
+target_link_libraries(airspeed PRIVATE drivers_device)

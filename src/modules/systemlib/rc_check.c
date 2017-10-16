@@ -46,9 +46,9 @@
 
 #include <systemlib/err.h>
 #include <systemlib/rc_check.h>
-#include <systemlib/param/param.h>
-#include <systemlib/mavlink_log.h>
+#include <parameters/param.h>
 #include <drivers/drv_rc_input.h>
+#include <log/mavlink_log.h>
 
 #define RC_INPUT_MAP_UNMAPPED 0
 

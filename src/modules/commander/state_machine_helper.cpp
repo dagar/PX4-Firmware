@@ -52,11 +52,11 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/actuator_controls.h>
 #include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_device.h>
+#include <log/mavlink_log.h>
 
 #include "state_machine_helper.h"
 #include "commander_helper.h"

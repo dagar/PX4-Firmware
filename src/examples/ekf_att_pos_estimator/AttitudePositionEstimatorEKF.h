@@ -69,7 +69,7 @@
 
 #include <geo/geo.h>
 #include <terrain_estimation/terrain_estimator.h>
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include "estimator_22states.h"
 
 #include <controllib/blocks.hpp>

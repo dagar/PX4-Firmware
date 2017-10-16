@@ -43,7 +43,6 @@
  */
 
 #include <geo/geo.h>
-#include <px4.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <stdio.h>

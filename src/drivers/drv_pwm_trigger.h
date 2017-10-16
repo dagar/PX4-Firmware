@@ -38,8 +38,6 @@
 
 #pragma once
 
-#include <px4_defines.h>
-
 #include <stdint.h>
 
 __BEGIN_DECLS

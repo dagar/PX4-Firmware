@@ -41,9 +41,9 @@
 #include "navigator.h"
 
 #include <geo/geo.h>
+#include <log/mavlink_log.h>
 #include <mathlib/mathlib.h>
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/uORB.h>

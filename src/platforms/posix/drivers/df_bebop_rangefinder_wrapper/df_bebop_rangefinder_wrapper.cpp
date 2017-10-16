@@ -50,7 +50,7 @@
 #include <errno.h>
 #include <string>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <systemlib/err.h>
 
 #include <drivers/drv_range_finder.h>

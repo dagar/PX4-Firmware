@@ -38,7 +38,6 @@
  */
 
 #include <px4_defines.h>
-#include <px4_middleware.h>
 #include <px4_workqueue.h>
 #include <px4_defines.h>
 #include <stdint.h>
@@ -46,7 +45,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include "hrt_work.h"
 #include <drivers/drv_hrt.h>
 #include "px4_time.h"
@@ -110,5 +109,5 @@ uint64_t get_time_micros()
 	return hrt_absolute_time();
 }
 
-}
+} // namespace px4
 

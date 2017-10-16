@@ -40,7 +40,5 @@ px4_add_module(
 	SRCS
 		position_estimator_inav_main.cpp
 		inertial_filter.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

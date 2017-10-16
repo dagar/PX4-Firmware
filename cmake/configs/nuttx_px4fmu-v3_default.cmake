@@ -7,7 +7,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/airspeed
 	drivers/blinkm
 	drivers/bmi160
 	drivers/bmp280
@@ -45,7 +44,6 @@ set(config_module_list
 	drivers/sf1xx
 	drivers/snapdragon_rc_pwm
 	drivers/srf02
-	drivers/stm32
 	drivers/stm32/adc
 	drivers/stm32/tone_alarm
 	drivers/tap_esc
@@ -92,6 +90,7 @@ set(config_module_list
 	#
 	# General system control
 	#
+	modules/camera_feedback
 	modules/commander
 	modules/events
 	modules/gpio_led
@@ -100,7 +99,6 @@ set(config_module_list
 	modules/mavlink
 	modules/navigator
 	modules/uavcan
-	modules/camera_feedback
 
 	#
 	# Estimation modules
@@ -131,32 +129,11 @@ set(config_module_list
 	# Library modules
 	#
 	modules/dataman
-	modules/systemlib/param
 	modules/systemlib
-	modules/systemlib/mixer
 	modules/uORB
 
 	# micro RTPS
 	modules/micrortps_bridge/micrortps_client
-
-	#
-	# Libraries
-	#
-	lib/controllib
-	lib/conversion
-	lib/DriverFramework/framework
-	lib/ecl
-	lib/external_lgpl
-	lib/geo
-	lib/geo_lookup
-	lib/launchdetection
-	lib/led
-	lib/mathlib
-	lib/mathlib/math/filter
-	lib/runway_takeoff
-	lib/tailsitter_recovery
-	lib/terrain_estimation
-	lib/version
 
 	#
 	# OBC challenge

@@ -30,10 +30,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE lib__controllib
-	COMPILE_FLAGS
-	SRCS
+px4_add_library(controllib
 		block/Block.cpp
 		block/BlockParam.cpp
 		BlockDerivative.cpp
@@ -44,7 +41,8 @@ px4_add_module(
 		BlockLimitSym.cpp
 		BlockLowPass.cpp
 		BlockLowPass2.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+target_link_libraries(controllib
+	PUBLIC mathlib log
+	PRIVATE mathlib log
+	)

@@ -58,7 +58,7 @@
 #include <errno.h>
 #include <math.h>
 #include <poll.h>
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <systemlib/circuit_breaker.h>
 #include <lib/mathlib/mathlib.h>
 

@@ -42,8 +42,6 @@
 
 #include <px4/vehicle_attitude.h>
 #include <mathlib/mathlib.h>
-#include <platforms/px4_defines.h>
-#include <platforms/px4_middleware.h>
 
 AttitudeEstimator::AttitudeEstimator() :
 	_n(),

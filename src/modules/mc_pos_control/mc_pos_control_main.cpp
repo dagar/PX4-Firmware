@@ -71,10 +71,9 @@
 #include <float.h>
 #include <lib/geo/geo.h>
 #include <mathlib/mathlib.h>
-#include <systemlib/mavlink_log.h>
-
 #include <controllib/blocks.hpp>
 #include <controllib/block/BlockParam.hpp>
+#include <log/mavlink_log.h>
 
 #define SIGMA_SINGLE_OP			0.000001f
 #define SIGMA_NORM			0.001f

@@ -36,7 +36,6 @@
  * @author Mark Charlebois <charlebm@gmail.com>
  */
 
-#include <px4_middleware.h>
 #include <px4_tasks.h>
 #include <px4_time.h>
 #include <px4_posix.h>

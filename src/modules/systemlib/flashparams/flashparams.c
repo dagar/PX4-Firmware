@@ -42,16 +42,18 @@
  * foot print device.
  */
 
-#include <px4_defines.h>
+#include "px4_log.h"
 #include <px4_posix.h>
 #include <px4_shutdown.h>
+
+#include <errno.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <tinybson/tinybson.h>
 
-#include "systemlib/param/param.h"
+#include "parameters/param.h"
 #include "systemlib/uthash/utarray.h"
-#include "systemlib/bson/tinybson.h"
 #include "flashparams.h"
 #include "flashfs.h"
 

@@ -50,6 +50,7 @@
 #include <dataman/dataman.h>
 #include <drivers/drv_hrt.h>
 #include <geo/geo.h>
+#include <log/mavlink_log.h>
 #include <mathlib/mathlib.h>
 #include <px4_config.h>
 #include <px4_defines.h>
@@ -58,7 +59,6 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <systemlib/mavlink_log.h>
 #include <systemlib/systemlib.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
 #include <uORB/topics/home_position.h>

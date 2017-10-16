@@ -42,9 +42,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <px4_config.h>
-#include <board_config.h>
-#include <px4_defines.h>
 
 __BEGIN_DECLS
 

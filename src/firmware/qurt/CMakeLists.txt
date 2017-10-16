@@ -57,4 +57,4 @@ else()
 			 DEST /usr/share/data/adsp)
 endif()
 
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

@@ -42,13 +42,14 @@
  * parameter needs to set to the key (magic).
  */
 
-#include <stdint.h>
-#include <px4_defines.h>
 #include <systemlib/circuit_breaker.h>
+#include <parameters/param.h>
+
+#define PX4_PARAM_GET_BYNAME(_name, _destpt) param_get(param_find(_name), _destpt)
 
 bool circuit_breaker_enabled(const char *breaker, int32_t magic)
 {
 	int32_t val = -1;
 
-	return (PX4_PARAM_GET_BYNAME(breaker, &val) == 0) && (val == magic);
+	return (param_get(param_find(breaker), &val) == 0) && (val == magic);
 }

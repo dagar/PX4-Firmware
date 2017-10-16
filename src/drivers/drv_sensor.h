@@ -40,7 +40,6 @@
 #ifndef _DRV_SENSOR_H
 #define _DRV_SENSOR_H
 
-#include <px4_defines.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
 

@@ -56,8 +56,6 @@ px4_add_module(
 	SRCS
 		mpu9x50_main.cpp
 		mpu9x50_params.c
-	DEPENDS
-		platforms__common
 	)
 
 set(module_external_libraries
@@ -66,4 +64,4 @@ set(module_external_libraries
 	CACHE INTERNAL "module_external_libraries"
 	)
 
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

@@ -31,17 +31,9 @@
 #
 ############################################################################
 
-set(SRCS
+px4_add_library(board_stm32
 	board_identity.c
-)
-
-if (NOT ${LABEL} STREQUAL "bootloader")
-	list(APPEND SRCS
-		board_mcu_version.c
-		board_reset.c
-		board_hw_rev_ver.c
-		)
-endif()
-
-px4_add_library(board_stm32 ${SRCS})
-add_dependencies(board_stm32 nuttx_build)
+	board_mcu_version.c
+	board_reset.c
+	board_hw_rev_ver.c
+	)

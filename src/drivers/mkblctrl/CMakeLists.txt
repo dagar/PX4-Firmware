@@ -37,7 +37,5 @@ px4_add_module(
 	SRCS
 		mkblctrl.cpp
 		mkblctrl_params.c
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

@@ -41,7 +41,7 @@
 
 #pragma once
 
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 
 #include "mavlink_bridge_header.h"
 #include <uORB/uORB.h>

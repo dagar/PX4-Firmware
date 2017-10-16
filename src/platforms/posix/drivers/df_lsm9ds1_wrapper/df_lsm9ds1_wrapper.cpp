@@ -53,9 +53,7 @@
 
 #include <systemlib/err.h>
 
-#include <systemlib/perf_counter.h>
-#include <systemlib/mavlink_log.h>
-
+#include <perf_counter/perf_counter.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_accel.h>
 #include <drivers/drv_gyro.h>
@@ -68,6 +66,7 @@
 
 #include <lsm9ds1/LSM9DS1.hpp>
 #include <DevMgr.hpp>
+#include <log/mavlink_log.h>
 
 // We don't want to auto publish, therefore set this to 0.
 #define LSM9DS1_NEVER_AUTOPUBLISH_US 0

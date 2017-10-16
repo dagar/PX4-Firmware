@@ -33,13 +33,13 @@
 px4_add_module(
 	MODULE drivers__linux_pwm_out
 	MAIN linux_pwm_out
-	COMPILE_FLAGS
 	SRCS
 		PCA9685.cpp
 		navio_sysfs.cpp
 		linux_pwm_out.cpp
 		ocpoc_mmap.cpp
 	DEPENDS
-		platforms__common
+		mixer
+		pwm_limit
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

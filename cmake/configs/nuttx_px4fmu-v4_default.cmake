@@ -8,7 +8,6 @@ set(config_module_list
 	#
 	# Board support modules
 	#
-	drivers/airspeed
 	drivers/blinkm
 	drivers/bma180
 	drivers/bmi055
@@ -47,7 +46,6 @@ set(config_module_list
 	drivers/sf1xx
 	drivers/snapdragon_rc_pwm
 	drivers/srf02
-	drivers/stm32
 	drivers/stm32/adc
 	drivers/stm32/tone_alarm
 	drivers/tap_esc
@@ -66,6 +64,7 @@ set(config_module_list
 	systemcmds/led_control
 	systemcmds/mixer
 	systemcmds/motor_ramp
+	systemcmds/motor_test
 	systemcmds/mtd
 	systemcmds/nshterm
 	systemcmds/param
@@ -131,34 +130,12 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/systemlib/mixer
-	modules/uORB
 	modules/dataman
+	modules/systemlib
+	modules/uORB
 
 	# micro RTPS
 	modules/micrortps_bridge/micrortps_client
-
-	#
-	# Libraries
-	#
-	lib/controllib
-	lib/mathlib
-	lib/mathlib/math/filter
-	lib/rc
-	lib/ecl
-	lib/external_lgpl
-	lib/geo
-	lib/geo_lookup
-	lib/conversion
-	lib/launchdetection
-	lib/led
-	lib/terrain_estimation
-	lib/runway_takeoff
-	lib/tailsitter_recovery
-	lib/version
-	lib/DriverFramework/framework
 
 	#
 	# OBC challenge

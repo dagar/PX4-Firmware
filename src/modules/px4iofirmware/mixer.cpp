@@ -49,13 +49,11 @@
 
 #include <drivers/drv_pwm_output.h>
 #include <drivers/drv_hrt.h>
-#include <rc/sbus.h>
+#include "rc/sbus.h"
 
-#include <systemlib/pwm_limit/pwm_limit.h>
-#include <systemlib/mixer/mixer.h>
+#include <pwm_limit/pwm_limit.h>
+#include "mixer/mixer.h"
 #include <uORB/topics/actuator_controls.h>
-
-#include "mixer.h"
 
 extern "C" {
 	/* #define DEBUG */
@@ -485,6 +483,7 @@ mixer_callback(uintptr_t handle,
  * not loaded faithfully.
  */
 
+#define PX4IO_MAX_MIXER_LENGHT		230
 static char mixer_text[PX4IO_MAX_MIXER_LENGHT];		/* large enough for one mixer */
 static unsigned mixer_text_length = 0;
 

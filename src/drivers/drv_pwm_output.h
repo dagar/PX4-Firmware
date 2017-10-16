@@ -43,14 +43,10 @@
 
 #pragma once
 
-#include <px4_defines.h>
-
 #include "uORB/topics/output_pwm.h"
 
 #include <stdint.h>
 #include <sys/ioctl.h>
-
-#include "drv_orb_dev.h"
 
 __BEGIN_DECLS
 

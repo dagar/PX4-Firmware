@@ -38,7 +38,5 @@ px4_add_module(
 	COMPILE_FLAGS
 	SRCS
 		pwm_out_sim.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

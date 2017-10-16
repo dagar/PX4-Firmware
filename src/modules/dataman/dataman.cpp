@@ -56,11 +56,11 @@
 #include <string.h>
 #include <semaphore.h>
 #include <unistd.h>
-#include <platforms/px4_getopt.h>
+#include "px4_getopt.h"
 #include <drivers/drv_hrt.h>
 
 #include "dataman.h"
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 
 #if defined(FLASH_BASED_DATAMAN)
 #include <nuttx/clock.h>

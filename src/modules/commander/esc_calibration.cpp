@@ -59,7 +59,7 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/uORB.h>
 #include <drivers/drv_hrt.h>
-#include <systemlib/mavlink_log.h>
+#include <log/mavlink_log.h>
 
 int check_if_batt_disconnected(orb_advert_t *mavlink_log_pub) {
 	struct battery_status_s battery;

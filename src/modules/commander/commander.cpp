@@ -75,8 +75,7 @@
 #include <px4_time.h>
 #include <systemlib/circuit_breaker.h>
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/rc_check.h>
 #include <systemlib/state_table.h>
 #include <float.h>
@@ -89,6 +88,7 @@
 #include <math.h>
 #include <poll.h>
 #include <float.h>
+#include <log/mavlink_log.h>
 #include <matrix/math.hpp>
 
 #include <uORB/uORB.h>

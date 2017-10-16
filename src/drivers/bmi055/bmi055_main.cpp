@@ -1,5 +1,5 @@
 #include <px4_config.h>
-#include <platforms/px4_getopt.h>
+#include "px4_getopt.h"
 #include "bmi055.hpp"
 
 /** driver 'main' command */

@@ -36,12 +36,6 @@ if (NOT ${BOARD} MATCHES "io")
 	add_subdirectory(px4_layer)
 endif()
 
-px4_add_module(
-	MODULE platforms__nuttx
-	COMPILE_FLAGS
-	SRCS
-		px4_nuttx_impl.cpp
-	DEPENDS
-		platforms__common
+add_library(platforms__nuttx
+	px4_nuttx_impl.cpp
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

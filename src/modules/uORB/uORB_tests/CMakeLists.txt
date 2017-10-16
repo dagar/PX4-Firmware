@@ -47,7 +47,5 @@ px4_add_module(
 	COMPILE_FLAGS
 		-Wno-sign-compare # TODO: fix all sign-compare
 	SRCS ${SRCS}
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

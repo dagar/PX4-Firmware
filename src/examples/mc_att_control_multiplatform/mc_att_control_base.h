@@ -45,7 +45,6 @@
  * @author Roman Bapst <bapstr@ethz.ch>
  *
  */
-#include <px4.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +52,7 @@
 #include <errno.h>
 #include <math.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <lib/mathlib/mathlib.h>
 
 

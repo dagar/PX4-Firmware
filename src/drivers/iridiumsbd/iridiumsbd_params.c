@@ -1,4 +1,4 @@
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 
 /**
  * Satellite radio read interval

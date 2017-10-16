@@ -44,18 +44,11 @@ if("${CONFIG_SHMEM}" STREQUAL "1")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCONFIG_SHMEM")
 endif()
 
-px4_add_module(
-	MODULE platforms__posix__px4_layer
-	COMPILE_FLAGS
-	SRCS
-		px4_posix_impl.cpp
-		px4_posix_tasks.cpp
-		px4_sem.cpp
-		lib_crc32.c
-		drv_hrt.c
-		px4_log.c
-		${SHMEM_SRCS}
-	DEPENDS
-		platforms__common
+add_library(platforms__posix__px4_layer
+	px4_posix_impl.cpp
+	px4_posix_tasks.cpp
+	px4_sem.cpp
+	lib_crc32.c
+	drv_hrt.c
+	${SHMEM_SRCS}
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

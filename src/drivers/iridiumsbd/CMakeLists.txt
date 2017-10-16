@@ -39,6 +39,4 @@ px4_add_module(
 	SRCS
 		IridiumSBD.cpp
 		iridiumsbd_params.c
-	DEPENDS
-		platforms__common
 	)

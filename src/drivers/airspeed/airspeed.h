@@ -41,7 +41,7 @@
 #include <px4_defines.h>
 #include <px4_workqueue.h>
 #include <systemlib/airspeed.h>
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/subsystem_info.h>
 #include <uORB/uORB.h>

@@ -38,7 +38,4 @@ px4_add_module(
 		mc_att_control_start_nuttx.cpp
 		mc_att_control.cpp
 		mc_att_control_base.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 

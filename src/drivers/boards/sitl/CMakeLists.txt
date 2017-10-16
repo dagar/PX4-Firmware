@@ -30,12 +30,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE drivers__boards__sitl
-	COMPILE_FLAGS
-	SRCS
-		sitl_led.c
-	DEPENDS
-		platforms__common
+
+px4_add_library(drivers_boards
+	sitl_led.c
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

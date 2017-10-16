@@ -38,6 +38,8 @@
  */
 
 #include <px4_config.h>
+#include <px4_defines.h>
+#include <px4_log.h>
 #include <drivers/drv_board_led.h>
 #include <stdio.h>
 
@@ -101,7 +103,7 @@ LED::init()
 int
 LED::devIOCTL(unsigned long cmd, unsigned long arg)
 {
-	int result = OK;
+	int result = PX4_OK;
 
 	switch (cmd) {
 	case LED_ON:

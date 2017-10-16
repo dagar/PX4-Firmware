@@ -63,7 +63,6 @@ px4_add_module(
 	MAIN uavcan
 	STACK_MAIN 3200
 	STACK_MAX 1500
-	COMPILE_FLAGS
 	SRCS
 		# Main
 		uavcan_main.cpp
@@ -81,8 +80,7 @@ px4_add_module(
 		sensors/baro.cpp
 
 	DEPENDS
-		platforms__common
 		uavcan
+		uavcan_stm32_driver
+		version
 	)
-
-target_link_libraries(modules__uavcan uavcan uavcan_stm32_driver)

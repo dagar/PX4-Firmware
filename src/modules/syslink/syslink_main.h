@@ -33,9 +33,8 @@
 
 #pragma once
 
+#include <battery/battery.h>
 #include <stdint.h>
-
-#include <systemlib/battery.h>
 
 #include <drivers/device/device.h>
 #include <drivers/device/ringbuffer.h>

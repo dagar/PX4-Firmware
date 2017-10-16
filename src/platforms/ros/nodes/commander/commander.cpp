@@ -40,8 +40,6 @@
 
 #include "commander.h"
 
-#include <platforms/px4_middleware.h>
-
 Commander::Commander() :
 	_n(),
 	_man_ctrl_sp_sub(_n.subscribe("manual_control_setpoint", 10, &Commander::ManualControlInputCallback, this)),

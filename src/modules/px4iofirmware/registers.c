@@ -45,13 +45,17 @@
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
-#include <systemlib/systemlib.h>
 #include <stm32_pwr.h>
-#include <rc/dsm.h>
-#include <rc/sbus.h>
+
+#include "rc/dsm.h"
+#include "rc/sbus.h"
 
 #include "px4io.h"
 #include "protocol.h"
+
+#ifndef SPEKTRUM_POWER
+#error "SPEKTRUM_POWER not defined"
+#endif /* SPEKTRUM_POWER */
 
 static int	registers_set_one(uint8_t page, uint8_t offset, uint16_t value);
 static void	pwm_configure_rates(uint16_t map, uint16_t defaultrate, uint16_t altrate);

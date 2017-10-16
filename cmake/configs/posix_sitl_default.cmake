@@ -8,7 +8,7 @@ set(config_module_list
 	drivers/pwm_out_sim
 	drivers/vmount
 	drivers/linux_gpio
-	drivers/airspeed
+
 	drivers/ets_airspeed
 	drivers/ms4525_airspeed
 	drivers/ms5525_airspeed
@@ -107,33 +107,11 @@ set(config_module_list
 	# Library modules
 	#
 	modules/dataman
-	modules/systemlib/param
 	modules/systemlib
-	modules/systemlib/mixer
 	modules/uORB
 
 	# micro RTPS
 	modules/micrortps_bridge/micrortps_client
-
-	#
-	# Libraries
-	#
-	lib/controllib
-	lib/conversion
-	lib/DriverFramework/framework
-	lib/ecl
-	lib/external_lgpl
-	lib/geo
-	lib/geo_lookup
-	lib/launchdetection
-	lib/led
-	lib/mathlib
-	lib/mathlib/math/filter
-	lib/rc
-	lib/runway_takeoff
-	lib/tailsitter_recovery
-	lib/terrain_estimation
-	lib/version
 
 	#
 	# OBC challenge

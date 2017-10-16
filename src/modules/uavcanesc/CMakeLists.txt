@@ -78,8 +78,8 @@ px4_add_module(
 		${PX4_SOURCE_DIR}/src/modules/systemlib/flashparams/flashparams.c
 		${PX4_SOURCE_DIR}/src/modules/systemlib/flashparams/flashfs.c
 	DEPENDS
-		platforms__common
 		uavcan
+		version
 	)
 
 target_link_libraries(modules__uavcanesc uavcan uavcan_stm32_driver)

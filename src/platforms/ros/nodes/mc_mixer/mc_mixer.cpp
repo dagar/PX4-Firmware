@@ -38,7 +38,6 @@
  * @author Roman Bapst <romanbapst@yahoo.de>
 */
 #include <ros/ros.h>
-#include <px4.h>
 #include <lib/mathlib/mathlib.h>
 #include <mav_msgs/CommandMotorSpeed.h>
 #include <string>

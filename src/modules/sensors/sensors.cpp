@@ -41,6 +41,7 @@
  * @author Beat Küng <beat-kueng@gmx.net>
  */
 
+#include <battery/battery.h>
 #include <board_config.h>
 
 #include <px4_config.h>
@@ -69,11 +70,9 @@
 
 #include <systemlib/airspeed.h>
 #include <systemlib/systemlib.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/err.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/battery.h>
-
+#include <perf_counter/perf_counter.h>
 #include <conversion/rotation.h>
 
 #include <uORB/uORB.h>

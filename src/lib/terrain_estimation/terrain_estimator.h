@@ -37,13 +37,12 @@
 
 #pragma once
 
-#include <lib/mathlib/mathlib.h>
-#include "matrix/Matrix.hpp"
+#include "mathlib.h"
+
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/distance_sensor.h>
-
 
 /*
 * This class can be used to estimate distance to the ground using a laser range finder.

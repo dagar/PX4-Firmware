@@ -50,11 +50,10 @@
 #include <drivers/drv_pwm_output.h>
 #include <drivers/drv_rc_input.h>
 #include <lib/geo/geo.h>
+#include <log/mavlink_log.h>
 #include <mathlib/mathlib.h>
 #include <px4_time.h>
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
-
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>

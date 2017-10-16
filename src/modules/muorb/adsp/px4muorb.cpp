@@ -35,14 +35,13 @@
 #include "uORBFastRpcChannel.hpp"
 #include "uORBManager.hpp"
 
-#include <px4_middleware.h>
 #include <px4_tasks.h>
 #include <px4_posix.h>
 #include <dspal_platform.h>
 #include "px4_log.h"
 #include "uORB/topics/sensor_combined.h"
 #include "uORB.h"
-#include "systemlib/param/param.h"
+#include "parameters/param.h"
 #include <shmem.h>
 
 __BEGIN_DECLS

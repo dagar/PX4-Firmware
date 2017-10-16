@@ -21,8 +21,9 @@
 #ifndef TECS_H
 #define TECS_H
 
-#include <mathlib/mathlib.h>
-#include <stdint.h>
+#include "mathlib.h"
+
+#include <cstdint>
 
 class __EXPORT TECS
 {

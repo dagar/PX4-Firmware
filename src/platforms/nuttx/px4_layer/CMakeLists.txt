@@ -30,13 +30,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE platforms__nuttx__px4_layer
-	COMPILE_FLAGS
-	SRCS
-		px4_nuttx_tasks.c
-		../../posix/px4_layer/px4_log.c
-	DEPENDS
-		platforms__common
+
+add_library(platforms__nuttx__px4_layer
+	px4_nuttx_tasks.c
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

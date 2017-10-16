@@ -108,7 +108,7 @@ CDev::register_class_devname(const char *class_devname)
 		snprintf(name, sizeof(name), "%s%d", class_devname, class_instance);
 		ret = register_driver(name, (void *)this);
 
-		if (ret == OK) { break; }
+		if (ret == PX4_OK) { break; }
 
 		class_instance++;
 	}

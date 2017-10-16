@@ -57,7 +57,7 @@
 #include <controllib/block/BlockParam.hpp>
 #include <controllib/blocks.hpp>
 #include <navigator/navigation.h>
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <uORB/topics/fw_pos_ctrl_status.h>
 #include <uORB/topics/geofence_result.h>
 #include <uORB/topics/mission.h>

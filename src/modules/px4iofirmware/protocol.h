@@ -34,6 +34,7 @@
 #pragma once
 
 #include <inttypes.h>
+#include <math.h>
 
 /**
  * @file protocol.h

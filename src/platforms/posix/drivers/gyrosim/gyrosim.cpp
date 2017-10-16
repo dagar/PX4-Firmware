@@ -61,7 +61,7 @@
 
 #include <simulator/simulator.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <systemlib/err.h>
 #include <systemlib/conversions.h>
 

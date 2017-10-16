@@ -433,8 +433,8 @@ endif()
 #
 
 add_subdirectory(src/platforms EXCLUDE_FROM_ALL)
-add_subdirectory(src/drivers/boards EXCLUDE_FROM_ALL)
-add_subdirectory(src/drivers/device EXCLUDE_FROM_ALL)
+add_subdirectory(src/lib EXCLUDE_FROM_ALL)
+add_subdirectory(src/drivers EXCLUDE_FROM_ALL)
 
 foreach(module ${config_module_list})
 	string(REGEX MATCH "^[./]" external_module ${module})

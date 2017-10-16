@@ -52,14 +52,13 @@
 #include <uORB/topics/vehicle_command_ack.h>
 
 #include <drivers/drv_hrt.h>
-#include <px4_includes.h>
+#include <log/mavlink_log.h>
 #include <px4_getopt.h>
 #include <px4_log.h>
 #include <px4_posix.h>
 #include <px4_sem.h>
 #include <px4_shutdown.h>
 #include <px4_tasks.h>
-#include <systemlib/mavlink_log.h>
 #include <replay/definitions.hpp>
 #include <version/version.h>
 
@@ -1950,7 +1949,7 @@ int Logger::check_free_space()
 		}
 
 		if (num_sess + num_dates <= max_log_dirs_to_keep &&
-		    statfs_buf.f_bavail >= (px4_statfs_buf_f_bavail_t)(min_free_bytes / statfs_buf.f_bsize)) {
+		    statfs_buf.f_bavail >= (min_free_bytes / statfs_buf.f_bsize)) {
 			break; // enough free space and limit not reached
 		}
 
@@ -1986,7 +1985,7 @@ int Logger::check_free_space()
 
 
 	/* use a threshold of 50 MiB: if below, do not start logging */
-	if (statfs_buf.f_bavail < (px4_statfs_buf_f_bavail_t)(50 * 1024 * 1024 / statfs_buf.f_bsize)) {
+	if (statfs_buf.f_bavail < (50 * 1024 * 1024 / statfs_buf.f_bsize)) {
 		mavlink_log_critical(&_mavlink_log_pub,
 				     "[logger] Not logging; SD almost full: %u MiB",
 				     (unsigned int)(statfs_buf.f_bavail / 1024U * statfs_buf.f_bsize / 1024U));

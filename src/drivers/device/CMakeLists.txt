@@ -58,12 +58,7 @@ elseif(${OS} STREQUAL "posix" OR ${OS} STREQUAL "qurt")
 		i2c_posix.cpp
 		sim.cpp
 	)
-
 endif()
 
-px4_add_module(
-	MODULE drivers__device
-	SRCS ${SRCS}
-	DEPENDS
-		platforms__common
-	)
+px4_add_library(drivers_device ${SRCS})
+target_link_libraries(drivers_device PUBLIC mathlib)

@@ -39,8 +39,6 @@
 
 #include "device.h"
 
-#include <px4_defines.h>
-#include <px4_posix.h>
 #include <drivers/drv_device.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -58,7 +56,7 @@ Device::Device(const char *name) :
 	int ret = px4_sem_init(&_lock, 0, 1);
 
 	if (ret != 0) {
-		PX4_WARN("SEM INIT FAIL: ret %d, %s", ret, strerror(errno));
+		PX4_ERR("SEM INIT FAIL: ret %d, %s", ret);
 	}
 
 	/* setup a default device ID. When bus_type is UNKNOWN the
@@ -78,7 +76,7 @@ Device::~Device()
 int
 Device::init()
 {
-	int ret = OK;
+	int ret = PX4_OK;
 
 	return ret;
 }

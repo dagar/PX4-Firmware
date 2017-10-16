@@ -40,7 +40,5 @@ px4_add_module(
 		drv_pwm_trigger.c
 		drv_input_capture.c
 		drv_led_pwm.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

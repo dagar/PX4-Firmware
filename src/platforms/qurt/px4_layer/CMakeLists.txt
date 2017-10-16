@@ -58,7 +58,5 @@ px4_add_module(
 	SRCS
 		${QURT_LAYER_SRCS}
 		${CONFIG_SRC}
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

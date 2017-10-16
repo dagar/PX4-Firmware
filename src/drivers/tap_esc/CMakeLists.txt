@@ -38,7 +38,5 @@ px4_add_module(
 	SRCS
 		tap_esc.cpp
 		tap_esc_common.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

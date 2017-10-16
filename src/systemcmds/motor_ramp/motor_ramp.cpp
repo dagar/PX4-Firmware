@@ -38,11 +38,10 @@
  * @author Roman Bapst <bapstroman@gmail.com>
  */
 
-#include <px4_config.h>
-#include <px4_defines.h>
 #include <px4_module.h>
 #include <px4_tasks.h>
 #include <px4_posix.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,10 +50,8 @@
 #include <math.h>
 #include <poll.h>
 
-#include <arch/board/board.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
-#include <platforms/px4_defines.h>
 
 #include "systemlib/systemlib.h"
 #include "systemlib/err.h"

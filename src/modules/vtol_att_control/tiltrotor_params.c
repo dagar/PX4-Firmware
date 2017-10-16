@@ -38,7 +38,7 @@
  * @author Roman Bapst <roman@px4.io>
  */
 
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 
 /**
  * Position of tilt servo in mc mode

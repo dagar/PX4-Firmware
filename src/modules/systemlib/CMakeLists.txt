@@ -33,19 +33,12 @@
 
 set(SRCS
 	airspeed.c
-	battery.cpp
 	board_serial.c
-	bson/tinybson.c
 	circuit_breaker.cpp
 	conversions.c
 	cpuload.c
 	crc.c
-	hysteresis/hysteresis.cpp
-	mavlink_log.c
 	otp.c
-	perf_counter.c
-	pid/pid.c
-	pwm_limit/pwm_limit.c
 	rc_check.c
 	)
 
@@ -53,9 +46,9 @@ if(${OS} STREQUAL "nuttx")
 	list(APPEND SRCS
 		err.c
 		printload.c
-		flashparams/flashparams.c
-		flashparams/flashfs.c
 		)
+		
+	add_subdirectory(flashparams)
 elseif ("${CONFIG_SHMEM}" STREQUAL "1")
 	list(APPEND SRCS
 		print_load_posix.c
@@ -66,18 +59,5 @@ else()
 		)
 endif()
 
-if(NOT ${OS} STREQUAL "qurt")
-	list(APPEND SRCS
-		hx_stream.c
-		)
-endif()
-
-px4_add_module(
-	MODULE modules__systemlib
-	COMPILE_FLAGS
-		-Wno-sign-compare
-	SRCS ${SRCS}
-	DEPENDS
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+px4_add_library(modules__systemlib ${SRCS})
+target_link_libraries(modules__systemlib PUBLIC log)

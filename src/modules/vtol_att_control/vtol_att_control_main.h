@@ -60,7 +60,7 @@
 #include <lib/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
 #include <systemlib/err.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/systemlib.h>
 
 #include <uORB/topics/actuator_armed.h>

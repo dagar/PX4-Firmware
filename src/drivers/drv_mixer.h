@@ -53,7 +53,6 @@
 #ifndef _DRV_MIXER_H
 #define _DRV_MIXER_H
 
-#include <px4_defines.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
 

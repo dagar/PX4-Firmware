@@ -39,8 +39,6 @@ px4_add_module(
 		px4io.cpp
 		px4io_uploader.cpp
 		px4io_serial.cpp
-	DEPENDS
-		platforms__common
 	)
 
 # include the px4io binary in ROMFS

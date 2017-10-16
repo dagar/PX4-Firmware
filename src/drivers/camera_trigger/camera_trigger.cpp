@@ -52,9 +52,7 @@
 #include <px4_workqueue.h>
 #include <systemlib/systemlib.h>
 #include <systemlib/err.h>
-#include <systemlib/param/param.h>
-#include <systemlib/mavlink_log.h>
-
+#include <parameters/param.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/camera_trigger.h>
 #include <uORB/topics/camera_capture.h>
@@ -65,6 +63,7 @@
 #include <uORB/topics/vehicle_global_position.h>
 
 #include <drivers/drv_hrt.h>
+#include <log/mavlink_log.h>
 
 #include "interfaces/src/camera_interface.h"
 #include "interfaces/src/gpio.h"

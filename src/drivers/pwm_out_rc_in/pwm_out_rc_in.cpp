@@ -46,10 +46,9 @@
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
-#include <systemlib/mixer/mixer.h>
-#include <systemlib/mixer/mixer_multirotor.generated.h>
-#include <systemlib/param/param.h>
-#include <systemlib/pwm_limit/pwm_limit.h>
+#include "mixer.h"
+#include <parameters/param.h>
+#include <pwm_limit/pwm_limit.h>
 #include <dev_fs_lib_serial.h>
 #include <v1.0/checksum.h>
 #include <v1.0/mavlink_types.h>

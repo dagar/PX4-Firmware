@@ -48,7 +48,5 @@ px4_add_module(
 	SRCS
 		topic_listener.cpp
 	DEPENDS
-		platforms__common
 		generate_topic_listener
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

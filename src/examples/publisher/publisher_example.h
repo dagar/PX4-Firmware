@@ -38,7 +38,6 @@
  * @author Thomas Gubler <thomasgubler@gmail.com>
  */
 #pragma once
-#include <px4.h>
 #include <px4_app.h>
 
 class PublisherExample

@@ -48,7 +48,7 @@
 #include <errno.h>
 #include <nuttx/mm/gran.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 
 /************************************************************************************
  * Definitions

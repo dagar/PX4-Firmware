@@ -65,10 +65,9 @@
 #include <uORB/topics/distance_sensor.h>
 #include <poll.h>
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
 #include <geo/geo.h>
 #include <drivers/drv_hrt.h>
-#include <platforms/px4_defines.h>
+#include <log/mavlink_log.h>
 
 #include <terrain_estimation/terrain_estimator.h>
 #include "position_estimator_inav_params.h"

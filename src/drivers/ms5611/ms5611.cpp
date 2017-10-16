@@ -64,9 +64,9 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/device/ringbuffer.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <systemlib/err.h>
-#include <platforms/px4_getopt.h>
+#include "px4_getopt.h"
 
 #include "ms5611.h"
 

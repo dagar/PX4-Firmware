@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
+#include <log/mavlink_log.h>
 #include "arm_auth.h"
 
 #include <string.h>
@@ -38,7 +39,6 @@
 #include <px4_defines.h>
 #include <px4_config.h>
 
-#include <systemlib/mavlink_log.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_command_ack.h>
 

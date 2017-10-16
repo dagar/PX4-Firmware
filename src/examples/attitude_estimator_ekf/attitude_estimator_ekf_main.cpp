@@ -69,7 +69,7 @@
 #include <lib/mathlib/mathlib.h>
 #include <lib/geo/geo.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <systemlib/err.h>
 
 #ifdef __cplusplus

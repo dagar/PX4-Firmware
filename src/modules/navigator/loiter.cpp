@@ -46,8 +46,8 @@
 #include <fcntl.h>
 
 #include <geo/geo.h>
+#include <log/mavlink_log.h>
 
-#include <systemlib/mavlink_log.h>
 #include <systemlib/err.h>
 
 #include <uORB/uORB.h>

@@ -60,16 +60,7 @@ add_custom_command(OUTPUT ${px4_git_ver_header}
 	WORKING_DIRECTORY ${PX4_SOURCE_DIR}
 	COMMENT "Generating git hash header"
 	)
-set_source_files_properties(${px4_git_ver_header} PROPERTIES GENERATED TRUE)
-add_custom_target(ver_gen ALL DEPENDS ${px4_git_ver_header})
 
-px4_add_module(
-	MODULE lib__version
-	COMPILE_FLAGS
-	SRCS
-		version.c
-	DEPENDS
-		ver_gen
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+add_library(version version.c ${px4_git_ver_header})
+
+target_include_directories(version PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

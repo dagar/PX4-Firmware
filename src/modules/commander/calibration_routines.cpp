@@ -47,7 +47,6 @@
 #include <float.h>
 #include <poll.h>
 #include <drivers/drv_hrt.h>
-#include <systemlib/mavlink_log.h>
 #include <geo/geo.h>
 #include <string.h>
 #include <mathlib/mathlib.h>
@@ -56,6 +55,7 @@
 #include <uORB/topics/sensor_combined.h>
 
 #include <drivers/drv_tone_alarm.h>
+#include <log/mavlink_log.h>
 
 #include "calibration_routines.h"
 #include "calibration_messages.h"

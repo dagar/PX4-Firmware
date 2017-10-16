@@ -42,7 +42,6 @@
 #		* px4_add_module
 #		* px4_add_common_flags
 #		* px4_add_optimization_flags_for_target
-#		* px4_add_executable
 #		* px4_add_library
 #
 
@@ -195,13 +194,26 @@ function(px4_add_module)
 		ONE_VALUE MODULE MAIN STACK STACK_MAIN STACK_MAX PRIORITY
 		MULTI_VALUE COMPILE_FLAGS LINK_FLAGS SRCS INCLUDES DEPENDS
 		OPTIONS EXTERNAL
-		REQUIRED MODULE
+		REQUIRED MODULE MAIN
 		ARGN ${ARGN})
 
-	px4_add_library(${MODULE} STATIC EXCLUDE_FROM_ALL ${SRCS})
+	add_library(${MODULE} STATIC EXCLUDE_FROM_ALL ${SRCS})
+	set_property(GLOBAL APPEND PROPERTY PX4_LIBRARIES ${MODULE})
+
+	# TODO: reevaluate per target optimization helpers
+	px4_add_optimization_flags_for_target(${MODULE})
+
+	# Pass variable to the parent px4_add_module.
+	set(_no_optimization_for_target ${_no_optimization_for_target} PARENT_SCOPE)
+
+	set_property(GLOBAL APPEND PROPERTY PX4_LIBRARIES ${target})
+
+	target_compile_definitions(${MODULE} PRIVATE PX4_MAIN=${MAIN}_app_main)
+	target_compile_definitions(${MODULE} PRIVATE MODULE_NAME="${MAIN}")
+ 
+	set_target_properties(${MODULE} PROPERTIES MAIN ${MAIN})
 
 	# set defaults if not set
-	set(MAIN_DEFAULT MAIN-NOTFOUND)
 	set(STACK_MAIN_DEFAULT 1024)
 	set(PRIORITY_DEFAULT SCHED_PRIORITY_DEFAULT)
 
@@ -211,7 +223,7 @@ function(px4_add_module)
 		message(AUTHOR_WARNING "STACK deprecated, USE STACK_MAIN instead!")
 	endif()
 
-	foreach(property MAIN STACK_MAIN PRIORITY)
+	foreach(property STACK_MAIN PRIORITY)
 		if(NOT ${property})
 			set(${property} ${${property}_DEFAULT})
 		endif()
@@ -230,20 +242,17 @@ function(px4_add_module)
 		list(APPEND COMPILE_FLAGS -Wframe-larger-than=${STACK_MAX})
 	endif()
 
-	if(MAIN)
-		set_target_properties(${MODULE} PROPERTIES
-			COMPILE_DEFINITIONS PX4_MAIN=${MAIN}_app_main)
-		add_definitions(-DMODULE_NAME="${MAIN}")
-	else()
-		add_definitions(-DMODULE_NAME="${MODULE}")
-	endif()
-
 	if(INCLUDES)
 		target_include_directories(${MODULE} PRIVATE ${INCLUDES})
 	endif()
 
 	if(DEPENDS)
-		add_dependencies(${MODULE} ${DEPENDS})
+		foreach(dep ${DEPENDS})
+			get_target_property(dep_type ${dep} TYPE)
+			if (${dep_type} STREQUAL "STATIC_LIBRARY")
+				target_link_libraries(${MODULE} PRIVATE ${dep})
+			endif()
+		endforeach()
 	endif()
 
 	# join list variables to get ready to send to compiler
@@ -264,6 +273,10 @@ function(px4_add_module)
 			set_target_properties(${MODULE} PROPERTIES ${prop} ${${prop}})
 		endif()
 	endforeach()
+
+	# common dependencies and libraries for every PX4 module
+	add_dependencies(${MODULE} prebuild_targets uorb_headers)
+	target_link_libraries(${MODULE} PRIVATE controllib log mathlib)
 endfunction()
 
 #=============================================================================
@@ -449,10 +462,12 @@ function(px4_add_common_flags)
 
 	set(added_include_dirs
 		${PX4_BINARY_DIR}
-		${PX4_BINARY_DIR}/src
 		${PX4_BINARY_DIR}/src/modules
-		${PX4_SOURCE_DIR}/src
+
+		# TODO: replace with cmake PUBLIC target_include_directories
 		${PX4_SOURCE_DIR}/src/drivers/boards/${BOARD}
+		${PX4_SOURCE_DIR}/src
+
 		${PX4_SOURCE_DIR}/src/include
 		${PX4_SOURCE_DIR}/src/lib
 		${PX4_SOURCE_DIR}/src/lib/DriverFramework/framework/include
@@ -478,7 +493,6 @@ function(px4_add_common_flags)
 		set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)
 		#message(STATUS "set(${${var}} ${${${var}}} ${added_${lower_var}} PARENT_SCOPE)")
 	endforeach()
-
 endfunction()
 
 #=============================================================================
@@ -528,17 +542,6 @@ endfunction()
 
 #=============================================================================
 #
-#	px4_add_executable
-#
-#	Like add_executable but with optimization flag fixup.
-#
-function(px4_add_executable target)
-	add_executable(${target} ${ARGN})
-	px4_add_optimization_flags_for_target(${target})
-endfunction()
-
-#=============================================================================
-#
 #	px4_add_library
 #
 #	Like add_library but with optimization flag fixup.
@@ -546,6 +549,10 @@ endfunction()
 function(px4_add_library target)
 	add_library(${target} ${ARGN})
 	add_dependencies(${target} prebuild_targets)
+
+	target_compile_definitions(${target} PRIVATE MODULE_NAME="${target}")
+	target_link_libraries(${target} PRIVATE log)
+
 	px4_add_optimization_flags_for_target(${target})
 
 	# Pass variable to the parent px4_add_module.

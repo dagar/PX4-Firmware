@@ -51,7 +51,5 @@ px4_add_module(
 		esc_calibration.cpp
 		PreflightCheck.cpp
 		arm_auth.cpp
-	DEPENDS
-		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+

@@ -39,7 +39,6 @@
 
 #include <px4_defines.h>
 #include <px4_tasks.h>
-#include <px4_middleware.h>
 #include <px4_workqueue.h>
 #include <dataman/dataman.h>
 #include <stdint.h>
@@ -48,7 +47,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <semaphore.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include "hrt_work.h"
 #include "px4_log.h"
 

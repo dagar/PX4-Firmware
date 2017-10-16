@@ -53,7 +53,7 @@
 #include <math.h>
 #include <unistd.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 #include <systemlib/err.h>
 #include <nuttx/arch.h>
 #include <nuttx/wqueue.h>

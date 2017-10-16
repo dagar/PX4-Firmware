@@ -38,6 +38,7 @@
 
 #pragma once
 
+#include <battery/battery.h>
 #include <px4_posix.h>
 #include <uORB/topics/hil_sensor.h>
 #include <uORB/topics/manual_control_setpoint.h>
@@ -53,8 +54,7 @@
 #include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_rc_input.h>
-#include <systemlib/perf_counter.h>
-#include <systemlib/battery.h>
+#include <perf_counter/perf_counter.h>
 #include <controllib/blocks.hpp>
 #include <controllib/block/BlockParam.hpp>
 #include <uORB/uORB.h>

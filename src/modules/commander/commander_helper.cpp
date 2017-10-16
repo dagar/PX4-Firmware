@@ -57,7 +57,7 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/led_control.h>
 #include <systemlib/err.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_tone_alarm.h>
 

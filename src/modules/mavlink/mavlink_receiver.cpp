@@ -75,9 +75,9 @@
 
 #include <conversion/rotation.h>
 
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/systemlib.h>
-#include <systemlib/mavlink_log.h>
+#include <log/mavlink_log.h>
 #include <systemlib/err.h>
 #include <systemlib/airspeed.h>
 #include <commander/px4_custom_mode.h>

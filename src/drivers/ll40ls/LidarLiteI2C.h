@@ -44,7 +44,7 @@
 
 #include <nuttx/wqueue.h>
 #include <nuttx/clock.h>
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 
 #include <drivers/device/i2c.h>
 #include <drivers/device/ringbuffer.h>

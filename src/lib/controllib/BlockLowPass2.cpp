@@ -37,7 +37,7 @@
  * Controller library code
  */
 
-#include <math.h>
+#include "mathlib.h"
 #include <float.h>
 
 #include "blocks.hpp"

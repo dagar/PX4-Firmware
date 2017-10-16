@@ -38,7 +38,6 @@ if (${OS} MATCHES "nuttx" AND NOT ${BOARD} MATCHES "io")
 		board_dma_alloc.c
 		board_gpio_init.c
 		)
-	add_dependencies(boards_common nuttx_build)
 
 	if (${CONFIG_ARCH_CHIP} MATCHES "kinetis")
 		add_subdirectory(kinetis)

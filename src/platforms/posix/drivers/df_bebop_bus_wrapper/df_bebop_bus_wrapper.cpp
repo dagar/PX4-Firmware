@@ -39,6 +39,7 @@
  * motor and contol commands to the Bebop and reads its status and informations.
  */
 
+#include <battery/battery.h>
 #include <stdint.h>
 
 #include <px4_tasks.h>
@@ -53,9 +54,7 @@
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/esc_status.h>
 
-#include <systemlib/mixer/mixer.h>
-#include <systemlib/battery.h>
-
+#include "mixer.h"
 #include <bebop_bus/BebopBus.hpp>
 #include <DevMgr.hpp>
 

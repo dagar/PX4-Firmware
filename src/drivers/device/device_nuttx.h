@@ -45,6 +45,7 @@
  */
 #include <px4_config.h>
 #include <px4_posix.h>
+#include "px4_log.h"
 
 #include <errno.h>
 #include <stdbool.h>

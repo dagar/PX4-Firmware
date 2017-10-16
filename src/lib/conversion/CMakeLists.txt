@@ -30,12 +30,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE lib__conversion
-	COMPILE_FLAGS
-	SRCS
-		rotation.cpp
-	DEPENDS
-		platforms__common
-	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :
+
+px4_add_library(rotation rotation.cpp)
+target_link_libraries(rotation PUBLIC mathlib)

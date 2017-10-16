@@ -36,6 +36,7 @@
  * Remote Control calibration routine
  */
 
+#include <log/mavlink_log.h>
 #include <px4_posix.h>
 #include <px4_time.h>
 #include <px4_defines.h>
@@ -47,8 +48,7 @@
 #include <unistd.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/manual_control_setpoint.h>
-#include <systemlib/mavlink_log.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <systemlib/err.h>
 
 int do_trim_calibration(orb_advert_t *mavlink_log_pub)

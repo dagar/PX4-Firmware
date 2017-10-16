@@ -50,12 +50,12 @@
 #include <termios.h>
 
 #include <systemlib/err.h>
-#include <systemlib/mavlink_log.h>
 #include <arch/board/board.h>
 
 #include <uORB/Publication.hpp>
 #include <uORB/topics/debug_key_value.h>
 #include <drivers/drv_hrt.h>
+#include <log/mavlink_log.h>
 
 uint8_t RoboClaw::checksum_mask = 0x7f;
 

@@ -37,7 +37,6 @@
  *
  * @author Thomas Gubler <thomasgubler@gmail.com>
  */
-#include <px4.h>
 
 using namespace px4;
 

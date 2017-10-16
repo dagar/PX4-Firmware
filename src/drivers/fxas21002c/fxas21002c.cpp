@@ -58,7 +58,7 @@
 
 #include <px4_log.h>
 
-#include <systemlib/perf_counter.h>
+#include <perf_counter/perf_counter.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/clock.h>
@@ -72,7 +72,7 @@
 #include <board_config.h>
 #include <mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/conversion/rotation.h>
-#include <platforms/px4_getopt.h>
+#include "px4_getopt.h"
 
 /* SPI protocol address bits */
 #define DIR_READ(a)                     ((a) | (1 << 7))

@@ -2,8 +2,6 @@
 
 #include "tecs.h"
 
-#include <ecl/ecl.h>
-#include <systemlib/err.h>
 #include <geo/geo.h>
 
 using math::constrain;
