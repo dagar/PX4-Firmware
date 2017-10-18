@@ -56,6 +56,6 @@ px4_add_module(
 		px4_log.c
 		${SHMEM_SRCS}
 	DEPENDS
-		platforms__common
+		#platforms__common
 	)
 # vim: set noet ft=cmake fenc=utf-8 ff=unix :

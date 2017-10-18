@@ -96,4 +96,4 @@ px4_add_library(parameters
 	)
 target_compile_options(parameters PRIVATE -Wno-sign-compare)
 target_include_directories(parameters PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(parameters PRIVATE tinybson)
+#target_link_libraries(parameters PRIVATE tinybson)

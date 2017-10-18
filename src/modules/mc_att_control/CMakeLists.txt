@@ -42,5 +42,5 @@ px4_add_module(
 		mc_att_control_main.cpp
 	DEPENDS
 		rotation
-		tailsitter_recovery
+		#tailsitter_recovery
 	)

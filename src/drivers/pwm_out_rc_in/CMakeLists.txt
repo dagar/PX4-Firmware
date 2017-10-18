@@ -31,6 +31,8 @@
 #
 ############################################################################
 
+include_directories(${CMAKE_BINARY_DIR}/src/lib/mixer)
+
 px4_add_module(
 	MODULE drivers__pwm_out_rc_in
 	MAIN pwm_out_rc_in
@@ -41,5 +43,5 @@ px4_add_module(
 	SRCS
 		pwm_out_rc_in.cpp
 	DEPENDS
-		mixer
+		#mixer
 	)

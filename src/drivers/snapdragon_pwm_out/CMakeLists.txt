@@ -30,11 +30,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+
+include_directories(${CMAKE_BINARY_DIR}/src/lib/mixer)
+
 px4_add_module(
 	MODULE drivers__snapdragon_pwm_out
 	MAIN snapdragon_pwm_out
 	SRCS
 		snapdragon_pwm_out.cpp
 	DEPENDS
-		mixer
+		#mixer
 	)

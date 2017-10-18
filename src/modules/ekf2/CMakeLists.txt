@@ -41,8 +41,8 @@ px4_add_module(
 		ekf2_main.cpp
 	DEPENDS
 		git_ecl
-		lib__ecl
+		#lib__ecl
 		controllib
-		geo
+		#geo
 		geo_lookup
 	)

@@ -41,6 +41,6 @@ px4_add_module(
 	SRCS
 		snapdragon_rc_pwm.cpp
 	DEPENDS
-		platforms__common
+		#platforms__common
 	)
 # vim: set noet ft=cmake fenc=utf-8 ff=unix :

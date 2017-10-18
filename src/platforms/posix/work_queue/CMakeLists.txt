@@ -49,6 +49,6 @@ px4_add_module(
 		sq_addafter.c
 		dq_rem.c
 	DEPENDS
-		platforms__common
+		#platforms__common
 	)
 # vim: set noet ft=cmake fenc=utf-8 ff=unix :
