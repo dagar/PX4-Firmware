@@ -47,5 +47,5 @@ px4_add_library(mixer EXCLUDE_FROM_ALL
 	mixer_simple.cpp
 	${CMAKE_CURRENT_BINARY_DIR}/mixer_multirotor.generated.h
 	)
-add_dependencies(mixer prebuild_targets)
+#add_dependencies(mixer prebuild_targets)
 target_include_directories(mixer PUBLIC ${CMAKE_CURRENT_BINARY_DIR})

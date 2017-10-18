@@ -37,6 +37,11 @@ if ("${QURT_ENABLE_STUBS}" STREQUAL "1")
 else()
 	# Generate the DSP lib and stubs but not the apps side executable
 	# The Apps side executable is generated via the posix_eagle_xxxx target
+	message("==============================================================================================================================================")
+	message("==============================================================================================================================================")
+	message("==============================================================================================================================================")
+	message("MODULE_LIBS=${module_libraries}")
+	message("df_driver_libs=${df_driver_libs}")
 	QURT_LIB(LIB_NAME px4
 		IDL_NAME px4muorb
 		SOURCES
