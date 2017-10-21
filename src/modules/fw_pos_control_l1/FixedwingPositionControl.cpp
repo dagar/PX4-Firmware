@@ -332,6 +332,7 @@ FixedwingPositionControl::airspeed_poll()
 
 		if (_sub_airspeed.get().indicated_airspeed_m_s > 0.0f
 		    && _sub_airspeed.get().true_airspeed_m_s > _sub_airspeed.get().indicated_airspeed_m_s) {
+
 			_eas2tas = max(_sub_airspeed.get().true_airspeed_m_s / _sub_airspeed.get().indicated_airspeed_m_s, 1.0f);
 
 		} else {
@@ -346,7 +347,7 @@ FixedwingPositionControl::airspeed_poll()
 	}
 
 	/* update TECS state */
-	_tecs.enable_airspeed(_airspeed_valid);
+	_tecs.set_airspeed_enabled(_airspeed_valid);
 }
 
 void
@@ -1811,20 +1812,15 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 		accel_body(2) = tmp;
 	}
 
-	/* tell TECS to update its state, but let it know when it cannot actually control the plane */
-	bool in_air_alt_control = (!_vehicle_land_detected.landed &&
-				   (_control_mode.flag_control_auto_enabled ||
-				    _control_mode.flag_control_velocity_enabled ||
-				    _control_mode.flag_control_altitude_enabled));
+	/* update TECS vehicle state estimates */
 
 	/* update TECS vehicle state estimates */
-	_tecs.update_vehicle_state_estimates(_airspeed, _R_nb,
-					     accel_body, (_global_pos.timestamp > 0), in_air_alt_control,
-					     _global_pos.alt, _local_pos.v_z_valid, _local_pos.vz, _local_pos.az);
+	_tecs.update_airspeed(_airspeed, _R_nb, accel_body, !_vehicle_land_detected.landed);
 
-	_tecs.update_pitch_throttle(_R_nb, pitch_for_tecs,
-				    _global_pos.alt, alt_sp,
-				    airspeed_sp, _airspeed, _eas2tas,
+	_tecs.update_height(!_vehicle_land_detected.landed, _global_pos.alt, _local_pos.v_z_valid, _local_pos.vz,
+			    _local_pos.az);
+
+	_tecs.update_pitch_throttle(alt_sp, airspeed_sp,
 				    climbout_mode, climbout_pitch_min_rad,
 				    throttle_min, throttle_max, throttle_cruise,
 				    pitch_min_rad, pitch_max_rad);
@@ -1833,19 +1829,19 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 	t.timestamp = _tecs.timestamp();
 
 	switch (_tecs.tecs_mode()) {
-	case TECS::ECL_TECS_MODE_NORMAL:
+	case TECS::ECL_TECS_MODE::NORMAL:
 		t.mode = tecs_status_s::TECS_MODE_NORMAL;
 		break;
 
-	case TECS::ECL_TECS_MODE_UNDERSPEED:
+	case TECS::ECL_TECS_MODE::UNDERSPEED:
 		t.mode = tecs_status_s::TECS_MODE_UNDERSPEED;
 		break;
 
-	case TECS::ECL_TECS_MODE_BAD_DESCENT:
+	case TECS::ECL_TECS_MODE::BAD_DESCENT:
 		t.mode = tecs_status_s::TECS_MODE_BAD_DESCENT;
 		break;
 
-	case TECS::ECL_TECS_MODE_CLIMBOUT:
+	case TECS::ECL_TECS_MODE::CLIMBOUT:
 		t.mode = tecs_status_s::TECS_MODE_CLIMBOUT;
 		break;
 	}

@@ -59,7 +59,7 @@
 
 #include <drivers/drv_hrt.h>
 #include <ecl/l1/ecl_l1_pos_controller.h>
-#include <ecl/tecs/tecs.h>
+#include <ecl/tecs/tecs.hpp>
 #include <geo/geo.h>
 #include <launchdetection/LaunchDetector.h>
 #include <mathlib/mathlib.h>
@@ -81,7 +81,6 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
 
 static constexpr float HDG_HOLD_DIST_NEXT =
