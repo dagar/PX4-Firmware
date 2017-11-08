@@ -1072,6 +1072,34 @@ void Ekf2::run()
 					orb_publish(ORB_ID(sensor_bias), _sensor_bias_pub, &bias);
 				}
 			}
+
+			{
+				// Publish wind estimate
+				wind_estimate_s wind_estimate;
+				wind_estimate.timestamp = now;
+
+				float velNE_wind[2];
+				_ekf.get_wind_velocity(velNE_wind);
+				wind_estimate.windspeed_north = velNE_wind[0];
+				wind_estimate.windspeed_east = velNE_wind[1];
+
+				float wind_varaiance[2];
+				_ekf.get_wind_velocity_var(wind_varaiance);
+				wind_estimate.variance_north = wind_varaiance[0];
+				wind_estimate.variance_east = wind_varaiance[1];
+
+				if (_wind_pub == nullptr) {
+					_wind_pub = orb_advertise(ORB_ID(wind_estimate), &wind_estimate);
+
+				} else {
+					orb_publish(ORB_ID(wind_estimate), _wind_pub, &wind_estimate);
+				}
+
+				// Calculate wind-compensated velocity in body frame
+				Vector3f v_wind_comp{velocity[0] - velNE_wind[0], velocity[1] - velNE_wind[1], 0.0f};
+				Dcmf R_to_body(q.inversed());
+				_vel_body_wind = R_to_body * v_wind_comp; // TODO: move this elsewhere
+			}
 		}
 
 		// publish estimator status
@@ -1181,41 +1209,6 @@ void Ekf2::run()
 
 					// reset to prevent data being saved too frequently
 					_total_cal_time_us = 0;
-				}
-
-				{
-					// Velocity of body origin in local NED frame (m/s)
-					float velocity[3];
-					_ekf.get_velocity(velocity);
-
-					matrix::Quatf q;
-					_ekf.copy_quaternion(q.data());
-
-					// Calculate wind-compensated velocity in body frame
-					Vector3f v_wind_comp(velocity);
-					matrix::Dcmf R_to_body(q.inversed());
-
-					float velNE_wind[2];
-					_ekf.get_wind_velocity(velNE_wind);
-
-					v_wind_comp(0) -= velNE_wind[0];
-					v_wind_comp(1) -= velNE_wind[1];
-					_vel_body_wind = R_to_body * v_wind_comp; // TODO: move this elsewhere
-
-					// Publish wind estimate
-					wind_estimate_s wind_estimate;
-					wind_estimate.timestamp = now;
-					wind_estimate.windspeed_north = velNE_wind[0];
-					wind_estimate.windspeed_east = velNE_wind[1];
-					wind_estimate.variance_north = status.covariances[22];
-					wind_estimate.variance_east = status.covariances[23];
-
-					if (_wind_pub == nullptr) {
-						_wind_pub = orb_advertise(ORB_ID(wind_estimate), &wind_estimate);
-
-					} else {
-						orb_publish(ORB_ID(wind_estimate), _wind_pub, &wind_estimate);
-					}
 				}
 			}
 
