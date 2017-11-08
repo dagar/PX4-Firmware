@@ -787,7 +787,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, bool checkSensors, bool check
 		// don't fail if not using GPS for the first 20s after gaining 3D lock because quality checks take time to pass
 		bool enforce_gps_required = (_time_last_no_gps_lock > 20 * 1000000);
 
-		if (!ekf2Check(mavlink_log_pub, true, reportFailures, enforce_gps_required)) {
+		if (!ekf2Check(mavlink_log_pub, true, reportFailures, enforce_gps_required || prearm)) {
 			failed = true;
 		}
 	}
