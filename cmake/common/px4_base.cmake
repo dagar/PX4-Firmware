@@ -456,6 +456,7 @@ function(px4_add_common_flags)
 		${PX4_SOURCE_DIR}/src/include
 		${PX4_SOURCE_DIR}/src/lib
 		${PX4_SOURCE_DIR}/src/lib/DriverFramework/framework/include
+		${PX4_SOURCE_DIR}/src/lib/eigen
 		${PX4_SOURCE_DIR}/src/lib/matrix
 		${PX4_SOURCE_DIR}/src/modules
 		${PX4_SOURCE_DIR}/src/platforms

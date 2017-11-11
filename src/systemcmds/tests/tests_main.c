@@ -104,6 +104,7 @@ const struct {
 	{"bson",		test_bson,	0},
 	{"conv",		test_conv, 0},
 	{"dataman",		test_dataman, OPT_NOJIGTEST | OPT_NOALLTEST},
+	{"eigen",		test_eigen,	0},
 	{"file2",		test_file2,	OPT_NOJIGTEST},
 	{"float",		test_float,	0},
 	{"gpio",		test_gpio,	OPT_NOJIGTEST | OPT_NOALLTEST},

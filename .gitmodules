@@ -49,3 +49,6 @@
 [submodule "cmake/configs/uavcan_board_ident"]
 	path = cmake/configs/uavcan_board_ident
 	url = https://github.com/PX4/uavcan_board_ident.git
+[submodule "src/lib/eigen"]
+	path = src/lib/eigen
+	url = git@github.com:PX4/eigen.git

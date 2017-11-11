@@ -37,6 +37,7 @@ set(srcs
 	test_bson.c
 	test_conv.cpp
 	test_dataman.c
+	test_eigen.cpp
 	test_file.c
 	test_file2.c
 	test_float.cpp

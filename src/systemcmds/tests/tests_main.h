@@ -58,6 +58,7 @@ extern int	test_hysteresis(int argc, char *argv[]);
 extern int	test_bson(int argc, char *argv[]);
 extern int	test_conv(int argc, char *argv[]);
 extern int	test_dataman(int argc, char *argv[]);
+extern int	test_eigen(int argc, char *argv[]);
 extern int	test_file(int argc, char *argv[]);
 extern int	test_file2(int argc, char *argv[]);
 extern int	test_float(int argc, char *argv[]);
