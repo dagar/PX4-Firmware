@@ -76,6 +76,8 @@ using control::BlockParamExtInt;
 
 using math::constrain;
 
+#define EKF2_STACK_SIZE 6600
+
 extern "C" __EXPORT int ekf2_main(int argc, char *argv[]);
 
 class Ekf2 final : public control::SuperBlock, public ModuleBase<Ekf2>
@@ -435,9 +437,11 @@ Ekf2::Ekf2():
 
 int Ekf2::print_status()
 {
-	PX4_INFO("local position OK %s", (_ekf.local_position_is_valid()) ? "yes" : "no");
-	PX4_INFO("global position OK %s", (_ekf.global_position_is_valid()) ? "yes" : "no");
 	PX4_INFO("time slip: %" PRId64 " us", _last_time_slip_us);
+	PX4_INFO("Ekf2 class: %d Bytes", sizeof(*this));
+	PX4_INFO("Ekf2 stack size: %d Bytes", EKF2_STACK_SIZE);
+
+	_ekf.print_status();
 	return 0;
 }
 
