@@ -174,6 +174,8 @@ private:
 	uORB::Publication<vehicle_global_position_s>	_vehicle_global_position_pub;
 	uORB::Publication<ekf2_timestamps_s>		_ekf2_timestamps_pub;
 
+	ext_vision_message _ev_data{}; ///< external vision data
+
 	// Used to correct baro data for positional errors
 	Vector3f _vel_body_wind = {};	// XYZ velocity relative to wind in body frame (m/s)
 
@@ -494,8 +496,6 @@ void Ekf2::run()
 	// initialize data structures outside of loop
 	// because they will else not always be
 	// properly populated
-	vehicle_local_position_s ev_pos = {};
-	vehicle_attitude_s ev_att = {};
 	sensor_selection_s sensor_selection = {};
 	sensor_baro_s sensor_baro = {};
 	sensor_baro.pressure = 1013.5f; // initialise pressure to sea level
@@ -530,8 +530,6 @@ void Ekf2::run()
 
 		bool baro_updated = false;
 		bool sensor_selection_updated = false;
-		bool vision_position_updated = false;
-		bool vision_attitude_updated = false;
 
 		sensor_combined_s sensors = {};
 
@@ -766,23 +764,45 @@ void Ekf2::run()
 			range_finder_sub_index = getRangeSubIndex(range_finder_subs);
 		}
 
+
+		bool vision_position_updated = false;
+		bool vision_attitude_updated = false;
 		orb_check(ev_pos_sub, &vision_position_updated);
-
-		if (vision_position_updated) {
-			if (orb_copy(ORB_ID(vehicle_vision_position), ev_pos_sub, &ev_pos) == PX4_OK) {
-				ekf2_timestamps.vision_position_timestamp_rel = (int16_t)((int64_t)ev_pos.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
-
-			}
-		}
-
 		orb_check(ev_att_sub, &vision_attitude_updated);
 
-		if (vision_attitude_updated) {
-			if (orb_copy(ORB_ID(vehicle_vision_attitude), ev_att_sub, &ev_att) == PX4_OK) {
-				ekf2_timestamps.vision_attitude_timestamp_rel = (int16_t)((int64_t)ev_att.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
+		if (vision_position_updated || vision_attitude_updated) {
+			uint64_t time_usec = 0;
+
+			if (vision_position_updated) {
+				vehicle_local_position_s ev_pos;
+
+				if (orb_copy(ORB_ID(vehicle_vision_position), ev_pos_sub, &ev_pos) == PX4_OK) {
+					_ev_data.posNED = matrix::Vector3f{ev_pos.x, ev_pos.y, ev_pos.z};
+
+					time_usec = ev_pos.timestamp;
+					ekf2_timestamps.vision_position_timestamp_rel = (int16_t)((int64_t)ev_pos.timestamp / 100 -
+							(int64_t)ekf2_timestamps.timestamp / 100);
+				}
 			}
+
+			if (vision_attitude_updated) {
+				vehicle_attitude_s ev_att;
+
+				if (orb_copy(ORB_ID(vehicle_vision_attitude), ev_att_sub, &ev_att) == PX4_OK) {
+					_ev_data.quat = matrix::Quatf(ev_att.q);
+
+					time_usec = ev_att.timestamp;
+					ekf2_timestamps.vision_attitude_timestamp_rel = (int16_t)((int64_t)ev_att.timestamp / 100 -
+							(int64_t)ekf2_timestamps.timestamp / 100);
+				}
+			}
+
+			// position measurement error from parameters. TODO : use covariances from topic
+			_ev_data.posErr = _ev_pos_noise.get();
+			_ev_data.angErr = _ev_ang_noise.get();
+
+			// use timestamp from external computer, clocks are synchronized when using MAVROS
+			_ekf.setExtVisionData(time_usec, &_ev_data);
 		}
 
 		// push imu data into estimator
@@ -921,24 +941,6 @@ void Ekf2::run()
 					_balt_data_sum = 0.0f;
 				}
 			}
-		}
-
-		// get external vision data
-		// if error estimates are unavailable, use parameter defined defaults
-		if (vision_position_updated || vision_attitude_updated) {
-			ext_vision_message ev_data;
-			ev_data.posNED(0) = ev_pos.x;
-			ev_data.posNED(1) = ev_pos.y;
-			ev_data.posNED(2) = ev_pos.z;
-			matrix::Quatf q(ev_att.q);
-			ev_data.quat = q;
-
-			// position measurement error from parameters. TODO : use covariances from topic
-			ev_data.posErr = _ev_pos_noise.get();
-			ev_data.angErr = _ev_ang_noise.get();
-
-			// use timestamp from external computer, clocks are synchronized when using MAVROS
-			_ekf.setExtVisionData(vision_position_updated ? ev_pos.timestamp : ev_att.timestamp, &ev_data);
 		}
 
 		// run the EKF update and output
