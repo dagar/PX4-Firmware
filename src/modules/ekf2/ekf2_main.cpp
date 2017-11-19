@@ -494,7 +494,6 @@ void Ekf2::run()
 	// initialize data structures outside of loop
 	// because they will else not always be
 	// properly populated
-	optical_flow_s optical_flow = {};
 	distance_sensor_s range_finder = {};
 	vehicle_local_position_s ev_pos = {};
 	vehicle_attitude_s ev_att = {};
@@ -532,7 +531,6 @@ void Ekf2::run()
 
 		bool baro_updated = false;
 		bool sensor_selection_updated = false;
-		bool optical_flow_updated = false;
 		bool range_finder_updated = false;
 		bool vision_position_updated = false;
 		bool vision_attitude_updated = false;
@@ -710,10 +708,30 @@ void Ekf2::run()
 			imu_bias_reset_request = !_ekf.reset_imu_bias();
 		}
 
+
+		bool optical_flow_updated = false;
 		orb_check(optical_flow_sub, &optical_flow_updated);
 
 		if (optical_flow_updated) {
+			optical_flow_s optical_flow;
+
 			if (orb_copy(ORB_ID(optical_flow), optical_flow_sub, &optical_flow) == PX4_OK) {
+
+				flow_message flow;
+				flow.flowdata(0) = optical_flow.pixel_flow_x_integral;
+				flow.flowdata(1) = optical_flow.pixel_flow_y_integral;
+				flow.quality = optical_flow.quality;
+				flow.gyrodata(0) = optical_flow.gyro_x_rate_integral;
+				flow.gyrodata(1) = optical_flow.gyro_y_rate_integral;
+				flow.gyrodata(2) = optical_flow.gyro_z_rate_integral;
+				flow.dt = optical_flow.integration_timespan;
+
+				if (PX4_ISFINITE(optical_flow.pixel_flow_y_integral) &&
+				    PX4_ISFINITE(optical_flow.pixel_flow_x_integral)) {
+
+					_ekf.setOpticalFlowData(optical_flow.timestamp, &flow);
+				}
+
 				ekf2_timestamps.optical_flow_timestamp_rel = (int16_t)((int64_t)optical_flow.timestamp / 100 -
 						(int64_t)ekf2_timestamps.timestamp / 100);
 			}
@@ -899,22 +917,6 @@ void Ekf2::run()
 					_balt_sample_count = 0;
 					_balt_data_sum = 0.0f;
 				}
-			}
-		}
-
-		if (optical_flow_updated) {
-			flow_message flow;
-			flow.flowdata(0) = optical_flow.pixel_flow_x_integral;
-			flow.flowdata(1) = optical_flow.pixel_flow_y_integral;
-			flow.quality = optical_flow.quality;
-			flow.gyrodata(0) = optical_flow.gyro_x_rate_integral;
-			flow.gyrodata(1) = optical_flow.gyro_y_rate_integral;
-			flow.gyrodata(2) = optical_flow.gyro_z_rate_integral;
-			flow.dt = optical_flow.integration_timespan;
-
-			if (PX4_ISFINITE(optical_flow.pixel_flow_y_integral) &&
-			    PX4_ISFINITE(optical_flow.pixel_flow_x_integral)) {
-				_ekf.setOpticalFlowData(optical_flow.timestamp, &flow);
 			}
 		}
 
