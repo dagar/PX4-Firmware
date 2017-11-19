@@ -46,12 +46,8 @@
 #define MAG_ROT_VAL_INTERNAL		-1
 #define CAL_ERROR_APPLY_CAL_MSG "FAILED APPLYING %s CAL #%u"
 
-
 using namespace sensors;
 using namespace DriverFramework;
-
-
-const double VotedSensorsUpdate::_msl_pressure = 101.325;
 
 VotedSensorsUpdate::VotedSensorsUpdate(const Parameters &parameters, bool hil_enabled)
 	: _parameters(parameters), _hil_enabled(hil_enabled)
@@ -849,9 +845,8 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			_baro_device_id[uorb_index] = baro_report.device_id;
 
 			got_update = true;
-			math::Vector<3> vect(baro_report.altitude, 0.f, 0.f);
+			math::Vector<3> vect(corrected_pressure, 0.f, 0.f);
 
-			_last_sensor_data[uorb_index].baro_alt_meter = baro_report.altitude;
 			_last_sensor_data[uorb_index].baro_temp_celcius = baro_report.temperature;
 			_last_sensor_data[uorb_index].baro_pessure_pa = corrected_pressure;
 
@@ -901,7 +896,7 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			const double R  = 287.05;	/* ideal gas constant in J/kg/K */
 
 			/* current pressure at MSL in kPa */
-			const double p1 = _msl_pressure;
+			const double p1 = MSL_PRESSURE;
 
 			/* measured pressure in kPa */
 			const double p = 0.001f * raw.baro_pessure_pa;

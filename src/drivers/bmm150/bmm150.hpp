@@ -224,9 +224,7 @@ private:
 
 	bool _running;
 
-	/* altitude conversion calibration */
 	unsigned        _call_interval;
-
 
 	mag_report _report {};
 	ringbuffer::RingBuffer  *_reports;
