@@ -494,7 +494,6 @@ void Ekf2::run()
 	// initialize data structures outside of loop
 	// because they will else not always be
 	// properly populated
-	distance_sensor_s range_finder = {};
 	vehicle_local_position_s ev_pos = {};
 	vehicle_attitude_s ev_att = {};
 	sensor_selection_s sensor_selection = {};
@@ -531,7 +530,6 @@ void Ekf2::run()
 
 		bool baro_updated = false;
 		bool sensor_selection_updated = false;
-		bool range_finder_updated = false;
 		bool vision_position_updated = false;
 		bool vision_attitude_updated = false;
 
@@ -738,19 +736,24 @@ void Ekf2::run()
 		}
 
 		if (range_finder_sub_index >= 0) {
+			bool range_finder_updated = false;
 			orb_check(range_finder_subs[range_finder_sub_index], &range_finder_updated);
 
 			if (range_finder_updated) {
+				distance_sensor_s range_finder;
+
 				if (orb_copy(ORB_ID(distance_sensor), range_finder_subs[range_finder_sub_index], &range_finder) == PX4_OK) {
 					// check if distance sensor is within working boundaries
-					if (range_finder.min_distance >= range_finder.current_distance ||
-					    range_finder.max_distance <= range_finder.current_distance) {
-						// use rng_gnd_clearance if on ground
-						if (_ekf.get_in_air_status()) {
-							range_finder_updated = false;
+					const bool valid_min = range_finder.current_distance >= range_finder.min_distance;
+					const bool valid_max = range_finder.current_distance <= range_finder.max_distance;
 
-						} else {
-							range_finder.current_distance = _rng_gnd_clearance.get();
+					if (valid_min && valid_max) {
+						_ekf.setRangeData(range_finder.timestamp, range_finder.current_distance);
+
+					} else {
+						// use rng_gnd_clearance if on ground
+						if (!_ekf.get_in_air_status()) {
+							_ekf.setRangeData(range_finder.timestamp, _rng_gnd_clearance.get());
 						}
 					}
 
@@ -918,10 +921,6 @@ void Ekf2::run()
 					_balt_data_sum = 0.0f;
 				}
 			}
-		}
-
-		if (range_finder_updated) {
-			_ekf.setRangeData(range_finder.timestamp, range_finder.current_distance);
 		}
 
 		// get external vision data
