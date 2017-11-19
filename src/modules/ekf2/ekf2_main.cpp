@@ -494,8 +494,6 @@ void Ekf2::run()
 	// initialize data structures outside of loop
 	// because they will else not always be
 	// properly populated
-	sensor_combined_s sensors = {};
-	vehicle_gps_position_s gps = {};
 	optical_flow_s optical_flow = {};
 	distance_sensor_s range_finder = {};
 	vehicle_local_position_s ev_pos = {};
@@ -532,13 +530,14 @@ void Ekf2::run()
 			updateParams();
 		}
 
-		bool gps_updated = false;
 		bool baro_updated = false;
 		bool sensor_selection_updated = false;
 		bool optical_flow_updated = false;
 		bool range_finder_updated = false;
 		bool vision_position_updated = false;
 		bool vision_attitude_updated = false;
+
+		sensor_combined_s sensors = {};
 
 		if (orb_copy(ORB_ID(sensor_combined), sensors_sub, &sensors) != PX4_OK) {
 			// sensor copy failure, do nothing
@@ -619,10 +618,35 @@ void Ekf2::run()
 		}
 
 
+		// read gps data if available
+		bool gps_updated = false;
+
 		orb_check(gps_sub, &gps_updated);
 
 		if (gps_updated) {
+			vehicle_gps_position_s gps;
+
 			if (orb_copy(ORB_ID(vehicle_gps_position), gps_sub, &gps) == PX4_OK) {
+				gps_message gps_msg;
+				gps_msg.time_usec = gps.timestamp;
+				gps_msg.lat = gps.lat;
+				gps_msg.lon = gps.lon;
+				gps_msg.alt = gps.alt;
+				gps_msg.fix_type = gps.fix_type;
+				gps_msg.eph = gps.eph;
+				gps_msg.epv = gps.epv;
+				gps_msg.sacc = gps.s_variance_m_s;
+				gps_msg.vel_m_s = gps.vel_m_s;
+				gps_msg.vel_ned[0] = gps.vel_n_m_s;
+				gps_msg.vel_ned[1] = gps.vel_e_m_s;
+				gps_msg.vel_ned[2] = gps.vel_d_m_s;
+				gps_msg.vel_ned_valid = gps.vel_ned_valid;
+				gps_msg.nsats = gps.satellites_used;
+				//TODO: add gdop to gps topic
+				gps_msg.gdop = 0.0f;
+
+				_ekf.setGpsData(gps.timestamp, &gps_msg);
+
 				// divide individually to get consistent rounding behavior
 				ekf2_timestamps.gps_timestamp_rel = (int16_t)((int64_t)gps.timestamp / 100 - (int64_t)ekf2_timestamps.timestamp / 100);
 			}
@@ -876,29 +900,6 @@ void Ekf2::run()
 					_balt_data_sum = 0.0f;
 				}
 			}
-		}
-
-		// read gps data if available
-		if (gps_updated) {
-			struct gps_message gps_msg;
-			gps_msg.time_usec = gps.timestamp;
-			gps_msg.lat = gps.lat;
-			gps_msg.lon = gps.lon;
-			gps_msg.alt = gps.alt;
-			gps_msg.fix_type = gps.fix_type;
-			gps_msg.eph = gps.eph;
-			gps_msg.epv = gps.epv;
-			gps_msg.sacc = gps.s_variance_m_s;
-			gps_msg.vel_m_s = gps.vel_m_s;
-			gps_msg.vel_ned[0] = gps.vel_n_m_s;
-			gps_msg.vel_ned[1] = gps.vel_e_m_s;
-			gps_msg.vel_ned[2] = gps.vel_d_m_s;
-			gps_msg.vel_ned_valid = gps.vel_ned_valid;
-			gps_msg.nsats = gps.satellites_used;
-			//TODO: add gdop to gps topic
-			gps_msg.gdop = 0.0f;
-
-			_ekf.setGpsData(gps.timestamp, &gps_msg);
 		}
 
 		if (optical_flow_updated) {
