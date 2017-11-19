@@ -152,8 +152,12 @@ void VotedSensorsUpdate::parameters_update()
 	 * IMPORTANT: we assume all sensor drivers are running and published sensor data at this point
 	 */
 
-	/* temperature compensation */
-	_temperature_compensation.parameters_update();
+	/* temperature compensation
+	 *  skip if HIL enabled to disable temperature compensation
+	 */
+	if (!_hil_enabled) {
+		_temperature_compensation.parameters_update();
+	}
 
 	/* gyro */
 	for (unsigned topic_instance = 0; topic_instance < GYRO_COUNT_MAX; ++topic_instance) {
@@ -602,11 +606,9 @@ void VotedSensorsUpdate::accel_poll(struct sensor_combined_s &raw)
 			}
 
 			// handle temperature compensation
-			if (!_hil_enabled) {
-				if (_temperature_compensation.apply_corrections_accel(uorb_index, accel_data, accel_report.temperature,
-						offsets[uorb_index], scales[uorb_index]) == 2) {
-					_corrections_changed = true;
-				}
+			if (_temperature_compensation.apply_corrections_accel(uorb_index, accel_data, accel_report.temperature,
+					offsets[uorb_index], scales[uorb_index]) == 2) {
+				_corrections_changed = true;
 			}
 
 			// rotate corrected measurements from sensor to body frame
@@ -709,11 +711,9 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 			}
 
 			// handle temperature compensation
-			if (!_hil_enabled) {
-				if (_temperature_compensation.apply_corrections_gyro(uorb_index, gyro_rate, gyro_report.temperature,
-						offsets[uorb_index], scales[uorb_index]) == 2) {
-					_corrections_changed = true;
-				}
+			if (_temperature_compensation.apply_corrections_gyro(uorb_index, gyro_rate, gyro_report.temperature,
+					offsets[uorb_index], scales[uorb_index]) == 2) {
+				_corrections_changed = true;
 			}
 
 			// rotate corrected measurements from sensor to body frame
@@ -834,11 +834,9 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			float corrected_pressure = 100.0f * baro_report.pressure;
 
 			// handle temperature compensation
-			if (!_hil_enabled) {
-				if (_temperature_compensation.apply_corrections_baro(uorb_index, corrected_pressure, baro_report.temperature,
-						offsets[uorb_index], scales[uorb_index]) == 2) {
-					_corrections_changed = true;
-				}
+			if (_temperature_compensation.apply_corrections_baro(uorb_index, corrected_pressure, baro_report.temperature,
+					offsets[uorb_index], scales[uorb_index]) == 2) {
+				_corrections_changed = true;
 			}
 
 			// First publication with data
