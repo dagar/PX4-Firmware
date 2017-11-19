@@ -347,16 +347,16 @@ Sensors::diff_pres_poll(struct sensor_combined_s &raw)
 		_airspeed.indicated_airspeed_m_s = math::max(0.0f,
 						   calc_indicated_airspeed_corrected((enum AIRSPEED_PITOT_MODEL)_parameters.air_pmodel,
 								   smodel, _parameters.air_tube_length,
-								   _diff_pres.differential_pressure_filtered_pa, _voted_sensors_update.baro_pressure(),
+								   _diff_pres.differential_pressure_filtered_pa, raw.baro_pessure_pa,
 								   air_temperature_celsius));
 
 		_airspeed.true_airspeed_m_s = math::max(0.0f,
 							calc_true_airspeed_from_indicated(_airspeed.indicated_airspeed_m_s,
-									_voted_sensors_update.baro_pressure(), air_temperature_celsius));
+									raw.baro_pessure_pa, air_temperature_celsius));
 
 		_airspeed.true_airspeed_unfiltered_m_s = math::max(0.0f,
-				calc_true_airspeed(_diff_pres.differential_pressure_raw_pa + _voted_sensors_update.baro_pressure(),
-						   _voted_sensors_update.baro_pressure(), air_temperature_celsius));
+				calc_true_airspeed(_diff_pres.differential_pressure_raw_pa + raw.baro_pessure_pa,
+						   raw.baro_pessure_pa, air_temperature_celsius));
 
 		_airspeed.air_temperature_celsius = air_temperature_celsius;
 

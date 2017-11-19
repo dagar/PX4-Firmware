@@ -10,7 +10,7 @@ int32 RELATIVE_TIMESTAMP_INVALID = 2147483647 # (0x7fffffff) If one of the relat
 
 # gyro timstamp is equal to the timestamp of the message
 float32[3] gyro_rad			# average angular rate measured in the XYZ body frame in rad/s over the last gyro sampling period
-uint32 gyro_integral_dt		# gyro measurement sampling period in us
+uint32 gyro_integral_dt			# gyro measurement sampling period in us
 
 int32 accelerometer_timestamp_relative	# timestamp + accelerometer_timestamp_relative = Accelerometer timestamp
 float32[3] accelerometer_m_s2		# average value acceleration measured in the XYZ body frame in m/s/s over the last accelerometer sampling period
@@ -22,3 +22,4 @@ float32[3] magnetometer_ga		# Magnetic field in NED body frame, in Gauss
 int32 baro_timestamp_relative		# timestamp + baro_timestamp_relative = Barometer timestamp
 float32 baro_alt_meter			# Altitude, already temp. comp.
 float32 baro_temp_celcius		# Temperature in degrees celsius
+float32 baro_pessure_pa			# Absolute pressure in pascals

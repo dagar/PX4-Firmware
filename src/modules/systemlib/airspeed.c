@@ -58,7 +58,6 @@
 float calc_indicated_airspeed_corrected(enum AIRSPEED_PITOT_MODEL pmodel, enum AIRSPEED_SENSOR_MODEL smodel,
 					float tube_len, float differential_pressure, float pressure_ambient, float temperature_celsius)
 {
-
 	// air density in kg/m3
 	double rho_air = get_air_density(pressure_ambient, temperature_celsius);
 
@@ -150,8 +149,6 @@ float calc_indicated_airspeed_corrected(enum AIRSPEED_PITOT_MODEL pmodel, enum A
  */
 float calc_indicated_airspeed(float differential_pressure)
 {
-
-
 	if (differential_pressure > 0.0f) {
 		return sqrtf((2.0f * differential_pressure) / CONSTANTS_AIR_DENSITY_SEA_LEVEL_15C);
 

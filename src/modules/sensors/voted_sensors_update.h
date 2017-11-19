@@ -97,9 +97,6 @@ public:
 
 	void print_status();
 
-	/** get the latest baro pressure */
-	float baro_pressure() const { return _last_best_baro_pressure; }
-
 	/**
 	 * call this whenever parameters got updated. Make sure to have initialize_sensors() called at least
 	 * once before calling this.
@@ -253,9 +250,8 @@ private:
 
 	orb_advert_t	_mavlink_log_pub = nullptr;
 
-	float _last_baro_pressure[BARO_COUNT_MAX]; /**< pressure from last baro sensors */
-	float _last_best_baro_pressure = 0.0f; /**< pressure from last best baro */
 	sensor_combined_s _last_sensor_data[SENSOR_COUNT_MAX]; /**< latest sensor data from all sensors instances */
+
 	uint64_t _last_accel_timestamp[ACCEL_COUNT_MAX]; /**< latest full timestamp */
 	uint64_t _last_mag_timestamp[MAG_COUNT_MAX]; /**< latest full timestamp */
 	uint64_t _last_baro_timestamp[BARO_COUNT_MAX]; /**< latest full timestamp */

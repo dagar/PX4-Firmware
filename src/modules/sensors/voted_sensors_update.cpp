@@ -855,7 +855,7 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 
 			_last_sensor_data[uorb_index].baro_alt_meter = baro_report.altitude;
 			_last_sensor_data[uorb_index].baro_temp_celcius = baro_report.temperature;
-			_last_baro_pressure[uorb_index] = corrected_pressure;
+			_last_sensor_data[uorb_index].baro_pessure_pa = corrected_pressure;
 
 			_last_baro_timestamp[uorb_index] = baro_report.timestamp;
 			_baro.voter.put(uorb_index, baro_report.timestamp, vect.data,
@@ -869,7 +869,7 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 
 		if (best_index >= 0) {
 			raw.baro_temp_celcius = _last_sensor_data[best_index].baro_temp_celcius;
-			_last_best_baro_pressure = _last_baro_pressure[best_index];
+			raw.baro_pessure_pa = _last_sensor_data[best_index].baro_pessure_pa;
 
 			if (_baro.last_best_vote != best_index) {
 				_baro.last_best_vote = (uint8_t)best_index;
@@ -906,7 +906,7 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			const double p1 = _msl_pressure;
 
 			/* measured pressure in kPa */
-			const double p = 0.001f * _last_best_baro_pressure;
+			const double p = 0.001f * raw.baro_pessure_pa;
 
 			/*
 			 * Solve:
