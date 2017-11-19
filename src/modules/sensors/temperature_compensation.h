@@ -187,11 +187,13 @@ private:
 
 	// create a struct containing all thermal calibration parameters
 	struct Parameters {
-		int32_t gyro_tc_enable;
+		bool gyro_tc_enable;
 		SensorCalData3D gyro_cal_data[GYRO_COUNT_MAX];
-		int32_t accel_tc_enable;
+
+		bool accel_tc_enable;
 		SensorCalData3D accel_cal_data[ACCEL_COUNT_MAX];
-		int32_t baro_tc_enable;
+
+		bool baro_tc_enable;
 		SensorCalData1D baro_cal_data[BARO_COUNT_MAX];
 	};
 
@@ -199,8 +201,10 @@ private:
 	struct ParameterHandles {
 		param_t gyro_tc_enable;
 		SensorCalHandles3D gyro_cal_handles[GYRO_COUNT_MAX];
+
 		param_t accel_tc_enable;
 		SensorCalHandles3D accel_cal_handles[ACCEL_COUNT_MAX];
+
 		param_t baro_tc_enable;
 		SensorCalHandles1D baro_cal_handles[BARO_COUNT_MAX];
 	};
@@ -208,7 +212,7 @@ private:
 
 	/**
 	 * initialize ParameterHandles struct
-	 * @return 0 on succes, <0 on error
+	 * @return 0 on success, <0 on error
 	 */
 	static int initialize_parameter_handles(ParameterHandles &parameter_handles);
 

@@ -42,7 +42,7 @@
 namespace sensors
 {
 
-int initialize_parameter_handles(ParameterHandles &parameter_handles)
+void initialize_parameter_handles(ParameterHandles &parameter_handles)
 {
 	/* basic r/c parameters */
 	for (unsigned i = 0; i < RC_MAX_CHAN_COUNT; i++) {
@@ -135,7 +135,9 @@ int initialize_parameter_handles(ParameterHandles &parameter_handles)
 
 	/* Differential pressure offset */
 	parameter_handles.diff_pres_offset_pa = param_find("SENS_DPRES_OFF");
+#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	parameter_handles.diff_pres_analog_scale = param_find("SENS_DPRES_ANSC");
+#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
 
 	parameter_handles.battery_voltage_scaling = param_find("BAT_CNT_V_VOLT");
 	parameter_handles.battery_current_scaling = param_find("BAT_CNT_V_CURR");
@@ -244,8 +246,6 @@ int initialize_parameter_handles(ParameterHandles &parameter_handles)
 	(void)param_find("SYS_CAL_TDEL");
 	(void)param_find("SYS_CAL_TMAX");
 	(void)param_find("SYS_CAL_TMIN");
-
-	return 0;
 }
 
 int update_parameters(const ParameterHandles &parameter_handles, Parameters &parameters)
@@ -430,7 +430,9 @@ int update_parameters(const ParameterHandles &parameter_handles, Parameters &par
 
 	/* Airspeed offset */
 	param_get(parameter_handles.diff_pres_offset_pa, &(parameters.diff_pres_offset_pa));
+#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	param_get(parameter_handles.diff_pres_analog_scale, &(parameters.diff_pres_analog_scale));
+#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
 
 	/* scaling of ADC ticks to battery voltage */
 	if (param_get(parameter_handles.battery_voltage_scaling, &(parameters.battery_voltage_scaling)) != OK) {
@@ -439,7 +441,7 @@ int update_parameters(const ParameterHandles &parameter_handles, Parameters &par
 	} else if (parameters.battery_voltage_scaling < 0.0f) {
 		/* apply scaling according to defaults if set to default */
 		parameters.battery_voltage_scaling = (3.3f / 4096);
-		param_set(parameter_handles.battery_voltage_scaling, &parameters.battery_voltage_scaling);
+		param_set_no_notification(parameter_handles.battery_voltage_scaling, &parameters.battery_voltage_scaling);
 	}
 
 	/* scaling of ADC ticks to battery current */
@@ -449,7 +451,7 @@ int update_parameters(const ParameterHandles &parameter_handles, Parameters &par
 	} else if (parameters.battery_current_scaling < 0.0f) {
 		/* apply scaling according to defaults if set to default */
 		parameters.battery_current_scaling = (3.3f / 4096);
-		param_set(parameter_handles.battery_current_scaling, &parameters.battery_current_scaling);
+		param_set_no_notification(parameter_handles.battery_current_scaling, &parameters.battery_current_scaling);
 	}
 
 	if (param_get(parameter_handles.battery_current_offset, &(parameters.battery_current_offset)) != OK) {
@@ -465,7 +467,7 @@ int update_parameters(const ParameterHandles &parameter_handles, Parameters &par
 		/* apply scaling according to defaults if set to default */
 
 		parameters.battery_v_div = BOARD_BATTERY1_V_DIV;
-		param_set(parameter_handles.battery_v_div, &parameters.battery_v_div);
+		param_set_no_notification(parameter_handles.battery_v_div, &parameters.battery_v_div);
 	}
 
 	if (param_get(parameter_handles.battery_a_per_v, &(parameters.battery_a_per_v)) != OK) {
@@ -476,7 +478,7 @@ int update_parameters(const ParameterHandles &parameter_handles, Parameters &par
 		/* apply scaling according to defaults if set to default */
 
 		parameters.battery_a_per_v = BOARD_BATTERY1_A_PER_V;
-		param_set(parameter_handles.battery_a_per_v, &parameters.battery_a_per_v);
+		param_set_no_notification(parameter_handles.battery_a_per_v, &parameters.battery_a_per_v);
 	}
 
 	param_get(parameter_handles.battery_source, &(parameters.battery_source));
