@@ -42,6 +42,7 @@
 #include <systemlib/mavlink_log.h>
 
 #include <conversion/rotation.h>
+#include <geo/geo.h>
 
 #define MAG_ROT_VAL_INTERNAL		-1
 #define CAL_ERROR_APPLY_CAL_MSG "FAILED APPLYING %s CAL #%u"
@@ -851,31 +852,17 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			raw.baro_temp_celcius = _last_sensor_data[best_index].baro_temp_celcius;
 			raw.baro_pessure_pa = _last_sensor_data[best_index].baro_pessure_pa;
 
-			/* altitude calculations based on http://www.kansasflyer.org/index.asp?nav=Avi&sec=Alti&tab=Theory&pg=1 */
-
-			/*
-			 * PERFORMANCE HINT:
-			 *
-			 * The single precision calculation is 50 microseconds faster than the double
-			 * precision variant. It is however not obvious if double precision is required.
-			 * Pending more inspection and tests, we'll leave the double precision variant active.
-			 *
-			 * Measurements:
-			 * 	double precision: ms5611_read: 992 events, 258641us elapsed, min 202us max 305us
-			 *	single precision: ms5611_read: 963 events, 208066us elapsed, min 202us max 241us
-			 */
+			// calculate altitude using the hypsometric equation
 
 			/* tropospheric properties (0-11km) for standard atmosphere */
-			const double T1 = 15.0 + 273.15;	/* temperature at base height in Kelvin */
-			const double a  = -6.5 / 1000;	/* temperature gradient in degrees per metre */
-			const double g  = 9.80665;	/* gravity constant in m/s/s */
-			const double R  = 287.05;	/* ideal gas constant in J/kg/K */
+			static constexpr float T1 = 15.0f - CONSTANTS_ABSOLUTE_NULL_CELSIUS;	/* temperature at base height in Kelvin */
+			static constexpr float a  = -6.5f / 1000.0f;	/* temperature gradient in degrees per metre */
 
-			/* current pressure at MSL in kPa */
-			const double p1 = MSL_PRESSURE;
+			/* current pressure at MSL in kPa (QNH in hPa)*/
+			const float p1 = _parameters.baro_qnh * 0.1f;
 
 			/* measured pressure in kPa */
-			const double p = 0.001f * raw.baro_pessure_pa;
+			const float p = raw.baro_pessure_pa * 0.001f;
 
 			/*
 			 * Solve:
@@ -886,7 +873,7 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			 * h = -------------------------------  + h1
 			 *                   a
 			 */
-			raw.baro_alt_meter = (((pow((p / p1), (-(a * R) / g))) * T1) - T1) / a;
+			raw.baro_alt_meter = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
 
 			if (_baro.last_best_vote != best_index) {
 				_baro.last_best_vote = (uint8_t)best_index;
