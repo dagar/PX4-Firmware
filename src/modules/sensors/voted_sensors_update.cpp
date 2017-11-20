@@ -552,9 +552,9 @@ void VotedSensorsUpdate::accel_poll(struct sensor_combined_s &raw)
 		if (accel_updated && _accel.enabled[uorb_index]) {
 			struct accel_report accel_report;
 
-			orb_copy(ORB_ID(sensor_accel), _accel.subscription[uorb_index], &accel_report);
+			int ret = orb_copy(ORB_ID(sensor_accel), _accel.subscription[uorb_index], &accel_report);
 
-			if (accel_report.timestamp == 0) {
+			if (ret != PX4_OK || accel_report.timestamp == 0) {
 				continue; //ignore invalid data
 			}
 
@@ -627,6 +627,7 @@ void VotedSensorsUpdate::accel_poll(struct sensor_combined_s &raw)
 	// write the best sensor data to the output variables
 	if (best_index >= 0) {
 		raw.accelerometer_integral_dt = _last_sensor_data[best_index].accelerometer_integral_dt;
+		memcpy(&raw.accelerometer_m_s2, &_last_sensor_data[best_index].accelerometer_m_s2, sizeof(raw.accelerometer_m_s2));
 
 		if (best_index != _accel.last_best_vote) {
 			_accel.last_best_vote = (uint8_t)best_index;
@@ -637,10 +638,6 @@ void VotedSensorsUpdate::accel_poll(struct sensor_combined_s &raw)
 		if (_selection.accel_device_id != _accel_device_id[best_index]) {
 			_selection_changed = true;
 			_selection.accel_device_id = _accel_device_id[best_index];
-		}
-
-		for (unsigned axis_index = 0; axis_index < 3; axis_index++) {
-			raw.accelerometer_m_s2[axis_index] = _last_sensor_data[best_index].accelerometer_m_s2[axis_index];
 		}
 	}
 }
@@ -657,9 +654,9 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 		if (gyro_updated && _gyro.enabled[uorb_index]) {
 			struct gyro_report gyro_report;
 
-			orb_copy(ORB_ID(sensor_gyro), _gyro.subscription[uorb_index], &gyro_report);
+			int ret = orb_copy(ORB_ID(sensor_gyro), _gyro.subscription[uorb_index], &gyro_report);
 
-			if (gyro_report.timestamp == 0) {
+			if (ret != PX4_OK || gyro_report.timestamp == 0) {
 				continue; //ignore invalid data
 			}
 
@@ -733,7 +730,7 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 	if (best_index >= 0) {
 		raw.timestamp = _last_sensor_data[best_index].timestamp;
 		raw.gyro_integral_dt = _last_sensor_data[best_index].gyro_integral_dt;
-		memcpy(&raw.gyro_rad, &_last_sensor_data[best_index].gyro_rad, raw.gyro_rad);
+		memcpy(&raw.gyro_rad, &_last_sensor_data[best_index].gyro_rad, sizeof(raw.gyro_rad));
 
 		if (_gyro.last_best_vote != best_index) {
 			_gyro.last_best_vote = (uint8_t)best_index;
@@ -757,9 +754,9 @@ void VotedSensorsUpdate::mag_poll(struct sensor_combined_s &raw)
 		if (mag_updated && _mag.enabled[uorb_index]) {
 			struct mag_report mag_report;
 
-			orb_copy(ORB_ID(sensor_mag), _mag.subscription[uorb_index], &mag_report);
+			int ret = orb_copy(ORB_ID(sensor_mag), _mag.subscription[uorb_index], &mag_report);
 
-			if (mag_report.timestamp == 0) {
+			if (ret != PX4_OK || mag_report.timestamp == 0) {
 				continue; //ignore invalid data
 			}
 
@@ -787,9 +784,7 @@ void VotedSensorsUpdate::mag_poll(struct sensor_combined_s &raw)
 	_mag.voter.get_best(hrt_absolute_time(), &best_index);
 
 	if (best_index >= 0) {
-		raw.magnetometer_ga[0] = _last_sensor_data[best_index].magnetometer_ga[0];
-		raw.magnetometer_ga[1] = _last_sensor_data[best_index].magnetometer_ga[1];
-		raw.magnetometer_ga[2] = _last_sensor_data[best_index].magnetometer_ga[2];
+		memcpy(&raw.magnetometer_ga, &_last_sensor_data[best_index].magnetometer_ga, sizeof(raw.magnetometer_ga));
 		_mag.last_best_vote = (uint8_t)best_index;
 
 		if (_selection.mag_device_id != _mag_device_id[best_index]) {
@@ -812,9 +807,9 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 		if (baro_updated) {
 			struct baro_report baro_report;
 
-			orb_copy(ORB_ID(sensor_baro), _baro.subscription[uorb_index], &baro_report);
+			int ret = orb_copy(ORB_ID(sensor_baro), _baro.subscription[uorb_index], &baro_report);
 
-			if (baro_report.timestamp == 0) {
+			if (ret != PX4_OK || baro_report.timestamp == 0) {
 				continue; //ignore invalid data
 			}
 
@@ -837,7 +832,7 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			_baro_device_id[uorb_index] = baro_report.device_id;
 
 			got_update = true;
-			math::Vector<3> vect(corrected_pressure, 0.f, 0.f);
+			math::Vector<3> vect(corrected_pressure, baro_report.temperature, 0.0f);
 
 			_last_sensor_data[uorb_index].baro_temp_celcius = baro_report.temperature;
 			_last_sensor_data[uorb_index].baro_pessure_pa = corrected_pressure;

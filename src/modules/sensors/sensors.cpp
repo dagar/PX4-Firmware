@@ -182,10 +182,6 @@ private:
 
 	DataValidator	_airspeed_validator;		/**< data validator to monitor airspeed */
 
-	battery_status_s _battery_status[BOARD_NUMBER_BRICKS] {};	/**< battery status */
-	differential_pressure_s _diff_pres{};
-	airspeed_s _airspeed{};
-
 	Battery		_battery[BOARD_NUMBER_BRICKS];			/**< Helper lib to publish battery_status topic. */
 
 	Parameters		_parameters{};			/**< local copies of interesting parameters */
@@ -285,24 +281,25 @@ Sensors::diff_pres_poll(struct sensor_combined_s &raw)
 	orb_check(_diff_pres_sub, &updated);
 
 	if (updated) {
-		orb_copy(ORB_ID(differential_pressure), _diff_pres_sub, &_diff_pres);
+		differential_pressure_s diff_pres;
+		orb_copy(ORB_ID(differential_pressure), _diff_pres_sub, &diff_pres);
 
-		float air_temperature_celsius = (_diff_pres.temperature > -300.0f) ? _diff_pres.temperature :
-						(raw.baro_temp_celcius - PCB_TEMP_ESTIMATE_DEG);
-
-		_airspeed.timestamp = _diff_pres.timestamp;
+		airspeed_s airspeed = {};
+		airspeed.timestamp = diff_pres.timestamp;
+		airspeed.air_temperature_celsius = (diff_pres.temperature > -300.0f) ? diff_pres.temperature :
+						   (raw.baro_temp_celcius - PCB_TEMP_ESTIMATE_DEG);;
 
 		/* push data into validator */
-		float airspeed_input[3] = { _diff_pres.differential_pressure_raw_pa, _diff_pres.temperature, 0.0f };
+		float airspeed_input[3] = { diff_pres.differential_pressure_raw_pa, diff_pres.temperature, 0.0f };
 
-		_airspeed_validator.put(_airspeed.timestamp, airspeed_input, _diff_pres.error_count,
+		_airspeed_validator.put(airspeed.timestamp, airspeed_input, diff_pres.error_count,
 					ORB_PRIO_HIGH);
 
-		_airspeed.confidence = _airspeed_validator.confidence(hrt_absolute_time());
+		airspeed.confidence = _airspeed_validator.confidence(hrt_absolute_time());
 
 		enum AIRSPEED_SENSOR_MODEL smodel;
 
-		switch ((_diff_pres.device_id >> 16) & 0xFF) {
+		switch ((diff_pres.device_id >> 16) & 0xFF) {
 		case DRV_DIFF_PRESS_DEVTYPE_SDP31:
 
 		/* fallthrough */
@@ -320,24 +317,22 @@ Sensors::diff_pres_poll(struct sensor_combined_s &raw)
 		}
 
 		/* don't risk to feed negative airspeed into the system */
-		_airspeed.indicated_airspeed_m_s = math::max(0.0f,
-						   calc_indicated_airspeed_corrected((enum AIRSPEED_PITOT_MODEL)_parameters.air_pmodel,
-								   smodel, _parameters.air_tube_length,
-								   _diff_pres.differential_pressure_filtered_pa, raw.baro_pessure_pa,
-								   air_temperature_celsius));
+		airspeed.indicated_airspeed_m_s = math::max(0.0f,
+						  calc_indicated_airspeed_corrected((enum AIRSPEED_PITOT_MODEL)_parameters.air_pmodel,
+								  smodel, _parameters.air_tube_length,
+								  diff_pres.differential_pressure_filtered_pa, raw.baro_pessure_pa,
+								  airspeed.air_temperature_celsius));
 
-		_airspeed.true_airspeed_m_s = math::max(0.0f,
-							calc_true_airspeed_from_indicated(_airspeed.indicated_airspeed_m_s,
-									raw.baro_pessure_pa, air_temperature_celsius));
+		airspeed.true_airspeed_m_s = math::max(0.0f,
+						       calc_true_airspeed_from_indicated(airspeed.indicated_airspeed_m_s, raw.baro_pessure_pa,
+								       airspeed.air_temperature_celsius));
 
-		_airspeed.true_airspeed_unfiltered_m_s = math::max(0.0f,
-				calc_true_airspeed(_diff_pres.differential_pressure_raw_pa + raw.baro_pessure_pa,
-						   raw.baro_pessure_pa, air_temperature_celsius));
-
-		_airspeed.air_temperature_celsius = air_temperature_celsius;
+		airspeed.true_airspeed_unfiltered_m_s = math::max(0.0f,
+							calc_true_airspeed(diff_pres.differential_pressure_raw_pa + raw.baro_pessure_pa, raw.baro_pessure_pa,
+									airspeed.air_temperature_celsius));
 
 		int instance;
-		orb_publish_auto(ORB_ID(airspeed), &_airspeed_pub, &_airspeed, &instance, ORB_PRIO_DEFAULT);
+		orb_publish_auto(ORB_ID(airspeed), &_airspeed_pub, &airspeed, &instance, ORB_PRIO_DEFAULT);
 	}
 }
 
@@ -462,15 +457,15 @@ Sensors::adc_poll(struct sensor_combined_s &raw)
 
 						float diff_pres_pa_raw = voltage * _parameters.diff_pres_analog_scale - _parameters.diff_pres_offset_pa;
 
-						_diff_pres.timestamp = t;
-						_diff_pres.differential_pressure_raw_pa = diff_pres_pa_raw;
-						_diff_pres.differential_pressure_filtered_pa = (_diff_pres.differential_pressure_filtered_pa * 0.9f) +
+						differential_pressure_s diff_pres = {};
+						diff_pres.timestamp = t;
+						diff_pres.differential_pressure_raw_pa = diff_pres_pa_raw;
+						diff_pres.differential_pressure_filtered_pa = (diff_pres.differential_pressure_filtered_pa * 0.9f) +
 								(diff_pres_pa_raw * 0.1f);
-						_diff_pres.temperature = -1000.0f;
+						diff_pres.temperature = -1000.0f;
 
 						int instance;
-						orb_publish_auto(ORB_ID(differential_pressure), &_diff_pres_pub, &_diff_pres, &instance,
-								 ORB_PRIO_DEFAULT);
+						orb_publish_auto(ORB_ID(differential_pressure), &_diff_pres_pub, &diff_pres, &instance, ORB_PRIO_DEFAULT);
 					}
 
 				} else
@@ -534,12 +529,13 @@ Sensors::adc_poll(struct sensor_combined_s &raw)
 					actuator_controls_s ctrl;
 					orb_copy(ORB_ID(actuator_controls_0), _actuator_ctrl_0_sub, &ctrl);
 
+					battery_status_s battery_status = {};
 					_battery[b].updateBatteryStatus(t, bat_voltage_v[b], bat_current_a[b],
 									connected, selected_source == b, b,
 									ctrl.control[actuator_controls_s::INDEX_THROTTLE],
-									_armed,  &_battery_status[b]);
+									_armed,  &battery_status);
 					int instance;
-					orb_publish_auto(ORB_ID(battery_status), &_battery_pub[b], &_battery_status[b], &instance, ORB_PRIO_DEFAULT);
+					orb_publish_auto(ORB_ID(battery_status), &_battery_pub[b], &battery_status, &instance, ORB_PRIO_DEFAULT);
 				}
 			}
 
@@ -581,10 +577,6 @@ Sensors::run()
 
 	_actuator_ctrl_0_sub = orb_subscribe(ORB_ID(actuator_controls_0));
 
-	for (int b = 0; b < BOARD_NUMBER_BRICKS; b++) {
-		_battery[b].reset(&_battery_status[b]);
-	}
-
 	/* get a set of initial values */
 	_voted_sensors_update.sensors_poll(raw);
 
@@ -597,7 +589,9 @@ Sensors::run()
 
 	/* advertise the sensor_preflight topic and make the initial publication */
 	preflt.accel_inconsistency_m_s_s = 0.0f;
+
 	preflt.gyro_inconsistency_rad_s = 0.0f;
+
 	preflt.mag_inconsistency_ga = 0.0f;
 
 	_sensor_preflight = orb_advertise(ORB_ID(sensor_preflight), &preflt);
