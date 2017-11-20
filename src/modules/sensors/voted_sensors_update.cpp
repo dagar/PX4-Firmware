@@ -731,8 +731,9 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 
 	// write data for the best sensor to output variables
 	if (best_index >= 0) {
-		raw.gyro_integral_dt = _last_sensor_data[best_index].gyro_integral_dt;
 		raw.timestamp = _last_sensor_data[best_index].timestamp;
+		raw.gyro_integral_dt = _last_sensor_data[best_index].gyro_integral_dt;
+		memcpy(&raw.gyro_rad, &_last_sensor_data[best_index].gyro_rad, raw.gyro_rad);
 
 		if (_gyro.last_best_vote != best_index) {
 			_gyro.last_best_vote = (uint8_t)best_index;
@@ -743,10 +744,6 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 		if (_selection.gyro_device_id != _gyro_device_id[best_index]) {
 			_selection_changed = true;
 			_selection.gyro_device_id = _gyro_device_id[best_index];
-		}
-
-		for (unsigned axis_index = 0; axis_index < 3; axis_index++) {
-			raw.gyro_rad[axis_index] = _last_sensor_data[best_index].gyro_rad[axis_index];
 		}
 	}
 }
@@ -794,11 +791,11 @@ void VotedSensorsUpdate::mag_poll(struct sensor_combined_s &raw)
 		raw.magnetometer_ga[1] = _last_sensor_data[best_index].magnetometer_ga[1];
 		raw.magnetometer_ga[2] = _last_sensor_data[best_index].magnetometer_ga[2];
 		_mag.last_best_vote = (uint8_t)best_index;
-	}
 
-	if (_selection.mag_device_id != _mag_device_id[best_index]) {
-		_selection_changed = true;
-		_selection.mag_device_id = _mag_device_id[best_index];
+		if (_selection.mag_device_id != _mag_device_id[best_index]) {
+			_selection_changed = true;
+			_selection.mag_device_id = _mag_device_id[best_index];
+		}
 	}
 }
 
@@ -859,17 +856,6 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			raw.baro_temp_celcius = _last_sensor_data[best_index].baro_temp_celcius;
 			raw.baro_pessure_pa = _last_sensor_data[best_index].baro_pessure_pa;
 
-			if (_baro.last_best_vote != best_index) {
-				_baro.last_best_vote = (uint8_t)best_index;
-				_corrections.selected_baro_instance = (uint8_t)best_index;
-				_corrections_changed = true;
-			}
-
-			if (_selection.baro_device_id != _baro_device_id[best_index]) {
-				_selection_changed = true;
-				_selection.baro_device_id = _baro_device_id[best_index];
-			}
-
 			/* altitude calculations based on http://www.kansasflyer.org/index.asp?nav=Avi&sec=Alti&tab=Theory&pg=1 */
 
 			/*
@@ -907,6 +893,16 @@ void VotedSensorsUpdate::baro_poll(struct sensor_combined_s &raw)
 			 */
 			raw.baro_alt_meter = (((pow((p / p1), (-(a * R) / g))) * T1) - T1) / a;
 
+			if (_baro.last_best_vote != best_index) {
+				_baro.last_best_vote = (uint8_t)best_index;
+				_corrections.selected_baro_instance = (uint8_t)best_index;
+				_corrections_changed = true;
+			}
+
+			if (_selection.baro_device_id != _baro_device_id[best_index]) {
+				_selection_changed = true;
+				_selection.baro_device_id = _baro_device_id[best_index];
+			}
 		}
 	}
 }
