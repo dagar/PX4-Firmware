@@ -57,7 +57,6 @@
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_bias.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_selection.h>
@@ -454,7 +453,6 @@ void Ekf2::run()
 	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	int sensor_selection_sub = orb_subscribe(ORB_ID(sensor_selection));
-	int sensor_baro_sub = orb_subscribe(ORB_ID(sensor_baro));
 
 	bool imu_bias_reset_request = false;
 
@@ -486,8 +484,6 @@ void Ekf2::run()
 	vehicle_attitude_s ev_att = {};
 	vehicle_status_s vehicle_status = {};
 	sensor_selection_s sensor_selection = {};
-	sensor_baro_s sensor_baro = {};
-	sensor_baro.pressure = 1013.5f; // initialise pressure to sea level
 
 	while (!should_exit()) {
 		int ret = px4_poll(fds, sizeof(fds) / sizeof(fds[0]), 1000);
@@ -519,7 +515,6 @@ void Ekf2::run()
 
 		bool gps_updated = false;
 		bool airspeed_updated = false;
-		bool baro_updated = false;
 		bool sensor_selection_updated = false;
 		bool optical_flow_updated = false;
 		bool range_finder_updated = false;
@@ -550,12 +545,6 @@ void Ekf2::run()
 
 		if (airspeed_updated) {
 			orb_copy(ORB_ID(airspeed), airspeed_sub, &airspeed);
-		}
-
-		orb_check(sensor_baro_sub, &baro_updated);
-
-		if (baro_updated) {
-			orb_copy(ORB_ID(sensor_baro), sensor_baro_sub, &sensor_baro);
 		}
 
 		orb_check(sensor_selection_sub, &sensor_selection_updated);
@@ -740,8 +729,9 @@ void Ekf2::run()
 					float balt_data_avg = _balt_data_sum / (float)_balt_sample_count;
 
 					// estimate air density assuming typical 20degC ambient temperature
-					const float pressure_to_density = 100.0f / (CONSTANTS_AIR_GAS_CONST * (20.0f - CONSTANTS_ABSOLUTE_NULL_CELSIUS));
-					const float rho = pressure_to_density * sensor_baro.pressure;
+					const float rho = sensors.baro_pessure_pa / (CONSTANTS_AIR_GAS_CONST * (20.0f - CONSTANTS_ABSOLUTE_NULL_CELSIUS));
+
+					PX4_INFO("rph = %.5f", (double)rho);
 					_ekf.set_air_density(rho);
 
 					// calculate static pressure error = Pmeas - Ptruth
@@ -1358,7 +1348,6 @@ void Ekf2::run()
 	orb_unsubscribe(vehicle_land_detected_sub);
 	orb_unsubscribe(status_sub);
 	orb_unsubscribe(sensor_selection_sub);
-	orb_unsubscribe(sensor_baro_sub);
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		orb_unsubscribe(range_finder_subs[i]);
