@@ -1,12 +1,11 @@
 uint32 instance_count		# Instance count of this mission. Increments monotonically whenever the mission is modified
 
-uint32 seq_reached		# Sequence of the mission item which has been reached
+int32 seq_reached		# Sequence of the mission item which has been reached, default -1
 uint32 seq_current		# Sequence of the current mission item
 uint32 seq_total		# Total number of mission items
 
 bool valid			# true if mission is valid
 bool warning			# true if mission is valid, but has potentially problematic items leading to safety warnings
-bool reached			# true if mission has been reached
 bool finished			# true if mission has been completed
 bool failure			# true if the mission cannot continue or be completed for some reason
 

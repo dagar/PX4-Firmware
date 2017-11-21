@@ -499,13 +499,10 @@ MavlinkMissionManager::send(const hrt_abstime now)
 
 		if (_verbose) { PX4_INFO("WPM: got mission result, new current_seq: %d", _current_seq); }
 
-		if (mission_result.reached) {
+		if (_last_reached != mission_result.seq_reached) {
 			_time_last_reached = now;
 			_last_reached = mission_result.seq_reached;
 			send_mission_item_reached((uint16_t)mission_result.seq_reached);
-
-		} else {
-			_last_reached = -1;
 		}
 
 		send_mission_current(_current_seq);
