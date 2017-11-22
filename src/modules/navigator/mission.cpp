@@ -139,6 +139,9 @@ Mission::on_inactive()
 
 	/* reset so current mission item gets restarted if mission was paused */
 	_work_item_type = WORK_ITEM_TYPE_DEFAULT;
+
+	/* reset so MISSION_ITEM_REACHED isn't published */
+	_navigator->get_mission_result()->seq_reached = -1;
 }
 
 void
@@ -157,7 +160,6 @@ void
 Mission::on_activation()
 {
 	set_mission_items();
-	_navigator->get_mission_result()->seq_reached = -1;
 
 	// unpause triggering if it was paused
 	vehicle_command_s cmd = {};
