@@ -495,14 +495,18 @@ MavlinkMissionManager::send(const hrt_abstime now)
 		mission_result_s mission_result;
 		orb_copy(ORB_ID(mission_result), _mission_result_sub, &mission_result);
 
-		_current_seq = mission_result.seq_current;
-
-		if (_verbose) { PX4_INFO("WPM: got mission result, new current_seq: %d", _current_seq); }
+		if (_current_seq != mission_result.seq_current) {
+			_current_seq = mission_result.seq_current;
+			if (_verbose) { PX4_INFO("WPM: got mission result, new current_seq: %u", _current_seq); }
+		}
 
 		if (_last_reached != mission_result.seq_reached) {
 			_time_last_reached = now;
 			_last_reached = mission_result.seq_reached;
-			send_mission_item_reached((uint16_t)mission_result.seq_reached);
+			if (_last_reached >= 0) {
+				send_mission_item_reached((uint16_t)mission_result.seq_reached);
+			}
+			if (_verbose) { PX4_INFO("WPM: got mission result, new seq_reached: %d", _last_reached); }
 		}
 
 		send_mission_current(_current_seq);

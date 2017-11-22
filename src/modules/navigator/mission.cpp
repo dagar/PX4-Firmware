@@ -157,6 +157,7 @@ void
 Mission::on_activation()
 {
 	set_mission_items();
+	_navigator->get_mission_result()->seq_reached = -1;
 
 	// unpause triggering if it was paused
 	vehicle_command_s cmd = {};
