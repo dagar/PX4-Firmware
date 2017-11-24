@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,22 +31,11 @@
  *
  ****************************************************************************/
 
-/**
- * @file mathlib.h
- *
- * Common header for mathlib exports.
- */
-
 #pragma once
 
-#ifdef __cplusplus
+#include <cmath>
+#include <cfloat>
 
-#include "math/Vector.hpp"
-#include "math/Matrix.hpp"
-#include "math/Quaternion.hpp"
-#include "math/Limits.hpp"
-#include "math/Functions.hpp"
-#include "math/matrix_alg.h"
-#include "math/Utilities.hpp"
-
-#endif
+// floating point equality check that handles edge cases
+// Based on http://floating-point-gui.de/errors/comparison/ as of 2017-11-24
+bool AlmostEquals(float a, float b, float epsilon = FLT_EPSILON);

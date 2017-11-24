@@ -37,6 +37,7 @@ px4_add_module(
 		math/test/test.cpp
 		math/Limits.cpp
 		math/matrix_alg.cpp
+		math/Utilities.cpp
 	DEPENDS
 		platforms__common
 	)

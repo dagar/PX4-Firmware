@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,22 +31,34 @@
  *
  ****************************************************************************/
 
-/**
- * @file mathlib.h
- *
- * Common header for mathlib exports.
- */
+#include "Utilities.hpp"
 
-#pragma once
+#include "Limits.hpp"
 
-#ifdef __cplusplus
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
 
-#include "math/Vector.hpp"
-#include "math/Matrix.hpp"
-#include "math/Quaternion.hpp"
-#include "math/Limits.hpp"
-#include "math/Functions.hpp"
-#include "math/matrix_alg.h"
-#include "math/Utilities.hpp"
+// floating point equality check that handles edge cases
+// Based on http://floating-point-gui.de/errors/comparison/ as of 2017-11-24
+bool AlmostEquals(float a, float b, float epsilon)
+{
+	const float absA = fabsf(a);
+	const float absB = fabsf(b);
+	const float diff = fabsf(a - b);
 
-#endif
+	if (a == b) {
+		// shortcut, handles infinities
+		return true;
+
+	} else if (a == 0 || b == 0 || diff < FLT_MIN) {
+		// a or b is zero or both are extremely close to it
+		// relative error is less meaningful here
+		return diff < (epsilon * FLT_MIN);
+
+	} else {
+		// use relative error
+		return diff / math::min((absA + absB), FLT_MAX) < epsilon;
+	}
+}
+
+#pragma GCC diagnostic pop
