@@ -304,12 +304,12 @@ RTL::advance_rtl()
 
 	case RTL_STATE_DESCEND:
 
-		/* only go to land if autoland is enabled */
-		if (_param_land_delay.get() > FLT_EPSILON) {
-			_rtl_state = RTL_STATE_LOITER;
+		/* land immediately if RTL_LAND_DELAY is 0 */
+		if (AlmostEquals(_param_land_delay.get(), 0.0f)) {
+			_rtl_state = RTL_STATE_LAND;
 
 		} else {
-			_rtl_state = RTL_STATE_LAND;
+			_rtl_state = RTL_STATE_LOITER;
 		}
 
 		break;
