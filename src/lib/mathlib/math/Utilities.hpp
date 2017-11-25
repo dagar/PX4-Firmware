@@ -36,6 +36,11 @@
 #include <cmath>
 #include <cfloat>
 
+namespace math
+{
+
 // floating point equality check that handles edge cases
 // Based on http://floating-point-gui.de/errors/comparison/ as of 2017-11-24
-bool AlmostEquals(float a, float b, float epsilon = FLT_EPSILON);
+bool almost_equals(float a, float b, float epsilon = FLT_EPSILON);
+
+} // namespace math

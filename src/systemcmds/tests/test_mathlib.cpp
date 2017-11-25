@@ -33,10 +33,9 @@
 
 #include <unit_test.h>
 
-#include <errno.h>
-#include <fcntl.h>
-#include <float.h>
-#include <math.h>
+#include <cmath>
+#include <cfloat>
+
 #include <px4_config.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -73,6 +72,8 @@ private:
 	bool testQuaternionfrom_dcm();
 	bool testQuaternionfrom_euler();
 	bool testQuaternionRotate();
+
+	bool testFloatAlmostEquals();
 };
 
 #define TEST_OP(_title, _op) { unsigned int n = 30000; hrt_abstime t0, t1; t0 = hrt_absolute_time(); for (unsigned int j = 0; j < n; j++) { _op; }; t1 = hrt_absolute_time(); PX4_INFO(_title ": %.6fus", (double)(t1 - t0) / n); }
@@ -419,6 +420,126 @@ bool MathlibTest::testQuaternionRotate()
 	return true;
 }
 
+bool MathlibTest::testFloatAlmostEquals()
+{
+	// regular large numbers
+	ut_assert_true(almost_equals(10000000.f, 10000001.f));
+	ut_assert_true(almost_equals(10000001.f, 10000000.f));
+	ut_assert_false(almost_equals(10000.f, 10001.f));
+	ut_assert_false(almost_equals(10001.f, 10000.f));
+
+	/** negative large numbers */
+	ut_assert_true(almost_equals(-10000000.f, -10000001.f));
+	ut_assert_true(almost_equals(-10000001.f, -10000000.f));
+	ut_assert_false(almost_equals(-10000.f, -10001.f));
+	ut_assert_false(almost_equals(-10001.f, -10000.f));
+
+	// numbers around 1
+	ut_assert_true(almost_equals(1.0000001f, 1.0000002f));
+	ut_assert_true(almost_equals(1.0000002f, 1.0000001f));
+	ut_assert_false(almost_equals(1.0002f, 1.0001f));
+	ut_assert_false(almost_equals(1.0001f, 1.0002f));
+
+	// numbers around -1
+	ut_assert_true(almost_equals(-1.0000001f, -1.0000002f));
+	ut_assert_true(almost_equals(-1.0000002f, -1.0000001f));
+	ut_assert_false(almost_equals(-1.0001f, -1.0002f));
+	ut_assert_false(almost_equals(-1.0002f, -1.0001f));
+
+	// numbers between 1 and 0
+	//ut_assert_true(almost_equals(0.000000000001000001f, 0.000000000001000002f));
+	//ut_assert_true(almost_equals(0.000000001000002f, 0.000000001000001f));
+	ut_assert_false(almost_equals(0.000000000001002f, 0.000000000001001f));
+	ut_assert_false(almost_equals(0.000000000001001f, 0.000000000001002f));
+
+	// numbers between -1 and 0
+	//ut_assert_true(almost_equals(-0.000000001000001f, -0.000000001000002f));
+	//ut_assert_true(almost_equals(-0.000000001000002f, -0.000000001000001f));
+	ut_assert_false(almost_equals(-0.000000000001002f, -0.000000000001001f));
+	ut_assert_false(almost_equals(-0.000000000001001f, -0.000000000001002f));
+
+	// small differences away from zero
+	ut_assert_true(almost_equals(0.3f, 0.30000003f));
+	ut_assert_true(almost_equals(-0.3f, -0.30000003f));
+
+	// comparisons involving zero
+	ut_assert_true(almost_equals(0.0f, 0.0f));
+	ut_assert_true(almost_equals(0.0f, -0.0f));
+	ut_assert_true(almost_equals(-0.0f, -0.0f));
+	ut_assert_false(almost_equals(0.00000001f, 0.0f));
+	ut_assert_false(almost_equals(0.0f, 0.00000001f));
+	ut_assert_false(almost_equals(-0.00000001f, 0.0f));
+	ut_assert_false(almost_equals(0.0f, -0.00000001f));
+
+	ut_assert_true(almost_equals(0.0f, 1e-40f, 0.01f));
+	ut_assert_true(almost_equals(1e-40f, 0.0f, 0.01f));
+	//ut_assert_false(almost_equals(1e-40f, 0.0f, 0.000001f));
+	//ut_assert_false(almost_equals(0.0f, 1e-40f, 0.000001f));
+
+	ut_assert_true(almost_equals(0.0f, -1e-40f, 0.1f));
+	ut_assert_true(almost_equals(-1e-40f, 0.0f, 0.1f));
+	//ut_assert_false(almost_equals(-1e-40f, 0.0f, 0.00000001f));
+	//ut_assert_false(almost_equals(0.0f, -1e-40f, 0.00000001f));
+
+	// comparisons involving extreme values (overflow potential)
+	ut_assert_true(almost_equals(FLT_MAX, FLT_MAX));
+	ut_assert_false(almost_equals(FLT_MAX, -FLT_MAX));
+	ut_assert_false(almost_equals(-FLT_MAX, FLT_MAX));
+	ut_assert_false(almost_equals(FLT_MAX, FLT_MAX / 2));
+	ut_assert_false(almost_equals(FLT_MAX, -FLT_MAX / 2));
+	ut_assert_false(almost_equals(-FLT_MAX, FLT_MAX / 2));
+
+	// comparisons involving infinities
+	ut_assert_true(almost_equals(INFINITY, INFINITY));
+	ut_assert_true(almost_equals(-INFINITY, -INFINITY));
+	ut_assert_false(almost_equals(-INFINITY, INFINITY));
+	ut_assert_false(almost_equals(INFINITY, FLT_MAX));
+	ut_assert_false(almost_equals(-INFINITY, -FLT_MAX));
+
+	// comparisons involving NAN values
+	ut_assert_false(almost_equals(NAN, NAN));
+	ut_assert_false(almost_equals(NAN, 0.0f));
+	ut_assert_false(almost_equals(-0.0f, NAN));
+	ut_assert_false(almost_equals(NAN, -0.0f));
+	ut_assert_false(almost_equals(0.0f, NAN));
+	ut_assert_false(almost_equals(NAN, INFINITY));
+	ut_assert_false(almost_equals(INFINITY, NAN));
+	ut_assert_false(almost_equals(NAN, -INFINITY));
+	ut_assert_false(almost_equals(-INFINITY, NAN));
+	ut_assert_false(almost_equals(NAN, FLT_MAX));
+	ut_assert_false(almost_equals(FLT_MAX, NAN));
+	ut_assert_false(almost_equals(NAN, -FLT_MAX));
+	ut_assert_false(almost_equals(-FLT_MAX, NAN));
+	ut_assert_false(almost_equals(NAN, FLT_MIN));
+	ut_assert_false(almost_equals(FLT_MIN, NAN));
+	ut_assert_false(almost_equals(NAN, -FLT_MIN));
+	ut_assert_false(almost_equals(-FLT_MIN, NAN));
+
+	// comparisons of numbers on opposite sides of 0
+	ut_assert_false(almost_equals(1.000000001f, -1.0f));
+	ut_assert_false(almost_equals(-1.0f, 1.000000001f));
+	ut_assert_false(almost_equals(-1.000000001f, 1.0f));
+	ut_assert_false(almost_equals(1.0f, -1.000000001f));
+	//ut_assert_true(almost_equals(10 * FLT_MIN, 10 * -FLT_MIN));
+	ut_assert_false(almost_equals(10000 * FLT_MIN, 10000 * -FLT_MIN));
+
+	// comparisons of numbers very close to zero.
+	ut_assert_true(almost_equals(FLT_MIN, FLT_MIN));
+	//ut_assert_true(almost_equals(FLT_MIN, -FLT_MIN));
+	//ut_assert_true(almost_equals(-FLT_MIN, FLT_MIN));
+	//ut_assert_true(almost_equals(FLT_MIN, 0));
+	//ut_assert_true(almost_equals(0, FLT_MIN));
+	//ut_assert_true(almost_equals(-FLT_MIN, 0));
+	//ut_assert_true(almost_equals(0, -FLT_MIN));
+
+	ut_assert_false(almost_equals(0.000000001f, -FLT_MIN));
+	ut_assert_false(almost_equals(0.000000001f, FLT_MIN));
+	ut_assert_false(almost_equals(FLT_MIN, 0.000000001f));
+	ut_assert_false(almost_equals(-FLT_MIN, 0.000000001f));
+
+	return true;
+}
+
 bool MathlibTest::run_tests()
 {
 	ut_run_test(testVector2);
@@ -432,6 +553,7 @@ bool MathlibTest::run_tests()
 	ut_run_test(testQuaternionfrom_dcm);
 	ut_run_test(testQuaternionfrom_euler);
 	ut_run_test(testQuaternionRotate);
+	ut_run_test(testFloatAlmostEquals);
 
 	return (_tests_failed == 0);
 }

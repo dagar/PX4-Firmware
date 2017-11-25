@@ -35,12 +35,15 @@
 
 #include "Limits.hpp"
 
+namespace math
+{
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wfloat-equal"
 
 // floating point equality check that handles edge cases
 // Based on http://floating-point-gui.de/errors/comparison/ as of 2017-11-24
-bool AlmostEquals(float a, float b, float epsilon)
+bool almost_equals(float a, float b, float epsilon)
 {
 	const float absA = fabsf(a);
 	const float absB = fabsf(b);
@@ -57,8 +60,10 @@ bool AlmostEquals(float a, float b, float epsilon)
 
 	} else {
 		// use relative error
-		return diff / math::min((absA + absB), FLT_MAX) < epsilon;
+		return diff / min((absA + absB), FLT_MAX) < epsilon;
 	}
 }
 
 #pragma GCC diagnostic pop
+
+} // namespace math
