@@ -423,8 +423,8 @@ bool MathlibTest::testQuaternionRotate()
 bool MathlibTest::testFloatAlmostEquals()
 {
 	// regular large numbers
-	ut_assert_true(almost_equals(10000000.f, 10000001.f));
-	ut_assert_true(almost_equals(10000001.f, 10000000.f));
+	ut_assert_true(almost_equals(1000000.f, 1000001.f));
+	ut_assert_true(almost_equals(1000001.f, 1000000.f));
 	ut_assert_false(almost_equals(10000.f, 10001.f));
 	ut_assert_false(almost_equals(10001.f, 10000.f));
 
