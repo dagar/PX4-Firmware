@@ -41,6 +41,6 @@ namespace math
 
 // floating point equality check that handles edge cases
 // Based on http://floating-point-gui.de/errors/comparison/ as of 2017-11-24
-bool almost_equals(float a, float b, float epsilon = std::numeric_limits<float>::epsilon);
+bool nearly_equal(float a, float b, float epsilon = 0.00001f);
 
 } // namespace math

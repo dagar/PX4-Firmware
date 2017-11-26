@@ -43,7 +43,7 @@ namespace math
 
 // floating point equality check that handles edge cases
 // Based on http://floating-point-gui.de/errors/comparison/ as of 2017-11-24
-bool almost_equals(float a, float b, float epsilon)
+bool nearly_equal(float a, float b, float epsilon)
 {
 	const float absA = fabsf(a);
 	const float absB = fabsf(b);
@@ -53,7 +53,7 @@ bool almost_equals(float a, float b, float epsilon)
 		// shortcut, handles infinities
 		return true;
 
-	} else if (a == 0 || b == 0 || diff < FLT_MIN) {
+	} else if (a == 0 || b == 0 || (absA + absB < FLT_MIN)) {
 		// a or b is zero or both are extremely close to it
 		// relative error is less meaningful here
 		return diff < (epsilon * FLT_MIN);

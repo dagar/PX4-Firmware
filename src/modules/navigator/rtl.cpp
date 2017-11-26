@@ -47,7 +47,7 @@
 
 using math::max;
 using math::min;
-using math::almost_equals;
+using math::nearly_equal;
 
 RTL::RTL(Navigator *navigator, const char *name) :
 	MissionBlock(navigator, name),
@@ -306,7 +306,7 @@ RTL::advance_rtl()
 	case RTL_STATE_DESCEND:
 
 		/* land immediately if RTL_LAND_DELAY is 0 */
-		if (almost_equals(_param_land_delay.get(), 0.0f)) {
+		if (nearly_equal(_param_land_delay.get(), 0.0f)) {
 			_rtl_state = RTL_STATE_LAND;
 
 		} else {
