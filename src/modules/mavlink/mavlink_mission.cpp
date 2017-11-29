@@ -58,7 +58,6 @@ int MavlinkMissionManager::_dataman_id = 0;
 bool MavlinkMissionManager::_dataman_init = false;
 unsigned MavlinkMissionManager::_count[3] = { 0, 0, 0 };
 int MavlinkMissionManager::_current_seq = 0;
-int MavlinkMissionManager::_last_reached = -1;
 bool MavlinkMissionManager::_transfer_in_progress = false;
 constexpr unsigned MavlinkMissionManager::MAX_COUNT[];
 uint16_t MavlinkMissionManager::_geofence_update_counter = 0;
@@ -69,27 +68,6 @@ uint16_t MavlinkMissionManager::_geofence_update_counter = 0;
 		 (_msg.target_component == MAV_COMP_ID_ALL)))
 
 MavlinkMissionManager::MavlinkMissionManager(Mavlink *mavlink) :
-	_state(MAVLINK_WPM_STATE_IDLE),
-	_mission_type(MAV_MISSION_TYPE_MISSION),
-	_time_last_recv(0),
-	_time_last_sent(0),
-	_time_last_reached(0),
-	_action_timeout(MAVLINK_MISSION_PROTOCOL_TIMEOUT_DEFAULT),
-	_retry_timeout(MAVLINK_MISSION_RETRY_TIMEOUT_DEFAULT),
-	_int_mode(false),
-	_filesystem_errcount(0),
-	_my_dataman_id(0),
-	_transfer_dataman_id(0),
-	_transfer_count(0),
-	_transfer_seq(0),
-	_transfer_current_seq(-1),
-	_transfer_partner_sysid(0),
-	_transfer_partner_compid(0),
-	_offboard_mission_sub(-1),
-	_mission_result_sub(-1),
-	_offboard_mission_pub(nullptr),
-	_geofence_locked(false),
-	_slow_rate_limiter(100 * 1000), // Rate limit sending of the current WP sequence to 10 Hz
 	_verbose(mavlink->verbose()),
 	_mavlink(mavlink)
 {
@@ -502,8 +480,8 @@ MavlinkMissionManager::send(const hrt_abstime now)
 		}
 
 		if (_last_reached != mission_result.seq_reached) {
-			_time_last_reached = now;
 			_last_reached = mission_result.seq_reached;
+			_reached_sent_count = 0;
 
 			if (_last_reached >= 0) {
 				send_mission_item_reached((uint16_t)mission_result.seq_reached);
@@ -524,9 +502,10 @@ MavlinkMissionManager::send(const hrt_abstime now)
 		if (_slow_rate_limiter.check(now)) {
 			send_mission_current(_current_seq);
 
-			// send the reached message a couple of times after reaching the waypoint
-			if (_last_reached >= 0 && (now - _time_last_reached) < 300 * 1000) {
+			// send the reached message another 10 times
+			if (_last_reached >= 0 && (_reached_sent_count < 10)) {
 				send_mission_item_reached((uint16_t)_last_reached);
+				_reached_sent_count++;
 			}
 		}
 	}
