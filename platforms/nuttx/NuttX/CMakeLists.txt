@@ -215,6 +215,9 @@ if (CONFIG_NET)
 	add_nuttx_dir(net net y -D__KERNEL__)
 endif()
 
+# WIP, only include relevant directories
+target_include_directories(nuttx_build INTERFACE ${NUTTX_DIR}/include)
+
 # oldconfig helper
 add_custom_target(oldconfig
 	COMMAND make --no-print-directory --silent -C ${NUTTX_DIR} CONFIG_ARCH_BOARD=${BOARD} oldconfig

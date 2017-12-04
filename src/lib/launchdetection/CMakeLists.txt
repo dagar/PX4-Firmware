@@ -31,8 +31,11 @@
 #
 ############################################################################
 
-px4_add_library(launchdetection
-	LaunchDetector.cpp
-	CatapultLaunchMethod.cpp
+px4_add_module(
+	MODULE launchdetection
+	SRCS
+		LaunchDetector.cpp
+		CatapultLaunchMethod.cpp
+	DEPENDS
+		controllib
 	)
-target_link_libraries(launchdetection PRIVATE controllib)

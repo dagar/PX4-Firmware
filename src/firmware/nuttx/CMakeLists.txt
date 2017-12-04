@@ -5,9 +5,6 @@ set(fw_name ${CONFIG}.elf)
 add_executable(${fw_name} ${PX4_SOURCE_DIR}/src/platforms/empty.c)
 add_dependencies(${fw_name} git_nuttx nuttx_build)
 
-get_property(libraries GLOBAL PROPERTY PX4_LIBRARIES)
-get_property(module_libraries GLOBAL PROPERTY PX4_MODULE_LIBRARIES)
-
 # build NuttX
 add_subdirectory(${PX4_SOURCE_DIR}/platforms/nuttx/NuttX ${PX4_BINARY_DIR}/NuttX)
 
@@ -35,22 +32,34 @@ if (NOT LD_SCRIPT)
 endif()
 
 target_link_libraries(${fw_name} PRIVATE
+
+	-nodefaultlibs
+	-nostdlib
+
 	-T${PX4_BINARY_DIR}/NuttX/nuttx/configs/${BOARD}/scripts/${LD_SCRIPT}
+
 	-Wl,-Map=${PX4_BINARY_DIR}/${CONFIG}.map
+
 	-Wl,--warn-common
 	-Wl,--gc-sections
 
 	-Wl,--start-group
-	${libraries}
-	${module_libraries}
 	${nuttx_libs}
 	-Wl,--end-group
 
-	systemlib
-	m
-	gcc
+	# temporary hack to resolve circular dependency
+	# px4_layer depends on the uORB module (push into platform layer)
+	-Wl,--start-group
+	px4_layer
+	modules__uORB
+	uorb_msgs
+	-Wl,--end-group
 
 	)
+
+get_property(module_libraries GLOBAL PROPERTY PX4_MODULE_LIBRARIES)
+target_link_libraries(${fw_name} PRIVATE ${module_libraries})
+target_link_libraries(${fw_name} PRIVATE lib__ecl) # temporary until we can update ecl cmake
 
 if (config_romfs_root)
 	add_subdirectory(${PX4_SOURCE_DIR}/ROMFS ${PX4_BINARY_DIR}/ROMFS)
@@ -64,7 +73,7 @@ endif()
 set(fw_file ${PX4_BINARY_DIR}/${BOARD}_${LABEL}.px4)
 
 add_custom_command(OUTPUT ${BOARD}.bin
-	COMMAND ${OBJCOPY} -O binary ${PX4_BINARY_DIR}/${fw_name} ${BOARD}.bin
+	COMMAND ${CMAKE_OBJCOPY} -O binary ${PX4_BINARY_DIR}/${fw_name} ${BOARD}.bin
 	DEPENDS ${fw_name}
 	)
 
@@ -94,6 +103,7 @@ endif()
 add_custom_target(size
 	COMMAND size $<TARGET_FILE:${fw_name}>
 	DEPENDS ${fw_name}
+	USES_TERMINAL
 	)
 
 # print weak symbols
@@ -101,9 +111,11 @@ add_custom_target(check_weak
 	COMMAND ${NM} $<TARGET_FILE:${fw_name}> | ${GREP} " w " | cat
 	DEPENDS ${fw_name}
 	VERBATIM
+	USES_TERMINAL
 	)
 
 # debugger helpers
+set(DEBUG_PORT "/dev/ttyACM0" CACHE STRING "debugging port")
 configure_file(gdbinit.in .gdbinit)
 
 add_custom_target(debug

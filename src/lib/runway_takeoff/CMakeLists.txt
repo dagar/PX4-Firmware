@@ -31,5 +31,10 @@
 #
 ############################################################################
 
-px4_add_library(runway_takeoff RunwayTakeoff.cpp)
-target_link_libraries(runway_takeoff PRIVATE controllib)
+px4_add_module(
+	MODULE runway_takeoff
+	SRCS
+		RunwayTakeoff.cpp
+	DEPENDS
+		controllib
+	)

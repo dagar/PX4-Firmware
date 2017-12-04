@@ -78,4 +78,5 @@ px4_add_module(
 		uavcan
 		uavcan_stm32_driver
 	)
-set_property(GLOBAL APPEND PROPERTY PX4_LIBRARIES uavcan_stm32_driver)
+
+set_property(GLOBAL APPEND PROPERTY PX4_MODULE_LIBRARIES uavcan_stm32_driver)

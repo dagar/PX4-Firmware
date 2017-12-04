@@ -1,4 +1,3 @@
-include(nuttx/px4_impl_nuttx)
 
 add_definitions(
 	-DFLASH_BASED_PARAMS
@@ -54,7 +53,6 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/uORB
 
 	#
 	# General system control

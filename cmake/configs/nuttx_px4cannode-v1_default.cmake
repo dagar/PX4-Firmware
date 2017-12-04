@@ -1,4 +1,3 @@
-include(nuttx/px4_impl_nuttx)
 
 add_definitions(
 	-DPARAM_NO_ORB
@@ -51,7 +50,6 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/uORB
 
 	#
 	# General system control

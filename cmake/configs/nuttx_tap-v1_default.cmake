@@ -1,4 +1,3 @@
-include(nuttx/px4_impl_nuttx)
 
 px4_nuttx_configure(HWCLASS m4 CONFIG nsh ROMFS y ROMFSROOT tap_common)
 
@@ -76,6 +75,5 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/uORB
 	modules/dataman
 )

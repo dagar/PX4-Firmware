@@ -115,9 +115,9 @@ define_property(GLOBAL PROPERTY PX4_MODULE_LIBRARIES
                  FULL_DOCS "List of all PX4 module libraries"
                  )
 
-define_property(GLOBAL PROPERTY PX4_LIBRARIES
-                 BRIEF_DOCS "PX4 libs"
-                 FULL_DOCS "List of all PX4 libraries"
+define_property(GLOBAL PROPERTY PX4_MODULE_PATHS
+                 BRIEF_DOCS "PX4 module paths"
+                 FULL_DOCS "List of paths to all PX4 modules"
                  )
 
 #=============================================================================
@@ -144,6 +144,9 @@ if (NOT EXTERNAL_MODULES_LOCATION STREQUAL "")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${PX4_SOURCE_DIR}/cmake")
+
+include(${OS}/px4_impl_${OS})
+
 set(config_module "configs/${CONFIG}")
 include(${config_module})
 
@@ -155,8 +158,7 @@ include(common/sanitizers)
 if (NOT CMAKE_BUILD_TYPE)
 	if (${OS} STREQUAL "nuttx")
 		set(PX4_BUILD_TYPE "MinSizeRel")
-	elseif (${OS} STREQUAL "bebop")
-		set(PX4_BUILD_TYPE "MinSizeRel")
+		add_compile_options(-g2)
 	else()
 		set(PX4_BUILD_TYPE "RelWithDebInfo")
 	endif()
@@ -205,15 +207,6 @@ project(px4 CXX C ASM)
 set(package-contact "px4users@googlegroups.com")
 
 #=============================================================================
-
-# The URL for the elf file for crash logging
-if (DEFINED ENV{BUILD_URI})
-	set(BUILD_URI $ENV{BUILD_URI})
-else()
-	set(BUILD_URI "localhost")
-endif()
-
-add_definitions(-DBUILD_URI=${BUILD_URI})
 
 # Setup install paths
 if (${OS} STREQUAL "posix")
@@ -294,56 +287,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(required_variables CMAKE_C_COMPILER_ID CMAKE_CXX_COMPILER_ID)
-foreach(var ${required_variables})
-	if (NOT ${var})
-		message(FATAL_ERROR "Toolchain/config must define ${var}")
-	endif()
-endforeach()
-
-# print full c compiler version
-execute_process(COMMAND ${CMAKE_C_COMPILER} --version
-		OUTPUT_VARIABLE c_compiler_version
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-STRING(REGEX MATCH "[^\n]*" c_compiler_version_short ${c_compiler_version})
-message(STATUS "C compiler: ${c_compiler_version_short}")
-
-# print full c++ compiler version
-execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version
-		OUTPUT_VARIABLE cxx_compiler_version
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-STRING(REGEX MATCH "[^\n]*" cxx_compiler_version_short ${cxx_compiler_version})
-message(STATUS "C++ compiler: ${cxx_compiler_version_short}")
-
 #=============================================================================
-# external libraries
+# build setup
 #
-px4_os_prebuild_targets(OUT prebuild_targets
-	BOARD ${BOARD}
-	THREADS ${THREADS})
 
-#=============================================================================
-# build flags
-#
-px4_os_add_flags(
-	BOARD ${BOARD}
-	C_FLAGS c_flags
-	CXX_FLAGS cxx_flags
-	OPTIMIZATION_FLAGS optimization_flags
-	EXE_LINKER_FLAGS exe_linker_flags
-	INCLUDE_DIRS include_dirs
-	LINK_DIRS link_dirs
-	DEFINITIONS definitions)
-
-px4_join(OUT CMAKE_EXE_LINKER_FLAGS LIST "${CMAKE_EXE_LINKER_FLAGS};${exe_linker_flags}" GLUE " ")
-px4_join(OUT CMAKE_C_FLAGS LIST "${CMAKE_C_FLAGS};${c_flags};${optimization_flags}" GLUE " ")
-px4_join(OUT CMAKE_CXX_FLAGS LIST "${CMAKE_CXX_FLAGS};${cxx_flags};${optimization_flags}" GLUE " ")
-
-include_directories(${include_dirs})
-link_directories(${link_dirs})
-add_definitions(${definitions})
+px4_os_prebuild_targets(OUT prebuild_targets)
+px4_add_common_flags()
+px4_os_add_flags()
 
 #=============================================================================
 # message, and airframe generation
@@ -403,7 +353,8 @@ endif()
 #
 
 add_subdirectory(src/platforms EXCLUDE_FROM_ALL)
-add_subdirectory(src/modules/systemlib EXCLUDE_FROM_ALL)
+add_subdirectory(src/modules/systemlib EXCLUDE_FROM_ALL) # TODO: split into libraries in platform layer
+add_subdirectory(src/modules/uORB EXCLUDE_FROM_ALL) # TODO: platform layer
 add_subdirectory(src/lib EXCLUDE_FROM_ALL)
 add_subdirectory(src/drivers/boards EXCLUDE_FROM_ALL)
 add_subdirectory(src/drivers/device EXCLUDE_FROM_ALL)
@@ -411,6 +362,9 @@ add_subdirectory(src/drivers/device EXCLUDE_FROM_ALL)
 foreach(module ${config_module_list})
 	add_subdirectory(src/${module})
 endforeach()
+
+# must be the last module before firmware
+add_subdirectory(src/modules/systemlib/param EXCLUDE_FROM_ALL)
 
 # firmware added last to generate the builtin for included modules
 add_subdirectory(src/firmware/${OS})
