@@ -1471,7 +1471,9 @@ PX4FMU::cycle()
 
 #endif
 
-		orb_check(_param_sub, &updated);
+		if (!_armed.armed) {
+			orb_check(_param_sub, &updated);
+		}
 
 		if (updated) {
 			this->update_params();
