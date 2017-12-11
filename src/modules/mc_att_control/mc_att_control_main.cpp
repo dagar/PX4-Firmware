@@ -1099,6 +1099,8 @@ MulticopterAttitudeControl::task_main()
 
 	while (!_task_should_exit) {
 
+		parameter_update_poll();
+
 		poll_fds.fd = _sensor_gyro_sub[_selected_gyro];
 
 		/* wait for up to 100ms for data */
@@ -1137,7 +1139,6 @@ MulticopterAttitudeControl::task_main()
 			orb_copy(ORB_ID(sensor_gyro), _sensor_gyro_sub[_selected_gyro], &_sensor_gyro);
 
 			/* check for updates in other topics */
-			parameter_update_poll();
 			vehicle_control_mode_poll();
 			vehicle_manual_poll();
 			vehicle_status_poll();
