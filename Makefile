@@ -206,6 +206,7 @@ alt_firmware: \
 	check_px4-stm32f4discovery_default \
 	check_px4cannode-v1_default \
 	check_px4esc-v1_default \
+	check_px4nucleoF412_default \
 	check_px4nucleoF767ZI-v1_default \
 	check_s2740vc-v1_default \
 	sizes
