@@ -758,6 +758,19 @@ FixedwingAttitudeControl::task_main()
 	while (!_task_should_exit) {
 		static int loop_counter = 0;
 
+		/* only update parameters if they changed */
+		bool params_updated = false;
+		orb_check(_params_sub, &params_updated);
+
+		if (params_updated) {
+			/* read from param to clear updated flag */
+			parameter_update_s update;
+			orb_copy(ORB_ID(parameter_update), _params_sub, &update);
+
+			/* update parameters from storage */
+			parameters_update();
+		}
+
 		/* wait for up to 500ms for data */
 		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
 
@@ -773,19 +786,6 @@ FixedwingAttitudeControl::task_main()
 		}
 
 		perf_begin(_loop_perf);
-
-		/* only update parameters if they changed */
-		bool params_updated = false;
-		orb_check(_params_sub, &params_updated);
-
-		if (params_updated) {
-			/* read from param to clear updated flag */
-			parameter_update_s update;
-			orb_copy(ORB_ID(parameter_update), _params_sub, &update);
-
-			/* update parameters from storage */
-			parameters_update();
-		}
 
 		/* only run controller if attitude changed */
 		if (fds[0].revents & POLLIN) {
