@@ -1955,7 +1955,6 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 
 		baro.timestamp = timestamp;
 		baro.pressure = imu.abs_pressure;
-		baro.altitude = imu.pressure_alt;
 		baro.temperature = imu.temperature;
 
 		/* fake device ID */
