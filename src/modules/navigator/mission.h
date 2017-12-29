@@ -101,7 +101,7 @@ private:
 	/**
 	 * Update offboard mission topic
 	 */
-	void update_offboard_mission();
+	void update_offboard_mission(bool force = false);
 
 	/**
 	 * Move on to next mission item or switch to loiter
@@ -205,7 +205,7 @@ private:
 	/**
 	 * Check whether a mission is ready to go
 	 */
-	void check_mission_valid(bool force);
+	bool check_mission_valid(const mission_s &mission, bool force);
 
 
 	/**
@@ -233,9 +233,7 @@ private:
 	control::BlockParamInt _param_altmode;
 	control::BlockParamInt _param_yawmode;
 
-	struct mission_s _offboard_mission {};
-
-	int32_t _current_offboard_mission_index{-1};
+	mission_s _offboard_mission {};
 
 	// track location of planned mission landing
 	bool	_land_start_available{false};
@@ -248,8 +246,6 @@ private:
 		MISSION_TYPE_OFFBOARD
 	} _mission_type{MISSION_TYPE_NONE};
 
-	bool _inited{false};
-	bool _home_inited{false};
 	bool _need_mission_reset{false};
 
 	float _min_current_sp_distance_xy{FLT_MAX}; /**< minimum distance which was achieved to the current waypoint  */

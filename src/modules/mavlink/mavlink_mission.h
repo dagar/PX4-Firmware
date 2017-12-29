@@ -102,17 +102,17 @@ private:
 
 	unsigned		_filesystem_errcount{0};		///< File system error count
 
-	static dm_item_t		_dataman_id;				///< Global Dataman storage ID for active mission
-	dm_item_t			_my_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_0};			///< class Dataman storage ID
-
 	static bool		_dataman_init;				///< Dataman initialized
+	static mission_s	_mission_state;
 
 	static uint16_t		_count[3];				///< Count of items in (active) mission for each MAV_MISSION_TYPE
-	static int32_t		_current_seq;				///< Current item sequence in active mission
+
+	dm_item_t		_my_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_0};			///< class Dataman storage ID
+
 
 	int32_t			_last_reached{-1};			///< Last reached waypoint in active mission (-1 means nothing reached)
 
-	dm_item_t			_transfer_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_1};		///< Dataman storage ID for current transmission
+	dm_item_t		_transfer_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_1};		///< Dataman storage ID for current transmission
 
 	uint16_t		_transfer_count{0};			///< Items count in current transmission
 	uint16_t		_transfer_seq{0};			///< Item sequence in current transmission
@@ -124,7 +124,6 @@ private:
 
 	static bool		_transfer_in_progress;			///< Global variable checking for current transmission
 
-	int			_offboard_mission_sub{-1};
 	int			_mission_result_sub{-1};
 
 	orb_advert_t		_offboard_mission_pub{nullptr};

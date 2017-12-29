@@ -4,6 +4,9 @@ int32 seq_reached		# Sequence of the mission item which has been reached, defaul
 uint16 seq_current		# Sequence of the current mission item
 uint16 seq_total		# Total number of mission items
 
+uint64 mission_timestamp
+uint8 mission_dataman_id
+
 bool valid			# true if mission is valid
 bool warning			# true if mission is valid, but has potentially problematic items leading to safety warnings
 bool finished			# true if mission has been completed

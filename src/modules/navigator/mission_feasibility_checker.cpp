@@ -74,6 +74,7 @@ MissionFeasibilityChecker::checkMissionFeasible(const mission_s &mission,
 	const float home_alt = _navigator->get_home_position()->alt;
 
 	// check if all mission item commands are supported
+	failed = failed || !checkMissionBasics(mission);
 	failed = failed || !checkMissionItemValidity(mission);
 	failed = failed || !checkDistancesBetweenWaypoints(mission, max_distance_between_waypoints);
 	failed = failed || !checkGeofence(mission, home_alt, home_valid);
@@ -88,6 +89,44 @@ MissionFeasibilityChecker::checkMissionFeasible(const mission_s &mission,
 	}
 
 	return !failed;
+}
+
+bool
+MissionFeasibilityChecker::checkMissionBasics(const mission_s &mission)
+{
+	printf("mission.timestamp: %llu\n", mission.timestamp);
+	printf("mission.current_seq: %d\n", mission.current_seq);
+	printf("mission.count: %d\n", mission.count);
+	printf("mission.dataman_id: %d\n", mission.dataman_id);
+
+	// require valid timestamp
+	if (mission.timestamp == 0) {
+		PX4_INFO("1");
+		return false;
+	}
+
+	// invalid if mission empty
+	if (mission.count == 0) {
+		PX4_INFO("2");
+		return false;
+	}
+
+	// current waypoint invalid number
+	if (mission.current_seq >= mission.count) {
+		PX4_INFO("3");
+		return false;
+	}
+
+	// check dataman validity
+	if (!((mission.dataman_id == DM_KEY_WAYPOINTS_OFFBOARD_0) ||
+	      (mission.dataman_id == DM_KEY_WAYPOINTS_OFFBOARD_1) ||
+	      (mission.dataman_id == DM_KEY_WAYPOINTS_ONBOARD))) {
+
+		PX4_INFO("4");
+		return false;
+	}
+
+	return true;
 }
 
 bool

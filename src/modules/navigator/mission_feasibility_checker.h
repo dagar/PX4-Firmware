@@ -55,6 +55,9 @@ private:
 	Navigator *_navigator{nullptr};
 
 	/* Checks for all airframes */
+
+	bool checkMissionBasics(const mission_s &mission);
+
 	bool checkGeofence(const mission_s &mission, float home_alt, bool home_valid);
 
 	bool checkHomePositionAltitude(const mission_s &mission, float home_alt, bool home_alt_valid, bool throw_error);

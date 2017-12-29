@@ -101,8 +101,6 @@
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/mavlink_log.h>
-#include <uORB/topics/mission.h>
-#include <uORB/topics/mission_result.h>
 #include <uORB/topics/offboard_control_mode.h>
 #include <uORB/topics/power_button_state.h>
 #include <uORB/topics/parameter_update.h>
@@ -1416,9 +1414,6 @@ Commander::run()
 	orb_advert_t vehicle_status_flags_pub = nullptr;
 	vehicle_status_flags_s vehicle_status_flags = {};
 
-	/* init mission state, do it here to allow navigator to use stored mission even if mavlink failed to start */
-	mission_init();
-
 	/* Start monitoring loop */
 	unsigned counter = 0;
 	unsigned stick_off_counter = 0;
@@ -1887,7 +1882,7 @@ Commander::run()
 
 					// Provide feedback on mission state
 					const mission_result_s& mission_result = _mission_result_sub.get();
-					if ((mission_result.timestamp > commander_boot_timestamp) && hotplug_timeout &&
+					if ((mission_result.mission_timestamp > commander_boot_timestamp) && hotplug_timeout &&
 						(mission_result.instance_count > 0) && !mission_result.valid) {
 
 						mavlink_log_critical(&mavlink_log_pub, "Planned mission fails check. Please upload again.");
@@ -4554,28 +4549,4 @@ Commander *Commander::instantiate(int argc, char *argv[])
 void Commander::enable_hil()
 {
 	status.hil_state = vehicle_status_s::HIL_STATE_ON;
-}
-
-void Commander::mission_init()
-{
-	/* init mission state, do it here to allow navigator to use stored mission even if mavlink failed to start */
-	mission_s mission = {};
-	if (dm_read(DM_KEY_MISSION_STATE, 0, &mission, sizeof(mission_s)) == sizeof(mission_s)) {
-		if (mission.dataman_id == DM_KEY_WAYPOINTS_OFFBOARD_0 || mission.dataman_id == DM_KEY_WAYPOINTS_OFFBOARD_1) {
-			if (mission.count > 0) {
-				PX4_INFO("Mission #%d loaded, %u WPs, curr: %d", mission.dataman_id, mission.count, mission.current_seq);
-			}
-
-		} else {
-			PX4_ERR("reading mission state failed");
-
-			/* initialize mission state in dataman */
-			mission.timestamp = hrt_absolute_time();
-			mission.dataman_id = DM_KEY_WAYPOINTS_OFFBOARD_0;
-			dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
-		}
-
-		orb_advert_t mission_pub = orb_advertise(ORB_ID(mission), &mission);
-		orb_unadvertise(mission_pub);
-	}
 }
