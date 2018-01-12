@@ -2,5 +2,6 @@ int8 dataman_id	# default 0, there are two offboard storage places in the datama
 
 uint16 count		# count of the missions stored in the dataman
 int32 current_seq	# default -1, start at the one changed latest
+int8 direction		# mission direction 1 for forward, -1 reverse
 
 # TOPICS mission offboard_mission onboard_mission

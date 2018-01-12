@@ -149,6 +149,7 @@ MavlinkMissionManager::update_active_mission(int8_t dataman_id, uint16_t count, 
 	mission.dataman_id = dataman_id;
 	mission.count = count;
 	mission.current_seq = seq;
+	mission.direction = 1; // default forward direction
 
 	/* update mission state in dataman */
 	int res = dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));

@@ -122,6 +122,7 @@ Mission::on_inactive()
 		if (read_res == sizeof(mission_s)) {
 			_offboard_mission.dataman_id = mission_state.dataman_id;
 			_offboard_mission.count = mission_state.count;
+			_offboard_mission.direction = mission_state.direction;
 			_current_offboard_mission_index = mission_state.current_seq;
 
 			// find and store landing start marker (if available)
@@ -414,6 +415,10 @@ Mission::update_offboard_mission()
 			/* otherwise, just leave it */
 		}
 
+		if (_offboard_mission.direction != 1 || _offboard_mission.direction != -1) {
+			_offboard_mission.direction = 1;
+		}
+
 		check_mission_valid(true);
 
 		failed = !_navigator->get_mission_result()->valid;
@@ -437,6 +442,7 @@ Mission::update_offboard_mission()
 	if (failed) {
 		_offboard_mission.count = 0;
 		_offboard_mission.current_seq = 0;
+		_offboard_mission.direction = 1;
 		_current_offboard_mission_index = 0;
 
 		PX4_ERR("mission check failed");
@@ -446,6 +452,27 @@ Mission::update_offboard_mission()
 	find_offboard_land_start();
 
 	set_current_offboard_mission_item();
+}
+
+
+bool
+Mission::reverse_offboard_mission()
+{
+	int new_direction = (_offboard_mission.direction == 1) ? -1 : 1;
+	_offboard_mission.direction = new_direction;
+
+	set_current_offboard_mission_index(_current_offboard_mission_index + _offboard_mission.direction);
+
+	// update mission items if already in active mission
+	if (_navigator->is_planned_mission()) {
+		// prevent following "previous - current" line
+		_navigator->get_position_setpoint_triplet()->previous.valid = false;
+		_navigator->get_position_setpoint_triplet()->current.valid = false;
+
+		set_mission_items();
+	}
+
+	return true;
 }
 
 
@@ -463,7 +490,7 @@ Mission::advance_mission()
 		break;
 
 	case MISSION_TYPE_OFFBOARD:
-		_current_offboard_mission_index++;
+		_current_offboard_mission_index += _offboard_mission.direction;
 		break;
 
 	case MISSION_TYPE_NONE:
@@ -1256,7 +1283,14 @@ Mission::prepare_mission_items(bool onboard, struct mission_item_s *mission_item
 			       struct mission_item_s *next_position_mission_item, bool *has_next_position_item)
 {
 	bool first_res = false;
-	int offset = 1;
+
+	int direction = 1;
+
+	if (!onboard) {
+		direction = _offboard_mission.direction;
+	}
+
+	int offset = direction;
 
 	if (read_mission_item(onboard, 0, mission_item)) {
 
@@ -1270,7 +1304,7 @@ Mission::prepare_mission_items(bool onboard, struct mission_item_s *mission_item
 				break;
 			}
 
-			offset++;
+			offset += direction;
 		}
 	}
 
@@ -1293,6 +1327,9 @@ Mission::read_mission_item(bool onboard, int offset, struct mission_item_s *miss
 		return false;
 	}
 
+	/* default forward direction */
+	int direction = 1;
+
 	if (onboard) {
 		/* onboard mission */
 		mission_index_ptr = (offset == 0) ? &_current_onboard_mission_index : &index_to_read;
@@ -1302,6 +1339,7 @@ Mission::read_mission_item(bool onboard, int offset, struct mission_item_s *miss
 		/* offboard mission */
 		mission_index_ptr = (offset == 0) ? &_current_offboard_mission_index : &index_to_read;
 		dm_item = DM_KEY_WAYPOINTS_OFFBOARD(_offboard_mission.dataman_id);
+		direction = _offboard_mission.direction;
 	}
 
 	/* Repeat this several times in case there are several DO JUMPS that we need to follow along, however, after
@@ -1364,7 +1402,7 @@ Mission::read_mission_item(bool onboard, int offset, struct mission_item_s *miss
 				}
 
 				/* no more DO_JUMPS, therefore just try to continue with next mission item */
-				(*mission_index_ptr)++;
+				(*mission_index_ptr) += direction;
 			}
 
 		} else {
@@ -1398,7 +1436,12 @@ Mission::save_offboard_mission_state()
 		/* data read successfully, check dataman ID and items count */
 		if (mission_state.dataman_id == _offboard_mission.dataman_id && mission_state.count == _offboard_mission.count) {
 			/* navigator may modify only sequence, write modified state only if it changed */
-			if (mission_state.current_seq != _current_offboard_mission_index) {
+
+			mission_state.current_seq = _current_offboard_mission_index;
+			mission_state.direction = _offboard_mission.direction;
+
+			if (mission_state.current_seq != _current_offboard_mission_index
+			    || mission_state.direction != _offboard_mission.direction) {
 				if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
 					     sizeof(mission_s)) != sizeof(mission_s)) {
 
@@ -1412,6 +1455,7 @@ Mission::save_offboard_mission_state()
 		mission_state.dataman_id = _offboard_mission.dataman_id;
 		mission_state.count = _offboard_mission.count;
 		mission_state.current_seq = _current_offboard_mission_index;
+		mission_state.direction = _offboard_mission.direction;
 
 		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Invalid mission state.");
 
