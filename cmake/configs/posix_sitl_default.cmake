@@ -86,7 +86,7 @@ set(config_module_list
 	#
 	modules/attitude_estimator_q
 	modules/ekf2
-	modules/local_position_estimator
+	#modules/local_position_estimator
 	modules/position_estimator_inav
 
 	#
@@ -150,7 +150,7 @@ set(config_module_list
 	#
 	# Segway
 	#
-	examples/segway
+	#examples/segway
 
 	#
 	# Demo apps

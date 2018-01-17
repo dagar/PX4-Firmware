@@ -116,7 +116,7 @@ AirspeedSim::~AirspeedSim()
 int
 AirspeedSim::init()
 {
-	int ret = ERROR;
+	int ret = PX4_ERROR;
 
 	/* init base class */
 	if (CDev::init() != OK) {

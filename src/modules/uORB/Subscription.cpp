@@ -37,62 +37,48 @@
  */
 
 #include "Subscription.hpp"
-#include <px4_defines.h>
 
 namespace uORB
 {
 
-SubscriptionBase::SubscriptionBase(const struct orb_metadata *meta, unsigned interval, unsigned instance) :
-	_meta(meta)
+SubscriptionBase::SubscriptionBase(const orb_metadata *meta, uint8_t interval, uint8_t instance) :
+	_meta(*meta),
+	_interval(interval),
+	_instance(instance)
 {
-	if (instance > 0) {
-		_handle = orb_subscribe_multi(_meta, instance);
-
-	} else {
-		_handle = orb_subscribe(_meta);
-	}
-
-	if (_handle < 0) {
-		PX4_ERR("%s sub failed", _meta->o_name);
-	}
-
-	if (interval > 0) {
-		orb_set_interval(_handle, interval);
-	}
+	init();
 }
 
-bool SubscriptionBase::updated()
+bool SubscriptionBase::init()
 {
-	bool isUpdated = false;
+	DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master(uORB::PUBSUB);
 
-	if (orb_check(_handle, &isUpdated) != PX4_OK) {
-		PX4_ERR("%s check failed", _meta->o_name);
+	char path[orb_maxpath];
+	const struct orb_metadata *meta = &_meta;
+	int instance = _instance;
+
+	int ret = uORB::Utils::node_mkpath(path, PUBSUB, meta, &instance);
+
+	PX4_DEBUG("path: %s", path);
+
+	if (ret != PX4_OK) {
+		PX4_ERR("init failed %s", path);
 	}
 
-	return isUpdated;
+	_node = device_master->getDeviceNode(path);
+
+	return published();
 }
 
-bool SubscriptionBase::update(void *data)
+bool SubscriptionBase::update(uint64_t *time, void *data)
 {
-	bool orb_updated = false;
-
-	if (updated()) {
-		if (orb_copy(_meta, _handle, data) != PX4_OK) {
-			PX4_ERR("%s copy failed", _meta->o_name);
-
-		} else {
-			orb_updated = true;
-		}
+	if (updated() && update(data)) {
+		/* data copied successfully */
+		*time = _node->last_update();
+		return true;
 	}
 
-	return orb_updated;
-}
-
-SubscriptionBase::~SubscriptionBase()
-{
-	if (orb_unsubscribe(_handle) != PX4_OK) {
-		PX4_ERR("%s unsubscribe failed", _meta->o_name);
-	}
+	return false;
 }
 
 SubscriptionNode::SubscriptionNode(const struct orb_metadata *meta, unsigned interval, unsigned instance,

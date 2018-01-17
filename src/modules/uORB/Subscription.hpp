@@ -38,9 +38,12 @@
 
 #pragma once
 
-#include <uORB/uORB.h>
 #include <containers/List.hpp>
-#include <systemlib/err.h>
+
+#include "uORB.h"
+#include "uORBDevices.hpp"
+#include "uORBManager.hpp"
+#include "uORBUtils.hpp"
 
 namespace uORB
 {
@@ -61,31 +64,75 @@ public:
 	 * 	between updates
 	 * @param instance The instance for multi sub.
 	 */
-	SubscriptionBase(const struct orb_metadata *meta, unsigned interval = 0, unsigned instance = 0);
-	virtual ~SubscriptionBase();
+	SubscriptionBase(const orb_metadata *meta, uint8_t interval = 0, uint8_t instance = 0);
 
-	// no copy, assignment, move, move assignment
-	SubscriptionBase(const SubscriptionBase &) = delete;
-	SubscriptionBase &operator=(const SubscriptionBase &) = delete;
-	SubscriptionBase(SubscriptionBase &&) = delete;
-	SubscriptionBase &operator=(SubscriptionBase &&) = delete;
+	bool init();
 
 	/**
 	 * Check if there is a new update.
 	 * */
-	bool updated();
+	bool updated(bool reinit = false)
+	{
+		if (!published()) {
+			PX4_DEBUG("no DeviceNode: %s", _meta.o_name);
+
+			if (reinit) {
+				return init();
+			}
+
+			return false;
+		}
+
+		return (_node->published_message_count() > _generation);
+	}
+
+	bool copy(void *dst)
+	{
+		if (published()) {
+			return _node->copy(dst, _generation);
+		}
+
+		return false;
+	}
 
 	/**
 	 * Update the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool update(void *data);
+	bool update(void *dst, bool reinit = false)
+	{
+		if (updated(reinit)) {
+			return copy(dst);
+		}
 
-	int getHandle() const { return _handle; }
+		return false;
+	}
+
+	bool update(uint64_t *time, void *data);
+
+	hrt_abstime last_update()
+	{
+		if (published()) {
+			return _node->last_update();
+		}
+
+		return 0;
+	}
+
+	bool published() { return _node != nullptr; }
+
+	uint8_t get_instance() const { return _instance; }
+	orb_id_t get_topic() const { return &_meta; }
 
 protected:
-	const struct orb_metadata *_meta;
-	int _handle;
+	DeviceNode				*_node{nullptr};
+
+	const orb_metadata		&_meta;
+	uint8_t					_interval;
+	const uint8_t			_instance;
+
+	// subscriber data
+	unsigned				_generation{0};
 };
 
 /**
@@ -159,7 +206,7 @@ public:
 	 */
 	bool update() override final
 	{
-		return SubscriptionBase::update((void *)(&_data));
+		return SubscriptionBase::update((void *)(&_data), true);
 	}
 
 	/*

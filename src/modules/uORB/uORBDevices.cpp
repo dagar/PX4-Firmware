@@ -207,6 +207,8 @@ uORB::DeviceNode::read(device::file_t *filp, char *buffer, size_t buflen)
 {
 	SubscriberData *sd = (SubscriberData *)filp_to_sd(filp);
 
+	//PX4_INFO("sizeof(sd) %d", sizeof(*sd));
+
 	/* if the object has not been written yet, return zero */
 	if (_data == nullptr) {
 		return 0;
@@ -723,6 +725,10 @@ uORB::DeviceNode::print_statistics(bool reset)
 	unlock();
 
 	PX4_INFO("%s: %i", _meta->o_name, lost_messages);
+
+	PX4_INFO("%s node: %d", _meta->o_name, sizeof(*this));
+	PX4_INFO("%s data: %d", _meta->o_name, _meta->o_size * _queue_size);
+
 	return true;
 }
 
@@ -907,6 +913,8 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 				/* construct the new node */
 				node = new uORB::DeviceNode(meta, objname, devpath, adv->priority);
 
+				//PX4_INFO("size node: %s %d", meta->o_name, sizeof(*node));
+
 				/* if we didn't get a device, that's bad */
 				if (node == nullptr) {
 					free((void *)devpath);
@@ -950,6 +958,8 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 				group_tries++;
 
 			} while (ret != PX4_OK && (group_tries < max_group_tries));
+
+			//PX4_INFO("total number: %d", _node_map.size());
 
 			if (ret != PX4_OK && group_tries >= max_group_tries) {
 				ret = -ENOMEM;

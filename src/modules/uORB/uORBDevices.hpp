@@ -185,6 +185,23 @@ public:
 	unsigned int published_message_count() const { return _generation; }
 	const struct orb_metadata *get_meta() const { return _meta; }
 
+	bool copy(void *dst, unsigned &generation)
+	{
+		ATOMIC_ENTER;
+
+		if (_data != nullptr && dst != nullptr) {
+			memcpy(dst, _data, _meta->o_size);
+			generation = _generation;
+			ATOMIC_LEAVE;
+			return true;
+		}
+
+		ATOMIC_LEAVE;
+		return false;
+	}
+
+	const hrt_abstime &last_update() { return _last_update; }
+
 	void set_priority(uint8_t priority) { _priority = priority; }
 
 protected:
