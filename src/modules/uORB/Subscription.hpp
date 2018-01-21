@@ -83,6 +83,12 @@ public:
 			return false;
 		}
 
+		if (_interval > 0) {
+			if (hrt_elapsed_time(&_last_update) < _interval) {
+				return false;
+			}
+		}
+
 		return (_node->published_message_count() > _generation);
 	}
 
@@ -102,7 +108,10 @@ public:
 	bool update(void *dst, bool reinit = false)
 	{
 		if (updated(reinit)) {
-			return copy(dst);
+			if (copy(dst)) {
+				_last_update = hrt_absolute_time();
+				return true;
+			}
 		}
 
 		return false;
@@ -124,12 +133,16 @@ public:
 	uint8_t get_instance() const { return _instance; }
 	orb_id_t get_topic() const { return &_meta; }
 
+	void set_interval(int interval) { _interval = interval; }
+
 protected:
 	DeviceNode				*_node{nullptr};
 
 	const orb_metadata		&_meta;
 	uint8_t					_interval;
 	const uint8_t			_instance;
+
+	hrt_abstime				_last_update{0};
 
 	// subscriber data
 	unsigned				_generation{0};

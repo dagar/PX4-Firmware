@@ -41,23 +41,12 @@
 #ifdef __PX4_NUTTX
 #define FILE_FLAGS(filp) filp->f_oflags
 #define FILE_PRIV(filp) filp->f_priv
-#define ITERATE_NODE_MAP() \
-	for (ORBMap::Node *node_iter = _node_map.top(); node_iter; node_iter = node_iter->next)
-#define INIT_NODE_MAP_VARS(node_obj, node_name_str) \
-	DeviceNode *node_obj = node_iter->node; \
-	const char *node_name_str = node_iter->node_name; \
-	UNUSED(node_name_str);
 
 #else
 #include <algorithm>
 #define FILE_FLAGS(filp) filp->flags
 #define FILE_PRIV(filp) filp->priv
-#define ITERATE_NODE_MAP() \
-	for (const auto &node_iter : _node_map)
-#define INIT_NODE_MAP_VARS(node_obj, node_name_str) \
-	DeviceNode *node_obj = node_iter.second; \
-	const char *node_name_str = node_iter.first.c_str(); \
-	UNUSED(node_name_str);
+
 #endif
 
 #include "uORBDevices.hpp"
@@ -85,7 +74,6 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *name, 
 			     int priority, unsigned int queue_size) :
 	CDev(name, path),
 	_meta(meta),
-	_data(nullptr),
 	_last_update(0),
 	_generation(0),
 	_priority((uint8_t)priority),
@@ -94,6 +82,7 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *name, 
 	_subscriber_count(0),
 	_publisher(0)
 {
+	_data = new uint8_t[_meta->o_size * _queue_size];
 }
 
 uORB::DeviceNode::~DeviceNode()
@@ -460,8 +449,7 @@ uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle, const v
 
 	if (ch != nullptr) {
 		if (ch->send_message(meta->o_name, meta->o_size, (uint8_t *)data) != 0) {
-			warnx("[uORB::DeviceNode::publish(%d)]: Error Sending [%s] topic data over comm_channel",
-			      __LINE__, meta->o_name);
+			PX4_ERR("Error Sending [%s] topic data over comm_channel", meta->o_name);
 			return ERROR;
 		}
 	}
@@ -821,8 +809,7 @@ int16_t uORB::DeviceNode::process_received_message(int32_t length, uint8_t *data
 	int16_t ret = -1;
 
 	if (length != (int32_t)(_meta->o_size)) {
-		warnx("[uORB::DeviceNode::process_received_message(%d)]Error:[%s] Received DataLength[%d] != ExpectedLen[%d]",
-		      __LINE__, _meta->o_name, (int)length, (int)_meta->o_size);
+		PX4_ERR("Received DataLength[%d] != ExpectedLen[%d]", _meta->o_name, (int)length, (int)_meta->o_size);
 		return ERROR;
 	}
 
@@ -841,16 +828,10 @@ int16_t uORB::DeviceNode::process_received_message(int32_t length, uint8_t *data
 	return PX4_OK;
 }
 
-uORB::DeviceMaster::DeviceMaster(Flavor f) :
-	CDev((f == PUBSUB) ? "obj_master" : "param_master",
-	     (f == PUBSUB) ? TOPIC_MASTER_DEVICE_PATH : PARAM_MASTER_DEVICE_PATH),
-	_flavor(f)
+uORB::DeviceMaster::DeviceMaster() :
+	CDev("obj_master", TOPIC_MASTER_DEVICE_PATH)
 {
 	_last_statistics_output = hrt_absolute_time();
-}
-
-uORB::DeviceMaster::~DeviceMaster()
-{
 }
 
 int
@@ -861,14 +842,11 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 	switch (cmd) {
 	case ORBIOCADVERTISE: {
 			const struct orb_advertdata *adv = (const struct orb_advertdata *)arg;
-			const struct orb_metadata *meta = adv->meta;
-			const char *objname;
-			const char *devpath;
+
 			char nodepath[orb_maxpath];
-			uORB::DeviceNode *node;
 
 			/* construct a path to the node - this also checks the node name */
-			ret = uORB::Utils::node_mkpath(nodepath, _flavor, meta, adv->instance);
+			ret = uORB::Utils::node_mkpath(nodepath, adv->meta, adv->instance);
 
 			if (ret != PX4_OK) {
 				return ret;
@@ -901,19 +879,15 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 					*(adv->instance) = group_tries;
 				}
 
-				objname = meta->o_name; //no need for a copy, meta->o_name will never be freed or changed
-
 				/* driver wants a permanent copy of the path, so make one here */
-				devpath = strdup(nodepath);
+				const char *devpath = strdup(nodepath);
 
 				if (devpath == nullptr) {
 					return -ENOMEM;
 				}
 
 				/* construct the new node */
-				node = new uORB::DeviceNode(meta, objname, devpath, adv->priority);
-
-				//PX4_INFO("size node: %s %d", meta->o_name, sizeof(*node));
+				uORB::DeviceNode *node = new uORB::DeviceNode(adv->meta, adv->meta->o_name, devpath, adv->priority);
 
 				/* if we didn't get a device, that's bad */
 				if (node == nullptr) {
@@ -931,7 +905,7 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 					if (ret == -EEXIST) {
 						/* if the node exists already, get the existing one and check if
 						 * something has been published yet. */
-						uORB::DeviceNode *existing_node = getDeviceNodeLocked(devpath);
+						uORB::DeviceNode *existing_node = getDeviceNode(adv->meta, *adv->instance);
 
 						if ((existing_node != nullptr) && !(existing_node->is_published())) {
 							/* nothing has been published yet, lets claim it */
@@ -947,12 +921,8 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 					free((void *)devpath);
 
 				} else {
-					// add to the node map;.
-#ifdef __PX4_NUTTX
-					_node_map.insert(devpath, node);
-#else
-					_node_map[std::string(devpath)] = node;
-#endif
+					// add to the node map;
+					_nodes_map[adv->meta->o_id][*adv->instance] = node;
 				}
 
 				group_tries++;
@@ -985,13 +955,13 @@ void uORB::DeviceMaster::printStatistics(bool reset)
 	bool had_print = false;
 
 	lock();
-	ITERATE_NODE_MAP() {
-		INIT_NODE_MAP_VARS(node, node_name)
-
-		if (node->print_statistics(reset)) {
-			had_print = true;
-		}
-	}
+//	ITERATE_NODE_MAP() {
+//		INIT_NODE_MAP_VARS(node, node_name)
+//
+//		if (node->print_statistics(reset)) {
+//			had_print = true;
+//		}
+//	}
 
 	unlock();
 
@@ -1001,8 +971,7 @@ void uORB::DeviceMaster::printStatistics(bool reset)
 }
 
 void uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node, int &num_topics,
-		size_t &max_topic_name_length,
-		char **topic_filter, int num_filters)
+		size_t &max_topic_name_length, char **topic_filter, int num_filters)
 {
 	DeviceNodeStatisticsData *cur_node;
 	num_topics = 0;
@@ -1014,60 +983,69 @@ void uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node
 		}
 	}
 
+	for (uint8_t index = 0; index < orb_topics_count; index++) {
+		for (uint8_t multi = 0; multi < ORB_MULTI_MAX_INSTANCES; multi++) {
 
-	ITERATE_NODE_MAP() {
-		INIT_NODE_MAP_VARS(node, node_name)
-		++num_topics;
+			DeviceNode *node = _nodes_map[index][multi];
 
-		//check if already added
-		cur_node = *first_node;
+			if (node == nullptr) {
+				break;
+			}
 
-		while (cur_node && cur_node->node != node) {
-			cur_node = cur_node->next;
-		}
+			const char *node_name = node->name();
 
-		if (cur_node) {
-			continue;
-		}
+			++num_topics;
 
-		if (num_filters > 0 && topic_filter) {
-			bool matched = false;
+			//check if already added
+			cur_node = *first_node;
 
-			for (int i = 0; i < num_filters; ++i) {
-				if (strstr(node->get_meta()->o_name, topic_filter[i])) {
-					matched = true;
+			while (cur_node && cur_node->node != node) {
+				cur_node = cur_node->next;
+			}
+
+			if (cur_node) {
+				continue;
+			}
+
+			if (num_filters > 0 && topic_filter) {
+				bool matched = false;
+
+				for (int i = 0; i < num_filters; ++i) {
+					if (strstr(node->get_meta()->o_name, topic_filter[i])) {
+						matched = true;
+					}
+				}
+
+				if (!matched) {
+					continue;
 				}
 			}
 
-			if (!matched) {
-				continue;
+			if (last_node) {
+				last_node->next = new DeviceNodeStatisticsData();
+				last_node = last_node->next;
+
+			} else {
+				*first_node = last_node = new DeviceNodeStatisticsData();
 			}
+
+			if (!last_node) {
+				PX4_ERR("mem alloc failed");
+				break;
+			}
+
+			last_node->node = node;
+			int node_name_len = strlen(node_name);
+			last_node->instance = (uint8_t)(node_name[node_name_len - 1] - '0');
+			size_t name_length = strlen(last_node->node->get_meta()->o_name);
+
+			if (name_length > max_topic_name_length) {
+				max_topic_name_length = name_length;
+			}
+
+			last_node->last_lost_msg_count = last_node->node->lost_message_count();
+			last_node->last_pub_msg_count = last_node->node->published_message_count();
 		}
-
-		if (last_node) {
-			last_node->next = new DeviceNodeStatisticsData();
-			last_node = last_node->next;
-
-		} else {
-			*first_node = last_node = new DeviceNodeStatisticsData();
-		}
-
-		if (!last_node) {
-			PX4_ERR("mem alloc failed");
-			break;
-		}
-
-		last_node->node = node;
-		int node_name_len = strlen(node_name);
-		last_node->instance = (uint8_t)(node_name[node_name_len - 1] - '0');
-		size_t name_length = strlen(last_node->node->get_meta()->o_name);
-
-		if (name_length > max_topic_name_length) {
-			max_topic_name_length = name_length;
-		}
-
-		last_node->last_lost_msg_count = last_node->node->lost_message_count();
-		last_node->last_pub_msg_count = last_node->node->published_message_count();
 	}
 }
 
@@ -1090,11 +1068,11 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
 
 	lock();
 
-	if (_node_map.empty()) {
-		unlock();
-		PX4_INFO("no active topics");
-		return;
-	}
+//	if (_node_map.empty()) {
+//		unlock();
+//		PX4_INFO("no active topics");
+//		return;
+//	}
 
 	DeviceNodeStatisticsData *first_node = nullptr;
 	DeviceNodeStatisticsData *cur_node = nullptr;
@@ -1212,42 +1190,19 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
 
 #undef CLEAR_LINE
 
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const char *nodepath)
+uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const orb_metadata *meta, int instance)
 {
-	lock();
-	uORB::DeviceNode *node = getDeviceNodeLocked(nodepath);
-	unlock();
-	//We can safely return the node that can be used by any thread, because
-	//a DeviceNode never gets deleted.
-	return node;
-}
+	uint8_t index = meta->o_id;
 
-
-#ifdef __PX4_NUTTX
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(const char *nodepath)
-{
-	uORB::DeviceNode *rc = nullptr;
-
-	if (_node_map.find(nodepath)) {
-		rc = _node_map.get(nodepath);
+	if (index < orb_topics_count && instance < ORB_MULTI_MAX_INSTANCES) {
+		return _nodes_map[index][instance];
 	}
 
-	return rc;
+	return nullptr;
 }
 
-#else
-
-uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(const char *nodepath)
+uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(char *node_path)
 {
-	uORB::DeviceNode *rc = nullptr;
-	std::string np(nodepath);
-
-	auto iter = _node_map.find(np);
-
-	if (iter != _node_map.end()) {
-		rc = iter->second;
-	}
-
-	return rc;
+	return nullptr;
 }
-#endif
+

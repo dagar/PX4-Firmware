@@ -43,7 +43,10 @@
 #include <systemlib/printload.h>
 #include <px4_module.h>
 
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/vehicle_command.h>
+
+using LoggerSubscription = uORB::SubscriptionBase;
 
 extern "C" __EXPORT int logger_main(int argc, char *argv[]);
 
@@ -75,29 +78,6 @@ inline bool operator&(SDLogProfileMask a, SDLogProfileMask b)
 {
 	return static_cast<int32_t>(a) & static_cast<int32_t>(b);
 }
-
-struct LoggerSubscription {
-	int fd[ORB_MULTI_MAX_INSTANCES]; ///< uorb subscription. The first fd is also used to store the interval if
-	/// not subscribed yet (-interval - 1)
-	uint16_t msg_ids[ORB_MULTI_MAX_INSTANCES];
-	const orb_metadata *metadata = nullptr;
-
-	LoggerSubscription() {}
-
-	LoggerSubscription(int fd_, const orb_metadata *metadata_) :
-		metadata(metadata_)
-	{
-		fd[0] = fd_;
-
-		for (int i = 1; i < ORB_MULTI_MAX_INSTANCES; i++) {
-			fd[i] = -1;
-		}
-
-		for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-			msg_ids[i] = (uint16_t) - 1;
-		}
-	}
-};
 
 class Logger : public ModuleBase<Logger>
 {

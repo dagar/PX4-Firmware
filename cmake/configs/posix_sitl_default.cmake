@@ -77,7 +77,7 @@ set(config_module_list
 	modules/load_mon
 	modules/mavlink
 	modules/navigator
-	modules/replay
+	#modules/replay
 	modules/simulator
 	#modules/uavcan
 
@@ -103,7 +103,7 @@ set(config_module_list
 	#
 	# Logging
 	#
-	modules/logger
+	#modules/logger
 	modules/sdlog2
 
 	#

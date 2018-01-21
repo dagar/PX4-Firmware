@@ -79,12 +79,12 @@ public:
 	}
 
 	/**
-	 * Get the DeviceMaster for a given Flavor. If it does not exist,
+	 * Get the DeviceMaster. If it does not exist,
 	 * it will be created and initialized.
 	 * Note: the first call to this is not thread-safe.
 	 * @return nullptr if initialization failed (and errno will be set)
 	 */
-	uORB::DeviceMaster *get_device_master(Flavor flavor);
+	uORB::DeviceMaster *get_device_master();
 
 	// ==== uORB interface methods ====
 	/**
@@ -393,25 +393,18 @@ private: // class methods
 	 * Handles creation of the object and the initial publication for
 	 * advertisers.
 	 */
-	int
-	node_open
-	(
-		Flavor f,
-		const struct orb_metadata *meta,
-		const void *data,
-		bool advertiser,
-		int *instance = nullptr,
-		int priority = ORB_PRIO_DEFAULT
-	);
+	int node_open(const struct orb_metadata *meta, const void *data, bool advertiser, int *instance = nullptr,
+		      int priority = ORB_PRIO_DEFAULT);
 
 private: // data members
 	static Manager *_Instance;
 	// the communicator channel instance.
 	uORBCommunicator::IChannel *_comm_channel;
+
 	ORBSet _remote_subscriber_topics;
 	ORBSet _remote_topics;
 
-	DeviceMaster *_device_masters[Flavor_count]; ///< Allow at most one DeviceMaster per Flavor
+	DeviceMaster *_device_master{nullptr};
 
 private: //class methods
 	Manager();

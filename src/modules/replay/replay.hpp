@@ -42,7 +42,7 @@
 #include "definitions.hpp"
 
 #include <px4_module.h>
-#include <uORB/uORBTopics.h>
+#include <uORB/uORBTopics.hpp>
 #include <uORB/topics/ekf2_timestamps.h>
 
 namespace px4

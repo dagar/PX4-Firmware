@@ -1,6 +1,6 @@
 @###############################################
 @#
-@# EmPy template for generating uORBTopics.cpp file
+@# EmPy template for generating uORBTopics.hpp file
 @# for logging purposes
 @#
 @###############################################
@@ -43,7 +43,6 @@
  *
  ****************************************************************************/
 
-#include <uORB/uORBTopics.h>
 #include <uORB/uORB.h>
 @{
 msg_names = [mn.replace(".msg", "") for mn in msgs]
@@ -51,23 +50,21 @@ msgs_count = len(msg_names)
 msg_names_all = list(set(msg_names + multi_topics)) # set() filters duplicates
 msgs_count_all = len(msg_names_all)
 }@
+
 @[for msg_name in msg_names]@
 #include <uORB/topics/@(msg_name).h>
 @[end for]
 
-const size_t _uorb_topics_count = @(msgs_count_all);
-const struct orb_metadata* _uorb_topics_list[_uorb_topics_count] = { 
-@[for idx, msg_name in enumerate(msg_names_all, 1)]@
-    ORB_ID(@(msg_name))@[if idx != msgs_count_all],@[end if]
+static constexpr size_t orb_topics_count = @(msgs_count_all);
+
+enum { 
+@[for idx, msg_name in enumerate(msg_names_all, 0)]@
+	__orb_@(msg_name)_id = @(idx),
 @[end for]
 };
 
-size_t orb_topics_count()
-{
-	return _uorb_topics_count;
-}
-
-const struct orb_metadata **orb_get_topics()
-{
-	return _uorb_topics_list;
-}
+static constexpr const orb_id_t uorb_topics_list[orb_topics_count] = { 
+@[for idx, msg_name in enumerate(msg_names_all, 0)]@
+	ORB_ID(@(msg_name)),
+@[end for]
+};

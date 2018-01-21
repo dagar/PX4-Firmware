@@ -51,13 +51,13 @@ SubscriptionBase::SubscriptionBase(const orb_metadata *meta, uint8_t interval, u
 
 bool SubscriptionBase::init()
 {
-	DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master(uORB::PUBSUB);
+	DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master();
 
 	char path[orb_maxpath];
 	const struct orb_metadata *meta = &_meta;
 	int instance = _instance;
 
-	int ret = uORB::Utils::node_mkpath(path, PUBSUB, meta, &instance);
+	int ret = uORB::Utils::node_mkpath(path, meta, &instance);
 
 	PX4_DEBUG("path: %s", path);
 

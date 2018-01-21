@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include "uORBCommon.hpp"
 
+#include <msg/topics_sources/uORBTopics.hpp>
 
 #ifdef __PX4_NUTTX
 #include <string.h>
@@ -204,6 +205,8 @@ public:
 
 	void set_priority(uint8_t priority) { _priority = priority; }
 
+	const char *name() const { return _meta->o_name; }
+
 protected:
 	virtual pollevent_t poll_state(device::file_t *filp);
 	virtual void poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events);
@@ -296,7 +299,9 @@ public:
 	 * Public interface for getDeviceNodeLocked(). Takes care of synchronization.
 	 * @return node if exists, nullptr otherwise
 	 */
-	uORB::DeviceNode *getDeviceNode(const char *node_name);
+	uORB::DeviceNode *getDeviceNode(const orb_metadata *meta, int instance = 0);
+
+	uORB::DeviceNode *getDeviceNode(char *node_path);
 
 	/**
 	 * Print statistics for each existing topic.
@@ -315,8 +320,8 @@ public:
 
 private:
 	// Private constructor, uORB::Manager takes care of its creation
-	DeviceMaster(Flavor f);
-	virtual ~DeviceMaster();
+	DeviceMaster();
+	virtual ~DeviceMaster() = default;
 
 	struct DeviceNodeStatisticsData {
 		DeviceNode *node;
@@ -332,19 +337,7 @@ private:
 
 	friend class uORB::Manager;
 
-	/**
-	 * Find a node give its name.
-	 * _lock must already be held when calling this.
-	 * @return node if exists, nullptr otherwise
-	 */
-	uORB::DeviceNode *getDeviceNodeLocked(const char *node_name);
+	uORB::DeviceNode *_nodes_map[orb_topics_count][ORB_MULTI_MAX_INSTANCES] {};
 
-	const Flavor _flavor;
-
-#ifdef __PX4_NUTTX
-	ORBMap _node_map;
-#else
-	std::map<std::string, uORB::DeviceNode *> _node_map;
-#endif
 	hrt_abstime       _last_statistics_output;
 };

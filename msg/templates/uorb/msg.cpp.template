@@ -65,11 +65,18 @@ topic_fields = ["uint64_t timestamp"]+["%s %s" % (convert_type(field.type), fiel
 }@
 
 #include <uORB/topics/@(topic_name).h>
+#include <msg/topics_sources/uORBTopics.hpp>
 
 @# join all msg files in one line e.g: "float[3] position;float[3] velocity;bool armed"
 @# This is used for the logger
-constexpr char __orb_@(topic_name)_fields[] = "@( ";".join(topic_fields) );";
+static constexpr const char __orb_@(topic_name)_fields[] = "@( ";".join(topic_fields) );";
 
 @[for multi_topic in topics]@
-ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), __orb_@(topic_name)_fields);
+const struct orb_metadata __orb_@(multi_topic) = {
+	.o_id = __orb_@(topic_name)_id,
+	.o_name = "@multi_topic",
+	.o_size = sizeof(struct @uorb_struct),
+	.o_size_no_padding = @(struct_size-padding_end_size),
+	.o_fields = __orb_@(topic_name)_fields
+};
 @[end for]

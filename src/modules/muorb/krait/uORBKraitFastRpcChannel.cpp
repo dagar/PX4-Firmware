@@ -274,8 +274,7 @@ void uORB::KraitFastRpcChannel::fastrpc_recv_thread()
 				if (_RxHandler != nullptr) {
 					if (header->_MsgType == _DATA_MSG_TYPE) {
 						//PX4_DEBUG( "Received topic data for: [%s] len[%d]\n", messageName, data_length );
-						_RxHandler->process_received_message(messageName,
-										     header->_DataLen, topic_data);
+						_RxHandler->process_received_message(messageName, header->_DataLen, topic_data);
 
 					} else if (header->_MsgType == _CONTROL_MSG_TYPE_ADVERTISE) {
 						PX4_DEBUG("Received topic advertise message for: [%s] len[%d]\n", messageName, data_length);

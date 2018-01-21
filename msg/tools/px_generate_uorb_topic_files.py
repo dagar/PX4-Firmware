@@ -77,7 +77,7 @@ __email__ = "thomasgubler@gmail.com"
 
 
 TEMPLATE_FILE = ['msg.h.template', 'msg.cpp.template']
-TOPICS_LIST_TEMPLATE_FILE = 'uORBTopics.cpp.template'
+TOPICS_LIST_TEMPLATE_FILE = 'uORBTopics.hpp.template'
 OUTPUT_FILE_EXT = ['.h', '.cpp']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
@@ -354,7 +354,7 @@ def convert_dir_save(format_idx, inputdir, outputdir, templatedir, temporarydir,
         # Create new headers in temporary output directory
         convert_dir(format_idx, inputdir, temporarydir, templatedir)
         if generate_idx == 1:
-            generate_topics_list_file(inputdir, temporarydir, templatedir)
+            generate_topics_list_file(inputdir, temporarydir, outputdir)
         # Copy changed headers from temporary dir to output dir
         copy_changed(temporarydir, outputdir, prefix, quiet)
 

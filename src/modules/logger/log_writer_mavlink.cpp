@@ -38,6 +38,7 @@
 #include <mathlib/mathlib.h>
 #include <px4_log.h>
 #include <px4_posix.h>
+#include <uORB/uORB.h>
 
 namespace px4
 {
