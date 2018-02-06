@@ -40,9 +40,9 @@
 
 #include "output_rc.h"
 
-#include <uORB/topics/actuator_controls.h>
+#include <mathlib/mathlib.h>
 #include <px4_defines.h>
-
+#include <uORB/topics/vehicle_control_mode.h>
 
 namespace vmount
 {
@@ -60,9 +60,27 @@ OutputRC::~OutputRC()
 
 int OutputRC::update(const ControlData *control_data)
 {
+	bool control_mode_updated = false;
+	orb_check(_vehicle_control_mode_sub, &control_mode_updated);
+
+	if (control_mode_updated) {
+		vehicle_control_mode_s control_mode = {};
+
+		if (orb_copy(ORB_ID(vehicle_control_mode), _vehicle_control_mode_sub, &control_mode) == PX4_OK) {
+			_armed = control_mode.flag_armed;
+		}
+	}
+
 	if (control_data) {
-		//got new command
+		// got new command
+
+		if (_retract_gimbal != control_data->gimbal_shutter_retract) {
+			// TODO: only if armed?
+			_retract_changed = hrt_absolute_time();
+		}
+
 		_retract_gimbal = control_data->gimbal_shutter_retract;
+
 		_set_angle_setpoints(control_data);
 	}
 
@@ -71,17 +89,87 @@ int OutputRC::update(const ControlData *control_data)
 	hrt_abstime t = hrt_absolute_time();
 	_calculate_output_angles(t);
 
-	actuator_controls_s actuator_controls;
-	actuator_controls.timestamp = hrt_absolute_time();
-	// _angle_outputs are in radians, actuator_controls are in [-1, 1]
-	actuator_controls.control[0] = (_angle_outputs[0] + _config.roll_offset) * _config.roll_scale;
-	actuator_controls.control[1] = (_angle_outputs[1] + _config.pitch_offset) * _config.pitch_scale;
-	actuator_controls.control[2] = (_angle_outputs[2] + _config.yaw_offset) * _config.yaw_scale;
-	actuator_controls.control[3] = _retract_gimbal ? _config.gimbal_retracted_mode_value : _config.gimbal_normal_mode_value;
+	_actuator_controls.timestamp = hrt_absolute_time();
+
+	const float retract_elapsed = hrt_elapsed_time(&_retract_changed) / 1e6f;
+
+	const float doors_delay = _config.doors_delay / 1000.0f;
+	const float camera_safe_elapsed = _config.camera_safe_position_close_delay / 1000.0f;
+
+	if (_retract_gimbal && _doors_open) { // TODO: readd _armed
+		// retract gimbal camera
+		if (_doors_open) {
+
+			_actuator_controls.control[0] = _config.gimbal_roll_retracted_mode_value;
+			_actuator_controls.control[1] = _config.gimbal_pitch_retracted_mode_value;
+			_actuator_controls.control[2] = _config.gimbal_yaw_retracted_mode_value;
+
+			if (retract_elapsed > camera_safe_elapsed) {
+				// camera in safe position for closing, begin retracting
+				_actuator_controls.control[3] = _config.gimbal_retracted_mode_value;
+
+				if (retract_elapsed > camera_safe_elapsed + doors_delay) {
+					// close doors
+					_actuator_controls.control[4] = _config.doors_closed_value;
+					_doors_open = false;
+				}
+			}
+		}
+
+	} else if (!_retract_gimbal && !_doors_open) { // TODO: readd _armed
+		// deploy gimbal camera
+		if (!_doors_open) {
+			// first open doors then wait
+			_actuator_controls.control[4] = _config.doors_open_value;
+
+			if (retract_elapsed > doors_delay) {
+				_actuator_controls.control[0] = _config.gimbal_roll_retracted_mode_value;
+				_actuator_controls.control[1] = _config.gimbal_pitch_retracted_mode_value;
+				_actuator_controls.control[2] = _config.gimbal_yaw_retracted_mode_value;
+
+				_actuator_controls.control[3] = _config.gimbal_normal_mode_value;
+
+				if (retract_elapsed > camera_safe_elapsed + doors_delay) {
+					// report doors now open to complete
+					_doors_open = true;
+				}
+			}
+		}
+
+	} else if (_retract_gimbal && !_doors_open) {
+		// retracted and doors closed
+		// lock in safe positions
+		_actuator_controls.control[0] = _config.gimbal_roll_retracted_mode_value;
+		_actuator_controls.control[1] = _config.gimbal_pitch_retracted_mode_value;
+		_actuator_controls.control[2] = _config.gimbal_yaw_retracted_mode_value;
+
+		_actuator_controls.control[3] = _config.gimbal_retracted_mode_value;
+		_actuator_controls.control[4] = _config.doors_closed_value;
+
+	} else {
+		// otherwise allow normal movement
+		// _angle_outputs are in radians, actuator_controls are in [-1, 1]
+
+		//float roll = math::constrain(_angle_outputs[0], _config.roll_offset, _config.roll_offset + _config.roll_scale);
+
+
+		_actuator_controls.control[0] = (_angle_outputs[0] + _config.roll_offset) * _config.roll_scale;
+		_actuator_controls.control[1] = (_angle_outputs[1] + _config.pitch_offset) * _config.pitch_scale;
+		_actuator_controls.control[2] = (_angle_outputs[2] + _config.yaw_offset) * _config.yaw_scale;
+
+		PX4_INFO("P: %.3f (%.3f) Y: %.3f (%.3f)",
+			 (double)math::degrees(_angle_outputs[1]), (double)_actuator_controls.control[1],
+			 (double)math::degrees(_angle_outputs[2]), (double)_actuator_controls.control[2]);
+	}
+
+	// limit outputs to within scale
+	_actuator_controls.control[0] = math::constrain(_actuator_controls.control[0], -1.0f, 1.0f);
+	_actuator_controls.control[1] = math::constrain(_actuator_controls.control[1], -1.0f, 1.0f);
+	_actuator_controls.control[2] = math::constrain(_actuator_controls.control[2], -1.0f, 1.0f);
 
 	int instance;
-	orb_publish_auto(ORB_ID(actuator_controls_2), &_actuator_controls_pub, &actuator_controls,
-			 &instance, ORB_PRIO_DEFAULT);
+	orb_publish_auto(ORB_ID(actuator_controls_2), &_actuator_controls_pub, &_actuator_controls, &instance,
+			 ORB_PRIO_DEFAULT);
 
 	_last_update = t;
 
@@ -91,6 +179,13 @@ int OutputRC::update(const ControlData *control_data)
 void OutputRC::print_status()
 {
 	PX4_INFO("Output: AUX");
+
+	PX4_INFO("Retract Gimbal: %d", _retract_gimbal);
+	PX4_INFO("Doors Open: %d", _doors_open);
+
+	PX4_INFO("roll %.3f", (double)math::degrees(_angle_outputs[0]));
+	PX4_INFO("pitch (tilt) %.3f", (double)math::degrees(_angle_outputs[1]));
+	PX4_INFO("yaw (pan) %.3f", (double)math::degrees(_angle_outputs[2]));
 }
 
 } /* namespace vmount */
