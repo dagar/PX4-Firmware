@@ -53,6 +53,16 @@ struct OutputConfig {
 	float gimbal_retracted_mode_value;	/**< Mixer output value for selecting gimbal retracted mode */
 	float gimbal_normal_mode_value;		/**< Mixer output value for selecting gimbal normal mode */
 
+	float gimbal_roll_retracted_mode_value;	/**< Mixer output value for selecting gimbal retracted mode */
+	float gimbal_pitch_retracted_mode_value;	/**< Mixer output value for selecting gimbal retracted mode */
+	float gimbal_yaw_retracted_mode_value;	/**< Mixer output value for selecting gimbal retracted mode */
+
+	float doors_delay;	/**< Delay before opening or closing the doors relative to the gimbal retract */
+	float doors_open_value;	/**< Mixer output value for selecting doors open */
+	float doors_closed_value;	/**< Mixer output value for selecting doors closed */
+
+	float camera_safe_position_close_delay;	/**< Delay before opening or closing the doors relative to the gimbal retract */
+
 	/** Scale factor for pitch channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */
 	float pitch_scale;
 	/** Scale factor for roll channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */
@@ -121,9 +131,14 @@ protected:
 
 	int _get_vehicle_attitude_sub() const { return _vehicle_attitude_sub; }
 
+	bool 	_armed{false};
+
+	// TODO: move to base class and make private
+	int _vehicle_control_mode_sub = -1;
 private:
 	int _vehicle_attitude_sub = -1;
 	int _vehicle_global_position_sub = -1;
+
 
 	orb_advert_t _mount_orientation_pub = nullptr;
 };
