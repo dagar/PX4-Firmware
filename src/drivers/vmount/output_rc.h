@@ -41,12 +41,11 @@
 
 #include "output.h"
 
+#include <uORB/topics/actuator_controls.h>
 #include <uORB/uORB.h>
-
 
 namespace vmount
 {
-
 
 /**
  ** class OutputRC
@@ -63,8 +62,15 @@ public:
 	virtual void print_status();
 
 private:
+
+	actuator_controls_s	_actuator_controls{};
+
 	orb_advert_t _actuator_controls_pub = nullptr;
 	bool _retract_gimbal = true;
+	uint64_t _retract_changed{0};
+
+	bool _doors_open = false;
+
 };
 
 
