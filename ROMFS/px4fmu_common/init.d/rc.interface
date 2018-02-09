@@ -58,8 +58,7 @@ then
 	then
 		echo "INFO  [init] Mixer: ${MIXER_FILE} on ${OUTPUT_DEV}"
 	else
-		echo "ERROR  [init] Failed loading mixer: ${MIXER_FILE}"
-		echo "ERROR  [init] Failed loading mixer: ${MIXER_FILE}" >> $LOG_FILE
+		log "ERROR  [init] Failed loading mixer: ${MIXER_FILE}"
 		tone_alarm ${TUNE_ERR}
 	fi
 
@@ -67,8 +66,7 @@ then
 else
 	if [ $MIXER != skip ]
 	then
-		echo "ERROR  [init] Mixer undefined"
-		echo "ERROR  [init] Mixer undefined" >> $LOG_FILE
+		log "ERROR  [init] Mixer undefined"
 		tone_alarm ${TUNE_ERR}
 	fi
 fi
@@ -156,8 +154,7 @@ then
 				then
 					echo "INFO  [init] Mixer: ${MIXER_AUX_FILE} appended to ${OUTPUT_DEV}"
 				else
-					echo "ERROR  [init] Failed appending mixer: ${MIXER_AUX_FILE}"
-					echo "ERROR  [init] Failed appending mixer: ${MIXER_AUX_FILE}" >> $LOG_FILE
+					log "ERROR  [init] Failed appending mixer: ${MIXER_AUX_FILE}"
 				fi
 			fi
 			if [ -e $OUTPUT_AUX_DEV -a $OUTPUT_MODE != hil ]
@@ -166,15 +163,14 @@ then
 				then
 					echo "INFO  [init] Mixer: ${MIXER_AUX_FILE} on ${OUTPUT_AUX_DEV}"
 				else
-					echo "ERROR  [init] Failed loading mixer: ${MIXER_AUX_FILE}"
-					echo "ERROR  [init] Failed loading mixer: ${MIXER_AUX_FILE}" >> $LOG_FILE
+					log "ERROR  [init] Failed loading mixer: ${MIXER_AUX_FILE}"
 				fi
 			else
 				set PWM_AUX_OUT none
 				set FAILSAFE_AUX none
 			fi
 		else
-			echo "ERROR: Could not start: fmu mode_pwm" >> $LOG_FILE
+			log "ERROR: Could not start: fmu mode_pwm"
 			tone_alarm ${TUNE_ERR}
 			set PWM_AUX_OUT none
 			set FAILSAFE_AUX none

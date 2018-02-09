@@ -46,13 +46,16 @@ sercon
 # print full system version
 ver all
 
+log 1
+
 #
 # Default to auto-start mode.
 #
 set MODE autostart
 
 set TUNE_ERR "ML<<CP4CP4CP4CP4CP4"
-set LOG_FILE /fs/microsd/bootlog.txt
+
+log 2
 
 #
 # Try to mount the microSD card.
@@ -77,14 +80,12 @@ else
 		then
 			echo "INFO  [init] card formatted"
 		else
-			echo "ERROR [init] format failed"
-			tone_alarm MNBG
-			set LOG_FILE /dev/null
+			log "ERROR [init] format failed"
 		fi
-	else
-		set LOG_FILE /dev/null
 	fi
 fi
+
+log 3
 
 #
 # Look for an init script on the microSD card.
@@ -105,12 +106,18 @@ then
 	# Start the ORB (first app to start)
 	#
 	uorb start
+	
+	log 4
 
 	# Start tone driver
 	tone_alarm start
+	
+	log 5
 
 	# play startup tone
 	tune_control play -t 1
+	
+	log 6
 
 	#
 	# Load parameters
@@ -120,15 +127,22 @@ then
 	then
 		set PARAM_FILE /fs/mtd_params
 	fi
+	
+	log 7
 
 	param select $PARAM_FILE
 	if param load
 	then
 	else
-		if param reset
-		then
-		fi
+		param reset
 	fi
+	
+	sleep 1
+	
+	# start logger as soon as possible
+	sh /etc/init.d/rc.logging
+	
+	log 8
 
 	#
 	# Start system state indicator
@@ -141,9 +155,13 @@ then
 			blinkm systemstate
 		fi
 	fi
+	
+	log 9
 
 	# FMUv5 may have both PWM I2C RGB LED support
 	rgbled_pwm start
+	
+	log 10
 
 	#
 	# Set AUTOCNF flag to use it in AUTOSTART scripts
@@ -166,6 +184,8 @@ then
 			param set BAT_N_CELLS 3
 		fi
 	fi
+	
+	log 11
 
 	#
 	# Set default values
@@ -331,16 +351,15 @@ then
 					usleep 10000
 					if px4io checkcrc ${IO_FILE}
 					then
-						echo "PX4IO CRC OK after updating" >> $LOG_FILE
 						tone_alarm MLL8CDE
 
 						set IO_PRESENT yes
 					else
-						echo "PX4IO update failed" >> $LOG_FILE
+						log "PX4IO update failed"
 						tone_alarm ${TUNE_ERR}
 					fi
 				else
-					echo "PX4IO update failed" >> $LOG_FILE
+					log "PX4IO update failed"
 					tune_control play -m ${TUNE_ERR}
 				fi
 			fi
@@ -349,7 +368,7 @@ then
 
 		if [ $IO_PRESENT == no ]
 		then
-			echo "PX4IO not found" >> $LOG_FILE
+			log "PX4IO not found"
 			tune_control play -m ${TUNE_ERR}
 		fi
 	fi
@@ -466,7 +485,7 @@ then
 			then
 				sh /etc/init.d/rc.io
 			else
-				echo "PX4IO start failed" >> $LOG_FILE
+				log "PX4IO start failed"
 				tune_control play -m  ${TUNE_ERR}
 			fi
 		fi
@@ -476,7 +495,7 @@ then
 			if fmu mode_$FMU_MODE $FMU_ARGS
 			then
 			else
-				echo "FMU start failed" >> $LOG_FILE
+				log "FMU start failed"
 				tune_control play -m ${TUNE_ERR}
 			fi
 		fi
@@ -522,7 +541,7 @@ then
 				then
 					sh /etc/init.d/rc.io
 				else
-					echo "PX4IO start failed" >> $LOG_FILE
+					log "PX4IO start failed"
 					tune_control play -m ${TUNE_ERR}
 				fi
 			fi
@@ -532,7 +551,7 @@ then
 				if fmu mode_${FMU_MODE} $FMU_ARGS
 				then
 				else
-					echo "FMU mode_${FMU_MODE} start failed" >> $LOG_FILE
+					log "FMU mode_${FMU_MODE} start failed"
 					tune_control play -m ${TUNE_ERR}
 				fi
 			fi
@@ -691,36 +710,6 @@ then
 	else
 		# Start MAVLink
 		mavlink start -r 800000 -d /dev/ttyACM0 -m config -x
-	fi
-
-	#
-	# Logging
-	#
-	if param compare SYS_LOGGER 0
-	then
-		sdlog2 start -r 100 -a -b 9 -t
-	else
-		set LOGGER_ARGS ""
-
-		if param compare SDLOG_MODE 1
-		then
-			set LOGGER_ARGS "-e"
-		fi
-
-		if param compare SDLOG_MODE 2
-		then
-			set LOGGER_ARGS "-f"
-		fi
-
-		if ver hwcmp AEROFC_V1
-		then
-			set LOGGER_ARGS "-m mavlink"
-		fi
-
-		logger start -b ${LOGGER_BUF} -t ${LOGGER_ARGS}
-
-		unset LOGGER_BUF
-		unset LOGGER_ARGS
 	fi
 
 	#
@@ -910,27 +899,6 @@ then
 		sh $FEXTRAS
 	fi
 	unset FEXTRAS
-
-	if ver hwcmp CRAZYFLIE
-	then
-		# CF2 shouldn't have an sd card
-	else
-
-		if ver hwcmp AEROCORE2
-		then
-			# AEROCORE2 shouldn't have an sd card
-		else
-
-			# Run no SD alarm
-			if [ $LOG_FILE == /dev/null ]
-			then
-				# Play SOS
-				tone_alarm error
-			fi
-
-		fi
-
-	fi
 
 	#
 	# Check if we should start a thermal calibration

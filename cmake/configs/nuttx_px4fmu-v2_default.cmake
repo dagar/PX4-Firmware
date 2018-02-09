@@ -69,6 +69,7 @@ set(config_module_list
 	#systemcmds/esc_calib
 	systemcmds/hardfault_log
 	#systemcmds/led_control
+	systemcmds/log
 	systemcmds/mixer
 	#systemcmds/motor_ramp
 	#systemcmds/motor_test

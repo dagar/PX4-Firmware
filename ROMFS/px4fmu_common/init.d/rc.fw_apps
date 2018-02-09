@@ -6,7 +6,7 @@
 # LPE
 if param compare SYS_MC_EST_GROUP 1
 then
-	echo "ERROR [init] Estimator LPE not supported on fixed wing. Using EKF2"
+	log "ERROR [init] Estimator LPE not supported on fixed wing. Using EKF2"
 	param set SYS_MC_EST_GROUP 2
 	param save
 fi

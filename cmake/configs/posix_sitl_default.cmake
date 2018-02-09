@@ -34,6 +34,7 @@ set(config_module_list
 	#systemcmds/dumpfile
 	systemcmds/esc_calib
 	systemcmds/led_control
+	systemcmds/log
 	systemcmds/mixer
 	systemcmds/motor_ramp
 	#systemcmds/mtd

@@ -25,8 +25,7 @@ then
 	then
 		echo "INFO  [init] Mixer: $MIXER_FILE on $OUTPUT_DEV"
 	else
-		echo "ERROR [init] Error loading mixer: $MIXER_FILE"
-		echo "ERROR:[init] Could not load mixer: $MIXER_FILE" >> $LOG_FILE
+		log "ERROR [init] Error loading mixer: $MIXER_FILE"
 		tone_alarm $TUNE_ERR
 	fi
 
@@ -34,8 +33,7 @@ then
 else
 	if [ $MIXER != skip ]
 	then
-		echo "ERROR [init] Mixer not defined"
-		echo "ERROR [init] Mixer not defined" >> $LOG_FILE
+		log "ERROR [init] Mixer not defined"
 		tone_alarm $TUNE_ERR
 	fi
 fi
