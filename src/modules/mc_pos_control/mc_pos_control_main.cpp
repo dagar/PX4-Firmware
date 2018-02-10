@@ -1545,7 +1545,7 @@ MulticopterPositionControl::control_non_manual()
 		_att_sp.roll_body = 0.0f;
 		_att_sp.pitch_body = 0.0f;
 		_att_sp.yaw_body = _yaw;
-		_att_sp.thrust = 0.0f;
+		_att_sp.thrust_z = 0.0f;
 
 		_att_sp.timestamp = hrt_absolute_time();
 
@@ -2748,7 +2748,7 @@ MulticopterPositionControl::calculate_thrust_setpoint()
 		warn_rate_limited("Thrust setpoint not finite");
 	}
 
-	_att_sp.thrust = math::max(thrust_body_z, thr_min);
+	_att_sp.thrust_z = math::max(thrust_body_z, thr_min);
 
 	/* update integrals */
 	if (_control_mode.flag_control_velocity_enabled && !saturation_xy) {
@@ -2877,11 +2877,11 @@ MulticopterPositionControl::generate_attitude_setpoint()
 	/* control throttle directly if no climb rate controller is active */
 	if (!_control_mode.flag_control_climb_rate_enabled) {
 		float thr_val = throttle_curve(_manual.z, _params.thr_hover);
-		_att_sp.thrust = math::min(thr_val, _manual_thr_max.get());
+		_att_sp.thrust_z = math::min(thr_val, _manual_thr_max.get());
 
 		/* enforce minimum throttle if not landed */
 		if (!_vehicle_land_detected.landed) {
-			_att_sp.thrust = math::max(_att_sp.thrust, _manual_thr_min.get());
+			_att_sp.thrust_z = math::max(_att_sp.thrust_z, _manual_thr_min.get());
 		}
 	}
 
@@ -3109,7 +3109,7 @@ MulticopterPositionControl::task_main()
 
 			/* make sure attitude setpoint output "disables" attitude control
 			 * TODO: we need a defined setpoint to do this properly especially when adjusting the mixer */
-			_att_sp.thrust = 0.0f;
+			_att_sp.thrust_z = 0.0f;
 			_att_sp.timestamp = hrt_absolute_time();
 
 			/* reset velocity limit */
