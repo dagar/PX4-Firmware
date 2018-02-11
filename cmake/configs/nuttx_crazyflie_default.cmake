@@ -32,6 +32,7 @@ set(config_module_list
 	systemcmds/dumpfile
 	systemcmds/ver
 	systemcmds/hardfault_log
+	systemcmds/i2c
 
 	#
 	# General system control

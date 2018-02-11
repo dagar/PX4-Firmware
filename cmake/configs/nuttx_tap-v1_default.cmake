@@ -35,6 +35,7 @@ set(config_module_list
 	systemcmds/perf
 	systemcmds/pwm
 	systemcmds/hardfault_log
+	systemcmds/i2c
 	systemcmds/motor_test
 	systemcmds/reboot
 	systemcmds/top

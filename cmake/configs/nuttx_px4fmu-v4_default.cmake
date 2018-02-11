@@ -45,25 +45,7 @@ set(config_module_list
 	#
 	# System commands
 	#
-	systemcmds/bl_update
-	systemcmds/config
-	systemcmds/dumpfile
-	systemcmds/esc_calib
-	systemcmds/hardfault_log
-	systemcmds/led_control
-	systemcmds/mixer
-	systemcmds/motor_ramp
-	systemcmds/mtd
-	systemcmds/nshterm
-	systemcmds/param
-	systemcmds/perf
-	systemcmds/pwm
-	systemcmds/reboot
-	systemcmds/sd_bench
-	systemcmds/top
-	systemcmds/topic_listener
-	systemcmds/tune_control
-	systemcmds/ver
+	systemcmds
 
 	#
 	# Testing
@@ -76,7 +58,6 @@ set(config_module_list
 	modules/mavlink/mavlink_tests
 	modules/mc_pos_control/mc_pos_control_tests
 	modules/uORB/uORB_tests
-	systemcmds/tests
 
 	#
 	# General system control
@@ -120,10 +101,10 @@ set(config_module_list
 	#
 	# Library modules
 	#
+	modules/dataman
 	modules/systemlib/param
 	modules/systemlib
 	modules/uORB
-	modules/dataman
 
 	#
 	# Libraries

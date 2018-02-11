@@ -13,18 +13,23 @@ set(config_module_list
 	drivers/magnetometer
 	drivers/telemetry
 
+	drivers/imu/adis16448
 	drivers/airspeed
 	drivers/batt_smbus
 	drivers/blinkm
+	drivers/imu/bmi160
 	drivers/boards
 	drivers/camera_trigger
 	drivers/device
 	drivers/gps
+	drivers/irlock
+	drivers/imu/l3gd20
 	drivers/led
 	drivers/mkblctrl
 	drivers/imu/mpu6000
 	drivers/imu/mpu9250
 	drivers/oreoled
+	drivers/protocol_splitter
 	drivers/pwm_input
 	drivers/pwm_out_sim
 	drivers/px4flow
@@ -34,63 +39,48 @@ set(config_module_list
 	drivers/stm32
 	drivers/stm32/adc
 	drivers/stm32/tone_alarm
+	drivers/tap_esc
 	drivers/vmount
 	modules/sensors
 
 	#
 	# System commands
 	#
-	systemcmds/bl_update
-	systemcmds/config
-	systemcmds/dumpfile
-	systemcmds/esc_calib
-	systemcmds/led_control
-	systemcmds/mixer
-	systemcmds/hardfault_log
-	systemcmds/motor_ramp
-	systemcmds/mtd
-	systemcmds/nshterm
-	systemcmds/param
-	systemcmds/perf
-	systemcmds/pwm
-	systemcmds/reboot
-	systemcmds/sd_bench
-	systemcmds/top
-	systemcmds/topic_listener
-	systemcmds/tune_control
-	systemcmds/ver
+	systemcmds
 
 	#
 	# Testing
 	#
 	drivers/distance_sensor/sf0x/sf0x_tests
 	drivers/test_ppm
+	lib/controllib/controllib_test
 	#lib/rc/rc_tests
 	modules/commander/commander_tests
-	lib/controllib/controllib_test
 	modules/mavlink/mavlink_tests
 	modules/mc_pos_control/mc_pos_control_tests
 	modules/uORB/uORB_tests
-	systemcmds/tests
 
 	#
 	# General system control
 	#
+	modules/camera_feedback
 	modules/commander
-	modules/load_mon
-	modules/navigator
-	modules/mavlink
+	modules/events
 	modules/gpio_led
-	modules/uavcan
 	modules/land_detector
+	modules/load_mon
+	modules/mavlink
+	modules/navigator
+	modules/uavcan
 
 	#
 	# Estimation modules
 	#
 	modules/attitude_estimator_q
-	modules/position_estimator_inav
-	modules/local_position_estimator
 	modules/ekf2
+	modules/landing_target_estimator
+	modules/local_position_estimator
+	modules/position_estimator_inav
 
 	#
 	# Vehicle Control
@@ -112,10 +102,10 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/uORB
 	modules/dataman
+	modules/systemlib
+	modules/systemlib/param
+	modules/uORB
 
 	#
 	# Libraries
@@ -136,29 +126,34 @@ set(config_module_list
 	#
 	# OBC challenge
 	#
-	#examples/bottle_drop
+	examples/bottle_drop
 
 	#
 	# Rover apps
 	#
-	#examples/rover_steering_control
+	examples/rover_steering_control
+
+	#
+	# Segway
+	#
+	examples/segway
 
 	#
 	# Demo apps
 	#
-	#examples/math_demo
+
 	# Tutorial code from
 	# https://px4.io/dev/px4_simple_app
-	#examples/px4_simple_app
+	examples/px4_simple_app
 
 	# Tutorial code from
 	# https://px4.io/dev/debug_values
-	#examples/px4_mavlink_debug
+	examples/px4_mavlink_debug
 
 	# Tutorial code from
 	# https://px4.io/dev/example_fixedwing_control
-	#examples/fixedwing_control
+	examples/fixedwing_control
 
 	# Hardware test
-	#examples/hwtest
+	examples/hwtest
 )

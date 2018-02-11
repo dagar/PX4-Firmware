@@ -50,6 +50,7 @@ set(config_module_list
 	systemcmds/dumpfile
 	systemcmds/esc_calib
 ## Needs bbsrm 	systemcmds/hardfault_log
+	systemcmds/i2c
 	systemcmds/led_control
 	systemcmds/mixer
 	systemcmds/motor_ramp

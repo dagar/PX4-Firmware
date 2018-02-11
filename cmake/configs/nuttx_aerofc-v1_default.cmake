@@ -8,15 +8,15 @@ set(config_module_list
 	# Board support modules
 	#
 	drivers/aerofc_adc
+	drivers/barometer/ms5611
 	drivers/boards
 	drivers/device
 	drivers/distance_sensor
 	drivers/gps
+	drivers/imu/mpu9250
 	drivers/led
-	drivers/barometer/ms5611
 	drivers/magnetometer/hmc5883
 	drivers/magnetometer/ist8310
-	drivers/imu/mpu9250
 	drivers/px4fmu
 	drivers/stm32
 	drivers/tap_esc
@@ -25,16 +25,17 @@ set(config_module_list
 	#
 	# System commands
 	#
+	systemcmds/config
+	systemcmds/dumpfile
+	systemcmds/i2c
 	systemcmds/mixer
+	systemcmds/motor_test
+	systemcmds/nshterm
 	systemcmds/param
 	systemcmds/perf
 	systemcmds/pwm
-	systemcmds/motor_test
 	systemcmds/reboot
 	systemcmds/top
-	systemcmds/config
-	systemcmds/nshterm
-	systemcmds/dumpfile
 	systemcmds/ver
 
 	#
