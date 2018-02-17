@@ -128,7 +128,6 @@ private:
 	orb_advert_t	_rate_sp_pub;			/**< rate setpoint publication */
 	orb_advert_t	_attitude_sp_pub;		/**< attitude setpoint point */
 	orb_advert_t	_actuators_0_pub;		/**< actuator control group 0 setpoint */
-	orb_advert_t	_actuators_2_pub;		/**< actuator control group 1 setpoint (Airframe) */
 	orb_advert_t	_rate_ctrl_status_pub;		/**< rate controller status publication */
 
 	orb_id_t _rates_sp_id;	// pointer to correct rates setpoint uORB metadata structure
@@ -136,7 +135,6 @@ private:
 	orb_id_t _attitude_setpoint_id;
 
 	struct actuator_controls_s			_actuators;		/**< actuator control inputs */
-	struct actuator_controls_s			_actuators_airframe;	/**< actuator control inputs */
 	struct battery_status_s				_battery_status;	/**< battery status */
 	struct manual_control_setpoint_s		_manual;		/**< r/c channel data */
 	struct vehicle_attitude_s			_att;		/**< vehicle attitude setpoint */
@@ -366,7 +364,6 @@ FixedwingAttitudeControl::FixedwingAttitudeControl() :
 	_rate_sp_pub(nullptr),
 	_attitude_sp_pub(nullptr),
 	_actuators_0_pub(nullptr),
-	_actuators_2_pub(nullptr),
 	_rate_ctrl_status_pub(nullptr),
 
 	_rates_sp_id(nullptr),
@@ -389,7 +386,6 @@ FixedwingAttitudeControl::FixedwingAttitudeControl() :
 {
 	/* safely initialize structs */
 	_actuators = {};
-	_actuators_airframe = {};
 	_att = {};
 	_att_sp = {};
 	_battery_status = {};
@@ -867,16 +863,6 @@ FixedwingAttitudeControl::task_main()
 			/* lock integrator until control is started */
 			bool lock_integrator = !(_vcontrol_mode.flag_control_rates_enabled && !_vehicle_status.is_rotary_wing);
 
-			/* Simple handling of failsafe: deploy parachute if failsafe is on */
-			if (_vcontrol_mode.flag_control_termination_enabled) {
-				_actuators_airframe.control[7] = 1.0f;
-				//warnx("_actuators_airframe.control[1] = 1.0f;");
-
-			} else {
-				_actuators_airframe.control[7] = 0.0f;
-				//warnx("_actuators_airframe.control[1] = -1.0f;");
-			}
-
 			/* if we are in rotary wing mode, do nothing */
 			if (_vehicle_status.is_rotary_wing && !_vehicle_status.is_vtol) {
 				continue;
@@ -1216,8 +1202,6 @@ FixedwingAttitudeControl::task_main()
 			/* lazily publish the setpoint only once available */
 			_actuators.timestamp = hrt_absolute_time();
 			_actuators.timestamp_sample = _att.timestamp;
-			_actuators_airframe.timestamp = hrt_absolute_time();
-			_actuators_airframe.timestamp_sample = _att.timestamp;
 
 			/* Only publish if any of the proper modes are enabled */
 			if (_vcontrol_mode.flag_control_rates_enabled ||
@@ -1229,15 +1213,6 @@ FixedwingAttitudeControl::task_main()
 
 				} else if (_actuators_id) {
 					_actuators_0_pub = orb_advertise(_actuators_id, &_actuators);
-				}
-
-				if (_actuators_2_pub != nullptr) {
-					/* publish the actuator controls*/
-					orb_publish(ORB_ID(actuator_controls_2), _actuators_2_pub, &_actuators_airframe);
-
-				} else {
-					/* advertise and publish */
-					_actuators_2_pub = orb_advertise(ORB_ID(actuator_controls_2), &_actuators_airframe);
 				}
 			}
 		}
