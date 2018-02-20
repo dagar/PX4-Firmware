@@ -132,13 +132,41 @@ define_property(GLOBAL PROPERTY PX4_MODULE_PATHS
 # configuration
 #
 
-set(CONFIG "posix_sitl_default" CACHE STRING "desired configuration")
+set(CONFIG "px4_fmu-v2_default" CACHE STRING "desired configuration")
+
+# boards/<VENDOR>/<MODEL>/<LABEL>.cmake
+#  <VENDOR>_<MODEL>_<CONFIG>
+# BOARD=<VENDOR><MODEL>
+#  OS set by board config
 
 string(REPLACE "_" ";" config_args ${CONFIG})
-list(GET config_args 0 OS)
-list(GET config_args 1 BOARD)
-list(GET config_args 2 LABEL)
 
+list(LENGTH config_args config_args_length)
+
+list(GET config_args 0 VENDOR)
+list(GET config_args 1 MODEL)
+set(BOARD ${VENDOR}${MODEL})
+
+if (${config_args_length} EQUAL 2)
+	set(LABEL "default")
+else()
+	list(GET config_args 2 LABEL)
+endif()
+
+include(px4_add_board)
+
+list(APPEND CMAKE_MODULE_PATH
+	${PX4_SOURCE_DIR}/boards/${VENDOR}
+	${PX4_SOURCE_DIR}/boards/${VENDOR}/${MODEL}
+	)
+
+include(boards/${VENDOR}/${MODEL}/${LABEL}.cmake)
+
+list(APPEND CMAKE_MODULE_PATH ${PX4_SOURCE_DIR}/platforms/${OS}/cmake)
+
+set(target_name "${OS}_${BOARD}_${LABEL}")
+
+# external modules
 set(EXTERNAL_MODULES_LOCATION "" CACHE STRING "External modules source location")
 
 if (NOT EXTERNAL_MODULES_LOCATION STREQUAL "")

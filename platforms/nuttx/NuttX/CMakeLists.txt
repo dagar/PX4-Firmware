@@ -128,7 +128,7 @@ if (CONFIG_NSH_LIBRARY)
 		DEPENDS
 			nuttx_configure
 			nuttx_context
-			${PX4_SOURCE_DIR}/cmake/configs/${CONFIG}.cmake
+			${PX4_SOURCE_DIR}/boards/${VENDOR}/${MODEL}/${LABEL}.cmake
 		)
 
 	foreach(module ${module_libraries})
