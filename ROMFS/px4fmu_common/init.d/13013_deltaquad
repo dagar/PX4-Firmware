@@ -117,25 +117,25 @@ param set PWM_MAIN_DIS6 1500
 param set PWM_MAIN_DIS7 900
 param set PWM_MAIN_DIS8 900
 
-# btc 40
-set MIXER_AUX mount_btc
-param set PWM_AUX_DIS1 1000
-param set PWM_AUX_DIS2 1800
-param set PWM_AUX_DIS3 2000
-param set PWM_AUX_DIS4 1000
+# btc 88
+set MIXER_AUX mount_btc88
+param set PWM_AUX_DIS1 1500
+param set PWM_AUX_DIS2 1500
+param set PWM_AUX_DIS3 1000
+param set PWM_AUX_DIS4 1900
 
 param set MNT_MODE_IN 3
 param set MNT_MODE_OUT 0
 param set MNT_DO_STAB 0
 
-param set MNT_PITCH_CLOSE 0.6
-param set MNT_YAW_CLOSE -1.0
-param set MNT_DOORS_CLOSED 1.0
-param set MNT_DOORS_OPEN -0.2
+param set MNT_PITCH_CLOSE 0.0
+param set MNT_YAW_CLOSE 0.0
+param set MNT_DOORS_CLOSED -1.0
+param set MNT_DOORS_OPEN 0.94
 
-# retract closed 1000us, open 1900us
-param set MNT_OB_LOCK_MODE -1.0
-param set MNT_OB_NORM_MODE 0.8
+# retract closed 1900us, open 1500us
+param set MNT_OB_LOCK_MODE 0.9
+param set MNT_OB_NORM_MODE 0.0
 
 param set MNT_SF_POS_DELAY 1000
 param set MNT_DOORS_DELAY 500
