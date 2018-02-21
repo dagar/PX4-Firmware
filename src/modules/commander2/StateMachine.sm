@@ -1,0 +1,44 @@
+
+%start Map1::Start
+%class StateMachine
+%header   StateMachine.h
+
+%map Map1
+%%
+// State		Transition		End State		Action(s)
+Start
+{
+				Zero			Zeros			{}
+				One				Ones			{}
+				Unknown			Error			{}
+				EOS				OK				{Acceptable();}
+}
+
+Zeros
+{
+				Zero			Zeros			{}
+				One				Ones			{}
+				Unknown			Error			{}
+				EOS				OK				{Acceptable();}
+}
+
+Ones
+{
+				Zero			Error			{}
+				One				Ones			{}
+				Unknown			Error			{}
+				EOS				OK				{Acceptable();}
+}
+
+OK
+{}
+
+Error
+{
+				Zero			nil				{}
+				One				nil				{}
+				Unknown			nil				{}
+				EOS				nil				{Unacceptable();}
+}
+
+%%

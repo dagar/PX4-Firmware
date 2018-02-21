@@ -82,6 +82,7 @@ set(config_module_list
 	# General system control
 	#
 	modules/commander
+	modules/commander2
 	modules/events
 	modules/gpio_led
 	modules/land_detector
