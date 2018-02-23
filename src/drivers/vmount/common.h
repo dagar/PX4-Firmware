@@ -85,6 +85,9 @@ struct ControlData {
 
 	bool gimbal_shutter_retract = true; /**< whether to lock the gimbal (only in RC output mode) */
 
+
+	float zoom{0.0f};
+
 };
 
 

@@ -292,7 +292,7 @@ int InputMavlinkCmdMount::update_impl(unsigned int timeout_ms, ControlData **con
 							const float pitch = vehicle_command.param1 * M_DEG_TO_RAD_F;
 							const float yaw = vehicle_command.param3 * M_DEG_TO_RAD_F;
 
-							if (PX4_ISFINITE(roll) && PX4_ISFINITE(pitch) && PX4_ISFINITE(yaw)) {
+							if (PX4_ISFINITE(pitch) && PX4_ISFINITE(yaw)) {
 								_control_data.type_data.angle.angles[0] = roll;
 								_control_data.type_data.angle.angles[1] = pitch;
 								_control_data.type_data.angle.angles[2] = yaw;
@@ -343,6 +343,15 @@ int InputMavlinkCmdMount::update_impl(unsigned int timeout_ms, ControlData **con
 					_control_data.type_data.angle.is_speed[2] = (uint8_t) vehicle_command.param7 == 1;
 
 					*control_data = &_control_data;
+					_ack_vehicle_command(&vehicle_command);
+
+				} else if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_DIGICAM_CONTROL) {
+					// find a better home for this
+
+					float zoom = (int)vehicle_command.param2;
+
+					_control_data.zoom = zoom;
+
 					_ack_vehicle_command(&vehicle_command);
 
 				} else {
