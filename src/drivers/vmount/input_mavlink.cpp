@@ -287,6 +287,7 @@ int InputMavlinkCmdMount::update_impl(unsigned int timeout_ms, ControlData **con
 							// param2: roll
 							// param3: yaw (pan)
 
+							// We expect angle of [-pi..+pi]. If the input range is [0..2pi] we can fix that.
 							const float roll = vehicle_command.param2 * M_DEG_TO_RAD_F;
 							const float pitch = vehicle_command.param1 * M_DEG_TO_RAD_F;
 							const float yaw = vehicle_command.param3 * M_DEG_TO_RAD_F;
@@ -296,13 +297,6 @@ int InputMavlinkCmdMount::update_impl(unsigned int timeout_ms, ControlData **con
 								_control_data.type_data.angle.angles[1] = pitch;
 								_control_data.type_data.angle.angles[2] = yaw;
 							}
-
-							// We expect angle of [-pi..+pi]. If the input range is [0..2pi] we can fix that.
-							if (_control_data.type_data.angle.angles[2] > M_PI_F) {
-								_control_data.type_data.angle.angles[2] -= 2 * M_PI_F;
-							}
-
-							//PX4_INFO("pan: %.3f tilt: %.3f", (double)vehicle_command.param3, (double)vehicle_command.param1);
 
 							*control_data = &_control_data;
 						}
