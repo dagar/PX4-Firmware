@@ -65,6 +65,8 @@ struct OutputConfig {
 
 	/** Scale factor for pitch channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */
 	float pitch_scale;
+	float pitch_max;
+	float pitch_min;
 	/** Scale factor for roll channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */
 	float roll_scale;
 	/** Scale factor for yaw channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */

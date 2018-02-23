@@ -152,18 +152,22 @@ int OutputRC::update(const ControlData *control_data)
 
 		//float roll = math::constrain(_angle_outputs[0], _config.roll_offset, _config.roll_offset + _config.roll_scale);
 
-		_actuator_controls.control[0] = (_angle_outputs[0] + _config.roll_offset) * _config.roll_scale;
-		_actuator_controls.control[1] = (_angle_outputs[1] + _config.pitch_offset) * _config.pitch_scale;
+		// constrain pitch range
+		//PX4_INFO("pitch min: %.3f max: %.3f", (double)_config.pitch_min, (double)_config.pitch_max);
+		_angle_setpoints[1] = math::constrain(_angle_setpoints[1], _config.pitch_min, _config.pitch_max);
+		_angle_outputs[1] = math::constrain(_angle_outputs[1], _config.pitch_min, _config.pitch_max);
 
 		// map yaw to +- 180 degrees
 		if (_angle_outputs[2] > M_PI_F) {
 			_angle_outputs[2] = -(M_PI_F * 2.0f) + _angle_outputs[2];
 		}
 
+		_actuator_controls.control[0] = (_angle_outputs[0] + _config.roll_offset) * _config.roll_scale;
+		_actuator_controls.control[1] = (_angle_outputs[1] - _config.pitch_offset) * _config.pitch_scale;
 		_actuator_controls.control[2] = (_angle_outputs[2] + _config.yaw_offset) * _config.yaw_scale;
 
-		//PX4_INFO("Y OFF: %.3f Y SCALE: %.3f", (double)_config.yaw_offset, (double)_config.yaw_scale);
-		//PX4_INFO("Y: %.3f (%.3f)", (double)math::degrees(_angle_outputs[2]), (double)_actuator_controls.control[2]);
+		//PX4_INFO("P OFF: %.3f P SCALE: %.3f", (double)_config.pitch_offset, (double)_config.pitch_scale);
+		//PX4_INFO("P: %.3f (%.3f)", (double)math::degrees(_angle_outputs[1]), (double)_actuator_controls.control[1]);
 	}
 
 	// limit outputs to within scale

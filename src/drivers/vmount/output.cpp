@@ -209,7 +209,7 @@ void OutputBase::_calculate_output_angles(const hrt_abstime &t)
 	const float dt = (t - _last_update) / 1.e6f;
 
 	for (int i = 0; i < 3; ++i) {
-		_angle_setpoints[i] += dt * _angle_speeds[i];
+		_angle_setpoints[i] += math::constrain(dt * _angle_speeds[i], -M_PI_F * 2.0f, M_PI_F * 2.0f);
 	}
 
 	matrix::Eulerf euler{0.0f, 0.0f, 0.0f};
