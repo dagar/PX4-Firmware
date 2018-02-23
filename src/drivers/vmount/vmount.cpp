@@ -278,7 +278,17 @@ static int vmount_thread_main(int argc, char *argv[])
 			output_config.gimbal_pitch_retracted_mode_value = params.mnt_pitch_close;
 			output_config.gimbal_yaw_retracted_mode_value = params.mnt_yaw_close;
 
-			output_config.pitch_scale = 1.0f / ((params.mnt_range_pitch / 2.0f) * M_DEG_TO_RAD_F);
+			const float pitch_range = params.mnt_range_pitch * M_DEG_TO_RAD_F;
+			const float pitch_range_half = (params.mnt_range_pitch / 2.0f) * M_DEG_TO_RAD_F;
+			const float pitch_offset = params.mnt_off_pitch * M_DEG_TO_RAD_F;
+
+			PX4_INFO("pitch range: %.3f", (double)(pitch_range));
+			PX4_INFO("pitch offset: %.3f", (double)(pitch_offset));
+
+			output_config.pitch_scale = 1.0f / pitch_range_half;
+			output_config.pitch_min = pitch_offset - pitch_range_half;
+			output_config.pitch_max = pitch_offset + pitch_range_half;
+
 			output_config.roll_scale = 1.0f / ((params.mnt_range_roll / 2.0f) * M_DEG_TO_RAD_F);
 			output_config.yaw_scale = 1.0f / ((params.mnt_range_yaw / 2.0f) * M_DEG_TO_RAD_F);
 

@@ -148,24 +148,31 @@ int OutputRC::update(const ControlData *control_data)
 
 	} else {
 		// otherwise allow normal movement
-		// _angle_outputs are in radians, actuator_controls are in [-1, 1]
 
-		//float roll = math::constrain(_angle_outputs[0], _config.roll_offset, _config.roll_offset + _config.roll_scale);
+		// constrain pitch to defined range
+		_angle_setpoints[1] = math::constrain(_angle_setpoints[1], _config.pitch_min, _config.pitch_max);
+		_angle_outputs[1] = math::constrain(_angle_outputs[1], _config.pitch_min, _config.pitch_max);
 
+		// map yaw to +- 180 degrees
+		if (_angle_outputs[2] > M_PI_F) {
+			//_angle_setpoints[2] = -(M_PI_F * 2.0f) + _angle_setpoints[2];
+			_angle_outputs[2] = -(M_PI_F * 2.0f) + _angle_outputs[2];
+		}
 
-		_actuator_controls.control[0] = (_angle_outputs[0] + _config.roll_offset) * _config.roll_scale;
-		_actuator_controls.control[1] = (_angle_outputs[1] + _config.pitch_offset) * _config.pitch_scale;
-		_actuator_controls.control[2] = (_angle_outputs[2] + _config.yaw_offset) * _config.yaw_scale;
+		_actuator_controls.control[0] = (_angle_outputs[0] - _config.roll_offset) * _config.roll_scale;
+		_actuator_controls.control[1] = (_angle_outputs[1] - _config.pitch_offset) * _config.pitch_scale;
+		_actuator_controls.control[2] = (_angle_outputs[2] - _config.yaw_offset) * _config.yaw_scale;
 
-		PX4_INFO("P: %.3f (%.3f) Y: %.3f (%.3f)",
-			 (double)math::degrees(_angle_outputs[1]), (double)_actuator_controls.control[1],
-			 (double)math::degrees(_angle_outputs[2]), (double)_actuator_controls.control[2]);
+		//PX4_INFO("Y: %.3f (%.3f)", (double)math::degrees(_angle_outputs[2]), (double)_actuator_controls.control[2]);
 	}
 
 	// limit outputs to within scale
 	_actuator_controls.control[0] = math::constrain(_actuator_controls.control[0], -1.0f, 1.0f);
 	_actuator_controls.control[1] = math::constrain(_actuator_controls.control[1], -1.0f, 1.0f);
 	_actuator_controls.control[2] = math::constrain(_actuator_controls.control[2], -1.0f, 1.0f);
+
+	// zoom (find a better home for this)
+	_actuator_controls.control[5] = math::constrain(control_data->zoom, -1.0f, 1.0f);
 
 	int instance;
 	orb_publish_auto(ORB_ID(actuator_controls_2), &_actuator_controls_pub, &_actuator_controls, &instance,

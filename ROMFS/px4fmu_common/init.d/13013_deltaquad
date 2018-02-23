@@ -142,10 +142,10 @@ param set MNT_DOORS_DELAY 500
 
 # pitch/tilt range and offset
 param set MNT_RANGE_PITCH 80
-param set MNT_OFF_PITCH -20
+param set MNT_OFF_PITCH -50
 
 # yaw/pan range and offset
-param set MNT_OFF_YAW 0.0
+param set MNT_OFF_YAW 0
 param set MNT_RANGE_YAW 360
 
 set MAV_TYPE 22
