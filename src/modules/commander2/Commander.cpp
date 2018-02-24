@@ -9,6 +9,7 @@ int commander2_main(int argc, char *argv[])
 {
 	StateMachine thisContext;
 
+
 	if (argc < 2) {
 		PX4_INFO("No string to check.");
 

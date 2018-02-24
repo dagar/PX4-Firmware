@@ -1,44 +1,19 @@
 
-%start Map1::Start
+%start Map1::MANUAL
 %class StateMachine
 %header   StateMachine.h
 
 %map Map1
 %%
 // State		Transition		End State		Action(s)
-Start
+MANUAL
 {
-				Zero			Zeros			{}
-				One				Ones			{}
-				Unknown			Error			{}
-				EOS				OK				{Acceptable();}
+				EOS				AUTO				{Acceptable();}
 }
 
-Zeros
+AUTO
 {
-				Zero			Zeros			{}
-				One				Ones			{}
-				Unknown			Error			{}
-				EOS				OK				{Acceptable();}
-}
-
-Ones
-{
-				Zero			Error			{}
-				One				Ones			{}
-				Unknown			Error			{}
-				EOS				OK				{Acceptable();}
-}
-
-OK
-{}
-
-Error
-{
-				Zero			nil				{}
-				One				nil				{}
-				Unknown			nil				{}
-				EOS				nil				{Unacceptable();}
+				EOS				MANUAL				{Acceptable();}
 }
 
 %%
