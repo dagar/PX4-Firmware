@@ -65,6 +65,8 @@ private:
 
 	actuator_controls_s	_actuator_controls{};
 
+	int _position_setpoint_triplet_sub{-1};
+
 	orb_advert_t _actuator_controls_pub = nullptr;
 	bool _retract_gimbal = true;
 	uint64_t _retract_changed{0};

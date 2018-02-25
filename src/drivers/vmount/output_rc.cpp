@@ -43,14 +43,16 @@
 #include <mathlib/mathlib.h>
 #include <px4_defines.h>
 #include <uORB/topics/vehicle_control_mode.h>
-
+#include <uORB/topics/position_setpoint_triplet.h>
 namespace vmount
 {
 
 OutputRC::OutputRC(const OutputConfig &output_config)
 	: OutputBase(output_config)
 {
+	_position_setpoint_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 }
+
 OutputRC::~OutputRC()
 {
 	if (_actuator_controls_pub) {
@@ -68,6 +70,22 @@ int OutputRC::update(const ControlData *control_data)
 
 		if (orb_copy(ORB_ID(vehicle_control_mode), _vehicle_control_mode_sub, &control_mode) == PX4_OK) {
 			_armed = control_mode.flag_armed;
+		}
+	}
+
+	bool position_setpoint_triplet_updated = false;
+	orb_check(_position_setpoint_triplet_sub, &position_setpoint_triplet_updated);
+
+	if (position_setpoint_triplet_updated) {
+		position_setpoint_triplet_s position_setpoint_triplet = {};
+
+		if (orb_copy(ORB_ID(position_setpoint_triplet), _position_setpoint_triplet_sub, &position_setpoint_triplet) == PX4_OK) {
+			if (position_setpoint_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND) {
+				if (!_retract_gimbal) {
+					_retract_gimbal = true;
+					_retract_changed = hrt_absolute_time();
+				}
+			}
 		}
 	}
 
