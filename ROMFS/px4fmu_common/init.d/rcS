@@ -274,7 +274,8 @@ then
 	else
 		if param compare MNT_MODE_OUT 0
 		then
-			set MIXER_AUX mount
+			# TODO: how to configure this properly?
+			#set MIXER_AUX mount
 		fi
 	fi
 

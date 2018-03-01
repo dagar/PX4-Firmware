@@ -34,7 +34,7 @@ set(config_module_list
 	#drivers/mb12xx
 	#drivers/mkblctrl
 	drivers/mpu6000
-	drivers/mpu9250
+	#drivers/mpu9250
 	drivers/ms4525_airspeed
 	drivers/ms5525_airspeed
 	drivers/ms5611
