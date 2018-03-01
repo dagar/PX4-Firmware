@@ -1516,7 +1516,7 @@ PX4IO::io_set_rc_config()
 	}
 
 	/* MAIN MODE SWITCH */
-	param_get(param_find("RC_MAP_MODE_SW"), &ichan);
+	//param_get(param_find("RC_MAP_MODE_SW"), &ichan);
 
 	if ((ichan > 0) && (ichan <= (int)_max_rc_input)) {
 		/* use out of normal bounds index to indicate special channel */
