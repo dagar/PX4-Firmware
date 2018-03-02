@@ -106,49 +106,52 @@ then
 	param set EKF2_TAU_VEL 0.5
 
 	param set SYS_COMPANION 57600
+
+	# servo setup
+	param set PWM_MAIN_DIS5 1500
+	param set PWM_MAIN_DIS6 1500
+	param set PWM_MAIN_DIS7 900
+	param set PWM_MAIN_DIS8 900
+
+	param set PWM_AUX_DIS1 1500
+
+	param set PWM_AUX_DIS2 1500
+	param set PWM_AUX_REV2 1
+
+	param set PWM_AUX_DIS3 1000
+	param set PWM_AUX_DIS4 1900
+
+	# setup vmount for BTC-88
+	param set MNT_MODE_IN 3
+	param set MNT_MODE_OUT 0
+	param set MNT_DO_STAB 0
+
+	param set MNT_PITCH_CLOSE 0.0
+	param set MNT_YAW_CLOSE 0.0
+	param set MNT_DOORS_CLOSED -1.0
+	param set MNT_DOORS_OPEN 0.94
+
+	# retract closed 1900us, open 1500us
+	param set MNT_OB_LOCK_MODE 0.85
+	param set MNT_OB_NORM_MODE 0.0
+
+	param set MNT_SF_POS_DELAY 1000
+	param set MNT_DOORS_DELAY 500
+
+	# pitch/tilt range and offset
+	param set MNT_RANGE_PITCH 80
+	param set MNT_OFF_PITCH -50
+
+	# yaw/pan range and offset
+	param set MNT_OFF_YAW 0
+	param set MNT_RANGE_YAW 360
 fi
 
 set MIXER deltaquad
 set PWM_OUT 1234
 set PWM_RATE 400
 
-param set PWM_MAIN_DIS5 1500
-param set PWM_MAIN_DIS6 1500
-param set PWM_MAIN_DIS7 900
-param set PWM_MAIN_DIS8 900
-
-# btc 88
+# GIMBAL: BTC-88
 set MIXER_AUX mount_btc88
-param set PWM_AUX_DIS1 1500
-
-param set PWM_AUX_DIS2 1500
-param set PWM_AUX_REV2 1
-
-param set PWM_AUX_DIS3 1000
-param set PWM_AUX_DIS4 1900
-
-param set MNT_MODE_IN 3
-param set MNT_MODE_OUT 0
-param set MNT_DO_STAB 0
-
-param set MNT_PITCH_CLOSE 0.0
-param set MNT_YAW_CLOSE 0.0
-param set MNT_DOORS_CLOSED -1.0
-param set MNT_DOORS_OPEN 0.94
-
-# retract closed 1900us, open 1500us
-param set MNT_OB_LOCK_MODE 0.85
-param set MNT_OB_NORM_MODE 0.0
-
-param set MNT_SF_POS_DELAY 1000
-param set MNT_DOORS_DELAY 500
-
-# pitch/tilt range and offset
-param set MNT_RANGE_PITCH 80
-param set MNT_OFF_PITCH -50
-
-# yaw/pan range and offset
-param set MNT_OFF_YAW 0
-param set MNT_RANGE_YAW 360
 
 set MAV_TYPE 22
