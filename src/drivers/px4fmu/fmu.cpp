@@ -76,8 +76,6 @@
 # include <systemlib/ppm_decode.h>
 #endif
 
-#define SCHEDULE_INTERVAL	2000	/**< The schedule interval in usec (500 Hz) */
-
 static constexpr uint8_t CYCLE_COUNT = 10; /* safety switch must be held for 1 second to activate */
 static constexpr uint8_t MAX_ACTUATORS = DIRECT_PWM_OUTPUT_CHANNELS;
 
