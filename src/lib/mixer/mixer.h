@@ -280,48 +280,6 @@ private:
 };
 
 /**
- * Null mixer; returns zero.
- *
- * Used as a placeholder for output channels that are unassigned in groups.
- */
-class __EXPORT NullMixer : public Mixer
-{
-public:
-	NullMixer();
-	~NullMixer() {}
-
-	/**
-	 * Factory method.
-	 *
-	 * Given a pointer to a buffer containing a text description of the mixer,
-	 * returns a pointer to a new instance of the mixer.
-	 *
-	 * @param buf			Buffer containing a text description of
-	 *				the mixer.
-	 * @param buflen		Length of the buffer in bytes, adjusted
-	 *				to reflect the bytes consumed.
-	 * @return			A new NullMixer instance, or nullptr
-	 *				if the text format is bad.
-	 */
-	static NullMixer		*from_text(const char *buf, unsigned &buflen);
-
-	virtual unsigned		mix(float *outputs, unsigned space);
-	virtual uint16_t		get_saturation_status(void);
-	virtual void			groups_required(uint32_t &groups);
-	virtual void 			set_offset(float trim) {}
-	unsigned set_trim(float trim)
-	{
-		return 0;
-	}
-
-	unsigned get_trim(float *trim)
-	{
-		return 0;
-	}
-
-};
-
-/**
  * Simple summing mixer.
  *
  * Collects zero or more inputs and mixes them to a single output.
@@ -640,5 +598,6 @@ private:
 };
 
 #include "MixerGroup.hpp"
+#include "NullMixer.hpp"
 
 #endif
