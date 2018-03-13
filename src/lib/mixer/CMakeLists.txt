@@ -90,11 +90,11 @@ px4_add_module(
 		${CMAKE_CURRENT_BINARY_DIR}
 	SRCS
 		mixer.cpp
-		mixer_group.cpp
 		mixer_helicopter.cpp
 		mixer_load.c
 		mixer_multirotor.cpp
 		mixer_simple.cpp
+		MixerGroup.cpp
 	DEPENDS
 		mixer_gen
 		mixer_gen_6dof
