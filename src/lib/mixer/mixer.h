@@ -280,138 +280,6 @@ private:
 };
 
 /**
- * Group of mixers, built up from single mixers and processed
- * in order when mixing.
- */
-class __EXPORT MixerGroup : public Mixer
-{
-public:
-	MixerGroup(ControlCallback control_cb, uintptr_t cb_handle);
-	~MixerGroup();
-
-	virtual unsigned		mix(float *outputs, unsigned space);
-	virtual uint16_t		get_saturation_status(void);
-	virtual void			groups_required(uint32_t &groups);
-
-	/**
-	 * Add a mixer to the group.
-	 *
-	 * @param mixer			The mixer to be added.
-	 */
-	void				add_mixer(Mixer *mixer);
-
-	/**
-	 * Remove all the mixers from the group.
-	 */
-	void				reset();
-
-	/**
-	 * Count the mixers in the group.
-	 */
-	unsigned			count();
-
-	/**
-	 * Adds mixers to the group based on a text description in a buffer.
-	 *
-	 * Mixer definitions begin with a single capital letter and a colon.
-	 * The actual format of the mixer definition varies with the individual
-	 * mixers; they are summarised here, but see ROMFS/mixers/README for
-	 * more details.
-	 *
-	 * Null Mixer
-	 * ..........
-	 *
-	 * The null mixer definition has the form:
-	 *
-	 *   Z:
-	 *
-	 * Simple Mixer
-	 * ............
-	 *
-	 * A simple mixer definition begins with:
-	 *
-	 *   M: <control count>
-	 *   O: <-ve scale> <+ve scale> <offset> <lower limit> <upper limit>
-	 *
-	 * The definition continues with <control count> entries describing the control
-	 * inputs and their scaling, in the form:
-	 *
-	 *   S: <group> <index> <-ve scale> <+ve scale> <offset> <lower limit> <upper limit>
-	 *
-	 * Multirotor Mixer
-	 * ................
-	 *
-	 * The multirotor mixer definition is a single line of the form:
-	 *
-	 * R: <geometry> <roll scale> <pitch scale> <yaw scale> <deadband>
-	 *
-	 * Helicopter Mixer
-	 * ................
-	 *
-	 * The helicopter mixer includes throttle and pitch curves
-	 *
-	 * H: <swash plate servo count>
-	 * T: <0> <2500> <5000> <7500> <10000>
-	 * P: <-10000> <-5000> <0> <5000> <10000>
-	 *
-	 * The definition continues with <swash plate servo count> entries describing
-	 * the position of the servo, in the following form:
-	 *
-	 *   S: <angle (deg)> <normalized arm length> <scale> <offset> <lower limit> <upper limit>
-	 *
-	 * @param buf			The mixer configuration buffer.
-	 * @param buflen		The length of the buffer, updated to reflect
-	 *				bytes as they are consumed.
-	 * @return			Zero on successful load, nonzero otherwise.
-	 */
-	int				load_from_buf(const char *buf, unsigned &buflen);
-
-	/**
-	 * @brief      Update slew rate parameter. This tells instances of the class MultirotorMixer
-	 *             the maximum allowed change of the output values per cycle.
-	 *             The value is only valid for one cycle, in order to have continuous
-	 *             slew rate limiting this function needs to be called before every call
-	 *             to mix().
-	 *
-	 * @param[in]  delta_out_max  Maximum delta output.
-	 *
-	 */
-	virtual void 			set_max_delta_out_once(float delta_out_max);
-
-	/*
-	 * Invoke the set_offset method of each mixer in the group
-	 * for each value in page r_page_servo_control_trim
-	 */
-	unsigned set_trims(int16_t *v, unsigned n);
-
-	unsigned set_trim(float trim)
-	{
-		return 0;
-	}
-
-	unsigned get_trims(int16_t *values);
-
-	unsigned get_trim(float *trim)
-	{
-		return 0;
-	}
-
-	/**
-	 * @brief      Sets the thrust factor used to calculate mapping from desired thrust to pwm.
-	 *
-	 * @param[in]  val   The value
-	 */
-	virtual void	set_thrust_factor(float val);
-
-private:
-	Mixer				*_first;	/**< linked list of mixers */
-
-	/* do not allow to copy due to pointer data members */
-	MixerGroup(const MixerGroup &);
-	MixerGroup operator=(const MixerGroup &);
-};
-
-/**
  * Null mixer; returns zero.
  *
  * Used as a placeholder for output channels that are unassigned in groups.
@@ -770,5 +638,7 @@ private:
 	HelicopterMixer(const HelicopterMixer &);
 	HelicopterMixer operator=(const HelicopterMixer &);
 };
+
+#include "MixerGroup.hpp"
 
 #endif
