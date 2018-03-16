@@ -114,6 +114,8 @@ private:
 	bool update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state);
 	bool update_air_data();
 
+	bool publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
+	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
 	bool publish_position(const hrt_abstime &timestamp);
 	bool publish_wind_estimate(const hrt_abstime &timestamp);
 
@@ -917,68 +919,9 @@ void Ekf2::run()
 				_last_time_slip_us = (now - _start_time_us) - _integrated_time_us;
 			}
 
-			matrix::Quatf q;
-			_ekf.copy_quaternion(q.data());
-
-			// In-run bias estimates
-			float gyro_bias[3];
-			_ekf.get_gyro_bias(gyro_bias);
-
-			{
-				// generate vehicle attitude quaternion data
-				vehicle_attitude_s att;
-				att.timestamp = now;
-
-				q.copyTo(att.q);
-				_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
-
-				att.rollspeed = sensors.gyro_rad[0] - gyro_bias[0];
-				att.pitchspeed = sensors.gyro_rad[1] - gyro_bias[1];
-				att.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
-
-				// publish vehicle attitude data
-				if (_att_pub == nullptr) {
-					_att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
-
-				} else {
-					orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
-				}
-			}
-
+			publish_attitude(now, sensors);
+			publish_sensor_bias(now, sensors);
 			publish_position(now);
-
-			{
-				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
-				float accel_bias[3];
-				_ekf.get_accel_bias(accel_bias);
-
-				sensor_bias_s bias;
-
-				bias.timestamp = now;
-
-				bias.accel_x = sensors.accelerometer_m_s2[0] - accel_bias[0];
-				bias.accel_y = sensors.accelerometer_m_s2[1] - accel_bias[1];
-				bias.accel_z = sensors.accelerometer_m_s2[2] - accel_bias[2];
-
-				bias.gyro_x_bias = gyro_bias[0];
-				bias.gyro_y_bias = gyro_bias[1];
-				bias.gyro_z_bias = gyro_bias[2];
-
-				bias.accel_x_bias = accel_bias[0];
-				bias.accel_y_bias = accel_bias[1];
-				bias.accel_z_bias = accel_bias[2];
-
-				bias.mag_x_bias = _last_valid_mag_cal[0];
-				bias.mag_y_bias = _last_valid_mag_cal[1];
-				bias.mag_z_bias = _last_valid_mag_cal[2];
-
-				if (_sensor_bias_pub == nullptr) {
-					_sensor_bias_pub = orb_advertise(ORB_ID(sensor_bias), &bias);
-
-				} else {
-					orb_publish(ORB_ID(sensor_bias), _sensor_bias_pub, &bias);
-				}
-			}
 		}
 
 		// publish estimator status
@@ -1363,6 +1306,77 @@ bool Ekf2::update_magnetometer(const uint32_t mag_device_id, const uint8_t armin
 	}
 
 	return magnetometer_updated;
+}
+
+bool Ekf2::publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors)
+{
+	matrix::Quatf q;
+	_ekf.copy_quaternion(q.data());
+
+	// In-run bias estimates
+	float gyro_bias[3];
+	_ekf.get_gyro_bias(gyro_bias);
+
+	// generate vehicle attitude quaternion data
+	vehicle_attitude_s att;
+	att.timestamp = timestamp;
+
+	q.copyTo(att.q);
+	_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
+
+	att.rollspeed = sensors.gyro_rad[0] - gyro_bias[0];
+	att.pitchspeed = sensors.gyro_rad[1] - gyro_bias[1];
+	att.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
+
+	// publish vehicle attitude data
+	if (_att_pub == nullptr) {
+		_att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
+
+	} else {
+		orb_publish(ORB_ID(vehicle_attitude), _att_pub, &att);
+	}
+
+	return true;
+}
+
+bool Ekf2::publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors)
+{
+	// publish all corrected sensor readings and bias estimates after mag calibration is updated above
+	float accel_bias[3];
+	_ekf.get_accel_bias(accel_bias);
+
+	// In-run bias estimates
+	float gyro_bias[3];
+	_ekf.get_gyro_bias(gyro_bias);
+
+	sensor_bias_s bias;
+
+	bias.timestamp = timestamp;
+
+	bias.accel_x = sensors.accelerometer_m_s2[0] - accel_bias[0];
+	bias.accel_y = sensors.accelerometer_m_s2[1] - accel_bias[1];
+	bias.accel_z = sensors.accelerometer_m_s2[2] - accel_bias[2];
+
+	bias.gyro_x_bias = gyro_bias[0];
+	bias.gyro_y_bias = gyro_bias[1];
+	bias.gyro_z_bias = gyro_bias[2];
+
+	bias.accel_x_bias = accel_bias[0];
+	bias.accel_y_bias = accel_bias[1];
+	bias.accel_z_bias = accel_bias[2];
+
+	bias.mag_x_bias = _last_valid_mag_cal[0];
+	bias.mag_y_bias = _last_valid_mag_cal[1];
+	bias.mag_z_bias = _last_valid_mag_cal[2];
+
+	if (_sensor_bias_pub == nullptr) {
+		_sensor_bias_pub = orb_advertise(ORB_ID(sensor_bias), &bias);
+
+	} else {
+		orb_publish(ORB_ID(sensor_bias), _sensor_bias_pub, &bias);
+	}
+
+	return true;
 }
 
 bool Ekf2::publish_position(const hrt_abstime &timestamp)
