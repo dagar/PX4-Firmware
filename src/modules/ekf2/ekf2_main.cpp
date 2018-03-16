@@ -111,6 +111,7 @@ private:
 	bool update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state);
 	bool update_air_data();
 
+	bool publish_position(const hrt_abstime &timestamp);
 	bool publish_wind_estimate(const hrt_abstime &timestamp);
 
 	const Vector3f get_vel_body_wind();
@@ -873,134 +874,7 @@ void Ekf2::run()
 				}
 			}
 
-			// generate vehicle local position data
-			vehicle_local_position_s &lpos = _vehicle_local_position_pub.get();
-
-			lpos.timestamp = now;
-
-			// Position of body origin in local NED frame
-			float position[3];
-			_ekf.get_position(position);
-			const float lpos_x_prev = lpos.x;
-			const float lpos_y_prev = lpos.y;
-			lpos.x = (_ekf.local_position_is_valid()) ? position[0] : 0.0f;
-			lpos.y = (_ekf.local_position_is_valid()) ? position[1] : 0.0f;
-			lpos.z = position[2];
-
-			// Velocity of body origin in local NED frame (m/s)
-			float velocity[3];
-			_ekf.get_velocity(velocity);
-			lpos.vx = velocity[0];
-			lpos.vy = velocity[1];
-			lpos.vz = velocity[2];
-
-			// vertical position time derivative (m/s)
-			_ekf.get_pos_d_deriv(&lpos.z_deriv);
-
-			// Acceleration of body origin in local NED frame
-			float vel_deriv[3];
-			_ekf.get_vel_deriv_ned(vel_deriv);
-			lpos.ax = vel_deriv[0];
-			lpos.ay = vel_deriv[1];
-			lpos.az = vel_deriv[2];
-
-			// TODO: better status reporting
-			lpos.xy_valid = _ekf.local_position_is_valid() && !_preflt_horiz_fail;
-			lpos.z_valid = !_preflt_vert_fail;
-			lpos.v_xy_valid = _ekf.local_position_is_valid() && !_preflt_horiz_fail;
-			lpos.v_z_valid = !_preflt_vert_fail;
-
-			// Position of local NED origin in GPS / WGS84 frame
-			map_projection_reference_s ekf_origin;
-			uint64_t origin_time;
-
-			// true if position (x,y,z) has a valid WGS-84 global reference (ref_lat, ref_lon, alt)
-			const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin, &lpos.ref_alt);
-			lpos.xy_global = ekf_origin_valid;
-			lpos.z_global = ekf_origin_valid;
-
-			if (ekf_origin_valid && (origin_time > lpos.ref_timestamp)) {
-				lpos.ref_timestamp = origin_time;
-				lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
-				lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
-			}
-
-			// The rotation of the tangent plane vs. geographical north
-			matrix::Eulerf euler(q);
-			lpos.yaw = euler.psi();
-
-			lpos.dist_bottom_valid = _ekf.get_terrain_valid();
-
-			float terrain_vpos;
-			_ekf.get_terrain_vert_pos(&terrain_vpos);
-			lpos.dist_bottom = terrain_vpos - lpos.z; // Distance to bottom surface (ground) in meters
-
-			// constrain the distance to ground to _rng_gnd_clearance
-			if (lpos.dist_bottom < _rng_gnd_clearance.get()) {
-				lpos.dist_bottom = _rng_gnd_clearance.get();
-			}
-
-			lpos.dist_bottom_rate = -lpos.vz; // Distance to bottom surface (ground) change rate
-
-			bool dead_reckoning;
-			_ekf.get_ekf_lpos_accuracy(&lpos.eph, &lpos.epv, &dead_reckoning);
-			_ekf.get_ekf_vel_accuracy(&lpos.evh, &lpos.evv, &dead_reckoning);
-
-			// get state reset information of position and velocity
-			_ekf.get_posD_reset(&lpos.delta_z, &lpos.z_reset_counter);
-			_ekf.get_velD_reset(&lpos.delta_vz, &lpos.vz_reset_counter);
-			_ekf.get_posNE_reset(&lpos.delta_xy[0], &lpos.xy_reset_counter);
-			_ekf.get_velNE_reset(&lpos.delta_vxy[0], &lpos.vxy_reset_counter);
-
-			// get control limit information
-			_ekf.get_ekf_ctrl_limits(&lpos.vxy_max, &lpos.limit_hagl);
-
-			// convert NaN to zero
-			if (!PX4_ISFINITE(lpos.vxy_max)) {
-				lpos.vxy_max = 0.0f;
-			}
-
-			// publish vehicle local position data
-			_vehicle_local_position_pub.update();
-
-			if (_ekf.global_position_is_valid() && !_preflt_fail) {
-				// generate and publish global position data
-				vehicle_global_position_s &global_pos = _vehicle_global_position_pub.get();
-
-				global_pos.timestamp = now;
-
-				if (fabsf(lpos_x_prev - lpos.x) > FLT_EPSILON || fabsf(lpos_y_prev - lpos.y) > FLT_EPSILON) {
-					map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
-				}
-
-				global_pos.lat_lon_reset_counter = lpos.xy_reset_counter;
-
-				global_pos.alt = -lpos.z + lpos.ref_alt; // Altitude AMSL in meters
-
-				// global altitude has opposite sign of local down position
-				global_pos.delta_alt = -lpos.delta_z;
-
-				global_pos.vel_n = lpos.vx; // Ground north velocity, m/s
-				global_pos.vel_e = lpos.vy; // Ground east velocity, m/s
-				global_pos.vel_d = lpos.vz; // Ground downside velocity, m/s
-
-				global_pos.yaw = lpos.yaw; // Yaw in radians -PI..+PI.
-
-				_ekf.get_ekf_gpos_accuracy(&global_pos.eph, &global_pos.epv, &global_pos.dead_reckoning);
-
-				global_pos.terrain_alt_valid = lpos.dist_bottom_valid;
-
-				if (global_pos.terrain_alt_valid) {
-					global_pos.terrain_alt = lpos.ref_alt - terrain_vpos; // Terrain altitude in m, WGS84
-
-				} else {
-					global_pos.terrain_alt = 0.0f; // Terrain altitude in m, WGS84
-				}
-
-				global_pos.dead_reckoning = _ekf.inertial_dead_reckoning(); // True if this position is estimated through dead-reckoning
-
-				_vehicle_global_position_pub.update();
-			}
+			publish_position(now);
 
 			{
 				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
@@ -1480,6 +1354,142 @@ bool Ekf2::update_magnetometer(const uint32_t mag_device_id, const uint8_t armin
 	}
 
 	return magnetometer_updated;
+}
+
+bool Ekf2::publish_position(const hrt_abstime &timestamp)
+{
+	// generate vehicle local position data
+	vehicle_local_position_s &lpos = _vehicle_local_position_pub.get();
+
+	lpos.timestamp = timestamp;
+
+	// Position of body origin in local NED frame
+	float position[3];
+	_ekf.get_position(position);
+	const float lpos_x_prev = lpos.x;
+	const float lpos_y_prev = lpos.y;
+	lpos.x = (_ekf.local_position_is_valid()) ? position[0] : 0.0f;
+	lpos.y = (_ekf.local_position_is_valid()) ? position[1] : 0.0f;
+	lpos.z = position[2];
+
+	// Velocity of body origin in local NED frame (m/s)
+	float velocity[3];
+	_ekf.get_velocity(velocity);
+	lpos.vx = velocity[0];
+	lpos.vy = velocity[1];
+	lpos.vz = velocity[2];
+
+	// vertical position time derivative (m/s)
+	_ekf.get_pos_d_deriv(&lpos.z_deriv);
+
+	// Acceleration of body origin in local NED frame
+	float vel_deriv[3];
+	_ekf.get_vel_deriv_ned(vel_deriv);
+	lpos.ax = vel_deriv[0];
+	lpos.ay = vel_deriv[1];
+	lpos.az = vel_deriv[2];
+
+	// TODO: better status reporting
+	lpos.xy_valid = _ekf.local_position_is_valid() && !_preflt_horiz_fail;
+	lpos.z_valid = !_preflt_vert_fail;
+	lpos.v_xy_valid = _ekf.local_position_is_valid() && !_preflt_horiz_fail;
+	lpos.v_z_valid = !_preflt_vert_fail;
+
+	// Position of local NED origin in GPS / WGS84 frame
+	map_projection_reference_s ekf_origin;
+	uint64_t origin_time;
+
+	// true if position (x,y,z) has a valid WGS-84 global reference (ref_lat, ref_lon, alt)
+	const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin, &lpos.ref_alt);
+	lpos.xy_global = ekf_origin_valid;
+	lpos.z_global = ekf_origin_valid;
+
+	if (ekf_origin_valid && (origin_time > lpos.ref_timestamp)) {
+		lpos.ref_timestamp = origin_time;
+		lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
+		lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
+	}
+
+	// The rotation of the tangent plane vs. geographical north
+	matrix::Quatf q;
+	_ekf.copy_quaternion(q.data());
+	matrix::Eulerf euler(q);
+	lpos.yaw = euler.psi();
+
+	lpos.dist_bottom_valid = _ekf.get_terrain_valid();
+
+	float terrain_vpos;
+	_ekf.get_terrain_vert_pos(&terrain_vpos);
+	lpos.dist_bottom = terrain_vpos - lpos.z; // Distance to bottom surface (ground) in meters
+
+	// constrain the distance to ground to _rng_gnd_clearance
+	if (lpos.dist_bottom < _rng_gnd_clearance.get()) {
+		lpos.dist_bottom = _rng_gnd_clearance.get();
+	}
+
+	lpos.dist_bottom_rate = -lpos.vz; // Distance to bottom surface (ground) change rate
+
+	bool dead_reckoning;
+	_ekf.get_ekf_lpos_accuracy(&lpos.eph, &lpos.epv, &dead_reckoning);
+	_ekf.get_ekf_vel_accuracy(&lpos.evh, &lpos.evv, &dead_reckoning);
+
+	// get state reset information of position and velocity
+	_ekf.get_posD_reset(&lpos.delta_z, &lpos.z_reset_counter);
+	_ekf.get_velD_reset(&lpos.delta_vz, &lpos.vz_reset_counter);
+	_ekf.get_posNE_reset(&lpos.delta_xy[0], &lpos.xy_reset_counter);
+	_ekf.get_velNE_reset(&lpos.delta_vxy[0], &lpos.vxy_reset_counter);
+
+	// get control limit information
+	_ekf.get_ekf_ctrl_limits(&lpos.vxy_max, &lpos.limit_hagl);
+
+	// convert NaN to zero
+	if (!PX4_ISFINITE(lpos.vxy_max)) {
+		lpos.vxy_max = 0.0f;
+	}
+
+	// publish vehicle local position data
+	_vehicle_local_position_pub.update();
+
+	if (_ekf.global_position_is_valid() && !_preflt_fail) {
+		// generate and publish global position data
+		vehicle_global_position_s &global_pos = _vehicle_global_position_pub.get();
+
+		global_pos.timestamp = timestamp;
+
+		if (fabsf(lpos_x_prev - lpos.x) > FLT_EPSILON || fabsf(lpos_y_prev - lpos.y) > FLT_EPSILON) {
+			map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
+		}
+
+		global_pos.lat_lon_reset_counter = lpos.xy_reset_counter;
+
+		global_pos.alt = -lpos.z + lpos.ref_alt; // Altitude AMSL in meters
+
+		// global altitude has opposite sign of local down position
+		global_pos.delta_alt = -lpos.delta_z;
+
+		global_pos.vel_n = lpos.vx; // Ground north velocity, m/s
+		global_pos.vel_e = lpos.vy; // Ground east velocity, m/s
+		global_pos.vel_d = lpos.vz; // Ground downside velocity, m/s
+
+		global_pos.yaw = lpos.yaw; // Yaw in radians -PI..+PI.
+
+		_ekf.get_ekf_gpos_accuracy(&global_pos.eph, &global_pos.epv, &global_pos.dead_reckoning);
+
+		global_pos.terrain_alt_valid = lpos.dist_bottom_valid;
+
+		if (global_pos.terrain_alt_valid) {
+			global_pos.terrain_alt = lpos.ref_alt - terrain_vpos; // Terrain altitude in m, WGS84
+
+		} else {
+			global_pos.terrain_alt = 0.0f; // Terrain altitude in m, WGS84
+		}
+
+		global_pos.dead_reckoning = _ekf.inertial_dead_reckoning(); // True if this position is estimated through dead-reckoning
+
+		_vehicle_global_position_pub.update();
+	}
+
+	return true;
 }
 
 bool Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
