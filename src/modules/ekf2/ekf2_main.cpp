@@ -108,6 +108,9 @@ private:
 	template<typename Param>
 	void update_mag_bias(Param &mag_bias_param, int axis_index);
 
+	bool update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state);
+	bool update_air_data();
+
 	bool publish_wind_estimate(const hrt_abstime &timestamp);
 
 	const Vector3f get_vel_body_wind();
@@ -171,6 +174,9 @@ private:
 	orb_advert_t _estimator_innovations_pub{nullptr};
 	orb_advert_t _ekf2_timestamps_pub{nullptr};
 	orb_advert_t _sensor_bias_pub{nullptr};
+
+	int	_air_data_sub{-1};
+	int	_magnetometer_sub{-1};
 
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
 	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
@@ -520,9 +526,10 @@ void Ekf2::run()
 	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	int sensor_selection_sub = orb_subscribe(ORB_ID(sensor_selection));
-	int airdata_sub = orb_subscribe(ORB_ID(vehicle_air_data));
 	int landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
-	int magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
+
+	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
+	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
 
 	bool imu_bias_reset_request = false;
 
@@ -586,7 +593,6 @@ void Ekf2::run()
 
 		bool gps_updated = false;
 		bool airspeed_updated = false;
-		bool airdata_updated = false;
 		bool sensor_selection_updated = false;
 		bool optical_flow_updated = false;
 		bool range_finder_updated = false;
@@ -595,7 +601,6 @@ void Ekf2::run()
 		bool vision_attitude_updated = false;
 		bool vehicle_status_updated = false;
 		bool landing_target_pose_updated = false;
-		bool magnetometer_updated = false;
 
 		orb_copy(ORB_ID(sensor_combined), sensors_sub, &sensors);
 		// update all other topics if they have new data
@@ -618,9 +623,6 @@ void Ekf2::run()
 		if (airspeed_updated) {
 			orb_copy(ORB_ID(airspeed), airspeed_sub, &airspeed);
 		}
-
-		orb_check(airdata_sub, &airdata_updated);
-		orb_check(magnetometer_sub, &magnetometer_updated);
 
 		orb_check(sensor_selection_sub, &sensor_selection_updated);
 
@@ -714,124 +716,10 @@ void Ekf2::run()
 		_ekf.setIMUData(now, sensors.gyro_integral_dt, sensors.accelerometer_integral_dt, gyro_integral, accel_integral);
 
 		// read mag data
-		if (magnetometer_updated) {
-			vehicle_magnetometer_s magnetometer = {};
-
-			if (orb_copy(ORB_ID(vehicle_magnetometer), magnetometer_sub, &magnetometer) == PX4_OK) {
-				// Reset learned bias parameters if there has been a persistant change in magnetometer ID
-				// Do not reset parmameters when armed to prevent potential time slips casued by parameter set
-				// and notification events
-				// Check if there has been a persistant change in magnetometer ID
-				if (sensor_selection.mag_device_id != 0 && sensor_selection.mag_device_id != _mag_bias_id.get()) {
-					if (_invalid_mag_id_count < 200) {
-						_invalid_mag_id_count++;
-					}
-
-				} else {
-					if (_invalid_mag_id_count > 0) {
-						_invalid_mag_id_count--;
-					}
-				}
-
-				if ((vehicle_status.arming_state != vehicle_status_s::ARMING_STATE_ARMED) && (_invalid_mag_id_count > 100)) {
-					// the sensor ID used for the last saved mag bias is not confirmed to be the same as the current sensor ID
-					// this means we need to reset the learned bias values to zero
-					_mag_bias_x.set(0.f);
-					_mag_bias_x.commit_no_notification();
-					_mag_bias_y.set(0.f);
-					_mag_bias_y.commit_no_notification();
-					_mag_bias_z.set(0.f);
-					_mag_bias_z.commit_no_notification();
-					_mag_bias_id.set(sensor_selection.mag_device_id);
-					_mag_bias_id.commit();
-
-					_invalid_mag_id_count = 0;
-
-					PX4_INFO("Mag sensor ID changed to %i", _mag_bias_id.get());
-				}
-
-				// If the time last used by the EKF is less than specified, then accumulate the
-				// data and push the average when the specified interval is reached.
-				_mag_time_sum_ms += magnetometer.timestamp / 1000;
-				_mag_sample_count++;
-				_mag_data_sum[0] += magnetometer.magnetometer_ga[0];
-				_mag_data_sum[1] += magnetometer.magnetometer_ga[1];
-				_mag_data_sum[2] += magnetometer.magnetometer_ga[2];
-				uint32_t mag_time_ms = _mag_time_sum_ms / _mag_sample_count;
-
-				if (mag_time_ms - _mag_time_ms_last_used > _params->sensor_interval_min_ms) {
-					const float mag_sample_count_inv = 1.0f / _mag_sample_count;
-					// calculate mean of measurements and correct for learned bias offsets
-					float mag_data_avg_ga[3] = {_mag_data_sum[0] *mag_sample_count_inv - _mag_bias_x.get(),
-								    _mag_data_sum[1] *mag_sample_count_inv - _mag_bias_y.get(),
-								    _mag_data_sum[2] *mag_sample_count_inv - _mag_bias_z.get()
-								   };
-
-					_ekf.setMagData(1000 * (uint64_t)mag_time_ms, mag_data_avg_ga);
-
-					_mag_time_ms_last_used = mag_time_ms;
-					_mag_time_sum_ms = 0;
-					_mag_sample_count = 0;
-					_mag_data_sum[0] = 0.0f;
-					_mag_data_sum[1] = 0.0f;
-					_mag_data_sum[2] = 0.0f;
-				}
-			}
-		}
+		update_magnetometer(vehicle_status.arming_state, sensor_selection.mag_device_id);
 
 		// read baro data
-		if (airdata_updated) {
-			vehicle_air_data_s airdata;
-
-			if (orb_copy(ORB_ID(vehicle_air_data), airdata_sub, &airdata) == PX4_OK) {
-
-				// If the time last used by the EKF is less than specified, then accumulate the
-				// data and push the average when the specified interval is reached.
-				_balt_time_sum_ms += airdata.timestamp / 1000;
-				_balt_sample_count++;
-				_balt_data_sum += airdata.baro_alt_meter;
-				uint32_t balt_time_ms = _balt_time_sum_ms / _balt_sample_count;
-
-				if (balt_time_ms - _balt_time_ms_last_used > (uint32_t)_params->sensor_interval_min_ms) {
-					// take mean across sample period
-					float balt_data_avg = _balt_data_sum / (float)_balt_sample_count;
-
-					_ekf.set_air_density(airdata.rho);
-
-					// calculate static pressure error = Pmeas - Ptruth
-					// model position error sensitivity as a body fixed ellipse with different scale in the positive and negtive X direction
-					const float max_airspeed_sq = _aspd_max.get() * _aspd_max.get();
-					float K_pstatic_coef_x;
-
-					const Vector3f vel_body_wind = get_vel_body_wind();
-
-					if (vel_body_wind(0) >= 0.0f) {
-						K_pstatic_coef_x = _K_pstatic_coef_xp.get();
-
-					} else {
-						K_pstatic_coef_x = _K_pstatic_coef_xn.get();
-					}
-
-					const float x_v2 = fminf(vel_body_wind(0) * vel_body_wind(0), max_airspeed_sq);
-					const float y_v2 = fminf(vel_body_wind(1) * vel_body_wind(1), max_airspeed_sq);
-					const float z_v2 = fminf(vel_body_wind(2) * vel_body_wind(2), max_airspeed_sq);
-
-					const float pstatic_err = 0.5f * airdata.rho *
-								  (K_pstatic_coef_x * x_v2) + (_K_pstatic_coef_y.get() * y_v2) + (_K_pstatic_coef_z.get() * z_v2);
-
-					// correct baro measurement using pressure error estimate and assuming sea level gravity
-					balt_data_avg += pstatic_err / (airdata.rho * CONSTANTS_ONE_G);
-
-					// push to estimator
-					_ekf.setBaroData(1000 * (uint64_t)balt_time_ms, balt_data_avg);
-
-					_balt_time_ms_last_used = balt_time_ms;
-					_balt_time_sum_ms = 0;
-					_balt_sample_count = 0;
-					_balt_data_sum = 0.0f;
-				}
-			}
-		}
+		update_air_data();
 
 		// read gps data if available
 		if (gps_updated) {
@@ -1457,6 +1345,141 @@ int Ekf2::getRangeSubIndex(const int *subs)
 	}
 
 	return -1;
+}
+
+bool Ekf2::update_air_data()
+{
+	bool air_data_updated = false;
+
+	orb_check(_air_data_sub, &air_data_updated);
+
+	if (air_data_updated) {
+		vehicle_air_data_s airdata;
+
+		if (orb_copy(ORB_ID(vehicle_air_data), _air_data_sub, &airdata) == PX4_OK) {
+
+			// If the time last used by the EKF is less than specified, then accumulate the
+			// data and push the average when the specified interval is reached.
+			_balt_time_sum_ms += airdata.timestamp / 1000;
+			_balt_sample_count++;
+			_balt_data_sum += airdata.baro_alt_meter;
+			uint32_t balt_time_ms = _balt_time_sum_ms / _balt_sample_count;
+
+			if (balt_time_ms - _balt_time_ms_last_used > (uint32_t)_params->sensor_interval_min_ms) {
+				// take mean across sample period
+				float balt_data_avg = _balt_data_sum / (float)_balt_sample_count;
+
+				_ekf.set_air_density(airdata.rho);
+
+				// calculate static pressure error = Pmeas - Ptruth
+				// model position error sensitivity as a body fixed ellipse with different scale in the positive and negtive X direction
+				const float max_airspeed_sq = _aspd_max.get() * _aspd_max.get();
+				float K_pstatic_coef_x;
+
+				const Vector3f vel_body_wind = get_vel_body_wind();
+
+				if (vel_body_wind(0) >= 0.0f) {
+					K_pstatic_coef_x = _K_pstatic_coef_xp.get();
+
+				} else {
+					K_pstatic_coef_x = _K_pstatic_coef_xn.get();
+				}
+
+				const float x_v2 = fminf(vel_body_wind(0) * vel_body_wind(0), max_airspeed_sq);
+				const float y_v2 = fminf(vel_body_wind(1) * vel_body_wind(1), max_airspeed_sq);
+				const float z_v2 = fminf(vel_body_wind(2) * vel_body_wind(2), max_airspeed_sq);
+
+				const float pstatic_err = 0.5f * airdata.rho *
+							  (K_pstatic_coef_x * x_v2) + (_K_pstatic_coef_y.get() * y_v2) + (_K_pstatic_coef_z.get() * z_v2);
+
+				// correct baro measurement using pressure error estimate and assuming sea level gravity
+				balt_data_avg += pstatic_err / (airdata.rho * CONSTANTS_ONE_G);
+
+				// push to estimator
+				_ekf.setBaroData(1000 * (uint64_t)balt_time_ms, balt_data_avg);
+
+				_balt_time_ms_last_used = balt_time_ms;
+				_balt_time_sum_ms = 0;
+				_balt_sample_count = 0;
+				_balt_data_sum = 0.0f;
+			}
+		}
+	}
+
+	return air_data_updated;
+}
+
+bool Ekf2::update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state)
+{
+	bool magnetometer_updated = false;
+	orb_check(_magnetometer_sub, &magnetometer_updated);
+
+	if (magnetometer_updated) {
+		vehicle_magnetometer_s magnetometer;
+
+		if (orb_copy(ORB_ID(vehicle_magnetometer), _magnetometer_sub, &magnetometer) == PX4_OK) {
+			// Reset learned bias parameters if there has been a persistant change in magnetometer ID
+			// Do not reset parmameters when armed to prevent potential time slips casued by parameter set
+			// and notification events
+			// Check if there has been a persistant change in magnetometer ID
+			if (mag_device_id != 0 && mag_device_id != _mag_bias_id.get()) {
+				if (_invalid_mag_id_count < 200) {
+					_invalid_mag_id_count++;
+				}
+
+			} else {
+				if (_invalid_mag_id_count > 0) {
+					_invalid_mag_id_count--;
+				}
+			}
+
+			if ((arming_state != vehicle_status_s::ARMING_STATE_ARMED) && (_invalid_mag_id_count > 100)) {
+				// the sensor ID used for the last saved mag bias is not confirmed to be the same as the current sensor ID
+				// this means we need to reset the learned bias values to zero
+				_mag_bias_x.set(0.f);
+				_mag_bias_x.commit_no_notification();
+				_mag_bias_y.set(0.f);
+				_mag_bias_y.commit_no_notification();
+				_mag_bias_z.set(0.f);
+				_mag_bias_z.commit_no_notification();
+				_mag_bias_id.set(mag_device_id);
+				_mag_bias_id.commit();
+
+				_invalid_mag_id_count = 0;
+
+				PX4_INFO("Mag sensor ID changed to %i", _mag_bias_id.get());
+			}
+
+			// If the time last used by the EKF is less than specified, then accumulate the
+			// data and push the average when the specified interval is reached.
+			_mag_time_sum_ms += magnetometer.timestamp / 1000;
+			_mag_sample_count++;
+			_mag_data_sum[0] += magnetometer.magnetometer_ga[0];
+			_mag_data_sum[1] += magnetometer.magnetometer_ga[1];
+			_mag_data_sum[2] += magnetometer.magnetometer_ga[2];
+			uint32_t mag_time_ms = _mag_time_sum_ms / _mag_sample_count;
+
+			if (mag_time_ms - _mag_time_ms_last_used > _params->sensor_interval_min_ms) {
+				const float mag_sample_count_inv = 1.0f / _mag_sample_count;
+				// calculate mean of measurements and correct for learned bias offsets
+				float mag_data_avg_ga[3] = {_mag_data_sum[0] *mag_sample_count_inv - _mag_bias_x.get(),
+							    _mag_data_sum[1] *mag_sample_count_inv - _mag_bias_y.get(),
+							    _mag_data_sum[2] *mag_sample_count_inv - _mag_bias_z.get()
+							   };
+
+				_ekf.setMagData(1000 * (uint64_t)mag_time_ms, mag_data_avg_ga);
+
+				_mag_time_ms_last_used = mag_time_ms;
+				_mag_time_sum_ms = 0;
+				_mag_sample_count = 0;
+				_mag_data_sum[0] = 0.0f;
+				_mag_data_sum[1] = 0.0f;
+				_mag_data_sum[2] = 0.0f;
+			}
+		}
+	}
+
+	return magnetometer_updated;
 }
 
 bool Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
