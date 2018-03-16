@@ -105,6 +105,9 @@ public:
 private:
 	int getRangeSubIndex(const int *subs); ///< get subscription index of first downward-facing range sensor
 
+	void learned_mag_bias(const hrt_abstime &timestamp, const uint8_t arming_state, const bool landed,
+			      const estimator_status_s &status, const uint32_t mag_device_id);
+
 	template<typename Param>
 	void update_mag_bias(Param &mag_bias_param, int axis_index);
 
@@ -493,6 +496,74 @@ int Ekf2::print_status()
 	PX4_INFO("global position OK %s", (_ekf.global_position_is_valid()) ? "yes" : "no");
 	PX4_INFO("time slip: %" PRId64 " us", _last_time_slip_us);
 	return 0;
+}
+
+void Ekf2::learned_mag_bias(const hrt_abstime &timestamp, const uint8_t arming_state, const bool landed,
+			    const estimator_status_s &status, const uint32_t mag_device_id)
+{
+	// Check if conditions are OK to for learning of magnetometer bias values
+	if (!landed && // not on ground
+	    (arming_state == vehicle_status_s::ARMING_STATE_ARMED) && // vehicle is armed
+	    (status.filter_fault_flags == 0) && // there are no filter faults
+	    (status.control_mode_flags & (1 << 5))) { // the EKF is operating in the correct mode
+
+		if (_last_magcal_us == 0) {
+			_last_magcal_us = timestamp;
+
+		} else {
+			_total_cal_time_us += timestamp - _last_magcal_us;
+			_last_magcal_us = timestamp;
+		}
+
+	} else if (status.filter_fault_flags != 0) {
+		// if a filter fault has occurred, assume previous learning was invalid and do not
+		// count it towards total learning time.
+		_total_cal_time_us = 0;
+
+		for (bool &cal_available : _valid_cal_available) {
+			cal_available = false;
+		}
+	}
+
+	// Start checking mag bias estimates when we have accumulated sufficient calibration time
+	if (_total_cal_time_us > 120 * 1000 * 1000ULL) {
+		// we have sufficient accumulated valid flight time to form a reliable bias estimate
+		// check that the state variance for each axis is within a range indicating filter convergence
+		const float max_var_allowed = 100.0f * _mag_bias_saved_variance.get();
+		const float min_var_allowed = 0.01f * _mag_bias_saved_variance.get();
+
+		// Declare all bias estimates invalid if any variances are out of range
+		bool all_estimates_invalid = false;
+
+		for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
+			if (status.covariances[axis_index + 19] < min_var_allowed
+			    || status.covariances[axis_index + 19] > max_var_allowed) {
+				all_estimates_invalid = true;
+			}
+		}
+
+		// Store valid estimates and their associated variances
+		if (!all_estimates_invalid) {
+			for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
+				_last_valid_mag_cal[axis_index] = status.states[axis_index + 19];
+				_valid_cal_available[axis_index] = true;
+				_last_valid_variance[axis_index] = status.covariances[axis_index + 19];
+			}
+		}
+	}
+
+	// Check and save the last valid calibration when we are disarmed
+	if ((arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
+	    && (status.filter_fault_flags == 0)
+	    && (mag_device_id == _mag_bias_id.get())) {
+
+		update_mag_bias(_mag_bias_x, 0);
+		update_mag_bias(_mag_bias_y, 1);
+		update_mag_bias(_mag_bias_z, 2);
+
+		// reset to prevent data being saved too frequently
+		_total_cal_time_us = 0;
+	}
 }
 
 template<typename Param>
@@ -943,70 +1014,8 @@ void Ekf2::run()
 		if (updated) {
 			{
 				/* Check and save learned magnetometer bias estimates */
-
-				// Check if conditions are OK to for learning of magnetometer bias values
-				if (!vehicle_land_detected.landed && // not on ground
-				    (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) && // vehicle is armed
-				    (status.filter_fault_flags == 0) && // there are no filter faults
-				    (status.control_mode_flags & (1 << 5))) { // the EKF is operating in the correct mode
-
-					if (_last_magcal_us == 0) {
-						_last_magcal_us = now;
-
-					} else {
-						_total_cal_time_us += now - _last_magcal_us;
-						_last_magcal_us = now;
-					}
-
-				} else if (status.filter_fault_flags != 0) {
-					// if a filter fault has occurred, assume previous learning was invalid and do not
-					// count it towards total learning time.
-					_total_cal_time_us = 0;
-
-					for (bool &cal_available : _valid_cal_available) {
-						cal_available = false;
-					}
-				}
-
-				// Start checking mag bias estimates when we have accumulated sufficient calibration time
-				if (_total_cal_time_us > 120 * 1000 * 1000ULL) {
-					// we have sufficient accumulated valid flight time to form a reliable bias estimate
-					// check that the state variance for each axis is within a range indicating filter convergence
-					const float max_var_allowed = 100.0f * _mag_bias_saved_variance.get();
-					const float min_var_allowed = 0.01f * _mag_bias_saved_variance.get();
-
-					// Declare all bias estimates invalid if any variances are out of range
-					bool all_estimates_invalid = false;
-
-					for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
-						if (status.covariances[axis_index + 19] < min_var_allowed
-						    || status.covariances[axis_index + 19] > max_var_allowed) {
-							all_estimates_invalid = true;
-						}
-					}
-
-					// Store valid estimates and their associated variances
-					if (!all_estimates_invalid) {
-						for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
-							_last_valid_mag_cal[axis_index] = status.states[axis_index + 19];
-							_valid_cal_available[axis_index] = true;
-							_last_valid_variance[axis_index] = status.covariances[axis_index + 19];
-						}
-					}
-				}
-
-				// Check and save the last valid calibration when we are disarmed
-				if ((vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
-				    && (status.filter_fault_flags == 0)
-				    && (sensor_selection.mag_device_id == _mag_bias_id.get())) {
-
-					update_mag_bias(_mag_bias_x, 0);
-					update_mag_bias(_mag_bias_y, 1);
-					update_mag_bias(_mag_bias_z, 2);
-
-					// reset to prevent data being saved too frequently
-					_total_cal_time_us = 0;
-				}
+				learned_mag_bias(now, vehicle_status.arming_state, vehicle_land_detected.landed, status,
+						 sensor_selection.mag_device_id);
 
 				publish_wind_estimate(now);
 			}
