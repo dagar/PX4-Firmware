@@ -79,7 +79,7 @@ class Ekf2 final : public ModuleBase<Ekf2>, public ModuleParams
 {
 public:
 	Ekf2();
-	~Ekf2() override = default;
+	~Ekf2() override;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -515,6 +515,35 @@ Ekf2::Ekf2():
 	_bcoef_x(_params->bcoef_x),
 	_bcoef_y(_params->bcoef_y)
 {
+	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
+	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
+	_ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
+	_ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
+	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
+	_landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
+	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
+	_optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
+
+	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
+		_range_finder_subs[i] = orb_subscribe_multi(ORB_ID(distance_sensor), i);
+	}
+}
+
+Ekf2::~Ekf2()
+{
+	orb_unsubscribe(_air_data_sub);
+	orb_unsubscribe(_airspeed_sub);
+	orb_unsubscribe(_ev_pos_sub);
+	orb_unsubscribe(_ev_att_sub);
+	orb_unsubscribe(_gps_sub);
+	orb_unsubscribe(_landing_target_pose_sub);
+	orb_unsubscribe(_magnetometer_sub);
+	orb_unsubscribe(_optical_flow_sub);
+
+	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
+		orb_unsubscribe(_range_finder_subs[i]);
+		_range_finder_subs[i] = -1;
+	}
 }
 
 int Ekf2::print_status()
@@ -621,20 +650,7 @@ void Ekf2::run()
 	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	int sensor_selection_sub = orb_subscribe(ORB_ID(sensor_selection));
 
-	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
-	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
-	_ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
-	_ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
-	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
-	_landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
-	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
-	_optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
-
 	bool imu_bias_reset_request = false;
-
-	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		_range_finder_subs[i] = orb_subscribe_multi(ORB_ID(distance_sensor), i);
-	}
 
 	px4_pollfd_struct_t fds[1] = {};
 	fds[0].fd = sensors_sub;
@@ -850,20 +866,6 @@ void Ekf2::run()
 	orb_unsubscribe(vehicle_land_detected_sub);
 	orb_unsubscribe(status_sub);
 	orb_unsubscribe(sensor_selection_sub);
-
-	orb_unsubscribe(_air_data_sub);
-	orb_unsubscribe(_airspeed_sub);
-	orb_unsubscribe(_ev_pos_sub);
-	orb_unsubscribe(_ev_att_sub);
-	orb_unsubscribe(_gps_sub);
-	orb_unsubscribe(_landing_target_pose_sub);
-	orb_unsubscribe(_magnetometer_sub);
-	orb_unsubscribe(_optical_flow_sub);
-
-	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		orb_unsubscribe(_range_finder_subs[i]);
-		_range_finder_subs[i] = -1;
-	}
 }
 
 int Ekf2::getRangeSubIndex(const int *subs)
