@@ -133,8 +133,7 @@ private:
 	void get_ekf2_innovations(ekf2_innovations_s &innovations);
 	void get_estimator_status(estimator_status_s &status);
 
-	bool update_preflight_check(const uint8_t arming_state, const sensor_combined_s &sensors,
-				    const ekf2_innovations_s &innovations);
+	bool update_preflight_check(const sensor_combined_s &sensors, const ekf2_innovations_s &innovations);
 
 	const Vector3f get_vel_body_wind();
 
@@ -205,6 +204,8 @@ private:
 	int _landing_target_pose_sub{-1};
 	int _magnetometer_sub{-1};
 	int _optical_flow_sub{-1};
+	int _params_sub{-1};
+	int _sensors_sub{-1};
 	int _vehicle_land_detected_sub{-1};
 	int _vehicle_status_sub{-1};
 
@@ -528,6 +529,7 @@ Ekf2::Ekf2():
 	_bcoef_x(_params->bcoef_x),
 	_bcoef_y(_params->bcoef_y)
 {
+	// subscribe to relevant topics
 	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
 	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	_ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
@@ -536,6 +538,8 @@ Ekf2::Ekf2():
 	_landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
 	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
 	_optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
+	_params_sub = orb_subscribe(ORB_ID(parameter_update));
+	_sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
 	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 
@@ -554,6 +558,8 @@ Ekf2::~Ekf2()
 	orb_unsubscribe(_landing_target_pose_sub);
 	orb_unsubscribe(_magnetometer_sub);
 	orb_unsubscribe(_optical_flow_sub);
+	orb_unsubscribe(_params_sub);
+	orb_unsubscribe(_sensors_sub);
 	orb_unsubscribe(_vehicle_land_detected_sub);
 	orb_unsubscribe(_vehicle_status_sub);
 
@@ -659,12 +665,8 @@ void Ekf2::update_mag_bias(Param &mag_bias_param, int axis_index)
 
 void Ekf2::run()
 {
-	// subscribe to relevant topics
-	int sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
-	int params_sub = orb_subscribe(ORB_ID(parameter_update));
-
 	px4_pollfd_struct_t fds[1] = {};
-	fds[0].fd = sensors_sub;
+	fds[0].fd = _sensors_sub;
 	fds[0].events = POLLIN;
 
 	// initialise parameter cache
@@ -687,12 +689,12 @@ void Ekf2::run()
 		ekf2_timestamps.vision_attitude_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 
 		bool params_updated = false;
-		orb_check(params_sub, &params_updated);
+		orb_check(_params_sub, &params_updated);
 
 		if (params_updated) {
 			// read from param to clear updated flag
 			parameter_update_s update;
-			orb_copy(ORB_ID(parameter_update), params_sub, &update);
+			orb_copy(ORB_ID(parameter_update), _params_sub, &update);
 			updateParams();
 		}
 
@@ -713,7 +715,7 @@ void Ekf2::run()
 			continue;
 		}
 
-		orb_copy(ORB_ID(sensor_combined), sensors_sub, &sensors);
+		orb_copy(ORB_ID(sensor_combined), _sensors_sub, &sensors);
 		ekf2_timestamps.timestamp = sensors.timestamp;
 
 		// update all other topics if they have new data
@@ -757,6 +759,12 @@ void Ekf2::run()
 		// run the EKF update and output
 		const bool updated = _ekf.update();
 
+		// fill estimator_status and publish
+		estimator_status_s status = {};
+		status.timestamp = now;
+		get_estimator_status(status);
+		publish_estimator_status(status);
+
 		if (updated) {
 
 			// integrate time to monitor time slippage
@@ -772,27 +780,20 @@ void Ekf2::run()
 			publish_attitude(now, sensors);
 			publish_sensor_bias(now, sensors);
 			publish_position(now);
-		}
-
-		estimator_status_s status = {};
-		status.timestamp = now;
-		get_estimator_status(status);
-
-		publish_estimator_status(status);
-
-		if (updated) {
-			learned_mag_bias(now, status);
-
 			publish_wind_estimate(now);
 
+			// fill ekf2_innovations and publish
 			ekf2_innovations_s innovations = {};
 			innovations.timestamp = now;
 			get_ekf2_innovations(innovations);
 			publish_ekf2_innovations(innovations);
 
-			update_preflight_check(_arming_state, sensors, innovations);
+			update_preflight_check(sensors, innovations);
 
-		} else if (_replay_mode) {
+			learned_mag_bias(now, status);
+		}
+
+		if (_replay_mode) {
 			// in replay mode we have to tell the replay module not to wait for an update
 			// we do this by publishing an attitude with zero timestamp
 			vehicle_attitude_s att;
@@ -808,9 +809,6 @@ void Ekf2::run()
 
 		_ekf2_timestamps_pub.update();
 	}
-
-	orb_unsubscribe(sensors_sub);
-	orb_unsubscribe(params_sub);
 }
 
 int Ekf2::getRangeSubIndex(const int *subs)
@@ -1568,13 +1566,12 @@ bool Ekf2::publish_estimator_status(const estimator_status_s &status)
 	return true;
 }
 
-bool Ekf2::update_preflight_check(const uint8_t arming_state, const sensor_combined_s &sensors,
-				  const ekf2_innovations_s &innovations)
+bool Ekf2::update_preflight_check(const sensor_combined_s &sensors, const ekf2_innovations_s &innovations)
 {
 	bool updated = false;
 
 	// calculate noise filtered velocity innovations which are used for pre-flight checking
-	if (arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
+	if (_arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
 		// calculate coefficients for LPF applied to innovation sequences
 		float alpha = constrain(sensors.accelerometer_integral_dt / 1.e6f * _innov_lpf_tau_inv, 0.0f, 1.0f);
 		float beta = 1.0f - alpha;
@@ -1605,8 +1602,8 @@ bool Ekf2::update_preflight_check(const uint8_t arming_state, const sensor_combi
 		}
 
 		// filter the yaw innovations using a decaying envelope filter to prevent innovation sign changes due to angle wrapping allowinging large innvoations to pass checks after filtering.
-		_yaw_innov_magnitude_lpf = fmaxf(beta * _yaw_innov_magnitude_lpf,
-						 fminf(fabsf(innovations.heading_innov), 2.0f * yaw_test_limit));
+		_yaw_innov_magnitude_lpf = fmaxf(beta * _yaw_innov_magnitude_lpf, fminf(fabsf(innovations.heading_innov),
+						 2.0f * yaw_test_limit));
 
 		_hgt_innov_lpf = beta * _hgt_innov_lpf + alpha * constrain(innovations.vel_pos_innov[5], -_hgt_innov_spike_lim,
 				 _hgt_innov_spike_lim);
