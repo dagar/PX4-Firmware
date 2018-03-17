@@ -50,26 +50,27 @@
 #include <px4_tasks.h>
 #include <px4_time.h>
 #include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/ekf2_innovations.h>
 #include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_bias.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_selection.h>
+#include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/wind_estimate.h>
-#include <uORB/topics/landing_target_pose.h>
-#include <uORB/topics/vehicle_air_data.h>
-#include <uORB/topics/vehicle_magnetometer.h>
 
 using math::constrain;
 
@@ -119,6 +120,7 @@ private:
 	bool update_range_finder();
 	bool update_vision();
 	bool update_landing_target_pose();
+	bool update_sensor_selection();
 
 	bool publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
 	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
@@ -210,6 +212,10 @@ private:
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
 	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
 	uORB::Publication<ekf2_timestamps_s> _ekf2_timestamps_pub;
+
+	uORB::Subscription<sensor_selection_s> _sensor_selection_sub;
+
+	bool	_imu_bias_reset_request{false};
 
 	Ekf _ekf;
 
@@ -423,6 +429,7 @@ Ekf2::Ekf2():
 	_vehicle_local_position_pub(ORB_ID(vehicle_local_position)),
 	_vehicle_global_position_pub(ORB_ID(vehicle_global_position)),
 	_ekf2_timestamps_pub(ORB_ID(ekf2_timestamps)),
+	_sensor_selection_sub(ORB_ID(sensor_selection)),
 	_params(_ekf.getParamHandle()),
 	_obs_dt_min_ms(_params->sensor_interval_min_ms),
 	_mag_delay_ms(_params->mag_delay_ms),
@@ -648,9 +655,6 @@ void Ekf2::run()
 	int params_sub = orb_subscribe(ORB_ID(parameter_update));
 	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
-	int sensor_selection_sub = orb_subscribe(ORB_ID(sensor_selection));
-
-	bool imu_bias_reset_request = false;
 
 	px4_pollfd_struct_t fds[1] = {};
 	fds[0].fd = sensors_sub;
@@ -665,7 +669,6 @@ void Ekf2::run()
 	sensor_combined_s sensors = {};
 	vehicle_land_detected_s vehicle_land_detected = {};
 	vehicle_status_s vehicle_status = {};
-	sensor_selection_s sensor_selection = {};
 
 	while (!should_exit()) {
 
@@ -706,7 +709,6 @@ void Ekf2::run()
 			continue;
 		}
 
-		bool sensor_selection_updated = false;
 		bool vehicle_land_detected_updated = false;
 		bool vehicle_status_updated = false;
 
@@ -721,36 +723,15 @@ void Ekf2::run()
 			orb_copy(ORB_ID(vehicle_status), status_sub, &vehicle_status);
 		}
 
+		update_air_data();
+		update_airspeed();
 		update_gps();
-
-		orb_check(sensor_selection_sub, &sensor_selection_updated);
-
-		// Always update sensor selction first time through if time stamp is non zero
-		if (sensor_selection_updated || (sensor_selection.timestamp == 0)) {
-			sensor_selection_s sensor_selection_prev = sensor_selection;
-			orb_copy(ORB_ID(sensor_selection), sensor_selection_sub, &sensor_selection);
-
-			if ((sensor_selection_prev.timestamp > 0) && (sensor_selection.timestamp > sensor_selection_prev.timestamp)) {
-				if (sensor_selection.accel_device_id != sensor_selection_prev.accel_device_id) {
-					PX4_WARN("accel id changed, resetting IMU bias");
-					imu_bias_reset_request = true;
-				}
-
-				if (sensor_selection.gyro_device_id != sensor_selection_prev.gyro_device_id) {
-					PX4_WARN("gyro id changed, resetting IMU bias");
-					imu_bias_reset_request = true;
-				}
-			}
-		}
-
-		// attempt reset until successful
-		if (imu_bias_reset_request) {
-			imu_bias_reset_request = !_ekf.reset_imu_bias();
-		}
-
+		update_landing_target_pose();
+		update_magnetometer(vehicle_status.arming_state, _sensor_selection_sub.get().mag_device_id);
 		update_optical_flow();
-
 		update_range_finder();
+		update_sensor_selection();
+		update_vision();
 
 		// in replay mode we are getting the actual timestamp from the sensor topic
 		hrt_abstime now = 0;
@@ -777,14 +758,6 @@ void Ekf2::run()
 
 		_ekf.setIMUData(now, sensors.gyro_integral_dt, sensors.accelerometer_integral_dt, gyro_integral, accel_integral);
 
-		// read mag data
-		update_magnetometer(vehicle_status.arming_state, sensor_selection.mag_device_id);
-
-		// read baro data
-		update_air_data();
-
-		update_airspeed();
-
 		if (vehicle_status_updated) {
 			// only fuse synthetic sideslip measurements if conditions are met
 			bool fuse_beta = !vehicle_status.is_rotary_wing && (_fuseBeta.get() == 1);
@@ -794,16 +767,12 @@ void Ekf2::run()
 			_ekf.set_is_fixed_wing(!vehicle_status.is_rotary_wing);
 		}
 
-		update_vision();
-
 		orb_check(vehicle_land_detected_sub, &vehicle_land_detected_updated);
 
 		if (vehicle_land_detected_updated) {
 			orb_copy(ORB_ID(vehicle_land_detected), vehicle_land_detected_sub, &vehicle_land_detected);
 			_ekf.set_in_air_status(!vehicle_land_detected.landed);
 		}
-
-		update_landing_target_pose();
 
 		// run the EKF update and output
 		const bool updated = _ekf.update();
@@ -833,7 +802,7 @@ void Ekf2::run()
 
 		if (updated) {
 			learned_mag_bias(now, vehicle_status.arming_state, vehicle_land_detected.landed, status,
-					 sensor_selection.mag_device_id);
+					 _sensor_selection_sub.get().mag_device_id);
 
 			publish_wind_estimate(now);
 
@@ -865,7 +834,6 @@ void Ekf2::run()
 	orb_unsubscribe(params_sub);
 	orb_unsubscribe(vehicle_land_detected_sub);
 	orb_unsubscribe(status_sub);
-	orb_unsubscribe(sensor_selection_sub);
 }
 
 int Ekf2::getRangeSubIndex(const int *subs)
@@ -950,6 +918,39 @@ bool Ekf2::update_gps()
 	}
 
 	return gps_updated;
+}
+
+bool Ekf2::update_sensor_selection()
+{
+	bool updated = false;
+	const sensor_selection_s sensor_selection_prev = _sensor_selection_sub.get();
+
+	// Always update sensor selction first time through if time stamp is non zero
+	if (_sensor_selection_sub.update()) {
+
+		const sensor_selection_s &sensor_selection = _sensor_selection_sub.get();
+
+		if ((sensor_selection_prev.timestamp > 0) && (sensor_selection.timestamp > sensor_selection_prev.timestamp)) {
+			if (sensor_selection.accel_device_id != sensor_selection_prev.accel_device_id) {
+				PX4_WARN("accel id changed, resetting IMU bias");
+				_imu_bias_reset_request = true;
+			}
+
+			if (sensor_selection.gyro_device_id != sensor_selection_prev.gyro_device_id) {
+				PX4_WARN("gyro id changed, resetting IMU bias");
+				_imu_bias_reset_request = true;
+			}
+
+			updated = true;
+		}
+	}
+
+	// attempt reset until successful
+	if (_imu_bias_reset_request) {
+		_imu_bias_reset_request = !_ekf.reset_imu_bias();
+	}
+
+	return updated;
 }
 
 bool Ekf2::update_optical_flow()
