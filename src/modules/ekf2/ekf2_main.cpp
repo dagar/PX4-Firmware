@@ -115,6 +115,7 @@ private:
 	bool update_air_data();
 	bool update_gps();
 	bool update_optical_flow();
+	bool update_range_finder();
 
 	bool publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
 	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
@@ -194,6 +195,10 @@ private:
 	int _gps_sub{-1};
 	int	_magnetometer_sub{-1};
 	int _optical_flow_sub{-1};
+
+	// because we can have several distance sensor instances with different orientations
+	int _range_finder_subs[ORB_MULTI_MAX_INSTANCES];
+	int _range_finder_sub_index{-1}; // index for downward-facing range finder subscription
 
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
 	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
@@ -620,12 +625,8 @@ void Ekf2::run()
 
 	bool imu_bias_reset_request = false;
 
-	// because we can have several distance sensor instances with different orientations
-	int range_finder_subs[ORB_MULTI_MAX_INSTANCES];
-	int range_finder_sub_index = -1; // index for downward-facing range finder subscription
-
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		range_finder_subs[i] = orb_subscribe_multi(ORB_ID(distance_sensor), i);
+		_range_finder_subs[i] = orb_subscribe_multi(ORB_ID(distance_sensor), i);
 	}
 
 	px4_pollfd_struct_t fds[1] = {};
@@ -640,7 +641,6 @@ void Ekf2::run()
 	// properly populated
 	sensor_combined_s sensors = {};
 	airspeed_s airspeed = {};
-	distance_sensor_s range_finder = {};
 	vehicle_land_detected_s vehicle_land_detected = {};
 	vehicle_local_position_s ev_pos = {};
 	vehicle_attitude_s ev_att = {};
@@ -689,7 +689,6 @@ void Ekf2::run()
 
 		bool airspeed_updated = false;
 		bool sensor_selection_updated = false;
-		bool range_finder_updated = false;
 		bool vehicle_land_detected_updated = false;
 		bool vision_position_updated = false;
 		bool vision_attitude_updated = false;
@@ -746,28 +745,7 @@ void Ekf2::run()
 
 		update_optical_flow();
 
-		if (range_finder_sub_index >= 0) {
-			orb_check(range_finder_subs[range_finder_sub_index], &range_finder_updated);
-
-			if (range_finder_updated) {
-				orb_copy(ORB_ID(distance_sensor), range_finder_subs[range_finder_sub_index], &range_finder);
-
-				// check if distance sensor is within working boundaries
-				if (range_finder.min_distance >= range_finder.current_distance ||
-				    range_finder.max_distance <= range_finder.current_distance) {
-					// use rng_gnd_clearance if on ground
-					if (_ekf.get_in_air_status()) {
-						range_finder_updated = false;
-
-					} else {
-						range_finder.current_distance = _rng_gnd_clearance.get();
-					}
-				}
-			}
-
-		} else {
-			range_finder_sub_index = getRangeSubIndex(range_finder_subs);
-		}
+		update_range_finder();
 
 		orb_check(ev_pos_sub, &vision_position_updated);
 
@@ -832,12 +810,6 @@ void Ekf2::run()
 
 			// let the EKF know if the vehicle motion is that of a fixed wing (forward flight only relative to wind)
 			_ekf.set_is_fixed_wing(!vehicle_status.is_rotary_wing);
-		}
-
-		if (range_finder_updated) {
-			_ekf.setRangeData(range_finder.timestamp, range_finder.current_distance);
-			ekf2_timestamps.distance_sensor_timestamp_rel = (int16_t)((int64_t)range_finder.timestamp / 100 -
-					(int64_t)ekf2_timestamps.timestamp / 100);
 		}
 
 		// get external vision data
@@ -962,8 +934,8 @@ void Ekf2::run()
 	orb_unsubscribe(_optical_flow_sub);
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		orb_unsubscribe(range_finder_subs[i]);
-		range_finder_subs[i] = -1;
+		orb_unsubscribe(_range_finder_subs[i]);
+		_range_finder_subs[i] = -1;
 	}
 }
 
@@ -1056,6 +1028,43 @@ bool Ekf2::update_optical_flow()
 	}
 
 	return optical_flow_updated;
+}
+
+bool Ekf2::update_range_finder()
+{
+	bool range_finder_updated = false;
+	distance_sensor_s range_finder;
+
+	if (_range_finder_sub_index >= 0) {
+		orb_check(_range_finder_subs[_range_finder_sub_index], &range_finder_updated);
+
+		if (range_finder_updated) {
+			orb_copy(ORB_ID(distance_sensor), _range_finder_subs[_range_finder_sub_index], &range_finder);
+
+			// check if distance sensor is within working boundaries
+			if (range_finder.min_distance >= range_finder.current_distance ||
+			    range_finder.max_distance <= range_finder.current_distance) {
+				// use rng_gnd_clearance if on ground
+				if (_ekf.get_in_air_status()) {
+					range_finder_updated = false;
+
+				} else {
+					range_finder.current_distance = _rng_gnd_clearance.get();
+				}
+			}
+		}
+
+	} else {
+		_range_finder_sub_index = getRangeSubIndex(_range_finder_subs);
+	}
+
+	if (range_finder_updated) {
+		_ekf.setRangeData(range_finder.timestamp, range_finder.current_distance);
+		_ekf2_timestamps_pub.get().distance_sensor_timestamp_rel = (int16_t)((int64_t)range_finder.timestamp / 100 -
+				(int64_t)_ekf2_timestamps_pub.get().timestamp / 100);
+	}
+
+	return range_finder_updated;
 }
 
 bool Ekf2::update_air_data()
