@@ -186,7 +186,6 @@ private:
 	orb_advert_t _wind_pub{nullptr};
 	orb_advert_t _estimator_status_pub{nullptr};
 	orb_advert_t _estimator_innovations_pub{nullptr};
-	orb_advert_t _ekf2_timestamps_pub{nullptr};
 	orb_advert_t _sensor_bias_pub{nullptr};
 
 	int	_air_data_sub{-1};
@@ -194,6 +193,7 @@ private:
 
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
 	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
+	uORB::Publication<ekf2_timestamps_s> _ekf2_timestamps_pub;
 
 	Ekf _ekf;
 
@@ -406,6 +406,7 @@ Ekf2::Ekf2():
 	ModuleParams(nullptr),
 	_vehicle_local_position_pub(ORB_ID(vehicle_local_position)),
 	_vehicle_global_position_pub(ORB_ID(vehicle_global_position)),
+	_ekf2_timestamps_pub(ORB_ID(ekf2_timestamps)),
 	_params(_ekf.getParamHandle()),
 	_obs_dt_min_ms(_params->sensor_interval_min_ms),
 	_mag_delay_ms(_params->mag_delay_ms),
@@ -646,6 +647,27 @@ void Ekf2::run()
 	landing_target_pose_s landing_target_pose = {};
 
 	while (!should_exit()) {
+
+		// reset all timestamps
+		ekf2_timestamps_s ekf2_timestamps = _ekf2_timestamps_pub.get();
+		ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+		ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+		ekf2_timestamps.optical_flow_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+		ekf2_timestamps.distance_sensor_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+		ekf2_timestamps.airspeed_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+		ekf2_timestamps.vision_position_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+		ekf2_timestamps.vision_attitude_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+
+		bool params_updated = false;
+		orb_check(params_sub, &params_updated);
+
+		if (params_updated) {
+			// read from param to clear updated flag
+			parameter_update_s update;
+			orb_copy(ORB_ID(parameter_update), params_sub, &update);
+			updateParams();
+		}
+
 		int ret = px4_poll(fds, sizeof(fds) / sizeof(fds[0]), 1000);
 
 		if (!(fds[0].revents & POLLIN)) {
@@ -663,16 +685,6 @@ void Ekf2::run()
 			continue;
 		}
 
-		bool params_updated = false;
-		orb_check(params_sub, &params_updated);
-
-		if (params_updated) {
-			// read from param to clear updated flag
-			parameter_update_s update;
-			orb_copy(ORB_ID(parameter_update), params_sub, &update);
-			updateParams();
-		}
-
 		bool gps_updated = false;
 		bool airspeed_updated = false;
 		bool sensor_selection_updated = false;
@@ -685,6 +697,8 @@ void Ekf2::run()
 		bool landing_target_pose_updated = false;
 
 		orb_copy(ORB_ID(sensor_combined), sensors_sub, &sensors);
+		ekf2_timestamps.timestamp = sensors.timestamp;
+
 		// update all other topics if they have new data
 
 		orb_check(status_sub, &vehicle_status_updated);
@@ -704,6 +718,9 @@ void Ekf2::run()
 
 		if (airspeed_updated) {
 			orb_copy(ORB_ID(airspeed), airspeed_sub, &airspeed);
+
+			ekf2_timestamps.airspeed_timestamp_rel = (int16_t)((int64_t)airspeed.timestamp / 100 -
+					(int64_t)ekf2_timestamps.timestamp / 100);
 		}
 
 		orb_check(sensor_selection_sub, &sensor_selection_updated);
@@ -770,6 +787,9 @@ void Ekf2::run()
 
 		if (vision_attitude_updated) {
 			orb_copy(ORB_ID(vehicle_vision_attitude), ev_att_sub, &ev_att);
+
+			ekf2_timestamps.vision_attitude_timestamp_rel = (int16_t)((int64_t)ev_att.timestamp / 100 -
+					(int64_t)ekf2_timestamps.timestamp / 100);
 		}
 
 		// in replay mode we are getting the actual timestamp from the sensor topic
@@ -824,6 +844,9 @@ void Ekf2::run()
 			gps_msg.gdop = 0.0f;
 
 			_ekf.setGpsData(gps.timestamp, &gps_msg);
+
+			// divide individually to get consistent rounding behavior
+			ekf2_timestamps.gps_timestamp_rel = (int16_t)((int64_t)gps.timestamp / 100 - (int64_t)ekf2_timestamps.timestamp / 100);
 		}
 
 		// only set airspeed data if condition for airspeed fusion are met
@@ -859,10 +882,15 @@ void Ekf2::run()
 			    PX4_ISFINITE(optical_flow.pixel_flow_x_integral)) {
 				_ekf.setOpticalFlowData(optical_flow.timestamp, &flow);
 			}
+
+			ekf2_timestamps.optical_flow_timestamp_rel = (int16_t)((int64_t)optical_flow.timestamp / 100 -
+					(int64_t)ekf2_timestamps.timestamp / 100);
 		}
 
 		if (range_finder_updated) {
 			_ekf.setRangeData(range_finder.timestamp, range_finder.current_distance);
+			ekf2_timestamps.distance_sensor_timestamp_rel = (int16_t)((int64_t)range_finder.timestamp / 100 -
+					(int64_t)ekf2_timestamps.timestamp / 100);
 		}
 
 		// get external vision data
@@ -883,6 +911,9 @@ void Ekf2::run()
 			if (ev_pos.xy_valid && ev_pos.z_valid && ev_pos.v_xy_valid && ev_pos.v_z_valid) {
 				// use timestamp from external computer, clocks are synchronized when using MAVROS
 				_ekf.setExtVisionData(vision_position_updated ? ev_pos.timestamp : ev_att.timestamp, &ev_data);
+
+				ekf2_timestamps.vision_position_timestamp_rel = (int16_t)((int64_t)ev_pos.timestamp / 100 -
+						(int64_t)ekf2_timestamps.timestamp / 100);
 			}
 		}
 
@@ -965,66 +996,7 @@ void Ekf2::run()
 			}
 		}
 
-		{
-			// publish ekf2_timestamps (using 0.1 ms relative timestamps)
-			ekf2_timestamps_s ekf2_timestamps;
-			ekf2_timestamps.timestamp = sensors.timestamp;
-
-			if (gps_updated) {
-				// divide individually to get consistent rounding behavior
-				ekf2_timestamps.gps_timestamp_rel = (int16_t)((int64_t)gps.timestamp / 100 - (int64_t)ekf2_timestamps.timestamp / 100);
-
-			} else {
-				ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-			}
-
-			if (optical_flow_updated) {
-				ekf2_timestamps.optical_flow_timestamp_rel = (int16_t)((int64_t)optical_flow.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
-
-			} else {
-				ekf2_timestamps.optical_flow_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-			}
-
-			if (range_finder_updated) {
-				ekf2_timestamps.distance_sensor_timestamp_rel = (int16_t)((int64_t)range_finder.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
-
-			} else {
-				ekf2_timestamps.distance_sensor_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-			}
-
-			if (airspeed_updated) {
-				ekf2_timestamps.airspeed_timestamp_rel = (int16_t)((int64_t)airspeed.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
-
-			} else {
-				ekf2_timestamps.airspeed_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-			}
-
-			if (vision_position_updated) {
-				ekf2_timestamps.vision_position_timestamp_rel = (int16_t)((int64_t)ev_pos.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
-
-			} else {
-				ekf2_timestamps.vision_position_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-			}
-
-			if (vision_attitude_updated) {
-				ekf2_timestamps.vision_attitude_timestamp_rel = (int16_t)((int64_t)ev_att.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
-
-			} else {
-				ekf2_timestamps.vision_attitude_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-			}
-
-			if (_ekf2_timestamps_pub == nullptr) {
-				_ekf2_timestamps_pub = orb_advertise(ORB_ID(ekf2_timestamps), &ekf2_timestamps);
-
-			} else {
-				orb_publish(ORB_ID(ekf2_timestamps), _ekf2_timestamps_pub, &ekf2_timestamps);
-			}
-		}
+		_ekf2_timestamps_pub.update();
 	}
 
 	orb_unsubscribe(sensors_sub);
