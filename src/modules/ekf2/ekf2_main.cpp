@@ -113,6 +113,7 @@ private:
 
 	bool update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state);
 	bool update_air_data();
+	bool update_gps();
 
 	bool publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
 	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
@@ -189,6 +190,7 @@ private:
 	orb_advert_t _sensor_bias_pub{nullptr};
 
 	int	_air_data_sub{-1};
+	int _gps_sub{-1};
 	int	_magnetometer_sub{-1};
 
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
@@ -600,7 +602,6 @@ void Ekf2::run()
 {
 	// subscribe to relevant topics
 	int sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
-	int gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
 	int airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	int params_sub = orb_subscribe(ORB_ID(parameter_update));
 	int optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
@@ -612,6 +613,7 @@ void Ekf2::run()
 	int landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
 
 	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
+	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
 	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
 
 	bool imu_bias_reset_request = false;
@@ -635,7 +637,6 @@ void Ekf2::run()
 	// because they will else not always be
 	// properly populated
 	sensor_combined_s sensors = {};
-	vehicle_gps_position_s gps = {};
 	airspeed_s airspeed = {};
 	optical_flow_s optical_flow = {};
 	distance_sensor_s range_finder = {};
@@ -685,7 +686,7 @@ void Ekf2::run()
 			continue;
 		}
 
-		bool gps_updated = false;
+
 		bool airspeed_updated = false;
 		bool sensor_selection_updated = false;
 		bool optical_flow_updated = false;
@@ -707,11 +708,7 @@ void Ekf2::run()
 			orb_copy(ORB_ID(vehicle_status), status_sub, &vehicle_status);
 		}
 
-		orb_check(gps_sub, &gps_updated);
-
-		if (gps_updated) {
-			orb_copy(ORB_ID(vehicle_gps_position), gps_sub, &gps);
-		}
+		update_gps();
 
 		// Do not attempt to use airspeed if use has been disabled by the user.
 		orb_check(airspeed_sub, &airspeed_updated);
@@ -822,32 +819,6 @@ void Ekf2::run()
 
 		// read baro data
 		update_air_data();
-
-		// read gps data if available
-		if (gps_updated) {
-			struct gps_message gps_msg;
-			gps_msg.time_usec = gps.timestamp;
-			gps_msg.lat = gps.lat;
-			gps_msg.lon = gps.lon;
-			gps_msg.alt = gps.alt;
-			gps_msg.fix_type = gps.fix_type;
-			gps_msg.eph = gps.eph;
-			gps_msg.epv = gps.epv;
-			gps_msg.sacc = gps.s_variance_m_s;
-			gps_msg.vel_m_s = gps.vel_m_s;
-			gps_msg.vel_ned[0] = gps.vel_n_m_s;
-			gps_msg.vel_ned[1] = gps.vel_e_m_s;
-			gps_msg.vel_ned[2] = gps.vel_d_m_s;
-			gps_msg.vel_ned_valid = gps.vel_ned_valid;
-			gps_msg.nsats = gps.satellites_used;
-			//TODO: add gdop to gps topic
-			gps_msg.gdop = 0.0f;
-
-			_ekf.setGpsData(gps.timestamp, &gps_msg);
-
-			// divide individually to get consistent rounding behavior
-			ekf2_timestamps.gps_timestamp_rel = (int16_t)((int64_t)gps.timestamp / 100 - (int64_t)ekf2_timestamps.timestamp / 100);
-		}
 
 		// only set airspeed data if condition for airspeed fusion are met
 		bool fuse_airspeed = airspeed_updated && !vehicle_status.is_rotary_wing
@@ -1000,7 +971,6 @@ void Ekf2::run()
 	}
 
 	orb_unsubscribe(sensors_sub);
-	orb_unsubscribe(gps_sub);
 	orb_unsubscribe(airspeed_sub);
 	orb_unsubscribe(params_sub);
 	orb_unsubscribe(optical_flow_sub);
@@ -1010,6 +980,10 @@ void Ekf2::run()
 	orb_unsubscribe(status_sub);
 	orb_unsubscribe(sensor_selection_sub);
 	orb_unsubscribe(landing_target_pose_sub);
+
+	orb_unsubscribe(_air_data_sub);
+	orb_unsubscribe(_gps_sub);
+	orb_unsubscribe(_magnetometer_sub);
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		orb_unsubscribe(range_finder_subs[i]);
@@ -1036,6 +1010,44 @@ int Ekf2::getRangeSubIndex(const int *subs)
 	}
 
 	return -1;
+}
+
+bool Ekf2::update_gps()
+{
+	bool gps_updated = false;
+	orb_check(_gps_sub, &gps_updated);
+
+	if (gps_updated) {
+		vehicle_gps_position_s gps;
+
+		if (orb_copy(ORB_ID(vehicle_gps_position), _gps_sub, &gps) == PX4_OK) {
+			struct gps_message gps_msg;
+			gps_msg.time_usec = gps.timestamp;
+			gps_msg.lat = gps.lat;
+			gps_msg.lon = gps.lon;
+			gps_msg.alt = gps.alt;
+			gps_msg.fix_type = gps.fix_type;
+			gps_msg.eph = gps.eph;
+			gps_msg.epv = gps.epv;
+			gps_msg.sacc = gps.s_variance_m_s;
+			gps_msg.vel_m_s = gps.vel_m_s;
+			gps_msg.vel_ned[0] = gps.vel_n_m_s;
+			gps_msg.vel_ned[1] = gps.vel_e_m_s;
+			gps_msg.vel_ned[2] = gps.vel_d_m_s;
+			gps_msg.vel_ned_valid = gps.vel_ned_valid;
+			gps_msg.nsats = gps.satellites_used;
+			//TODO: add gdop to gps topic
+			gps_msg.gdop = 0.0f;
+
+			_ekf.setGpsData(gps.timestamp, &gps_msg);
+
+			// divide individually to get consistent rounding behavior
+			_ekf2_timestamps_pub.get().gps_timestamp_rel = (int16_t)((int64_t)gps.timestamp / 100 -
+					(int64_t)_ekf2_timestamps_pub.get().timestamp / 100);
+		}
+	}
+
+	return gps_updated;
 }
 
 bool Ekf2::update_air_data()
