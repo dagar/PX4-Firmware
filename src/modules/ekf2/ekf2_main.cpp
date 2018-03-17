@@ -116,6 +116,8 @@ private:
 	bool update_gps();
 	bool update_optical_flow();
 	bool update_range_finder();
+	bool update_vision();
+	bool update_landing_target_pose();
 
 	bool publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
 	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
@@ -192,7 +194,10 @@ private:
 	orb_advert_t _sensor_bias_pub{nullptr};
 
 	int	_air_data_sub{-1};
+	int _ev_pos_sub{-1};
+	int _ev_att_sub{-1};
 	int _gps_sub{-1};
+	int _landing_target_pose_sub{-1};
 	int	_magnetometer_sub{-1};
 	int _optical_flow_sub{-1};
 
@@ -611,15 +616,15 @@ void Ekf2::run()
 	int sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
 	int airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	int params_sub = orb_subscribe(ORB_ID(parameter_update));
-	int ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
-	int ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
 	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	int sensor_selection_sub = orb_subscribe(ORB_ID(sensor_selection));
-	int landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
 
 	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
+	_ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
+	_ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
 	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
+	_landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
 	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
 	_optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
 
@@ -642,11 +647,8 @@ void Ekf2::run()
 	sensor_combined_s sensors = {};
 	airspeed_s airspeed = {};
 	vehicle_land_detected_s vehicle_land_detected = {};
-	vehicle_local_position_s ev_pos = {};
-	vehicle_attitude_s ev_att = {};
 	vehicle_status_s vehicle_status = {};
 	sensor_selection_s sensor_selection = {};
-	landing_target_pose_s landing_target_pose = {};
 
 	while (!should_exit()) {
 
@@ -690,10 +692,7 @@ void Ekf2::run()
 		bool airspeed_updated = false;
 		bool sensor_selection_updated = false;
 		bool vehicle_land_detected_updated = false;
-		bool vision_position_updated = false;
-		bool vision_attitude_updated = false;
 		bool vehicle_status_updated = false;
-		bool landing_target_pose_updated = false;
 
 		orb_copy(ORB_ID(sensor_combined), sensors_sub, &sensors);
 		ekf2_timestamps.timestamp = sensors.timestamp;
@@ -747,21 +746,6 @@ void Ekf2::run()
 
 		update_range_finder();
 
-		orb_check(ev_pos_sub, &vision_position_updated);
-
-		if (vision_position_updated) {
-			orb_copy(ORB_ID(vehicle_vision_position), ev_pos_sub, &ev_pos);
-		}
-
-		orb_check(ev_att_sub, &vision_attitude_updated);
-
-		if (vision_attitude_updated) {
-			orb_copy(ORB_ID(vehicle_vision_attitude), ev_att_sub, &ev_att);
-
-			ekf2_timestamps.vision_attitude_timestamp_rel = (int16_t)((int64_t)ev_att.timestamp / 100 -
-					(int64_t)ekf2_timestamps.timestamp / 100);
-		}
-
 		// in replay mode we are getting the actual timestamp from the sensor topic
 		hrt_abstime now = 0;
 
@@ -812,29 +796,7 @@ void Ekf2::run()
 			_ekf.set_is_fixed_wing(!vehicle_status.is_rotary_wing);
 		}
 
-		// get external vision data
-		// if error estimates are unavailable, use parameter defined defaults
-		if (vision_position_updated || vision_attitude_updated) {
-			ext_vision_message ev_data;
-			ev_data.posNED(0) = ev_pos.x;
-			ev_data.posNED(1) = ev_pos.y;
-			ev_data.posNED(2) = ev_pos.z;
-			matrix::Quatf q(ev_att.q);
-			ev_data.quat = q;
-
-			// position measurement error from parameters. TODO : use covariances from topic
-			ev_data.posErr = fmaxf(_ev_pos_noise.get(), fmaxf(ev_pos.eph, ev_pos.epv));
-			ev_data.angErr = _ev_ang_noise.get();
-
-			// only set data if all positions and velocities are valid
-			if (ev_pos.xy_valid && ev_pos.z_valid && ev_pos.v_xy_valid && ev_pos.v_z_valid) {
-				// use timestamp from external computer, clocks are synchronized when using MAVROS
-				_ekf.setExtVisionData(vision_position_updated ? ev_pos.timestamp : ev_att.timestamp, &ev_data);
-
-				ekf2_timestamps.vision_position_timestamp_rel = (int16_t)((int64_t)ev_pos.timestamp / 100 -
-						(int64_t)ekf2_timestamps.timestamp / 100);
-			}
-		}
+		update_vision();
 
 		orb_check(vehicle_land_detected_sub, &vehicle_land_detected_updated);
 
@@ -843,24 +805,7 @@ void Ekf2::run()
 			_ekf.set_in_air_status(!vehicle_land_detected.landed);
 		}
 
-		// use the landing target pose estimate as another source of velocity data
-		orb_check(landing_target_pose_sub, &landing_target_pose_updated);
-
-		if (landing_target_pose_updated) {
-			orb_copy(ORB_ID(landing_target_pose), landing_target_pose_sub, &landing_target_pose);
-
-			// we can only use the landing target if it has a fixed position and  a valid velocity estimate
-			if (landing_target_pose.is_static && landing_target_pose.rel_vel_valid) {
-				// velocity of vehicle relative to target has opposite sign to target relative to vehicle
-				float velocity[2];
-				velocity[0] = -landing_target_pose.vx_rel;
-				velocity[1] = -landing_target_pose.vy_rel;
-				float variance[2];
-				variance[0] = landing_target_pose.cov_vx_rel;
-				variance[1] = landing_target_pose.cov_vy_rel;
-				_ekf.setAuxVelData(landing_target_pose.timestamp, velocity, variance);
-			}
-		}
+		update_landing_target_pose();
 
 		// run the EKF update and output
 		const bool updated = _ekf.update();
@@ -921,15 +866,15 @@ void Ekf2::run()
 	orb_unsubscribe(sensors_sub);
 	orb_unsubscribe(airspeed_sub);
 	orb_unsubscribe(params_sub);
-	orb_unsubscribe(ev_pos_sub);
-	orb_unsubscribe(ev_att_sub);
 	orb_unsubscribe(vehicle_land_detected_sub);
 	orb_unsubscribe(status_sub);
 	orb_unsubscribe(sensor_selection_sub);
-	orb_unsubscribe(landing_target_pose_sub);
 
 	orb_unsubscribe(_air_data_sub);
+	orb_unsubscribe(_ev_pos_sub);
+	orb_unsubscribe(_ev_att_sub);
 	orb_unsubscribe(_gps_sub);
+	orb_unsubscribe(_landing_target_pose_sub);
 	orb_unsubscribe(_magnetometer_sub);
 	orb_unsubscribe(_optical_flow_sub);
 
@@ -1065,6 +1010,83 @@ bool Ekf2::update_range_finder()
 	}
 
 	return range_finder_updated;
+}
+
+bool Ekf2::update_vision()
+{
+	bool vision_position_updated = false;
+	bool vision_attitude_updated = false;
+
+	vehicle_local_position_s ev_pos = {};
+	vehicle_attitude_s ev_att = {};
+
+	orb_check(_ev_pos_sub, &vision_position_updated);
+
+	if (vision_position_updated) {
+		orb_copy(ORB_ID(vehicle_vision_position), _ev_pos_sub, &ev_pos);
+	}
+
+	orb_check(_ev_att_sub, &vision_attitude_updated);
+
+	if (vision_attitude_updated) {
+		orb_copy(ORB_ID(vehicle_vision_attitude), _ev_att_sub, &ev_att);
+
+		_ekf2_timestamps_pub.get().vision_attitude_timestamp_rel = (int16_t)((int64_t)ev_att.timestamp / 100 -
+				(int64_t)_ekf2_timestamps_pub.get().timestamp / 100);
+	}
+
+	// get external vision data
+	// if error estimates are unavailable, use parameter defined defaults
+	if (vision_position_updated || vision_attitude_updated) {
+		ext_vision_message ev_data;
+		ev_data.posNED(0) = ev_pos.x;
+		ev_data.posNED(1) = ev_pos.y;
+		ev_data.posNED(2) = ev_pos.z;
+		matrix::Quatf q(ev_att.q);
+		ev_data.quat = q;
+
+		// position measurement error from parameters. TODO : use covariances from topic
+		ev_data.posErr = fmaxf(_ev_pos_noise.get(), fmaxf(ev_pos.eph, ev_pos.epv));
+		ev_data.angErr = _ev_ang_noise.get();
+
+		// only set data if all positions and velocities are valid
+		if (ev_pos.xy_valid && ev_pos.z_valid && ev_pos.v_xy_valid && ev_pos.v_z_valid) {
+			// use timestamp from external computer, clocks are synchronized when using MAVROS
+			_ekf.setExtVisionData(vision_position_updated ? ev_pos.timestamp : ev_att.timestamp, &ev_data);
+
+			_ekf2_timestamps_pub.get().vision_position_timestamp_rel = (int16_t)((int64_t)ev_pos.timestamp / 100 -
+					(int64_t)_ekf2_timestamps_pub.get().timestamp / 100);
+		}
+	}
+
+	return vision_position_updated || vision_attitude_updated;
+}
+
+bool Ekf2::update_landing_target_pose()
+{
+	bool landing_target_pose_updated = false;
+
+	// use the landing target pose estimate as another source of velocity data
+	orb_check(_landing_target_pose_sub, &landing_target_pose_updated);
+
+	if (landing_target_pose_updated) {
+		landing_target_pose_s landing_target_pose;
+		orb_copy(ORB_ID(landing_target_pose), _landing_target_pose_sub, &landing_target_pose);
+
+		// we can only use the landing target if it has a fixed position and  a valid velocity estimate
+		if (landing_target_pose.is_static && landing_target_pose.rel_vel_valid) {
+			// velocity of vehicle relative to target has opposite sign to target relative to vehicle
+			float velocity[2];
+			velocity[0] = -landing_target_pose.vx_rel;
+			velocity[1] = -landing_target_pose.vy_rel;
+			float variance[2];
+			variance[0] = landing_target_pose.cov_vx_rel;
+			variance[1] = landing_target_pose.cov_vy_rel;
+			_ekf.setAuxVelData(landing_target_pose.timestamp, velocity, variance);
+		}
+	}
+
+	return landing_target_pose_updated;
 }
 
 bool Ekf2::update_air_data()
