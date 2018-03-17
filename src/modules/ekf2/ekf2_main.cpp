@@ -531,6 +531,9 @@ Ekf2::Ekf2():
 	_bcoef_x(_params->bcoef_x),
 	_bcoef_y(_params->bcoef_y)
 {
+	// initialise parameter cache
+	updateParams();
+
 	// subscribe to relevant topics
 	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
 	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
@@ -670,9 +673,6 @@ void Ekf2::run()
 	px4_pollfd_struct_t fds[1] = {};
 	fds[0].fd = _sensors_sub;
 	fds[0].events = POLLIN;
-
-	// initialise parameter cache
-	updateParams();
 
 	// initialize data structures outside of loop
 	// because they will else not always be
