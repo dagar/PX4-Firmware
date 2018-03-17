@@ -114,6 +114,7 @@ private:
 	bool update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state);
 	bool update_air_data();
 	bool update_gps();
+	bool update_optical_flow();
 
 	bool publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
 	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
@@ -192,6 +193,7 @@ private:
 	int	_air_data_sub{-1};
 	int _gps_sub{-1};
 	int	_magnetometer_sub{-1};
+	int _optical_flow_sub{-1};
 
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
 	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
@@ -604,7 +606,6 @@ void Ekf2::run()
 	int sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
 	int airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	int params_sub = orb_subscribe(ORB_ID(parameter_update));
-	int optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
 	int ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
 	int ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
 	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
@@ -615,6 +616,7 @@ void Ekf2::run()
 	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
 	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
 	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
+	_optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
 
 	bool imu_bias_reset_request = false;
 
@@ -638,7 +640,6 @@ void Ekf2::run()
 	// properly populated
 	sensor_combined_s sensors = {};
 	airspeed_s airspeed = {};
-	optical_flow_s optical_flow = {};
 	distance_sensor_s range_finder = {};
 	vehicle_land_detected_s vehicle_land_detected = {};
 	vehicle_local_position_s ev_pos = {};
@@ -686,10 +687,8 @@ void Ekf2::run()
 			continue;
 		}
 
-
 		bool airspeed_updated = false;
 		bool sensor_selection_updated = false;
-		bool optical_flow_updated = false;
 		bool range_finder_updated = false;
 		bool vehicle_land_detected_updated = false;
 		bool vision_position_updated = false;
@@ -745,11 +744,7 @@ void Ekf2::run()
 			imu_bias_reset_request = !_ekf.reset_imu_bias();
 		}
 
-		orb_check(optical_flow_sub, &optical_flow_updated);
-
-		if (optical_flow_updated) {
-			orb_copy(ORB_ID(optical_flow), optical_flow_sub, &optical_flow);
-		}
+		update_optical_flow();
 
 		if (range_finder_sub_index >= 0) {
 			orb_check(range_finder_subs[range_finder_sub_index], &range_finder_updated);
@@ -837,25 +832,6 @@ void Ekf2::run()
 
 			// let the EKF know if the vehicle motion is that of a fixed wing (forward flight only relative to wind)
 			_ekf.set_is_fixed_wing(!vehicle_status.is_rotary_wing);
-		}
-
-		if (optical_flow_updated) {
-			flow_message flow;
-			flow.flowdata(0) = optical_flow.pixel_flow_x_integral;
-			flow.flowdata(1) = optical_flow.pixel_flow_y_integral;
-			flow.quality = optical_flow.quality;
-			flow.gyrodata(0) = optical_flow.gyro_x_rate_integral;
-			flow.gyrodata(1) = optical_flow.gyro_y_rate_integral;
-			flow.gyrodata(2) = optical_flow.gyro_z_rate_integral;
-			flow.dt = optical_flow.integration_timespan;
-
-			if (PX4_ISFINITE(optical_flow.pixel_flow_y_integral) &&
-			    PX4_ISFINITE(optical_flow.pixel_flow_x_integral)) {
-				_ekf.setOpticalFlowData(optical_flow.timestamp, &flow);
-			}
-
-			ekf2_timestamps.optical_flow_timestamp_rel = (int16_t)((int64_t)optical_flow.timestamp / 100 -
-					(int64_t)ekf2_timestamps.timestamp / 100);
 		}
 
 		if (range_finder_updated) {
@@ -973,7 +949,6 @@ void Ekf2::run()
 	orb_unsubscribe(sensors_sub);
 	orb_unsubscribe(airspeed_sub);
 	orb_unsubscribe(params_sub);
-	orb_unsubscribe(optical_flow_sub);
 	orb_unsubscribe(ev_pos_sub);
 	orb_unsubscribe(ev_att_sub);
 	orb_unsubscribe(vehicle_land_detected_sub);
@@ -984,6 +959,7 @@ void Ekf2::run()
 	orb_unsubscribe(_air_data_sub);
 	orb_unsubscribe(_gps_sub);
 	orb_unsubscribe(_magnetometer_sub);
+	orb_unsubscribe(_optical_flow_sub);
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		orb_unsubscribe(range_finder_subs[i]);
@@ -1048,6 +1024,38 @@ bool Ekf2::update_gps()
 	}
 
 	return gps_updated;
+}
+
+bool Ekf2::update_optical_flow()
+{
+	bool optical_flow_updated = false;
+
+	orb_check(_optical_flow_sub, &optical_flow_updated);
+
+	if (optical_flow_updated) {
+		optical_flow_s optical_flow = {};
+
+		orb_copy(ORB_ID(optical_flow), _optical_flow_sub, &optical_flow);
+
+		flow_message flow;
+		flow.flowdata(0) = optical_flow.pixel_flow_x_integral;
+		flow.flowdata(1) = optical_flow.pixel_flow_y_integral;
+		flow.quality = optical_flow.quality;
+		flow.gyrodata(0) = optical_flow.gyro_x_rate_integral;
+		flow.gyrodata(1) = optical_flow.gyro_y_rate_integral;
+		flow.gyrodata(2) = optical_flow.gyro_z_rate_integral;
+		flow.dt = optical_flow.integration_timespan;
+
+		if (PX4_ISFINITE(optical_flow.pixel_flow_y_integral) &&
+		    PX4_ISFINITE(optical_flow.pixel_flow_x_integral)) {
+			_ekf.setOpticalFlowData(optical_flow.timestamp, &flow);
+		}
+
+		_ekf2_timestamps_pub.get().optical_flow_timestamp_rel = (int16_t)((int64_t)optical_flow.timestamp / 100 -
+				(int64_t)_ekf2_timestamps_pub.get().timestamp / 100);
+	}
+
+	return optical_flow_updated;
 }
 
 bool Ekf2::update_air_data()
