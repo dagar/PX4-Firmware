@@ -111,6 +111,8 @@ private:
 	template<typename Param>
 	void update_mag_bias(Param &mag_bias_param, int axis_index);
 
+	void update_imu(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
+
 	bool update_air_data();
 	bool update_airspeed();
 	bool update_gps();
@@ -741,20 +743,7 @@ void Ekf2::run()
 			now = hrt_absolute_time();
 		}
 
-		// push imu data into estimator
-		float gyro_integral[3];
-		float gyro_dt = sensors.gyro_integral_dt / 1.e6f;
-		gyro_integral[0] = sensors.gyro_rad[0] * gyro_dt;
-		gyro_integral[1] = sensors.gyro_rad[1] * gyro_dt;
-		gyro_integral[2] = sensors.gyro_rad[2] * gyro_dt;
-
-		float accel_integral[3];
-		float accel_dt = sensors.accelerometer_integral_dt / 1.e6f;
-		accel_integral[0] = sensors.accelerometer_m_s2[0] * accel_dt;
-		accel_integral[1] = sensors.accelerometer_m_s2[1] * accel_dt;
-		accel_integral[2] = sensors.accelerometer_m_s2[2] * accel_dt;
-
-		_ekf.setIMUData(now, sensors.gyro_integral_dt, sensors.accelerometer_integral_dt, gyro_integral, accel_integral);
+		update_imu(now, sensors);
 
 		// run the EKF update and output
 		const bool updated = _ekf.update();
@@ -830,6 +819,24 @@ int Ekf2::getRangeSubIndex(const int *subs)
 	}
 
 	return -1;
+}
+
+void Ekf2::update_imu(const hrt_abstime &timestamp, const sensor_combined_s &sensors)
+{
+	float gyro_integral[3];
+	const float gyro_dt = sensors.gyro_integral_dt / 1.e6f;
+	gyro_integral[0] = sensors.gyro_rad[0] * gyro_dt;
+	gyro_integral[1] = sensors.gyro_rad[1] * gyro_dt;
+	gyro_integral[2] = sensors.gyro_rad[2] * gyro_dt;
+
+	float accel_integral[3];
+	const float accel_dt = sensors.accelerometer_integral_dt / 1.e6f;
+	accel_integral[0] = sensors.accelerometer_m_s2[0] * accel_dt;
+	accel_integral[1] = sensors.accelerometer_m_s2[1] * accel_dt;
+	accel_integral[2] = sensors.accelerometer_m_s2[2] * accel_dt;
+
+	// push imu data into estimator
+	_ekf.setIMUData(timestamp, sensors.gyro_integral_dt, sensors.accelerometer_integral_dt, gyro_integral, accel_integral);
 }
 
 bool Ekf2::update_airspeed()
