@@ -106,28 +106,29 @@ public:
 private:
 	int getRangeSubIndex(const int *subs); ///< get subscription index of first downward-facing range sensor
 
-	void learned_mag_bias(const hrt_abstime &timestamp, const uint8_t arming_state, const bool landed,
-			      const estimator_status_s &status, const uint32_t mag_device_id);
+	void learned_mag_bias(const hrt_abstime &timestamp, const estimator_status_s &status);
 
 	template<typename Param>
 	void update_mag_bias(Param &mag_bias_param, int axis_index);
 
-	bool update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state);
 	bool update_air_data();
 	bool update_airspeed();
 	bool update_gps();
+	bool update_landing_target_pose();
+	bool update_magnetometer();
 	bool update_optical_flow();
 	bool update_range_finder();
-	bool update_vision();
-	bool update_landing_target_pose();
 	bool update_sensor_selection();
+	bool update_vehicle_land_detected();
+	bool update_vehicle_status();
+	bool update_vision();
 
 	bool publish_attitude(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
-	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
-	bool publish_position(const hrt_abstime &timestamp);
-	bool publish_wind_estimate(const hrt_abstime &timestamp);
 	bool publish_ekf2_innovations(const ekf2_innovations_s &innovations);
 	bool publish_estimator_status(const estimator_status_s &status);
+	bool publish_position(const hrt_abstime &timestamp);
+	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
+	bool publish_wind_estimate(const hrt_abstime &timestamp);
 
 	void get_ekf2_innovations(ekf2_innovations_s &innovations);
 	void get_estimator_status(estimator_status_s &status);
@@ -191,19 +192,21 @@ private:
 	const float _hgt_innov_spike_lim = 2.0f * _hgt_innov_test_lim;	///< preflight position innovation spike limit (m)
 
 	orb_advert_t _att_pub{nullptr};
-	orb_advert_t _wind_pub{nullptr};
-	orb_advert_t _estimator_status_pub{nullptr};
 	orb_advert_t _estimator_innovations_pub{nullptr};
+	orb_advert_t _estimator_status_pub{nullptr};
 	orb_advert_t _sensor_bias_pub{nullptr};
+	orb_advert_t _wind_pub{nullptr};
 
-	int	_air_data_sub{-1};
+	int _air_data_sub{-1};
 	int _airspeed_sub{-1};
-	int _ev_pos_sub{-1};
 	int _ev_att_sub{-1};
+	int _ev_pos_sub{-1};
 	int _gps_sub{-1};
 	int _landing_target_pose_sub{-1};
-	int	_magnetometer_sub{-1};
+	int _magnetometer_sub{-1};
 	int _optical_flow_sub{-1};
+	int _vehicle_land_detected_sub{-1};
+	int _vehicle_status_sub{-1};
 
 	// because we can have several distance sensor instances with different orientations
 	int _range_finder_subs[ORB_MULTI_MAX_INSTANCES];
@@ -216,6 +219,9 @@ private:
 	uORB::Subscription<sensor_selection_s> _sensor_selection_sub;
 
 	bool	_imu_bias_reset_request{false};
+
+	uint8_t	_arming_state{vehicle_status_s::ARMING_STATE_INIT};
+	bool	_landed{true};
 
 	Ekf _ekf;
 
@@ -524,12 +530,14 @@ Ekf2::Ekf2():
 {
 	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
 	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
-	_ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
 	_ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
+	_ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
 	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
 	_landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
 	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
 	_optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
+	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
+	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		_range_finder_subs[i] = orb_subscribe_multi(ORB_ID(distance_sensor), i);
@@ -540,12 +548,14 @@ Ekf2::~Ekf2()
 {
 	orb_unsubscribe(_air_data_sub);
 	orb_unsubscribe(_airspeed_sub);
-	orb_unsubscribe(_ev_pos_sub);
 	orb_unsubscribe(_ev_att_sub);
+	orb_unsubscribe(_ev_pos_sub);
 	orb_unsubscribe(_gps_sub);
 	orb_unsubscribe(_landing_target_pose_sub);
 	orb_unsubscribe(_magnetometer_sub);
 	orb_unsubscribe(_optical_flow_sub);
+	orb_unsubscribe(_vehicle_land_detected_sub);
+	orb_unsubscribe(_vehicle_status_sub);
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		orb_unsubscribe(_range_finder_subs[i]);
@@ -561,12 +571,11 @@ int Ekf2::print_status()
 	return 0;
 }
 
-void Ekf2::learned_mag_bias(const hrt_abstime &timestamp, const uint8_t arming_state, const bool landed,
-			    const estimator_status_s &status, const uint32_t mag_device_id)
+void Ekf2::learned_mag_bias(const hrt_abstime &timestamp, const estimator_status_s &status)
 {
 	// Check if conditions are OK to for learning of magnetometer bias values
-	if (!landed && // not on ground
-	    (arming_state == vehicle_status_s::ARMING_STATE_ARMED) && // vehicle is armed
+	if (!_landed && // not on ground
+	    (_arming_state == vehicle_status_s::ARMING_STATE_ARMED) && // vehicle is armed
 	    (status.filter_fault_flags == 0) && // there are no filter faults
 	    (status.control_mode_flags & (1 << 5))) { // the EKF is operating in the correct mode
 
@@ -616,9 +625,9 @@ void Ekf2::learned_mag_bias(const hrt_abstime &timestamp, const uint8_t arming_s
 	}
 
 	// Check and save the last valid calibration when we are disarmed
-	if ((arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
+	if ((_arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
 	    && (status.filter_fault_flags == 0)
-	    && (mag_device_id == _mag_bias_id.get())) {
+	    && (_sensor_selection_sub.get().mag_device_id == _mag_bias_id.get())) {
 
 		update_mag_bias(_mag_bias_x, 0);
 		update_mag_bias(_mag_bias_y, 1);
@@ -653,8 +662,6 @@ void Ekf2::run()
 	// subscribe to relevant topics
 	int sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
 	int params_sub = orb_subscribe(ORB_ID(parameter_update));
-	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
-	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
 
 	px4_pollfd_struct_t fds[1] = {};
 	fds[0].fd = sensors_sub;
@@ -667,14 +674,11 @@ void Ekf2::run()
 	// because they will else not always be
 	// properly populated
 	sensor_combined_s sensors = {};
-	vehicle_land_detected_s vehicle_land_detected = {};
-	vehicle_status_s vehicle_status = {};
 
 	while (!should_exit()) {
 
 		// reset all timestamps
 		ekf2_timestamps_s &ekf2_timestamps = _ekf2_timestamps_pub.get();
-		ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.optical_flow_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.distance_sensor_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
@@ -709,28 +713,20 @@ void Ekf2::run()
 			continue;
 		}
 
-		bool vehicle_land_detected_updated = false;
-		bool vehicle_status_updated = false;
-
 		orb_copy(ORB_ID(sensor_combined), sensors_sub, &sensors);
 		ekf2_timestamps.timestamp = sensors.timestamp;
 
 		// update all other topics if they have new data
-
-		orb_check(status_sub, &vehicle_status_updated);
-
-		if (vehicle_status_updated) {
-			orb_copy(ORB_ID(vehicle_status), status_sub, &vehicle_status);
-		}
-
 		update_air_data();
 		update_airspeed();
 		update_gps();
 		update_landing_target_pose();
-		update_magnetometer(vehicle_status.arming_state, _sensor_selection_sub.get().mag_device_id);
+		update_magnetometer();
 		update_optical_flow();
 		update_range_finder();
 		update_sensor_selection();
+		update_vehicle_land_detected();
+		update_vehicle_status();
 		update_vision();
 
 		// in replay mode we are getting the actual timestamp from the sensor topic
@@ -757,22 +753,6 @@ void Ekf2::run()
 		accel_integral[2] = sensors.accelerometer_m_s2[2] * accel_dt;
 
 		_ekf.setIMUData(now, sensors.gyro_integral_dt, sensors.accelerometer_integral_dt, gyro_integral, accel_integral);
-
-		if (vehicle_status_updated) {
-			// only fuse synthetic sideslip measurements if conditions are met
-			bool fuse_beta = !vehicle_status.is_rotary_wing && (_fuseBeta.get() == 1);
-			_ekf.set_fuse_beta_flag(fuse_beta);
-
-			// let the EKF know if the vehicle motion is that of a fixed wing (forward flight only relative to wind)
-			_ekf.set_is_fixed_wing(!vehicle_status.is_rotary_wing);
-		}
-
-		orb_check(vehicle_land_detected_sub, &vehicle_land_detected_updated);
-
-		if (vehicle_land_detected_updated) {
-			orb_copy(ORB_ID(vehicle_land_detected), vehicle_land_detected_sub, &vehicle_land_detected);
-			_ekf.set_in_air_status(!vehicle_land_detected.landed);
-		}
 
 		// run the EKF update and output
 		const bool updated = _ekf.update();
@@ -801,8 +781,7 @@ void Ekf2::run()
 		publish_estimator_status(status);
 
 		if (updated) {
-			learned_mag_bias(now, vehicle_status.arming_state, vehicle_land_detected.landed, status,
-					 _sensor_selection_sub.get().mag_device_id);
+			learned_mag_bias(now, status);
 
 			publish_wind_estimate(now);
 
@@ -811,7 +790,7 @@ void Ekf2::run()
 			get_ekf2_innovations(innovations);
 			publish_ekf2_innovations(innovations);
 
-			update_preflight_check(vehicle_status.arming_state, sensors, innovations);
+			update_preflight_check(_arming_state, sensors, innovations);
 
 		} else if (_replay_mode) {
 			// in replay mode we have to tell the replay module not to wait for an update
@@ -832,8 +811,6 @@ void Ekf2::run()
 
 	orb_unsubscribe(sensors_sub);
 	orb_unsubscribe(params_sub);
-	orb_unsubscribe(vehicle_land_detected_sub);
-	orb_unsubscribe(status_sub);
 }
 
 int Ekf2::getRangeSubIndex(const int *subs)
@@ -1072,6 +1049,49 @@ bool Ekf2::update_vision()
 	return vision_position_updated || vision_attitude_updated;
 }
 
+bool Ekf2::update_vehicle_land_detected()
+{
+	bool vehicle_land_detected_updated = false;
+
+	orb_check(_vehicle_land_detected_sub, &vehicle_land_detected_updated);
+
+	if (vehicle_land_detected_updated) {
+		vehicle_land_detected_s vehicle_land_detected = {};
+
+		if (orb_copy(ORB_ID(vehicle_land_detected), _vehicle_land_detected_sub, &vehicle_land_detected) == PX4_OK) {
+			_landed = vehicle_land_detected.landed;
+			_ekf.set_in_air_status(!_landed);
+		}
+	}
+
+	return vehicle_land_detected_updated;
+}
+
+bool Ekf2::update_vehicle_status()
+{
+	bool vehicle_status_updated = false;
+
+	orb_check(_vehicle_status_sub, &vehicle_status_updated);
+
+	if (vehicle_status_updated) {
+		vehicle_status_s vehicle_status;
+
+		if (orb_copy(ORB_ID(vehicle_status), _vehicle_status_sub, &vehicle_status) == PX4_OK) {
+
+			_arming_state = vehicle_status.arming_state;
+
+			// only fuse synthetic sideslip measurements if conditions are met
+			bool fuse_beta = !vehicle_status.is_rotary_wing && (_fuseBeta.get() == 1);
+			_ekf.set_fuse_beta_flag(fuse_beta);
+
+			// let the EKF know if the vehicle motion is that of a fixed wing (forward flight only relative to wind)
+			_ekf.set_is_fixed_wing(!vehicle_status.is_rotary_wing);
+		}
+	}
+
+	return vehicle_status_updated;
+}
+
 bool Ekf2::update_landing_target_pose()
 {
 	bool landing_target_pose_updated = false;
@@ -1161,7 +1181,7 @@ bool Ekf2::update_air_data()
 	return air_data_updated;
 }
 
-bool Ekf2::update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state)
+bool Ekf2::update_magnetometer()
 {
 	bool magnetometer_updated = false;
 	orb_check(_magnetometer_sub, &magnetometer_updated);
@@ -1174,6 +1194,8 @@ bool Ekf2::update_magnetometer(const uint32_t mag_device_id, const uint8_t armin
 			// Do not reset parmameters when armed to prevent potential time slips casued by parameter set
 			// and notification events
 			// Check if there has been a persistant change in magnetometer ID
+			const uint32_t mag_device_id = _sensor_selection_sub.get().mag_device_id;
+
 			if (mag_device_id != 0 && mag_device_id != _mag_bias_id.get()) {
 				if (_invalid_mag_id_count < 200) {
 					_invalid_mag_id_count++;
@@ -1185,7 +1207,7 @@ bool Ekf2::update_magnetometer(const uint32_t mag_device_id, const uint8_t armin
 				}
 			}
 
-			if ((arming_state != vehicle_status_s::ARMING_STATE_ARMED) && (_invalid_mag_id_count > 100)) {
+			if ((_arming_state != vehicle_status_s::ARMING_STATE_ARMED) && (_invalid_mag_id_count > 100)) {
 				// the sensor ID used for the last saved mag bias is not confirmed to be the same as the current sensor ID
 				// this means we need to reset the learned bias values to zero
 				_mag_bias_x.set(0.f);
