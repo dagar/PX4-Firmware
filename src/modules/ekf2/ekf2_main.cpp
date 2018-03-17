@@ -118,6 +118,14 @@ private:
 	bool publish_sensor_bias(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
 	bool publish_position(const hrt_abstime &timestamp);
 	bool publish_wind_estimate(const hrt_abstime &timestamp);
+	bool publish_ekf2_innovations(const ekf2_innovations_s &innovations);
+	bool publish_estimator_status(const estimator_status_s &status);
+
+	void get_ekf2_innovations(ekf2_innovations_s &innovations);
+	void get_estimator_status(estimator_status_s &status);
+
+	bool update_preflight_check(const uint8_t arming_state, const sensor_combined_s &sensors,
+				    const ekf2_innovations_s &innovations);
 
 	const Vector3f get_vel_body_wind();
 
@@ -924,139 +932,24 @@ void Ekf2::run()
 			publish_position(now);
 		}
 
-		// publish estimator status
-		estimator_status_s status;
+		estimator_status_s status = {};
 		status.timestamp = now;
-		_ekf.get_state_delayed(status.states);
-		_ekf.get_covariances(status.covariances);
-		_ekf.get_gps_check_status(&status.gps_check_fail_flags);
-		_ekf.get_control_mode(&status.control_mode_flags);
-		_ekf.get_filter_fault_status(&status.filter_fault_flags);
-		_ekf.get_innovation_test_status(&status.innovation_check_flags, &status.mag_test_ratio,
-						&status.vel_test_ratio, &status.pos_test_ratio,
-						&status.hgt_test_ratio, &status.tas_test_ratio,
-						&status.hagl_test_ratio, &status.beta_test_ratio);
+		get_estimator_status(status);
 
-		status.pos_horiz_accuracy = _vehicle_local_position_pub.get().eph;
-		status.pos_vert_accuracy = _vehicle_local_position_pub.get().epv;
-		_ekf.get_ekf_soln_status(&status.solution_status_flags);
-		_ekf.get_imu_vibe_metrics(status.vibe);
-		status.time_slip = _last_time_slip_us / 1e6f;
-		status.nan_flags = 0.0f; // unused
-		status.health_flags = 0.0f; // unused
-		status.timeout_flags = 0.0f; // unused
-		status.pre_flt_fail = _preflt_fail;
-
-		if (_estimator_status_pub == nullptr) {
-			_estimator_status_pub = orb_advertise(ORB_ID(estimator_status), &status);
-
-		} else {
-			orb_publish(ORB_ID(estimator_status), _estimator_status_pub, &status);
-		}
+		publish_estimator_status(status);
 
 		if (updated) {
-			{
-				/* Check and save learned magnetometer bias estimates */
-				learned_mag_bias(now, vehicle_status.arming_state, vehicle_land_detected.landed, status,
-						 sensor_selection.mag_device_id);
+			learned_mag_bias(now, vehicle_status.arming_state, vehicle_land_detected.landed, status,
+					 sensor_selection.mag_device_id);
 
-				publish_wind_estimate(now);
-			}
+			publish_wind_estimate(now);
 
-			{
-				// publish estimator innovation data
-				ekf2_innovations_s innovations;
-				innovations.timestamp = now;
-				_ekf.get_vel_pos_innov(&innovations.vel_pos_innov[0]);
-				_ekf.get_aux_vel_innov(&innovations.aux_vel_innov[0]);
-				_ekf.get_mag_innov(&innovations.mag_innov[0]);
-				_ekf.get_heading_innov(&innovations.heading_innov);
-				_ekf.get_airspeed_innov(&innovations.airspeed_innov);
-				_ekf.get_beta_innov(&innovations.beta_innov);
-				_ekf.get_flow_innov(&innovations.flow_innov[0]);
-				_ekf.get_hagl_innov(&innovations.hagl_innov);
-				_ekf.get_drag_innov(&innovations.drag_innov[0]);
+			ekf2_innovations_s innovations = {};
+			innovations.timestamp = now;
+			get_ekf2_innovations(innovations);
+			publish_ekf2_innovations(innovations);
 
-				_ekf.get_vel_pos_innov_var(&innovations.vel_pos_innov_var[0]);
-				_ekf.get_mag_innov_var(&innovations.mag_innov_var[0]);
-				_ekf.get_heading_innov_var(&innovations.heading_innov_var);
-				_ekf.get_airspeed_innov_var(&innovations.airspeed_innov_var);
-				_ekf.get_beta_innov_var(&innovations.beta_innov_var);
-				_ekf.get_flow_innov_var(&innovations.flow_innov_var[0]);
-				_ekf.get_hagl_innov_var(&innovations.hagl_innov_var);
-				_ekf.get_drag_innov_var(&innovations.drag_innov_var[0]);
-
-				_ekf.get_output_tracking_error(&innovations.output_tracking_error[0]);
-
-				// calculate noise filtered velocity innovations which are used for pre-flight checking
-				if (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
-					// calculate coefficients for LPF applied to innovation sequences
-					float alpha = constrain(sensors.accelerometer_integral_dt / 1.e6f * _innov_lpf_tau_inv, 0.0f, 1.0f);
-					float beta = 1.0f - alpha;
-
-					// filter the velocity and innvovations
-					_vel_ne_innov_lpf(0) = beta * _vel_ne_innov_lpf(0) + alpha * constrain(innovations.vel_pos_innov[0],
-							       -_vel_innov_spike_lim, _vel_innov_spike_lim);
-					_vel_ne_innov_lpf(1) = beta * _vel_ne_innov_lpf(1) + alpha * constrain(innovations.vel_pos_innov[1],
-							       -_vel_innov_spike_lim, _vel_innov_spike_lim);
-					_vel_d_innov_lpf = beta * _vel_d_innov_lpf + alpha * constrain(innovations.vel_pos_innov[2],
-							   -_vel_innov_spike_lim, _vel_innov_spike_lim);
-
-					// set the max allowed yaw innovaton depending on whether we are not aiding navigation using
-					// observations in the NE reference frame.
-					filter_control_status_u _ekf_control_mask;
-					_ekf.get_control_mode(&_ekf_control_mask.value);
-					bool doing_ne_aiding = _ekf_control_mask.flags.gps ||  _ekf_control_mask.flags.ev_pos;
-
-					float yaw_test_limit;
-
-					if (doing_ne_aiding) {
-						// use a smaller tolerance when doing NE inertial frame aiding
-						yaw_test_limit = _nav_yaw_innov_test_lim;
-
-					} else {
-						// use a larger tolerance when not doing NE inertial frame aiding
-						yaw_test_limit = _yaw_innov_test_lim;
-					}
-
-					// filter the yaw innovations using a decaying envelope filter to prevent innovation sign changes due to angle wrapping allowinging large innvoations to pass checks after filtering.
-					_yaw_innov_magnitude_lpf = fmaxf(beta * _yaw_innov_magnitude_lpf,
-									 fminf(fabsf(innovations.heading_innov), 2.0f * yaw_test_limit));
-
-					_hgt_innov_lpf = beta * _hgt_innov_lpf + alpha * constrain(innovations.vel_pos_innov[5], -_hgt_innov_spike_lim,
-							 _hgt_innov_spike_lim);
-
-					// check the yaw and horizontal velocity innovations
-					float vel_ne_innov_length = sqrtf(innovations.vel_pos_innov[0] * innovations.vel_pos_innov[0] +
-									  innovations.vel_pos_innov[1] * innovations.vel_pos_innov[1]);
-					_preflt_horiz_fail = (_vel_ne_innov_lpf.norm() > _vel_innov_test_lim)
-							     || (vel_ne_innov_length > 2.0f * _vel_innov_test_lim)
-							     || (_yaw_innov_magnitude_lpf > yaw_test_limit);
-
-					// check the vertical velocity and position innovations
-					_preflt_vert_fail = (fabsf(_vel_d_innov_lpf) > _vel_innov_test_lim)
-							    || (fabsf(innovations.vel_pos_innov[2]) > 2.0f * _vel_innov_test_lim)
-							    || (fabsf(_hgt_innov_lpf) > _hgt_innov_test_lim);
-
-					// master pass-fail status
-					_preflt_fail = _preflt_horiz_fail || _preflt_vert_fail;
-
-				} else {
-					_vel_ne_innov_lpf.zero();
-					_vel_d_innov_lpf = 0.0f;
-					_hgt_innov_lpf = 0.0f;
-					_preflt_horiz_fail = false;
-					_preflt_vert_fail = false;
-					_preflt_fail = false;
-				}
-
-				if (_estimator_innovations_pub == nullptr) {
-					_estimator_innovations_pub = orb_advertise(ORB_ID(ekf2_innovations), &innovations);
-
-				} else {
-					orb_publish(ORB_ID(ekf2_innovations), _estimator_innovations_pub, &innovations);
-				}
-			}
+			update_preflight_check(vehicle_status.arming_state, sensors, innovations);
 
 		} else if (_replay_mode) {
 			// in replay mode we have to tell the replay module not to wait for an update
@@ -1545,6 +1438,151 @@ bool Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
 	}
 
 	return published;
+}
+
+void Ekf2::get_estimator_status(estimator_status_s &status)
+{
+	_ekf.get_state_delayed(status.states);
+	_ekf.get_covariances(status.covariances);
+	_ekf.get_gps_check_status(&status.gps_check_fail_flags);
+	_ekf.get_control_mode(&status.control_mode_flags);
+	_ekf.get_filter_fault_status(&status.filter_fault_flags);
+	_ekf.get_innovation_test_status(
+		&status.innovation_check_flags,
+		&status.mag_test_ratio,
+		&status.vel_test_ratio, &status.pos_test_ratio,
+		&status.hgt_test_ratio, &status.tas_test_ratio,
+		&status.hagl_test_ratio, &status.beta_test_ratio);
+
+	status.pos_horiz_accuracy = _vehicle_local_position_pub.get().eph;
+	status.pos_vert_accuracy = _vehicle_local_position_pub.get().epv;
+	_ekf.get_ekf_soln_status(&status.solution_status_flags);
+	_ekf.get_imu_vibe_metrics(status.vibe);
+	status.time_slip = _last_time_slip_us / 1e6f;
+	status.nan_flags = 0.0f; // unused
+	status.health_flags = 0.0f; // unused
+	status.timeout_flags = 0.0f; // unused
+	status.pre_flt_fail = _preflt_fail;
+}
+
+void Ekf2::get_ekf2_innovations(ekf2_innovations_s &innovations)
+{
+	_ekf.get_vel_pos_innov(&innovations.vel_pos_innov[0]);
+	_ekf.get_aux_vel_innov(&innovations.aux_vel_innov[0]);
+	_ekf.get_mag_innov(&innovations.mag_innov[0]);
+	_ekf.get_heading_innov(&innovations.heading_innov);
+	_ekf.get_airspeed_innov(&innovations.airspeed_innov);
+	_ekf.get_beta_innov(&innovations.beta_innov);
+	_ekf.get_flow_innov(&innovations.flow_innov[0]);
+	_ekf.get_hagl_innov(&innovations.hagl_innov);
+	_ekf.get_drag_innov(&innovations.drag_innov[0]);
+	_ekf.get_vel_pos_innov_var(&innovations.vel_pos_innov_var[0]);
+	_ekf.get_mag_innov_var(&innovations.mag_innov_var[0]);
+	_ekf.get_heading_innov_var(&innovations.heading_innov_var);
+	_ekf.get_airspeed_innov_var(&innovations.airspeed_innov_var);
+	_ekf.get_beta_innov_var(&innovations.beta_innov_var);
+	_ekf.get_flow_innov_var(&innovations.flow_innov_var[0]);
+	_ekf.get_hagl_innov_var(&innovations.hagl_innov_var);
+	_ekf.get_drag_innov_var(&innovations.drag_innov_var[0]);
+	_ekf.get_output_tracking_error(&innovations.output_tracking_error[0]);
+}
+
+bool Ekf2::publish_ekf2_innovations(const ekf2_innovations_s &innovations)
+{
+	// publish estimator innovation data
+	if (_estimator_innovations_pub == nullptr) {
+		_estimator_innovations_pub = orb_advertise(ORB_ID(ekf2_innovations), &innovations);
+
+	} else {
+		orb_publish(ORB_ID(ekf2_innovations), _estimator_innovations_pub, &innovations);
+	}
+
+	return true;
+}
+
+bool Ekf2::publish_estimator_status(const estimator_status_s &status)
+{
+	// publish estimator status
+	if (_estimator_status_pub == nullptr) {
+		_estimator_status_pub = orb_advertise(ORB_ID(estimator_status), &status);
+
+	} else {
+		orb_publish(ORB_ID(estimator_status), _estimator_status_pub, &status);
+	}
+
+	return true;
+}
+
+bool Ekf2::update_preflight_check(const uint8_t arming_state, const sensor_combined_s &sensors,
+				  const ekf2_innovations_s &innovations)
+{
+	bool updated = false;
+
+	// calculate noise filtered velocity innovations which are used for pre-flight checking
+	if (arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
+		// calculate coefficients for LPF applied to innovation sequences
+		float alpha = constrain(sensors.accelerometer_integral_dt / 1.e6f * _innov_lpf_tau_inv, 0.0f, 1.0f);
+		float beta = 1.0f - alpha;
+
+		// filter the velocity and innvovations
+		_vel_ne_innov_lpf(0) = beta * _vel_ne_innov_lpf(0) + alpha * constrain(innovations.vel_pos_innov[0],
+				       -_vel_innov_spike_lim, _vel_innov_spike_lim);
+		_vel_ne_innov_lpf(1) = beta * _vel_ne_innov_lpf(1) + alpha * constrain(innovations.vel_pos_innov[1],
+				       -_vel_innov_spike_lim, _vel_innov_spike_lim);
+		_vel_d_innov_lpf = beta * _vel_d_innov_lpf + alpha * constrain(innovations.vel_pos_innov[2],
+				   -_vel_innov_spike_lim, _vel_innov_spike_lim);
+
+		// set the max allowed yaw innovaton depending on whether we are not aiding navigation using
+		// observations in the NE reference frame.
+		filter_control_status_u _ekf_control_mask;
+		_ekf.get_control_mode(&_ekf_control_mask.value);
+		bool doing_ne_aiding = _ekf_control_mask.flags.gps ||  _ekf_control_mask.flags.ev_pos;
+
+		float yaw_test_limit;
+
+		if (doing_ne_aiding) {
+			// use a smaller tolerance when doing NE inertial frame aiding
+			yaw_test_limit = _nav_yaw_innov_test_lim;
+
+		} else {
+			// use a larger tolerance when not doing NE inertial frame aiding
+			yaw_test_limit = _yaw_innov_test_lim;
+		}
+
+		// filter the yaw innovations using a decaying envelope filter to prevent innovation sign changes due to angle wrapping allowinging large innvoations to pass checks after filtering.
+		_yaw_innov_magnitude_lpf = fmaxf(beta * _yaw_innov_magnitude_lpf,
+						 fminf(fabsf(innovations.heading_innov), 2.0f * yaw_test_limit));
+
+		_hgt_innov_lpf = beta * _hgt_innov_lpf + alpha * constrain(innovations.vel_pos_innov[5], -_hgt_innov_spike_lim,
+				 _hgt_innov_spike_lim);
+
+		// check the yaw and horizontal velocity innovations
+		float vel_ne_innov_length = sqrtf(innovations.vel_pos_innov[0] * innovations.vel_pos_innov[0] +
+						  innovations.vel_pos_innov[1] * innovations.vel_pos_innov[1]);
+		_preflt_horiz_fail = (_vel_ne_innov_lpf.norm() > _vel_innov_test_lim)
+				     || (vel_ne_innov_length > 2.0f * _vel_innov_test_lim)
+				     || (_yaw_innov_magnitude_lpf > yaw_test_limit);
+
+		// check the vertical velocity and position innovations
+		_preflt_vert_fail = (fabsf(_vel_d_innov_lpf) > _vel_innov_test_lim)
+				    || (fabsf(innovations.vel_pos_innov[2]) > 2.0f * _vel_innov_test_lim)
+				    || (fabsf(_hgt_innov_lpf) > _hgt_innov_test_lim);
+
+		// master pass-fail status
+		_preflt_fail = _preflt_horiz_fail || _preflt_vert_fail;
+
+		updated = true;
+
+	} else {
+		_vel_ne_innov_lpf.zero();
+		_vel_d_innov_lpf = 0.0f;
+		_hgt_innov_lpf = 0.0f;
+		_preflt_horiz_fail = false;
+		_preflt_vert_fail = false;
+		_preflt_fail = false;
+	}
+
+	return updated;
 }
 
 const Vector3f Ekf2::get_vel_body_wind()
