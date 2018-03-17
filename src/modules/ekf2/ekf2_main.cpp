@@ -113,6 +113,7 @@ private:
 
 	bool update_magnetometer(const uint32_t mag_device_id, const uint8_t arming_state);
 	bool update_air_data();
+	bool update_airspeed();
 	bool update_gps();
 	bool update_optical_flow();
 	bool update_range_finder();
@@ -194,6 +195,7 @@ private:
 	orb_advert_t _sensor_bias_pub{nullptr};
 
 	int	_air_data_sub{-1};
+	int _airspeed_sub{-1};
 	int _ev_pos_sub{-1};
 	int _ev_att_sub{-1};
 	int _gps_sub{-1};
@@ -614,13 +616,13 @@ void Ekf2::run()
 {
 	// subscribe to relevant topics
 	int sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
-	int airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	int params_sub = orb_subscribe(ORB_ID(parameter_update));
 	int vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	int status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	int sensor_selection_sub = orb_subscribe(ORB_ID(sensor_selection));
 
 	_air_data_sub = orb_subscribe(ORB_ID(vehicle_air_data));
+	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	_ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
 	_ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
 	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
@@ -645,7 +647,6 @@ void Ekf2::run()
 	// because they will else not always be
 	// properly populated
 	sensor_combined_s sensors = {};
-	airspeed_s airspeed = {};
 	vehicle_land_detected_s vehicle_land_detected = {};
 	vehicle_status_s vehicle_status = {};
 	sensor_selection_s sensor_selection = {};
@@ -653,7 +654,7 @@ void Ekf2::run()
 	while (!should_exit()) {
 
 		// reset all timestamps
-		ekf2_timestamps_s ekf2_timestamps = _ekf2_timestamps_pub.get();
+		ekf2_timestamps_s &ekf2_timestamps = _ekf2_timestamps_pub.get();
 		ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.optical_flow_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
@@ -689,7 +690,6 @@ void Ekf2::run()
 			continue;
 		}
 
-		bool airspeed_updated = false;
 		bool sensor_selection_updated = false;
 		bool vehicle_land_detected_updated = false;
 		bool vehicle_status_updated = false;
@@ -706,16 +706,6 @@ void Ekf2::run()
 		}
 
 		update_gps();
-
-		// Do not attempt to use airspeed if use has been disabled by the user.
-		orb_check(airspeed_sub, &airspeed_updated);
-
-		if (airspeed_updated) {
-			orb_copy(ORB_ID(airspeed), airspeed_sub, &airspeed);
-
-			ekf2_timestamps.airspeed_timestamp_rel = (int16_t)((int64_t)airspeed.timestamp / 100 -
-					(int64_t)ekf2_timestamps.timestamp / 100);
-		}
 
 		orb_check(sensor_selection_sub, &sensor_selection_updated);
 
@@ -777,15 +767,7 @@ void Ekf2::run()
 		// read baro data
 		update_air_data();
 
-		// only set airspeed data if condition for airspeed fusion are met
-		bool fuse_airspeed = airspeed_updated && !vehicle_status.is_rotary_wing
-				     && (_arspFusionThreshold.get() > FLT_EPSILON)
-				     && (airspeed.true_airspeed_m_s > _arspFusionThreshold.get());
-
-		if (fuse_airspeed) {
-			const float eas2tas = airspeed.true_airspeed_m_s / airspeed.indicated_airspeed_m_s;
-			_ekf.setAirspeedData(airspeed.timestamp, airspeed.true_airspeed_m_s, eas2tas);
-		}
+		update_airspeed();
 
 		if (vehicle_status_updated) {
 			// only fuse synthetic sideslip measurements if conditions are met
@@ -864,13 +846,13 @@ void Ekf2::run()
 	}
 
 	orb_unsubscribe(sensors_sub);
-	orb_unsubscribe(airspeed_sub);
 	orb_unsubscribe(params_sub);
 	orb_unsubscribe(vehicle_land_detected_sub);
 	orb_unsubscribe(status_sub);
 	orb_unsubscribe(sensor_selection_sub);
 
 	orb_unsubscribe(_air_data_sub);
+	orb_unsubscribe(_airspeed_sub);
 	orb_unsubscribe(_ev_pos_sub);
 	orb_unsubscribe(_ev_att_sub);
 	orb_unsubscribe(_gps_sub);
@@ -903,6 +885,31 @@ int Ekf2::getRangeSubIndex(const int *subs)
 	}
 
 	return -1;
+}
+
+bool Ekf2::update_airspeed()
+{
+	bool airspeed_updated = false;
+
+	// Do not attempt to use airspeed if use has been disabled by the user.
+	orb_check(_airspeed_sub, &airspeed_updated);
+
+	if (airspeed_updated) {
+		airspeed_s airspeed = {};
+
+		if (orb_copy(ORB_ID(airspeed), _airspeed_sub, &airspeed) == PX4_OK) {
+			// only set airspeed data if condition for airspeed fusion are met
+			if ((_arspFusionThreshold.get() > FLT_EPSILON) && (airspeed.true_airspeed_m_s > _arspFusionThreshold.get())) {
+				const float eas2tas = airspeed.true_airspeed_m_s / airspeed.indicated_airspeed_m_s;
+				_ekf.setAirspeedData(airspeed.timestamp, airspeed.true_airspeed_m_s, eas2tas);
+
+				_ekf2_timestamps_pub.get().airspeed_timestamp_rel = (int16_t)((int64_t)airspeed.timestamp / 100 -
+						(int64_t)_ekf2_timestamps_pub.get().timestamp / 100);
+			}
+		}
+	}
+
+	return airspeed_updated;
 }
 
 bool Ekf2::update_gps()
