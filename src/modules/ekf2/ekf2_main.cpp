@@ -108,10 +108,14 @@ private:
 
 	void learned_mag_bias(const hrt_abstime &timestamp, const estimator_status_s &status);
 
+	bool update();
+
+	void update_parameters();
+
 	template<typename Param>
 	void update_mag_bias(Param &mag_bias_param, int axis_index);
 
-	void update_imu(const hrt_abstime &timestamp, const sensor_combined_s &sensors);
+	bool update_imu(sensor_combined_s &sensors);
 
 	bool update_air_data();
 	bool update_airspeed();
@@ -674,40 +678,14 @@ void Ekf2::run()
 	fds[0].fd = _sensors_sub;
 	fds[0].events = POLLIN;
 
-	// initialize data structures outside of loop
-	// because they will else not always be
-	// properly populated
-	sensor_combined_s sensors = {};
-
 	while (!should_exit()) {
-
-		// reset all timestamps
-		ekf2_timestamps_s &ekf2_timestamps = _ekf2_timestamps_pub.get();
-		ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-		ekf2_timestamps.optical_flow_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-		ekf2_timestamps.distance_sensor_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-		ekf2_timestamps.airspeed_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-		ekf2_timestamps.vision_position_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-		ekf2_timestamps.vision_attitude_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
-
-		bool params_updated = false;
-		orb_check(_params_sub, &params_updated);
-
-		if (params_updated) {
-			// read from param to clear updated flag
-			parameter_update_s update;
-			orb_copy(ORB_ID(parameter_update), _params_sub, &update);
-			updateParams();
-		}
-
 		int ret = px4_poll(fds, sizeof(fds) / sizeof(fds[0]), 1000);
 
-		if (!(fds[0].revents & POLLIN)) {
-			// no new data
-			continue;
-		}
+		if ((ret > 0) && (fds[0].revents & POLLIN)) {
+			// poll successful and there is data to read
+			update();
 
-		if (ret < 0) {
+		} else if (ret < 0) {
 			// Poll error, sleep and try again
 			usleep(10000);
 			continue;
@@ -716,9 +694,28 @@ void Ekf2::run()
 			// Poll timeout or no new data, do nothing
 			continue;
 		}
+	}
+}
 
-		orb_copy(ORB_ID(sensor_combined), _sensors_sub, &sensors);
-		ekf2_timestamps.timestamp = sensors.timestamp;
+bool Ekf2::update()
+{
+	bool updated = false;
+
+	update_parameters();
+
+	// reset all timestamps
+	ekf2_timestamps_s &ekf2_timestamps = _ekf2_timestamps_pub.get();
+	ekf2_timestamps.gps_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+	ekf2_timestamps.optical_flow_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+	ekf2_timestamps.distance_sensor_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+	ekf2_timestamps.airspeed_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+	ekf2_timestamps.vision_position_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+	ekf2_timestamps.vision_attitude_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
+
+	// get latest IMU data and set timestamp
+	sensor_combined_s sensors = {};
+
+	if (update_imu(sensors)) {
 
 		// update all other topics if they have new data
 		update_air_data();
@@ -743,10 +740,8 @@ void Ekf2::run()
 			now = hrt_absolute_time();
 		}
 
-		update_imu(now, sensors);
-
 		// run the EKF update and output
-		const bool updated = _ekf.update();
+		updated = _ekf.update();
 
 		// fill estimator_status and publish
 		estimator_status_s status = {};
@@ -761,7 +756,7 @@ void Ekf2::run()
 				_start_time_us = now;
 				_last_time_slip_us = 0;
 
-			} else if (_start_time_us > 0) {
+			} else {
 				_integrated_time_us += sensors.gyro_integral_dt;
 				_last_time_slip_us = (now - _start_time_us) - _integrated_time_us;
 			}
@@ -798,6 +793,21 @@ void Ekf2::run()
 
 		_ekf2_timestamps_pub.update();
 	}
+
+	return updated;
+}
+
+void Ekf2::update_parameters()
+{
+	bool params_updated = false;
+	orb_check(_params_sub, &params_updated);
+
+	if (params_updated) {
+		// read from param to clear updated flag
+		parameter_update_s update;
+		orb_copy(ORB_ID(parameter_update), _params_sub, &update);
+		updateParams();
+	}
 }
 
 int Ekf2::getRangeSubIndex(const int *subs)
@@ -821,22 +831,36 @@ int Ekf2::getRangeSubIndex(const int *subs)
 	return -1;
 }
 
-void Ekf2::update_imu(const hrt_abstime &timestamp, const sensor_combined_s &sensors)
+bool Ekf2::update_imu(sensor_combined_s &sensors)
 {
-	float gyro_integral[3];
-	const float gyro_dt = sensors.gyro_integral_dt / 1.e6f;
-	gyro_integral[0] = sensors.gyro_rad[0] * gyro_dt;
-	gyro_integral[1] = sensors.gyro_rad[1] * gyro_dt;
-	gyro_integral[2] = sensors.gyro_rad[2] * gyro_dt;
+	bool imu_updated = false;
 
-	float accel_integral[3];
-	const float accel_dt = sensors.accelerometer_integral_dt / 1.e6f;
-	accel_integral[0] = sensors.accelerometer_m_s2[0] * accel_dt;
-	accel_integral[1] = sensors.accelerometer_m_s2[1] * accel_dt;
-	accel_integral[2] = sensors.accelerometer_m_s2[2] * accel_dt;
+	// TODO: always update for now
+	//if (orb_check(_sensors_sub, &imu_updated)) {
+	if (true) {
+		if (orb_copy(ORB_ID(sensor_combined), _sensors_sub, &sensors) == PX4_OK) {
+			float gyro_integral[3];
+			const float gyro_dt = sensors.gyro_integral_dt / 1.e6f;
+			gyro_integral[0] = sensors.gyro_rad[0] * gyro_dt;
+			gyro_integral[1] = sensors.gyro_rad[1] * gyro_dt;
+			gyro_integral[2] = sensors.gyro_rad[2] * gyro_dt;
 
-	// push imu data into estimator
-	_ekf.setIMUData(timestamp, sensors.gyro_integral_dt, sensors.accelerometer_integral_dt, gyro_integral, accel_integral);
+			float accel_integral[3];
+			const float accel_dt = sensors.accelerometer_integral_dt / 1.e6f;
+			accel_integral[0] = sensors.accelerometer_m_s2[0] * accel_dt;
+			accel_integral[1] = sensors.accelerometer_m_s2[1] * accel_dt;
+			accel_integral[2] = sensors.accelerometer_m_s2[2] * accel_dt;
+
+			// push imu data into estimator
+			_ekf.setIMUData(sensors.timestamp, sensors.gyro_integral_dt, sensors.accelerometer_integral_dt, gyro_integral,
+					accel_integral);
+			_ekf2_timestamps_pub.get().timestamp = sensors.timestamp;
+
+			imu_updated = true;
+		}
+	}
+
+	return imu_updated;
 }
 
 bool Ekf2::update_airspeed()
