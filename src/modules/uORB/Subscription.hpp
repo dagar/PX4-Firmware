@@ -41,6 +41,7 @@
 #include <uORB/uORB.h>
 #include <containers/List.hpp>
 #include <systemlib/err.h>
+#include <px4_defines.h>
 
 namespace uORB
 {
@@ -144,7 +145,12 @@ public:
 		     List<SubscriptionNode *> *list = nullptr):
 		SubscriptionNode(meta, interval, instance, list),
 		_data() // initialize data structure to zero
-	{}
+	{
+		// force initial copy
+		if (orb_copy(_meta, _handle, &_data) != PX4_OK) {
+			PX4_ERR("%s initial copy failed", _meta->o_name);
+		}
+	}
 
 	~Subscription() override final = default;
 
