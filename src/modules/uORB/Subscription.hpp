@@ -83,6 +83,11 @@ public:
 
 	int getHandle() const { return _handle; }
 
+	const char *get_name() const { return _meta->o_name; }
+
+	virtual void print() {}
+	virtual bool update() { return false; }
+
 protected:
 	const struct orb_metadata *_meta;
 	int _handle;
@@ -144,7 +149,10 @@ public:
 		     List<SubscriptionNode *> *list = nullptr):
 		SubscriptionNode(meta, interval, instance, list),
 		_data() // initialize data structure to zero
-	{}
+	{
+		// force initial update
+		orb_copy(_meta, _handle, &_data);
+	}
 
 	~Subscription() override final = default;
 
@@ -169,6 +177,8 @@ public:
 	{
 		return _data;
 	}
+
+	void print() override { print_message(_data); }
 
 private:
 	T _data;
