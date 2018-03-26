@@ -377,8 +377,6 @@ public:
 
 	MavlinkStream 		*get_streams() const { return _streams; }
 
-	float			get_rate_mult();
-
 	float			get_baudrate() { return _baudrate; }
 
 	/* Functions for waiting to start transmission until message received. */
@@ -454,8 +452,6 @@ public:
 	int			get_data_rate()		{ return _datarate; }
 	void			set_data_rate(int rate) { if (rate > 0) { _datarate = rate; } }
 
-	unsigned		get_main_loop_delay() const { return _main_loop_delay; }
-
 	/** get the Mavlink shell. Create a new one if there isn't one. It is *always* created via MavlinkReceiver thread.
 	 *  Returns nullptr if shell cannot be created */
 	MavlinkShell		*get_shell();
@@ -480,6 +476,8 @@ public:
 
 	bool ftp_enabled() const { return _ftp_on; }
 
+	void set_update_total_stream_rate() { _update_total_stream_rate = true; }
+
 protected:
 	Mavlink			*next;
 
@@ -489,10 +487,11 @@ private:
 	orb_advert_t		_mavlink_log_pub;
 	bool			_task_running;
 	static bool		_boot_complete;
+
 	static constexpr unsigned MAVLINK_MAX_INSTANCES = 4;
-	static constexpr unsigned MAVLINK_MIN_INTERVAL = 1500;
-	static constexpr unsigned MAVLINK_MAX_INTERVAL = 10000;
+
 	static constexpr float MAVLINK_MIN_MULTIPLIER = 0.0005f;
+
 	mavlink_message_t _mavlink_buffer;
 	mavlink_status_t _mavlink_status;
 
@@ -505,10 +504,18 @@ private:
 	bool			_wait_to_transmit;  	/**< Wait to transmit until received messages. */
 	bool			_received_messages;	/**< Whether we've received valid mavlink messages. */
 
-	unsigned		_main_loop_delay;	/**< mainloop delay, depends on data rate */
+	uint64_t		_main_loop_delay;	/**< mainloop delay, depends on data rate */
 
 	MavlinkOrbSubscription	*_subscriptions;
 	MavlinkStream		*_streams;
+
+	void				update_total_stream_rate();
+
+	bool				_update_total_stream_rate{false};
+	uint64_t			_last_total_stream_rate_update{0};
+
+	float				_streams_total_const_rate{0.0f};
+	float				_streams_total_rate{0.0f};
 
 	MavlinkShell			*_mavlink_shell;
 	MavlinkULog			*_mavlink_ulog;
@@ -520,7 +527,6 @@ private:
 	int32_t			_radio_id;
 
 	ringbuffer::RingBuffer		_logbuffer;
-	unsigned int		_total_counter;
 
 	pthread_t		_receive_thread;
 
@@ -531,7 +537,7 @@ private:
 #endif
 	int			_baudrate;
 	int			_datarate;		///< data rate for normal streams (attitude, position, etc.)
-	int			_datarate_events;	///< data rate for params, waypoints, text messages
+
 	float			_rate_mult;
 	hrt_abstime		_last_hw_rate_timestamp;
 
@@ -609,6 +615,7 @@ private:
 	static bool		_config_link_on;
 
 	perf_counter_t		_loop_perf;			/**< loop performance counter */
+	perf_counter_t		_interval_perf;			/**< loop interval counter */
 	perf_counter_t		_txerr_perf;			/**< TX error counter */
 
 	void			mavlink_update_system();
@@ -617,20 +624,11 @@ private:
 	int			mavlink_open_uart(int baudrate, const char *uart_name, bool force_flow_control);
 #endif
 
-	static int		interval_from_rate(float rate);
-
 	static constexpr unsigned RADIO_BUFFER_CRITICAL_LOW_PERCENTAGE = 25;
 	static constexpr unsigned RADIO_BUFFER_LOW_PERCENTAGE = 35;
 	static constexpr unsigned RADIO_BUFFER_HALF_PERCENTAGE = 50;
 
 	int configure_stream(const char *stream_name, const float rate = -1.0f);
-
-	/**
-	 * Adjust the stream rates based on the current rate
-	 *
-	 * @param multiplier if greater than 1, the transmission rate will increase, if smaller than one decrease
-	 */
-	void adjust_stream_rates(const float multiplier);
 
 	int message_buffer_init(int size);
 

@@ -41,24 +41,16 @@
 
 #include "mavlink_orb_subscription.h"
 
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-
 #include <px4_defines.h>
 #include <uORB/uORB.h>
 
 MavlinkOrbSubscription::MavlinkOrbSubscription(const orb_id_t topic, int instance) :
-	next(nullptr),
 	_topic(topic),
-	_fd(-1),
-	_instance(instance),
-	_published(false),
-	_subscribe_from_beginning(false),
-	_last_pub_check(0)
+	_instance(instance)
 {
-}
+	// set initially to space out the first updates
+	_last_pub_check = hrt_absolute_time();
+};
 
 MavlinkOrbSubscription::~MavlinkOrbSubscription()
 {
@@ -82,27 +74,24 @@ MavlinkOrbSubscription::get_instance() const
 bool
 MavlinkOrbSubscription::update(uint64_t *time, void *data)
 {
-
+	if (!is_published()) {
+		return false;
+	}
 
 	// TODO this is NOT atomic operation, we can get data newer than time
 	// if topic was published between orb_stat and orb_copy calls.
 
-	uint64_t time_topic;
+	uint64_t time_topic = 0;
 
-	if (orb_stat(_fd, &time_topic)) {
+	if (orb_stat(_fd, &time_topic) != PX4_OK) {
 		/* error getting last topic publication time */
-		time_topic = 0;
+		return false;
 	}
 
-	if (update(data)) {
-		/* data copied successfully */
-
-		if (time_topic == 0 || (time_topic != *time)) {
+	if (time_topic != 0 && (time_topic > *time)) {
+		if (orb_copy(_topic, _fd, data) == PX4_OK) {
 			*time = time_topic;
 			return true;
-
-		} else {
-			return false;
 		}
 	}
 
@@ -112,20 +101,11 @@ MavlinkOrbSubscription::update(uint64_t *time, void *data)
 bool
 MavlinkOrbSubscription::update(void *data)
 {
-	if (!is_published()) {
-		return false;
+	if (is_published() && (orb_copy(_topic, _fd, data) == PX4_OK)) {
+		return true;
 	}
 
-	if (orb_copy(_topic, _fd, data)) {
-		if (data != nullptr) {
-			/* error copying topic data */
-			memset(data, 0, _topic->o_size);
-		}
-
-		return false;
-	}
-
-	return true;
+	return false;
 }
 
 bool
@@ -139,7 +119,7 @@ MavlinkOrbSubscription::update_if_changed(void *data)
 
 	bool updated;
 
-	if (orb_check(_fd, &updated)) {
+	if (orb_check(_fd, &updated) != PX4_OK) {
 		return false;
 	}
 
@@ -149,7 +129,11 @@ MavlinkOrbSubscription::update_if_changed(void *data)
 		return false;
 	}
 
-	return update(data);
+	if (updated && (orb_copy(_topic, _fd, data) == PX4_OK)) {
+		return true;
+	}
+
+	return false;
 }
 
 bool
@@ -173,12 +157,13 @@ MavlinkOrbSubscription::is_published()
 	// in order to save memory and file descriptors.
 	// However, for some topics like vehicle_command_ack, we want to subscribe
 	// from the beginning in order not to miss the first publish respective advertise.
-	if (!_subscribe_from_beginning && orb_exists(_topic, _instance)) {
-		return false;
-	}
-
 	if (_fd < 0) {
-		_fd = orb_subscribe_multi(_topic, _instance);
+		if (orb_exists(_topic, _instance) == PX4_OK) {
+			subscribe();
+
+		} else {
+			return false;
+		}
 	}
 
 	bool updated;
@@ -201,7 +186,9 @@ MavlinkOrbSubscription::is_published()
 }
 
 void
-MavlinkOrbSubscription::subscribe_from_beginning(bool from_beginning)
+MavlinkOrbSubscription::subscribe()
 {
-	_subscribe_from_beginning = from_beginning;
+	if (_fd < 0) {
+		_fd = orb_subscribe_multi(_topic, _instance);
+	}
 }

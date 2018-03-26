@@ -43,34 +43,20 @@
 #include <px4_defines.h>
 #include <px4_getopt.h>
 #include <px4_module.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <assert.h>
-#include <math.h>
-#include <poll.h>
-#include <termios.h>
-#include <time.h>
 
+#include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <drivers/device/device.h>
+#include <mathlib/mathlib.h>
 #include <drivers/drv_hrt.h>
-#include <arch/board/board.h>
-
 #include <systemlib/param/param.h>
 #include <systemlib/err.h>
 #include <systemlib/perf_counter.h>
 #include <systemlib/systemlib.h>
 #include <systemlib/mavlink_log.h>
 #include <lib/ecl/geo/geo.h>
-#include <dataman/dataman.h>
 #include <version/version.h>
 
 #include <uORB/topics/parameter_update.h>
@@ -96,8 +82,13 @@
 
 #define DEFAULT_REMOTE_PORT_UDP			14550 ///< GCS port per MAVLink spec
 #define DEFAULT_DEVICE_NAME			"/dev/ttyS1"
-#define MAX_DATA_RATE				10000000	///< max data rate in bytes/s
-#define MAIN_LOOP_DELAY 			10000	///< 100 Hz @ 1000 bytes/s data rate
+
+static constexpr unsigned MAX_DATA_RATE = 10000000;	///< max data rate in bytes/s
+static constexpr uint64_t MAIN_LOOP_DELAY = 10000;	///< 100 Hz @ 1000 bytes/s data rate
+
+static constexpr uint64_t MAVLINK_MIN_INTERVAL = 2000;
+static constexpr uint64_t MAVLINK_MAX_INTERVAL = 10000;
+
 #define FLOW_CONTROL_DISABLE_THRESHOLD		40	///< picked so that some messages still would fit it.
 //#define MAVLINK_PRINT_PACKETS
 
@@ -213,14 +204,12 @@ Mavlink::Mavlink() :
 	_channel(MAVLINK_COMM_0),
 	_radio_id(0),
 	_logbuffer(5, sizeof(mavlink_log_s)),
-	_total_counter(0),
 	_receive_thread{},
 	_forwarding_on(false),
 	_ftp_on(false),
 	_uart_fd(-1),
 	_baudrate(57600),
 	_datarate(1000),
-	_datarate_events(500),
 	_rate_mult(1.0f),
 	_last_hw_rate_timestamp(0),
 	_mavlink_param_queue_index(0),
@@ -273,6 +262,7 @@ Mavlink::Mavlink() :
 
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "mavlink_el")),
+	_interval_perf(perf_alloc(PC_INTERVAL, "mavlink_interval")),
 	_txerr_perf(perf_alloc(PC_COUNT, "mavlink_txe"))
 {
 	_instance_id = Mavlink::instance_count();
@@ -326,6 +316,7 @@ Mavlink::~Mavlink()
 {
 	perf_free(_loop_perf);
 	perf_free(_txerr_perf);
+	perf_free(_interval_perf);
 
 	if (_task_running) {
 		/* task wakes up every 10ms or so at the longest */
@@ -1351,30 +1342,26 @@ MavlinkOrbSubscription *Mavlink::add_orb_subscription(const orb_id_t topic, int 
 }
 
 int
-Mavlink::interval_from_rate(float rate)
-{
-	if (rate > 0.000001f) {
-		return (1000000.0f / rate);
-
-	} else if (rate < 0.0f) {
-		return -1;
-
-	} else {
-		return 0;
-	}
-}
-
-int
 Mavlink::configure_stream(const char *stream_name, const float rate)
 {
-	/* calculate interval in us, -1 means unlimited stream, 0 means disabled */
-	int interval = interval_from_rate(rate);
+	// rate 0 = disable
+	// rate < 0 = unlimited
+
+	uint32_t interval = 0;
+
+	if (rate > 0.0f) {
+		interval = (1e6f / rate);
+	}
+
+	bool stream_exists = false;
 
 	/* search if stream exists */
 	MavlinkStream *stream;
 	LL_FOREACH(_streams, stream) {
 		if (strcmp(stream_name, stream->get_name()) == 0) {
-			if (interval != 0) {
+			stream_exists = true;
+
+			if (rate > 0.0f || rate < 0.0f) {
 				/* set new interval */
 				stream->set_interval(interval);
 
@@ -1382,66 +1369,36 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 				/* delete stream */
 				LL_DELETE(_streams, stream);
 				delete stream;
+
 			}
 
-			return OK;
+			return PX4_OK;
 		}
 	}
 
-	if (interval == 0) {
-		/* stream was not active and is requested to be disabled, do nothing */
-		return OK;
-	}
+	// stream wasn't found, add it
+	if (!stream_exists) {
+		/* search for stream with specified name in supported streams list */
+		for (unsigned int i = 0; streams_list[i] != nullptr; i++) {
 
-	/* search for stream with specified name in supported streams list */
-	for (unsigned int i = 0; streams_list[i] != nullptr; i++) {
+			if (strcmp(stream_name, streams_list[i]->get_name()) == 0) {
+				/* create new instance */
+				stream = streams_list[i]->new_instance(this);
+				stream->set_interval(interval);
+				LL_APPEND(_streams, stream);
 
-		if (strcmp(stream_name, streams_list[i]->get_name()) == 0) {
-			/* create new instance */
-			stream = streams_list[i]->new_instance(this);
-			stream->set_interval(interval);
-			LL_APPEND(_streams, stream);
-
-			return OK;
-		}
-	}
-
-	/* if we reach here, the stream list does not contain the stream */
-	PX4_WARN("stream %s not found", stream_name);
-
-	return PX4_ERROR;
-}
-
-void
-Mavlink::adjust_stream_rates(const float multiplier)
-{
-	/* do not allow to push us to zero */
-	if (multiplier < MAVLINK_MIN_MULTIPLIER) {
-		return;
-	}
-
-	/* search if stream exists */
-	MavlinkStream *stream;
-	LL_FOREACH(_streams, stream) {
-		/* set new interval */
-		int interval = stream->get_interval();
-
-		if (interval > 0) {
-			interval /= multiplier;
-
-			/* limit min / max interval */
-			if (interval < MAVLINK_MIN_INTERVAL) {
-				interval = MAVLINK_MIN_INTERVAL;
+				return OK;
 			}
-
-			if (interval > MAVLINK_MAX_INTERVAL) {
-				interval = MAVLINK_MAX_INTERVAL;
-			}
-
-			/* set new interval */
-			stream->set_interval(interval);
 		}
+
+		/* if we reach here, the stream list does not contain the stream */
+		PX4_WARN("stream %s not found", stream_name);
+
+		return PX4_ERROR;
+
 	}
+
+	return PX4_OK;
 }
 
 void
@@ -1471,6 +1428,50 @@ Mavlink::configure_stream_threadsafe(const char *stream_name, const float rate)
 		} while (_subscribe_to_stream != nullptr);
 
 		delete[] s;
+	}
+}
+
+void
+Mavlink::update_total_stream_rate()
+{
+	// update when called, or at 10 Hz
+	if (_update_total_stream_rate || (hrt_elapsed_time(&_last_total_stream_rate_update) > 100000)) {
+		float const_rate = 0.0f;
+		float rate = 0.0f;
+
+		// find lowest interval across all streams
+		uint64_t min_interval = MAVLINK_MAX_INTERVAL;
+
+		/* scale down rates if their theoretical bandwidth is exceeding the link bandwidth */
+		MavlinkStream *stream;
+		LL_FOREACH(_streams, stream) {
+
+			const int interval = stream->get_interval();
+
+			// find lowest interval across all streams
+			if (interval > 0 && interval < min_interval) {
+				min_interval = interval;
+			}
+
+			// add stream data rates to totals
+			const float stream_size = stream->get_size_avg() * 1e6f / interval;
+
+			if (stream->const_rate()) {
+				const_rate += stream_size;
+
+			} else {
+				rate += stream_size;
+			}
+		}
+
+		_streams_total_const_rate = const_rate;
+		_streams_total_rate = rate;
+
+		_main_loop_delay = math::constrain(min_interval, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
+
+		_update_total_stream_rate = false;
+
+		_last_total_stream_rate_update = hrt_absolute_time();
 	}
 }
 
@@ -1603,12 +1604,6 @@ Mavlink::pass_message(const mavlink_message_t *msg)
 	}
 }
 
-float
-Mavlink::get_rate_mult()
-{
-	return _rate_mult;
-}
-
 MavlinkShell *
 Mavlink::get_shell()
 {
@@ -1644,24 +1639,15 @@ Mavlink::close_shell()
 void
 Mavlink::update_rate_mult()
 {
-	float const_rate = 0.0f;
-	float rate = 0.0f;
+	update_total_stream_rate();
 
-	/* scale down rates if their theoretical bandwidth is exceeding the link bandwidth */
-	MavlinkStream *stream;
-	LL_FOREACH(_streams, stream) {
-		if (stream->const_rate()) {
-			const_rate += (stream->get_interval() > 0) ? stream->get_size_avg() * 1000000.0f / stream->get_interval() : 0;
-
-		} else {
-			rate += (stream->get_interval() > 0) ? stream->get_size_avg() * 1000000.0f / stream->get_interval() : 0;
-		}
-	}
+	const float const_rate = _streams_total_const_rate;
+	const float rate = _streams_total_rate;
 
 	float mavlink_ulog_streaming_rate_inv = 1.0f;
 
 	if (_mavlink_ulog) {
-		mavlink_ulog_streaming_rate_inv = 1.f - _mavlink_ulog->current_data_rate();
+		mavlink_ulog_streaming_rate_inv = 1.0f - _mavlink_ulog->current_data_rate();
 	}
 
 	/* scale up and down as the link permits */
@@ -1673,7 +1659,7 @@ Mavlink::update_rate_mult()
 	}
 
 	/* check if we have radio feedback */
-	struct telemetry_status_s &tstatus = get_rx_status();
+	const telemetry_status_s &tstatus = get_rx_status();
 
 	bool radio_critical = false;
 	bool radio_found = false;
@@ -1967,7 +1953,7 @@ Mavlink::task_main(int argc, char *argv[])
 	uint64_t ack_time = 0;
 	/* We don't want to miss the first advertise of an ACK, so we subscribe from the
 	 * beginning and not just when the topic exists. */
-	ack_sub->subscribe_from_beginning(true);
+	ack_sub->subscribe();
 
 	MavlinkOrbSubscription *mavlink_log_sub = add_orb_subscription(ORB_ID(mavlink_log));
 
@@ -2136,17 +2122,8 @@ Mavlink::task_main(int argc, char *argv[])
 	}
 
 	/* set main loop delay depending on data rate to minimize CPU overhead */
-	_main_loop_delay = (MAIN_LOOP_DELAY * 1000) / _datarate;
-
-	/* hard limit to 1000 Hz at max */
-	if (_main_loop_delay < MAVLINK_MIN_INTERVAL) {
-		_main_loop_delay = MAVLINK_MIN_INTERVAL;
-	}
-
-	/* hard limit to 100 Hz at least */
-	if (_main_loop_delay > MAVLINK_MAX_INTERVAL) {
-		_main_loop_delay = MAVLINK_MAX_INTERVAL;
-	}
+	/* hard limit to 100 - 500 Hz */
+	_main_loop_delay = math::constrain((MAIN_LOOP_DELAY * 1000) / _datarate, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
 
 	/* now the instance is fully initialized and we can bump the instance count */
 	LL_APPEND(_mavlink_instances, this);
@@ -2165,12 +2142,11 @@ Mavlink::task_main(int argc, char *argv[])
 	MavlinkReceiver::receive_start(&_receive_thread, this);
 
 	while (!_task_should_exit) {
-		/* main loop */
-		usleep(_main_loop_delay);
 
 		perf_begin(_loop_perf);
+		perf_count(_interval_perf);
 
-		hrt_abstime t = hrt_absolute_time();
+		const hrt_abstime t = hrt_absolute_time();
 
 		update_rate_mult();
 
@@ -2285,10 +2261,24 @@ Mavlink::task_main(int argc, char *argv[])
 			_subscribe_to_stream = nullptr;
 		}
 
+
 		/* update streams */
+
+		// Send the message if it is due or
+		// if it will overrun the next scheduled send interval
+		// by 30% of the interval time. This helps to avoid
+		// sending a scheduled message on average slower than
+		// scheduled. Doing this at 50% would risk sending
+		// the message too often as the loop runtime of the app
+		// needs to be accounted for as well.
+		// This method is not theoretically optimal but a suitable
+		// stopgap as it hits its deadlines well (0.5 Hz, 50 Hz and 250 Hz)
+
+		const float interval_scale = 1.0f / _rate_mult;
+
 		MavlinkStream *stream;
 		LL_FOREACH(_streams, stream) {
-			stream->update(t);
+			stream->update(t, interval_scale);
 		}
 
 		/* pass messages from other UARTs */
@@ -2358,6 +2348,11 @@ Mavlink::task_main(int argc, char *argv[])
 
 		/* confirm task running only once fully initialized */
 		_task_running = true;
+
+		const uint64_t sleep = 0.7 * math::constrain(_main_loop_delay - hrt_elapsed_time(&t), MAVLINK_MIN_INTERVAL,
+				       MAVLINK_MAX_INTERVAL);
+
+		usleep(sleep);
 	}
 
 	/* first wait for threads to complete before tearing down anything */
@@ -2588,6 +2583,7 @@ Mavlink::display_status()
 	printf("\ttxerr: %.3f kB/s\n", (double)_rate_txerr);
 	printf("\trx: %.3f kB/s\n", (double)_rate_rx);
 	printf("\trate mult: %.3f\n", (double)_rate_mult);
+	printf("\tloop interval: %.3f us\n", (double)_main_loop_delay);
 
 	if (_mavlink_ulog) {
 		printf("\tULog rate: %.1f%% of max %.1f%%\n", (double)_mavlink_ulog->current_data_rate() * 100.,

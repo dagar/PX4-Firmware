@@ -39,9 +39,6 @@
  * @author Anton Babushkin <anton.babushkin@me.com>
  */
 
-#include <stdio.h>
-#include <errno.h>
-
 #include "mavlink_main.h"
 #include "mavlink_messages.h"
 #include "mavlink_command_sender.h"
@@ -100,23 +97,8 @@
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/uORB.h>
 
-
-static uint16_t cm_uint16_from_m_float(float m);
 static void get_mavlink_mode_state(struct vehicle_status_s *status, uint8_t *mavlink_state,
 				   uint8_t *mavlink_base_mode, uint32_t *mavlink_custom_mode);
-
-uint16_t
-cm_uint16_from_m_float(float m)
-{
-	if (m < 0.0f) {
-		return 0;
-
-	} else if (m > 655.35f) {
-		return 65535;
-	}
-
-	return (uint16_t)(m * 100.0f);
-}
 
 void get_mavlink_mode_state(struct vehicle_status_s *status, uint8_t *mavlink_state,
 			    uint8_t *mavlink_base_mode, uint32_t *mavlink_custom_mode)
@@ -272,7 +254,6 @@ void get_mavlink_mode_state(struct vehicle_status_s *status, uint8_t *mavlink_st
 		*mavlink_state = MAV_STATE_CRITICAL;
 	}
 }
-
 
 class MavlinkStreamHeartbeat : public MavlinkStream
 {
@@ -638,15 +619,16 @@ private:
 	uint64_t _sensor_time;
 
 	MavlinkOrbSubscription *_bias_sub;
-	uint64_t _bias_time;
-
 	MavlinkOrbSubscription *_differential_pressure_sub;
-	uint64_t _differential_pressure_time;
 
 	uint64_t _accel_timestamp;
 	uint64_t _gyro_timestamp;
 	uint64_t _mag_timestamp;
 	uint64_t _baro_timestamp;
+
+
+	perf_counter_t _perf_interval_send{nullptr};
+	perf_counter_t _perf_interval_sent{nullptr};
 
 	/* do not allow top copying this class */
 	MavlinkStreamHighresIMU(MavlinkStreamHighresIMU &);
@@ -657,22 +639,39 @@ protected:
 		_sensor_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_combined))),
 		_sensor_time(0),
 		_bias_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_bias))),
-		_bias_time(0),
 		_differential_pressure_sub(_mavlink->add_orb_subscription(ORB_ID(differential_pressure))),
-		_differential_pressure_time(0),
 		_accel_timestamp(0),
 		_gyro_timestamp(0),
 		_mag_timestamp(0),
 		_baro_timestamp(0)
-	{}
+	{
+
+		_perf_interval_send = perf_alloc_once(PC_INTERVAL, "mavlink HIGHRES_IMU send");
+		_perf_interval_sent = perf_alloc_once(PC_INTERVAL, "mavlink HIGHRES_IMU sent");
+
+	}
 
 	bool send(const hrt_abstime t)
 	{
-		struct sensor_combined_s sensor = {};
-		struct sensor_bias_s bias = {};
-		struct differential_pressure_s differential_pressure = {};
+		perf_count(_perf_interval_send);
 
-		if (_sensor_sub->update(&_sensor_time, &sensor)) {
+		sensor_combined_s sensor;
+
+		//const auto elapsed1 = hrt_elapsed_time(&_sensor_time);
+		//const auto time1 = _sensor_time;
+
+		const bool updated = _sensor_sub->update(&_sensor_time, &sensor);
+
+		//const auto elapsed2 = hrt_elapsed_time(&_sensor_time);
+		//const auto time2 = _sensor_time;
+
+		//bool orb_checked = false;
+		//orb_check(_sensor_sub->get_fd(), &orb_checked);
+
+		//PX4_INFO("HIGHRES_IMU: %d %d - 1: %llu (%llu) 2: %llu (%llu)", updated, orb_checked, time1, elapsed1, time2, elapsed2);
+
+		if (updated) {
+			perf_count(_perf_interval_sent);
 			uint16_t fields_updated = 0;
 
 			if (_accel_timestamp != sensor.timestamp + sensor.accelerometer_timestamp_relative) {
@@ -699,8 +698,11 @@ protected:
 				_baro_timestamp = sensor.timestamp + sensor.baro_timestamp_relative;
 			}
 
-			_bias_sub->update(&_bias_time, &bias);
-			_differential_pressure_sub->update(&_differential_pressure_time, &differential_pressure);
+			sensor_bias_s bias = {};
+			_bias_sub->update(&bias);
+
+			differential_pressure_s differential_pressure = {};
+			_differential_pressure_sub->update(&differential_pressure);
 
 			mavlink_highres_imu_t msg = {};
 
@@ -721,6 +723,8 @@ protected:
 			msg.fields_updated = fields_updated;
 
 			mavlink_msg_highres_imu_send_struct(_mavlink->get_channel(), &msg);
+
+			_sensor_time = sensor.timestamp;
 
 			return true;
 		}
@@ -1166,9 +1170,9 @@ protected:
 			msg.v_acc = gps.epv * 1e3f;
 			msg.vel_acc = gps.s_variance_m_s * 1e3f;
 			msg.hdg_acc = gps.c_variance_rad * 1e5f / M_DEG_TO_RAD_F;
-			msg.vel = cm_uint16_from_m_float(gps.vel_m_s),
-			    msg.cog = _wrap_2pi(gps.cog_rad) * M_RAD_TO_DEG_F * 1e2f,
-				msg.satellites_visible = gps.satellites_used;
+			msg.vel = math::constrain(gps.vel_m_s * 100.0f, 0.0f, 65535.0f);
+			msg.cog = _wrap_2pi(gps.cog_rad) * M_RAD_TO_DEG_F * 1e2f;
+			msg.satellites_visible = gps.satellites_used;
 
 			mavlink_msg_gps_raw_int_send_struct(_mavlink->get_channel(), &msg);
 
@@ -2938,8 +2942,8 @@ protected:
 
 		if (_att_sp_sub->update(&_att_sp_time, &att_sp)) {
 
-			struct vehicle_rates_setpoint_s att_rates_sp = {};
-			(void)_att_rates_sp_sub->update(&_att_rates_sp_time, &att_rates_sp);
+			vehicle_rates_setpoint_s att_rates_sp = {};
+			_att_rates_sp_sub->update(&_att_rates_sp_time, &att_rates_sp);
 
 			mavlink_attitude_target_t msg = {};
 

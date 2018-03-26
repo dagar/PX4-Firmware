@@ -49,29 +49,27 @@ class MavlinkStream
 {
 
 public:
-	MavlinkStream *next;
+	MavlinkStream *next{nullptr};
 
 	MavlinkStream(Mavlink *mavlink);
-	virtual ~MavlinkStream();
+	virtual ~MavlinkStream() = default;
 
 	/**
 	 * Get the interval
 	 *
-	 * @param interval the inveral in microseconds (us) between messages
+	 * @param interval the interval in microseconds (us) between messages
 	 */
-	void set_interval(const int interval);
+	void set_interval(const uint32_t interval);
 
 	/**
 	 * Get the interval
 	 *
-	 * @return the inveral in microseconds (us) between messages
+	 * @return the interval in microseconds (us) between messages
 	 */
-	int get_interval() { return _interval; }
+	uint32_t get_interval() const { return _interval; }
 
-	/**
-	 * @return 0 if updated / sent, -1 if unchanged
-	 */
-	int update(const hrt_abstime t);
+	bool update(const uint64_t &now, const float scale);
+
 	virtual const char *get_name() const = 0;
 	virtual uint16_t get_id() = 0;
 
@@ -97,18 +95,20 @@ public:
 
 protected:
 	Mavlink     *_mavlink;
-	int _interval;		///< if set to negative value = unlimited rate
+	uint32_t		_interval{1000000};		///< if set to 0 = unlimited rate
 
 #ifndef __PX4_QURT
 	virtual bool send(const hrt_abstime t) = 0;
 #endif
 
-private:
-	hrt_abstime _last_sent;
+	// no copy, assignment, move, move assignment
+	MavlinkStream(const MavlinkStream &) = delete;
+	MavlinkStream &operator=(const MavlinkStream &) = delete;
+	MavlinkStream(MavlinkStream &&) = delete;
+	MavlinkStream &operator=(MavlinkStream &&) = delete;
 
-	/* do not allow top copying this class */
-	MavlinkStream(const MavlinkStream &);
-	MavlinkStream &operator=(const MavlinkStream &);
+private:
+	hrt_abstime _last_sent{0}; /* 0 means unlimited - updates on every iteration */
 };
 
 
