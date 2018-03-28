@@ -85,7 +85,7 @@ MavlinkStream::update(const uint64_t &now, const float scale)
 
 	const int64_t dt = now - _last_sent;
 
-	if (dt >= interval) {
+	if (dt > interval) {
 		// interval expired, send message
 
 		// If the interval is non-zero do not use the actual time but

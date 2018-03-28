@@ -67,6 +67,7 @@ public:
 	 * @return the interval in microseconds (us) between messages
 	 */
 	uint32_t get_interval() const { return _interval; }
+	uint32_t get_rate() const { return _interval; }
 
 	bool update(const uint64_t &now, const float scale);
 

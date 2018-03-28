@@ -146,7 +146,7 @@ MavlinkOrbSubscription::is_published()
 
 	hrt_abstime now = hrt_absolute_time();
 
-	if (now - _last_pub_check < 300000) {
+	if (now - _last_pub_check < 500000) {
 		return false;
 	}
 

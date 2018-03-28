@@ -626,10 +626,6 @@ private:
 	uint64_t _mag_timestamp;
 	uint64_t _baro_timestamp;
 
-
-	perf_counter_t _perf_interval_send{nullptr};
-	perf_counter_t _perf_interval_sent{nullptr};
-
 	/* do not allow top copying this class */
 	MavlinkStreamHighresIMU(MavlinkStreamHighresIMU &);
 	MavlinkStreamHighresIMU &operator = (const MavlinkStreamHighresIMU &);
@@ -644,34 +640,15 @@ protected:
 		_gyro_timestamp(0),
 		_mag_timestamp(0),
 		_baro_timestamp(0)
-	{
-
-		_perf_interval_send = perf_alloc_once(PC_INTERVAL, "mavlink HIGHRES_IMU send");
-		_perf_interval_sent = perf_alloc_once(PC_INTERVAL, "mavlink HIGHRES_IMU sent");
-
-	}
+	{}
 
 	bool send(const hrt_abstime t)
 	{
-		perf_count(_perf_interval_send);
-
 		sensor_combined_s sensor;
-
-		//const auto elapsed1 = hrt_elapsed_time(&_sensor_time);
-		//const auto time1 = _sensor_time;
 
 		const bool updated = _sensor_sub->update(&_sensor_time, &sensor);
 
-		//const auto elapsed2 = hrt_elapsed_time(&_sensor_time);
-		//const auto time2 = _sensor_time;
-
-		//bool orb_checked = false;
-		//orb_check(_sensor_sub->get_fd(), &orb_checked);
-
-		//PX4_INFO("HIGHRES_IMU: %d %d - 1: %llu (%llu) 2: %llu (%llu)", updated, orb_checked, time1, elapsed1, time2, elapsed2);
-
 		if (updated) {
-			perf_count(_perf_interval_sent);
 			uint16_t fields_updated = 0;
 
 			if (_accel_timestamp != sensor.timestamp + sensor.accelerometer_timestamp_relative) {
@@ -3474,7 +3451,10 @@ public:
 
 private:
 	MavlinkOrbSubscription *_fw_pos_ctrl_status_sub;
+	uint64_t	_fw_pos_ctrl_status_timestamp{0};
+
 	MavlinkOrbSubscription *_tecs_status_sub;
+	uint64_t	_tecs_timestamp{0};
 
 	/* do not allow top copying this class */
 	MavlinkStreamNavControllerOutput(MavlinkStreamNavControllerOutput &);
@@ -3488,11 +3468,12 @@ protected:
 
 	bool send(const hrt_abstime t)
 	{
-		struct fw_pos_ctrl_status_s _fw_pos_ctrl_status;
-		struct tecs_status_s _tecs_status;
+		fw_pos_ctrl_status_s _fw_pos_ctrl_status = {};
+		tecs_status_s _tecs_status = {};
 
-		const bool updated_fw_pos_ctrl_status = _fw_pos_ctrl_status_sub->update(&_fw_pos_ctrl_status);
-		const bool updated_tecs = _tecs_status_sub->update(&_tecs_status);
+		const bool updated_fw_pos_ctrl_status = _fw_pos_ctrl_status_sub->update(&_fw_pos_ctrl_status_timestamp,
+							&_fw_pos_ctrl_status);
+		const bool updated_tecs = _tecs_status_sub->update(&_tecs_timestamp, &_tecs_status);
 
 		if (updated_fw_pos_ctrl_status || updated_tecs) {
 			mavlink_nav_controller_output_t msg = {};

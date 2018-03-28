@@ -1446,7 +1446,7 @@ Mavlink::update_total_stream_rate()
 		MavlinkStream *stream;
 		LL_FOREACH(_streams, stream) {
 
-			const int interval = stream->get_interval();
+			const float interval = stream->get_interval();
 
 			// find lowest interval across all streams
 			if (interval > 0 && interval < min_interval) {
@@ -1466,6 +1466,8 @@ Mavlink::update_total_stream_rate()
 
 		_streams_total_const_rate = const_rate;
 		_streams_total_rate = rate;
+
+		PX4_INFO("const rate: %.3f rate: %.3f", (double)const_rate, (double)rate);
 
 		_main_loop_delay = math::constrain(min_interval, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
 
