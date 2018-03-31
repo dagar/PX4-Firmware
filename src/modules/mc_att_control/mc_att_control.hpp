@@ -69,7 +69,7 @@ class MulticopterAttitudeControl : public ModuleBase<MulticopterAttitudeControl>
 public:
 	MulticopterAttitudeControl();
 
-	virtual ~MulticopterAttitudeControl() = default;
+	~MulticopterAttitudeControl() override;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -91,37 +91,43 @@ private:
 	/**
 	 * initialize some vectors/matrices from parameters
 	 */
-	void			parameters_updated();
+	void		parameters_updated();
 
-	/**
-	 * Check for parameter update and handle it.
-	 */
-	void		battery_status_poll();
-	void		parameter_update_poll();
-	void		sensor_bias_poll();
-	void		sensor_correction_poll();
-	void		vehicle_attitude_poll();
-	void		vehicle_attitude_setpoint_poll();
-	void		vehicle_control_mode_poll();
-	void		vehicle_manual_poll();
-	void		vehicle_motor_limits_poll();
-	void		vehicle_rates_setpoint_poll();
+	// generic topics
 	void		vehicle_status_poll();
+	void		vehicle_control_mode_poll();
+	bool		vehicle_manual_poll();
+	void		parameter_update_poll();
+
+	// rate controller topics
+	bool		sensor_gyro_poll(matrix::Vector3f &rates);
+	void		sensor_bias_poll();
+	void		sensor_correction_poll(bool force = false);
+	void		vehicle_rates_setpoint_poll();
+	void		vehicle_motor_limits_poll();
+	void		battery_status_poll();
+
+	// attitude controll topics
+	bool		vehicle_attitude_poll(matrix::Quatf &q);
+	void		vehicle_attitude_setpoint_poll();
+
+	void		publish_actuator_controls(const matrix::Vector3f &att_control, const float thrust);
 
 	/**
 	 * Attitude controller.
 	 */
-	void		control_attitude(float dt);
+	matrix::Vector3f		control_attitude(const float dt, const matrix::Quatf &q, const matrix::Quatf &q_d);
 
 	/**
 	 * Attitude rates controller.
 	 */
-	void		control_attitude_rates(float dt);
+	matrix::Vector3f		control_attitude_rates(float dt, const matrix::Vector3f &rates, const matrix::Vector3f &rates_sp,
+			const float thrust);
 
 	/**
 	 * Throttle PID attenuation.
 	 */
-	matrix::Vector3f pid_attenuations(float tpa_breakpoint, float tpa_rate);
+	matrix::Vector3f pid_attenuations(const float tpa_breakpoint, const float tpa_rate, const float thrust);
 
 
 	int		_v_att_sub{-1};			/**< vehicle attitude subscription */
@@ -140,6 +146,8 @@ private:
 	unsigned _gyro_count{1};
 	int _selected_gyro{0};
 
+	uint64_t	_last_sample_timestamp{0};
+
 	orb_advert_t	_v_rates_sp_pub{nullptr};		/**< rate setpoint publication */
 	orb_advert_t	_actuators_0_pub{nullptr};		/**< attitude actuator controls publication */
 	orb_advert_t	_controller_status_pub{nullptr};	/**< controller status publication */
@@ -148,17 +156,17 @@ private:
 
 	bool		_actuators_0_circuit_breaker_enabled{false};	/**< circuit breaker to suppress output */
 
-	struct vehicle_attitude_s		_v_att {};		/**< vehicle attitude */
+	bool		_vtol{false};
+
 	struct vehicle_attitude_setpoint_s	_v_att_sp {};		/**< vehicle attitude setpoint */
 	struct vehicle_rates_setpoint_s		_v_rates_sp {};		/**< vehicle rates setpoint */
-	struct manual_control_setpoint_s	_manual_control_sp {};	/**< manual control setpoint */
 	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
-	struct actuator_controls_s		_actuators {};		/**< actuator controls */
-	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
-	struct battery_status_s			_battery_status {};	/**< battery status */
-	struct sensor_gyro_s			_sensor_gyro {};	/**< gyro data before thermal correctons and ekf bias estimates are applied */
-	struct sensor_correction_s		_sensor_correction {};	/**< sensor thermal corrections */
-	struct sensor_bias_s			_sensor_bias {};	/**< sensor in-run bias corrections */
+
+	matrix::Vector3f				_gyro_offset{0.0f, 0.0f, 0.0f};
+	matrix::Vector3f				_gyro_scale{1.0f, 1.0f, 1.0f};
+	matrix::Vector3f				_gyro_bias;
+
+	float							_battery_scale{1.0f};
 
 	MultirotorMixer::saturation_status _saturation_status{};
 
@@ -171,10 +179,7 @@ private:
 
 	matrix::Vector3f _rates_prev;			/**< angular rates on previous step */
 	matrix::Vector3f _rates_prev_filtered;		/**< angular rates on previous step (low-pass filtered) */
-	matrix::Vector3f _rates_sp;			/**< angular rates setpoint */
 	matrix::Vector3f _rates_int;			/**< angular rates integral error */
-
-	matrix::Vector3f _att_control;			/**< attitude control vector */
 
 	matrix::Dcmf _board_rotation;			/**< rotation matrix for the orientation that the board is mounted */
 
