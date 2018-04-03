@@ -264,6 +264,7 @@ bool StateMachineHelperTest::armingStateTransitionTest()
         transition_result_t result = arming_state_transition(&status, battery, safety, test->requested_state, &armed,
 				false /* no pre-arm checks */,
 				nullptr /* no mavlink_log_pub */,
+				nullptr /* no subsystem_info_pub */,
 				&status_flags,
 				5.0f, /* avionics rail voltage */
 				(check_gps ? ARM_REQ_GPS_BIT : 0),

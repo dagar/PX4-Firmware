@@ -150,8 +150,13 @@ uORB::DeviceNode::open(device::file_t *filp)
 
 		memset(sd, 0, sizeof(*sd));
 
-		/* default to no pending update */
-		sd->generation = _generation;
+		/* If queue size >1, allow the subscriber to read the data in the queue. Otherwise, assume subscriber is up to date.*/
+		if(_queue_size <= 1) {
+			sd->generation = _generation;
+		} else {
+			sd->generation = _generation - (_queue_size<_generation ? _queue_size:_generation);
+			//math::min((volatile unsigned int &)_queue_size, _generation);
+		}
 
 		/* set priority */
 		sd->set_priority(_priority);
@@ -207,6 +212,8 @@ uORB::DeviceNode::read(device::file_t *filp, char *buffer, size_t buflen)
 {
 	SubscriberData *sd = (SubscriberData *)filp_to_sd(filp);
 
+	//if(strcmp(_meta->o_name,"subsystem_info")==0) warnx(" \n dev::read():Subsytem info. Gen:%u SDGen:%u, QS:%u \n ",_generation, sd->generation,_queue_size);
+
 	/* if the object has not been written yet, return zero */
 	if (_data == nullptr) {
 		return 0;
@@ -226,6 +233,7 @@ uORB::DeviceNode::read(device::file_t *filp, char *buffer, size_t buflen)
 		/* Reader is too far behind: some messages are lost */
 		_lost_messages += _generation - (sd->generation + _queue_size);
 		sd->generation = _generation - _queue_size;
+		//warnx(" dev::read() : Queue size of topic %s exceeded!!! ", _meta->o_name);
 	}
 
 	if (_generation == sd->generation && sd->generation > 0) {
@@ -557,6 +565,8 @@ uORB::DeviceNode::appears_updated(SubscriberData *sd)
 		goto out;
 	}
 
+	//if(strcmp(_meta->o_name,"subsystem_info")==0) warnx("\nsubsystem_info updated?: %u/%u \n",sd->generation,_generation);
+
 	/*
 	 * If the subscriber's generation count matches the update generation
 	 * count, there has been no update from their perspective; if they
@@ -568,6 +578,7 @@ uORB::DeviceNode::appears_updated(SubscriberData *sd)
 		 * Handle non-rate-limited subscribers.
 		 */
 		if (sd->update_interval == nullptr) {
+			//if(strcmp(_meta->o_name,"subsystem_info")==0) warnx("\nsubsystem_info updated: %u/%u \n",sd->generation,_generation);
 			ret = true;
 			break;
 		}

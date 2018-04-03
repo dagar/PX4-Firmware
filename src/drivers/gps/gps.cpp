@@ -73,12 +73,14 @@
 #include <systemlib/systemlib.h>
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
+#include <systemlib/subsystem_info_pub.h>
 #include <drivers/drv_gps.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/satellite_info.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/gps_dump.h>
+#include <uORB/topics/subsystem_info.h>
 
 #include <board_config.h>
 
@@ -163,6 +165,7 @@ private:
 	struct satellite_info_s		*_p_report_sat_info;				///< pointer to uORB topic for satellite info
 	int					_gps_sat_orb_instance;				///< uORB multi-topic instance for satellite info
 	orb_advert_t			_report_sat_info_pub;				///< uORB pub for satellite info
+	orb_advert_t 		_subsystem_info_pub;		///< uORB pub for GPS subsystem health flags
 	float				_rate;						///< position update rate
 	float				_rate_rtcm_injection;				///< RTCM message injection rate
 	unsigned			_last_rate_rtcm_injection_count; 		///< counter for number of RTCM messages
@@ -275,6 +278,7 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 	_gps_orb_instance(-1),
 	_p_report_sat_info(nullptr),
 	_report_sat_info_pub(nullptr),
+	_subsystem_info_pub(nullptr),
 	_rate(0.0f),
 	_rate_rtcm_injection(0.0f),
 	_last_rate_rtcm_injection_count(0),
@@ -635,6 +639,9 @@ GPS::run()
 	uint64_t last_rate_measurement = hrt_absolute_time();
 	unsigned last_rate_count = 0;
 
+	//Initialize subsystem_info health flags to zero
+	publish_subsystem_info(&_subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GPS, false, false, false);
+
 	/* loop handling received serial bytes and also configuring in between */
 	while (!should_exit()) {
 
@@ -662,6 +669,7 @@ GPS::run()
 
 			/* no time and satellite information simulated */
 
+			publish_subsystem_info(&_subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true, true);
 
 			publish();
 
@@ -765,6 +773,8 @@ GPS::run()
 //
 //						PX4_WARN("module found: %s", mode_str);
 						_healthy = true;
+
+						publish_subsystem_info(&_subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true, true);
 					}
 				}
 
@@ -772,6 +782,7 @@ GPS::run()
 					_healthy = false;
 					_rate = 0.0f;
 					_rate_rtcm_injection = 0.0f;
+					publish_subsystem_info(&_subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true, false);
 				}
 			}
 

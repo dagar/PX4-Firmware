@@ -56,6 +56,7 @@
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/sensor_selection.h>
+#include <uORB/topics/subsystem_info.h>
 
 #include <DevMgr.hpp>
 
@@ -244,6 +245,7 @@ private:
 	SensorData _mag;
 	SensorData _baro;
 
+	orb_advert_t	_subsystem_info_pub = nullptr;
 	orb_advert_t	_mavlink_log_pub = nullptr;
 
 	float _last_baro_pressure[BARO_COUNT_MAX]; /**< pressure from last baro sensors */
