@@ -150,17 +150,18 @@ public:
 private:
 	orb_advert_t	_mavlink_log_pub{nullptr};
 
+	int		_control_mode_sub{-1};			///< control mode subscription */
 	int		_global_pos_sub{-1};
 	int		_local_pos_sub{-1};
+	int		_manual_control_sub{-1};		///< notification of manual control updates */
+	int		_params_sub{-1};			///< notification of parameter updates */
 	int		_pos_sp_triplet_sub{-1};
-	int		_control_mode_sub{-1};			///< control mode subscription */
+	int		_sensor_baro_sub{-1};
+	int		_sensor_bias_sub{-1};		///< vehicle attitude subscription */
 	int		_vehicle_attitude_sub{-1};		///< vehicle attitude subscription */
 	int		_vehicle_command_sub{-1};		///< vehicle command subscription */
-	int		_vehicle_status_sub{-1};		///< vehicle status subscription */
 	int		_vehicle_land_detected_sub{-1};		///< vehicle land detected subscription */
-	int		_params_sub{-1};			///< notification of parameter updates */
-	int		_manual_control_sub{-1};		///< notification of manual control updates */
-	int		_sensor_baro_sub{-1};
+	int		_vehicle_status_sub{-1};		///< vehicle status subscription */
 
 	orb_advert_t	_attitude_sp_pub{nullptr};		///< attitude setpoint */
 	orb_advert_t	_tecs_status_pub{nullptr};		///< TECS status publication */
@@ -171,7 +172,6 @@ private:
 	fw_pos_ctrl_status_s		_fw_pos_ctrl_status {};		///< navigation capabilities */
 	manual_control_setpoint_s	_manual {};			///< r/c channel data */
 	position_setpoint_triplet_s	_pos_sp_triplet {};		///< triplet of mission items */
-	vehicle_attitude_s	_att {};			///< vehicle attitude setpoint */
 	vehicle_attitude_setpoint_s	_att_sp {};			///< vehicle attitude setpoint */
 	vehicle_command_s		_vehicle_command {};		///< vehicle commands */
 	vehicle_control_mode_s		_control_mode {};		///< control mode */
@@ -181,7 +181,8 @@ private:
 	vehicle_status_s		_vehicle_status {};		///< vehicle status */
 
 	Subscription<airspeed_s> _sub_airspeed;
-	Subscription<sensor_bias_s> _sub_sensors;
+
+	matrix::Vector3f		_accel_body;
 
 	perf_counter_t	_loop_perf;				///< loop performance counter */
 
@@ -240,6 +241,7 @@ private:
 	float _roll{0.0f};
 	float _pitch{0.0f};
 	float _yaw{0.0f};
+	float _yawspeed{0.0f};
 
 	bool _reinitialize_tecs{true};				///< indicates if the TECS states should be reinitialized (used for VTOL)
 	bool _is_tecs_running{false};
@@ -388,9 +390,9 @@ private:
 
 	// Update subscriptions
 	void		airspeed_poll();
-	void		control_update();
 	void		manual_control_setpoint_poll();
 	void		position_setpoint_triplet_poll();
+	void		sensor_accel_poll();
 	void		vehicle_attitude_poll();
 	void		vehicle_command_poll();
 	void		vehicle_control_mode_poll();

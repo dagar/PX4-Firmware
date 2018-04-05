@@ -38,7 +38,6 @@ extern "C" __EXPORT int fw_pos_control_l1_main(int argc, char *argv[]);
 FixedwingPositionControl::FixedwingPositionControl() :
 	ModuleParams(nullptr),
 	_sub_airspeed(ORB_ID(airspeed)),
-	_sub_sensors(ORB_ID(sensor_bias)),
 	_loop_perf(perf_alloc(PC_ELAPSED, "fw l1 control")),
 	_launchDetector(this),
 	_runway_takeoff(this)
@@ -101,13 +100,50 @@ FixedwingPositionControl::FixedwingPositionControl() :
 	// initialize to invalid vtol type
 	_parameters.vtol_type = -1;
 
-	/* fetch initial parameter values */
-	parameters_update();
+	// subscriptions
+	_global_pos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
+	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
+	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
+	_control_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
+	_sensor_bias_sub = orb_subscribe(ORB_ID(sensor_bias));
+	_vehicle_attitude_sub = orb_subscribe(ORB_ID(vehicle_attitude));
+	_vehicle_command_sub = orb_subscribe(ORB_ID(vehicle_command));
+	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
+	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
+	_params_sub = orb_subscribe(ORB_ID(parameter_update));
+	_manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
+	_sensor_baro_sub = orb_subscribe(ORB_ID(sensor_baro));
+
+	/* rate limit vehicle land detected updates to 5Hz */
+	orb_set_interval(_vehicle_land_detected_sub, 200);
+
+	/* rate limit position updates to 50 Hz */
+	orb_set_interval(_global_pos_sub, 20);
+
+	/* rate limit barometer updates to 1 Hz */
+	orb_set_interval(_sensor_baro_sub, 1000);
+
+	if (parameters_update() != PX4_OK) {
+		PX4_ERR("parameter error");
+	}
 }
 
 FixedwingPositionControl::~FixedwingPositionControl()
 {
 	perf_free(_loop_perf);
+
+	orb_unsubscribe(_global_pos_sub);
+	orb_unsubscribe(_local_pos_sub);
+	orb_unsubscribe(_pos_sp_triplet_sub);
+	orb_unsubscribe(_control_mode_sub);
+	orb_unsubscribe(_sensor_bias_sub);
+	orb_unsubscribe(_vehicle_attitude_sub);
+	orb_unsubscribe(_vehicle_command_sub);
+	orb_unsubscribe(_vehicle_status_sub);
+	orb_unsubscribe(_vehicle_land_detected_sub);
+	orb_unsubscribe(_params_sub);
+	orb_unsubscribe(_manual_control_sub);
+	orb_unsubscribe(_sensor_baro_sub);
 }
 
 int
@@ -345,23 +381,60 @@ FixedwingPositionControl::airspeed_poll()
 }
 
 void
+FixedwingPositionControl::sensor_accel_poll()
+{
+	bool updated = false;
+	orb_check(_sensor_bias_sub, &updated);
+
+	if (updated) {
+		sensor_bias_s sensors;
+
+		if (orb_copy(ORB_ID(vehicle_attitude), _sensor_bias_sub, &sensors) == PX4_OK) {
+			Vector3f accel_body(sensors.accel_x, sensors.accel_y, sensors.accel_z);
+
+			// if the vehicle is a tailsitter we have to rotate the attitude by the pitch offset
+			// between multirotor and fixed wing flight
+			if (_vehicle_status.is_vtol && _parameters.vtol_type == vtol_type::TAILSITTER) {
+				// tailsitters use the multicopter frame as reference, in fixed wing
+				// we need to use the fixed wing frame
+				_accel_body = Vector3f{-sensors.accel_z, sensors.accel_y, sensors.accel_x};
+
+			} else {
+				_accel_body = Vector3f{sensors.accel_x, sensors.accel_y, sensors.accel_z};
+			}
+		}
+	}
+}
+
+void
 FixedwingPositionControl::vehicle_attitude_poll()
 {
 	/* check if there is a new position */
-	bool updated;
+	bool updated = false;
 	orb_check(_vehicle_attitude_sub, &updated);
 
 	if (updated) {
-		orb_copy(ORB_ID(vehicle_attitude), _vehicle_attitude_sub, &_att);
+		vehicle_attitude_s att;
+
+		if (orb_copy(ORB_ID(vehicle_attitude), _vehicle_attitude_sub, &att)) {
+
+			// if the vehicle is a tailsitter we have to rotate the attitude by the pitch offset
+			// between multirotor and fixed wing flight
+			if (_vehicle_status.is_vtol && _parameters.vtol_type == vtol_type::TAILSITTER) {
+				_R_nb = Quatf(att.q) * Dcmf(Eulerf(0, M_PI_2_F, 0));
+
+			} else {
+				/* set rotation matrix and euler angles */
+				_R_nb = Quatf(att.q);
+			}
+
+			Eulerf euler_angles(_R_nb);
+			_roll = euler_angles(0);
+			_pitch = euler_angles(1);
+			_yaw = euler_angles(2);
+			_yawspeed = att.yawspeed;
+		}
 	}
-
-	/* set rotation matrix and euler angles */
-	_R_nb = Quatf(_att.q);
-
-	Eulerf euler_angles(_R_nb);
-	_roll    = euler_angles(0);
-	_pitch   = euler_angles(1);
-	_yaw     = euler_angles(2);
 }
 
 void
@@ -825,6 +898,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		/* POSITION CONTROL: pitch stick moves altitude setpoint, throttle stick sets airspeed,
 		   heading is set to a distant waypoint */
 
+		manual_control_setpoint_poll();
+
 		if (_control_mode_current != FW_POSCTRL_MODE_POSITION) {
 			/* Need to init because last loop iteration was in a different mode */
 			_hold_alt = _global_pos.alt;
@@ -874,7 +949,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		    fabsf(_manual.r) < HDG_HOLD_MAN_INPUT_THRESH) {
 
 			/* heading / roll is zero, lock onto current heading */
-			if (fabsf(_att.yawspeed) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
+			if (fabsf(_yawspeed) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
 				// little yaw movement, lock to current heading
 				_yaw_lock_engaged = true;
 
@@ -933,6 +1008,8 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 	} else if (_control_mode.flag_control_altitude_enabled) {
 		/* ALTITUDE CONTROL: pitch stick moves altitude setpoint, throttle stick sets airspeed */
+
+		manual_control_setpoint_poll();
 
 		if (_control_mode_current != FW_POSCTRL_MODE_POSITION && _control_mode_current != FW_POSCTRL_MODE_ALTITUDE) {
 			/* Need to init because last loop iteration was in a different mode */
@@ -1085,8 +1162,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
 	if (_runway_takeoff.runwayTakeoffEnabled()) {
 		if (!_runway_takeoff.isInitialized()) {
-			Eulerf euler(Quatf(_att.q));
-			_runway_takeoff.init(euler.psi(), _global_pos.lat, _global_pos.lon);
+			_runway_takeoff.init(_yaw, _global_pos.lat, _global_pos.lon);
 
 			/* need this already before takeoff is detected
 			 * doesn't matter if it gets reset when takeoff is detected eventually */
@@ -1146,7 +1222,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 				}
 
 				/* Detect launch using body X (forward) acceleration */
-				_launchDetector.update(_sub_sensors.get().accel_x);
+				_launchDetector.update(_accel_body(0));
 
 				/* update our copy of the launch detection state */
 				_launch_detection_state = _launchDetector.getLaunchDetected();
@@ -1524,42 +1600,6 @@ FixedwingPositionControl::handle_command()
 void
 FixedwingPositionControl::run()
 {
-	/*
-	 * do subscriptions
-	 */
-	_global_pos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
-	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
-	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
-	_control_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
-	_vehicle_attitude_sub = orb_subscribe(ORB_ID(vehicle_attitude));
-	_vehicle_command_sub = orb_subscribe(ORB_ID(vehicle_command));
-	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
-	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
-	_params_sub = orb_subscribe(ORB_ID(parameter_update));
-	_manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
-	_sensor_baro_sub = orb_subscribe(ORB_ID(sensor_baro));
-
-	/* rate limit control mode updates to 5Hz */
-	orb_set_interval(_control_mode_sub, 200);
-
-	/* rate limit vehicle status updates to 5Hz */
-	orb_set_interval(_vehicle_status_sub, 200);
-
-	/* rate limit vehicle land detected updates to 5Hz */
-	orb_set_interval(_vehicle_land_detected_sub, 200);
-
-	/* rate limit position updates to 50 Hz */
-	orb_set_interval(_global_pos_sub, 20);
-
-	/* rate limit barometer updates to 1 Hz */
-	orb_set_interval(_sensor_baro_sub, 1000);
-
-	/* abort on a nonzero return value from the parameter init */
-	if (parameters_update() != PX4_OK) {
-		/* parameter setup went wrong, abort */
-		PX4_ERR("aborting startup due to errors.");
-	}
-
 	/* wakeup source(s) */
 	px4_pollfd_struct_t fds[1];
 
@@ -1625,10 +1665,9 @@ FixedwingPositionControl::run()
 			_alt_reset_counter = _global_pos.alt_reset_counter;
 			_pos_reset_counter = _global_pos.lat_lon_reset_counter;
 
-			_sub_sensors.update();
 			airspeed_poll();
-			manual_control_setpoint_poll();
 			position_setpoint_triplet_poll();
+			sensor_accel_poll();
 			vehicle_attitude_poll();
 			vehicle_command_poll();
 			vehicle_control_mode_poll();
@@ -1824,25 +1863,6 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 	/* Using tecs library */
 	float pitch_for_tecs = _pitch - _parameters.pitchsp_offset_rad;
 
-	// if the vehicle is a tailsitter we have to rotate the attitude by the pitch offset
-	// between multirotor and fixed wing flight
-	if (_parameters.vtol_type == vtol_type::TAILSITTER && _vehicle_status.is_vtol) {
-		Dcmf R_offset = Eulerf(0, M_PI_2_F, 0);
-		Eulerf euler = Eulerf(_R_nb * R_offset);
-		pitch_for_tecs = euler(1);
-	}
-
-	/* filter speed and altitude for controller */
-	Vector3f accel_body(_sub_sensors.get().accel_x, _sub_sensors.get().accel_y, _sub_sensors.get().accel_z);
-
-	// tailsitters use the multicopter frame as reference, in fixed wing
-	// we need to use the fixed wing frame
-	if (_parameters.vtol_type == vtol_type::TAILSITTER && _vehicle_status.is_vtol) {
-		float tmp = accel_body(0);
-		accel_body(0) = -accel_body(2);
-		accel_body(2) = tmp;
-	}
-
 	/* tell TECS to update its state, but let it know when it cannot actually control the plane */
 	bool in_air_alt_control = (!_vehicle_land_detected.landed &&
 				   (_control_mode.flag_control_auto_enabled ||
@@ -1851,7 +1871,7 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 
 	/* update TECS vehicle state estimates */
 	_tecs.update_vehicle_state_estimates(_airspeed, _R_nb,
-					     accel_body, (_global_pos.timestamp > 0), in_air_alt_control,
+					     _accel_body, (_global_pos.timestamp > 0), in_air_alt_control,
 					     _global_pos.alt, _local_pos.v_z_valid, _local_pos.vz, _local_pos.az);
 
 	/* scale throttle cruise by baro pressure */

@@ -61,6 +61,7 @@
 #include <uORB/topics/vehicle_status.h>
 #include <vtol_att_control/vtol_type.h>
 
+using matrix::Dcmf;
 using matrix::Eulerf;
 using matrix::Quatf;
 
@@ -113,9 +114,7 @@ private:
 	orb_id_t _attitude_setpoint_id{nullptr};
 
 	actuator_controls_s			_actuators {};		/**< actuator control inputs */
-	actuator_controls_s			_actuators_airframe {};	/**< actuator control inputs */
 	manual_control_setpoint_s		_manual {};		/**< r/c channel data */
-	vehicle_attitude_s			_att {};		/**< vehicle attitude setpoint */
 	vehicle_attitude_setpoint_s		_att_sp {};		/**< vehicle attitude setpoint */
 	vehicle_control_mode_s			_vcontrol_mode {};	/**< vehicle control mode */
 	vehicle_global_position_s		_global_pos {};		/**< global position */
@@ -123,6 +122,8 @@ private:
 	vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 
 	Subscription<airspeed_s>			_airspeed_sub;
+
+	uint64_t					_last_attitude_timestamp{0};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 	perf_counter_t	_nonfinite_input_perf;		/**< performance counter for non finite input */
@@ -272,6 +273,7 @@ private:
 
 	} _parameter_handles{};		/**< handles for interesting parameters */
 
+	ECL_ControlData				_control_input = {};
 	ECL_RollController				_roll_ctrl;
 	ECL_PitchController				_pitch_ctrl;
 	ECL_YawController				_yaw_ctrl;
@@ -282,7 +284,9 @@ private:
 	/**
 	 * Update our local parameter cache.
 	 */
-	int		parameters_update();
+	void		parameters_update();
+
+	bool		vehicle_attitude_poll();
 
 	void		vehicle_control_mode_poll();
 	void		vehicle_manual_poll();
