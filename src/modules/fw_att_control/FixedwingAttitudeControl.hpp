@@ -93,6 +93,7 @@ public:
 
 private:
 
+	int		_airspeed_sub{-1};
 	int		_att_sub{-1};				/**< vehicle attitude */
 	int		_att_sp_sub{-1};			/**< vehicle attitude setpoint */
 	int		_rates_sp_sub{-1};			/**< vehicle attitude setpoint */
@@ -120,9 +121,14 @@ private:
 	vehicle_rates_setpoint_s		_rates_sp {};		/* attitude rates setpoint */
 	vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 
-	Subscription<airspeed_s>			_airspeed_sub;
-
 	uint64_t					_last_attitude_timestamp{0};
+
+	uint64_t					_last_airspeed_timestamp{0};
+	bool						_airspeed_valid{false};
+
+	float						_dtrim_roll{0.0f};
+	float						_dtrim_pitch{0.0f};
+	float						_dtrim_yaw{0.0f};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 	perf_counter_t	_nonfinite_input_perf;		/**< performance counter for non finite input */
@@ -130,8 +136,6 @@ private:
 
 	float _flaps_applied{0.0f};
 	float _flaperons_applied{0.0f};
-
-	bool _landed{true};
 
 	float _battery_scale{1.0f};
 
@@ -285,6 +289,7 @@ private:
 
 	bool		vehicle_attitude_poll();
 
+	void		airspeed_poll();
 	void		vehicle_control_mode_poll();
 	void		vehicle_manual_poll();
 	void		vehicle_attitude_setpoint_poll();

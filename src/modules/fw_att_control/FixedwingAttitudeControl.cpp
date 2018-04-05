@@ -40,10 +40,9 @@
  */
 extern "C" __EXPORT int fw_att_control_main(int argc, char *argv[]);
 
-FixedwingAttitudeControl::FixedwingAttitudeControl() :
-	_airspeed_sub(ORB_ID(airspeed)),
+using math::gradual;
 
-	/* performance counters */
+FixedwingAttitudeControl::FixedwingAttitudeControl() :
 	_loop_perf(perf_alloc(PC_ELAPSED, "fwa_dt")),
 	_nonfinite_input_perf(perf_alloc(PC_COUNT, "fwa_nani")),
 	_nonfinite_output_perf(perf_alloc(PC_COUNT, "fwa_nano"))
@@ -118,6 +117,7 @@ FixedwingAttitudeControl::FixedwingAttitudeControl() :
 	/* fetch initial parameter values */
 	parameters_update();
 
+	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_att_sp_sub = orb_subscribe(ORB_ID(vehicle_attitude_setpoint));
 	_vcontrol_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
@@ -139,6 +139,7 @@ FixedwingAttitudeControl::~FixedwingAttitudeControl()
 	perf_free(_nonfinite_input_perf);
 	perf_free(_nonfinite_output_perf);
 
+	orb_unsubscribe(_airspeed_sub);
 	orb_unsubscribe(_att_sub);
 	orb_unsubscribe(_att_sp_sub);
 	orb_unsubscribe(_rates_sp_sub);
@@ -260,6 +261,95 @@ FixedwingAttitudeControl::parameters_update()
 	_wheel_ctrl.set_k_ff(_parameters.w_ff);
 	_wheel_ctrl.set_integrator_max(_parameters.w_integrator_max);
 	_wheel_ctrl.set_max_rate(math::radians(_parameters.w_rmax));
+}
+
+void
+FixedwingAttitudeControl::airspeed_poll()
+{
+	const bool airspeed_valid_prev = _airspeed_valid;
+
+	bool updated = false;
+
+	/* Check if vehicle control mode has changed */
+	orb_check(_vcontrol_mode_sub, &updated);
+
+	if (updated) {
+		airspeed_s airspeed;
+
+		if (orb_copy(ORB_ID(airspeed), _airspeed_sub, &airspeed) == PX4_OK) {
+
+			/* scale around tuning airspeed */
+			float IAS = 0.0f;
+
+			/* if airspeed is non-finite or not valid or if we are asked not to control it, we assume the normal average speed */
+			_airspeed_valid = PX4_ISFINITE(airspeed.indicated_airspeed_m_s);
+
+			if (_airspeed_valid) {
+				/* prevent numerical drama by requiring 0.5 m/s minimal speed */
+				IAS = math::max(0.5f, airspeed.indicated_airspeed_m_s);
+
+				_last_airspeed_timestamp = airspeed.timestamp;
+
+				/*
+				 * For scaling our actuators using anything less than the min (close to stall)
+				 * speed doesn't make any sense - its the strongest reasonable deflection we
+				 * want to do in flight and its the baseline a human pilot would choose.
+				 *
+				 * Forcing the scaling to this value allows reasonable handheld tests.
+				 */
+				_control_input.airspeed = IAS;
+				_control_input.scaler = _parameters.airspeed_trim / ((IAS < _control_input.airspeed_min) ? _control_input.airspeed_min :
+							IAS);
+
+				/* bi-linear interpolation over airspeed for actuator trim scheduling */
+				_dtrim_roll = 0.0f;
+				_dtrim_pitch = 0.0f;
+				_dtrim_yaw = 0.0f;
+
+				if (IAS < _parameters.airspeed_trim) {
+					_dtrim_roll += gradual(IAS, _control_input.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_roll_vmin, 0.0f);
+					_dtrim_pitch += gradual(IAS, _control_input.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_pitch_vmin,
+								0.0f);
+					_dtrim_yaw += gradual(IAS, _control_input.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_yaw_vmin, 0.0f);
+
+				} else {
+					_dtrim_roll += gradual(IAS, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f, _parameters.dtrim_roll_vmax);
+					_dtrim_pitch += gradual(IAS, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f,
+								_parameters.dtrim_pitch_vmax);
+					_dtrim_yaw += gradual(IAS, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f, _parameters.dtrim_yaw_vmax);
+				}
+
+			} else {
+				perf_count(_nonfinite_input_perf);
+			}
+		}
+	}
+
+	// check timeout
+	if (hrt_elapsed_time(&_last_airspeed_timestamp) > 1e6) {
+		_airspeed_valid = false;
+	}
+
+	if (!_airspeed_valid) {
+		_dtrim_roll = 0.0f;
+		_dtrim_pitch = 0.0f;
+		_dtrim_yaw = 0.0f;
+
+		_control_input.airspeed = _parameters.airspeed_trim;
+		_control_input.scaler = 1.0f;
+	}
+
+	// VTOL tailsitter gain scheduling during hover.
+	if (_vehicle_status.is_vtol && _parameters.vtol_type == vtol_type::TAILSITTER) {
+		if (_vehicle_status.in_transition_mode || !_vehicle_status.is_rotary_wing) {
+			_control_input.airspeed = _control_input.airspeed_max;
+			_control_input.scaler = _parameters.airspeed_trim / _control_input.airspeed_max;
+		}
+	}
+
+	if (airspeed_valid_prev && !_airspeed_valid) {
+		PX4_ERR("airspeed now invalid");
+	}
 }
 
 void
@@ -494,6 +584,14 @@ FixedwingAttitudeControl::vehicle_status_poll()
 			if (_vehicle_status.is_rotary_wing) {
 				_vcontrol_mode.flag_control_attitude_enabled = false;
 				_vcontrol_mode.flag_control_manual_enabled = false;
+
+				/* Reset integrators if a VTOL and not transitioning */
+				if (!_vehicle_status.in_transition_mode) {
+					_roll_ctrl.reset_integrator();
+					_pitch_ctrl.reset_integrator();
+					_yaw_ctrl.reset_integrator();
+					_wheel_ctrl.reset_integrator();
+				}
 			}
 		}
 
@@ -526,7 +624,12 @@ FixedwingAttitudeControl::vehicle_land_detected_poll()
 		vehicle_land_detected_s vehicle_land_detected {};
 
 		if (orb_copy(ORB_ID(vehicle_land_detected), _vehicle_land_detected_sub, &vehicle_land_detected) == PX4_OK) {
-			_landed = vehicle_land_detected.landed;
+			if (vehicle_land_detected.landed) {
+				_roll_ctrl.reset_integrator();
+				_pitch_ctrl.reset_integrator();
+				_yaw_ctrl.reset_integrator();
+				_wheel_ctrl.reset_integrator();
+			}
 		}
 	}
 }
@@ -568,7 +671,7 @@ void FixedwingAttitudeControl::run()
 				deltaT = 0.01f;
 			}
 
-			_airspeed_sub.update();
+			airspeed_poll();
 			vehicle_attitude_setpoint_poll();
 			vehicle_control_mode_poll();
 			vehicle_manual_poll();
@@ -580,9 +683,6 @@ void FixedwingAttitudeControl::run()
 			// we need to make sure that this flag is reset
 			_att_sp.fw_control_yaw = _att_sp.fw_control_yaw && _vcontrol_mode.flag_control_auto_enabled;
 
-			/* lock integrator until control is started */
-			bool lock_integrator = !(_vcontrol_mode.flag_control_rates_enabled && !_vehicle_status.is_rotary_wing);
-
 			/* if we are in rotary wing mode, do nothing */
 			if (_vehicle_status.is_rotary_wing && !_vehicle_status.is_vtol) {
 				continue;
@@ -592,56 +692,12 @@ void FixedwingAttitudeControl::run()
 
 			/* decide if in stabilized or full manual control */
 			if (_vcontrol_mode.flag_control_rates_enabled) {
-				/* scale around tuning airspeed */
-				float airspeed;
-
-				/* if airspeed is non-finite or not valid or if we are asked not to control it, we assume the normal average speed */
-				const bool airspeed_valid = PX4_ISFINITE(_airspeed_sub.get().indicated_airspeed_m_s)
-							    && (hrt_elapsed_time(&_airspeed_sub.get().timestamp) < 1e6);
-
-				if (airspeed_valid) {
-					/* prevent numerical drama by requiring 0.5 m/s minimal speed */
-					airspeed = math::max(0.5f, _airspeed_sub.get().indicated_airspeed_m_s);
-
-				} else {
-					airspeed = _parameters.airspeed_trim;
-					perf_count(_nonfinite_input_perf);
-				}
-
-				if (_vehicle_status.in_transition_mode || !_vehicle_status.is_rotary_wing) {
-					airspeed = _control_input.airspeed_max;
-				}
-
-				/*
-				 * For scaling our actuators using anything less than the min (close to stall)
-				 * speed doesn't make any sense - its the strongest reasonable deflection we
-				 * want to do in flight and its the baseline a human pilot would choose.
-				 *
-				 * Forcing the scaling to this value allows reasonable handheld tests.
-				 */
-				float airspeed_scaling = _parameters.airspeed_trim / ((airspeed < _control_input.airspeed_min) ?
-							 _control_input.airspeed_min :
-							 airspeed);
-
-				/* Reset integrators if the aircraft is on ground
-				 * or a multicopter (but not transitioning VTOL)
-				 */
-				if (_landed
-				    || (_vehicle_status.is_rotary_wing && !_vehicle_status.in_transition_mode)) {
-
-					_roll_ctrl.reset_integrator();
-					_pitch_ctrl.reset_integrator();
-					_yaw_ctrl.reset_integrator();
-					_wheel_ctrl.reset_integrator();
-				}
 
 				/* Prepare data for attitude controllers */
 				_control_input.roll_setpoint = _att_sp.roll_body;
 				_control_input.pitch_setpoint = _att_sp.pitch_body;
 				_control_input.yaw_setpoint = _att_sp.yaw_body;
-				_control_input.airspeed = airspeed;
-				_control_input.scaler = airspeed_scaling;
-				_control_input.lock_integrator = lock_integrator;
+				_control_input.lock_integrator = !(_vcontrol_mode.flag_control_rates_enabled && !_vehicle_status.is_rotary_wing);
 
 				/* reset body angular rate limits on mode change */
 				if ((_vcontrol_mode.flag_control_attitude_enabled != _flag_control_attitude_enabled_last) || params_updated) {
@@ -661,29 +717,9 @@ void FixedwingAttitudeControl::run()
 
 				_flag_control_attitude_enabled_last = _vcontrol_mode.flag_control_attitude_enabled;
 
-				/* bi-linear interpolation over airspeed for actuator trim scheduling */
-				float trim_roll = _parameters.trim_roll;
-				float trim_pitch = _parameters.trim_pitch;
-				float trim_yaw = _parameters.trim_yaw;
-
-				if (airspeed < _parameters.airspeed_trim) {
-					trim_roll += math::gradual(airspeed, _control_input.airspeed_min, _parameters.airspeed_trim,
-								   _parameters.dtrim_roll_vmin,
-								   0.0f);
-					trim_pitch += math::gradual(airspeed, _control_input.airspeed_min, _parameters.airspeed_trim,
-								    _parameters.dtrim_pitch_vmin,
-								    0.0f);
-					trim_yaw += math::gradual(airspeed, _control_input.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_yaw_vmin,
-								  0.0f);
-
-				} else {
-					trim_roll += math::gradual(airspeed, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f,
-								   _parameters.dtrim_roll_vmax);
-					trim_pitch += math::gradual(airspeed, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f,
-								    _parameters.dtrim_pitch_vmax);
-					trim_yaw += math::gradual(airspeed, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f,
-								  _parameters.dtrim_yaw_vmax);
-				}
+				float trim_roll = _parameters.trim_roll + _dtrim_roll;
+				float trim_pitch = _parameters.trim_pitch + _dtrim_pitch;
+				float trim_yaw = _parameters.trim_yaw + _dtrim_yaw;
 
 				/* add trim increment if flaps are deployed  */
 				trim_roll += _flaps_applied * _parameters.dtrim_roll_flaps;
