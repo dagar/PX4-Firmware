@@ -55,7 +55,7 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
-#include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
@@ -97,7 +97,7 @@ private:
 	int		_att_sp_sub{-1};			/**< vehicle attitude setpoint */
 	int		_rates_sp_sub{-1};			/**< vehicle attitude setpoint */
 	int		_battery_status_sub{-1};		/**< battery status subscription */
-	int		_global_pos_sub{-1};			/**< global position subscription */
+	int		_vehicle_local_position_sub{-1};			/**< global position subscription */
 	int		_manual_sub{-1};			/**< notification of manual control updates */
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_vcontrol_mode_sub{-1};			/**< vehicle status subscription */
@@ -117,7 +117,6 @@ private:
 	manual_control_setpoint_s		_manual {};		/**< r/c channel data */
 	vehicle_attitude_setpoint_s		_att_sp {};		/**< vehicle attitude setpoint */
 	vehicle_control_mode_s			_vcontrol_mode {};	/**< vehicle control mode */
-	vehicle_global_position_s		_global_pos {};		/**< global position */
 	vehicle_rates_setpoint_s		_rates_sp {};		/* attitude rates setpoint */
 	vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 
@@ -166,9 +165,7 @@ private:
 		float w_integrator_max;
 		float w_rmax;
 
-		float airspeed_min;
 		float airspeed_trim;
-		float airspeed_max;
 
 		float trim_roll;
 		float trim_pitch;
@@ -292,7 +289,7 @@ private:
 	void		vehicle_manual_poll();
 	void		vehicle_attitude_setpoint_poll();
 	void		vehicle_rates_setpoint_poll();
-	void		global_pos_poll();
+	void		vehicle_local_position_poll();
 	void		vehicle_status_poll();
 	void		vehicle_land_detected_poll();
 

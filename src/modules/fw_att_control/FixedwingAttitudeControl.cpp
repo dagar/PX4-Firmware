@@ -123,11 +123,14 @@ FixedwingAttitudeControl::FixedwingAttitudeControl() :
 	_vcontrol_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_manual_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
-	_global_pos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
+	_vehicle_local_position_sub = orb_subscribe(ORB_ID(vehicle_local_position));
 	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	_battery_status_sub = orb_subscribe(ORB_ID(battery_status));
 	_rates_sp_sub = orb_subscribe(ORB_ID(vehicle_rates_setpoint));
+
+	_control_input.scaler = 1.0f;
+	_control_input.groundspeed_scaler = 1.0f;
 }
 
 FixedwingAttitudeControl::~FixedwingAttitudeControl()
@@ -140,7 +143,7 @@ FixedwingAttitudeControl::~FixedwingAttitudeControl()
 	orb_unsubscribe(_att_sp_sub);
 	orb_unsubscribe(_rates_sp_sub);
 	orb_unsubscribe(_battery_status_sub);
-	orb_unsubscribe(_global_pos_sub);
+	orb_unsubscribe(_vehicle_local_position_sub);
 	orb_unsubscribe(_manual_sub);
 	orb_unsubscribe(_params_sub);
 	orb_unsubscribe(_vcontrol_mode_sub);
@@ -184,9 +187,9 @@ FixedwingAttitudeControl::parameters_update()
 	param_get(_parameter_handles.w_integrator_max, &(_parameters.w_integrator_max));
 	param_get(_parameter_handles.w_rmax, &(_parameters.w_rmax));
 
-	param_get(_parameter_handles.airspeed_min, &(_parameters.airspeed_min));
+	param_get(_parameter_handles.airspeed_min, &(_control_input.airspeed_min));
 	param_get(_parameter_handles.airspeed_trim, &(_parameters.airspeed_trim));
-	param_get(_parameter_handles.airspeed_max, &(_parameters.airspeed_max));
+	param_get(_parameter_handles.airspeed_max, &(_control_input.airspeed_max));
 
 	param_get(_parameter_handles.trim_roll, &(_parameters.trim_roll));
 	param_get(_parameter_handles.trim_pitch, &(_parameters.trim_pitch));
@@ -450,14 +453,29 @@ FixedwingAttitudeControl::vehicle_rates_setpoint_poll()
 }
 
 void
-FixedwingAttitudeControl::global_pos_poll()
+FixedwingAttitudeControl::vehicle_local_position_poll()
 {
-	/* check if there is a new global position */
-	bool global_pos_updated;
-	orb_check(_global_pos_sub, &global_pos_updated);
+	// only update if wheel enabled
+	if (_parameters.w_en && _att_sp.fw_control_yaw) {
+		bool updated = false;
+		orb_check(_vehicle_local_position_sub, &updated);
 
-	if (global_pos_updated) {
-		orb_copy(ORB_ID(vehicle_global_position), _global_pos_sub, &_global_pos);
+		if (updated) {
+			vehicle_local_position_s lpos;
+
+			if (orb_copy(ORB_ID(vehicle_local_position), _vehicle_local_position_sub, &lpos) == PX4_OK) {
+
+				/* Use min airspeed to calculate ground speed scaling region.
+				 * Don't scale below gspd_scaling_trim
+				 */
+				const float groundspeed = sqrtf(lpos.vx * lpos.vx + lpos.vy * lpos.vy);
+				float gspd_scaling_trim = (_control_input.airspeed_min * 0.6f);
+				float groundspeed_scaler = gspd_scaling_trim / ((groundspeed < gspd_scaling_trim) ? gspd_scaling_trim : groundspeed);
+
+				_control_input.groundspeed = groundspeed;
+				_control_input.groundspeed_scaler = groundspeed_scaler;
+			}
+		}
 	}
 }
 
@@ -554,9 +572,9 @@ void FixedwingAttitudeControl::run()
 			vehicle_attitude_setpoint_poll();
 			vehicle_control_mode_poll();
 			vehicle_manual_poll();
-			global_pos_poll();
 			vehicle_status_poll();
 			vehicle_land_detected_poll();
+			vehicle_local_position_poll();
 
 			// the position controller will not emit attitude setpoints in some modes
 			// we need to make sure that this flag is reset
@@ -591,7 +609,7 @@ void FixedwingAttitudeControl::run()
 				}
 
 				if (_vehicle_status.in_transition_mode || !_vehicle_status.is_rotary_wing) {
-					airspeed = _parameters.airspeed_max;
+					airspeed = _control_input.airspeed_max;
 				}
 
 				/*
@@ -601,16 +619,9 @@ void FixedwingAttitudeControl::run()
 				 *
 				 * Forcing the scaling to this value allows reasonable handheld tests.
 				 */
-				float airspeed_scaling = _parameters.airspeed_trim / ((airspeed < _parameters.airspeed_min) ? _parameters.airspeed_min :
+				float airspeed_scaling = _parameters.airspeed_trim / ((airspeed < _control_input.airspeed_min) ?
+							 _control_input.airspeed_min :
 							 airspeed);
-
-				/* Use min airspeed to calculate ground speed scaling region.
-				 * Don't scale below gspd_scaling_trim
-				 */
-				float groundspeed = sqrtf(_global_pos.vel_n * _global_pos.vel_n +
-							  _global_pos.vel_e * _global_pos.vel_e);
-				float gspd_scaling_trim = (_parameters.airspeed_min * 0.6f);
-				float groundspeed_scaler = gspd_scaling_trim / ((groundspeed < gspd_scaling_trim) ? gspd_scaling_trim : groundspeed);
 
 				/* Reset integrators if the aircraft is on ground
 				 * or a multicopter (but not transitioning VTOL)
@@ -628,13 +639,9 @@ void FixedwingAttitudeControl::run()
 				_control_input.roll_setpoint = _att_sp.roll_body;
 				_control_input.pitch_setpoint = _att_sp.pitch_body;
 				_control_input.yaw_setpoint = _att_sp.yaw_body;
-				_control_input.airspeed_min = _parameters.airspeed_min;
-				_control_input.airspeed_max = _parameters.airspeed_max;
 				_control_input.airspeed = airspeed;
 				_control_input.scaler = airspeed_scaling;
 				_control_input.lock_integrator = lock_integrator;
-				_control_input.groundspeed = groundspeed;
-				_control_input.groundspeed_scaler = groundspeed_scaler;
 
 				/* reset body angular rate limits on mode change */
 				if ((_vcontrol_mode.flag_control_attitude_enabled != _flag_control_attitude_enabled_last) || params_updated) {
@@ -660,19 +667,21 @@ void FixedwingAttitudeControl::run()
 				float trim_yaw = _parameters.trim_yaw;
 
 				if (airspeed < _parameters.airspeed_trim) {
-					trim_roll += math::gradual(airspeed, _parameters.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_roll_vmin,
+					trim_roll += math::gradual(airspeed, _control_input.airspeed_min, _parameters.airspeed_trim,
+								   _parameters.dtrim_roll_vmin,
 								   0.0f);
-					trim_pitch += math::gradual(airspeed, _parameters.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_pitch_vmin,
+					trim_pitch += math::gradual(airspeed, _control_input.airspeed_min, _parameters.airspeed_trim,
+								    _parameters.dtrim_pitch_vmin,
 								    0.0f);
-					trim_yaw += math::gradual(airspeed, _parameters.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_yaw_vmin,
+					trim_yaw += math::gradual(airspeed, _control_input.airspeed_min, _parameters.airspeed_trim, _parameters.dtrim_yaw_vmin,
 								  0.0f);
 
 				} else {
-					trim_roll += math::gradual(airspeed, _parameters.airspeed_trim, _parameters.airspeed_max, 0.0f,
+					trim_roll += math::gradual(airspeed, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f,
 								   _parameters.dtrim_roll_vmax);
-					trim_pitch += math::gradual(airspeed, _parameters.airspeed_trim, _parameters.airspeed_max, 0.0f,
+					trim_pitch += math::gradual(airspeed, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f,
 								    _parameters.dtrim_pitch_vmax);
-					trim_yaw += math::gradual(airspeed, _parameters.airspeed_trim, _parameters.airspeed_max, 0.0f,
+					trim_yaw += math::gradual(airspeed, _parameters.airspeed_trim, _control_input.airspeed_max, 0.0f,
 								  _parameters.dtrim_yaw_vmax);
 				}
 
