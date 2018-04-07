@@ -69,7 +69,6 @@
 
 #include <uORB/uORB.h>
 #include <uORB/topics/differential_pressure.h>
-#include <uORB/topics/subsystem_info.h>
 
 /* Default I2C bus */
 #define PX4_I2C_BUS_DEFAULT		PX4_I2C_BUS_EXPANSION
@@ -130,7 +129,6 @@ protected:
 	float			_diff_pres_offset;
 
 	orb_advert_t		_airspeed_pub;
-	orb_advert_t		_subsys_pub;
 
 	int			_class_instance;
 

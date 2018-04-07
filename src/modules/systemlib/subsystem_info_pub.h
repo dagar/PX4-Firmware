@@ -43,8 +43,14 @@
 
 #include <px4_log.h>
 #include <uORB/uORB.h>
-#include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/vehicle_status.h>
 
-void publish_subsystem_info(orb_advert_t* pub_handle, uint64_t subsystem_type, bool present, bool enabled, bool ok);
-void publish_subsystem_info_healthy(orb_advert_t* pub_handle, uint64_t subsystem_type, bool ok);
+void publish_subsystem_info_init(vehicle_status_s *commander_vehicle_status_ptr, bool *commander_status_changed_ptr);
+void publish_subsystem_info(uint64_t subsystem_type, bool present, bool enabled, bool ok);
+void publish_subsystem_info_healthy(uint64_t subsystem_type, bool ok);
+void publish_subsystem_info_print(void);
+
+// Local helper functions
+bool getPresent(uint64_t subsystem_type);
+bool getEnabled(uint64_t subsystem_type);
+

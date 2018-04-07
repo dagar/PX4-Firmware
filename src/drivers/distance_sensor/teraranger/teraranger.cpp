@@ -657,8 +657,7 @@ TERARANGER::start()
 	work_queue(HPWORK, &_work, (worker_t)&TERARANGER::cycle_trampoline, this, 1);
 
 	/* notify about state change */
-	static orb_advert_t pub = nullptr;
-	publish_subsystem_info(&pub, subsystem_info_s::SUBSYSTEM_TYPE_RANGEFINDER, true, true, true);
+	publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_RANGEFINDER, true, true, true);
 }
 
 void

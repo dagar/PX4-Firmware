@@ -972,7 +972,7 @@ bool VotedSensorsUpdate::check_failover(SensorData &sensor, const char *sensor_n
 						if(strcmp(sensor_name,"Accel")==0) subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_ACC2;
 						if(strcmp(sensor_name,"Mag")==0) subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_MAG2;
 					}
-					publish_subsystem_info_healthy(&_subsystem_info_pub, subsystem_type, false);
+					publish_subsystem_info_healthy(subsystem_type, false);
 				}
 			}
 		}
@@ -1021,7 +1021,7 @@ void VotedSensorsUpdate::init_sensor_class(const struct orb_metadata *meta, Sens
 					if(strcmp(meta->o_name,"sensor_accel")==0) subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_ACC2;
 					if(strcmp(meta->o_name,"sensor_mag")==0) subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_MAG2;
 				}
-				publish_subsystem_info(&_subsystem_info_pub, subsystem_type, true, true, true);
+				publish_subsystem_info(subsystem_type, true, true, true);
 			}
 		}
 	}

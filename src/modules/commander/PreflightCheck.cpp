@@ -69,6 +69,7 @@
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/subsystem_info.h>
 
 #include "PreflightCheck.h"
 
@@ -115,7 +116,7 @@ static int check_calibration(DevHandle &h, const char *param_template, int &devi
 	return !calibration_found;
 }
 
-static bool magnometerCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, unsigned instance, bool optional, int &device_id, bool report_fail)
+static bool magnometerCheck(orb_advert_t *mavlink_log_pub, unsigned instance, bool optional, int &device_id, bool report_fail)
 {
 	bool success = true;
 
@@ -130,8 +131,8 @@ static bool magnometerCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsyst
 				mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: NO MAG SENSOR #%u", instance);
 			}
 		}
-		if(instance==0) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, false, false);
-		if(instance==1) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false, false, false);
+		if(instance==0) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, false, false);
+		if(instance==1) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false, false, false);
 		return false;
 	}
 
@@ -156,16 +157,16 @@ static bool magnometerCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsyst
 	}
 
 out:
-	if(!success && instance==0) publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG, false);
-	if(!success && instance==1) publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false);
-	if(success && instance==0) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG, true, true, true);
-	if(success && instance==1) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG2, true, true, true);
+	if(!success && instance==0) publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false);
+	if(!success && instance==1) publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false);
+	if(success && instance==0) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MAG, true, true, true);
+	if(success && instance==1) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, true, true, true);
 
 	DevMgr::releaseHandle(h);
 	return success;
 }
 
-static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, bool report_status)
+static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, bool report_status)
 {
 	bool success = true; // start with a pass and change to a fail if any test fails
 	float test_limit = 1.0f; // pass limit re-used for each test
@@ -184,8 +185,8 @@ static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *sub
 	if (sensors.accel_inconsistency_m_s_s > test_limit) {
 		if (report_status) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: ACCELS INCONSISTENT - CHECK CAL");
-			publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC, false);
-			publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC2, false);
+			publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_ACC, false);
+			publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_ACC2, false);
 		}
 		success = false;
 		goto out;
@@ -201,8 +202,8 @@ static bool imuConsistencyCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *sub
 	if (sensors.gyro_inconsistency_rad_s > test_limit) {
 		if (report_status) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: GYROS INCONSISTENT - CHECK CAL");
-			publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false);
-			publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, false);
+			publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false);
+			publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, false);
 		}
 		success = false;
 		goto out;
@@ -219,7 +220,7 @@ out:
 }
 
 // return false if the magnetomer measurements are inconsistent
-static bool magConsistencyCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, bool report_status)
+static bool magConsistencyCheck(orb_advert_t *mavlink_log_pub, bool report_status)
 {
 	// get the sensor preflight data
 	int sensors_sub = orb_subscribe(ORB_ID(sensor_preflight));
@@ -238,15 +239,15 @@ static bool magConsistencyCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *sub
 		if (report_status) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: MAG SENSORS INCONSISTENT");
 		}
-		publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG, false);
-		publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false);
+		publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false);
+		publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false);
 		return false;
 	}
 
 	return true;
 }
 
-static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, unsigned instance, bool optional, bool dynamic, int &device_id, bool report_fail)
+static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, unsigned instance, bool optional, bool dynamic, int &device_id, bool report_fail)
 {
 	bool success = true;
 
@@ -261,8 +262,8 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subs
 				mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: NO ACCEL SENSOR #%u", instance);
 			}
 		}
-		if(instance==0) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC, false, false, false);
-		if(instance==1) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC2, false, false, false);
+		if(instance==0) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ACC, false, false, false);
+		if(instance==1) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ACC2, false, false, false);
 		return false;
 	}
 
@@ -316,16 +317,16 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subs
 #endif
 
 out:
-	if(!success && instance==0) publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC, false);
-	if(!success && instance==1) publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC2, false);
-	if(success && instance==0) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC, true, true, true);
-	if(success && instance==1) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC2, true, true, true);
+	if(!success && instance==0) publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_ACC, false);
+	if(!success && instance==1) publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_ACC2, false);
+	if(success && instance==0) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ACC, true, true, true);
+	if(success && instance==1) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ACC2, true, true, true);
 
 	DevMgr::releaseHandle(h);
 	return success;
 }
 
-static bool gyroCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, unsigned instance, bool optional, int &device_id, bool report_fail)
+static bool gyroCheck(orb_advert_t *mavlink_log_pub, unsigned instance, bool optional, int &device_id, bool report_fail)
 {
 	bool success = true;
 
@@ -340,8 +341,8 @@ static bool gyroCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_inf
 				mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: NO GYRO SENSOR #%u", instance);
 			}
 		}
-		if(instance==0) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false, false, false);
-		if(instance==1) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, false, false, false);
+		if(instance==0) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false, false, false);
+		if(instance==1) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, false, false, false);
 		return false;
 	}
 
@@ -366,16 +367,16 @@ static bool gyroCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_inf
 	}
 
 out:
-	if(!success && instance==0) publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false);
-	if(!success && instance==1) publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, false);
-	if(success && instance==0) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO, true, true, true);
-	if(success && instance==1) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, true, true, true);
+	if(!success && instance==0) publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false);
+	if(!success && instance==1) publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, false);
+	if(success && instance==0) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GYRO, true, true, true);
+	if(success && instance==1) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GYRO2, true, true, true);
 
 	DevMgr::releaseHandle(h);
 	return success;
 }
 
-static bool baroCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, unsigned instance, bool optional, int &device_id, bool report_fail)
+static bool baroCheck(orb_advert_t *mavlink_log_pub, unsigned instance, bool optional, int &device_id, bool report_fail)
 {
 	bool success = true;
 
@@ -390,7 +391,7 @@ static bool baroCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_inf
 				mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: NO BARO SENSOR #%u", instance);
 			}
 		}
-		publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ABSPRESSURE, false, false, false);
+		publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ABSPRESSURE, false, false, false);
 		return false;
 	}
 
@@ -406,12 +407,12 @@ static bool baroCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_inf
 	// }
 
 //out:
-	if(success) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ABSPRESSURE, true, true, true);
+	if(success) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ABSPRESSURE, true, true, true);
 	DevMgr::releaseHandle(h);
 	return success;
 }
 
-static bool airspeedCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, bool optional, bool report_fail, bool prearm)
+static bool airspeedCheck(orb_advert_t *mavlink_log_pub, bool optional, bool report_fail, bool prearm)
 {
 	bool success = true;
 
@@ -426,7 +427,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: AIRSPEED SENSOR MISSING");
 		}
-		publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false, false, false);
+		publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false, false, false);
 		success = false;
 		goto out;
 	}
@@ -436,7 +437,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: AIRSPEED SENSOR MISSING");
 		}
-		publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false, false, false);
+		publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false, false, false);
 		success = false;
 		goto out;
 	}
@@ -451,7 +452,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: AIRSPEED SENSOR STUCK");
 		}
-		publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false);
+		publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false);
 		success = false;
 		goto out;
 	}
@@ -465,19 +466,19 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: CHECK AIRSPEED CAL OR PITOT");
 		}
-		publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false);
+		publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, false);
 		success = false;
 		goto out;
 	}
 
 out:
-	if(success) publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, true, true, true);
+	if(success) publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, true, true, true);
 	orb_unsubscribe(fd_airspeed);
 	orb_unsubscribe(fd_diffpres);
 	return success;
 }
 
-static bool ekf2Check(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, bool optional, bool report_fail, bool enforce_gps_required)
+static bool ekf2Check(orb_advert_t *mavlink_log_pub, bool optional, bool report_fail, bool enforce_gps_required)
 {
 	bool success = true; // start with a pass and change to a fail if any test fails
 	float test_limit = 1.0f; // pass limit re-used for each test
@@ -594,14 +595,14 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_inf
 	}
 
 out:
-	if(!success) publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_AHRS, false);
-	else publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_AHRS, true, true, true);
+	if(!success) publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_AHRS, false);
+	else publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_AHRS, true, true, true);
 
 	orb_unsubscribe(sub);
 	return success;
 }
 
-bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_pub, vehicle_status_flags_s *status_flags, bool checkSensors, bool checkAirspeed, bool checkRC, bool checkGNSS,
+bool preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_status_flags_s *status_flags, bool checkSensors, bool checkAirspeed, bool checkRC, bool checkGNSS,
 		    bool checkDynamic, bool isVTOL, bool rcSignalLost, bool reportFailures, bool prearm, hrt_abstime time_since_boot)
 {
 	if (time_since_boot < 2000000) {
@@ -638,7 +639,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			bool required = (i < max_mandatory_mag_count);
 			int device_id = -1;
 
-			if (!magnometerCheck(mavlink_log_pub, subsystem_info_pub, i, !required, device_id, reportFailures) && required) {
+			if (!magnometerCheck(mavlink_log_pub, i, !required, device_id, reportFailures) && required) {
 				failed = true;
 			}
 
@@ -652,12 +653,12 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			if (reportFailures) {
 				mavlink_log_critical(mavlink_log_pub, "Warning: Primary compass not found");
 			}
-			publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, false, false);
+			publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, false, false);
 			failed = true;
 		}
 
 		/* fail if mag sensors are inconsistent */
-		if (!magConsistencyCheck(mavlink_log_pub, subsystem_info_pub, reportFailures)) {
+		if (!magConsistencyCheck(mavlink_log_pub, reportFailures)) {
 			failed = true;
 		}
 	}
@@ -673,7 +674,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			bool required = (i < max_mandatory_accel_count);
 			int device_id = -1;
 
-			if (!accelerometerCheck(mavlink_log_pub, subsystem_info_pub, i, !required, checkDynamic, device_id, reportFailures) && required) {
+			if (!accelerometerCheck(mavlink_log_pub, i, !required, checkDynamic, device_id, reportFailures) && required) {
 				failed = true;
 			}
 
@@ -687,7 +688,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			if (reportFailures) {
 				mavlink_log_critical(mavlink_log_pub, "Warning: Primary accelerometer not found");
 			}
-			publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ACC, false, false, false);
+			publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ACC, false, false, false);
 			failed = true;
 		}
 	}
@@ -703,7 +704,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			bool required = (i < max_mandatory_gyro_count);
 			int device_id = -1;
 
-			if (!gyroCheck(mavlink_log_pub, subsystem_info_pub, i, !required, device_id, reportFailures) && required) {
+			if (!gyroCheck(mavlink_log_pub, i, !required, device_id, reportFailures) && required) {
 				failed = true;
 			}
 
@@ -717,7 +718,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			if (reportFailures) {
 				mavlink_log_critical(mavlink_log_pub, "Warning: Primary gyro not found");
 			}
-			publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false, false, false);
+			publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false, false, false);
 			failed = true;
 		}
 	}
@@ -733,7 +734,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			bool required = (i < max_mandatory_baro_count);
 			int device_id = -1;
 
-			if (!baroCheck(mavlink_log_pub, subsystem_info_pub, i, !required, device_id, reportFailures) && required) {
+			if (!baroCheck(mavlink_log_pub, i, !required, device_id, reportFailures) && required) {
 				failed = true;
 			}
 
@@ -748,21 +749,21 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			if (reportFailures) {
 				mavlink_log_critical(mavlink_log_pub, "warning: primary barometer not operational");
 			}
-			publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_ABSPRESSURE, false, false, false);
+			publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_ABSPRESSURE, false, false, false);
 			failed = true;
 		}
 	}
 
 	/* ---- IMU CONSISTENCY ---- */
 	if (checkSensors) {
-		if (!imuConsistencyCheck(mavlink_log_pub, subsystem_info_pub, (reportFailures && !failed))) {
+		if (!imuConsistencyCheck(mavlink_log_pub, (reportFailures && !failed))) {
 			failed = true;
 		}
 	}
 
 	/* ---- AIRSPEED ---- */
 	if (checkAirspeed) {
-		if (!airspeedCheck(mavlink_log_pub, subsystem_info_pub, true, reportFailures, prearm)) {
+		if (!airspeedCheck(mavlink_log_pub, true, reportFailures, prearm)) {
 			failed = true;
 		}
 	}
@@ -773,13 +774,13 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 			if (reportFailures) {
 				mavlink_log_critical(mavlink_log_pub, "RC calibration check failed");
 			}
-			publish_subsystem_info_healthy(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, false);
+			publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, false);
 			status_flags->rc_calibration_valid = false;
 			failed = true;
 		} else {
 			// The calibration is fine, but only set the overall health state to true if the signal is not currently lost
 			status_flags->rc_calibration_valid = true;
-			publish_subsystem_info(subsystem_info_pub, subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, true, true, !rcSignalLost);
+			publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, true, true, !rcSignalLost);
 		}
 	}
 
@@ -791,7 +792,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, orb_advert_t *subsystem_info_
 		// don't report ekf failures for the first 10 seconds to allow time for the filter to start
 		bool report_ekf_fail = (time_since_boot > 10 * 1000000);
 
-		if (!ekf2Check(mavlink_log_pub, subsystem_info_pub, true, reportFailures && report_ekf_fail && !failed, checkGNSS)) {
+		if (!ekf2Check(mavlink_log_pub, true, reportFailures && report_ekf_fail && !failed, checkGNSS)) {
 			failed = true;
 		}
 	}

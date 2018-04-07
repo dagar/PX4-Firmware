@@ -68,7 +68,6 @@ Airspeed::Airspeed(int bus, int address, unsigned conversion_interval, const cha
 	_diff_pres_offset(0.0f),
 	_airspeed_pub(nullptr),
 	_airspeed_orb_class_instance(-1),
-	_subsys_pub(nullptr),
 	_class_instance(-1),
 	_conversion_interval(conversion_interval),
 	_sample_perf(perf_alloc(PC_ELAPSED, "aspd_read")),
@@ -254,7 +253,7 @@ Airspeed::update_status()
 {
 	if (_sensor_ok != _last_published_sensor_ok) {
 		/* notify about state change */
-		publish_subsystem_info(&_subsys_pub, subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, true, true, _sensor_ok);
+		publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, true, true, _sensor_ok);
 		_last_published_sensor_ok = _sensor_ok;
 	}
 }

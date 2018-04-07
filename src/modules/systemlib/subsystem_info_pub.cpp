@@ -34,50 +34,75 @@
 /**
  * @file subsystem_info_pub.cpp
  *
- * Contains helper functions to efficiently publish the subsystem_info topic from various locations inside the code.
+ * Contains helper functions to efficiently publish the subsystem_info messages from various locations inside the code. It is basically a
+ * helper function for commander. Approach:
+ * 	- Before commander starts (which happens after some of the drivers have already published the respective subsystem_info), this helper
+ * 	  code stores all requests for a publish_subsystem_info in the internal_status variable
+ * 	- When commander starts up, it calls the publish_subsystem_info_init function. This 1) copies the internal_status into commander's
+ * 	  vehicle status variable and 2) assigns the status pointer to commanders vehicle status
+ * 	- After that, all requests to publish_subsystem_info are directly written to commander's vehicle status such that it is always up
+ * 	  to date. Commander then publishes the vehicle_status uORB (and is in fact the only app that does that, which is why this approach works)
  *
  * @author Philipp Oettershagen (philipp.oettershagen@mavt.ethz.ch)
  */
 
 #include "subsystem_info_pub.h"
 
-int vehicle_status_sub = 0;
-struct vehicle_status_s status = {};
+vehicle_status_s internal_status = {};
+vehicle_status_s* status = &internal_status;
+bool *status_changed = nullptr;
 
-/* Publishes the full state information for a specific subsystem type */
-void publish_subsystem_info(orb_advert_t* pub_handle, uint64_t subsystem_type, bool present, bool enabled, bool ok)
+/* initialize pointer to commander's vehicle status variable */
+void publish_subsystem_info_init(vehicle_status_s *commander_vehicle_status_ptr, bool *commander_status_changed_ptr)
 {
-	struct subsystem_info_s info = {};
-	info.present = present;
-	info.enabled = enabled;
-	info.ok = ok;
-	info.subsystem_type = subsystem_type;
+	status = commander_vehicle_status_ptr;
+	status_changed = commander_status_changed_ptr;
 
-	if (*pub_handle != nullptr) {
-		orb_publish(ORB_ID(subsystem_info), *pub_handle, &info);
-		PX4_INFO("publish_subsystem_info: type=%llu, handle=%d, pres=%u, enab=%u, ok=%u",subsystem_type,*pub_handle,present,enabled,ok);
-	} else {
-		*pub_handle = orb_advertise_queue(ORB_ID(subsystem_info), &info,subsystem_info_s::ORB_QUEUE_LENGTH);
-		PX4_INFO("advertise_subsystem_info: type=%llu, handle=%d, pres=%u, enab=%u, ok=%u",subsystem_type,*pub_handle,present,enabled,ok);
-	}
+	status->onboard_control_sensors_present = internal_status.onboard_control_sensors_present;
+	status->onboard_control_sensors_enabled = internal_status.onboard_control_sensors_enabled;
+	status->onboard_control_sensors_health = internal_status.onboard_control_sensors_health;
+	*status_changed = true;
+}
+
+/* Writes the full state information for a specific subsystem type, either directly into commander's vehicle
+ * status variable or into an internal variable that is later copied to commander's vehicle status variable*/
+void publish_subsystem_info(uint64_t subsystem_type, bool present, bool enabled, bool ok)
+{
+	PX4_INFO("publish_subsystem_info (ext:%u): Type %llu pres=%u enabl=%u ok=%u", status != &internal_status, subsystem_type, present, enabled, ok);
+
+	if (present) status->onboard_control_sensors_present |= (uint32_t)subsystem_type;
+	else status->onboard_control_sensors_present &= ~(uint32_t)subsystem_type;
+
+	if (enabled) status->onboard_control_sensors_enabled |= (uint32_t)subsystem_type;
+	else status->onboard_control_sensors_enabled &= ~(uint32_t)subsystem_type;
+
+	if (ok) status->onboard_control_sensors_health |= (uint32_t)subsystem_type;
+	else status->onboard_control_sensors_health &= ~(uint32_t)subsystem_type;
+
+	if(status != &internal_status) *status_changed=true;
 }
 
 /* Leaves the present and enabled flags for a certain subsystem type unchanged, but changes the ok/healthy flag */
-void publish_subsystem_info_healthy(orb_advert_t* pub_handle, uint64_t subsystem_type, bool ok)
+void publish_subsystem_info_healthy(uint64_t subsystem_type, bool ok)
 {
-	if(vehicle_status_sub==0) vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
-	orb_copy(ORB_ID(vehicle_status), vehicle_status_sub, &status);
+	publish_subsystem_info(subsystem_type, getPresent(subsystem_type), getEnabled(subsystem_type), ok);
+}
 
-	bool present = status.onboard_control_sensors_present & (uint32_t) subsystem_type;
-	bool enabled = status.onboard_control_sensors_enabled & (uint32_t) subsystem_type;
+void publish_subsystem_info_print(void)
+{
+	uint64_t type = 1;
+	for (int i=1;i<31;i++) {
+		PX4_INFO("subsystem_info: Type %llu pres=%u enabl=%u ok=%u", type, (status->onboard_control_sensors_present & (uint32_t)type)>0, (status->onboard_control_sensors_enabled & (uint32_t)type)>0, (status->onboard_control_sensors_health & (uint32_t)type)>0);
+		type=type*2;
+	}
+}
 
-	//PX4_INFO("pub_subsys_info_healthy: type: %llu, present:%u, enabled:%u", subsystem_type, present,enabled);
-
-	// Warning: In theory, if the subsystem_info queue size is >1 and depending on when exactly commander evaluates the subsystem_info
-	// messages, there is a small risk that this function reads "old" present+enabled values from vehicle_status, then publishes a
-	// subsystem_info message with those "old" values into the queue but before that (in the queue) there is already another
-	// subsystem_info message that has not been applied yet that will change the present+enabled values. In that case, this function would
-	// overwrite those values!
-	publish_subsystem_info(pub_handle, subsystem_type, present, enabled, ok);
-
+// Local helper functions
+bool getPresent(uint64_t subsystem_type)
+{
+	return status->onboard_control_sensors_present & (uint32_t)subsystem_type;
+}
+bool getEnabled(uint64_t subsystem_type)
+{
+	return status->onboard_control_sensors_enabled & (uint32_t)subsystem_type;
 }

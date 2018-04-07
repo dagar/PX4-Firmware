@@ -43,7 +43,6 @@
 #include <systemlib/airspeed.h>
 #include <systemlib/perf_counter.h>
 #include <uORB/topics/differential_pressure.h>
-#include <uORB/topics/subsystem_info.h>
 #include <uORB/uORB.h>
 
 /* Default I2C bus */
@@ -89,8 +88,6 @@ protected:
 
 	orb_advert_t		_airspeed_pub;
 	int			_airspeed_orb_class_instance;
-
-	orb_advert_t		_subsys_pub;
 
 	int			_class_instance;
 

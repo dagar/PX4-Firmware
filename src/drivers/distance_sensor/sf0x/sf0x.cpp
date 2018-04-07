@@ -66,7 +66,6 @@
 #include <drivers/device/ringbuffer.h>
 
 #include <uORB/uORB.h>
-#include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/distance_sensor.h>
 
 #include "sf0x_parser.h"

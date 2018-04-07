@@ -26,7 +26,7 @@ uint64 SUBSYSTEM_TYPE_LOGGING = 16777216
 uint64 SUBSYSTEM_TYPE_SENSORBATTERY = 33554432
 uint64 SUBSYSTEM_TYPE_RANGEFINDER = 67108864 #TODO: This is not contained in the mavlink enum def!
 
-uint32 ORB_QUEUE_LENGTH = 20
+uint32 ORB_QUEUE_LENGTH = 6
 
 bool present
 bool enabled
