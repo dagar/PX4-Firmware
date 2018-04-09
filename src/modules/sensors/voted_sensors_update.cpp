@@ -998,8 +998,6 @@ void VotedSensorsUpdate::init_sensor_class(const struct orb_metadata *meta, Sens
 		if (sensor_data.subscription[i] < 0) {
 			sensor_data.subscription[i] = orb_subscribe_multi(meta, i);
 
-			//PX4_WARN("Detected %u %s sensors, currently initializing sensor %u", group_count, meta->o_name,i+1);
-
 			if (i > 0) {
 				/* the first always exists, but for each further sensor, add a new validator */
 				if (!sensor_data.voter.add_new_validator()) {

@@ -164,7 +164,6 @@ static uint64_t lvel_probation_time_us = POSVEL_PROBATION_MIN;
 /* Mavlink log uORB handle */
 static orb_advert_t mavlink_log_pub = nullptr;
 static orb_advert_t power_button_state_pub = nullptr;
-//static orb_advert_t subsys_pub = nullptr;
 
 /* flags */
 static volatile bool thread_should_exit = false;	/**< daemon exit flag */
@@ -1284,7 +1283,7 @@ Commander::run()
 
 	bool status_changed = true;
 
-	/* initialize the vehicle status flag helper functions. This also initializes the sensor healt flags*/
+	/* initialize the vehicle status flag helper functions. This also initializes the sensor health flags*/
 	publish_subsystem_info_init(&status, &status_changed);
 
 	/* publish initial state */
@@ -1757,12 +1756,10 @@ Commander::run()
 						(mission_result.instance_count > 0) && !mission_result.valid) {
 
 						mavlink_log_critical(&mavlink_log_pub, "Planned mission fails check. Please upload again.");
-						//publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MISSION, true, true, false);
+						//publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MISSION, true, true, false); // TODO
 					} else {
-						//publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MISSION, true, true, true);
+						//publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MISSION, true, true, true); // TODO
 					}
-
-					// publish_subsystem_info_print(); // DEBUG only
 				}
 
 				/* set (and don't reset) telemetry via USB as active once a MAVLink connection is up */
@@ -1957,6 +1954,11 @@ Commander::run()
 				}
 			}
 		}
+		if(_last_condition_global_position_valid != status_flags.condition_global_position_valid) {
+			publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_AHRS, status_flags.condition_global_position_valid);
+			//Hack: Assume GPS is OK if global pos is OK, but not vice versa. But this would need to be checked independently
+			if(status_flags.condition_global_position_valid) publish_subsystem_info_present_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true);
+		}
 
 		/* update local position estimate */
 		bool lpos_updated = false;
@@ -2146,48 +2148,6 @@ Commander::run()
 				/* End battery voltage check */
 			}
 		}
-
-//		/* update subsystem info */
-//		int ctr=0;
-//		do {
-//			orb_check(subsys_sub, &updated);
-//			//warnx("ret1: %d",ret1);
-//			//warnx("Check whether subsystem changed: %d / %d", (int)updated, (int)info.subsystem_type);
-//
-//			if (updated) {
-//				orb_copy(ORB_ID(subsystem_info), subsys_sub, &info);
-//				//warnx("ret2: %d",ret2);
-//
-//				PX4_INFO("subsysinfo changed event #%d: Item %llu state %u/%u/%u", ctr, info.subsystem_type,info.present,info.enabled,info.ok);
-//				ctr++;
-//
-//				/* mark / unmark as present */
-//				if (info.present) {
-//					status.onboard_control_sensors_present |= info.subsystem_type;
-//
-//				} else {
-//					status.onboard_control_sensors_present &= ~info.subsystem_type;
-//				}
-//
-//				/* mark / unmark as enabled */
-//				if (info.enabled) {
-//					status.onboard_control_sensors_enabled |= info.subsystem_type;
-//
-//				} else {
-//					status.onboard_control_sensors_enabled &= ~info.subsystem_type;
-//				}
-//
-//				/* mark / unmark as ok */
-//				if (info.ok) {
-//					status.onboard_control_sensors_health |= info.subsystem_type;
-//
-//				} else {
-//					status.onboard_control_sensors_health &= ~info.subsystem_type;
-//				}
-//
-//				status_changed = true;
-//			}
-//		} while(updated);
 
 		/* If in INIT state, try to proceed to STANDBY state */
 		if (!status_flags.condition_calibration_enabled && status.arming_state == vehicle_status_s::ARMING_STATE_INIT) {

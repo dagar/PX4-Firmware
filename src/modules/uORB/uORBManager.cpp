@@ -274,7 +274,6 @@ int uORB::Manager::orb_publish(const struct orb_metadata *meta, orb_advert_t han
 
 #endif /* ORB_USE_PUBLISHER_RULES */
 
-	//if(strcmp(meta->o_name,"subsystem_info") == 0) {printf("***Publishing subsystem info***");}
 	return uORB::DeviceNode::publish(meta, handle, data);
 }
 

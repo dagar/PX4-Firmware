@@ -82,7 +82,26 @@ void publish_subsystem_info(uint64_t subsystem_type, bool present, bool enabled,
 	if(status != &internal_status) *status_changed=true;
 }
 
-/* Leaves the present and enabled flags for a certain subsystem type unchanged, but changes the ok/healthy flag */
+void publish_subsystem_info_present_healthy(uint64_t subsystem_type, bool present, bool healthy)
+{
+	publish_subsystem_info(subsystem_type, present, getEnabled(subsystem_type), healthy);
+}
+
+void publish_subsystem_info_present_enabled(uint64_t subsystem_type, bool present, bool enabled)
+{
+	publish_subsystem_info(subsystem_type, present, enabled, getHealthy(subsystem_type));
+}
+
+void publish_subsystem_info_enabled_healthy(uint64_t subsystem_type, bool enabled, bool ok)
+{
+	publish_subsystem_info(subsystem_type, getPresent(subsystem_type), enabled, ok);
+}
+
+void publish_subsystem_info_enabled(uint64_t subsystem_type, bool enabled)
+{
+	publish_subsystem_info(subsystem_type, getPresent(subsystem_type), enabled, getHealthy(subsystem_type));
+}
+
 void publish_subsystem_info_healthy(uint64_t subsystem_type, bool ok)
 {
 	publish_subsystem_info(subsystem_type, getPresent(subsystem_type), getEnabled(subsystem_type), ok);
@@ -105,4 +124,8 @@ bool getPresent(uint64_t subsystem_type)
 bool getEnabled(uint64_t subsystem_type)
 {
 	return status->onboard_control_sensors_enabled & (uint32_t)subsystem_type;
+}
+bool getHealthy(uint64_t subsystem_type)
+{
+	return status->onboard_control_sensors_health & (uint32_t)subsystem_type;
 }

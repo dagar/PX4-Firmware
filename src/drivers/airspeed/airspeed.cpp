@@ -47,7 +47,6 @@
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
 #include <systemlib/perf_counter.h>
-#include <systemlib/subsystem_info_pub.h>
 
 #include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
@@ -55,7 +54,6 @@
 
 #include <uORB/uORB.h>
 #include <uORB/topics/differential_pressure.h>
-#include <uORB/topics/subsystem_info.h>
 
 #include <drivers/airspeed/airspeed.h>
 
@@ -252,8 +250,7 @@ void
 Airspeed::update_status()
 {
 	if (_sensor_ok != _last_published_sensor_ok) {
-		/* notify about state change */
-		publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE, true, true, _sensor_ok);
+		// Nothing to be done here as commander now handles airspeed validity checking
 		_last_published_sensor_ok = _sensor_ok;
 	}
 }

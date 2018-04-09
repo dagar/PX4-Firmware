@@ -73,14 +73,12 @@
 #include <systemlib/systemlib.h>
 #include <systemlib/err.h>
 #include <systemlib/param/param.h>
-#include <systemlib/subsystem_info_pub.h>
 #include <drivers/drv_gps.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/satellite_info.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/gps_dump.h>
-#include <uORB/topics/subsystem_info.h>
 
 #include <board_config.h>
 
@@ -664,7 +662,6 @@ GPS::run()
 
 			/* no time and satellite information simulated */
 
-			publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true, true);
 			publish();
 
 			usleep(200000);
@@ -767,7 +764,6 @@ GPS::run()
 //
 //						PX4_WARN("module found: %s", mode_str);
 						_healthy = true;
-						publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true, true);
 					}
 				}
 
@@ -775,7 +771,6 @@ GPS::run()
 					_healthy = false;
 					_rate = 0.0f;
 					_rate_rtcm_injection = 0.0f;
-					publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true, false);
 				}
 			}
 
