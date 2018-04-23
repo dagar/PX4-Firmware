@@ -662,7 +662,6 @@ GPS::run()
 
 			/* no time and satellite information simulated */
 
-
 			publish();
 
 			usleep(200000);

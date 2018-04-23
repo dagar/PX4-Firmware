@@ -132,9 +132,9 @@ transition_result_t arming_state_transition(vehicle_status_s *status, const batt
 		if (fRunPreArmChecks && new_arming_state == vehicle_status_s::ARMING_STATE_ARMED
 		    && !hil_enabled) {
 
-			bool preflight_check = Preflight::preflightCheck(mavlink_log_pub, sensor_checks, checkAirspeed,
+			bool preflight_check = Preflight::preflightCheck(mavlink_log_pub, status_flags, sensor_checks, checkAirspeed,
 					       (status->rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), arm_requirements & ARM_REQ_GPS_BIT, true,
-					       status->is_vtol, true, true, time_since_boot);
+					       status->is_vtol, status->rc_signal_lost, true, true, time_since_boot);
 
 			prearm_ret = prearm_check(mavlink_log_pub, true /* pre-arm */, false /* force_report */, status_flags, battery,
 						  arm_requirements, time_since_boot);
@@ -153,9 +153,9 @@ transition_result_t arming_state_transition(vehicle_status_s *status, const batt
 
 			if (last_preflight_check == 0 || hrt_absolute_time() - last_preflight_check > 1000 * 1000) {
 
-				prearm_ret = Preflight::preflightCheck(mavlink_log_pub, sensor_checks, checkAirspeed,
+				prearm_ret = Preflight::preflightCheck(mavlink_log_pub, status_flags, sensor_checks, checkAirspeed,
 								       (status->rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), arm_requirements & ARM_REQ_GPS_BIT, true,
-								       status->is_vtol, false, false, time_since_boot);
+								       status->is_vtol, status->rc_signal_lost, false, false, time_since_boot);
 
 				status_flags->condition_system_sensors_initialized = (prearm_ret == OK);
 				last_preflight_check = hrt_absolute_time();

@@ -58,13 +58,13 @@
 
 #include <systemlib/perf_counter.h>
 #include <systemlib/err.h>
+#include <systemlib/subsystem_info_pub.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_range_finder.h>
 #include <drivers/device/ringbuffer.h>
 
 #include <uORB/uORB.h>
-#include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/distance_sensor.h>
 
 #define SR04_MAX_RANGEFINDERS 6
@@ -626,22 +626,7 @@ HC_SR04::start()
 
 
 	/* notify about state change */
-	struct subsystem_info_s info = {};
-	info.present = true;
-	info.enabled = true;
-	info.ok = true;
-	info.subsystem_type = SUBSYSTEM_TYPE_RANGEFINDER;
-
-	static orb_advert_t pub = nullptr;
-
-	if (pub != nullptr) {
-		orb_publish(ORB_ID(subsystem_info), pub, &info);
-
-
-	} else {
-		pub = orb_advertise(ORB_ID(subsystem_info), &info);
-
-	}
+	publish_subsystem_info(pub, subsystem_info_s::SUBSYSTEM_TYPE_RANGEFINDER, true, true, true);
 }
 
 void

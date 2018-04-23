@@ -150,8 +150,13 @@ uORB::DeviceNode::open(device::file_t *filp)
 
 		memset(sd, 0, sizeof(*sd));
 
-		/* default to no pending update */
-		sd->generation = _generation;
+		/* If queue size >1, allow the subscriber to read the data in the queue. Otherwise, assume subscriber is up to date.*/
+		if(_queue_size <= 1) {
+			sd->generation = _generation;
+		} else {
+			sd->generation = _generation - (_queue_size<_generation ? _queue_size:_generation);
+			//math::min((volatile unsigned int &)_queue_size, _generation);
+		}
 
 		/* set priority */
 		sd->set_priority(_priority);

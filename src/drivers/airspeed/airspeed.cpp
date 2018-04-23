@@ -54,7 +54,6 @@
 
 #include <uORB/uORB.h>
 #include <uORB/topics/differential_pressure.h>
-#include <uORB/topics/subsystem_info.h>
 
 #include <drivers/airspeed/airspeed.h>
 
@@ -67,7 +66,6 @@ Airspeed::Airspeed(int bus, int address, unsigned conversion_interval, const cha
 	_diff_pres_offset(0.0f),
 	_airspeed_pub(nullptr),
 	_airspeed_orb_class_instance(-1),
-	_subsys_pub(nullptr),
 	_class_instance(-1),
 	_conversion_interval(conversion_interval),
 	_sample_perf(perf_alloc(PC_ELAPSED, "aspd_read")),
@@ -252,20 +250,7 @@ void
 Airspeed::update_status()
 {
 	if (_sensor_ok != _last_published_sensor_ok) {
-		/* notify about state change */
-		struct subsystem_info_s info = {};
-		info.present = true;
-		info.enabled = true;
-		info.ok = _sensor_ok;
-		info.subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE;
-
-		if (_subsys_pub != nullptr) {
-			orb_publish(ORB_ID(subsystem_info), _subsys_pub, &info);
-
-		} else {
-			_subsys_pub = orb_advertise(ORB_ID(subsystem_info), &info);
-		}
-
+		// Nothing to be done here as commander now handles airspeed validity checking
 		_last_published_sensor_ok = _sensor_ok;
 	}
 }

@@ -56,6 +56,7 @@
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/sensor_selection.h>
+#include <uORB/topics/subsystem_info.h>
 
 #include <DevMgr.hpp>
 

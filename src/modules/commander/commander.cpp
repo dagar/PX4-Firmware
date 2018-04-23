@@ -79,6 +79,7 @@
 #include <systemlib/param/param.h>
 #include <systemlib/rc_check.h>
 #include <systemlib/state_table.h>
+#include <systemlib/subsystem_info_pub.h>
 
 #include <cmath>
 #include <cfloat>
@@ -1265,6 +1266,7 @@ Commander::run()
 	status_flags.condition_power_input_valid = true;
 	avionics_power_rail_voltage = -1.0f;
 	status_flags.usb_connected = false;
+	status_flags.rc_calibration_valid = true;
 
 	// CIRCUIT BREAKERS
 	status_flags.circuit_breaker_engaged_power_check = false;
@@ -1279,6 +1281,11 @@ Commander::run()
 	status_flags.condition_local_velocity_valid = false;
 	status_flags.condition_local_altitude_valid = false;
 
+	bool status_changed = true;
+
+	/* initialize the vehicle status flag helper functions. This also initializes the sensor health flags*/
+	publish_subsystem_info_init(&status, &status_changed);
+
 	/* publish initial state */
 	status_pub = orb_advertise(ORB_ID(vehicle_status), &status);
 
@@ -1287,6 +1294,8 @@ Commander::run()
 		warnx("exiting.");
 		px4_task_exit(PX4_ERROR);
 	}
+
+	usleep(200000);	publish_subsystem_info_print();
 
 	/* Initialize armed with all false */
 	memset(&armed, 0, sizeof(armed));
@@ -1318,7 +1327,6 @@ Commander::run()
 	bool critical_battery_voltage_actions_done = false;
 	bool emergency_battery_voltage_actions_done = false;
 
-	bool status_changed = true;
 	bool param_init_forced = true;
 
 	bool updated = false;
@@ -1385,7 +1393,7 @@ Commander::run()
 
 	/* Subscribe to subsystem info topic */
 	int subsys_sub = orb_subscribe(ORB_ID(subsystem_info));
-	struct subsystem_info_s info;
+	struct subsystem_info_s info = {};
 	memset(&info, 0, sizeof(info));
 
 	/* Subscribe to system power */
@@ -1476,9 +1484,9 @@ Commander::run()
 		status_flags.condition_system_sensors_initialized = false;
 	} else {
 			// sensor diagnostics done continuously, not just at boot so don't warn about any issues just yet
-			status_flags.condition_system_sensors_initialized = Preflight::preflightCheck(&mavlink_log_pub, true,
+			status_flags.condition_system_sensors_initialized = Preflight::preflightCheck(&mavlink_log_pub, &status_flags, true,
 				checkAirspeed, (status.rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), !status_flags.circuit_breaker_engaged_gpsfailure_check,
-				false, is_vtol(&status), false, false, hrt_elapsed_time(&commander_boot_timestamp));
+				false, is_vtol(&status), status.rc_signal_lost, false, false, hrt_elapsed_time(&commander_boot_timestamp));
 	}
 
 	// user adjustable duration required to assert arm/disarm via throttle/rudder stick
@@ -1732,14 +1740,14 @@ Commander::run()
 					/* provide RC and sensor status feedback to the user */
 					if (status.hil_state == vehicle_status_s::HIL_STATE_ON) {
 						/* HITL configuration: check only RC input */
-						Preflight::preflightCheck(&mavlink_log_pub, false, false,
+						Preflight::preflightCheck(&mavlink_log_pub, &status_flags, false, false,
 								(status.rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), false,
-								 true, is_vtol(&status), false, false, hrt_elapsed_time(&commander_boot_timestamp));
+								 true, is_vtol(&status), status.rc_signal_lost, false, false, hrt_elapsed_time(&commander_boot_timestamp));
 					} else {
 						/* check sensors also */
-						Preflight::preflightCheck(&mavlink_log_pub, true, checkAirspeed,
+						Preflight::preflightCheck(&mavlink_log_pub, &status_flags, true, checkAirspeed,
 								(status.rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), arm_requirements & ARM_REQ_GPS_BIT,
-								 true, is_vtol(&status), hotplug_timeout, false, hrt_elapsed_time(&commander_boot_timestamp));
+								 true, is_vtol(&status), status.rc_signal_lost, hotplug_timeout, false, hrt_elapsed_time(&commander_boot_timestamp));
 					}
 
 					// Provide feedback on mission state
@@ -1748,6 +1756,9 @@ Commander::run()
 						(mission_result.instance_count > 0) && !mission_result.valid) {
 
 						mavlink_log_critical(&mavlink_log_pub, "Planned mission fails check. Please upload again.");
+						//publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MISSION, true, true, false); // TODO
+					} else {
+						//publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_MISSION, true, true, true); // TODO
 					}
 				}
 
@@ -1943,6 +1954,11 @@ Commander::run()
 				}
 			}
 		}
+		if(_last_condition_global_position_valid != status_flags.condition_global_position_valid) {
+			publish_subsystem_info_healthy(subsystem_info_s::SUBSYSTEM_TYPE_AHRS, status_flags.condition_global_position_valid);
+			//Hack: Assume GPS is OK if global pos is OK, but not vice versa. But this would need to be checked independently
+			if(status_flags.condition_global_position_valid) publish_subsystem_info_present_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true);
+		}
 
 		/* update local position estimate */
 		bool lpos_updated = false;
@@ -2133,41 +2149,6 @@ Commander::run()
 			}
 		}
 
-		/* update subsystem */
-		orb_check(subsys_sub, &updated);
-
-		if (updated) {
-			orb_copy(ORB_ID(subsystem_info), subsys_sub, &info);
-
-			//warnx("subsystem changed: %d\n", (int)info.subsystem_type);
-
-			/* mark / unmark as present */
-			if (info.present) {
-				status.onboard_control_sensors_present |= info.subsystem_type;
-
-			} else {
-				status.onboard_control_sensors_present &= ~info.subsystem_type;
-			}
-
-			/* mark / unmark as enabled */
-			if (info.enabled) {
-				status.onboard_control_sensors_enabled |= info.subsystem_type;
-
-			} else {
-				status.onboard_control_sensors_enabled &= ~info.subsystem_type;
-			}
-
-			/* mark / unmark as ok */
-			if (info.ok) {
-				status.onboard_control_sensors_health |= info.subsystem_type;
-
-			} else {
-				status.onboard_control_sensors_health &= ~info.subsystem_type;
-			}
-
-			status_changed = true;
-		}
-
 		/* If in INIT state, try to proceed to STANDBY state */
 		if (!status_flags.condition_calibration_enabled && status.arming_state == vehicle_status_s::ARMING_STATE_INIT) {
 
@@ -2356,12 +2337,14 @@ Commander::run()
 			/* handle the case where RC signal was regained */
 			if (!status_flags.rc_signal_found_once) {
 				status_flags.rc_signal_found_once = true;
+				publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, true, true, true & status_flags.rc_calibration_valid);
 				status_changed = true;
 
 			} else {
 				if (status.rc_signal_lost) {
 					mavlink_log_info(&mavlink_log_pub, "MANUAL CONTROL REGAINED after %llums",
 							     (hrt_absolute_time() - rc_signal_lost_timestamp) / 1000);
+					publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, true, true, true & status_flags.rc_calibration_valid);
 					status_changed = true;
 				}
 			}
@@ -2499,6 +2482,7 @@ Commander::run()
 				mavlink_log_critical(&mavlink_log_pub, "MANUAL CONTROL LOST (at t=%llums)", hrt_absolute_time() / 1000);
 				status.rc_signal_lost = true;
 				rc_signal_lost_timestamp = sp_man.timestamp;
+				publish_subsystem_info(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, true, true, false);
 				status_changed = true;
 			}
 		}
@@ -4029,9 +4013,9 @@ void *commander_low_prio_loop(void *arg)
 							checkAirspeed = true;
 						}
 
-						status_flags.condition_system_sensors_initialized = Preflight::preflightCheck(&mavlink_log_pub, true, checkAirspeed,
+						status_flags.condition_system_sensors_initialized = Preflight::preflightCheck(&mavlink_log_pub, &status_flags, true, checkAirspeed,
 							!(status.rc_input_mode >= vehicle_status_s::RC_IN_MODE_OFF), arm_requirements & ARM_REQ_GPS_BIT,
-							true, is_vtol(&status), hotplug_timeout, false, hrt_elapsed_time(&commander_boot_timestamp));
+							true, is_vtol(&status), status.rc_signal_lost, hotplug_timeout, false, hrt_elapsed_time(&commander_boot_timestamp));
 
 						arming_state_transition(&status, battery, safety, vehicle_status_s::ARMING_STATE_STANDBY, &armed, false /* fRunPreArmChecks */,
 								&mavlink_log_pub, &status_flags, avionics_power_rail_voltage, arm_requirements, hrt_elapsed_time(&commander_boot_timestamp));
