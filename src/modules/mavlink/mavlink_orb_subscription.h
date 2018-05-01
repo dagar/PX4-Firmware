@@ -44,6 +44,7 @@
 #include <systemlib/uthash/utlist.h>
 #include <drivers/drv_hrt.h>
 #include "uORB/uORB.h"	// orb_id_t
+#include <uORB/Subscription.hpp>
 
 class MavlinkOrbSubscription
 {
@@ -51,7 +52,7 @@ public:
 	MavlinkOrbSubscription *next;	///< pointer to next subscription in list
 
 	MavlinkOrbSubscription(const orb_id_t topic, int instance);
-	~MavlinkOrbSubscription();
+	~MavlinkOrbSubscription() = default;
 
 	/**
 	 * Check if subscription updated based on timestamp.
@@ -90,18 +91,12 @@ public:
 
 	void subscribe_from_beginning(bool from_beginning);
 
-	orb_id_t get_topic() const;
-	int get_instance() const;
-
-	int get_fd() { return _fd; }
+	orb_id_t get_topic() const { return _subscription_base.get_topic(); }
+	int get_instance() const { return _subscription_base.get_instance(); }
 
 private:
-	const orb_id_t _topic;		///< topic metadata
-	int _fd;			///< subscription handle
-	const uint8_t _instance;		///< get topic instance
-	bool _published;		///< topic was ever published
-	bool _subscribe_from_beginning; ///< we need to subscribe from the beginning, e.g. for vehicle_command_acks
-	hrt_abstime _last_pub_check;	///< when we checked last
+
+	uORB::SubscriptionBase	_subscription_base;
 
 	/* do not allow copying this class */
 	MavlinkOrbSubscription(const MavlinkOrbSubscription &);

@@ -38,10 +38,12 @@
 
 #pragma once
 
-#include <uORB/uORB.h>
 #include <containers/List.hpp>
-#include <systemlib/err.h>
-#include <px4_defines.h>
+
+#include "uORB.h"
+#include "uORBDevices.hpp"
+#include "uORBManager.hpp"
+#include "uORBUtils.hpp"
 
 namespace uORB
 {
@@ -53,6 +55,9 @@ namespace uORB
 class __EXPORT SubscriptionBase
 {
 public:
+
+	SubscriptionBase() {};
+
 	/**
 	 * Constructor
 	 *
@@ -62,36 +67,121 @@ public:
 	 * 	between updates
 	 * @param instance The instance for multi sub.
 	 */
-	SubscriptionBase(const struct orb_metadata *meta, unsigned interval = 0, unsigned instance = 0);
-	virtual ~SubscriptionBase();
+	SubscriptionBase(const orb_metadata *meta, uint8_t interval = 0, uint8_t instance = 0);
 
-	// no copy, assignment, move, move assignment
-	SubscriptionBase(const SubscriptionBase &) = delete;
-	SubscriptionBase &operator=(const SubscriptionBase &) = delete;
-	SubscriptionBase(SubscriptionBase &&) = delete;
-	SubscriptionBase &operator=(SubscriptionBase &&) = delete;
+	bool init();
+
+	bool initialized()
+	{
+		if (_node != nullptr) {
+			return true;
+
+		} else {
+			if (published()) {
+				return init();
+			}
+		}
+
+		return false;
+	}
 
 	/**
 	 * Check if there is a new update.
 	 * */
-	bool updated();
+	bool updated()
+	{
+		if (initialized()) {
+			if (_interval > 0) {
+				if (hrt_elapsed_time(&_last_update) < _interval) {
+					return false;
+				}
+			}
+
+			return (_node->published_message_count() != _generation);
+		}
+
+		return false;
+	}
+
+	bool copy(void *dst)
+	{
+		if (initialized()) {
+			return _node->copy(dst, _generation);
+		}
+
+		return false;
+	}
 
 	/**
 	 * Update the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool update(void *data);
+	bool update(void *dst)
+	{
+		if (updated()) {
+			if (copy(dst)) {
+				_last_update = hrt_absolute_time();
+				return true;
+			}
+		}
 
-	int getHandle() const { return _handle; }
+		return false;
+	}
+
+	bool update(uint64_t *time, void *data);
+
+	hrt_abstime last_update()
+	{
+		if (initialized()) {
+			return _node->last_update();
+		}
+
+		return 0;
+	}
+
+	bool published();
+
+	uint8_t get_instance() const { return _instance; }
+	orb_id_t get_topic() const { return _meta; }
+
+	void set_interval(int interval) { _interval = interval; }
+
+	bool change_topic(orb_metadata *meta)
+	{
+		_meta = meta;
+		_node = nullptr;
+		_instance = 0;
+		_last_update = 0;
+		_generation = 0;
+
+		return init();
+	}
+
+	bool change_instance(int instance)
+	{
+		_node = nullptr;
+		_instance = instance;
+		_last_update = 0;
+		_generation = 0;
+
+		return init();
+	}
 
 	const orb_metadata *getMeta() const { return _meta; }
 
 	unsigned getInstance() const { return _instance; }
 
 protected:
-	const struct orb_metadata *_meta;
-	unsigned _instance;
-	int _handle;
+	DeviceNode				*_node{nullptr};
+
+	const orb_metadata			*_meta{nullptr};
+	uint32_t					_interval{0};
+	uint8_t					_instance{0};
+
+	hrt_abstime				_last_update{0};
+
+	// subscriber data
+	unsigned				_generation{0};
 };
 
 /**
@@ -175,7 +265,7 @@ public:
 
 	bool forcedUpdate() override
 	{
-		return orb_copy(_meta, _handle, &_data) == PX4_OK;
+		return SubscriptionBase::copy((void *)(&_data));
 	}
 
 	/*

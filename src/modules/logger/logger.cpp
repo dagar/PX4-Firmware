@@ -450,27 +450,10 @@ LoggerSubscription* Logger::add_topic(const orb_metadata *topic)
 		return nullptr;
 	}
 
-	int fd = -1;
-	// Only subscribe to the topic now if it's published. If published later on, we'll dynamically
-	// add the subscription then
-	if (orb_exists(topic, 0) == 0) {
-		fd = orb_subscribe(topic);
-
-		if (fd < 0) {
-			PX4_WARN("logger: %s subscribe failed (%i)", topic->o_name, errno);
-			return nullptr;
-		}
-	} else {
-		PX4_DEBUG("Topic %s does not exist. Not subscribing (yet)", topic->o_name);
-	}
-
-	if (_subscriptions.push_back(LoggerSubscription(fd, topic))) {
+	if (_subscriptions.push_back(LoggerSubscription(topic))) {
 		subscription = &_subscriptions[_subscriptions.size() - 1];
 	} else {
 		PX4_WARN("logger: failed to add topic. Too many subscriptions");
-		if (fd >= 0) {
-			orb_unsubscribe(fd);
-		}
 	}
 
 	return subscription;
@@ -499,22 +482,23 @@ bool Logger::add_topic(const char *name, unsigned interval)
 			if (!already_added) {
 				subscription = add_topic(topics[i]);
 				PX4_DEBUG("logging topic: %s, interval: %i", topics[i]->o_name, interval);
+
+				for (int j = 0; j < ORB_MULTI_MAX_INSTANCES; j++) {
+					subscription->sub[j].set_interval(interval);
+				}
 				break;
 			}
 		}
 	}
 
 	// if we poll on a topic, we don't use the interval and let the polled topic define the maximum interval
-	if (_polling_topic_meta) {
-		interval = 0;
-	}
+	//if (_polling_topic_meta) {
+	//	interval = 0;
+	//}
 
 	if (subscription) {
-		if (subscription->fd[0] >= 0) {
-			orb_set_interval(subscription->fd[0], interval);
-		} else {
-			// store the interval: use a value < 0 to know it's not a valid fd
-			subscription->fd[0] = -interval - 1;
+		for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
+			subscription->sub[i].set_interval(interval);
 		}
 	}
 
@@ -523,63 +507,14 @@ bool Logger::add_topic(const char *name, unsigned interval)
 
 bool Logger::copy_if_updated_multi(LoggerSubscription &sub, int multi_instance, void *buffer, bool try_to_subscribe)
 {
-	bool updated = false;
-	int &handle = sub.fd[multi_instance];
-
-	if (handle < 0 && try_to_subscribe) {
-
-		if (try_to_subscribe_topic(sub, multi_instance)) {
-
-			write_add_logged_msg(sub, multi_instance);
-
-			/* copy first data */
-			if (orb_copy(sub.metadata, handle, buffer) == PX4_OK) {
-				updated = true;
-			}
-		}
-
-	} else if (handle >= 0) {
-		orb_check(handle, &updated);
-
-		if (updated) {
-			orb_copy(sub.metadata, handle, buffer);
-		}
-	}
-
-	return updated;
+	return sub.sub[multi_instance].update(buffer);
 }
 
 bool Logger::try_to_subscribe_topic(LoggerSubscription &sub, int multi_instance)
 {
-	bool ret = false;
-	if (OK == orb_exists(sub.metadata, multi_instance)) {
-
-		unsigned int interval;
-
-		if (multi_instance == 0) {
-			// the first instance and no subscription yet: this means we stored the negative interval as fd
-			interval = (unsigned int) (-(sub.fd[0] + 1));
-		} else {
-			// set to the same interval as the first instance
-			if (orb_get_interval(sub.fd[0], &interval) != 0) {
-				interval = 0;
-			}
-		}
-
-		int &handle = sub.fd[multi_instance];
-		handle = orb_subscribe_multi(sub.metadata, multi_instance);
-
-		if (handle >= 0) {
-			PX4_DEBUG("subscribed to instance %d of topic %s", multi_instance, sub.metadata->o_name);
-			if (interval > 0) {
-				orb_set_interval(handle, interval);
-			}
-			ret = true;
-		} else {
-			PX4_ERR("orb_subscribe_multi %s failed (%i)", sub.metadata->o_name, errno);
-		}
-	}
-	return ret;
+	//sub.sub[multi_instance].change_instance(multi_instance);
+	//sub.sub[multi_instance].set_interval(multi_instance);
+	return true;
 }
 
 void Logger::add_default_topics()
@@ -1162,9 +1097,7 @@ void Logger::run()
 			// - we'll get the data immediately once we start logging (no need to wait for the next subscribe timeout)
 			if (next_subscribe_topic_index != -1) {
 				for (int instance = 0; instance < ORB_MULTI_MAX_INSTANCES; instance++) {
-					if (_subscriptions[next_subscribe_topic_index].fd[instance] < 0) {
-						try_to_subscribe_topic(_subscriptions[next_subscribe_topic_index], instance);
-					}
+					try_to_subscribe_topic(_subscriptions[next_subscribe_topic_index], instance);
 				}
 				if (++next_subscribe_topic_index >= _subscriptions.size()) {
 					next_subscribe_topic_index = -1;
@@ -1212,16 +1145,6 @@ void Logger::run()
 
 	// stop the writer thread
 	_writer.thread_stop();
-
-	//unsubscribe
-	for (LoggerSubscription &sub : _subscriptions) {
-		for (int instance = 0; instance < ORB_MULTI_MAX_INSTANCES; instance++) {
-			if (sub.fd[instance] >= 0) {
-				orb_unsubscribe(sub.fd[instance]);
-				sub.fd[instance] = -1;
-			}
-		}
-	}
 
 	if (polling_topic_sub >= 0) {
 		orb_unsubscribe(polling_topic_sub);
@@ -1642,7 +1565,7 @@ void Logger::write_all_add_logged_msg()
 
 	for (LoggerSubscription &sub : _subscriptions) {
 		for (int instance = 0; instance < ORB_MULTI_MAX_INSTANCES; ++instance) {
-			if (sub.fd[instance] >= 0) {
+			if (sub.sub[instance].published()) {
 				write_add_logged_msg(sub, instance);
 			}
 		}

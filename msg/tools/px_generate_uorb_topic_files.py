@@ -84,6 +84,8 @@ PACKAGE = 'px4'
 TOPICS_TOKEN = '# TOPICS '
 IDL_TEMPLATE_FILE = 'msg.idl.template'
 
+topics_count = 0
+
 class MsgScope:
     NONE = 0
     SEND = 1
@@ -127,14 +129,19 @@ def generate_output_from_file(format_idx, filename, outputdir, templatedir, incl
         md5sum = genmsg.gentools.compute_md5(msg_context, spec)
         if len(topics) == 0:
                 topics.append(spec.short_name)
+
+        global topics_count
+
         em_globals = {
             "file_name_in": filename,
             "md5sum": md5sum,
             "search_path": search_path,
             "msg_context": msg_context,
             "spec": spec,
-            "topics": topics
+            "topics": topics,
+            "topic_id": topics_count
         }
+        topics_count = topics_count + 1
 
         # Make sure output directory exists:
         if not os.path.isdir(outputdir):

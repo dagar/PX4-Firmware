@@ -379,13 +379,7 @@ private: // class methods
 	 * @todo verify that the existing node is the same as the one
 	 *       we tried to advertise.
 	 */
-	int
-	node_advertise
-	(
-		const struct orb_metadata *meta,
-		int *instance = nullptr,
-		int priority = ORB_PRIO_DEFAULT
-	);
+	int node_advertise(const struct orb_metadata *meta, int *instance = nullptr, int priority = ORB_PRIO_DEFAULT);
 
 	/**
 	 * Common implementation for orb_advertise and orb_subscribe.
@@ -436,8 +430,7 @@ private: //class methods
 	   *    handler.
 	   *  otherwise = failure.
 	   */
-	virtual int16_t process_add_subscription(const char *messageName,
-			int32_t msgRateInHz);
+	virtual int16_t process_add_subscription(const char *messageName, int32_t msgRateInHz);
 
 	/**
 	 * Interface to process a received control msg to remove subscription
@@ -465,8 +458,7 @@ private: //class methods
 	 *    handler.
 	 *  otherwise = failure.
 	 */
-	virtual int16_t process_received_message(const char *messageName,
-			int32_t length, uint8_t *data);
+	virtual int16_t process_received_message(const char *messageName, int32_t length, uint8_t *data);
 
 
 #ifdef ORB_USE_PUBLISHER_RULES

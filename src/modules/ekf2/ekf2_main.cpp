@@ -50,6 +50,7 @@
 #include <px4_tasks.h>
 #include <px4_time.h>
 #include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/ekf2_innovations.h>
@@ -103,7 +104,7 @@ public:
 	int print_status() override;
 
 private:
-	int getRangeSubIndex(const int *subs); ///< get subscription index of first downward-facing range sensor
+	int getRangeSubIndex(uORB::SubscriptionBase *subs); ///< get subscription index of first downward-facing range sensor
 
 	template<typename Param>
 	void update_mag_bias(Param &mag_bias_param, int axis_index);
@@ -166,13 +167,13 @@ private:
 	const float _hgt_innov_spike_lim = 2.0f * _hgt_innov_test_lim;	///< preflight position innovation spike limit (m)
 
 	int _airdata_sub{-1};
-	int _airspeed_sub{-1};
-	int _ev_att_sub{-1};
-	int _ev_pos_sub{-1};
+	uORB::SubscriptionBase _airspeed_sub{ORB_ID(airspeed)};
+	uORB::SubscriptionBase _ev_att_sub{ORB_ID(vehicle_vision_attitude)};
+	uORB::SubscriptionBase _ev_pos_sub{ORB_ID(vehicle_vision_position)};
 	int _gps_sub{-1};
 	int _landing_target_pose_sub{-1};
 	int _magnetometer_sub{-1};
-	int _optical_flow_sub{-1};
+	uORB::SubscriptionBase _optical_flow_sub{ORB_ID(optical_flow)};
 	int _params_sub{-1};
 	int _sensor_selection_sub{-1};
 	int _sensors_sub{-1};
@@ -180,7 +181,7 @@ private:
 	int _vehicle_land_detected_sub{-1};
 
 	// because we can have several distance sensor instances with different orientations
-	int _range_finder_subs[ORB_MULTI_MAX_INSTANCES];
+	uORB::SubscriptionBase _range_finder_subs[ORB_MULTI_MAX_INSTANCES] {ORB_ID(distance_sensor), ORB_ID(distance_sensor), ORB_ID(distance_sensor), ORB_ID(distance_sensor)};
 	int _range_finder_sub_index = -1; // index for downward-facing range finder subscription
 
 	orb_advert_t _att_pub{nullptr};
@@ -500,13 +501,9 @@ Ekf2::Ekf2():
 	_bcoef_y(_params->bcoef_y)
 {
 	_airdata_sub = orb_subscribe(ORB_ID(vehicle_air_data));
-	_airspeed_sub = orb_subscribe(ORB_ID(airspeed));
-	_ev_att_sub = orb_subscribe(ORB_ID(vehicle_vision_attitude));
-	_ev_pos_sub = orb_subscribe(ORB_ID(vehicle_vision_position));
 	_gps_sub = orb_subscribe(ORB_ID(vehicle_gps_position));
 	_landing_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
 	_magnetometer_sub = orb_subscribe(ORB_ID(vehicle_magnetometer));
-	_optical_flow_sub = orb_subscribe(ORB_ID(optical_flow));
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_sensor_selection_sub = orb_subscribe(ORB_ID(sensor_selection));
 	_sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
@@ -514,7 +511,7 @@ Ekf2::Ekf2():
 	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		_range_finder_subs[i] = orb_subscribe_multi(ORB_ID(distance_sensor), i);
+		_range_finder_subs[i].change_instance(i);
 	}
 
 	// initialise parameter cache
@@ -524,23 +521,14 @@ Ekf2::Ekf2():
 Ekf2::~Ekf2()
 {
 	orb_unsubscribe(_airdata_sub);
-	orb_unsubscribe(_airspeed_sub);
-	orb_unsubscribe(_ev_att_sub);
-	orb_unsubscribe(_ev_pos_sub);
 	orb_unsubscribe(_gps_sub);
 	orb_unsubscribe(_landing_target_pose_sub);
 	orb_unsubscribe(_magnetometer_sub);
-	orb_unsubscribe(_optical_flow_sub);
 	orb_unsubscribe(_params_sub);
 	orb_unsubscribe(_sensor_selection_sub);
 	orb_unsubscribe(_sensors_sub);
 	orb_unsubscribe(_status_sub);
 	orb_unsubscribe(_vehicle_land_detected_sub);
-
-	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		orb_unsubscribe(_range_finder_subs[i]);
-		_range_finder_subs[i] = -1;
-	}
 }
 
 int Ekf2::print_status()
@@ -861,13 +849,10 @@ void Ekf2::run()
 			}
 		}
 
-		bool airspeed_updated = false;
-		orb_check(_airspeed_sub, &airspeed_updated);
-
-		if (airspeed_updated) {
+		if (_airspeed_sub.updated()) {
 			airspeed_s airspeed;
 
-			if (orb_copy(ORB_ID(airspeed), _airspeed_sub, &airspeed) == PX4_OK) {
+			if (_airspeed_sub.update(&airspeed)) {
 				// only set airspeed data if condition for airspeed fusion are met
 				if ((_arspFusionThreshold.get() > FLT_EPSILON) && (airspeed.true_airspeed_m_s > _arspFusionThreshold.get())) {
 
@@ -880,14 +865,10 @@ void Ekf2::run()
 			}
 		}
 
-		bool optical_flow_updated = false;
-
-		orb_check(_optical_flow_sub, &optical_flow_updated);
-
-		if (optical_flow_updated) {
+		if (_optical_flow_sub.updated()) {
 			optical_flow_s optical_flow;
 
-			if (orb_copy(ORB_ID(optical_flow), _optical_flow_sub, &optical_flow) == PX4_OK) {
+			if (_optical_flow_sub.update(&optical_flow)) {
 				flow_message flow;
 				flow.flowdata(0) = optical_flow.pixel_flow_x_integral;
 				flow.flowdata(1) = optical_flow.pixel_flow_y_integral;
@@ -909,22 +890,15 @@ void Ekf2::run()
 		}
 
 		if (_range_finder_sub_index >= 0) {
-			bool range_finder_updated = false;
-
-			orb_check(_range_finder_subs[_range_finder_sub_index], &range_finder_updated);
-
-			if (range_finder_updated) {
+			if (_range_finder_subs[_range_finder_sub_index].updated()) {
 				distance_sensor_s range_finder;
 
-				if (orb_copy(ORB_ID(distance_sensor), _range_finder_subs[_range_finder_sub_index], &range_finder) == PX4_OK) {
+				if (_range_finder_subs[_range_finder_sub_index].update(&range_finder)) {
 					// check if distance sensor is within working boundaries
 					if (range_finder.min_distance >= range_finder.current_distance ||
 					    range_finder.max_distance <= range_finder.current_distance) {
 						// use rng_gnd_clearance if on ground
-						if (_ekf.get_in_air_status()) {
-							range_finder_updated = false;
-
-						} else {
+						if (!_ekf.get_in_air_status()) {
 							range_finder.current_distance = _rng_gnd_clearance.get();
 						}
 					}
@@ -942,18 +916,16 @@ void Ekf2::run()
 
 		// get external vision data
 		// if error estimates are unavailable, use parameter defined defaults
-		bool vision_position_updated = false;
-		bool vision_attitude_updated = false;
-		orb_check(_ev_pos_sub, &vision_position_updated);
-		orb_check(_ev_att_sub, &vision_attitude_updated);
+		bool vision_position_updated = _ev_pos_sub.updated();
+		bool vision_attitude_updated = _ev_att_sub.updated();
 
 		if (vision_position_updated || vision_attitude_updated) {
 			// copy both attitude & position if either updated, we need both to fill a single ext_vision_message
 			vehicle_attitude_s ev_att = {};
-			orb_copy(ORB_ID(vehicle_vision_attitude), _ev_att_sub, &ev_att);
+			_ev_att_sub.update(&ev_att);
 
 			vehicle_local_position_s ev_pos = {};
-			orb_copy(ORB_ID(vehicle_vision_position), _ev_pos_sub, &ev_pos);
+			_ev_pos_sub.update(&ev_pos);
 
 			ext_vision_message ev_data;
 			ev_data.posNED(0) = ev_pos.x;
@@ -1432,15 +1404,12 @@ void Ekf2::run()
 	}
 }
 
-int Ekf2::getRangeSubIndex(const int *subs)
+int Ekf2::getRangeSubIndex(uORB::SubscriptionBase *subs)
 {
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		bool updated = false;
-		orb_check(subs[i], &updated);
-
-		if (updated) {
+		if (subs->updated()) {
 			distance_sensor_s report;
-			orb_copy(ORB_ID(distance_sensor), subs[i], &report);
+			subs->update(&report);
 
 			// only use the first instace which has the correct orientation
 			if (report.orientation == distance_sensor_s::ROTATION_DOWNWARD_FACING) {

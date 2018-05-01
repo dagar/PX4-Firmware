@@ -97,10 +97,8 @@ int wait_for_topic(int argc, char *argv[])
 		return 1;
 	}
 
-	struct orb_metadata meta = { .o_name = argv[1],
-				     .o_size = 0,
-				     .o_size_no_padding = 0,
-				     .o_fields = nullptr };
+	struct orb_metadata meta = {};
+	meta.o_name = argv[1];
 
 	unsigned int timeout = (argc == 3) ? (unsigned int)atoi(argv[2]) : 0;
 	unsigned int elapsed = 0;

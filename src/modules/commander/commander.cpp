@@ -1304,26 +1304,26 @@ Commander::run()
 	bool updated = false;
 
 	/* Subscribe to safety topic */
-	int safety_sub = orb_subscribe(ORB_ID(safety));
+	uORB::SubscriptionBase safety_sub{ORB_ID(safety)};
 	memset(&safety, 0, sizeof(safety));
 	safety.safety_switch_available = false;
 	safety.safety_off = false;
 
 	/* Subscribe to geofence result topic */
-	int geofence_result_sub = orb_subscribe(ORB_ID(geofence_result));
+	uORB::SubscriptionBase geofence_result_sub{ORB_ID(geofence_result)};
 	struct geofence_result_s geofence_result;
 	memset(&geofence_result, 0, sizeof(geofence_result));
 
 	/* Subscribe to manual control data */
-	int sp_man_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
+	uORB::SubscriptionBase sp_man_sub{ORB_ID(manual_control_setpoint)};
 	memset(&sp_man, 0, sizeof(sp_man));
 
 	/* Subscribe to offboard control data */
-	int offboard_control_mode_sub = orb_subscribe(ORB_ID(offboard_control_mode));
+	uORB::SubscriptionBase offboard_control_mode_sub{ORB_ID(offboard_control_mode)};
 	memset(&offboard_control_mode, 0, sizeof(offboard_control_mode));
 
 	/* Subscribe to land detector */
-	int land_detector_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
+	uORB::SubscriptionBase land_detector_sub{ORB_ID(vehicle_land_detected)};
 	land_detector.landed = true;
 
 	/* Subscribe to command topic */
@@ -1348,7 +1348,7 @@ Commander::run()
 	int actuator_controls_sub = orb_subscribe(ORB_ID_VEHICLE_ATTITUDE_CONTROLS);
 
 	/* Subscribe to vtol vehicle status topic */
-	int vtol_vehicle_status_sub = orb_subscribe(ORB_ID(vtol_vehicle_status));
+	uORB::SubscriptionBase vtol_vehicle_status_sub{ORB_ID(vtol_vehicle_status)};
 	//struct vtol_vehicle_status_s vtol_status;
 	memset(&vtol_status, 0, sizeof(vtol_status));
 	vtol_status.vtol_in_rw_mode = true;		//default for vtol is rotary wing
@@ -1583,17 +1583,9 @@ Commander::run()
 			}
 		}
 
-		orb_check(sp_man_sub, &updated);
+		sp_man_sub.update(&sp_man);
 
-		if (updated) {
-			orb_copy(ORB_ID(manual_control_setpoint), sp_man_sub, &sp_man);
-		}
-
-		orb_check(offboard_control_mode_sub, &updated);
-
-		if (updated) {
-			orb_copy(ORB_ID(offboard_control_mode), offboard_control_mode_sub, &offboard_control_mode);
-		}
+		offboard_control_mode_sub.update(&offboard_control_mode);
 
 		if (offboard_control_mode.timestamp != 0 &&
 		    offboard_control_mode.timestamp + OFFBOARD_TIMEOUT > hrt_absolute_time()) {
@@ -1661,12 +1653,10 @@ Commander::run()
 		}
 
 		/* update safety topic */
-		orb_check(safety_sub, &updated);
-
-		if (updated) {
+		if (safety_sub.updated()) {
 			bool previous_safety_off = safety.safety_off;
 
-			if (orb_copy(ORB_ID(safety), safety_sub, &safety) == PX4_OK) {
+			if (safety_sub.update(&safety)) {
 
 				/* disarm if safety is now on and still armed */
 				if (armed.armed && (status.hil_state == vehicle_status_s::HIL_STATE_OFF)
@@ -1696,11 +1686,9 @@ Commander::run()
 		}
 
 		/* update vtol vehicle status*/
-		orb_check(vtol_vehicle_status_sub, &updated);
-
-		if (updated) {
+		if (vtol_vehicle_status_sub.updated()) {
 			/* vtol status changed */
-			orb_copy(ORB_ID(vtol_vehicle_status), vtol_vehicle_status_sub, &vtol_status);
+			vtol_vehicle_status_sub.update(&vtol_status);
 			status.vtol_fw_permanent_stab = vtol_status.fw_permanent_stab;
 
 			/* Make sure that this is only adjusted if vehicle really is of type vtol */
@@ -1815,11 +1803,7 @@ Commander::run()
 
 		check_valid(_local_position_sub.get().timestamp, _failsafe_pos_delay.get() * 1_s, _local_position_sub.get().z_valid, &(status_flags.condition_local_altitude_valid), &status_changed);
 
-		/* Update land detector */
-		orb_check(land_detector_sub, &updated);
-
-		if (updated) {
-			orb_copy(ORB_ID(vehicle_land_detected), land_detector_sub, &land_detector);
+		if (land_detector_sub.update(&land_detector)) {
 
 			// Only take actions if armed
 			if (armed.armed) {
@@ -2080,11 +2064,7 @@ Commander::run()
 		}
 
 		/* start geofence result check */
-		orb_check(geofence_result_sub, &updated);
-
-		if (updated) {
-			orb_copy(ORB_ID(geofence_result), geofence_result_sub, &geofence_result);
-		}
+		geofence_result_sub.update(&geofence_result);
 
 		// Geofence actions
 		if (armed.armed && (geofence_result.geofence_action != geofence_result_s::GF_ACTION_NONE)) {
@@ -2753,14 +2733,10 @@ Commander::run()
 	/* close fds */
 	led_deinit();
 	buzzer_deinit();
-	px4_close(sp_man_sub);
-	px4_close(offboard_control_mode_sub);
-	px4_close(safety_sub);
 	px4_close(cmd_sub);
 	px4_close(subsys_sub);
 	px4_close(param_changed_sub);
 	px4_close(battery_sub);
-	px4_close(land_detector_sub);
 	px4_close(estimator_status_sub);
 
 	thread_running = false;
@@ -4040,19 +4016,15 @@ bool Commander::preflight_check(bool report)
 
 void Commander::poll_telemetry_status()
 {
-	bool updated = false;
+	for (uint8_t i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 
-	for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-
-		if (_telemetry[i].subscriber < 0) {
-			_telemetry[i].subscriber = orb_subscribe_multi(ORB_ID(telemetry_status), i);
+		if (_telemetry[i].subscriber == nullptr) {
+			_telemetry[i].subscriber = new uORB::SubscriptionBase{ORB_ID(telemetry_status), 0, i};
 		}
 
-		orb_check(_telemetry[i].subscriber, &updated);
-
-		if (updated) {
+		if (_telemetry[i].subscriber->updated()) {
 			telemetry_status_s telemetry = {};
-			orb_copy(ORB_ID(telemetry_status), _telemetry[i].subscriber, &telemetry);
+			_telemetry[i].subscriber->update(&telemetry);
 
 			/* perform system checks when new telemetry link connected */
 			if (/* we first connect a link or re-connect a link after loosing it or haven't yet reported anything */

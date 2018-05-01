@@ -82,7 +82,7 @@ uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(device::file_t *f
 }
 
 uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *name, const char *path,
-			     int priority, unsigned int queue_size) :
+			     int priority, int instance, unsigned int queue_size) :
 	CDev(name, path),
 	_meta(meta),
 	_data(nullptr),
@@ -92,6 +92,7 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *name, 
 	_published(false),
 	_queue_size(queue_size),
 	_subscriber_count(0),
+	_instance(instance),
 	_publisher(0)
 {
 }
@@ -313,10 +314,17 @@ uORB::DeviceNode::write(device::file_t *filp, const char *buffer, size_t buflen)
 
 	/* update the timestamp and generation count */
 	_last_update = hrt_absolute_time();
+
 	/* wrap-around happens after ~49 days, assuming a publisher rate of 1 kHz */
 	_generation++;
 
-	_published = true;
+	if (!_published) {
+		_published = true;
+
+		// set bitset
+		uORB::Manager::get_instance()->get_device_master()->setPublished(_meta, _instance);
+		assert(uORB::Manager::get_instance()->get_device_master()->published(_meta, _instance));
+	}
 
 	ATOMIC_LEAVE;
 
@@ -486,6 +494,10 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle)
 	 * publishers reuse the same DeviceNode object.
 	 */
 	devnode->_published = false;
+
+	// set bitset
+	uORB::Manager::get_instance()->get_device_master()->unpublish(devnode->_meta, devnode->_instance);
+	assert(uORB::Manager::get_instance()->get_device_master()->published(devnode->_meta, devnode->_instance));
 
 	return PX4_OK;
 }
@@ -980,8 +992,7 @@ void uORB::DeviceMaster::printStatistics(bool reset)
 }
 
 void uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node, int &num_topics,
-		size_t &max_topic_name_length,
-		char **topic_filter, int num_filters)
+		size_t &max_topic_name_length, char **topic_filter, int num_filters)
 {
 	DeviceNodeStatisticsData *cur_node;
 	num_topics = 0;
@@ -1196,6 +1207,7 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const char *nodepath)
 	lock();
 	uORB::DeviceNode *node = getDeviceNodeLocked(nodepath);
 	unlock();
+
 	//We can safely return the node that can be used by any thread, because
 	//a DeviceNode never gets deleted.
 	return node;

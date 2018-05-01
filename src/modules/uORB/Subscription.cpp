@@ -37,63 +37,58 @@
  */
 
 #include "Subscription.hpp"
-#include <px4_defines.h>
 
 namespace uORB
 {
 
-SubscriptionBase::SubscriptionBase(const struct orb_metadata *meta, unsigned interval, unsigned instance) :
+SubscriptionBase::SubscriptionBase(const orb_metadata *meta, uint8_t interval, uint8_t instance) :
 	_meta(meta),
+	_interval(interval),
 	_instance(instance)
 {
-	if (instance > 0) {
-		_handle = orb_subscribe_multi(_meta, instance);
-
-	} else {
-		_handle = orb_subscribe(_meta);
-	}
-
-	if (_handle < 0) {
-		PX4_ERR("%s sub failed", _meta->o_name);
-	}
-
-	if (interval > 0) {
-		orb_set_interval(_handle, interval);
-	}
+	init();
 }
 
-bool SubscriptionBase::updated()
+bool SubscriptionBase::init()
 {
-	bool isUpdated = false;
+	if (published()) {
+		DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master();
 
-	if (orb_check(_handle, &isUpdated) != PX4_OK) {
-		PX4_ERR("%s check failed", _meta->o_name);
-	}
+		char path[orb_maxpath];
+		const struct orb_metadata *meta = _meta;
+		int instance = _instance;
 
-	return isUpdated;
-}
+		int ret = uORB::Utils::node_mkpath(path, meta, &instance);
 
-bool SubscriptionBase::update(void *data)
-{
-	bool orb_updated = false;
+		PX4_DEBUG("path: %s", path);
 
-	if (updated()) {
-		if (orb_copy(_meta, _handle, data) != PX4_OK) {
-			PX4_ERR("%s copy failed", _meta->o_name);
-
-		} else {
-			orb_updated = true;
+		if (ret != PX4_OK) {
+			PX4_ERR("init failed %s", path);
 		}
+
+		_node = device_master->getDeviceNode(path);
+
+		return (_node != nullptr);
 	}
 
-	return orb_updated;
+	return false;
 }
 
-SubscriptionBase::~SubscriptionBase()
+bool SubscriptionBase::published()
 {
-	if (orb_unsubscribe(_handle) != PX4_OK) {
-		PX4_ERR("%s unsubscribe failed", _meta->o_name);
+	DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master();
+	return device_master->published(_meta, _instance);
+}
+
+bool SubscriptionBase::update(uint64_t *time, void *data)
+{
+	if (update(data)) {
+		/* data copied successfully */
+		*time = _node->last_update();
+		return true;
 	}
+
+	return false;
 }
 
 SubscriptionNode::SubscriptionNode(const struct orb_metadata *meta, unsigned interval, unsigned instance,

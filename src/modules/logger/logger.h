@@ -77,22 +77,19 @@ inline bool operator&(SDLogProfileMask a, SDLogProfileMask b)
 }
 
 struct LoggerSubscription {
-	int fd[ORB_MULTI_MAX_INSTANCES]; ///< uorb subscription. The first fd is also used to store the interval if
+	///< uorb subscription. The first fd is also used to store the interval if
+	uORB::SubscriptionBase sub[ORB_MULTI_MAX_INSTANCES];
+
 	/// not subscribed yet (-interval - 1)
 	uint16_t msg_ids[ORB_MULTI_MAX_INSTANCES];
 	const orb_metadata *metadata = nullptr;
 
 	LoggerSubscription() {}
 
-	LoggerSubscription(int fd_, const orb_metadata *metadata_) :
-		metadata(metadata_)
+	LoggerSubscription(const orb_metadata *metadata_) :
+		sub{{metadata_, 0}, {metadata_, 1}, {metadata_, 2}, {metadata_, 3}},
+	metadata(metadata_)
 	{
-		fd[0] = fd_;
-
-		for (int i = 1; i < ORB_MULTI_MAX_INSTANCES; i++) {
-			fd[i] = -1;
-		}
-
 		for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 			msg_ids[i] = (uint16_t) - 1;
 		}

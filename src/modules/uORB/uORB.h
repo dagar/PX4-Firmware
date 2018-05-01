@@ -48,6 +48,7 @@
  * Object metadata.
  */
 struct orb_metadata {
+	const uint8_t o_id;
 	const char *o_name;		/**< unique object name */
 	const uint16_t o_size;		/**< object size */
 	const uint16_t o_size_no_padding;	/**< object size w/o padding at the end (for logger) */
@@ -111,8 +112,9 @@ enum ORB_PRIO {
  * @param _size_no_padding	Struct size w/o padding at the end
  * @param _fields	All fields in a semicolon separated list e.g: "float[3] position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)		\
+#define ORB_DEFINE(_name, _struct, _id, _size_no_padding, _fields)		\
 	const struct orb_metadata __orb_##_name = {	\
+		_id,                    \
 		#_name,					\
 		sizeof(_struct),		\
 		_size_no_padding,			\

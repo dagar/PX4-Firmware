@@ -595,8 +595,6 @@ Sensors::run()
 
 	struct sensor_preflight_s preflt = {};
 
-	_rc_update.init();
-
 	_voted_sensors_update.init(raw);
 
 	/* (re)load params and calibration */
@@ -741,7 +739,6 @@ Sensors::run()
 	orb_unadvertise(_airdata_pub);
 	orb_unadvertise(_magnetometer_pub);
 
-	_rc_update.deinit();
 	_voted_sensors_update.deinit();
 }
 

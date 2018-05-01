@@ -130,13 +130,13 @@ BlockLocalPositionEstimator::BlockLocalPositionEstimator() :
 	_dist_subs[3] = &_sub_dist3;
 
 	// setup event triggering based on new flow messages to integrate
-	_polls[POLL_FLOW].fd = _sub_flow.getHandle();
+	_polls[POLL_FLOW].fd = orb_subscribe(ORB_ID(optical_flow));
 	_polls[POLL_FLOW].events = POLLIN;
 
-	_polls[POLL_PARAM].fd = _sub_param_update.getHandle();
+	_polls[POLL_PARAM].fd = orb_subscribe(ORB_ID(parameter_update));
 	_polls[POLL_PARAM].events = POLLIN;
 
-	_polls[POLL_SENSORS].fd = _sub_sensor.getHandle();
+	_polls[POLL_SENSORS].fd = orb_subscribe(ORB_ID(sensor_combined));
 	_polls[POLL_SENSORS].events = POLLIN;
 
 	// initialize A, B,  P, x, u
@@ -173,6 +173,15 @@ void BlockLocalPositionEstimator::update()
 {
 	// wait for a sensor update, check for exit condition every 100 ms
 	int ret = px4_poll(_polls, 3, 100);
+
+	optical_flow_s buf1;
+	orb_copy(ORB_ID(optical_flow), _polls[POLL_FLOW].fd, &buf1);
+
+	parameter_update_s buf2;
+	orb_copy(ORB_ID(parameter_update), _polls[POLL_PARAM].fd, &buf2);
+
+	sensor_combined_s buf3;
+	orb_copy(ORB_ID(sensor_combined), _polls[POLL_SENSORS].fd, &buf3);
 
 	if (ret < 0) {
 		return;

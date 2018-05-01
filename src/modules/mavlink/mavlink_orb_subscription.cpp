@@ -51,150 +51,35 @@
 
 MavlinkOrbSubscription::MavlinkOrbSubscription(const orb_id_t topic, int instance) :
 	next(nullptr),
-	_topic(topic),
-	_fd(-1),
-	_instance(instance),
-	_published(false),
-	_subscribe_from_beginning(false),
-	_last_pub_check(0)
+	_subscription_base(topic, 0, instance)
 {
-}
-
-MavlinkOrbSubscription::~MavlinkOrbSubscription()
-{
-	if (_fd >= 0) {
-		orb_unsubscribe(_fd);
-	}
-}
-
-orb_id_t
-MavlinkOrbSubscription::get_topic() const
-{
-	return _topic;
-}
-
-int
-MavlinkOrbSubscription::get_instance() const
-{
-	return _instance;
 }
 
 bool
 MavlinkOrbSubscription::update(uint64_t *time, void *data)
 {
-	// TODO this is NOT atomic operation, we can get data newer than time
-	// if topic was published between orb_stat and orb_copy calls.
-
-	uint64_t time_topic;
-
-	if (orb_stat(_fd, &time_topic)) {
-		/* error getting last topic publication time */
-		time_topic = 0;
-	}
-
-	if (update(data)) {
-		/* data copied successfully */
-
-		if (time_topic == 0 || (time_topic != *time)) {
-			*time = time_topic;
-			return true;
-
-		} else {
-			return false;
-		}
-	}
-
-	return false;
+	return _subscription_base.update(time, data);
 }
 
 bool
 MavlinkOrbSubscription::update(void *data)
 {
-	if (!is_published()) {
-		return false;
-	}
-
-	if (orb_copy(_topic, _fd, data) != PX4_OK) {
-		return false;
-	}
-
-	return true;
+	return _subscription_base.copy(data);
 }
 
 bool
 MavlinkOrbSubscription::update_if_changed(void *data)
 {
-	bool prevpub = _published;
-
-	if (!is_published()) {
-		return false;
-	}
-
-	bool updated;
-
-	if (orb_check(_fd, &updated)) {
-		return false;
-	}
-
-	// If we didn't update and this topic did not change
-	// its publication status then nothing really changed
-	if (!updated && prevpub == _published) {
-		return false;
-	}
-
-	return update(data);
+	return _subscription_base.update(data);
 }
 
 bool
 MavlinkOrbSubscription::is_published()
 {
-	// If we marked it as published no need to check again
-	if (_published) {
-		return true;
-	}
-
-	hrt_abstime now = hrt_absolute_time();
-
-	if (now - _last_pub_check < 300000) {
-		return false;
-	}
-
-	// We are checking now
-	_last_pub_check = now;
-
-	// We don't want to subscribe to anything that does not exist
-	// in order to save memory and file descriptors.
-	// However, for some topics like vehicle_command_ack, we want to subscribe
-	// from the beginning in order not to miss the first publish respective advertise.
-	if (!_subscribe_from_beginning && orb_exists(_topic, _instance)) {
-		return false;
-	}
-
-	if (_fd < 0) {
-		_fd = orb_subscribe_multi(_topic, _instance);
-	}
-
-	bool updated;
-	orb_check(_fd, &updated);
-
-	if (updated) {
-		_published = true;
-	}
-
-	// topic may have been last published before we subscribed
-	uint64_t time_topic = 0;
-
-	if (!_published && orb_stat(_fd, &time_topic) == PX4_OK) {
-		if (time_topic != 0) {
-			_published = true;
-		}
-	}
-
-	return _published;
+	return _subscription_base.published();
 }
 
 void
 MavlinkOrbSubscription::subscribe_from_beginning(bool from_beginning)
 {
-	_subscribe_from_beginning = from_beginning;
 }

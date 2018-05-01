@@ -38,5 +38,6 @@ px4_add_module(
 	SRCS
 		lsm303d.cpp
 	DEPENDS
+		mathlib
 	)
 

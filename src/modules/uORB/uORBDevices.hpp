@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include "uORBCommon.hpp"
 
+#include <bitset.h>
 
 #ifdef __PX4_NUTTX
 #include <string.h>
@@ -62,8 +63,8 @@ class Manager;
 class uORB::DeviceNode : public device::CDev
 {
 public:
-	DeviceNode(const struct orb_metadata *meta, const char *name, const char *path,
-		   int priority, unsigned int queue_size = 1);
+	DeviceNode(const struct orb_metadata *meta, const char *name, const char *path, int priority, int instance = 0,
+		   unsigned int queue_size = 1);
 	~DeviceNode();
 
 	/**
@@ -185,7 +186,26 @@ public:
 	unsigned int published_message_count() const { return _generation; }
 	const struct orb_metadata *get_meta() const { return _meta; }
 
+	bool copy(void *dst, unsigned &generation)
+	{
+		ATOMIC_ENTER;
+
+		if (_data != nullptr && dst != nullptr) {
+			memcpy(dst, _data, _meta->o_size);
+			generation = _generation;
+			ATOMIC_LEAVE;
+			return true;
+		}
+
+		ATOMIC_LEAVE;
+		return false;
+	}
+
+	const hrt_abstime &last_update() { return _last_update; }
+
 	void set_priority(uint8_t priority) { _priority = priority; }
+
+	const char *name() const { return _meta->o_name; }
 
 protected:
 	virtual pollevent_t poll_state(device::file_t *filp);
@@ -221,6 +241,8 @@ private:
 	bool _published;  /**< has ever data been published */
 	uint8_t _queue_size; /**< maximum number of elements in the queue */
 	int16_t _subscriber_count;
+
+	const uint8_t		_instance;
 
 	inline static SubscriberData    *filp_to_sd(device::file_t *filp);
 
@@ -279,7 +301,9 @@ public:
 	 * Public interface for getDeviceNodeLocked(). Takes care of synchronization.
 	 * @return node if exists, nullptr otherwise
 	 */
-	uORB::DeviceNode *getDeviceNode(const char *node_name);
+	uORB::DeviceNode *getDeviceNode(const orb_metadata *meta, int instance = 0);
+
+	uORB::DeviceNode *getDeviceNode(const char *node_path);
 
 	/**
 	 * Print statistics for each existing topic.
@@ -295,6 +319,18 @@ public:
 	 * @param num_filters
 	 */
 	void showTop(char **topic_filter, int num_filters);
+
+	bool published(const orb_metadata *meta, uint8_t instance = 0) const
+	{
+		if (meta != nullptr && instance < ORB_MULTI_MAX_INSTANCES) {
+			return _published[instance][meta->o_id];
+		}
+
+		return false;
+	}
+
+	void setPublished(const orb_metadata *meta, int instance = 0) { _published[instance].set(meta->o_id, true); }
+	void unpublish(const orb_metadata *meta, int instance = 0) { _published[instance].set(meta->o_id, false); }
 
 private:
 	// Private constructor, uORB::Manager takes care of its creation
@@ -327,5 +363,8 @@ private:
 #else
 	std::map<std::string, uORB::DeviceNode *> _node_map;
 #endif
+
+	bitset<256>		_published[ORB_MULTI_MAX_INSTANCES];
+
 	hrt_abstime       _last_statistics_output;
 };

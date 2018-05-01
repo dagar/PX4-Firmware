@@ -160,7 +160,7 @@ private:
 
 	// telemetry variables
 	struct telemetry_data {
-		int subscriber = -1;
+		uORB::SubscriptionBase* subscriber = nullptr;
 		uint64_t last_heartbeat = 0u;
 		uint64_t last_dl_loss = 0u;
 		bool preflight_checks_reported = false;

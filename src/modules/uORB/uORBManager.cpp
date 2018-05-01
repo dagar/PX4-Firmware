@@ -318,13 +318,7 @@ int uORB::Manager::orb_get_interval(int handle, unsigned *interval)
 	return ret;
 }
 
-
-int uORB::Manager::node_advertise
-(
-	const struct orb_metadata *meta,
-	int *instance,
-	int priority
-)
+int uORB::Manager::node_advertise(const struct orb_metadata *meta, int *instance, int priority)
 {
 	int fd = -1;
 	int ret = PX4_ERROR;

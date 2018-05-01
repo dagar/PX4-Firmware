@@ -141,7 +141,7 @@ set(config_module_list
 	#
 	# Segway
 	#
-	examples/segway
+	#examples/segway
 
 	#
 	# Demo apps
