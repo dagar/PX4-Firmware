@@ -842,44 +842,51 @@ MulticopterPositionControl::reset_alt_sp()
 void
 MulticopterPositionControl::limit_altitude()
 {
-	float altitude_above_home = -(_pos(2) - _home_pos.z);
-	bool applying_flow_height_limit = false;
 
-	if (_terrain_follow && _local_pos.limit_hagl) {
-		// Don't allow the height setpoint to exceed the optical flow limits
-		if (_pos_sp(2) < -_flow_max_hgt.get()) {
-			_pos_sp(2) = -_flow_max_hgt.get();
+	// Estimator height limit
+	bool estimator_limit_height = _local_pos.hagl_max > 0.0f;
+	// Vehicle height limit
+	bool vehicle_limit_height = _vehicle_land_detected.alt_max > 0.0f;
+
+	// Check if limiting is enabled
+	if (estimator_limit_height || vehicle_limit_height) {
+
+		// Calculate altitude limit
+		float altitude_limit = 0.0f;
+		if (_terrain_follow) {
+			if (estimator_limit_height) {
+				altitude_limit = -_local_pos.hagl_max;
+			} else if (vehicle_limit_height) {
+				// TODO : should this limit be the maximum rangefinder measurable distance?
+				altitude_limit = -_vehicle_land_detected.alt_max;
+			}
+		} else {
+			if (estimator_limit_height) {
+				altitude_limit = _local_pos.hagl_max + _pos(2) + _local_pos.dist_bottom;
+			} else if (vehicle_limit_height) {
+				altitude_limit = -_vehicle_land_detected.alt_max + _home_pos.z;
+			}
 		}
 
-		applying_flow_height_limit = true;
+		// Don't allow the height setpoint to exceed the limits
+		if (_run_alt_control && (_pos_sp(2) < altitude_limit)) {
+			_pos_sp(2) = altitude_limit; // TODO : how does the setpoint handle the home position in normal mode?
+		}
 
-	} else if (_run_alt_control && (_vehicle_land_detected.alt_max > 0.0f)
-		   && (altitude_above_home > _vehicle_land_detected.alt_max)) {
-		// we are above maximum altitude
-		_pos_sp(2) = -_vehicle_land_detected.alt_max +  _home_pos.z;
+		if (!_run_alt_control && _vel_sp(2) <= 0.0f) {
+			// we want to fly upwards: check that vehicle does not exceed altitude
 
-	}
+			// time to reach zero velocity
+			float delta_t = -_vel(2) / _acceleration_z_max_down.get();
 
-	if (!_run_alt_control && _vel_sp(2) <= 0.0f) {
-		// we want to fly upwards: check if vehicle does not exceed altitude
+			// predict next position based on current position, velocity, max acceleration downwards and time to reach zero velocity
+			float pos_z_next = _pos(2) + _vel(2) * delta_t + 0.5f * _acceleration_z_max_down.get() * delta_t * delta_t;
 
-		// time to reach zero velocity
-		float delta_t = -_vel(2) / _acceleration_z_max_down.get();
-
-		// predict next position based on current position, velocity, max acceleration downwards and time to reach zero velocity
-		float pos_z_next = _pos(2) + _vel(2) * delta_t + 0.5f * _acceleration_z_max_down.get() * delta_t *delta_t;
-
-
-		if (!applying_flow_height_limit && (-(pos_z_next - _home_pos.z) > _vehicle_land_detected.alt_max)
-		    && (_vehicle_land_detected.alt_max > 0.0f)) {
-			// prevent the vehicle from exceeding maximum altitude by switching back to altitude control with maximum altitude as setpoint
-			_pos_sp(2) = -_vehicle_land_detected.alt_max + _home_pos.z;
-			_run_alt_control = true;
-
-		} else if (applying_flow_height_limit && (pos_z_next < -_flow_max_hgt.get())) {
-			// prevent the vehicle from exceeding maximum altitude by switching back to altitude control with maximum altitude as setpoint
-			_pos_sp(2) = -_flow_max_hgt.get();
-			_run_alt_control = true;
+			if (pos_z_next < altitude_limit) {
+				// prevent the vehicle from exceeding maximum altitude by switching back to altitude control with maximum altitude as setpoint
+				_pos_sp(2) = altitude_limit;
+				_run_alt_control = true;
+			}
 		}
 	}
 }
@@ -2433,6 +2440,7 @@ MulticopterPositionControl::calculate_velocity_setpoint()
 	}
 
 	// encourage pilot to respect flow sensor minimum height limitations
+	/*
 	if (_terrain_follow && _local_pos.limit_hagl
 		&& _control_mode.flag_control_manual_enabled
 	    && _control_mode.flag_control_altitude_enabled) {
@@ -2443,7 +2451,7 @@ MulticopterPositionControl::calculate_velocity_setpoint()
 			_pos_sp(2) -= climb_rate_bias * _dt;
 
 		}
-	}
+	}*/
 
 	/* limit vertical downwards speed (positive z) close to ground
 	 * for now we use the altitude above home and assume that we want to land at same height as we took off */
