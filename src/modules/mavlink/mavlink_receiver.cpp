@@ -2260,7 +2260,9 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		_hil_local_pos.xy_global = true;
 		_hil_local_pos.z_global = true;
 		_hil_local_pos.vxy_max = 0.0f;
-		_hil_local_pos.limit_hagl = false;
+		_hil_local_pos.vz_max = 0.0f;
+		_hil_local_pos.hagl_min = 0.0f;
+		_hil_local_pos.hagl_max = 0.0f;
 
 		if (_local_pos_pub == nullptr) {
 			_local_pos_pub = orb_advertise(ORB_ID(vehicle_local_position), &_hil_local_pos);
