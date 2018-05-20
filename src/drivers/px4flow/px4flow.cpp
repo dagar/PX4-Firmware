@@ -271,6 +271,7 @@ PX4FLOW::init()
 
 	/* get yaw rotation from sensor frame to body frame */
 	param_t rot = param_find("SENS_FLOW_ROT");
+
 	if (rot != PARAM_INVALID) {
 		int32_t val = 6; // the recommended installation for the flow sensor is with the Y sensor axis forward
 		param_get(rot, &val);
@@ -280,6 +281,7 @@ PX4FLOW::init()
 
 	/* get operational limits of the sensor */
 	param_t hmin = param_find("SENS_FLOW_MINHGT");
+
 	if (hmin != PARAM_INVALID) {
 		float val = 0.7;
 		param_get(hmin, &val);
@@ -288,6 +290,7 @@ PX4FLOW::init()
 	}
 
 	param_t hmax = param_find("SENS_FLOW_MAXHGT");
+
 	if (hmax != PARAM_INVALID) {
 		float val = 3.0;
 		param_get(hmax, &val);
@@ -296,6 +299,7 @@ PX4FLOW::init()
 	}
 
 	param_t ratemax = param_find("SENS_FLOW_MAXR");
+
 	if (ratemax != PARAM_INVALID) {
 		float val = 2.5;
 		param_get(ratemax, &val);

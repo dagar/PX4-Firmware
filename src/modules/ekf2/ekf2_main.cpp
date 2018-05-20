@@ -902,7 +902,8 @@ void Ekf2::run()
 				}
 
 				// Save sensor limits reported by the optical flow sensor
-				_ekf.set_optical_flow_limits(optical_flow.max_flow_rate, optical_flow.min_ground_distance, optical_flow.max_ground_distance);
+				_ekf.set_optical_flow_limits(optical_flow.max_flow_rate, optical_flow.min_ground_distance,
+							     optical_flow.max_ground_distance);
 
 				ekf2_timestamps.optical_flow_timestamp_rel = (int16_t)((int64_t)optical_flow.timestamp / 100 -
 						(int64_t)ekf2_timestamps.timestamp / 100);
@@ -1137,12 +1138,15 @@ void Ekf2::run()
 			if (!PX4_ISFINITE(lpos.vxy_max)) {
 				lpos.vxy_max = 0.0f;
 			}
+
 			if (!PX4_ISFINITE(lpos.vz_max)) {
 				lpos.vz_max = 0.0f;
 			}
+
 			if (!PX4_ISFINITE(lpos.hagl_min)) {
 				lpos.hagl_min = 0.0f;
 			}
+
 			if (!PX4_ISFINITE(lpos.hagl_max)) {
 				lpos.hagl_max = 0.0f;
 			}

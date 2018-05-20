@@ -853,16 +853,20 @@ MulticopterPositionControl::limit_altitude()
 
 		// Calculate altitude limit
 		float altitude_limit = 0.0f;
+
 		if (_terrain_follow) {
 			if (estimator_limit_height) {
 				altitude_limit = -_local_pos.hagl_max;
+
 			} else if (vehicle_limit_height) {
 				// TODO : should this limit be the maximum rangefinder measurable distance?
 				altitude_limit = -_vehicle_land_detected.alt_max;
 			}
+
 		} else {
 			if (estimator_limit_height) {
 				altitude_limit = _local_pos.hagl_max + _pos(2) + _local_pos.dist_bottom;
+
 			} else if (vehicle_limit_height) {
 				altitude_limit = -_vehicle_land_detected.alt_max + _home_pos.z;
 			}
@@ -880,7 +884,7 @@ MulticopterPositionControl::limit_altitude()
 			float delta_t = -_vel(2) / _acceleration_z_max_down.get();
 
 			// predict next position based on current position, velocity, max acceleration downwards and time to reach zero velocity
-			float pos_z_next = _pos(2) + _vel(2) * delta_t + 0.5f * _acceleration_z_max_down.get() * delta_t * delta_t;
+			float pos_z_next = _pos(2) + _vel(2) * delta_t + 0.5f * _acceleration_z_max_down.get() * delta_t *delta_t;
 
 			if (pos_z_next < altitude_limit) {
 				// prevent the vehicle from exceeding maximum altitude by switching back to altitude control with maximum altitude as setpoint
