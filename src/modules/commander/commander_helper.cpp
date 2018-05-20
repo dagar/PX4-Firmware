@@ -66,6 +66,7 @@
 #include "DevMgr.hpp"
 
 using namespace DriverFramework;
+using namespace time_literals;
 
 #define VEHICLE_TYPE_QUADROTOR 2
 #define VEHICLE_TYPE_COAXIAL 3
@@ -81,7 +82,7 @@ using namespace DriverFramework;
 #define VEHICLE_TYPE_VTOL_RESERVED4 24
 #define VEHICLE_TYPE_VTOL_RESERVED5 25
 
-#define BLINK_MSG_TIME	700000	// 3 fast blinks (in us)
+static constexpr hrt_abstime BLINK_MSG_TIME = 700_ms; // 3 fast blinks (in us)
 
 bool is_multirotor(const struct vehicle_status_s *current_status)
 {
@@ -97,7 +98,8 @@ bool is_rotary_wing(const struct vehicle_status_s *current_status)
 		   || (current_status->system_type == VEHICLE_TYPE_COAXIAL);
 }
 
-bool is_vtol(const struct vehicle_status_s * current_status) {
+bool is_vtol(const struct vehicle_status_s *current_status)
+{
 	return (current_status->system_type == VEHICLE_TYPE_VTOL_DUOROTOR ||
 		current_status->system_type == VEHICLE_TYPE_VTOL_QUADROTOR ||
 		current_status->system_type == VEHICLE_TYPE_VTOL_TILTROTOR ||
@@ -110,29 +112,30 @@ bool is_vtol(const struct vehicle_status_s * current_status) {
 static hrt_abstime blink_msg_end = 0;	// end time for currently blinking LED message, 0 if no blink message
 static hrt_abstime tune_end = 0;		// end time of currently played tune, 0 for repeating tunes or silence
 static int tune_current = TONE_STOP_TUNE;		// currently playing tune, can be interrupted after tune_end
-static unsigned int tune_durations[TONE_NUMBER_OF_TUNES];
+
+static hrt_abstime tune_durations[TONE_NUMBER_OF_TUNES];
 
 static DevHandle h_leds;
 static DevHandle h_buzzer;
-static led_control_s led_control = {};
+
 static orb_advert_t led_control_pub = nullptr;
-static tune_control_s tune_control = {};
 static orb_advert_t tune_control_pub = nullptr;
 
 int buzzer_init()
 {
-	tune_end = 0;
-	tune_current = 0;
-	memset(tune_durations, 0, sizeof(tune_durations));
-	tune_durations[TONE_NOTIFY_POSITIVE_TUNE] = 800000;
-	tune_durations[TONE_NOTIFY_NEGATIVE_TUNE] = 900000;
-	tune_durations[TONE_NOTIFY_NEUTRAL_TUNE] = 500000;
-	tune_durations[TONE_ARMING_WARNING_TUNE] = 3000000;
-	tune_durations[TONE_HOME_SET] = 800000;
-	tune_durations[TONE_BATTERY_WARNING_FAST_TUNE] = 800000;
-	tune_durations[TONE_BATTERY_WARNING_SLOW_TUNE] = 800000;
-	tune_durations[TONE_SINGLE_BEEP_TUNE] = 300000;
+	tune_durations[TONE_NOTIFY_POSITIVE_TUNE] = 800_ms;
+	tune_durations[TONE_NOTIFY_NEGATIVE_TUNE] = 900_ms;
+	tune_durations[TONE_NOTIFY_NEUTRAL_TUNE] = 500_ms;
+	tune_durations[TONE_ARMING_WARNING_TUNE] = 3_s;
+	tune_durations[TONE_HOME_SET] = 800_ms;
+	tune_durations[TONE_BATTERY_WARNING_FAST_TUNE] = 800_ms;
+	tune_durations[TONE_BATTERY_WARNING_SLOW_TUNE] = 800_ms;
+	tune_durations[TONE_SINGLE_BEEP_TUNE] = 300_ms;
+
+	tune_control_s tune_control = {};
+	tune_control.timestamp = hrt_absolute_time();
 	tune_control_pub = orb_advertise(ORB_ID(tune_control), &tune_control);
+
 	return PX4_OK;
 }
 
@@ -143,10 +146,12 @@ void buzzer_deinit()
 
 void set_tune_override(int tune)
 {
+	tune_control_s tune_control = {};
 	tune_control.tune_id = tune;
 	tune_control.strength = tune_control_s::STRENGTH_NORMAL;
 	tune_control.tune_override = 1;
 	tune_control.timestamp = hrt_absolute_time();
+
 	orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
 }
 
@@ -158,10 +163,12 @@ void set_tune(int tune)
 	if (tune_end == 0 || new_tune_duration != 0 || hrt_absolute_time() > tune_end) {
 		/* allow interrupting current non-repeating tune by the same tune */
 		if (tune != tune_current || new_tune_duration != 0) {
+			tune_control_s tune_control = {};
 			tune_control.tune_id = tune;
 			tune_control.strength = tune_control_s::STRENGTH_NORMAL;
 			tune_control.tune_override = 0;
 			tune_control.timestamp = hrt_absolute_time();
+
 			orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
 		}
 
@@ -273,13 +280,13 @@ int led_init()
 {
 	blink_msg_end = 0;
 
+	led_control_s led_control = {};
 	led_control.led_mask = 0xff;
 	led_control.mode = led_control_s::MODE_OFF;
 	led_control.priority = 0;
 	led_control.timestamp = hrt_absolute_time();
 	led_control_pub = orb_advertise_queue(ORB_ID(led_control), &led_control, LED_UORB_QUEUE_LENGTH);
 
-#ifndef CONFIG_ARCH_BOARD_RPI
 	/* first open normal LEDs */
 	DevMgr::getHandle(LED0_DEVICE_PATH, h_leds);
 
@@ -289,7 +296,7 @@ int led_init()
 	}
 
 	/* the blue LED is only available on AeroCore but not FMUv2 */
-	(void)h_leds.ioctl(LED_ON, LED_BLUE);
+	h_leds.ioctl(LED_ON, LED_BLUE);
 
 	/* switch blue off */
 	led_off(LED_BLUE);
@@ -302,7 +309,6 @@ int led_init()
 
 	/* switch amber off */
 	led_off(LED_AMBER);
-#endif
 
 	return 0;
 }
@@ -310,9 +316,8 @@ int led_init()
 void led_deinit()
 {
 	orb_unadvertise(led_control_pub);
-#ifndef CONFIG_ARCH_BOARD_RPI
+
 	DevMgr::releaseHandle(h_leds);
-#endif
 }
 
 int led_toggle(int led)
@@ -332,14 +337,17 @@ int led_off(int led)
 
 void rgbled_set_color_and_mode(uint8_t color, uint8_t mode, uint8_t blinks, uint8_t prio)
 {
+	led_control_s led_control = {};
 	led_control.mode = mode;
 	led_control.color = color;
 	led_control.num_blinks = blinks;
 	led_control.priority = prio;
 	led_control.timestamp = hrt_absolute_time();
+
 	orb_publish(ORB_ID(led_control), led_control_pub, &led_control);
 }
 
-void rgbled_set_color_and_mode(uint8_t color, uint8_t mode){
+void rgbled_set_color_and_mode(uint8_t color, uint8_t mode)
+{
 	rgbled_set_color_and_mode(color, mode, 0, 0);
 }

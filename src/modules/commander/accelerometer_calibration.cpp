@@ -149,7 +149,9 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/sensor_correction.h>
 
-static const char *sensor_name = "accel";
+using namespace time_literals;
+
+static constexpr const char *sensor_name = "accel";
 
 static int32_t device_id[max_accel_sens];
 static int device_prio_max = 0;
@@ -786,14 +788,14 @@ int do_level_calibration(orb_advert_t *mavlink_log_pub) {
 
 	// sleep for some time
 	hrt_abstime start = hrt_absolute_time();
-	while(hrt_elapsed_time(&start) < settle_time * 1000000) {
+	while(hrt_elapsed_time(&start) < settle_time * 1_s) {
 		mavlink_log_info(mavlink_log_pub, CAL_QGC_PROGRESS_MSG, (int)(90*hrt_elapsed_time(&start)/1e6f/(float)settle_time));
 		sleep(settle_time / 10);
 	}
 
 	start = hrt_absolute_time();
 	// average attitude for 5 seconds
-	while(hrt_elapsed_time(&start) < cal_time * 1000000) {
+	while(hrt_elapsed_time(&start) < cal_time * 1_s) {
 		int pollret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
 
 		if (pollret <= 0) {

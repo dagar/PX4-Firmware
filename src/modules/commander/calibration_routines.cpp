@@ -61,6 +61,8 @@
 #include "calibration_messages.h"
 #include "commander_helper.h"
 
+using namespace time_literals;
+
 int sphere_fit_least_squares(const float x[], const float y[], const float z[],
 			     unsigned int size, unsigned int max_iterations, float delta, float *sphere_x, float *sphere_y, float *sphere_z,
 			     float *sphere_radius)
@@ -538,7 +540,7 @@ enum detect_orientation_return detect_orientation(orb_advert_t *mavlink_log_pub,
 	static constexpr float	normal_still_thr = 0.25;		// normal still threshold
 	float		still_thr2 = powf(lenient_still_position ? (normal_still_thr * 3) : normal_still_thr, 2);
 	static constexpr float		accel_err_thr = 5.0f;			// set accel error threshold to 5m/s^2
-	const hrt_abstime	still_time = lenient_still_position ? 500000 : 1300000;	// still time required in us
+	const hrt_abstime still_time = lenient_still_position ? 500_ms : 1300_ms;	// still time required in us
 
 	px4_pollfd_struct_t fds[1];
 	fds[0].fd = accel_sub;
@@ -547,7 +549,7 @@ enum detect_orientation_return detect_orientation(orb_advert_t *mavlink_log_pub,
 	const hrt_abstime t_start = hrt_absolute_time();
 
 	/* set timeout to 30s */
-	static constexpr hrt_abstime timeout = 90000000;
+	static constexpr hrt_abstime timeout = 90_s;
 
 	hrt_abstime t_timeout = t_start + timeout;
 	hrt_abstime t = t_start;
@@ -564,7 +566,7 @@ enum detect_orientation_return detect_orientation(orb_advert_t *mavlink_log_pub,
 			struct sensor_combined_s sensor;
 			orb_copy(ORB_ID(sensor_combined), accel_sub, &sensor);
 			t = hrt_absolute_time();
-			float dt = (t - t_prev) / 1000000.0f;
+			float dt = (t - t_prev) / 1e6f;
 			t_prev = t;
 			float w = dt / ema_len;
 

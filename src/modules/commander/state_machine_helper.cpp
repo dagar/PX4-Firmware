@@ -51,6 +51,8 @@
 #include "PreflightCheck.h"
 #include "arm_auth.h"
 
+using namespace time_literals;
+
 static constexpr const char reason_no_rc[] = "no RC";
 static constexpr const char reason_no_offboard[] = "no offboard";
 static constexpr const char reason_no_rc_and_no_offboard[] = "no RC and no offboard";
@@ -140,7 +142,7 @@ transition_result_t arming_state_transition(vehicle_status_s *status, const batt
 		    && ((new_arming_state == vehicle_status_s::ARMING_STATE_ARMED) || (new_arming_state == vehicle_status_s::ARMING_STATE_STANDBY))
 		    && !hil_enabled) {
 
-			if ((last_preflight_check == 0) || (hrt_elapsed_time(&last_preflight_check) > 1000 * 1000)) {
+			if ((last_preflight_check == 0) || (hrt_elapsed_time(&last_preflight_check) > 1_s)) {
 
 				status_flags->condition_system_sensors_initialized = Preflight::preflightCheck(mavlink_log_pub, *status, *status_flags, checkGNSS, false, false, time_since_boot);
 

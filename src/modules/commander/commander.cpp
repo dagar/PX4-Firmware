@@ -48,7 +48,6 @@
 #include "accelerometer_calibration.h"
 #include "airspeed_calibration.h"
 #include "arm_auth.h"
-#include "baro_calibration.h"
 #include "calibration_routines.h"
 #include "commander_helper.h"
 #include "esc_calibration.h"

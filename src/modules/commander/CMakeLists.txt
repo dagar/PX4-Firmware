@@ -45,7 +45,6 @@ px4_add_module(
 		accelerometer_calibration.cpp
 		gyro_calibration.cpp
 		mag_calibration.cpp
-		baro_calibration.cpp
 		rc_calibration.cpp
 		airspeed_calibration.cpp
 		esc_calibration.cpp

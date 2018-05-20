@@ -57,7 +57,7 @@
 #include <systemlib/err.h>
 #include <systemlib/airspeed.h>
 
-static const char *sensor_name = "airspeed";
+static constexpr const char *sensor_name = "airspeed";
 
 static void feedback_calibration_failed(orb_advert_t *mavlink_log_pub)
 {
