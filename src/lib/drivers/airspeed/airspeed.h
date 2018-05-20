@@ -43,7 +43,6 @@
 #include <systemlib/airspeed.h>
 #include <perf/perf_counter.h>
 #include <uORB/topics/differential_pressure.h>
-#include <uORB/topics/subsystem_info.h>
 #include <uORB/uORB.h>
 
 /* Default I2C bus */
@@ -74,11 +73,6 @@ protected:
 	virtual void	cycle() = 0;
 	virtual int	measure() = 0;
 	virtual int	collect() = 0;
-
-	/**
-	 * Update the subsystem status
-	 */
-	void update_status();
 
 	work_s			_work;
 	bool			_sensor_ok;

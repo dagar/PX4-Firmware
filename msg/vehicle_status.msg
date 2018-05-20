@@ -65,8 +65,3 @@ bool high_latency_data_link_active 		# all low latency datalinks to GCS lost
 uint8 data_link_lost_counter			# counts unique data link lost events
 bool engine_failure				# Set to true if an engine failure is detected
 bool mission_failure				# Set to true if mission could not continue/finish
-
-# see SYS_STATUS mavlink message for the following
-uint32 onboard_control_sensors_present
-uint32 onboard_control_sensors_enabled
-uint32 onboard_control_sensors_health

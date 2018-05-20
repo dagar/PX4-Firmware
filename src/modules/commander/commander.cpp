@@ -99,7 +99,6 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/power_button_state.h>
 #include <uORB/topics/safety.h>
-#include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/system_power.h>
 #include <uORB/topics/telemetry_status.h>
 #include <uORB/topics/vehicle_command.h>
@@ -1336,11 +1335,6 @@ Commander::run()
 	int battery_sub = orb_subscribe(ORB_ID(battery_status));
 	memset(&battery, 0, sizeof(battery));
 
-	/* Subscribe to subsystem info topic */
-	int subsys_sub = orb_subscribe(ORB_ID(subsystem_info));
-	struct subsystem_info_s info;
-	memset(&info, 0, sizeof(info));
-
 	/* Subscribe to system power */
 	int system_power_sub = orb_subscribe(ORB_ID(system_power));
 
@@ -1987,41 +1981,6 @@ Commander::run()
 
 				/* End battery voltage check */
 			}
-		}
-
-		/* update subsystem */
-		orb_check(subsys_sub, &updated);
-
-		if (updated) {
-			orb_copy(ORB_ID(subsystem_info), subsys_sub, &info);
-
-			//warnx("subsystem changed: %d\n", (int)info.subsystem_type);
-
-			/* mark / unmark as present */
-			if (info.present) {
-				status.onboard_control_sensors_present |= info.subsystem_type;
-
-			} else {
-				status.onboard_control_sensors_present &= ~info.subsystem_type;
-			}
-
-			/* mark / unmark as enabled */
-			if (info.enabled) {
-				status.onboard_control_sensors_enabled |= info.subsystem_type;
-
-			} else {
-				status.onboard_control_sensors_enabled &= ~info.subsystem_type;
-			}
-
-			/* mark / unmark as ok */
-			if (info.ok) {
-				status.onboard_control_sensors_health |= info.subsystem_type;
-
-			} else {
-				status.onboard_control_sensors_health &= ~info.subsystem_type;
-			}
-
-			status_changed = true;
 		}
 
 		/* If in INIT state, try to proceed to STANDBY state */
@@ -2757,7 +2716,6 @@ Commander::run()
 	px4_close(offboard_control_mode_sub);
 	px4_close(safety_sub);
 	px4_close(cmd_sub);
-	px4_close(subsys_sub);
 	px4_close(param_changed_sub);
 	px4_close(battery_sub);
 	px4_close(land_detector_sub);

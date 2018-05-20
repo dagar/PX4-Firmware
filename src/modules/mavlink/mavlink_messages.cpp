@@ -565,9 +565,10 @@ protected:
 		if (updated_status || updated_battery || updated_cpuload) {
 			mavlink_sys_status_t msg = {};
 
-			msg.onboard_control_sensors_present = status.onboard_control_sensors_present;
-			msg.onboard_control_sensors_enabled = status.onboard_control_sensors_enabled;
-			msg.onboard_control_sensors_health = status.onboard_control_sensors_health;
+			// TODO: populate from vehicle_status_flags
+			//msg.onboard_control_sensors_present = status.onboard_control_sensors_present;
+			//msg.onboard_control_sensors_enabled = status.onboard_control_sensors_enabled;
+			//msg.onboard_control_sensors_health = status.onboard_control_sensors_health;
 			msg.load = cpuload.load * 1000.0f;
 			msg.voltage_battery = (battery_status.connected) ? battery_status.voltage_filtered_v * 1000.0f : UINT16_MAX;
 			msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100.0f : -1;
