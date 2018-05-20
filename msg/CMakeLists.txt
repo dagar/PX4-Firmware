@@ -55,6 +55,7 @@ set(msg_files
 	esc_report.msg
 	esc_status.msg
 	estimator_status.msg
+	estimator_status_flags.msg
 	follow_target.msg
 	fw_pos_ctrl_status.msg
 	geofence_result.msg

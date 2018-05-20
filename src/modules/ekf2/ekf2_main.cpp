@@ -55,6 +55,7 @@
 #include <uORB/topics/ekf2_innovations.h>
 #include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/estimator_status_flags.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_bias.h>
@@ -109,6 +110,12 @@ private:
 	void update_mag_bias(Param &mag_bias_param, int axis_index);
 
 	bool publish_wind_estimate(const hrt_abstime &timestamp);
+	bool publish_estimator_status_flags();
+
+	void get_ekf_fault_status(estimator_status_flags_s &est_status_flags);
+	void get_ekf_innovation_check_status(estimator_status_flags_s &est_status_flags);
+	void get_ekf_gps_fault_status(estimator_status_flags_s &est_status_flags);
+	void get_ekf_control_mode(estimator_status_flags_s &est_status_flags);
 
 	const Vector3f get_vel_body_wind();
 
@@ -186,6 +193,7 @@ private:
 	orb_advert_t _att_pub{nullptr};
 	orb_advert_t _wind_pub{nullptr};
 	orb_advert_t _estimator_status_pub{nullptr};
+	orb_advert_t _estimator_status_flags_pub{nullptr};
 	orb_advert_t _estimator_innovations_pub{nullptr};
 	orb_advert_t _ekf2_timestamps_pub{nullptr};
 	orb_advert_t _sensor_bias_pub{nullptr};
@@ -1025,8 +1033,7 @@ void Ekf2::run()
 				_last_time_slip_us = (now - _start_time_us) - _integrated_time_us;
 			}
 
-			matrix::Quatf q;
-			_ekf.copy_quaternion(q.data());
+			const matrix::Quatf &q = _ekf.get_quaternion();
 
 			// In-run bias estimates
 			float gyro_bias[3];
@@ -1075,7 +1082,7 @@ void Ekf2::run()
 			lpos.vz = velocity[2];
 
 			// vertical position time derivative (m/s)
-			_ekf.get_pos_d_deriv(&lpos.z_deriv);
+			lpos.z_deriv = _ekf.get_pos_d_deriv();
 
 			// Acceleration of body origin in local NED frame
 			float vel_deriv[3];
@@ -1101,8 +1108,8 @@ void Ekf2::run()
 
 			if (ekf_origin_valid && (origin_time > lpos.ref_timestamp)) {
 				lpos.ref_timestamp = origin_time;
-				lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
-				lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
+				lpos.ref_lat = math::degrees(ekf_origin.lat_rad); // Reference point latitude in degrees
+				lpos.ref_lon = math::degrees(ekf_origin.lon_rad); // Reference point longitude in degrees
 			}
 
 			// The rotation of the tangent plane vs. geographical north
@@ -1234,10 +1241,8 @@ void Ekf2::run()
 		status.timestamp = now;
 		_ekf.get_state_delayed(status.states);
 		_ekf.get_covariances(status.covariances);
-		_ekf.get_gps_check_status(&status.gps_check_fail_flags);
-		_ekf.get_control_mode(&status.control_mode_flags);
-		_ekf.get_filter_fault_status(&status.filter_fault_flags);
-		_ekf.get_innovation_test_status(&status.innovation_check_flags, &status.mag_test_ratio,
+
+		_ekf.get_innovation_test_status(&status.mag_test_ratio,
 						&status.vel_test_ratio, &status.pos_test_ratio,
 						&status.hgt_test_ratio, &status.tas_test_ratio,
 						&status.hagl_test_ratio, &status.beta_test_ratio);
@@ -1247,6 +1252,7 @@ void Ekf2::run()
 		_ekf.get_ekf_soln_status(&status.solution_status_flags);
 		_ekf.get_imu_vibe_metrics(status.vibe);
 		status.time_slip = _last_time_slip_us / 1e6f;
+
 		status.nan_flags = 0.0f; // unused
 		status.health_flags = 0.0f; // unused
 		status.timeout_flags = 0.0f; // unused
@@ -1258,6 +1264,8 @@ void Ekf2::run()
 		} else {
 			orb_publish(ORB_ID(estimator_status), _estimator_status_pub, &status);
 		}
+
+		publish_estimator_status_flags();
 
 		if (updated) {
 			{
@@ -1371,9 +1379,10 @@ void Ekf2::run()
 
 					// set the max allowed yaw innovaton depending on whether we are not aiding navigation using
 					// observations in the NE reference frame.
-					filter_control_status_u _ekf_control_mask;
-					_ekf.get_control_mode(&_ekf_control_mask.value);
-					bool doing_ne_aiding = _ekf_control_mask.flags.gps ||  _ekf_control_mask.flags.ev_pos;
+					filter_control_status _ekf_control_mask;
+
+					//_ekf.get_control_mode(&_ekf_control_mask.value);
+					bool doing_ne_aiding = _ekf_control_mask.gps ||  _ekf_control_mask.ev_pos;
 
 					float yaw_test_limit;
 
@@ -1505,9 +1514,7 @@ bool Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
 const Vector3f Ekf2::get_vel_body_wind()
 {
 	// Used to correct baro data for positional errors
-
-	matrix::Quatf q;
-	_ekf.copy_quaternion(q.data());
+	const matrix::Quatf &q = _ekf.get_quaternion();
 	matrix::Dcmf R_to_body(q.inversed());
 
 	// Calculate wind-compensated velocity in body frame
@@ -1521,6 +1528,105 @@ const Vector3f Ekf2::get_vel_body_wind()
 	Vector3f v_wind_comp = {velocity[0] - velNE_wind[0], velocity[1] - velNE_wind[1], velocity[2]};
 
 	return R_to_body * v_wind_comp;
+}
+
+bool Ekf2::publish_estimator_status_flags()
+{
+	estimator_status_flags_s est_status_flags = {};
+
+	get_ekf_fault_status(est_status_flags);
+	get_ekf_innovation_check_status(est_status_flags);
+	get_ekf_gps_fault_status(est_status_flags);
+	get_ekf_control_mode(est_status_flags);
+
+	// publish
+	est_status_flags.timestamp = hrt_absolute_time();
+
+	if (_estimator_status_flags_pub == nullptr) {
+		_estimator_status_flags_pub = orb_advertise(ORB_ID(estimator_status_flags), &est_status_flags);
+
+	} else {
+		orb_publish(ORB_ID(estimator_status_flags), _estimator_status_flags_pub, &est_status_flags);
+	}
+
+	return true;
+}
+
+void Ekf2::get_ekf_fault_status(estimator_status_flags_s &est_status_flags)
+{
+	// ecl fault_status -> estimator_status_flags fault_*
+	const estimator::fault_status &fault_status = _ekf.get_filter_fault_status();
+
+	est_status_flags.fault_bad_mag_x = fault_status.bad_mag_x;
+	est_status_flags.fault_bad_mag_y = fault_status.bad_mag_y;
+	est_status_flags.fault_bad_mag_z = fault_status.bad_mag_z;
+	est_status_flags.fault_bad_mag_hdg = fault_status.bad_mag_hdg;
+	est_status_flags.fault_bad_mag_decl = fault_status.bad_mag_decl;
+	est_status_flags.fault_bad_airspeed = fault_status.bad_airspeed;
+	est_status_flags.fault_bad_sideslip = fault_status.bad_sideslip;
+	est_status_flags.fault_bad_optflow_X = fault_status.bad_optflow_X;
+	est_status_flags.fault_bad_optflow_Y = fault_status.bad_optflow_Y;
+	est_status_flags.fault_bad_vel_N = fault_status.bad_vel_N;
+	est_status_flags.fault_bad_vel_E = fault_status.bad_vel_E;
+	est_status_flags.fault_bad_vel_D = fault_status.bad_vel_D;
+	est_status_flags.fault_bad_pos_N = fault_status.bad_pos_N;
+	est_status_flags.fault_bad_pos_E = fault_status.bad_pos_E;
+	est_status_flags.fault_bad_pos_D = fault_status.bad_pos_D;
+	est_status_flags.fault_bad_acc_bias = fault_status.bad_acc_bias;
+}
+
+void Ekf2::get_ekf_innovation_check_status(estimator_status_flags_s &est_status_flags)
+{
+	// ecl fault_status -> estimator_status_flags fault_*
+	const estimator::innovation_fault_status &innovation_fault_status = _ekf.get_innovation_check_status();
+
+	est_status_flags.reject_vel_NED = innovation_fault_status.reject_vel_NED;
+	est_status_flags.reject_pos_NE = innovation_fault_status.reject_pos_NE;
+	est_status_flags.reject_pos_D = innovation_fault_status.reject_pos_D;
+	est_status_flags.reject_mag_x = innovation_fault_status.reject_mag_x;
+	est_status_flags.reject_mag_y = innovation_fault_status.reject_mag_y;
+	est_status_flags.reject_mag_z = innovation_fault_status.reject_mag_z;
+	est_status_flags.reject_yaw = innovation_fault_status.reject_yaw;
+	est_status_flags.reject_airspeed = innovation_fault_status.reject_airspeed;
+	est_status_flags.reject_sideslip = innovation_fault_status.reject_sideslip;
+	est_status_flags.reject_hagl = innovation_fault_status.reject_hagl;
+	est_status_flags.reject_optflow_X = innovation_fault_status.reject_optflow_X;
+	est_status_flags.reject_optflow_Y = innovation_fault_status.reject_optflow_Y;
+}
+
+void Ekf2::get_ekf_gps_fault_status(estimator_status_flags_s &est_status_flags)
+{
+	const estimator::gps_check_fail_status &gps_fail_status = _ekf.get_gps_check_status();
+
+	est_status_flags.gps_fail_fix = gps_fail_status.fix;
+}
+
+void Ekf2::get_ekf_control_mode(estimator_status_flags_s &est_status_flags)
+{
+	const estimator::filter_control_status &control_status = _ekf.get_control_status();
+
+	est_status_flags.control_mode_tilt_align = control_status.tilt_align;
+	est_status_flags.control_mode_yaw_align = control_status.yaw_align;
+	est_status_flags.control_mode_gps = control_status.gps;
+	est_status_flags.control_mode_opt_flow = control_status.opt_flow;
+	est_status_flags.control_mode_mag_hdg = control_status.mag_hdg;
+	est_status_flags.control_mode_mag_3d = control_status.mag_3D;
+	est_status_flags.control_mode_mag_dec = control_status.mag_dec;
+	est_status_flags.control_mode_in_air = control_status.in_air;
+	est_status_flags.control_mode_wind = control_status.wind;
+	est_status_flags.control_mode_baro_hgt = control_status.baro_hgt;
+	est_status_flags.control_mode_rng_hgt = control_status.rng_hgt;
+	est_status_flags.control_mode_gps_hgt = control_status.gps_hgt;
+	est_status_flags.control_mode_ev_pos = control_status.ev_pos;
+	est_status_flags.control_mode_ev_yaw = control_status.ev_yaw;
+	est_status_flags.control_mode_ev_hgt = control_status.ev_hgt;
+	est_status_flags.control_mode_fuse_beta = control_status.fuse_beta;
+	est_status_flags.control_mode_mag_field = control_status.update_mag_states_only;
+	est_status_flags.control_mode_fixed_wing = control_status.fixed_wing;
+	est_status_flags.control_mode_mag_fault = control_status.mag_fault;
+	est_status_flags.control_mode_fuse_airspeed = control_status.fuse_aspd;
+	est_status_flags.control_mode_gnd_effect = control_status.gnd_effect;
+	est_status_flags.control_mode_rng_stuck = control_status.rng_stuck;
 }
 
 Ekf2 *Ekf2::instantiate(int argc, char *argv[])
