@@ -266,11 +266,11 @@ bool MavlinkStreamHighLatency2::write_estimator_status(mavlink_high_latency2_t *
 	const bool updated = _estimator_status_sub->update(&_estimator_status_time, &estimator_status);
 
 	if (_estimator_status_time > 0) {
-		if (estimator_status.gps_check_fail_flags > 0 ||
-		    estimator_status.filter_fault_flags > 0 ||
-		    estimator_status.innovation_check_flags > 0) {
-			msg->failure_flags |= HL_FAILURE_FLAG_ESTIMATOR;
-		}
+//		if (estimator_status.gps_check_fail_flags > 0 ||
+//		    estimator_status.filter_fault_flags > 0 ||
+//		    estimator_status.innovation_check_flags > 0) {
+//			msg->failure_flags |= HL_FAILURE_FLAG_ESTIMATOR;
+//		}
 	}
 
 	return updated;

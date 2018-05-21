@@ -4253,20 +4253,20 @@ bool Commander::estimator_checks()
 
 	// optical flow
 	// TODO: using vs valid
-	status_flags.condition_optical_flow_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_OPT_FLOW);
+	//status_flags.condition_optical_flow_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_OPT_FLOW);
 
 	//bool reliant_on_opt_flow = ((estimator_status.control_mode_flags & (1 << estimator_status_s::CS_OPT_FLOW))
 	//			    && !(estimator_status.control_mode_flags & (1 << estimator_status_s::CS_GPS))
 	//			    && !(estimator_status.control_mode_flags & (1 << estimator_status_s::CS_EV_POS)));
 
 	// airspeed
-	status_flags.condition_airspeed_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_ASPD);
+	//status_flags.condition_airspeed_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_ASPD);
 
 	// gps
-	status_flags.condition_gps_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_GPS);
+	//status_flags.condition_gps_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_GPS);
 
 	// attitude
-	status_flags.condition_attitude_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_GPS);
+	//status_flags.condition_attitude_valid = check_bit(est_status.control_mode_flags, estimator_status_s::CS_GPS);
 
 	return status_changed;
 }

@@ -63,9 +63,11 @@
 #include <drivers/drv_baro.h>
 #include <drivers/drv_airspeed.h>
 
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/estimator_status_flags.h>
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/system_power.h>
 #include <uORB/topics/vehicle_gps_position.h>
@@ -525,16 +527,14 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, bool optional, bool report_
 	bool success = true; // start with a pass and change to a fail if any test fails
 	float test_limit = 1.0f; // pass limit re-used for each test
 
-	// Get estimator status data if available and exit with a fail recorded if not
-	int sub = orb_subscribe(ORB_ID(estimator_status));
-	estimator_status_s status = {};
+	uORB::Subscription<estimator_status_s> estimator_status_sub{ORB_ID(estimator_status)};
+	uORB::Subscription<estimator_status_flags_s> estimator_status_flags_sub{ORB_ID(estimator_status_flags)};
 
-	if (orb_copy(ORB_ID(estimator_status), sub, &status) != PX4_OK) {
-		goto out;
-	}
+	const estimator_status_s& status = estimator_status_sub.get();
+	const estimator_status_flags_s& status_flags = estimator_status_flags_sub.get();
 
 	// Check if preflight check performed by estimator has failed
-	if (status.pre_flt_fail) {
+	if (status_flags.preflight_failure) {
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: EKF INTERNAL CHECKS");
 		}
@@ -619,46 +619,27 @@ static bool ekf2Check(orb_advert_t *mavlink_log_pub, bool optional, bool report_
 
 	// If GPS aiding is required, declare fault condition if the required GPS quality checks are failing
 	if (enforce_gps_required) {
-		bool ekf_gps_fusion = status.control_mode_flags & (1 << 2);
-		bool ekf_gps_check_fail = status.gps_check_fail_flags > 0;
 
-		if (!ekf_gps_fusion) {
-			// The EKF is not using GPS
+		if (status_flags.gps_fail_min_sat_count
+			|| status_flags.gps_fail_min_gdop
+			|| status_flags.gps_fail_max_horz_err
+			|| status_flags.gps_fail_max_vert_err
+			|| status_flags.gps_fail_max_spd_err) {
+
 			if (report_fail) {
-				if (ekf_gps_check_fail) {
-					// Poor GPS qulaity is the likely cause
-					mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: GPS QUALITY POOR");
-
-				} else {
-					// Likely cause unknown
+				if (!status_flags.control_mode_gps) {
 					mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: EKF NOT USING GPS");
 				}
-			}
 
-			success = false;
-			goto out;
-
-		} else {
-			// The EKF is using GPS so check for bad quality on key performance indicators
-			bool gps_quality_fail = ((status.gps_check_fail_flags & ((1 << estimator_status_s::GPS_CHECK_FAIL_MIN_SAT_COUNT)
-						  + (1 << estimator_status_s::GPS_CHECK_FAIL_MIN_GDOP)
-						  + (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_HORZ_ERR)
-						  + (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_VERT_ERR)
-						  + (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_SPD_ERR))) > 0);
-
-			if (gps_quality_fail) {
-				if (report_fail) {
-					mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: GPS QUALITY POOR");
-				}
+				mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: GPS QUALITY POOR");
 
 				success = false;
-				goto out;
 			}
 		}
 	}
 
 out:
-	orb_unsubscribe(sub);
+
 	return success;
 }
 

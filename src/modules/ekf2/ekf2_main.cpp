@@ -73,6 +73,7 @@
 #include <uORB/topics/vehicle_magnetometer.h>
 
 using math::constrain;
+using namespace time_literals;
 
 extern "C" __EXPORT int ekf2_main(int argc, char *argv[]);
 
@@ -193,13 +194,13 @@ private:
 	orb_advert_t _att_pub{nullptr};
 	orb_advert_t _wind_pub{nullptr};
 	orb_advert_t _estimator_status_pub{nullptr};
-	orb_advert_t _estimator_status_flags_pub{nullptr};
 	orb_advert_t _estimator_innovations_pub{nullptr};
 	orb_advert_t _ekf2_timestamps_pub{nullptr};
 	orb_advert_t _sensor_bias_pub{nullptr};
 
-	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
-	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
+	uORB::Publication<estimator_status_flags_s> _estimator_status_flags_pub{ORB_ID(estimator_status_flags)};
+	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub{ORB_ID(vehicle_local_position)};
+	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub{ORB_ID(vehicle_global_position)};
 
 	Ekf _ekf;
 
@@ -411,8 +412,6 @@ private:
 
 Ekf2::Ekf2():
 	ModuleParams(nullptr),
-	_vehicle_local_position_pub(ORB_ID(vehicle_local_position)),
-	_vehicle_global_position_pub(ORB_ID(vehicle_global_position)),
 	_params(_ekf.getParamHandle()),
 	_obs_dt_min_ms(_params->sensor_interval_min_ms),
 	_mag_delay_ms(_params->mag_delay_ms),
@@ -1066,30 +1065,27 @@ void Ekf2::run()
 			lpos.timestamp = now;
 
 			// Position of body origin in local NED frame
-			float position[3];
-			_ekf.get_position(position);
+			Vector3f position = _ekf.get_position();
 			const float lpos_x_prev = lpos.x;
 			const float lpos_y_prev = lpos.y;
-			lpos.x = (_ekf.local_position_is_valid()) ? position[0] : 0.0f;
-			lpos.y = (_ekf.local_position_is_valid()) ? position[1] : 0.0f;
-			lpos.z = position[2];
+			lpos.x = position(0);
+			lpos.y = position(1);
+			lpos.z = position(2);
 
 			// Velocity of body origin in local NED frame (m/s)
-			float velocity[3];
-			_ekf.get_velocity(velocity);
-			lpos.vx = velocity[0];
-			lpos.vy = velocity[1];
-			lpos.vz = velocity[2];
+			const Vector3f velocity = _ekf.get_velocity();
+			lpos.vx = velocity(0);
+			lpos.vy = velocity(1);
+			lpos.vz = velocity(2);
 
 			// vertical position time derivative (m/s)
 			lpos.z_deriv = _ekf.get_pos_d_deriv();
 
 			// Acceleration of body origin in local NED frame
-			float vel_deriv[3];
-			_ekf.get_vel_deriv_ned(vel_deriv);
-			lpos.ax = vel_deriv[0];
-			lpos.ay = vel_deriv[1];
-			lpos.az = vel_deriv[2];
+			const Vector3f &vel_deriv = _ekf.get_vel_deriv_ned();
+			lpos.ax = vel_deriv(0);
+			lpos.ay = vel_deriv(1);
+			lpos.az = vel_deriv(2);
 
 			// TODO: better status reporting
 			lpos.xy_valid = _ekf.local_position_is_valid() && !_preflt_horiz_fail;
@@ -1098,15 +1094,16 @@ void Ekf2::run()
 			lpos.v_z_valid = !_preflt_vert_fail;
 
 			// Position of local NED origin in GPS / WGS84 frame
-			map_projection_reference_s ekf_origin;
-			uint64_t origin_time;
+			const map_projection_reference_s &ekf_origin = _ekf.get_ekf_origin();
+			uint64_t origin_time = 0;
 
 			// true if position (x,y,z) has a valid WGS-84 global reference (ref_lat, ref_lon, alt)
-			const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin, &lpos.ref_alt);
+			//const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin, &lpos.ref_alt);
+			const bool ekf_origin_valid = _ekf.ekf_origin_valid();
 			lpos.xy_global = ekf_origin_valid;
 			lpos.z_global = ekf_origin_valid;
 
-			if (ekf_origin_valid && (origin_time > lpos.ref_timestamp)) {
+			if (ekf_origin_valid && (ekf_origin.timestamp > lpos.ref_timestamp)) {
 				lpos.ref_timestamp = origin_time;
 				lpos.ref_lat = math::degrees(ekf_origin.lat_rad); // Reference point latitude in degrees
 				lpos.ref_lon = math::degrees(ekf_origin.lon_rad); // Reference point longitude in degrees
@@ -1237,7 +1234,7 @@ void Ekf2::run()
 		}
 
 		// publish estimator status
-		estimator_status_s status;
+		estimator_status_s status = {};
 		status.timestamp = now;
 		_ekf.get_state_delayed(status.states);
 		_ekf.get_covariances(status.covariances);
@@ -1247,16 +1244,9 @@ void Ekf2::run()
 						&status.hgt_test_ratio, &status.tas_test_ratio,
 						&status.hagl_test_ratio, &status.beta_test_ratio);
 
-		status.pos_horiz_accuracy = _vehicle_local_position_pub.get().eph;
-		status.pos_vert_accuracy = _vehicle_local_position_pub.get().epv;
-		_ekf.get_ekf_soln_status(&status.solution_status_flags);
 		_ekf.get_imu_vibe_metrics(status.vibe);
-		status.time_slip = _last_time_slip_us / 1e6f;
 
-		status.nan_flags = 0.0f; // unused
-		status.health_flags = 0.0f; // unused
-		status.timeout_flags = 0.0f; // unused
-		status.pre_flt_fail = _preflt_fail;
+		status.time_slip = _last_time_slip_us / 1e6f;
 
 		if (_estimator_status_pub == nullptr) {
 			_estimator_status_pub = orb_advertise(ORB_ID(estimator_status), &status);
@@ -1274,8 +1264,9 @@ void Ekf2::run()
 				// Check if conditions are OK to for learning of magnetometer bias values
 				if (!vehicle_land_detected.landed && // not on ground
 				    (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) && // vehicle is armed
-				    (status.filter_fault_flags == 0) && // there are no filter faults
-				    (status.control_mode_flags & (1 << 5))) { // the EKF is operating in the correct mode
+				    //(status.filter_fault_flags == 0) && // there are no filter faults
+				    //(status & (1 << 5))) { // the EKF is operating in the correct mode
+				    true) {
 
 					if (_last_magcal_us == 0) {
 						_last_magcal_us = now;
@@ -1285,7 +1276,7 @@ void Ekf2::run()
 						_last_magcal_us = now;
 					}
 
-				} else if (status.filter_fault_flags != 0) {
+				} else if (false /*status.filter_fault_flags != 0*/) {
 					// if a filter fault has occurred, assume previous learning was invalid and do not
 					// count it towards total learning time.
 					_total_cal_time_us = 0;
@@ -1296,7 +1287,7 @@ void Ekf2::run()
 				}
 
 				// Start checking mag bias estimates when we have accumulated sufficient calibration time
-				if (_total_cal_time_us > 120 * 1000 * 1000ULL) {
+				if (_total_cal_time_us > 120_s) {
 					// we have sufficient accumulated valid flight time to form a reliable bias estimate
 					// check that the state variance for each axis is within a range indicating filter convergence
 					const float max_var_allowed = 100.0f * _mag_bias_saved_variance.get();
@@ -1324,7 +1315,7 @@ void Ekf2::run()
 
 				// Check and save the last valid calibration when we are disarmed
 				if ((vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
-				    && (status.filter_fault_flags == 0)
+				    //&& (status.filter_fault_flags == 0)
 				    && (sensor_selection.mag_device_id == _mag_bias_id.get())) {
 
 					update_mag_bias(_mag_bias_x, 0);
@@ -1484,8 +1475,7 @@ bool Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
 	bool published = false;
 
 	if (_ekf.get_wind_status()) {
-		float velNE_wind[2];
-		_ekf.get_wind_velocity(velNE_wind);
+		const Vector2f &wind = _ekf.get_wind_velocity();
 
 		float wind_var[2];
 		_ekf.get_wind_velocity_var(wind_var);
@@ -1493,8 +1483,8 @@ bool Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
 		// Publish wind estimate
 		wind_estimate_s wind_estimate;
 		wind_estimate.timestamp = timestamp;
-		wind_estimate.windspeed_north = velNE_wind[0];
-		wind_estimate.windspeed_east = velNE_wind[1];
+		wind_estimate.windspeed_north = wind(0);
+		wind_estimate.windspeed_east = wind(1);
 		wind_estimate.variance_north = wind_var[0];
 		wind_estimate.variance_east = wind_var[1];
 
@@ -1534,19 +1524,19 @@ bool Ekf2::publish_estimator_status_flags()
 {
 	estimator_status_flags_s est_status_flags = {};
 
+	est_status_flags.preflight_failure = _preflt_fail;
+
 	get_ekf_fault_status(est_status_flags);
 	get_ekf_innovation_check_status(est_status_flags);
 	get_ekf_gps_fault_status(est_status_flags);
 	get_ekf_control_mode(est_status_flags);
 
-	// publish
-	est_status_flags.timestamp = hrt_absolute_time();
+	est_status_flags.timestamp = _estimator_status_flags_pub.get().timestamp; // for comparison
 
-	if (_estimator_status_flags_pub == nullptr) {
-		_estimator_status_flags_pub = orb_advertise(ORB_ID(estimator_status_flags), &est_status_flags);
-
-	} else {
-		orb_publish(ORB_ID(estimator_status_flags), _estimator_status_flags_pub, &est_status_flags);
+	if (memcmp(&est_status_flags, &_estimator_status_flags_pub.get(), sizeof(estimator_status_flags_s)) != 0) {
+		_estimator_status_flags_pub.get() = est_status_flags;
+		_estimator_status_flags_pub.get().timestamp = hrt_absolute_time();
+		_estimator_status_flags_pub.update();
 	}
 
 	return true;
@@ -1599,6 +1589,15 @@ void Ekf2::get_ekf_gps_fault_status(estimator_status_flags_s &est_status_flags)
 	const estimator::gps_check_fail_status &gps_fail_status = _ekf.get_gps_check_status();
 
 	est_status_flags.gps_fail_fix = gps_fail_status.fix;
+	est_status_flags.gps_fail_min_sat_count = gps_fail_status.nsats;
+	est_status_flags.gps_fail_min_gdop = gps_fail_status.gdop;
+	est_status_flags.gps_fail_max_horz_err = gps_fail_status.hacc;
+	est_status_flags.gps_fail_max_vert_err = gps_fail_status.fix;
+	est_status_flags.gps_fail_max_spd_err = gps_fail_status.sacc;
+	est_status_flags.gps_fail_max_horz_drift = gps_fail_status.hdrift;
+	est_status_flags.gps_fail_max_vert_drift = gps_fail_status.vdrift;
+	est_status_flags.gps_fail_max_horz_spd_err = gps_fail_status.hspeed;
+	est_status_flags.gps_fail_max_vert_spd_err = gps_fail_status.vspeed;
 }
 
 void Ekf2::get_ekf_control_mode(estimator_status_flags_s &est_status_flags)

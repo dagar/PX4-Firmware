@@ -1,4 +1,9 @@
 
+# general
+bool gps_failure
+bool preflight_failure
+
+
 # solution status (ekf_solution_status)
 bool solution_attitude				# True if the attitude estimate is good
 bool solution_velocity_horiz		# True if the horizontal velocity estimate is good
