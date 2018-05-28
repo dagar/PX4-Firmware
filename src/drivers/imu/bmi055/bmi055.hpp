@@ -336,9 +336,9 @@ protected:
 
 private:
 
-	ringbuffer::RingBuffer  *_accel_reports;
+	ringbuffer::RingBuffer  *_sensor_accel_ss;
 
-	accel_calibration_s  _accel_scale;
+	calibration_accel_s  _accel_scale;
 	float           _accel_range_scale;
 	float           _accel_range_m_s2;
 	orb_advert_t        _accel_topic;
@@ -489,9 +489,9 @@ protected:
 	virtual int     probe();
 private:
 
-	ringbuffer::RingBuffer  *_gyro_reports;
+	ringbuffer::RingBuffer  *_sensor_gyro_ss;
 
-	gyro_calibration_s   _gyro_scale;
+	calibration_gyro_s   _gyro_scale;
 	float           _gyro_range_scale;
 	float           _gyro_range_rad_s;
 

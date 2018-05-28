@@ -113,7 +113,7 @@ private:
 
 	int			    _param_update_sub;
 
-	accel_calibration_s {
+	calibration_accel_s {
 		float x_offset;
 		float x_scale;
 		float y_offset;
@@ -122,7 +122,7 @@ private:
 		float z_scale;
 	} _accel_calibration;
 
-	gyro_calibration_s {
+	calibration_gyro_s {
 		float x_offset;
 		float x_scale;
 		float y_offset;
@@ -488,70 +488,70 @@ int DfMPU6050Wrapper::_publish(struct imu_sensor_data &data)
 
 	perf_begin(_publish_perf);
 
-	accel_report accel_report = {};
-	gyro_report gyro_report = {};
+	sensor_accel_s sensor_accel_s = {};
+	sensor_gyro_s sensor_gyro_s = {};
 
-	accel_report.timestamp = gyro_report.timestamp = hrt_absolute_time();
+	sensor_accel_s.timestamp = sensor_gyro_s.timestamp = hrt_absolute_time();
 
 	// TODO: get these right
-	gyro_report.scaling = -1.0f;
-	gyro_report.range_rad_s = -1.0f;
-	gyro_report.device_id = m_id.dev_id;
+	sensor_gyro_s.scaling = -1.0f;
+	sensor_gyro_s.range_rad_s = -1.0f;
+	sensor_gyro_s.device_id = m_id.dev_id;
 
-	accel_report.scaling = -1.0f;
-	accel_report.range_m_s2 = -1.0f;
-	accel_report.device_id = m_id.dev_id;
+	sensor_accel_s.scaling = -1.0f;
+	sensor_accel_s.range_m_s2 = -1.0f;
+	sensor_accel_s.device_id = m_id.dev_id;
 
 	// TODO: remove these (or get the values)
-	gyro_report.x_raw = 0;
-	gyro_report.y_raw = 0;
-	gyro_report.z_raw = 0;
+	sensor_gyro_s.x_raw = 0;
+	sensor_gyro_s.y_raw = 0;
+	sensor_gyro_s.z_raw = 0;
 
-	accel_report.x_raw = 0;
-	accel_report.y_raw = 0;
-	accel_report.z_raw = 0;
+	sensor_accel_s.x_raw = 0;
+	sensor_accel_s.y_raw = 0;
+	sensor_accel_s.z_raw = 0;
 
 	matrix::Vector3f gyro_val_filt;
 	matrix::Vector3f accel_val_filt;
 
 	// Read and reset.
-	matrix::Vector3f gyro_val_integ = _gyro_int.get_and_filtered(true, gyro_report.integral_dt, gyro_val_filt);
-	matrix::Vector3f accel_val_integ = _accel_int.get_and_filtered(true, accel_report.integral_dt, accel_val_filt);
+	matrix::Vector3f gyro_val_integ = _gyro_int.get_and_filtered(true, sensor_gyro_s.integral_dt, gyro_val_filt);
+	matrix::Vector3f accel_val_integ = _accel_int.get_and_filtered(true, sensor_accel_s.integral_dt, accel_val_filt);
 
 	// Use the filtered (by integration) values to get smoother / less noisy data.
-	gyro_report.x = gyro_val_filt(0);
-	gyro_report.y = gyro_val_filt(1);
-	gyro_report.z = gyro_val_filt(2);
+	sensor_gyro_s.x = gyro_val_filt(0);
+	sensor_gyro_s.y = gyro_val_filt(1);
+	sensor_gyro_s.z = gyro_val_filt(2);
 
-	accel_report.x = accel_val_filt(0);
-	accel_report.y = accel_val_filt(1);
-	accel_report.z = accel_val_filt(2);
+	sensor_accel_s.x = accel_val_filt(0);
+	sensor_accel_s.y = accel_val_filt(1);
+	sensor_accel_s.z = accel_val_filt(2);
 
-	gyro_report.x_integral = gyro_val_integ(0);
-	gyro_report.y_integral = gyro_val_integ(1);
-	gyro_report.z_integral = gyro_val_integ(2);
+	sensor_gyro_s.x_integral = gyro_val_integ(0);
+	sensor_gyro_s.y_integral = gyro_val_integ(1);
+	sensor_gyro_s.z_integral = gyro_val_integ(2);
 
-	accel_report.x_integral = accel_val_integ(0);
-	accel_report.y_integral = accel_val_integ(1);
-	accel_report.z_integral = accel_val_integ(2);
+	sensor_accel_s.x_integral = accel_val_integ(0);
+	sensor_accel_s.y_integral = accel_val_integ(1);
+	sensor_accel_s.z_integral = accel_val_integ(2);
 
 	// TODO: when is this ever blocked?
 	if (!(m_pub_blocked)) {
 
 		if (_gyro_topic == nullptr) {
-			_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &gyro_report,
+			_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &sensor_gyro_s,
 							  &_gyro_orb_class_instance, ORB_PRIO_DEFAULT);
 
 		} else {
-			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &gyro_report);
+			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &sensor_gyro_s);
 		}
 
 		if (_accel_topic == nullptr) {
-			_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &accel_report,
+			_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &sensor_accel_s,
 							   &_accel_orb_class_instance, ORB_PRIO_DEFAULT);
 
 		} else {
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
+			orb_publish(ORB_ID(sensor_accel), _accel_topic, &sensor_accel_s);
 		}
 
 		// Report if there are high vibrations, every 10 times it happens.

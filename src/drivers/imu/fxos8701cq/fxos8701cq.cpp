@@ -196,10 +196,10 @@ private:
 	unsigned		_call_accel_interval;
 	unsigned		_call_mag_interval;
 
-	ringbuffer::RingBuffer	*_accel_reports;
+	ringbuffer::RingBuffer	*_sensor_accel_ss;
 	ringbuffer::RingBuffer		*_mag_reports;
 
-	accel_calibration_s	_accel_scale;
+	calibration_accel_s	_accel_scale;
 	unsigned		_accel_range_m_s2;
 	float			_accel_range_scale;
 	unsigned		_accel_samplerate;
@@ -473,7 +473,7 @@ FXOS8701CQ::FXOS8701CQ(int bus, const char *path, uint32_t device, enum Rotation
 	_mag_call{},
 	_call_accel_interval(0),
 	_call_mag_interval(0),
-	_accel_reports(nullptr),
+	_sensor_accel_ss(nullptr),
 	_mag_reports(nullptr),
 	_accel_scale{},
 	_accel_range_m_s2(0.0f),
@@ -539,8 +539,8 @@ FXOS8701CQ::~FXOS8701CQ()
 	stop();
 
 	/* free any existing reports */
-	if (_accel_reports != nullptr) {
-		delete _accel_reports;
+	if (_sensor_accel_ss != nullptr) {
+		delete _sensor_accel_ss;
 	}
 
 	if (_mag_reports != nullptr) {
@@ -573,9 +573,9 @@ FXOS8701CQ::init()
 	}
 
 	/* allocate basic report buffers */
-	_accel_reports = new ringbuffer::RingBuffer(2, sizeof(accel_report));
+	_sensor_accel_ss = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
 
-	if (_accel_reports == nullptr) {
+	if (_sensor_accel_ss == nullptr) {
 		goto out;
 	}
 
@@ -614,8 +614,8 @@ FXOS8701CQ::init()
 	_accel_class_instance = register_class_devname(ACCEL_BASE_DEVICE_PATH);
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	struct accel_report arp;
-	_accel_reports->get(&arp);
+	sensor_accel_s arp;
+	_sensor_accel_ss->get(&arp);
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
@@ -685,8 +685,8 @@ FXOS8701CQ::probe()
 ssize_t
 FXOS8701CQ::read(struct file *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(struct accel_report);
-	accel_report *arb = reinterpret_cast<accel_report *>(buffer);
+	unsigned count = buflen / sizeof(sensor_accel_s);
+	sensor_accel_s *arb = reinterpret_cast<sensor_accel_s *>(buffer);
 	int ret = 0;
 
 	/* buffer must be large enough */
@@ -700,7 +700,7 @@ FXOS8701CQ::read(struct file *filp, char *buffer, size_t buflen)
 		 * While there is space in the caller's buffer, and reports, copy them.
 		 */
 		while (count--) {
-			if (_accel_reports->get(arb)) {
+			if (_sensor_accel_ss->get(arb)) {
 				ret += sizeof(*arb);
 				arb++;
 			}
@@ -714,7 +714,7 @@ FXOS8701CQ::read(struct file *filp, char *buffer, size_t buflen)
 	measure();
 
 	/* measurement will have generated a report, copy it out */
-	if (_accel_reports->get(arb)) {
+	if (_sensor_accel_ss->get(arb)) {
 		ret = sizeof(*arb);
 	}
 
@@ -837,7 +837,7 @@ FXOS8701CQ::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 			irqstate_t flags = px4_enter_critical_section();
 
-			if (!_accel_reports->resize(arg)) {
+			if (!_sensor_accel_ss->resize(arg)) {
 				px4_leave_critical_section(flags);
 				return -ENOMEM;
 			}
@@ -859,7 +859,7 @@ FXOS8701CQ::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
-			accel_calibration_s *s = (accel_calibration_s *) arg;
+			calibration_accel_s *s = (calibration_accel_s *) arg;
 			float sum = s->x_scale + s->y_scale + s->z_scale;
 
 			if (sum > 2.0f && sum < 4.0f) {
@@ -881,7 +881,7 @@ FXOS8701CQ::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
+		memcpy((calibration_accel_s *) arg, &_accel_scale, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSELFTEST:
@@ -1249,7 +1249,7 @@ FXOS8701CQ::start()
 	stop();
 
 	/* reset the report ring */
-	_accel_reports->flush();
+	_sensor_accel_ss->flush();
 	_mag_reports->flush();
 
 	/* start polling at the specified rate */
@@ -1270,7 +1270,7 @@ FXOS8701CQ::stop()
 	memset(_last_accel, 0, sizeof(_last_accel));
 
 	/* discard unread data in the buffers */
-	_accel_reports->flush();
+	_sensor_accel_ss->flush();
 	_mag_reports->flush();
 }
 
@@ -1341,7 +1341,7 @@ FXOS8701CQ::measure()
 	} raw_accel_mag_report;
 #pragma pack(pop)
 
-	accel_report accel_report;
+	sensor_accel_s sensor_accel_s;
 
 	/* start the performance counter */
 	perf_begin(_accel_sample_perf);
@@ -1383,7 +1383,7 @@ FXOS8701CQ::measure()
 	 *		  74 from all measurements centers them around zero.
 	 */
 
-	accel_report.timestamp = hrt_absolute_time();
+	sensor_accel_s.timestamp = hrt_absolute_time();
 
 	/*
 	 * Eight-bit 2’s complement sensor temperature value with 0.96 °C/LSB sensitivity.
@@ -1395,17 +1395,17 @@ FXOS8701CQ::measure()
 
 	_last_temperature = (read_reg(FXOS8701CQ_TEMP)) * 0.96f;
 
-	accel_report.temperature = _last_temperature;
+	sensor_accel_s.temperature = _last_temperature;
 
 	// report the error count as the sum of the number of bad
 	// register reads and bad values. This allows the higher level
 	// code to decide if it should use this sensor based on
 	// whether it has had failures
-	accel_report.error_count = perf_event_count(_bad_registers) + perf_event_count(_bad_values);
+	sensor_accel_s.error_count = perf_event_count(_bad_registers) + perf_event_count(_bad_values);
 
-	accel_report.x_raw = swap16RightJustify14(raw_accel_mag_report.x);
-	accel_report.y_raw = swap16RightJustify14(raw_accel_mag_report.y);
-	accel_report.z_raw = swap16RightJustify14(raw_accel_mag_report.z);
+	sensor_accel_s.x_raw = swap16RightJustify14(raw_accel_mag_report.x);
+	sensor_accel_s.y_raw = swap16RightJustify14(raw_accel_mag_report.y);
+	sensor_accel_s.z_raw = swap16RightJustify14(raw_accel_mag_report.z);
 
 	/* Save off the Mag readings todo: revist integrating theses */
 
@@ -1413,9 +1413,9 @@ FXOS8701CQ::measure()
 	_last_raw_mag_y = swap16(raw_accel_mag_report.my);
 	_last_raw_mag_z = swap16(raw_accel_mag_report.mz);
 
-	float xraw_f = accel_report.x_raw;
-	float yraw_f = accel_report.y_raw;
-	float zraw_f = accel_report.z_raw;
+	float xraw_f = sensor_accel_s.x_raw;
+	float yraw_f = sensor_accel_s.y_raw;
+	float zraw_f = sensor_accel_s.z_raw;
 
 	// apply user specified rotation
 	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
@@ -1456,25 +1456,25 @@ FXOS8701CQ::measure()
 	_last_accel[1] = y_in_new;
 	_last_accel[2] = z_in_new;
 
-	accel_report.x = _accel_filter_x.apply(x_in_new);
-	accel_report.y = _accel_filter_y.apply(y_in_new);
-	accel_report.z = _accel_filter_z.apply(z_in_new);
+	sensor_accel_s.x = _accel_filter_x.apply(x_in_new);
+	sensor_accel_s.y = _accel_filter_y.apply(y_in_new);
+	sensor_accel_s.z = _accel_filter_z.apply(z_in_new);
 
 	matrix::Vector3f aval(x_in_new, y_in_new, z_in_new);
 	matrix::Vector3f aval_integrated;
 
-	bool accel_notify = _accel_int.put(accel_report.timestamp, aval, aval_integrated, accel_report.integral_dt);
-	accel_report.x_integral = aval_integrated(0);
-	accel_report.y_integral = aval_integrated(1);
-	accel_report.z_integral = aval_integrated(2);
+	bool accel_notify = _accel_int.put(sensor_accel_s.timestamp, aval, aval_integrated, sensor_accel_s.integral_dt);
+	sensor_accel_s.x_integral = aval_integrated(0);
+	sensor_accel_s.y_integral = aval_integrated(1);
+	sensor_accel_s.z_integral = aval_integrated(2);
 
-	accel_report.scaling = _accel_range_scale;
-	accel_report.range_m_s2 = _accel_range_m_s2;
+	sensor_accel_s.scaling = _accel_range_scale;
+	sensor_accel_s.range_m_s2 = _accel_range_m_s2;
 
 	/* return device ID */
-	accel_report.device_id = _device_id.devid;
+	sensor_accel_s.device_id = _device_id.devid;
 
-	_accel_reports->force(&accel_report);
+	_sensor_accel_ss->force(&sensor_accel_s);
 
 	/* notify anyone waiting for data */
 	if (accel_notify) {
@@ -1482,7 +1482,7 @@ FXOS8701CQ::measure()
 
 		if (!(_pub_blocked)) {
 			/* publish it */
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
+			orb_publish(ORB_ID(sensor_accel), _accel_topic, &sensor_accel_s);
 		}
 	}
 
@@ -1567,7 +1567,7 @@ FXOS8701CQ::print_info()
 	perf_print_counter(_bad_registers);
 	perf_print_counter(_bad_values);
 	perf_print_counter(_accel_duplicates);
-	_accel_reports->print_info("accel reports");
+	_sensor_accel_ss->print_info("accel reports");
 	_mag_reports->print_info("mag reports");
 	::printf("checked_next: %u\n", _checked_next);
 
@@ -1787,7 +1787,7 @@ test()
 {
 	int rv = 1;
 	int fd_accel = -1;
-	struct accel_report accel_report;
+	sensor_accel_s sensor_accel_s;
 	ssize_t sz;
 	int ret;
 	int fd_mag = -1;
@@ -1803,22 +1803,22 @@ test()
 	}
 
 	/* do a simple demand read */
-	sz = read(fd_accel, &accel_report, sizeof(accel_report));
+	sz = read(fd_accel, &sensor_accel_s, sizeof(sensor_accel_s));
 
-	if (sz != sizeof(accel_report)) {
+	if (sz != sizeof(sensor_accel_s)) {
 		PX4_ERR("immediate read failed");
 		goto exit_with_accel;
 	}
 
 
-	PX4_INFO("accel x: \t% 9.5f\tm/s^2", (double)accel_report.x);
-	PX4_INFO("accel y: \t% 9.5f\tm/s^2", (double)accel_report.y);
-	PX4_INFO("accel z: \t% 9.5f\tm/s^2", (double)accel_report.z);
-	PX4_INFO("accel x: \t%d\traw", (int)accel_report.x_raw);
-	PX4_INFO("accel y: \t%d\traw", (int)accel_report.y_raw);
-	PX4_INFO("accel z: \t%d\traw", (int)accel_report.z_raw);
+	PX4_INFO("accel x: \t% 9.5f\tm/s^2", (double)sensor_accel_s.x);
+	PX4_INFO("accel y: \t% 9.5f\tm/s^2", (double)sensor_accel_s.y);
+	PX4_INFO("accel z: \t% 9.5f\tm/s^2", (double)sensor_accel_s.z);
+	PX4_INFO("accel x: \t%d\traw", (int)sensor_accel_s.x_raw);
+	PX4_INFO("accel y: \t%d\traw", (int)sensor_accel_s.y_raw);
+	PX4_INFO("accel z: \t%d\traw", (int)sensor_accel_s.z_raw);
 
-	PX4_INFO("accel range: %8.4f m/s^2", (double)accel_report.range_m_s2);
+	PX4_INFO("accel range: %8.4f m/s^2", (double)sensor_accel_s.range_m_s2);
 
 	/* get the driver */
 	fd_mag = open(FXOS8701C_DEVICE_PATH_MAG, O_RDONLY);

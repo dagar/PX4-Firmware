@@ -264,10 +264,10 @@ private:
 	unsigned		_call_accel_interval;
 	unsigned		_call_mag_interval;
 
-	ringbuffer::RingBuffer	*_accel_reports;
+	ringbuffer::RingBuffer	*_sensor_accel_ss;
 	ringbuffer::RingBuffer		*_mag_reports;
 
-	accel_calibration_s	_accel_scale;
+	calibration_accel_s	_accel_scale;
 	unsigned		_accel_range_m_s2;
 	float			_accel_range_scale;
 	unsigned		_accel_samplerate;
@@ -538,7 +538,7 @@ LSM303D::LSM303D(int bus, const char *path, uint32_t device, enum Rotation rotat
 	_mag_call{},
 	_call_accel_interval(0),
 	_call_mag_interval(0),
-	_accel_reports(nullptr),
+	_sensor_accel_ss(nullptr),
 	_mag_reports(nullptr),
 	_accel_scale{},
 	_accel_range_m_s2(0.0f),
@@ -597,8 +597,8 @@ LSM303D::~LSM303D()
 	stop();
 
 	/* free any existing reports */
-	if (_accel_reports != nullptr) {
-		delete _accel_reports;
+	if (_sensor_accel_ss != nullptr) {
+		delete _sensor_accel_ss;
 	}
 
 	if (_mag_reports != nullptr) {
@@ -631,9 +631,9 @@ LSM303D::init()
 	}
 
 	/* allocate basic report buffers */
-	_accel_reports = new ringbuffer::RingBuffer(2, sizeof(accel_report));
+	_sensor_accel_ss = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
 
-	if (_accel_reports == nullptr) {
+	if (_sensor_accel_ss == nullptr) {
 		goto out;
 	}
 
@@ -672,8 +672,8 @@ LSM303D::init()
 	_accel_class_instance = register_class_devname(ACCEL_BASE_DEVICE_PATH);
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	struct accel_report arp;
-	_accel_reports->get(&arp);
+	sensor_accel_s arp;
+	_sensor_accel_ss->get(&arp);
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
@@ -753,8 +753,8 @@ LSM303D::probe()
 ssize_t
 LSM303D::read(struct file *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(struct accel_report);
-	accel_report *arb = reinterpret_cast<accel_report *>(buffer);
+	unsigned count = buflen / sizeof(sensor_accel_s);
+	sensor_accel_s *arb = reinterpret_cast<sensor_accel_s *>(buffer);
 	int ret = 0;
 
 	/* buffer must be large enough */
@@ -768,7 +768,7 @@ LSM303D::read(struct file *filp, char *buffer, size_t buflen)
 		 * While there is space in the caller's buffer, and reports, copy them.
 		 */
 		while (count--) {
-			if (_accel_reports->get(arb)) {
+			if (_sensor_accel_ss->get(arb)) {
 				ret += sizeof(*arb);
 				arb++;
 			}
@@ -782,7 +782,7 @@ LSM303D::read(struct file *filp, char *buffer, size_t buflen)
 	measure();
 
 	/* measurement will have generated a report, copy it out */
-	if (_accel_reports->get(arb)) {
+	if (_sensor_accel_ss->get(arb)) {
 		ret = sizeof(*arb);
 	}
 
@@ -905,7 +905,7 @@ LSM303D::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 			irqstate_t flags = px4_enter_critical_section();
 
-			if (!_accel_reports->resize(arg)) {
+			if (!_sensor_accel_ss->resize(arg)) {
 				px4_leave_critical_section(flags);
 				return -ENOMEM;
 			}
@@ -927,7 +927,7 @@ LSM303D::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
-			accel_calibration_s *s = (accel_calibration_s *) arg;
+			calibration_accel_s *s = (calibration_accel_s *) arg;
 			float sum = s->x_scale + s->y_scale + s->z_scale;
 
 			if (sum > 2.0f && sum < 4.0f) {
@@ -949,7 +949,7 @@ LSM303D::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
+		memcpy((calibration_accel_s *) arg, &_accel_scale, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSELFTEST:
@@ -1377,7 +1377,7 @@ LSM303D::start()
 	stop();
 
 	/* reset the report ring */
-	_accel_reports->flush();
+	_sensor_accel_ss->flush();
 	_mag_reports->flush();
 
 	/* start polling at the specified rate */
@@ -1398,7 +1398,7 @@ LSM303D::stop()
 	memset(_last_accel, 0, sizeof(_last_accel));
 
 	/* discard unread data in the buffers */
-	_accel_reports->flush();
+	_sensor_accel_ss->flush();
 	_mag_reports->flush();
 }
 
@@ -1462,10 +1462,10 @@ LSM303D::measure()
 		int16_t		x;
 		int16_t		y;
 		int16_t		z;
-	} raw_accel_report;
+	} raw_sensor_accel_s;
 #pragma pack(pop)
 
-	accel_report accel_report;
+	sensor_accel_s sensor_accel_s;
 
 	/* start the performance counter */
 	perf_begin(_accel_sample_perf);
@@ -1481,11 +1481,11 @@ LSM303D::measure()
 	}
 
 	/* fetch data from the sensor */
-	memset(&raw_accel_report, 0, sizeof(raw_accel_report));
-	raw_accel_report.cmd = ADDR_STATUS_A | DIR_READ | ADDR_INCREMENT;
-	transfer((uint8_t *)&raw_accel_report, (uint8_t *)&raw_accel_report, sizeof(raw_accel_report));
+	memset(&raw_sensor_accel_s, 0, sizeof(raw_sensor_accel_s));
+	raw_sensor_accel_s.cmd = ADDR_STATUS_A | DIR_READ | ADDR_INCREMENT;
+	transfer((uint8_t *)&raw_sensor_accel_s, (uint8_t *)&raw_sensor_accel_s, sizeof(raw_sensor_accel_s));
 
-	if (!(raw_accel_report.status & REG_STATUS_A_NEW_ZYXADA)) {
+	if (!(raw_sensor_accel_s.status & REG_STATUS_A_NEW_ZYXADA)) {
 		perf_end(_accel_sample_perf);
 		perf_count(_accel_duplicates);
 		return;
@@ -1506,24 +1506,24 @@ LSM303D::measure()
 	 *		  74 from all measurements centers them around zero.
 	 */
 
-	accel_report.timestamp = hrt_absolute_time();
+	sensor_accel_s.timestamp = hrt_absolute_time();
 
 	// use the temperature from the last mag reading
-	accel_report.temperature = _last_temperature;
+	sensor_accel_s.temperature = _last_temperature;
 
 	// report the error count as the sum of the number of bad
 	// register reads and bad values. This allows the higher level
 	// code to decide if it should use this sensor based on
 	// whether it has had failures
-	accel_report.error_count = perf_event_count(_bad_registers) + perf_event_count(_bad_values);
+	sensor_accel_s.error_count = perf_event_count(_bad_registers) + perf_event_count(_bad_values);
 
-	accel_report.x_raw = raw_accel_report.x;
-	accel_report.y_raw = raw_accel_report.y;
-	accel_report.z_raw = raw_accel_report.z;
+	sensor_accel_s.x_raw = raw_sensor_accel_s.x;
+	sensor_accel_s.y_raw = raw_sensor_accel_s.y;
+	sensor_accel_s.z_raw = raw_sensor_accel_s.z;
 
-	float xraw_f = raw_accel_report.x;
-	float yraw_f = raw_accel_report.y;
-	float zraw_f = raw_accel_report.z;
+	float xraw_f = raw_sensor_accel_s.x;
+	float yraw_f = raw_sensor_accel_s.y;
+	float zraw_f = raw_sensor_accel_s.z;
 
 	// apply user specified rotation
 	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
@@ -1564,25 +1564,25 @@ LSM303D::measure()
 	_last_accel[1] = y_in_new;
 	_last_accel[2] = z_in_new;
 
-	accel_report.x = _accel_filter_x.apply(x_in_new);
-	accel_report.y = _accel_filter_y.apply(y_in_new);
-	accel_report.z = _accel_filter_z.apply(z_in_new);
+	sensor_accel_s.x = _accel_filter_x.apply(x_in_new);
+	sensor_accel_s.y = _accel_filter_y.apply(y_in_new);
+	sensor_accel_s.z = _accel_filter_z.apply(z_in_new);
 
 	matrix::Vector3f aval(x_in_new, y_in_new, z_in_new);
 	matrix::Vector3f aval_integrated;
 
-	bool accel_notify = _accel_int.put(accel_report.timestamp, aval, aval_integrated, accel_report.integral_dt);
-	accel_report.x_integral = aval_integrated(0);
-	accel_report.y_integral = aval_integrated(1);
-	accel_report.z_integral = aval_integrated(2);
+	bool accel_notify = _accel_int.put(sensor_accel_s.timestamp, aval, aval_integrated, sensor_accel_s.integral_dt);
+	sensor_accel_s.x_integral = aval_integrated(0);
+	sensor_accel_s.y_integral = aval_integrated(1);
+	sensor_accel_s.z_integral = aval_integrated(2);
 
-	accel_report.scaling = _accel_range_scale;
-	accel_report.range_m_s2 = _accel_range_m_s2;
+	sensor_accel_s.scaling = _accel_range_scale;
+	sensor_accel_s.range_m_s2 = _accel_range_m_s2;
 
 	/* return device ID */
-	accel_report.device_id = _device_id.devid;
+	sensor_accel_s.device_id = _device_id.devid;
 
-	_accel_reports->force(&accel_report);
+	_sensor_accel_ss->force(&sensor_accel_s);
 
 	/* notify anyone waiting for data */
 	if (accel_notify) {
@@ -1590,7 +1590,7 @@ LSM303D::measure()
 
 		if (!(_pub_blocked)) {
 			/* publish it */
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
+			orb_publish(ORB_ID(sensor_accel), _accel_topic, &sensor_accel_s);
 		}
 	}
 
@@ -1694,7 +1694,7 @@ LSM303D::print_info()
 	perf_print_counter(_bad_registers);
 	perf_print_counter(_bad_values);
 	perf_print_counter(_accel_duplicates);
-	_accel_reports->print_info("accel reports");
+	_sensor_accel_ss->print_info("accel reports");
 	_mag_reports->print_info("mag reports");
 	::printf("checked_next: %u\n", _checked_next);
 
@@ -1946,7 +1946,7 @@ void
 test()
 {
 	int fd_accel = -1;
-	struct accel_report accel_report;
+	sensor_accel_s sensor_accel_s;
 	ssize_t sz;
 	int ret;
 
@@ -1958,13 +1958,13 @@ test()
 	}
 
 	/* do a simple demand read */
-	sz = read(fd_accel, &accel_report, sizeof(accel_report));
+	sz = read(fd_accel, &sensor_accel_s, sizeof(sensor_accel_s));
 
-	if (sz != sizeof(accel_report)) {
+	if (sz != sizeof(sensor_accel_s)) {
 		err(1, "immediate read failed");
 	}
 
-	print_message(accel_report);
+	print_message(sensor_accel_s);
 
 	int fd_mag = -1;
 	struct mag_report m_report;

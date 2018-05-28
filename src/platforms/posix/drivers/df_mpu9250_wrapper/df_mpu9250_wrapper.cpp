@@ -124,7 +124,7 @@ private:
 
 	int			    _param_update_sub;
 
-	accel_calibration_s {
+	calibration_accel_s {
 		float x_offset;
 		float x_scale;
 		float y_offset;
@@ -133,7 +133,7 @@ private:
 		float z_scale;
 	} _accel_calibration;
 
-	gyro_calibration_s {
+	calibration_gyro_s {
 		float x_offset;
 		float x_scale;
 		float y_offset;
@@ -285,8 +285,8 @@ DfMpu9250Wrapper::~DfMpu9250Wrapper()
 int DfMpu9250Wrapper::start()
 {
 	// TODO: don't publish garbage here
-	accel_report accel_report = {};
-	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &accel_report,
+	sensor_accel_s sensor_accel_s = {};
+	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &sensor_accel_s,
 					   &_accel_orb_class_instance, ORB_PRIO_DEFAULT);
 
 	if (_accel_topic == nullptr) {
@@ -295,8 +295,8 @@ int DfMpu9250Wrapper::start()
 	}
 
 	// TODO: don't publish garbage here
-	gyro_report gyro_report = {};
-	_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &gyro_report,
+	sensor_gyro_s sensor_gyro_s = {};
+	_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &sensor_gyro_s,
 					  &_gyro_orb_class_instance, ORB_PRIO_DEFAULT);
 
 	if (_gyro_topic == nullptr) {
@@ -612,11 +612,11 @@ int DfMpu9250Wrapper::_publish(struct imu_sensor_data &data)
 		_update_mag_calibration();
 	}
 
-	accel_report accel_report = {};
-	gyro_report gyro_report = {};
+	sensor_accel_s sensor_accel_s = {};
+	sensor_gyro_s sensor_gyro_s = {};
 	mag_report mag_report = {};
 
-	accel_report.timestamp = gyro_report.timestamp = hrt_absolute_time();
+	sensor_accel_s.timestamp = sensor_gyro_s.timestamp = hrt_absolute_time();
 
 	// ACCEL
 
@@ -629,26 +629,26 @@ int DfMpu9250Wrapper::_publish(struct imu_sensor_data &data)
 
 	// MPU9250 driver from DriverFramework does not provide any raw values
 	// TEMP We misuse the raw values on the Snapdragon to publish unfiltered data for VISLAM
-	accel_report.x_raw = (int16_t)(xraw_f * 1000); // (int16) [m / s^2 * 1000];
-	accel_report.y_raw = (int16_t)(yraw_f * 1000); // (int16) [m / s^2 * 1000];
-	accel_report.z_raw = (int16_t)(zraw_f * 1000); // (int16) [m / s^2 * 1000];
+	sensor_accel_s.x_raw = (int16_t)(xraw_f * 1000); // (int16) [m / s^2 * 1000];
+	sensor_accel_s.y_raw = (int16_t)(yraw_f * 1000); // (int16) [m / s^2 * 1000];
+	sensor_accel_s.z_raw = (int16_t)(zraw_f * 1000); // (int16) [m / s^2 * 1000];
 
 	// adjust values according to the calibration
 	float x_in_new = (xraw_f - _accel_calibration.x_offset) * _accel_calibration.x_scale;
 	float y_in_new = (yraw_f - _accel_calibration.y_offset) * _accel_calibration.y_scale;
 	float z_in_new = (zraw_f - _accel_calibration.z_offset) * _accel_calibration.z_scale;
 
-	accel_report.x = _accel_filter_x.apply(x_in_new);
-	accel_report.y = _accel_filter_y.apply(y_in_new);
-	accel_report.z = _accel_filter_z.apply(z_in_new);
+	sensor_accel_s.x = _accel_filter_x.apply(x_in_new);
+	sensor_accel_s.y = _accel_filter_y.apply(y_in_new);
+	sensor_accel_s.z = _accel_filter_z.apply(z_in_new);
 
 	matrix::Vector3f aval(x_in_new, y_in_new, z_in_new);
 	matrix::Vector3f aval_integrated;
 
-	_accel_int.put(accel_report.timestamp, aval, aval_integrated, accel_report.integral_dt);
-	accel_report.x_integral = aval_integrated(0);
-	accel_report.y_integral = aval_integrated(1);
-	accel_report.z_integral = aval_integrated(2);
+	_accel_int.put(sensor_accel_s.timestamp, aval, aval_integrated, sensor_accel_s.integral_dt);
+	sensor_accel_s.x_integral = aval_integrated(0);
+	sensor_accel_s.y_integral = aval_integrated(1);
+	sensor_accel_s.z_integral = aval_integrated(2);
 
 	// GYRO
 
@@ -661,26 +661,26 @@ int DfMpu9250Wrapper::_publish(struct imu_sensor_data &data)
 
 	// MPU9250 driver from DriverFramework does not provide any raw values
 	// TEMP We misuse the raw values on the Snapdragon to publish unfiltered data for VISLAM
-	gyro_report.x_raw = (int16_t)(xraw_f * 1000); // (int16) [rad / s * 1000];
-	gyro_report.y_raw = (int16_t)(yraw_f * 1000); // (int16) [rad / s * 1000];
-	gyro_report.z_raw = (int16_t)(zraw_f * 1000); // (int16) [rad / s * 1000];
+	sensor_gyro_s.x_raw = (int16_t)(xraw_f * 1000); // (int16) [rad / s * 1000];
+	sensor_gyro_s.y_raw = (int16_t)(yraw_f * 1000); // (int16) [rad / s * 1000];
+	sensor_gyro_s.z_raw = (int16_t)(zraw_f * 1000); // (int16) [rad / s * 1000];
 
 	// adjust values according to the calibration
 	float x_gyro_in_new = (xraw_f - _gyro_calibration.x_offset) * _gyro_calibration.x_scale;
 	float y_gyro_in_new = (yraw_f - _gyro_calibration.y_offset) * _gyro_calibration.y_scale;
 	float z_gyro_in_new = (zraw_f - _gyro_calibration.z_offset) * _gyro_calibration.z_scale;
 
-	gyro_report.x = _gyro_filter_x.apply(x_gyro_in_new);
-	gyro_report.y = _gyro_filter_y.apply(y_gyro_in_new);
-	gyro_report.z = _gyro_filter_z.apply(z_gyro_in_new);
+	sensor_gyro_s.x = _gyro_filter_x.apply(x_gyro_in_new);
+	sensor_gyro_s.y = _gyro_filter_y.apply(y_gyro_in_new);
+	sensor_gyro_s.z = _gyro_filter_z.apply(z_gyro_in_new);
 
 	matrix::Vector3f gval(x_gyro_in_new, y_gyro_in_new, z_gyro_in_new);
 	matrix::Vector3f gval_integrated;
 
-	bool sensor_notify = _gyro_int.put(gyro_report.timestamp, gval, gval_integrated, gyro_report.integral_dt);
-	gyro_report.x_integral = gval_integrated(0);
-	gyro_report.y_integral = gval_integrated(1);
-	gyro_report.z_integral = gval_integrated(2);
+	bool sensor_notify = _gyro_int.put(sensor_gyro_s.timestamp, gval, gval_integrated, sensor_gyro_s.integral_dt);
+	sensor_gyro_s.x_integral = gval_integrated(0);
+	sensor_gyro_s.y_integral = gval_integrated(1);
+	sensor_gyro_s.z_integral = gval_integrated(2);
 
 
 	// if gyro integrator did not return a sample we can return here
@@ -705,16 +705,16 @@ int DfMpu9250Wrapper::_publish(struct imu_sensor_data &data)
 	perf_begin(_publish_perf);
 
 	// TODO: get these right
-	gyro_report.scaling = -1.0f;
-	gyro_report.range_rad_s = -1.0f;
-	gyro_report.device_id = m_id.dev_id;
+	sensor_gyro_s.scaling = -1.0f;
+	sensor_gyro_s.range_rad_s = -1.0f;
+	sensor_gyro_s.device_id = m_id.dev_id;
 
-	accel_report.scaling = -1.0f;
-	accel_report.range_m_s2 = -1.0f;
-	accel_report.device_id = m_id.dev_id;
+	sensor_accel_s.scaling = -1.0f;
+	sensor_accel_s.range_m_s2 = -1.0f;
+	sensor_accel_s.device_id = m_id.dev_id;
 
 	if (_mag_enabled) {
-		mag_report.timestamp = accel_report.timestamp;
+		mag_report.timestamp = sensor_accel_s.timestamp;
 		mag_report.is_external = false;
 
 		mag_report.scaling = -1.0f;
@@ -742,11 +742,11 @@ int DfMpu9250Wrapper::_publish(struct imu_sensor_data &data)
 	if (!(m_pub_blocked) && sensor_notify) {
 
 		if (_gyro_topic != nullptr) {
-			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &gyro_report);
+			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &sensor_gyro_s);
 		}
 
 		if (_accel_topic != nullptr) {
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
+			orb_publish(ORB_ID(sensor_accel), _accel_topic, &sensor_accel_s);
 		}
 
 		if (_mag_enabled) {

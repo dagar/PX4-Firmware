@@ -58,7 +58,8 @@
 #include <drivers/drv_gyro.h>
 #include <systemlib/mavlink_log.h>
 #include <parameters/param.h>
-#include <systemlib/err.h>
+#include <uORB/topics/calibration_gyro.h>
+#include <uORB/topics/sensor_gyro.h>
 
 static const char *sensor_name = "gyro";
 
@@ -70,8 +71,8 @@ typedef struct  {
 	int32_t			device_id[max_gyros];
 	int			gyro_sensor_sub[max_gyros];
 	int			sensor_correction_sub;
-	gyro_calibration_s	gyro_scale[max_gyros];
-	struct gyro_report	gyro_report_0;
+	calibration_gyro_s	gyro_scale[max_gyros];
+	sensor_gyro_s	sensor_gyro_s_0;
 } gyro_worker_data_t;
 
 static calibrate_return gyro_calibration_worker(int cancel_sub, void* data)
@@ -79,7 +80,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, void* data)
 	gyro_worker_data_t*	worker_data = (gyro_worker_data_t*)(data);
 	unsigned		calibration_counter[max_gyros] = { 0 }, slow_count = 0;
 	const unsigned		calibration_count = 5000;
-	struct gyro_report	gyro_report;
+	sensor_gyro_s	sensor_gyro_s;
 	unsigned		poll_errcount = 0;
 
 	struct sensor_correction_s sensor_correction; /**< sensor thermal corrections */
@@ -99,7 +100,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, void* data)
 		fds[s].events = POLLIN;
 	}
 
-	memset(&worker_data->gyro_report_0, 0, sizeof(worker_data->gyro_report_0));
+	memset(&worker_data->sensor_gyro_s_0, 0, sizeof(worker_data->sensor_gyro_s_0));
 
 
 	/* use slowest gyro to pace, but count correctly per-gyro for statistics */
@@ -130,34 +131,34 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, void* data)
 				orb_check(worker_data->gyro_sensor_sub[s], &changed);
 
 				if (changed) {
-					orb_copy(ORB_ID(sensor_gyro), worker_data->gyro_sensor_sub[s], &gyro_report);
+					orb_copy(ORB_ID(sensor_gyro), worker_data->gyro_sensor_sub[s], &sensor_gyro_s);
 
 					if (s == 0) {
 						// take a working copy
-						worker_data->gyro_scale[s].x_offset += (gyro_report.x - sensor_correction.gyro_offset_0[0]) * sensor_correction.gyro_scale_0[0];
-						worker_data->gyro_scale[s].y_offset += (gyro_report.y - sensor_correction.gyro_offset_0[1]) * sensor_correction.gyro_scale_0[1];
-						worker_data->gyro_scale[s].z_offset += (gyro_report.z - sensor_correction.gyro_offset_0[2]) * sensor_correction.gyro_scale_0[2];
+						worker_data->gyro_scale[s].x_offset += (sensor_gyro_s.x - sensor_correction.gyro_offset_0[0]) * sensor_correction.gyro_scale_0[0];
+						worker_data->gyro_scale[s].y_offset += (sensor_gyro_s.y - sensor_correction.gyro_offset_0[1]) * sensor_correction.gyro_scale_0[1];
+						worker_data->gyro_scale[s].z_offset += (sensor_gyro_s.z - sensor_correction.gyro_offset_0[2]) * sensor_correction.gyro_scale_0[2];
 
 						// take a reference copy of the primary sensor including correction for thermal drift
-						orb_copy(ORB_ID(sensor_gyro), worker_data->gyro_sensor_sub[s], &worker_data->gyro_report_0);
-						worker_data->gyro_report_0.x = (gyro_report.x - sensor_correction.gyro_offset_0[0]) * sensor_correction.gyro_scale_0[0];
-						worker_data->gyro_report_0.y = (gyro_report.y - sensor_correction.gyro_offset_0[1]) * sensor_correction.gyro_scale_0[1];
-						worker_data->gyro_report_0.z = (gyro_report.z - sensor_correction.gyro_offset_0[2]) * sensor_correction.gyro_scale_0[2];
+						orb_copy(ORB_ID(sensor_gyro), worker_data->gyro_sensor_sub[s], &worker_data->sensor_gyro_s_0);
+						worker_data->sensor_gyro_s_0.x = (sensor_gyro_s.x - sensor_correction.gyro_offset_0[0]) * sensor_correction.gyro_scale_0[0];
+						worker_data->sensor_gyro_s_0.y = (sensor_gyro_s.y - sensor_correction.gyro_offset_0[1]) * sensor_correction.gyro_scale_0[1];
+						worker_data->sensor_gyro_s_0.z = (sensor_gyro_s.z - sensor_correction.gyro_offset_0[2]) * sensor_correction.gyro_scale_0[2];
 
 					} else if (s == 1) {
-						worker_data->gyro_scale[s].x_offset += (gyro_report.x - sensor_correction.gyro_offset_1[0]) * sensor_correction.gyro_scale_1[0];
-						worker_data->gyro_scale[s].y_offset += (gyro_report.y - sensor_correction.gyro_offset_1[1]) * sensor_correction.gyro_scale_1[1];
-						worker_data->gyro_scale[s].z_offset += (gyro_report.z - sensor_correction.gyro_offset_1[2]) * sensor_correction.gyro_scale_1[2];
+						worker_data->gyro_scale[s].x_offset += (sensor_gyro_s.x - sensor_correction.gyro_offset_1[0]) * sensor_correction.gyro_scale_1[0];
+						worker_data->gyro_scale[s].y_offset += (sensor_gyro_s.y - sensor_correction.gyro_offset_1[1]) * sensor_correction.gyro_scale_1[1];
+						worker_data->gyro_scale[s].z_offset += (sensor_gyro_s.z - sensor_correction.gyro_offset_1[2]) * sensor_correction.gyro_scale_1[2];
 
 					} else if (s == 2) {
-						worker_data->gyro_scale[s].x_offset += (gyro_report.x - sensor_correction.gyro_offset_2[0]) * sensor_correction.gyro_scale_2[0];
-						worker_data->gyro_scale[s].y_offset += (gyro_report.y - sensor_correction.gyro_offset_2[1]) * sensor_correction.gyro_scale_2[1];
-						worker_data->gyro_scale[s].z_offset += (gyro_report.z - sensor_correction.gyro_offset_2[2]) * sensor_correction.gyro_scale_2[2];
+						worker_data->gyro_scale[s].x_offset += (sensor_gyro_s.x - sensor_correction.gyro_offset_2[0]) * sensor_correction.gyro_scale_2[0];
+						worker_data->gyro_scale[s].y_offset += (sensor_gyro_s.y - sensor_correction.gyro_offset_2[1]) * sensor_correction.gyro_scale_2[1];
+						worker_data->gyro_scale[s].z_offset += (sensor_gyro_s.z - sensor_correction.gyro_offset_2[2]) * sensor_correction.gyro_scale_2[2];
 
 					} else {
-						worker_data->gyro_scale[s].x_offset += gyro_report.x;
-						worker_data->gyro_scale[s].y_offset += gyro_report.y;
-						worker_data->gyro_scale[s].z_offset += gyro_report.z;
+						worker_data->gyro_scale[s].x_offset += sensor_gyro_s.x;
+						worker_data->gyro_scale[s].y_offset += sensor_gyro_s.y;
+						worker_data->gyro_scale[s].z_offset += sensor_gyro_s.z;
 
 					}
 
@@ -214,7 +215,7 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 	worker_data.mavlink_log_pub = mavlink_log_pub;
 
-	gyro_calibration_s gyro_scale_zero;
+	calibration_gyro_s gyro_scale_zero;
 	gyro_scale_zero.x_offset = 0.0f;
 	gyro_scale_zero.x_scale = 1.0f;
 	gyro_scale_zero.y_offset = 0.0f;
@@ -297,7 +298,7 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 		for(unsigned i = 0; i < orb_gyro_count && !found_cur_gyro; i++) {
 			worker_data.gyro_sensor_sub[cur_gyro] = orb_subscribe_multi(ORB_ID(sensor_gyro), i);
 
-			struct gyro_report report;
+			sensor_gyro_s report;
 			orb_copy(ORB_ID(sensor_gyro), worker_data.gyro_sensor_sub[cur_gyro], &report);
 
 #ifdef __PX4_NUTTX
@@ -359,9 +360,9 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 		} else {
 			/* check offsets */
-			float xdiff = worker_data.gyro_report_0.x - worker_data.gyro_scale[0].x_offset;
-			float ydiff = worker_data.gyro_report_0.y - worker_data.gyro_scale[0].y_offset;
-			float zdiff = worker_data.gyro_report_0.z - worker_data.gyro_scale[0].z_offset;
+			float xdiff = worker_data.sensor_gyro_s_0.x - worker_data.gyro_scale[0].x_offset;
+			float ydiff = worker_data.sensor_gyro_s_0.y - worker_data.gyro_scale[0].y_offset;
+			float zdiff = worker_data.sensor_gyro_s_0.z - worker_data.gyro_scale[0].z_offset;
 
 			/* maximum allowable calibration error in radians */
 			const float maxoff = 0.01f;

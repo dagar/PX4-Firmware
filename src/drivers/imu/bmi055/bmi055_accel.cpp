@@ -16,7 +16,7 @@ const uint8_t BMI055_accel::_checked_registers[BMI055_ACCEL_NUM_CHECKED_REGISTER
 
 BMI055_accel::BMI055_accel(int bus, const char *path_accel, uint32_t device, enum Rotation rotation) :
 	BMI055("BMI055_ACCEL", path_accel, bus, device, SPIDEV_MODE3, BMI055_BUS_SPEED, rotation),
-	_accel_reports(nullptr),
+	_sensor_accel_ss(nullptr),
 	_accel_scale{},
 	_accel_range_scale(0.0f),
 	_accel_range_m_s2(0.0f),
@@ -55,8 +55,8 @@ BMI055_accel::~BMI055_accel()
 	stop();
 
 	/* free any existing reports */
-	if (_accel_reports != nullptr) {
-		delete _accel_reports;
+	if (_sensor_accel_ss != nullptr) {
+		delete _sensor_accel_ss;
 	}
 
 
@@ -84,9 +84,9 @@ BMI055_accel::init()
 	}
 
 	/* allocate basic report buffers */
-	_accel_reports = new ringbuffer::RingBuffer(2, sizeof(accel_report));
+	_sensor_accel_ss = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
 
-	if (_accel_reports == nullptr) {
+	if (_sensor_accel_ss == nullptr) {
 		goto out;
 	}
 
@@ -108,8 +108,8 @@ BMI055_accel::init()
 	measure();
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	struct accel_report arp;
-	_accel_reports->get(&arp);
+	sensor_accel_s arp;
+	_sensor_accel_ss->get(&arp);
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
@@ -239,7 +239,7 @@ BMI055_accel::accel_set_sample_rate(float frequency)
 ssize_t
 BMI055_accel::read(struct file *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(accel_report);
+	unsigned count = buflen / sizeof(sensor_accel_s);
 
 	/* buffer must be large enough */
 	if (count < 1) {
@@ -248,23 +248,23 @@ BMI055_accel::read(struct file *filp, char *buffer, size_t buflen)
 
 	/* if automatic measurement is not enabled, get a fresh measurement into the buffer */
 	if (_call_interval == 0) {
-		_accel_reports->flush();
+		_sensor_accel_ss->flush();
 		measure();
 	}
 
 	/* if no data, error (we could block here) */
-	if (_accel_reports->empty()) {
+	if (_sensor_accel_ss->empty()) {
 		return -EAGAIN;
 	}
 
 	perf_count(_accel_reads);
 
 	/* copy reports out of our buffer to the caller */
-	accel_report *arp = reinterpret_cast<accel_report *>(buffer);
+	sensor_accel_s *arp = reinterpret_cast<sensor_accel_s *>(buffer);
 	int transferred = 0;
 
 	while (count--) {
-		if (!_accel_reports->get(arp)) {
+		if (!_sensor_accel_ss->get(arp)) {
 			break;
 		}
 
@@ -273,7 +273,7 @@ BMI055_accel::read(struct file *filp, char *buffer, size_t buflen)
 	}
 
 	/* return the number of bytes transferred */
-	return (transferred * sizeof(accel_report));
+	return (transferred * sizeof(sensor_accel_s));
 }
 
 int
@@ -424,7 +424,7 @@ BMI055_accel::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 			irqstate_t flags = px4_enter_critical_section();
 
-			if (!_accel_reports->resize(arg)) {
+			if (!_sensor_accel_ss->resize(arg)) {
 				px4_leave_critical_section(flags);
 				return -ENOMEM;
 			}
@@ -442,7 +442,7 @@ BMI055_accel::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
-			accel_calibration_s *s = (accel_calibration_s *) arg;
+			calibration_accel_s *s = (calibration_accel_s *) arg;
 			float sum = s->x_scale + s->y_scale + s->z_scale;
 
 			if (sum > 2.0f && sum < 4.0f) {
@@ -456,7 +456,7 @@ BMI055_accel::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
+		memcpy((calibration_accel_s *) arg, &_accel_scale, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSRANGE:
@@ -551,7 +551,7 @@ BMI055_accel::start()
 	stop();
 
 	/* discard any stale data in the buffers */
-	_accel_reports->flush();
+	_sensor_accel_ss->flush();
 
 	/* start polling at the specified rate */
 	hrt_call_every(&_call,
@@ -715,7 +715,7 @@ BMI055_accel::measure()
 	/*
 	 * Report buffers.
 	 */
-	accel_report        arb;
+	sensor_accel_s        arb;
 
 
 	arb.timestamp = hrt_absolute_time();
@@ -775,7 +775,7 @@ BMI055_accel::measure()
 	arb.temperature = _last_temperature;
 	arb.device_id = _device_id.devid;
 
-	_accel_reports->force(&arb);
+	_sensor_accel_ss->force(&arb);
 
 	/* notify anyone waiting for data */
 	if (accel_notify) {
@@ -803,7 +803,7 @@ BMI055_accel::print_info()
 	perf_print_counter(_good_transfers);
 	perf_print_counter(_reset_retries);
 	perf_print_counter(_duplicates);
-	_accel_reports->print_info("accel queue");
+	_sensor_accel_ss->print_info("accel queue");
 	::printf("checked_next: %u\n", _checked_next);
 
 	for (uint8_t i = 0; i < BMI055_ACCEL_NUM_CHECKED_REGISTERS; i++) {

@@ -75,6 +75,10 @@
 #include <drivers/drv_gyro.h>
 #include <mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/conversion/rotation.h>
+#include <uORB/topics/calibration_accel.h>
+#include <uORB/topics/calibration_gyro.h>
+#include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_gyro.h>
 
 #include "VirtDevObj.hpp"
 
@@ -148,17 +152,17 @@ private:
 
 	unsigned		_call_interval;
 
-	ringbuffer::RingBuffer	*_accel_reports;
+	ringbuffer::RingBuffer	*_sensor_accel_ss;
 
-	accel_calibration_s	_accel_scale;
+	calibration_accel_s	_accel_scale;
 	float			_accel_range_scale;
 	float			_accel_range_m_s2;
 	orb_advert_t		_accel_topic;
 	int			_accel_orb_class_instance;
 
-	ringbuffer::RingBuffer	*_gyro_reports;
+	ringbuffer::RingBuffer	*_sensor_gyro_ss;
 
-	gyro_calibration_s	_gyro_scale;
+	calibration_gyro_s	_gyro_scale;
 	float			_gyro_range_scale;
 	float			_gyro_range_rad_s;
 
@@ -303,13 +307,13 @@ GYROSIM::GYROSIM(const char *path_accel, const char *path_gyro, enum Rotation ro
 	VirtDevObj("GYROSIM", path_accel, ACCEL_BASE_DEVICE_PATH, 1e6 / 400),
 	_gyro(new GYROSIM_gyro(this, path_gyro)),
 	_product(GYROSIMES_REV_C4),
-	_accel_reports(nullptr),
+	_sensor_accel_ss(nullptr),
 	_accel_scale{},
 	_accel_range_scale(0.0f),
 	_accel_range_m_s2(0.0f),
 	_accel_topic(nullptr),
 	_accel_orb_class_instance(-1),
-	_gyro_reports(nullptr),
+	_sensor_gyro_ss(nullptr),
 	_gyro_scale{},
 	_gyro_range_scale(0.0f),
 	_gyro_range_rad_s(0.0f),
@@ -356,12 +360,12 @@ GYROSIM::~GYROSIM()
 	delete _gyro;
 
 	/* free any existing reports */
-	if (_accel_reports != nullptr) {
-		delete _accel_reports;
+	if (_sensor_accel_ss != nullptr) {
+		delete _sensor_accel_ss;
 	}
 
-	if (_gyro_reports != nullptr) {
-		delete _gyro_reports;
+	if (_sensor_gyro_ss != nullptr) {
+		delete _sensor_gyro_ss;
 	}
 
 	/* delete the perf counter */
@@ -377,9 +381,9 @@ GYROSIM::init()
 	PX4_DEBUG("init");
 	int ret = 1;
 
-	struct accel_report arp = {};
+	sensor_accel_s arp = {};
 
-	struct gyro_report grp = {};
+	sensor_gyro_s grp = {};
 
 	ret = VirtDevObj::init();
 
@@ -390,17 +394,17 @@ GYROSIM::init()
 	}
 
 	/* allocate basic report buffers */
-	_accel_reports = new ringbuffer::RingBuffer(2, sizeof(accel_report));
+	_sensor_accel_ss = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
 
-	if (_accel_reports == nullptr) {
-		PX4_WARN("_accel_reports creation failed");
+	if (_sensor_accel_ss == nullptr) {
+		PX4_WARN("_sensor_accel_ss creation failed");
 		goto out;
 	}
 
-	_gyro_reports = new ringbuffer::RingBuffer(2, sizeof(gyro_report));
+	_sensor_gyro_ss = new ringbuffer::RingBuffer(2, sizeof(sensor_gyro_s));
 
-	if (_gyro_reports == nullptr) {
-		PX4_WARN("_gyro_reports creation failed");
+	if (_sensor_gyro_ss == nullptr) {
+		PX4_WARN("_sensor_gyro_ss creation failed");
 		goto out;
 	}
 
@@ -446,7 +450,7 @@ GYROSIM::init()
 	_measure();
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	_accel_reports->get(&arp);
+	_sensor_accel_ss->get(&arp);
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
@@ -461,7 +465,7 @@ GYROSIM::init()
 
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	_gyro_reports->get(&grp);
+	_sensor_gyro_ss->get(&grp);
 
 	_gyro->_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &grp,
 			     &_gyro->_gyro_orb_class_instance, ORB_PRIO_HIGH);
@@ -551,7 +555,7 @@ GYROSIM::_set_sample_rate(unsigned desired_sample_rate_hz)
 ssize_t
 GYROSIM::devRead(void *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(accel_report);
+	unsigned count = buflen / sizeof(sensor_accel_s);
 
 	/* buffer must be large enough */
 	if (count < 1) {
@@ -560,23 +564,23 @@ GYROSIM::devRead(void *buffer, size_t buflen)
 
 	/* if automatic measurement is not enabled, get a fresh measurement into the buffer */
 	if (_call_interval == 0) {
-		_accel_reports->flush();
+		_sensor_accel_ss->flush();
 		_measure();
 	}
 
 	/* if no data, error (we could block here) */
-	if (_accel_reports->empty()) {
+	if (_sensor_accel_ss->empty()) {
 		return -EAGAIN;
 	}
 
 	perf_count(_accel_reads);
 
 	/* copy reports out of our buffer to the caller */
-	accel_report *arp = reinterpret_cast<accel_report *>(buffer);
+	sensor_accel_s *arp = reinterpret_cast<sensor_accel_s *>(buffer);
 	int transferred = 0;
 
 	while (count--) {
-		if (!_accel_reports->get(arp)) {
+		if (!_sensor_accel_ss->get(arp)) {
 			break;
 		}
 
@@ -585,7 +589,7 @@ GYROSIM::devRead(void *buffer, size_t buflen)
 	}
 
 	/* return the number of bytes transferred */
-	return (transferred * sizeof(accel_report));
+	return (transferred * sizeof(sensor_accel_s));
 }
 
 int
@@ -665,7 +669,7 @@ GYROSIM::gyro_self_test()
 ssize_t
 GYROSIM::gyro_read(void *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(gyro_report);
+	unsigned count = buflen / sizeof(sensor_gyro_s);
 
 	/* buffer must be large enough */
 	if (count < 1) {
@@ -674,23 +678,23 @@ GYROSIM::gyro_read(void *buffer, size_t buflen)
 
 	/* if automatic measurement is not enabled, get a fresh measurement into the buffer */
 	if (_call_interval == 0) {
-		_gyro_reports->flush();
+		_sensor_gyro_ss->flush();
 		_measure();
 	}
 
 	/* if no data, error (we could block here) */
-	if (_gyro_reports->empty()) {
+	if (_sensor_gyro_ss->empty()) {
 		return -EAGAIN;
 	}
 
 	perf_count(_gyro_reads);
 
 	/* copy reports out of our buffer to the caller */
-	gyro_report *grp = reinterpret_cast<gyro_report *>(buffer);
+	sensor_gyro_s *grp = reinterpret_cast<sensor_gyro_s *>(buffer);
 	int transferred = 0;
 
 	while (count--) {
-		if (!_gyro_reports->get(grp)) {
+		if (!_sensor_gyro_ss->get(grp)) {
 			break;
 		}
 
@@ -699,7 +703,7 @@ GYROSIM::gyro_read(void *buffer, size_t buflen)
 	}
 
 	/* return the number of bytes transferred */
-	return (transferred * sizeof(gyro_report));
+	return (transferred * sizeof(sensor_gyro_s));
 }
 
 int
@@ -773,7 +777,7 @@ GYROSIM::devIOCTL(unsigned long cmd, unsigned long arg)
 				return -EINVAL;
 			}
 
-			if (!_accel_reports->resize(arg)) {
+			if (!_sensor_accel_ss->resize(arg)) {
 				return -ENOMEM;
 			}
 
@@ -789,7 +793,7 @@ GYROSIM::devIOCTL(unsigned long cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
-			accel_calibration_s *s = (accel_calibration_s *) arg;
+			calibration_accel_s *s = (calibration_accel_s *) arg;
 			float sum = s->x_scale + s->y_scale + s->z_scale;
 
 			if (sum > 2.0f && sum < 4.0f) {
@@ -803,7 +807,7 @@ GYROSIM::devIOCTL(unsigned long cmd, unsigned long arg)
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
+		memcpy((calibration_accel_s *) arg, &_accel_scale, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSRANGE:
@@ -838,7 +842,7 @@ GYROSIM::gyro_ioctl(unsigned long cmd, unsigned long arg)
 				return -EINVAL;
 			}
 
-			if (!_gyro_reports->resize(arg)) {
+			if (!_sensor_gyro_ss->resize(arg)) {
 				return -ENOMEM;
 			}
 
@@ -854,12 +858,12 @@ GYROSIM::gyro_ioctl(unsigned long cmd, unsigned long arg)
 
 	case GYROIOCSSCALE:
 		/* copy scale in */
-		memcpy(&_gyro_scale, (gyro_calibration_s *) arg, sizeof(_gyro_scale));
+		memcpy(&_gyro_scale, (calibration_gyro_s *) arg, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCGSCALE:
 		/* copy scale out */
-		memcpy((gyro_calibration_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
+		memcpy((calibration_gyro_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCSRANGE:
@@ -955,8 +959,8 @@ GYROSIM::start()
 	stop();
 
 	/* discard any stale data in the buffers */
-	_accel_reports->flush();
-	_gyro_reports->flush();
+	_sensor_accel_ss->flush();
+	_sensor_gyro_ss->flush();
 
 	/* start polling at the specified rate */
 	return DevObj::start();
@@ -998,8 +1002,8 @@ GYROSIM::_measure()
 	/*
 	 * Report buffers.
 	 */
-	accel_report	arb = {};
-	gyro_report	grb = {};
+	sensor_accel_s	arb = {};
+	sensor_gyro_s	grb = {};
 
 	// for now use local time but this should be the timestamp of the simulator
 	grb.timestamp = hrt_absolute_time();
@@ -1080,8 +1084,8 @@ GYROSIM::_measure()
 	/* fake device ID */
 	grb.device_id = 3467548;
 
-	_accel_reports->force(&arb);
-	_gyro_reports->force(&grb);
+	_sensor_accel_ss->force(&arb);
+	_sensor_gyro_ss->force(&grb);
 
 
 	if (accel_notify) {
@@ -1110,8 +1114,8 @@ GYROSIM::print_info()
 	perf_print_counter(_gyro_reads);
 	perf_print_counter(_good_transfers);
 	perf_print_counter(_reset_retries);
-	_accel_reports->print_info("accel queue");
-	_gyro_reports->print_info("gyro queue");
+	_sensor_accel_ss->print_info("accel queue");
+	_sensor_gyro_ss->print_info("gyro queue");
 	PX4_INFO("temperature: %.1f", (double)_last_temperature);
 }
 
@@ -1277,8 +1281,8 @@ test()
 {
 	const char *path_accel = MPU_DEVICE_PATH_ACCEL;
 	const char *path_gyro  = MPU_DEVICE_PATH_GYRO;
-	accel_report a_report;
-	gyro_report g_report;
+	sensor_accel_s a_report;
+	sensor_gyro_s g_report;
 	ssize_t sz;
 
 	/* get the driver */

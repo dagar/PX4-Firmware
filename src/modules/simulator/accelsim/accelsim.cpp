@@ -63,6 +63,10 @@
 #include <mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/conversion/rotation.h>
 #include <VirtDevObj.hpp>
+#include <uORB/topics/calibration_accel.h>
+#include <uORB/topics/calibration_gyro.h>
+#include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_gyro.h>
 
 #define ACCELSIM_DEVICE_PATH_ACCEL	"/dev/sim_accel"
 #define ACCELSIM_DEVICE_PATH_MAG	"/dev/sim_mag"
@@ -110,10 +114,10 @@ private:
 
 	ACCELSIM_mag		*_mag;
 
-	ringbuffer::RingBuffer	*_accel_reports;
+	ringbuffer::RingBuffer	*_sensor_accel_ss;
 	ringbuffer::RingBuffer	*_mag_reports;
 
-	accel_calibration_s	_accel_scale;
+	calibration_accel_s	_accel_scale;
 	unsigned		_accel_range_m_s2;
 	float			_accel_range_scale;
 	unsigned		_accel_samplerate;
@@ -238,7 +242,7 @@ private:
 ACCELSIM::ACCELSIM(const char *path, enum Rotation rotation) :
 	VirtDevObj("ACCELSIM", path, ACCEL_BASE_DEVICE_PATH, 1e6 / 400),
 	_mag(new ACCELSIM_mag(this)),
-	_accel_reports(nullptr),
+	_sensor_accel_ss(nullptr),
 	_mag_reports(nullptr),
 	_accel_scale{},
 	_accel_range_m_s2(0.0f),
@@ -296,8 +300,8 @@ ACCELSIM::~ACCELSIM()
 	stop();
 
 	/* free any existing reports */
-	if (_accel_reports != nullptr) {
-		delete _accel_reports;
+	if (_sensor_accel_ss != nullptr) {
+		delete _sensor_accel_ss;
 	}
 
 	if (_mag_reports != nullptr) {
@@ -320,7 +324,7 @@ ACCELSIM::init()
 	int ret = -1;
 
 	struct mag_report mrp = {};
-	struct accel_report arp = {};
+	sensor_accel_s arp = {};
 
 	/* do SIM init first */
 	if (VirtDevObj::init() != 0) {
@@ -329,9 +333,9 @@ ACCELSIM::init()
 	}
 
 	/* allocate basic report buffers */
-	_accel_reports = new ringbuffer::RingBuffer(2, sizeof(accel_report));
+	_sensor_accel_ss = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
 
-	if (_accel_reports == nullptr) {
+	if (_sensor_accel_ss == nullptr) {
 		goto out;
 	}
 
@@ -364,7 +368,7 @@ ACCELSIM::init()
 	}
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	_accel_reports->get(&arp);
+	_sensor_accel_ss->get(&arp);
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
@@ -409,8 +413,8 @@ ACCELSIM::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 ssize_t
 ACCELSIM::devRead(void *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(struct accel_report);
-	accel_report *arb = reinterpret_cast<accel_report *>(buffer);
+	unsigned count = buflen / sizeof(sensor_accel_s);
+	sensor_accel_s *arb = reinterpret_cast<sensor_accel_s *>(buffer);
 	int ret = 0;
 
 	/* buffer must be large enough */
@@ -424,7 +428,7 @@ ACCELSIM::devRead(void *buffer, size_t buflen)
 		 * While there is space in the caller's buffer, and reports, copy them.
 		 */
 		while (count--) {
-			if (_accel_reports->get(arb)) {
+			if (_sensor_accel_ss->get(arb)) {
 				ret += sizeof(*arb);
 				arb++;
 			}
@@ -438,7 +442,7 @@ ACCELSIM::devRead(void *buffer, size_t buflen)
 	_measure();
 
 	/* measurement will have generated a report, copy it out */
-	if (_accel_reports->get(arb)) {
+	if (_sensor_accel_ss->get(arb)) {
 		ret = sizeof(*arb);
 	}
 
@@ -556,7 +560,7 @@ ACCELSIM::devIOCTL(unsigned long cmd, unsigned long arg)
 				return -EINVAL;
 			}
 
-			if (!_accel_reports->resize(ul_arg)) {
+			if (!_sensor_accel_ss->resize(ul_arg)) {
 				return -ENOMEM;
 			}
 
@@ -576,7 +580,7 @@ ACCELSIM::devIOCTL(unsigned long cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
-			accel_calibration_s *s = (accel_calibration_s *) arg;
+			calibration_accel_s *s = (calibration_accel_s *) arg;
 			float sum = s->x_scale + s->y_scale + s->z_scale;
 
 			if (sum > 2.0f && sum < 4.0f) {
@@ -598,7 +602,7 @@ ACCELSIM::devIOCTL(unsigned long cmd, unsigned long arg)
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((accel_calibration_s *) arg, &(_accel_scale), sizeof(_accel_scale));
+		memcpy((calibration_accel_s *) arg, &(_accel_scale), sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSELFTEST:
@@ -764,7 +768,7 @@ ACCELSIM::start()
 	stop();
 
 	/* reset the report ring */
-	_accel_reports->flush();
+	_sensor_accel_ss->flush();
 	_mag_reports->flush();
 
 	int ret2 = VirtDevObj::start();
@@ -809,19 +813,19 @@ ACCELSIM::_measure()
 		float		x;
 		float		y;
 		float		z;
-	} raw_accel_report;
+	} raw_sensor_accel_s;
 #pragma pack(pop)
 
-	accel_report accel_report = {};
+	sensor_accel_s sensor_accel_s = {};
 
 	/* start the performance counter */
 	perf_begin(_accel_sample_perf);
 
 	/* fetch data from the sensor */
-	memset(&raw_accel_report, 0, sizeof(raw_accel_report));
-	raw_accel_report.cmd = DIR_READ | ACC_READ;
+	memset(&raw_sensor_accel_s, 0, sizeof(raw_sensor_accel_s));
+	raw_sensor_accel_s.cmd = DIR_READ | ACC_READ;
 
-	if (OK != transfer((uint8_t *)&raw_accel_report, (uint8_t *)&raw_accel_report, sizeof(raw_accel_report))) {
+	if (OK != transfer((uint8_t *)&raw_sensor_accel_s, (uint8_t *)&raw_sensor_accel_s, sizeof(raw_sensor_accel_s))) {
 		return;
 	}
 
@@ -841,29 +845,29 @@ ACCELSIM::_measure()
 	 */
 
 
-	accel_report.timestamp = hrt_absolute_time();
+	sensor_accel_s.timestamp = hrt_absolute_time();
 
 	// use the temperature from the last mag reading
-	accel_report.temperature = _last_temperature;
+	sensor_accel_s.temperature = _last_temperature;
 
 	// report the error count as the sum of the number of bad
 	// register reads and bad values. This allows the higher level
 	// code to decide if it should use this sensor based on
 	// whether it has had failures
-	accel_report.error_count = perf_event_count(_bad_registers) + perf_event_count(_bad_values);
+	sensor_accel_s.error_count = perf_event_count(_bad_registers) + perf_event_count(_bad_values);
 
-	accel_report.x_raw = (int16_t)(raw_accel_report.x / _accel_range_scale);
-	accel_report.y_raw = (int16_t)(raw_accel_report.y / _accel_range_scale);
-	accel_report.z_raw = (int16_t)(raw_accel_report.z / _accel_range_scale);
+	sensor_accel_s.x_raw = (int16_t)(raw_sensor_accel_s.x / _accel_range_scale);
+	sensor_accel_s.y_raw = (int16_t)(raw_sensor_accel_s.y / _accel_range_scale);
+	sensor_accel_s.z_raw = (int16_t)(raw_sensor_accel_s.z / _accel_range_scale);
 
-	accel_report.x = raw_accel_report.x;
-	accel_report.y = raw_accel_report.y;
-	accel_report.z = raw_accel_report.z;
+	sensor_accel_s.x = raw_sensor_accel_s.x;
+	sensor_accel_s.y = raw_sensor_accel_s.y;
+	sensor_accel_s.z = raw_sensor_accel_s.z;
 
-	accel_report.scaling = _accel_range_scale;
-	accel_report.range_m_s2 = _accel_range_m_s2;
+	sensor_accel_s.scaling = _accel_range_scale;
+	sensor_accel_s.range_m_s2 = _accel_range_m_s2;
 
-	_accel_reports->force(&accel_report);
+	_sensor_accel_ss->force(&sensor_accel_s);
 
 	if (!(m_pub_blocked)) {
 		/* publish it */
@@ -871,7 +875,7 @@ ACCELSIM::_measure()
 		// The first call to measure() is from init() and _accel_topic is not
 		// yet initialized
 		if (_accel_topic != nullptr) {
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
+			orb_publish(ORB_ID(sensor_accel), _accel_topic, &sensor_accel_s);
 		}
 	}
 

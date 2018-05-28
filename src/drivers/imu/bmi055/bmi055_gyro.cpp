@@ -19,7 +19,7 @@ const uint8_t BMI055_gyro::_checked_registers[BMI055_GYRO_NUM_CHECKED_REGISTERS]
 
 BMI055_gyro::BMI055_gyro(int bus, const char *path_gyro, uint32_t device, enum Rotation rotation) :
 	BMI055("BMI055_GYRO", path_gyro, bus, device, SPIDEV_MODE3, BMI055_BUS_SPEED, rotation),
-	_gyro_reports(nullptr),
+	_sensor_gyro_ss(nullptr),
 	_gyro_scale{},
 	_gyro_range_scale(0.0f),
 	_gyro_range_rad_s(0.0f),
@@ -57,8 +57,8 @@ BMI055_gyro::~BMI055_gyro()
 	stop();
 
 	/* free any existing reports */
-	if (_gyro_reports != nullptr) {
-		delete _gyro_reports;
+	if (_sensor_gyro_ss != nullptr) {
+		delete _sensor_gyro_ss;
 	}
 
 	if (_gyro_class_instance != -1) {
@@ -84,9 +84,9 @@ BMI055_gyro::init()
 	}
 
 	/* allocate basic report buffers */
-	_gyro_reports = new ringbuffer::RingBuffer(2, sizeof(accel_report));
+	_sensor_gyro_ss = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
 
-	if (_gyro_reports == nullptr) {
+	if (_sensor_gyro_ss == nullptr) {
 		goto out;
 	}
 
@@ -114,8 +114,8 @@ BMI055_gyro::init()
 	measure();
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	struct gyro_report grp;
-	_gyro_reports->get(&grp);
+	sensor_gyro_s grp;
+	_sensor_gyro_ss->get(&grp);
 
 	_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &grp,
 					  &_gyro_orb_class_instance, (external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
@@ -301,7 +301,7 @@ BMI055_gyro::test_error()
 ssize_t
 BMI055_gyro::read(struct file *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(gyro_report);
+	unsigned count = buflen / sizeof(sensor_gyro_s);
 
 	/* buffer must be large enough */
 	if (count < 1) {
@@ -310,23 +310,23 @@ BMI055_gyro::read(struct file *filp, char *buffer, size_t buflen)
 
 	/* if automatic measurement is not enabled, get a fresh measurement into the buffer */
 	if (_call_interval == 0) {
-		_gyro_reports->flush();
+		_sensor_gyro_ss->flush();
 		measure();
 	}
 
 	/* if no data, error (we could block here) */
-	if (_gyro_reports->empty()) {
+	if (_sensor_gyro_ss->empty()) {
 		return -EAGAIN;
 	}
 
 	perf_count(_gyro_reads);
 
 	/* copy reports out of our buffer to the caller */
-	gyro_report *grp = reinterpret_cast<gyro_report *>(buffer);
+	sensor_gyro_s *grp = reinterpret_cast<sensor_gyro_s *>(buffer);
 	int transferred = 0;
 
 	while (count--) {
-		if (!_gyro_reports->get(grp)) {
+		if (!_sensor_gyro_ss->get(grp)) {
 			break;
 		}
 
@@ -335,7 +335,7 @@ BMI055_gyro::read(struct file *filp, char *buffer, size_t buflen)
 	}
 
 	/* return the number of bytes transferred */
-	return (transferred * sizeof(gyro_report));
+	return (transferred * sizeof(sensor_gyro_s));
 }
 
 
@@ -425,7 +425,7 @@ BMI055_gyro::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 			irqstate_t flags = px4_enter_critical_section();
 
-			if (!_gyro_reports->resize(arg)) {
+			if (!_sensor_gyro_ss->resize(arg)) {
 				px4_leave_critical_section(flags);
 				return -ENOMEM;
 			}
@@ -443,12 +443,12 @@ BMI055_gyro::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case GYROIOCSSCALE:
 		/* copy scale in */
-		memcpy(&_gyro_scale, (gyro_calibration_s *) arg, sizeof(_gyro_scale));
+		memcpy(&_gyro_scale, (calibration_gyro_s *) arg, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCGSCALE:
 		/* copy scale out */
-		memcpy((gyro_calibration_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
+		memcpy((calibration_gyro_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCSRANGE:
@@ -549,7 +549,7 @@ BMI055_gyro::start()
 	stop();
 
 	/* discard any stale data in the buffers */
-	_gyro_reports->flush();
+	_sensor_gyro_ss->flush();
 
 	/* start polling at the specified rate */
 	hrt_call_every(&_call,
@@ -685,7 +685,7 @@ BMI055_gyro::measure()
 	/*
 	 * Report buffers.
 	 */
-	gyro_report     grb;
+	sensor_gyro_s     grb;
 
 
 	grb.timestamp =  hrt_absolute_time();
@@ -745,7 +745,7 @@ BMI055_gyro::measure()
 	grb.temperature = _last_temperature;
 	grb.device_id = _device_id.devid;
 
-	_gyro_reports->force(&grb);
+	_sensor_gyro_ss->force(&grb);
 
 	/* notify anyone waiting for data */
 	if (gyro_notify) {
@@ -772,7 +772,7 @@ BMI055_gyro::print_info()
 	perf_print_counter(_good_transfers);
 	perf_print_counter(_reset_retries);
 	perf_print_counter(_duplicates);
-	_gyro_reports->print_info("gyro queue");
+	_sensor_gyro_ss->print_info("gyro queue");
 	::printf("checked_next: %u\n", _checked_next);
 
 	for (uint8_t i = 0; i < BMI055_GYRO_NUM_CHECKED_REGISTERS; i++) {

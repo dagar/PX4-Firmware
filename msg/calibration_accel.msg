@@ -1,4 +1,6 @@
 
+# scaling factors; Vout = (Vin * Vscale) + Voffset
+
 float32 x_offset
 float32 y_offset
 float32 z_offset

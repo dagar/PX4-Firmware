@@ -51,14 +51,6 @@
 #define ACCEL1_DEVICE_PATH	"/dev/accel1"
 #define ACCEL2_DEVICE_PATH	"/dev/accel2"
 
-#include <uORB/topics/sensor_accel.h>
-#include <uORB/topics/calibration.h>
-
-#define accel_report sensor_accel_s
-
-/** accel scaling factors; Vout = Vscale * (Vin + Voffset) */
-typedef struct calibration_s accel_calibration_s;
-
 /*
  * ioctl() definitions
  *

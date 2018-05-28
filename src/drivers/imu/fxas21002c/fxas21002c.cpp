@@ -252,7 +252,7 @@ private:
 
 	ringbuffer::RingBuffer	*_reports;
 
-	gyro_calibration_s	_gyro_scale;
+	calibration_gyro_s	_gyro_scale;
 	float			_gyro_range_scale;
 	float			_gyro_range_rad_s;
 	orb_advert_t		_gyro_topic;
@@ -500,7 +500,7 @@ FXAS21002C::init()
 	}
 
 	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(gyro_report));
+	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_gyro_s));
 
 	if (_reports == nullptr) {
 		goto out;
@@ -514,7 +514,7 @@ FXAS21002C::init()
 	_class_instance = register_class_devname(GYRO_BASE_DEVICE_PATH);
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	struct gyro_report grp;
+	sensor_gyro_s grp;
 	_reports->get(&grp);
 
 	/* measurement will have generated a report, publish */
@@ -583,8 +583,8 @@ FXAS21002C::probe()
 ssize_t
 FXAS21002C::read(struct file *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(struct gyro_report);
-	struct gyro_report *gbuf = reinterpret_cast<struct gyro_report *>(buffer);
+	unsigned count = buflen / sizeof(sensor_gyro_s);
+	sensor_gyro_s *gbuf = reinterpret_cast<sensor_gyro_s *>(buffer);
 	int ret = 0;
 
 	/* buffer must be large enough */
@@ -720,12 +720,12 @@ FXAS21002C::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case GYROIOCSSCALE:
 		/* copy scale in */
-		memcpy(&_gyro_scale, (gyro_calibration_s *) arg, sizeof(_gyro_scale));
+		memcpy(&_gyro_scale, (calibration_gyro_s *) arg, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCGSCALE:
 		/* copy scale out */
-		memcpy((gyro_calibration_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
+		memcpy((calibration_gyro_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCSRANGE:
@@ -979,10 +979,10 @@ FXAS21002C::measure()
 		int16_t		x;
 		int16_t		y;
 		int16_t		z;
-	} raw_gyro_report;
+	} raw_sensor_gyro_s;
 #pragma pack(pop)
 
-	struct gyro_report gyro_report;
+	sensor_gyro_s sensor_gyro_s;
 
 	/* start the performance counter */
 	perf_begin(_sample_perf);
@@ -998,11 +998,11 @@ FXAS21002C::measure()
 	}
 
 	/* fetch data from the sensor */
-	memset(&raw_gyro_report, 0, sizeof(raw_gyro_report));
-	raw_gyro_report.cmd = DIR_READ(FXAS21002C_STATUS);
-	transfer((uint8_t *)&raw_gyro_report, (uint8_t *)&raw_gyro_report, sizeof(raw_gyro_report));
+	memset(&raw_sensor_gyro_s, 0, sizeof(raw_sensor_gyro_s));
+	raw_sensor_gyro_s.cmd = DIR_READ(FXAS21002C_STATUS);
+	transfer((uint8_t *)&raw_sensor_gyro_s, (uint8_t *)&raw_sensor_gyro_s, sizeof(raw_sensor_gyro_s));
 
-	if (!(raw_gyro_report.status & DR_STATUS_ZYXDR)) {
+	if (!(raw_sensor_gyro_s.status & DR_STATUS_ZYXDR)) {
 		perf_end(_sample_perf);
 		perf_count(_duplicates);
 		return;
@@ -1017,7 +1017,7 @@ FXAS21002C::measure()
 
 	if ((_read % _current_rate) == 0) {
 		_last_temperature = read_reg(FXAS21002C_TEMP) * 1.0f;
-		gyro_report.temperature = _last_temperature;
+		sensor_gyro_s.temperature = _last_temperature;
 	}
 
 	/*
@@ -1035,21 +1035,21 @@ FXAS21002C::measure()
 	 *		  74 from all measurements centers them around zero.
 	 */
 
-	gyro_report.timestamp = hrt_absolute_time();
+	sensor_gyro_s.timestamp = hrt_absolute_time();
 
 	// report the error count as the number of bad
 	// register reads. This allows the higher level
 	// code to decide if it should use this sensor based on
 	// whether it has had failures
-	gyro_report.error_count = perf_event_count(_bad_registers);
+	sensor_gyro_s.error_count = perf_event_count(_bad_registers);
 
-	gyro_report.x_raw = swap16(raw_gyro_report.x);
-	gyro_report.y_raw = swap16(raw_gyro_report.y);
-	gyro_report.z_raw = swap16(raw_gyro_report.z);
+	sensor_gyro_s.x_raw = swap16(raw_sensor_gyro_s.x);
+	sensor_gyro_s.y_raw = swap16(raw_sensor_gyro_s.y);
+	sensor_gyro_s.z_raw = swap16(raw_sensor_gyro_s.z);
 
-	float xraw_f = gyro_report.x_raw;
-	float yraw_f = gyro_report.y_raw;
-	float zraw_f = gyro_report.z_raw;
+	float xraw_f = sensor_gyro_s.x_raw;
+	float yraw_f = sensor_gyro_s.y_raw;
+	float zraw_f = sensor_gyro_s.z_raw;
 
 	// apply user specified rotation
 	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
@@ -1058,26 +1058,26 @@ FXAS21002C::measure()
 	float y_in_new = ((yraw_f * _gyro_range_scale) - _gyro_scale.y_offset) * _gyro_scale.y_scale;
 	float z_in_new = ((zraw_f * _gyro_range_scale) - _gyro_scale.z_offset) * _gyro_scale.z_scale;
 
-	gyro_report.x = _gyro_filter_x.apply(x_in_new);
-	gyro_report.y = _gyro_filter_y.apply(y_in_new);
-	gyro_report.z = _gyro_filter_z.apply(z_in_new);
+	sensor_gyro_s.x = _gyro_filter_x.apply(x_in_new);
+	sensor_gyro_s.y = _gyro_filter_y.apply(y_in_new);
+	sensor_gyro_s.z = _gyro_filter_z.apply(z_in_new);
 
 	matrix::Vector3f gval(x_in_new, y_in_new, z_in_new);
 	matrix::Vector3f gval_integrated;
 
-	bool gyro_notify = _gyro_int.put(gyro_report.timestamp, gval, gval_integrated, gyro_report.integral_dt);
-	gyro_report.x_integral = gval_integrated(0);
-	gyro_report.y_integral = gval_integrated(1);
-	gyro_report.z_integral = gval_integrated(2);
+	bool gyro_notify = _gyro_int.put(sensor_gyro_s.timestamp, gval, gval_integrated, sensor_gyro_s.integral_dt);
+	sensor_gyro_s.x_integral = gval_integrated(0);
+	sensor_gyro_s.y_integral = gval_integrated(1);
+	sensor_gyro_s.z_integral = gval_integrated(2);
 
-	gyro_report.scaling = _gyro_range_scale;
-	gyro_report.range_rad_s = _gyro_range_rad_s;
+	sensor_gyro_s.scaling = _gyro_range_scale;
+	sensor_gyro_s.range_rad_s = _gyro_range_rad_s;
 
 	/* return device ID */
-	gyro_report.device_id = _device_id.devid;
+	sensor_gyro_s.device_id = _device_id.devid;
 
 
-	_reports->force(&gyro_report);
+	_reports->force(&sensor_gyro_s);
 
 	/* notify anyone waiting for data */
 	if (gyro_notify) {
@@ -1085,7 +1085,7 @@ FXAS21002C::measure()
 
 		if (!(_pub_blocked)) {
 			/* publish it */
-			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &gyro_report);
+			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &sensor_gyro_s);
 		}
 	}
 
@@ -1251,7 +1251,7 @@ void
 test()
 {
 	int fd_gyro = -1;
-	struct gyro_report g_report;
+	sensor_gyro_s g_report;
 	ssize_t sz;
 
 	/* get the driver */

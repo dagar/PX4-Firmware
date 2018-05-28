@@ -60,6 +60,10 @@
 
 #include "systemlib/systemlib.h"
 #include <parameters/param.h>
+#include <uORB/topics/calibration_accel.h>
+#include <uORB/topics/calibration_gyro.h>
+#include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_gyro.h>
 
 __EXPORT int config_main(int argc, char *argv[]);
 
@@ -214,7 +218,7 @@ do_gyro(int argc, char *argv[])
 
 			if (ret) {
 				PX4_WARN("gyro self test FAILED! Check calibration:");
-				gyro_calibration_s scale;
+				struct calibration_gyro_s scale;
 				ret = ioctl(fd, GYROIOCGSCALE, (long unsigned int)&scale);
 
 				if (ret) {
@@ -390,7 +394,7 @@ do_accel(int argc, char *argv[])
 
 			if (ret) {
 				PX4_WARN("accel self test FAILED! Check calibration:");
-				accel_calibration_s scale;
+				struct calibration_accel_s scale;
 				ret = ioctl(fd, ACCELIOCGSCALE, (long unsigned int)&scale);
 
 				if (ret) {
