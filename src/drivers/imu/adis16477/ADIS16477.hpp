@@ -88,13 +88,13 @@ private:
 	struct hrt_call		_call {};
 	unsigned			_call_interval{0};
 
-	struct gyro_calibration_s	_gyro_scale {};
+	gyro_calibration_s	_gyro_scale {};
 
 	// gyro 0.025 °/sec/LSB
 	float				_gyro_range_scale{0.025f};
 	float				_gyro_range_rad_s{math::radians(500.0f)};
 
-	struct accel_calibration_s	_accel_scale {};
+	accel_calibration_s	_accel_scale {};
 
 	// accel 1.25 mg/LSB
 	float				_accel_range_scale{1.25f * CONSTANTS_ONE_G / 1000.0f};

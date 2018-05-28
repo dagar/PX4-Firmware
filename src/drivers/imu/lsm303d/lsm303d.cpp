@@ -267,7 +267,7 @@ private:
 	ringbuffer::RingBuffer	*_accel_reports;
 	ringbuffer::RingBuffer		*_mag_reports;
 
-	struct accel_calibration_s	_accel_scale;
+	accel_calibration_s	_accel_scale;
 	unsigned		_accel_range_m_s2;
 	float			_accel_range_scale;
 	unsigned		_accel_samplerate;
@@ -927,7 +927,7 @@ LSM303D::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
-			struct accel_calibration_s *s = (struct accel_calibration_s *) arg;
+			accel_calibration_s *s = (accel_calibration_s *) arg;
 			float sum = s->x_scale + s->y_scale + s->z_scale;
 
 			if (sum > 2.0f && sum < 4.0f) {
@@ -949,7 +949,7 @@ LSM303D::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((struct accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
+		memcpy((accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSELFTEST:

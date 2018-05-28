@@ -118,7 +118,7 @@ private:
 
 	int			    _param_update_sub;
 
-	struct accel_calibration_s {
+	accel_calibration_s {
 		float x_offset;
 		float x_scale;
 		float y_offset;
@@ -127,7 +127,7 @@ private:
 		float z_scale;
 	} _accel_calibration;
 
-	struct gyro_calibration_s {
+	gyro_calibration_s {
 		float x_offset;
 		float x_scale;
 		float y_offset;

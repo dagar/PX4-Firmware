@@ -229,13 +229,13 @@ private:
 
 	ringbuffer::RingBuffer			*_gyro_reports;
 
-	struct gyro_calibration_s	_gyro_scale;
+	gyro_calibration_s	_gyro_scale;
 	float				_gyro_range_scale;
 	float				_gyro_range_rad_s;
 
 	ringbuffer::RingBuffer			*_accel_reports;
 
-	struct accel_calibration_s	_accel_scale;
+	accel_calibration_s	_accel_scale;
 	float				_accel_range_scale;
 	float				_accel_range_m_s2;
 	orb_advert_t		_accel_topic;
@@ -1114,7 +1114,7 @@ ADIS16448::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
-			struct accel_calibration_s *s = (struct accel_calibration_s *) arg;
+			accel_calibration_s *s = (accel_calibration_s *) arg;
 			float sum = s->x_scale + s->y_scale + s->z_scale;
 
 			if (sum > 2.0f && sum < 4.0f) {
@@ -1128,7 +1128,7 @@ ADIS16448::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((struct accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
+		memcpy((accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSRANGE:
@@ -1187,12 +1187,12 @@ ADIS16448::gyro_ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case GYROIOCSSCALE:
 		/* copy scale in */
-		memcpy(&_gyro_scale, (struct gyro_calibration_s *) arg, sizeof(_gyro_scale));
+		memcpy(&_gyro_scale, (gyro_calibration_s *) arg, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCGSCALE:
 		/* copy scale out */
-		memcpy((struct gyro_calibration_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
+		memcpy((gyro_calibration_s *) arg, &_gyro_scale, sizeof(_gyro_scale));
 		return OK;
 
 	case GYROIOCSRANGE:

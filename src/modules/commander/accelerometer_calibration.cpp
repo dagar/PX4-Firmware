@@ -171,13 +171,11 @@ typedef struct  {
 
 int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 {
-#ifdef __PX4_NUTTX
-	int fd;
-#endif
+	int fd = -1;
 
 	calibration_log_info(mavlink_log_pub, CAL_QGC_STARTED_MSG, sensor_name);
 
-	struct accel_calibration_s accel_scale;
+	accel_calibration_s accel_scale;
 	accel_scale.x_offset = 0.0f;
 	accel_scale.x_scale = 1.0f;
 	accel_scale.y_offset = 0.0f;
@@ -191,56 +189,47 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 
 	/* reset all sensors */
 	for (unsigned s = 0; s < max_accel_sens; s++) {
-#ifdef __PX4_NUTTX
-		sprintf(str, "%s%u", ACCEL_BASE_DEVICE_PATH, s);
-		/* reset all offsets to zero and all scales to one */
-		fd = px4_open(str, 0);
 
-		if (fd < 0) {
-			continue;
-		}
-
-		device_id[s] = px4_ioctl(fd, DEVIOCGDEVICEID, 0);
-
-		res = px4_ioctl(fd, ACCELIOCSSCALE, (long unsigned int)&accel_scale);
-		px4_close(fd);
-
-		if (res != PX4_OK) {
-			calibration_log_critical(mavlink_log_pub, CAL_ERROR_RESET_CAL_MSG, s);
-		}
-#else
+		// offsets
 		(void)sprintf(str, "CAL_ACC%u_XOFF", s);
 		res = param_set_no_notification(param_find(str), &accel_scale.x_offset);
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
+
 		(void)sprintf(str, "CAL_ACC%u_YOFF", s);
 		res = param_set_no_notification(param_find(str), &accel_scale.y_offset);
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
+
 		(void)sprintf(str, "CAL_ACC%u_ZOFF", s);
 		res = param_set_no_notification(param_find(str), &accel_scale.z_offset);
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
+
+		// scale factors
 		(void)sprintf(str, "CAL_ACC%u_XSCALE", s);
 		res = param_set_no_notification(param_find(str), &accel_scale.x_scale);
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
+
 		(void)sprintf(str, "CAL_ACC%u_YSCALE", s);
 		res = param_set_no_notification(param_find(str), &accel_scale.y_scale);
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
+
 		(void)sprintf(str, "CAL_ACC%u_ZSCALE", s);
 		res = param_set_no_notification(param_find(str), &accel_scale.z_scale);
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
+
+
 		param_notify_changes();
-#endif
 	}
 
 	float accel_offs[max_accel_sens][3];
@@ -387,7 +376,6 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 			return PX4_ERROR;
 		}
 
-#ifdef __PX4_NUTTX
 		sprintf(str, "%s%u", ACCEL_BASE_DEVICE_PATH, uorb_index);
 		fd = px4_open(str, 0);
 
@@ -402,7 +390,6 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 		if (res != PX4_OK) {
 			calibration_log_critical(mavlink_log_pub, CAL_ERROR_APPLY_CAL_MSG, uorb_index);
 		}
-#endif
 	}
 
 	if (res == PX4_OK) {
@@ -483,12 +470,10 @@ calibrate_return do_accel_calibration_measurements(orb_advert_t *mavlink_log_pub
 			orb_copy(ORB_ID(sensor_accel), worker_data.subs[cur_accel], &report);
 
 #ifdef __PX4_NUTTX
-
 			// For NuttX, we get the UNIQUE device ID from the sensor driver via an IOCTL
 			// and match it up with the one from the uORB subscription, because the
 			// instance ordering of uORB and the order of the FDs may not be the same.
-
-			if(report.device_id == device_id[cur_accel]) {
+			if (report.device_id == device_id[cur_accel]) {
 				// Device IDs match, correct ORB instance for this accel
 				found_cur_accel = true;
 				// store initial timestamp - used to infer which sensors are active
@@ -496,17 +481,14 @@ calibrate_return do_accel_calibration_measurements(orb_advert_t *mavlink_log_pub
 			} else {
 				orb_unsubscribe(worker_data.subs[cur_accel]);
 			}
-
 #else
-
 			// For the DriverFramework drivers, we fill device ID (this is the first time) by copying one report.
 			device_id[cur_accel] = report.device_id;
 			found_cur_accel = true;
-
 #endif
 		}
 
-		if(!found_cur_accel) {
+		if (!found_cur_accel) {
 			calibration_log_critical(mavlink_log_pub, "Accel #%u (ID %u) no matching uORB devid", cur_accel, device_id[cur_accel]);
 			result = calibrate_return_error;
 			break;

@@ -147,7 +147,7 @@ private:
 
 	ringbuffer::RingBuffer		*_reports;
 
-	struct accel_calibration_s	_accel_scale;
+	accel_calibration_s	_accel_scale;
 	float			_accel_range_scale;
 	float			_accel_range_m_s2;
 	orb_advert_t		_accel_topic;
@@ -484,12 +484,12 @@ BMA180::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSSCALE:
 		/* copy scale in */
-		memcpy(&_accel_scale, (struct accel_calibration_s *) arg, sizeof(_accel_scale));
+		memcpy(&_accel_scale, (accel_calibration_s *) arg, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCGSCALE:
 		/* copy scale out */
-		memcpy((struct accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
+		memcpy((accel_calibration_s *) arg, &_accel_scale, sizeof(_accel_scale));
 		return OK;
 
 	case ACCELIOCSRANGE:

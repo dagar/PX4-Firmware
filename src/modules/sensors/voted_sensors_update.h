@@ -215,7 +215,7 @@ private:
 	 * @param device: the device id of the sensor.
 	 * @return: true if config is ok
 	 */
-	bool apply_gyro_calibration(DriverFramework::DevHandle &h, const struct gyro_calibration_s *gcal, const int device_id);
+	bool apply_gyro_calibration(DriverFramework::DevHandle &h, const gyro_calibration_s *gcal, const int device_id);
 
 	/**
 	 * Apply a accel calibration.
@@ -225,7 +225,7 @@ private:
 	 * @param device: the device id of the sensor.
 	 * @return: true if config is ok
 	 */
-	bool apply_accel_calibration(DriverFramework::DevHandle &h, const struct accel_calibration_s *acal,
+	bool apply_accel_calibration(DriverFramework::DevHandle &h, const accel_calibration_s *acal,
 				     const int device_id);
 
 	/**
@@ -236,7 +236,7 @@ private:
 	 * @param device: the device id of the sensor.
 	 * @return: true if config is ok
 	 */
-	bool apply_mag_calibration(DriverFramework::DevHandle &h, const struct mag_calibration_s *mcal, const int device_id);
+	bool apply_mag_calibration(DriverFramework::DevHandle &h, const mag_calibration_s *mcal, const int device_id);
 
 	SensorData _gyro;
 	SensorData _accel;

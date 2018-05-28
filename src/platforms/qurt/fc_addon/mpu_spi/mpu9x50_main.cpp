@@ -99,8 +99,8 @@ static int _params_sub;										/**< parameter update subscription */
 static struct gyro_report _gyro;					/**< gyro report */
 static struct accel_report _accel;				/**< accel report */
 static struct mag_report _mag;						/**< mag report */
-static struct gyro_calibration_s _gyro_sc;				/**< gyro scale */
-static struct accel_calibration_s _accel_sc;			/**< accel scale */
+static gyro_calibration_s _gyro_sc;				/**< gyro scale */
+static accel_calibration_s _accel_sc;			/**< accel scale */
 static struct mag_calibration_s _mag_sc;					/**< mag scale */
 static enum gyro_lpf_e _gyro_lpf = MPU9X50_GYRO_LPF_20HZ;	/**< gyro lpf enum value */
 static enum acc_lpf_e _accel_lpf = MPU9X50_ACC_LPF_20HZ;	/**< accel lpf enum value */

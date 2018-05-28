@@ -214,7 +214,7 @@ do_gyro(int argc, char *argv[])
 
 			if (ret) {
 				PX4_WARN("gyro self test FAILED! Check calibration:");
-				struct gyro_calibration_s scale;
+				gyro_calibration_s scale;
 				ret = ioctl(fd, GYROIOCGSCALE, (long unsigned int)&scale);
 
 				if (ret) {
@@ -390,7 +390,7 @@ do_accel(int argc, char *argv[])
 
 			if (ret) {
 				PX4_WARN("accel self test FAILED! Check calibration:");
-				struct accel_calibration_s scale;
+				accel_calibration_s scale;
 				ret = ioctl(fd, ACCELIOCGSCALE, (long unsigned int)&scale);
 
 				if (ret) {

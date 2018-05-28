@@ -282,7 +282,7 @@ private:
 
 	ringbuffer::RingBuffer	*_accel_reports;
 
-	struct accel_calibration_s	_accel_scale;
+	accel_calibration_s	_accel_scale;
 	float			_accel_range_scale;
 	float			_accel_range_m_s2;
 	orb_advert_t		_accel_topic;
@@ -291,7 +291,7 @@ private:
 
 	ringbuffer::RingBuffer	*_gyro_reports;
 
-	struct gyro_calibration_s	_gyro_scale;
+	gyro_calibration_s	_gyro_scale;
 	float			_gyro_range_scale;
 	float			_gyro_range_rad_s;
 

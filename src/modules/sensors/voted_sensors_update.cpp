@@ -154,17 +154,17 @@ void VotedSensorsUpdate::parameters_update()
 			// valid subscription, so get the driver id by getting the published sensor data
 			struct gyro_report report;
 
-			if (orb_copy(ORB_ID(sensor_gyro), _gyro.subscription[topic_instance], &report) == 0) {
+			if (orb_copy(ORB_ID(sensor_gyro), _gyro.subscription[topic_instance], &report) == PX4_OK) {
 				int temp = _temperature_compensation.set_sensor_id_gyro(report.device_id, topic_instance);
 
 				if (temp < 0) {
 					PX4_ERR("%s temp compensation init: failed to find device ID %u for instance %i",
 						"gyro", report.device_id, topic_instance);
+
 					_corrections.gyro_mapping[topic_instance] = 0;
 
 				} else {
 					_corrections.gyro_mapping[topic_instance] = temp;
-
 				}
 			}
 		}
@@ -184,11 +184,11 @@ void VotedSensorsUpdate::parameters_update()
 				if (temp < 0) {
 					PX4_ERR("%s temp compensation init: failed to find device ID %u for instance %i",
 						"accel", report.device_id, topic_instance);
+
 					_corrections.accel_mapping[topic_instance] = 0;
 
 				} else {
 					_corrections.accel_mapping[topic_instance] = temp;
-
 				}
 			}
 		}
@@ -201,17 +201,17 @@ void VotedSensorsUpdate::parameters_update()
 			// valid subscription, so get the driver id by getting the published sensor data
 			struct baro_report report;
 
-			if (orb_copy(ORB_ID(sensor_baro), _baro.subscription[topic_instance], &report) == 0) {
+			if (orb_copy(ORB_ID(sensor_baro), _baro.subscription[topic_instance], &report) == PX4_OK) {
 				int temp = _temperature_compensation.set_sensor_id_baro(report.device_id, topic_instance);
 
 				if (temp < 0) {
 					PX4_ERR("%s temp compensation init: failed to find device ID %u for instance %i",
 						"baro", report.device_id, topic_instance);
+
 					_corrections.baro_mapping[topic_instance] = 0;
 
 				} else {
 					_corrections.baro_mapping[topic_instance] = temp;
-
 				}
 			}
 		}
@@ -219,12 +219,11 @@ void VotedSensorsUpdate::parameters_update()
 
 
 	/* set offset parameters to new values */
-	bool failed;
+	bool failed = false;
 	char str[30];
+
 	unsigned gyro_count = 0;
-	unsigned accel_count = 0;
 	unsigned gyro_cal_found_count = 0;
-	unsigned accel_cal_found_count = 0;
 
 	/* run through all gyro sensors */
 	for (unsigned driver_index = 0; driver_index < GYRO_COUNT_MAX; driver_index++) {
@@ -238,7 +237,7 @@ void VotedSensorsUpdate::parameters_update()
 			continue;
 		}
 
-		uint32_t driver_device_id = h.ioctl(DEVIOCGDEVICEID, 0);
+		const uint32_t driver_device_id = h.ioctl(DEVIOCGDEVICEID, 0);
 		bool config_ok = false;
 
 		/* run through all stored calibrations that are applied at the driver level*/
@@ -247,12 +246,12 @@ void VotedSensorsUpdate::parameters_update()
 			failed = false;
 
 			(void)sprintf(str, "CAL_GYRO%u_ID", i);
-			int32_t device_id;
+			int32_t device_id = 0;
 			failed = failed || (OK != param_get(param_find(str), &device_id));
 
 			(void)sprintf(str, "CAL_GYRO%u_EN", i);
 			int32_t device_enabled = 1;
-			failed = failed || (OK != param_get(param_find(str), &device_enabled));
+			failed = failed || (PX4_OK != param_get(param_find(str), &device_enabled));
 
 			_gyro.enabled[i] = (device_enabled == 1);
 
@@ -266,13 +265,15 @@ void VotedSensorsUpdate::parameters_update()
 
 			/* if the calibration is for this device, apply it */
 			if (device_id == driver_device_id) {
-				struct gyro_calibration_s gscale = {};
+				gyro_calibration_s gscale = {};
+
 				(void)sprintf(str, "CAL_GYRO%u_XOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &gscale.x_offset));
 				(void)sprintf(str, "CAL_GYRO%u_YOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &gscale.y_offset));
 				(void)sprintf(str, "CAL_GYRO%u_ZOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &gscale.z_offset));
+
 				(void)sprintf(str, "CAL_GYRO%u_XSCALE", i);
 				failed = failed || (OK != param_get(param_find(str), &gscale.x_scale));
 				(void)sprintf(str, "CAL_GYRO%u_YSCALE", i);
@@ -304,15 +305,16 @@ void VotedSensorsUpdate::parameters_update()
 	// There are less gyros than calibrations
 	// reset the board calibration and fail the initial load
 	if (gyro_count < gyro_cal_found_count) {
-
 		// run through all stored calibrations and reset them
 		for (unsigned i = 0; i < GYRO_COUNT_MAX; i++) {
-
 			int32_t device_id = 0;
 			(void)sprintf(str, "CAL_GYRO%u_ID", i);
 			(void)param_set(param_find(str), &device_id);
 		}
 	}
+
+	unsigned accel_count = 0;
+	unsigned accel_cal_found_count = 0;
 
 	/* run through all accel sensors */
 	for (unsigned driver_index = 0; driver_index < ACCEL_COUNT_MAX; driver_index++) {
@@ -335,7 +337,7 @@ void VotedSensorsUpdate::parameters_update()
 			failed = false;
 
 			(void)sprintf(str, "CAL_ACC%u_ID", i);
-			int32_t device_id;
+			int32_t device_id = 0;
 			failed = failed || (OK != param_get(param_find(str), &device_id));
 
 			(void)sprintf(str, "CAL_ACC%u_EN", i);
@@ -354,13 +356,15 @@ void VotedSensorsUpdate::parameters_update()
 
 			/* if the calibration is for this device, apply it */
 			if (device_id == driver_device_id) {
-				struct accel_calibration_s ascale = {};
+				accel_calibration_s ascale = {};
+
 				(void)sprintf(str, "CAL_ACC%u_XOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &ascale.x_offset));
 				(void)sprintf(str, "CAL_ACC%u_YOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &ascale.y_offset));
 				(void)sprintf(str, "CAL_ACC%u_ZOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &ascale.z_offset));
+
 				(void)sprintf(str, "CAL_ACC%u_XSCALE", i);
 				failed = failed || (OK != param_get(param_find(str), &ascale.x_scale));
 				(void)sprintf(str, "CAL_ACC%u_YSCALE", i);
@@ -392,10 +396,8 @@ void VotedSensorsUpdate::parameters_update()
 	// There are less accels than calibrations
 	// reset the board calibration and fail the initial load
 	if (accel_count < accel_cal_found_count) {
-
 		// run through all stored calibrations and reset them
 		for (unsigned i = 0; i < ACCEL_COUNT_MAX; i++) {
-
 			int32_t device_id = 0;
 			(void)sprintf(str, "CAL_ACC%u_ID", i);
 			(void)param_set(param_find(str), &device_id);
@@ -409,13 +411,13 @@ void VotedSensorsUpdate::parameters_update()
 	for (unsigned topic_instance = 0; topic_instance < MAG_COUNT_MAX && topic_instance < _mag.subscription_count;
 	     ++topic_instance) {
 
-		struct mag_report report;
+		mag_report report;
 
-		if (orb_copy(ORB_ID(sensor_mag), _mag.subscription[topic_instance], &report) != 0) {
+		if (orb_copy(ORB_ID(sensor_mag), _mag.subscription[topic_instance], &report) != PX4_OK) {
 			continue;
 		}
 
-		int topic_device_id = report.device_id;
+		const int topic_device_id = report.device_id;
 		bool is_external = report.is_external;
 		_mag_device_id[topic_instance] = topic_device_id;
 
@@ -466,13 +468,15 @@ void VotedSensorsUpdate::parameters_update()
 
 			/* if the calibration is for this device, apply it */
 			if (device_id == _mag_device_id[topic_instance]) {
-				struct mag_calibration_s mscale = {};
+				mag_calibration_s mscale = {};
+
 				(void)sprintf(str, "CAL_MAG%u_XOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &mscale.x_offset));
 				(void)sprintf(str, "CAL_MAG%u_YOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &mscale.y_offset));
 				(void)sprintf(str, "CAL_MAG%u_ZOFF", i);
 				failed = failed || (OK != param_get(param_find(str), &mscale.z_offset));
+
 				(void)sprintf(str, "CAL_MAG%u_XSCALE", i);
 				failed = failed || (OK != param_get(param_find(str), &mscale.x_scale));
 				(void)sprintf(str, "CAL_MAG%u_YSCALE", i);
@@ -481,12 +485,10 @@ void VotedSensorsUpdate::parameters_update()
 				failed = failed || (OK != param_get(param_find(str), &mscale.z_scale));
 
 				(void)sprintf(str, "CAL_MAG%u_ROT", i);
-
 				int32_t mag_rot;
 				param_get(param_find(str), &mag_rot);
 
 				if (is_external) {
-
 					/* check if this mag is still set as internal, otherwise leave untouched */
 					if (mag_rot < 0) {
 						/* it was marked as internal, change to external with no rotation */
@@ -516,7 +518,6 @@ void VotedSensorsUpdate::parameters_update()
 					PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "mag", i);
 
 				} else {
-
 					/* apply new scaling and offsets */
 					config_ok = apply_mag_calibration(h, &mscale, device_id);
 
@@ -972,7 +973,7 @@ void VotedSensorsUpdate::print_status()
 }
 
 bool
-VotedSensorsUpdate::apply_gyro_calibration(DevHandle &h, const struct gyro_calibration_s *gcal, const int device_id)
+VotedSensorsUpdate::apply_gyro_calibration(DevHandle &h, const gyro_calibration_s *gcal, const int device_id)
 {
 #if !defined(__PX4_QURT) && !defined(__PX4_POSIX_RPI) && !defined(__PX4_POSIX_BEBOP)
 
@@ -986,7 +987,7 @@ VotedSensorsUpdate::apply_gyro_calibration(DevHandle &h, const struct gyro_calib
 }
 
 bool
-VotedSensorsUpdate::apply_accel_calibration(DevHandle &h, const struct accel_calibration_s *acal, const int device_id)
+VotedSensorsUpdate::apply_accel_calibration(DevHandle &h, const accel_calibration_s *acal, const int device_id)
 {
 #if !defined(__PX4_QURT) && !defined(__PX4_POSIX_RPI) && !defined(__PX4_POSIX_BEBOP)
 

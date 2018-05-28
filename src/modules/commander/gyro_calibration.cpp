@@ -70,7 +70,7 @@ typedef struct  {
 	int32_t			device_id[max_gyros];
 	int			gyro_sensor_sub[max_gyros];
 	int			sensor_correction_sub;
-	struct gyro_calibration_s	gyro_scale[max_gyros];
+	gyro_calibration_s	gyro_scale[max_gyros];
 	struct gyro_report	gyro_report_0;
 } gyro_worker_data_t;
 
@@ -214,7 +214,7 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 	worker_data.mavlink_log_pub = mavlink_log_pub;
 
-	struct gyro_calibration_s gyro_scale_zero;
+	gyro_calibration_s gyro_scale_zero;
 	gyro_scale_zero.x_offset = 0.0f;
 	gyro_scale_zero.x_scale = 1.0f;
 	gyro_scale_zero.y_offset = 0.0f;
@@ -243,20 +243,8 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 		// Reset all offsets to 0 and scales to 1
 		(void)memcpy(&worker_data.gyro_scale[s], &gyro_scale_zero, sizeof(gyro_scale_zero));
-#ifdef __PX4_NUTTX
-		sprintf(str, "%s%u", GYRO_BASE_DEVICE_PATH, s);
-		int fd = px4_open(str, 0);
-		if (fd >= 0) {
-			worker_data.device_id[s] = px4_ioctl(fd, DEVIOCGDEVICEID, 0);
-			res = px4_ioctl(fd, GYROIOCSSCALE, (long unsigned int)&gyro_scale_zero);
-			px4_close(fd);
 
-			if (res != PX4_OK) {
-				calibration_log_critical(mavlink_log_pub, CAL_ERROR_RESET_CAL_MSG, s);
-				return PX4_ERROR;
-			}
-		}
-#else
+		// set offsets
 		(void)sprintf(str, "CAL_GYRO%u_XOFF", s);
 		res = param_set_no_notification(param_find(str), &gyro_scale_zero.x_offset);
 		if (res != PX4_OK) {
@@ -272,6 +260,8 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
+
+		// set scale factors
 		(void)sprintf(str, "CAL_GYRO%u_XSCALE", s);
 		res = param_set_no_notification(param_find(str), &gyro_scale_zero.x_scale);
 		if (res != PX4_OK) {
@@ -287,9 +277,9 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 		if (res != PX4_OK) {
 			PX4_ERR("unable to reset %s", str);
 		}
-		param_notify_changes();
-#endif
 
+
+		param_notify_changes();
 	}
 
 	// We should not try to subscribe if the topic doesn't actually exist and can be counted.
@@ -322,13 +312,10 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 			} else {
 				orb_unsubscribe(worker_data.gyro_sensor_sub[cur_gyro]);
 			}
-
 #else
-
 			// For the DriverFramework drivers, we fill device ID (this is the first time) by copying one report.
 			worker_data.device_id[cur_gyro] = report.device_id;
 			found_cur_gyro = true;
-
 #endif
 		}
 
@@ -472,24 +459,6 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 				(void)sprintf(str, "CAL_GYRO%u_ID", uorb_index);
 				failed |= (PX4_OK != param_set_no_notification(param_find(str), &(worker_data.device_id[uorb_index])));
-
-#ifdef __PX4_NUTTX
-				/* apply new scaling and offsets */
-				(void)sprintf(str, "%s%u", GYRO_BASE_DEVICE_PATH, uorb_index);
-				int fd = px4_open(str, 0);
-
-				if (fd < 0) {
-					failed = true;
-					continue;
-				}
-
-				res = px4_ioctl(fd, GYROIOCSSCALE, (long unsigned int)&worker_data.gyro_scale[uorb_index]);
-				px4_close(fd);
-
-				if (res != PX4_OK) {
-					calibration_log_critical(mavlink_log_pub, CAL_ERROR_APPLY_CAL_MSG, 1);
-				}
-#endif
 			}
 		}
 
