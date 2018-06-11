@@ -88,7 +88,8 @@ bool sonar_valid = false;				/**< the mode of all sonar measurements */
   *
   * see datasheet for more info
   */
-void sonar_trigger(){
+void sonar_trigger()
+{
 	GPIO_SetBits(GPIOE, GPIO_Pin_8);
 }
 
@@ -97,38 +98,31 @@ void sonar_trigger(){
   */
 void UART4_IRQHandler(void)
 {
-	if (USART_GetITStatus(UART4, USART_IT_RXNE) != RESET)
-	{
+	if (USART_GetITStatus(UART4, USART_IT_RXNE) != RESET) {
 		/* Read one byte from the receive data register */
 		uint8_t data = (USART_ReceiveData(UART4));
 
-		if (data == 'R')
-		{
+		if (data == 'R') {
 			/* this is the first char (start of transmission) */
 			data_counter = 0;
 			data_valid = 1;
 
 			/* set sonar pin 4 to low -> we want triggered mode */
 			GPIO_ResetBits(GPIOE, GPIO_Pin_8);
-		}
-		else if (0x30 <= data && data <= 0x39)
-		{
-			if (data_valid)
-			{
+
+		} else if (0x30 <= data && data <= 0x39) {
+			if (data_valid) {
 				data_buffer[data_counter] = data;
 				data_counter++;
 			}
-		}
-		else if (data == 0x0D)
-		{
-			if (data_valid && data_counter == 4)
-			{
+
+		} else if (data == 0x0D) {
+			if (data_valid && data_counter == 4) {
 				data_buffer[4] = 0;
 				int temp = atoi(data_buffer);
 
 				/* use real-world maximum ranges to cut off pure noise */
-				if ((temp > SONAR_MIN*SONAR_SCALE) && (temp < SONAR_MAX*SONAR_SCALE))
-				{
+				if ((temp > SONAR_MIN * SONAR_SCALE) && (temp < SONAR_MAX * SONAR_SCALE)) {
 					/* it is in normal sensor range, take it */
 					last_measure_time = measure_time;
 					measure_time = get_boot_time_us();
@@ -142,15 +136,15 @@ void UART4_IRQHandler(void)
 					sonar_mode = valid_data / SONAR_SCALE;
 					new_value = 1;
 					sonar_valid = true;
+
 				} else {
 					sonar_valid = false;
 				}
 			}
 
 			data_valid = 0;
-		}
-		else
-		{
+
+		} else {
 			data_valid = 0;
 		}
 	}
@@ -162,8 +156,7 @@ void UART4_IRQHandler(void)
 static void sonar_filter(void)
 {
 	/* no data for long time */
-	if (dt > 0.25f) // more than 2 values lost
-	{
+	if (dt > 0.25f) { // more than 2 values lost
 		v_pred = 0;
 	}
 
@@ -184,7 +177,7 @@ static void sonar_filter(void)
   * @param  sonar_value_filtered Filtered return value
   * @param  sonar_value_raw Raw return value
   */
-bool sonar_read(float* sonar_value_filtered, float* sonar_value_raw)
+bool sonar_read(float *sonar_value_filtered, float *sonar_value_raw)
 {
 	/* getting new data with only around 10Hz */
 	if (new_value) {
@@ -273,11 +266,11 @@ void sonar_config(void)
 
 uint32_t get_sonar_measure_time()
 {
-    return sonar_measure_time;
+	return sonar_measure_time;
 }
 
 uint32_t get_sonar_measure_time_interrupt()
 {
-    return sonar_measure_time_interrupt;
+	return sonar_measure_time_interrupt;
 }
 

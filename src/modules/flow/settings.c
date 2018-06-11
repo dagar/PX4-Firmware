@@ -38,12 +38,13 @@
 enum global_param_id_t global_param_id;
 struct global_struct global_data;
 
-extern uint8_t debug_int_message_buffer(const char* string, int32_t num);
+extern uint8_t debug_int_message_buffer(const char *string, int32_t num);
 
 /**
  * @brief reset all parameters to default
  */
-void global_data_reset_param_defaults(void){
+void global_data_reset_param_defaults(void)
+{
 
 	global_data.param[PARAM_SYSTEM_ID] = 81;
 	strcpy(global_data.param_name[PARAM_SYSTEM_ID], "SYS_ID");
@@ -255,16 +256,15 @@ void global_data_reset(void)
 void set_sensor_position_settings(uint8_t sensor_position)
 {
 
-	switch(sensor_position)
-	{
-		case(BOTTOM):
-			global_data.param[PARAM_IMAGE_WIDTH] = BOTTOM_FLOW_IMAGE_WIDTH;
-			global_data.param[PARAM_IMAGE_HEIGHT] = BOTTOM_FLOW_IMAGE_HEIGHT;
-			break;
+	switch (sensor_position) {
+	case (BOTTOM):
+		global_data.param[PARAM_IMAGE_WIDTH] = BOTTOM_FLOW_IMAGE_WIDTH;
+		global_data.param[PARAM_IMAGE_HEIGHT] = BOTTOM_FLOW_IMAGE_HEIGHT;
+		break;
 
-		default:
-			debug_int_message_buffer("Unused sensor position:", sensor_position);
-			return;
+	default:
+		debug_int_message_buffer("Unused sensor position:", sensor_position);
+		return;
 	}
 
 	debug_int_message_buffer("Set sensor position:", sensor_position);

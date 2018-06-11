@@ -48,7 +48,7 @@ static void sonar_bubble_sort(float in_out_sonar_values[], unsigned n)
 
 	for (unsigned i = 0; i < (n - 1); i++) {
 		for (unsigned j = 0; j < (n - i - 1); j++) {
-			if (in_out_sonar_values[j] > in_out_sonar_values[j+1]) {
+			if (in_out_sonar_values[j] > in_out_sonar_values[j + 1]) {
 				/* swap two values */
 				t = in_out_sonar_values[j];
 				in_out_sonar_values[j] = in_out_sonar_values[j + 1];
@@ -64,6 +64,7 @@ float insert_sonar_value_and_get_mode_value(float insert)
 
 	sonar_values[insert_index] = insert;
 	insert_index++;
+
 	if (insert_index == sonar_count) {
 		insert_index = 0;
 	}

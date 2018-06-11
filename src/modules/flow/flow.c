@@ -56,78 +56,79 @@
 
 #define sign(x) (( x > 0 ) - ( x < 0 ))
 
-uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rate, float z_rate, float *pixel_flow_x, float *pixel_flow_y);
+uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rate, float z_rate, float *pixel_flow_x,
+		     float *pixel_flow_y);
 
 // compliments of Adam Williams
 #define ABSDIFF(frame1, frame2) \
-({ \
- int result = 0; \
- asm volatile( \
-  "mov %[result], #0\n"           /* accumulator */ \
- \
-  "ldr r4, [%[src], #0]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #0]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #4]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #4]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  "ldr r4, [%[src], #(64 * 1)]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #(64 * 1)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #(64 * 1 + 4)]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #(64 * 1 + 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  "ldr r4, [%[src], #(64 * 2)]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #(64 * 2)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #(64 * 2 + 4)]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #(64 * 2 + 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  "ldr r4, [%[src], #(64 * 3)]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #(64 * 3)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #(64 * 3 + 4)]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #(64 * 3 + 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  "ldr r4, [%[src], #(64 * 4)]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #(64 * 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #(64 * 4 + 4)]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #(64 * 4 + 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  "ldr r4, [%[src], #(64 * 5)]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #(64 * 5)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #(64 * 5 + 4)]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #(64 * 5 + 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  "ldr r4, [%[src], #(64 * 6)]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #(64 * 6)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #(64 * 6 + 4)]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #(64 * 6 + 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  "ldr r4, [%[src], #(64 * 7)]\n"        /* read data from address + offset*/ \
-  "ldr r5, [%[dst], #(64 * 7)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
-  "ldr r4, [%[src], #(64 * 7 + 4)]\n"        /* read data from address + offset */ \
-  "ldr r5, [%[dst], #(64 * 7 + 4)]\n" \
-  "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
- \
-  : [result] "+r" (result) \
-  : [src] "r" (frame1), [dst] "r" (frame2) \
-  : "r4", "r5" \
-  ); \
-  \
- result; \
-})
+	({ \
+		int result = 0; \
+		asm volatile( \
+			      "mov %[result], #0\n"           /* accumulator */ \
+			      \
+			      "ldr r4, [%[src], #0]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #0]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #4]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #4]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      "ldr r4, [%[src], #(64 * 1)]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #(64 * 1)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #(64 * 1 + 4)]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #(64 * 1 + 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      "ldr r4, [%[src], #(64 * 2)]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #(64 * 2)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #(64 * 2 + 4)]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #(64 * 2 + 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      "ldr r4, [%[src], #(64 * 3)]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #(64 * 3)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #(64 * 3 + 4)]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #(64 * 3 + 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      "ldr r4, [%[src], #(64 * 4)]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #(64 * 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #(64 * 4 + 4)]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #(64 * 4 + 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      "ldr r4, [%[src], #(64 * 5)]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #(64 * 5)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #(64 * 5 + 4)]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #(64 * 5 + 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      "ldr r4, [%[src], #(64 * 6)]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #(64 * 6)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #(64 * 6 + 4)]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #(64 * 6 + 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      "ldr r4, [%[src], #(64 * 7)]\n"        /* read data from address + offset*/ \
+			      "ldr r5, [%[dst], #(64 * 7)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      "ldr r4, [%[src], #(64 * 7 + 4)]\n"        /* read data from address + offset */ \
+			      "ldr r5, [%[dst], #(64 * 7 + 4)]\n" \
+			      "usada8 %[result], r4, r5, %[result]\n"      /* difference */ \
+			      \
+			      : [result] "+r" (result) \
+			      : [src] "r" (frame1), [dst] "r" (frame2) \
+			      : "r4", "r5" \
+			    ); \
+		\
+		result; \
+	})
 
 /**
  * @brief Computes the Hessian at a pixel location
@@ -146,12 +147,12 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 static inline uint32_t compute_hessian_4x6(uint8_t *image, uint16_t x, uint16_t y, uint16_t row_size)
 {
 	// candidate for hessian calculation:
-	uint16_t off1 = y*row_size + x;   	// First row of ones
-	uint16_t off2 = (y+1)*row_size + x;   // Second row of ones
-	uint16_t off3 = (y+2)*row_size + x;   // Third row of minus twos
-	uint16_t off4 = (y+3)*row_size + x;   // Third row of minus twos
-	uint16_t off5 = (y+4)*row_size + x;   // Third row of minus twos
-	uint16_t off6 = (y+5)*row_size + x;   // Third row of minus twos
+	uint16_t off1 = y * row_size + x;   	// First row of ones
+	uint16_t off2 = (y + 1) * row_size + x; // Second row of ones
+	uint16_t off3 = (y + 2) * row_size + x; // Third row of minus twos
+	uint16_t off4 = (y + 3) * row_size + x; // Third row of minus twos
+	uint16_t off5 = (y + 4) * row_size + x; // Third row of minus twos
+	uint16_t off6 = (y + 5) * row_size + x; // Third row of minus twos
 	uint32_t magnitude;
 
 	// Uncentered for max. performance:
@@ -164,9 +165,9 @@ static inline uint32_t compute_hessian_4x6(uint8_t *image, uint16_t x, uint16_t 
 	//  1   1   1   1
 	//  1   1   1   1
 
-	magnitude = __UADD8(*((uint32_t*) &image[off1 - 1]), *((uint32_t*) &image[off2 - 1]));
-	magnitude -= 2*__UADD8(*((uint32_t*) &image[off3 - 1]), *((uint32_t*) &image[off4 - 1]));
-	magnitude += __UADD8(*((uint32_t*) &image[off5 - 1]), *((uint32_t*) &image[off6 - 1]));
+	magnitude = __UADD8(*((uint32_t *) &image[off1 - 1]), *((uint32_t *) &image[off2 - 1]));
+	magnitude -= 2 * __UADD8(*((uint32_t *) &image[off3 - 1]), *((uint32_t *) &image[off4 - 1]));
+	magnitude += __UADD8(*((uint32_t *) &image[off5 - 1]), *((uint32_t *) &image[off6 - 1]));
 
 	return magnitude;
 }
@@ -188,15 +189,19 @@ static inline uint32_t compute_diff(uint8_t *image, uint16_t offX, uint16_t offY
 	uint32_t acc;
 
 	/* calc row diff */
-	acc = __USAD8 (*((uint32_t*) &image[off + 0 + 0 * row_size]), *((uint32_t*) &image[off + 0 + 1 * row_size]));
-	acc = __USADA8(*((uint32_t*) &image[off + 0 + 1 * row_size]), *((uint32_t*) &image[off + 0 + 2 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image[off + 0 + 2 * row_size]), *((uint32_t*) &image[off + 0 + 3 * row_size]), acc);
+	acc = __USAD8(*((uint32_t *) &image[off + 0 + 0 * row_size]), *((uint32_t *) &image[off + 0 + 1 * row_size]));
+	acc = __USADA8(*((uint32_t *) &image[off + 0 + 1 * row_size]), *((uint32_t *) &image[off + 0 + 2 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image[off + 0 + 2 * row_size]), *((uint32_t *) &image[off + 0 + 3 * row_size]), acc);
 
 	/* we need to get columns */
-	uint32_t col1 = (image[off + 0 + 0 * row_size] << 24) | image[off + 0 + 1 * row_size] << 16 | image[off + 0 + 2 * row_size] << 8 | image[off + 0 + 3 * row_size];
-	uint32_t col2 = (image[off + 1 + 0 * row_size] << 24) | image[off + 1 + 1 * row_size] << 16 | image[off + 1 + 2 * row_size] << 8 | image[off + 1 + 3 * row_size];
-	uint32_t col3 = (image[off + 2 + 0 * row_size] << 24) | image[off + 2 + 1 * row_size] << 16 | image[off + 2 + 2 * row_size] << 8 | image[off + 2 + 3 * row_size];
-	uint32_t col4 = (image[off + 3 + 0 * row_size] << 24) | image[off + 3 + 1 * row_size] << 16 | image[off + 3 + 2 * row_size] << 8 | image[off + 3 + 3 * row_size];
+	uint32_t col1 = (image[off + 0 + 0 * row_size] << 24) | image[off + 0 + 1 * row_size] << 16 | image[off + 0 + 2 *
+			row_size] << 8 | image[off + 0 + 3 * row_size];
+	uint32_t col2 = (image[off + 1 + 0 * row_size] << 24) | image[off + 1 + 1 * row_size] << 16 | image[off + 1 + 2 *
+			row_size] << 8 | image[off + 1 + 3 * row_size];
+	uint32_t col3 = (image[off + 2 + 0 * row_size] << 24) | image[off + 2 + 1 * row_size] << 16 | image[off + 2 + 2 *
+			row_size] << 8 | image[off + 2 + 3 * row_size];
+	uint32_t col4 = (image[off + 3 + 0 * row_size] << 24) | image[off + 3 + 1 * row_size] << 16 | image[off + 3 + 2 *
+			row_size] << 8 | image[off + 3 + 3 * row_size];
 
 	/* calc column diff */
 	acc = __USADA8(col1, col2, acc);
@@ -218,7 +223,8 @@ static inline uint32_t compute_diff(uint8_t *image, uint16_t offX, uint16_t offY
  * @param off2Y y coordinate of upper left corner of pattern in image2
  * @param acc array to store SAD distances for shift in every direction
  */
-static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16_t off1X, uint16_t off1Y, uint16_t off2X, uint16_t off2Y, uint32_t *acc, uint16_t row_size)
+static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16_t off1X, uint16_t off1Y,
+					uint16_t off2X, uint16_t off2Y, uint32_t *acc, uint16_t row_size)
 {
 	/* calculate position in image buffer */
 	uint16_t off1 = off1Y * row_size + off1X; // image1
@@ -226,8 +232,7 @@ static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16
 
 	uint32_t s0, s1, s2, s3, s4, s5, s6, s7, t1, t3, t5, t7;
 
-	for (uint16_t i = 0; i < 8; i++)
-	{
+	for (uint16_t i = 0; i < 8; i++) {
 		acc[i] = 0;
 	}
 
@@ -243,8 +248,7 @@ static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16
 	 *
 	 */
 
-	for (uint16_t i = 0; i < 8; i++)
-	{
+	for (uint16_t i = 0; i < 8; i++) {
 		/*
 		 * first column of 4 pixels:
 		 *
@@ -266,14 +270,22 @@ static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16
 		 */
 
 		/* compute average of two pixel values */
-		s0 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i+0) * row_size]), *((uint32_t*) &image2[off2 + 1 + (i+0) * row_size])));
-		s1 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i+1) * row_size]), *((uint32_t*) &image2[off2 + 1 + (i+1) * row_size])));
-		s2 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i+0) * row_size]), *((uint32_t*) &image2[off2 + 0 + (i+1) * row_size])));
-		s3 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i+1) * row_size]), *((uint32_t*) &image2[off2 - 1 + (i+1) * row_size])));
-		s4 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i+0) * row_size]), *((uint32_t*) &image2[off2 - 1 + (i+0) * row_size])));
-		s5 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i-1) * row_size]), *((uint32_t*) &image2[off2 - 1 + (i-1) * row_size])));
-		s6 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i+0) * row_size]), *((uint32_t*) &image2[off2 + 0 + (i-1) * row_size])));
-		s7 = (__UHADD8(*((uint32_t*) &image2[off2 +  0 + (i-1) * row_size]), *((uint32_t*) &image2[off2 + 1 + (i-1) * row_size])));
+		s0 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 + 1 + (i + 0) * row_size])));
+		s1 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i + 1) * row_size]),
+			       *((uint32_t *) &image2[off2 + 1 + (i + 1) * row_size])));
+		s2 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 + 0 + (i + 1) * row_size])));
+		s3 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i + 1) * row_size]),
+			       *((uint32_t *) &image2[off2 - 1 + (i + 1) * row_size])));
+		s4 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 - 1 + (i + 0) * row_size])));
+		s5 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i - 1) * row_size]),
+			       *((uint32_t *) &image2[off2 - 1 + (i - 1) * row_size])));
+		s6 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 + 0 + (i - 1) * row_size])));
+		s7 = (__UHADD8(*((uint32_t *) &image2[off2 +  0 + (i - 1) * row_size]),
+			       *((uint32_t *) &image2[off2 + 1 + (i - 1) * row_size])));
 
 		/* these 4 t values are from the corners around the center pixel */
 		t1 = (__UHADD8(s0, s1));
@@ -293,14 +305,14 @@ static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16
 		 */
 
 		/* fill accumulation vector */
-		acc[0] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), s0, acc[0]);
-		acc[1] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), t1, acc[1]);
-		acc[2] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), s2, acc[2]);
-		acc[3] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), t3, acc[3]);
-		acc[4] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), s4, acc[4]);
-		acc[5] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), t5, acc[5]);
-		acc[6] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), s6, acc[6]);
-		acc[7] = __USADA8 ((*((uint32_t*) &image1[off1 + 0 + i * row_size])), t7, acc[7]);
+		acc[0] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), s0, acc[0]);
+		acc[1] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), t1, acc[1]);
+		acc[2] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), s2, acc[2]);
+		acc[3] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), t3, acc[3]);
+		acc[4] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), s4, acc[4]);
+		acc[5] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), t5, acc[5]);
+		acc[6] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), s6, acc[6]);
+		acc[7] = __USADA8((*((uint32_t *) &image1[off1 + 0 + i * row_size])), t7, acc[7]);
 
 		/*
 		 * same for second column of 4 pixels:
@@ -311,28 +323,36 @@ static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16
 		 *
 		 */
 
-		s0 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i+0) * row_size]), *((uint32_t*) &image2[off2 + 5 + (i+0) * row_size])));
-		s1 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i+1) * row_size]), *((uint32_t*) &image2[off2 + 5 + (i+1) * row_size])));
-		s2 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i+0) * row_size]), *((uint32_t*) &image2[off2 + 4 + (i+1) * row_size])));
-		s3 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i+1) * row_size]), *((uint32_t*) &image2[off2 + 3 + (i+1) * row_size])));
-		s4 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i+0) * row_size]), *((uint32_t*) &image2[off2 + 3 + (i+0) * row_size])));
-		s5 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i-1) * row_size]), *((uint32_t*) &image2[off2 + 3 + (i-1) * row_size])));
-		s6 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i+0) * row_size]), *((uint32_t*) &image2[off2 + 4 + (i-1) * row_size])));
-		s7 = (__UHADD8(*((uint32_t*) &image2[off2 + 4 + (i-1) * row_size]), *((uint32_t*) &image2[off2 + 5 + (i-1) * row_size])));
+		s0 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 + 5 + (i + 0) * row_size])));
+		s1 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i + 1) * row_size]),
+			       *((uint32_t *) &image2[off2 + 5 + (i + 1) * row_size])));
+		s2 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 + 4 + (i + 1) * row_size])));
+		s3 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i + 1) * row_size]),
+			       *((uint32_t *) &image2[off2 + 3 + (i + 1) * row_size])));
+		s4 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 + 3 + (i + 0) * row_size])));
+		s5 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i - 1) * row_size]),
+			       *((uint32_t *) &image2[off2 + 3 + (i - 1) * row_size])));
+		s6 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i + 0) * row_size]),
+			       *((uint32_t *) &image2[off2 + 4 + (i - 1) * row_size])));
+		s7 = (__UHADD8(*((uint32_t *) &image2[off2 + 4 + (i - 1) * row_size]),
+			       *((uint32_t *) &image2[off2 + 5 + (i - 1) * row_size])));
 
 		t1 = (__UHADD8(s0, s1));
 		t3 = (__UHADD8(s3, s4));
 		t5 = (__UHADD8(s4, s5));
 		t7 = (__UHADD8(s7, s0));
 
-		acc[0] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), s0, acc[0]);
-		acc[1] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), t1, acc[1]);
-		acc[2] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), s2, acc[2]);
-		acc[3] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), t3, acc[3]);
-		acc[4] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), s4, acc[4]);
-		acc[5] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), t5, acc[5]);
-		acc[6] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), s6, acc[6]);
-		acc[7] = __USADA8 ((*((uint32_t*) &image1[off1 + 4 + i * row_size])), t7, acc[7]);
+		acc[0] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), s0, acc[0]);
+		acc[1] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), t1, acc[1]);
+		acc[2] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), s2, acc[2]);
+		acc[3] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), t3, acc[3]);
+		acc[4] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), s4, acc[4]);
+		acc[5] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), t5, acc[5]);
+		acc[6] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), s6, acc[6]);
+		acc[7] = __USADA8((*((uint32_t *) &image1[off1 + 4 + i * row_size])), t7, acc[7]);
 	}
 
 	return 0;
@@ -348,36 +368,37 @@ static inline uint32_t compute_subpixel(uint8_t *image1, uint8_t *image2, uint16
  * @param off2X x coordinate of upper left corner of pattern in image2
  * @param off2Y y coordinate of upper left corner of pattern in image2
  */
-static inline uint32_t compute_sad_8x8(uint8_t *image1, uint8_t *image2, uint16_t off1X, uint16_t off1Y, uint16_t off2X, uint16_t off2Y, uint16_t row_size)
+static inline uint32_t compute_sad_8x8(uint8_t *image1, uint8_t *image2, uint16_t off1X, uint16_t off1Y, uint16_t off2X,
+				       uint16_t off2Y, uint16_t row_size)
 {
 	/* calculate position in image buffer */
 	uint16_t off1 = off1Y * row_size + off1X; // image1
 	uint16_t off2 = off2Y * row_size + off2X; // image2
 
 	uint32_t acc;
-	acc = __USAD8 (*((uint32_t*) &image1[off1 + 0 + 0 * row_size]), *((uint32_t*) &image2[off2 + 0 + 0 * row_size]));
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 0 * row_size]), *((uint32_t*) &image2[off2 + 4 + 0 * row_size]), acc);
+	acc = __USAD8(*((uint32_t *) &image1[off1 + 0 + 0 * row_size]), *((uint32_t *) &image2[off2 + 0 + 0 * row_size]));
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 0 * row_size]), *((uint32_t *) &image2[off2 + 4 + 0 * row_size]), acc);
 
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 0 + 1 * row_size]), *((uint32_t*) &image2[off2 + 0 + 1 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 1 * row_size]), *((uint32_t*) &image2[off2 + 4 + 1 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 0 + 1 * row_size]), *((uint32_t *) &image2[off2 + 0 + 1 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 1 * row_size]), *((uint32_t *) &image2[off2 + 4 + 1 * row_size]), acc);
 
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 0 + 2 * row_size]), *((uint32_t*) &image2[off2 + 0 + 2 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 2 * row_size]), *((uint32_t*) &image2[off2 + 4 + 2 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 0 + 2 * row_size]), *((uint32_t *) &image2[off2 + 0 + 2 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 2 * row_size]), *((uint32_t *) &image2[off2 + 4 + 2 * row_size]), acc);
 
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 0 + 3 * row_size]), *((uint32_t*) &image2[off2 + 0 + 3 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 3 * row_size]), *((uint32_t*) &image2[off2 + 4 + 3 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 0 + 3 * row_size]), *((uint32_t *) &image2[off2 + 0 + 3 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 3 * row_size]), *((uint32_t *) &image2[off2 + 4 + 3 * row_size]), acc);
 
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 0 + 4 * row_size]), *((uint32_t*) &image2[off2 + 0 + 4 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 4 * row_size]), *((uint32_t*) &image2[off2 + 4 + 4 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 0 + 4 * row_size]), *((uint32_t *) &image2[off2 + 0 + 4 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 4 * row_size]), *((uint32_t *) &image2[off2 + 4 + 4 * row_size]), acc);
 
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 0 + 5 * row_size]), *((uint32_t*) &image2[off2 + 0 + 5 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 5 * row_size]), *((uint32_t*) &image2[off2 + 4 + 5 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 0 + 5 * row_size]), *((uint32_t *) &image2[off2 + 0 + 5 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 5 * row_size]), *((uint32_t *) &image2[off2 + 4 + 5 * row_size]), acc);
 
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 0 + 6 * row_size]), *((uint32_t*) &image2[off2 + 0 + 6 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 6 * row_size]), *((uint32_t*) &image2[off2 + 4 + 6 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 0 + 6 * row_size]), *((uint32_t *) &image2[off2 + 0 + 6 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 6 * row_size]), *((uint32_t *) &image2[off2 + 4 + 6 * row_size]), acc);
 
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 0 + 7 * row_size]), *((uint32_t*) &image2[off2 + 0 + 7 * row_size]), acc);
-	acc = __USADA8(*((uint32_t*) &image1[off1 + 4 + 7 * row_size]), *((uint32_t*) &image2[off2 + 4 + 7 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 0 + 7 * row_size]), *((uint32_t *) &image2[off2 + 0 + 7 * row_size]), acc);
+	acc = __USADA8(*((uint32_t *) &image1[off1 + 4 + 7 * row_size]), *((uint32_t *) &image2[off2 + 4 + 7 * row_size]), acc);
 
 	return acc;
 }
@@ -396,17 +417,19 @@ static inline uint32_t compute_sad_8x8(uint8_t *image1, uint8_t *image2, uint16_
  *
  * @return quality of flow calculation
  */
-uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rate, float z_rate, float *pixel_flow_x, float *pixel_flow_y) {
+uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rate, float z_rate, float *pixel_flow_x,
+		     float *pixel_flow_y)
+{
 
 	/* constants */
 	const int16_t winmin = -SEARCH_SIZE;
 	const int16_t winmax = SEARCH_SIZE;
-	const uint16_t hist_size = 2*(winmax-winmin+1)+1;
+	const uint16_t hist_size = 2 * (winmax - winmin + 1) + 1;
 
 	/* variables */
-        uint16_t pixLo = SEARCH_SIZE + 1;
-        uint16_t pixHi = FRAME_SIZE - (SEARCH_SIZE + 1) - TILE_SIZE;
-        uint16_t pixStep = (pixHi - pixLo) / NUM_BLOCKS + 1;
+	uint16_t pixLo = SEARCH_SIZE + 1;
+	uint16_t pixHi = FRAME_SIZE - (SEARCH_SIZE + 1) - TILE_SIZE;
+	uint16_t pixStep = (pixHi - pixLo) / NUM_BLOCKS + 1;
 	uint16_t i, j;
 	uint32_t acc[8]; // subpixels
 	uint16_t histx[hist_size]; // counter for x shift
@@ -425,14 +448,12 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 
 	/* iterate over all patterns
 	 */
-	for (j = pixLo; j < pixHi; j += pixStep)
-	{
-		for (i = pixLo; i < pixHi; i += pixStep)
-		{
+	for (j = pixLo; j < pixHi; j += pixStep) {
+		for (i = pixLo; i < pixHi; i += pixStep) {
 			/* test pixel if it is suitable for flow tracking */
 			uint32_t diff = compute_diff(image1, i, j, (uint16_t) global_data.param[PARAM_IMAGE_WIDTH]);
-			if (diff < global_data.param[PARAM_BOTTOM_FLOW_FEATURE_THRESHOLD])
-			{
+
+			if (diff < global_data.param[PARAM_BOTTOM_FLOW_FEATURE_THRESHOLD]) {
 				continue;
 			}
 
@@ -443,16 +464,14 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 
 			uint8_t *base1 = image1 + j * (uint16_t) global_data.param[PARAM_IMAGE_WIDTH] + i;
 
-			for (jj = winmin; jj <= winmax; jj++)
-			{
-				uint8_t *base2 = image2 + (j+jj) * (uint16_t) global_data.param[PARAM_IMAGE_WIDTH] + i;
+			for (jj = winmin; jj <= winmax; jj++) {
+				uint8_t *base2 = image2 + (j + jj) * (uint16_t) global_data.param[PARAM_IMAGE_WIDTH] + i;
 
-				for (ii = winmin; ii <= winmax; ii++)
-				{
+				for (ii = winmin; ii <= winmax; ii++) {
 //					uint32_t temp_dist = compute_sad_8x8(image1, image2, i, j, i + ii, j + jj, (uint16_t) global_data.param[PARAM_IMAGE_WIDTH]);
 					uint32_t temp_dist = ABSDIFF(base1, base2 + ii);
-					if (temp_dist < dist)
-					{
+
+					if (temp_dist < dist) {
 						sumx = ii;
 						sumy = jj;
 						dist = temp_dist;
@@ -461,35 +480,39 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 			}
 
 			/* acceptance SAD distance threshhold */
-			if (dist < global_data.param[PARAM_BOTTOM_FLOW_VALUE_THRESHOLD])
-			{
+			if (dist < global_data.param[PARAM_BOTTOM_FLOW_VALUE_THRESHOLD]) {
 				meanflowx += (float) sumx;
 				meanflowy += (float) sumy;
 
 				compute_subpixel(image1, image2, i, j, i + sumx, j + sumy, acc, (uint16_t) global_data.param[PARAM_IMAGE_WIDTH]);
 				uint32_t mindist = dist; // best SAD until now
 				uint8_t mindir = 8; // direction 8 for no direction
-				for(uint8_t k = 0; k < 8; k++)
-				{
-					if (acc[k] < mindist)
-					{
+
+				for (uint8_t k = 0; k < 8; k++) {
+					if (acc[k] < mindist) {
 						// SAD becomes better in direction k
 						mindist = acc[k];
 						mindir = k;
 					}
 				}
+
 				dirsx[meancount] = sumx;
 				dirsy[meancount] = sumy;
 				subdirs[meancount] = mindir;
 				meancount++;
 
 				/* feed histogram filter*/
-				uint8_t hist_index_x = 2*sumx + (winmax-winmin+1);
-				if (subdirs[i] == 0 || subdirs[i] == 1 || subdirs[i] == 7) hist_index_x += 1;
-				if (subdirs[i] == 3 || subdirs[i] == 4 || subdirs[i] == 5) hist_index_x += -1;
-				uint8_t hist_index_y = 2*sumy + (winmax-winmin+1);
-				if (subdirs[i] == 5 || subdirs[i] == 6 || subdirs[i] == 7) hist_index_y += -1;
-				if (subdirs[i] == 1 || subdirs[i] == 2 || subdirs[i] == 3) hist_index_y += 1;
+				uint8_t hist_index_x = 2 * sumx + (winmax - winmin + 1);
+
+				if (subdirs[i] == 0 || subdirs[i] == 1 || subdirs[i] == 7) { hist_index_x += 1; }
+
+				if (subdirs[i] == 3 || subdirs[i] == 4 || subdirs[i] == 5) { hist_index_x += -1; }
+
+				uint8_t hist_index_y = 2 * sumy + (winmax - winmin + 1);
+
+				if (subdirs[i] == 5 || subdirs[i] == 6 || subdirs[i] == 7) { hist_index_y += -1; }
+
+				if (subdirs[i] == 1 || subdirs[i] == 2 || subdirs[i] == 3) { hist_index_y += 1; }
 
 				histx[hist_index_x]++;
 				histy[hist_index_y]++;
@@ -501,16 +524,14 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 	/* create flow image if needed (image1 is not needed anymore)
 	 * -> can be used for debugging purpose
 	 */
-	if (FLOAT_AS_BOOL(global_data.param[PARAM_USB_SEND_VIDEO]))//&& global_data.param[PARAM_VIDEO_USB_MODE] == FLOW_VIDEO)
-	{
-		for (j = pixLo; j < pixHi; j += pixStep)
-		{
-			for (i = pixLo; i < pixHi; i += pixStep)
-			{
+	if (FLOAT_AS_BOOL(
+		    global_data.param[PARAM_USB_SEND_VIDEO])) { //&& global_data.param[PARAM_VIDEO_USB_MODE] == FLOW_VIDEO)
+		for (j = pixLo; j < pixHi; j += pixStep) {
+			for (i = pixLo; i < pixHi; i += pixStep) {
 
 				uint32_t diff = compute_diff(image1, i, j, (uint16_t) global_data.param[PARAM_IMAGE_WIDTH]);
-				if (diff > global_data.param[PARAM_BOTTOM_FLOW_FEATURE_THRESHOLD])
-				{
+
+				if (diff > global_data.param[PARAM_BOTTOM_FLOW_FEATURE_THRESHOLD]) {
 					image1[j * ((uint16_t) global_data.param[PARAM_IMAGE_WIDTH]) + i] = 255;
 				}
 
@@ -519,8 +540,7 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 	}
 
 	/* evaluate flow calculation */
-	if (meancount > 10)
-	{
+	if (meancount > 10) {
 		meanflowx /= meancount;
 		meanflowy /= meancount;
 
@@ -530,25 +550,21 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 		uint16_t maxvaluey = 0;
 
 		/* position of maximal histogram peek */
-		for (j = 0; j < hist_size; j++)
-		{
-			if (histx[j] > maxvaluex)
-			{
+		for (j = 0; j < hist_size; j++) {
+			if (histx[j] > maxvaluex) {
 				maxvaluex = histx[j];
 				maxpositionx = j;
 			}
-			if (histy[j] > maxvaluey)
-			{
+
+			if (histy[j] > maxvaluey) {
 				maxvaluey = histy[j];
 				maxpositiony = j;
 			}
 		}
 
 		/* check if there is a peak value in histogram */
-		if (1) //(histx[maxpositionx] > meancount / 6 && histy[maxpositiony] > meancount / 6)
-		{
-			if (FLOAT_AS_BOOL(global_data.param[PARAM_BOTTOM_FLOW_HIST_FILTER]))
-			{
+		if (1) { //(histx[maxpositionx] > meancount / 6 && histy[maxpositiony] > meancount / 6)
+			if (FLOAT_AS_BOOL(global_data.param[PARAM_BOTTOM_FLOW_HIST_FILTER])) {
 
 				/* use histogram filter peek value */
 				uint16_t hist_x_min = maxpositionx;
@@ -557,55 +573,45 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 				uint16_t hist_y_max = maxpositiony;
 
 				/* x direction */
-				if (maxpositionx > 1 && maxpositionx < hist_size-2)
-				{
+				if (maxpositionx > 1 && maxpositionx < hist_size - 2) {
 					hist_x_min = maxpositionx - 2;
 					hist_x_max = maxpositionx + 2;
-				}
-				else if (maxpositionx == 0)
-				{
+
+				} else if (maxpositionx == 0) {
 					hist_x_min = maxpositionx;
 					hist_x_max = maxpositionx + 2;
-				}
-				else  if (maxpositionx == hist_size-1)
-				{
+
+				} else  if (maxpositionx == hist_size - 1) {
 					hist_x_min = maxpositionx - 2;
 					hist_x_max = maxpositionx;
-				}
-				else if (maxpositionx == 1)
-				{
+
+				} else if (maxpositionx == 1) {
 					hist_x_min = maxpositionx - 1;
 					hist_x_max = maxpositionx + 2;
-				}
-				else  if (maxpositionx == hist_size-2)
-				{
+
+				} else  if (maxpositionx == hist_size - 2) {
 					hist_x_min = maxpositionx - 2;
 					hist_x_max = maxpositionx + 1;
 				}
 
 				/* y direction */
-				if (maxpositiony > 1 && maxpositiony < hist_size-2)
-				{
+				if (maxpositiony > 1 && maxpositiony < hist_size - 2) {
 					hist_y_min = maxpositiony - 2;
 					hist_y_max = maxpositiony + 2;
-				}
-				else if (maxpositiony == 0)
-				{
+
+				} else if (maxpositiony == 0) {
 					hist_y_min = maxpositiony;
 					hist_y_max = maxpositiony + 2;
-				}
-				else if (maxpositiony == hist_size-1)
-				{
+
+				} else if (maxpositiony == hist_size - 1) {
 					hist_y_min = maxpositiony - 2;
 					hist_y_max = maxpositiony;
-				}
-				else if (maxpositiony == 1)
-				{
+
+				} else if (maxpositiony == 1) {
 					hist_y_min = maxpositiony - 1;
 					hist_y_max = maxpositiony + 2;
-				}
-				else if (maxpositiony == hist_size-2)
-				{
+
+				} else if (maxpositiony == hist_size - 2) {
 					hist_y_min = maxpositiony - 2;
 					hist_y_max = maxpositiony + 1;
 				}
@@ -616,40 +622,41 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 				float hist_y_value = 0.0f;
 				float hist_y_weight = 0.0f;
 
-				for (uint8_t h = hist_x_min; h < hist_x_max+1; h++)
-				{
-					hist_x_value += (float) (h*histx[h]);
+				for (uint8_t h = hist_x_min; h < hist_x_max + 1; h++) {
+					hist_x_value += (float)(h * histx[h]);
 					hist_x_weight += (float) histx[h];
 				}
 
-				for (uint8_t h = hist_y_min; h<hist_y_max+1; h++)
-				{
-					hist_y_value += (float) (h*histy[h]);
+				for (uint8_t h = hist_y_min; h < hist_y_max + 1; h++) {
+					hist_y_value += (float)(h * histy[h]);
 					hist_y_weight += (float) histy[h];
 				}
 
-				histflowx = (hist_x_value/hist_x_weight - (winmax-winmin+1)) / 2.0f ;
-				histflowy = (hist_y_value/hist_y_weight - (winmax-winmin+1)) / 2.0f;
+				histflowx = (hist_x_value / hist_x_weight - (winmax - winmin + 1)) / 2.0f ;
+				histflowy = (hist_y_value / hist_y_weight - (winmax - winmin + 1)) / 2.0f;
 
-			}
-			else
-			{
+			} else {
 
 				/* use average of accepted flow values */
 				uint32_t meancount_x = 0;
 				uint32_t meancount_y = 0;
 
-				for (uint8_t h = 0; h < meancount; h++)
-				{
+				for (uint8_t h = 0; h < meancount; h++) {
 					float subdirx = 0.0f;
-					if (subdirs[h] == 0 || subdirs[h] == 1 || subdirs[h] == 7) subdirx = 0.5f;
-					if (subdirs[h] == 3 || subdirs[h] == 4 || subdirs[h] == 5) subdirx = -0.5f;
+
+					if (subdirs[h] == 0 || subdirs[h] == 1 || subdirs[h] == 7) { subdirx = 0.5f; }
+
+					if (subdirs[h] == 3 || subdirs[h] == 4 || subdirs[h] == 5) { subdirx = -0.5f; }
+
 					histflowx += (float)dirsx[h] + subdirx;
 					meancount_x++;
 
 					float subdiry = 0.0f;
-					if (subdirs[h] == 5 || subdirs[h] == 6 || subdirs[h] == 7) subdiry = -0.5f;
-					if (subdirs[h] == 1 || subdirs[h] == 2 || subdirs[h] == 3) subdiry = 0.5f;
+
+					if (subdirs[h] == 5 || subdirs[h] == 6 || subdirs[h] == 7) { subdiry = -0.5f; }
+
+					if (subdirs[h] == 1 || subdirs[h] == 2 || subdirs[h] == 3) { subdiry = 0.5f; }
+
 					histflowy += (float)dirsy[h] + subdiry;
 					meancount_y++;
 				}
@@ -661,7 +668,8 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 
 			/* compensate rotation */
 			/* calculate focal_length in pixel */
-			const float focal_length_px = (global_data.param[PARAM_FOCAL_LENGTH_MM]) / (4.0f * 6.0f) * 1000.0f; //original focal lenght: 12mm pixelsize: 6um, binning 4 enabled
+			const float focal_length_px = (global_data.param[PARAM_FOCAL_LENGTH_MM]) / (4.0f * 6.0f) *
+						      1000.0f; //original focal lenght: 12mm pixelsize: 6um, binning 4 enabled
 
 			/*
 			 * gyro compensation
@@ -672,43 +680,44 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 			 * -y_rate gives x flow
 			 * x_rates gives y_flow
 			 */
-			if (FLOAT_AS_BOOL(global_data.param[PARAM_BOTTOM_FLOW_GYRO_COMPENSATION]))
-			{
-				if(fabsf(y_rate) > global_data.param[PARAM_GYRO_COMPENSATION_THRESHOLD])
-				{
+			if (FLOAT_AS_BOOL(global_data.param[PARAM_BOTTOM_FLOW_GYRO_COMPENSATION])) {
+				if (fabsf(y_rate) > global_data.param[PARAM_GYRO_COMPENSATION_THRESHOLD]) {
 					/* calc pixel of gyro */
 					float y_rate_pixel = y_rate * (get_time_between_images() / 1000000.0f) * focal_length_px;
 					float comp_x = histflowx + y_rate_pixel;
 
-                    /* clamp value to maximum search window size plus half pixel from subpixel search */
-                    if (comp_x < (-SEARCH_SIZE - 0.5f))
-                    	*pixel_flow_x = (-SEARCH_SIZE - 0.5f);
-                    else if (comp_x > (SEARCH_SIZE + 0.5f))
-                    	*pixel_flow_x = (SEARCH_SIZE + 0.5f);
-                    else
-                    	*pixel_flow_x = comp_x;
-				}
-				else
-				{
+					/* clamp value to maximum search window size plus half pixel from subpixel search */
+					if (comp_x < (-SEARCH_SIZE - 0.5f)) {
+						*pixel_flow_x = (-SEARCH_SIZE - 0.5f);
+
+					} else if (comp_x > (SEARCH_SIZE + 0.5f)) {
+						*pixel_flow_x = (SEARCH_SIZE + 0.5f);
+
+					} else {
+						*pixel_flow_x = comp_x;
+					}
+
+				} else {
 					*pixel_flow_x = histflowx;
 				}
 
-				if(fabsf(x_rate) > global_data.param[PARAM_GYRO_COMPENSATION_THRESHOLD])
-				{
+				if (fabsf(x_rate) > global_data.param[PARAM_GYRO_COMPENSATION_THRESHOLD]) {
 					/* calc pixel of gyro */
 					float x_rate_pixel = x_rate * (get_time_between_images() / 1000000.0f) * focal_length_px;
 					float comp_y = histflowy - x_rate_pixel;
 
 					/* clamp value to maximum search window size plus/minus half pixel from subpixel search */
-					if (comp_y < (-SEARCH_SIZE - 0.5f))
+					if (comp_y < (-SEARCH_SIZE - 0.5f)) {
 						*pixel_flow_y = (-SEARCH_SIZE - 0.5f);
-					else if (comp_y > (SEARCH_SIZE + 0.5f))
+
+					} else if (comp_y > (SEARCH_SIZE + 0.5f)) {
 						*pixel_flow_y = (SEARCH_SIZE + 0.5f);
-					else
+
+					} else {
 						*pixel_flow_y = comp_y;
-				}
-				else
-				{
+					}
+
+				} else {
 					*pixel_flow_y = histflowy;
 				}
 
@@ -719,30 +728,26 @@ uint8_t compute_flow(uint8_t *image1, uint8_t *image2, float x_rate, float y_rat
 //				/* compensate x rotation */
 //				*pixel_flow_y = histflowy - x_rate_pixel;
 
-			} else
-			{
+			} else {
 				/* without gyro compensation */
 				*pixel_flow_x = histflowx;
 				*pixel_flow_y = histflowy;
 			}
 
-		}
-		else
-		{
+		} else {
 			*pixel_flow_x = 0.0f;
 			*pixel_flow_y = 0.0f;
 			return 0;
 		}
-	}
-	else
-	{
+
+	} else {
 		*pixel_flow_x = 0.0f;
 		*pixel_flow_y = 0.0f;
 		return 0;
 	}
 
 	/* calc quality */
-	uint8_t qual = (uint8_t)(meancount * 255 / (NUM_BLOCKS*NUM_BLOCKS));
+	uint8_t qual = (uint8_t)(meancount * 255 / (NUM_BLOCKS * NUM_BLOCKS));
 
 	return qual;
 }
