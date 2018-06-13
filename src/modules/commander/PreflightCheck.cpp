@@ -418,7 +418,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, bool optional, bool rep
 	differential_pressure_s differential_pressure = {};
 
 	if ((orb_copy(ORB_ID(differential_pressure), fd_diffpres, &differential_pressure) != PX4_OK) ||
-	    (hrt_elapsed_time(&differential_pressure.timestamp) > 1000000)) {
+	    (hrt_elapsed_time(&differential_pressure.timestamp) > 1_s)) {
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: AIRSPEED SENSOR MISSING");
 		}
@@ -428,7 +428,7 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, bool optional, bool rep
 	}
 
 	if ((orb_copy(ORB_ID(airspeed), fd_airspeed, &airspeed) != PX4_OK) ||
-	    (hrt_elapsed_time(&airspeed.timestamp) > 1000000)) {
+	    (hrt_elapsed_time(&airspeed.timestamp) > 1_s)) {
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: AIRSPEED SENSOR MISSING");
 		}
@@ -446,6 +446,16 @@ static bool airspeedCheck(orb_advert_t *mavlink_log_pub, bool optional, bool rep
 	if (prearm && fabsf(airspeed.confidence) < 0.95f) {
 		if (report_fail) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: AIRSPEED SENSOR STUCK");
+		}
+
+		success = false;
+		goto out;
+	}
+
+	if (prearm && fabsf(airspeed.indicated_airspeed) > 10.0f) {
+		// also check if < -2ish?
+		if (report_fail) {
+			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: CHECK AIRSPEED");
 		}
 
 		success = false;
@@ -688,22 +698,6 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, const vehicle_status_s &statu
 	}
 
 	reportFailures = (reportFailures && status_flags.condition_system_hotplug_timeout && !status_flags.condition_calibration_enabled);
-
-#ifdef __PX4_QURT
-	// WARNING: Preflight checks are important and should be added back when
-	// all the sensors are supported
-	PX4_WARN("Preflight checks always pass on Snapdragon.");
-	checkSensors = false;
-#elif defined(__PX4_POSIX_RPI)
-	PX4_WARN("Preflight checks for mag, acc, gyro always pass on RPI");
-	checkSensors = false;
-#elif defined(__PX4_POSIX_BEBOP)
-	PX4_WARN("Preflight checks always pass on Bebop.");
-	checkSensors = false;
-#elif defined(__PX4_POSIX_OCPOC)
-	PX4_WARN("Preflight checks always pass on OcPoC.");
-	checkSensors = false;
-#endif
 
 	bool failed = false;
 

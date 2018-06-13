@@ -773,3 +773,219 @@ PARAM_DEFINE_INT32(COM_FLIGHT_UUID, 0);
  * @group Mission
  */
 PARAM_DEFINE_INT32(COM_TAKEOFF_ACT, 0);
+
+/**
+ * Integer bitmask controlling GPS checks.
+ *
+ * Set bits to 1 to enable checks. Checks enabled by the following bit positions
+ * 0 : Minimum required sat count set by EKF2_REQ_NSATS
+ * 1 : Minimum required GDoP set by EKF2_REQ_GDOP
+ * 2 : Maximum allowed horizontal position error set by EKF2_REQ_EPH
+ * 3 : Maximum allowed vertical position error set by EKF2_REQ_EPV
+ * 4 : Maximum allowed speed error set by EKF2_REQ_SACC
+ * 5 : Maximum allowed horizontal position rate set by EKF2_REQ_HDRIFT. This check can only be used if the vehicle is stationary during alignment.
+ * 6 : Maximum allowed vertical position rate set by EKF2_REQ_VDRIFT. This check can only be used if the vehicle is stationary during alignment.
+ * 7 : Maximum allowed horizontal speed set by EKF2_REQ_HDRIFT. This check can only be used if the vehicle is stationary during alignment.
+ * 8 : Maximum allowed vertical velocity discrepancy set by EKF2_REQ_VDRIFT
+ *
+ * @group Commander
+ * @min 0
+ * @max 511
+ * @bit 0 Global Position
+ * @bit 1 GPS
+ * @bit 2 Mission
+ * @bit 3 Estimator health
+ * @bit 4 Accelerometer consistency
+ * @bit 5 Gyro consistency
+ * @bit 6 Magnetometer consistency
+ * @bit 7 Airspeed
+ */
+PARAM_DEFINE_INT32(COM_ARM_REQ, 0);
+
+// authorization?
+// sensors (presence, health, required, consistency)
+// estimator based on configuration
+// local position and global position validity
+// requirements for current main state must be met (main_state != nav_state)
+// valid attitude
+// valid airspeed (positive, confidence, multi)
+// local position
+// velocity
+// global position
+// barometer
+// optical flow
+// vision 
+
+
+// estimator voter
+// special subscriber helpers (uorb cheap) for getting winning airspeed, attitude, position, gyro, etc
+// use RTPS to compare estimators from both pixhawk and offboard
+
+// how do we know from the estimator if gps, airspeed, flow, vision, etc is expected and healthy or not
+
+// airspeed use wind_estimator, one per airspeed
+// work queue within PX4 (wind estimators and airspeed architecture)
+//
+// should preflight be running from a work queue as needed?
+// preflight becomes a library 
+// calibration becomes a library (split math from boilerplate)
+
+// can a module provide callbacks for arming?
+//  NO - each module publishes health status with a timestamp
+//  (READY TO ARM type status)
+
+// land detector to vehicle model
+//  vehicle model states required eph based context?
+//   OR from position controller (airspeed required, eph required)
+
+// gyro valid (sensors voting, clipping)
+// accel valid (sensors voting, clipping) - what about EKF feedback (accel errors, etc)
+// sensors_status
+//  - 
+//  - inconsistencies continuously logged might be helpful
+
+// EKF attitude
+// EKF wind (wind > X warnings)
+
+// QGC ardupilot style preflight failures
+// publish ability for QGC to request arming or not
+
+// main_state != nav_state ===> FAILSAFE EVENT (shouldn't be able to ARM)
+
+// FW airspeed only descend
+
+// SYSTEM configuration
+// - # accels, gyros, mags, airspeed, GPS
+// preflight walk through check sensors, control surfaces, etcs
+
+// SENSORS module should own sensor arming and in flight requirements
+// EKF module should own EKF arming and in flight requirements
+
+// commander publish ARMING attempt
+// each modules responds with status
+//  sensors OK
+//  estimator OK
+//  fw_att OK
+//  fw_pos OK
+//  vehicle_model OK
+// ### COMMANDER only knows which modules should be required, but no REQUIREMENTS
+
+//  FW move engine failure detection to FW position
+//  geofence handle completely within geofence (publish, mode change, etc)
+//    - geofence in state machine
+
+// split navigator_status and mission_status from mission_result
+//  publish if TAKEOFF or LANDING
+//  feasibility status
+
+// QGC see TAKEOFF or LANDING if current nav state or within mission
+
+// how do we show an actual current TAKEOFF, LOITER, or LANDING in QGC
+
+// vehicle_status_flags VS preflight requirements
+
+// unify system_power and multiple battery_status
+
+// MISSION hash
+
+// uORB cheap
+// uORB timestamp = publish time
+// replay without special EKF2 replay
+// header
+//  - timestamp
+//  - sequence, count, or something?
+//  - publisher module (compile time option enabled on SITL only)
+//
+// normal publishers are given a timestamp, etc
+// replay has a special publish helper
+
+
+// CALIBRATION
+//  calibration_status
+//   EKF resets itself after calibration
+//   EKF requires holding still or stable mag to initialize
+
+
+// ARMING state machine add calibration state
+// EKF resets itself after that
+
+
+// airspeed calibration parameters per sensor (DIFFERENTIAL PRESSURE NOT AIRSPEED)
+//  - offset
+//  - scale factor
+//  - device id
+//  - airspeed primary
+//  - calibration procedure (blow 1, blow 2)
+//  - airspeed quick cal to zero immediately (advanced)
+
+// move SDP3x calibration factors to driver 
+
+// QGC group parameters (all cal per specific sensor)
+// QGC auto update params if param HASH changes (CHECK HASH and volatile)
+
+// vehicle_status vs vehicle_status_flags vs commander_status
+
+
+// estimator_status_flags
+//  booleans instead that only publish on change
+
+// !!!!!!!!!!!!! PARAMETER INSTANCES !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// calibration parameters generate multiples
+//  PARAMETER INSTANCES (just limit max length to 14 and append _X)
+//   CAL_GYRO_ID, X
+//   CAL_GYRO
+//  12 bytes per parameter + 16 bytes per string
+//  avg 20 bytes * 100?
+// ||||||| access param 0 with or without _0?
+// ||||||| internally paremeters fully support instances with a legacy helper API
+//  param API add optional instance
+
+
+
+// NUTTX clang build
+// cmake toolchains, platforms, and general triplet usage
+// build with latest visual studio, clion, eclipse, vscode, qtcreator, xcode, commander line
+
+// cmake debug targets
+//  break out launchers for SITL
+
+// DriverFramework minimum changes required to delete
+
+
+// ORB
+//  - publisher
+//  - subscriber
+//  log pub rate
+//  log sub rate
+//  create graph with heat
+
+
+// good clean c++ api for getting a const struct
+
+// uORB header
+// timestamp (us since boot)
+// count
+// origin (publisher: a PX4 module/driver + instance)
+
+// driver status
+ - type
+ - update rate
+// module status
+ 
+  - continually log task cpu and memory usage, then plot over time
+  - 
+
+  uORB - why can't we have an arbitrary number of instances per message type
+
+
+
+  modules or drivers need to strictly understand their instance
+   - param automatically uses the instance
+   - uorb publisher automatically uses the instance
+   - task boilerplate defaults to instance 0, but automatically works with -i or --instance
+
+- generalize multi orb, param, module, drivers
+- parameters that apply to all modules
+- helper that starts all module instances that are configured (ekf2 start --all) 
+
+CDev split from Device hierarchy 
