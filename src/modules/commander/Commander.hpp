@@ -40,6 +40,7 @@
 #include <px4_module.h>
 #include <px4_module_params.h>
 #include <mathlib/mathlib.h>
+#include <systemlib/hysteresis/hysteresis.h>
 
 // publications
 #include <uORB/Publication.hpp>
@@ -54,6 +55,7 @@
 // subscriptions
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/geofence_result.h>
+#include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/mission_result.h>
 #include <uORB/topics/safety.h>
 #include <uORB/topics/vehicle_command.h>
@@ -103,7 +105,18 @@ private:
 
 		(ParamInt<px4::params::COM_POS_FS_DELAY>) _failsafe_pos_delay,
 		(ParamInt<px4::params::COM_POS_FS_PROB>) _failsafe_pos_probation,
-		(ParamInt<px4::params::COM_POS_FS_GAIN>) _failsafe_pos_gain
+		(ParamInt<px4::params::COM_POS_FS_GAIN>) _failsafe_pos_gain,
+
+		(ParamBool<px4::params::COM_ARM_SWISBTN>) _arm_switch_is_button,
+
+		(ParamInt<px4::params::COM_RC_ARM_HYST>) _rc_arm_hyst,
+
+		(ParamFloat<px4::params::COM_RC_STICK_OV>) _rc_min_stick_change,
+
+		(ParamBool<px4::params::COM_RC_OVERRIDE>) _rc_override,
+
+		(ParamFloat<px4::params::COM_RC_LOSS_T>) _rc_loss_timeout
+
 	)
 
 	const int64_t POSVEL_PROBATION_MIN = 1_s;	/**< minimum probation duration (usec) */
@@ -123,19 +136,8 @@ private:
 
 	bool set_home_position(orb_advert_t &homePub, home_position_s &home, bool set_alt_only_to_lpos_ref);
 
-	// Set the main system state based on RC and override device inputs
-	transition_result_t set_main_state(const vehicle_status_s &status, bool *changed);
-
-	// Enable override (manual reversion mode) on the system
-	transition_result_t set_main_state_override_on(const vehicle_status_s &status, bool *changed);
-
 	// Set the system main state based on the current RC inputs
-	transition_result_t set_main_state_rc(const vehicle_status_s &status, bool *changed);
-
-	// Set the main system state based on RC and override device inputs
-	transition_result_t set_main_state(vehicle_status_s *status, bool *changed);
-	transition_result_t set_main_state_override_on(vehicle_status_s *status, bool *changed);
-	transition_result_t set_main_state_rc(vehicle_status_s *status, bool *changed);
+	transition_result_t set_main_state_rc(const manual_control_setpoint_s& sp_man, const vehicle_status_s &status_local, bool *changed);
 
 	void check_valid(const hrt_abstime &timestamp, const hrt_abstime &timeout, const bool valid_in, bool *valid_out, bool *changed);
 
@@ -146,6 +148,23 @@ private:
 	void reset_posvel_validity(bool *changed);
 
 	void mission_init();
+
+	void update_manual_control(bool &status_changed);
+
+	uint64_t _rc_signal_lost_timestamp{0};		// Time at which the RC reception was lost
+
+
+	systemlib::Hysteresis _rc_stick_arm{false};
+	systemlib::Hysteresis _rc_stick_disarm{false};
+
+	systemlib::Hysteresis _rc_switch_button{false};
+
+	uint8_t _main_state_before_warning_action{commander_state_s::MAIN_STATE_MAX};
+
+	bool low_battery_voltage_actions_done{false};
+	bool critical_battery_voltage_actions_done{false};
+	bool emergency_battery_voltage_actions_done{false};
+	bool dangerous_battery_level_requests_poweroff{false};
 
 	/**
 	 * Update the telemetry status and the corresponding status variables.
@@ -170,10 +189,11 @@ private:
 	} _telemetry[ORB_MULTI_MAX_INSTANCES];
 
 	// Subscriptions
-	Subscription<mission_result_s>			_mission_result_sub;
-	Subscription<vehicle_global_position_s>		_global_position_sub;
-	Subscription<vehicle_local_position_s>		_local_position_sub;
-	Subscription<iridiumsbd_status_s> 		_iridiumsbd_status_sub;
+	Subscription<manual_control_setpoint_s>			_manual_control_sp_sub{ORB_ID(mission_result)};
+	Subscription<mission_result_s>			_mission_result_sub{ORB_ID(mission_result)};
+	Subscription<vehicle_global_position_s>		_global_position_sub{ORB_ID(vehicle_global_position)};
+	Subscription<vehicle_local_position_s>		_local_position_sub{ORB_ID(vehicle_local_position)};
+	Subscription<iridiumsbd_status_s> 		_iridiumsbd_status_sub{ORB_ID(iridiumsbd_status)};
 };
 
 #endif /* COMMANDER_HPP_ */

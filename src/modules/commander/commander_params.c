@@ -269,6 +269,7 @@ PARAM_DEFINE_INT32(COM_RC_IN_MODE, 0);
  * The default value of 1000 requires the stick to be held in the arm or disarm position for 1 second.
  *
  * @group Commander
+ * @unit ms
  * @min 100
  * @max 1500
  */

@@ -12,6 +12,10 @@ bool condition_local_velocity_valid		# set to true by the commander app if the q
 bool condition_local_altitude_valid
 bool condition_power_input_valid                # set if input power is valid
 
+bool condition_manual_control_valid			# RC input or manual control via mavlink valid
+
+bool condition_warning_action_on			# RC input or manual control via mavlink valid
+
 bool circuit_breaker_engaged_power_check
 bool circuit_breaker_engaged_airspd_check
 bool circuit_breaker_engaged_enginefailure_check
@@ -26,7 +30,6 @@ bool offboard_control_set_by_command                # true if the offboard mode 
 bool offboard_control_loss_timeout                # true if offboard is lost for a certain amount of time
 
 bool rc_signal_found_once
-bool rc_input_blocked                                # set if RC input should be ignored temporarily
 bool rc_calibration_valid                            # set if RC calibration is valid
 bool vtol_transition_failure                        # Set to true if vtol transition failed
 bool usb_connected                                # status of the USB power supply
