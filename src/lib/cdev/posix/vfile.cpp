@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2014 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2015 Mark Charlebois. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,20 +32,36 @@
  ****************************************************************************/
 
 /**
- * @file drv_device.h
+ * @file vdev_file.cpp
+ * Virtual file
  *
- * Generic device / sensor interface.
+ * @author Mark Charlebois <charlebm@gmail.com>
  */
 
-#ifndef _DRV_DEVICE_H
-#define _DRV_DEVICE_H
+#include "vfile.h"
 
-#include <stdint.h>
-#include <sys/ioctl.h>
+namespace device
+{
 
-#include "drv_sensor.h"
-#include "drv_orb_dev.h"
+VFile::VFile(const char *fname, mode_t mode) :
+	CDev(fname)
+{
+}
 
-#include "DevIOCTL.h"
+VFile *VFile::createFile(const char *fname, mode_t mode)
+{
+	VFile *me = new VFile(fname, mode);
+	px4_file_operations_t *file_ops = nullptr;
+	register_driver(fname, file_ops, 0666, (void *)me);
+	return me;
+}
 
-#endif /* _DRV_DEVICE_H */
+ssize_t VFile::write(file_t *handlep, const char *buffer, size_t buflen)
+{
+	// ignore what was written, but let pollers know something was written
+	poll_notify(POLLIN);
+
+	return buflen;
+}
+
+} // namespace device

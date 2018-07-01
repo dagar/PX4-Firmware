@@ -64,7 +64,7 @@
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_range_finder.h>
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/device/ringbuffer.h>
 
 #include <uORB/uORB.h>
@@ -170,7 +170,7 @@ private:
 extern "C" __EXPORT int tfmini_main(int argc, char *argv[]);
 
 TFMINI::TFMINI(const char *port, uint8_t rotation) :
-	CDev("tfmini", RANGE_FINDER0_DEVICE_PATH),
+	CDev(RANGE_FINDER0_DEVICE_PATH),
 	_rotation(rotation),
 	_min_distance(0.30f),
 	_max_distance(12.0f),
@@ -193,9 +193,6 @@ TFMINI::TFMINI(const char *port, uint8_t rotation) :
 	strncpy(_port, port, sizeof(_port));
 	/* enforce null termination */
 	_port[sizeof(_port) - 1] = '\0';
-
-	// disable debug() calls
-	_debug_enabled = false;
 
 	// work_cancel in the dtor will explode if we don't do this...
 	memset(&_work, 0, sizeof(_work));
@@ -227,7 +224,7 @@ TFMINI::init()
 
 	switch (hw_model) {
 	case 0:
-		DEVICE_LOG("disabled.");
+		PX4_ERR("disabled.");
 		return 0;
 
 	case 1: /* TFMINI (12m, 100 Hz)*/
@@ -237,7 +234,7 @@ TFMINI::init()
 		break;
 
 	default:
-		DEVICE_LOG("invalid HW model %d.", hw_model);
+		PX4_ERR("invalid HW model %d.", hw_model);
 		return -1;
 	}
 
@@ -250,7 +247,7 @@ TFMINI::init()
 		_fd = ::open(_port, O_RDWR | O_NOCTTY | O_SYNC);
 
 		if (_fd < 0) {
-			warnx("Error opening fd");
+			PX4_WARN("Error opening fd");
 			return -1;
 		}
 
@@ -330,7 +327,7 @@ TFMINI::init()
 					 &_orb_class_instance, ORB_PRIO_HIGH);
 
 		if (_distance_sensor_topic == nullptr) {
-			DEVICE_LOG("failed to create distance_sensor object. Did you start uOrb?");
+			PX4_ERR("failed to create distance_sensor object");
 		}
 
 	} while (0);
@@ -538,7 +535,7 @@ TFMINI::collect()
 	ret = ::read(_fd, &readbuf[0], readlen);
 
 	if (ret < 0) {
-		DEVICE_DEBUG("read err: %d", ret);
+		PX4_DEBUG("read err: %d", ret);
 		perf_count(_comms_errors);
 		perf_end(_sample_perf);
 
@@ -569,7 +566,7 @@ TFMINI::collect()
 		return -EAGAIN;
 	}
 
-	DEVICE_DEBUG("val (float): %8.4f, raw: %s, valid: %s", (double)distance_m, _linebuf, ((valid) ? "OK" : "NO"));
+	PX4_DEBUG("val (float): %8.4f, raw: %s, valid: %s", (double)distance_m, _linebuf, ((valid) ? "OK" : "NO"));
 
 	struct distance_sensor_s report;
 
@@ -651,7 +648,7 @@ TFMINI::cycle()
 
 			/* we know the sensor needs about four seconds to initialize */
 			if (hrt_absolute_time() > 5 * 1000 * 1000LL && _consecutive_fail_count < 5) {
-				DEVICE_LOG("collection error #%u", _consecutive_fail_count);
+				PX4_DEBUG("collection error #%u", _consecutive_fail_count);
 			}
 
 			_consecutive_fail_count++;

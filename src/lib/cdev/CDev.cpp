@@ -42,16 +42,14 @@
 #include <cstring>
 
 #include "px4_posix.h"
-#include "drivers/drv_device.h"
 
 namespace device
 {
 
-CDev::CDev(const char *name, const char *devname) :
-	Device(name),
+CDev::CDev(const char *devname) :
 	_devname(devname)
 {
-	DEVICE_DEBUG("CDev::CDev");
+	PX4_DEBUG("CDev::CDev");
 
 	int ret = px4_sem_init(&_lock, 0, 1);
 
@@ -62,7 +60,7 @@ CDev::CDev(const char *name, const char *devname) :
 
 CDev::~CDev()
 {
-	DEVICE_DEBUG("CDev::~CDev");
+	PX4_DEBUG("CDev::~CDev");
 
 	if (_registered) {
 		unregister_driver(_devname);
@@ -78,7 +76,7 @@ CDev::~CDev()
 int
 CDev::register_class_devname(const char *class_devname)
 {
-	DEVICE_DEBUG("CDev::register_class_devname %s", class_devname);
+	PX4_DEBUG("CDev::register_class_devname %s", class_devname);
 
 	if (class_devname == nullptr) {
 		return -EINVAL;
@@ -109,7 +107,7 @@ CDev::register_class_devname(const char *class_devname)
 int
 CDev::unregister_class_devname(const char *class_devname, unsigned class_instance)
 {
-	DEVICE_DEBUG("CDev::unregister_class_devname");
+	PX4_DEBUG("CDev::unregister_class_devname");
 	char name[32];
 	snprintf(name, sizeof(name), "%s%u", class_devname, class_instance);
 	return unregister_driver(name);
@@ -118,14 +116,9 @@ CDev::unregister_class_devname(const char *class_devname, unsigned class_instanc
 int
 CDev::init()
 {
-	DEVICE_DEBUG("CDev::init");
+	PX4_DEBUG("CDev::init");
 
-	// base class init first
-	int ret = Device::init();
-
-	if (ret != PX4_OK) {
-		goto out;
-	}
+	int ret = PX4_ERROR;
 
 	// now register the driver
 	if (_devname != nullptr) {
@@ -148,7 +141,7 @@ out:
 int
 CDev::open(file_t *filep)
 {
-	DEVICE_DEBUG("CDev::open");
+	PX4_DEBUG("CDev::open");
 	int ret = PX4_OK;
 
 	lock();
@@ -173,14 +166,14 @@ CDev::open(file_t *filep)
 int
 CDev::open_first(file_t *filep)
 {
-	DEVICE_DEBUG("CDev::open_first");
+	PX4_DEBUG("CDev::open_first");
 	return PX4_OK;
 }
 
 int
 CDev::close(file_t *filep)
 {
-	DEVICE_DEBUG("CDev::close");
+	PX4_DEBUG("CDev::close");
 	int ret = PX4_OK;
 
 	lock();
@@ -206,45 +199,38 @@ CDev::close(file_t *filep)
 int
 CDev::close_last(file_t *filep)
 {
-	DEVICE_DEBUG("CDev::close_last");
+	PX4_DEBUG("CDev::close_last");
 	return PX4_OK;
 }
 
 ssize_t
 CDev::read(file_t *filep, char *buffer, size_t buflen)
 {
-	DEVICE_DEBUG("CDev::read");
+	PX4_DEBUG("CDev::read");
 	return -ENOSYS;
 }
 
 ssize_t
 CDev::write(file_t *filep, const char *buffer, size_t buflen)
 {
-	DEVICE_DEBUG("CDev::write");
+	PX4_DEBUG("CDev::write");
 	return -ENOSYS;
 }
 
 off_t
 CDev::seek(file_t *filep, off_t offset, int whence)
 {
-	DEVICE_DEBUG("CDev::seek");
+	PX4_DEBUG("CDev::seek");
 	return -ENOSYS;
 }
 
 int
 CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 {
-	DEVICE_DEBUG("CDev::ioctl");
+	PX4_DEBUG("CDev::ioctl");
 	int ret = -ENOTTY;
 
 	switch (cmd) {
-
-	/* fetch a pointer to the driver's private data */
-	case DIOC_GETPRIV:
-		*(void **)(uintptr_t)arg = (void *)this;
-		ret = PX4_OK;
-		break;
-
 	case DEVIOCSPUBBLOCK:
 		_pub_blocked = (arg != 0);
 		ret = PX4_OK;
@@ -252,10 +238,6 @@ CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 
 	case DEVIOCGPUBBLOCK:
 		ret = _pub_blocked;
-		break;
-
-	case DEVIOCGDEVICEID:
-		ret = (int)_device_id.devid;
 		break;
 
 	default:
@@ -268,7 +250,7 @@ CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 int
 CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 {
-	DEVICE_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
+	PX4_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
 	int ret = PX4_OK;
 
 	/*
@@ -282,7 +264,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 		 * benefit.
 		 */
 		fds->priv = (void *)filep;
-		DEVICE_DEBUG("CDev::poll: fds->priv = %p", filep);
+		PX4_DEBUG("CDev::poll: fds->priv = %p", filep);
 
 		/*
 		 * Handle setup requests.
@@ -303,7 +285,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 			}
 
 		} else {
-			PX4_WARN("Store Poll Waiter error.");
+			PX4_ERR("Store Poll Waiter error.");
 		}
 
 	} else {
@@ -321,7 +303,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 void
 CDev::poll_notify(pollevent_t events)
 {
-	DEVICE_DEBUG("CDev::poll_notify events = %0x", events);
+	PX4_DEBUG("CDev::poll_notify events = %0x", events);
 
 	/* lock against poll() as well as other wakeups */
 	ATOMIC_ENTER;
@@ -338,7 +320,7 @@ CDev::poll_notify(pollevent_t events)
 void
 CDev::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
 {
-	DEVICE_DEBUG("CDev::poll_notify_one");
+	PX4_DEBUG("CDev::poll_notify_one");
 
 #ifdef __PX4_NUTTX
 	int value = fds->sem->semcount;
@@ -350,7 +332,7 @@ CDev::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
 	/* update the reported event set */
 	fds->revents |= fds->events & events;
 
-	DEVICE_DEBUG(" Events fds=%p %0x %0x %0x %d", fds, fds->revents, fds->events, events, value);
+	PX4_DEBUG(" Events fds=%p %0x %0x %0x %d", fds, fds->revents, fds->events, events, value);
 
 	/* if the state is now interesting, wake the waiter if it's still asleep */
 	/* XXX semcount check here is a vile hack; counting semphores should not be abused as cvars */
@@ -362,7 +344,7 @@ CDev::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
 pollevent_t
 CDev::poll_state(file_t *filep)
 {
-	DEVICE_DEBUG("CDev::poll_notify");
+	PX4_DEBUG("CDev::poll_notify");
 	/* by default, no poll events to report */
 	return 0;
 }
@@ -373,7 +355,7 @@ CDev::store_poll_waiter(px4_pollfd_struct_t *fds)
 	/*
 	 * Look for a free slot.
 	 */
-	DEVICE_DEBUG("CDev::store_poll_waiter");
+	PX4_DEBUG("CDev::store_poll_waiter");
 
 	for (unsigned i = 0; i < _max_pollwaiters; i++) {
 		if (nullptr == _pollset[i]) {
@@ -413,7 +395,7 @@ CDev::store_poll_waiter(px4_pollfd_struct_t *fds)
 int
 CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
 {
-	DEVICE_DEBUG("CDev::remove_poll_waiter");
+	PX4_DEBUG("CDev::remove_poll_waiter");
 
 	for (unsigned i = 0; i < _max_pollwaiters; i++) {
 		if (fds == _pollset[i]) {
@@ -424,7 +406,7 @@ CDev::remove_poll_waiter(px4_pollfd_struct_t *fds)
 		}
 	}
 
-	PX4_WARN("poll: bad fd state");
+	PX4_ERR("poll: bad fd state");
 	return -EINVAL;
 }
 

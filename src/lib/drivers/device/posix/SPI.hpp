@@ -40,7 +40,7 @@
 #ifndef _DEVICE_SPI_H
 #define _DEVICE_SPI_H
 
-#include "CDev.hpp"
+#include <lib/cdev/CDev.hpp>
 
 #include <px4_spi.h>
 

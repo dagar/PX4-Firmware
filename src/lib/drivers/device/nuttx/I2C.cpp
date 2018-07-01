@@ -52,7 +52,8 @@ namespace device
 unsigned int I2C::_bus_clocks[BOARD_NUMBER_I2C_BUSES] = BOARD_I2C_BUS_CLOCK_INIT;
 
 I2C::I2C(const char *name, const char *devname, int bus, uint16_t address, uint32_t frequency) :
-	CDev(name, devname),
+	CDev(devname),
+	Device(name),
 	_frequency(frequency)
 {
 	DEVICE_DEBUG("I2C::I2C name = %s devname = %s", name, devname);

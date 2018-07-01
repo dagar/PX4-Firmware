@@ -85,9 +85,8 @@ uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(device::file_t *f
 	return (SubscriberData *)(FILE_PRIV(filp));
 }
 
-uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *name, const char *path,
-			     int priority, unsigned int queue_size) :
-	CDev(name, path),
+uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const char *path, int priority, unsigned int queue_size) :
+	CDev(path),
 	_meta(meta),
 	_priority((uint8_t)priority),
 	_queue_size(queue_size)
@@ -830,7 +829,7 @@ int uORB::DeviceNode::update_queue_size(unsigned int queue_size)
 }
 
 uORB::DeviceMaster::DeviceMaster() :
-	CDev("obj_master", TOPIC_MASTER_DEVICE_PATH)
+	CDev(TOPIC_MASTER_DEVICE_PATH)
 {
 	_last_statistics_output = hrt_absolute_time();
 }
@@ -880,8 +879,6 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 					*(adv->instance) = group_tries;
 				}
 
-				const char *objname = meta->o_name; //no need for a copy, meta->o_name will never be freed or changed
-
 				/* driver wants a permanent copy of the path, so make one here */
 				const char *devpath = strdup(nodepath);
 
@@ -890,7 +887,7 @@ uORB::DeviceMaster::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 				}
 
 				/* construct the new node */
-				uORB::DeviceNode *node = new uORB::DeviceNode(meta, objname, devpath, adv->priority);
+				uORB::DeviceNode *node = new uORB::DeviceNode(meta, devpath, adv->priority);
 
 				/* if we didn't get a device, that's bad */
 				if (node == nullptr) {

@@ -36,7 +36,7 @@
 
 #include <string.h>
 
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
 #include <drivers/drv_pwm_output.h>

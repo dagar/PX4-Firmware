@@ -40,7 +40,8 @@
 #ifndef _DEVICE_I2C_H
 #define _DEVICE_I2C_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
+#include <lib/cdev/CDev.hpp>
 
 #include <px4_i2c.h>
 
@@ -55,7 +56,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on I2C
  */
-class __EXPORT I2C : public CDev
+class __EXPORT I2C : public CDev, public Device
 {
 
 public:
@@ -80,6 +81,34 @@ protected:
 	virtual ~I2C();
 
 	virtual int	init();
+
+	/**
+	 * Perform an ioctl operation on the device.
+	 *
+	 * The default implementation handles DIOC_GETPRIV, and otherwise
+	 * returns -ENOTTY. Subclasses should call the default implementation
+	 * for any command they do not handle themselves.
+	 *
+	 * @param filep		Pointer to the NuttX file structure.
+	 * @param cmd		The ioctl command value.
+	 * @param arg		The ioctl argument value.
+	 * @return		OK on success, or -errno otherwise.
+	 */
+	virtual int ioctl(file_t *filep, int cmd, unsigned long arg)
+	{
+		int ret = -ENOTTY;
+
+		switch (cmd) {
+		case DEVIOCGDEVICEID:
+			ret = (int)_device_id.devid;
+			break;
+
+		default:
+			break;
+		}
+
+		return ret;
+	}
 
 	/**
 	 * Check for the presence of the device on the bus.

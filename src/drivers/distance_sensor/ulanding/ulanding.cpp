@@ -63,10 +63,9 @@
 #include <uORB/uORB.h>
 #include <termios.h>
 
-
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_range_finder.h>
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 
 #include <uORB/topics/distance_sensor.h>
 
@@ -136,7 +135,7 @@ Radar	*g_dev;
 }
 
 Radar::Radar(uint8_t rotation, const char *port) :
-	CDev("Radar", RANGE_FINDER0_DEVICE_PATH),
+	CDev(RANGE_FINDER0_DEVICE_PATH),
 	_rotation(rotation),
 	_task_should_exit(false),
 	_task_handle(-1),
@@ -151,9 +150,6 @@ Radar::Radar(uint8_t rotation, const char *port) :
 	strncpy(_port, port, sizeof(_port));
 	/* enforce null termination */
 	_port[sizeof(_port) - 1] = '\0';
-
-	// disable debug() calls
-	_debug_enabled = false;
 
 	memset(&_buf[0], 0, sizeof(_buf));
 }
@@ -289,7 +285,7 @@ Radar::init()
 					 &_orb_class_instance, ORB_PRIO_HIGH);
 
 		if (_distance_sensor_topic == nullptr) {
-			DEVICE_LOG("failed to create distance_sensor object. Did you start uOrb?");
+			PX4_ERR("failed to create distance_sensor object");
 			ret = 1;
 			break;
 		}

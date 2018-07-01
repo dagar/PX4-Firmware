@@ -37,10 +37,8 @@
  * Definitions for the generic base classes in the device framework.
  */
 
-#ifndef _DEVICE_CDEV_HPP
-#define _DEVICE_CDEV_HPP
-
-#include "Device.hpp"
+#ifndef _CDEV_HPP
+#define _CDEV_HPP
 
 #include <px4_config.h>
 #include <px4_posix.h>
@@ -51,16 +49,15 @@
 #include "posix/cdev_platform.hpp"
 #endif
 
-/**
- * Namespace encapsulating all device framework classes, functions and data.
- */
+#include <drivers/drv_device.h> // only needed for DEVIOCSPUBBLOCK/DEVIOCGPUBBLOCK, TODO: remove
+
 namespace device
 {
 
 /**
  * Abstract class for any character device
  */
-class __EXPORT CDev : public Device
+class __EXPORT CDev
 {
 public:
 	/**
@@ -69,7 +66,7 @@ public:
 	 * @param name		Driver name
 	 * @param devname	Device node name
 	 */
-	CDev(const char *name, const char *devname); // TODO: dagar remove name and Device inheritance
+	CDev(const char *devname);
 
 	virtual ~CDev();
 
@@ -316,4 +313,4 @@ enum CLASS_DEVICE {
 	CLASS_DEVICE_TERTIARY = 2
 };
 
-#endif /* _DEVICE_CDEV_HPP */
+#endif /* _CDEV_HPP */

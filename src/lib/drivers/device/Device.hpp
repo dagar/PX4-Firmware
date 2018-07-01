@@ -107,23 +107,6 @@ public:
 	 */
 	virtual int	write(unsigned address, void *data, unsigned count) { return -ENODEV; }
 
-	/**
-	 * Perform a device-specific operation.
-	 *
-	 * @param operation	The operation to perform.
-	 * @param arg		An argument to the operation.
-	 * @return		Negative errno on error, OK or positive value on success.
-	 */
-	virtual int	ioctl(unsigned operation, unsigned &arg)
-	{
-		switch (operation) {
-		case DEVIOCGDEVICEID:
-			return (int)_device_id.devid;
-		}
-
-		return -ENODEV;
-	}
-
 	/** Device bus types for DEVID */
 	enum DeviceBusType {
 		DeviceBusType_UNKNOWN = 0,

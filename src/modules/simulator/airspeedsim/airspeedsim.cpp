@@ -70,7 +70,7 @@
 #include "airspeedsim.h"
 
 AirspeedSim::AirspeedSim(int bus, int address, unsigned conversion_interval, const char *path) :
-	CDev("AIRSPEEDSIM", path),
+	CDev(path),
 	_reports(nullptr),
 	_retries(0),
 	_sensor_ok(false),
@@ -83,9 +83,6 @@ AirspeedSim::AirspeedSim(int bus, int address, unsigned conversion_interval, con
 	_sample_perf(perf_alloc(PC_ELAPSED, "airspeed_read")),
 	_comms_errors(perf_alloc(PC_COUNT, "airspeed_comms_errors"))
 {
-	// enable debug() calls
-	_debug_enabled = false;
-
 	// work_cancel in the dtor will explode if we don't do this...
 	memset(&_work, 0, sizeof(_work));
 }
@@ -116,7 +113,7 @@ AirspeedSim::init()
 
 	/* init base class */
 	if (CDev::init() != OK) {
-		DEVICE_DEBUG("CDev init failed");
+		PX4_DEBUG("CDev init failed");
 		goto out;
 	}
 

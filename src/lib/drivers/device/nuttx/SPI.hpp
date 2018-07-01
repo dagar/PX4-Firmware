@@ -40,7 +40,8 @@
 #ifndef _DEVICE_SPI_H
 #define _DEVICE_SPI_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
+#include <lib/cdev/CDev.hpp>
 
 #include <px4_spi.h>
 
@@ -50,7 +51,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on SPI
  */
-class __EXPORT SPI : public CDev
+class __EXPORT SPI : public CDev, public Device
 {
 protected:
 	/**
@@ -81,6 +82,34 @@ protected:
 	};
 
 	virtual int	init();
+
+	/**
+	 * Perform an ioctl operation on the device.
+	 *
+	 * The default implementation handles DIOC_GETPRIV, and otherwise
+	 * returns -ENOTTY. Subclasses should call the default implementation
+	 * for any command they do not handle themselves.
+	 *
+	 * @param filep		Pointer to the NuttX file structure.
+	 * @param cmd		The ioctl command value.
+	 * @param arg		The ioctl argument value.
+	 * @return		OK on success, or -errno otherwise.
+	 */
+	virtual int ioctl(file_t *filep, int cmd, unsigned long arg)
+	{
+		int ret = -ENOTTY;
+
+		switch (cmd) {
+		case DEVIOCGDEVICEID:
+			ret = (int)_device_id.devid;
+			break;
+
+		default:
+			break;
+		}
+
+		return ret;
+	}
 
 	/**
 	 * Check for the presence of the device on the bus.
@@ -150,13 +179,16 @@ protected:
 	 */
 	void		set_lockmode(enum LockMode mode) { locking_mode = mode; }
 
-	LockMode	locking_mode;	/**< selected locking mode */
+	const LockMode	locking_mode;	/**< selected locking mode */
 
 private:
-	uint32_t			_device;
+	const uint32_t			_device;
+
 	enum spi_mode_e		_mode;
+
 	uint32_t		_frequency;
-	struct spi_dev_s	*_dev;
+
+	struct spi_dev_s	*_dev {nullptr};
 
 	/* this class does not allow copying */
 	SPI(const SPI &);

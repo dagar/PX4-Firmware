@@ -33,9 +33,10 @@
 
 #pragma once
 
+#include <lib/cdev/CDev.hpp>
+
 #include <stdint.h>
 #include "uORBCommon.hpp"
-
 
 #ifdef __PX4_NUTTX
 #include <string.h>
@@ -62,8 +63,7 @@ class Manager;
 class uORB::DeviceNode : public device::CDev
 {
 public:
-	DeviceNode(const struct orb_metadata *meta, const char *name, const char *path,
-		   int priority, unsigned int queue_size = 1);
+	DeviceNode(const struct orb_metadata *meta, const char *path, int priority, unsigned int queue_size = 1);
 	~DeviceNode();
 
 	/**

@@ -43,7 +43,7 @@
 #include <px4_time.h>
 #include "vcdevtest_example.h"
 #include <drivers/drv_device.h>
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 #include <unistd.h>
 #include <stdio.h>
 
@@ -103,7 +103,7 @@ class VCDevNode : public CDev
 {
 public:
 	VCDevNode() :
-		CDev("vcdevtest", TESTDEV),
+		CDev(TESTDEV),
 		_is_open_for_write(false),
 		_write_offset(0) {}
 
@@ -289,17 +289,7 @@ int VCDevExample::main()
 		return -px4_errno;
 	}
 
-	void *p = nullptr;
-	int ret = px4_ioctl(fd, DIOC_GETPRIV, (unsigned long)&p);
-
-	if (ret < 0) {
-		PX4_INFO("ioctl DIOC_GETPRIV failed %d %d", ret, px4_errno);
-		return -px4_errno;
-	}
-
-	PX4_INFO("priv data = %p %s", p, p == (void *)_node ? "PASS" : "FAIL");
-
-	ret = test_pub_block(fd, 1);
+	int ret = test_pub_block(fd, 1);
 
 	if (ret < 0) {
 		return ret;

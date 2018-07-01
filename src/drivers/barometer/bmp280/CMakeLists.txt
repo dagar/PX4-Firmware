@@ -40,5 +40,6 @@ px4_add_module(
 		bmp280_i2c.cpp
 		bmp280.cpp
 	DEPENDS
+		cdev
 	)
 

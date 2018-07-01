@@ -178,7 +178,6 @@ using ::isfinite;
 #  include "dspal_math.h"
 #  define PX4_ROOTFSDIR ""
 #  define PX4_TICKS_PER_SEC 1000L
-#  define SIOCDEVPRIVATE 999999
 
 // HEXAGON's isfinite() is erroneously defined as a macro even for C++,
 // using std::isfinite (using ::isfinite) which is a function, but which

@@ -34,4 +34,3 @@
 #pragma once
 
 #include "Device.hpp"
-#include "CDev.hpp"
