@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/drv_hrt.h>
 
 #include <uORB/uORB.h>

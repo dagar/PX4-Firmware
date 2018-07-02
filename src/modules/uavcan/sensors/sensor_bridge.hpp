@@ -39,7 +39,8 @@
 
 #include <containers/List.hpp>
 #include <uavcan/uavcan.hpp>
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
+#include <lib/drivers/device/Device.hpp>
 #include <drivers/drv_orb_dev.h>
 
 /**
@@ -84,7 +85,7 @@ public:
  * This is the base class for redundant sensors with an independent ORB topic per each redundancy channel.
  * For example, sensor_mag0, sensor_mag1, etc.
  */
-class UavcanCDevSensorBridgeBase : public IUavcanSensorBridge, public device::CDev
+class UavcanCDevSensorBridgeBase : public IUavcanSensorBridge, public device::CDev, public device::Device
 {
 	struct Channel {
 		int node_id              = -1;
@@ -105,7 +106,8 @@ protected:
 	UavcanCDevSensorBridgeBase(const char *name, const char *devname, const char *class_devname,
 				   const orb_id_t orb_topic_sensor,
 				   const unsigned max_channels = DEFAULT_MAX_CHANNELS) :
-		device::CDev(name, devname),
+		device::CDev(devname),
+		Device(name),
 		_max_channels(max_channels),
 		_class_devname(class_devname),
 		_orb_topic(orb_topic_sensor),

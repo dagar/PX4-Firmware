@@ -50,11 +50,6 @@ LPS22HB::LPS22HB(device::Device *interface, const char *path) :
 	_sample_perf(perf_alloc(PC_ELAPSED, "lps22hb_read")),
 	_comms_errors(perf_alloc(PC_COUNT, "lps22hb_comms_errors"))
 {
-	// set the device type from the interface
-	_device_id.devid_s.bus_type = _interface->get_device_bus_type();
-	_device_id.devid_s.bus = _interface->get_device_bus();
-	_device_id.devid_s.address = _interface->get_device_address();
-	_device_id.devid_s.devtype = DRV_BARO_DEVTYPE_LPS22HB;
 }
 
 LPS22HB::~LPS22HB()
@@ -79,7 +74,7 @@ LPS22HB::init()
 	int ret = CDev::init();
 
 	if (ret != OK) {
-		DEVICE_DEBUG("CDev init failed");
+		PX4_DEBUG("CDev init failed");
 		goto out;
 	}
 
@@ -227,7 +222,7 @@ LPS22HB::cycle()
 
 		/* perform collection */
 		if (OK != collect()) {
-			DEVICE_DEBUG("collection error");
+			PX4_DEBUG("collection error");
 			/* restart the measurement state machine */
 			start();
 			return;
@@ -254,7 +249,7 @@ LPS22HB::cycle()
 
 	/* measurement phase */
 	if (OK != measure()) {
-		DEVICE_DEBUG("measure error");
+		PX4_DEBUG("measure error");
 	}
 
 	/* next phase is collection */
@@ -319,7 +314,7 @@ LPS22HB::collect()
 	new_report.temperature = 42.5f + (TEMP_OUT / 480.0f);
 
 	/* get device ID */
-	new_report.device_id = _device_id.devid;
+	new_report.device_id = _interface->get_device_id();
 	new_report.error_count = perf_event_count(_comms_errors);
 
 	if (!(_pub_blocked)) {
@@ -334,7 +329,7 @@ LPS22HB::collect()
 							  (sensor_is_onboard) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
 
 			if (_baro_topic == nullptr) {
-				DEVICE_DEBUG("ADVERT FAIL");
+				PX4_DEBUG("ADVERT FAIL");
 			}
 		}
 	}

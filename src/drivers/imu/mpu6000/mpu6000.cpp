@@ -370,6 +370,17 @@ private:
 	uint16_t		swap16(uint16_t val) { return (val >> 8) | (val << 8);	}
 
 	/**
+	 * Get the internal / external state
+	 *
+	 * @return true if the sensor is not on the main MCU board
+	 */
+	bool			is_external()
+	{
+		unsigned dummy;
+		return _interface->ioctl(ACCELIOCGEXTERNAL, dummy);
+	}
+
+	/**
 	 * Measurement self test
 	 *
 	 * @return 0 on success, 1 on failure
@@ -616,17 +627,22 @@ MPU6000::~MPU6000()
 int
 MPU6000::init()
 {
+
 #if defined(USE_I2C)
 	unsigned dummy;
 	use_i2c(_interface->ioctl(MPUIOCGIS_I2C, dummy));
 #endif
 
+
 	/* probe again to get our settings that are based on the device type */
+
 	int ret = probe();
 
 	/* if probe failed, bail now */
+
 	if (ret != OK) {
-		PX4_DEBUG("CDev init failed");
+
+		DEVICE_DEBUG("CDev init failed");
 		return ret;
 	}
 
@@ -723,7 +739,7 @@ MPU6000::init()
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
-					   &_accel_orb_class_instance, _interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
+					   &_accel_orb_class_instance, (is_external()) ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
 
 	if (_accel_topic == nullptr) {
 		PX4_WARN("ADVERT FAIL");
@@ -734,7 +750,7 @@ MPU6000::init()
 	_gyro_reports->get(&grp);
 
 	_gyro->_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &grp,
-			     &_gyro->_gyro_orb_class_instance, _interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
+			     &_gyro->_gyro_orb_class_instance, (is_external()) ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
 
 	if (_gyro->_gyro_topic == nullptr) {
 		PX4_WARN("ADVERT FAIL");
@@ -1343,6 +1359,8 @@ MPU6000::gyro_read(struct file *filp, char *buffer, size_t buflen)
 int
 MPU6000::ioctl(struct file *filp, int cmd, unsigned long arg)
 {
+	unsigned dummy = arg;
+
 	switch (cmd) {
 
 	case SENSORIOCRESET:
@@ -1481,6 +1499,9 @@ MPU6000::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSELFTEST:
 		return accel_self_test();
+
+	case ACCELIOCGEXTERNAL:
+		return _interface->ioctl(cmd, dummy);
 
 	default:
 		/* give it to the superclass */

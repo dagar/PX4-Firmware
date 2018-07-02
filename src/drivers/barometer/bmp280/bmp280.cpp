@@ -61,7 +61,7 @@
 #include <board_config.h>
 #include "bmp280.h"
 
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/drv_baro.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/device/ringbuffer.h>
@@ -197,7 +197,7 @@ BMP280::init()
 	int ret = CDev::init();
 
 	if (ret != OK) {
-		DEVICE_DEBUG("CDev init failed");
+		PX4_DEBUG("CDev init failed");
 		return ret;
 	}
 
@@ -205,7 +205,7 @@ BMP280::init()
 	_reports = new ringbuffer::RingBuffer(2, sizeof(baro_report));
 
 	if (_reports == nullptr) {
-		DEVICE_DEBUG("can't get memory for reports");
+		PX4_DEBUG("can't get memory for reports");
 		ret = -ENOMEM;
 		return ret;
 	}

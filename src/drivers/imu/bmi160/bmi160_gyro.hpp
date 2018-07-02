@@ -8,7 +8,7 @@
 /**
  * Helper class implementing the gyro driver node.
  */
-class BMI160_gyro : public device::CDev
+class BMI160_gyro : public device::CDev, public device::Device
 {
 public:
 	BMI160_gyro(BMI160 *parent, const char *path);

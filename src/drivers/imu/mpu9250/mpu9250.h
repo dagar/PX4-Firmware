@@ -486,6 +486,17 @@ private:
 	uint16_t		swap16(uint16_t val) { return (val >> 8) | (val << 8);	}
 
 	/**
+	 * Get the internal / external state
+	 *
+	 * @return true if the sensor is not on the main MCU board
+	 */
+	bool			is_external()
+	{
+		unsigned dummy;
+		return _interface->ioctl(ACCELIOCGEXTERNAL, dummy);
+	}
+
+	/**
 	 * Measurement self test
 	 *
 	 * @return 0 on success, 1 on failure

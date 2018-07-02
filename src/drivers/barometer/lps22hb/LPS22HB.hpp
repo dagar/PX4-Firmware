@@ -33,7 +33,7 @@
 
 #pragma once
 
-#include <drivers/device/CDev.hpp>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/device/Device.hpp>
 #include <px4_config.h>
 #include <px4_workqueue.h>
@@ -99,7 +99,7 @@ public:
 	void			print_info();
 
 protected:
-	Device			*_interface;
+	device::Device			*_interface;
 
 private:
 	work_s			_work{};

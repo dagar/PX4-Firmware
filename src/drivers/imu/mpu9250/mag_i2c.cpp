@@ -100,8 +100,12 @@ AK8963_I2C::ioctl(unsigned operation, unsigned &arg)
 	int ret;
 
 	switch (operation) {
+
+	case ACCELIOCGEXTERNAL:
+		return external();
+
 	case DEVIOCGDEVICEID:
-		return get_device_id();
+		return I2C::ioctl(nullptr, operation, arg);
 
 	case MPUIOCGIS_I2C:
 		return 1;

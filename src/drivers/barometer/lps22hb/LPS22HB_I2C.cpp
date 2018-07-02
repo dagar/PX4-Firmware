@@ -75,6 +75,7 @@ LPS22HB_I2C_interface(int bus)
 LPS22HB_I2C::LPS22HB_I2C(int bus) :
 	I2C("LPS22HB_I2C", nullptr, bus, LPS22HB_ADDRESS, 400000)
 {
+	_device_id.devid_s.devtype = DRV_BARO_DEVTYPE_LPS22HB;
 }
 
 int
@@ -85,14 +86,14 @@ LPS22HB_I2C::probe()
 	_retries = 10;
 
 	if (read(WHO_AM_I, &id, 1)) {
-		DEVICE_DEBUG("read_reg fail");
+		PX4_DEBUG("read_reg fail");
 		return -EIO;
 	}
 
 	_retries = 2;
 
 	if (id != LPS22HB_ID_WHO_AM_I) {
-		DEVICE_DEBUG("ID byte mismatch (%02x != %02x)", LPS22HB_ID_WHO_AM_I, id);
+		PX4_DEBUG("ID byte mismatch (%02x != %02x)", LPS22HB_ID_WHO_AM_I, id);
 		return -EIO;
 	}
 

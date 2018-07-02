@@ -56,7 +56,7 @@ ADIS16477_gyro::init()
 
 	/* if probe/setup failed, bail now */
 	if (ret != OK) {
-		DEVICE_DEBUG("gyro init failed");
+		PX4_DEBUG("gyro init failed");
 		return ret;
 	}
 
@@ -70,7 +70,7 @@ ADIS16477_gyro::ioctl(struct file *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case DEVIOCGDEVICEID:
-		return (int)CDev::ioctl(filp, cmd, arg);
+		return get_device_id();
 		break;
 
 	default:

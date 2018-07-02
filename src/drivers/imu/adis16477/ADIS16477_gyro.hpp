@@ -36,7 +36,7 @@
 
 #include "ADIS16477.hpp"
 
-#include <drivers/device/CDev.hpp>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/drv_gyro.h>
 
 /**

@@ -433,7 +433,7 @@ const uint8_t FXOS8701CQ::_checked_registers[FXOS8701C_NUM_CHECKED_REGISTERS] = 
 /**
  * Helper class implementing the mag driver node.
  */
-class FXOS8701CQ_mag : public device::CDev
+class FXOS8701CQ_mag : public device::CDev, public device::Device
 {
 public:
 	FXOS8701CQ_mag(FXOS8701CQ *parent);

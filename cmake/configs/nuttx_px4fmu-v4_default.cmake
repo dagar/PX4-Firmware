@@ -12,7 +12,9 @@ set(config_module_list
 	drivers/distance_sensor
 	drivers/magnetometer
 	drivers/telemetry
-	drivers/imu
+	#drivers/imu
+	drivers/imu/mpu6000
+	drivers/imu/mpu9250
 
 	drivers/batt_smbus
 	drivers/blinkm
