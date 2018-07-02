@@ -72,7 +72,8 @@
 // If interface is non-null, then it will used for interacting with the device.
 // Otherwise, it will passthrough the parent MPU9250
 MPU9250_mag::MPU9250_mag(MPU9250 *parent, device::Device *interface, const char *path) :
-	CDev("MPU9250_mag", path),
+	CDev(path),
+	Device("MPU9250_mag"),
 	_interface(interface),
 	_parent(parent),
 	_mag_topic(nullptr),

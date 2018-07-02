@@ -47,7 +47,3 @@ px4_add_library(cdev
 	CDev.cpp
 	${SRCS_PLATFORM}
 	)
-
-if (${OS} STREQUAL "nuttx")
-	target_link_libraries(drivers__device PRIVATE nuttx_arch)
-endif()

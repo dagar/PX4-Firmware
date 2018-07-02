@@ -150,7 +150,7 @@ public:
 	void			print_info();
 
 protected:
-	Device			*_interface;
+	device::Device			*_interface;
 
 private:
 	work_s			_work{};
@@ -343,7 +343,7 @@ extern "C" __EXPORT int hmc5883_main(int argc, char *argv[]);
 
 
 HMC5883::HMC5883(device::Device *interface, const char *path, enum Rotation rotation) :
-	CDev("HMC5883", path),
+	CDev(path),
 	_interface(interface),
 	_measure_ticks(0),
 	_reports(nullptr),
@@ -366,15 +366,6 @@ HMC5883::HMC5883(device::Device *interface, const char *path, enum Rotation rota
 	_temperature_counter(0),
 	_temperature_error_count(0)
 {
-	// set the device type from the interface
-	_device_id.devid_s.bus_type = _interface->get_device_bus_type();
-	_device_id.devid_s.bus = _interface->get_device_bus();
-	_device_id.devid_s.address = _interface->get_device_address();
-	_device_id.devid_s.devtype = DRV_MAG_DEVTYPE_HMC5883;
-
-	// enable debug() calls
-	_debug_enabled = false;
-
 	// default scaling
 	_scale.x_offset = 0;
 	_scale.x_scale = 1.0f;
@@ -415,7 +406,7 @@ HMC5883::init()
 	ret = CDev::init();
 
 	if (ret != OK) {
-		DEVICE_DEBUG("CDev init failed");
+		PX4_DEBUG("CDev init failed");
 		goto out;
 	}
 
@@ -743,7 +734,6 @@ HMC5883::ioctl(struct file *filp, int cmd, unsigned long arg)
 		return check_calibration();
 
 	case MAGIOCGEXTERNAL:
-		DEVICE_DEBUG("MAGIOCGEXTERNAL in main driver");
 		return _interface->ioctl(cmd, dummy);
 
 	case MAGIOCSTEMPCOMP:
@@ -803,7 +793,7 @@ HMC5883::cycle()
 
 		/* perform collection */
 		if (OK != collect()) {
-			DEVICE_DEBUG("collection error");
+			PX4_DEBUG("collection error");
 			/* restart the measurement state machine */
 			start();
 			return;
@@ -830,7 +820,7 @@ HMC5883::cycle()
 
 	/* measurement phase */
 	if (OK != measure()) {
-		DEVICE_DEBUG("measure error");
+		PX4_DEBUG("measure error");
 	}
 
 	/* next phase is collection */
@@ -893,7 +883,7 @@ HMC5883::collect()
 	new_report.error_count = perf_event_count(_comms_errors);
 	new_report.range_ga = _range_ga;
 	new_report.scaling = _range_scale;
-	new_report.device_id = _device_id.devid;
+	new_report.device_id = _interface->get_device_id();
 
 	/*
 	 * @note  We could read the status register here, which could tell us that
@@ -907,7 +897,7 @@ HMC5883::collect()
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
-		DEVICE_DEBUG("data/status read error");
+		PX4_DEBUG("data/status read error");
 		goto out;
 	}
 
@@ -961,7 +951,7 @@ HMC5883::collect()
 					  and can't do temperature. Disable it
 					*/
 					_temperature_error_count = 0;
-					DEVICE_DEBUG("disabling temperature compensation");
+					PX4_DEBUG("disabling temperature compensation");
 					set_temperature_compensation(0);
 				}
 			}
@@ -1023,7 +1013,7 @@ HMC5883::collect()
 							 &_orb_class_instance, (sensor_is_onboard) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
 
 			if (_mag_topic == nullptr) {
-				DEVICE_DEBUG("ADVERT FAIL");
+				PX4_DEBUG("ADVERT FAIL");
 			}
 		}
 	}

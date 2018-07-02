@@ -498,7 +498,7 @@ const uint8_t LSM303D::_checked_registers[LSM303D_NUM_CHECKED_REGISTERS] = { ADD
 /**
  * Helper class implementing the mag driver node.
  */
-class LSM303D_mag : public device::CDev
+class LSM303D_mag : public device::CDev, public device::Device
 {
 public:
 	LSM303D_mag(LSM303D *parent);
@@ -1778,7 +1778,8 @@ LSM303D::test_error()
 }
 
 LSM303D_mag::LSM303D_mag(LSM303D *parent) :
-	CDev("LSM303D_mag", LSM303D_DEVICE_PATH_MAG),
+	CDev(LSM303D_DEVICE_PATH_MAG),
+	Device("LSM303D_mag"),
 	_parent(parent),
 	_mag_topic(nullptr),
 	_mag_orb_class_instance(-1),

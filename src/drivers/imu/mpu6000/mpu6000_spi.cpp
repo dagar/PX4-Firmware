@@ -234,14 +234,8 @@ MPU6000_SPI::ioctl(unsigned operation, unsigned &arg)
 	int ret;
 
 	switch (operation) {
-
-	case ACCELIOCGEXTERNAL:
-		external();
-
-	/* FALLTHROUGH */
-
 	case DEVIOCGDEVICEID:
-		return CDev::ioctl(nullptr, operation, arg);
+		return get_device_id();
 
 	case MPUIOCGIS_I2C:
 		return 0;

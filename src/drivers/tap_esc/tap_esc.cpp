@@ -155,7 +155,7 @@ const uint8_t TAP_ESC::_device_mux_map[TAP_ESC_MAX_MOTOR_NUM] = ESC_POS;
 const uint8_t TAP_ESC::_device_dir_map[TAP_ESC_MAX_MOTOR_NUM] = ESC_DIR;
 
 TAP_ESC::TAP_ESC(char const *const device, uint8_t channels_count):
-	CDev("tap_esc", TAP_ESC_DEVICE_PATH),
+	CDev(TAP_ESC_DEVICE_PATH),
 	ModuleParams(nullptr),
 	_perf_control_latency(perf_alloc(PC_ELAPSED, "tap_esc control latency")),
 	_channels_count(channels_count)

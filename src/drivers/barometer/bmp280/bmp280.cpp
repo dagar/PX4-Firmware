@@ -148,7 +148,7 @@ private:
 extern "C" __EXPORT int bmp280_main(int argc, char *argv[]);
 
 BMP280::BMP280(bmp280::IBMP280 *interface, const char *path) :
-	CDev("BMP280", path),
+	CDev(path),
 	_interface(interface),
 	_running(false),
 	_report_ticks(0),

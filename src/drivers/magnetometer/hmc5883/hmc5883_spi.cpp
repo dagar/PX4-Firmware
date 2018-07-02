@@ -143,7 +143,7 @@ HMC5883_SPI::ioctl(unsigned operation, unsigned &arg)
 		return 0;
 
 	case DEVIOCGDEVICEID:
-		return CDev::ioctl(nullptr, operation, arg);
+		return get_device_id();
 
 	default: {
 			ret = -EINVAL;

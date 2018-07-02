@@ -167,7 +167,7 @@ private:
 };
 
 DevCommon::DevCommon(const char *device_name, const char *device_path)
-	: CDev(device_name, device_path)
+	: CDev(device_path)
 {
 }
 

@@ -240,7 +240,7 @@ typedef device::Device *(*MPU9250_constructor)(int, uint32_t, bool);
 class MPU9250_mag;
 class MPU9250_gyro;
 
-class MPU9250 : public device::CDev
+class MPU9250 : public device::CDev, public device::Device
 {
 public:
 	MPU9250(device::Device *interface, device::Device *mag_interface, const char *path_accel, const char *path_gyro,
@@ -264,7 +264,7 @@ public:
 	void 			test_error();
 
 protected:
-	Device			*_interface;
+	device::Device			*_interface;
 
 	virtual int		probe();
 
@@ -484,17 +484,6 @@ private:
 	 * Swap a 16-bit value read from the mpu to native byte order.
 	 */
 	uint16_t		swap16(uint16_t val) { return (val >> 8) | (val << 8);	}
-
-	/**
-	 * Get the internal / external state
-	 *
-	 * @return true if the sensor is not on the main MCU board
-	 */
-	bool			is_external()
-	{
-		unsigned dummy;
-		return _interface->ioctl(ACCELIOCGEXTERNAL, dummy);
-	}
 
 	/**
 	 * Measurement self test

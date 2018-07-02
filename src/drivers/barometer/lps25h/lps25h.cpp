@@ -309,7 +309,7 @@ extern "C" __EXPORT int lps25h_main(int argc, char *argv[]);
 
 
 LPS25H::LPS25H(device::Device *interface, const char *path) :
-	CDev("LPS25H", path),
+	CDev(path),
 	_interface(interface),
 	_work{},
 	_measure_ticks(0),

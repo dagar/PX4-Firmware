@@ -38,7 +38,7 @@ class MPU9250;
 /**
  * Helper class implementing the gyro driver node.
  */
-class MPU9250_gyro : public device::CDev
+class MPU9250_gyro : public device::CDev, public device::Device
 {
 public:
 	MPU9250_gyro(MPU9250 *parent, const char *path);

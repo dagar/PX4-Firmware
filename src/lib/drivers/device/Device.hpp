@@ -107,6 +107,23 @@ public:
 	 */
 	virtual int	write(unsigned address, void *data, unsigned count) { return -ENODEV; }
 
+	/**
+	 * Perform a device-specific operation.
+	 *
+	 * @param operation	The operation to perform.
+	 * @param arg		An argument to the operation.
+	 * @return		Negative errno on error, OK or positive value on success.
+	 */
+	virtual int	ioctl(unsigned operation, unsigned &arg)
+	{
+		switch (operation) {
+		case DEVIOCGDEVICEID:
+			return (int)_device_id.devid;
+		}
+
+		return -ENODEV;
+	}
+
 	/** Device bus types for DEVID */
 	enum DeviceBusType {
 		DeviceBusType_UNKNOWN = 0,
@@ -120,21 +137,23 @@ public:
 	 *
 	 * @return The bus ID
 	 */
-	uint8_t get_device_bus() { return _device_id.devid_s.bus; }
+	uint8_t get_device_bus() const { return _device_id.devid_s.bus; }
+
+	uint32_t get_device_id() const { return _device_id.devid; }
 
 	/**
 	 * Return the bus type the device is connected to.
 	 *
 	 * @return The bus type
 	 */
-	DeviceBusType get_device_bus_type() { return _device_id.devid_s.bus_type; }
+	DeviceBusType get_device_bus_type() const { return _device_id.devid_s.bus_type; }
 
 	/**
 	 * Return the bus address of the device.
 	 *
 	 * @return The bus address
 	 */
-	uint8_t get_device_address() { return _device_id.devid_s.address; }
+	uint8_t get_device_address() const { return _device_id.devid_s.address; }
 
 	void set_device_address(int address) { _device_id.devid_s.address = address; }
 

@@ -201,7 +201,7 @@ extern "C"  __EXPORT int hc_sr04_main(int argc, char *argv[]);
 static int sonar_isr(int irq, void *context);
 
 HC_SR04::HC_SR04(unsigned sonars) :
-	CDev("HC_SR04", SR04_DEVICE_PATH, 0),
+	CDev(SR04_DEVICE_PATH, 0),
 	_min_distance(SR04_MIN_DISTANCE),
 	_max_distance(SR04_MAX_DISTANCE),
 	_reports(nullptr),

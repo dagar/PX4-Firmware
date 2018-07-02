@@ -1618,7 +1618,7 @@ FXOS8701CQ::test_error()
 }
 
 FXOS8701CQ_mag::FXOS8701CQ_mag(FXOS8701CQ *parent) :
-	CDev("FXOS8701C_mag", FXOS8701C_DEVICE_PATH_MAG),
+	CDev(FXOS8701C_DEVICE_PATH_MAG),
 	_parent(parent),
 	_mag_topic(nullptr),
 	_mag_orb_class_instance(-1),

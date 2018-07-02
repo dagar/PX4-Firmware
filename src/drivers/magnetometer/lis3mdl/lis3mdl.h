@@ -110,7 +110,7 @@ enum OPERATING_MODE {
 };
 
 
-class LIS3MDL : public device::CDev
+class LIS3MDL : public device::CDev, public device::Device
 {
 public:
 	LIS3MDL(device::Device *interface, const char *path, enum Rotation rotation);
@@ -139,7 +139,7 @@ public:
 	void stop();
 
 protected:
-	Device *_interface;
+	device::Device *_interface;
 
 private:
 	work_s _work;

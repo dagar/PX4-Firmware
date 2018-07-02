@@ -89,7 +89,7 @@ typedef device::Device *(*MPU9250_mag_constructor)(int, bool);
 /**
  * Helper class implementing the magnetometer driver node.
  */
-class MPU9250_mag : public device::CDev
+class MPU9250_mag : public device::CDev, public device::Device
 {
 public:
 	MPU9250_mag(MPU9250 *parent, device::Device *interface, const char *path);
@@ -111,7 +111,7 @@ public:
 	bool ak8963_read_adjustments(void);
 
 protected:
-	Device			*_interface;
+	device::Device			*_interface;
 
 	friend class MPU9250;
 

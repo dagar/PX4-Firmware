@@ -70,7 +70,8 @@
 #include "mpu9250.h"
 
 MPU9250_gyro::MPU9250_gyro(MPU9250 *parent, const char *path) :
-	CDev("MPU9250_gyro", path),
+	CDev(path),
+	Device("MPU9250_gyro"),
 	_parent(parent),
 	_gyro_topic(nullptr),
 	_gyro_orb_class_instance(-1),

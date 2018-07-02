@@ -128,7 +128,7 @@ enum MPU6000_BUS {
 
 class MPU6000_gyro;
 
-class MPU6000 : public device::CDev
+class MPU6000 : public device::CDev, public device::Device
 {
 public:
 	MPU6000(device::Device *interface, const char *path_accel, const char *path_gyro, enum Rotation rotation,
@@ -158,7 +158,7 @@ public:
 	void 			test_error();
 
 protected:
-	Device			*_interface;
+	device::Device			*_interface;
 
 	virtual int		probe();
 
@@ -370,17 +370,6 @@ private:
 	uint16_t		swap16(uint16_t val) { return (val >> 8) | (val << 8);	}
 
 	/**
-	 * Get the internal / external state
-	 *
-	 * @return true if the sensor is not on the main MCU board
-	 */
-	bool			is_external()
-	{
-		unsigned dummy;
-		return _interface->ioctl(ACCELIOCGEXTERNAL, dummy);
-	}
-
-	/**
 	 * Measurement self test
 	 *
 	 * @return 0 on success, 1 on failure
@@ -444,7 +433,7 @@ const uint8_t MPU6000::_checked_registers[MPU6000_NUM_CHECKED_REGISTERS] = { MPU
 /**
  * Helper class implementing the gyro driver node.
  */
-class MPU6000_gyro : public device::CDev
+class MPU6000_gyro : public device::CDev, public device::Device
 {
 public:
 	MPU6000_gyro(MPU6000 *parent, const char *path);
@@ -476,7 +465,8 @@ extern "C" { __EXPORT int mpu6000_main(int argc, char *argv[]); }
 
 MPU6000::MPU6000(device::Device *interface, const char *path_accel, const char *path_gyro, enum Rotation rotation,
 		 int device_type) :
-	CDev("MPU6000", path_accel),
+	CDev(path_accel),
+	Device("MPU6000"),
 	_interface(interface),
 	_device_type(device_type),
 	_gyro(new MPU6000_gyro(this, path_gyro)),
@@ -626,22 +616,17 @@ MPU6000::~MPU6000()
 int
 MPU6000::init()
 {
-
 #if defined(USE_I2C)
 	unsigned dummy;
 	use_i2c(_interface->ioctl(MPUIOCGIS_I2C, dummy));
 #endif
 
-
 	/* probe again to get our settings that are based on the device type */
-
 	int ret = probe();
 
 	/* if probe failed, bail now */
-
 	if (ret != OK) {
-
-		DEVICE_DEBUG("CDev init failed");
+		PX4_DEBUG("CDev init failed");
 		return ret;
 	}
 
@@ -738,7 +723,7 @@ MPU6000::init()
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
-					   &_accel_orb_class_instance, (is_external()) ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
+					   &_accel_orb_class_instance, _interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
 
 	if (_accel_topic == nullptr) {
 		PX4_WARN("ADVERT FAIL");
@@ -749,7 +734,7 @@ MPU6000::init()
 	_gyro_reports->get(&grp);
 
 	_gyro->_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &grp,
-			     &_gyro->_gyro_orb_class_instance, (is_external()) ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
+			     &_gyro->_gyro_orb_class_instance, _interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH);
 
 	if (_gyro->_gyro_topic == nullptr) {
 		PX4_WARN("ADVERT FAIL");
@@ -1358,8 +1343,6 @@ MPU6000::gyro_read(struct file *filp, char *buffer, size_t buflen)
 int
 MPU6000::ioctl(struct file *filp, int cmd, unsigned long arg)
 {
-	unsigned dummy = arg;
-
 	switch (cmd) {
 
 	case SENSORIOCRESET:
@@ -1498,9 +1481,6 @@ MPU6000::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSELFTEST:
 		return accel_self_test();
-
-	case ACCELIOCGEXTERNAL:
-		return _interface->ioctl(cmd, dummy);
 
 	default:
 		/* give it to the superclass */
@@ -2140,7 +2120,8 @@ MPU6000::print_registers()
 
 
 MPU6000_gyro::MPU6000_gyro(MPU6000 *parent, const char *path) :
-	CDev("MPU6000_gyro", path),
+	CDev(path),
+	Device("MPU6000_gyro"),
 	_parent(parent),
 	_gyro_topic(nullptr),
 	_gyro_orb_class_instance(-1),
@@ -2192,7 +2173,7 @@ MPU6000_gyro::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case DEVIOCGDEVICEID:
-		return (int)CDev::ioctl(filp, cmd, arg);
+		return get_device_id();
 		break;
 
 	default:

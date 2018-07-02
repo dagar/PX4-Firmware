@@ -199,7 +199,7 @@ protected:
 extern "C" __EXPORT int mpl3115a2_main(int argc, char *argv[]);
 
 MPL3115A2::MPL3115A2(device::Device *interface, const char *path) :
-	CDev("MPL3115A2", path),
+	CDev(path),
 	_interface(interface),
 	_measure_ticks(0),
 	_reports(nullptr),

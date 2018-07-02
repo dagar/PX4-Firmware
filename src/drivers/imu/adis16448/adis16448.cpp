@@ -1631,7 +1631,7 @@ ADIS16448::print_info()
 }
 
 ADIS16448_gyro::ADIS16448_gyro(ADIS16448 *parent, const char *path) :
-	CDev("ADIS16448_gyro", path),
+	CDev(path),
 	_parent(parent),
 	_gyro_topic(nullptr),
 	_gyro_orb_class_instance(-1),
@@ -1691,7 +1691,7 @@ ADIS16448_gyro::ioctl(struct file *filp, int cmd, unsigned long arg)
 }
 
 ADIS16448_mag::ADIS16448_mag(ADIS16448 *parent, const char *path) :
-	CDev("ADIS16448_mag", path),
+	CDev(path),
 	_parent(parent),
 	_mag_topic(nullptr),
 	_mag_orb_class_instance(-1),

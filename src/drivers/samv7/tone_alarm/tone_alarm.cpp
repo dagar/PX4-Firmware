@@ -313,7 +313,7 @@ extern "C" __EXPORT int tone_alarm_main(int argc, char *argv[]);
 
 
 ToneAlarm::ToneAlarm() :
-	CDev("tone_alarm", TONEALARM0_DEVICE_PATH),
+	CDev(TONEALARM0_DEVICE_PATH),
 	_default_tune_number(0),
 	_user_tune(nullptr),
 	_tune(nullptr),

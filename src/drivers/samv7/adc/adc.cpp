@@ -145,7 +145,7 @@ private:
 };
 
 ADC::ADC(uint32_t channels) :
-	CDev("adc", ADC0_DEVICE_PATH),
+	CDev(ADC0_DEVICE_PATH),
 	_sample_perf(perf_alloc(PC_ELAPSED, "adc_samples")),
 	_channel_count(0),
 	_samples(nullptr),

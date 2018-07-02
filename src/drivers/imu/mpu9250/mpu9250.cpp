@@ -113,7 +113,8 @@ const uint8_t MPU9250::_checked_registers[MPU9250_NUM_CHECKED_REGISTERS] = { MPU
 MPU9250::MPU9250(device::Device *interface, device::Device *mag_interface, const char *path_accel,
 		 const char *path_gyro, const char *path_mag,
 		 enum Rotation rotation) :
-	CDev("MPU9250", path_accel),
+	CDev(path_accel),
+	Device("mpu9250"),
 	_interface(interface),
 	_gyro(new MPU9250_gyro(this, path_gyro)),
 	_mag(new MPU9250_mag(this, mag_interface, path_mag)),
@@ -399,7 +400,7 @@ MPU9250::init()
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
-					   &_accel_orb_class_instance, (is_external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
+					   &_accel_orb_class_instance, _interface->external() ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
 
 	if (_accel_topic == nullptr) {
 		PX4_ERR("ADVERT FAIL");
@@ -411,7 +412,7 @@ MPU9250::init()
 	_gyro_reports->get(&grp);
 
 	_gyro->_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &grp,
-			     &_gyro->_gyro_orb_class_instance, (is_external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
+			     &_gyro->_gyro_orb_class_instance, _interface->external() ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
 
 	if (_gyro->_gyro_topic == nullptr) {
 		PX4_ERR("ADVERT FAIL");

@@ -42,7 +42,8 @@
 #include "lis3mdl.h"
 
 LIS3MDL::LIS3MDL(device::Device *interface, const char *path, enum Rotation rotation) :
-	CDev("LIS3MDL", path),
+	CDev(path),
+	Device("LIS3MDL"),
 	_interface(interface),
 	_work{},
 	_reports(nullptr),

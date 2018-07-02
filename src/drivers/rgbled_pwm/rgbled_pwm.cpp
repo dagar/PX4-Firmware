@@ -114,7 +114,7 @@ RGBLED_PWM *g_rgbled = nullptr;
 }
 
 RGBLED_PWM::RGBLED_PWM() :
-	CDev("rgbled_pwm", RGBLED_PWM0_DEVICE_PATH),
+	CDev(RGBLED_PWM0_DEVICE_PATH),
 	_work{},
 	_r(0),
 	_g(0),

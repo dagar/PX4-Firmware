@@ -75,7 +75,7 @@
 #include <uORB/topics/pwm_input.h>
 
 #include <drivers/drv_device.h>
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/device/ringbuffer.h>
 
 #include <sys/types.h>
@@ -271,7 +271,7 @@ static void pwmin_usage(void);
 static PWMIN *g_dev;
 
 PWMIN::PWMIN() :
-	CDev("pwmin", PWMIN0_DEVICE_PATH),
+	CDev(PWMIN0_DEVICE_PATH),
 	_error_count(0),
 	_pulses_captured(0),
 	_last_period(0),

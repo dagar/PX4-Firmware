@@ -34,7 +34,7 @@
 #include "ADIS16477_gyro.hpp"
 
 ADIS16477_gyro::ADIS16477_gyro(ADIS16477 *parent, const char *path) :
-	CDev("ADIS16477_gyro", path),
+	CDev(path),
 	_parent(parent),
 	_gyro_topic(nullptr),
 	_gyro_orb_class_instance(-1),

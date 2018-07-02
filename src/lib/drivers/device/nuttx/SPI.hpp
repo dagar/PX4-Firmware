@@ -40,18 +40,18 @@
 #ifndef _DEVICE_SPI_H
 #define _DEVICE_SPI_H
 
-#include "../Device.hpp"
+#include <lib/drivers/device/Device.hpp>
 #include <lib/cdev/CDev.hpp>
 
 #include <px4_spi.h>
 
-namespace device __EXPORT
+namespace device
 {
 
 /**
  * Abstract class for character device on SPI
  */
-class __EXPORT SPI : public CDev, public Device
+class SPI : public CDev, public Device
 {
 protected:
 	/**
@@ -179,7 +179,7 @@ protected:
 	 */
 	void		set_lockmode(enum LockMode mode) { locking_mode = mode; }
 
-	const LockMode	locking_mode;	/**< selected locking mode */
+	LockMode	locking_mode;	/**< selected locking mode */
 
 private:
 	const uint32_t			_device;
