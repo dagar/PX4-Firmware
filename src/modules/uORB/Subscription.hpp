@@ -90,8 +90,10 @@ public:
 
 protected:
 	const struct orb_metadata *_meta;
+
 	unsigned _instance;
-	int _handle;
+
+	int _handle{-1};
 };
 
 /**
@@ -155,7 +157,9 @@ public:
 		     List<SubscriptionNode *> *list = nullptr):
 		SubscriptionNode(meta, interval, instance, list),
 		_data() // initialize data structure to zero
-	{}
+	{
+		forcedUpdate();
+	}
 
 	~Subscription() override = default;
 
@@ -184,6 +188,11 @@ public:
 	const T &get() const
 	{
 		return _data;
+	}
+
+	bool valid() const
+	{
+		return (_handle >= 0) && (_data.timestamp > 0);
 	}
 
 private:
