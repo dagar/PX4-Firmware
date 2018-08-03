@@ -270,40 +270,6 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 		goto out;
 	}
 
-#ifdef __PX4_NUTTX
-
-	if (dynamic) {
-		/* check measurement result range */
-		struct accel_report acc;
-		ret = h.read(&acc, sizeof(acc));
-
-		if (ret == sizeof(acc)) {
-			/* evaluate values */
-			float accel_magnitude = sqrtf(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-
-			if (accel_magnitude < 4.0f || accel_magnitude > 15.0f /* m/s^2 */) {
-				if (report_fail) {
-					mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: ACCEL RANGE, hold still on arming");
-				}
-
-				/* this is frickin' fatal */
-				success = false;
-				goto out;
-			}
-
-		} else {
-			if (report_fail) {
-				mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: ACCEL READ");
-			}
-
-			/* this is frickin' fatal */
-			success = false;
-			goto out;
-		}
-	}
-
-#endif
-
 out:
 	if (instance==0) set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_ACC, present, !optional, success, status);
 	if (instance==1) set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_ACC2, present, !optional, success, status);
