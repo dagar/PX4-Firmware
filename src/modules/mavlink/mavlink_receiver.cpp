@@ -1376,7 +1376,6 @@ MavlinkReceiver::handle_message_radio_status(mavlink_message_t *msg)
 
 		radio_status_s status = {};
 		status.timestamp = hrt_absolute_time();
-		status.type = radio_status_s::RADIO_TYPE_3DR_RADIO;
 		status.rssi = rstatus.rssi;
 		status.remote_rssi = rstatus.remrssi;
 		status.txbuf = rstatus.txbuf;
@@ -1387,8 +1386,8 @@ MavlinkReceiver::handle_message_radio_status(mavlink_message_t *msg)
 
 		_mavlink->update_radio_status(status);
 
-		int multi_instance;
-		orb_publish_auto(ORB_ID(radio_status), &_radio_status_pub, &status, &multi_instance, ORB_PRIO_HIGH);
+		int instance;
+		orb_publish_auto(ORB_ID(radio_status), &_radio_status_pub, &status, &instance, ORB_PRIO_DEFAULT);
 	}
 }
 
@@ -2478,7 +2477,6 @@ MavlinkReceiver::receive_thread(void *arg)
 	/* the serial port buffers internally as well, we just need to fit a small chunk */
 	uint8_t buf[64];
 #endif
-	mavlink_message_t msg;
 
 	struct pollfd fds[1] = {};
 
@@ -2559,6 +2557,8 @@ MavlinkReceiver::receive_thread(void *arg)
 			if (_mavlink->get_client_source_initialized()) {
 				/* if read failed, this loop won't execute */
 				for (ssize_t i = 0; i < nread; i++) {
+					mavlink_message_t msg;
+
 					if (mavlink_parse_char(_mavlink->get_channel(), buf[i], &msg, &_status)) {
 
 						/* check if we received version 2 and request a switch. */

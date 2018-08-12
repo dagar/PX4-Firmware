@@ -152,21 +152,21 @@ public:
 
 	static int		get_uart_fd(unsigned index);
 
-	int			get_uart_fd();
+	int			get_uart_fd() { return _uart_fd; }
 
 	/**
 	 * Get the MAVLink system id.
 	 *
 	 * @return		The system ID of this vehicle
 	 */
-	int			get_system_id();
+	int			get_system_id() { return mavlink_system.sysid; }
 
 	/**
 	 * Get the MAVLink component id.
 	 *
 	 * @return		The component ID of this vehicle
 	 */
-	int			get_component_id();
+	int			get_component_id() { return mavlink_system.compid; }
 
 	const char *_device_name;
 
@@ -325,7 +325,7 @@ public:
 	 */
 	MavlinkOrbSubscription *add_orb_subscription(const orb_id_t topic, int instance = 0, bool disable_sharing = false);
 
-	int			get_instance_id();
+	int			get_instance_id() { return _instance_id; };
 
 	/**
 	 * Enable / disable hardware flow control.
@@ -334,7 +334,7 @@ public:
 	 */
 	int			enable_flow_control(enum FLOW_CONTROL_MODE enabled);
 
-	mavlink_channel_t	get_channel();
+	mavlink_channel_t	get_channel() { return _channel; }
 
 	void			configure_stream_threadsafe(const char *stream_name, float rate = -1.0f);
 
@@ -676,14 +676,6 @@ private:
 	void pass_message(const mavlink_message_t *msg);
 
 	void publish_telemetry_status();
-
-	/**
-	 * Check the configuration of a connected radio
-	 *
-	 * This convenience function allows to re-configure a connected
-	 * radio without removing it from the main system harness.
-	 */
-	void check_radio_config();
 
 	/**
 	 * Update rate mult so total bitrate will be equal to _datarate.

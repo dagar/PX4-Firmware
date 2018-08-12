@@ -73,6 +73,7 @@
 #include <dataman/dataman.h>
 #include <version/version.h>
 #include <mathlib/mathlib.h>
+#include <sik_radio/sik_radio.hpp>
 
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_command_ack.h>
@@ -547,35 +548,18 @@ Mavlink::get_uart_fd(unsigned index)
 	return -1;
 }
 
-int
-Mavlink::get_uart_fd()
-{
-	return _uart_fd;
-}
-
-int
-Mavlink::get_instance_id()
-{
-	return _instance_id;
-}
-
-mavlink_channel_t
-Mavlink::get_channel()
-{
-	return _channel;
-}
-
 void Mavlink::mavlink_update_system()
 {
 	if (!_param_initialized) {
 		_param_system_id = param_find("MAV_SYS_ID");
 		_param_component_id = param_find("MAV_COMP_ID");
 		_param_proto_ver = param_find("MAV_PROTO_VER");
-		_param_radio_id = param_find("MAV_RADIO_ID");
 		_param_system_type = param_find("MAV_TYPE");
 		_param_use_hil_gps = param_find("MAV_USEHILGPS");
 		_param_forward_externalsp = param_find("MAV_FWDEXTSP");
 		_param_broadcast = param_find("MAV_BROADCAST");
+
+		_param_radio_id = param_find("MAV_RADIO_ID");
 	}
 
 	/* update system and component id */
@@ -627,16 +611,6 @@ void Mavlink::mavlink_update_system()
 	param_get(_param_broadcast, &_broadcast_mode);
 
 	_forward_externalsp = (bool)forward_externalsp;
-}
-
-int Mavlink::get_system_id()
-{
-	return mavlink_system.sysid;
-}
-
-int Mavlink::get_component_id()
-{
-	return mavlink_system.compid;
 }
 
 int Mavlink::mavlink_open_uart(int baud, const char *uart_name, bool force_flow_control)
@@ -821,6 +795,11 @@ int Mavlink::mavlink_open_uart(int baud, const char *uart_name, bool force_flow_
 	/* setup output flow control */
 	if (enable_flow_control(force_flow_control ? FLOW_CONTROL_ON : FLOW_CONTROL_AUTO)) {
 		PX4_WARN("hardware flow control not supported");
+	}
+
+	//if ((get_protocol() == SERIAL) && (_tstatus.type == telemetry_status_s::TELEMETRY_STATUS_RADIO_TYPE_SIK_RADIO)) {
+	if (get_protocol() == SERIAL) {
+		check_radio_config(_uart_fd, _radio_id);
 	}
 
 	return _uart_fd;
@@ -1653,30 +1632,23 @@ void
 Mavlink::update_radio_status(const radio_status_s &radio_status)
 {
 	_rstatus = radio_status;
+	_tstatus.type = telemetry_status_s::TELEMETRY_STATUS_RADIO_TYPE_SIK_RADIO;
 
 	/* check hardware limits */
-	if (radio_status.type == telemetry_status_s::TELEMETRY_STATUS_RADIO_TYPE_3DR_RADIO) {
+	_radio_status_available = true;
+	_radio_status_critical = (radio_status.txbuf < RADIO_BUFFER_LOW_PERCENTAGE);
 
-		_radio_status_available = true;
-		_radio_status_critical = (radio_status.txbuf < RADIO_BUFFER_LOW_PERCENTAGE);
+	if (radio_status.txbuf < RADIO_BUFFER_CRITICAL_LOW_PERCENTAGE) {
+		/* this indicates link congestion, reduce rate by 20% */
+		_radio_status_mult *= 0.80f;
 
-		if (radio_status.txbuf < RADIO_BUFFER_CRITICAL_LOW_PERCENTAGE) {
-			/* this indicates link congestion, reduce rate by 20% */
-			_radio_status_mult *= 0.80f;
+	} else if (radio_status.txbuf < RADIO_BUFFER_LOW_PERCENTAGE) {
+		/* this indicates link congestion, reduce rate by 2.5% */
+		_radio_status_mult *= 0.975f;
 
-		} else if (radio_status.txbuf < RADIO_BUFFER_LOW_PERCENTAGE) {
-			/* this indicates link congestion, reduce rate by 2.5% */
-			_radio_status_mult *= 0.975f;
-
-		} else if (radio_status.txbuf > RADIO_BUFFER_HALF_PERCENTAGE) {
-			/* this indicates spare bandwidth, increase by 2.5% */
-			_radio_status_mult *= 1.025f;
-		}
-
-	} else {
-		_radio_status_available = false;
-		_radio_status_critical = false;
-		_radio_status_mult = 1.0f;
+	} else if (radio_status.txbuf > RADIO_BUFFER_HALF_PERCENTAGE) {
+		/* this indicates spare bandwidth, increase by 2.5% */
+		_radio_status_mult *= 1.025f;
 	}
 }
 
@@ -2194,8 +2166,6 @@ Mavlink::task_main(int argc, char *argv[])
 			mavlink_update_system();
 		}
 
-		check_radio_config();
-
 		if (status_sub->update(&status_time, &status)) {
 			/* switch HIL mode if required */
 			set_hil_enabled(status.hil_state == vehicle_status_s::HIL_STATE_ON);
@@ -2551,57 +2521,6 @@ void Mavlink::publish_telemetry_status()
 	orb_publish_auto(ORB_ID(telemetry_status), &_telem_status_pub, &_tstatus, &instance, ORB_PRIO_DEFAULT);
 }
 
-void Mavlink::check_radio_config()
-{
-	/* radio config check */
-	if (_uart_fd >= 0 && _radio_id != 0 && _tstatus.type == telemetry_status_s::TELEMETRY_STATUS_RADIO_TYPE_3DR_RADIO) {
-		/* request to configure radio and radio is present */
-		FILE *fs = fdopen(_uart_fd, "w");
-
-		if (fs) {
-			/* switch to AT command mode */
-			usleep(1200000);
-			fprintf(fs, "+++\n");
-			usleep(1200000);
-
-			if (_radio_id > 0) {
-				/* set channel */
-				fprintf(fs, "ATS3=%u\n", _radio_id);
-				usleep(200000);
-
-			} else {
-				/* reset to factory defaults */
-				fprintf(fs, "AT&F\n");
-				usleep(200000);
-			}
-
-			/* write config */
-			fprintf(fs, "AT&W");
-			usleep(200000);
-
-			/* reboot */
-			fprintf(fs, "ATZ");
-			usleep(200000);
-
-			// XXX NuttX suffers from a bug where
-			// fclose() also closes the fd, not just
-			// the file stream. Since this is a one-time
-			// config thing, we leave the file struct
-			// allocated.
-#ifndef __PX4_NUTTX
-			fclose(fs);
-#endif
-
-		} else {
-			PX4_WARN("open fd %d failed", _uart_fd);
-		}
-
-		/* reset param and save */
-		_radio_id = 0;
-		param_set_no_notification(_param_radio_id, &_radio_id);
-	}
-}
-
 int Mavlink::start_helper(int argc, char *argv[])
 {
 	/* create the instance in task context */
@@ -2699,8 +2618,8 @@ Mavlink::display_status()
 		printf("\ttype:\t\t");
 
 		switch (_tstatus.type) {
-		case telemetry_status_s::TELEMETRY_STATUS_RADIO_TYPE_3DR_RADIO:
-			printf("3DR RADIO\n");
+		case telemetry_status_s::TELEMETRY_STATUS_RADIO_TYPE_SIK_RADIO:
+			printf("SIK RADIO\n");
 			printf("\trssi:\t\t%d\n", _rstatus.rssi);
 			printf("\tremote rssi:\t%u\n", _rstatus.remote_rssi);
 			printf("\ttxbuf:\t\t%u\n", _rstatus.txbuf);
