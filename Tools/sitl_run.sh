@@ -74,7 +74,7 @@ then
 			# Set the plugin path so Gazebo finds our model and sim
 			source $src_path/Tools/setup_gazebo.bash ${src_path} ${build_path}
 
-			gzserver --verbose ${src_path}/Tools/sitl_gazebo/worlds/${model}.world &
+			gzserver ${src_path}/Tools/sitl_gazebo/worlds/${model}.world &
 			SIM_PID=`echo $!`
 
 			if [[ -n "$HEADLESS" ]]; then
@@ -127,6 +127,26 @@ then
 elif [ "$debugger" == "callgrind" ]
 then
 	valgrind --tool=callgrind -v $sitl_command
+elif [ "$debugger" == "perf" ]
+then
+	echo "$sitl_command"
+	
+	sudo sysctl kernel.kptr_restrict=0
+	# May also have to do the following:
+	# (additional reading http://unix.stackexchange.com/questions/14227/do-i-need-root-admin-permissions-to-run-userspace-perf-tool-perf-events-ar )
+	sudo sysctl kernel.perf_event_paranoid=0
+
+	#perf record -F 99 
+	#perf record -i -g -e cycles:u -- $sitl_command
+	perf record -F 250 --call-graph dwarf $sitl_command
+	#perf report
+	
+	#perf script | egrep -v "( __libc_start| LazyCompile | v8::internal::| Builtin:| Stub:| LoadIC:|\[unknown\]| LoadPolymorphicIC:)" | sed 's/ LazyCompile:[*~]\?/ /' | ~/sources/FlameGraph/stackcollapse-perf.pl > out.perf-folded
+	#perf script | $HOME/git/FlameGraph/stackcollapse-perf.pl | $HOME/git/FlameGraph/flamegraph.pl > perf.svg
+	
+	perf script | $HOME/git/FlameGraph/stackcollapse-perf.pl > out.perf-folded
+	$HOME/git/FlameGraph/flamegraph.pl out.perf-folded > perf.svg
+	
 elif [ "$debugger" == "ide" ]
 then
 	echo "######################################################################"

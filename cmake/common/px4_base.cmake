@@ -404,7 +404,8 @@ function(px4_add_common_flags)
 
 	set(_optimization_flags
 		-fno-strict-aliasing
-		-fomit-frame-pointer
+		#-fomit-frame-pointer
+		-fno-omit-frame-pointer
 
 		-fno-math-errno
 		-funsafe-math-optimizations
