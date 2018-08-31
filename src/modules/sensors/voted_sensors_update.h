@@ -100,6 +100,8 @@ public:
 
 	void print_status();
 
+	void print_device_ids();
+
 	/**
 	 * call this whenever parameters got updated. Make sure to have initialize_sensors() called at least
 	 * once before calling this.

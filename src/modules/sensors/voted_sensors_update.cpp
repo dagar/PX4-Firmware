@@ -43,6 +43,7 @@
 
 #include <conversion/rotation.h>
 #include <ecl/geo/geo.h>
+#include <lib/drivers/device/Device.hpp>
 
 #define MAG_ROT_VAL_INTERNAL		-1
 #define CAL_ERROR_APPLY_CAL_MSG "FAILED APPLYING %s CAL #%u"
@@ -1009,14 +1010,46 @@ void VotedSensorsUpdate::print_status()
 {
 	PX4_INFO("gyro status:");
 	_gyro.voter.print();
+
 	PX4_INFO("accel status:");
 	_accel.voter.print();
+
 	PX4_INFO("mag status:");
 	_mag.voter.print();
+
 	PX4_INFO("baro status:");
 	_baro.voter.print();
 
 	_temperature_compensation.print_status();
+}
+
+void VotedSensorsUpdate::print_device_ids()
+{
+	PX4_INFO("Accels:");
+
+	for (int i = 0; i < SENSOR_COUNT_MAX; i++) {
+		if (_accel_device_id[i] != 0) {
+	        char device_id_buffer[80];
+			device::Device::device_id_print_buffer(device_id_buffer, sizeof(device_id_buffer), _accel_device_id[i]);
+			PX4_INFO_RAW("orb sensor_accel %d: device_id: %d - %s\n", i, _accel_device_id[i], device_id_buffer);
+		}
+	}
+
+	for (int i = 0; i < SENSOR_COUNT_MAX; i++) {
+		char str[30];
+		sprintf(str, "%s%u", ACCEL_BASE_DEVICE_PATH, i);
+		DevHandle h;
+		DevMgr::getHandle(str, h);
+
+		if (h.isValid()) {
+			uint32_t driver_device_id = h.ioctl(DEVIOCGDEVICEID, 0);
+
+	        char device_id_buffer[80];
+			device::Device::device_id_print_buffer(device_id_buffer, sizeof(device_id_buffer), driver_device_id);
+			PX4_INFO_RAW("/dev/accel%d: device_id: %d - %s\n", i, driver_device_id, device_id_buffer);
+		}
+	}
+
 }
 
 bool

@@ -156,6 +156,8 @@ public:
 	/** @see ModuleBase::print_status() */
 	int print_status() override;
 
+	void print_device_ids();
+
 private:
 	DevHandle 	_h_adc;				/**< ADC driver handle */
 
@@ -764,8 +766,28 @@ int Sensors::print_status()
 	return 0;
 }
 
+void Sensors::print_device_ids()
+{
+	_voted_sensors_update.print_device_ids();
+}
+
 int Sensors::custom_command(int argc, char *argv[])
 {
+	const char *verb = argv[0];
+
+	if (!strcmp(verb, "device_ids")) {
+
+		if (is_running()) {
+			if (get_instance()) {
+				get_instance()->print_device_ids();
+			}
+		}
+
+
+
+		return PX4_OK;
+	}
+
 	return print_usage("unknown command");
 }
 
