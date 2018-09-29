@@ -103,6 +103,7 @@ const struct {
 	{"mixer",		test_mixer,	OPT_NOJIGTEST},
 	{"autodeclination",	test_autodeclination,	0},
 	{"bezier",		test_bezierQuad, 0},
+	{"bitset",		test_bitset,	0},
 	{"bson",		test_bson,	0},
 	{"conv",		test_conv, 0},
 	{"dataman",		test_dataman, OPT_NOJIGTEST | OPT_NOALLTEST},
