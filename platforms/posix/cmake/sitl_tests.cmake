@@ -6,6 +6,7 @@
 set(tests
 	autodeclination
 	bezier
+	bitset
 	bson
 	commander
 	controllib
