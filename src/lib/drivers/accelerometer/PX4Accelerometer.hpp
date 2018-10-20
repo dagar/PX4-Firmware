@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,36 +31,48 @@
  *
  ****************************************************************************/
 
-#pragma once
 
-class MPU9250;
+#include <drivers/device/integrator.h>
+#include <drivers/drv_accel.h>
+#include <drivers/drv_hrt.h>
+#include <lib/cdev/CDev.hpp>
+#include <lib/conversion/rotation.h>
+#include <mathlib/math/filter/LowPassFilter2pVector3f.hpp>
+#include <uORB/topics/sensor_accel.h>
+#include <uORB/uORB.h>
 
-/**
- * Helper class implementing the gyro driver node.
- */
-class MPU9250_gyro : public device::CDev
+class PX4Accelerometer : public cdev::CDev
 {
+
 public:
-	MPU9250_gyro(MPU9250 *parent, const char *path);
-	~MPU9250_gyro();
+	PX4Accelerometer(uint32_t device_id, enum Rotation rotation, float scale);
+	~PX4Accelerometer() override;
 
-	virtual ssize_t		read(struct file *filp, char *buffer, size_t buflen);
-	virtual int		ioctl(struct file *filp, int cmd, unsigned long arg);
+	int	init() override;
+	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
-	virtual int		init();
+	void configure_filter(float sample_freq, float cutoff_freq);
 
-protected:
-	friend class MPU9250;
+	void update(int16_t x, int16_t y, int16_t z);
 
-	void			parent_poll_notify();
+	void update_temperature(float temperature) { _report.temperature = temperature; }
 
 private:
-	MPU9250			*_parent;
-	orb_advert_t		_gyro_topic;
-	int			_gyro_orb_class_instance;
-	int			_gyro_class_instance;
 
-	/* do not allow to copy this class due to pointer data members */
-	MPU9250_gyro(const MPU9250_gyro &);
-	MPU9250_gyro operator=(const MPU9250_gyro &);
+	sensor_accel_s		_report{};
+
+	matrix::Vector3f	_calibration_scale{1.0f, 1.0f, 1.0f};
+	matrix::Vector3f	_calibration_offset{0.0f, 0.0f, 0.0f};
+
+	orb_advert_t		_topic{nullptr};
+
+	int			_orb_class_instance{-1};
+
+	int			_class_device_instance{-1};
+
+	const matrix::Dcmf	_rotation;
+
+	math::LowPassFilter2pVector3f _filter{1000, 100};
+
+	Integrator _integrator{4000};
 };

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,101 +31,51 @@
  *
  ****************************************************************************/
 
-/**
- * @file gyro.cpp
- *
- * Driver for the Invensense mpu9250 connected via SPI.
- *
- * @author Andrew Tridgell
- *
- * based on the mpu6000 driver
- */
 
-#include <px4_config.h>
-
-#include <sys/types.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <stdio.h>
-
-#include <perf/perf_counter.h>
-
-#include <board_config.h>
-#include <drivers/drv_hrt.h>
-
-#include <drivers/device/spi.h>
-#include <drivers/device/ringbuffer.h>
-#include <drivers/device/integrator.h>
-#include <drivers/drv_accel.h>
-#include <drivers/drv_gyro.h>
-#include <drivers/drv_mag.h>
 #include <mathlib/math/filter/LowPassFilter2p.hpp>
+
+#include <drivers/device/integrator.h>
+#include <drivers/drv_mag.h>
+#include <drivers/drv_hrt.h>
+#include <lib/drivers/device/Device.hpp>
+#include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
+#include <uORB/topics/sensor_mag.h>
+#include <uORB/uORB.h>
 
-#include "mag.h"
-#include "gyro.h"
-#include "mpu9250.h"
-
-MPU9250_gyro::MPU9250_gyro(MPU9250 *parent, const char *path) :
-	CDev("MPU9250_gyro", path),
-	_parent(parent),
-	_gyro_topic(nullptr),
-	_gyro_orb_class_instance(-1),
-	_gyro_class_instance(-1)
-{
-}
-
-MPU9250_gyro::~MPU9250_gyro()
-{
-	if (_gyro_class_instance != -1) {
-		unregister_class_devname(GYRO_BASE_DEVICE_PATH, _gyro_class_instance);
-	}
-}
-
-int
-MPU9250_gyro::init()
-{
-	int ret;
-
-	// do base class init
-	ret = CDev::init();
-
-	/* if probe/setup failed, bail now */
-	if (ret != OK) {
-		DEVICE_DEBUG("gyro init failed");
-		return ret;
-	}
-
-	_gyro_class_instance = register_class_devname(GYRO_BASE_DEVICE_PATH);
-
-	return ret;
-}
-
-void
-MPU9250_gyro::parent_poll_notify()
-{
-	poll_notify(POLLIN);
-}
-
-ssize_t
-MPU9250_gyro::read(struct file *filp, char *buffer, size_t buflen)
-{
-	return _parent->gyro_read(filp, buffer, buflen);
-}
-
-int
-MPU9250_gyro::ioctl(struct file *filp, int cmd, unsigned long arg)
+class PX4Magnetometer : public cdev::CDev
 {
 
-	switch (cmd) {
-	case DEVIOCGDEVICEID:
-		return (int)CDev::ioctl(filp, cmd, arg);
-		break;
+public:
+	PX4Magnetometer(const char *name, device::Device  *interface, uint8_t dev_type, enum Rotation rotation, float scale);
+	~PX4Magnetometer() override;
 
-	default:
-		return _parent->gyro_ioctl(filp, cmd, arg);
-	}
-}
+	int	init() override;
+	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
+
+	int publish(float x, float y, float z, float temperature);
+
+	void configure_filter(float sample_freq, float cutoff_freq);
+
+private:
+	// Pointer to the communication interface
+	const device::Device *_interface{nullptr};
+
+	mag_calibration_s _cal{};
+
+	orb_advert_t _topic{nullptr};
+
+	device::Device::DeviceId _device_id{};
+
+	int	_orb_class_instance{-1};
+
+	int _class_device_instance{-1};
+
+	enum Rotation _rotation {ROTATION_NONE};
+
+	float _scale{1.0f};
+
+	math::LowPassFilter2p _filter_x{100, 20};
+	math::LowPassFilter2p _filter_y{100, 20};
+	math::LowPassFilter2p _filter_z{100, 20};
+};
