@@ -162,7 +162,7 @@ PARAM_DEFINE_INT32(CBRK_GPSFAIL, 0);
  * @category Developer
  * @group Circuit Breaker
  */
-PARAM_DEFINE_INT32(CBRK_BUZZER, 0);
+PARAM_DEFINE_INT32(CBRK_BUZZER, 782097);
 
 /**
  * Circuit breaker for USB link check

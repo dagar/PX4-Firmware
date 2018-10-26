@@ -615,136 +615,44 @@ bool Logger::try_to_subscribe_topic(LoggerSubscription &sub, int multi_instance)
 void Logger::add_default_topics()
 {
 	// Note: try to avoid setting the interval where possible, as it increases RAM usage
-	add_topic("actuator_controls_0", 100);
-	add_topic("actuator_controls_1", 100);
-	add_topic("actuator_outputs", 100);
-	add_topic("airspeed", 200);
-	add_topic("battery_status", 500);
-	add_topic("camera_capture");
-	add_topic("camera_trigger");
-	add_topic("cpuload");
-	add_topic("distance_sensor", 100);
-	add_topic("ekf2_innovations", 200);
-	add_topic("ekf_gps_drift");
-	add_topic("esc_status", 250);
-	add_topic("estimator_status", 200);
+	add_topic("battery_status", 2000);
+	add_topic("cpuload", 2000);
+	add_topic("estimator_status", 2000);
 	add_topic("home_position");
-	add_topic("input_rc", 200);
-	add_topic("manual_control_setpoint", 200);
-	add_topic("mission");
-	add_topic("mission_result");
-	add_topic("optical_flow", 50);
-	add_topic("position_setpoint_triplet", 200);
 	add_topic("radio_status");
-	add_topic("rate_ctrl_status", 30);
-	add_topic("sensor_combined", 100);
-	add_topic("sensor_preflight", 200);
-	add_topic("system_power", 500);
-	add_topic("tecs_status", 200);
-	add_topic("trajectory_setpoint");
+	add_topic("system_power", 2000);
 	add_topic("telemetry_status");
-	add_topic("vehicle_air_data", 200);
-	add_topic("vehicle_attitude", 30);
-	add_topic("vehicle_attitude_setpoint", 100);
+	add_topic("vehicle_air_data", 2000);
+	add_topic("vehicle_attitude", 500);
 	add_topic("vehicle_command");
-	add_topic("vehicle_global_position", 200);
-	add_topic("vehicle_gps_position");
-	add_topic("vehicle_land_detected");
-	add_topic("vehicle_local_position", 100);
-	add_topic("vehicle_local_position_setpoint", 100);
-	add_topic("vehicle_magnetometer", 200);
-	add_topic("vehicle_rates_setpoint", 30);
-	add_topic("vehicle_status", 200);
+	add_topic("vehicle_global_position", 500);
+	add_topic("vehicle_gps_position", 1000);
+	add_topic("vehicle_status");
 	add_topic("vehicle_status_flags");
-	add_topic("vehicle_trajectory_waypoint", 200);
-	add_topic("vehicle_trajectory_waypoint_desired", 200);
-	add_topic("vehicle_vision_attitude");
-	add_topic("vehicle_vision_position");
-	add_topic("vtol_vehicle_status", 200);
-	add_topic("wind_estimate", 200);
-
-#ifdef CONFIG_ARCH_BOARD_SITL
-	add_topic("actuator_armed");
-	add_topic("actuator_controls_virtual_fw");
-	add_topic("actuator_controls_virtual_mc");
-	add_topic("commander_state");
-	add_topic("fw_virtual_attitude_setpoint");
-	add_topic("mc_virtual_attitude_setpoint");
-	add_topic("multirotor_motor_limits");
-	add_topic("position_controller_status");
-	add_topic("position_controller_landingstatus");
-	add_topic("offboard_control_mode");
-	add_topic("time_offset");
-	add_topic("vehicle_attitude_groundtruth", 10);
-	add_topic("vehicle_global_position_groundtruth", 100);
-	add_topic("vehicle_local_position_groundtruth", 100);
-	add_topic("vehicle_roi");
-#endif
 }
 
 void Logger::add_high_rate_topics()
 {
-	// maximum rate to analyze fast maneuvers (e.g. for racing)
-	add_topic("actuator_controls_0");
-	add_topic("actuator_outputs");
-	add_topic("manual_control_setpoint");
-	add_topic("rate_ctrl_status");
-	add_topic("sensor_combined");
-	add_topic("vehicle_attitude");
-	add_topic("vehicle_attitude_setpoint");
-	add_topic("vehicle_rates_setpoint");
 }
 
 void Logger::add_debug_topics()
 {
-	add_topic("debug_key_value");
-	add_topic("debug_value");
-	add_topic("debug_vect");
-	add_topic("debug_array");
 }
 
 void Logger::add_estimator_replay_topics()
 {
-	// for estimator replay (need to be at full rate)
-	add_topic("ekf2_timestamps");
-	add_topic("ekf_gps_position");
-
-	// current EKF2 subscriptions
-	add_topic("airspeed");
-	add_topic("distance_sensor");
-	add_topic("optical_flow");
-	add_topic("sensor_combined");
-	add_topic("sensor_selection");
-	add_topic("vehicle_air_data");
-	add_topic("vehicle_gps_position");
-	add_topic("vehicle_land_detected");
-	add_topic("vehicle_magnetometer");
-	add_topic("vehicle_status");
-	add_topic("vehicle_vision_attitude");
-	add_topic("vehicle_vision_position");
 }
 
 void Logger::add_thermal_calibration_topics()
 {
-	add_topic("sensor_accel", 100);
-	add_topic("sensor_baro", 100);
-	add_topic("sensor_gyro", 100);
 }
 
 void Logger::add_sensor_comparison_topics()
 {
-	add_topic("sensor_accel", 100);
-	add_topic("sensor_baro", 100);
-	add_topic("sensor_gyro", 100);
-	add_topic("sensor_mag", 100);
 }
 
 void Logger::add_system_identification_topics()
 {
-	// for system id need to log imu and controls at full rate
-	add_topic("actuator_controls_0");
-	add_topic("actuator_controls_1");
-	add_topic("sensor_combined");
 }
 
 int Logger::add_topics_from_file(const char *fname)

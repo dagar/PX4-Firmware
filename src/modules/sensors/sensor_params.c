@@ -163,7 +163,7 @@ PARAM_DEFINE_FLOAT(SENS_BARO_QNH, 1013.25f);
  *
  * @group Sensors
  */
-PARAM_DEFINE_INT32(SENS_BOARD_ROT, 0);
+PARAM_DEFINE_INT32(SENS_BOARD_ROT, 22);
 
 /**
  * Board rotation Y (Pitch) offset
