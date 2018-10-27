@@ -40,7 +40,7 @@ file(GLOB_RECURSE copy_apps_files
 
 set(NUTTX_DIR ${CMAKE_CURRENT_BINARY_DIR}/nuttx)
 set(NUTTX_CONFIG_DIR ${PX4_SOURCE_DIR}/platforms/nuttx/nuttx-configs)
-configure_file(${NUTTX_CONFIG_DIR}/Make.defs.in ${NUTTX_DIR}/Make.defs)
+configure_file(${NUTTX_CONFIG_DIR}/Make.defs.in ${NUTTX_DIR}/configs/${BOARD}/${nuttx_config_type}/Make.defs)
 
 # copy nuttx to build directory
 file(RELATIVE_PATH CP_SRC ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/nuttx)
@@ -71,16 +71,16 @@ file(RELATIVE_PATH CP_SRC ${CMAKE_SOURCE_DIR} ${NUTTX_CONFIG_DIR}/${BOARD})
 file(RELATIVE_PATH CP_DST ${CMAKE_SOURCE_DIR} ${NUTTX_DIR}/configs)
 add_custom_command(
 	OUTPUT ${NUTTX_DIR}/.config
-	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig ${NUTTX_DIR}/.config
-	COMMAND ${CMAKE_COMMAND} -E remove -f ${NUTTX_DIR}/include/nuttx/config.h
-	COMMAND ${CMAKE_COMMAND} -E make_directory ${NUTTX_DIR}/configs/${BOARD}/src
+	COMMAND ${CMAKE_COMMAND} -E make_directory ${NUTTX_DIR}/configs/${BOARD}/src # create empty src directory
+	COMMAND ${CMAKE_COMMAND} -E touch ${NUTTX_DIR}/configs/${BOARD}/Kconfig # create empty Kconfig or touch existing
 	COMMAND cd ${CMAKE_SOURCE_DIR} && ${cp_cmd} ${cp_opts} ${CP_SRC} ${CP_DST}
+	COMMAND cd ${NUTTX_DIR} && sh tools/configure.sh ${BOARD}/${nuttx_config_type} || true
 	DEPENDS
 		${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig
 		${board_config_files}
 		${CMAKE_CURRENT_BINARY_DIR}/nuttx_copy.stamp
 		${CMAKE_CURRENT_BINARY_DIR}/apps_copy.stamp
-	WORKING_DIRECTORY ${NUTTX_DIR}/tools
+	WORKING_DIRECTORY ${NUTTX_DIR}
 	COMMENT "Copying NuttX config ${BOARD} and configuring"
 	)
 add_custom_target(nuttx_configure DEPENDS ${NUTTX_DIR}/.config)
@@ -233,9 +233,29 @@ add_custom_target(menuconfig
 # qconfig helper
 add_custom_target(qconfig
 	COMMAND make --no-print-directory --silent -C ${NUTTX_DIR} CONFIG_ARCH_BOARD=${BOARD} qconfig
-	COMMAND cp .config ${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig
+	COMMAND ${CMAKE_COMMAND} -E copy_directory ${NUTTX_CONFIG_DIR}/${BOARD} ${NUTTX_DIR}/configs/${BOARD}
+	COMMAND make --no-print-directory --silent savedefconfig
+	COMMAND cp defconfig ${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig
 	DEPENDS nuttx_configure
 	WORKING_DIRECTORY ${NUTTX_DIR}
 	COMMENT "Running NuttX make qconfig for ${BOARD} with ${nuttx_config_type}"
+	USES_TERMINAL
+	)
+
+# compressed defconfig helper
+add_custom_target(compress_defconfig
+	COMMAND ${CMAKE_COMMAND} -E copy_directory ${NUTTX_CONFIG_DIR}/${BOARD} ${NUTTX_DIR}/configs/${BOARD}
+	COMMAND ${CMAKE_COMMAND} -E make_directory ${NUTTX_DIR}/configs/${BOARD}/src # create empty src directory
+	COMMAND ${CMAKE_COMMAND} -E touch ${NUTTX_DIR}/configs/${BOARD}/Kconfig # create empty Kconfig or touch existing
+	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_DIR}/configs/${BOARD}/${nuttx_config_type}/defconfig ${NUTTX_DIR}/.config
+	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_DIR}/configs/${BOARD}/${nuttx_config_type}/Make.defs ${NUTTX_DIR}/Make.defs
+	COMMAND make --no-print-directory --silent context
+	COMMAND make --no-print-directory --silent savedefconfig
+	COMMAND ${CMAKE_COMMAND} -E copy ${NUTTX_DIR}/defconfig ${NUTTX_CONFIG_DIR}/${BOARD}/${nuttx_config_type}/defconfig
+	DEPENDS
+		${CMAKE_CURRENT_BINARY_DIR}/nuttx_copy.stamp
+		${CMAKE_CURRENT_BINARY_DIR}/apps_copy.stamp
+	WORKING_DIRECTORY ${NUTTX_DIR}
+	COMMENT "Compressing old NuttX defconfig"
 	USES_TERMINAL
 	)
