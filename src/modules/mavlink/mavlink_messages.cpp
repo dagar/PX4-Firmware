@@ -1805,7 +1805,7 @@ protected:
 
 	bool send(const hrt_abstime t)
 	{
-		struct camera_trigger_s trigger;
+		camera_trigger_s trigger;
 
 		if (_trigger_sub->update(&_trigger_time, &trigger)) {
 			mavlink_camera_trigger_t msg = {};
@@ -1913,11 +1913,11 @@ protected:
 
 	bool send(const hrt_abstime t)
 	{
-		struct camera_capture_s capture;
+		camera_capture_s capture;
 
 		if (_capture_sub->update(&_capture_time, &capture)) {
 
-			mavlink_camera_image_captured_t msg;
+			mavlink_camera_image_captured_t msg{};
 
 			msg.time_boot_ms = capture.timestamp / 1000;
 			msg.time_utc = capture.timestamp_utc;

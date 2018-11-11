@@ -28,6 +28,7 @@ set(config_module_list
 
 	drivers/batt_smbus
 	drivers/blinkm
+	drivers/camera_capture
 	drivers/camera_trigger
 	drivers/gps
 	drivers/imu/adis16448

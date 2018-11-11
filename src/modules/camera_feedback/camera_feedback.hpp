@@ -38,74 +38,44 @@
 
 #pragma once
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <poll.h>
-#include <mathlib/mathlib.h>
-#include <systemlib/err.h>
-#include <parameters/param.h>
-
+#include <drivers/drv_hrt.h>
+#include <lib/mathlib/mathlib.h>
+#include <lib/parameters/param.h>
 #include <px4_config.h>
 #include <px4_defines.h>
-#include <px4_tasks.h>
 #include <px4_posix.h>
-#include <drivers/drv_hrt.h>
-
-#include <uORB/uORB.h>
-#include <uORB/topics/camera_trigger.h>
+#include <px4_tasks.h>
 #include <uORB/topics/camera_capture.h>
+#include <uORB/topics/camera_trigger.h>
 #include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_global_position.h>
-
-typedef enum : int32_t {
-	CAMERA_FEEDBACK_MODE_NONE = 0,
-	CAMERA_FEEDBACK_MODE_TRIGGER,
-	CAMERA_FEEDBACK_MODE_PWM
-} camera_feedback_mode_t;
+#include <uORB/topics/vehicle_local_position.h>
+#include <uORB/uORB.h>
 
 class CameraFeedback
 {
 public:
-	/**
-	 * Constructor
-	 */
-	CameraFeedback();
 
-	/**
-	 * Destructor, also kills task.
-	 */
+	CameraFeedback();
 	~CameraFeedback();
 
-	/**
-	 * Start the task.
-	 *
-	 * @return		OK on success.
-	 */
 	int			start();
-
-	/**
-	 * Stop the task.
-	 */
 	void		stop();
 
 private:
 
-	bool		_task_should_exit;		/**< if true, task should exit */
-	int			_main_task;				/**< handle for task */
+	bool		_task_should_exit{false};		/**< if true, task should exit */
+	int		_main_task{-1};				/**< handle for task */
 
-	int			_trigger_sub;
-	int			_gpos_sub;
-	int			_att_sub;
+	int		_trigger_sub{-1};
+	int		_gpos_sub{-1};
+	int		_att_sub{-1};
 
-	orb_advert_t	_capture_pub;
+	orb_advert_t	_capture_pub{nullptr};
 
-	param_t			_p_feedback;
+	param_t		_p_camera_capture_feedback{PARAM_INVALID};
 
-	camera_feedback_mode_t _camera_feedback_mode;
+	int32_t		_camera_capture_feedback{0};
 
 	void		task_main();
 

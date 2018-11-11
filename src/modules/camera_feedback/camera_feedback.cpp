@@ -46,26 +46,15 @@ namespace camera_feedback
 CameraFeedback	*g_camera_feedback;
 }
 
-CameraFeedback::CameraFeedback() :
-	_task_should_exit(false),
-	_main_task(-1),
-	_trigger_sub(-1),
-	_gpos_sub(-1),
-	_att_sub(-1),
-	_capture_pub(nullptr),
-	_camera_feedback_mode(CAMERA_FEEDBACK_MODE_NONE)
+CameraFeedback::CameraFeedback()
 {
-
 	// Parameters
-	_p_feedback = param_find("CAM_FBACK_MODE");
-
-	param_get(_p_feedback, (int32_t *)&_camera_feedback_mode);
-
+	_p_camera_capture_feedback = param_find("CAM_CAP_FBACK");
+	param_get(_p_camera_capture_feedback, (int32_t *)&_camera_capture_feedback);
 }
 
 CameraFeedback::~CameraFeedback()
 {
-
 	if (_main_task != -1) {
 
 		/* task wakes up every 100ms or so at the longest */
@@ -92,7 +81,6 @@ CameraFeedback::~CameraFeedback()
 int
 CameraFeedback::start()
 {
-
 	/* start the task */
 	_main_task = px4_task_spawn_cmd("camera_feedback",
 					SCHED_DEFAULT,
@@ -107,7 +95,6 @@ CameraFeedback::start()
 	}
 
 	return OK;
-
 }
 
 void
@@ -118,19 +105,17 @@ CameraFeedback::stop()
 	}
 }
 
-
 void
 CameraFeedback::task_main()
 {
+	if (!_camera_capture_feedback) {
+		_trigger_sub = orb_subscribe(ORB_ID(camera_trigger));
 
-	// We only support trigger feedback for now
-	// This will later be extended to support hardware feedback from the camera.
-	if (_camera_feedback_mode != CAMERA_FEEDBACK_MODE_TRIGGER) {
-		return;
+	} else {
+		_trigger_sub = orb_subscribe(ORB_ID(camera_trigger_feedback));
 	}
 
 	// Polling sources
-	_trigger_sub = orb_subscribe(ORB_ID(camera_trigger));
 	struct camera_trigger_s trig = {};
 
 	px4_pollfd_struct_t fds[1] = {};
@@ -140,8 +125,8 @@ CameraFeedback::task_main()
 	// Geotagging subscriptions
 	_gpos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
-	struct vehicle_global_position_s gpos = {};
-	struct vehicle_attitude_s att = {};
+	vehicle_global_position_s gpos = {};
+	vehicle_attitude_s att = {};
 
 	bool updated = false;
 
@@ -158,7 +143,12 @@ CameraFeedback::task_main()
 		/* trigger subscription updated */
 		if (fds[0].revents & POLLIN) {
 
-			orb_copy(ORB_ID(camera_trigger), _trigger_sub, &trig);
+			if (!_camera_capture_feedback) {
+				orb_copy(ORB_ID(camera_trigger), _trigger_sub, &trig);
+
+			} else {
+				orb_copy(ORB_ID(camera_trigger_feedback), _trigger_sub, &trig);
+			}
 
 			/* update geotagging subscriptions */
 			orb_check(_gpos_sub, &updated);
@@ -180,11 +170,10 @@ CameraFeedback::task_main()
 				continue;
 			}
 
-			struct camera_capture_s capture = {};
+			camera_capture_s capture = {};
 
 			// Fill timestamps
 			capture.timestamp = trig.timestamp;
-
 			capture.timestamp_utc = trig.timestamp_utc;
 
 			// Fill image sequence
@@ -192,9 +181,7 @@ CameraFeedback::task_main()
 
 			// Fill position data
 			capture.lat = gpos.lat;
-
 			capture.lon = gpos.lon;
-
 			capture.alt = gpos.alt;
 
 			capture.ground_distance = gpos.terrain_alt_valid ? (gpos.alt - gpos.terrain_alt) : -1.0f;
@@ -202,22 +189,22 @@ CameraFeedback::task_main()
 			// Fill attitude data
 			// TODO : this needs to be rotated by camera orientation or set to gimbal orientation when available
 			capture.q[0] = att.q[0];
-
 			capture.q[1] = att.q[1];
-
 			capture.q[2] = att.q[2];
-
 			capture.q[3] = att.q[3];
 
-			// Indicate that no capture feedback from camera is available
-			capture.result = -1;
+			// Indicate that whether capture feedback from camera is available
+			// What is case 0 for capture.result?
+			if (!_camera_capture_feedback) {
+				capture.result = -1;
+
+			} else {
+				capture.result = 1;
+			}
 
 			int instance_id;
-
 			orb_publish_auto(ORB_ID(camera_capture), &_capture_pub, &capture, &instance_id, ORB_PRIO_DEFAULT);
-
 		}
-
 	}
 
 	orb_unsubscribe(_trigger_sub);
@@ -225,7 +212,6 @@ CameraFeedback::task_main()
 	orb_unsubscribe(_att_sub);
 
 	_main_task = -1;
-
 }
 
 int
