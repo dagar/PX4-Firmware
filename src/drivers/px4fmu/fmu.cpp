@@ -169,65 +169,65 @@ private:
 		Betaflight = 1
 	};
 
-	hrt_abstime _cycle_timestamp = 0;
-	hrt_abstime _time_last_mix = 0;
+	hrt_abstime _cycle_timestamp{0};
+	hrt_abstime _time_last_mix{0};
 
-	static const unsigned _max_actuators = DIRECT_PWM_OUTPUT_CHANNELS;
+	static constexpr unsigned _max_actuators = DIRECT_PWM_OUTPUT_CHANNELS;
 
 	Mode		_mode;
-	unsigned	_pwm_default_rate;
-	unsigned	_pwm_alt_rate;
-	uint32_t	_pwm_alt_rate_channels;
-	unsigned	_current_update_rate;
-	bool 		_run_as_task;
+	unsigned	_pwm_default_rate{50};
+	unsigned	_pwm_alt_rate{50};
+	uint32_t	_pwm_alt_rate_channels{0};
+	unsigned	_current_update_rate{0};
+
+	bool 		_run_as_task{false};
+
 	static struct work_s	_work;
 
-	int		_armed_sub;
-	int		_param_sub;
+	int		_armed_sub{-1};
+	int		_param_sub{-1};
 
-	orb_advert_t	_outputs_pub;
-	unsigned	_num_outputs;
-	int		_class_instance;
+	orb_advert_t	_outputs_pub{nullptr};
+	unsigned	_num_outputs{0};
+	int		_class_instance{-1};
 
-	bool		_throttle_armed;
-	bool		_pwm_on;
-	uint32_t	_pwm_mask;
-	bool		_pwm_initialized;
-	bool		_test_mode;
+	bool		_throttle_armed{false};
+	bool		_pwm_on{false};
+	uint32_t	_pwm_mask{0};
+	bool		_pwm_initialized{false};
+	bool		_test_mode{false};
 
-	MixerGroup	*_mixers;
+	MixerGroup	*_mixers{nullptr};
 
-	uint32_t	_groups_required;
-	uint32_t	_groups_subscribed;
-	int		_control_subs[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
-	actuator_controls_s _controls[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
-	orb_id_t	_control_topics[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
-	pollfd	_poll_fds[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
-	unsigned	_poll_fds_num;
+	uint32_t	_groups_required{0};
+	uint32_t	_groups_subscribed{0};
+	int		_control_subs[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS] {};
+	actuator_controls_s _controls[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS] {};
+	orb_id_t	_control_topics[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS] {};
+	pollfd	_poll_fds[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS] {};
+	unsigned	_poll_fds_num{0};
 
 	static pwm_limit_t	_pwm_limit;
 	static actuator_armed_s	_armed;
-	uint16_t	_failsafe_pwm[_max_actuators];
-	uint16_t	_disarmed_pwm[_max_actuators];
-	uint16_t	_min_pwm[_max_actuators];
-	uint16_t	_max_pwm[_max_actuators];
-	uint16_t	_reverse_pwm_mask;
-	unsigned	_num_failsafe_set;
-	unsigned	_num_disarmed_set;
 
-	orb_advert_t      _to_mixer_status; 	///< mixer status flags
+	uint16_t	_failsafe_pwm[_max_actuators] {0};
+	uint16_t	_disarmed_pwm[_max_actuators] {0};
+	uint16_t	_min_pwm[_max_actuators] {};
+	uint16_t	_max_pwm[_max_actuators] {};
+	uint16_t	_reverse_pwm_mask{0};
+	unsigned	_num_failsafe_set{0};
+	unsigned	_num_disarmed_set{0};
 
-	float _mot_t_max;	///< maximum rise time for motor (slew rate limiting)
-	float _thr_mdl_fac;	///< thrust to pwm modelling factor
-	bool _airmode; 		///< multicopter air-mode
-	MotorOrdering _motor_ordering;
+	orb_advert_t      _to_mixer_status{nullptr}; 	///< mixer status flags
+
+	float _mot_t_max{0.0f};	///< maximum rise time for motor (slew rate limiting)
+	float _thr_mdl_fac{0.0f};	///< thrust to pwm modelling factor
+	bool _airmode{false}; 		///< multicopter air-mode
+	MotorOrdering _motor_ordering{MotorOrdering::PX4};
 
 	perf_counter_t	_perf_control_latency;
 
-	static bool	arm_nothrottle()
-	{
-		return ((_armed.prearmed && !_armed.armed) || _armed.in_esc_calibration_mode);
-	}
+	static bool	arm_nothrottle() { return ((_armed.prearmed && !_armed.armed) || _armed.in_esc_calibration_mode); }
 
 	static void	cycle_trampoline(void *arg);
 	int 		start();
@@ -236,8 +236,9 @@ private:
 					 uint8_t control_group,
 					 uint8_t control_index,
 					 float &input);
-	void		capture_callback(uint32_t chan_index,
-					 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
+
+	void		capture_callback(uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
+
 	void		subscribe();
 	int			set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
 	int			pwm_ioctl(file *filp, int cmd, unsigned long arg);
@@ -288,35 +289,7 @@ work_s	PX4FMU::_work = {};
 PX4FMU::PX4FMU(bool run_as_task) :
 	CDev(PX4FMU_DEVICE_PATH),
 	_mode(MODE_NONE),
-	_pwm_default_rate(50),
-	_pwm_alt_rate(50),
-	_pwm_alt_rate_channels(0),
-	_current_update_rate(0),
 	_run_as_task(run_as_task),
-	_armed_sub(-1),
-	_param_sub(-1),
-	_outputs_pub(nullptr),
-	_num_outputs(0),
-	_class_instance(0),
-	_throttle_armed(false),
-	_pwm_on(false),
-	_pwm_mask(0),
-	_pwm_initialized(false),
-	_test_mode(false),
-	_mixers(nullptr),
-	_groups_required(0),
-	_groups_subscribed(0),
-	_poll_fds_num(0),
-	_failsafe_pwm{0},
-	_disarmed_pwm{0},
-	_reverse_pwm_mask(0),
-	_num_failsafe_set(0),
-	_num_disarmed_set(0),
-	_to_mixer_status(nullptr),
-	_mot_t_max(0.0f),
-	_thr_mdl_fac(0.0f),
-	_airmode(false),
-	_motor_ordering(MotorOrdering::PX4),
 	_perf_control_latency(perf_alloc(PC_ELAPSED, "fmu control latency"))
 {
 	for (unsigned i = 0; i < _max_actuators; i++) {
@@ -332,17 +305,6 @@ PX4FMU::PX4FMU(bool run_as_task) :
 	for (int i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; ++i) {
 		_control_subs[i] = -1;
 	}
-
-	memset(_controls, 0, sizeof(_controls));
-	memset(_poll_fds, 0, sizeof(_poll_fds));
-
-	// Safely initialize armed flags.
-	_armed.armed = false;
-	_armed.prearmed = false;
-	_armed.ready_to_arm = false;
-	_armed.lockdown = false;
-	_armed.force_failsafe = false;
-	_armed.in_esc_calibration_mode = false;
 }
 
 PX4FMU::~PX4FMU()
@@ -373,10 +335,8 @@ PX4FMU::~PX4FMU()
 int
 PX4FMU::init()
 {
-	int ret;
-
 	/* do regular cdev init */
-	ret = CDev::init();
+	int ret = CDev::init();
 
 	if (ret != OK) {
 		return ret;
@@ -392,9 +352,6 @@ PX4FMU::init()
 	} else if (_class_instance < 0) {
 		PX4_ERR("FAILED registering class device");
 	}
-
-	/* force a reset of the update rate */
-	_current_update_rate = 0;
 
 	_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
 	_param_sub = orb_subscribe(ORB_ID(parameter_update));
