@@ -1421,6 +1421,7 @@ void Ekf2::run()
 					lpos.hagl_max = INFINITY;
 				}
 
+<<<<<<< HEAD
 				// get pose covariance
 				float pose_covariance[36];
 				_ekf.get_pose_covariances(pose_covariance);
@@ -1430,9 +1431,21 @@ void Ekf2::run()
 						odom.pose_covariance[x + y] = pose_covariance[x * 6 + y];
 
 
+=======
+				// get pose covariance and copy the URT to the uORB message
+				float *pos_p = &odom.pose_covariance[0];
 
-				// get linear velocity covariance
+				for (unsigned x = 0; x < 6; x++) {
+					for (unsigned y = x; y < 6; y++) {
+						*pos_p++ = _ekf.pose_covariances()(x, y);
+					}
+				}
+>>>>>>> ekf2: tide new covariance methods
+
+				// get the velocity covariances
+				// note: unknown angular velocity covariance matrix
 				matrix::SquareMatrix<float, 6> twist_cov = matrix::eye<float, 6>();
+<<<<<<< HEAD
 				
 				// unknown angular velocity covariance matrix
 				float lv_cov[9];
@@ -1441,6 +1454,10 @@ void Ekf2::run()
 
 				// parse twist covariance
 				twist_cov.slice<3, 3>(0, 0) = linvel_cov;
+=======
+				twist_cov.set(_ekf.velocity_covariances(), 0, 0);
+				float *vel_p = &odom.velocity_covariance[0];
+>>>>>>> ekf2: tide new covariance methods
 
 				for (unsigned x = 0; x < 6; x++)
 					for (unsigned y = x; y < 6; y++)
@@ -1534,7 +1551,11 @@ void Ekf2::run()
 			status.timestamp = now;
 			_ekf.get_state_delayed(status.states);
 			status.n_states = 24;
+<<<<<<< HEAD
 			_ekf.get_covariances(status.covariances);
+=======
+			*status.covariances = (*_ekf.covariances_diagonal().data());
+>>>>>>> ekf2: tide new covariance methods
 			_ekf.get_gps_check_status(&status.gps_check_fail_flags);
 			// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
 			// the GPS Fix bit, which is always checked)
