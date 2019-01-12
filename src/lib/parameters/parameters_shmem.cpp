@@ -118,16 +118,16 @@ struct param_wbuf_s {
 
 static bitset<param_info_count> params_active;
 
-//#define ENABLE_SHMEM_DEBUG
-static void init_params();
+#ifdef CONFIG_SHMEM
+static bool set_called_from_get = false;
 
-static int param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes);
-static unsigned char set_called_from_get = 0;
-
-static int param_import_done =
-	0; /*at startup, params are loaded from file, if present. we dont want to send notifications that time since muorb is not ready*/
+// at startup, params are loaded from file, if present. we dont want to send notifications that time since muorb is not ready
+static bool param_import_done = false;
 
 static int param_load_default_no_notify();
+#endif /* CONFIG_SHMEM */
+
+static int param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes);
 
 /** flexible array holding modified parameter values */
 UT_array *param_values{nullptr};
@@ -143,20 +143,19 @@ static unsigned int param_instance = 0;
 
 static param_t param_find_internal(const char *name, bool notification);
 
-// TODO: not working on Snappy just yet
 // the following implements an RW-lock using 2 semaphores (used as mutexes). It gives
 // priority to readers, meaning a writer could suffer from starvation, but in our use-case
 // we only have short periods of reads and writes are rare.
-//static px4_sem_t param_sem; ///< this protects against concurrent access to param_values
-//static int reader_lock_holders = 0;
-//static px4_sem_t reader_lock_holders_lock; ///< this protects against concurrent access to reader_lock_holders
+static px4_sem_t param_sem; ///< this protects against concurrent access to param_values
+static int reader_lock_holders = 0;
+static px4_sem_t reader_lock_holders_lock; ///< this protects against concurrent access to reader_lock_holders
 
 static perf_counter_t param_export_perf;
 static perf_counter_t param_find_perf;
 static perf_counter_t param_get_perf;
 static perf_counter_t param_set_perf;
 
-//static px4_sem_t param_sem_save; ///< this protects against concurrent param saves (file or flash access).
+static px4_sem_t param_sem_save; ///< this protects against concurrent param saves (file or flash access).
 ///< we use a separate lock to allow concurrent param reads and saves.
 ///< a param_set could still be blocked by a param save, because it
 ///< needs to take the reader lock
@@ -165,8 +164,6 @@ static perf_counter_t param_set_perf;
 static void
 param_lock_reader()
 {
-	// TODO: this doesn't seem to work on Snappy
-#if 0
 	do {} while (px4_sem_wait(&reader_lock_holders_lock) != 0);
 
 	++reader_lock_holders;
@@ -177,26 +174,19 @@ param_lock_reader()
 	}
 
 	px4_sem_post(&reader_lock_holders_lock);
-#endif
 }
 
 /** lock the parameter store for write access */
 static void
 param_lock_writer()
 {
-	// TODO: this doesn't seem to work on Snappy
-#if 0
 	do {} while (px4_sem_wait(&param_sem) != 0);
-
-#endif
 }
 
 /** unlock the parameter store */
 static void
 param_unlock_reader()
 {
-	// TODO: this doesn't seem to work on Snappy
-#if 0
 	do {} while (px4_sem_wait(&reader_lock_holders_lock) != 0);
 
 	--reader_lock_holders;
@@ -207,17 +197,13 @@ param_unlock_reader()
 	}
 
 	px4_sem_post(&reader_lock_holders_lock);
-#endif
 }
 
 /** unlock the parameter store */
 static void
 param_unlock_writer()
 {
-	// TODO: this doesn't seem to work on Snappy
-#if 0
 	px4_sem_post(&param_sem);
-#endif
 }
 
 /** assert that the parameter store is locked */
@@ -230,10 +216,9 @@ param_assert_locked()
 void
 param_init()
 {
-	// TODO: not needed on Snappy yet.
-	//px4_sem_init(&param_sem, 0, 1);
-	//px4_sem_init(&param_sem_save, 0, 1);
-	//px4_sem_init(&reader_lock_holders_lock, 0, 1);
+	px4_sem_init(&param_sem, 0, 1);
+	px4_sem_init(&param_sem_save, 0, 1);
+	px4_sem_init(&reader_lock_holders_lock, 0, 1);
 
 	param_export_perf = perf_alloc(PC_ELAPSED, "param_export");
 	param_find_perf = perf_alloc(PC_ELAPSED, "param_find");
@@ -242,13 +227,36 @@ param_init()
 
 #ifdef CONFIG_SHMEM
 	PX4_DEBUG("Syncing params to shared memory\n");
-	init_params();
+
+#ifdef __PX4_QURT
+	// copy params to shared memory
+	init_shared_memory();
 #endif
+
+	// load params automatically
+#ifdef __PX4_POSIX
+	param_load_default_no_notify();
+#endif
+
+	param_import_done = true;
+
+#ifdef __PX4_QURT
+	copy_params_to_shmem(px4::parameters);
+
+	PX4_DEBUG("Offsets:");
+	PX4_DEBUG("params_val %lu, krait_changed %lu, adsp_changed %lu",
+		  (unsigned char *)shmem_info_p->params_val - (unsigned char *)shmem_info_p,
+		  (unsigned char *)&shmem_info_p->krait_changed_index - (unsigned char *)shmem_info_p,
+		  (unsigned char *)&shmem_info_p->adsp_changed_index - (unsigned char *)shmem_info_p);
+
+#endif /* __PX4_QURT */
 
 	// mark all parameters active
 	for (int i = 0; i < params_active.size(); i++) {
 		params_active.set(i, true);
 	}
+
+#endif /* CONFIG_SHMEM */
 }
 
 /**
@@ -583,22 +591,21 @@ param_get_value_ptr(param_t param)
 int
 param_get(param_t param, void *val)
 {
+#if CONFIG_SHMEM
+	union param_value_u value {};
+
+	if (update_from_shmem(param, &value)) {
+		set_called_from_get = true;
+		param_set_internal(param, &value, true, false);
+		set_called_from_get = false;
+	}
+
+#endif /* CONFIG_SHMEM */
+
 	int result = -1;
 
 	param_lock_reader();
 	perf_begin(param_get_perf);
-
-	if (!handle_in_range(param)) {
-		return result;
-	}
-
-	union param_value_u value;
-
-	if (update_from_shmem(param, &value)) {
-		set_called_from_get = 1;
-		param_set_internal(param, &value, true, false);
-		set_called_from_get = 0;
-	}
 
 	const void *v = param_get_value_ptr(param);
 
@@ -606,22 +613,6 @@ param_get(param_t param, void *val)
 		memcpy(val, v, param_size(param));
 		result = 0;
 	}
-
-#ifdef ENABLE_SHMEM_DEBUG
-
-	if (param_type(param) == PARAM_TYPE_INT32) {
-		PX4_INFO("param_get for %s : %d", param_name(param), ((union param_value_u *)val)->i);
-	}
-
-	else if (param_type(param) == PARAM_TYPE_FLOAT) {
-		PX4_INFO("param_get for %s : %f", param_name(param), (double)((union param_value_u *)val)->f);
-	}
-
-	else {
-		PX4_INFO("Unknown param type for %s", param_name(param));
-	}
-
-#endif
 
 	perf_end(param_get_perf);
 	param_unlock_reader();
@@ -801,33 +792,21 @@ out:
 	 * a thing has been set.
 	 */
 
-	if (!param_import_done) {
-		notify_changes = 0;
-	}
+#ifdef CONFIG_SHMEM
 
-	if (params_changed && notify_changes) {
-		_param_notify_changes();
+	if (!param_import_done) {
+		notify_changes = false;
 	}
 
 	if (result == 0 && !set_called_from_get) {
 		update_to_shmem(param, *(union param_value_u *)val);
 	}
 
-#ifdef ENABLE_SHMEM_DEBUG
+#endif /* CONFIG_SHMEM */
 
-	if (param_type(param) == PARAM_TYPE_INT32) {
-		PX4_INFO("param_set for %s : %d", param_name(param), ((union param_value_u *)val)->i);
+	if (params_changed && notify_changes) {
+		_param_notify_changes();
 	}
-
-	else if (param_type(param) == PARAM_TYPE_FLOAT) {
-		PX4_INFO("param_set for %s : %f", param_name(param), (double)((union param_value_u *)val)->f);
-	}
-
-	else {
-		PX4_INFO("Unknown param type for %s", param_name(param));
-	}
-
-#endif
 
 	return result;
 }
@@ -998,39 +977,32 @@ param_get_default_file()
 int
 param_save_default()
 {
-	int res = OK;
-	int fd = -1;
+	int res = PX4_ERROR;
 
 	const char *filename = param_get_default_file();
 
-	fd = PARAM_OPEN(filename, O_WRONLY | O_CREAT, PX4_O_MODE_666);
+	if (!filename) {
+		param_lock_writer();
+		res = flash_param_save(false);
+		param_unlock_writer();
+		return res;
+	}
+
+	/* write parameters to temp file */
+	int fd = PARAM_OPEN(filename, O_WRONLY | O_CREAT, PX4_O_MODE_666);
 
 	if (fd < 0) {
 		PX4_ERR("failed to open param file: %s", filename);
-		goto do_exit;
+		return PX4_ERROR;
 	}
 
 	res = param_export(fd, false);
 
 	if (res != OK) {
 		PX4_ERR("failed to write parameters to file: %s", filename);
-		goto do_exit;
 	}
 
 	PARAM_CLOSE(fd);
-
-
-	fd = -1;
-
-do_exit:
-
-	if (fd >= 0) {
-		close(fd);
-	}
-
-	if (res == OK) {
-		PX4_DEBUG("saving params completed successfully");
-	}
 
 	return res;
 }
@@ -1110,11 +1082,19 @@ param_load_default_no_notify()
 int
 param_export(int fd, bool only_unsaved)
 {
+	int	result = -1;
 	perf_begin(param_export_perf);
 
-	param_wbuf_s *s = nullptr;
-	int	result = -1;
+	if (fd < 0) {
+		param_lock_writer();
+		// flash_param_save() will take the shutdown lock
+		result = flash_param_save(only_unsaved);
+		param_unlock_writer();
+		perf_end(param_export_perf);
+		return result;
+	}
 
+	param_wbuf_s *s = nullptr;
 	struct bson_encoder_s encoder;
 
 	int shutdown_lock_ret = px4_shutdown_lock();
@@ -1124,11 +1104,12 @@ param_export(int fd, bool only_unsaved)
 	}
 
 	// take the file lock
-	//do {} while (px4_sem_wait(&param_sem_save) != 0);
+	do {} while (px4_sem_wait(&param_sem_save) != 0);
 
 	param_lock_reader();
 
-	bson_encoder_init_file(&encoder, fd);
+	uint8_t bson_buffer[256];
+	bson_encoder_init_buf_file(&encoder, fd, &bson_buffer, sizeof(bson_buffer));
 
 	/* no modified parameters -> we are done */
 	if (param_values == nullptr) {
@@ -1136,9 +1117,11 @@ param_export(int fd, bool only_unsaved)
 		goto out;
 	}
 
+#ifdef CONFIG_SHMEM
 	/* First of all, update the index which will call param_get for params
 	 * that have recently been changed. */
 	update_index_from_shmem();
+#endif /* CONFIG_SHMEM */
 
 	while ((s = (struct param_wbuf_s *)utarray_next(param_values, s)) != nullptr) {
 		/*
@@ -1151,8 +1134,10 @@ param_export(int fd, bool only_unsaved)
 
 		s->unsaved = false;
 
+#ifdef CONFIG_SHMEM
 		/* Make sure to get latest from shmem before saving. */
 		update_from_shmem(s->param, &s->val);
+#endif /* CONFIG_SHMEM */
 
 		const char *name = param_name(s->param);
 		const size_t size = param_size(s->param);
@@ -1209,18 +1194,19 @@ param_export(int fd, bool only_unsaved)
 	result = 0;
 
 out:
+
+	if (result == 0) {
+		if (bson_encoder_fini(&encoder) != PX4_OK) {
+			PX4_ERR("bson encoder finish failed");
+		}
+	}
+
 	param_unlock_reader();
 
-	//px4_sem_post(&param_sem_save);
-
-	fsync(fd); // make sure the data is flushed before releasing the shutdown lock
+	px4_sem_post(&param_sem_save);
 
 	if (shutdown_lock_ret == 0) {
 		px4_shutdown_unlock();
-	}
-
-	if (result == 0) {
-		result = bson_encoder_fini(&encoder);
 	}
 
 	perf_end(param_export_perf);
@@ -1443,32 +1429,4 @@ uint32_t param_hash_check()
 	param_unlock_reader();
 
 	return param_hash;
-}
-
-void init_params()
-{
-#ifdef __PX4_QURT
-	//copy params to shared memory
-	init_shared_memory();
-#endif
-
-	/*load params automatically*/
-#ifdef __PX4_POSIX
-	param_load_default_no_notify();
-#endif
-
-	param_import_done = 1;
-
-#ifdef __PX4_QURT
-	copy_params_to_shmem(px4::parameters);
-
-#ifdef ENABLE_SHMEM_DEBUG
-	PX4_INFO("Offsets:");
-	PX4_INFO("params_val %lu, krait_changed %lu, adsp_changed %lu",
-		 (unsigned char *)shmem_info_p->params_val - (unsigned char *)shmem_info_p,
-		 (unsigned char *)&shmem_info_p->krait_changed_index - (unsigned char *)shmem_info_p,
-		 (unsigned char *)&shmem_info_p->adsp_changed_index - (unsigned char *)shmem_info_p);
-#endif /* ENABLE_SHMEM_DEBUG */
-
-#endif /* __PX4_QURT */
 }

@@ -109,6 +109,8 @@ struct param_wbuf_s {
 
 static bitset<param_info_count> params_active;
 
+static int param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes);
+
 /** flexible array holding modified parameter values */
 UT_array *param_values{nullptr};
 

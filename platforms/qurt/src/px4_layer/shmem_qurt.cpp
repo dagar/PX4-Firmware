@@ -166,9 +166,8 @@ void copy_params_to_shmem(const param_info_s *param_info_base)
 
 		if (s == NULL) {
 			shmem_info_p->params_val[param] = param_info_base[param].val;
-		}
 
-		else {
+		} else {
 			shmem_info_p->params_val[param] = s->val;
 		}
 
@@ -191,7 +190,6 @@ void copy_params_to_shmem(const param_info_s *param_info_base)
 
 	release_shmem_lock(__FILE__, __LINE__);
 	//PX4_INFO("Released lock\n");
-
 }
 
 /*update value and param's change bit in shared memory*/
