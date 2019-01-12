@@ -76,27 +76,33 @@ static const char *param_default_file = nullptr; // nullptr means to store to FL
 inline static int flash_param_save(bool only_unsaved) { return -1; }
 inline static int flash_param_load() { return -1; }
 inline static int flash_param_import() { return -1; }
-//static const char *param_default_file = PX4_ROOTFSDIR"/eeprom/parameters";
-#endif
 
+#if !defined(CONFIG_SHMEM)
+static const char *param_default_file = PX4_ROOTFSDIR"/eeprom/parameters";
+#else
 #include <sys/stat.h>
-
 #include "shmem.h"
+
+static bool set_called_from_get = false;
 
 #ifdef __PX4_QURT
 static const char *param_default_file = "/dev/fs/params";
 #else
 static const char *param_default_file = "/usr/share/data/adsp/params";
 #endif
+#endif
+
+#endif
+
 static char *param_user_file = nullptr;
 
 #ifdef __PX4_QURT
-//Mode not supported by qurt
-#define PARAM_OPEN(a, b, ...)	open(a, b)
+#define PARAM_OPEN(a, b, ...)	open(a, b) //Mode not supported by qurt
+#define PARAM_CLOSE	close
 #else
 #define PARAM_OPEN	open
-#endif
 #define PARAM_CLOSE	close
+#endif
 
 #ifndef PARAM_NO_AUTOSAVE
 #include <px4_workqueue.h>
@@ -117,15 +123,6 @@ struct param_wbuf_s {
 };
 
 static bitset<param_info_count> params_active;
-
-#ifdef CONFIG_SHMEM
-static bool set_called_from_get = false;
-
-// at startup, params are loaded from file, if present. we dont want to send notifications that time since muorb is not ready
-static bool param_import_done = false;
-
-static int param_load_default_no_notify();
-#endif /* CONFIG_SHMEM */
 
 static int param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes);
 
@@ -228,19 +225,12 @@ param_init()
 #ifdef CONFIG_SHMEM
 	PX4_DEBUG("Syncing params to shared memory\n");
 
-#ifdef __PX4_QURT
+#ifndef __PX4_QURT
+	// load params automatically
+	param_load_default();
+#else
 	// copy params to shared memory
 	init_shared_memory();
-#endif
-
-	// load params automatically
-#ifdef __PX4_POSIX
-	param_load_default_no_notify();
-#endif
-
-	param_import_done = true;
-
-#ifdef __PX4_QURT
 	copy_params_to_shmem(px4::parameters);
 
 	PX4_DEBUG("Offsets:");
@@ -794,10 +784,6 @@ out:
 
 #ifdef CONFIG_SHMEM
 
-	if (!param_import_done) {
-		notify_changes = false;
-	}
-
 	if (result == 0 && !set_called_from_get) {
 		update_to_shmem(param, *(union param_value_u *)val);
 	}
@@ -996,7 +982,17 @@ param_save_default()
 		return PX4_ERROR;
 	}
 
-	res = param_export(fd, false);
+	int attempts = 5;
+
+	while (res != OK && attempts > 0) {
+		res = param_export(fd, false);
+		attempts--;
+
+		if (res != PX4_OK) {
+			PX4_ERR("param_export failed, retrying %d", attempts);
+			lseek(fd, 0, SEEK_SET); // jump back to the beginning of the file
+		}
+	}
 
 	if (res != OK) {
 		PX4_ERR("failed to write parameters to file: %s", filename);
@@ -1041,42 +1037,6 @@ param_load_default()
 	}
 
 	return res;
-}
-
-/**
- * @return 0 on success, 1 if all params have not yet been stored, -1 if device open failed, -2 if writing parameters failed
- */
-static int
-param_load_default_no_notify()
-{
-	int fd_load = open(param_get_default_file(), O_RDONLY);
-
-	if (fd_load < 0) {
-#ifdef __PX4_QURT
-		release_shmem_lock(__FILE__, __LINE__);
-#endif
-
-		/* no parameter file is OK, otherwise this is an error */
-		if (errno != ENOENT) {
-			PX4_DEBUG("open '%s' for reading failed", param_get_default_file());
-			return -1;
-		}
-
-		return 1;
-	}
-
-	int result = param_import(fd_load);
-
-	close(fd_load);
-
-	PX4_DEBUG("param loading done");
-
-	if (result != 0) {
-		PX4_WARN("error reading parameters from '%s'", param_get_default_file());
-		return -2;
-	}
-
-	return 0;
 }
 
 int
@@ -1255,7 +1215,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 	switch (node->type) {
 	case BSON_INT32: {
 			if (param_type(param) != PARAM_TYPE_INT32) {
-				PX4_WARN("unexpected type for %s", node->name);
+				PX4_ERR("unexpected type for %s", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
@@ -1269,7 +1229,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 
 	case BSON_DOUBLE: {
 			if (param_type(param) != PARAM_TYPE_FLOAT) {
-				PX4_WARN("unexpected type for %s", node->name);
+				PX4_ERR("unexpected type for %s", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
@@ -1283,13 +1243,13 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 
 	case BSON_BINDATA: {
 			if (node->subtype != BSON_BIN_BINARY) {
-				PX4_WARN("unexpected subtype for %s", node->name);
+				PX4_ERR("unexpected subtype for %s", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
 
 			if (bson_decoder_data_pending(decoder) != param_size(param)) {
-				PX4_WARN("bad size for '%s'", node->name);
+				PX4_ERR("bad size for '%s'", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
@@ -1323,7 +1283,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 		goto out;
 	}
 
-	if (param_set_internal(param, v, state->mark_saved, true)) {
+	if (param_set_internal(param, v, state->mark_saved, false)) {
 		PX4_DEBUG("error setting value for '%s'", node->name);
 		goto out;
 	}
@@ -1363,6 +1323,9 @@ param_import_internal(int fd, bool mark_saved)
 		result = bson_decoder_next(&decoder);
 
 	} while (result > 0);
+
+	// notify the system of changes once
+	param_notify_changes();
 
 	return result;
 }

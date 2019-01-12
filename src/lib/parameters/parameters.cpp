@@ -82,8 +82,8 @@ static const char *param_default_file = PX4_ROOTFSDIR"/eeprom/parameters";
 static char *param_user_file = nullptr;
 
 #ifdef __PX4_QURT
-#define PARAM_OPEN	px4_open
-#define PARAM_CLOSE	px4_close
+#define PARAM_OPEN(a, b, ...)	open(a, b) //Mode not supported by qurt
+#define PARAM_CLOSE	close
 #else
 #define PARAM_OPEN	open
 #define PARAM_CLOSE	close
@@ -1143,7 +1143,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 	switch (node->type) {
 	case BSON_INT32: {
 			if (param_type(param) != PARAM_TYPE_INT32) {
-				PX4_WARN("unexpected type for %s", node->name);
+				PX4_ERR("unexpected type for %s", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
@@ -1157,7 +1157,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 
 	case BSON_DOUBLE: {
 			if (param_type(param) != PARAM_TYPE_FLOAT) {
-				PX4_WARN("unexpected type for %s", node->name);
+				PX4_ERR("unexpected type for %s", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
@@ -1171,13 +1171,13 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 
 	case BSON_BINDATA: {
 			if (node->subtype != BSON_BIN_BINARY) {
-				PX4_WARN("unexpected subtype for %s", node->name);
+				PX4_ERR("unexpected subtype for %s", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
 
 			if (bson_decoder_data_pending(decoder) != param_size(param)) {
-				PX4_WARN("bad size for '%s'", node->name);
+				PX4_ERR("bad size for '%s'", node->name);
 				result = 1; // just skip this entry
 				goto out;
 			}
@@ -1211,7 +1211,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 		goto out;
 	}
 
-	if (param_set_internal(param, v, state->mark_saved, true)) {
+	if (param_set_internal(param, v, state->mark_saved, false)) {
 		PX4_DEBUG("error setting value for '%s'", node->name);
 		goto out;
 	}
@@ -1251,6 +1251,9 @@ param_import_internal(int fd, bool mark_saved)
 		result = bson_decoder_next(&decoder);
 
 	} while (result > 0);
+
+	// notify the system of changes once
+	param_notify_changes();
 
 	return result;
 }
