@@ -397,6 +397,8 @@ do_load(const char *param_file_name)
 	if (result < 0) {
 		PX4_ERR("importing from '%s' failed (%i)", param_file_name, result);
 		return 1;
+	} else {
+		PX4_INFO("%d parameters loaded from file %s", param_count_used(), param_file_name);
 	}
 
 	return 0;

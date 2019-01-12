@@ -102,8 +102,8 @@ static char *param_user_file = nullptr;
 #include <px4_workqueue.h>
 /* autosaving variables */
 static hrt_abstime last_autosave_timestamp = 0;
-static struct work_s autosave_work;
-static bool autosave_scheduled = false;
+static struct work_s autosave_work {};
+static volatile bool autosave_scheduled = false;
 static bool autosave_disabled = false;
 #endif /* PARAM_NO_AUTOSAVE */
 
@@ -119,14 +119,11 @@ struct param_wbuf_s {
 static bitset<param_info_count> params_active;
 
 //#define ENABLE_SHMEM_DEBUG
-static void init_params();
 
 static unsigned char set_called_from_get = 0;
 
 static int param_import_done =
 	0; /*at startup, params are loaded from file, if present. we dont want to send notifications that time since muorb is not ready*/
-
-static int param_load_default_no_notify();
 
 /** flexible array holding modified parameter values */
 UT_array *param_values{nullptr};
@@ -243,13 +240,40 @@ param_init()
 
 #ifdef CONFIG_SHMEM
 	PX4_DEBUG("Syncing params to shared memory\n");
-	init_params();
+
+#ifdef __PX4_QURT
+	//copy params to shared memory
+	init_shared_memory();
 #endif
+
+	/*load params automatically*/
+#ifdef __PX4_POSIX
+	param_load_default();
+#endif
+
+	param_import_done = 1;
+
+#ifdef __PX4_QURT
+	copy_params_to_shmem(px4::parameters);
+
+#ifdef ENABLE_SHMEM_DEBUG
+	PX4_INFO("Offsets:");
+	PX4_INFO("params_val %lu, krait_changed %lu, adsp_changed %lu",
+		 (unsigned char *)shmem_info_p->params_val - (unsigned char *)shmem_info_p,
+		 (unsigned char *)&shmem_info_p->krait_changed_index - (unsigned char *)shmem_info_p,
+		 (unsigned char *)&shmem_info_p->adsp_changed_index - (unsigned char *)shmem_info_p);
+#endif /* ENABLE_SHMEM_DEBUG */
+
+#endif /* __PX4_QURT */
+
+#else
 
 	// mark all parameters active
 	for (int i = 0; i < params_active.size(); i++) {
 		params_active.set(i, true);
 	}
+
+#endif /* CONFIG_SHMEM */
 }
 
 /**
@@ -608,22 +632,6 @@ param_get(param_t param, void *val)
 		result = 0;
 	}
 
-#ifdef ENABLE_SHMEM_DEBUG
-
-	if (param_type(param) == PARAM_TYPE_INT32) {
-		PX4_INFO("param_get for %s : %d", param_name(param), ((union param_value_u *)val)->i);
-	}
-
-	else if (param_type(param) == PARAM_TYPE_FLOAT) {
-		PX4_INFO("param_get for %s : %f", param_name(param), (double)((union param_value_u *)val)->f);
-	}
-
-	else {
-		PX4_INFO("Unknown param type for %s", param_name(param));
-	}
-
-#endif
-
 	perf_end(param_get_perf);
 	param_unlock_reader();
 
@@ -654,7 +662,7 @@ autosave_worker(void *arg)
 	int ret = param_save_default();
 
 	if (ret != 0) {
-		PX4_ERR("param save failed (%i)", ret);
+		PX4_ERR("param auto save failed (%i)", ret);
 	}
 }
 #endif /* PARAM_NO_AUTOSAVE */
@@ -680,8 +688,8 @@ param_autosave()
 	//   looks at all unsaved params.
 	hrt_abstime delay = 300_ms;
 
-	static constexpr hrt_abstime rate_limit = 2_s; // rate-limit saving to 2 seconds
-	hrt_abstime last_save_elapsed = hrt_elapsed_time(&last_autosave_timestamp);
+	static constexpr const hrt_abstime rate_limit = 2_s; // rate-limit saving to 2 seconds
+	const hrt_abstime last_save_elapsed = hrt_elapsed_time(&last_autosave_timestamp);
 
 	if (last_save_elapsed < rate_limit && rate_limit > last_save_elapsed + delay) {
 		delay = rate_limit - last_save_elapsed;
@@ -719,6 +727,15 @@ param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_
 
 	if (param_values == nullptr) {
 		utarray_new(param_values, &param_icd);
+
+#ifndef CONFIG_SHMEM
+
+		// mark all parameters inactive
+		for (int i = 0; i < params_active.size(); i++) {
+			params_active.set(i, false);
+		}
+
+#endif /* !CONFIG_SHMEM */
 	}
 
 	if (param_values == nullptr) {
@@ -801,7 +818,6 @@ out:
 	 * If we set something, now that we have unlocked, go ahead and advertise that
 	 * a thing has been set.
 	 */
-
 	if (!param_import_done) {
 		notify_changes = 0;
 	}
@@ -814,36 +830,8 @@ out:
 		update_to_shmem(param, *(union param_value_u *)val);
 	}
 
-#ifdef ENABLE_SHMEM_DEBUG
-
-	if (param_type(param) == PARAM_TYPE_INT32) {
-		PX4_INFO("param_set for %s : %d", param_name(param), ((union param_value_u *)val)->i);
-	}
-
-	else if (param_type(param) == PARAM_TYPE_FLOAT) {
-		PX4_INFO("param_set for %s : %f", param_name(param), (double)((union param_value_u *)val)->f);
-	}
-
-	else {
-		PX4_INFO("Unknown param type for %s", param_name(param));
-	}
-
-#endif
-
 	return result;
 }
-
-#if defined(FLASH_BASED_PARAMS)
-int param_set_external(param_t param, const void *val, bool mark_saved, bool notify_changes)
-{
-	return param_set_internal(param, val, mark_saved, notify_changes);
-}
-
-const void *param_get_value_ptr_external(param_t param)
-{
-	return param_get_value_ptr(param);
-}
-#endif
 
 int
 param_set(param_t param, const void *val)
@@ -941,9 +929,7 @@ param_reset_all()
 void
 param_reset_excludes(const char *excludes[], int num_excludes)
 {
-	param_t	param;
-
-	for (param = 0; handle_in_range(param); param++) {
+	for (param_t param = 0; handle_in_range(param); param++) {
 		const char *name = param_name(param);
 		bool exclude = false;
 
@@ -999,39 +985,42 @@ param_get_default_file()
 int
 param_save_default()
 {
-	int res = OK;
-	int fd = -1;
+	int res = PX4_ERROR;
 
 	const char *filename = param_get_default_file();
 
-	fd = PARAM_OPEN(filename, O_WRONLY | O_CREAT, PX4_O_MODE_666);
+	if (!filename) {
+		param_lock_writer();
+		res = flash_param_save(false);
+		param_unlock_writer();
+		return res;
+	}
+
+	/* write parameters to temp file */
+	int fd = PARAM_OPEN(filename, O_WRONLY | O_CREAT, PX4_O_MODE_666);
 
 	if (fd < 0) {
 		PX4_ERR("failed to open param file: %s", filename);
-		goto do_exit;
+		return PX4_ERROR;
 	}
 
-	res = param_export(fd, false);
+	int attempts = 5;
+
+	while (res != OK && attempts > 0) {
+		res = param_export(fd, false);
+		attempts--;
+
+		if (res != PX4_OK) {
+			PX4_ERR("param_export failed, retrying %d", attempts);
+			lseek(fd, 0, SEEK_SET); // jump back to the beginning of the file
+		}
+	}
 
 	if (res != OK) {
 		PX4_ERR("failed to write parameters to file: %s", filename);
-		goto do_exit;
 	}
 
 	PARAM_CLOSE(fd);
-
-
-	fd = -1;
-
-do_exit:
-
-	if (fd >= 0) {
-		close(fd);
-	}
-
-	if (res == OK) {
-		PX4_DEBUG("saving params completed successfully");
-	}
 
 	return res;
 }
@@ -1070,42 +1059,6 @@ param_load_default()
 	}
 
 	return res;
-}
-
-/**
- * @return 0 on success, 1 if all params have not yet been stored, -1 if device open failed, -2 if writing parameters failed
- */
-static int
-param_load_default_no_notify()
-{
-	int fd_load = open(param_get_default_file(), O_RDONLY);
-
-	if (fd_load < 0) {
-#ifdef __PX4_QURT
-		release_shmem_lock(__FILE__, __LINE__);
-#endif
-
-		/* no parameter file is OK, otherwise this is an error */
-		if (errno != ENOENT) {
-			PX4_DEBUG("open '%s' for reading failed", param_get_default_file());
-			return -1;
-		}
-
-		return 1;
-	}
-
-	int result = param_import(fd_load);
-
-	close(fd_load);
-
-	PX4_DEBUG("param loading done");
-
-	if (result != 0) {
-		PX4_WARN("error reading parameters from '%s'", param_get_default_file());
-		return -2;
-	}
-
-	return 0;
 }
 
 int
@@ -1352,7 +1305,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 		goto out;
 	}
 
-	if (param_set_internal(param, v, state->mark_saved, true)) {
+	if (param_set_internal(param, v, state->mark_saved, false)) {
 		PX4_DEBUG("error setting value for '%s'", node->name);
 		goto out;
 	}
@@ -1393,6 +1346,9 @@ param_import_internal(int fd, bool mark_saved)
 
 	} while (result > 0);
 
+	// notify the system of changes once
+	param_notify_changes();
+
 	return result;
 }
 
@@ -1420,12 +1376,10 @@ param_load(int fd)
 void
 param_foreach(void (*func)(void *arg, param_t param), void *arg, bool only_changed, bool only_used)
 {
-	param_t	param;
-
-	for (param = 0; handle_in_range(param); param++) {
+	for (param_t param = 0; handle_in_range(param); param++) {
 
 		/* if requested, skip unchanged values */
-		if (only_changed && (param_find_changed(param) == nullptr)) {
+		if (only_changed && param_value_is_default(param)) {
 			continue;
 		}
 
@@ -1491,32 +1445,4 @@ void param_print_status()
 	perf_print_counter(param_find_perf);
 	perf_print_counter(param_get_perf);
 	perf_print_counter(param_set_perf);
-}
-
-void init_params()
-{
-#ifdef __PX4_QURT
-	//copy params to shared memory
-	init_shared_memory();
-#endif
-
-	/*load params automatically*/
-#ifdef __PX4_POSIX
-	param_load_default_no_notify();
-#endif
-
-	param_import_done = 1;
-
-#ifdef __PX4_QURT
-	copy_params_to_shmem(px4::parameters);
-
-#ifdef ENABLE_SHMEM_DEBUG
-	PX4_INFO("Offsets:");
-	PX4_INFO("params_val %lu, krait_changed %lu, adsp_changed %lu",
-		 (unsigned char *)shmem_info_p->params_val - (unsigned char *)shmem_info_p,
-		 (unsigned char *)&shmem_info_p->krait_changed_index - (unsigned char *)shmem_info_p,
-		 (unsigned char *)&shmem_info_p->adsp_changed_index - (unsigned char *)shmem_info_p);
-#endif /* ENABLE_SHMEM_DEBUG */
-
-#endif /* __PX4_QURT */
 }

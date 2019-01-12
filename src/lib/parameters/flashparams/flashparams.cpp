@@ -133,7 +133,7 @@ param_export_internal(bool only_unsaved)
 						       param_name(s->param),
 						       BSON_BIN_BINARY,
 						       param_size(s->param),
-						       param_get_value_ptr_external(s->param))) {
+						       param_get_value_ptr(s->param))) {
 				debug("BSON append failed for '%s'", param_name(s->param));
 				goto out;
 			}
@@ -298,7 +298,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 		goto out;
 	}
 
-	if (param_set_external(param, v, state->mark_saved, true)) {
+	if (param_set_internal(param, v, state->mark_saved, false)) {
 
 		debug("error setting value for '%s'", node->name);
 		goto out;
@@ -341,8 +341,10 @@ param_import_internal(bool mark_saved)
 
 	do {
 		result = bson_decoder_next(&decoder);
-
 	} while (result > 0);
+
+	// notify the system of changes once
+	param_notify_changes();
 
 out:
 
