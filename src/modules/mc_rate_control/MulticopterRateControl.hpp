@@ -31,31 +31,29 @@
  *
  ****************************************************************************/
 
+#include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
+#include <lib/matrix/matrix/math.hpp>
 #include <lib/mixer/mixer.h>
-#include <mathlib/math/filter/LowPassFilter2pVector3f.hpp>
-#include <matrix/matrix/math.hpp>
-#include <perf/perf_counter.h>
+#include <lib/perf/perf_counter.h>
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_module.h>
 #include <px4_module_params.h>
 #include <px4_posix.h>
-#include <px4_tasks.h>
+#include <px4_work_queue/WorkItem.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
+#include <uORB/topics/landing_gear.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/multirotor_motor_limits.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/rate_ctrl_status.h>
-#include <uORB/topics/sensor_bias.h>
-#include <uORB/topics/sensor_correction.h>
-#include <uORB/topics/sensor_gyro_control.h>
 #include <uORB/topics/vehicle_control_mode.h>
+#include <uORB/topics/vehicle_land_detected.h>
+#include <uORB/topics/vehicle_rates.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/vehicle_land_detected.h>
-#include <uORB/topics/landing_gear.h>
 
 /**
  * Multicopter attitude control app start / stop handling function
@@ -65,7 +63,7 @@ extern "C" __EXPORT int mc_rate_control_main(int argc, char *argv[]);
 #define MAX_GYRO_COUNT 3
 
 
-class MulticopterRateControl : public ModuleBase<MulticopterRateControl>, public ModuleParams
+class MulticopterRateControl : public ModuleBase<MulticopterRateControl>, public ModuleParams, public px4::WorkItem
 {
 public:
 	MulticopterRateControl();
@@ -84,24 +82,16 @@ public:
 	/** @see ModuleBase */
 	static int print_usage(const char *reason = nullptr);
 
-	/** @see ModuleBase::run() */
-	void run() override;
+	void Run() override;
 
 private:
 
-	/**
-	 * initialize some vectors/matrices from parameters
-	 */
-	void		parameters_updated();
+	void		parameters_update(bool force = false);
+	void		multirotor_motor_limits_update();
+	void		vehicle_land_detected_updated();
+	void		vehicle_status_update();
 
-	/**
-	 * Check for parameter update and handle it.
-	 */
-	void		parameter_update_poll();
-	void		vehicle_motor_limits_poll();
-	void		vehicle_status_poll();
-
-	void		publish_actuator_controls();
+	void		publish_actuator_controls(const hrt_abstime &timestamp_sample, const matrix::Vector3f &att_control);
 	void		publish_rates_setpoint();
 	void		publish_rate_controller_status();
 
@@ -109,63 +99,59 @@ private:
 	 * Get the landing gear state based on the manual control switch position
 	 * @return vehicle_attitude_setpoint_s::LANDING_GEAR_UP or vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN
 	 */
-	float		get_landing_gear_state();
+	float		get_landing_gear_state(uint8_t gear_switch);
 
 	/**
 	 * Attitude rates controller.
 	 */
-	void		control_attitude_rates(float dt);
+	matrix::Vector3f	control_attitude_rates(const matrix::Vector3f &rates, float dt);
 
 	/**
 	 * Throttle PID attenuation.
 	 */
 	matrix::Vector3f pid_attenuations(float tpa_breakpoint, float tpa_rate);
 
-	uORB::Subscription _v_rates_sp_sub{ORB_ID(vehicle_rates_setpoint)};		/**< vehicle rates setpoint subscription */
-	uORB::Subscription _v_control_mode_sub{ORB_ID(vehicle_control_mode)};		/**< vehicle control mode subscription */
-	uORB::Subscription _params_sub{ORB_ID(parameter_update)};			/**< parameter updates subscription */
-	uORB::Subscription _manual_control_sp_sub{ORB_ID(manual_control_setpoint)};	/**< manual control setpoint subscription */
-	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};			/**< vehicle status subscription */
-	uORB::Subscription _motor_limits_sub{ORB_ID(multirotor_motor_limits)};		/**< motor limits subscription */
+
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};			/**< battery status subscription */
-	uORB::Subscription _sensor_correction_sub{ORB_ID(sensor_correction)};		/**< sensor thermal correction subscription */
-	uORB::Subscription _sensor_bias_sub{ORB_ID(sensor_bias)};			/**< sensor in-run bias correction subscription */
-	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};	/**< vehicle land detected subscription */
 	uORB::Subscription _landing_gear_sub{ORB_ID(landing_gear)};
+	uORB::Subscription _manual_control_sp_sub{ORB_ID(manual_control_setpoint)};	/**< manual control setpoint subscription */
+	uORB::Subscription _motor_limits_sub{ORB_ID(multirotor_motor_limits)};		/**< motor limits subscription */
+	uORB::Subscription _params_sub{ORB_ID(parameter_update)};			/**< parameter updates subscription */
+	uORB::Subscription _v_control_mode_sub{ORB_ID(vehicle_control_mode)};		/**< vehicle control mode subscription */
+	uORB::Subscription _v_rates_sp_sub{ORB_ID(vehicle_rates_setpoint)};		/**< vehicle rates setpoint subscription */
+	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};	/**< vehicle land detected subscription */
+	uORB::Subscription _vehicle_rates_sub{ORB_ID(vehicle_rates)};
+	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};			/**< vehicle status subscription */
 
-	int		_sensor_gyro_sub[MAX_GYRO_COUNT];	/**< gyro data subscription */
-
-	unsigned _gyro_count{1};
-	int _selected_gyro{0};
-
-	orb_advert_t	_v_rates_sp_pub{nullptr};		/**< rate setpoint publication */
 	orb_advert_t	_actuators_0_pub{nullptr};		/**< attitude actuator controls publication */
 	orb_advert_t	_controller_status_pub{nullptr};	/**< controller status publication */
 	orb_advert_t	_landing_gear_pub{nullptr};
+	orb_advert_t	_v_rates_sp_pub{nullptr};		/**< rate setpoint publication */
 
 	orb_id_t	_actuators_id{nullptr};			/**< pointer to correct actuator controls0 uORB metadata structure */
 
-	bool		_actuators_0_circuit_breaker_enabled{false};	/**< circuit breaker to suppress output */
-
-	struct vehicle_rates_setpoint_s		_v_rates_sp {};		/**< vehicle rates setpoint */
-	struct manual_control_setpoint_s	_manual_control_sp {};	/**< manual control setpoint */
-	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
-	struct actuator_controls_s		_actuators {};		/**< actuator controls */
-	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
-	struct battery_status_s			_battery_status {};	/**< battery status */
-	struct sensor_correction_s		_sensor_correction {};	/**< sensor thermal corrections */
-	struct sensor_bias_s			_sensor_bias {};	/**< sensor in-run bias corrections */
-	struct vehicle_land_detected_s		_vehicle_land_detected {};
-	struct landing_gear_s 			_landing_gear {};
-
-	sensor_gyro_control_s			_sensor_gyro {};	/**< gyro data before thermal correctons and ekf bias estimates are applied */
+	actuator_controls_s		_actuators{};
+	vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
 
 	MultirotorMixer::saturation_status _saturation_status{};
+
+	bool	_actuators_0_circuit_breaker_enabled{false};	/**< circuit breaker to suppress output */
+
+	bool	_landed{true};
+	bool	_maybe_landed{true};
+
+	bool	_gear_state_initialized{false};		/**< true if the gear state has been initialized */
+
+	bool	_is_rotary_wing{true};
+	bool	_in_transition_mode{false};
+	bool	_is_vtol{false};
+
+	float 	_battery_status_scale{1.0f};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
 	math::LowPassFilter2pVector3f _lp_filters_d{initial_update_rate_hz, 50.f};	/**< low-pass filters for D-term (roll, pitch & yaw) */
-	static constexpr const float initial_update_rate_hz = 250.f; /**< loop update rate used for initialization */
+	static constexpr const float initial_update_rate_hz = 1000.f; /**< loop update rate used for initialization */
 	float _loop_update_rate_hz{initial_update_rate_hz};          /**< current rate-controller loop update rate in [Hz] */
 
 	matrix::Vector3f _rates_prev;			/**< angular rates on previous step */
@@ -173,12 +159,25 @@ private:
 	matrix::Vector3f _rates_sp;			/**< angular rates setpoint */
 	matrix::Vector3f _rates_int;			/**< angular rates integral error */
 
-	matrix::Vector3f _att_control;			/**< attitude control vector */
+	matrix::Vector3f _rate_p;		/**< P gain for angular rate error */
+	matrix::Vector3f _rate_i;		/**< I gain for angular rate error */
+	matrix::Vector3f _rate_int_lim;		/**< integrator state limit for rate loop */
+	matrix::Vector3f _rate_d;		/**< D gain for angular rate error */
+	matrix::Vector3f _rate_ff;		/**< Feedforward gain for desired rates */
+
+	matrix::Vector3f _rate_p_scaled;	/**< TPA scaled P gain for angular rate error */
+	matrix::Vector3f _rate_i_scaled;	/**< TPA scaled I gain for angular rate error */
+	matrix::Vector3f _rate_d_scaled;	/**< TPA scaled D gain for angular rate error */
+
+	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */
+
 	float		_thrust_sp{0.0f};		/**< thrust setpoint */
+	float		_thrust_sp_prev{0.0f};		/**< previous thrust setpoint */
 
-	matrix::Dcmf _board_rotation;			/**< rotation matrix for the orientation that the board is mounted */
-
-	bool _gear_state_initialized{false};		/**< true if the gear state has been initialized */
+	hrt_abstime	_task_start{0};
+	hrt_abstime	_last_run{0};
+	float		_dt_accumulator{0.0f};
+	int		_loop_counter{0};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,
@@ -216,21 +215,6 @@ private:
 		(ParamFloat<px4::params::MC_ACRO_SUPEXPO>) _param_mc_acro_supexpo,			/**< superexpo stick curve shape (roll & pitch) */
 		(ParamFloat<px4::params::MC_ACRO_SUPEXPOY>) _param_mc_acro_supexpoy,			/**< superexpo stick curve shape (yaw) */
 
-		(ParamBool<px4::params::MC_BAT_SCALE_EN>) _param_mc_bat_scale_en,
-
-		(ParamInt<px4::params::SENS_BOARD_ROT>) _param_sens_board_rot,
-
-		(ParamFloat<px4::params::SENS_BOARD_X_OFF>) _param_sens_board_x_off,
-		(ParamFloat<px4::params::SENS_BOARD_Y_OFF>) _param_sens_board_y_off,
-		(ParamFloat<px4::params::SENS_BOARD_Z_OFF>) _param_sens_board_z_off
+		(ParamBool<px4::params::MC_BAT_SCALE_EN>) _param_mc_bat_scale_en
 	)
-
-	matrix::Vector3f _rate_p;		/**< P gain for angular rate error */
-	matrix::Vector3f _rate_i;		/**< I gain for angular rate error */
-	matrix::Vector3f _rate_int_lim;		/**< integrator state limit for rate loop */
-	matrix::Vector3f _rate_d;		/**< D gain for angular rate error */
-	matrix::Vector3f _rate_ff;		/**< Feedforward gain for desired rates */
-
-	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */
-
 };
