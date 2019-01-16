@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013, 2017-2018 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2013, 2016, 2018 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,25 +32,22 @@
  ****************************************************************************/
 
 /*
- * Simulated Low Level Driver for the PX4 audio alarm port. Subscribes to
+ * Low Level Driver for the PX4 audio alarm port. Subscribes to
  * tune_control and plays notes on this architecture specific
  * timer HW
  */
 
-#include <circuit_breaker/circuit_breaker.h>
-#include <drivers/device/device.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/drv_tone_alarm.h>
-#include <lib/cdev/CDev.hpp>
-#include <lib/tunes/tunes.h>
-#include <px4_config.h>
-#include <px4_posix.h>
-#include <px4_workqueue.h>
-#include <uORB/topics/tune_control.h>
+#include <string.h>
 
-#if !defined(UNUSED)
-#  define UNUSED(a) ((void)(a))
-#endif
+#include <px4_config.h>
+#include <px4_log.h>
+#include <lib/tunes/tunes.h>
+#include <lib/cdev/CDev.hpp>
+#include <lib/circuit_breaker/circuit_breaker.h>
+#include <drivers/drv_tone_alarm.h>
+#include <drivers/drv_hrt.h>
+#include <px4_workqueue.h>
+#include <lib/drivers/tone_alarm/ToneAlarmArchInterface.hpp>
 
 #define CBRK_BUZZER_KEY 782097
 
@@ -105,8 +102,6 @@ private:
 	//
 	static void next_trampoline(void *arg);
 
-	// Unused
-	virtual void _measure() {}
 };
 
 struct work_s ToneAlarm::_work = {};
@@ -127,6 +122,8 @@ ToneAlarm::ToneAlarm() :
 	_cbrk(CBRK_UNINIT),
 	_tune_control_sub(-1)
 {
+	// enable debug() calls
+	//_debug_enabled = true;
 }
 
 ToneAlarm::~ToneAlarm()
@@ -147,6 +144,11 @@ int ToneAlarm::init()
 		return ret;
 	}
 
+	// architecture specific init
+	ToneAlarmArchInterface::init();
+
+	PX4_DEBUG("ready");
+
 	_running = true;
 	work_queue(HPWORK, &_work, (worker_t)&ToneAlarm::next_trampoline, this, 0);
 	return OK;
@@ -162,18 +164,6 @@ void ToneAlarm::status()
 	}
 }
 
-unsigned ToneAlarm::frequency_to_divisor(unsigned frequency)
-{
-	const int TONE_ALARM_CLOCK = 120000000ul / 4;
-
-	float period = 0.5f / frequency;
-
-	// and the divisor, rounded to the nearest integer
-	unsigned divisor = (period * TONE_ALARM_CLOCK) + 0.5f;
-
-	return divisor;
-}
-
 void ToneAlarm::start_note(unsigned frequency)
 {
 	// check if circuit breaker is enabled
@@ -181,25 +171,18 @@ void ToneAlarm::start_note(unsigned frequency)
 		_cbrk = circuit_breaker_enabled("CBRK_BUZZER", CBRK_BUZZER_KEY);
 	}
 
-	if (_cbrk != CBRK_OFF) { return; }
+	if (_cbrk != CBRK_OFF) {
+		return;
+	}
 
-	// compute the divisor
-	unsigned divisor = frequency_to_divisor(frequency);
-
-	// pick the lowest prescaler value that we can use
-	// (note that the effective prescale value is 1 greater)
-	unsigned prescale = divisor / 65536;
-
-	// calculate the timer period for the selected prescaler value
-	unsigned period = (divisor / (prescale + 1)) - 1;
-
-	// Silence warning of unused var
-	UNUSED(period);
-	PX4_DEBUG("ToneAlarm::start_note %u", period);
+	// architecture specific start_note
+	ToneAlarmArchInterface::start_note(frequency);
 }
 
 void ToneAlarm::stop_note()
 {
+	// architecture specific stop_note
+	ToneAlarmArchInterface::stop_note();
 }
 
 void ToneAlarm::next_note()
@@ -232,6 +215,7 @@ void ToneAlarm::next_note()
 
 	if (updated) {
 		orb_copy(ORB_ID(tune_control), _tune_control_sub, &_tune);
+		_play_tone = _tunes.set_control(_tune) == 0;
 	}
 
 	unsigned frequency = 0;

@@ -31,12 +31,4 @@
 #
 ############################################################################
 
-px4_add_module(
-	MODULE drivers__tone_alarm
-	MAIN tone_alarm
-	SRCS
-		tone_alarm.cpp
-	DEPENDS
-		circuit_breaker
-		tunes
-	)
+px4_add_library(tone_alarm_arch tone_alarm_arch.cpp)
