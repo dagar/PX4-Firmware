@@ -119,6 +119,13 @@ protected:
 	 */
 	void dequeue_uavcan_request();
 
+
+	// packed parameters WIP
+	void send_packed_params(const hrt_abstime t);
+	size_t packed_param_size(param_t param);
+	int pack_param(uint8_t *dst, uint16_t param_id, param_t param);
+	int unpack_test(const mavlink_packed_param_values_t &msg);
+
 	_uavcan_open_request_list_item *_uavcan_open_request_list; ///< Pointer to the first item in the linked list
 	bool _uavcan_waiting_for_request_response; ///< We have reqested a parameter and wait for the response
 	uint16_t _uavcan_queued_request_items;	///< Number of stored parameter requests currently in the list

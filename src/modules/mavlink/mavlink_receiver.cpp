@@ -585,6 +585,10 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 			send_storage_information(cmd_mavlink.param1 + 0.5f);
 		}
 
+	} else if (cmd_mavlink.command == MAV_CMD_REQUEST_PACKED_PARAMS) {
+
+		//_parameters2_manager.send_all();
+
 	} else {
 
 		send_ack = false;
