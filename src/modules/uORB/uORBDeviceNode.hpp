@@ -74,6 +74,8 @@ public:
 	 */
 	int close(cdev::file_t *filp) override;
 
+	unsigned copy(char *buffer, unsigned sd_generation);
+
 	/**
 	 * reads data from a subscriber node to the buffer provided.
 	 * @param filp

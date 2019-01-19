@@ -164,6 +164,34 @@ uORB::DeviceNode::close(cdev::file_t *filp)
 	return CDev::close(filp);
 }
 
+unsigned
+uORB::DeviceNode::copy(char *buffer, unsigned sd_generation)
+{
+	if (_generation > sd_generation + _queue_size) {
+		/* Reader is too far behind: some messages are lost */
+		_lost_messages += _generation - (sd_generation + _queue_size);
+		sd_generation = _generation - _queue_size;
+	}
+
+	if (_generation == sd_generation && sd_generation > 0) {
+		/* The subscriber already read the latest message, but nothing new was published yet.
+		 * Return the previous message
+		 */
+		--sd_generation;
+	}
+
+	/* if the caller doesn't want the data, don't give it to them */
+	if (nullptr != buffer) {
+		memcpy(buffer, _data + (_meta->o_size * (sd_generation % _queue_size)), _meta->o_size);
+	}
+
+	if (sd_generation < _generation) {
+		++sd_generation;
+	}
+
+	return sd_generation;
+}
+
 ssize_t
 uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
@@ -182,37 +210,22 @@ uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 	/*
 	 * Perform an atomic copy & state update
 	 */
-	ATOMIC_ENTER;
+	unsigned sd_gen_updated = 0;
+	unsigned gen1 = 0;
 
-	if (_generation > sd->generation + _queue_size) {
-		/* Reader is too far behind: some messages are lost */
-		_lost_messages += _generation - (sd->generation + _queue_size);
-		sd->generation = _generation - _queue_size;
-	}
+	do {
+		gen1 = published_message_count();
+		sd_gen_updated = copy(buffer, sd->generation);
+		//const unsigned gen2 = published_message_count();
+	} while (gen1 != published_message_count());
 
-	if (_generation == sd->generation && sd->generation > 0) {
-		/* The subscriber already read the latest message, but nothing new was published yet.
-		 * Return the previous message
-		 */
-		--sd->generation;
-	}
-
-	/* if the caller doesn't want the data, don't give it to them */
-	if (nullptr != buffer) {
-		memcpy(buffer, _data + (_meta->o_size * (sd->generation % _queue_size)), _meta->o_size);
-	}
-
-	if (sd->generation < _generation) {
-		++sd->generation;
-	}
+	sd->generation = sd_gen_updated;
 
 	/*
 	 * Clear the flag that indicates that an update has been reported, as
 	 * we have just collected it.
 	 */
 	sd->set_update_reported(false);
-
-	ATOMIC_LEAVE;
 
 	return _meta->o_size;
 }
@@ -299,13 +312,7 @@ uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 		}
 
 	case ORBIOCUPDATED:
-#ifndef __PX4_NUTTX
-		lock();
-#endif
-		*(bool *)arg = appears_updated(sd);
-#ifndef __PX4_NUTTX
-		unlock();
-#endif
+		*(bool *)arg = (sd->generation != published_message_count());
 		return PX4_OK;
 
 	case ORBIOCSETINTERVAL: {
