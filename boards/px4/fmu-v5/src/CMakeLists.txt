@@ -31,13 +31,14 @@
 #
 ############################################################################
 
+# TODO: px4_add_library -> add_library
 px4_add_library(drivers_board
 	#stm32_can.c # WIP
 	init.c
 	led.c
 	manifest.c
 	sdio.c
-	spi.c
+	spi.cpp
 	timer_config.c
 	usb.c
 )

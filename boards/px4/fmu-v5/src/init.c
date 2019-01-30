@@ -45,10 +45,6 @@
  * Included Files
  ****************************************************************************/
 
-#include <px4_config.h>
-#include <px4_tasks.h>
-#include <px4_log.h>
-
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -295,10 +291,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 
 	if (OK == board_determine_hw_info()) {
-		PX4_INFO("Rev 0x%1x : Ver 0x%1x %s", board_get_hw_revision(), board_get_hw_version(), board_get_hw_type_name());
+		syslog(LOG_INFO, "Rev 0x%1x : Ver 0x%1x %s", board_get_hw_revision(), board_get_hw_version(), board_get_hw_type_name());
 
 	} else {
-		PX4_ERR("Failed to read HW revision and version");
+		syslog(LOG_ERR, "Failed to read HW revision and version");
 	}
 
 	px4_platform_init();
@@ -306,7 +302,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	/* configure the DMA allocator */
 
 	if (board_dma_alloc_init() < 0) {
-		PX4_ERR("DMA alloc FAILED");
+		syslog(LOG_ERR, "DMA alloc FAILED");
 	}
 
 	/* set up the serial DMA polling */
