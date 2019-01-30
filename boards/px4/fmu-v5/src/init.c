@@ -233,22 +233,17 @@ stm32_boardinitialize(void)
 	board_on_reset(-1); /* Reset PWM first thing */
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure pins */
-
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	board_gpio_init(gpio, arraySize(gpio));
 
 	/* configure SPI interfaces */
-
 	stm32_spiinitialize();
 
 	/* configure USB interfaces */
-
 	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -333,26 +328,15 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_RED);
 	}
 
-#ifdef CONFIG_SPI
-	int ret = stm32_spi_bus_initialize();
-
-	if (ret != OK) {
-		led_on(LED_RED);
-		return ret;
-	}
-
-#endif
-
 #ifdef CONFIG_MMCSD
-
-	ret = stm32_sdio_initialize();
+	int ret = stm32_sdio_initialize();
 
 	if (ret != OK) {
 		led_on(LED_RED);
 		return ret;
 	}
 
-#endif
+#endif /* CONFIG_MMCSD */
 
 	return OK;
 }
