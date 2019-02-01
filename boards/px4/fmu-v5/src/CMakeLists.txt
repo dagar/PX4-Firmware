@@ -40,7 +40,7 @@ px4_add_library(drivers_board
 	sdio.c
 	spi.cpp
 	timer_config.c
-	usb.c
+	#usb.c
 )
 
 target_link_libraries(drivers_board

@@ -67,15 +67,8 @@
 
 /* Define CS GPIO array */
 static constexpr uint32_t spi1selects_gpio[] = PX4_SENSOR_BUS_CS_GPIO;
-static constexpr uint32_t spi2selects_gpio[] = PX4_MEMORY_BUS_CS_GPIO;
-#ifdef CONFIG_STM32F7_SPI3
-static constexpr uint32_t spi3selects_gpio[] = {FIXME};
-#error Need to define SPI3 Usage
-#endif
 static constexpr uint32_t spi4selects_gpio[] = PX4_BARO_BUS_CS_GPIO;
-#ifdef CONFIG_STM32F7_SPI5
 static constexpr uint32_t spi5selects_gpio[] = PX4_EXTERNAL1_BUS_CS_GPIO;
-#endif
 static constexpr uint32_t spi6selects_gpio[] = PX4_EXTERNAL2_BUS_CS_GPIO;
 
 /************************************************************************************
@@ -89,24 +82,52 @@ static constexpr uint32_t spi6selects_gpio[] = PX4_EXTERNAL2_BUS_CS_GPIO;
 __EXPORT void stm32_spiinitialize(void)
 {
 #ifdef CONFIG_STM32F7_SPI1
-	board_gpio_init(spi1selects_gpio, arraySize(spi1selects_gpio));
-#endif
+
+	for (auto gpio : spi1selects_gpio) {
+		px4_arch_configgpio(gpio);
+	}
+
+#endif /* CONFIG_STM32F7_SPI1 */
 
 #ifdef CONFIG_STM32F7_SPI2
-	board_gpio_init(spi2selects_gpio, arraySize(spi2selects_gpio));
-#endif
+
+	for (auto gpio : spi2selects_gpio) {
+		px4_arch_configgpio(gpio);
+	}
+
+#endif /* CONFIG_STM32F7_SPI2 */
+
 #ifdef CONFIG_STM32F7_SPI3
-	board_gpio_init(spi3selects_gpio, arraySize(spi3selects_gpio));
-#endif
+
+	for (auto gpio : spi3selects_gpio) {
+		px4_arch_configgpio(gpio);
+	}
+
+#endif /* CONFIG_STM32F7_SPI3 */
+
 #ifdef CONFIG_STM32F7_SPI4
-	board_gpio_init(spi4selects_gpio, arraySize(spi4selects_gpio));
-#endif
+
+	for (auto gpio : spi4selects_gpio) {
+		px4_arch_configgpio(gpio);
+	}
+
+#endif /* CONFIG_STM32F7_SPI4 */
+
 #ifdef CONFIG_STM32F7_SPI5
-	board_gpio_init(spi5selects_gpio, arraySize(spi5selects_gpio));
-#endif
+
+	for (auto gpio : spi5selects_gpio) {
+		px4_arch_configgpio(gpio);
+	}
+
+#endif /* CONFIG_STM32F7_SPI5 */
+
 #ifdef CONFIG_STM32F7_SPI6
-	board_gpio_init(spi6selects_gpio, arraySize(spi6selects_gpio));
-#endif
+
+	for (auto gpio : spi6selects_gpio) {
+		px4_arch_configgpio(gpio);
+	}
+
+#endif /* CONFIG_STM32F7_SPI6 */
 }
 
 /************************************************************************************
@@ -145,25 +166,9 @@ __EXPORT uint8_t stm32_spi1status(FAR struct spi_dev_s *dev, uint32_t devid)
 
 __EXPORT void stm32_spi2select(FAR struct spi_dev_s *dev, uint32_t devid, bool selected)
 {
-	/* SPI select is active low, so write !selected to select the device */
-
-	int sel = (int) devid;
-
+	// SPI select is active low, so write !selected to select the device
 	if (devid == SPIDEV_FLASH(0)) {
-		sel = PX4_SPIDEV_MEMORY;
-	}
-
-	ASSERT(PX4_SPI_BUS_ID(sel) == PX4_SPI_BUS_MEMORY);
-
-	// Making sure the other peripherals are not selected
-	for (auto cs : spi2selects_gpio) {
-		stm32_gpiowrite(cs, 1);
-	}
-
-	uint32_t gpio = spi2selects_gpio[PX4_SPI_DEV_ID(sel)];
-
-	if (gpio) {
-		stm32_gpiowrite(gpio, !selected);
+		stm32_gpiowrite(GPIO_SPI2_CS_FRAM, !selected);
 	}
 }
 

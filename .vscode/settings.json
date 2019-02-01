@@ -7,4 +7,20 @@
         "cmake.buildDirectory": "${workspaceRoot}/build/${variant:CONFIG}",
         "cmake.autoRestartBuild": true,
         "cmake.configureOnOpen": true,
+        "files.associations": {
+                "__hash_table": "cpp",
+                "__split_buffer": "cpp",
+                "__tree": "cpp",
+                "atomic": "cpp",
+                "deque": "cpp",
+                "ios": "cpp",
+                "list": "cpp",
+                "map": "cpp",
+                "set": "cpp",
+                "string": "cpp",
+                "system_error": "cpp",
+                "unordered_map": "cpp",
+                "unordered_set": "cpp",
+                "vector": "cpp"
+        },
 }

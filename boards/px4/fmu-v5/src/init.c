@@ -106,11 +106,10 @@ __END_DECLS
 
 __EXPORT void board_rc_input(bool invert_on, uint32_t uxart_base)
 {
-
 	irqstate_t irqstate = px4_enter_critical_section();
 
-	uint32_t cr1 =	getreg32(STM32_USART_CR1_OFFSET + uxart_base);
-	uint32_t cr2 =	getreg32(STM32_USART_CR2_OFFSET + uxart_base);
+	uint32_t cr1 = getreg32(STM32_USART_CR1_OFFSET + uxart_base);
+	uint32_t cr2 = getreg32(STM32_USART_CR2_OFFSET + uxart_base);
 	uint32_t regval = cr1;
 
 	/* {R|T}XINV bit fields can only be written when the USART is disabled (UE=0). */
@@ -120,10 +119,9 @@ __EXPORT void board_rc_input(bool invert_on, uint32_t uxart_base)
 	putreg32(regval, STM32_USART_CR1_OFFSET + uxart_base);
 
 	if (invert_on) {
-#if defined(BOARD_HAS_RX_TX_SWAP) &&	RC_SERIAL_PORT_IS_SWAPED == 1
+#if defined(BOARD_HAS_RX_TX_SWAP) && (RC_SERIAL_PORT_IS_SWAPED == 1)
 
 		/* This is only ever turned on */
-
 		cr2 |= (USART_CR2_RXINV | USART_CR2_TXINV | USART_CR2_SWAP);
 #else
 		cr2 |= (USART_CR2_RXINV | USART_CR2_TXINV);
@@ -166,7 +164,6 @@ __EXPORT void board_peripheral_reset(int ms)
 	VDD_3V3_SPEKTRUM_POWER_EN(last);
 	VDD_3V3_SENSORS_EN(true);
 	VDD_5V_PERIPH_EN(true);
-
 }
 
 /************************************************************************************
@@ -182,40 +179,15 @@ __EXPORT void board_peripheral_reset(int ms)
  ************************************************************************************/
 __EXPORT void board_on_reset(int status)
 {
-	/* configure the GPIO pins to outputs and keep them low */
-
-	const uint32_t gpio[] = PX4_GPIO_PWM_INIT_LIST;
-	board_gpio_init(gpio, arraySize(gpio));
+	// configure the GPIO pins to outputs and keep them low
+	for (auto gpio : PX4_GPIO_PWM_INIT_LIST) {
+		px4_arch_gpioconfig(gpio);
+	}
 
 	if (status >= 0) {
 		up_mdelay(6);
 	}
 }
-
-/****************************************************************************
- * Name: board_app_finalinitialize
- *
- * Description:
- *   Perform application specific initialization.  This function is never
- *   called directly from application code, but only indirectly via the
- *   (non-standard) boardctl() interface using the command
- *   BOARDIOC_FINALINIT.
- *
- * Input Parameters:
- *   arg - The argument has no meaning.
- *
- * Returned Value:
- *   Zero (OK) is returned on success; a negated errno value is returned on
- *   any failure to indicate the nature of the failure.
- *
- ****************************************************************************/
-
-#ifdef CONFIG_BOARDCTL_FINALINIT
-int board_app_finalinitialize(uintptr_t arg)
-{
-	return 0;
-}
-#endif
 
 /************************************************************************************
  * Name: stm32_boardinitialize
@@ -243,7 +215,9 @@ stm32_boardinitialize(void)
 	stm32_spiinitialize();
 
 	/* configure USB interfaces */
-	stm32_usbinitialize();
+#ifdef CONFIG_STM32F7_OTGFS
+	stm32_configgpio(GPIO_OTGFS_VBUS);
+#endif /* CONFIG_STM32F7_OTGFS */
 }
 
 /****************************************************************************
