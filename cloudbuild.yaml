@@ -1,0 +1,13 @@
+steps:
+  - id: build_test1
+    name: px4io/px4-dev-base:2019-01-31
+    args: ['/bin/bash', 'pwd']
+  - id: build_test2
+    name: px4io/px4-dev-base:2019-01-31
+    args: ['/bin/bash', 'ls']
+  - id: build_test3
+    name: px4io/px4-dev-base:2019-01-31
+    args: ['/bin/bash', 'git status']
+  - id: build_test4
+    name: px4io/px4-dev-base:2019-01-31
+    args: ['/bin/bash', 'export']
