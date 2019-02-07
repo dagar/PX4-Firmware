@@ -207,6 +207,11 @@ MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt,
 		attitude_setpoint.pitch_body = atan2f(z_roll_pitch_sp(0), z_roll_pitch_sp(2));
 	}
 
+	// flight test input injection
+	attitude_setpoint.roll_body = _flight_test_input.inject(7, attitude_setpoint.roll_body);
+	attitude_setpoint.pitch_body = _flight_test_input.inject(8, attitude_setpoint.pitch_body);
+	attitude_setpoint.yaw_body = _flight_test_input.inject(9, attitude_setpoint.yaw_body);
+
 	/* copy quaternion setpoint to attitude setpoint topic */
 	Quatf q_sp = Eulerf(attitude_setpoint.roll_body, attitude_setpoint.pitch_body, attitude_setpoint.yaw_body);
 	q_sp.copyTo(attitude_setpoint.q_d);
@@ -264,6 +269,8 @@ MulticopterAttitudeControl::Run()
 		// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
 		const float dt = math::constrain(((v_att.timestamp - _last_run) * 1e-6f), 0.0002f, 0.02f);
 		_last_run = v_att.timestamp;
+
+		_flight_test_input.update(dt);
 
 		/* check for updates in other topics */
 		_manual_control_setpoint_sub.update(&_manual_control_setpoint);

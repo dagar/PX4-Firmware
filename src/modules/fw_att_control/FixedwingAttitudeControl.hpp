@@ -67,6 +67,8 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 
+#include <flight_test_input/flight_test_input.h>
+
 using matrix::Eulerf;
 using matrix::Quatf;
 
@@ -127,6 +129,8 @@ private:
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
 	hrt_abstime _last_run{0};
+
+	FlightTestInput _flight_test_input;
 
 	float _flaps_applied{0.0f};
 	float _flaperons_applied{0.0f};

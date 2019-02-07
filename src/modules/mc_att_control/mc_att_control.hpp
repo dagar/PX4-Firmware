@@ -58,6 +58,8 @@
 
 #include <AttitudeControl.hpp>
 
+#include <flight_test_input/flight_test_input.h>
+
 using namespace time_literals;
 
 /**
@@ -135,6 +137,8 @@ private:
 	bool _vtol_in_transition_mode{false};
 
 	uint8_t _quat_reset_counter{0};
+
+	FlightTestInput _flight_test_input;
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLL_P>) _param_mc_roll_p,

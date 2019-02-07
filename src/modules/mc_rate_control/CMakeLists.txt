@@ -46,4 +46,5 @@ px4_add_module(
 		mathlib
 		RateControl
 		px4_work_queue
+		flight_test_input
 	)

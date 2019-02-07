@@ -60,6 +60,8 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 
+#include <flight_test_input/flight_test_input.h>
+
 using namespace time_literals;
 
 class MulticopterRateControl : public ModuleBase<MulticopterRateControl>, public ModuleParams, public px4::WorkItem
@@ -125,6 +127,8 @@ private:
 	hrt_abstime _last_run{0};
 
 	int8_t _landing_gear{landing_gear_s::GEAR_DOWN};
+
+	FlightTestInput _flight_test_input;
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,

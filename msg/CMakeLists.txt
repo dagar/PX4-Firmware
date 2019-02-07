@@ -70,6 +70,7 @@ set(msg_files
 	estimator_status.msg
 	estimator_status_flags.msg
 	follow_target.msg
+	flight_test_input.msg
 	generator_status.msg
 	geofence_result.msg
 	gimbal_device_attitude_status.msg

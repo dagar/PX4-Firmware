@@ -433,6 +433,11 @@ void FixedwingAttitudeControl::Run()
 			control_input.scaler = _airspeed_scaling;
 			control_input.lock_integrator = lock_integrator;
 
+			// flight test input injection
+			control_input.roll_setpoint = _flight_test_input.inject(7, _att_sp.roll_body);
+			control_input.pitch_setpoint = _flight_test_input.inject(8, _att_sp.pitch_body);
+			control_input.yaw_setpoint = _flight_test_input.inject(9, _att_sp.yaw_body);
+
 			if (wheel_control) {
 				_local_pos_sub.update(&_local_pos);
 
@@ -631,6 +636,11 @@ void FixedwingAttitudeControl::Run()
 		_actuators.control[actuator_controls_s::INDEX_AIRBRAKES] = _flaperons_applied;
 		// FIXME: this should use _vcontrol_mode.landing_gear_pos in the future
 		_actuators.control[7] = _manual_control_setpoint.aux3;
+
+		// flight test input injection
+		_actuators.control[0] = _flight_test_input.inject(1, _actuators.control[0]);
+		_actuators.control[1] = _flight_test_input.inject(2, _actuators.control[1]);
+		_actuators.control[2] = _flight_test_input.inject(3, _actuators.control[2]);
 
 		/* lazily publish the setpoint only once available */
 		_actuators.timestamp = hrt_absolute_time();

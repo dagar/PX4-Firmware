@@ -218,6 +218,11 @@ MulticopterRateControl::Run()
 				}
 			}
 
+			// flight test input injection
+			_rates_sp(0) = _flight_test_input.inject(4, _rates_sp(0));
+			_rates_sp(1) = _flight_test_input.inject(5, _rates_sp(1));
+			_rates_sp(2) = _flight_test_input.inject(6, _rates_sp(2));
+
 			// run rate controller
 			const Vector3f att_control = _rate_control.update(rates, _rates_sp, angular_accel, dt, _maybe_landed || _landed);
 
@@ -252,6 +257,11 @@ MulticopterRateControl::Run()
 					}
 				}
 			}
+
+			// flight test input injection
+			actuators.control[0] = _flight_test_input.inject(1, actuators.control[0]);
+			actuators.control[1] = _flight_test_input.inject(2, actuators.control[1]);
+			actuators.control[2] = _flight_test_input.inject(3, actuators.control[2]);
 
 			actuators.timestamp = hrt_absolute_time();
 			_actuators_0_pub.publish(actuators);
