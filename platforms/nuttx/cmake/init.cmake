@@ -83,6 +83,22 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_DEFCONFIG}
 file(STRINGS ${NUTTX_CONFIG_DIR}/${NUTTX_CONFIG}/defconfig config_expanded REGEX "# Automatically generated file; DO NOT EDIT.")
 
 if ("x${config_expanded}" STREQUAL "x")
+
+	# https://github.com/zephyrproject-rtos/zephyr/blob/master/cmake/kconfig.cmake
+	execute_process(
+  	COMMAND
+		  ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/kconfig/kconfig.py
+		  ${KCONFIG_ROOT} ${DOTCONFIG} ${AUTOCONF_H} ${merge_fragments}
+	  WORKING_DIRECTORY ${APPLICATION_SOURCE_DIR}
+		  # The working directory is set to the app dir such that the user
+		  # can use relative paths in CONF_FILE, e.g. CONF_FILE=nrf5.conf
+		  RESULT_VARIABLE ret
+	  )
+	if(NOT "${ret}" STREQUAL "0")
+	  message(FATAL_ERROR "command failed with return code: ${ret}")
+	endif()
+
+
 	execute_process(COMMAND kconfig-tweak --set-str CONFIG_APPS_DIR "../apps" WORKING_DIRECTORY ${NUTTX_DIR})
 	execute_process(COMMAND make --no-print-directory --silent -C ${NUTTX_DIR} CONFIG_ARCH_BOARD_CUSTOM=y olddefconfig WORKING_DIRECTORY ${NUTTX_DIR})
 endif()
