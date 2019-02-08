@@ -39,12 +39,10 @@
  * Includes bit / byte / geo representation and unit conversions.
  */
 
-#ifndef CONVERSIONS_H_
-#define CONVERSIONS_H_
+#pragma once
+
 #include <float.h>
 #include <stdint.h>
-
-__BEGIN_DECLS
 
 /**
  * Converts a signed 16 bit integer from big endian to little endian.
@@ -54,8 +52,7 @@ __BEGIN_DECLS
  * Common vendors with big endian representation are Invense, Bosch and
  * Honeywell. ST micro devices tend to use a little endian representation.
  */
-__EXPORT int16_t int16_t_from_bytes(uint8_t bytes[]);
-
-__END_DECLS
-
-#endif /* CONVERSIONS_H_ */
+inline int16_t int16_t_from_bytes(uint8_t bytes[])
+{
+	return (int16_t)(__builtin_bswap16((uint16_t)bytes[0]));
+}

@@ -32,7 +32,6 @@
 ############################################################################
 
 set(SRCS
-	conversions.c
 	cpuload.c
 	crc.c
 	hysteresis/hysteresis.cpp
