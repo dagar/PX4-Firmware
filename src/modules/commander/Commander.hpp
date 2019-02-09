@@ -105,7 +105,20 @@ private:
 		(ParamInt<px4::params::COM_POS_FS_GAIN>) _failsafe_pos_gain,
 
 		(ParamInt<px4::params::COM_LOW_BAT_ACT>) _low_bat_action,
-		(ParamFloat<px4::params::COM_DISARM_LAND>) _disarm_when_landed_timeout
+		(ParamFloat<px4::params::COM_DISARM_LAND>) _disarm_when_landed_timeout,
+
+		(ParamBool<px4::params::COM_ARM_MIS_REQ>) _arm_require_mission,
+		(ParamBool<px4::params::COM_ARM_WO_GPS>) _arm_wo_gps,
+
+		// data link loss
+		(ParamInt<px4::params::NAV_DLL_ACT>) _data_link_loss_action,
+		(ParamInt<px4::params::COM_DL_LOSS_T>) _data_link_loss_timeout,
+		(ParamInt<px4::params::COM_DL_REG_T>) _data_link_loss_regain,
+
+		// RC loss
+		(ParamInt<px4::params::NAV_RCL_ACT>) _manual_control_loss_action,
+		(ParamFloat<px4::params::COM_RC_LOSS_T>) _manual_control_loss_timeout
+
 	)
 
 	const int64_t POSVEL_PROBATION_MIN = 1_s;	/**< minimum probation duration (usec) */
@@ -128,6 +141,8 @@ private:
 
 	FailureDetector _failure_detector;
 	bool _failure_detector_termination_printed{false};
+
+	arming_requirements_t get_arming_requirements();
 
 	bool handle_command(vehicle_status_s *status, const vehicle_command_s &cmd, actuator_armed_s *armed,
 			    orb_advert_t *command_ack_pub, bool *changed);

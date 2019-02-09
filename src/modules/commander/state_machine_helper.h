@@ -68,12 +68,34 @@ enum class link_loss_actions_t {
 	LOCKDOWN = 6,
 };
 
-typedef enum {
-	ARM_REQ_NONE = 0,
-	ARM_REQ_MISSION_BIT = (1 << 0),
-	ARM_REQ_ARM_AUTH_BIT = (1 << 1),
-	ARM_REQ_GPS_BIT = (1 << 2),
-} arm_requirements_t;
+struct arming_requirements_t {
+	bool mission{false};
+	bool authorization{false};
+	bool global_position_estimate{false};
+	// altitude
+	// velocity
+	// local position
+	// battery
+	// attitude
+
+	// logging
+	// sdcard
+
+
+	// no active failsafes
+	//  can't arm in a failsafe mode?
+
+	bool data_link{false};
+	bool manual_control{false};
+
+	// sensors?
+
+	// airspeed
+
+	// battery?
+
+
+};
 
 extern const char *const arming_state_names[];
 
@@ -82,7 +104,8 @@ bool is_safe(const safety_s &safety, const actuator_armed_s &armed);
 transition_result_t
 arming_state_transition(vehicle_status_s *status, const safety_s &safety, const arming_state_t new_arming_state,
 			actuator_armed_s *armed, const bool fRunPreArmChecks, orb_advert_t *mavlink_log_pub,
-			vehicle_status_flags_s *status_flags, const uint8_t arm_requirements, const hrt_abstime &time_since_boot);
+			vehicle_status_flags_s *status_flags, const arming_requirements_t &arm_requirements,
+			const hrt_abstime &time_since_boot);
 
 transition_result_t
 main_state_transition(const vehicle_status_s &status, const main_state_t new_main_state,
@@ -104,7 +127,7 @@ bool check_invalid_pos_nav_state(vehicle_status_s *status, bool old_failsafe, or
 				 const vehicle_status_flags_s &status_flags, const bool use_rc, const bool using_global_pos);
 
 bool prearm_check(orb_advert_t *mavlink_log_pub, const vehicle_status_flags_s &status_flags, const safety_s &safety,
-		  const uint8_t arm_requirements);
+		  const arming_requirements_t &arm_requirements);
 
 
 // COM_LOW_BAT_ACT parameter values

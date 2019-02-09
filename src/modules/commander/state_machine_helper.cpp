@@ -94,7 +94,7 @@ void reset_link_loss_globals(actuator_armed_s *armed, const bool old_failsafe, c
 
 transition_result_t arming_state_transition(vehicle_status_s *status, const safety_s &safety,
 		const arming_state_t new_arming_state, actuator_armed_s *armed, const bool fRunPreArmChecks,
-		orb_advert_t *mavlink_log_pub, vehicle_status_flags_s *status_flags, const uint8_t arm_requirements,
+		orb_advert_t *mavlink_log_pub, vehicle_status_flags_s *status_flags, const arming_requirements_t &arm_requirements,
 		const hrt_abstime &time_since_boot)
 {
 	// Double check that our static arrays are still valid
@@ -120,7 +120,7 @@ transition_result_t arming_state_transition(vehicle_status_s *status, const safe
 		bool preflight_check_ret = true;
 		bool prearm_check_ret = true;
 
-		const bool checkGNSS = (arm_requirements & ARM_REQ_GPS_BIT);
+		const bool checkGNSS = false;
 
 		/* only perform the pre-arm check if we have to */
 		if (fRunPreArmChecks && (new_arming_state == vehicle_status_s::ARMING_STATE_ARMED)
@@ -892,7 +892,7 @@ void reset_link_loss_globals(actuator_armed_s *armed, const bool old_failsafe, c
 }
 
 bool prearm_check(orb_advert_t *mavlink_log_pub, const vehicle_status_flags_s &status_flags, const safety_s &safety,
-		  const uint8_t arm_requirements)
+		  const arming_requirements_t &arm_requirements)
 {
 	bool reportFailures = true;
 	bool prearm_ok = true;
@@ -929,7 +929,7 @@ bool prearm_check(orb_advert_t *mavlink_log_pub, const vehicle_status_flags_s &s
 	}
 
 	// Arm Requirements: mission
-	if (arm_requirements & ARM_REQ_MISSION_BIT) {
+	if (arm_requirements.mission) {
 
 		if (!status_flags.condition_auto_mission_available) {
 			if (prearm_ok && reportFailures) {
@@ -949,7 +949,7 @@ bool prearm_check(orb_advert_t *mavlink_log_pub, const vehicle_status_flags_s &s
 	}
 
 	// Arm Requirements: global position
-	if (arm_requirements & ARM_REQ_GPS_BIT) {
+	if (arm_requirements.global_position_estimate) {
 
 		if (!status_flags.condition_global_position_valid) {
 			if (prearm_ok && reportFailures) {
@@ -972,7 +972,7 @@ bool prearm_check(orb_advert_t *mavlink_log_pub, const vehicle_status_flags_s &s
 
 	// Arm Requirements: authorization
 	// check last, and only if everything else has passed
-	if ((arm_requirements & ARM_REQ_ARM_AUTH_BIT) && prearm_ok) {
+	if ((arm_requirements.authorization) && prearm_ok) {
 		if (arm_auth_check() != vehicle_command_ack_s::VEHICLE_RESULT_ACCEPTED) {
 			// feedback provided in arm_auth_check
 			prearm_ok = false;
