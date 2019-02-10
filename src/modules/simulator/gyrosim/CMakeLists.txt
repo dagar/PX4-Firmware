@@ -41,4 +41,6 @@ px4_add_module(
 		gyrosim.cpp
 	DEPENDS
 		modules__simulator
+		drivers_accelerometer
+		drivers_gyroscope
 )
