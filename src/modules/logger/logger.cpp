@@ -641,8 +641,8 @@ void Logger::add_default_topics()
 	add_topic("sensor_preflight", 200);
 	add_topic("system_power", 500);
 	add_topic("tecs_status", 200);
-	add_topic("trajectory_setpoint", 200);
 	add_topic("telemetry_status");
+	add_topic("trajectory_setpoint", 200);
 	add_topic("vehicle_air_data", 200);
 	add_topic("vehicle_attitude", 30);
 	add_topic("vehicle_attitude_setpoint", 100);
@@ -656,6 +656,7 @@ void Logger::add_default_topics()
 	add_topic("vehicle_rates_setpoint", 30);
 	add_topic("vehicle_status", 200);
 	add_topic("vehicle_status_flags");
+	add_topic("vehicle_thrust_setpoint", 100);
 	add_topic("vtol_vehicle_status", 200);
 	add_topic("wind_estimate", 200);
 

@@ -133,6 +133,7 @@ FixedwingAttitudeControl::FixedwingAttitudeControl() :
 	// subscriptions
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_att_sp_sub = orb_subscribe(ORB_ID(vehicle_attitude_setpoint));
+	_thrust_sp_sub = orb_subscribe(ORB_ID(vehicle_thrust_setpoint));
 	_vcontrol_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_manual_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
@@ -147,6 +148,7 @@ FixedwingAttitudeControl::~FixedwingAttitudeControl()
 {
 	orb_unsubscribe(_att_sub);
 	orb_unsubscribe(_att_sp_sub);
+	orb_unsubscribe(_thrust_sp_sub);
 	orb_unsubscribe(_vcontrol_mode_sub);
 	orb_unsubscribe(_params_sub);
 	orb_unsubscribe(_manual_sub);
@@ -319,7 +321,6 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 					_att_sp.pitch_body = -_manual.x * _parameters.man_pitch_max + _parameters.pitchsp_offset_rad;
 					_att_sp.pitch_body = math::constrain(_att_sp.pitch_body, -_parameters.man_pitch_max, _parameters.man_pitch_max);
 					_att_sp.yaw_body = 0.0f;
-					_att_sp.thrust_body[0] = _manual.z;
 
 					Quatf q(Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body));
 					q.copyTo(_att_sp.q_d);
@@ -334,6 +335,18 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 						_attitude_sp_pub = orb_advertise(_attitude_setpoint_id, &_att_sp);
 					}
 
+					_thrust_sp.thrust_body[0] = _manual.z;
+					_thrust_sp.timestamp = hrt_absolute_time();
+
+					if (_thrust_sp_pub != nullptr) {
+						/* publish the attitude rates setpoint */
+						orb_publish(_thrust_setpoint_id, _thrust_sp_pub, &_thrust_sp);
+
+					} else if (_thrust_setpoint_id) {
+						/* advertise the attitude rates setpoint */
+						_thrust_sp_pub = orb_advertise(_thrust_setpoint_id, &_thrust_sp);
+					}
+
 				} else if (_vcontrol_mode.flag_control_rates_enabled &&
 					   !_vcontrol_mode.flag_control_attitude_enabled) {
 
@@ -342,7 +355,6 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 					_rates_sp.roll = _manual.y * _parameters.acro_max_x_rate_rad;
 					_rates_sp.pitch = -_manual.x * _parameters.acro_max_y_rate_rad;
 					_rates_sp.yaw = _manual.r * _parameters.acro_max_z_rate_rad;
-					_rates_sp.thrust_body[0] = _manual.z;
 
 					if (_rate_sp_pub != nullptr) {
 						/* publish the attitude rates setpoint */
@@ -351,6 +363,18 @@ FixedwingAttitudeControl::vehicle_manual_poll()
 					} else {
 						/* advertise the attitude rates setpoint */
 						_rate_sp_pub = orb_advertise(ORB_ID(vehicle_rates_setpoint), &_rates_sp);
+					}
+
+					_thrust_sp.thrust_body[0] = _manual.z;
+					_thrust_sp.timestamp = hrt_absolute_time();
+
+					if (_thrust_sp_pub != nullptr) {
+						/* publish the attitude rates setpoint */
+						orb_publish(_thrust_setpoint_id, _thrust_sp_pub, &_thrust_sp);
+
+					} else if (_thrust_setpoint_id) {
+						/* advertise the attitude rates setpoint */
+						_thrust_sp_pub = orb_advertise(_thrust_setpoint_id, &_thrust_sp);
 					}
 
 				} else {
@@ -370,15 +394,22 @@ void
 FixedwingAttitudeControl::vehicle_attitude_setpoint_poll()
 {
 	/* check if there is a new setpoint */
+	bool att_sp_updated;
+	orb_check(_att_sp_sub, &att_sp_updated);
+
+	if (att_sp_updated) {
+		orb_copy(ORB_ID(vehicle_attitude_setpoint), _att_sp_sub, &_att_sp);
+	}
+}
+
+void
+FixedwingAttitudeControl::vehicle_thrust_setpoint_poll()
+{
 	bool updated = false;
-	orb_check(_att_sp_sub, &updated);
+	orb_check(_thrust_sp_sub, &updated);
 
 	if (updated) {
-		if (orb_copy(ORB_ID(vehicle_attitude_setpoint), _att_sp_sub, &_att_sp) == PX4_OK) {
-			_rates_sp.thrust_body[0] = _att_sp.thrust_body[0];
-			_rates_sp.thrust_body[1] = _att_sp.thrust_body[1];
-			_rates_sp.thrust_body[2] = _att_sp.thrust_body[2];
-		}
+		orb_copy(ORB_ID(vehicle_thrust_setpoint), _thrust_sp_sub, &_thrust_sp);
 	}
 }
 
@@ -386,10 +417,10 @@ void
 FixedwingAttitudeControl::vehicle_rates_setpoint_poll()
 {
 	/* check if there is a new setpoint */
-	bool updated = false;
-	orb_check(_rates_sp_sub, &updated);
+	bool rates_sp_updated = false;
+	orb_check(_rates_sp_sub, &rates_sp_updated);
 
-	if (updated) {
+	if (rates_sp_updated) {
 		orb_copy(ORB_ID(vehicle_rates_setpoint), _rates_sp_sub, &_rates_sp);
 
 		if (_parameters.vtol_type == vtol_type::TAILSITTER) {
@@ -437,6 +468,7 @@ FixedwingAttitudeControl::vehicle_status_poll()
 			if (_vehicle_status.is_vtol) {
 				_actuators_id = ORB_ID(actuator_controls_virtual_fw);
 				_attitude_setpoint_id = ORB_ID(fw_virtual_attitude_setpoint);
+				_thrust_setpoint_id = ORB_ID(fw_virtual_thrust_setpoint);
 
 				_parameter_handles.vtol_type = param_find("VT_TYPE");
 
@@ -445,6 +477,7 @@ FixedwingAttitudeControl::vehicle_status_poll()
 			} else {
 				_actuators_id = ORB_ID(actuator_controls_0);
 				_attitude_setpoint_id = ORB_ID(vehicle_attitude_setpoint);
+				_thrust_setpoint_id = ORB_ID(vehicle_thrust_setpoint);
 			}
 		}
 	}
@@ -606,6 +639,7 @@ void FixedwingAttitudeControl::run()
 
 			_airspeed_sub.update();
 			vehicle_attitude_setpoint_poll();
+			vehicle_thrust_setpoint_poll();
 			vehicle_control_mode_poll();
 			vehicle_manual_poll();
 			global_pos_poll();
@@ -791,8 +825,8 @@ void FixedwingAttitudeControl::run()
 						}
 
 						/* throttle passed through if it is finite and if no engine failure was detected */
-						_actuators.control[actuator_controls_s::INDEX_THROTTLE] = (PX4_ISFINITE(_att_sp.thrust_body[0])
-								&& !_vehicle_status.engine_failure) ? _att_sp.thrust_body[0] : 0.0f;
+						_actuators.control[actuator_controls_s::INDEX_THROTTLE] = (PX4_ISFINITE(_thrust_sp.thrust_body[0])
+								&& !_vehicle_status.engine_failure) ? _thrust_sp.thrust_body[0] : 0.0f;
 
 						/* scale effort by battery status */
 						if (_parameters.bat_scale_en &&
@@ -853,8 +887,8 @@ void FixedwingAttitudeControl::run()
 					float yaw_u = _yaw_ctrl.control_bodyrate(control_input);
 					_actuators.control[actuator_controls_s::INDEX_YAW] = (PX4_ISFINITE(yaw_u)) ? yaw_u + trim_yaw : trim_yaw;
 
-					_actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_rates_sp.thrust_body[0]) ?
-							_rates_sp.thrust_body[0] : 0.0f;
+					_actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_thrust_sp.thrust_body[0]) ?
+							_thrust_sp.thrust_body[0] : 0.0f;
 				}
 
 				rate_ctrl_status_s rate_ctrl_status;
