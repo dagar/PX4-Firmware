@@ -39,6 +39,7 @@ set(geometry_files
 	hex_t.toml
 	hex_x.toml
 	octa_cox.toml
+	octa_cox_omni.toml
 	octa_cox_wide.toml
 	octa_plus.toml
 	octa_x.toml
@@ -77,11 +78,14 @@ add_custom_target(mixer_gen DEPENDS mixer_multirotor.generated.h ${CMAKE_CURRENT
 
 # 6DOF mixers
 add_custom_command(
-	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mixer_multirotor_6dof.generated.h
+	OUTPUT
+		${CMAKE_CURRENT_BINARY_DIR}/mixer_multirotor_6dof.generated.h
+		${CMAKE_CURRENT_BINARY_DIR}/mixer_multirotor_6dof_normalized.generated.h
 	COMMAND ${PYTHON_EXECUTABLE} ${MIXER_TOOLS}/px_generate_mixers.py --sixdof -f ${geometries_list} -o mixer_multirotor_6dof.generated.h
+	COMMAND ${PYTHON_EXECUTABLE} ${MIXER_TOOLS}/px_generate_mixers.py --sixdof --normalize -f ${geometries_list} -o mixer_multirotor_6dof_normalized.generated.h
 	DEPENDS ${MIXER_TOOLS}/px_generate_mixers.py ${geometries_list}
 	)
-add_custom_target(mixer_gen_6dof DEPENDS mixer_multirotor_6dof.generated.h)
+add_custom_target(mixer_gen_6dof DEPENDS mixer_multirotor_6dof.generated.h mixer_multirotor_6dof_normalized.generated.h)
 
 add_library(mixer
 	mixer.cpp
@@ -90,6 +94,7 @@ add_library(mixer
 	mixer_load.c
 	mixer_multirotor.cpp
 	mixer_simple.cpp
+	mixer_multirotor_6dof.cpp
 )
 target_include_directories(mixer PRIVATE ${PX4_BINARY_DIR}/src/lib/mixer)
 

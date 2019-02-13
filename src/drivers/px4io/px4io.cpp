@@ -84,7 +84,7 @@
 #include <uORB/topics/rc_channels.h>
 #include <uORB/topics/servorail_status.h>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/multirotor_motor_limits.h>
+#include <uORB/topics/actuator_controls_status.h>
 
 #include <debug.h>
 
@@ -1922,11 +1922,11 @@ PX4IO::io_publish_pwm_outputs()
 
 	/* publish mixer status */
 	if (saturation_status.flags.valid) {
-		multirotor_motor_limits_s motor_limits;
+		actuator_controls_status_s motor_limits;
 		motor_limits.timestamp = hrt_absolute_time();
 		motor_limits.saturation_status = saturation_status.value;
 
-		orb_publish_auto(ORB_ID(multirotor_motor_limits), &_to_mixer_status, &motor_limits, &instance, ORB_PRIO_DEFAULT);
+		orb_publish_auto(ORB_ID(actuator_controls_status), &_to_mixer_status, &motor_limits, &instance, ORB_PRIO_DEFAULT);
 	}
 
 	return OK;

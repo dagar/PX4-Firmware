@@ -60,7 +60,7 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
-#include <uORB/topics/multirotor_motor_limits.h>
+#include <uORB/topics/actuator_controls_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/safety.h>
 
@@ -1255,11 +1255,12 @@ PX4FMU::cycle()
 				saturation_status.value = _mixers->get_saturation_status();
 
 				if (saturation_status.flags.valid) {
-					multirotor_motor_limits_s motor_limits;
+					actuator_controls_status_s motor_limits;
 					motor_limits.timestamp = hrt_absolute_time();
 					motor_limits.saturation_status = saturation_status.value;
 
-					orb_publish_auto(ORB_ID(multirotor_motor_limits), &_to_mixer_status, &motor_limits, &_class_instance, ORB_PRIO_DEFAULT);
+					orb_publish_auto(ORB_ID(actuator_controls_status), &_to_mixer_status, &motor_limits, &_class_instance,
+							 ORB_PRIO_DEFAULT);
 				}
 
 				_mixers->set_airmode(_airmode);

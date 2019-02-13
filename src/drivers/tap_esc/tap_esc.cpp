@@ -54,7 +54,7 @@
 #include <uORB/topics/test_motor.h>
 #include <uORB/topics/input_rc.h>
 #include <uORB/topics/esc_status.h>
-#include <uORB/topics/multirotor_motor_limits.h>
+#include <uORB/topics/actuator_controls_status.h>
 #include <uORB/topics/parameter_update.h>
 
 #include <drivers/drv_hrt.h>
@@ -332,8 +332,8 @@ int TAP_ESC::init()
 	/* advertise the mixed control outputs, insist on the first group output */
 	_outputs_pub = orb_advertise(ORB_ID(actuator_outputs), &_outputs);
 	_esc_feedback_pub = orb_advertise(ORB_ID(esc_status), &_esc_feedback);
-	multirotor_motor_limits_s multirotor_motor_limits = {};
-	_to_mixer_status = orb_advertise(ORB_ID(multirotor_motor_limits), &multirotor_motor_limits);
+	actuator_controls_status_s actuator_controls_status = {};
+	_to_mixer_status = orb_advertise(ORB_ID(actuator_controls_status), &actuator_controls_status);
 
 	_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
 	_test_motor_sub = orb_subscribe(ORB_ID(test_motor));
@@ -456,10 +456,10 @@ void TAP_ESC::cycle()
 			_outputs.noutputs = num_outputs;
 
 			/* publish mixer status */
-			multirotor_motor_limits_s multirotor_motor_limits = {};
-			multirotor_motor_limits.saturation_status = _mixers->get_saturation_status();
+			actuator_controls_status_s actuator_controls_status = {};
+			actuator_controls_status.saturation_status = _mixers->get_saturation_status();
 
-			orb_publish(ORB_ID(multirotor_motor_limits), _to_mixer_status, &multirotor_motor_limits);
+			orb_publish(ORB_ID(actuator_controls_status), _to_mixer_status, &actuator_controls_status);
 
 			/* disable unused ports by setting their output to NaN */
 			for (size_t i = num_outputs; i < sizeof(_outputs.output) / sizeof(_outputs.output[0]); i++) {

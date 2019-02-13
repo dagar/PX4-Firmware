@@ -57,10 +57,13 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
 #include <uORB/topics/landing_gear.h>
+#include <uORB/topics/actuator_controls_status.h>
 
 #include <float.h>
-#include <mathlib/mathlib.h>
-#include <systemlib/mavlink_log.h>
+
+#include <lib/mathlib/mathlib.h>
+#include <lib/mixer/mixer.h>
+#include <lib/systemlib/mavlink_log.h>
 
 #include <controllib/blocks.hpp>
 
@@ -120,6 +123,7 @@ private:
 	int		_vehicle_status_sub{-1};		/**< vehicle status subscription */
 	int		_vehicle_land_detected_sub{-1};	/**< vehicle land detected subscription */
 	int		_control_mode_sub{-1};		/**< vehicle control mode subscription */
+	int		_actuator_controls_status_sub{-1};		/**< motor limits subscription */
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_local_pos_sub{-1};			/**< vehicle local position */
 	int		_att_sub{-1};				/**< vehicle attitude */
@@ -151,7 +155,10 @@ private:
 	vehicle_trajectory_waypoint_s _traj_wp_avoidance{};		/**< trajectory waypoint */
 	vehicle_trajectory_waypoint_s _traj_wp_avoidance_desired{};	/**< desired waypoints, inputs to an obstacle avoidance module */
 	landing_gear_s _landing_gear{};
+
 	int8_t _old_landing_gear_position{landing_gear_s::GEAR_KEEP};
+
+	MultirotorMixer::saturation_status _saturation_status{};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MPC_TKO_RAMP_T>) _takeoff_ramp_time, /**< time constant for smooth takeoff ramp */
@@ -481,6 +488,15 @@ MulticopterPositionControl::poll_subscriptions()
 
 	if (updated) {
 		orb_copy(ORB_ID(vehicle_trajectory_waypoint), _traj_wp_avoidance_sub, &_traj_wp_avoidance);
+	}
+
+	orb_check(_actuator_controls_status_sub, &updated);
+
+ 	if (updated) {
+		actuator_controls_status_s actuator_controls_status = {};
+		orb_copy(ORB_ID(actuator_controls_status), _actuator_controls_status_sub, &actuator_controls_status);
+
+ 		_saturation_status.value = actuator_controls_status.saturation_status;
 	}
 }
 

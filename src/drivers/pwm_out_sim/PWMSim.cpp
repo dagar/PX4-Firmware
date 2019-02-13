@@ -36,7 +36,7 @@
 #include <px4_time.h>
 #include <mathlib/mathlib.h>
 
-#include <uORB/topics/multirotor_motor_limits.h>
+#include <uORB/topics/actuator_controls_status.h>
 
 PWMSim::PWMSim() :
 	CDev(PWM_OUTPUT0_DEVICE_PATH),
@@ -285,12 +285,12 @@ PWMSim::run()
 			saturation_status.value = _mixers->get_saturation_status();
 
 			if (saturation_status.flags.valid) {
-				multirotor_motor_limits_s motor_limits;
+				actuator_controls_status_s motor_limits;
 				motor_limits.timestamp = hrt_absolute_time();
 				motor_limits.saturation_status = saturation_status.value;
 
 				int instance;
-				orb_publish_auto(ORB_ID(multirotor_motor_limits), &_mixer_status, &motor_limits, &instance, ORB_PRIO_DEFAULT);
+				orb_publish_auto(ORB_ID(actuator_controls_status), &_mixer_status, &motor_limits, &instance, ORB_PRIO_DEFAULT);
 			}
 
 			/* and publish for anyone that cares to see */

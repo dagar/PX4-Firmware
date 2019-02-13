@@ -207,7 +207,7 @@ float MultirotorMixer::compute_desaturation_gain(const float *desaturation_vecto
 
 			if (k > k_max) { k_max = k; }
 
-			sat_status.flags.motor_neg = true;
+			//sat_status.flags.motor_neg = true;
 		}
 
 		if (outputs[i] > max_output) {
@@ -217,7 +217,7 @@ float MultirotorMixer::compute_desaturation_gain(const float *desaturation_vecto
 
 			if (k > k_max) { k_max = k; }
 
-			sat_status.flags.motor_pos = true;
+			//sat_status.flags.motor_pos = true;
 		}
 	}
 
@@ -346,10 +346,10 @@ void MultirotorMixer::mix_yaw(float yaw, float *outputs)
 unsigned
 MultirotorMixer::mix(float *outputs, unsigned space)
 {
-	float roll    = math::constrain(get_control(0, 0) * _roll_scale, -1.0f, 1.0f);
-	float pitch   = math::constrain(get_control(0, 1) * _pitch_scale, -1.0f, 1.0f);
-	float yaw     = math::constrain(get_control(0, 2) * _yaw_scale, -1.0f, 1.0f);
-	float thrust  = math::constrain(get_control(0, 3), 0.0f, 1.0f);
+	float roll    = math::constrain(get_control(0, actuator_controls_s::INDEX_ROLL) * _roll_scale, -1.0f, 1.0f);
+	float pitch   = math::constrain(get_control(0, actuator_controls_s::INDEX_PITCH) * _pitch_scale, -1.0f, 1.0f);
+	float yaw     = math::constrain(get_control(0, actuator_controls_s::INDEX_YAW) * _yaw_scale, -1.0f, 1.0f);
+	float thrust  = math::constrain(get_control(0, actuator_controls_s::INDEX_THROTTLE), 0.0f, 1.0f);
 
 	// clean out class variable used to capture saturation
 	_saturation_status.value = 0;
@@ -384,6 +384,11 @@ MultirotorMixer::mix(float *outputs, unsigned space)
 
 		outputs[i] = math::constrain(_idle_speed + (outputs[i] * (1.0f - _idle_speed)), _idle_speed, 1.0f);
 	}
+
+	// Update saturation based on controlled axes
+	_saturation_status.flags.x_thrust_valid = false;
+	_saturation_status.flags.y_thrust_valid = false;
+	_saturation_status.flags.z_thrust_valid = true;
 
 	// Slew rate limiting and saturation checking
 	for (unsigned i = 0; i < _rotor_count; i++) {
@@ -468,10 +473,10 @@ MultirotorMixer::update_saturation_status(unsigned index, bool clipping_high, bo
 			_saturation_status.flags.yaw_neg = true;
 		}
 
-		// A positive change in thrust will increase saturation
-		_saturation_status.flags.thrust_pos = true;
-
+		// A negative change in Z thrust will increase saturation
+		_saturation_status.flags.z_thrust_neg = true;
 	}
+
 
 	// The motor is saturated at the lower limit
 	// check which control axes and which directions are contributing
@@ -506,9 +511,15 @@ MultirotorMixer::update_saturation_status(unsigned index, bool clipping_high, bo
 			_saturation_status.flags.yaw_pos = true;
 		}
 
-		// A negative change in thrust will increase saturation
-		_saturation_status.flags.thrust_neg = true;
+		// A positive change in Z thrust will increase saturation
+		_saturation_status.flags.z_thrust_pos = true;
 	}
+
+	// X and Y thrust are not controlled
+	_saturation_status.flags.x_thrust_pos = true;
+	_saturation_status.flags.x_thrust_neg = true;
+	_saturation_status.flags.y_thrust_pos = true;
+	_saturation_status.flags.y_thrust_neg = true;
 
 	_saturation_status.flags.valid = true;
 }
