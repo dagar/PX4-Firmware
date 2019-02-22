@@ -66,6 +66,7 @@ set(srcs
 	test_sensors.c
 	test_servo.c
 	test_sleep.c
+	test_List.cpp
 	test_smooth_z.cpp
 	test_tone.cpp
 	test_uart_baudchange.c
