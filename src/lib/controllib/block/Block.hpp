@@ -121,20 +121,20 @@ public:
 	{
 		Block::updateParams();
 
-		if (getChildren().getHead() != nullptr) { updateChildParams(); }
+		if (getChildren().front() != nullptr) { updateChildParams(); }
 	}
 
 	void updateSubscriptions() override
 	{
 		Block::updateSubscriptions();
 
-		if (getChildren().getHead() != nullptr) { updateChildSubscriptions(); }
+		if (getChildren().front() != nullptr) { updateChildSubscriptions(); }
 	}
 	void updatePublications() override
 	{
 		Block::updatePublications();
 
-		if (getChildren().getHead() != nullptr) { updateChildPublications(); }
+		if (getChildren().front() != nullptr) { updateChildPublications(); }
 	}
 
 protected:

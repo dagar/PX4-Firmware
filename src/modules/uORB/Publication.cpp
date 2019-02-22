@@ -92,7 +92,7 @@ PublicationNode::PublicationNode(const struct orb_metadata *meta, int priority, 
 	PublicationBase(meta, priority)
 {
 	if (list != nullptr) {
-		list->add(this);
+		list->push_front(this);
 	}
 }
 

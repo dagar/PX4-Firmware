@@ -47,9 +47,9 @@
  */
 void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge *> &list)
 {
-	list.add(new UavcanBarometerBridge(node));
-	list.add(new UavcanMagnetometerBridge(node));
-	list.add(new UavcanGnssBridge(node));
+	list.push_front(new UavcanBarometerBridge(node));
+	list.push_front(new UavcanMagnetometerBridge(node));
+	list.push_front(new UavcanGnssBridge(node));
 }
 
 /*

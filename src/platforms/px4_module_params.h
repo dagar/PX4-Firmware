@@ -59,7 +59,7 @@ public:
 	void setParent(ModuleParams *parent)
 	{
 		if (parent) {
-			parent->_children.add(this);
+			parent->_children.push_back(this);
 		}
 	}
 
@@ -78,11 +78,8 @@ protected:
 	 */
 	virtual void updateParams()
 	{
-		ModuleParams *child = _children.getHead();
-
-		while (child) {
+		for (const auto &child : _children) {
 			child->updateParams();
-			child = child->getSibling();
 		}
 
 		updateParamsImpl();
