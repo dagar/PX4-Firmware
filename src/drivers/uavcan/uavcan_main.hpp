@@ -189,7 +189,7 @@ private:
 	uavcan::GlobalTimeSyncSlave	_time_sync_slave;
 	uavcan::NodeStatusMonitor	_node_status_monitor;
 
-	List<IUavcanSensorBridge *>	_sensor_bridges;		///< List of active sensor bridges
+	IntrusiveList<IUavcanSensorBridge *>	_sensor_bridges;		///< List of active sensor bridges
 
 	MixerGroup			*_mixers = nullptr;
 	ITxQueueInjector		*_tx_injector;

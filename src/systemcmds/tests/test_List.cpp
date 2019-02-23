@@ -37,7 +37,7 @@
  */
 
 #include <unit_test.h>
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 #include <float.h>
 #include <math.h>
 

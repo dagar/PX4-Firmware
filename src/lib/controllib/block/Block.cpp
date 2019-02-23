@@ -53,7 +53,7 @@ Block::Block(SuperBlock *parent, const char *name) :
 	_parent(parent)
 {
 	if (getParent() != nullptr) {
-		getParent()->getChildren().add(this);
+		getParent()->getChildren().push_front(this);
 	}
 }
 
@@ -81,7 +81,7 @@ void Block::getName(char *buf, size_t n)
 
 void Block::updateParams()
 {
-	BlockParamBase *param = getParams().getHead();
+	BlockParamBase *param = getParams().front();
 	int count = 0;
 
 	while (param != nullptr) {
@@ -94,7 +94,7 @@ void Block::updateParams()
 
 		//printf("updating param: %s\n", param->getName());
 		param->update();
-		param = param->getSibling();
+		param = param->next();
 	}
 
 	updateParamsSubclass();
@@ -102,7 +102,7 @@ void Block::updateParams()
 
 void Block::updateSubscriptions()
 {
-	uORB::SubscriptionNode *sub = getSubscriptions().getHead();
+	uORB::SubscriptionNode *sub = getSubscriptions().front();
 	int count = 0;
 
 	while (sub != nullptr) {
@@ -114,13 +114,13 @@ void Block::updateSubscriptions()
 		}
 
 		sub->update();
-		sub = sub->getSibling();
+		sub = sub->next();
 	}
 }
 
 void Block::updatePublications()
 {
-	uORB::PublicationNode *pub = getPublications().getHead();
+	uORB::PublicationNode *pub = getPublications().front();
 	int count = 0;
 
 	while (pub != nullptr) {
@@ -132,14 +132,14 @@ void Block::updatePublications()
 		}
 
 		pub->update();
-		pub = pub->getSibling();
+		pub = pub->next();
 	}
 }
 
 void SuperBlock::setDt(float dt)
 {
 	Block::setDt(dt);
-	Block *child = getChildren().getHead();
+	Block *child = getChildren().front();
 	int count = 0;
 
 	while (child != nullptr) {
@@ -151,13 +151,13 @@ void SuperBlock::setDt(float dt)
 		}
 
 		child->setDt(dt);
-		child = child->getSibling();
+		child = child->next();
 	}
 }
 
 void SuperBlock::updateChildParams()
 {
-	Block *child = getChildren().getHead();
+	Block *child = getChildren().front();
 	int count = 0;
 
 	while (child != nullptr) {
@@ -169,13 +169,13 @@ void SuperBlock::updateChildParams()
 		}
 
 		child->updateParams();
-		child = child->getSibling();
+		child = child->next();
 	}
 }
 
 void SuperBlock::updateChildSubscriptions()
 {
-	Block *child = getChildren().getHead();
+	Block *child = getChildren().front();
 	int count = 0;
 
 	while (child != nullptr) {
@@ -187,13 +187,13 @@ void SuperBlock::updateChildSubscriptions()
 		}
 
 		child->updateSubscriptions();
-		child = child->getSibling();
+		child = child->next();
 	}
 }
 
 void SuperBlock::updateChildPublications()
 {
-	Block *child = getChildren().getHead();
+	Block *child = getChildren().front();
 	int count = 0;
 
 	while (child != nullptr) {
@@ -205,12 +205,12 @@ void SuperBlock::updateChildPublications()
 		}
 
 		child->updatePublications();
-		child = child->getSibling();
+		child = child->next();
 	}
 }
 
 } // namespace control
 
-template class List<uORB::SubscriptionNode *>;
-template class List<uORB::PublicationNode *>;
-template class List<control::BlockParamBase *>;
+template class IntrusiveList<uORB::SubscriptionNode *>;
+template class IntrusiveList<uORB::PublicationNode *>;
+template class IntrusiveList<control::BlockParamBase *>;

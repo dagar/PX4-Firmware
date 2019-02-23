@@ -39,11 +39,11 @@
 
 #pragma once
 
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 
 #include "px4_param.h"
 
-class ModuleParams : public ListNode<ModuleParams *>
+class ModuleParams : public IntrusiveListNode<ModuleParams *>
 {
 public:
 
@@ -59,7 +59,7 @@ public:
 	void setParent(ModuleParams *parent)
 	{
 		if (parent) {
-			parent->_children.add(this);
+			parent->_children.push_front(this);
 		}
 	}
 
@@ -78,11 +78,8 @@ protected:
 	 */
 	virtual void updateParams()
 	{
-		ModuleParams *child = _children.getHead();
-
-		while (child) {
+		for (auto child : _children) {
 			child->updateParams();
-			child = child->getSibling();
 		}
 
 		updateParamsImpl();
@@ -95,5 +92,5 @@ protected:
 
 private:
 	/** @list _children The module parameter list of inheriting classes. */
-	List<ModuleParams *> _children;
+	IntrusiveList<ModuleParams *> _children;
 };

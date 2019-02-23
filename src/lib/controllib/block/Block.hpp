@@ -39,7 +39,7 @@
 
 #pragma once
 
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <controllib/block/BlockParam.hpp>
@@ -59,7 +59,7 @@ class SuperBlock;
 
 /**
  */
-class __EXPORT Block : public ListNode<Block *>
+class __EXPORT Block : public IntrusiveListNode<Block *>
 {
 public:
 	friend class BlockParamBase;
@@ -87,17 +87,17 @@ protected:
 	virtual void updateParamsSubclass() {}
 
 	SuperBlock *getParent() { return _parent; }
-	List<uORB::SubscriptionNode *> &getSubscriptions() { return _subscriptions; }
-	List<uORB::PublicationNode *> &getPublications() { return _publications; }
-	List<BlockParamBase *> &getParams() { return _params; }
+	IntrusiveList<uORB::SubscriptionNode *> &getSubscriptions() { return _subscriptions; }
+	IntrusiveList<uORB::PublicationNode *> &getPublications() { return _publications; }
+	IntrusiveList<BlockParamBase *> &getParams() { return _params; }
 
 	const char *_name;
 	SuperBlock *_parent;
 	float _dt{0.0f};
 
-	List<uORB::SubscriptionNode *> _subscriptions;
-	List<uORB::PublicationNode *> _publications;
-	List<BlockParamBase *> _params;
+	IntrusiveList<uORB::SubscriptionNode *> _subscriptions;
+	IntrusiveList<uORB::PublicationNode *> _publications;
+	IntrusiveList<BlockParamBase *> _params;
 };
 
 class __EXPORT SuperBlock :
@@ -121,29 +121,29 @@ public:
 	{
 		Block::updateParams();
 
-		if (getChildren().getHead() != nullptr) { updateChildParams(); }
+		if (getChildren().front() != nullptr) { updateChildParams(); }
 	}
 
 	void updateSubscriptions() override
 	{
 		Block::updateSubscriptions();
 
-		if (getChildren().getHead() != nullptr) { updateChildSubscriptions(); }
+		if (getChildren().front() != nullptr) { updateChildSubscriptions(); }
 	}
 	void updatePublications() override
 	{
 		Block::updatePublications();
 
-		if (getChildren().getHead() != nullptr) { updateChildPublications(); }
+		if (getChildren().front() != nullptr) { updateChildPublications(); }
 	}
 
 protected:
-	List<Block *> &getChildren() { return _children; }
+	IntrusiveList<Block *> &getChildren() { return _children; }
 	void updateChildParams();
 	void updateChildSubscriptions();
 	void updateChildPublications();
 
-	List<Block *> _children;
+	IntrusiveList<Block *> _children;
 };
 
 

@@ -38,7 +38,7 @@
 
 #include <lib/cdev/CDev.hpp>
 
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 
 namespace uORB
 {
@@ -50,7 +50,7 @@ class Manager;
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public cdev::CDev, public ListNode<uORB::DeviceNode *>
+class uORB::DeviceNode : public cdev::CDev, public IntrusiveListNode<uORB::DeviceNode *>
 {
 public:
 	DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path, uint8_t priority,

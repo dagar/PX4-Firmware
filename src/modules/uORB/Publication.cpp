@@ -88,11 +88,12 @@ bool PublicationBase::update(void *data)
 	return updated;
 }
 
-PublicationNode::PublicationNode(const struct orb_metadata *meta, int priority, List<PublicationNode *> *list) :
+PublicationNode::PublicationNode(const struct orb_metadata *meta, int priority,
+				 IntrusiveList<PublicationNode *> *list) :
 	PublicationBase(meta, priority)
 {
 	if (list != nullptr) {
-		list->add(this);
+		list->push_front(this);
 	}
 }
 

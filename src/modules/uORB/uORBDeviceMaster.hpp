@@ -48,7 +48,7 @@ class Manager;
 #include <string.h>
 #include <stdlib.h>
 
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 
 /**
  * Master control device for ObjDev.
@@ -110,7 +110,7 @@ private:
 	 */
 	uORB::DeviceNode *getDeviceNodeLocked(const struct orb_metadata *meta, const uint8_t instance);
 
-	List<uORB::DeviceNode *> _node_list;
+	IntrusiveList<uORB::DeviceNode *> _node_list;
 
 	hrt_abstime       _last_statistics_output;
 

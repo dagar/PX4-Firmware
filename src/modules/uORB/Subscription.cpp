@@ -97,11 +97,11 @@ SubscriptionBase::~SubscriptionBase()
 }
 
 SubscriptionNode::SubscriptionNode(const struct orb_metadata *meta, unsigned interval, unsigned instance,
-				   List<SubscriptionNode *> *list)
+				   IntrusiveList<SubscriptionNode *> *list)
 	: SubscriptionBase(meta, interval, instance)
 {
 	if (list != nullptr) {
-		list->add(this);
+		list->push_front(this);
 	}
 }
 

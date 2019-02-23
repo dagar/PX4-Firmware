@@ -39,7 +39,7 @@
 #pragma once
 
 #include <uORB/uORB.h>
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 #include <systemlib/err.h>
 
 namespace uORB
@@ -93,7 +93,7 @@ typedef PublicationBase PublicationTiny;
 /**
  * The publication base class as a list node.
  */
-class __EXPORT PublicationNode : public PublicationBase, public ListNode<PublicationNode *>
+class __EXPORT PublicationNode : public PublicationBase, public IntrusiveListNode<PublicationNode *>
 {
 public:
 	/**
@@ -105,7 +105,7 @@ public:
 	 * @param list A list interface for adding to
 	 * 	list during construction
 	 */
-	PublicationNode(const struct orb_metadata *meta, int priority = -1, List<PublicationNode *> *list = nullptr);
+	PublicationNode(const struct orb_metadata *meta, int priority = -1, IntrusiveList<PublicationNode *> *list = nullptr);
 	virtual ~PublicationNode() override = default;
 
 	/**
@@ -131,7 +131,7 @@ public:
 	 * @param list A list interface for adding to
 	 * 	list during construction
 	 */
-	Publication(const struct orb_metadata *meta, int priority = -1, List<PublicationNode *> *list = nullptr)  :
+	Publication(const struct orb_metadata *meta, int priority = -1, IntrusiveList<PublicationNode *> *list = nullptr)  :
 		PublicationNode(meta, priority, list),
 		_data()
 	{

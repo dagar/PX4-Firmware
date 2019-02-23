@@ -41,7 +41,7 @@
 
 #include <cstring>
 
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 
 namespace control
 {
@@ -74,7 +74,7 @@ BlockParamBase::BlockParamBase(Block *parent, const char *name, bool parent_pref
 			fullname[sizeof(fullname) - 1] = '\0';
 		}
 
-		parent->getParams().add(this);
+		parent->getParams().push_front(this);
 	}
 
 	_handle = param_find(fullname);

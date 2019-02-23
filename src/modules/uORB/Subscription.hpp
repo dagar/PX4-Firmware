@@ -39,7 +39,7 @@
 #pragma once
 
 #include <uORB/uORB.h>
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 #include <systemlib/err.h>
 #include <px4_defines.h>
 
@@ -104,7 +104,7 @@ typedef SubscriptionBase SubscriptionTiny;
 /**
  * The subscription base class as a list node.
  */
-class __EXPORT SubscriptionNode : public SubscriptionBase, public ListNode<SubscriptionNode *>
+class __EXPORT SubscriptionNode : public SubscriptionBase, public IntrusiveListNode<SubscriptionNode *>
 {
 public:
 	/**
@@ -119,7 +119,7 @@ public:
 	 * 	that this should be appended to.
 	 */
 	SubscriptionNode(const struct orb_metadata *meta, unsigned interval = 0, unsigned instance = 0,
-			 List<SubscriptionNode *> *list = nullptr);
+			 IntrusiveList<SubscriptionNode *> *list = nullptr);
 
 	virtual ~SubscriptionNode() override = default;
 
@@ -154,7 +154,7 @@ public:
 	 * 	list during construction
 	 */
 	Subscription(const struct orb_metadata *meta, unsigned interval = 0, unsigned instance = 0,
-		     List<SubscriptionNode *> *list = nullptr):
+		     IntrusiveList<SubscriptionNode *> *list = nullptr):
 		SubscriptionNode(meta, interval, instance, list),
 		_data() // initialize data structure to zero
 	{

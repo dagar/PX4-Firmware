@@ -37,7 +37,7 @@
 
 #pragma once
 
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 #include <uavcan/uavcan.hpp>
 #include <drivers/device/device.h>
 #include <drivers/drv_orb_dev.h>
@@ -46,7 +46,7 @@
 /**
  * A sensor bridge class must implement this interface.
  */
-class IUavcanSensorBridge : uavcan::Noncopyable, public ListNode<IUavcanSensorBridge *>
+class IUavcanSensorBridge : uavcan::Noncopyable, public IntrusiveListNode<IUavcanSensorBridge *>
 {
 public:
 	static constexpr unsigned MAX_NAME_LEN = 20;
@@ -78,7 +78,7 @@ public:
 	 * Sensor bridge factory.
 	 * Creates all known sensor bridges and puts them in the linked list.
 	 */
-	static void make_all(uavcan::INode &node, List<IUavcanSensorBridge *> &list);
+	static void make_all(uavcan::INode &node, IntrusiveList<IUavcanSensorBridge *> &list);
 };
 
 /**

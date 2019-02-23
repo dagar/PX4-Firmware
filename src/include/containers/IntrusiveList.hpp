@@ -32,9 +32,9 @@
  ****************************************************************************/
 
 /**
- * @file List.hpp
+ * @file IntrusiveList.hpp
  *
- * A linked list.
+ * An intrusive linked list.
  */
 
 #pragma once
@@ -42,18 +42,15 @@
 #include <stdlib.h>
 
 template<typename T>
-class ListNode
+class IntrusiveListNode
 {
 public:
 
-	template<typename ...Args>
-	ListNode(Args &&... args) : _data(args...) {}
+	T next() const { return _next; }
+	T prev() const { return _prev; }
 
-	ListNode<T> *next() const { return _next; }
-	ListNode<T> *prev() const { return _prev; }
-
-	void setNext(ListNode<T> *next) { _next = next; }
-	void setPrev(ListNode<T> *prev) { _prev = prev; }
+	void setNext(T next) { _next = next; }
+	void setPrev(T prev) { _prev = prev; }
 
 	// join prev and next
 	void remove()
@@ -69,35 +66,24 @@ public:
 		}
 	}
 
-	//T *data() { return &_data; }
-	T &data() { return _data; }
-
-	//operator T &() { return _data; }
-
 private:
 
-	T _data;
-
-	ListNode<T> *_next{nullptr};
-	ListNode<T> *_prev{nullptr};
+	T _prev{nullptr};
+	T _next{nullptr};
 };
 
 template<typename T>
-class List
+class IntrusiveList
 {
 public:
-
-	List() = default;
-	~List() { clear(); }
 
 	class Iterator
 	{
 	public:
-		explicit Iterator(ListNode<T> *node): _node(node) {}
+		explicit Iterator(T node): _node(node) {}
 		Iterator() = delete;
 
-		T *operator*() { return &_node->data(); }
-
+		T operator*() { return _node; }
 		bool operator!=(const Iterator &it) const { return value() != it.value(); }
 
 		Iterator &operator++()
@@ -106,48 +92,36 @@ public:
 			return *this;
 		}
 
-		const ListNode<T> *value() const { return _node; }
+		Iterator &operator--()
+		{
+			_node = _node->prev();
+			return *this;
+		}
+
+		const T &value() const { return _node; }
 
 	private:
-		ListNode<T> *_node;
+		T _node;
 	};
 
 	Iterator begin() { return Iterator{front()}; }
 	Iterator end() { return Iterator{back()}; }
 
-	template<typename ...Args>
-	T emplace_front(Args &&... args)
+	void push_front(T newNode)
 	{
-		ListNode<T> *newNode = new ListNode<T>(args...);
 		newNode->setNext(front());
 		newNode->setPrev(nullptr);
 		_head = newNode;
-
-		return newNode->data();
 	}
 
-	template<typename ...Args>
-	T emplace_back(Args &&... args)
+	void push_back(T newNode)
 	{
-		ListNode<T> *newNode = new ListNode<T>(args...);
 		newNode->setNext(nullptr);
 		newNode->setPrev(back());
 		_tail = newNode;
-
-		return newNode->data();
 	}
 
-	void pop_back()
-	{
-		if (_tail != nullptr) {
-			ListNode<T> *oldTail = _tail;
-			_tail = _tail->prev();
-			_tail->setNext(nullptr);
-			delete oldTail;
-		}
-	}
-
-	void removeNode(ListNode<T> &node)
+	void remove(const T node)
 	{
 		if (_head == node) {
 			_head = _head->next();
@@ -157,13 +131,7 @@ public:
 			_tail = _tail->prev();
 		}
 
-		node.remove();
-	}
-
-	void deleteNode(ListNode<T> *node)
-	{
-		removeNode(node);
-		delete node;
+		node->remove();
 	}
 
 	bool empty() const { return _head == nullptr; }
@@ -180,28 +148,12 @@ public:
 		return i;
 	}
 
-	void clear()
-	{
-		const size_t sz = size();
-
-		ListNode<T> *node = _head;
-
-		for (size_t i = 0; i < sz; i++) {
-			ListNode<T> *next = node->next();
-			delete node;
-			node = next;
-		}
-
-		_head = nullptr;
-		_tail = nullptr;
-	}
-
-	ListNode<T> *front() const { return _head; }
-	ListNode<T> *back() const { return _tail; }
+	T front() const { return _head; }
+	T back() const { return _tail; }
 
 protected:
 
-	ListNode<T> *_head{nullptr};
-	ListNode<T> *_tail{nullptr};
+	T _head{nullptr};
+	T _tail{nullptr};
 
 };

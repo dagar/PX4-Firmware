@@ -41,7 +41,7 @@
 
 #include "Block.hpp"
 
-#include <containers/List.hpp>
+#include <containers/IntrusiveList.hpp>
 #include <px4_defines.h>
 #include <parameters/param.h>
 
@@ -51,7 +51,7 @@ namespace control
 class Block;
 
 // A base class for block params that enables traversing linked list.
-class BlockParamBase : public ListNode<BlockParamBase *>
+class BlockParamBase : public IntrusiveListNode<BlockParamBase *>
 {
 public:
 	/**
