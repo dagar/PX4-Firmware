@@ -48,6 +48,7 @@ set(srcs
 	test_int.cpp
 	test_jig_voltages.c
 	test_led.c
+	test_List.cpp
 	test_mathlib.cpp
 	test_matrix.cpp
 	test_microbench_hrt.cpp
@@ -61,12 +62,12 @@ set(srcs
 	test_perf.c
 	test_ppm.cpp
 	test_ppm_loopback.c
+	test_Queue.cpp
 	test_rc.c
 	test_search_min.cpp
 	test_sensors.c
 	test_servo.c
 	test_sleep.c
-	test_List.cpp
 	test_smooth_z.cpp
 	test_tone.cpp
 	test_uart_baudchange.c

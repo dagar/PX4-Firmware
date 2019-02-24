@@ -28,6 +28,7 @@ set(tests
 	param
 	parameters
 	perf
+	Queue
 	rc
 	search_min
 	servo
