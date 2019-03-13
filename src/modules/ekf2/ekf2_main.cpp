@@ -124,6 +124,7 @@ private:
 	template<typename Param>
 	bool update_mag_decl(Param &mag_decl_param);
 	bool publish_attitude(const sensor_combined_s &sensors, const hrt_abstime &now);
+	void publish_odometry(const vehicle_local_position_s &lpos, const sensor_combined_s &sensors);
 	bool publish_wind_estimate(const hrt_abstime &timestamp);
 
 	const Vector3f get_vel_body_wind();
@@ -284,6 +285,7 @@ private:
 	int _gps_orb_instance{-1};
 
 	orb_advert_t _att_pub{nullptr};
+	orb_advert_t _odometry_pub{nullptr};
 	orb_advert_t _wind_pub{nullptr};
 	orb_advert_t _estimator_status_pub{nullptr};
 	orb_advert_t _ekf_gps_drift_pub{nullptr};
@@ -294,7 +296,6 @@ private:
 
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
 	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
-	uORB::Publication<vehicle_odometry_s> _vehicle_odometry_pub;
 
 	Ekf _ekf;
 
@@ -522,7 +523,6 @@ Ekf2::Ekf2():
 	_perf_ekf_update(perf_alloc_once(PC_ELAPSED, "EKF2 update")),
 	_vehicle_local_position_pub(ORB_ID(vehicle_local_position)),
 	_vehicle_global_position_pub(ORB_ID(vehicle_global_position)),
-	_vehicle_odometry_pub(ORB_ID(vehicle_odometry)),
 	_params(_ekf.getParamHandle()),
 	_obs_dt_min_ms(_params->sensor_interval_min_ms),
 	_mag_delay_ms(_params->mag_delay_ms),
@@ -1308,13 +1308,7 @@ void Ekf2::run()
 				// generate vehicle local position data
 				vehicle_local_position_s &lpos = _vehicle_local_position_pub.get();
 
-				// generate vehicle odometry data
-				vehicle_odometry_s &odom = _vehicle_odometry_pub.get();
-
 				lpos.timestamp = now;
-				odom.timestamp = lpos.timestamp;
-
-				odom.local_frame = odom.LOCAL_FRAME_NED;
 
 				// Position of body origin in local NED frame
 				float position[3];
@@ -1325,10 +1319,6 @@ void Ekf2::run()
 				lpos.y = (_ekf.local_position_is_valid()) ? position[1] : 0.0f;
 				lpos.z = position[2];
 
-				// Vehicle odometry position
-				odom.x = lpos.x;
-				odom.y = lpos.y;
-				odom.z = lpos.z;
 
 				// Velocity of body origin in local NED frame (m/s)
 				float velocity[3];
@@ -1336,11 +1326,6 @@ void Ekf2::run()
 				lpos.vx = velocity[0];
 				lpos.vy = velocity[1];
 				lpos.vz = velocity[2];
-
-				// Vehicle odometry linear velocity
-				odom.vx = lpos.vx;
-				odom.vy = lpos.vy;
-				odom.vz = lpos.vz;
 
 				// vertical position time derivative (m/s)
 				_ekf.get_pos_d_deriv(&lpos.z_deriv);
@@ -1369,25 +1354,14 @@ void Ekf2::run()
 
 				if (ekf_origin_valid && (origin_time > lpos.ref_timestamp)) {
 					lpos.ref_timestamp = origin_time;
-					lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
-					lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
+					lpos.ref_lat = math::degrees(ekf_origin.lat_rad); // Reference point latitude in degrees
+					lpos.ref_lon = math::degrees(ekf_origin.lon_rad); // Reference point longitude in degrees
 				}
 
 				// The rotation of the tangent plane vs. geographical north
-				matrix::Quatf q;
-				_ekf.copy_quaternion(q.data());
+				const matrix::Quatf q{_ekf.get_quaternion()};
 
 				lpos.yaw = matrix::Eulerf(q).psi();
-
-				// Vehicle odometry quaternion
-				q.copyTo(odom.q);
-
-				// Vehicle odometry angular rates
-				float gyro_bias[3];
-				_ekf.get_gyro_bias(gyro_bias);
-				odom.rollspeed = sensors.gyro_rad[0] - gyro_bias[0];
-				odom.pitchspeed = sensors.gyro_rad[1] - gyro_bias[1];
-				odom.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
 
 				lpos.dist_bottom_valid = _ekf.get_terrain_valid();
 
@@ -1431,24 +1405,10 @@ void Ekf2::run()
 					lpos.hagl_max = INFINITY;
 				}
 
-				// get the position and orientation covariances and fill the pose covariance matrix
-				// it's not a cross-covariance matrix but simplifies propagating the data
-				matrix::SquareMatrix<float, 6> pose_cov = matrix::eye<float, 6>();
-				pose_cov.set(_ekf.position_covariances(), 0, 0);
-				pose_cov.set(propagate_covariances_from_quat_to_euler(q, _ekf.orientation_covariances()), 3, 3);
-				pose_cov.upper_right_triangle().copyTo(odom.pose_covariance);
-
-				// get the velocity covariances
-				// note: unknown angular velocity covariance matrix - diag set to NaN
-				matrix::SquareMatrix<float, 6> vel_cov = matrix::diag<float, 6>(matrix::nans<6, 1>());
-				vel_cov.set(_ekf.velocity_covariances(), 0, 0);
-				vel_cov.upper_right_triangle().copyTo(odom.velocity_covariance);
-
 				// publish vehicle local position data
 				_vehicle_local_position_pub.update();
 
-				// publish vehicle odometry data
-				_vehicle_odometry_pub.update();
+				publish_odometry(lpos, sensors);
 
 				if (_ekf.global_position_is_valid() && !_preflt_fail) {
 					// generate and publish global position data
@@ -1790,8 +1750,7 @@ bool Ekf2::publish_attitude(const sensor_combined_s &sensors, const hrt_abstime 
 		vehicle_attitude_s att;
 		att.timestamp = now;
 
-		const Quatf q{_ekf.calculate_quaternion()};
-		q.copyTo(att.q);
+		_ekf.calculate_quaternion().copyTo(att.q);
 
 		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
 
@@ -1817,6 +1776,53 @@ bool Ekf2::publish_attitude(const sensor_combined_s &sensors, const hrt_abstime 
 	}
 
 	return false;
+}
+
+void Ekf2::publish_odometry(const vehicle_local_position_s &lpos, const sensor_combined_s &sensors)
+{
+	// generate vehicle odometry data
+	vehicle_odometry_s odom{};
+
+	odom.timestamp = lpos.timestamp;
+	odom.local_frame = odom.LOCAL_FRAME_NED;
+
+	// Vehicle odometry position
+	odom.x = lpos.x;
+	odom.y = lpos.y;
+	odom.z = lpos.z;
+
+	// Vehicle odometry linear velocity
+	odom.vx = lpos.vx;
+	odom.vy = lpos.vy;
+	odom.vz = lpos.vz;
+
+	// Vehicle odometry quaternion
+	const matrix::Quatf q{_ekf.get_quaternion()};
+	q.copyTo(odom.q);
+
+	// Vehicle odometry angular rates
+	float gyro_bias[3];
+	_ekf.get_gyro_bias(gyro_bias);
+	odom.rollspeed = sensors.gyro_rad[0] - gyro_bias[0];
+	odom.pitchspeed = sensors.gyro_rad[1] - gyro_bias[1];
+	odom.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
+
+	// get the position and orientation covariances and fill the pose covariance matrix
+	// it's not a cross-covariance matrix but simplifies propagating the data
+	matrix::SquareMatrix<float, 6> pose_cov = matrix::eye<float, 6>();
+	pose_cov.set(_ekf.position_covariances(), 0, 0);
+	pose_cov.set(propagate_covariances_from_quat_to_euler(q, _ekf.orientation_covariances()), 3, 3);
+	pose_cov.upper_right_triangle().copyTo(odom.pose_covariance);
+
+	// get the velocity covariances
+	// note: unknown angular velocity covariance matrix - diag set to NaN
+	matrix::SquareMatrix<float, 6> vel_cov = matrix::diag<float, 6>(matrix::nans<6, 1>());
+	vel_cov.set(_ekf.velocity_covariances(), 0, 0);
+	vel_cov.upper_right_triangle().copyTo(odom.velocity_covariance);
+
+	// publish vehicle odometry data
+	int instance;
+	orb_publish_auto(ORB_ID(vehicle_odometry), &_odometry_pub, &odom, &instance, ORB_PRIO_HIGH);
 }
 
 bool Ekf2::publish_wind_estimate(const hrt_abstime &timestamp)
@@ -1849,9 +1855,8 @@ const Vector3f Ekf2::get_vel_body_wind()
 {
 	// Used to correct baro data for positional errors
 
-	matrix::Quatf q;
-	_ekf.copy_quaternion(q.data());
-	matrix::Dcmf R_to_body(q.inversed());
+	const matrix::Quatf q{_ekf.get_quaternion()};
+	const matrix::Dcmf R_to_body(q.inversed());
 
 	// Calculate wind-compensated velocity in body frame
 	// Velocity of body origin in local NED frame (m/s)
@@ -2539,7 +2544,7 @@ int Ekf2::task_spawn(int argc, char *argv[])
 	_task_id = px4_task_spawn_cmd("ekf2",
 				      SCHED_DEFAULT,
 				      SCHED_PRIORITY_ESTIMATOR,
-				      6600,
+				      7100,
 				      (px4_main_t)&run_trampoline,
 				      (char *const *)argv);
 
