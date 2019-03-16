@@ -41,8 +41,9 @@
 
 #include <fcntl.h>
 
-
 #include "platform/cxxinitialize.h"
+
+#include <SEGGER/SEGGER_SYSVIEW.h>
 
 int px4_platform_init(void)
 {
@@ -59,6 +60,7 @@ int px4_platform_init(void)
 #  error platform is dependent on c++ both CONFIG_HAVE_CXX and CONFIG_HAVE_CXXINITIALIZE must be defined.
 #endif
 
+	SEGGER_SYSVIEW_Conf();
 
 #if !defined(CONFIG_DEV_CONSOLE) && defined(CONFIG_DEV_NULL)
 

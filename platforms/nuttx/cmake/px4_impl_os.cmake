@@ -64,6 +64,9 @@ function(px4_os_add_flags)
 		${PX4_BINARY_DIR}/NuttX/nuttx/arch/${CONFIG_ARCH}/src/common
 
 		${PX4_BINARY_DIR}/NuttX/apps/include
+
+		${PX4_SOURCE_DIR}/platforms/nuttx/src/segger
+		${PX4_SOURCE_DIR}/platforms/nuttx/src/segger/Config
 		)
 
 	# NuttX's disables inline below C99 (comiler.h), but __STDC_VERSION__ isn't set for C++

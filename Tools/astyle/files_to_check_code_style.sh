@@ -9,6 +9,8 @@ fi
 
 exec find boards src platforms \
     -path platforms/nuttx/NuttX -prune -o \
+    -path platforms/nuttx/src/segger/Config -prune -o \
+    -path platforms/nuttx/src/segger/SEGGER -prune -o \
     -path src/drivers/uavcan/libuavcan -prune -o \
     -path src/lib/DriverFramework -prune -o \
     -path src/lib/ecl -prune -o \
