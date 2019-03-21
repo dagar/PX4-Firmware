@@ -43,6 +43,7 @@ if (${PX4_PLATFORM} STREQUAL "nuttx")
 else()
 	list(APPEND SRCS_PLATFORM
 		posix/I2C.cpp
+		posix/SPI.cpp
 	)
 endif()
 

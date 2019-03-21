@@ -31,8 +31,10 @@
 #
 ############################################################################
 
-add_subdirectory(bbblue_adc)
+px4_add_git_submodule(TARGET librobotcontrol PATH "librobotcontrol")
+add_subdirectory(librobotcontrol)
 
+add_subdirectory(bbblue_adc)
 
 ############################################################################
 # Upload

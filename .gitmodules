@@ -58,3 +58,6 @@
 	path = cmake/configs/uavcan_board_ident
 	url = https://github.com/PX4/uavcan_board_ident.git
 	branch = master
+[submodule "boards/beaglebone/blue/librobotcontrol"]
+	path = boards/beaglebone/blue/librobotcontrol
+	url = https://github.com/dagar/librobotcontrol.git

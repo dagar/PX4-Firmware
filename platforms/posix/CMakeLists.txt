@@ -110,7 +110,7 @@ endif()
 
 
 if ("${PX4_BOARD}" MATCHES "beaglebone_blue")
-	target_link_libraries(px4 PRIVATE robotcontrol)
+	target_link_libraries(px4 PRIVATE robotics_cape)
 
 elseif ("${PX4_BOARD}" MATCHES "sitl")
 

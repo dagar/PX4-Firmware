@@ -16,6 +16,7 @@ px4_add_board(
 		distance_sensor # all available distance sensor drivers
 		gps
 		#imu # all available imu drivers
+		imu/adis16448
 		#magnetometer # all available magnetometer drivers
 		pwm_out_sim
 		#telemetry # all available telemetry drivers

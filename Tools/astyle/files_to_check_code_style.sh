@@ -8,6 +8,7 @@ if [ $# -gt 0 ]; then
 fi
 
 exec find boards src platforms \
+    -path boards/beaglebone/blue/librobotcontrol -prune -o \
     -path platforms/nuttx/NuttX -prune -o \
     -path src/drivers/uavcan/libuavcan -prune -o \
     -path src/lib/DriverFramework -prune -o \
