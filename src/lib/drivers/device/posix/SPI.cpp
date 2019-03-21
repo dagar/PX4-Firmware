@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,24 +47,27 @@
 
 #include "SPI.hpp"
 
-#include <px4_config.h>
-#include <nuttx/arch.h>
-
-#ifndef CONFIG_SPI_EXCHANGE
-# error This driver requires CONFIG_SPI_EXCHANGE
+#ifdef __PX4_LINUX
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <linux/types.h>
+#include <linux/spi/spidev.h>
 #endif
+
+#include <px4_config.h>
 
 namespace device
 {
 
 SPI::SPI(const char *name, const char *devname, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency) :
 	CDev(name, devname),
-	_dev(nullptr),
 	_device(device),
 	_mode(mode),
-	_frequency(frequency),
-	_locking_mode(LOCK_PREEMPTION)
+	_frequency(frequency)
 {
+	DEVICE_DEBUG("SPI::SPI name = %s devname = %s", name, devname);
+
 	// fill in _device_id fields for a SPI device
 	_device_id.devid_s.bus_type = DeviceBusType_SPI;
 	_device_id.devid_s.bus = bus;
@@ -75,160 +78,76 @@ SPI::SPI(const char *name, const char *devname, int bus, uint32_t device, enum s
 
 SPI::~SPI()
 {
-	// XXX no way to let go of the bus...
+	if (_fd >= 0) {
+		::close(_fd);
+		_fd = -1;
+	}
 }
 
 int
 SPI::init()
 {
-	int ret = OK;
+	// Assume the driver set the desired bus frequency. There is no standard
+	// way to set it from user space.
 
-	/* attach to the spi bus */
-	if (_dev == nullptr) {
-		int bus = get_device_bus();
+	// do base class init, which will create device node, etc
+	int ret = CDev::init();
 
-		if (!board_has_bus(BOARD_SPI_BUS, bus)) {
-			ret = -ENOENT;
-			goto out;
-		}
-
-		_dev = px4_spibus_initialize(bus);
+	if (ret != PX4_OK) {
+		DEVICE_DEBUG("CDev::init failed");
+		return ret;
 	}
 
-	if (_dev == nullptr) {
-		DEVICE_DEBUG("failed to init SPI");
-		ret = -ENOENT;
-		goto out;
-	}
+	// Open the actual SPI device
+	char dev_path[16];
+	snprintf(dev_path, sizeof(dev_path), "/dev/spi-%i", get_device_bus());
+	_fd = ::open(dev_path, O_RDWR);
 
-	/* deselect device to ensure high to low transition of pin select */
-	SPI_SELECT(_dev, _device, false);
-
-	/* call the probe function to check whether the device is present */
-	ret = probe();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("probe failed");
-		goto out;
-	}
-
-	/* do base class init, which will create the device node, etc. */
-	ret = CDev::init();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("cdev init failed");
-		goto out;
+	if (_fd < 0) {
+		PX4_ERR("could not open %s", dev_path);
+		return PX4_ERROR;
 	}
 
 	/* tell the workd where we are */
 	DEVICE_LOG("on SPI bus %d at %d (%u KHz)", get_device_bus(), PX4_SPI_DEV_ID(_device), _frequency / 1000);
 
-out:
 	return ret;
 }
 
 int
 SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 {
-	int result;
-
 	if ((send == nullptr) && (recv == nullptr)) {
 		return -EINVAL;
 	}
 
-	LockMode mode = up_interrupt_context() ? LOCK_NONE : _locking_mode;
+	spi_ioc_transfer spi_transfer{}; // datastructures for linux spi interface
 
-	/* lock the bus as required */
-	switch (mode) {
-	default:
-	case LOCK_PREEMPTION: {
-			irqstate_t state = px4_enter_critical_section();
-			result = _transfer(send, recv, len);
-			px4_leave_critical_section(state);
-		}
-		break;
+	spi_transfer.rx_buf = (unsigned long)recv;
+	spi_transfer.len = len;
+	spi_transfer.tx_buf = (unsigned long)send;
+	spi_transfer.speed_hz = _frequency;
+	spi_transfer.bits_per_word = 8;
+	spi_transfer.delay_usecs = 0;
 
-	case LOCK_THREADS:
-		SPI_LOCK(_dev, true);
-		result = _transfer(send, recv, len);
-		SPI_LOCK(_dev, false);
-		break;
+	int result = ::ioctl(_fd, SPI_IOC_MESSAGE(1), &spi_transfer);
 
-	case LOCK_NONE:
-		result = _transfer(send, recv, len);
-		break;
+	if (result != (int)len) {
+		PX4_ERR("SPI write failed. Reported %d bytes written (%s)", result, strerror(errno));
+		return -1;
 	}
 
-	return result;
-}
-
-int
-SPI::_transfer(uint8_t *send, uint8_t *recv, unsigned len)
-{
-	SPI_SETFREQUENCY(_dev, _frequency);
-	SPI_SETMODE(_dev, _mode);
-	SPI_SETBITS(_dev, 8);
-	SPI_SELECT(_dev, _device, true);
-
-	/* do the transfer */
-	SPI_EXCHANGE(_dev, send, recv, len);
-
-	/* and clean up */
-	SPI_SELECT(_dev, _device, false);
-
-	return OK;
+	return 0;
 }
 
 int
 SPI::transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 {
-	int result;
-
 	if ((send == nullptr) && (recv == nullptr)) {
 		return -EINVAL;
 	}
 
-	LockMode mode = up_interrupt_context() ? LOCK_NONE : _locking_mode;
-
-	/* lock the bus as required */
-	switch (mode) {
-	default:
-	case LOCK_PREEMPTION: {
-			irqstate_t state = px4_enter_critical_section();
-			result = _transferhword(send, recv, len);
-			px4_leave_critical_section(state);
-		}
-		break;
-
-	case LOCK_THREADS:
-		SPI_LOCK(_dev, true);
-		result = _transferhword(send, recv, len);
-		SPI_LOCK(_dev, false);
-		break;
-
-	case LOCK_NONE:
-		result = _transferhword(send, recv, len);
-		break;
-	}
-
-	return result;
-}
-
-int
-SPI::_transferhword(uint16_t *send, uint16_t *recv, unsigned len)
-{
-	SPI_SETFREQUENCY(_dev, _frequency);
-	SPI_SETMODE(_dev, _mode);
-	SPI_SETBITS(_dev, 16);							/* 16 bit transfer */
-	SPI_SELECT(_dev, _device, true);
-
-	/* do the transfer */
-	SPI_EXCHANGE(_dev, send, recv, len);
-
-	/* and clean up */
-	SPI_SELECT(_dev, _device, false);
-
-	return OK;
+	return 0;
 }
 
 } // namespace device

@@ -67,7 +67,7 @@ int do_esc_calibration(orb_advert_t *mavlink_log_pub, struct actuator_armed_s *a
 {
 	int	return_code = PX4_OK;
 
-#if defined(__PX4_POSIX_OCPOC) || defined(__PX4_POSIX_BBBLUE)
+#if defined(__PX4_POSIX_OCPOC) || defined(CONFIG_ARCH_BOARD_BEAGLEBONE_BLUE)
 	hrt_abstime timeout_start = 0;
 	hrt_abstime timeout_wait = 60_s;
 	armed->in_esc_calibration_mode = true;

@@ -31,16 +31,19 @@
 #
 ############################################################################
 
-add_subdirectory(bbblue_adc)
+px4_add_git_submodule(TARGET librobotcontrol PATH "librobotcontrol")
+add_subdirectory(librobotcontrol)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/librobotcontrol/library/include)
 
+add_subdirectory(bbblue_adc)
 
 ############################################################################
 # Upload
 ############################################################################
 
 add_custom_target(upload
-	COMMAND rsync -arh --progress ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} ${PX4_SOURCE_DIR}/posix-configs/bbblue/*.config ${PX4_SOURCE_DIR}/ROMFS debian@BBBluePX4:/home/debian/px4
+	COMMAND rsync -arh --progress ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bin ${PX4_SOURCE_DIR}/posix-configs/bbblue/*.config $<TARGET_FILE:px4> ${PX4_SOURCE_DIR}/ROMFS debian@beaglebone:/home/debian/px4
 	DEPENDS px4
 	COMMENT "uploading px4 and data files"
 	USES_TERMINAL
-	)
+)

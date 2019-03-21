@@ -1,4 +1,13 @@
 
+add_definitions(
+	-D__PX4_LINUX
+	-D__PX4_POSIX_OCPOC # TODO: remove
+
+	# For DriverFramework
+	-D__DF_LINUX
+	-D__DF_OCPOC
+)
+
 px4_add_board(
 	VENDOR aerotenna
 	MODEL ocpoc

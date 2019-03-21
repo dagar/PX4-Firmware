@@ -146,15 +146,16 @@ protected:
 	 *
 	 * @param mode	Locking mode
 	 */
-	void		set_lockmode(enum LockMode mode) { locking_mode = mode; }
-
-	LockMode	locking_mode;	/**< selected locking mode */
+	void		set_lockmode(enum LockMode mode) { _locking_mode = mode; }
 
 private:
+	struct spi_dev_s	*_dev;
+
 	uint32_t			_device;
 	enum spi_mode_e		_mode;
 	uint32_t		_frequency;
-	struct spi_dev_s	*_dev;
+
+	LockMode	_locking_mode;	/**< selected locking mode */
 
 	/* this class does not allow copying */
 	SPI(const SPI &);

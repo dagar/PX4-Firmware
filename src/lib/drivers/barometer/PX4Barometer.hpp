@@ -30,53 +30,35 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
-#ifdef CONFIG_ARCH_BOARD_BEAGLEBONE_BLUE
 
-#include <fcntl.h>
-#include <errno.h>
-#include <px4_log.h>
+#include <drivers/drv_baro.h>
+#include <drivers/drv_hrt.h>
+#include <lib/cdev/CDev.hpp>
+#include <lib/conversion/rotation.h>
+#include <uORB/uORB.h>
+#include <uORB/Publication.hpp>
+#include <uORB/topics/sensor_baro.h>
 
-#include <robotcontrol.h>
-#include <board_config.h>
-
-#include "bbblue_pwm_rc.h"
-
-using namespace linux_pwm_out;
-
-BBBlueRcPWMOut::BBBlueRcPWMOut(int max_num_outputs) : _num_outputs(max_num_outputs)
+class PX4Barometer : public cdev::CDev
 {
-	if (_num_outputs > MAX_NUM_PWM) {
-		PX4_WARN("number of outputs too large. Setting to %i", MAX_NUM_PWM);
-		_num_outputs = MAX_NUM_PWM;
-	}
-}
 
-BBBlueRcPWMOut::~BBBlueRcPWMOut()
-{
-	rc_cleaning();
-}
+public:
+	PX4Barometer(uint32_t device_id, uint8_t priority);
+	~PX4Barometer() override;
 
-int BBBlueRcPWMOut::init()
-{
-	rc_init();
+	void set_device_type(uint8_t devtype);
+	void set_error_count(uint64_t error_count) { _sensor_baro_pub.get().error_count = error_count; }
 
-	return 0;
-}
+	void set_temperature(float temperature) { _sensor_baro_pub.get().temperature = temperature; }
 
-int BBBlueRcPWMOut::send_output_pwm(const uint16_t *pwm, int num_outputs)
-{
-	if (num_outputs > _num_outputs) {
-		num_outputs = _num_outputs;
-	}
+	void update(hrt_abstime timestamp, float pressure);
 
-	int ret = 0;
+	void print_status();
 
-	// pwm[ch] is duty_cycle in us
-	for (int ch = 0; ch < num_outputs; ++ch) {
-		ret += rc_servo_send_pulse_us(ch + 1, pwm[ch]); // converts to 1-based channel #
-	}
+private:
 
-	return ret;
-}
+	uORB::Publication<sensor_baro_s>	_sensor_baro_pub;
 
-#endif  // CONFIG_ARCH_BOARD_BEAGLEBONE_BLUE
+	int			_class_device_instance{-1};
+
+};

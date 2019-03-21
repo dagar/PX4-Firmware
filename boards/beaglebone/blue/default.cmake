@@ -1,8 +1,20 @@
 
+
+add_definitions(
+	-D__PX4_LINUX
+
+	# For DriverFramework
+	-D__DF_LINUX
+	-D__DF_BBBLUE
+
+	-DRC_AUTOPILOT_EXT
+)
+add_compile_options(-Wno-cast-align)
+
 px4_add_board(
 	VENDOR beaglebone
 	MODEL blue
-	LABEL cross
+	LABEL default
 	PLATFORM posix
 	ARCHITECTURE cortex-a8
 	TOOLCHAIN arm-linux-gnueabihf
@@ -10,22 +22,21 @@ px4_add_board(
 
 	DRIVERS
 		#barometer # all available barometer drivers
+		#barometer/bmp280
 		batt_smbus
 		camera_trigger
 		differential_pressure # all available differential pressure drivers
 		distance_sensor # all available distance sensor drivers
 		gps
 		#imu # all available imu drivers
+		#imu/mpu9250
+		imu/adis16448
 		#magnetometer # all available magnetometer drivers
 		pwm_out_sim
 		#telemetry # all available telemetry drivers
 
 		linux_pwm_out
 		linux_sbus
-
-	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
-		mpu9250
-		bmp280
 
 	MODULES
 		attitude_estimator_q
@@ -79,4 +90,7 @@ px4_add_board(
 		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
 		rover_steering_control # Rover example app
 		segway
-	)
+)
+
+# TODO: can be removed after DriverFramework is deprecated
+include_directories(${PX4_BOARD_DIR}/librobotcontrol/library/include)

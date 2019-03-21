@@ -1,4 +1,12 @@
 
+add_definitions(
+	-D__PX4_LINUX
+
+	# For DriverFramework
+	-D__DF_LINUX
+	-D__DF_RPI
+)
+
 px4_add_board(
 	VENDOR px4
 	MODEL raspberrypi

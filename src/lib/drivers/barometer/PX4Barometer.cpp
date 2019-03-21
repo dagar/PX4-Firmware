@@ -30,53 +30,60 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
-#ifdef CONFIG_ARCH_BOARD_BEAGLEBONE_BLUE
 
-#include <fcntl.h>
-#include <errno.h>
-#include <px4_log.h>
 
-#include <robotcontrol.h>
-#include <board_config.h>
+#include "PX4Barometer.hpp"
 
-#include "bbblue_pwm_rc.h"
+#include <lib/drivers/device/Device.hpp>
 
-using namespace linux_pwm_out;
-
-BBBlueRcPWMOut::BBBlueRcPWMOut(int max_num_outputs) : _num_outputs(max_num_outputs)
+PX4Barometer::PX4Barometer(uint32_t device_id, uint8_t priority) :
+	CDev(nullptr),
+	_sensor_baro_pub{ORB_ID(sensor_baro), priority}
 {
-	if (_num_outputs > MAX_NUM_PWM) {
-		PX4_WARN("number of outputs too large. Setting to %i", MAX_NUM_PWM);
-		_num_outputs = MAX_NUM_PWM;
+	_class_device_instance = register_class_devname(BARO_BASE_DEVICE_PATH);
+
+	_sensor_baro_pub.get().device_id = device_id;
+
+	// force initial publish to allocate uORB buffer
+	// TODO: can be removed once all drivers are in threads
+	_sensor_baro_pub.update();
+}
+
+PX4Barometer::~PX4Barometer()
+{
+	if (_class_device_instance != -1) {
+		unregister_class_devname(BARO_BASE_DEVICE_PATH, _class_device_instance);
 	}
 }
 
-BBBlueRcPWMOut::~BBBlueRcPWMOut()
+void PX4Barometer::set_device_type(uint8_t devtype)
 {
-	rc_cleaning();
+	// current DeviceStructure
+	union device::Device::DeviceId device_id;
+	device_id.devid = _sensor_baro_pub.get().device_id;
+
+	// update to new device type
+	device_id.devid_s.devtype = devtype;
+
+	// copy back to report
+	_sensor_baro_pub.get().device_id = device_id.devid;
 }
 
-int BBBlueRcPWMOut::init()
+void PX4Barometer::update(hrt_abstime timestamp, float pressure)
 {
-	rc_init();
+	sensor_baro_s &report = _sensor_baro_pub.get();
 
-	return 0;
+	report.timestamp = timestamp;
+	report.pressure = pressure;
+
+	poll_notify(POLLIN);
+
+	_sensor_baro_pub.update();
 }
 
-int BBBlueRcPWMOut::send_output_pwm(const uint16_t *pwm, int num_outputs)
+void PX4Barometer::print_status()
 {
-	if (num_outputs > _num_outputs) {
-		num_outputs = _num_outputs;
-	}
+	PX4_INFO(BARO_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
 
-	int ret = 0;
-
-	// pwm[ch] is duty_cycle in us
-	for (int ch = 0; ch < num_outputs; ++ch) {
-		ret += rc_servo_send_pulse_us(ch + 1, pwm[ch]); // converts to 1-based channel #
-	}
-
-	return ret;
+	print_message(_sensor_baro_pub.get());
 }
-
-#endif  // CONFIG_ARCH_BOARD_BEAGLEBONE_BLUE

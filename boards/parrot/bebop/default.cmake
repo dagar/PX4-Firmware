@@ -1,4 +1,13 @@
 
+add_definitions(
+	-D__PX4_LINUX
+	-D__PX4_POSIX_BEBOP # TODO: remove
+
+	# For DriverFramework
+	-D__DF_LINUX
+	-D__DF_BEBOP
+)
+
 px4_add_board(
 	VENDOR parrot
 	MODEL bebop

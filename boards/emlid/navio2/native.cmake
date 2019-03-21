@@ -1,4 +1,12 @@
 
+add_definitions(
+	-D__PX4_LINUX
+
+	# For DriverFramework
+	-D__DF_LINUX
+	-D__DF_RPI
+)
+
 px4_add_board(
 	VENDOR emlid
 	MODEL navio2
@@ -14,6 +22,7 @@ px4_add_board(
 		distance_sensor # all available distance sensor drivers
 		gps
 		#imu # all available imu drivers
+		imu/adis16448
 		#magnetometer # all available magnetometer drivers
 		pwm_out_sim
 		#telemetry # all available telemetry drivers

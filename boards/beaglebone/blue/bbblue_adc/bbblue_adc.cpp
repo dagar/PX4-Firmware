@@ -50,10 +50,8 @@
 #include <poll.h>
 #include <string.h>
 
-#ifdef __DF_BBBLUE
 #include <robotcontrol.h>
 #include <board_config.h>
-#endif
 
 #define ADC_BASE_DEV_PATH "/dev/null"
 
@@ -100,7 +98,6 @@ BBBlueADC::~BBBlueADC()
 
 void BBBlueADC::_measure()
 {
-#ifdef __DF_BBBLUE
 	px4_adc_msg_t tmp_samples[BBBLUE_MAX_ADC_CHANNELS];
 
 	for (int i = 0; i < BBBLUE_MAX_ADC_USER_CHANNELS; ++i) {
@@ -117,7 +114,6 @@ void BBBlueADC::_measure()
 	pthread_mutex_lock(&_samples_lock);
 	memcpy(&_samples, &tmp_samples, sizeof(tmp_samples));
 	pthread_mutex_unlock(&_samples_lock);
-#endif
 }
 
 int BBBlueADC::init()
@@ -132,6 +128,7 @@ int BBBlueADC::init()
 	}
 
 	_measure(); // start the initial conversion so that the test command right
+
 	// after the start command can return values
 	return PX4_OK;
 }

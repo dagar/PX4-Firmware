@@ -66,7 +66,7 @@ function(px4_add_common_flags)
 		-Werror
 
 		-Warray-bounds
-		-Wcast-align
+		#-Wcast-align
 		-Wdisabled-optimization
 		-Wdouble-promotion
 		-Wfatal-errors
