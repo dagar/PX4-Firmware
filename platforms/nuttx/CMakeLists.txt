@@ -81,9 +81,6 @@ target_link_libraries(nuttx_arch
 		drivers_boards_common_arch
 )
 
-target_link_libraries(nuttx_c INTERFACE nuttx_drivers)
-target_link_libraries(nuttx_xx INTERFACE nuttx_c)
-
 target_link_libraries(px4 PRIVATE
 
 	-nostartfiles

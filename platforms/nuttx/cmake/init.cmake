@@ -114,13 +114,37 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_DEFCONFIG}
 # copy PX4 board config into nuttx
 file(STRINGS ${NUTTX_DEFCONFIG} config_expanded REGEX "# Automatically generated file; DO NOT EDIT.")
 if (NOT config_expanded)
-	set(ENV{PATH} "${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/tools:$ENV{PATH}")
+
+	set(ENV{CONFIG_ARCH_BOARD_CUSTOM} "y")
+	set(ENV{CONFIG_ARCH_BOARD_CUSTOM_NAME} "px4")
+	set(ENV{CONFIG_ARCH_BOARD_CUSTOM_DIR} "../nuttx-config")
+	set(ENV{CONFIG_APPS_DIR} "../apps")
+	set(ENV{APPSDIR} "../apps")
+
+	# dirlinks
 	execute_process(
-		COMMAND make --no-print-directory --silent -C ${NUTTX_DIR} CONFIG_ARCH_BOARD_CUSTOM=y olddefconfig
+		COMMAND make -j1 --no-print-directory dirlinks
 		WORKING_DIRECTORY ${NUTTX_DIR}
-		OUTPUT_FILE nuttx_olddefconfig.log
-		ERROR_FILE nuttx_olddefconfig.log
+		OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuttx_dirlinks.log
+		ERROR_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuttx_dirlinks.log
 	)
+
+	# apps_preconfig
+	execute_process(
+		COMMAND make -j1 --no-print-directory apps_preconfig
+		WORKING_DIRECTORY ${NUTTX_DIR}
+		OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuttx_apps_preconfig.log
+		ERROR_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuttx_apps_preconfig.log
+	)
+
+	# olddefconfig
+	execute_process(
+		COMMAND ${NUTTX_SRC_DIR}/tools/olddefconfig.py
+		WORKING_DIRECTORY ${NUTTX_DIR}
+		OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuttx_olddefconfig.log
+		ERROR_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuttx_olddefconfig.log
+	)
+
 endif()
 
 ###############################################################################
