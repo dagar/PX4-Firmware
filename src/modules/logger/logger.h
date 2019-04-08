@@ -39,12 +39,14 @@
 #include "util.h"
 #include <px4_defines.h>
 #include <drivers/drv_hrt.h>
+#include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <version/version.h>
 #include <parameters/param.h>
 #include <systemlib/printload.h>
 #include <px4_module.h>
 
+#include <uORB/topics/logger_status.h>
 #include <uORB/topics/vehicle_command.h>
 
 extern "C" __EXPORT int logger_main(int argc, char *argv[]);
@@ -373,6 +375,8 @@ private:
 	bool						_arm_override{false};
 
 	Statistics					_statistics[(int)LogType::Count];
+
+	uORB::Publication<logger_status_s>		_logger_status_pub{ORB_ID(logger_status);
 
 	const bool 					_log_on_start;
 	const bool 					_log_until_shutdown;

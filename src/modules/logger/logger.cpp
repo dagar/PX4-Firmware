@@ -1180,6 +1180,14 @@ void Logger::run()
 				if (!_statistics[i].dropout_start && _writer.get_buffer_fill_count_file((LogType)i) > _statistics[i].high_water) {
 					_statistics[i].high_water = _writer.get_buffer_fill_count_file((LogType)i);
 				}
+
+				logger_status_s& logger_status = _logger_status_pub[i].get();
+
+				logger_status.timestamp = hrt_absolute_time();
+				logger_status.dropouts = _statistics
+
+				_logger_status_pub[i].update();
+
 			}
 
 			/* release the log buffer */
