@@ -830,9 +830,12 @@ PARAM_DEFINE_INT32(COM_OA_BOOT_T, 100);
 PARAM_DEFINE_FLOAT(COM_TAS_FS_INNOV, 1.0f);
 
 /**
+ *
+ * Airspeed failsafe stop delay
+ *
  * Delay before stopping use of airspeed sensor if checks indicate sensor is bad. The failsafe response is controlled by the COM_ASPD_FS_ACT parameter.
  *
- * @unit sec
+ * @unit s
  * @group Commander
  * @min 1
  * @max 10
@@ -840,9 +843,12 @@ PARAM_DEFINE_FLOAT(COM_TAS_FS_INNOV, 1.0f);
 PARAM_DEFINE_INT32(COM_TAS_FS_T1, 3);
 
 /**
+ *
+ * Airspeed failsafe start delay
+ *
  * Delay before switching back to using airspeed sensor if checks indicate sensor is good. The failsafe response is controlled by the COM_ASPD_FS_ACT parameter.
  *
- * @unit sec
+ * @unit s
  * @group Commander
  * @min 10
  * @max 1000
@@ -867,7 +873,7 @@ PARAM_DEFINE_FLOAT(COM_ASPD_STALL, 10.0f);
  * @value 2 log a message, warn the user
  * @value 3 log a message, warn the user, switch to non-airspeed TECS mode
  * @value 4 log a message, warn the user, switch to non-airspeed TECS mode, switch to Return mode after COM_ASPD_FS_DLY seconds
- * @group Mission
+ * @group Commander
  */
 PARAM_DEFINE_INT32(COM_ASPD_FS_ACT, 0);
 
