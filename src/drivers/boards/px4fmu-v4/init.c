@@ -223,8 +223,8 @@ stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_SPEKTRUM_PWR_EN);
 
 	stm32_configgpio(GPIO_8266_GPIO0);
-	stm32_configgpio(GPIO_8266_PD);
-	stm32_configgpio(GPIO_8266_RST);
+	//stm32_configgpio(GPIO_8266_PD);
+	//stm32_configgpio(GPIO_8266_RST);
 
 	/* Safety - led don in led driver */
 
