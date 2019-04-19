@@ -219,8 +219,8 @@ stm32_boardinitialize(void)
 	} else {
 #endif /* CONFIG_STM32_SPI4 */
 
-		stm32_configgpio(GPIO_8266_PD);
-		stm32_configgpio(GPIO_8266_RST);
+		//stm32_configgpio(GPIO_8266_PD);
+		//stm32_configgpio(GPIO_8266_RST);
 
 #if defined(CONFIG_STM32_SPI4)
 	}
