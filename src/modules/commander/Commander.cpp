@@ -165,12 +165,8 @@ static uint64_t rc_signal_lost_timestamp;		// Time at which the RC reception was
 
 static uint8_t arm_requirements = ARM_REQ_NONE;
 
-static bool _last_condition_global_position_valid = false;
-
 static struct vehicle_land_detected_s land_detector = {};
 
-static float _eph_threshold_adj =
-	INFINITY;	///< maximum allowable horizontal position uncertainty after adjustment for flight condition
 static bool _skip_pos_accuracy_check = false;
 
 /**
@@ -2084,9 +2080,6 @@ Commander::run()
 			bool first_rc_eval = (_last_sp_man.timestamp == 0) && (sp_man.timestamp > 0);
 			transition_result_t main_res = set_main_state(status, &status_changed);
 
-			/* store last position lock state */
-			_last_condition_global_position_valid = status_flags.condition_global_position_valid;
-
 			/* play tune on mode change only if armed, blink LED always */
 			if (main_res == TRANSITION_CHANGED || first_rc_eval) {
 				tune_positive(armed.armed);
@@ -2700,13 +2693,13 @@ control_status_leds(vehicle_status_s *status_local, const actuator_armed_s *actu
 }
 
 transition_result_t
-Commander::set_main_state(const vehicle_status_s &status_local, bool *changed)
+Commander::set_main_state(const vehicle_status_s &status_local, bool *changed, bool force)
 {
 	if (safety.override_available && safety.override_enabled) {
 		return set_main_state_override_on(status_local, changed);
 
 	} else {
-		return set_main_state_rc(status_local, changed);
+		return set_main_state_rc(status_local, changed, force);
 	}
 }
 
@@ -2721,7 +2714,7 @@ Commander::set_main_state_override_on(const vehicle_status_s &status_local, bool
 }
 
 transition_result_t
-Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed)
+Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed, bool force)
 {
 	/* set main state according to RC switches */
 	transition_result_t res = TRANSITION_DENIED;
@@ -2730,9 +2723,7 @@ Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed
 	// we want to allow rc mode change to take precidence.  This is a safety
 	// feature, just in case offboard control goes crazy.
 
-	const bool position_got_valid = !_last_condition_global_position_valid && status_flags.condition_global_position_valid;
-	const bool first_time_rc = _last_sp_man.timestamp == 0;
-	const bool rc_values_updated = _last_sp_man.timestamp != sp_man.timestamp;
+	const bool rc_values_updated = (sp_man.timestamp > _last_sp_man.timestamp);
 	const bool some_switch_changed =
 		(_last_sp_man.offboard_switch != sp_man.offboard_switch)
 		|| (_last_sp_man.return_switch != sp_man.return_switch)
@@ -2746,11 +2737,9 @@ Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed
 		|| (_last_sp_man.man_switch != sp_man.man_switch);
 
 	// only switch mode based on RC switch if necessary to also allow mode switching via MAVLink
-	const bool should_evaluate_rc_mode_switch = first_time_rc
-			|| position_got_valid
-			|| (rc_values_updated && some_switch_changed);
+	const bool evaluate_rc_mode_switch = ((rc_values_updated && some_switch_changed) || force);
 
-	if (!should_evaluate_rc_mode_switch) {
+	if (!evaluate_rc_mode_switch) {
 
 		// store the last manual control setpoint set by the pilot in a manual state
 		// if the system now later enters an autonomous state the pilot can move
@@ -2779,7 +2768,9 @@ Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed
 
 	// reset the position and velocity validity calculation to give the best change of being able to select
 	// the desired mode
-	reset_posvel_validity(changed);
+	if (!force) {
+		reset_posvel_validity(changed);
+	}
 
 	/* offboard switch overrides main switch */
 	if (sp_man.offboard_switch == manual_control_setpoint_s::SWITCH_POS_ON) {
@@ -3113,20 +3104,8 @@ Commander::reset_posvel_validity(bool *changed)
 	_lpos_probation_time_us = POSVEL_PROBATION_MIN;
 	_lvel_probation_time_us = POSVEL_PROBATION_MIN;
 
-	const vehicle_local_position_s &local_position = _local_position_sub.get();
-	const vehicle_global_position_s &global_position = _global_position_sub.get();
-
 	// recheck validity
-	if (!_skip_pos_accuracy_check) {
-		check_posvel_validity(true, global_position.eph, _eph_threshold_adj, global_position.timestamp,
-				      &_last_gpos_fail_time_us, &_gpos_probation_time_us, &status_flags.condition_global_position_valid, changed);
-	}
-
-	check_posvel_validity(local_position.xy_valid, local_position.eph, _eph_threshold_adj, local_position.timestamp,
-			      &_last_lpos_fail_time_us, &_lpos_probation_time_us, &status_flags.condition_local_position_valid, changed);
-	check_posvel_validity(local_position.v_xy_valid, local_position.evh, _param_com_vel_fs_evh.get(),
-			      local_position.timestamp,
-			      &_last_lvel_fail_time_us, &_lvel_probation_time_us, &status_flags.condition_local_velocity_valid, changed);
+	estimator_check(changed);
 }
 
 bool
@@ -4093,6 +4072,10 @@ void Commander::battery_status_check()
 
 void Commander::estimator_check(bool *status_changed)
 {
+	const bool condition_local_altitude_valid_prev = status_flags.condition_local_altitude_valid;
+	const bool condition_local_position_valid_prev = status_flags.condition_local_position_valid;
+	const bool condition_global_position_valid_prev = status_flags.condition_global_position_valid;
+
 	// Check if quality checking of position accuracy and consistency is to be performed
 	const bool run_quality_checks = !status_flags.circuit_breaker_engaged_posfailure_check;
 
@@ -4100,7 +4083,6 @@ void Commander::estimator_check(bool *status_changed)
 	_global_position_sub.update();
 
 	const vehicle_local_position_s &lpos = _local_position_sub.get();
-	const vehicle_global_position_s &gpos = _global_position_sub.get();
 
 	const bool mag_fault_prev = (_estimator_status_sub.get().control_mode_flags & (1 << estimator_status_s::CS_MAG_FAULT));
 
@@ -4123,13 +4105,6 @@ void Commander::estimator_check(bool *status_changed)
 		const bool operator_controlled_position = (internal_state.main_state == commander_state_s::MAIN_STATE_POSCTL);
 
 		_skip_pos_accuracy_check = reliant_on_opt_flow && operator_controlled_position;
-
-		if (_skip_pos_accuracy_check) {
-			_eph_threshold_adj = INFINITY;
-
-		} else {
-			_eph_threshold_adj = _param_com_pos_fs_eph.get();
-		}
 
 		/* Check estimator status for signs of bad yaw induced post takeoff navigation failure
 		 * for a short time interval after takeoff. Fixed wing vehicles can recover using GPS heading,
@@ -4186,27 +4161,46 @@ void Commander::estimator_check(bool *status_changed)
 			status_flags.condition_local_velocity_valid = false;
 
 		} else {
+
+			// maximum allowable horizontal position uncertainty after adjustment for flight condition
+			const float eph_threshold_adj = (_skip_pos_accuracy_check ? INFINITY : _param_com_pos_fs_eph.get());
+
 			if (!_skip_pos_accuracy_check) {
 				// use global position message to determine validity
-				check_posvel_validity(true, gpos.eph, _eph_threshold_adj, gpos.timestamp, &_last_gpos_fail_time_us,
+				const vehicle_global_position_s &gpos = _global_position_sub.get();
+				check_posvel_validity(true, gpos.eph, eph_threshold_adj, gpos.timestamp, &_last_gpos_fail_time_us,
 						      &_gpos_probation_time_us, &status_flags.condition_global_position_valid, status_changed);
 			}
 
 			// use local position message to determine validity
-			check_posvel_validity(lpos.xy_valid, lpos.eph, _eph_threshold_adj, lpos.timestamp, &_last_lpos_fail_time_us,
+			check_posvel_validity(lpos.xy_valid, lpos.eph, eph_threshold_adj, lpos.timestamp, &_last_lpos_fail_time_us,
 					      &_lpos_probation_time_us, &status_flags.condition_local_position_valid, status_changed);
+
 			check_posvel_validity(lpos.v_xy_valid, lpos.evh, _param_com_vel_fs_evh.get(), lpos.timestamp, &_last_lvel_fail_time_us,
 					      &_lvel_probation_time_us, &status_flags.condition_local_velocity_valid, status_changed);
 		}
 	}
 
-	if ((_last_condition_global_position_valid != status_flags.condition_global_position_valid)
-	    && status_flags.condition_global_position_valid) {
+	// check altitude validity
+	check_valid(lpos.timestamp, _param_com_pos_fs_delay.get() * 1_s, lpos.z_valid,
+		    &status_flags.condition_local_altitude_valid, status_changed);
+
+	if (!condition_local_altitude_valid_prev && status_flags.condition_local_altitude_valid) {
+		// re-evaluate main state from RC if altitude became valid
+		set_main_state(status, status_changed, true);
+	}
+
+	if (!condition_local_position_valid_prev && status_flags.condition_local_position_valid) {
+		// re-evaluate main state from RC if local position became valid
+		set_main_state(status, status_changed, true);
+	}
+
+	if (!condition_global_position_valid_prev && status_flags.condition_global_position_valid) {
 		// If global position state changed and is now valid, set respective health flags to true. For now also assume GPS is OK if global pos is OK, but not vice versa.
 		set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_AHRS, true, status);
 		set_health_flags_present_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GPS, true, true, status);
-	}
 
-	check_valid(lpos.timestamp, _param_com_pos_fs_delay.get() * 1_s, lpos.z_valid,
-		    &(status_flags.condition_local_altitude_valid), status_changed);
+		// re-evaluate main state from RC if global position became valid
+		set_main_state(status, status_changed, true);
+	}
 }

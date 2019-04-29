@@ -150,13 +150,13 @@ private:
 	bool set_home_position_alt_only();
 
 	// Set the main system state based on RC and override device inputs
-	transition_result_t set_main_state(const vehicle_status_s &status, bool *changed);
+	transition_result_t set_main_state(const vehicle_status_s &status, bool *changed, bool force = false);
 
 	// Enable override (manual reversion mode) on the system
 	transition_result_t set_main_state_override_on(const vehicle_status_s &status, bool *changed);
 
 	// Set the system main state based on the current RC inputs
-	transition_result_t set_main_state_rc(const vehicle_status_s &status, bool *changed);
+	transition_result_t set_main_state_rc(const vehicle_status_s &status, bool *changed, bool force = false);
 
 	void check_valid(const hrt_abstime &timestamp, const hrt_abstime &timeout, const bool valid_in, bool *valid_out,
 			 bool *changed);
