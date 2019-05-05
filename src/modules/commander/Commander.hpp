@@ -53,6 +53,7 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/geofence_result.h>
 #include <uORB/topics/iridiumsbd_status.h>
 #include <uORB/topics/mission_result.h>
 #include <uORB/topics/sensor_bias.h>
@@ -129,7 +130,11 @@ private:
 		(ParamInt<px4::params::COM_TAS_FS_T2>) _tas_use_start_delay,
 		(ParamInt<px4::params::COM_ASPD_FS_ACT>) _airspeed_fail_action,
 		(ParamFloat<px4::params::COM_ASPD_STALL>) _airspeed_stall,
-		(ParamInt<px4::params::COM_ASPD_FS_DLY>) _airspeed_rtl_delay
+		(ParamInt<px4::params::COM_ASPD_FS_DLY>) _airspeed_rtl_delay,
+
+		(ParamBool<px4::params::COM_ARM_MIS_REQ>) _param_arm_req_mission,
+		(ParamBool<px4::params::COM_ARM_WO_GPS>) _param_arm_req_wo_gps,
+		(ParamBool<px4::params::COM_ARM_GEOFENCE>) _param_arm_req_geofence
 
 	)
 
@@ -200,6 +205,8 @@ private:
 
 	void battery_status_check();
 
+	void geofence_check(bool *status_changed);
+
 	/**
 	 * Checks the status of all available data links and handles switching between different system telemetry states.
 	 */
@@ -235,6 +242,7 @@ private:
 	// Subscriptions
 	Subscription<airspeed_s>			_airspeed_sub{ORB_ID(airspeed)};
 	Subscription<estimator_status_s>		_estimator_status_sub{ORB_ID(estimator_status)};
+	Subscription<geofence_result_s>			_geofence_result_sub{ORB_ID(geofence_result)};
 	Subscription<mission_result_s>			_mission_result_sub{ORB_ID(mission_result)};
 	Subscription<sensor_bias_s>			_sensor_bias_sub{ORB_ID(sensor_bias)};
 	Subscription<vehicle_global_position_s>		_global_position_sub{ORB_ID(vehicle_global_position)};

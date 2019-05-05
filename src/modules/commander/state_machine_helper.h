@@ -73,6 +73,8 @@ typedef enum {
 	ARM_REQ_MISSION_BIT = (1 << 0),
 	ARM_REQ_ARM_AUTH_BIT = (1 << 1),
 	ARM_REQ_GPS_BIT = (1 << 2),
+	ARM_REQ_GEOFENCE_BIT = (1 << 3),
+	ARM_REQ_HOME_BIT = (1 << 4),
 } arm_requirements_t;
 
 extern const char *const arming_state_names[];

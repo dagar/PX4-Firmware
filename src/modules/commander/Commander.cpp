@@ -83,7 +83,6 @@
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/cpuload.h>
-#include <uORB/topics/geofence_result.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/mavlink_log.h>
 #include <uORB/topics/mission.h>
@@ -1195,12 +1194,9 @@ Commander::run()
 	param_t _param_rc_in_off = param_find("COM_RC_IN_MODE");
 	param_t _param_rc_arm_hyst = param_find("COM_RC_ARM_HYST");
 	param_t _param_min_stick_change = param_find("COM_RC_STICK_OV");
-	param_t _param_geofence_action = param_find("GF_ACTION");
 	param_t _param_offboard_loss_timeout = param_find("COM_OF_LOSS_T");
-	param_t _param_arm_without_gps = param_find("COM_ARM_WO_GPS");
 	param_t _param_arm_switch_is_button = param_find("COM_ARM_SWISBTN");
 	param_t _param_rc_override = param_find("COM_RC_OVERRIDE");
-	param_t _param_arm_mission_required = param_find("COM_ARM_MIS_REQ");
 	param_t _param_flight_uuid = param_find("COM_FLIGHT_UUID");
 	param_t _param_takeoff_finished_action = param_find("COM_TAKEOFF_ACT");
 
@@ -1279,7 +1275,6 @@ Commander::run()
 	int actuator_controls_sub = orb_subscribe(ORB_ID_VEHICLE_ATTITUDE_CONTROLS);
 	int cmd_sub = orb_subscribe(ORB_ID(vehicle_command));
 	int cpuload_sub = orb_subscribe(ORB_ID(cpuload));
-	int geofence_result_sub = orb_subscribe(ORB_ID(geofence_result));
 	int land_detector_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
 	int offboard_control_mode_sub = orb_subscribe(ORB_ID(offboard_control_mode));
 	int param_changed_sub = orb_subscribe(ORB_ID(parameter_update));
@@ -1288,8 +1283,6 @@ Commander::run()
 	int subsys_sub = orb_subscribe(ORB_ID(subsystem_info));
 	int system_power_sub = orb_subscribe(ORB_ID(system_power));
 	int vtol_vehicle_status_sub = orb_subscribe(ORB_ID(vtol_vehicle_status));
-
-	geofence_result_s geofence_result {};
 
 	land_detector.landed = true;
 
@@ -1321,14 +1314,6 @@ Commander::run()
 	int32_t arm_switch_is_button = 0;
 	param_get(_param_arm_switch_is_button, &arm_switch_is_button);
 
-	int32_t arm_without_gps_param = 0;
-	param_get(_param_arm_without_gps, &arm_without_gps_param);
-	arm_requirements = (arm_without_gps_param == 1) ? ARM_REQ_NONE : ARM_REQ_GPS_BIT;
-
-	int32_t arm_mission_required_param = 0;
-	param_get(_param_arm_mission_required, &arm_mission_required_param);
-	arm_requirements |= (arm_mission_required_param & (ARM_REQ_MISSION_BIT | ARM_REQ_ARM_AUTH_BIT));
-
 	status.rc_input_mode = rc_in_off;
 
 	// user adjustable duration required to assert arm/disarm via throttle/rudder stick
@@ -1340,7 +1325,6 @@ Commander::run()
 	int32_t offboard_loss_act = 0;
 	int32_t offboard_loss_rc_act = 0;
 	int32_t posctl_nav_loss_act = 0;
-	int32_t geofence_action = 0;
 	int32_t flight_uuid = 0;
 	int32_t airmode = 0;
 	int32_t rc_map_arm_switch = 0;
@@ -1446,7 +1430,6 @@ Commander::run()
 			param_get(_param_ef_throttle_thres, &ef_throttle_thres);
 			param_get(_param_ef_current2throttle_thres, &ef_current2throttle_thres);
 			param_get(_param_ef_time_thres, &ef_time_thres);
-			param_get(_param_geofence_action, &geofence_action);
 			param_get(_param_flight_uuid, &flight_uuid);
 
 			param_get(_param_offboard_loss_timeout, &offboard_loss_timeout);
@@ -1454,10 +1437,29 @@ Commander::run()
 			param_get(_param_offboard_loss_rc_act, &offboard_loss_rc_act);
 			param_get(_param_arm_switch_is_button, &arm_switch_is_button);
 
-			param_get(_param_arm_without_gps, &arm_without_gps_param);
-			arm_requirements = (arm_without_gps_param == 1) ? ARM_REQ_NONE : ARM_REQ_GPS_BIT;
-			param_get(_param_arm_mission_required, &arm_mission_required_param);
-			arm_requirements |= (arm_mission_required_param & (ARM_REQ_MISSION_BIT | ARM_REQ_ARM_AUTH_BIT));
+			// arming requirements: mission
+			if (_param_arm_req_mission.get()) {
+				arm_requirements |= ARM_REQ_MISSION_BIT;
+
+			} else {
+				arm_requirements &= ~ARM_REQ_MISSION_BIT;
+			}
+
+			// arming requirements: without GPS
+			if (_param_arm_req_wo_gps.get()) {
+				arm_requirements &= ~ARM_REQ_GPS_BIT;
+
+			} else {
+				arm_requirements |= ARM_REQ_GPS_BIT;
+			}
+
+			// arming requirements: geofence
+			if (_param_arm_req_geofence.get()) {
+				arm_requirements |= ARM_REQ_GEOFENCE_BIT;
+
+			} else {
+				arm_requirements &= ~ARM_REQ_GEOFENCE_BIT;
+			}
 
 			/* flight mode slots */
 			param_get(_param_fmode_1, &_flight_mode_slots[0]);
@@ -1813,82 +1815,7 @@ Commander::run()
 			}
 		}
 
-		/* start geofence result check */
-		orb_check(geofence_result_sub, &updated);
-
-		if (updated) {
-			orb_copy(ORB_ID(geofence_result), geofence_result_sub, &geofence_result);
-		}
-
-		// Geofence actions
-		if (armed.armed && (geofence_result.geofence_action != geofence_result_s::GF_ACTION_NONE)) {
-
-			static bool geofence_loiter_on = false;
-			static bool geofence_rtl_on = false;
-
-			// check for geofence violation
-			if (geofence_result.geofence_violated) {
-				static hrt_abstime last_geofence_violation = 0;
-				const hrt_abstime geofence_violation_action_interval = 10_s;
-
-				if (hrt_elapsed_time(&last_geofence_violation) > geofence_violation_action_interval) {
-
-					last_geofence_violation = hrt_absolute_time();
-
-					switch (geofence_result.geofence_action) {
-					case (geofence_result_s::GF_ACTION_NONE) : {
-							// do nothing
-							break;
-						}
-
-					case (geofence_result_s::GF_ACTION_WARN) : {
-							// do nothing, mavlink critical messages are sent by navigator
-							break;
-						}
-
-					case (geofence_result_s::GF_ACTION_LOITER) : {
-							if (TRANSITION_CHANGED == main_state_transition(status, commander_state_s::MAIN_STATE_AUTO_LOITER, status_flags,
-									&internal_state)) {
-								geofence_loiter_on = true;
-							}
-
-							break;
-						}
-
-					case (geofence_result_s::GF_ACTION_RTL) : {
-							if (TRANSITION_CHANGED == main_state_transition(status, commander_state_s::MAIN_STATE_AUTO_RTL, status_flags,
-									&internal_state)) {
-								geofence_rtl_on = true;
-							}
-
-							break;
-						}
-
-					case (geofence_result_s::GF_ACTION_TERMINATE) : {
-							warnx("Flight termination because of geofence");
-							mavlink_log_critical(&mavlink_log_pub, "Geofence violation! Flight terminated");
-							armed.force_failsafe = true;
-							status_changed = true;
-							break;
-						}
-					}
-				}
-			}
-
-			// reset if no longer in LOITER or if manually switched to LOITER
-			geofence_loiter_on = geofence_loiter_on
-					     && (internal_state.main_state == commander_state_s::MAIN_STATE_AUTO_LOITER)
-					     && (sp_man.loiter_switch == manual_control_setpoint_s::SWITCH_POS_OFF
-						 || sp_man.loiter_switch == manual_control_setpoint_s::SWITCH_POS_NONE);
-
-			// reset if no longer in RTL or if manually switched to RTL
-			geofence_rtl_on = geofence_rtl_on
-					  && (internal_state.main_state == commander_state_s::MAIN_STATE_AUTO_RTL)
-					  && (sp_man.return_switch == manual_control_setpoint_s::SWITCH_POS_OFF
-					      || sp_man.return_switch == manual_control_setpoint_s::SWITCH_POS_NONE);
-
-			warning_action_on = warning_action_on || (geofence_loiter_on || geofence_rtl_on);
-		}
+		geofence_check(&status_changed);
 
 		// revert geofence failsafe transition if sticks are moved and we were previously in a manual mode
 		// but only if not in a low battery handling action
@@ -2048,10 +1975,6 @@ Commander::run()
 					    && (internal_state.main_state != commander_state_s::MAIN_STATE_RATTITUDE)
 					   ) {
 						print_reject_arm("Not arming: Switch to a manual mode first");
-
-					} else if (!status_flags.condition_home_position_valid &&
-						   geofence_action == geofence_result_s::GF_ACTION_RTL) {
-						print_reject_arm("Not arming: Geofence RTL requires valid home");
 
 					} else if (status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
 						arming_ret = arming_state_transition(&status, safety, vehicle_status_s::ARMING_STATE_ARMED, &armed,
@@ -4483,4 +4406,86 @@ void Commander::estimator_check(bool *status_changed)
 
 	check_valid(lpos.timestamp, _param_com_pos_fs_delay.get() * 1_s, lpos.z_valid,
 		    &(status_flags.condition_local_altitude_valid), status_changed);
+}
+
+void Commander::geofence_check(bool *status_changed)
+{
+	const geofence_result_s &geofence_result = _geofence_result_sub.get();
+
+	/* start geofence result check */
+	if (_geofence_result_sub.update()) {
+
+		if ((geofence_result.timestamp > 0) && (geofence_result.action != geofence_result_s::GF_ACTION_NONE)) {
+			status_flags.condition_geofence_available = !geofence_result.empty;
+
+			if (geofence_result.home_required) {
+				arm_requirements |= ARM_REQ_HOME_BIT;
+			}
+		}
+	}
+
+	// Geofence actions
+	if (armed.armed && (geofence_result.action != geofence_result_s::GF_ACTION_NONE)) {
+
+		static bool geofence_loiter_on = false;
+		static bool geofence_rtl_on = false;
+
+		// check for geofence violation
+		if (geofence_result.violated) {
+			static hrt_abstime last_geofence_violation = 0;
+			static constexpr hrt_abstime geofence_violation_action_interval = 10_s;
+
+			if (hrt_elapsed_time(&last_geofence_violation) > geofence_violation_action_interval) {
+
+				last_geofence_violation = hrt_absolute_time();
+
+				switch (geofence_result.action) {
+				case (geofence_result_s::GF_ACTION_NONE) :
+					// do nothing
+					break;
+
+				case (geofence_result_s::GF_ACTION_WARN) :
+					// do nothing, mavlink critical messages are sent by navigator
+					break;
+
+				case (geofence_result_s::GF_ACTION_LOITER) :
+					if (TRANSITION_CHANGED == main_state_transition(status, commander_state_s::MAIN_STATE_AUTO_LOITER, status_flags,
+							&internal_state)) {
+						geofence_loiter_on = true;
+					}
+
+					break;
+
+				case (geofence_result_s::GF_ACTION_RTL) :
+					if (TRANSITION_CHANGED == main_state_transition(status, commander_state_s::MAIN_STATE_AUTO_RTL, status_flags,
+							&internal_state)) {
+						geofence_rtl_on = true;
+					}
+
+					break;
+
+				case (geofence_result_s::GF_ACTION_TERMINATE) :
+					mavlink_log_critical(&mavlink_log_pub, "Geofence violation! Flight terminated");
+					armed.force_failsafe = true;
+					*status_changed = true;
+					break;
+				}
+			}
+		}
+
+		// reset if no longer in LOITER or if manually switched to LOITER
+		geofence_loiter_on = geofence_loiter_on
+				     && (internal_state.main_state == commander_state_s::MAIN_STATE_AUTO_LOITER)
+				     && (sp_man.loiter_switch == manual_control_setpoint_s::SWITCH_POS_OFF
+					 || sp_man.loiter_switch == manual_control_setpoint_s::SWITCH_POS_NONE);
+
+		// reset if no longer in RTL or if manually switched to RTL
+		geofence_rtl_on = geofence_rtl_on
+				  && (internal_state.main_state == commander_state_s::MAIN_STATE_AUTO_RTL)
+				  && (sp_man.return_switch == manual_control_setpoint_s::SWITCH_POS_OFF
+				      || sp_man.return_switch == manual_control_setpoint_s::SWITCH_POS_NONE);
+
+		warning_action_on = warning_action_on || (geofence_loiter_on || geofence_rtl_on);
+	}
+
 }

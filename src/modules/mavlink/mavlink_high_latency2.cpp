@@ -300,7 +300,7 @@ bool MavlinkStreamHighLatency2::write_geofence_result(mavlink_high_latency2_t *m
 	const bool updated = _geofence_sub->update(&_geofence_time, &geofence);
 
 	if (_geofence_time > 0) {
-		if (geofence.geofence_violated) {
+		if (geofence.violated) {
 			msg->failure_flags |= HL_FAILURE_FLAG_GEOFENCE;
 		}
 	}
