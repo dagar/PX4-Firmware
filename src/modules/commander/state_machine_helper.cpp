@@ -980,6 +980,18 @@ bool prearm_check(orb_advert_t *mavlink_log_pub, const vehicle_status_flags_s &s
 		}
 	}
 
+	// Arm Requirements: geofence
+	if (arm_requirements & ARM_REQ_GEOFENCE_BIT) {
+
+		if (!status_flags.condition_geofence_available) {
+			if (prearm_ok && reportFailures) {
+				mavlink_log_critical(mavlink_log_pub, "ARMING DENIED: geofence required");
+			}
+
+			prearm_ok = false;
+		}
+	}
+
 	// safety button
 	if (safety.safety_switch_available && !safety.safety_off) {
 		// Fail transition if we need safety switch press

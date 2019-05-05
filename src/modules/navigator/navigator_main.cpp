@@ -549,12 +549,13 @@ Navigator::run()
 			have_geofence_position_data = false;
 
 			_geofence_result.timestamp = hrt_absolute_time();
-			_geofence_result.geofence_action = _geofence.getGeofenceAction();
+			_geofence_result.empty = _geofence.isEmpty();
+			_geofence_result.action = _geofence.getGeofenceAction();
 			_geofence_result.home_required = _geofence.isHomeRequired();
 
 			if (!inside) {
 				/* inform other apps via the mission result */
-				_geofence_result.geofence_violated = true;
+				_geofence_result.violated = true;
 
 				/* Issue a warning about the geofence violation once */
 				if (!_geofence_violation_warning_sent) {
@@ -564,7 +565,7 @@ Navigator::run()
 
 			} else {
 				/* inform other apps via the mission result */
-				_geofence_result.geofence_violated = false;
+				_geofence_result.violated = false;
 
 				/* Reset the _geofence_violation_warning_sent field */
 				_geofence_violation_warning_sent = false;

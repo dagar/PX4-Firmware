@@ -286,6 +286,16 @@ PARAM_DEFINE_FLOAT(COM_DISARM_LAND, -1.0f);
 PARAM_DEFINE_INT32(COM_ARM_WO_GPS, 1);
 
 /**
+ * Require GeoFence to be set for arming
+ *
+ * The default allows to arm the vehicle without GeoFence
+ *
+ * @group Commander
+ * @boolean
+ */
+PARAM_DEFINE_INT32(COM_ARM_GEOFENCE, 0);
+
+/**
  * Arm switch is only a button
  *
  * The default uses the arm switch as real switch.
