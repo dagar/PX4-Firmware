@@ -150,13 +150,14 @@ private:
 	 * Union with all existing tasks: we use it to make sure that only the memory of the largest existing
 	 * task is needed, and to avoid using dynamic memory allocations.
 	 */
-	TaskUnion _task_union; /**< storage for the currently active task */
+	TaskUnion _task_union[2]; /**< storage for the currently active task */
 
 	struct flight_task_t {
 		FlightTask *task;
 		FlightTaskIndex index;
+		uint8_t task_union_slot;
 	};
-	flight_task_t _current_task = {nullptr, FlightTaskIndex::None};
+	flight_task_t _current_task = {nullptr, FlightTaskIndex::None, 0};
 
 	SubscriptionArray _subscription_array;
 

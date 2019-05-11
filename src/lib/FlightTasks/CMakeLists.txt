@@ -51,39 +51,26 @@ endif()
 
 # add core flight tasks to list
 list(APPEND flight_tasks_all
+	AutoFollowMe
+	AutoLine
+	AutoLineSmoothVel
+	Failsafe
 	ManualAltitude
 	ManualAltitudeSmooth
 	ManualAltitudeSmoothVel
 	ManualPosition
 	ManualPositionSmooth
 	ManualPositionSmoothVel
-	Sport
-	AutoLine
-	AutoLineSmoothVel
-	AutoFollowMe
 	Offboard
-	Failsafe
+	Sport
 	Transition
 	${flight_tasks_to_add}
 )
 
-# set the files to be generated
-set(files_to_generate
-	FlightTasks_generated.hpp
-	FlightTasks_generated.cpp
-)
-
-# generate files needed for Flight Tasks
-set(python_args
-	-t ${flight_tasks_all}
-	-i ${CMAKE_CURRENT_SOURCE_DIR}/Templates
-	-o ${CMAKE_CURRENT_BINARY_DIR}
-	-f ${files_to_generate}
-)
-
 # add the additional tasks for the python script (if there are any)
+set(additional_python_args)
 if(flight_tasks_to_add)
-	list(APPEND python_args
+	list(APPEND additional_python_args
 		-s ${flight_tasks_to_add}
 	)
 endif()
@@ -93,9 +80,18 @@ add_custom_command(
 	OUTPUT
 		${CMAKE_CURRENT_BINARY_DIR}/FlightTasks_generated.hpp
 		${CMAKE_CURRENT_BINARY_DIR}/FlightTasks_generated.cpp
-	COMMAND ${PYTHON_EXECUTABLE} generate_flight_tasks.py
-		${python_args}
+	COMMAND
+		${PYTHON_EXECUTABLE} generate_flight_tasks.py
+			-t ${flight_tasks_all}
+			-i ${CMAKE_CURRENT_SOURCE_DIR}/Templates
+			-o ${CMAKE_CURRENT_BINARY_DIR}
+			-f FlightTasks_generated.cpp FlightTasks_generated.hpp
+			${additional_python_args}
 	COMMENT "Generating Flight Tasks"
+	DEPENDS
+		generate_flight_tasks.py
+		Templates/FlightTasks_generated.hpp.em
+		Templates/FlightTasks_generated.cpp.em
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	VERBATIM
 )

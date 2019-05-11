@@ -41,28 +41,34 @@
 
 #pragma once
 
-#include <px4_module_params.h>
 #include <drivers/drv_hrt.h>
+#include <lib/WeatherVane/WeatherVane.hpp>
 #include <matrix/matrix/math.hpp>
+#include <px4_module_params.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/landing_gear.h>
-#include <uORB/topics/vehicle_local_position.h>
-#include <uORB/topics/vehicle_local_position_setpoint.h>
+#include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_constraints.h>
-#include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
-#include <lib/WeatherVane/WeatherVane.hpp>
+
 #include "SubscriptionArray.hpp"
 
 class FlightTask : public ModuleParams
 {
 public:
-	FlightTask() :
-		ModuleParams(nullptr)
+	FlightTask() : ModuleParams(nullptr)
 	{
 		_resetSetpoints();
 		_constraints = empty_constraints;
+	}
+
+	FlightTask(FlightTask *previous_flight_task) : ModuleParams(nullptr)
+	{
+		//_resetSetpoints();
+		//_constraints = empty_constraints;
 	}
 
 	virtual ~FlightTask() = default;
@@ -165,10 +171,7 @@ public:
 	/**
 	 * Call this whenever a parameter update notification is received (parameter_update uORB message)
 	 */
-	void handleParameterUpdate()
-	{
-		updateParams();
-	}
+	void handleParameterUpdate() { updateParams(); }
 
 	/**
 	 * Sets an external yaw handler which can be used by any flight task to implement a different yaw control strategy.
@@ -176,13 +179,17 @@ public:
 	 */
 	virtual void setYawHandler(WeatherVane *ext_yaw_handler) {}
 
-	void updateVelocityControllerIO(const matrix::Vector3f &vel_sp,
-					const matrix::Vector3f &thrust_sp) {_velocity_setpoint_feedback = vel_sp; _thrust_setpoint_feedback = thrust_sp; }
+	void updateVelocityControllerIO(const matrix::Vector3f &vel_sp, const matrix::Vector3f &thrust_sp)
+	{
+		_velocity_setpoint_feedback = vel_sp;
+		_thrust_setpoint_feedback = thrust_sp;
+	}
 
 protected:
 
 	uORB::Subscription<vehicle_local_position_s> *_sub_vehicle_local_position{nullptr};
 	uORB::Subscription<vehicle_attitude_s> *_sub_attitude{nullptr};
+
 	uint8_t _heading_reset_counter{0}; /**< estimator heading reset */
 
 	/**
@@ -209,8 +216,8 @@ protected:
 	hrt_abstime _time_stamp_last = 0; /**< time stamp when task was last updated */
 
 	/* Current vehicle state */
-	matrix::Vector3f _position; /**< current vehicle position */
-	matrix::Vector3f _velocity; /**< current vehicle velocity */
+	matrix::Vector3f _position{}; /**< current vehicle position */
+	matrix::Vector3f _velocity{}; /**< current vehicle velocity */
 	float _yaw = 0.f; /**< current vehicle yaw heading */
 	float _dist_to_bottom = 0.0f; /**< current height above ground level */
 
@@ -222,16 +229,16 @@ protected:
 	 * _velocity_setpoint is used as feedforward.
 	 * _acceleration_setpoint and _jerk_setpoint are currently not supported.
 	 */
-	matrix::Vector3f _position_setpoint;
-	matrix::Vector3f _velocity_setpoint;
-	matrix::Vector3f _acceleration_setpoint;
-	matrix::Vector3f _jerk_setpoint;
-	matrix::Vector3f _thrust_setpoint;
-	float _yaw_setpoint;
-	float _yawspeed_setpoint;
+	matrix::Vector3f _position_setpoint{};
+	matrix::Vector3f _velocity_setpoint{};
+	matrix::Vector3f _acceleration_setpoint{};
+	matrix::Vector3f _jerk_setpoint{};
+	matrix::Vector3f _thrust_setpoint{};
+	float _yaw_setpoint{0.0f};
+	float _yawspeed_setpoint{0.0f};
 
-	matrix::Vector3f _velocity_setpoint_feedback;
-	matrix::Vector3f _thrust_setpoint_feedback;
+	matrix::Vector3f _velocity_setpoint_feedback{};
+	matrix::Vector3f _thrust_setpoint_feedback{};
 
 	/**
 	 * Vehicle constraints.

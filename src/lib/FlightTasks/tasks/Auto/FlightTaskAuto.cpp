@@ -40,7 +40,7 @@
 
 using namespace matrix;
 
-static constexpr float SIGMA_NORM	= 0.001f;
+static constexpr float SIGMA_NORM = 0.001f;
 
 FlightTaskAuto::FlightTaskAuto() :
 	_obstacle_avoidance(this)
@@ -78,7 +78,8 @@ bool FlightTaskAuto::activate()
 	bool ret = FlightTask::activate();
 	_position_setpoint = _position;
 	_velocity_setpoint = _velocity;
-	_yaw_setpoint = _yaw_sp_prev = _yaw;
+	_yaw_setpoint = _yaw;
+	_yaw_sp_prev = _yaw;
 	_yawspeed_setpoint = 0.0f;
 	_setDefaultConstraints();
 	return ret;
@@ -87,15 +88,14 @@ bool FlightTaskAuto::activate()
 bool FlightTaskAuto::updateInitialize()
 {
 	bool ret = FlightTask::updateInitialize();
+
 	// require valid reference and valid target
 	ret = ret && _evaluateGlobalReference() && _evaluateTriplets();
+
 	// require valid position
-	ret = ret && PX4_ISFINITE(_position(0))
-	      && PX4_ISFINITE(_position(1))
-	      && PX4_ISFINITE(_position(2))
-	      && PX4_ISFINITE(_velocity(0))
-	      && PX4_ISFINITE(_velocity(1))
-	      && PX4_ISFINITE(_velocity(2));
+	ret = ret &&
+	      PX4_ISFINITE(_position(0)) && PX4_ISFINITE(_position(1)) && PX4_ISFINITE(_position(2)) &&
+	      PX4_ISFINITE(_velocity(0)) && PX4_ISFINITE(_velocity(1)) && PX4_ISFINITE(_velocity(2));
 
 	return ret;
 }

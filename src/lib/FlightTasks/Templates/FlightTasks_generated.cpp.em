@@ -52,6 +52,8 @@ int FlightTasks::_initTask(FlightTaskIndex task_index)
 		_current_task.index = FlightTaskIndex::None;
 	}
 
+	FlightTask* current_task = _current_task.task;
+
 	switch (task_index) {
 	case FlightTaskIndex::None:
 		// already disabled task
@@ -64,7 +66,12 @@ int FlightTasks::_initTask(FlightTaskIndex task_index)
 firstLowercase = lambda s: s[:1].lower() + s[1:] if s else ''
 }@
 	case FlightTaskIndex::@(task):
-		_current_task.task = new (&_task_union.@(firstLowercase(task))) FlightTask@(task)();
+		PX4_INFO("sizeof(FlightTask@(task)): %zu", sizeof(FlightTask@(task)));
+		if (current_task) {
+			_current_task.task = new (&_task_union[0].@(firstLowercase(task))) FlightTask@(task)(current_task);
+		} else {
+			_current_task.task = new (&_task_union[0].@(firstLowercase(task))) FlightTask@(task)();
+		}
 		break;
 
 @[end for]@
