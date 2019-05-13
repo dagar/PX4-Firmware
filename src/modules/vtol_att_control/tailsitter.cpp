@@ -261,12 +261,6 @@ void Tailsitter::waiting_on_tecs()
 void Tailsitter::update_fw_state()
 {
 	VtolType::update_fw_state();
-
-	// allow fw yawrate control via multirotor roll actuation. this is useful for vehicles
-	// which don't have a rudder to coordinate turns
-	if (_params->diff_thrust == 1) {
-		_mc_roll_weight = 1.0f;
-	}
 }
 
 /**
@@ -274,36 +268,55 @@ void Tailsitter::update_fw_state()
 */
 void Tailsitter::fill_actuator_outputs()
 {
+	// MC actuators
 	_actuators_out_0->timestamp = hrt_absolute_time();
 	_actuators_out_0->timestamp_sample = _actuators_mc_in->timestamp_sample;
+	const auto &act_mc_in = _actuators_mc_in->control;
+	auto &act_mc_out = _actuators_out_0->control;
 
+	// FW actuators
 	_actuators_out_1->timestamp = hrt_absolute_time();
 	_actuators_out_1->timestamp_sample = _actuators_fw_in->timestamp_sample;
-
-	_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL]
-			* _mc_roll_weight;
-	_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] =
-		_actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] * _mc_pitch_weight;
-	_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW] *
-			_mc_yaw_weight;
+	const auto &act_fw_in = _actuators_fw_in->control;
+	auto &act_fw_out = _actuators_out_1->control;
 
 	if (_vtol_schedule.flight_mode == FW_MODE) {
-		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];
+		// MC out
+		if (_params->diff_thrust == 1) {
+			// allow fw yawrate control via multirotor roll actuation. this is useful for vehicles
+			// which don't have a rudder to coordinate turns
+			act_mc_out[actuator_controls_s::INDEX_ROLL] = act_fw_in[actuator_controls_s::INDEX_YAW] * _params->diff_thrust_scale;
+
+		} else {
+			act_mc_out[actuator_controls_s::INDEX_ROLL] = 0.0f;
+		}
+
+		act_mc_out[actuator_controls_s::INDEX_PITCH] = 0.0f;
+		act_mc_out[actuator_controls_s::INDEX_YAW] = 0.0f;
+		act_mc_out[actuator_controls_s::INDEX_THROTTLE] = act_fw_in[actuator_controls_s::INDEX_THROTTLE];
+
+		// FW out
+		act_fw_out[actuator_controls_s::INDEX_ROLL] = act_fw_in[actuator_controls_s::INDEX_ROLL];
+		act_fw_out[actuator_controls_s::INDEX_PITCH] = act_fw_in[actuator_controls_s::INDEX_PITCH];
+		act_fw_out[actuator_controls_s::INDEX_YAW] = act_fw_in[actuator_controls_s::INDEX_YAW];
 
 	} else {
-		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
-			_actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
-	}
+		// MC out
+		act_mc_out[actuator_controls_s::INDEX_ROLL] = act_mc_in[actuator_controls_s::INDEX_ROLL] * _mc_roll_weight;
+		act_mc_out[actuator_controls_s::INDEX_PITCH] = act_mc_in[actuator_controls_s::INDEX_PITCH] * _mc_pitch_weight;
+		act_mc_out[actuator_controls_s::INDEX_YAW] = act_mc_in[actuator_controls_s::INDEX_YAW] * _mc_yaw_weight;
+		act_mc_out[actuator_controls_s::INDEX_THROTTLE] = act_mc_in[actuator_controls_s::INDEX_THROTTLE];
 
-	if (_params->elevons_mc_lock && _vtol_schedule.flight_mode == MC_MODE) {
-		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = 0;
-		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = 0;
+		// FW out (optional)
+		if (_params->elevons_mc_lock) {
+			act_fw_out[actuator_controls_s::INDEX_ROLL] = 0.0f;
+			act_fw_out[actuator_controls_s::INDEX_PITCH] = 0.0f;
+			act_fw_out[actuator_controls_s::INDEX_YAW] = 0.0f;
 
-	} else {
-		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];
-		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];
+		} else {
+			act_fw_out[actuator_controls_s::INDEX_ROLL] = act_fw_in[actuator_controls_s::INDEX_ROLL];
+			act_fw_out[actuator_controls_s::INDEX_PITCH] = act_fw_in[actuator_controls_s::INDEX_PITCH];
+			act_fw_out[actuator_controls_s::INDEX_YAW] = 0.0f;
+		}
 	}
 }
