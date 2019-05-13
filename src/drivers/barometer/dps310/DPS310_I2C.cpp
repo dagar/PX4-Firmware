@@ -31,39 +31,58 @@
  *
  ****************************************************************************/
 
-#pragma once
+/**
+ * @file DPS310_I2C.cpp
+ *
+ * I2C interface for DPS310
+ */
 
-#include <lib/perf/perf_counter.h>
-#include <px4_getopt.h>
-#include <px4_work_queue/ScheduledWorkItem.hpp>
+#include <lib/drivers/device/i2c.h>
 
-#include "BMI088_Accelerometer.hpp"
-#include "BMI088_Gyroscope.hpp"
+#define DPS310_ADDRESS		0x77
 
-using Bosch_BMI088_Accelerometer::BMI088_Accelerometer;
-using Bosch_BMI088_Gyroscope::BMI088_Gyroscope;
+device::Device *DPS310_I2C_interface(int bus);
 
-class BMI088 : public px4::ScheduledWorkItem
+class DPS310_I2C : public device::I2C
 {
 public:
+	DPS310_I2C(int bus);
+	virtual ~DPS310_I2C() = default;
 
-	BMI088(int bus, enum Rotation rotation);
-	virtual ~BMI088() = default;
-
-	int init();
-
-	bool start();
-	bool stop();
-
-	void print_info();
-	void print_registers();
-
-
-private:
-
-	void Run() override;
-
-	BMI088_Accelerometer	_accel;
-	BMI088_Gyroscope	_gyro;
+	virtual int	read(unsigned address, void *data, unsigned count);
+	virtual int	write(unsigned address, void *data, unsigned count);
 
 };
+
+device::Device *
+DPS310_I2C_interface(int bus)
+{
+	return new DPS310_I2C(bus);
+}
+
+DPS310_I2C::DPS310_I2C(int bus) :
+	I2C("DPS310_I2C", nullptr, bus, DPS310_ADDRESS, 400000)
+{
+}
+
+int
+DPS310_I2C::read(unsigned address, void *data, unsigned count)
+{
+	uint8_t cmd = address;
+	return transfer(&cmd, 1, (uint8_t *)data, count);
+}
+
+int
+DPS310_I2C::write(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address;
+	memcpy(&buf[1], data, count);
+
+	return transfer(&buf[0], count + 1, nullptr, 0);
+}

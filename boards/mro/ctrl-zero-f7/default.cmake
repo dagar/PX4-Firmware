@@ -1,27 +1,26 @@
 
 px4_add_board(
 	PLATFORM nuttx
-	VENDOR px4
-	MODEL fmu-v5x
+	VENDOR mro
+	MODEL ctrl-zero-f7
 	LABEL default
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
-	IO px4_io-v2_default
 	TESTING
-	UAVCAN_INTERFACES 2
+	UAVCAN_INTERFACES 1
 
 	SERIAL_PORTS
-		GPS1:/dev/ttyS0
-		TEL1:/dev/ttyS6
-		TEL2:/dev/ttyS4
-		TEL3:/dev/ttyS2
-		GPS2:/dev/ttyS0
+		TEL1:/dev/ttyS0
+		TEL2:/dev/ttyS1
+		GPS1:/dev/ttyS2
+		#RC:/dev/ttyS3
+		#CONSOLE:/dev/ttyS4
+		#FRSKY:/dev/ttyS5
 
 	DRIVERS
 		#barometer # all available barometer drivers
-		#barometer/bmp388
-		barometer/ms5611
+		barometer/dps310
 		batt_smbus
 		camera_capture
 		camera_trigger
@@ -29,29 +28,24 @@ px4_add_board(
 		distance_sensor # all available distance sensor drivers
 		gps
 		#heater
-		imu/adis16448
-		imu/adis16497
 		#imu # all available imu drivers
 		imu/bmi088
-# TBD		imu/ism330dlc - needs bus selection
 		imu/mpu6000
+		imu/icm20948
 		irlock
-		lights/blinkm
-		lights/oreoled
-		lights/pca8574
+		#lights/blinkm
+		#lights/oreoled
+		#lights/pca8574
 		lights/rgbled
-		lights/rgbled_ncp5623c
 		magnetometer # all available magnetometer drivers
 		#md25
 		mkblctrl
-		optical_flow # all available optical flow drivers
+		#optical_flow # all available optical flow drivers
 		pca9685
-		power_monitor/ina226
 		#protocol_splitter
-		pwm_input
+		#pwm_input
 		pwm_out_sim
 		px4fmu
-		px4io
 		rc_input
 		roboclaw
 		stm32
@@ -72,6 +66,7 @@ px4_add_board(
 		events
 		fw_att_control
 		fw_pos_control_l1
+		rover_pos_control
 		land_detector
 		landing_target_estimator
 		load_mon
@@ -81,7 +76,6 @@ px4_add_board(
 		mc_att_control
 		mc_pos_control
 		navigator
-		rover_pos_control
 		sensors
 		sih
 		vmount
@@ -127,4 +121,5 @@ px4_add_board(
 		rover_steering_control # Rover example app
 		segway
 		uuv_example_app
+
 	)

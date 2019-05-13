@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,18 +30,17 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-
-add_subdirectory(adis16448)
-add_subdirectory(adis16477)
-add_subdirectory(adis16497)
-add_subdirectory(bma180)
-add_subdirectory(bmi055)
-add_subdirectory(bmi088)
-add_subdirectory(bmi160)
-add_subdirectory(fxas21002c)
-add_subdirectory(fxos8701cq)
-add_subdirectory(icm20948)
-add_subdirectory(l3gd20)
-add_subdirectory(lsm303d)
-add_subdirectory(mpu6000)
-add_subdirectory(mpu9250)
+px4_add_module(
+	MODULE drivers__barometer__dps310
+	MAIN dps310
+	STACK_MAIN 1500
+	COMPILE_FLAGS
+	SRCS
+		DPS310.cpp
+		DPS310.hpp
+		DPS310_I2C.cpp
+		DPS310_SPI.cpp
+		dps310_main.cpp
+	DEPENDS
+		drivers_barometer
+	)

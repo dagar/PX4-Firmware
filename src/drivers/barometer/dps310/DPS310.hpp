@@ -31,39 +31,65 @@
  *
  ****************************************************************************/
 
+/**
+ * @file dps310.cpp
+ *
+ * Driver for the DPS310 barometer connected via I2C or SPI.
+ */
+
 #pragma once
 
+#include <drivers/device/Device.hpp>
+#include <lib/drivers/barometer/PX4Barometer.hpp>
 #include <lib/perf/perf_counter.h>
-#include <px4_getopt.h>
 #include <px4_work_queue/ScheduledWorkItem.hpp>
 
-#include "BMI088_Accelerometer.hpp"
-#include "BMI088_Gyroscope.hpp"
+#include "Infineon_DPS310_Registers.hpp"
 
-using Bosch_BMI088_Accelerometer::BMI088_Accelerometer;
-using Bosch_BMI088_Gyroscope::BMI088_Gyroscope;
+using Infineon_DPS310::Register;
 
-class BMI088 : public px4::ScheduledWorkItem
+/*
+ * DPS310 internal constants and data structures.
+ */
+
+class DPS310 : public px4::ScheduledWorkItem
 {
 public:
+	DPS310(device::Device *interface);
+	virtual ~DPS310();
 
-	BMI088(int bus, enum Rotation rotation);
-	virtual ~BMI088() = default;
+	virtual int		init();
 
-	int init();
-
-	bool start();
-	bool stop();
-
-	void print_info();
-	void print_registers();
-
+	void			print_info();
 
 private:
 
-	void Run() override;
+	void			Run() override;
 
-	BMI088_Accelerometer	_accel;
-	BMI088_Gyroscope	_gyro;
+	void			start();
+	void			stop();
+	int			reset();
+
+	uint8_t			RegisterRead(Register reg);
+	void			RegisterWrite(Register reg, uint8_t val);
+	void			RegisterClearBits(Register reg, uint8_t clearbits);
+	void			RegisterSetBits(Register reg, uint8_t setbits);
+
+	void			calculate_PT(int32_t UT, int32_t UP, float &pressure, float &temperature);
+
+
+	PX4Barometer		_px4_barometer;
+
+	device::Device		*_interface;
+
+	Infineon_DPS310::Calibration	_calibration{};
+
+	unsigned		_measure_interval{0};
+
+	bool			_collect_phase{false};
+
+	perf_counter_t		_sample_perf;
+	perf_counter_t		_sample_interval_perf;
+	perf_counter_t		_comms_errors;
 
 };

@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,17 +31,19 @@
 #
 ############################################################################
 
-add_subdirectory(adis16448)
-add_subdirectory(adis16477)
-add_subdirectory(adis16497)
-add_subdirectory(bma180)
-add_subdirectory(bmi055)
-add_subdirectory(bmi088)
-add_subdirectory(bmi160)
-add_subdirectory(fxas21002c)
-add_subdirectory(fxos8701cq)
-add_subdirectory(icm20948)
-add_subdirectory(l3gd20)
-add_subdirectory(lsm303d)
-add_subdirectory(mpu6000)
-add_subdirectory(mpu9250)
+add_library(drivers_board
+	init.c
+	led.c
+	sdio.c
+	spi.cpp
+	timer_config.c
+	usb.c
+)
+
+target_link_libraries(drivers_board
+	PRIVATE
+		drivers__led # drv_led_start
+		nuttx_arch # sdio
+		nuttx_drivers # sdio
+		px4_layer
+)

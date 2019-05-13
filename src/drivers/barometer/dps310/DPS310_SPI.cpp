@@ -31,39 +31,69 @@
  *
  ****************************************************************************/
 
-#pragma once
+/**
+ * @file DPS310_SPI.cpp
+ *
+ * SPI interface for DPS310
+ */
 
-#include <lib/perf/perf_counter.h>
-#include <px4_getopt.h>
-#include <px4_work_queue/ScheduledWorkItem.hpp>
+#include <lib/drivers/device/spi.h>
 
-#include "BMI088_Accelerometer.hpp"
-#include "BMI088_Gyroscope.hpp"
+/* SPI protocol address bits */
+#define DIR_READ			(1<<7)
+#define DIR_WRITE			(0<<7)
 
-using Bosch_BMI088_Accelerometer::BMI088_Accelerometer;
-using Bosch_BMI088_Gyroscope::BMI088_Gyroscope;
+device::Device *DPS310_SPI_interface(int bus);
 
-class BMI088 : public px4::ScheduledWorkItem
+class DPS310_SPI : public device::SPI
 {
 public:
+	DPS310_SPI(int bus, uint32_t device);
+	virtual ~DPS310_SPI() = default;
 
-	BMI088(int bus, enum Rotation rotation);
-	virtual ~BMI088() = default;
-
-	int init();
-
-	bool start();
-	bool stop();
-
-	void print_info();
-	void print_registers();
-
-
-private:
-
-	void Run() override;
-
-	BMI088_Accelerometer	_accel;
-	BMI088_Gyroscope	_gyro;
+	virtual int	read(unsigned address, void *data, unsigned count);
+	virtual int	write(unsigned address, void *data, unsigned count);
 
 };
+
+device::Device *
+DPS310_SPI_interface(int bus)
+{
+	return new DPS310_SPI(bus, PX4_SPIDEV_BARO);
+}
+
+DPS310_SPI::DPS310_SPI(int bus, uint32_t device) :
+	SPI("DPS310_SPI", nullptr, bus, device, SPIDEV_MODE3, 10 * 1000 * 1000)
+{
+}
+
+int
+DPS310_SPI::read(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address | DIR_READ;
+
+	int ret = transfer(&buf[0], &buf[0], count + 1);
+	memcpy(data, &buf[1], count);
+	return ret;
+}
+
+int
+DPS310_SPI::write(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address | DIR_WRITE;
+	memcpy(&buf[1], data, count);
+
+	return transfer(&buf[0], &buf[0], count + 1);
+}

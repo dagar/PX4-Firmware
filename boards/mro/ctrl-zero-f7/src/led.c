@@ -31,39 +31,73 @@
  *
  ****************************************************************************/
 
-#pragma once
+/**
+ * @file led.c
+ *
+ * LED backend.
+ */
 
-#include <lib/perf/perf_counter.h>
-#include <px4_getopt.h>
-#include <px4_work_queue/ScheduledWorkItem.hpp>
+#include <px4_config.h>
 
-#include "BMI088_Accelerometer.hpp"
-#include "BMI088_Gyroscope.hpp"
+#include <stdbool.h>
 
-using Bosch_BMI088_Accelerometer::BMI088_Accelerometer;
-using Bosch_BMI088_Gyroscope::BMI088_Gyroscope;
+#include "chip.h"
+#include "stm32_gpio.h"
+#include "board_config.h"
 
-class BMI088 : public px4::ScheduledWorkItem
-{
-public:
+#include <nuttx/board.h>
+#include <arch/board/board.h>
 
-	BMI088(int bus, enum Rotation rotation);
-	virtual ~BMI088() = default;
+/*
+ * Ideally we'd be able to get these from up_internal.h,
+ * but since we want to be able to disable the NuttX use
+ * of leds for system indication at will and there is no
+ * separate switch, we need to build independent of the
+ * CONFIG_ARCH_LEDS configuration switch.
+ */
+__BEGIN_DECLS
+extern void led_init(void);
+extern void led_on(int led);
+extern void led_off(int led);
+extern void led_toggle(int led);
+__END_DECLS
 
-	int init();
-
-	bool start();
-	bool stop();
-
-	void print_info();
-	void print_registers();
-
-
-private:
-
-	void Run() override;
-
-	BMI088_Accelerometer	_accel;
-	BMI088_Gyroscope	_gyro;
-
+static uint32_t g_ledmap[] = {
+	GPIO_nLED_BLUE,                     // Indexed by LED_BLUE
+	GPIO_nLED_RED,                      // Indexed by LED_RED
+	GPIO_nLED_GREEN,                    // Indexed by LED_GREEN
 };
+
+__EXPORT void led_init(void)
+{
+	for (size_t l = 0; l < (sizeof(g_ledmap) / sizeof(g_ledmap[0])); l++) {
+		stm32_configgpio(g_ledmap[l]);
+	}
+}
+
+static void phy_set_led(int led, bool state)
+{
+	/* Drive Low to switch on */
+	stm32_gpiowrite(g_ledmap[led], !state);
+}
+
+static bool phy_get_led(int led)
+{
+	/* If Low it is on */
+	return !stm32_gpioread(g_ledmap[led]);
+}
+
+__EXPORT void led_on(int led)
+{
+	phy_set_led(led, true);
+}
+
+__EXPORT void led_off(int led)
+{
+	phy_set_led(led, false);
+}
+
+__EXPORT void led_toggle(int led)
+{
+	phy_set_led(led, !phy_get_led(led));
+}

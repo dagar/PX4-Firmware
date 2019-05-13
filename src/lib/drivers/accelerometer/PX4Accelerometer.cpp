@@ -101,6 +101,10 @@ PX4Accelerometer::set_sample_rate(unsigned rate)
 {
 	_sample_rate = rate;
 	_filter.set_cutoff_frequency(_sample_rate, _filter.get_cutoff_freq());
+
+	int interval = 1000000 / _sample_rate;
+
+	_integrator.set_autoreset_interval(interval * 4); // somewhat arbitrary
 }
 
 void

@@ -33,37 +33,47 @@
 
 #pragma once
 
-#include <lib/perf/perf_counter.h>
-#include <px4_getopt.h>
-#include <px4_work_queue/ScheduledWorkItem.hpp>
-
-#include "BMI088_Accelerometer.hpp"
-#include "BMI088_Gyroscope.hpp"
-
-using Bosch_BMI088_Accelerometer::BMI088_Accelerometer;
-using Bosch_BMI088_Gyroscope::BMI088_Gyroscope;
-
-class BMI088 : public px4::ScheduledWorkItem
+namespace Infineon_DPS310
 {
-public:
 
-	BMI088(int bus, enum Rotation rotation);
-	virtual ~BMI088() = default;
+static constexpr uint8_t ID = 0x10;
 
-	int init();
+enum class
+Register : uint8_t {
 
-	bool start();
-	bool stop();
+	PSR_B2		= 0x00,
+	PSR_B1		= 0x01,
+	PSR_B0		= 0x02,
+	TMP_B2		= 0x03,
+	TMP_B1		= 0x04,
+	TMP_B0		= 0x05,
+	PRS_CFG		= 0x06,
+	TMP_CFG		= 0x07,
+	MEAS_CFG	= 0x08,
+	CFG_REG		= 0x09,
+	INT_STS		= 0x0A,
+	FIFO_STS	= 0x0B,
+	RESET		= 0x0C,
+	Product_ID	= 0x0D,
 
-	void print_info();
-	void print_registers();
+	COEF		= 0x10,
 
-
-private:
-
-	void Run() override;
-
-	BMI088_Accelerometer	_accel;
-	BMI088_Gyroscope	_gyro;
+	COEF_SRCE	= 0x28,
 
 };
+
+struct Calibration {
+	int16_t C0;	// 12bit
+	int16_t C1;	// 12bit
+	int32_t C00;	// 20bit
+	int32_t C10;	// 20bit
+	int16_t C01;	// 16bit
+	int16_t C11;	// 16bit
+	int16_t C20;	// 16bit
+	int16_t C21;	// 16bit
+	int16_t C30;	// 16bit
+
+	uint8_t temp_source;
+};
+
+} // namespace Infineon_DPS310
