@@ -978,28 +978,24 @@ PX4FMU::task_spawn(int argc, char *argv[])
 			return ret;
 		}
 
-		_task_id = task_id_is_work_queue;
-
 	} else {
 
 		/* start the IO interface task */
 
-		_task_id = px4_task_spawn_cmd("fmu",
-					      SCHED_DEFAULT,
-					      SCHED_PRIORITY_ACTUATOR_OUTPUTS,
-					      1340,
-					      (px4_main_t)&run_trampoline,
-					      nullptr);
+		int task_id = px4_task_spawn_cmd("fmu",
+						 SCHED_DEFAULT,
+						 SCHED_PRIORITY_ACTUATOR_OUTPUTS,
+						 1340,
+						 (px4_main_t)&run_trampoline,
+						 nullptr);
 
-		if (_task_id < 0) {
-			_task_id = -1;
+		if (task_id < 0) {
 			return -errno;
 		}
 	}
 
 	// wait until task is up & running (the mode_* commands depend on it)
 	if (wait_until_running() < 0) {
-		_task_id = -1;
 		return -1;
 	}
 
@@ -1026,7 +1022,7 @@ PX4FMU::cycle_trampoline(void *arg)
 			return;
 		}
 
-		_object.store(dev);
+		dev->set_task_id(task_id_is_work_queue);
 	}
 
 	dev->cycle();

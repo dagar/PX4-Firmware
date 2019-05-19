@@ -89,7 +89,9 @@ int LandDetector::task_spawn(int argc, char *argv[])
 		return -1;
 	}
 
+	obj->set_task_id(task_id_is_work_queue);
 	int ret = obj->start();
+
 
 	if (ret < 0) {
 		delete obj;
@@ -101,7 +103,6 @@ int LandDetector::task_spawn(int argc, char *argv[])
 	_currentMode[sizeof(_currentMode) - 1] = '\0';
 
 	wait_until_running(); // this will wait until _object is set from the cycle method
-	_task_id = task_id_is_work_queue;
 	return 0;
 }
 

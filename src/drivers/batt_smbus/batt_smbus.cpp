@@ -141,8 +141,7 @@ int BATT_SMBUS::task_spawn(int argc, char *argv[])
 			BATT_SMBUS *dev = new BATT_SMBUS(interface, bus_options[i].devpath);
 
 			// Successful read of device type, we've found our battery
-			_object.store(dev);
-			_task_id = task_id_is_work_queue;
+			dev->set_task_id(task_id_is_work_queue);
 
 			int result = dev->get_startup_info();
 

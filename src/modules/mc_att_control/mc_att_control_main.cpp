@@ -935,15 +935,14 @@ MulticopterAttitudeControl::run()
 
 int MulticopterAttitudeControl::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("mc_att_control",
+	int task_id = px4_task_spawn_cmd("mc_att_control",
 					   SCHED_DEFAULT,
 					   SCHED_PRIORITY_ATTITUDE_CONTROL,
 					   1700,
 					   (px4_main_t)&run_trampoline,
 					   (char *const *)argv);
 
-	if (_task_id < 0) {
-		_task_id = -1;
+	if (task_id < 0) {
 		return -errno;
 	}
 

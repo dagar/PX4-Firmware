@@ -104,15 +104,14 @@ int Sih::custom_command(int argc, char *argv[])
 
 int Sih::task_spawn(int argc, char *argv[])
 {
-    _task_id = px4_task_spawn_cmd("sih",
+    int task_id = px4_task_spawn_cmd("sih",
                       SCHED_DEFAULT,
                       SCHED_PRIORITY_MAX,
                       1024,
                       (px4_main_t)&run_trampoline,
                       (char *const *)argv);
 
-    if (_task_id < 0) {
-        _task_id = -1;
+    if (task_id < 0) {
         return -errno;
     }
 
@@ -501,7 +500,7 @@ void Sih::publish_sih()
     } else {
         _att_gt_sub = orb_advertise(ORB_ID(vehicle_attitude_groundtruth), &_att_gt);
     }
-} 
+}
 
 float Sih::generate_wgn()   // generate white Gaussian noise sample with std=1
 {

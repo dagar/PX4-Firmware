@@ -240,7 +240,7 @@ void Heater::initialize_trampoline(void *argv)
 		return;
 	}
 
-	_object.store(heater);
+	heater->set_task_id(task_id_is_work_queue);
 	heater->start();
 }
 
@@ -361,7 +361,6 @@ int Heater::task_spawn(int argc, char *argv[])
 		return ret;
 	}
 
-	_task_id = task_id_is_work_queue;
 	return 0;
 }
 

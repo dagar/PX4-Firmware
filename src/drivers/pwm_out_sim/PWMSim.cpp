@@ -584,21 +584,19 @@ PWMSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 int
 PWMSim::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("pwm_out_sim",
-				      SCHED_DEFAULT,
-				      SCHED_PRIORITY_ACTUATOR_OUTPUTS,
-				      1100,
-				      (px4_main_t)&run_trampoline,
-				      nullptr);
+	int task_id = px4_task_spawn_cmd("pwm_out_sim",
+					 SCHED_DEFAULT,
+					 SCHED_PRIORITY_ACTUATOR_OUTPUTS,
+					 1100,
+					 (px4_main_t)&run_trampoline,
+					 nullptr);
 
-	if (_task_id < 0) {
-		_task_id = -1;
+	if (task_id < 0) {
 		return -errno;
 	}
 
 	// wait until task is up & running (the mode_* commands depend on it)
 	if (wait_until_running() < 0) {
-		_task_id = -1;
 		return -1;
 	}
 

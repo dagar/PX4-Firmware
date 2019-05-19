@@ -66,7 +66,7 @@
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_getopt.h>
-#include <px4_module.h>
+#include <px4_module_multi.h>
 #include <px4_module_params.h>
 #include <px4_posix.h>
 #include <systemlib/mavlink_log.h>
@@ -95,19 +95,33 @@ enum Protocol {
 
 using namespace time_literals;
 
-class Mavlink : public ModuleParams
+static constexpr int MAVLINK_MAX_INSTANCES{4};
+
+class Mavlink : public ModuleMultiBase<Mavlink, MAVLINK_MAX_INSTANCES>, ModuleParams
 {
 
 public:
-	/**
-	 * Constructor
-	 */
 	Mavlink();
-
-	/**
-	 * Destructor, also kills the mavlinks task.
-	 */
 	~Mavlink();
+
+	/** @see ModuleBase */
+	static int task_spawn(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static Mavlink *instantiate(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static int custom_command(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static int print_usage(const char *reason = nullptr);
+
+	/** @see ModuleBase::run() */
+	void run() override;
+
+	static void	task_main_trampoline(int argc, char *argv[]);
+
+	int print_status() override;
 
 	/**
 	* Start the mavlink task.
@@ -117,11 +131,6 @@ public:
 	static int		start(int argc, char *argv[]);
 
 	/**
-	 * Display the mavlink status.
-	 */
-	void			display_status();
-
-	/**
 	 * Display the status of all enabled streams.
 	 */
 	void			display_status_streams();
@@ -129,8 +138,6 @@ public:
 	static int		stream_command(int argc, char *argv[]);
 
 	static int		instance_count();
-
-	static Mavlink		*new_instance();
 
 	static Mavlink		*get_instance(int instance);
 
@@ -142,6 +149,8 @@ public:
 
 	mavlink_status_t 	*get_status() { return &_mavlink_status; }
 
+	int			init(int argc, char *argv[]);
+
 	/**
 	 * Set the MAVLink version
 	 *
@@ -151,9 +160,7 @@ public:
 	 */
 	void			set_proto_version(unsigned version);
 
-	static int		destroy_all_instances();
-
-	static int		get_status_all_instances(bool show_streams_status);
+	static int		get_status_streams_all_instances();
 
 	static bool		instance_exists(const char *device_name, Mavlink *self);
 
@@ -270,8 +277,6 @@ public:
 	 * @return free space in the UART TX buffer
 	 */
 	unsigned		get_free_tx_buf();
-
-	static int		start_helper(int argc, char *argv[]);
 
 	/**
 	 * Enable / disable Hardware in the Loop simulation mode.
@@ -451,8 +456,6 @@ public:
 
 	int 			get_socket_fd() { return _socket_fd; };
 
-	bool			_task_should_exit{false};	/**< Mavlink task should exit iff true. */
-
 #ifdef __PX4_POSIX
 	const in_addr		query_netmask_addr(const int socket_fd, const ifreq &ifreq);
 
@@ -527,7 +530,6 @@ protected:
 	Mavlink			*next{nullptr};
 
 private:
-	int			_instance_id{0};
 
 	bool			_transmitting_enabled{true};
 	bool			_transmitting_enabled_commanded{false};
@@ -536,9 +538,8 @@ private:
 	orb_advert_t		_mavlink_log_pub{nullptr};
 	orb_advert_t		_telem_status_pub{nullptr};
 
-	bool			_task_running{false};
 	static bool		_boot_complete;
-	static constexpr int	MAVLINK_MAX_INSTANCES{4};
+
 	static constexpr int	MAVLINK_MIN_INTERVAL{1500};
 	static constexpr int	MAVLINK_MAX_INTERVAL{10000};
 	static constexpr float	MAVLINK_MIN_MULTIPLIER{0.0005f};
@@ -599,36 +600,36 @@ private:
 
 	FLOW_CONTROL_MODE	_flow_control_mode{Mavlink::FLOW_CONTROL_OFF};
 
-	uint64_t		_last_write_success_time;
-	uint64_t		_last_write_try_time;
-	uint64_t		_mavlink_start_time;
-	int32_t			_protocol_version_switch;
-	int32_t			_protocol_version;
+	uint64_t		_last_write_success_time{0};
+	uint64_t		_last_write_try_time{0};
+	uint64_t		_mavlink_start_time{0};
+	int32_t			_protocol_version_switch{-1};
+	int32_t			_protocol_version{0};
 
-	unsigned		_bytes_tx;
-	unsigned		_bytes_txerr;
-	unsigned		_bytes_rx;
-	uint64_t		_bytes_timestamp;
+	unsigned		_bytes_tx{0};
+	unsigned		_bytes_txerr{0};
+	unsigned		_bytes_rx{0};
+	uint64_t		_bytes_timestamp{0};
 
 #if defined(CONFIG_NET) || defined(__PX4_POSIX)
-	sockaddr_in		_myaddr;
-	sockaddr_in		_src_addr;
-	sockaddr_in		_bcast_addr;
+	sockaddr_in		_myaddr {};
+	sockaddr_in		_src_addr{};
+	sockaddr_in		_bcast_addr{};
 
-	bool			_src_addr_initialized;
-	bool			_broadcast_address_found;
-	bool			_broadcast_address_not_found_warned;
-	bool			_broadcast_failed_warned;
-	uint8_t			_network_buf[MAVLINK_MAX_PACKET_LEN];
-	unsigned		_network_buf_len;
+	bool			_src_addr_initialized{false};
+	bool			_broadcast_address_found{false};
+	bool			_broadcast_address_not_found_warned{false};
+	bool			_broadcast_failed_warned{false};
+	uint8_t			_network_buf[MAVLINK_MAX_PACKET_LEN] {};
+	unsigned		_network_buf_len{0};
 #endif
 
 	const char 		*_interface_name;
 
-	int			_socket_fd;
-	Protocol		_protocol;
-	unsigned short		_network_port;
-	unsigned short		_remote_port;
+	int			_socket_fd{-1};
+	Protocol		_protocol{SERIAL};
+	unsigned short		_network_port{14556};
+	unsigned short		_remote_port{DEFAULT_REMOTE_PORT_UDP};
 
 	radio_status_s		_rstatus{};
 	telemetry_status_s	_tstatus{};
@@ -721,11 +722,6 @@ private:
 	void find_broadcast_address();
 
 	void init_udp();
-
-	/**
-	 * Main mavlink task.
-	 */
-	int		task_main(int argc, char *argv[]);
 
 	// Disallow copy construction and move assignment.
 	Mavlink(const Mavlink &) = delete;

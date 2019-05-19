@@ -348,7 +348,6 @@ px4_task_t px4_getpid()
 	return ~0;
 }
 
-
 const char *px4_get_taskname()
 {
 	pthread_t pid = pthread_self();

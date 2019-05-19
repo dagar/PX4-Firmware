@@ -63,8 +63,6 @@ int SendEvent::task_spawn(int argc, char *argv[])
 		return ret;
 	}
 
-	_task_id = task_id_is_work_queue;
-
 	return 0;
 }
 
@@ -114,8 +112,8 @@ void SendEvent::initialize_trampoline(void *arg)
 		return;
 	}
 
+	send_event->set_task_id(task_id_is_work_queue);
 	send_event->start();
-	_object.store(send_event);
 }
 
 void SendEvent::cycle_trampoline(void *arg)

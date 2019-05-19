@@ -1109,15 +1109,14 @@ void MulticopterPositionControl::send_vehicle_cmd_do(uint8_t nav_state)
 
 int MulticopterPositionControl::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("mc_pos_control",
+	int task_id = px4_task_spawn_cmd("mc_pos_control",
 					   SCHED_DEFAULT,
 					   SCHED_PRIORITY_POSITION_CONTROL,
 					   1900,
 					   (px4_main_t)&run_trampoline,
 					   (char *const *)argv);
 
-	if (_task_id < 0) {
-		_task_id = -1;
+	if (task_id < 0) {
 		return -errno;
 	}
 

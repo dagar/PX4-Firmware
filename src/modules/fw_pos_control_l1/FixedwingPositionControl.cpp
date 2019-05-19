@@ -2058,15 +2058,14 @@ FixedwingPositionControl *FixedwingPositionControl::instantiate(int argc, char *
 
 int FixedwingPositionControl::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("fw_pos_control_l1",
-				      SCHED_DEFAULT,
-				      SCHED_PRIORITY_POSITION_CONTROL,
-				      1810,
-				      (px4_main_t)&run_trampoline,
-				      (char *const *)argv);
+	int task_id = px4_task_spawn_cmd("fw_pos_control_l1",
+					 SCHED_DEFAULT,
+					 SCHED_PRIORITY_POSITION_CONTROL,
+					 1810,
+					 (px4_main_t)&run_trampoline,
+					 (char *const *)argv);
 
-	if (_task_id < 0) {
-		_task_id = -1;
+	if (task_id < 0) {
 		return -errno;
 	}
 

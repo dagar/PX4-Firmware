@@ -147,21 +147,17 @@ RCInput::task_spawn(int argc, char *argv[])
 			return ret;
 		}
 
-		_task_id = task_id_is_work_queue;
-
 	} else {
 
 		/* start the IO interface task */
+		int task_id = px4_task_spawn_cmd("rc_input",
+						 SCHED_DEFAULT,
+						 SCHED_PRIORITY_SLOW_DRIVER,
+						 1000,
+						 (px4_main_t)&run_trampoline,
+						 nullptr);
 
-		_task_id = px4_task_spawn_cmd("rc_input",
-					      SCHED_DEFAULT,
-					      SCHED_PRIORITY_SLOW_DRIVER,
-					      1000,
-					      (px4_main_t)&run_trampoline,
-					      nullptr);
-
-		if (_task_id < 0) {
-			_task_id = -1;
+		if (task_id < 0) {
 			return -errno;
 		}
 	}
@@ -189,7 +185,7 @@ RCInput::cycle_trampoline(void *arg)
 			return;
 		}
 
-		_object.store(dev);
+		dev->set_task_id(task_id_is_work_queue);
 	}
 
 	dev->cycle();

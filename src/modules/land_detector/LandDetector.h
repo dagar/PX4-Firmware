@@ -174,6 +174,8 @@ private:
 
 	uORB::Subscription _parameterSub{ORB_ID(parameter_update)};
 	uORB::Subscription _armingSub{ORB_ID(actuator_armed)};
+
+	bool _initialized{false};
 };
 
 } // namespace land_detector

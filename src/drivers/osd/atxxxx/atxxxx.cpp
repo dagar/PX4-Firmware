@@ -92,11 +92,8 @@ int OSDatxxxx::task_spawn(int argc, char *argv[])
 		return ret;
 	}
 
-	_task_id = task_id_is_work_queue;
-
 	return 0;
 }
-
 
 int
 OSDatxxxx::init()
@@ -151,8 +148,8 @@ void OSDatxxxx::initialize_trampoline(void *arg)
 		return;
 	}
 
+	osd->set_task_id(task_id_is_work_queue);
 	osd->start();
-	_object.store(osd);
 }
 
 void OSDatxxxx::cycle_trampoline(void *arg)

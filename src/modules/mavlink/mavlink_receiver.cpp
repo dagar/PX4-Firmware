@@ -2588,7 +2588,7 @@ MavlinkReceiver::receive_thread(void *arg)
 	ssize_t nread = 0;
 	hrt_abstime last_send_update = 0;
 
-	while (!_mavlink->_task_should_exit) {
+	while (!_mavlink->should_exit()) {
 		if (poll(&fds[0], 1, timeout) > 0) {
 			if (_mavlink->get_protocol() == SERIAL) {
 

@@ -762,8 +762,6 @@ int PGA460::task_spawn(int argc, char *argv[])
 		return -errno;
 	}
 
-	_task_id = task_id;
-
 	return PX4_OK;
 }
 

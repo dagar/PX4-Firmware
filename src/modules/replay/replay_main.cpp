@@ -1182,15 +1182,14 @@ int Replay::task_spawn(int argc, char *argv[])
 		return -1;
 	}
 
-	_task_id = px4_task_spawn_cmd("replay",
+	int task_id = px4_task_spawn_cmd("replay",
 				      SCHED_DEFAULT,
 				      SCHED_PRIORITY_MAX - 5,
 				      4000,
 				      (px4_main_t)&run_trampoline,
 				      (char *const *)argv);
 
-	if (_task_id < 0) {
-		_task_id = -1;
+	if (task_id < 0) {
 		return -errno;
 	}
 

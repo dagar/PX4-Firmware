@@ -75,7 +75,7 @@ void LandDetector::Run()
 {
 	perf_begin(_cycle_perf);
 
-	if (_object.load() == nullptr) { // not initialized yet
+	if (!_initialized) { // not initialized yet
 		// Advertise the first land detected uORB.
 		_landDetected.timestamp = hrt_absolute_time();
 		_landDetected.freefall = false;
@@ -88,7 +88,7 @@ void LandDetector::Run()
 
 		_check_params(true);
 
-		_object.store(this);
+		_initialized = true;
 	}
 
 	_check_params(false);
