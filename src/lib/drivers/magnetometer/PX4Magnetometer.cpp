@@ -105,7 +105,7 @@ void PX4Magnetometer::update(hrt_abstime timestamp, int16_t x, int16_t y, int16_
 	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
 
 	// Apply range scale and the calibrating offset/scale
-	const matrix::Vector3f val_calibrated{(((matrix::Vector3f{xraw_f, yraw_f, zraw_f} * report.scaling) - _calibration_offset).emult(_calibration_scale))};
+	const matrix::Vector3f val_calibrated{(((matrix::Vector3f{xraw_f, yraw_f, zraw_f} .emult(_sensitivity) * report.scaling) - _calibration_offset).emult(_calibration_scale))};
 
 	// Raw values (ADC units 0 - 65535)
 	report.x_raw = x;

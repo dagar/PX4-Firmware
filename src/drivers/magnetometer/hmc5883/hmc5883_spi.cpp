@@ -80,8 +80,6 @@ public:
 	virtual int	read(unsigned address, void *data, unsigned count);
 	virtual int	write(unsigned address, void *data, unsigned count);
 
-	virtual int	ioctl(unsigned operation, unsigned &arg);
-
 };
 
 device::Device *
@@ -93,7 +91,6 @@ HMC5883_SPI_interface(int bus)
 HMC5883_SPI::HMC5883_SPI(int bus, uint32_t device) :
 	SPI("HMC5883_SPI", nullptr, bus, device, SPIDEV_MODE3, 11 * 1000 * 1000 /* will be rounded to 10.4 MHz */)
 {
-	_device_id.devid_s.devtype = DRV_MAG_DEVTYPE_HMC5883;
 }
 
 int
@@ -125,32 +122,6 @@ HMC5883_SPI::init()
 	}
 
 	return OK;
-}
-
-int
-HMC5883_SPI::ioctl(unsigned operation, unsigned &arg)
-{
-	int ret;
-
-	switch (operation) {
-
-	case MAGIOCGEXTERNAL:
-		/*
-		 * Even if this sensor is on the external SPI
-		 * bus it is still internal to the autopilot
-		 * assembly, so always return 0 for internal.
-		 */
-		return 0;
-
-	case DEVIOCGDEVICEID:
-		return CDev::ioctl(nullptr, operation, arg);
-
-	default: {
-			ret = -EINVAL;
-		}
-	}
-
-	return ret;
 }
 
 int
