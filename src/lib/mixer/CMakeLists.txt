@@ -31,6 +31,8 @@
 #
 ############################################################################
 
+px4_find_python_module(toml REQUIRED)
+
 set(geometry_files
 	dodeca_bottom_cox.toml
 	dodeca_top_cox.toml

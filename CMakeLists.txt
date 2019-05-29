@@ -336,7 +336,29 @@ if (CATKIN_DEVEL_PREFIX)
 	endif()
 endif()
 
-find_package(PythonInterp REQUIRED)
+
+# Python
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.12.0")
+
+	find_package(Python3 COMPONENTS Interpreter)
+
+	if(Python3_FOUND)
+		set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+	else()
+		# otherwise look for python 2
+		find_package(Python2 COMPONENTS Interpreter)
+		set(PYTHON_EXECUTABLE ${Python2_EXECUTABLE})
+	endif()
+else()
+	find_package(PythonInterp 3)
+
+	if(Python3_FOUND)
+		set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+	else()
+		# otherwise look for python 2
+		find_package(PythonInterp 2.7 REQUIRED)
+	endif()
+endif()
 
 option(PYTHON_COVERAGE "Python code coverage" OFF)
 if(PYTHON_COVERAGE)

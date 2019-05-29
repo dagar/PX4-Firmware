@@ -146,7 +146,7 @@ function(px4_find_python_module module)
 		\nfor debian systems try: \
 		\n\tsudo apt-get install python-${module} \
 		\nor for all other OSs/debian: \
-		\n\tsudo -H pip install ${module}\n" PY_${module_upper})
+		\n\tsudo -H ${PYTHON_EXECUTABLE} -m pip install ${module}\n" PY_${module_upper})
 	#if (NOT PY_${module}_FOUND)
 		#message(FATAL_ERROR "python module not found, exiting")
 	#endif()
