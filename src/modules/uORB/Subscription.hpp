@@ -59,6 +59,7 @@ public:
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
 	 * @param instance The instance for multi sub.
 	 */
+	Subscription() = default;
 	Subscription(const orb_metadata *meta, uint8_t instance = 0) : _meta(meta), _instance(instance)
 	{
 		init();
@@ -133,6 +134,7 @@ public:
 	 * @param interval  The minimum interval in milliseconds between updates
 	 * @param instance The instance for multi sub.
 	 */
+	SubscriptionInterval() = default;
 	SubscriptionInterval(const orb_metadata *meta, unsigned interval = 0, uint8_t instance = 0) :
 		Subscription(meta, instance),
 		_interval(interval)
@@ -188,12 +190,6 @@ public:
 
 	virtual ~SubscriptionData() = default;
 
-	// no copy, assignment, move, move assignment
-	SubscriptionData(const SubscriptionData &) = delete;
-	SubscriptionData &operator=(const SubscriptionData &) = delete;
-	SubscriptionData(SubscriptionData &&) = delete;
-	SubscriptionData &operator=(SubscriptionData &&) = delete;
-
 	// update the embedded struct.
 	bool update() { return Subscription::update((void *)(&_data)); }
 
@@ -223,12 +219,6 @@ public:
 	}
 
 	~SubscriptionIntervalData() override = default;
-
-	// no copy, assignment, move, move assignment
-	SubscriptionIntervalData(const SubscriptionIntervalData &) = delete;
-	SubscriptionIntervalData &operator=(const SubscriptionIntervalData &) = delete;
-	SubscriptionIntervalData(SubscriptionIntervalData &&) = delete;
-	SubscriptionIntervalData &operator=(SubscriptionIntervalData &&) = delete;
 
 	// update the embedded struct.
 	bool update() { return SubscriptionInterval::update((void *)(&_data)); }
