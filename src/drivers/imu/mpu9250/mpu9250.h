@@ -31,6 +31,8 @@
  *
  ****************************************************************************/
 
+#pragma once
+
 #include <stdint.h>
 
 #include <perf/perf_counter.h>
@@ -179,12 +181,6 @@
 #define MPU9250_GYRO_DEFAULT_DRIVER_FILTER_FREQ 30
 
 #define MPU9250_DEFAULT_ONCHIP_FILTER_FREQ	92
-
-
-#define BANK0	0x0000
-#define BANK1	0x0100
-#define BANK2	0x0200
-#define BANK3	0x0300
 
 #define BANK_REG_MASK	0x0300
 #define REG_BANK(r) 			(((r) & BANK_REG_MASK)>>4)

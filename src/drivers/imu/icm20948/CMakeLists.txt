@@ -31,18 +31,20 @@
 #
 ############################################################################
 px4_add_module(
-	MODULE drivers__icm20948
+	MODULE drivers__imu__icm20948
 	MAIN icm20948
 	STACK_MAIN 1500
 	COMPILE_FLAGS
 	SRCS
+		AK09916_I2C.cpp
 		icm20948.cpp
 		icm20948_i2c.cpp
+		ICM20948_mag.cpp
+		icm20948_main.cpp
 		icm20948_spi.cpp
-		main.cpp
-		accel.cpp
-		gyro.cpp
-		mag.cpp
-		mag_i2c.cpp
 	DEPENDS
+		px4_work_queue
+		drivers_accelerometer
+		drivers_gyroscope
+		drivers_magnetometer
 	)

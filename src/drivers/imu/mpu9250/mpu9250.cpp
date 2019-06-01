@@ -153,7 +153,7 @@ MPU9250::init()
 
 #ifdef USE_I2C
 
-		up_udelay(100);
+		px4_usleep(100);
 
 		if (!_mag.is_passthrough() && _mag._interface->init() != PX4_OK) {
 			PX4_ERR("failed to setup ak8963 interface");

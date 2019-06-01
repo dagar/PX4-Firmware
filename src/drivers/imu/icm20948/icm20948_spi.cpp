@@ -43,7 +43,6 @@
 
 #include <px4_config.h>
 #include <drivers/device/spi.h>
-#include <drivers/drv_accel.h>
 #include <drivers/drv_device.h>
 
 #include "icm20948.h"
@@ -120,7 +119,7 @@ ICM20948_SPI::set_bus_frequency(unsigned &reg_speed)
 int
 ICM20948_SPI::write(unsigned reg_speed, void *data, unsigned count)
 {
-	uint8_t cmd[MPU_MAX_WRITE_BUFFER_SIZE];
+	uint8_t cmd[MPU_MAX_WRITE_BUFFER_SIZE] {};
 
 	if (sizeof(cmd) < (count + 1)) {
 		return -EIO;
@@ -139,16 +138,16 @@ ICM20948_SPI::write(unsigned reg_speed, void *data, unsigned count)
 int
 ICM20948_SPI::read(unsigned reg_speed, void *data, unsigned count)
 {
-	/* We want to avoid copying the data of MPUReport: So if the caller
-	 * supplies a buffer not MPUReport in size, it is assume to be a reg or reg 16 read
+	/* We want to avoid copying the data of ICMReport: So if the caller
+	 * supplies a buffer not ICMReport in size, it is assume to be a reg or reg 16 read
 	 * and we need to provied the buffer large enough for the callers data
 	 * and our command.
 	 */
-	uint8_t cmd[3] = {0, 0, 0};
+	uint8_t cmd[3] {};
 
-	uint8_t *pbuff  =  count < sizeof(MPUReport) ? cmd : (uint8_t *) data ;
+	uint8_t *pbuff  =  count < sizeof(ICMReport) ? cmd : (uint8_t *) data ;
 
-	if (count < sizeof(MPUReport))  {
+	if (count < sizeof(ICMReport))  {
 		/* add command */
 		count++;
 	}
@@ -177,13 +176,17 @@ ICM20948_SPI::probe()
 {
 	uint8_t whoami = 0;
 
-	int ret = read(MPUREG_WHOAMI, &whoami, 1);
+	int ret = read(ICMREG_20948_WHOAMI, &whoami, 1);
 
 	if (ret != OK) {
 		return -EIO;
 	}
 
 	switch (whoami) {
+	case ICM_WHOAMI_20948:
+		ret = 0;
+		break;
+
 	default:
 		PX4_WARN("probe failed! %u", whoami);
 		ret = -EIO;

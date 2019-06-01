@@ -39,7 +39,6 @@
 
 #include <px4_config.h>
 #include <drivers/device/i2c.h>
-#include <drivers/drv_accel.h>
 #include <drivers/drv_device.h>
 
 #include "icm20948.h"
@@ -93,13 +92,13 @@ ICM20948_I2C::write(unsigned reg_speed, void *data, unsigned count)
 int
 ICM20948_I2C::read(unsigned reg_speed, void *data, unsigned count)
 {
-	/* We want to avoid copying the data of MPUReport: So if the caller
-	 * supplies a buffer not MPUReport in size, it is assume to be a reg or
+	/* We want to avoid copying the data of ICMReport: So if the caller
+	 * supplies a buffer not ICMReport in size, it is assume to be a reg or
 	 * reg 16 read
-	 * Since MPUReport has a cmd at front, we must return the data
+	 * Since ICMReport has a cmd at front, we must return the data
 	 * after that. Foe anthing else we must return it
 	 */
-	uint32_t offset = count < sizeof(MPUReport) ? 0 : offsetof(MPUReport, status);
+	uint32_t offset = count < sizeof(ICMReport) ? 0 : offsetof(ICMReport, status);
 	uint8_t cmd = MPU9250_REG(reg_speed);
 	return transfer(&cmd, 1, &((uint8_t *)data)[offset], count);
 }
@@ -109,9 +108,6 @@ ICM20948_I2C::probe()
 {
 	uint8_t whoami = 0;
 	uint8_t register_select = REG_BANK(BANK0);  // register bank containing WHOAMI for ICM20948
-
-	// Try first for mpu9250/6500
-	read(MPUREG_WHOAMI, &whoami, 1);
 
 	/*
 	 * If it's not an MPU it must be an ICM

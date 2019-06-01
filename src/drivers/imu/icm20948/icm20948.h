@@ -31,180 +31,24 @@
  *
  ****************************************************************************/
 
+#pragma once
+
 #include <stdint.h>
 
 #include <perf/perf_counter.h>
 #include <systemlib/conversions.h>
-
-#include <board_config.h>
 #include <drivers/drv_hrt.h>
-
-#include <drivers/device/ringbuffer.h>
-#include <drivers/device/integrator.h>
-#include <drivers/drv_accel.h>
-#include <drivers/drv_gyro.h>
-#include <drivers/drv_mag.h>
-#include <mathlib/math/filter/LowPassFilter2p.hpp>
+#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
+#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/conversion/rotation.h>
-#include <systemlib/err.h>
 #include <px4_work_queue/ScheduledWorkItem.hpp>
-
 #include <uORB/uORB.h>
-#include <uORB/topics/debug_key_value.h>
 
-#include "mag.h"
-#include "accel.h"
-#include "gyro.h"
-
+#include "ICM20948_mag.h"
 
 #if defined(PX4_I2C_OBDEV_MPU9250) || defined(PX4_I2C_BUS_EXPANSION)
 #  define USE_I2C
 #endif
-
-
-// MPU 9250 registers
-#define MPUREG_WHOAMI			0x75
-#define MPUREG_SMPLRT_DIV		0x19
-#define MPUREG_CONFIG			0x1A
-#define MPUREG_GYRO_CONFIG		0x1B
-#define MPUREG_ACCEL_CONFIG		0x1C
-#define MPUREG_ACCEL_CONFIG2		0x1D
-#define MPUREG_LPACCEL_ODR		0x1E
-#define MPUREG_WOM_THRESH		0x1F
-#define MPUREG_FIFO_EN			0x23
-#define MPUREG_I2C_MST_CTRL		0x24
-#define MPUREG_I2C_SLV0_ADDR		0x25
-#define MPUREG_I2C_SLV0_REG		0x26
-#define MPUREG_I2C_SLV0_CTRL		0x27
-#define MPUREG_I2C_SLV1_ADDR		0x28
-#define MPUREG_I2C_SLV1_REG		0x29
-#define MPUREG_I2C_SLV1_CTRL		0x2A
-#define MPUREG_I2C_SLV2_ADDR		0x2B
-#define MPUREG_I2C_SLV2_REG		0x2C
-#define MPUREG_I2C_SLV2_CTRL		0x2D
-#define MPUREG_I2C_SLV3_ADDR		0x2E
-#define MPUREG_I2C_SLV3_REG		0x2F
-#define MPUREG_I2C_SLV3_CTRL		0x30
-#define MPUREG_I2C_SLV4_ADDR		0x31
-#define MPUREG_I2C_SLV4_REG		0x32
-#define MPUREG_I2C_SLV4_DO		0x33
-#define MPUREG_I2C_SLV4_CTRL		0x34
-#define MPUREG_I2C_SLV4_DI		0x35
-#define MPUREG_I2C_MST_STATUS		0x36
-#define MPUREG_INT_PIN_CFG		0x37
-#define MPUREG_INT_ENABLE		0x38
-#define MPUREG_INT_STATUS		0x3A
-#define MPUREG_ACCEL_XOUT_H		0x3B
-#define MPUREG_ACCEL_XOUT_L		0x3C
-#define MPUREG_ACCEL_YOUT_H		0x3D
-#define MPUREG_ACCEL_YOUT_L		0x3E
-#define MPUREG_ACCEL_ZOUT_H		0x3F
-#define MPUREG_ACCEL_ZOUT_L		0x40
-#define MPUREG_TEMP_OUT_H		0x41
-#define MPUREG_TEMP_OUT_L		0x42
-#define MPUREG_GYRO_XOUT_H		0x43
-#define MPUREG_GYRO_XOUT_L		0x44
-#define MPUREG_GYRO_YOUT_H		0x45
-#define MPUREG_GYRO_YOUT_L		0x46
-#define MPUREG_GYRO_ZOUT_H		0x47
-#define MPUREG_GYRO_ZOUT_L		0x48
-#define MPUREG_EXT_SENS_DATA_00		0x49
-#define MPUREG_I2C_SLV0_D0		0x63
-#define MPUREG_I2C_SLV1_D0		0x64
-#define MPUREG_I2C_SLV2_D0		0x65
-#define MPUREG_I2C_SLV3_D0		0x66
-#define MPUREG_I2C_MST_DELAY_CTRL	0x67
-#define MPUREG_SIGNAL_PATH_RESET	0x68
-#define MPUREG_MOT_DETECT_CTRL		0x69
-#define MPUREG_USER_CTRL		0x6A
-#define MPUREG_PWR_MGMT_1		0x6B
-#define MPUREG_PWR_MGMT_2		0x6C
-#define MPUREG_FIFO_COUNTH		0x72
-#define MPUREG_FIFO_COUNTL		0x73
-#define MPUREG_FIFO_R_W			0x74
-
-// Configuration bits MPU 9250
-#define BIT_SLEEP			0x40
-#define BIT_H_RESET			0x80
-#define MPU_CLK_SEL_AUTO		0x01
-
-#define BITS_GYRO_ST_X			0x80
-#define BITS_GYRO_ST_Y			0x40
-#define BITS_GYRO_ST_Z			0x20
-#define BITS_FS_250DPS			0x00
-#define BITS_FS_500DPS			0x08
-#define BITS_FS_1000DPS			0x10
-#define BITS_FS_2000DPS			0x18
-#define BITS_FS_MASK			0x18
-
-#define BITS_DLPF_CFG_250HZ		0x00
-#define BITS_DLPF_CFG_184HZ		0x01
-#define BITS_DLPF_CFG_92HZ		0x02
-#define BITS_DLPF_CFG_41HZ		0x03
-#define BITS_DLPF_CFG_20HZ		0x04
-#define BITS_DLPF_CFG_10HZ		0x05
-#define BITS_DLPF_CFG_5HZ		0x06
-#define BITS_DLPF_CFG_3600HZ		0x07
-#define BITS_DLPF_CFG_MASK		0x07
-
-#define BITS_ACCEL_CONFIG2_41HZ		0x03
-
-#define BIT_RAW_RDY_EN			0x01
-#define BIT_INT_ANYRD_2CLEAR		0x10
-#define BIT_INT_BYPASS_EN		0x02
-
-#define BIT_I2C_READ_FLAG           0x80
-
-#define BIT_I2C_SLV0_NACK           0x01
-#define BIT_I2C_FIFO_EN             0x40
-#define BIT_I2C_MST_EN              0x20
-#define BIT_I2C_IF_DIS              0x10
-#define BIT_FIFO_RST                0x04
-#define BIT_I2C_MST_RST             0x02
-#define BIT_SIG_COND_RST            0x01
-
-#define BIT_I2C_SLV0_EN             0x80
-#define BIT_I2C_SLV0_BYTE_SW        0x40
-#define BIT_I2C_SLV0_REG_DIS        0x20
-#define BIT_I2C_SLV0_REG_GRP        0x10
-
-#define BIT_I2C_MST_MULT_MST_EN     0x80
-#define BIT_I2C_MST_WAIT_FOR_ES     0x40
-#define BIT_I2C_MST_SLV_3_FIFO_EN   0x20
-#define BIT_I2C_MST_P_NSR           0x10
-#define BITS_I2C_MST_CLOCK_258HZ    0x08
-#define BITS_I2C_MST_CLOCK_400HZ    0x0D
-
-#define BIT_I2C_SLV0_DLY_EN         0x01
-#define BIT_I2C_SLV1_DLY_EN         0x02
-#define BIT_I2C_SLV2_DLY_EN         0x04
-#define BIT_I2C_SLV3_DLY_EN         0x08
-
-#define ICM_WHOAMI_20948            0xEA
-
-#define MPU9250_ACCEL_DEFAULT_RATE	1000
-#define MPU9250_ACCEL_MAX_OUTPUT_RATE			280
-#define MPU9250_ACCEL_DEFAULT_DRIVER_FILTER_FREQ 30
-#define MPU9250_GYRO_DEFAULT_RATE	1000
-/* rates need to be the same between accel and gyro */
-#define MPU9250_GYRO_MAX_OUTPUT_RATE			MPU9250_ACCEL_MAX_OUTPUT_RATE
-#define MPU9250_GYRO_DEFAULT_DRIVER_FILTER_FREQ 30
-
-#define MPU9250_DEFAULT_ONCHIP_FILTER_FREQ	92
-
-#define MPUIOCGIS_I2C	(unsigned)(DEVIOCGDEVICEID+100)
-
-
-
-// ICM20948 registers and data
-
-/*
- * ICM20948 I2C address LSB can be switched by the chip's AD0 pin, thus is device dependent.
- * Noting this down for now. Here GPS uses 0x69. To support a device implementing the second
- * address, probably an additional MPU_DEVICE_TYPE is the way to go.
- */
-#define PX4_I2C_EXT_ICM20948_0			0x68
-#define PX4_I2C_EXT_ICM20948_1			0x69
 
 /*
  * ICM20948 uses register banks. Register 127 (0x7F) is used to switch between 4 banks.
@@ -218,38 +62,34 @@
 #define BANK2	0x0200
 #define BANK3	0x0300
 
-#define BANK_REG_MASK	0x0300
-#define REG_BANK(r) 			(((r) & BANK_REG_MASK)>>4)
-#define REG_ADDRESS(r)			((r) & ~BANK_REG_MASK)
-
-#define ICMREG_20948_BANK_SEL 0x7F
-
-#define	ICMREG_20948_WHOAMI					(0x00 | BANK0)
-#define ICMREG_20948_USER_CTRL				(0x03 | BANK0)
-#define ICMREG_20948_PWR_MGMT_1				(0x06 | BANK0)
-#define ICMREG_20948_PWR_MGMT_2				(0x07 | BANK0)
-#define ICMREG_20948_INT_PIN_CFG			(0x0F | BANK0)
-#define ICMREG_20948_INT_ENABLE				(0x10 | BANK0)
-#define ICMREG_20948_INT_ENABLE_1			(0x11 | BANK0)
-#define ICMREG_20948_ACCEL_XOUT_H			(0x2D | BANK0)
-#define ICMREG_20948_INT_ENABLE_2			(0x12 | BANK0)
-#define ICMREG_20948_INT_ENABLE_3			(0x13 | BANK0)
+// ICM 20948 registers
+#define	ICMREG_20948_WHOAMI			(0x00 | BANK0)
+#define ICMREG_20948_USER_CTRL			(0x03 | BANK0)
+#define ICMREG_20948_PWR_MGMT_1			(0x06 | BANK0)
+#define ICMREG_20948_PWR_MGMT_2			(0x07 | BANK0)
+#define ICMREG_20948_INT_PIN_CFG		(0x0F | BANK0)
+#define ICMREG_20948_INT_ENABLE			(0x10 | BANK0)
+#define ICMREG_20948_INT_ENABLE_1		(0x11 | BANK0)
+#define ICMREG_20948_ACCEL_XOUT_H		(0x2D | BANK0)
+#define ICMREG_20948_INT_ENABLE_2		(0x12 | BANK0)
+#define ICMREG_20948_INT_ENABLE_3		(0x13 | BANK0)
 #define ICMREG_20948_EXT_SLV_SENS_DATA_00	(0x3B | BANK0)
 #define ICMREG_20948_GYRO_SMPLRT_DIV		(0x00 | BANK2)
-#define ICMREG_20948_GYRO_CONFIG_1			(0x01 | BANK2)
-#define ICMREG_20948_GYRO_CONFIG_2			(0x02 | BANK2)
+#define ICMREG_20948_GYRO_CONFIG_1		(0x01 | BANK2)
+#define ICMREG_20948_GYRO_CONFIG_2		(0x02 | BANK2)
 #define ICMREG_20948_ACCEL_SMPLRT_DIV_1		(0x10 | BANK2)
 #define ICMREG_20948_ACCEL_SMPLRT_DIV_2		(0x11 | BANK2)
-#define ICMREG_20948_ACCEL_CONFIG			(0x14 | BANK2)
-#define ICMREG_20948_ACCEL_CONFIG_2			(0x15 | BANK2)
-#define ICMREG_20948_I2C_MST_CTRL			(0x01 | BANK3)
-#define ICMREG_20948_I2C_SLV0_ADDR			(0x03 | BANK3)
-#define ICMREG_20948_I2C_SLV0_REG			(0x04 | BANK3)
-#define ICMREG_20948_I2C_SLV0_CTRL			(0x05 | BANK3)
-#define ICMREG_20948_I2C_SLV0_DO			(0x06 | BANK3)
+#define ICMREG_20948_ACCEL_CONFIG		(0x14 | BANK2)
+#define ICMREG_20948_ACCEL_CONFIG_2		(0x15 | BANK2)
+#define ICMREG_20948_I2C_MST_CTRL		(0x01 | BANK3)
+#define ICMREG_20948_I2C_SLV0_ADDR		(0x03 | BANK3)
+#define ICMREG_20948_I2C_SLV0_REG		(0x04 | BANK3)
+#define ICMREG_20948_I2C_SLV0_CTRL		(0x05 | BANK3)
+#define ICMREG_20948_I2C_SLV0_DO		(0x06 | BANK3)
 
+#define ICMREG_20948_BANK_SEL			(0x7F)
 
-
+// Configuration bits ICM 20948
 /*
 * ICM20948 register bits
 * Most of the regiser set values from MPU9250 have the same
@@ -257,30 +97,30 @@
 * defined for MPU9250 are defined below
 */
 #define ICM_BIT_PWR_MGMT_1_ENABLE       	0x00
-#define ICM_BIT_USER_CTRL_I2C_MST_DISABLE   0x00
+#define ICM_BIT_USER_CTRL_I2C_MST_DISABLE	0x00
 
 #define ICM_BITS_GYRO_DLPF_CFG_197HZ		0x01
 #define ICM_BITS_GYRO_DLPF_CFG_151HZ		0x09
 #define ICM_BITS_GYRO_DLPF_CFG_119HZ		0x11
-#define ICM_BITS_GYRO_DLPF_CFG_51HZ			0x19
-#define ICM_BITS_GYRO_DLPF_CFG_23HZ			0x21
-#define ICM_BITS_GYRO_DLPF_CFG_11HZ			0x29
-#define ICM_BITS_GYRO_DLPF_CFG_5HZ			0x31
+#define ICM_BITS_GYRO_DLPF_CFG_51HZ		0x19
+#define ICM_BITS_GYRO_DLPF_CFG_23HZ		0x21
+#define ICM_BITS_GYRO_DLPF_CFG_11HZ		0x29
+#define ICM_BITS_GYRO_DLPF_CFG_5HZ		0x31
 #define ICM_BITS_GYRO_DLPF_CFG_361HZ		0x39
-#define ICM_BITS_GYRO_DLPF_CFG_MASK			0x39
+#define ICM_BITS_GYRO_DLPF_CFG_MASK		0x39
 
-#define ICM_BITS_GYRO_FS_SEL_250DPS			0x00
-#define ICM_BITS_GYRO_FS_SEL_500DPS			0x02
+#define ICM_BITS_GYRO_FS_SEL_250DPS		0x00
+#define ICM_BITS_GYRO_FS_SEL_500DPS		0x02
 #define ICM_BITS_GYRO_FS_SEL_1000DPS		0x04
 #define ICM_BITS_GYRO_FS_SEL_2000DPS		0x06
-#define ICM_BITS_GYRO_FS_SEL_MASK			0x06
+#define ICM_BITS_GYRO_FS_SEL_MASK		0x06
 
 #define ICM_BITS_ACCEL_DLPF_CFG_246HZ		0x09
 #define ICM_BITS_ACCEL_DLPF_CFG_111HZ		0x11
 #define ICM_BITS_ACCEL_DLPF_CFG_50HZ		0x19
 #define ICM_BITS_ACCEL_DLPF_CFG_23HZ		0x21
 #define ICM_BITS_ACCEL_DLPF_CFG_11HZ		0x29
-#define ICM_BITS_ACCEL_DLPF_CFG_5HZ			0x31
+#define ICM_BITS_ACCEL_DLPF_CFG_5HZ		0x31
 #define ICM_BITS_ACCEL_DLPF_CFG_473HZ		0x39
 #define ICM_BITS_ACCEL_DLPF_CFG_MASK		0x39
 
@@ -288,21 +128,59 @@
 #define ICM_BITS_ACCEL_FS_SEL_500DPS		0x02
 #define ICM_BITS_ACCEL_FS_SEL_1000DPS		0x04
 #define ICM_BITS_ACCEL_FS_SEL_2000DPS		0x06
-#define ICM_BITS_ACCEL_FS_SEL_MASK			0x06
+#define ICM_BITS_ACCEL_FS_SEL_MASK		0x06
 
-#define ICM_BITS_DEC3_CFG_4					0x00
-#define ICM_BITS_DEC3_CFG_8					0x01
-#define ICM_BITS_DEC3_CFG_16				0x10
-#define ICM_BITS_DEC3_CFG_32				0x11
-#define ICM_BITS_DEC3_CFG_MASK				0x11
+#define ICM_BITS_DEC3_CFG_4			0x00
+#define ICM_BITS_DEC3_CFG_8			0x01
+#define ICM_BITS_DEC3_CFG_16			0x10
+#define ICM_BITS_DEC3_CFG_32			0x11
+#define ICM_BITS_DEC3_CFG_MASK			0x11
 
 #define ICM_BITS_I2C_MST_CLOCK_370KHZ    	0x00
 #define ICM_BITS_I2C_MST_CLOCK_400HZ    	0x07	// recommended by datasheet for 400kHz target clock
 
+// Configuration bits ICM 20948
+#define BIT_SLEEP			0x40
+#define BIT_H_RESET			0x80
+#define MPU_CLK_SEL_AUTO		0x01
 
+#define BIT_RAW_RDY_EN			0x01
+#define BIT_INT_ANYRD_2CLEAR		0x10
+#define BIT_INT_BYPASS_EN		0x02
 
-#define MPU_OR_ICM(m,i)					((_whoami==ICM_WHOAMI_20948) ? i : m)
+#define BIT_I2C_READ_FLAG           0x80
 
+#define BIT_I2C_MST_EN              0x20
+#define BIT_I2C_IF_DIS              0x10
+#define BIT_I2C_MST_RST             0x02
+
+#define BIT_I2C_SLV0_EN             0x80
+
+#define BIT_I2C_MST_P_NSR           0x10
+
+#define ICM_WHOAMI_20948			0xEA
+
+#define MPU9250_ACCEL_DEFAULT_RATE	1000
+#define MPU9250_ACCEL_MAX_OUTPUT_RATE			280
+#define MPU9250_ACCEL_DEFAULT_DRIVER_FILTER_FREQ 30
+#define MPU9250_GYRO_DEFAULT_RATE	1000
+/* rates need to be the same between accel and gyro */
+#define MPU9250_GYRO_MAX_OUTPUT_RATE			MPU9250_ACCEL_MAX_OUTPUT_RATE
+#define MPU9250_GYRO_DEFAULT_DRIVER_FILTER_FREQ 30
+
+#define MPU9250_DEFAULT_ONCHIP_FILTER_FREQ	92
+
+/*
+ * ICM20948 I2C address LSB can be switched by the chip's AD0 pin, thus is device dependent.
+ * Noting this down for now. Here GPS uses 0x69. To support a device implementing the second
+ * address, probably an additional MPU_DEVICE_TYPE is the way to go.
+ */
+#define PX4_I2C_EXT_ICM20948_0			0x68
+#define PX4_I2C_EXT_ICM20948_1			0x69
+
+#define BANK_REG_MASK	0x0300
+#define REG_BANK(r) 			(((r) & BANK_REG_MASK)>>4)
+#define REG_ADDRESS(r)			((r) & ~BANK_REG_MASK)
 
 #pragma pack(push, 1)
 /**
@@ -310,36 +188,16 @@
  * interrupt status.
  */
 struct ICMReport {
-	uint8_t		accel_x[2];
-	uint8_t		accel_y[2];
-	uint8_t		accel_z[2];
-	uint8_t		gyro_x[2];
-	uint8_t		gyro_y[2];
-	uint8_t		gyro_z[2];
-	uint8_t		temp[2];
-	struct ak8963_regs mag;
-};
-#pragma pack(pop)
-
-
-
-
-#pragma pack(push, 1)
-/**
- * Report conversation within the mpu, including command byte and
- * interrupt status.
- */
-struct MPUReport {
 	uint8_t		cmd;
 	uint8_t		status;
 	uint8_t		accel_x[2];
 	uint8_t		accel_y[2];
 	uint8_t		accel_z[2];
-	uint8_t		temp[2];
 	uint8_t		gyro_x[2];
 	uint8_t		gyro_y[2];
 	uint8_t		gyro_z[2];
-	struct ak8963_regs mag;
+	uint8_t		temp[2];
+	struct AK09916_regs mag;
 };
 #pragma pack(pop)
 
@@ -370,21 +228,17 @@ extern int MPU9250_probe(device::Device *dev);
 typedef device::Device *(*ICM20948_constructor)(int, uint32_t, bool);
 
 class ICM20948_mag;
-class ICM20948_accel;
-class ICM20948_gyro;
 
 class ICM20948 : public px4::ScheduledWorkItem
 {
 public:
-	ICM20948(device::Device *interface, device::Device *mag_interface, const char *path_accel, const char *path_gyro,
-		 const char *path_mag,
-		 enum Rotation rotation,
+	ICM20948(device::Device *interface, device::Device *mag_interface, const char *path, enum Rotation rotation,
 		 bool magnetometer_only);
 
 	virtual ~ICM20948();
 
 	virtual int		init();
-	uint8_t			get_whoami();
+	uint8_t			get_whoami() { return _whoami; }
 
 	/**
 	 * Diagnostics - print some basic information about the driver.
@@ -393,44 +247,30 @@ public:
 
 protected:
 	device::Device *_interface;
-	uint8_t			_whoami;	/** whoami result */
+	uint8_t			_whoami{0};	/** whoami result */
 
 	virtual int		probe();
 
-	friend class ICM20948_accel;
 	friend class ICM20948_mag;
-	friend class ICM20948_gyro;
 
 	void Run() override;
 
 private:
-	ICM20948_accel   *_accel;
-	ICM20948_gyro	*_gyro;
-	ICM20948_mag     *_mag;
+
+	PX4Accelerometer	_px4_accel;
+	PX4Gyroscope		_px4_gyro;
+
+	ICM20948_mag		_mag;
 	uint8_t 		_selected_bank;			/* Remember selected memory bank to avoid polling / setting on each read/write */
 	bool
 	_magnetometer_only;     /* To disable accel and gyro reporting if only magnetometer is used (e.g. as external magnetometer) */
 
-	unsigned		_call_interval;
-
-	ringbuffer::RingBuffer	*_accel_reports;
-
-	struct accel_calibration_s	_accel_scale;
-	float			_accel_range_scale;
-	float			_accel_range_m_s2;
-	orb_advert_t		_accel_topic;
-
-	ringbuffer::RingBuffer	*_gyro_reports;
-
-	struct gyro_calibration_s	_gyro_scale;
-	float			_gyro_range_scale;
-	float			_gyro_range_rad_s;
+	unsigned		_call_interval{1000};
 
 	unsigned		_dlpf_freq;
-	unsigned		_dlpf_freq_icm_gyro;
-	unsigned		_dlpf_freq_icm_accel;
 
-	unsigned		_sample_rate;
+	unsigned		_sample_rate{1000};
+
 	perf_counter_t		_accel_reads;
 	perf_counter_t		_gyro_reads;
 	perf_counter_t		_sample_perf;
@@ -440,48 +280,32 @@ private:
 	perf_counter_t		_reset_retries;
 	perf_counter_t		_duplicates;
 
-	uint8_t			_register_wait;
-	uint64_t		_reset_wait;
-
-	math::LowPassFilter2p	_accel_filter_x;
-	math::LowPassFilter2p	_accel_filter_y;
-	math::LowPassFilter2p	_accel_filter_z;
-	math::LowPassFilter2p	_gyro_filter_x;
-	math::LowPassFilter2p	_gyro_filter_y;
-	math::LowPassFilter2p	_gyro_filter_z;
-
-	Integrator		_accel_int;
-	Integrator		_gyro_int;
-
-	enum Rotation		_rotation;
+	uint8_t			_register_wait{0};
+	uint64_t		_reset_wait{0};
 
 	// this is used to support runtime checking of key
 	// configuration registers to detect SPI bus errors and sensor
 	// reset
 
-#ifndef MAX
-#define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
-#endif
-
 	static constexpr int ICM20948_NUM_CHECKED_REGISTERS{15};
 	static const uint16_t	_icm20948_checked_registers[ICM20948_NUM_CHECKED_REGISTERS];
 
-	const uint16_t			*_checked_registers;
+	const uint16_t			*_checked_registers{nullptr};
 
 	uint8_t					_checked_values[ICM20948_NUM_CHECKED_REGISTERS];
 	uint8_t					_checked_bad[ICM20948_NUM_CHECKED_REGISTERS];
-	unsigned				_checked_next;
-	unsigned				_num_checked_registers;
+	unsigned				_checked_next{0};
+	unsigned				_num_checked_registers{0};
 
 
 	// last temperature reading for print_info()
-	float			_last_temperature;
+	float			_last_temperature{0.0f};
 
 	bool check_null_data(uint16_t *data, uint8_t size);
 	bool check_duplicate(uint8_t *accel_data);
 	// keep last accel reading for duplicate detection
-	uint8_t			_last_accel_data[6];
-	bool			_got_duplicate;
+	uint8_t			_last_accel_data[6] {};
+	bool			_got_duplicate{false};
 
 	/**
 	 * Start automatic measurement.
@@ -612,11 +436,6 @@ private:
 	  set sample rate (approximate) - 1kHz to 5Hz
 	*/
 	void _set_sample_rate(unsigned desired_sample_rate_hz);
-
-	/*
-	  set poll rate
-	 */
-	int _set_pollrate(unsigned long rate);
 
 	/*
 	  check that key registers still have the right value

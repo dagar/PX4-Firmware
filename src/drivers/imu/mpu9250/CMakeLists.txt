@@ -31,7 +31,7 @@
 #
 ############################################################################
 px4_add_module(
-	MODULE drivers__mpu9250
+	MODULE drivers__imu__mpu9250
 	MAIN mpu9250
 	STACK_MAIN 1500
 	COMPILE_FLAGS

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,32 +31,84 @@
  *
  ****************************************************************************/
 
-#pragma once
-
-class ICM20948;
-
 /**
- * Helper class implementing the gyro driver node.
+ * @file mag_i2c.cpp
+ *
+ * I2C interface for AK09916
  */
-class ICM20948_gyro : public device::CDev
+
+#include <px4_config.h>
+#include <drivers/device/i2c.h>
+#include <drivers/drv_device.h>
+
+#include "icm20948.h"
+#include "ICM20948_mag.h"
+
+#ifdef USE_I2C
+
+device::Device *AK09916_I2C_interface(int bus, bool external_bus);
+
+class AK09916_I2C : public device::I2C
 {
 public:
-	ICM20948_gyro(ICM20948 *parent, const char *path);
-	~ICM20948_gyro();
+	AK09916_I2C(int bus);
+	~AK09916_I2C() override = default;
 
-	virtual int		ioctl(struct file *filp, int cmd, unsigned long arg);
-
-	virtual int		init();
+	int	read(unsigned address, void *data, unsigned count) override;
+	int	write(unsigned address, void *data, unsigned count) override;
 
 protected:
-	friend class ICM20948;
+	int	probe() override;
 
-	void			parent_poll_notify();
-
-private:
-	ICM20948			*_parent;
-
-	orb_advert_t		_gyro_topic{nullptr};
-	int			_gyro_orb_class_instance{-1};
-	int			_gyro_class_instance{-1};
 };
+
+device::Device *
+AK09916_I2C_interface(int bus, bool external_bus)
+{
+	return new AK09916_I2C(bus);
+}
+
+AK09916_I2C::AK09916_I2C(int bus) : I2C("AK09916_I2C", nullptr, bus, AK09916_I2C_ADDR, 400000)
+{
+	_device_id.devid_s.devtype = DRV_MAG_DEVTYPE_AK09916;
+}
+
+int
+AK09916_I2C::write(unsigned reg_speed, void *data, unsigned count)
+{
+	uint8_t cmd[MPU_MAX_WRITE_BUFFER_SIZE];
+
+	if (sizeof(cmd) < (count + 1)) {
+		return -EIO;
+	}
+
+	cmd[0] = MPU9250_REG(reg_speed);
+	cmd[1] = *(uint8_t *)data;
+	return transfer(&cmd[0], count + 1, nullptr, 0);
+}
+
+int
+AK09916_I2C::read(unsigned reg_speed, void *data, unsigned count)
+{
+	uint8_t cmd = MPU9250_REG(reg_speed);
+	return transfer(&cmd, 1, (uint8_t *)data, count);
+}
+
+int
+AK09916_I2C::probe()
+{
+	uint8_t whoami = 0;
+	uint8_t expected = AK09916_DEVICE_ID;
+
+	if (PX4_OK != read(AK09916REG_WIA, &whoami, 1)) {
+		return -EIO;
+	}
+
+	if (whoami != expected) {
+		return -EIO;
+	}
+
+	return OK;
+}
+
+#endif
