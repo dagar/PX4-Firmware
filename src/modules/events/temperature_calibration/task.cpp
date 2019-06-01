@@ -39,7 +39,7 @@
  * @author Beat Küng <beat-kueng@gmx.net>
  */
 
-#include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
 #include <mathlib/mathlib.h>
 #include <px4_log.h>
 #include <px4_posix.h>
@@ -112,14 +112,14 @@ void TemperatureCalibration::task_main()
 	// subscribe to all gyro instances
 	int gyro_sub[SENSOR_COUNT_MAX] = {};
 	px4_pollfd_struct_t fds[SENSOR_COUNT_MAX] = {};
-	unsigned num_gyro = orb_group_count(ORB_ID(sensor_gyro));
+	unsigned num_gyro = orb_group_count(ORB_ID(sensor_gyro_integrated));
 
 	if (num_gyro > SENSOR_COUNT_MAX) {
 		num_gyro = SENSOR_COUNT_MAX;
 	}
 
 	for (unsigned i = 0; i < num_gyro; i++) {
-		gyro_sub[i] = orb_subscribe_multi(ORB_ID(sensor_gyro), i);
+		gyro_sub[i] = orb_subscribe_multi(ORB_ID(sensor_gyro_integrated), i);
 		fds[i].fd = gyro_sub[i];
 		fds[i].events = POLLIN;
 	}
@@ -215,10 +215,10 @@ void TemperatureCalibration::task_main()
 
 		//if gyro is not enabled: we must do an orb_copy here, so that poll() does not immediately return again
 		if (!_gyro) {
-			sensor_gyro_s gyro_data;
+			sensor_gyro_integrated_s gyro_data;
 
 			for (unsigned i = 0; i < num_gyro; ++i) {
-				orb_copy(ORB_ID(sensor_gyro), gyro_sub[i], &gyro_data);
+				orb_copy(ORB_ID(sensor_gyro_integrated), gyro_sub[i], &gyro_data);
 			}
 		}
 

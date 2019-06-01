@@ -40,20 +40,22 @@ PX4Gyroscope::PX4Gyroscope(uint32_t device_id, uint8_t priority, enum Rotation r
 	CDev(nullptr),
 	ModuleParams(nullptr),
 	_sensor_gyro_pub{ORB_ID(sensor_gyro), priority},
+	_sensor_gyro_control_pub{ORB_ID(sensor_gyro_control), priority},
+	_sensor_gyro_integrated_pub{ORB_ID(sensor_gyro_integrated), priority},
 	_rotation{rotation}
 {
 	_class_device_instance = register_class_devname(GYRO_BASE_DEVICE_PATH);
 
 	_sensor_gyro_pub.get().device_id = device_id;
-	_sensor_gyro_pub.get().scaling = 1.0f;
+	_sensor_gyro_control_pub.get().device_id = device_id;
+	_sensor_gyro_integrated_pub.get().device_id = device_id;
+
+	// gyro raw
+	_sensor_gyro_pub.get().rotation = _rotation;
 
 	// set software low pass filter for controllers
 	updateParams();
 	configure_filter(_param_imu_gyro_cutoff.get());
-
-	// force initial publish to allocate uORB buffer
-	// TODO: can be removed once all drivers are in threads
-	_sensor_gyro_pub.update();
 }
 
 PX4Gyroscope::~PX4Gyroscope()
@@ -96,6 +98,8 @@ void PX4Gyroscope::set_device_type(uint8_t devtype)
 
 	// copy back to report
 	_sensor_gyro_pub.get().device_id = device_id.devid;
+	_sensor_gyro_control_pub.get().device_id = device_id.devid;
+	_sensor_gyro_integrated_pub.get().device_id = device_id.devid;
 }
 
 void PX4Gyroscope::set_sample_rate(unsigned rate)
@@ -121,29 +125,36 @@ void PX4Gyroscope::update(hrt_abstime timestamp, int16_t x, int16_t y, int16_t z
 	// Filtered values
 	const matrix::Vector3f val_filtered{_filter.apply(val_calibrated)};
 
+	// publish control data (filtered gyro) immediately
+	sensor_gyro_control_s &control = _sensor_gyro_control_pub.get();
+	control.timestamp = timestamp;
+	control.x = val_filtered(0);
+	control.y = val_filtered(1);
+	control.z = val_filtered(2);
+	_sensor_gyro_control_pub.update();	// publish
+
+
 	// Integrated values
 	matrix::Vector3f integrated_value;
 	uint32_t integral_dt = 0;
 
+	// integrated gyro
 	if (_integrator.put(timestamp, val_calibrated, integrated_value, integral_dt)) {
+		sensor_gyro_integrated_s &integrated = _sensor_gyro_integrated_pub.get();
 
-		// Raw values (ADC units 0 - 65535)
-		report.x_raw = x;
-		report.y_raw = y;
-		report.z_raw = z;
+		integrated.timestamp = timestamp;
+		integrated.dt = integral_dt;
 
-		report.x = val_filtered(0);
-		report.y = val_filtered(1);
-		report.z = val_filtered(2);
+		integrated_value.copyTo(integrated.delta_angle);
 
-		report.integral_dt = integral_dt;
-		report.x_integral = integrated_value(0);
-		report.y_integral = integrated_value(1);
-		report.z_integral = integrated_value(2);
-
-		poll_notify(POLLIN);
-		_sensor_gyro_pub.update();
+		_sensor_gyro_integrated_pub.update();	// publish
 	}
+
+	// raw gyro publish last
+	report.x = x;
+	report.y = y;
+	report.z = z;
+	_sensor_gyro_pub.update();	// publish
 }
 
 void PX4Gyroscope::print_status()
@@ -158,4 +169,7 @@ void PX4Gyroscope::print_status()
 		 (double)_calibration_offset(2));
 
 	print_message(_sensor_gyro_pub.get());
+	print_message(_sensor_gyro_control_pub.get());
+	print_message(_sensor_gyro_integrated_pub.get());
+
 }

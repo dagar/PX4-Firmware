@@ -292,7 +292,7 @@ void Sih::init_sensors()
 
     _sensor_gyro.device_id=1;
     _sensor_gyro.error_count=0;
-    _sensor_gyro.integral_dt=0;
+    //_sensor_gyro.integral_dt=0;
     _sensor_gyro.temperature=T1_C;
     _sensor_gyro.scaling=0.0f;
 
@@ -501,7 +501,7 @@ void Sih::publish_sih()
     } else {
         _att_gt_sub = orb_advertise(ORB_ID(vehicle_attitude_groundtruth), &_att_gt);
     }
-} 
+}
 
 float Sih::generate_wgn()   // generate white Gaussian noise sample with std=1
 {

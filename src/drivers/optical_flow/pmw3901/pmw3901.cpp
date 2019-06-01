@@ -74,7 +74,6 @@
 #include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/distance_sensor.h>
-#include <uORB/topics/sensor_gyro.h>
 
 #include <board_config.h>
 

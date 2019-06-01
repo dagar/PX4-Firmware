@@ -43,6 +43,8 @@
 #include <uORB/uORB.h>
 #include <uORB/Publication.hpp>
 #include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_control.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
 
 class PX4Gyroscope : public cdev::CDev, public ModuleParams
 {
@@ -54,9 +56,16 @@ public:
 	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_gyro_pub.get().error_count = error_count; }
+
+	void set_error_count(uint64_t error_count) { _sensor_gyro_integrated_pub.get().error_count = error_count; }
+
 	void set_scale(float scale) { _sensor_gyro_pub.get().scaling = scale; }
-	void set_temperature(float temperature) { _sensor_gyro_pub.get().temperature = temperature; }
+
+	void set_temperature(float temperature)
+	{
+		_sensor_gyro_pub.get().temperature = temperature;
+		_sensor_gyro_integrated_pub.get().temperature = temperature;
+	}
 
 	void set_sample_rate(unsigned rate);
 
@@ -68,7 +77,9 @@ private:
 
 	void configure_filter(float cutoff_freq) { _filter.set_cutoff_frequency(_sample_rate, cutoff_freq); }
 
-	uORB::Publication<sensor_gyro_s>	_sensor_gyro_pub;
+	uORB::Publication<sensor_gyro_s>		_sensor_gyro_pub;
+	uORB::Publication<sensor_gyro_control_s>	_sensor_gyro_control_pub;
+	uORB::Publication<sensor_gyro_integrated_s>	_sensor_gyro_integrated_pub;
 
 	math::LowPassFilter2pVector3f _filter{1000, 100};
 	Integrator _integrator{4000, true};

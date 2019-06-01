@@ -41,9 +41,8 @@
 
 #pragma once
 
-#include <perf/perf_counter.h>
-#include <uORB/uORB.h>
-
+#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
+#include <lib/perf/perf_counter.h>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
@@ -227,7 +226,6 @@ private:
 	orb_advert_t _global_pos_pub{nullptr};
 	orb_advert_t _gps_inject_data_pub{nullptr};
 	orb_advert_t _gps_pub{nullptr};
-	orb_advert_t _gyro_pub{nullptr};
 	orb_advert_t _hil_distance_sensor_pub{nullptr};
 	orb_advert_t _land_detector_pub{nullptr};
 	orb_advert_t _landing_target_pose_pub{nullptr};
@@ -245,6 +243,8 @@ private:
 	orb_advert_t _trajectory_waypoint_pub{nullptr};
 	orb_advert_t _transponder_report_pub{nullptr};
 	orb_advert_t _visual_odometry_pub{nullptr};
+
+	PX4Gyroscope	*_px4_gyro{nullptr};
 
 	static constexpr int _gps_inject_data_queue_size{6};
 

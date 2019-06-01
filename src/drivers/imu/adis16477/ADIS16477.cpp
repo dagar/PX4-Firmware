@@ -604,50 +604,50 @@ ADIS16477::publish_accel(const ADISReport &report)
 bool
 ADIS16477::publish_gyro(const ADISReport &report)
 {
-	sensor_gyro_s grb = {};
-	grb.timestamp = hrt_absolute_time();
-	grb.device_id = _gyro->_device_id.devid;
-	grb.error_count = perf_event_count(_bad_transfers);
+	// sensor_gyro_s grb = {};
+	// grb.timestamp = hrt_absolute_time();
+	// grb.device_id = _gyro->_device_id.devid;
+	// grb.error_count = perf_event_count(_bad_transfers);
 
-	/* Gyro report: */
-	grb.scaling = math::radians(_gyro_range_scale);
-	grb.x_raw = report.gyro_x;
-	grb.y_raw = report.gyro_y;
-	grb.z_raw = report.gyro_z;
+	// /* Gyro report: */
+	// grb.scaling = math::radians(_gyro_range_scale);
+	// grb.x = report.gyro_x;
+	// grb.y = report.gyro_y;
+	// grb.z = report.gyro_z;
 
-	// ADIS16477-2BMLZ scale factory
-	float xraw_f = report.gyro_x;
-	float yraw_f = report.gyro_y;
-	float zraw_f = report.gyro_z;
+	// // ADIS16477-2BMLZ scale factory
+	// float xraw_f = report.gyro_x;
+	// float yraw_f = report.gyro_y;
+	// float zraw_f = report.gyro_z;
 
-	// apply user specified rotation
-	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
+	// // apply user specified rotation
+	// rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
 
-	float x_gyro_in_new = (math::radians(xraw_f * _gyro_range_scale) - _gyro_scale.x_offset) * _gyro_scale.x_scale;
-	float y_gyro_in_new = (math::radians(yraw_f * _gyro_range_scale) - _gyro_scale.y_offset) * _gyro_scale.y_scale;
-	float z_gyro_in_new = (math::radians(zraw_f * _gyro_range_scale) - _gyro_scale.z_offset) * _gyro_scale.z_scale;
+	// float x_gyro_in_new = (math::radians(xraw_f * _gyro_range_scale) - _gyro_scale.x_offset) * _gyro_scale.x_scale;
+	// float y_gyro_in_new = (math::radians(yraw_f * _gyro_range_scale) - _gyro_scale.y_offset) * _gyro_scale.y_scale;
+	// float z_gyro_in_new = (math::radians(zraw_f * _gyro_range_scale) - _gyro_scale.z_offset) * _gyro_scale.z_scale;
 
-	grb.x = _gyro_filter_x.apply(x_gyro_in_new);
-	grb.y = _gyro_filter_y.apply(y_gyro_in_new);
-	grb.z = _gyro_filter_z.apply(z_gyro_in_new);
+	// grb.x = _gyro_filter_x.apply(x_gyro_in_new);
+	// grb.y = _gyro_filter_y.apply(y_gyro_in_new);
+	// grb.z = _gyro_filter_z.apply(z_gyro_in_new);
 
-	matrix::Vector3f gval(x_gyro_in_new, y_gyro_in_new, z_gyro_in_new);
-	matrix::Vector3f gval_integrated;
+	// matrix::Vector3f gval(x_gyro_in_new, y_gyro_in_new, z_gyro_in_new);
+	// matrix::Vector3f gval_integrated;
 
-	bool gyro_notify = _gyro_int.put(grb.timestamp, gval, gval_integrated, grb.integral_dt);
-	grb.x_integral = gval_integrated(0);
-	grb.y_integral = gval_integrated(1);
-	grb.z_integral = gval_integrated(2);
+	// // bool gyro_notify = _gyro_int.put(grb.timestamp, gval, gval_integrated, grb.integral_dt);
+	// // grb.x_integral = gval_integrated(0);
+	// // grb.y_integral = gval_integrated(1);
+	// // grb.z_integral = gval_integrated(2);
 
-	/* Temperature report: */
-	// temperature 1 LSB = 0.1°C
-	grb.temperature = report.temp * 0.1f;
+	// /* Temperature report: */
+	// // temperature 1 LSB = 0.1°C
+	// grb.temperature = report.temp * 0.1f;
 
-	if (gyro_notify) {
-		orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
-	}
+	// // if (gyro_notify) {
+	// // 	orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
+	// // }
 
-	return gyro_notify;
+	return false;
 }
 
 void

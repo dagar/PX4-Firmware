@@ -563,7 +563,7 @@ ADIS16497::measure()
 	// TODO check data counter here to see if we're missing samples/getting repeated samples
 
 	publish_accel(t, adis_report);
-	publish_gyro(t, adis_report);
+	//publish_gyro(t, adis_report);
 
 	perf_end(_sample_perf);
 	return OK;
@@ -621,50 +621,50 @@ ADIS16497::publish_accel(const hrt_abstime &t, const ADISReport &report)
 void
 ADIS16497::publish_gyro(const hrt_abstime &t, const ADISReport &report)
 {
-	float xraw_f = (int32_t(report.X_GYRO_OUT) << 16 | report.X_GYRO_LOW) / 65536.0f;
-	float yraw_f = (int32_t(report.Y_GYRO_OUT) << 16 | report.Y_GYRO_LOW) / 65536.0f;
-	float zraw_f = (int32_t(report.Z_GYRO_OUT) << 16 | report.Z_GYRO_LOW) / 65536.0f;
+	// float xraw_f = (int32_t(report.X_GYRO_OUT) << 16 | report.X_GYRO_LOW) / 65536.0f;
+	// float yraw_f = (int32_t(report.Y_GYRO_OUT) << 16 | report.Y_GYRO_LOW) / 65536.0f;
+	// float zraw_f = (int32_t(report.Z_GYRO_OUT) << 16 | report.Z_GYRO_LOW) / 65536.0f;
 
-	// Apply user specified rotation
-	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
+	// // Apply user specified rotation
+	// rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
 
-	const float x_gyro_in_new = (math::radians(xraw_f * _gyro_range_scale) - _gyro_scale.x_offset) * _gyro_scale.x_scale;
-	const float y_gyro_in_new = (math::radians(yraw_f * _gyro_range_scale) - _gyro_scale.y_offset) * _gyro_scale.y_scale;
-	const float z_gyro_in_new = (math::radians(zraw_f * _gyro_range_scale) - _gyro_scale.z_offset) * _gyro_scale.z_scale;
+	// const float x_gyro_in_new = (math::radians(xraw_f * _gyro_range_scale) - _gyro_scale.x_offset) * _gyro_scale.x_scale;
+	// const float y_gyro_in_new = (math::radians(yraw_f * _gyro_range_scale) - _gyro_scale.y_offset) * _gyro_scale.y_scale;
+	// const float z_gyro_in_new = (math::radians(zraw_f * _gyro_range_scale) - _gyro_scale.z_offset) * _gyro_scale.z_scale;
 
-	matrix::Vector3f gval(x_gyro_in_new, y_gyro_in_new, z_gyro_in_new);
+	// matrix::Vector3f gval(x_gyro_in_new, y_gyro_in_new, z_gyro_in_new);
 
-	const matrix::Vector3f gval_filt = _gyro_filter.apply(gval);
+	// const matrix::Vector3f gval_filt = _gyro_filter.apply(gval);
 
-	sensor_gyro_s grb{};
-	matrix::Vector3f gval_integrated;
+	// sensor_gyro_s grb{};
+	// matrix::Vector3f gval_integrated;
 
-	if (_gyro_int.put(t, gval, gval_integrated, grb.integral_dt)) {
-		grb.timestamp = t;
+	// if (_gyro_int.put(t, gval, gval_integrated, grb.integral_dt)) {
+	// 	grb.timestamp = t;
 
-		grb.device_id = _gyro->_device_id.devid;
-		grb.error_count = perf_event_count(_bad_transfers);
+	// 	grb.device_id = _gyro->_device_id.devid;
+	// 	grb.error_count = perf_event_count(_bad_transfers);
 
-		// Raw sensor readings
-		grb.x_raw = report.X_GYRO_OUT;
-		grb.y_raw = report.Y_GYRO_OUT;
-		grb.z_raw = report.Z_GYRO_OUT;
-		grb.scaling = math::radians(_gyro_range_scale);
+	// 	// Raw sensor readings
+	// 	grb.x_raw = report.X_GYRO_OUT;
+	// 	grb.y_raw = report.Y_GYRO_OUT;
+	// 	grb.z_raw = report.Z_GYRO_OUT;
+	// 	grb.scaling = math::radians(_gyro_range_scale);
 
-		// Filtered values for controls
-		grb.x = gval_filt(0);
-		grb.y = gval_filt(1);
-		grb.z = gval_filt(2);
+	// 	// Filtered values for controls
+	// 	grb.x = gval_filt(0);
+	// 	grb.y = gval_filt(1);
+	// 	grb.z = gval_filt(2);
 
-		// Unfiltered integrated values for estimation
-		grb.x_integral = gval_integrated(0);
-		grb.y_integral = gval_integrated(1);
-		grb.z_integral = gval_integrated(2);
+	// 	// Unfiltered integrated values for estimation
+	// 	grb.x_integral = gval_integrated(0);
+	// 	grb.y_integral = gval_integrated(1);
+	// 	grb.z_integral = gval_integrated(2);
 
-		grb.temperature = (int16_t(report.TEMP_OUT) * 0.0125f) + 25.0f; // 1 LSB = 0.0125°C, 0x0000 at 25°C
+	// 	grb.temperature = (int16_t(report.TEMP_OUT) * 0.0125f) + 25.0f; // 1 LSB = 0.0125°C, 0x0000 at 25°C
 
-		orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
-	}
+	// 	orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
+	// }
 }
 
 void

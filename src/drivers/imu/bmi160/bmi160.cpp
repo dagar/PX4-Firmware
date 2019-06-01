@@ -1027,9 +1027,9 @@ BMI160::measure()
 	/* return device ID */
 	arb.device_id = _device_id.devid;
 
-	grb.x_raw = report.gyro_x;
-	grb.y_raw = report.gyro_y;
-	grb.z_raw = report.gyro_z;
+	grb.x = report.gyro_x;
+	grb.y = report.gyro_y;
+	grb.z = report.gyro_z;
 
 	xraw_f = report.gyro_x;
 	yraw_f = report.gyro_y;
@@ -1049,10 +1049,10 @@ BMI160::measure()
 	matrix::Vector3f gval(x_gyro_in_new, y_gyro_in_new, z_gyro_in_new);
 	matrix::Vector3f gval_integrated;
 
-	bool gyro_notify = _gyro_int.put(arb.timestamp, gval, gval_integrated, grb.integral_dt);
-	grb.x_integral = gval_integrated(0);
-	grb.y_integral = gval_integrated(1);
-	grb.z_integral = gval_integrated(2);
+	// bool gyro_notify = _gyro_int.put(arb.timestamp, gval, gval_integrated, grb.integral_dt);
+	// grb.x_integral = gval_integrated(0);
+	// grb.y_integral = gval_integrated(1);
+	// grb.z_integral = gval_integrated(2);
 
 	grb.scaling = _gyro_range_scale;
 
@@ -1069,19 +1069,19 @@ BMI160::measure()
 		poll_notify(POLLIN);
 	}
 
-	if (gyro_notify) {
-		_gyro->parent_poll_notify();
-	}
+	// if (gyro_notify) {
+	// 	_gyro->parent_poll_notify();
+	// }
 
 	if (accel_notify && !(_pub_blocked)) {
 		/* publish it */
 		orb_publish(ORB_ID(sensor_accel), _accel_topic, &arb);
 	}
 
-	if (gyro_notify && !(_pub_blocked)) {
-		/* publish it */
-		orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
-	}
+	// if (gyro_notify && !(_pub_blocked)) {
+	// 	/* publish it */
+	// 	orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
+	// }
 
 	/* stop measuring */
 	perf_end(_sample_perf);

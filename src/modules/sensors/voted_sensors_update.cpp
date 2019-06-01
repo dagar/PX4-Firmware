@@ -104,7 +104,7 @@ int VotedSensorsUpdate::init(sensor_combined_s &raw)
 
 void VotedSensorsUpdate::initialize_sensors()
 {
-	init_sensor_class(ORB_ID(sensor_gyro), _gyro, GYRO_COUNT_MAX);
+	init_sensor_class(ORB_ID(sensor_gyro_integrated), _gyro, GYRO_COUNT_MAX);
 	init_sensor_class(ORB_ID(sensor_mag), _mag, MAG_COUNT_MAX);
 	init_sensor_class(ORB_ID(sensor_accel), _accel, ACCEL_COUNT_MAX);
 	init_sensor_class(ORB_ID(sensor_baro), _baro, BARO_COUNT_MAX);
@@ -154,7 +154,7 @@ void VotedSensorsUpdate::parameters_update()
 	/* gyro */
 	for (uint8_t topic_instance = 0; topic_instance < _gyro.subscription_count; ++topic_instance) {
 
-		uORB::SubscriptionData<sensor_gyro_s> report{ORB_ID(sensor_gyro), topic_instance};
+		uORB::SubscriptionData<sensor_gyro_integrated_s> report{ORB_ID(sensor_gyro_integrated), topic_instance};
 
 		int temp = _temperature_compensation.set_sensor_id_gyro(report.get().device_id, topic_instance);
 
@@ -642,9 +642,9 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 		orb_check(_gyro.subscription[uorb_index], &gyro_updated);
 
 		if (gyro_updated) {
-			sensor_gyro_s gyro_report;
+			sensor_gyro_integrated_s gyro_report;
 
-			int ret = orb_copy(ORB_ID(sensor_gyro), _gyro.subscription[uorb_index], &gyro_report);
+			int ret = orb_copy(ORB_ID(sensor_gyro_integrated), _gyro.subscription[uorb_index], &gyro_report);
 
 			if (ret != PX4_OK || gyro_report.timestamp == 0) {
 				continue; //ignore invalid data
@@ -663,40 +663,20 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 
 			_gyro_device_id[uorb_index] = gyro_report.device_id;
 
-			matrix::Vector3f gyro_rate;
+			/*
+			* Using data that has been integrated in the driver before downsampling is preferred
+			* because it reduces aliasing errors. Correct the raw sensor data for scale factor errors
+			* and offsets due to temperature variation. It is assumed that any filtering of input
+			* data required is performed in the sensor driver, preferably before downsampling.
+			*/
 
-			if (gyro_report.integral_dt != 0) {
-				/*
-				 * Using data that has been integrated in the driver before downsampling is preferred
-				 * becasue it reduces aliasing errors. Correct the raw sensor data for scale factor errors
-				 * and offsets due to temperature variation. It is assumed that any filtering of input
-				 * data required is performed in the sensor driver, preferably before downsampling.
-				*/
+			// convert the delta angles to an equivalent angular rate before application of corrections
+			matrix::Vector3f gyro_rate{matrix::Vector3f{gyro_report.delta_angle} * 1.e6f / gyro_report.dt};
 
-				// convert the delta angles to an equivalent angular rate before application of corrections
-				float dt_inv = 1.e6f / gyro_report.integral_dt;
-				gyro_rate = matrix::Vector3f(gyro_report.x_integral * dt_inv,
-							     gyro_report.y_integral * dt_inv,
-							     gyro_report.z_integral * dt_inv);
+			// rotate corrected measurements from sensor to body frame
+			gyro_rate = _board_rotation * gyro_rate;
 
-				_last_sensor_data[uorb_index].gyro_integral_dt = gyro_report.integral_dt;
-
-			} else {
-				//using the value instead of the integral (the integral is the prefered choice)
-
-				// Correct each sensor for temperature effects
-				// Filtering and/or downsampling of temperature should be performed in the driver layer
-				gyro_rate = matrix::Vector3f(gyro_report.x, gyro_report.y, gyro_report.z);
-
-				// handle the case where this is our first output
-				if (_last_sensor_data[uorb_index].timestamp == 0) {
-					_last_sensor_data[uorb_index].timestamp = gyro_report.timestamp - 1000;
-				}
-
-				// approximate the delta time using the difference in gyro data time stamps
-				_last_sensor_data[uorb_index].gyro_integral_dt =
-					(gyro_report.timestamp - _last_sensor_data[uorb_index].timestamp);
-			}
+			_last_sensor_data[uorb_index].gyro_integral_dt = gyro_report.dt;
 
 			// handle temperature compensation
 			if (_temperature_compensation.apply_corrections_gyro(uorb_index, gyro_rate, gyro_report.temperature,
@@ -704,16 +684,13 @@ void VotedSensorsUpdate::gyro_poll(struct sensor_combined_s &raw)
 				_corrections_changed = true;
 			}
 
-			// rotate corrected measurements from sensor to body frame
-			gyro_rate = _board_rotation * gyro_rate;
-
 			_last_sensor_data[uorb_index].gyro_rad[0] = gyro_rate(0);
 			_last_sensor_data[uorb_index].gyro_rad[1] = gyro_rate(1);
 			_last_sensor_data[uorb_index].gyro_rad[2] = gyro_rate(2);
 
 			_last_sensor_data[uorb_index].timestamp = gyro_report.timestamp;
-			_gyro.voter.put(uorb_index, gyro_report.timestamp, _last_sensor_data[uorb_index].gyro_rad,
-					gyro_report.error_count, _gyro.priority[uorb_index]);
+			_gyro.voter.put(uorb_index, gyro_report.timestamp, _last_sensor_data[uorb_index].gyro_rad, gyro_report.error_count,
+					_gyro.priority[uorb_index]);
 		}
 	}
 

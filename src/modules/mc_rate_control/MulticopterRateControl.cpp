@@ -367,10 +367,10 @@ MulticopterRateControl::publish_actuator_controls()
 void
 MulticopterRateControl::run()
 {
-	_gyro_count = math::constrain(orb_group_count(ORB_ID(sensor_gyro)), 1, MAX_GYRO_COUNT);
+	_gyro_count = math::constrain(orb_group_count(ORB_ID(sensor_gyro_control)), 1, MAX_GYRO_COUNT);
 
 	for (unsigned s = 0; s < _gyro_count; s++) {
-		_sensor_gyro_sub[s] = orb_subscribe_multi(ORB_ID(sensor_gyro), s);
+		_sensor_gyro_sub[s] = orb_subscribe_multi(ORB_ID(sensor_gyro_control), s);
 	}
 
 	/* wakeup source: gyro data from sensor selected by the sensor app */
@@ -423,7 +423,7 @@ MulticopterRateControl::run()
 			last_run = now;
 
 			/* copy gyro data */
-			orb_copy(ORB_ID(sensor_gyro), _sensor_gyro_sub[_selected_gyro], &_sensor_gyro);
+			orb_copy(ORB_ID(sensor_gyro_control), _sensor_gyro_sub[_selected_gyro], &_sensor_gyro);
 
 			_v_control_mode_sub.update(&_v_control_mode);
 

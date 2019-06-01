@@ -41,8 +41,8 @@ set(msg_files
 	battery_status.msg
 	camera_capture.msg
 	camera_trigger.msg
-	collision_report.msg
 	collision_constraints.msg
+	collision_report.msg
 	commander_state.msg
 	cpuload.msg
 	debug_array.msg
@@ -104,6 +104,8 @@ set(msg_files
 	sensor_combined.msg
 	sensor_correction.msg
 	sensor_gyro.msg
+	sensor_gyro_control.msg
+	sensor_gyro_integrated.msg
 	sensor_mag.msg
 	sensor_preflight.msg
 	sensor_selection.msg

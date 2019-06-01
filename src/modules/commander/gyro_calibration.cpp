@@ -55,6 +55,7 @@
 #include <drivers/drv_hrt.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_correction.h>
+#include <uORB/topics/sensor_gyro_control.h>
 #include <drivers/drv_gyro.h>
 #include <systemlib/mavlink_log.h>
 #include <parameters/param.h>
@@ -71,7 +72,7 @@ typedef struct  {
 	int			gyro_sensor_sub[max_gyros];
 	int			sensor_correction_sub;
 	struct gyro_calibration_s	gyro_scale[max_gyros];
-	sensor_gyro_s	gyro_report_0;
+	sensor_gyro_control_s	gyro_report_0;
 } gyro_worker_data_t;
 
 static calibrate_return gyro_calibration_worker(int cancel_sub, void *data)
@@ -79,7 +80,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, void *data)
 	gyro_worker_data_t	*worker_data = (gyro_worker_data_t *)(data);
 	unsigned		calibration_counter[max_gyros] = { 0 }, slow_count = 0;
 	const unsigned		calibration_count = 5000;
-	sensor_gyro_s	gyro_report;
+	sensor_gyro_control_s	gyro_report;
 	unsigned		poll_errcount = 0;
 
 	struct sensor_correction_s sensor_correction; /**< sensor thermal corrections */
@@ -134,7 +135,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, void *data)
 				orb_check(worker_data->gyro_sensor_sub[s], &changed);
 
 				if (changed) {
-					orb_copy(ORB_ID(sensor_gyro), worker_data->gyro_sensor_sub[s], &gyro_report);
+					orb_copy(ORB_ID(sensor_gyro_control), worker_data->gyro_sensor_sub[s], &gyro_report);
 
 					if (s == 0) {
 						// take a working copy
@@ -146,7 +147,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, void *data)
 										       sensor_correction.gyro_scale_0[2];
 
 						// take a reference copy of the primary sensor including correction for thermal drift
-						orb_copy(ORB_ID(sensor_gyro), worker_data->gyro_sensor_sub[s], &worker_data->gyro_report_0);
+						orb_copy(ORB_ID(sensor_gyro_control), worker_data->gyro_sensor_sub[s], &worker_data->gyro_report_0);
 						worker_data->gyro_report_0.x = (gyro_report.x - sensor_correction.gyro_offset_0[0]) * sensor_correction.gyro_scale_0[0];
 						worker_data->gyro_report_0.y = (gyro_report.y - sensor_correction.gyro_offset_0[1]) * sensor_correction.gyro_scale_0[1];
 						worker_data->gyro_report_0.z = (gyro_report.z - sensor_correction.gyro_offset_0[2]) * sensor_correction.gyro_scale_0[2];
@@ -321,7 +322,7 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 	}
 
 	// We should not try to subscribe if the topic doesn't actually exist and can be counted.
-	const unsigned orb_gyro_count = orb_group_count(ORB_ID(sensor_gyro));
+	const unsigned orb_gyro_count = orb_group_count(ORB_ID(sensor_gyro_control));
 
 	// Warn that we will not calibrate more than max_gyros gyroscopes
 	if (orb_gyro_count > max_gyros) {
@@ -334,10 +335,10 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 		bool found_cur_gyro = false;
 
 		for (unsigned i = 0; i < orb_gyro_count && !found_cur_gyro; i++) {
-			worker_data.gyro_sensor_sub[cur_gyro] = orb_subscribe_multi(ORB_ID(sensor_gyro), i);
+			worker_data.gyro_sensor_sub[cur_gyro] = orb_subscribe_multi(ORB_ID(sensor_gyro_control), i);
 
-			sensor_gyro_s report{};
-			orb_copy(ORB_ID(sensor_gyro), worker_data.gyro_sensor_sub[cur_gyro], &report);
+			sensor_gyro_control_s report{};
+			orb_copy(ORB_ID(sensor_gyro_control), worker_data.gyro_sensor_sub[cur_gyro], &report);
 
 #ifdef __PX4_NUTTX
 

@@ -54,7 +54,7 @@
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_baro.h>
-#include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/subsystem_info.h>
@@ -303,13 +303,13 @@ static bool accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 static bool gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, uint8_t instance, bool optional,
 		      int32_t &device_id, bool report_fail)
 {
-	const bool exists = (orb_exists(ORB_ID(sensor_gyro), instance) == PX4_OK);
+	const bool exists = (orb_exists(ORB_ID(sensor_gyro_integrated), instance) == PX4_OK);
 	bool calibration_valid = false;
 	bool gyro_valid = false;
 
 	if (exists) {
 
-		uORB::SubscriptionData<sensor_gyro_s> gyro{ORB_ID(sensor_gyro), instance};
+		uORB::SubscriptionData<sensor_gyro_integrated_s> gyro{ORB_ID(sensor_gyro_integrated), instance};
 
 		gyro_valid = (hrt_elapsed_time(&gyro.get().timestamp) < 1_s);
 

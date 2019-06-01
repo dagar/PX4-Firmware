@@ -1966,22 +1966,14 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 
 	/* gyro */
 	{
-		sensor_gyro_s gyro = {};
+		if (_px4_gyro == nullptr) {
+			_px4_gyro = new PX4Gyroscope{2294028, ORB_PRIO_DEFAULT, ROTATION_NONE}; // 2294028: DRV_GYR_DEVTYPE_GYROSIM, BUS: 1, ADDR: 2, TYPE: SIMULATION
+			_px4_gyro->set_scale(1.0f / 1000.0f);
+		}
 
-		gyro.timestamp = timestamp;
-		gyro.x_raw = imu.xgyro * 1000.0f;
-		gyro.y_raw = imu.ygyro * 1000.0f;
-		gyro.z_raw = imu.zgyro * 1000.0f;
-		gyro.x = imu.xgyro;
-		gyro.y = imu.ygyro;
-		gyro.z = imu.zgyro;
-		gyro.temperature = imu.temperature;
-
-		if (_gyro_pub == nullptr) {
-			_gyro_pub = orb_advertise(ORB_ID(sensor_gyro), &gyro);
-
-		} else {
-			orb_publish(ORB_ID(sensor_gyro), _gyro_pub, &gyro);
+		if (_px4_gyro != nullptr) {
+			_px4_gyro->set_temperature(imu.temperature);
+			_px4_gyro->update(hrt_absolute_time(), imu.xgyro * 1000.0f, imu.xgyro * 1000.0f, imu.xgyro * 1000.0f);
 		}
 	}
 
