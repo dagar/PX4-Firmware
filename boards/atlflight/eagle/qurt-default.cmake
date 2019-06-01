@@ -73,6 +73,7 @@ px4_add_board(
 		local_position_estimator
 		mc_att_control
 		mc_pos_control
+		mc_rate_control
 		sensors
 		#sih
 		vmount

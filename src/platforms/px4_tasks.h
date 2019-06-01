@@ -107,9 +107,14 @@ typedef struct {
 // latency.
 #define SCHED_PRIORITY_FAST_DRIVER		(SCHED_PRIORITY_MAX - 0)
 
-// Attitude controllers typically are in a blocking wait on driver data
+// Rate controllers typically are in a blocking wait on driver data
 // they should be the first to run on an update, using the current sensor
-// data and the *previous* attitude reference from the position controller
+// data
+#define SCHED_PRIORITY_RATE_CONTROL		(PX4_WQ_HP_BASE - 3)
+
+// Attitude controllers typically are in a blocking wait on estimator data
+// they should be the first to run on an update, using the attitude estimate
+// data and the attitude reference from the position controller
 // which typically runs at a slower rate
 #define SCHED_PRIORITY_ATTITUDE_CONTROL		(PX4_WQ_HP_BASE - 4)
 
