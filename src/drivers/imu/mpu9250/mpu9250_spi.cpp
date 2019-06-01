@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,19 +47,7 @@
 #define DIR_READ			0x80
 #define DIR_WRITE			0x00
 
-/*
- * The MPU9250 can only handle high SPI bus speeds of 20Mhz on the sensor and
- * interrupt status registers. All other registers have a maximum 1MHz
- * SPI speed
- *
- * The Actual Value will be rounded down by the spi driver.
- * for a 168Mhz CPU this will be 10.5 Mhz and for a 180 Mhz CPU
- * it will be 11.250 Mhz
- */
-#define MPU9250_LOW_SPI_BUS_SPEED	1000*1000
-#define MPU9250_HIGH_SPI_BUS_SPEED	20*1000*1000
-
-device::Device *MPU9250_SPI_interface(int bus, uint32_t cs, bool external_bus);
+device::Device *MPU9250_SPI_interface(int bus, uint32_t cs);
 
 class MPU9250_SPI : public device::SPI
 {
@@ -72,68 +60,43 @@ public:
 
 protected:
 	int probe() override;
-
-private:
-
-	/* Helper to set the desired speed and isolate the register on return */
-	void set_bus_frequency(unsigned &reg_speed_reg_out);
 };
 
 device::Device *
-MPU9250_SPI_interface(int bus, uint32_t cs, bool external_bus)
+MPU9250_SPI_interface(int bus, uint32_t cs)
 {
 	device::Device *interface = nullptr;
 
-	if (external_bus) {
-#if !(defined(PX4_SPI_BUS_EXT) && defined(PX4_SPIDEV_EXT_MPU))
-		errx(0, "External SPI not available");
-#endif
-	}
-
-	if (cs != SPIDEV_NONE(0)) {
-		interface = new MPU9250_SPI(bus, cs);
-	}
+	interface = new MPU9250_SPI(bus, cs);
 
 	return interface;
 }
 
 MPU9250_SPI::MPU9250_SPI(int bus, uint32_t device) :
-	SPI("MPU9250", nullptr, bus, device, SPIDEV_MODE3, MPU9250_LOW_SPI_BUS_SPEED)
+	SPI("MPU9250", nullptr, bus, device, SPIDEV_MODE3, 1000000)
 {
+	_debug_enabled = true;
+
 	_device_id.devid_s.devtype = DRV_ACC_DEVTYPE_MPU9250;
 }
 
-void
-MPU9250_SPI::set_bus_frequency(unsigned &reg_speed)
-{
-	/* Set the desired speed */
-	set_frequency(MPU9250_IS_HIGH_SPEED(reg_speed) ? MPU9250_HIGH_SPI_BUS_SPEED : MPU9250_LOW_SPI_BUS_SPEED);
-
-	/* Isoolate the register on return */
-	reg_speed = MPU9250_REG(reg_speed);
-}
-
 int
-MPU9250_SPI::write(unsigned reg_speed, void *data, unsigned count)
+MPU9250_SPI::write(unsigned reg, void *data, unsigned count)
 {
-	uint8_t cmd[MPU_MAX_WRITE_BUFFER_SIZE] {};
+	uint8_t cmd[2] {};
 
 	if (sizeof(cmd) < (count + 1)) {
 		return -EIO;
 	}
 
-	/* Set the desired speed and isolate the register */
-
-	set_bus_frequency(reg_speed);
-
-	cmd[0] = reg_speed | DIR_WRITE;
+	cmd[0] = reg | DIR_WRITE;
 	cmd[1] = *(uint8_t *)data;
 
 	return transfer(&cmd[0], &cmd[0], count + 1);
 }
 
 int
-MPU9250_SPI::read(unsigned reg_speed, void *data, unsigned count)
+MPU9250_SPI::read(unsigned reg, void *data, unsigned count)
 {
 	/* We want to avoid copying the data of MPUReport: So if the caller
 	 * supplies a buffer not MPUReport in size, it is assume to be a reg or reg 16 read
@@ -149,10 +112,8 @@ MPU9250_SPI::read(unsigned reg_speed, void *data, unsigned count)
 		count++;
 	}
 
-	set_bus_frequency(reg_speed);
-
 	/* Set command */
-	pbuff[0] = reg_speed | DIR_READ ;
+	pbuff[0] = reg | DIR_READ ;
 
 	/* Transfer the command and get the data */
 	int ret = transfer(pbuff, pbuff, count);
@@ -174,6 +135,8 @@ MPU9250_SPI::probe()
 	uint8_t whoami = 0;
 
 	int ret = read(MPUREG_WHOAMI, &whoami, 1);
+
+	PX4_INFO("WHOAMI: %X", whoami);
 
 	if (ret != OK) {
 		return -EIO;

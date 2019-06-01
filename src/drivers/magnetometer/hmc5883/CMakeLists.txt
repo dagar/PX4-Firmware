@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015-2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,11 +36,14 @@ px4_add_module(
 	STACK_MAIN 1500
 	COMPILE_FLAGS
 		-Wno-cast-align # TODO: fix and enable
+		-Wno-error=unused-but-set-variable
+		-Wno-unused-but-set-variable
 	SRCS
 		hmc5883_i2c.cpp
 		hmc5883_spi.cpp
 		hmc5883.cpp
 	DEPENDS
 		px4_work_queue
+		drivers_magnetometer
 	)
 

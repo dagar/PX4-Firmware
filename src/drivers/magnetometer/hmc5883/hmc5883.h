@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2015-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,8 @@
  */
 
 #pragma once
+
+#include <lib/drivers/device/Device.hpp>
 
 #define ADDR_ID_A			0x0a
 #define ADDR_ID_B			0x0b
