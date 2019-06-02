@@ -319,6 +319,11 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 
 	ATOMIC_LEAVE;
 
+	// schedule registered work items
+	for (auto item : _registered_work_items) {
+		item->ScheduleNow();
+	}
+
 	/* notify any poll waiters */
 	poll_notify(POLLIN);
 
@@ -672,4 +677,24 @@ int uORB::DeviceNode::update_queue_size(unsigned int queue_size)
 
 	_queue_size = queue_size;
 	return PX4_OK;
+}
+
+bool uORB::DeviceNode::register_work_item(px4::WorkItem *item)
+{
+	if (item != nullptr) {
+		_registered_work_items.add(item);
+		return true;
+	}
+
+	return false;
+}
+
+bool uORB::DeviceNode::unregister_work_item(px4::WorkItem *item)
+{
+	if (item != nullptr) {
+		_registered_work_items.remove(item);
+		return true;
+	}
+
+	return false;
 }
