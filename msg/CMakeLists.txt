@@ -41,8 +41,8 @@ set(msg_files
 	battery_status.msg
 	camera_capture.msg
 	camera_trigger.msg
-	collision_report.msg
 	collision_constraints.msg
+	collision_report.msg
 	commander_state.msg
 	cpuload.msg
 	debug_array.msg
@@ -123,6 +123,7 @@ set(msg_files
 	ulog_stream.msg
 	ulog_stream_ack.msg
 	vehicle_air_data.msg
+	vehicle_angular_velocity.msg
 	vehicle_attitude.msg
 	vehicle_attitude_setpoint.msg
 	vehicle_command.msg

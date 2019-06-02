@@ -51,6 +51,8 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
+#include <px4_work_queue/WorkItem.hpp>
+
 namespace uORB
 {
 class Manager;
@@ -314,6 +316,26 @@ public:
 	 * @return    OK if the topic exists, PX4_ERROR otherwise.
 	 */
 	int  orb_exists(const struct orb_metadata *meta, int instance);
+
+	/**
+	 * Register work item callback on orb publish
+	 *
+	 * @param item   Valid WorkItem to schedule on new publication
+	 * @param meta    ORB topic metadata.
+	 * @param instance  ORB instance
+	 * @return    OK if the item was registered successfully, PX4_ERROR otherwise.
+	 */
+	int  orb_register_work_callback(px4::WorkItem *item, const struct orb_metadata *meta, int instance = 0);
+
+	/**
+	 * Unregister work item callback on orb publish
+	 *
+	 * @param item   Valid WorkItem to schedule on new publication
+	 * @param meta    ORB topic metadata.
+	 * @param instance  ORB instance
+	 * @return    OK if the item was unregistered successfully, PX4_ERROR otherwise.
+	 */
+	int  orb_unregister_work_callback(px4::WorkItem *item, const struct orb_metadata *meta, int instance = 0);
 
 	/**
 	 * Return the priority of the topic
