@@ -39,6 +39,7 @@
 #pragma once
 
 #include <uORB/uORB.h>
+#include <systemlib/err.h>
 #include <px4_defines.h>
 
 #include "uORBDeviceNode.hpp"
@@ -95,7 +96,6 @@ public:
 	bool		updated() { return published() ? (_node->published_message_count() != _last_generation) : false; }
 	bool		valid() const { return _node != nullptr; }
 	bool		published() { return valid() ? _node->is_published() : Init(); }
-	hrt_abstime	last_update_time() { return valid() ? _node->last_update() : 0; }
 	uint8_t		instance() const { return _instance; }
 	orb_id_t	topic() const { return _meta; }
 
@@ -139,7 +139,11 @@ public:
 	// update the embedded struct.
 	bool	update() { return Subscription::update((void *)(&_data)); }
 
-	const T &get() const { return _data; }
+	const T &get()
+	{
+		update();
+		return _data;
+	}
 
 private:
 

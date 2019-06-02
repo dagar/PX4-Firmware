@@ -60,15 +60,6 @@ CollisionPrevention::~CollisionPrevention()
 	}
 }
 
-bool CollisionPrevention::initializeSubscriptions(SubscriptionArray &subscription_array)
-{
-	if (!subscription_array.get(ORB_ID(obstacle_distance), _sub_obstacle_distance)) {
-		return false;
-	}
-
-	return true;
-}
-
 void CollisionPrevention::reset_constraints()
 {
 
@@ -107,7 +98,8 @@ void CollisionPrevention::publish_constraints(const Vector2f &original_setpoint,
 
 void CollisionPrevention::update_range_constraints()
 {
-	const obstacle_distance_s &obstacle_distance = _sub_obstacle_distance->get();
+	_sub_obstacle_distance.update();
+	const obstacle_distance_s &obstacle_distance = _sub_obstacle_distance.get();
 
 	if (hrt_elapsed_time(&obstacle_distance.timestamp) < RANGE_STREAM_TIMEOUT_US) {
 		float max_detection_distance = obstacle_distance.max_distance / 100.0f; //convert to meters
