@@ -40,12 +40,13 @@ PX4Gyroscope::PX4Gyroscope(uint32_t device_id, uint8_t priority, enum Rotation r
 	CDev(nullptr),
 	ModuleParams(nullptr),
 	_sensor_gyro_pub{ORB_ID(sensor_gyro), priority},
+	_sensor_gyro_control_pub{ORB_ID(sensor_gyro_control), priority},
 	_rotation{rotation}
 {
 	_class_device_instance = register_class_devname(GYRO_BASE_DEVICE_PATH);
 
 	_sensor_gyro_pub.get().device_id = device_id;
-	_sensor_gyro_pub.get().scaling = 1.0f;
+	_sensor_gyro_control_pub.get().device_id = device_id;
 
 	// set software low pass filter for controllers
 	updateParams();
@@ -96,6 +97,7 @@ void PX4Gyroscope::set_device_type(uint8_t devtype)
 
 	// copy back to report
 	_sensor_gyro_pub.get().device_id = device_id.devid;
+	_sensor_gyro_control_pub.get().device_id = device_id.devid;
 }
 
 void PX4Gyroscope::set_sample_rate(unsigned rate)
@@ -121,6 +123,15 @@ void PX4Gyroscope::update(hrt_abstime timestamp, int16_t x, int16_t y, int16_t z
 	// Filtered values
 	const matrix::Vector3f val_filtered{_filter.apply(val_calibrated)};
 
+	// publish control data (filtered gyro) immediately
+	sensor_gyro_control_s &control = _sensor_gyro_control_pub.get();
+	control.timestamp_sample = timestamp;
+	control.x = val_filtered(0);
+	control.y = val_filtered(1);
+	control.z = val_filtered(2);
+	control.timestamp = hrt_absolute_time();
+	_sensor_gyro_control_pub.update();	// publish
+
 	// Integrated values
 	matrix::Vector3f integrated_value;
 	uint32_t integral_dt = 0;
@@ -142,7 +153,7 @@ void PX4Gyroscope::update(hrt_abstime timestamp, int16_t x, int16_t y, int16_t z
 		report.z_integral = integrated_value(2);
 
 		poll_notify(POLLIN);
-		_sensor_gyro_pub.update();
+		_sensor_gyro_pub.update();	// publish
 	}
 }
 

@@ -51,7 +51,7 @@
 #include <uORB/topics/rate_ctrl_status.h>
 #include <uORB/topics/sensor_bias.h>
 #include <uORB/topics/sensor_correction.h>
-#include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_control.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
@@ -155,7 +155,7 @@ private:
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};	/**< vehicle land detected subscription */
 	uORB::Subscription _landing_gear_sub{ORB_ID(landing_gear)};
 
-	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub{this, ORB_ID(sensor_gyro)};	/**< gyro data subscription */
+	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub{this, ORB_ID(sensor_gyro_control)};	/**< gyro data subscription */
 
 	unsigned _gyro_count{1};
 	int _selected_gyro{0};
@@ -179,7 +179,8 @@ private:
 	struct actuator_controls_s		_actuators {};		/**< actuator controls */
 	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 	struct battery_status_s			_battery_status {};	/**< battery status */
-	struct sensor_gyro_s			_sensor_gyro {};	/**< gyro data before thermal correctons and ekf bias estimates are applied */
+	struct sensor_gyro_control_s
+		_sensor_gyro {};	/**< gyro data before thermal correctons and ekf bias estimates are applied */
 	struct sensor_correction_s		_sensor_correction {};	/**< sensor thermal corrections */
 	struct sensor_bias_s			_sensor_bias {};	/**< sensor in-run bias corrections */
 	struct vehicle_land_detected_s		_vehicle_land_detected {};

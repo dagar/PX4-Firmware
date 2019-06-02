@@ -124,7 +124,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 
 	parameters_updated();
 
-	_gyro_count = math::constrain(orb_group_count(ORB_ID(sensor_gyro)), 1, MAX_GYRO_COUNT);
+	_gyro_count = math::constrain(orb_group_count(ORB_ID(sensor_gyro_control)), 1, MAX_GYRO_COUNT);
 }
 
 void
@@ -558,7 +558,7 @@ MulticopterAttitudeControl::publish_actuator_controls()
 	_actuators.control[3] = (PX4_ISFINITE(_thrust_sp)) ? _thrust_sp : 0.0f;
 	_actuators.control[7] = (float)_landing_gear.landing_gear;
 	_actuators.timestamp = hrt_absolute_time();
-	_actuators.timestamp_sample = _sensor_gyro.timestamp;
+	_actuators.timestamp_sample = _sensor_gyro.timestamp_sample;
 
 	/* scale effort by battery status */
 	if (_param_mc_bat_scale_en.get() && _battery_status.scale > 0.0f) {
@@ -581,7 +581,7 @@ MulticopterAttitudeControl::Run()
 	/* update the latest gyro selection */
 	if (_sensor_correction.selected_gyro_instance < _gyro_count) {
 		if (_selected_gyro != _sensor_correction.selected_gyro_instance) {
-			if (_sensor_gyro_sub.change_topic(ORB_ID(sensor_gyro), _selected_gyro)) {
+			if (_sensor_gyro_sub.change_topic(ORB_ID(sensor_gyro_control), _selected_gyro)) {
 				_selected_gyro = _sensor_correction.selected_gyro_instance;
 				PX4_WARN("selected gyro changed %d -> %d", _selected_gyro, _sensor_correction.selected_gyro_instance);
 			}
