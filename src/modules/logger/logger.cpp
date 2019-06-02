@@ -45,7 +45,7 @@
 
 #include <uORB/uORB.h>
 #include <uORB/uORBTopics.h>
-#include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionInterval.hpp>
 #include <uORB/topics/log_message.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_status.h>
@@ -509,7 +509,7 @@ bool Logger::add_topic(const char *name, unsigned interval, uint8_t instance)
 
 			// check if already added: if so, only update the interval
 			for (size_t j = 0; j < _subscriptions.size(); ++j) {
-				if ((_subscriptions[j].get_topic() == topics[i]) && (_subscriptions[j].get_instance() == instance)) {
+				if ((_subscriptions[j].topic() == topics[i]) && (_subscriptions[j].instance() == instance)) {
 
 					PX4_DEBUG("logging topic %s(%d), interval: %i, already added, only setting interval", topics[i]->o_name, instance, interval);
 
@@ -550,7 +550,7 @@ bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
 
 	if (!sub.valid() && try_to_subscribe) {
 
-		if (sub.forceInit()) {
+		if (sub.ForceInit()) {
 
 			write_add_logged_msg(LogType::Full, sub);
 			if (sub_idx < _num_mission_subs) {
@@ -558,11 +558,11 @@ bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
 			}
 
 			// copy first data
-			updated = sub.update(buffer);
+			updated = sub.Update(buffer);
 		}
 
 	} else if (sub.valid()) {
-		updated = sub.update(buffer);
+		updated = sub.Update(buffer);
 	}
 
 	return updated;
@@ -920,8 +920,8 @@ void Logger::run()
 
 	for (const auto &subscription : _subscriptions) {
 		//use o_size, because that's what orb_copy will use
-		if (subscription.get_topic()->o_size > max_msg_size) {
-			max_msg_size = subscription.get_topic()->o_size;
+		if (subscription.topic()->o_size > max_msg_size) {
+			max_msg_size = subscription.topic()->o_size;
 		}
 	}
 
@@ -1053,7 +1053,7 @@ void Logger::run()
 			for (LoggerSubscription &sub : _subscriptions) {
 				/* each message consists of a header followed by an orb data object
 				 */
-				size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+				size_t msg_size = sizeof(ulog_message_data_header_s) + sub.topic()->o_size_no_padding;
 
 				/* if this topic has been updated, copy the new data into the message buffer
 				 * and write a message to the log
@@ -1160,7 +1160,7 @@ void Logger::run()
 			if (next_subscribe_topic_index != -1) {
 
 				if (!_subscriptions[next_subscribe_topic_index].valid()) {
-					_subscriptions[next_subscribe_topic_index].forceInit();
+					_subscriptions[next_subscribe_topic_index].ForceInit();
 				}
 
 				if (++next_subscribe_topic_index >= (int)_subscriptions.size()) {
@@ -1799,7 +1799,7 @@ void Logger::write_formats(LogType type)
 	}
 	for (size_t i = 0; i < sub_count; ++i) {
 		const LoggerSubscription &sub = _subscriptions[i];
-		write_format(type, *sub.get_topic(), written_formats, msg);
+		write_format(type, *sub.topic(), written_formats, msg);
 	}
 
 	_writer.unlock();
@@ -1837,11 +1837,11 @@ void Logger::write_add_logged_msg(LogType type, LoggerSubscription &subscription
 	}
 
 	msg.msg_id = subscription.msg_ids;
-	msg.multi_id = subscription.get_instance();
+	msg.multi_id = subscription.instance();
 
-	int message_name_len = strlen(subscription.get_topic()->o_name);
+	int message_name_len = strlen(subscription.topic()->o_name);
 
-	memcpy(msg.message_name, subscription.get_topic()->o_name, message_name_len);
+	memcpy(msg.message_name, subscription.topic()->o_name, message_name_len);
 
 	size_t msg_size = sizeof(msg) - sizeof(msg.message_name) + message_name_len;
 	msg.msg_size = msg_size - ULOG_MSG_HEADER_LEN;

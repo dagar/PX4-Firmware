@@ -39,13 +39,13 @@
 #include "util.h"
 #include <px4_defines.h>
 #include <drivers/drv_hrt.h>
-#include <uORB/Subscription.hpp>
 #include <version/version.h>
 #include <parameters/param.h>
 #include <systemlib/printload.h>
 #include <px4_module.h>
 
 #include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionInterval.hpp>
 #include <uORB/topics/vehicle_command.h>
 
 extern "C" __EXPORT int logger_main(int argc, char *argv[]);

@@ -61,14 +61,14 @@ public:
 	 * still copy the data.
 	 * If no data available data buffer will be filled with zeros.
 	 */
-	bool update(uint64_t *time, void *data) { return _sub.update(time, data); }
+	bool update(uint64_t *time, void *data) { return _sub.Update(time, data); }
 
 	/**
 	 * Copy topic data to given buffer.
 	 *
 	 * @return true only if topic data copied successfully.
 	 */
-	bool update(void *data) { return _sub.copy(data); }
+	bool update(void *data) { return _sub.Copy(data); }
 
 	/**
 	 * Check if the subscription has been updated.
@@ -89,8 +89,8 @@ public:
 
 	void subscribe_from_beginning(bool from_beginning) { _subscribe_from_beginning = from_beginning; }
 
-	orb_id_t get_topic() const { return _sub.get_topic(); }
-	int get_instance() const { return _sub.get_instance(); }
+	orb_id_t get_topic() const { return _sub.topic(); }
+	int get_instance() const { return _sub.instance(); }
 
 private:
 

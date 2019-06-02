@@ -344,7 +344,7 @@ MavlinkReceiver::send_flight_information()
 	}
 
 	actuator_armed_s actuator_armed{};
-	bool ret = _actuator_armed_sub.copy(&actuator_armed);
+	bool ret = _actuator_armed_sub.Copy(&actuator_armed);
 
 	if (ret && actuator_armed.timestamp != 0) {
 		flight_info.arming_time_utc = flight_info.takeoff_time_utc = actuator_armed.armed_time_ms;

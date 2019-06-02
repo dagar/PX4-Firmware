@@ -45,11 +45,13 @@
 #include "uORBManager.hpp"
 #include "uORBUtils.hpp"
 
+#include "Subscription.hpp"
+
 namespace uORB
 {
 
 // Base subscription wrapper class
-class Subscription
+class SubscriptionInterval
 {
 public:
 
@@ -57,93 +59,62 @@ public:
 	 * Constructor
 	 *
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 * @param interval The requested maximum update interval in milliseconds.
 	 * @param instance The instance for multi sub.
 	 */
-	Subscription(const orb_metadata *meta, uint8_t instance = 0) : _meta(meta), _instance(instance)
+	SubscriptionInterval(const orb_metadata *meta, unsigned interval = 0, uint8_t instance = 0) :
+		_subscription{meta, instance},
+		_interval(interval)
 	{
-		Init();
 	}
+	SubscriptionInterval() : _subscription{nullptr} {}
 
-	~Subscription() { Unsubscribe(); }
+	~SubscriptionInterval() = default;
 
-	bool		ForceInit();
+	bool ForceInit() { return _subscription.ForceInit(); }
+
+	/**
+	 * Check if there is a new update.
+	 * */
+	bool updated()
+	{
+		if (hrt_elapsed_time(&_last_update) >= (_interval * 1000)) {
+			return _subscription.published();
+		}
+
+		return false;
+	}
 
 	/**
 	 * Update the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool		update(void *dst) { return updated() ? Copy(dst) : false; }
-
-	/**
-	 * Check if subscription updated based on timestamp.
-	 *
-	 * @return true only if topic was updated based on a timestamp and
-	 * copied to buffer successfully.
-	 * If topic was not updated since last check it will return false but
-	 * still copy the data.
-	 * If no data available data buffer will be filled with zeros.
-	 */
-	bool		Update(uint64_t *time, void *dst);
-
-	/**
-	 * Copy the struct
-	 * @param data The uORB message struct we are updating.
-	 */
-	bool		Copy(void *dst) { return valid() ? _node->copy(dst, _last_generation) : false; }
-
-	// Simple accessors
-	bool		updated() { return published() ? (_node->published_message_count() != _last_generation) : false; }
-	bool		valid() const { return _node != nullptr; }
-	bool		published() { return valid() ? _node->is_published() : Init(); }
-	hrt_abstime	last_update_time() { return valid() ? _node->last_update() : 0; }
-	uint8_t		instance() const { return _instance; }
-	orb_id_t	topic() const { return _meta; }
-
-protected:
-
-	bool		Init();
-	bool		Subscribe();
-	void		Unsubscribe();
-
-	DeviceNode		*_node{nullptr};
-	const orb_metadata	*_meta{nullptr};
-
-	/**
-	 * Subscription's latest data generation.
-	 * Also used to track (and rate limit) subscription
-	 * attempts if the topic has not yet been published.
-	 */
-	unsigned		_last_generation{0};
-	uint8_t			_instance{0};
-};
-
-// Subscription wrapper class with data
-template<class T>
-class SubscriptionData : public Subscription
-{
-public:
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 * @param instance The instance for multi sub.
-	 */
-	SubscriptionData(const orb_metadata *meta, uint8_t instance = 0) :
-		Subscription(meta, instance)
+	bool Update(void *dst)
 	{
-		Copy(&_data);
+		if (updated()) {
+			if (_subscription.Copy(dst)) {
+				_last_update = hrt_absolute_time();
+				return true;
+			}
+		}
+
+		return false;
 	}
 
-	~SubscriptionData() = default;
+	// Simple accessors
+	bool		valid() const { return _subscription.valid(); }
+	uint8_t		instance() const { return _subscription.instance(); }
+	orb_id_t	topic() const { return _subscription.topic(); }
+	uint16_t	interval() const { return _interval; }
 
-	// update the embedded struct.
-	bool	update() { return Subscription::update((void *)(&_data)); }
-
-	const T &get() const { return _data; }
+	void		set_interval(uint16_t interval) { _interval = interval; }
 
 private:
 
-	T _data{};
+	Subscription	_subscription;
+	uint64_t	_last_update{0};	// last update in microseconds
+	uint16_t	_interval{0};		// maximum update interval in milliseconds
+
 };
 
 } // namespace uORB

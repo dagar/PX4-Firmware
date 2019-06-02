@@ -81,7 +81,7 @@ bool get_log_time(struct tm *tt, int utc_offset_sec, bool boot_time)
 	/* Get the latest GPS publication */
 	vehicle_gps_position_s gps_pos{};
 
-	if (vehicle_gps_position_sub.copy(&gps_pos)) {
+	if (vehicle_gps_position_sub.Copy(&gps_pos)) {
 		utc_time_sec = gps_pos.time_utc_usec / 1e6;
 
 		if (gps_pos.fix_type >= 2 && utc_time_sec >= GPS_EPOCH_SECS) {

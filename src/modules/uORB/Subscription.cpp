@@ -42,7 +42,26 @@
 namespace uORB
 {
 
-bool Subscription::subscribe()
+bool Subscription::Init()
+{
+	if (_meta != nullptr) {
+		// this throttles retrying the relatively expensive subscription attempt
+		if ((_last_generation == 0) || (_last_generation < 1000) || (_last_generation % 100 == 0))  {
+			if (Subscribe()) {
+				return true;
+			}
+		}
+
+		if (_node == nullptr) {
+			// use generation to count subscription attempts
+			_last_generation++;
+		}
+	}
+
+	return false;
+}
+
+bool Subscription::Subscribe()
 {
 	DeviceMaster *device_master = uORB::Manager::get_instance()->get_device_master();
 	_node = device_master->getDeviceNode(_meta, _instance);
@@ -62,7 +81,7 @@ bool Subscription::subscribe()
 	return false;
 }
 
-void Subscription::unsubscribe()
+void Subscription::Unsubscribe()
 {
 	if (_node != nullptr) {
 		_node->remove_internal_subscriber();
@@ -71,37 +90,18 @@ void Subscription::unsubscribe()
 	_last_generation = 0;
 }
 
-bool Subscription::init()
-{
-	if (_meta != nullptr) {
-		// this throttles the relatively expensive calls to getDeviceNode()
-		if ((_last_generation == 0) || (_last_generation < 1000) || (_last_generation % 100 == 0))  {
-			if (subscribe()) {
-				return true;
-			}
-		}
-
-		if (_node == nullptr) {
-			// use generation to count attempts to subscribe
-			_last_generation++;
-		}
-	}
-
-	return false;
-}
-
-bool Subscription::forceInit()
+bool Subscription::ForceInit()
 {
 	if (_node == nullptr) {
 		// reset generation to force subscription attempt
 		_last_generation = 0;
-		return subscribe();
+		return Subscribe();
 	}
 
 	return false;
 }
 
-bool Subscription::update(uint64_t *time, void *dst)
+bool Subscription::Update(uint64_t *time, void *dst)
 {
 	if ((time != nullptr) && (dst != nullptr) && published()) {
 		// always copy data to dst regardless of update
