@@ -59,6 +59,7 @@ public:
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
 	 * @param instance The instance for multi sub.
 	 */
+	Subscription() = default;
 	Subscription(const orb_metadata *meta, uint8_t instance = 0) : _meta(meta), _instance(instance)
 	{
 		init();
