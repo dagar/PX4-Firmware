@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,41 +31,82 @@
  *
  ****************************************************************************/
 
+/**
+ * @file SubscriptionCallback.hpp
+ *
+ */
+
 #pragma once
 
+#include <uORB/Subscription.hpp>
+#include <px4_work_queue/WorkItem.hpp>
 
-#include "WorkQueueManager.hpp"
-#include "WorkQueue.hpp"
-
-#include <containers/IntrusiveQueue.hpp>
-#include <containers/List.hpp>
-#include <px4_defines.h>
-#include <drivers/drv_hrt.h>
-
-namespace px4
+namespace uORB
 {
 
-class WorkItem : public IntrusiveQueueNode<WorkItem *>, public ListNode<WorkItem *>
+// Subscription wrapper class with work item callback
+template<class T>
+class SubscriptionCallback : public Subscription
 {
 public:
+	/**
+	 * Constructor
+	 *
+	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 * @param instance The instance for multi sub.
+	 */
+	SubscriptionCallback(px4::WorkItem *work_item, const orb_metadata *meta, uint8_t instance = 0) :
+		Subscription(meta, instance),
+		_work_item(work_item)
+	{
+		//register_work_item();
+	}
 
-	explicit WorkItem(const wq_config_t &config);
-	WorkItem() = delete;
+	~SubscriptionCallback()
+	{
+		unregister_work_item();
+	};
 
-	virtual ~WorkItem() = default;
+	bool copy(T &dst)
+	{
+		return published() ? _node->copy(&dst, _last_generation) : false;
+	}
 
-	inline void ScheduleNow() { if (_wq != nullptr) _wq->Add(this); }
+	bool register_work_item()
+	{
+		if (_node != nullptr) {
+			if (_node->register_work_item(_work_item)) {
+				return true;
+			}
+		}
 
-	virtual void Run() = 0;
+		return false;
+	}
 
-protected:
+	bool unregister_work_item()
+	{
+		if (_node != nullptr) {
+			if (_node->unregister_work_item(_work_item)) {
+				return true;
+			}
+		}
 
-	bool Init(const wq_config_t &config);
+		return false;
+	}
+
+	bool set_topic(const orb_metadata *meta, uint8_t instance = 0)
+	{
+
+
+		unregister_work_item();
+		unsubscribe();
+
+		_meta = meta;
+		_instance = instance;
+	}
 
 private:
-
-	WorkQueue *_wq{nullptr};
-
+	px4::WorkItem *_work_item;
 };
 
-} // namespace px4
+} // namespace uORB

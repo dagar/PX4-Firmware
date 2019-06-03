@@ -33,39 +33,58 @@
 
 #pragma once
 
+#include <px4_work_queue/WorkItem.hpp>
 
-#include "WorkQueueManager.hpp"
-#include "WorkQueue.hpp"
-
-#include <containers/IntrusiveQueue.hpp>
-#include <containers/List.hpp>
-#include <px4_defines.h>
-#include <drivers/drv_hrt.h>
+#include <uORB/SubscriptionCallback.hpp>
 
 namespace px4
 {
 
-class WorkItem : public IntrusiveQueueNode<WorkItem *>, public ListNode<WorkItem *>
+template<typename T>
+class ORBActor : public WorkItem
 {
 public:
 
-	explicit WorkItem(const wq_config_t &config);
-	WorkItem() = delete;
+	ORBActor(const wq_config_t &config, const orb_metadata *meta, uint8_t instance = 0) :
+		WorkItem(config),
+		_subscription{this, meta, instance}
+	{
+	}
 
-	virtual ~WorkItem() = default;
+	virtual ~ORBActor()
+	{
+		Unregister();
+	}
 
-	inline void ScheduleNow() { if (_wq != nullptr) _wq->Add(this); }
+	bool Register()
+	{
+		return _subscription.register_work_item();
+	}
 
-	virtual void Run() = 0;
+	bool Unregister()
+	{
+		return _subscription.unregister_work_item();
+	}
 
-protected:
+	void Run() override final
+	{
+		T data;
 
-	bool Init(const wq_config_t &config);
+		if (_subscription.copy(data)) {
+			OnUpdate(data);
+		}
+	}
+
+	virtual void OnUpdate(const T &msg) = 0;
+
+
+	bool change_orb_topic(orb_id_t new_topic, uint8_t new_instance = 0)
+	{
+
+	}
 
 private:
-
-	WorkQueue *_wq{nullptr};
-
+	uORB::SubscriptionCallback<T>	_subscription;
 };
 
 } // namespace px4

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,41 +31,46 @@
  *
  ****************************************************************************/
 
-#pragma once
-
-
-#include "WorkQueueManager.hpp"
-#include "WorkQueue.hpp"
-
-#include <containers/IntrusiveQueue.hpp>
-#include <containers/List.hpp>
+#include <matrix/matrix/math.hpp>
+#include <perf/perf_counter.h>
+#include <px4_config.h>
 #include <px4_defines.h>
-#include <drivers/drv_hrt.h>
+#include <px4_module.h>
+#include <px4_module_params.h>
+#include <px4_posix.h>
+#include <uORB/topics/sensor_gyro.h>
+#include <lib/actor/ORBActor.hpp>
 
-namespace px4
-{
-
-class WorkItem : public IntrusiveQueueNode<WorkItem *>, public ListNode<WorkItem *>
+class MulticopterRateControl : public px4::ORBActor<sensor_gyro_s>, public ModuleBase<MulticopterRateControl>,
+	public ModuleParams
 {
 public:
+	MulticopterRateControl();
+	virtual ~MulticopterRateControl();
 
-	explicit WorkItem(const wq_config_t &config);
-	WorkItem() = delete;
+	/** @see ModuleBase */
+	static int task_spawn(int argc, char *argv[]);
 
-	virtual ~WorkItem() = default;
+	/** @see ModuleBase */
+	static MulticopterRateControl *instantiate(int argc, char *argv[]);
 
-	inline void ScheduleNow() { if (_wq != nullptr) _wq->Add(this); }
+	/** @see ModuleBase */
+	static int custom_command(int argc, char *argv[]);
 
-	virtual void Run() = 0;
+	/** @see ModuleBase */
+	static int print_usage(const char *reason = nullptr);
 
-protected:
+	int print_status() override;
 
-	bool Init(const wq_config_t &config);
+	void request_stop() override;
 
 private:
 
-	WorkQueue *_wq{nullptr};
+	void OnUpdate(const sensor_gyro_s &gyro) override;
+
+	perf_counter_t	_loop_perf;			/**< loop performance counter */
+	perf_counter_t	_loop_interval_perf;		/**< loop interval performance counter */
+	perf_counter_t	_gyro_latency_perf;		/**< gyro sample latency */
 
 };
 
-} // namespace px4
