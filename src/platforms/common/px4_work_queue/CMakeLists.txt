@@ -32,9 +32,13 @@
 ############################################################################
 
 px4_add_library(px4_work_queue
+	ORBActorWorkItem.hpp
 	ScheduledWorkItem.cpp
+	ScheduledWorkItem.hpp
 	WorkItem.cpp
+	WorkItem.hpp
 	WorkQueue.cpp
+	WorkQueue.hpp
 	WorkQueueManager.cpp
 )
 

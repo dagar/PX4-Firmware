@@ -318,26 +318,6 @@ public:
 	int  orb_exists(const struct orb_metadata *meta, int instance);
 
 	/**
-	 * Register work item callback on orb publish
-	 *
-	 * @param item   Valid WorkItem to schedule on new publication
-	 * @param meta    ORB topic metadata.
-	 * @param instance  ORB instance
-	 * @return    OK if the item was registered successfully, PX4_ERROR otherwise.
-	 */
-	int  orb_register_work_callback(px4::WorkItem *item, const struct orb_metadata *meta, int instance = 0);
-
-	/**
-	 * Unregister work item callback on orb publish
-	 *
-	 * @param item   Valid WorkItem to schedule on new publication
-	 * @param meta    ORB topic metadata.
-	 * @param instance  ORB instance
-	 * @return    OK if the item was unregistered successfully, PX4_ERROR otherwise.
-	 */
-	int  orb_unregister_work_callback(px4::WorkItem *item, const struct orb_metadata *meta, int instance = 0);
-
-	/**
 	 * Return the priority of the topic
 	 *
 	 * @param handle  A handle returned from orb_subscribe.
@@ -369,7 +349,6 @@ public:
 	 */
 	int  orb_set_interval(int handle, unsigned interval);
 
-
 	/**
 	 * Get the minimum interval between which updates are seen for a subscription.
 	 *
@@ -380,6 +359,26 @@ public:
 	 * @return    OK on success, PX4_ERROR otherwise with ERRNO set accordingly.
 	 */
 	int	orb_get_interval(int handle, unsigned *interval);
+
+	/**
+	 * Register work item callback on orb publish
+	 *
+	 * @param item   Valid WorkItem to schedule on new publication
+	 * @param meta    ORB topic metadata.
+	 * @param instance  ORB instance
+	 * @return    OK if the item was registered successfully, PX4_ERROR otherwise.
+	 */
+	int  orb_register_work_callback(px4::WorkItem *item, const orb_metadata *meta, int instance = 0);
+
+	/**
+	 * Unregister work item callback on orb publish
+	 *
+	 * @param item   Valid WorkItem to schedule on new publication
+	 * @param meta    ORB topic metadata.
+	 * @param instance  ORB instance
+	 * @return    OK if the item was unregistered successfully, PX4_ERROR otherwise.
+	 */
+	int  orb_unregister_work_callback(px4::WorkItem *item, const orb_metadata *meta, int instance = 0);
 
 #ifdef ORB_COMMUNICATOR
 	/**

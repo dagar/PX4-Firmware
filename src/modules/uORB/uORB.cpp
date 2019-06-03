@@ -107,12 +107,12 @@ int  orb_exists(const struct orb_metadata *meta, int instance)
 	return uORB::Manager::get_instance()->orb_exists(meta, instance);
 }
 
-int orb_register_work_callback(px4::WorkItem *item, const struct orb_metadata *meta, int instance)
+int orb_register_work_callback(px4::WorkItem *item, const orb_metadata *meta, int instance)
 {
 	return uORB::Manager::get_instance()->orb_register_work_callback(item, meta, instance);
 }
 
-int orb_unregister_work_callback(px4::WorkItem *item, const struct orb_metadata *meta, int instance)
+int orb_unregister_work_callback(px4::WorkItem *item, const orb_metadata *meta, int instance)
 {
 	return uORB::Manager::get_instance()->orb_unregister_work_callback(item, meta, instance);
 }

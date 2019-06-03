@@ -679,9 +679,18 @@ int uORB::DeviceNode::update_queue_size(unsigned int queue_size)
 	return PX4_OK;
 }
 
-bool uORB::DeviceNode::register_work_item(px4::WorkItem *item)
+bool
+uORB::DeviceNode::register_work_item(px4::WorkItem *item)
 {
 	if (item != nullptr) {
+		// prevent duplicate registrations
+		for (auto existing_item : _registered_work_items) {
+			if (item == existing_item) {
+				PX4_ERR("work item already registered, skipping");
+				return false;
+			}
+		}
+
 		_registered_work_items.add(item);
 		return true;
 	}
@@ -689,7 +698,8 @@ bool uORB::DeviceNode::register_work_item(px4::WorkItem *item)
 	return false;
 }
 
-bool uORB::DeviceNode::unregister_work_item(px4::WorkItem *item)
+bool
+uORB::DeviceNode::unregister_work_item(px4::WorkItem *item)
 {
 	if (item != nullptr) {
 		_registered_work_items.remove(item);
