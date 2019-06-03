@@ -44,7 +44,7 @@
 #include <time.h>
 
 #include <uORB/uORB.h>
-#include <uORB/uORBTopics.h>
+#include <uORB/topics/uORBTopics.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/log_message.h>
 #include <uORB/topics/parameter_update.h>
@@ -441,7 +441,7 @@ Logger::Logger(LogWriter::Backend backend, size_t buffer_size, uint32_t log_inte
 	if (poll_topic_name) {
 		const orb_metadata *const*topics = orb_get_topics();
 
-		for (size_t i = 0; i < orb_topics_count(); i++) {
+		for (size_t i = 0; i < orb_topics_count; i++) {
 			if (strcmp(poll_topic_name, topics[i]->o_name) == 0) {
 				_polling_topic_meta = topics[i];
 				break;
@@ -518,7 +518,7 @@ bool Logger::add_topic(const char *name, unsigned interval)
 	const orb_metadata *const*topics = orb_get_topics();
 	LoggerSubscription *subscription = nullptr;
 
-	for (size_t i = 0; i < orb_topics_count(); i++) {
+	for (size_t i = 0; i < orb_topics_count; i++) {
 		if (strcmp(name, topics[i]->o_name) == 0) {
 			bool already_added = false;
 
@@ -1854,7 +1854,7 @@ void Logger::write_format(LogType type, const orb_metadata &meta, WrittenFormats
 			// find orb meta for type
 			const orb_metadata *const*topics = orb_get_topics();
 			const orb_metadata *found_topic = nullptr;
-			for (size_t i = 0; i < orb_topics_count(); i++) {
+			for (size_t i = 0; i < orb_topics_count; i++) {
 				if (strcmp(topics[i]->o_name, type_name) == 0) {
 					found_topic = topics[i];
 				}

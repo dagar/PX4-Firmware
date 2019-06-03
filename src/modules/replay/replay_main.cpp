@@ -642,7 +642,7 @@ const orb_metadata *Replay::findTopic(const std::string &name)
 {
 	const orb_metadata *const *topics = orb_get_topics();
 
-	for (size_t i = 0; i < orb_topics_count(); i++) {
+	for (size_t i = 0; i < orb_topics_count; i++) {
 		if (name == topics[i]->o_name) {
 			return topics[i];
 		}

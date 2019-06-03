@@ -38,7 +38,6 @@
 int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta, int *instance)
 {
 	unsigned len;
-
 	unsigned index = 0;
 
 	if (instance != nullptr) {
@@ -59,7 +58,6 @@ int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta, int *in
 int uORB::Utils::node_mkpath(char *buf, const char *orbMsgName)
 {
 	unsigned len;
-
 	unsigned index = 0;
 
 	len = snprintf(buf, orb_maxpath, "/%s/%s%d", "obj", orbMsgName, index);

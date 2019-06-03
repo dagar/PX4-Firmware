@@ -19,3 +19,5 @@ float32 scaling		# scaling from raw to rad/s
 int16 x_raw
 int16 y_raw
 int16 z_raw
+
+# INSTANCES 3

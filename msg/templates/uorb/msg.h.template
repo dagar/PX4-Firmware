@@ -69,6 +69,9 @@ topic_name = spec.short_name
 @##############################
 
 #include <uORB/uORB.h>
+#ifdef __cplusplus
+#include <uORB/topics/uORBTopics.hpp>
+#endif
 
 @##############################
 @# Includes for dependencies
@@ -126,6 +129,11 @@ for constant in spec.constants:
 
     print('\tstatic constexpr %s %s = %s;'%(type_px4, constant.name, int(constant.val)))
 }
+#endif
+
+
+#ifdef __cplusplus
+    static constexpr orb_id ID = orb_id::@(topic_name);
 #endif
 };
 

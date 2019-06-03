@@ -61,6 +61,10 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, int *instance, in
 
 	char nodepath[orb_maxpath];
 
+	if (meta->max_instances == 1) {
+		instance = nullptr; // force instance 0 only
+	}
+
 	/* construct a path to the node - this also checks the node name */
 	ret = uORB::Utils::node_mkpath(nodepath, meta, instance);
 

@@ -49,9 +49,10 @@
  */
 struct orb_metadata {
 	const char *o_name;		/**< unique object name */
+	const char *o_fields;		/**< semicolon separated list of fields (with type) */
 	const uint16_t o_size;		/**< object size */
 	const uint16_t o_size_no_padding;	/**< object size w/o padding at the end (for logger) */
-	const char *o_fields;		/**< semicolon separated list of fields (with type) */
+	const uint8_t max_instances;
 };
 
 typedef const struct orb_metadata *orb_id_t;
@@ -111,12 +112,13 @@ enum ORB_PRIO {
  * @param _size_no_padding	Struct size w/o padding at the end
  * @param _fields	All fields in a semicolon separated list e.g: "float[3] position;bool armed"
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields)		\
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _max_instances)		\
 	const struct orb_metadata __orb_##_name = {	\
 		#_name,					\
-		sizeof(_struct),		\
+		_fields,				\
+		sizeof(_struct),			\
 		_size_no_padding,			\
-		_fields					\
+		_max_instances				\
 	}; struct hack
 
 __BEGIN_DECLS

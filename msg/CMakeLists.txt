@@ -164,7 +164,7 @@ px4_add_git_submodule(TARGET git_genmsg PATH tools/genmsg)
 set(msg_out_path ${PX4_BINARY_DIR}/uORB/topics)
 set(msg_source_out_path	${CMAKE_CURRENT_BINARY_DIR}/topics_sources)
 
-set(uorb_headers)
+set(uorb_headers ${msg_source_out_path}/uORBTopics.hpp)
 set(uorb_sources ${msg_source_out_path}/uORBTopics.cpp)
 foreach(msg_file ${msg_files})
 	get_filename_component(msg ${msg_file} NAME_WE)
@@ -181,10 +181,11 @@ add_custom_command(OUTPUT ${uorb_headers}
 		-o ${msg_out_path}
 		-e templates/uorb
 		-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/headers
-		-q
+		#-q
 	DEPENDS
 		${msg_files}
 		templates/uorb/msg.h.template
+		templates/uorb/uORBTopics.hpp.template
 		tools/px_generate_uorb_topic_files.py
 	COMMENT "Generating uORB topic headers"
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -201,10 +202,11 @@ add_custom_command(OUTPUT ${uorb_sources}
 		-o ${msg_source_out_path}
 		-e templates/uorb
 		-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/sources
-		-q
+		#-q
 	DEPENDS
 		${msg_files}
 		templates/uorb/msg.cpp.template
+		templates/uorb/uORBTopics.cpp.template
 		tools/px_generate_uorb_topic_files.py
 	COMMENT "Generating uORB topic sources"
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
