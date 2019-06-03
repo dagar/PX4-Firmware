@@ -64,7 +64,7 @@ public:
 		init();
 	}
 
-	virtual ~Subscription() { unsubscribe(); }
+	~Subscription() { unsubscribe(); }
 
 	bool init();
 	bool forceInit();
@@ -75,13 +75,13 @@ public:
 	/**
 	 * Check if there is a new update.
 	 * */
-	virtual bool updated() { return published() ? (_node->published_message_count() != _last_generation) : false; }
+	bool updated() { return published() ? (_node->published_message_count() != _last_generation) : false; }
 
 	/**
 	 * Update the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	virtual bool update(void *dst) { return updated() ? copy(dst) : false; }
+	bool update(void *dst) { return updated() ? copy(dst) : false; }
 
 	/**
 	 * Check if subscription updated based on timestamp.
@@ -186,7 +186,7 @@ public:
 		copy(&_data);
 	}
 
-	virtual ~SubscriptionData() = default;
+	~SubscriptionData() = default;
 
 	// no copy, assignment, move, move assignment
 	SubscriptionData(const SubscriptionData &) = delete;
@@ -201,41 +201,6 @@ public:
 
 private:
 
-	T _data{};
-};
-
-// Subscription wrapper class with data and configured interval
-template<class T>
-class SubscriptionIntervalData : public SubscriptionInterval
-{
-public:
-	/**
-	 * Constructor
-	 *
-	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
-	 * @param interval  The minimum interval in milliseconds between updates
-	 * @param instance The instance for multi sub.
-	 */
-	SubscriptionIntervalData(const orb_metadata *meta, unsigned interval = 0, uint8_t instance = 0) :
-		SubscriptionInterval(meta, interval, instance)
-	{
-		copy(&_data);
-	}
-
-	~SubscriptionIntervalData() override = default;
-
-	// no copy, assignment, move, move assignment
-	SubscriptionIntervalData(const SubscriptionIntervalData &) = delete;
-	SubscriptionIntervalData &operator=(const SubscriptionIntervalData &) = delete;
-	SubscriptionIntervalData(SubscriptionIntervalData &&) = delete;
-	SubscriptionIntervalData &operator=(SubscriptionIntervalData &&) = delete;
-
-	// update the embedded struct.
-	bool update() { return SubscriptionInterval::update((void *)(&_data)); }
-
-	const T &get() const { return _data; }
-
-private:
 	T _data{};
 };
 

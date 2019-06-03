@@ -31,47 +31,90 @@
  *
  ****************************************************************************/
 
-#include "Publication.hpp"
+/**
+ * @file Subscription.hpp
+ *
+ */
 
+#pragma once
+
+#include <uORB/uORB.h>
 #include <px4_defines.h>
+
+#include "uORBDeviceNode.hpp"
+#include "uORBManager.hpp"
+#include "uORBUtils.hpp"
+
+#include "Subscription.hpp"
 
 namespace uORB
 {
 
-bool
-Publication::update(void *data)
+// Base subscription wrapper class
+class SubscriptionInterval
 {
-	bool updated = false;
+public:
 
-	if (_handle != nullptr) {
-		if (orb_publish(_meta, _handle, data) != PX4_OK) {
-			PX4_ERR("%s publish fail", _meta->o_name);
+	/**
+	 * Constructor
+	 *
+	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 * @param interval The requested maximum update interval in milliseconds.
+	 * @param instance The instance for multi sub.
+	 */
+	SubscriptionInterval(const orb_metadata *meta, unsigned interval = 0, uint8_t instance = 0) :
+		_subscription{meta, instance},
+		_interval(interval)
+	{
+	}
+	SubscriptionInterval() : _subscription{nullptr} {}
 
-		} else {
-			updated = true;
+	~SubscriptionInterval() = default;
+
+	bool ForceInit() { return _subscription.ForceInit(); }
+
+	/**
+	 * Check if there is a new update.
+	 * */
+	bool updated()
+	{
+		if (hrt_elapsed_time(&_last_update) >= (_interval * 1000)) {
+			return _subscription.published();
 		}
 
-	} else {
-		orb_advert_t handle = nullptr;
-
-		if (_priority > 0) {
-			int instance;
-			handle = orb_advertise_multi(_meta, data, &instance, _priority);
-
-		} else {
-			handle = orb_advertise(_meta, data);
-		}
-
-		if (handle != nullptr) {
-			_handle = handle;
-			updated = true;
-
-		} else {
-			PX4_ERR("%s advert fail", _meta->o_name);
-		}
+		return false;
 	}
 
-	return updated;
-}
+	/**
+	 * Update the struct
+	 * @param data The uORB message struct we are updating.
+	 */
+	bool Update(void *dst)
+	{
+		if (updated()) {
+			if (_subscription.Copy(dst)) {
+				_last_update = hrt_absolute_time();
+				return true;
+			}
+		}
 
-}  // namespace uORB
+		return false;
+	}
+
+	// Simple accessors
+	bool		valid() const { return _subscription.valid(); }
+	uint8_t		instance() const { return _subscription.instance(); }
+	orb_id_t	topic() const { return _subscription.topic(); }
+	uint16_t	interval() const { return _interval; }
+
+	void		set_interval(uint16_t interval) { _interval = interval; }
+
+private:
+
+	Subscription	_subscription;
+	uint64_t	_last_update{0};	// last update in microseconds
+	uint16_t	_interval{0};		// maximum update interval in milliseconds
+
+};
+
+} // namespace uORB
