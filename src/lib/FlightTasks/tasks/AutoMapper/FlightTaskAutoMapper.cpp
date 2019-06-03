@@ -154,6 +154,8 @@ void FlightTaskAutoMapper::_generateVelocitySetpoints()
 
 void FlightTaskAutoMapper::_updateAltitudeAboveGround()
 {
+	_sub_home_position.update();
+
 	// Altitude above ground is by default just the negation of the current local position in D-direction.
 	_alt_above_ground = -_position(2);
 

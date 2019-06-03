@@ -278,6 +278,18 @@ void BlockLocalPositionEstimator::update()
 	_landUpdated = landed() && ((_timeStamp - _time_last_land) > 1.0e6f / LAND_RATE);// throttle rate
 	bool targetPositionUpdated = _sub_landing_target_pose.updated();
 
+	// get new data
+	_sub_armed.update();
+	_sub_land.update();
+	_sub_att.update();
+	_sub_gps.update();
+	_sub_visual_odom.update();
+	_sub_mocap_odom.update();
+	_sub_landing_target_pose.update();
+	_sub_airdata.update();
+	if (_sub_lidar) _sub_lidar->update();
+	if (_sub_sonar) _sub_sonar->update();
+
 	// update parameters
 	if (paramsUpdated) {
 		SuperBlock::updateParams();

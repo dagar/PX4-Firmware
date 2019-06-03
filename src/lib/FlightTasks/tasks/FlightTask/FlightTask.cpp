@@ -14,8 +14,12 @@ bool FlightTask::activate()
 	_resetSetpoints();
 	_setDefaultConstraints();
 	_time_stamp_activate = hrt_absolute_time();
+
+	_sub_attitude.update();
 	_heading_reset_counter = _sub_attitude.get().quat_reset_counter;
+
 	_gear = empty_landing_gear_default_keep;
+
 	return true;
 }
 
@@ -80,6 +84,9 @@ void FlightTask::_evaluateVehicleLocalPosition()
 	_yaw = NAN;
 	_dist_to_bottom = NAN;
 
+	_sub_attitude.update();
+	_sub_vehicle_local_position.update();
+
 	if ((_time_stamp_current - _sub_attitude.get().timestamp) < _timeout) {
 		// yaw
 		_yaw = matrix::Eulerf(matrix::Quatf(_sub_attitude.get().q)).psi();
@@ -135,6 +142,8 @@ void FlightTask::_setDefaultConstraints()
 
 bool FlightTask::_checkTakeoff()
 {
+	_sub_vehicle_local_position.update();
+
 	// position setpoint above the minimum altitude
 	bool position_triggered_takeoff = false;
 

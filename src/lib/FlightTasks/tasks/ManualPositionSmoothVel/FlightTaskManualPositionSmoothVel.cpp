@@ -91,6 +91,8 @@ void FlightTaskManualPositionSmoothVel::reset(Axes axes, bool force_z_zero)
 
 void FlightTaskManualPositionSmoothVel::_checkEkfResetCounters()
 {
+	_sub_vehicle_local_position.update();
+
 	// Check if a reset event has happened.
 	if (_sub_vehicle_local_position.get().xy_reset_counter != _reset_counters.xy) {
 		_smoothing[0].setCurrentPosition(_position(0));

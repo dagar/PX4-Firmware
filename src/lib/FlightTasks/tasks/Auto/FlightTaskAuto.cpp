@@ -119,7 +119,7 @@ bool FlightTaskAuto::_evaluateTriplets()
 	// takeoff/land was initiated. Until then we do this kind of logic here.
 
 	// Check if triplet is valid. There must be at least a valid altitude.
-
+	_sub_triplet_setpoint.update();
 	if (!_sub_triplet_setpoint.get().current.valid || !PX4_ISFINITE(_sub_triplet_setpoint.get().current.alt)) {
 		// Best we can do is to just set all waypoints to current state and return false.
 		_prev_prev_wp = _triplet_prev_wp = _triplet_target = _triplet_next_wp = _position;
@@ -264,7 +264,7 @@ bool FlightTaskAuto::_evaluateTriplets()
 
 void FlightTaskAuto::_set_heading_from_mode()
 {
-
+	_sub_home_position.update();
 	Vector2f v; // Vector that points towards desired location
 
 	switch (_param_mpc_yaw_mode.get()) {
@@ -326,11 +326,13 @@ bool FlightTaskAuto::_evaluateGlobalReference()
 	// Only update if reference timestamp has changed AND no valid reference altitude
 	// is available.
 	// TODO: this needs to be revisited and needs a more clear implementation
+	_sub_vehicle_local_position.update();
 	if (_sub_vehicle_local_position.get().ref_timestamp == _time_stamp_reference && PX4_ISFINITE(_reference_altitude)) {
 		// don't need to update anything
 		return true;
 	}
 
+	_sub_vehicle_local_position.update();
 	double ref_lat =  _sub_vehicle_local_position.get().ref_lat;
 	double ref_lon =  _sub_vehicle_local_position.get().ref_lon;
 	_reference_altitude = _sub_vehicle_local_position.get().ref_alt;
@@ -378,6 +380,7 @@ void FlightTaskAuto::_setDefaultConstraints()
 Vector2f FlightTaskAuto::_getTargetVelocityXY()
 {
 	// guard against any bad velocity values
+	_sub_triplet_setpoint.update();
 	const float vx = _sub_triplet_setpoint.get().current.vx;
 	const float vy = _sub_triplet_setpoint.get().current.vy;
 	bool velocity_valid = PX4_ISFINITE(vx) && PX4_ISFINITE(vy) &&

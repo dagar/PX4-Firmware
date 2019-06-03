@@ -113,6 +113,7 @@ inline float FlightTaskAutoLineSmoothVel::_constrainOneSide(float val, float con
 void FlightTaskAutoLineSmoothVel::_checkEkfResetCounters()
 {
 	// Check if a reset event has happened.
+	_sub_vehicle_local_position.update();
 	if (_sub_vehicle_local_position.get().xy_reset_counter != _reset_counters.xy) {
 		_trajectory[0].setCurrentPosition(_position(0));
 		_trajectory[1].setCurrentPosition(_position(1));

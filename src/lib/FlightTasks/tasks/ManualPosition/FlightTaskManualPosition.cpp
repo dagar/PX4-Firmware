@@ -93,6 +93,7 @@ void FlightTaskManualPosition::_scaleSticks()
 	}
 
 	// scale the stick inputs
+	_sub_vehicle_local_position.update();
 	if (PX4_ISFINITE(_sub_vehicle_local_position.get().vxy_max)) {
 		// estimator provides vehicle specific max
 
@@ -142,6 +143,7 @@ void FlightTaskManualPosition::_updateXYlock()
 	} else if (PX4_ISFINITE(_position_setpoint(0)) && apply_brake) {
 		// Position is locked but check if a reset event has happened.
 		// We will shift the setpoints.
+		_sub_vehicle_local_position.update();
 		if (_sub_vehicle_local_position.get().xy_reset_counter != _reset_counter) {
 			_position_setpoint(0) = _position(0);
 			_position_setpoint(1) = _position(1);

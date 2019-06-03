@@ -75,6 +75,8 @@ void FlightTaskManualAltitudeSmoothVel::_reset(bool force_vz_zero)
 
 void FlightTaskManualAltitudeSmoothVel::_checkEkfResetCounters()
 {
+	_sub_vehicle_local_position.update();
+
 	if (_sub_vehicle_local_position.get().z_reset_counter != _reset_counters.z) {
 		_smoothing.setCurrentPosition(_position(2));
 		_reset_counters.z = _sub_vehicle_local_position.get().z_reset_counter;

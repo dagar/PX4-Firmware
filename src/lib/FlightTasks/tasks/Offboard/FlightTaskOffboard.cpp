@@ -42,8 +42,11 @@ using namespace matrix;
 bool FlightTaskOffboard::updateInitialize()
 {
 	bool ret = FlightTask::updateInitialize();
+
 	// require a valid triplet
+	_sub_triplet_setpoint.update();
 	ret = ret && _sub_triplet_setpoint.get().current.valid;
+
 	// require valid position / velocity in xy
 	return ret && PX4_ISFINITE(_position(0))
 	       && PX4_ISFINITE(_position(1))
@@ -62,6 +65,8 @@ bool FlightTaskOffboard::activate()
 
 bool FlightTaskOffboard::update()
 {
+	_sub_triplet_setpoint.update();
+
 	// reset setpoint for every loop
 	_resetSetpoints();
 

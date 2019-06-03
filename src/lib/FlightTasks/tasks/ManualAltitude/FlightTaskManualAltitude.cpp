@@ -60,6 +60,8 @@ bool FlightTaskManualAltitude::activate()
 
 	_constraints.tilt = math::radians(_param_mpc_man_tilt_max.get());
 
+	_sub_vehicle_local_position.update();
+
 	if (PX4_ISFINITE(_sub_vehicle_local_position.get().hagl_min)) {
 		_constraints.min_distance_to_ground = _sub_vehicle_local_position.get().hagl_min;
 
@@ -254,6 +256,8 @@ void FlightTaskManualAltitude::_respectMaxAltitude()
 
 void FlightTaskManualAltitude::_respectGroundSlowdown()
 {
+	_sub_home_position.update();
+
 	float dist_to_ground = NAN;
 
 	// if there is a valid distance to bottom or vertical distance to home
@@ -286,6 +290,7 @@ void FlightTaskManualAltitude::_rotateIntoHeadingFrame(Vector2f &v)
 
 void FlightTaskManualAltitude::_updateHeadingSetpoints()
 {
+	_sub_attitude.update();
 	/* Yaw-lock depends on stick input. If not locked,
 	 * yaw_sp is set to NAN.
 	 * TODO: add yawspeed to get threshold.*/

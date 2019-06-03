@@ -139,11 +139,7 @@ public:
 	// update the embedded struct.
 	bool	update() { return Subscription::update((void *)(&_data)); }
 
-	const T &get()
-	{
-		update();
-		return _data;
-	}
+	const T &get() { return _data; }
 
 private:
 

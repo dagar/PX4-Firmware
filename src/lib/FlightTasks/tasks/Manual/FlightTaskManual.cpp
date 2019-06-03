@@ -56,6 +56,8 @@ bool FlightTaskManual::updateInitialize()
 
 bool FlightTaskManual::_evaluateSticks()
 {
+	_sub_manual_control_setpoint.update();
+
 	hrt_abstime rc_timeout = (_param_com_rc_loss_t.get() * 1.5f) * 1_s;
 
 	/* Sticks are rescaled linearly and exponentially to [-1,1] */

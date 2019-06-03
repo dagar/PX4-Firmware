@@ -75,12 +75,14 @@ ObstacleAvoidance::~ObstacleAvoidance()
 void ObstacleAvoidance::injectAvoidanceSetpoints(Vector3f &pos_sp, Vector3f &vel_sp, float &yaw_sp,
 		float &yaw_speed_sp)
 {
+	_sub_vehicle_status.update();
 
 	if (_sub_vehicle_status.get().nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER) {
 		// if in failsafe nav_state LOITER, don't inject setpoints from avoidance system
 		return;
 	}
 
+	_sub_vehicle_trajectory_waypoint.update();
 	const bool avoidance_data_timeout = hrt_elapsed_time((hrt_abstime *)&_sub_vehicle_trajectory_waypoint.get().timestamp)
 					    > TRAJECTORY_STREAM_TIMEOUT_US;
 	const bool avoidance_point_valid =
