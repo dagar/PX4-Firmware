@@ -45,7 +45,7 @@ using namespace time_literals;
 extern "C" __EXPORT int fw_att_control_main(int argc, char *argv[]);
 
 FixedwingAttitudeControl::FixedwingAttitudeControl() :
-	/* performance counters */
+	WorkItem(px4::wq_configurations::att_pos_ctrl),
 	_loop_perf(perf_alloc(PC_ELAPSED, "fwa_dt")),
 	_nonfinite_input_perf(perf_alloc(PC_COUNT, "fwa_nani")),
 	_nonfinite_output_perf(perf_alloc(PC_COUNT, "fwa_nano"))
@@ -128,15 +128,10 @@ FixedwingAttitudeControl::FixedwingAttitudeControl() :
 	_pitch_ctrl.set_max_rate_pos(_parameters.acro_max_y_rate_rad);
 	_pitch_ctrl.set_max_rate_neg(_parameters.acro_max_y_rate_rad);
 	_yaw_ctrl.set_max_rate(_parameters.acro_max_z_rate_rad);
-
-	// subscriptions
-	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 }
 
 FixedwingAttitudeControl::~FixedwingAttitudeControl()
 {
-	orb_unsubscribe(_att_sub);
-
 	perf_free(_loop_perf);
 	perf_free(_nonfinite_input_perf);
 	perf_free(_nonfinite_output_perf);
@@ -447,16 +442,9 @@ float FixedwingAttitudeControl::get_airspeed_and_update_scaling()
 	return airspeed;
 }
 
-void FixedwingAttitudeControl::run()
+void FixedwingAttitudeControl::Run()
 {
-	/* wakeup source */
-	px4_pollfd_struct_t fds[1];
-
-	/* Setup of loop */
-	fds[0].fd = _att_sub;
-	fds[0].events = POLLIN;
-
-	while (!should_exit()) {
+	if (_att_sub.update(&_att)) {
 
 		/* only update parameters if they changed */
 		bool params_updated = _params_sub.updated();
@@ -470,35 +458,13 @@ void FixedwingAttitudeControl::run()
 			parameters_update();
 		}
 
-		/* wait for up to 500ms for data */
-		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
-
-		/* timed out - periodic check for _task_should_exit, etc. */
-		if (pret == 0) {
-			continue;
-		}
-
-		/* this is undesirable but not much we can do - might want to flag unhappy status */
-		if (pret < 0) {
-			PX4_WARN("poll error %d, %d", pret, errno);
-			continue;
-		}
-
 		perf_begin(_loop_perf);
 
 		/* only run controller if attitude changed */
-		if (fds[0].revents & POLLIN) {
+		if (true) {
 			static uint64_t last_run = 0;
-			float deltaT = (hrt_absolute_time() - last_run) / 1000000.0f;
+			float deltaT = math::constrain((hrt_elapsed_time(&last_run) / 1e6f), 0.01f, 0.1f);
 			last_run = hrt_absolute_time();
-
-			/* guard against too large deltaT's */
-			if (deltaT > 1.0f) {
-				deltaT = 0.01f;
-			}
-
-			/* load local copies */
-			orb_copy(ORB_ID(vehicle_attitude), _att_sub, &_att);
 
 			/* get current rotation matrix and euler angles from control state quaternions */
 			matrix::Dcmf R = matrix::Quatf(_att.q);
@@ -572,7 +538,7 @@ void FixedwingAttitudeControl::run()
 
 			/* if we are in rotary wing mode, do nothing */
 			if (_vehicle_status.is_rotary_wing && !_vehicle_status.is_vtol) {
-				continue;
+				return;
 			}
 
 			control_flaps(deltaT);
@@ -910,26 +876,19 @@ void FixedwingAttitudeControl::control_flaps(const float dt)
 	}
 }
 
-FixedwingAttitudeControl *FixedwingAttitudeControl::instantiate(int argc, char *argv[])
-{
-	return new FixedwingAttitudeControl();
-}
-
 int FixedwingAttitudeControl::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("fw_att_controol",
-				      SCHED_DEFAULT,
-				      SCHED_PRIORITY_ATTITUDE_CONTROL,
-				      1500,
-				      (px4_main_t)&run_trampoline,
-				      (char *const *)argv);
+	FixedwingAttitudeControl *instance = new FixedwingAttitudeControl();
 
-	if (_task_id < 0) {
-		_task_id = -1;
-		return -errno;
+	if (instance == nullptr) {
+		PX4_ERR("alloc failed");
+		return PX4_ERROR;
 	}
 
-	return 0;
+	_object.store(instance);
+	_task_id = task_id_is_work_queue;
+
+	return PX4_OK;
 }
 
 int FixedwingAttitudeControl::custom_command(int argc, char *argv[])
