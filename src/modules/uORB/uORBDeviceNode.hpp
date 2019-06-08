@@ -185,6 +185,7 @@ public:
 	uint32_t lost_message_count() const { return _lost_messages; }
 
 	unsigned published_message_count() const { return _generation; }
+	unsigned read_message_count() const { return _read_count; }
 
 	const orb_metadata *get_meta() const { return _meta; }
 
@@ -278,8 +279,10 @@ private:
 						We allow one publisher to have an open file descriptor at the same time. */
 
 	// statistics
-	uint32_t _lost_messages = 0; /**< nr of lost messages for all subscribers. If two subscribers lose the same
+	uint32_t _lost_messages{0}; /**< nr of lost messages for all subscribers. If two subscribers lose the same
 					message, it is counted as two. */
+
+	unsigned _read_count{0};
 
 	inline static SubscriberData    *filp_to_sd(cdev::file_t *filp);
 

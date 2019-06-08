@@ -256,6 +256,7 @@ int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node,
 
 		last_node->last_lost_msg_count = last_node->node->lost_message_count();
 		last_node->last_pub_msg_count = last_node->node->published_message_count();
+		last_node->last_read_msg_count = last_node->node->read_message_count();
 	}
 
 	return 0;
@@ -328,7 +329,7 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
 #ifndef __PX4_QURT
 
 		/* Sleep 200 ms waiting for user input five times ~ 1s */
-		for (int k = 0; k < 5; k++) {
+		for (int k = 0; k < 10; k++) {
 			char c;
 
 			ret = ::poll(&fds, 1, 0); //just want to check if there is new data available
@@ -352,13 +353,14 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
 
 			//update the stats
 			hrt_abstime current_time = hrt_absolute_time();
-			float dt = (current_time - start_time) / 1.e6f;
+			const float dt = (current_time - start_time) / 1.e6f;
 			cur_node = first_node;
 
 			while (cur_node) {
 				uint32_t num_lost = cur_node->node->lost_message_count();
 				unsigned int num_msgs = cur_node->node->published_message_count();
 				cur_node->pub_msg_delta = (num_msgs - cur_node->last_pub_msg_count) / dt;
+				cur_node->read_msg_delta = (cur_node->node->read_message_count() - cur_node->last_read_msg_count) / dt;
 				cur_node->lost_msg_delta = (num_lost - cur_node->last_lost_msg_count) / dt;
 				cur_node->last_lost_msg_count = num_lost;
 				cur_node->last_pub_msg_count = num_msgs;
@@ -369,17 +371,20 @@ void uORB::DeviceMaster::showTop(char **topic_filter, int num_filters)
 
 
 			PX4_INFO_RAW("\033[H"); // move cursor home and clear screen
-			PX4_INFO_RAW(CLEAR_LINE "update: 1s, num topics: %i\n", num_topics);
-			PX4_INFO_RAW(CLEAR_LINE "%-*s INST #SUB #MSG #LOST #QSIZE\n", (int)max_topic_name_length - 2, "TOPIC NAME");
+			PX4_INFO_RAW(CLEAR_LINE "update: 2s, num topics: %i\n", num_topics);
+			PX4_INFO_RAW(CLEAR_LINE "%-*s INST #SUB #MSG #LOST #QSIZE #SIZE #READRATE #DATARATE\n", (int)max_topic_name_length - 2,
+				     "TOPIC NAME");
 			cur_node = first_node;
 
 			while (cur_node) {
 
 				if (!print_active_only || cur_node->pub_msg_delta > 0) {
-					PX4_INFO_RAW(CLEAR_LINE "%-*s %2i %4i %4i %5i %i\n", (int)max_topic_name_length,
+					PX4_INFO_RAW(CLEAR_LINE "%-*s %2i %4i %4i %5i %5i %4i %8i %.2f\n", (int)max_topic_name_length,
 						     cur_node->node->get_meta()->o_name, (int)cur_node->node->get_instance(),
 						     (int)cur_node->node->subscriber_count(), cur_node->pub_msg_delta,
-						     (int)cur_node->lost_msg_delta, cur_node->node->get_queue_size());
+						     (int)cur_node->lost_msg_delta, cur_node->node->get_queue_size(),
+						     cur_node->node->get_meta()->o_size, cur_node->read_msg_delta,
+						     (double)((cur_node->read_msg_delta * cur_node->node->get_meta()->o_size) / 1000.0f));
 				}
 
 				cur_node = cur_node->next;

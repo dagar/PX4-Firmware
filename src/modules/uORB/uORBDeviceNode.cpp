@@ -187,6 +187,8 @@ uORB::DeviceNode::copy_locked(void *dst, unsigned &generation)
 			++generation;
 		}
 
+		++_read_count;
+
 		updated = true;
 	}
 
