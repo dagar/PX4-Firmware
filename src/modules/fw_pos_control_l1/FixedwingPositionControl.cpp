@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,12 +37,15 @@ extern "C" __EXPORT int fw_pos_control_l1_main(int argc, char *argv[]);
 
 FixedwingPositionControl::FixedwingPositionControl() :
 	ModuleParams(nullptr),
+	WorkItem(px4::wq_configurations::att_pos_ctrl),
 	_sub_airspeed(ORB_ID(airspeed)),
 	_sub_sensors(ORB_ID(sensor_bias)),
 	_loop_perf(perf_alloc(PC_ELAPSED, "fw_l1_control")),
 	_launchDetector(this),
 	_runway_takeoff(this)
 {
+	_global_pos_sub.set_interval(20);
+
 	_parameter_handles.l1_period = param_find("FW_L1_PERIOD");
 	_parameter_handles.l1_damping = param_find("FW_L1_DAMPING");
 	_parameter_handles.roll_slew_deg_sec = param_find("FW_L1_R_SLEW_MAX");
@@ -1673,41 +1676,9 @@ FixedwingPositionControl::handle_command()
 }
 
 void
-FixedwingPositionControl::run()
+FixedwingPositionControl::Run()
 {
-	_global_pos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
-
-	/* rate limit position updates to 50 Hz */
-	orb_set_interval(_global_pos_sub, 20);
-
-	/* abort on a nonzero return value from the parameter init */
-	if (parameters_update() != PX4_OK) {
-		/* parameter setup went wrong, abort */
-		PX4_ERR("aborting startup due to errors.");
-	}
-
-	/* wakeup source(s) */
-	px4_pollfd_struct_t fds[1];
-
-	/* Setup of loop */
-	fds[0].fd = _global_pos_sub;
-	fds[0].events = POLLIN;
-
-	while (!should_exit()) {
-
-		/* wait for up to 500ms for data */
-		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 100);
-
-		/* timed out - periodic check for _task_should_exit, etc. */
-		if (pret == 0) {
-			continue;
-		}
-
-		/* this is undesirable but not much we can do - might want to flag unhappy status */
-		if (pret < 0) {
-			PX4_WARN("poll error %d, %d", pret, errno);
-			continue;
-		}
+	if (_global_pos_sub.update(&_global_pos)) {
 
 		/* only update parameters if they changed */
 		bool params_updated = _params_sub.updated();
@@ -1722,11 +1693,9 @@ FixedwingPositionControl::run()
 		}
 
 		/* only run controller if position changed */
-		if ((fds[0].revents & POLLIN) != 0) {
+		if (true) {
 			perf_begin(_loop_perf);
 
-			/* load local copies */
-			orb_copy(ORB_ID(vehicle_global_position), _global_pos_sub, &_global_pos);
 			_local_pos_sub.update(&_local_pos);
 
 			// handle estimator reset events. we only adjust setpoins for manual modes
@@ -1976,26 +1945,19 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 	tecs_status_publish();
 }
 
-FixedwingPositionControl *FixedwingPositionControl::instantiate(int argc, char *argv[])
-{
-	return new FixedwingPositionControl();
-}
-
 int FixedwingPositionControl::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("fw_pos_control_l1",
-				      SCHED_DEFAULT,
-				      SCHED_PRIORITY_POSITION_CONTROL,
-				      1810,
-				      (px4_main_t)&run_trampoline,
-				      (char *const *)argv);
+	FixedwingPositionControl *instance = new FixedwingPositionControl();
 
-	if (_task_id < 0) {
-		_task_id = -1;
-		return -errno;
+	if (instance == nullptr) {
+		PX4_ERR("alloc failed");
+		return PX4_ERROR;
 	}
 
-	return 0;
+	_object.store(instance);
+	_task_id = task_id_is_work_queue;
+
+	return PX4_OK;
 }
 
 int FixedwingPositionControl::custom_command(int argc, char *argv[])
