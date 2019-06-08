@@ -44,10 +44,11 @@
 #include <perf/perf_counter.h>
 #include <uORB/uORB.h>
 
-#include <uORB/topics/airspeed.h>
+#include <uORB/Publication.hpp>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
+#include <uORB/topics/airspeed.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/collision_report.h>
 #include <uORB/topics/debug_array.h>
@@ -58,6 +59,7 @@
 #include <uORB/topics/follow_target.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/home_position.h>
+#include <uORB/topics/input_rc.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/obstacle_distance.h>
@@ -65,16 +67,21 @@
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/ping.h>
 #include <uORB/topics/position_setpoint_triplet.h>
+#include <uORB/topics/radio_status.h>
 #include <uORB/topics/rc_channels.h>
+#include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/telemetry_status.h>
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
-#include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
@@ -206,45 +213,50 @@ private:
 	vehicle_land_detected_s _hil_land_detector {};
 	vehicle_control_mode_s _control_mode {};
 
-	orb_advert_t _accel_pub{nullptr};
-	orb_advert_t _actuator_controls_pubs[4] {nullptr, nullptr, nullptr, nullptr};
-	orb_advert_t _airspeed_pub{nullptr};
-	orb_advert_t _att_sp_pub{nullptr};
-	orb_advert_t _attitude_pub{nullptr};
-	orb_advert_t _baro_pub{nullptr};
-	orb_advert_t _battery_pub{nullptr};
+	// ORB publications (multi)
+	uORB::Publication<actuator_controls_s>			_actuator_controls_pubs[4] {ORB_ID(actuator_controls_0), ORB_ID(actuator_controls_1), ORB_ID(actuator_controls_2), ORB_ID(actuator_controls_3)};
+	uORB::Publication<airspeed_s>				_airspeed_pub{ORB_ID(airspeed)};
+	uORB::Publication<battery_status_s>			_battery_pub{ORB_ID(battery_status)};
+	uORB::Publication<collision_report_s>			_collision_report_pub{ORB_ID(collision_report)};
+	uORB::Publication<debug_array_s>			_debug_array_pub{ORB_ID(debug_array)};
+	uORB::Publication<debug_key_value_s>			_debug_key_value_pub{ORB_ID(debug_key_value)};
+	uORB::Publication<debug_value_s>			_debug_value_pub{ORB_ID(debug_value)};
+	uORB::Publication<debug_vect_s>				_debug_vect_pub{ORB_ID(debug_vect)};
+	uORB::Publication<follow_target_s>			_follow_target_pub{ORB_ID(follow_target)};
+	uORB::Publication<landing_target_pose_s>		_landing_target_pose_pub{ORB_ID(landing_target_pose)};
+	uORB::Publication<obstacle_distance_s>			_obstacle_distance_pub{ORB_ID(obstacle_distance)};
+	uORB::Publication<offboard_control_mode_s>		_offboard_control_mode_pub{ORB_ID(offboard_control_mode)};
+	uORB::Publication<optical_flow_s>			_flow_pub{ORB_ID(optical_flow)};
+	uORB::Publication<position_setpoint_triplet_s>		_pos_sp_triplet_pub{ORB_ID(position_setpoint_triplet)};
+	uORB::Publication<vehicle_attitude_s>			_attitude_pub{ORB_ID(vehicle_attitude)};
+	uORB::Publication<vehicle_attitude_setpoint_s>		_att_sp_pub{ORB_ID(vehicle_attitude_setpoint)};
+	uORB::Publication<vehicle_global_position_s>		_global_pos_pub{ORB_ID(vehicle_global_position)};
+	uORB::Publication<vehicle_gps_position_s>		_gps_pub{ORB_ID(vehicle_gps_position)};
+	uORB::Publication<vehicle_land_detected_s>		_land_detector_pub{ORB_ID(vehicle_land_detected)};
+	uORB::Publication<vehicle_local_position_s>		_local_pos_pub{ORB_ID(vehicle_local_position)};
+	uORB::Publication<vehicle_odometry_s>			_mocap_odometry_pub{ORB_ID(vehicle_mocap_odometry)};
+	uORB::Publication<vehicle_odometry_s>			_visual_odometry_pub{ORB_ID(vehicle_visual_odometry)};
+	uORB::Publication<vehicle_rates_setpoint_s>		_rates_sp_pub{ORB_ID(vehicle_rates_setpoint)};
+	uORB::Publication<vehicle_trajectory_waypoint_s>	_trajectory_waypoint_pub{ORB_ID(vehicle_trajectory_waypoint)};
+
+	// ORB publications (multi)
+	uORB::Publication<distance_sensor_s>			_distance_sensor_pub{ORB_ID(distance_sensor), ORB_PRIO_LOW};
+	uORB::Publication<distance_sensor_s>			_flow_distance_sensor_pub{ORB_ID(distance_sensor), ORB_PRIO_LOW};
+	uORB::Publication<distance_sensor_s>			_hil_distance_sensor_pub{ORB_ID(distance_sensor), ORB_PRIO_LOW};
+	uORB::Publication<input_rc_s>				_rc_pub{ORB_ID(input_rc), ORB_PRIO_LOW};
+	uORB::Publication<manual_control_setpoint_s>		_manual_pub{ORB_ID(manual_control_setpoint), ORB_PRIO_LOW};
+	uORB::Publication<ping_s>				_ping_pub{ORB_ID(ping), ORB_PRIO_LOW};
+	uORB::Publication<radio_status_s>			_radio_status_pub{ORB_ID(radio_status), ORB_PRIO_LOW};
+	uORB::Publication<sensor_accel_s>			_accel_pub{ORB_ID(sensor_accel), ORB_PRIO_LOW};
+	uORB::Publication<sensor_baro_s>			_baro_pub{ORB_ID(sensor_baro), ORB_PRIO_LOW};
+	uORB::Publication<sensor_gyro_s>			_gyro_pub{ORB_ID(sensor_gyro), ORB_PRIO_LOW};
+	uORB::Publication<sensor_mag_s>				_mag_pub{ORB_ID(sensor_mag), ORB_PRIO_LOW};
+
+	// ORB publications (queue length > 1)
 	orb_advert_t _cmd_pub{nullptr};
-	orb_advert_t _collision_report_pub{nullptr};
 	orb_advert_t _command_ack_pub{nullptr};
-	orb_advert_t _debug_array_pub{nullptr};
-	orb_advert_t _debug_key_value_pub{nullptr};
-	orb_advert_t _debug_value_pub{nullptr};
-	orb_advert_t _debug_vect_pub{nullptr};
-	orb_advert_t _distance_sensor_pub{nullptr};
-	orb_advert_t _flow_distance_sensor_pub{nullptr};
-	orb_advert_t _flow_pub{nullptr};
-	orb_advert_t _follow_target_pub{nullptr};
-	orb_advert_t _global_pos_pub{nullptr};
 	orb_advert_t _gps_inject_data_pub{nullptr};
-	orb_advert_t _gps_pub{nullptr};
-	orb_advert_t _gyro_pub{nullptr};
-	orb_advert_t _hil_distance_sensor_pub{nullptr};
-	orb_advert_t _land_detector_pub{nullptr};
-	orb_advert_t _landing_target_pose_pub{nullptr};
-	orb_advert_t _local_pos_pub{nullptr};
-	orb_advert_t _mag_pub{nullptr};
-	orb_advert_t _manual_pub{nullptr};
-	orb_advert_t _mocap_odometry_pub{nullptr};
-	orb_advert_t _obstacle_distance_pub{nullptr};
-	orb_advert_t _offboard_control_mode_pub{nullptr};
-	orb_advert_t _ping_pub{nullptr};
-	orb_advert_t _pos_sp_triplet_pub{nullptr};
-	orb_advert_t _radio_status_pub{nullptr};
-	orb_advert_t _rates_sp_pub{nullptr};
-	orb_advert_t _rc_pub{nullptr};
-	orb_advert_t _trajectory_waypoint_pub{nullptr};
 	orb_advert_t _transponder_report_pub{nullptr};
-	orb_advert_t _visual_odometry_pub{nullptr};
 
 	static constexpr int _gps_inject_data_queue_size{6};
 
