@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013 - 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013 - 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,14 +49,6 @@
 #include "vtol_att_control_main.h"
 #include <systemlib/mavlink_log.h>
 
-namespace VTOL_att_control
-{
-VtolAttitudeControl *g_control;
-}
-
-/**
-* Constructor
-*/
 VtolAttitudeControl::VtolAttitudeControl()
 {
 	_vtol_vehicle_status.vtol_in_rw_mode = true;	/* start vtol in rotary wing mode*/
@@ -105,64 +97,6 @@ VtolAttitudeControl::VtolAttitudeControl()
 
 	} else {
 		_task_should_exit = true;
-	}
-}
-
-/**
-* Destructor
-*/
-VtolAttitudeControl::~VtolAttitudeControl()
-{
-	if (_control_task != -1) {
-		/* task wakes up every 100ms or so at the longest */
-		_task_should_exit = true;
-
-		/* wait for a second for the task to quit at our request */
-		unsigned i = 0;
-
-		do {
-			/* wait 20ms */
-			px4_usleep(20000);
-
-			/* if we have given up, kill it */
-			if (++i > 50) {
-				px4_task_delete(_control_task);
-				break;
-			}
-		} while (_control_task != -1);
-	}
-
-	// free memory used by instances of base class VtolType
-	if (_vtol_type != nullptr) {
-		delete _vtol_type;
-	}
-
-	VTOL_att_control::g_control = nullptr;
-}
-
-/**
-* Check for inputs from mc attitude controller.
-*/
-void VtolAttitudeControl::actuator_controls_mc_poll()
-{
-	bool updated;
-	orb_check(_actuator_inputs_mc, &updated);
-
-	if (updated) {
-		orb_copy(ORB_ID(actuator_controls_virtual_mc), _actuator_inputs_mc, &_actuators_mc_in);
-	}
-}
-
-/**
-* Check for inputs from fw attitude controller.
-*/
-void VtolAttitudeControl::actuator_controls_fw_poll()
-{
-	bool updated;
-	orb_check(_actuator_inputs_fw, &updated);
-
-	if (updated) {
-		orb_copy(ORB_ID(actuator_controls_virtual_fw), _actuator_inputs_fw, &_actuators_fw_in);
 	}
 }
 
@@ -243,9 +177,6 @@ VtolAttitudeControl::is_fixed_wing_requested()
 	return to_fw;
 }
 
-/*
- * Abort front transition
- */
 void
 VtolAttitudeControl::abort_front_transition(const char *reason)
 {
@@ -256,9 +187,6 @@ VtolAttitudeControl::abort_front_transition(const char *reason)
 	}
 }
 
-/**
-* Update parameters.
-*/
 int
 VtolAttitudeControl::parameters_update()
 {
@@ -347,29 +275,24 @@ VtolAttitudeControl::parameters_update()
 	return OK;
 }
 
-int
-VtolAttitudeControl::task_main_trampoline(int argc, char *argv[])
+void
+VtolAttitudeControl::Run()
 {
-	VTOL_att_control::g_control->task_main();
-	return 0;
-}
-
-void VtolAttitudeControl::task_main()
-{
-	/* do subscriptions */
-	_actuator_inputs_mc    = orb_subscribe(ORB_ID(actuator_controls_virtual_mc));
-	_actuator_inputs_fw    = orb_subscribe(ORB_ID(actuator_controls_virtual_fw));
-
 	parameters_update();  // initialize parameter cache
 
 	_task_should_exit = !_vtol_type->init();
 
-	/* wakeup source*/
-	px4_pollfd_struct_t fds[1] = {};
-	fds[0].fd     = _actuator_inputs_mc;
-	fds[0].events = POLLIN;
+	bool updated = false;
 
-	while (!_task_should_exit) {
+	if (_actuator_inputs_fw.update(&_actuators_fw_in)) {
+		updated = true;
+	}
+
+	if (_actuator_inputs_mc.update(&_actuators_mc_in)) {
+		updated = true;
+	}
+
+	if (updated) {
 		/* only update parameters if they changed */
 		if (_params_sub.updated()) {
 			/* read from param to clear updated flag */
@@ -378,35 +301,6 @@ void VtolAttitudeControl::task_main()
 
 			/* update parameters from storage */
 			parameters_update();
-		}
-
-		// run vtol_att on MC actuator publications, unless in full FW mode
-		switch (_vtol_type->get_mode()) {
-		case mode::TRANSITION_TO_FW:
-		case mode::TRANSITION_TO_MC:
-		case mode::ROTARY_WING:
-			fds[0].fd = _actuator_inputs_mc;
-			break;
-
-		case mode::FIXED_WING:
-			fds[0].fd = _actuator_inputs_fw;
-			break;
-		}
-
-		/* wait for up to 100ms for data */
-		int pret = px4_poll(&fds[0], sizeof(fds) / sizeof(fds[0]), 100);
-
-		/* timed out - periodic check for _task_should_exit */
-		if (pret == 0) {
-			continue;
-		}
-
-		/* this is undesirable but not much we can do - might want to flag unhappy status */
-		if (pret < 0) {
-			PX4_ERR("poll error %d, %d", pret, errno);
-			/* sleep a bit before next try */
-			px4_usleep(100000);
-			continue;
 		}
 
 		_v_control_mode_sub.update(&_v_control_mode);
@@ -419,8 +313,6 @@ void VtolAttitudeControl::task_main()
 		_tecs_status_sub.update(&_tecs_status);
 		_land_detected_sub.update(&_land_detected);
 		vehicle_cmd_poll();
-		actuator_controls_fw_poll();
-		actuator_controls_mc_poll();
 
 		// update the vtol state machine which decides which mode we are in
 		_vtol_type->update_vtol_state();
@@ -551,84 +443,61 @@ void VtolAttitudeControl::task_main()
 			_vtol_vehicle_status_pub = orb_advertise(ORB_ID(vtol_vehicle_status), &_vtol_vehicle_status);
 		}
 	}
-
-	PX4_WARN("exit");
-	_control_task = -1;
 }
 
 int
-VtolAttitudeControl::start()
+VtolAttitudeControl::task_spawn(int argc, char *argv[])
 {
-	/* start the task */
-	_control_task = px4_task_spawn_cmd("vtol_att_control",
-					   SCHED_DEFAULT,
-					   SCHED_PRIORITY_ATTITUDE_CONTROL + 1,
-					   1320,
-					   (px4_main_t)&VtolAttitudeControl::task_main_trampoline,
-					   nullptr);
+	VtolAttitudeControl *instance = new VtolAttitudeControl();
 
-	if (_control_task < 0) {
-		PX4_WARN("task start failed");
-		return -errno;
+	if (instance == nullptr) {
+		PX4_ERR("alloc failed");
+		return PX4_ERROR;
 	}
 
-	return OK;
+	_object.store(instance);
+	_task_id = task_id_is_work_queue;
+
+	return PX4_OK;
 }
 
+int
+VtolAttitudeControl::custom_command(int argc, char *argv[])
+{
+	return print_usage("unknown command");
+}
+
+int
+VtolAttitudeControl::print_usage(const char *reason)
+{
+	if (reason) {
+		PX4_WARN("%s\n", reason);
+	}
+
+	PRINT_MODULE_DESCRIPTION(
+		R"DESCR_STR(
+### Description
+fw_att_control is the fixed wing attitude controller.
+)DESCR_STR");
+
+	PRINT_MODULE_USAGE_COMMAND("start");
+
+	PRINT_MODULE_USAGE_NAME("vtol_att_control", "controller");
+
+	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
+
+	return 0;
+}
+
+int
+VtolAttitudeControl::print_status()
+{
+	PX4_INFO("Running");
+
+	return PX4_OK;
+}
 
 int vtol_att_control_main(int argc, char *argv[])
 {
-	if (argc < 2) {
-		PX4_WARN("usage: vtol_att_control {start|stop|status}");
-		return 1;
-	}
-
-	if (!strcmp(argv[1], "start")) {
-
-		if (VTOL_att_control::g_control != nullptr) {
-			PX4_WARN("already running");
-			return 0;
-		}
-
-		VTOL_att_control::g_control = new VtolAttitudeControl;
-
-		if (VTOL_att_control::g_control == nullptr) {
-			PX4_WARN("alloc failed");
-			return 1;
-		}
-
-		if (OK != VTOL_att_control::g_control->start()) {
-			delete VTOL_att_control::g_control;
-			VTOL_att_control::g_control = nullptr;
-			PX4_WARN("start failed");
-			return 1;
-		}
-
-		return 0;
-	}
-
-	if (!strcmp(argv[1], "stop")) {
-		if (VTOL_att_control::g_control == nullptr) {
-			PX4_WARN("not running");
-			return 0;
-		}
-
-		delete VTOL_att_control::g_control;
-		VTOL_att_control::g_control = nullptr;
-		return 0;
-	}
-
-	if (!strcmp(argv[1], "status")) {
-		if (VTOL_att_control::g_control) {
-			PX4_WARN("running");
-
-		} else {
-			PX4_WARN("not running");
-		}
-
-		return 0;
-	}
-
-	PX4_WARN("unrecognized command");
-	return 1;
+	return VtolAttitudeControl::main(argc, argv);
 }

@@ -40,8 +40,7 @@
 *
 */
 
-#ifndef VTOL_TYPE_H
-#define VTOL_TYPE_H
+#pragma once
 
 #include <lib/mathlib/mathlib.h>
 #include <drivers/drv_hrt.h>
@@ -164,8 +163,6 @@ public:
 	 */
 	bool can_transition_on_ground();
 
-
-
 	mode get_mode() {return _vtol_mode;}
 
 	virtual void parameters_update() = 0;
@@ -276,5 +273,3 @@ private:
 	bool is_motor_off_channel(const int channel);
 
 };
-
-#endif
