@@ -63,7 +63,6 @@ px4_add_board(
 
 	SYSTEMCMDS
 		bl_update
-		config
 		dumpfile
 		esc_calib
 		hardfault_log

@@ -45,7 +45,6 @@ px4_add_board(
 		wind_estimator
 
 	SYSTEMCMDS
-		#config
 		esc_calib
 		led_control
 		mixer
