@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <lib/perf/PerfCounter.hpp>
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/ecl/geo/geo.h>
@@ -260,11 +261,11 @@ private:
 
 	unsigned		_sample_rate{1000};
 
-	perf_counter_t		_sample_perf;
-	perf_counter_t		_bad_transfers;
-	perf_counter_t		_bad_registers;
-	perf_counter_t		_good_transfers;
-	perf_counter_t		_duplicates;
+	PerfCounterElapsed	_sample_perf{"mpu9250_read"};
+	PerfCounter		_bad_transfers{"mpu9250_bad_trans"};
+	PerfCounter		_bad_registers{"mpu9250_bad_reg"};
+	PerfCounter		_good_transfers{"mpu9250_good_trans"};
+	PerfCounter		_duplicates{"mpu9250_dupe"};
 
 	uint8_t			_register_wait{0};
 	uint64_t		_reset_wait{0};

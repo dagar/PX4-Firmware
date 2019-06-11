@@ -58,7 +58,7 @@ set(srcs
 	test_mount.c
 	test_param.c
 	test_parameters.cpp
-	test_perf.c
+	test_perf.cpp
 	test_ppm.cpp
 	test_ppm_loopback.c
 	test_rc.c

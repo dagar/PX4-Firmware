@@ -61,12 +61,11 @@
 #include <lib/drivers/device/i2c.h>
 #include <lib/drivers/device/spi.h>
 #include <lib/ecl/geo/geo.h>
-#include <lib/perf/perf_counter.h>
+#include <lib/perf/PerfCounter.hpp>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <systemlib/conversions.h>
 #include <systemlib/px4_macros.h>
-
 
 /*
   we set the timer interrupt to run a bit faster than the desired
@@ -341,11 +340,11 @@ private:
 
 	unsigned		_sample_rate{1000};
 
-	perf_counter_t		_sample_perf;
-	perf_counter_t		_bad_transfers;
-	perf_counter_t		_bad_registers;
-	perf_counter_t		_reset_retries;
-	perf_counter_t		_duplicates;
+	PerfCounterElapsed	_sample_perf{MODULE_NAME": read"};
+	PerfCounter		_bad_transfers{MODULE_NAME": bad_trans"};
+	PerfCounter		_bad_registers{MODULE_NAME": bad_reg"};
+	PerfCounter		_reset_retries{MODULE_NAME": reset"};
+	PerfCounter		_duplicates{MODULE_NAME": duplicates"};
 
 	uint8_t			_register_wait{0};
 	uint64_t		_reset_wait{0};

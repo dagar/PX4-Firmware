@@ -44,8 +44,6 @@
 #include <errno.h>
 #include <nuttx/mm/gran.h>
 
-#include <perf/perf_counter.h>
-
 /************************************************************************************
  * Name: board_dma_alloc_init
  *
@@ -71,7 +69,6 @@ static GRAN_HANDLE dma_allocator;
  * to guarantee alignment for the largest STM32 DMA burst (16 beats x 32bits).
  */
 static uint8_t g_dma_heap[BOARD_DMA_ALLOC_POOL_SIZE] __attribute__((aligned(64)));
-static perf_counter_t g_dma_perf;
 static uint16_t dma_heap_inuse;
 static uint16_t dma_heap_peak_use;
 
@@ -92,7 +89,6 @@ board_dma_alloc_init(void)
 	} else {
 		dma_heap_inuse = 0;
 		dma_heap_peak_use = 0;
-		g_dma_perf = perf_alloc(PC_COUNT, "dma_alloc");
 	}
 
 	return OK;
@@ -112,7 +108,6 @@ __EXPORT void *
 board_dma_alloc(size_t size)
 {
 	void *rv = NULL;
-	perf_count(g_dma_perf);
 	rv = gran_alloc(dma_allocator, size);
 
 	if (rv != NULL) {

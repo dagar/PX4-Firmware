@@ -183,7 +183,7 @@ AirspeedModule::AirspeedModule():
 	// initialise parameters
 	update_params();
 
-	_perf_elapsed = perf_alloc_once(PC_ELAPSED, "airspeed_selector elapsed");
+	_perf_elapsed = perf_alloc(PC_ELAPSED, "airspeed_selector elapsed");
 }
 
 AirspeedModule::~AirspeedModule()
@@ -191,7 +191,6 @@ AirspeedModule::~AirspeedModule()
 	ScheduleClear();
 
 	perf_free(_perf_elapsed);
-
 }
 
 int

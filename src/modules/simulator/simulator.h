@@ -214,8 +214,8 @@ private:
 
 	simulator::Report<simulator::RawGPSData>	_gps{1};
 
-	perf_counter_t _perf_gps{perf_alloc_once(PC_ELAPSED, "sim_gps_delay")};
-	perf_counter_t _perf_sim_delay{perf_alloc_once(PC_ELAPSED, "sim_network_delay")};
+	perf_counter_t _perf_gps{perf_alloc(PC_ELAPSED, "sim_gps_delay")};
+	perf_counter_t _perf_sim_delay{perf_alloc(PC_ELAPSED, "sim_network_delay")};
 	perf_counter_t _perf_sim_interval{perf_alloc(PC_INTERVAL, "sim_network_interval")};
 
 	// uORB publisher handlers

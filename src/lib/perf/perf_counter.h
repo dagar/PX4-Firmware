@@ -57,10 +57,15 @@ enum perf_counter_type {
 	PC_INTERVAL		/**< measure the interval between instances of an event */
 };
 
-struct perf_ctr_header;
-typedef struct perf_ctr_header	*perf_counter_t;
+struct PerfCounter;
+typedef struct PerfCounter	*perf_counter_t;
 
 __BEGIN_DECLS
+
+/**
+ * Initialize the perf backend. Call this on startup before calling any other methods.
+ */
+__EXPORT void			perf_init(void);
 
 /**
  * Create a new local counter.
@@ -73,16 +78,6 @@ __BEGIN_DECLS
 #ifndef perf_alloc	// perf_alloc might be defined to be NULL in src/modules/px4iofirmware/px4io.h
 __EXPORT extern perf_counter_t	perf_alloc(enum perf_counter_type type, const char *name);
 #endif
-
-/**
- * Get the reference to an existing counter or create a new one if it does not exist.
- *
- * @param type			The type of the counter.
- * @param name			The counter name.
- * @return			Handle for the counter, or NULL if a counter
- *				could not be allocated.
- */
-__EXPORT extern perf_counter_t	perf_alloc_once(enum perf_counter_type type, const char *name);
 
 /**
  * Free a counter.

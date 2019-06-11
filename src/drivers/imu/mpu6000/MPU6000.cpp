@@ -44,12 +44,7 @@ MPU6000::MPU6000(device::Device *interface, enum Rotation rotation, int device_t
 	_interface(interface),
 	_device_type(device_type),
 	_px4_accel(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
-	_px4_gyro(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
-	_sample_perf(perf_alloc(PC_ELAPSED, "mpu6k_read")),
-	_bad_transfers(perf_alloc(PC_COUNT, "mpu6k_bad_trans")),
-	_bad_registers(perf_alloc(PC_COUNT, "mpu6k_bad_reg")),
-	_reset_retries(perf_alloc(PC_COUNT, "mpu6k_reset")),
-	_duplicates(perf_alloc(PC_COUNT, "mpu6k_duplicates"))
+	_px4_gyro(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation)
 {
 	switch (_device_type) {
 	default:
@@ -79,13 +74,6 @@ MPU6000::~MPU6000()
 {
 	/* make sure we are truly inactive */
 	stop();
-
-	/* delete the perf counter */
-	perf_free(_sample_perf);
-	perf_free(_bad_transfers);
-	perf_free(_bad_registers);
-	perf_free(_reset_retries);
-	perf_free(_duplicates);
 }
 
 int
@@ -141,7 +129,7 @@ int MPU6000::reset()
 			break;
 		}
 
-		perf_count(_reset_retries);
+		_reset_retries.count();
 		px4_usleep(2000);
 	}
 
@@ -683,7 +671,7 @@ MPU6000::check_registers(void)
 		  and wait until we have seen 20 good values in a row
 		  before we consider the sensor to be OK again.
 		 */
-		perf_count(_bad_registers);
+		_bad_registers.count();
 
 		/*
 		  try to fix the bad register value. We only try to
@@ -743,7 +731,7 @@ MPU6000::measure()
 	} report;
 
 	/* start measuring */
-	perf_begin(_sample_perf);
+	_sample_perf.begin();
 
 	/*
 	 * Fetch the full set of measurements from the MPU6000 in one pass.
@@ -771,8 +759,8 @@ MPU6000::measure()
 	*/
 	if (!_got_duplicate && memcmp(&mpu_report.accel_x[0], &_last_accel[0], 6) == 0) {
 		// it isn't new data - wait for next timer
-		perf_end(_sample_perf);
-		perf_count(_duplicates);
+		_sample_perf.end();
+		_duplicates.count();
 		_got_duplicate = true;
 		return OK;
 	}
@@ -803,8 +791,8 @@ MPU6000::measure()
 	    report.gyro_z == 0) {
 
 		// all zero data - probably a SPI bus error
-		perf_count(_bad_transfers);
-		perf_end(_sample_perf);
+		_bad_transfers.count();
+		_sample_perf.end();
 
 		// note that we don't call reset() here as a reset()
 		// costs 20ms with interrupts disabled. That means if
@@ -843,7 +831,7 @@ MPU6000::measure()
 	// level code to decide if it should use this sensor based on
 	// whether it has had failures
 
-	const uint64_t error_count = perf_event_count(_bad_transfers) + perf_event_count(_bad_registers);
+	const uint64_t error_count = _bad_transfers.event_count() + _bad_registers.event_count();
 	_px4_accel.set_error_count(error_count);
 	_px4_gyro.set_error_count(error_count);
 
@@ -878,18 +866,18 @@ MPU6000::measure()
 	_px4_gyro.update(timestamp_sample, report.gyro_x, report.gyro_y, report.gyro_z);
 
 	/* stop measuring */
-	perf_end(_sample_perf);
+	_sample_perf.end();
 	return OK;
 }
 
 void
 MPU6000::print_info()
 {
-	perf_print_counter(_sample_perf);
-	perf_print_counter(_bad_transfers);
-	perf_print_counter(_bad_registers);
-	perf_print_counter(_reset_retries);
-	perf_print_counter(_duplicates);
+	_sample_perf.print();
+	_bad_transfers.print();
+	_bad_registers.print();
+	_reset_retries.print();
+	_duplicates.print();
 
 	_px4_accel.print_status();
 	_px4_gyro.print_status();

@@ -76,12 +76,7 @@ MPU9250::MPU9250(device::Device *interface, device::Device *mag_interface, enum 
 	_px4_accel(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
 	_px4_gyro(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
 	_mag(this, mag_interface, rotation),
-	_dlpf_freq(MPU9250_DEFAULT_ONCHIP_FILTER_FREQ),
-	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
-	_bad_transfers(perf_alloc(PC_COUNT, MODULE_NAME": bad_trans")),
-	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": bad_reg")),
-	_good_transfers(perf_alloc(PC_COUNT, MODULE_NAME": good_trans")),
-	_duplicates(perf_alloc(PC_COUNT, MODULE_NAME": dupe"))
+	_dlpf_freq(MPU9250_DEFAULT_ONCHIP_FILTER_FREQ)
 {
 	_px4_accel.set_device_type(DRV_ACC_DEVTYPE_MPU9250);
 	_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_MPU9250);
@@ -91,13 +86,6 @@ MPU9250::~MPU9250()
 {
 	// make sure we are truly inactive
 	stop();
-
-	// delete the perf counter
-	perf_free(_sample_perf);
-	perf_free(_bad_transfers);
-	perf_free(_bad_registers);
-	perf_free(_good_transfers);
-	perf_free(_duplicates);
 }
 
 int
@@ -534,7 +522,7 @@ MPU9250::check_registers()
 		  and wait until we have seen 20 good values in a row
 		  before we consider the sensor to be OK again.
 		 */
-		perf_count(_bad_registers);
+		_bad_registers.count();
 
 		/*
 		  try to fix the bad register value. We only try to
@@ -575,14 +563,14 @@ MPU9250::check_null_data(uint16_t *data, uint8_t size)
 {
 	while (size--) {
 		if (*data++) {
-			perf_count(_good_transfers);
+			_good_transfers.count();
 			return false;
 		}
 	}
 
 	// all zero data - probably a SPI bus error
-	perf_count(_bad_transfers);
-	perf_end(_sample_perf);
+	_bad_transfers.count();
+	_sample_perf.end();
 	// note that we don't call reset() here as a reset()
 	// costs 20ms with interrupts disabled. That means if
 	// the mpu9250 does go bad it would cause a FMU failure,
@@ -603,8 +591,8 @@ MPU9250::check_duplicate(uint8_t *accel_data)
 	*/
 	if (!_got_duplicate && memcmp(accel_data, &_last_accel_data, sizeof(_last_accel_data)) == 0) {
 		// it isn't new data - wait for next timer
-		perf_end(_sample_perf);
-		perf_count(_duplicates);
+		_sample_perf.end();
+		_duplicates.count();
 		_got_duplicate = true;
 
 	} else {
@@ -618,11 +606,11 @@ MPU9250::check_duplicate(uint8_t *accel_data)
 void
 MPU9250::measure()
 {
-	perf_begin(_sample_perf);
+	_sample_perf.begin();
 
 	if (hrt_absolute_time() < _reset_wait) {
 		// we're waiting for a reset to complete
-		perf_end(_sample_perf);
+		_sample_perf.end();
 		return;
 	}
 
@@ -644,7 +632,7 @@ MPU9250::measure()
 	if (_mag.is_passthrough() && _register_wait == 0) {
 		if (_whoami == MPU_WHOAMI_9250 || _whoami == MPU_WHOAMI_6500) {
 			if (OK != read_reg_range(MPUREG_INT_STATUS, MPU9250_HIGH_BUS_SPEED, (uint8_t *)&mpu_report, sizeof(mpu_report))) {
-				perf_end(_sample_perf);
+				_sample_perf.end();
 				return;
 			}
 		}
@@ -736,17 +724,17 @@ MPU9250::measure()
 	_px4_gyro.update(timestamp_sample, report.gyro_x, report.gyro_y, report.gyro_z);
 
 	/* stop measuring */
-	perf_end(_sample_perf);
+	_sample_perf.end();
 }
 
 void
 MPU9250::print_info()
 {
-	perf_print_counter(_sample_perf);
-	perf_print_counter(_bad_transfers);
-	perf_print_counter(_bad_registers);
-	perf_print_counter(_good_transfers);
-	perf_print_counter(_duplicates);
+	_sample_perf.print();
+	_bad_transfers.print();
+	_bad_registers.print();
+	_good_transfers.print();
+	_duplicates.print();
 
 	_px4_accel.print_status();
 	_px4_gyro.print_status();

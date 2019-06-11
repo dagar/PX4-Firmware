@@ -35,13 +35,13 @@
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/console_buffer.h>
 #include <px4_platform_common/defines.h>
+#include <px4_platform_common/px4_work_queue/WorkQueueManager.hpp>
 #include <drivers/drv_hrt.h>
 #include <lib/parameters/param.h>
-#include <px4_platform_common/px4_work_queue/WorkQueueManager.hpp>
+#include <lib/perf/perf_counter.h>
 #include <systemlib/cpuload.h>
 
 #include <fcntl.h>
-
 
 #include "platform/cxxinitialize.h"
 
@@ -112,6 +112,8 @@ int px4_platform_init(void)
 	}
 
 	hrt_init();
+
+	perf_init();
 
 	param_init();
 

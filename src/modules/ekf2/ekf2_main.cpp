@@ -43,7 +43,7 @@
 #include <drivers/drv_hrt.h>
 #include <lib/ecl/EKF/ekf.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/perf/perf_counter.h>
+#include <lib/perf/PerfCounter.hpp>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
@@ -96,7 +96,7 @@ class Ekf2 final : public ModuleBase<Ekf2>, public ModuleParams, public px4::Wor
 {
 public:
 	explicit Ekf2(bool replay_mode = false);
-	~Ekf2() override;
+	~Ekf2() override = default;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -178,7 +178,7 @@ private:
 	uint64_t _start_time_us = 0;		///< system time at EKF start (uSec)
 	int64_t _last_time_slip_us = 0;		///< Last time slip (uSec)
 
-	perf_counter_t _ekf_update_perf;
+	PerfCounterElapsed _ekf_update_perf{MODULE_NAME": update"};
 
 	// Initialise time stamps used to send sensor data to the EKF and for logging
 	uint8_t _invalid_mag_id_count = 0;	///< number of times an invalid magnetomer device ID has been detected
@@ -534,7 +534,6 @@ Ekf2::Ekf2(bool replay_mode):
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::att_pos_ctrl),
 	_replay_mode(replay_mode),
-	_ekf_update_perf(perf_alloc_once(PC_ELAPSED, MODULE_NAME": update")),
 	_params(_ekf.getParamHandle()),
 	_param_ekf2_min_obs_dt(_params->sensor_interval_min_ms),
 	_param_ekf2_mag_delay(_params->mag_delay_ms),
@@ -638,11 +637,6 @@ Ekf2::Ekf2(bool replay_mode):
 	_ekf.set_min_required_gps_health_time(_param_ekf2_req_gps_h.get() * 1_s);
 }
 
-Ekf2::~Ekf2()
-{
-	perf_free(_ekf_update_perf);
-}
-
 bool
 Ekf2::init()
 {
@@ -661,7 +655,7 @@ int Ekf2::print_status()
 
 	PX4_INFO("time slip: %" PRId64 " us", _last_time_slip_us);
 
-	perf_print_counter(_ekf_update_perf);
+	_ekf_update_perf.print();
 
 	return 0;
 }
@@ -1184,9 +1178,9 @@ void Ekf2::Run()
 		}
 
 		// run the EKF update and output
-		perf_begin(_ekf_update_perf);
+		_ekf_update_perf.begin();
 		const bool updated = _ekf.update();
-		perf_end(_ekf_update_perf);
+		_ekf_update_perf.end();
 
 		// integrate time to monitor time slippage
 		if (_start_time_us == 0) {

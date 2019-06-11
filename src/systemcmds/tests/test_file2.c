@@ -43,7 +43,6 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <perf/perf_counter.h>
 #include <string.h>
 #include <stdlib.h>
 #include <px4_platform_common/getopt.h>
