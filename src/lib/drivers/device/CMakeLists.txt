@@ -34,17 +34,35 @@
 set(SRCS_PLATFORM)
 if (${PX4_PLATFORM} STREQUAL "nuttx")
 	if ("${CONFIG_I2C}" STREQUAL "y")
-		list(APPEND SRCS_PLATFORM nuttx/I2C.cpp)
+		list(APPEND SRCS_PLATFORM
+			nuttx/I2C.cpp
+			nuttx/I2C.hpp
+		)
 	endif()
 
 	if ("${CONFIG_SPI}" STREQUAL "y")
-		list(APPEND SRCS_PLATFORM nuttx/SPI.cpp)
+		list(APPEND SRCS_PLATFORM
+			nuttx/SPI.cpp
+			nuttx/SPI.hpp
+		)
 	endif()
+
+	list(APPEND SRCS_PLATFORM
+		posix/UART.cpp
+		posix/UART.hpp
+	)
+
 elseif(UNIX AND NOT APPLE AND NOT (${PX4_PLATFORM} MATCHES "qurt")) #TODO: add linux PX4 platform type
 	# Linux I2Cdev and SPIdev
 	list(APPEND SRCS_PLATFORM
 		posix/I2C.cpp
+		posix/I2C.hpp
+
 		posix/SPI.cpp
+		posix/SPI.hpp
+
+		posix/UART.cpp
+		posix/UART.hpp
 	)
 endif()
 

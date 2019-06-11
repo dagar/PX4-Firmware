@@ -130,7 +130,8 @@ public:
 		DeviceBusType_I2C     = 1,
 		DeviceBusType_SPI     = 2,
 		DeviceBusType_UAVCAN  = 3,
-		DeviceBusType_SIMULATION = 4,
+		DeviceBusType_UART    = 4,
+		DeviceBusType_SIMULATION = 5,
 	};
 
 	/**
@@ -157,6 +158,9 @@ public:
 
 		case DeviceBusType_SPI:
 			return "SPI";
+
+		case DeviceBusType_UART:
+			return "UART";
 
 		case DeviceBusType_UAVCAN:
 			return "UAVCAN";
