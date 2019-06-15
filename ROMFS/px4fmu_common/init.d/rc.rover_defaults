@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# UGV default parameters.
+# Rover default parameters
 #
 # NOTE: Script variables are declared/initialized/unset in the rcS script.
 #
@@ -9,9 +9,25 @@ set VEHICLE_TYPE rover
 
 if [ $AUTOCNF = yes ]
 then
-#
-# Default parameters for UGVs.
-#
+	#
+	# Default parameters for rovers.
+	#
+	param set COM_POS_FS_DELAY 5
+	param set COM_POS_FS_EPH 25
+	param set COM_POS_FS_EPV 50
+	param set COM_POS_FS_GAIN 0
+	param set COM_POS_FS_PROB 1
+	param set COM_VEL_FS_EVH 5
+
+	param set EKF2_GPS_CHECK 21
+	param set EKF2_MAG_ACCLIM 0
+	param set EKF2_MAG_YAWLIM 0
+	param set EKF2_REQ_EPH 10
+	param set EKF2_REQ_EPV 10
+	param set EKF2_REQ_HDRIFT 0.5
+	param set EKF2_REQ_SACC 1
+	param set EKF2_REQ_VDRIFT 1.0
+
 	param set MIS_LTRMIN_ALT 0.01
 	param set MIS_TAKEOFF_ALT 0.01
 
@@ -20,6 +36,9 @@ then
 
 	# Temporary.
 	param set NAV_FW_ALT_RAD 1000
+
+	# u-blox GPS dynamic platform model 4 for automotive
+	param set GPS_UBX_DYNMODEL 4
 fi
 
 #
@@ -39,5 +58,6 @@ set PWM_RATE 50
 # This is the gimbal pass mixer.
 #
 set MIXER_AUX pass
+
 set PWM_AUX_OUT 1234
 set PWM_AUX_RATE 50
