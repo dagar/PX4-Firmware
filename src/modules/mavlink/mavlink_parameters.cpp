@@ -335,7 +335,7 @@ MavlinkParametersManager::send_untransmitted()
 	if (_mavlink_parameter_sub.updated()) {
 		// Clear the ready flag
 		parameter_update_s value;
-		_mavlink_parameter_sub.update(&value);
+		_mavlink_parameter_sub.copy(&value);
 
 		// Schedule an update if not already the case
 		if (_param_update_time == 0) {
@@ -384,8 +384,9 @@ MavlinkParametersManager::send_uavcan()
 {
 	/* Send parameter values received from the UAVCAN topic */
 	if (_uavcan_parameter_value_sub.updated()) {
-		uavcan_parameter_value_s value;
-		_uavcan_parameter_value_sub.update(&value);
+
+		uavcan_parameter_value_s value{};
+		_uavcan_parameter_value_sub.copy(&value);
 
 		// Check if we received a matching parameter, drop it from the list and request the next
 		if (_uavcan_open_request_list != nullptr
