@@ -47,15 +47,21 @@
 #include <px4_module_params.h>
 #include <px4_work_queue/ScheduledWorkItem.hpp>
 #include <systemlib/cpuload.h>
+#include <uORB/Publication.hpp>
 #include <uORB/topics/cpuload.h>
 #include <uORB/topics/task_stack_info.h>
+#include <uORB/topics/task_info.h>
 #include <uORB/uORB.h>
+
+#include <math.h>
 
 #if defined(__PX4_NUTTX) && !defined(CONFIG_SCHED_INSTRUMENTATION)
 #  error load_mon support requires CONFIG_SCHED_INSTRUMENTATION
 #endif
 
 extern struct system_load_s system_load;
+
+using namespace time_literals;
 
 #define STACK_LOW_WARNING_THRESHOLD 300 ///< if free stack space falls below this, print a warning
 #define FDS_LOW_WARNING_THRESHOLD 3 ///< if free file descriptors fall below this, print a warning
@@ -65,8 +71,8 @@ namespace load_mon
 
 extern "C" __EXPORT int load_mon_main(int argc, char *argv[]);
 
-// Run it at 1 Hz.
-const unsigned LOAD_MON_INTERVAL_US = 1000000;
+// Run it at 10 Hz (100 ms interval).
+const unsigned LOAD_MON_INTERVAL_US = 10000;
 
 class LoadMon : public ModuleBase<LoadMon>, public ModuleParams, public px4::ScheduledWorkItem
 {
@@ -106,6 +112,14 @@ private:
 
 	int _stack_task_index{0};
 	orb_advert_t _task_stack_info_pub{nullptr};
+
+	void task_status();
+
+	uORB::Publication<task_info_s>		_task_info_pub{ORB_ID(task_info)};
+	int _task_info_index{0};
+	task_info_s	_task_info[CONFIG_MAX_TASKS] {};
+	uint64_t	_last_check{0};
+
 #endif
 
 	DEFINE_PARAMETERS(
@@ -118,12 +132,14 @@ private:
 	hrt_abstime _last_idle_time_sample{0};
 
 	perf_counter_t _stack_perf;
+	perf_counter_t _status_perf;
 };
 
 LoadMon::LoadMon() :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(px4::wq_configurations::lp_default),
-	_stack_perf(perf_alloc(PC_ELAPSED, "stack_check"))
+	_stack_perf(perf_alloc(PC_ELAPSED, "stack_check")),
+	_status_perf(perf_alloc(PC_ELAPSED, "task_status"))
 {
 }
 
@@ -132,6 +148,7 @@ LoadMon::~LoadMon()
 	ScheduleClear();
 
 	perf_free(_stack_perf);
+	perf_free(_status_perf);
 }
 
 int LoadMon::task_spawn(int argc, char *argv[])
@@ -167,6 +184,8 @@ void LoadMon::Run()
 	if (_param_sys_stck_en.get()) {
 		_stack_usage();
 	}
+
+	task_status();
 
 #endif
 
@@ -316,10 +335,83 @@ void LoadMon::_stack_usage()
 }
 #endif
 
+#ifdef __PX4_NUTTX
+void
+LoadMon::task_status()
+{
+	// _task_info_index - tracks task status
+	_task_info_index = (_task_info_index + 1) % CONFIG_MAX_TASKS;
+
+	sched_lock();
+	perf_begin(_status_perf);
+
+	const uint64_t now = hrt_absolute_time();
+	bool updated_task = false;
+
+	for (int task_index = _task_info_index; task_index < CONFIG_MAX_TASKS; task_index++) {
+
+		const system_load_taskinfo_s &task = system_load.tasks[task_index];
+
+		if (task.valid && task.tcb->pid > 0) {
+
+			static_assert(sizeof(_task_info[task_index].name) == CONFIG_TASK_NAME_SIZE,
+				      "task_stack_info.task_name must match NuttX CONFIG_TASK_NAME_SIZE");
+
+			if (_task_info[task_index].pid != task.tcb->pid) {
+				_task_info[task_index] = task_info_s{};
+				_task_info[task_index].pid = task.tcb->pid;
+
+				strncpy((char *)_task_info[task_index].name, task.tcb->name, CONFIG_TASK_NAME_SIZE);
+			}
+
+			float runtime = task.total_runtime - _task_info[task_index].total_runtime;
+			float dt_us = now - _task_info[task_index].timestamp;
+
+			const float load = runtime / dt_us;
+
+			const float relative_change = fabsf(load / _task_info[task_index].cpu_load);
+
+			// publish
+			if ((relative_change > 1.20f) || (relative_change < 0.80f)
+			    || (hrt_elapsed_time(&_task_info[task_index].timestamp) > 10_s)) {
+				// updated
+				updated_task = true;
+
+				_task_info[task_index].timestamp = now;
+
+				_task_info[task_index].total_runtime = task.total_runtime;
+				_task_info[task_index].cpu_load = load;
+
+				// stack
+				const float stack_size = task.tcb->adj_stack_size;
+				const float stack_free = up_check_tcbstack_remain(task.tcb);
+
+				_task_info[task_index].stack_used = stack_size - stack_free;
+				_task_info[task_index].stack_total = stack_size;
+			}
+		}
+
+		// if updated publish and exit loop
+		if (updated_task) {
+			_task_info_pub.publish(_task_info[task_index]);
+
+			// store for next iteration
+			_task_info_index = task_index;
+			break;
+		}
+	}
+
+	_last_check = now;
+	perf_end(_status_perf);
+	sched_unlock();
+}
+#endif
+
 int LoadMon::print_status()
 {
 	PX4_INFO("running");
 	perf_print_counter(_stack_perf);
+	perf_print_counter(_status_perf);
 	return 0;
 }
 

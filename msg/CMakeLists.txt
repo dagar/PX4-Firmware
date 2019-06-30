@@ -110,6 +110,7 @@ set(msg_files
 	servorail_status.msg
 	subsystem_info.msg
 	system_power.msg
+	task_info.msg
 	task_stack_info.msg
 	tecs_status.msg
 	telemetry_status.msg
