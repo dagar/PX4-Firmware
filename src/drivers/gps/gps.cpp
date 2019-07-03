@@ -75,6 +75,7 @@
 #include <matrix/math.hpp>
 #include <systemlib/err.h>
 #include <parameters/param.h>
+#include <uORB/PublicationQueued.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/satellite_info.h>
@@ -199,9 +200,10 @@ private:
 	const Instance 			_instance;
 
 	uORB::Subscription		_orb_inject_data_sub{ORB_ID(gps_inject_data)};
-	orb_advert_t			_dump_communication_pub{nullptr};		///< if non-null, dump communication
+	uORB::PublicationQueued<gps_dump_s>	_dump_communication_pub{ORB_ID(gps_dump)};
 	gps_dump_s			*_dump_to_device{nullptr};
 	gps_dump_s			*_dump_from_device{nullptr};
+	bool				_dump_communication{false};			///< if true, dump communication
 
 	static volatile bool _is_gps_main_advertised; ///< for the second gps we want to make sure that it gets instance 1
 	/// and thus we wait until the first one publishes at least one message.
@@ -576,16 +578,16 @@ void GPS::initializeCommunicationDump()
 	memset(_dump_to_device, 0, sizeof(gps_dump_s));
 	memset(_dump_from_device, 0, sizeof(gps_dump_s));
 
-	int instance;
 	//make sure to use a large enough queue size, so that we don't lose messages. You may also want
 	//to increase the logger rate for that.
-	_dump_communication_pub = orb_advertise_multi_queue(ORB_ID(gps_dump), _dump_from_device, &instance,
-				  ORB_PRIO_DEFAULT, 8);
+	_dump_communication_pub.publish(*_dump_from_device);
+
+	_dump_communication = true;
 }
 
 void GPS::dumpGpsData(uint8_t *data, size_t len, bool msg_to_gps_device)
 {
-	if (!_dump_communication_pub) {
+	if (!_dump_communication) {
 		return;
 	}
 
@@ -609,7 +611,7 @@ void GPS::dumpGpsData(uint8_t *data, size_t len, bool msg_to_gps_device)
 			}
 
 			dump_data->timestamp = hrt_absolute_time();
-			orb_publish(ORB_ID(gps_dump), _dump_communication_pub, dump_data);
+			_dump_communication_pub.publish(*dump_data);
 			dump_data->len = 0;
 		}
 	}
@@ -846,10 +848,6 @@ GPS::run()
 	}
 
 	PX4_INFO("exiting");
-
-	if (_dump_communication_pub) {
-		orb_unadvertise(_dump_communication_pub);
-	}
 
 	if (_serial_fd >= 0) {
 		::close(_serial_fd);

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012-2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,32 +32,72 @@
  ****************************************************************************/
 
 /**
- * @file drv_led.h
+ * @file PublicationQueued.hpp
  *
- * Led device API to control the external LED(s) via uORB interface
  */
 
 #pragma once
 
+#include <uORB/uORB.h>
+#include <px4_defines.h>
 
-#include <uORB/topics/led_control.h>
+namespace uORB
+{
 
-#include <board_config.h>
+/**
+ * Base publication wrapper class, used in list traversal
+ * of various publications.
+ */
+template<typename T>
+class PublicationQueued
+{
+public:
 
-// allow the board to override the number (or maxiumum number) of LED's it has
-#ifndef BOARD_MAX_LEDS
-#define BOARD_MAX_LEDS 4
-#endif
+	/**
+	 * Constructor
+	 *
+	 * @param meta The uORB metadata (usually from
+	 * 	the ORB_ID() macro) for the topic.
+	 */
+	PublicationQueued(const orb_metadata *meta) : _meta(meta) {}
 
-#if BOARD_MAX_LEDS < LED_CONTROL_ORB_QUEUE_LENGTH
-#error "led_control_s::ORB_QUEUE_LENGTH too small"
-#endif
+	~PublicationQueued() { orb_unadvertise(_handle); }
 
-#if BOARD_MAX_LEDS > 8 // because led_mask is uint8_t
-#error "BOARD_MAX_LEDS too large. You need to change the led_mask type in the led_control uorb topic (and where it's used)"
-#endif
+	/**
+	 * Publish the struct
+	 * @param data The uORB message struct we are updating.
+	 */
+	bool publish(const T &data)
+	{
+		bool updated = false;
 
-// Legacy paths - 2 are need to allow both pwm and i2c drviers to co-exist
-#define RGBLED0_DEVICE_PATH "/dev/rgbled0"         // Primary RGB LED on i2c
-#define RGBLED1_DEVICE_PATH "/dev/rgbled1"	   // Primary RGB LED(NCP5623C) on i2c
-#define RGBLED_PWM0_DEVICE_PATH "/dev/rgbled_pwm0" // Secondary RGB LED on PWM
+		if (_handle != nullptr) {
+			if (orb_publish(_meta, _handle, &data) != PX4_OK) {
+				PX4_ERR("%s publish fail", _meta->o_name);
+
+			} else {
+				updated = true;
+			}
+
+		} else {
+			orb_advert_t handle = orb_advertise_queue(_meta, &data, T::ORB_QUEUE_LENGTH);
+
+			if (handle != nullptr) {
+				_handle = handle;
+				updated = true;
+
+			} else {
+				PX4_ERR("%s advert fail", _meta->o_name);
+			}
+		}
+
+		return updated;
+	}
+
+protected:
+	const orb_metadata *_meta;
+
+	orb_advert_t _handle{nullptr};
+};
+
+} // namespace uORB

@@ -55,7 +55,7 @@
 #include <parameters/param.h>
 #include <systemlib/mavlink_log.h>
 
-#include <uORB/uORB.h>
+#include <uORB/PublicationQueued.hpp>
 #include <uORB/topics/camera_trigger.h>
 #include <uORB/topics/camera_capture.h>
 #include <uORB/topics/sensor_combined.h>
@@ -176,7 +176,8 @@ private:
 	int			_lpos_sub;
 
 	orb_advert_t		_trigger_pub;
-	orb_advert_t		_cmd_ack_pub;
+
+	uORB::PublicationQueued<vehicle_command_ack_s>	_cmd_ack_pub{ORB_ID(vehicle_command_ack)};
 
 	param_t			_p_mode;
 	param_t			_p_activation_time;
@@ -251,7 +252,6 @@ CameraTrigger::CameraTrigger() :
 	_command_sub(-1),
 	_lpos_sub(-1),
 	_trigger_pub(nullptr),
-	_cmd_ack_pub(nullptr),
 	_trigger_mode(TRIGGER_MODE_NONE),
 	_cam_cap_fback(0),
 	_camera_interface_mode(CAMERA_INTERFACE_MODE_GPIO),
@@ -494,12 +494,13 @@ CameraTrigger::stop()
 void
 CameraTrigger::test()
 {
-	vehicle_command_s vcmd = {};
+	vehicle_command_s vcmd{};
 	vcmd.timestamp = hrt_absolute_time();
 	vcmd.param5 = 1.0;
 	vcmd.command = vehicle_command_s::VEHICLE_CMD_DO_DIGICAM_CONTROL;
 
-	orb_advertise_queue(ORB_ID(vehicle_command), &vcmd, vehicle_command_s::ORB_QUEUE_LENGTH);
+	uORB::PublicationQueued<vehicle_command_s> vcmd_pub{ORB_ID(vehicle_command)};
+	vcmd_pub.publish(vcmd);
 }
 
 void
@@ -732,13 +733,7 @@ CameraTrigger::cycle_trampoline(void *arg)
 		command_ack.target_system = cmd.source_system;
 		command_ack.target_component = cmd.source_component;
 
-		if (trig->_cmd_ack_pub == nullptr) {
-			trig->_cmd_ack_pub = orb_advertise_queue(ORB_ID(vehicle_command_ack), &command_ack,
-					     vehicle_command_ack_s::ORB_QUEUE_LENGTH);
-
-		} else {
-			orb_publish(ORB_ID(vehicle_command_ack), trig->_cmd_ack_pub, &command_ack);
-		}
+		trig->_cmd_ack_pub.publish(command_ack);
 	}
 
 	work_queue(LPWORK, &_work, (worker_t)&CameraTrigger::cycle_trampoline,

@@ -45,8 +45,10 @@
 
 // publications
 #include <uORB/Publication.hpp>
+#include <uORB/PublicationQueued.hpp>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/home_position.h>
+#include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_status_flags.h>
@@ -179,8 +181,7 @@ private:
 	FailureDetector _failure_detector;
 	bool _flight_termination_triggered{false};
 
-	bool handle_command(vehicle_status_s *status, const vehicle_command_s &cmd, actuator_armed_s *armed,
-			    orb_advert_t *command_ack_pub, bool *changed);
+	bool handle_command(vehicle_status_s *status, const vehicle_command_s &cmd, actuator_armed_s *armed, bool *changed);
 
 	bool set_home_position();
 	bool set_home_position_alt_only();

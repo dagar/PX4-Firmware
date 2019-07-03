@@ -51,9 +51,6 @@ CameraCapture	*g_camera_capture;
 CameraCapture::CameraCapture() :
 	_capture_enabled(false),
 	_gpio_capture(false),
-	_trigger_pub(nullptr),
-	_command_ack_pub(nullptr),
-	_command_sub(-1),
 	_trig_buffer(nullptr),
 	_camera_capture_mode(0),
 	_camera_capture_edge(0),
@@ -173,15 +170,7 @@ CameraCapture::publish_trigger()
 		return;
 	}
 
-	if (_trigger_pub == nullptr) {
-
-		_trigger_pub = orb_advertise(ORB_ID(camera_trigger), &trigger);
-
-	} else {
-
-		orb_publish(ORB_ID(camera_trigger), _trigger_pub, &trigger);
-	}
-
+	_trigger_pub.publish(trigger);
 }
 
 void
@@ -202,19 +191,12 @@ CameraCapture::cycle_trampoline(void *arg)
 void
 CameraCapture::cycle()
 {
-
-	if (_command_sub < 0) {
-		_command_sub = orb_subscribe(ORB_ID(vehicle_command));
-	}
-
-	bool updated = false;
-	orb_check(_command_sub, &updated);
+	bool updated = _command_sub.updated();
 
 	// Command handling
 	if (updated) {
-
-		vehicle_command_s cmd;
-		orb_copy(ORB_ID(vehicle_command), _command_sub, &cmd);
+		vehicle_command_s cmd{};
+		_command_sub.copy(&cmd);
 
 		// TODO : this should eventuallly be a capture control command
 		if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_TRIGGER_CONTROL) {
@@ -235,27 +217,15 @@ CameraCapture::cycle()
 			}
 
 			// Acknowledge the command
-			vehicle_command_ack_s command_ack = {
-				.timestamp = 0,
-				.result_param2 = 0,
-				.command = cmd.command,
-				.result = (uint8_t)vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED,
-				.from_external = false,
-				.result_param1 = 0,
-				.target_system = cmd.source_system,
-				.target_component = cmd.source_component
-			};
+			vehicle_command_ack_s command_ack{};
+			command_ack.timestamp = hrt_absolute_time();
+			command_ack.command = cmd.command;
+			command_ack.result = (uint8_t)vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+			command_ack.target_system = cmd.source_system;
+			command_ack.target_component = cmd.source_component;
 
-			if (_command_ack_pub == nullptr) {
-				_command_ack_pub = orb_advertise_queue(ORB_ID(vehicle_command_ack), &command_ack,
-								       vehicle_command_ack_s::ORB_QUEUE_LENGTH);
-
-			} else {
-				orb_publish(ORB_ID(vehicle_command_ack), _command_ack_pub, &command_ack);
-
-			}
+			_command_ack_pub.publish(command_ack);
 		}
-
 	}
 
 	work_queue(LPWORK, &_work, (worker_t)&CameraCapture::cycle_trampoline, camera_capture::g_camera_capture,

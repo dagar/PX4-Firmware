@@ -59,7 +59,9 @@
 #include <drivers/drv_input_capture.h>
 #include <drivers/device/ringbuffer.h>
 
-#include <uORB/uORB.h>
+#include <uORB/Publication.hpp>
+#include <uORB/PublicationQueued.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/camera_trigger.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_command_ack.h>
@@ -117,11 +119,11 @@ private:
 	bool			_gpio_capture;
 
 	// Publishers
-	orb_advert_t	_trigger_pub;
-	orb_advert_t	_command_ack_pub;
+	uORB::PublicationQueued<vehicle_command_ack_s>	_command_ack_pub{ORB_ID(vehicle_command_ack)};
+	uORB::Publication<camera_trigger_s>		_trigger_pub{ORB_ID(camera_trigger)};
 
 	// Subscribers
-	int				_command_sub;
+	uORB::Subscription				_command_sub{ORB_ID(vehicle_command)};
 
 	// Trigger Buffer
 	struct _trig_s {
