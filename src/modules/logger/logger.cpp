@@ -614,6 +614,7 @@ void Logger::add_default_topics()
 	add_topic("sensor_combined", 100);
 	add_topic("sensor_preflight", 200);
 	add_topic("system_power", 500);
+	add_topic("task_info");
 	add_topic("tecs_status", 200);
 	add_topic("trajectory_setpoint", 200);
 	add_topic("telemetry_status");
