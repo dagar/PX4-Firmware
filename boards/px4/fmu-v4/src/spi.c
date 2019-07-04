@@ -99,7 +99,7 @@ __EXPORT void stm32_spiinitialize(int mask)
 		stm32_configgpio(GPIO_SPI1_CS_PORTE_PIN15);
 
 		stm32_configgpio(GPIO_DRDY_PORTD_PIN15);
-		stm32_configgpio(GPIO_DRDY_PORTC_PIN14);
+		stm32_configgpio(GPIO_DRDY_ICM20608);
 		stm32_configgpio(GPIO_DRDY_PORTE_PIN12);
 	}
 
@@ -223,11 +223,11 @@ __EXPORT void board_spi_reset(int ms)
 	/* disable SPI bus 1  DRDY */
 
 	stm32_configgpio(GPIO_DRDY_OFF_PORTD_PIN15);
-	stm32_configgpio(GPIO_DRDY_OFF_PORTC_PIN14);
+	stm32_configgpio(GPIO_DRDY_OFF_ICM20608);
 	stm32_configgpio(GPIO_DRDY_OFF_PORTE_PIN12);
 
 	stm32_gpiowrite(GPIO_DRDY_OFF_PORTD_PIN15, 0);
-	stm32_gpiowrite(GPIO_DRDY_OFF_PORTC_PIN14, 0);
+	stm32_gpiowrite(GPIO_DRDY_OFF_ICM20608, 0);
 	stm32_gpiowrite(GPIO_DRDY_OFF_PORTE_PIN12, 0);
 
 	/* disable SPI bus 1  CS */

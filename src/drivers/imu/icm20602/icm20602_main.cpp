@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,42 +31,40 @@
  *
  ****************************************************************************/
 
-#include "ADIS16477.hpp"
+#include "ICM20602.hpp"
 
 #include <px4_getopt.h>
 
-extern "C" { __EXPORT int adis16477_main(int argc, char *argv[]); }
+extern "C" { __EXPORT int icm20602_main(int argc, char *argv[]); }
 
 /**
  * Local functions in support of the shell command.
  */
-namespace adis16477
+namespace icm20602
 {
 
-ADIS16477 *g_dev{nullptr};
+ICM20602 *g_dev{nullptr};
 
-void	start(enum Rotation rotation);
-void	info();
+int	start(enum Rotation rotation);
+int	stop();
+int	status();
 void	usage();
 /**
  * Start the driver.
  */
-void
+int
 start(enum Rotation rotation)
 {
 	if (g_dev != nullptr)
 		/* if already started, the still command succeeded */
 	{
-		errx(0, "already started");
+		PX4_WARN("already started");
+		return 0;
 	}
 
-	/* create the driver */
-#if defined(PX4_SPIDEV_ADIS16477)
-	g_dev = new ADIS16477(PX4_SPI_BUS_SENSOR1, PX4_SPIDEV_ADIS16477, rotation);
-#else
-	PX4_ERR("External SPI not available");
-	exit(0);
-#endif
+	// create the driver
+	g_dev = new ICM20602(PX4_SPI_BUS_SENSORS, PX4_SPIDEV_ICM_20602, rotation);
+
 
 	if (g_dev == nullptr) {
 		goto fail;
@@ -76,7 +74,7 @@ start(enum Rotation rotation)
 		goto fail;
 	}
 
-	exit(0);
+	return 0;
 fail:
 
 	if (g_dev != nullptr) {
@@ -85,34 +83,61 @@ fail:
 	}
 
 	PX4_ERR("driver start failed");
+
+	return -1;
+}
+
+int
+stop()
+{
+	if (g_dev == nullptr) {
+		PX4_WARN("driver not running");
+	}
+
+	g_dev->stop();
+	delete g_dev;
+
+	return 0;
+}
+
+int
+reset()
+{
+	if (g_dev == nullptr) {
+		PX4_WARN("driver not running");
+	}
+
+	return g_dev->reset();
 }
 
 /**
  * Print a little info about the driver.
  */
-void
-info()
+int
+status()
 {
 	if (g_dev == nullptr) {
 		PX4_WARN("driver not running");
 	}
 
 	g_dev->print_info();
+	g_dev->print_registers();
+
+	return 0;
 }
 
 void
 usage()
 {
-	PX4_INFO("missing command: try 'start', 'info'");
+	PX4_INFO("missing command: try 'start', 'stop', 'reset', 'status'");
 	PX4_INFO("options:");
 	PX4_INFO("    -R rotation");
 }
 
-}
-// namespace
+} // namespace
 
 int
-adis16477_main(int argc, char *argv[])
+icm20602_main(int argc, char *argv[])
 {
 	enum Rotation rotation = ROTATION_NONE;
 	int myoptind = 1;
@@ -127,28 +152,27 @@ adis16477_main(int argc, char *argv[])
 			break;
 
 		default:
-			adis16477::usage();
+			icm20602::usage();
 			return 0;
 		}
 	}
 
 	const char *verb = argv[myoptind];
 
-	/*
-	 * Start/load the driver.
-	 */
 	if (!strcmp(verb, "start")) {
-		adis16477::start(rotation);
+		return icm20602::start(rotation);
+
+	} else if (!strcmp(verb, "stop")) {
+		return icm20602::stop();
+
+	} else if (!strcmp(verb, "status")) {
+		return icm20602::status();
+
+	} else if (!strcmp(verb, "reset")) {
+		return icm20602::reset();
 	}
 
-	/*
-	 * Print driver information.
-	 */
-	if (!strcmp(verb, "info")) {
-		adis16477::info();
-	}
-
-	adis16477::usage();
+	icm20602::usage();
 
 	return 0;
 }

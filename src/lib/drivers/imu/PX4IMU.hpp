@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,54 +31,37 @@
  *
  ****************************************************************************/
 
-/// @file	LowPassFilter.h
-/// @brief	A class to implement a second order low pass filter
-/// Author: Leonard Hall <LeonardTHall@gmail.com>
-/// Adapted for PX4 by Andrew Tridgell
-
 #pragma once
 
-namespace math
+#include <drivers/drv_hrt.h>
+#include <drivers/device/accelerometer/PX4Accelerometer.hpp>
+#include <drivers/device/gyroscope/PX4Gyroscope.hpp>
+#include <uORB/Publication.hpp>
+#include <uORB/topics/sensor_imu.h>
+
+class PX4IMU
 {
-class __EXPORT LowPassFilter2p
-{
+
 public:
+	PX4IMU(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
+	~PX4IMU() override;
 
-	LowPassFilter2p(float sample_freq, float cutoff_freq)
-	{
-		// set initial parameters
-		set_cutoff_frequency(sample_freq, cutoff_freq);
-	}
+	void set_device_type(uint8_t devtype);
+	void set_error_count(uint64_t error_count) { _sensor_pub.get().error_count = error_count; }
+	void set_scale(float scale) { _sensor_pub.get().scaling = scale; }
+	void set_temperature(float temperature) { _sensor_pub.get().temperature = temperature; }
 
-	// Change filter parameters
-	void set_cutoff_frequency(float sample_freq, float cutoff_freq);
+	void set_sample_rate(unsigned rate);
 
-	/**
-	 * Add a new raw value to the filter
-	 *
-	 * @return retrieve the filtered result
-	 */
-	float apply(float sample);
+	void updateAccelFIFO(sensor_accel_fifo_s &fifo);
+	void updateGyroFIFO(sensor_accel_fifo_s &fifo);
 
-	// Return the cutoff frequency
-	float get_cutoff_freq() const { return _cutoff_freq; }
+	void print_status();
 
-	// Reset the filter state to this value
-	float reset(float sample);
+private:
+	uORB::PublicationData<sensor_imu_s>		_imu_pub;
 
-protected:
+	PX4Accelerometer	_px4_accel;
+	PX4Gyroscope		_px4_gyro;
 
-	float _cutoff_freq{0.0f};
-
-	float _a1{0.0f};
-	float _a2{0.0f};
-
-	float _b0{0.0f};
-	float _b1{0.0f};
-	float _b2{0.0f};
-
-	float _delay_element_1{0.0f};	// buffered sample -1
-	float _delay_element_2{0.0f};	// buffered sample -2
 };
-
-} // namespace math

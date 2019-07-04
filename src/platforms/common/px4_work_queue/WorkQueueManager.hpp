@@ -50,7 +50,7 @@ namespace wq_configurations
 {
 static constexpr wq_config_t rate_ctrl{"wq:rate_ctrl", 1600, 0}; // PX4 inner loop highest priority
 
-static constexpr wq_config_t SPI1{"wq:SPI1", 1250, -1};
+static constexpr wq_config_t SPI1{"wq:SPI1", 4250, -1};
 static constexpr wq_config_t SPI2{"wq:SPI2", 1250, -2};
 static constexpr wq_config_t SPI3{"wq:SPI3", 1250, -3};
 static constexpr wq_config_t SPI4{"wq:SPI4", 1250, -4};

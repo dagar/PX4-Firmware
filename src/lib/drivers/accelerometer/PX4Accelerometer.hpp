@@ -39,10 +39,14 @@
 #include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
 #include <mathlib/math/filter/LowPassFilter2pVector3f.hpp>
+#include <mathlib/math/filter/LowPassFilter2pArray.hpp>
 #include <px4_module_params.h>
 #include <uORB/uORB.h>
 #include <uORB/Publication.hpp>
 #include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_accel_control.h>
+#include <uORB/topics/sensor_accel_fifo.h>
+#include <uORB/topics/sensor_accel_status.h>
 
 class PX4Accelerometer : public cdev::CDev, public ModuleParams
 {
@@ -54,23 +58,33 @@ public:
 	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_accel_pub.get().error_count = error_count; }
-	void set_scale(float scale) { _sensor_accel_pub.get().scaling = scale; }
-	void set_temperature(float temperature) { _sensor_accel_pub.get().temperature = temperature; }
+	void set_error_count(uint64_t error_count) { _sensor_pub.get().error_count = error_count; }
+	void set_scale(float scale) { _sensor_pub.get().scaling = scale; }
+	void set_temperature(float temperature) { _sensor_pub.get().temperature = temperature; }
 
 	void set_sample_rate(unsigned rate);
 
 	void update(hrt_abstime timestamp, float x, float y, float z);
+	void updateFIFO(sensor_accel_fifo_s &fifo);
 
 	void print_status();
 
 private:
 
-	void configure_filter(float cutoff_freq) { _filter.set_cutoff_frequency(_sample_rate, cutoff_freq); }
+	void		configure_filter(float cutoff_freq) { _filter.set_cutoff_frequency(_sample_rate, cutoff_freq); }
+	uint32_t	clipping(int16_t samples[], uint8_t num_samples);
+	void		vibrationMetrics(sensor_accel_fifo_s &fifo);
 
-	uORB::PublicationData<sensor_accel_s>	_sensor_accel_pub;
+	uORB::PublicationData<sensor_accel_s>		_sensor_pub;
+	uORB::Publication<sensor_accel_control_s>	_sensor_control_pub;
+	uORB::Publication<sensor_accel_status_s>	_sensor_status_pub;
 
 	math::LowPassFilter2pVector3f _filter{1000, 100};
+
+	math::LowPassFilter2pArray _filterArrayX{4000, 100};
+	math::LowPassFilter2pArray _filterArrayY{4000, 100};
+	math::LowPassFilter2pArray _filterArrayZ{4000, 100};
+
 	Integrator _integrator{4000, false};
 
 	const enum Rotation	_rotation;
@@ -81,6 +95,15 @@ private:
 	int			_class_device_instance{-1};
 
 	unsigned		_sample_rate{1000};
+
+	// IMU vibration metrics
+	// high frequency vibration level in the IMU delta velocity data (m/s)
+	float			_vibration_metric{};
+	matrix::Vector3f	_delta_velocity_prev;
+
+
+	int32_t			_integrator_accum[3] {};
+	hrt_abstime		_integrator_reset{0};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::IMU_ACCEL_CUTOFF>) _param_imu_accel_cutoff
