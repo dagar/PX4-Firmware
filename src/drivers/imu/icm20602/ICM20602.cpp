@@ -52,7 +52,8 @@ ICM20602::ICM20602(int bus, uint32_t device, enum Rotation rotation) :
 	_fifo_reset_perf(perf_alloc(PC_COUNT, "icm20602: fifo reset")),
 	_reset_perf(perf_alloc(PC_COUNT, "icm20602: reset")),
 	_accel_process_perf(perf_alloc(PC_ELAPSED, "icm20602: accel process")),
-	_gyro_process_perf(perf_alloc(PC_ELAPSED, "icm20602: gyro process"))
+	_gyro_process_perf(perf_alloc(PC_ELAPSED, "icm20602: gyro process")),
+	_drdy_interrupt_perf(perf_alloc(PC_INTERVAL, "icm20602: drdy interrupt"))
 {
 	_px4_accel.set_device_type(DRV_ACC_DEVTYPE_ICM20602);
 	_px4_accel.set_sample_rate(4000);
@@ -81,6 +82,7 @@ ICM20602::~ICM20602()
 	perf_free(_reset_perf);
 	perf_free(_gyro_process_perf);
 	perf_free(_accel_process_perf);
+	perf_free(_drdy_interrupt_perf);
 }
 
 int
@@ -143,6 +145,9 @@ int ICM20602::reset()
 		// CLKSEL[2:0] must be set to 001 to achieve full gyroscope performance.
 		registerWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::CLKSEL_0);
 		usleep(100);
+
+		// Interrupt status is cleared if any read operation is performed.
+		registerSetBits(Register::INT_PIN_CFG, INT_PIN_CFG_BIT::LATCH_INT_EN | INT_PIN_CFG_BIT::INT_RD_CLEAR);
 
 		configureAccel();
 		configureGyro();
@@ -207,24 +212,20 @@ ICM20602::resetFIFO()
 
 	// CONFIG
 	// should ensure that bit 7 of register 0x1A is set to 0 before using FIFO watermark feature
-	registerSetBits(Register::CONFIG, CONFIG_BIT::FIFO_MODE);
+	//registerSetBits(Register::CONFIG, CONFIG_BIT::FIFO_MODE);
 	registerClearBits(Register::CONFIG, CONFIG_BIT::FIFO_WM);
 
 	// FIFO watermark
-	// uint16_t fifo_watermark = sizeof(FIFO::DATA) * 32;
-	// uint8_t fifo_wm_th1 = (fifo_watermark >> 8) & 0xFF;	// FIFO_WM_TH1 (FIFO_WM_TH[9:8])
-	// uint8_t fifo_wm_th2 = fifo_watermark & 0xFF;		// FIFO_WM_TH2 (FIFO_WM_TH[7:0])
-	// registerWrite(Register::FIFO_WM_TH1, fifo_wm_th1);
-	// registerWrite(Register::FIFO_WM_TH2, fifo_wm_th2);
+	//  "User should ensure that bit 7 of register 0x1A (CONFIG) is set to 0 before using this feature"
+	uint16_t fifo_watermark = sizeof(FIFO::DATA) * 32;
+	uint8_t fifo_wm_th1 = (fifo_watermark >> 8) & 0xFF;	// FIFO_WM_TH1 (FIFO_WM_TH[9:8])
+	uint8_t fifo_wm_th2 = fifo_watermark & 0xFF;		// FIFO_WM_TH2 (FIFO_WM_TH[7:0])
+	registerWrite(Register::FIFO_WM_TH1, fifo_wm_th1);
+	registerWrite(Register::FIFO_WM_TH2, fifo_wm_th2);
 
 	// FIFO enable both gyro and accel
 	registerWrite(Register::FIFO_EN, FIFO_EN_BIT::GYRO_FIFO_EN | FIFO_EN_BIT::ACCEL_FIFO_EN);
 	up_udelay(10);
-
-#ifdef GPIO_DRDY_ICM20608
-	// Disable data ready callback
-	//px4_arch_gpiosetevent(GPIO_DRDY_ICM20608, true, false, true, &ICM20602::data_ready_interrupt, this);
-#endif // GPIO_DRDY_ICM20608
 
 	return true;
 }
@@ -286,10 +287,15 @@ ICM20602::start()
 {
 	stop();
 
-	resetFIFO();
-
+#ifdef GPIO_DRDY_ICM20608
+	// Setup data ready on rising edge
+	px4_arch_gpiosetevent(GPIO_DRDY_ICM20608, true, false, true, &ICM20602::data_ready_interrupt, this);
+#else
 	// start polling at the specified rate
-	ScheduleOnInterval(1000);
+	ScheduleOnInterval(1000, 1000);
+#endif
+
+	resetFIFO();
 }
 
 void
@@ -297,10 +303,10 @@ ICM20602::stop()
 {
 #ifdef GPIO_DRDY_ICM20608
 	// Disable data ready callback
-	//px4_arch_gpiosetevent(GPIO_DRDY_ICM20608, false, false, false, nullptr, nullptr);
-#endif
-
+	px4_arch_gpiosetevent(GPIO_DRDY_ICM20608, false, false, false, nullptr, nullptr);
+#else
 	ScheduleClear();
+#endif
 }
 
 int
@@ -308,10 +314,12 @@ ICM20602::data_ready_interrupt(int irq, void *context, void *arg)
 {
 	ICM20602 *dev = reinterpret_cast<ICM20602 *>(arg);
 
-	PX4_INFO("data_ready_interrupt");
+	dev->drdy_interrupt_perf();
+
+	printf("data_ready_interrupt\n");
 
 	// make another measurement
-	dev->ScheduleNow();
+	//dev->ScheduleNow();
 
 	return PX4_OK;
 }

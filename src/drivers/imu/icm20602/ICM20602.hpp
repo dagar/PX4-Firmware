@@ -79,6 +79,8 @@ public:
 	void			print_info();
 	void			print_registers();
 
+	void			drdy_interrupt_perf() { perf_count(_drdy_interrupt_perf); }
+
 protected:
 	virtual int		probe();
 
@@ -120,5 +122,6 @@ private:
 	perf_counter_t		_reset_perf;
 	perf_counter_t		_accel_process_perf;
 	perf_counter_t		_gyro_process_perf;
+	perf_counter_t		_drdy_interrupt_perf;
 
 };

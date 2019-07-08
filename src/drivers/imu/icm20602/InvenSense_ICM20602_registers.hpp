@@ -152,8 +152,6 @@ FIFO_EN_BIT : uint8_t {
 // INT_PIN_CFG
 enum
 INT_PIN_CFG_BIT : uint8_t {
-	INT_LEVEL	= Bit7,
-	INT_OPEN	= Bit6,
 	LATCH_INT_EN	= Bit5,
 	INT_RD_CLEAR	= Bit4
 };

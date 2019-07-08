@@ -36,7 +36,6 @@ px4_add_module(
 	MAIN icm20602
 	STACK_MAIN 1500
 	COMPILE_FLAGS
-		-Og
 		-Wno-error=unused-variable
 	SRCS
 		ICM20602.cpp
