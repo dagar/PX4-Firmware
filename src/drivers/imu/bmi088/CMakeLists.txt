@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,17 +31,14 @@
 #
 ############################################################################
 
-add_subdirectory(adis16448)
-add_subdirectory(adis16477)
-add_subdirectory(adis16497)
-add_subdirectory(bma180)
-add_subdirectory(bmi055)
-add_subdirectory(bmi088)
-add_subdirectory(bmi160)
-add_subdirectory(fxas21002c)
-add_subdirectory(fxos8701cq)
-add_subdirectory(icm20948)
-add_subdirectory(l3gd20)
-add_subdirectory(lsm303d)
-add_subdirectory(mpu6000)
-add_subdirectory(mpu9250)
+px4_add_module(
+	MODULE drivers__imu__bmi088
+	MAIN bmi088
+	STACK_MAIN 1500
+	COMPILE_FLAGS
+		-Wno-cast-align # TODO: fix and enable
+	SRCS
+		BMI088_accel.cpp
+		BMI088_gyro.cpp
+		bmi088_main.cpp
+	)
