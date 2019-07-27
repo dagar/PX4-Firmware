@@ -42,7 +42,7 @@ class ICM20948;
 /**
  * Helper class implementing the gyro driver node.
  */
-class ICM20948_gyro : public device::CDev
+class ICM20948_gyro : public cdev::CDev
 {
 public:
 	ICM20948_gyro(ICM20948 *parent, const char *path);

@@ -37,6 +37,7 @@
 #include <drivers/device/i2c.h>
 #include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
+#include <lib/cdev/CDev.hpp>
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <perf/perf_counter.h>
@@ -47,7 +48,7 @@
 /* Default I2C bus */
 static constexpr uint8_t PX4_I2C_BUS_DEFAULT = PX4_I2C_BUS_EXPANSION;
 
-class __EXPORT Airspeed : public device::I2C, public px4::ScheduledWorkItem
+class __EXPORT Airspeed : public cdev::CDev, public device::I2C, public px4::ScheduledWorkItem
 {
 public:
 	Airspeed(int bus, int address, unsigned conversion_interval, const char *path);
@@ -55,7 +56,7 @@ public:
 
 	virtual int	init();
 
-	virtual int	ioctl(device::file_t *filp, int cmd, unsigned long arg);
+	virtual int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 
 private:
 	/* this class has pointer data members and should not be copied */

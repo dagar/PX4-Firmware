@@ -42,7 +42,7 @@
 #include <termios.h>
 
 #include <arch/board/board.h>
-
+#include <lib/cdev/CDev.hpp>
 #include <drivers/device/device.h>
 #include <drivers/device/ringbuffer.h>
 #include <drivers/drv_hrt.h>

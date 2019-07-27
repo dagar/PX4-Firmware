@@ -84,8 +84,8 @@ public:
 
 	virtual int 			init() override;
 
-	virtual ssize_t			read(device::file_t *filp, char *buffer, size_t buflen) override;
-	virtual int			ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	virtual ssize_t			read(cdev::file_t *filp, char *buffer, size_t buflen) override;
+	virtual int			ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	/**
 	* Diagnostics - print some basic information about the driver.
@@ -307,7 +307,7 @@ SF0X::get_maximum_distance()
 }
 
 int
-SF0X::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+SF0X::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -368,7 +368,7 @@ SF0X::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 }
 
 ssize_t
-SF0X::read(device::file_t *filp, char *buffer, size_t buflen)
+SF0X::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 	unsigned count = buflen / sizeof(struct distance_sensor_s);
 	struct distance_sensor_s *rbuf = reinterpret_cast<struct distance_sensor_s *>(buffer);

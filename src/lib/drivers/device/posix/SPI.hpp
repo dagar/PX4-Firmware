@@ -40,7 +40,7 @@
 #ifndef _DEVICE_SPI_H
 #define _DEVICE_SPI_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
 
 #ifdef __PX4_LINUX
 
@@ -63,7 +63,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on SPI
  */
-class __EXPORT SPI : public CDev
+class __EXPORT SPI : public Device
 {
 protected:
 	/**

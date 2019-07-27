@@ -56,7 +56,7 @@
 
 
 
-class LidarLitePWM : public LidarLite, public cdev::CDev, public px4::ScheduledWorkItem
+class LidarLitePWM : public LidarLite, public px4::ScheduledWorkItem
 {
 public:
 	LidarLitePWM(const char *path, uint8_t rotation = distance_sensor_s::ROTATION_DOWNWARD_FACING);
@@ -64,8 +64,8 @@ public:
 
 	int init() override;
 
-	ssize_t read(device::file_t *filp, char *buffer, size_t buflen) override;
-	int	ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) override;
+	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	void start() override;
 

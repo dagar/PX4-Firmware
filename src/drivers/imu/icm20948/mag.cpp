@@ -251,9 +251,7 @@ ICM20948_mag::_measure(struct ak8963_regs data)
 	/* notify anyone waiting for data */
 	if (mag_notify) {
 		poll_notify(POLLIN);
-	}
 
-	if (mag_notify && !(_pub_blocked)) {
 		/* publish it */
 		orb_publish(ORB_ID(sensor_mag), _mag_topic, &mrb);
 	}

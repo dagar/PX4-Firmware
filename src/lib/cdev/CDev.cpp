@@ -194,18 +194,6 @@ CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
 	PX4_DEBUG("CDev::ioctl");
 	int ret = -ENOTTY;
 
-	switch (cmd) {
-
-	/* fetch a pointer to the driver's private data */
-	case DIOC_GETPRIV:
-		*(void **)(uintptr_t)arg = (void *)this;
-		ret = PX4_OK;
-		break;
-
-	default:
-		break;
-	}
-
 	return ret;
 }
 

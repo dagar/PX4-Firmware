@@ -125,7 +125,7 @@ enum HMC5883_BUS {
 	HMC5883_BUS_SPI
 };
 
-class HMC5883 : public device::CDev, public px4::ScheduledWorkItem
+class HMC5883 : public cdev::CDev, public px4::ScheduledWorkItem
 {
 public:
 	HMC5883(device::Device *interface, const char *path, enum Rotation rotation);
@@ -923,19 +923,16 @@ HMC5883::collect()
 	/* z remains z */
 	new_report.z = ((zraw_f * _range_scale) - _scale.z_offset) * _scale.z_scale;
 
-	if (!(_pub_blocked)) {
+	if (_mag_topic != nullptr) {
+		/* publish it */
+		orb_publish(ORB_ID(sensor_mag), _mag_topic, &new_report);
 
-		if (_mag_topic != nullptr) {
-			/* publish it */
-			orb_publish(ORB_ID(sensor_mag), _mag_topic, &new_report);
+	} else {
+		_mag_topic = orb_advertise_multi(ORB_ID(sensor_mag), &new_report,
+							&_orb_class_instance, (sensor_is_onboard) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
 
-		} else {
-			_mag_topic = orb_advertise_multi(ORB_ID(sensor_mag), &new_report,
-							 &_orb_class_instance, (sensor_is_onboard) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
-
-			if (_mag_topic == nullptr) {
-				DEVICE_DEBUG("ADVERT FAIL");
-			}
+		if (_mag_topic == nullptr) {
+			DEVICE_DEBUG("ADVERT FAIL");
 		}
 	}
 

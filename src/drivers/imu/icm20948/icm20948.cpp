@@ -1299,12 +1299,12 @@ ICM20948::measure()
 			_gyro->parent_poll_notify();
 		}
 
-		if (accel_notify && !(_accel->_pub_blocked)) {
+		if (accel_notify) {
 			/* publish it */
 			orb_publish(ORB_ID(sensor_accel), _accel_topic, &arb);
 		}
 
-		if (gyro_notify && !(_gyro->_pub_blocked)) {
+		if (gyro_notify) {
 			/* publish it */
 			orb_publish(ORB_ID(sensor_gyro), _gyro->_gyro_topic, &grb);
 		}

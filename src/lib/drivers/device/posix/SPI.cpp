@@ -54,7 +54,7 @@ namespace device
 {
 
 SPI::SPI(const char *name, const char *devname, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency) :
-	CDev(name, devname),
+	Device(name),
 	_device(device),
 	_mode(mode),
 	_frequency(frequency)
@@ -98,14 +98,6 @@ SPI::init()
 
 	if (ret != OK) {
 		DEVICE_DEBUG("probe failed");
-		return ret;
-	}
-
-	/* do base class init, which will create the device node, etc. */
-	ret = CDev::init();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("cdev init failed");
 		return ret;
 	}
 

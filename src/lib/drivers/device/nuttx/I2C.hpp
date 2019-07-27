@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file i2c.h
+ * @file I2C.hpp
  *
  * Base class for devices connected via I2C.
  */
@@ -40,7 +40,7 @@
 #ifndef _DEVICE_I2C_H
 #define _DEVICE_I2C_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
 
 #include <px4_i2c.h>
 
@@ -54,7 +54,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on I2C
  */
-class __EXPORT I2C : public CDev
+class __EXPORT I2C : public Device
 {
 
 public:

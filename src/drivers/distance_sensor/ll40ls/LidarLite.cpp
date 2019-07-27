@@ -41,7 +41,7 @@
 
 #include "LidarLite.h"
 
-int LidarLite::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+int LidarLite::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 

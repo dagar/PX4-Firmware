@@ -50,7 +50,7 @@ UavcanBarometerBridge::UavcanBarometerBridge(uavcan::INode &node) :
 
 int UavcanBarometerBridge::init()
 {
-	int res = device::CDev::init();
+	int res = cdev::CDev::init();
 
 	if (res < 0) {
 		return res;

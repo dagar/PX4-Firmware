@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,7 +60,7 @@ namespace device
 {
 
 I2C::I2C(const char *name, const char *devname, int bus, uint16_t address, uint32_t frequency) :
-	CDev(name, devname)
+	Device(name)
 {
 	DEVICE_DEBUG("I2C::I2C name = %s devname = %s", name, devname);
 	// fill in _device_id fields for a I2C device
@@ -86,14 +86,6 @@ I2C::init()
 {
 	// Assume the driver set the desired bus frequency. There is no standard
 	// way to set it from user space.
-
-	// do base class init, which will create device node, etc
-	int ret = CDev::init();
-
-	if (ret != PX4_OK) {
-		DEVICE_DEBUG("CDev::init failed");
-		return ret;
-	}
 
 	if (simulate) {
 		_fd = 10000;

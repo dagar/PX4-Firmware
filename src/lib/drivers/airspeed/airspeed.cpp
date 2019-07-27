@@ -57,6 +57,7 @@
 #include <drivers/airspeed/airspeed.h>
 
 Airspeed::Airspeed(int bus, int address, unsigned conversion_interval, const char *path) :
+	CDev(path),
 	I2C("Airspeed", path, bus, address, 100000),
 	ScheduledWorkItem(px4::device_bus_to_wq(get_device_id())),
 	_sensor_ok(false),
@@ -130,7 +131,7 @@ Airspeed::probe()
 }
 
 int
-Airspeed::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+Airspeed::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -192,7 +193,7 @@ Airspeed::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 
 	default:
 		/* give it to the superclass */
-		return I2C::ioctl(filp, cmd, arg);
+		return OK;
 	}
 }
 

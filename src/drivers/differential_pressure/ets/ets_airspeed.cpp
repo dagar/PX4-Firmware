@@ -147,7 +147,7 @@ ETSAirspeed::collect()
 	report.temperature = -1000.0f;
 	report.device_id = _device_id.devid;
 
-	if (_airspeed_pub != nullptr && !(_pub_blocked)) {
+	if (_airspeed_pub != nullptr) {
 		/* publish it */
 		orb_publish(ORB_ID(differential_pressure), _airspeed_pub, &report);
 	}

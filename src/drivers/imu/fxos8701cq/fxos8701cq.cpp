@@ -389,7 +389,7 @@ const uint8_t FXOS8701CQ::_checked_registers[FXOS8701C_NUM_CHECKED_REGISTERS] = 
 /**
  * Helper class implementing the mag driver node.
  */
-class FXOS8701CQ_mag : public device::CDev
+class FXOS8701CQ_mag : public cdev::CDev
 {
 public:
 	FXOS8701CQ_mag(FXOS8701CQ *parent);
@@ -1315,10 +1315,8 @@ FXOS8701CQ::measure()
 	if (accel_notify) {
 		poll_notify(POLLIN);
 
-		if (!(_pub_blocked)) {
-			/* publish it */
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
-		}
+		/* publish it */
+		orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
 	}
 
 	_accel_read++;
@@ -1384,10 +1382,8 @@ FXOS8701CQ::mag_measure()
 	/* notify anyone waiting for data */
 	poll_notify(POLLIN);
 
-	if (!(_pub_blocked)) {
-		/* publish it */
-		orb_publish(ORB_ID(sensor_mag), _mag->_mag_topic, &mag_report);
-	}
+	/* publish it */
+	orb_publish(ORB_ID(sensor_mag), _mag->_mag_topic, &mag_report);
 
 	_mag_read++;
 

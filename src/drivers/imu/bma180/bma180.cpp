@@ -54,6 +54,7 @@
 #include <math.h>
 #include <unistd.h>
 
+#include <lib/cdev/CDev.hpp>
 #include <perf/perf_counter.h>
 #include <systemlib/err.h>
 #include <nuttx/arch.h>
@@ -122,7 +123,7 @@
 
 extern "C" { __EXPORT int bma180_main(int argc, char *argv[]); }
 
-class BMA180 : public device::SPI, public px4::ScheduledWorkItem
+class BMA180 : public cdev::CDev, public device::SPI, public px4::ScheduledWorkItem
 {
 public:
 	BMA180(int bus, uint32_t device);
@@ -222,6 +223,7 @@ private:
 };
 
 BMA180::BMA180(int bus, uint32_t device) :
+	CDev(nullptr),
 	SPI("BMA180", ACCEL_DEVICE_PATH, bus, device, SPIDEV_MODE3, 8000000),
 	ScheduledWorkItem(px4::device_bus_to_wq(this->get_device_id())),
 	_call_interval(0),
@@ -668,7 +670,7 @@ BMA180::measure()
 	poll_notify(POLLIN);
 
 	/* publish for subscribers */
-	if (_accel_topic != nullptr && !(_pub_blocked)) {
+	if (_accel_topic != nullptr) {
 		orb_publish(ORB_ID(sensor_accel), _accel_topic, &report);
 	}
 

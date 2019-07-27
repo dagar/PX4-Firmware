@@ -444,7 +444,7 @@ const uint8_t LSM303D::_checked_registers[LSM303D_NUM_CHECKED_REGISTERS] = { ADD
 /**
  * Helper class implementing the mag driver node.
  */
-class LSM303D_mag : public device::CDev
+class LSM303D_mag : public cdev::CDev
 {
 public:
 	LSM303D_mag(LSM303D *parent);
@@ -1363,10 +1363,8 @@ LSM303D::measure()
 	if (accel_notify) {
 		poll_notify(POLLIN);
 
-		if (!(_pub_blocked)) {
-			/* publish it */
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
-		}
+		/* publish it */
+		orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
 	}
 
 	_accel_read++;
@@ -1450,10 +1448,8 @@ LSM303D::mag_measure()
 	/* notify anyone waiting for data */
 	poll_notify(POLLIN);
 
-	if (!(_pub_blocked)) {
-		/* publish it */
-		orb_publish(ORB_ID(sensor_mag), _mag->_mag_topic, &mag_report);
-	}
+	/* publish it */
+	orb_publish(ORB_ID(sensor_mag), _mag->_mag_topic, &mag_report);
 
 	_mag_read++;
 

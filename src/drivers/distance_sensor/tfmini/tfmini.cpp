@@ -62,6 +62,7 @@
 #include <drivers/device/ringbuffer.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_range_finder.h>
+#include <lib/cdev/CDev.hpp>
 #include <perf/perf_counter.h>
 #include <px4_config.h>
 #include <px4_getopt.h>
@@ -89,9 +90,9 @@ public:
 
 	virtual int init() override;
 
-	virtual int ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	virtual int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
-	virtual ssize_t read(device::file_t *filp, char *buffer, size_t buflen) override;
+	virtual ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) override;
 
 	/**
 	* Diagnostics - print some basic information about the driver.
@@ -332,7 +333,7 @@ TFMINI::get_maximum_distance()
 }
 
 int
-TFMINI::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+TFMINI::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -393,7 +394,7 @@ TFMINI::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 }
 
 ssize_t
-TFMINI::read(device::file_t *filp, char *buffer, size_t buflen)
+TFMINI::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 	unsigned count = buflen / sizeof(struct distance_sensor_s);
 	struct distance_sensor_s *rbuf = reinterpret_cast<struct distance_sensor_s *>(buffer);

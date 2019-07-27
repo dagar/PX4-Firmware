@@ -156,9 +156,6 @@ int DfMS5611Wrapper::_publish(struct baro_sensor_data &data)
 	baro_report.error_count = data.error_counter;
 	baro_report.device_id = m_id.dev_id;
 
-	// TODO: when is this ever blocked?
-	if (!(m_pub_blocked)) {
-
 		if (_baro_topic == nullptr) {
 			_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &baro_report,
 							  &_baro_orb_class_instance, ORB_PRIO_DEFAULT);
@@ -166,7 +163,6 @@ int DfMS5611Wrapper::_publish(struct baro_sensor_data &data)
 		} else {
 			orb_publish(ORB_ID(sensor_baro), _baro_topic, &baro_report);
 		}
-	}
 
 	perf_end(_baro_sample_perf);
 

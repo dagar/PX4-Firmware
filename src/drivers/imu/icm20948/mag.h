@@ -132,7 +132,7 @@ typedef device::Device *(*ICM20948_mag_constructor)(int, bool);
 /**
  * Helper class implementing the magnetometer driver node.
  */
-class ICM20948_mag : public device::CDev
+class ICM20948_mag : public cdev::CDev
 {
 public:
 	ICM20948_mag(ICM20948 *parent, device::Device *interface, const char *path);

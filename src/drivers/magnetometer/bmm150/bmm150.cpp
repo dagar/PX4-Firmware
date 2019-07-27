@@ -692,9 +692,7 @@ BMM150::collect()
 	/* notify anyone waiting for data */
 	if (mag_notify) {
 		poll_notify(POLLIN);
-	}
 
-	if (mag_notify && !(_pub_blocked)) {
 		/* publish it */
 		orb_publish(ORB_ID(sensor_mag), _topic, &mrb);
 	}

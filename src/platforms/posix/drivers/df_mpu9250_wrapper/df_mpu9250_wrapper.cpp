@@ -738,7 +738,7 @@ int DfMpu9250Wrapper::_publish(struct imu_sensor_data &data)
 	}
 
 	// TODO: when is this ever blocked?
-	if (!(m_pub_blocked) && sensor_notify) {
+	if (sensor_notify) {
 
 		if (_gyro_topic != nullptr) {
 			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &gyro_report);

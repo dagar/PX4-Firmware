@@ -853,8 +853,6 @@ IST8310::collect()
 	new_report.y = ((yraw_f * _range_scale) - _scale.y_offset) * _scale.y_scale;
 	new_report.z = ((zraw_f * _range_scale) - _scale.z_offset) * _scale.z_scale;
 
-	if (!(_pub_blocked)) {
-
 		if (_mag_topic != nullptr) {
 			/* publish it */
 			orb_publish(ORB_ID(sensor_mag), _mag_topic, &new_report);
@@ -867,7 +865,6 @@ IST8310::collect()
 				DEVICE_DEBUG("ADVERT FAIL");
 			}
 		}
-	}
 
 	_last_report = new_report;
 

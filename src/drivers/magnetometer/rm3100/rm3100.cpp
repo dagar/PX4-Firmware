@@ -247,19 +247,16 @@ RM3100::collect()
 	new_mag_report.y = ((yraw_f * _range_scale) - _scale.y_offset) * _scale.y_scale;
 	new_mag_report.z = ((zraw_f * _range_scale) - _scale.z_offset) * _scale.z_scale;
 
-	if (!(_pub_blocked)) {
+	if (_mag_topic != nullptr) {
+		/* publish it */
+		orb_publish(ORB_ID(sensor_mag), _mag_topic, &new_mag_report);
 
-		if (_mag_topic != nullptr) {
-			/* publish it */
-			orb_publish(ORB_ID(sensor_mag), _mag_topic, &new_mag_report);
+	} else {
+		_mag_topic = orb_advertise_multi(ORB_ID(sensor_mag), &new_mag_report,
+							&_orb_class_instance, (sensor_is_onboard) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
 
-		} else {
-			_mag_topic = orb_advertise_multi(ORB_ID(sensor_mag), &new_mag_report,
-							 &_orb_class_instance, (sensor_is_onboard) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
-
-			if (_mag_topic == nullptr) {
-				DEVICE_DEBUG("ADVERT FAIL");
-			}
+		if (_mag_topic == nullptr) {
+			DEVICE_DEBUG("ADVERT FAIL");
 		}
 	}
 

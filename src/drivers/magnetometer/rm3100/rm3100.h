@@ -115,7 +115,7 @@ enum OPERATING_MODE {
 };
 
 
-class RM3100 : public device::CDev, public px4::ScheduledWorkItem
+class RM3100 : public cdev::CDev, public px4::ScheduledWorkItem
 {
 public:
 	RM3100(device::Device *interface, const char *path, enum Rotation rotation);

@@ -64,7 +64,7 @@ SPI::SPI(const char *name,
 	 enum spi_mode_e mode,
 	 uint32_t frequency) :
 	// base class
-	CDev(name, devname),
+	Device(name),
 	// public
 	// protected
 	locking_mode(LOCK_PREEMPTION),
@@ -118,14 +118,6 @@ SPI::init()
 
 	if (ret != OK) {
 		DEVICE_DEBUG("probe failed");
-		goto out;
-	}
-
-	/* do base class init, which will create the device node, etc. */
-	ret = CDev::init();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("cdev init failed");
 		goto out;
 	}
 

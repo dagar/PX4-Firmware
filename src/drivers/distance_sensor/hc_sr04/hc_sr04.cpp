@@ -87,8 +87,8 @@ public:
 
 	virtual int 		init();
 
-	virtual ssize_t		read(device::file_t *filp, char *buffer, size_t buflen);
-	virtual int			ioctl(device::file_t *filp, int cmd, unsigned long arg);
+	virtual ssize_t		read(cdev::file_t *filp, char *buffer, size_t buflen);
+	virtual int			ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 
 	/**
 	* Diagnostics - print some basic information about the driver.
@@ -328,7 +328,7 @@ HC_SR04::interrupt(unsigned time)
 }
 
 int
-HC_SR04::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+HC_SR04::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -389,7 +389,7 @@ HC_SR04::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 }
 
 ssize_t
-HC_SR04::read(device::file_t *filp, char *buffer, size_t buflen)
+HC_SR04::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 
 	unsigned count = buflen / sizeof(struct distance_sensor_s);

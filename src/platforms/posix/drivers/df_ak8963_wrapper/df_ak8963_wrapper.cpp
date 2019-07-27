@@ -300,9 +300,6 @@ int DfAK8963Wrapper::_publish(struct mag_sensor_data &data)
 
 	mag_report.device_id = m_id.dev_id;
 
-	// TODO: when is this ever blocked?
-	if (!(m_pub_blocked)) {
-
 		if (_mag_topic == nullptr) {
 			_mag_topic = orb_advertise_multi(ORB_ID(sensor_mag), &mag_report,
 							 &_mag_orb_class_instance, ORB_PRIO_HIGH);
@@ -310,8 +307,6 @@ int DfAK8963Wrapper::_publish(struct mag_sensor_data &data)
 		} else {
 			orb_publish(ORB_ID(sensor_mag), _mag_topic, &mag_report);
 		}
-
-	}
 
 	perf_end(_mag_sample_perf);
 

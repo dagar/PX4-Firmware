@@ -101,7 +101,7 @@ public:
 	 */
 	void print_info();
 
-	virtual ssize_t read(device::file_t *file_pointer, char *buffer, size_t buflen);
+	virtual ssize_t read(cdev::file_t *file_pointer, char *buffer, size_t buflen);
 
 	/**
 	 * Initialise the automatic measurement state machine and start it.
@@ -366,7 +366,7 @@ VL53LXX::probe()
 }
 
 ssize_t
-VL53LXX::read(device::file_t *file_pointer, char *buffer, size_t buffer_length)
+VL53LXX::read(cdev::file_t *file_pointer, char *buffer, size_t buffer_length)
 {
 	size_t buffer_size = 0;
 	unsigned int count = buffer_length / sizeof(struct distance_sensor_s);

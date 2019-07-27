@@ -85,7 +85,7 @@ public:
  * This is the base class for redundant sensors with an independent ORB topic per each redundancy channel.
  * For example, sensor_mag0, sensor_mag1, etc.
  */
-class UavcanCDevSensorBridgeBase : public IUavcanSensorBridge, public device::CDev
+class UavcanCDevSensorBridgeBase : public IUavcanSensorBridge, public cdev::CDev
 {
 	struct Channel {
 		int node_id              = -1;
@@ -106,7 +106,7 @@ protected:
 	UavcanCDevSensorBridgeBase(const char *name, const char *devname, const char *class_devname,
 				   const orb_id_t orb_topic_sensor,
 				   const unsigned max_channels = DEFAULT_MAX_CHANNELS) :
-		device::CDev(name, devname),
+		cdev::CDev(name, devname),
 		_max_channels(max_channels),
 		_class_devname(class_devname),
 		_orb_topic(orb_topic_sensor),

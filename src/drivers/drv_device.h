@@ -48,13 +48,4 @@
 
 #include "DevIOCTL.h"
 
-#ifdef __PX4_POSIX
-
-#ifndef SIOCDEVPRIVATE
-#define SIOCDEVPRIVATE 1
-#endif
-
-#define DIOC_GETPRIV    SIOCDEVPRIVATE
-#endif
-
 #endif /* _DRV_DEVICE_H */

@@ -407,8 +407,6 @@ LIS3MDL::collect()
 	/* z remains z */
 	new_mag_report.z = ((zraw_f * _range_scale) - _scale.z_offset) * _scale.z_scale;
 
-	if (!(_pub_blocked)) {
-
 		if (_mag_topic != nullptr) {
 			/* publish it */
 			orb_publish(ORB_ID(sensor_mag), _mag_topic, &new_mag_report);
@@ -421,7 +419,6 @@ LIS3MDL::collect()
 				DEVICE_DEBUG("ADVERT FAIL");
 			}
 		}
-	}
 
 	_last_report = new_mag_report;
 

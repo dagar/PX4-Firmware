@@ -121,9 +121,9 @@ public:
 
 	virtual int init();
 
-	virtual ssize_t read(device::file_t *filp, char *buffer, size_t buflen);
+	virtual ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen);
 
-	virtual int ioctl(device::file_t *filp, int cmd, unsigned long arg);
+	virtual int ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 
 	/**
 	* Diagnostics - print some basic information about the driver.
@@ -386,7 +386,7 @@ PMW3901::probe()
 
 
 int
-PMW3901::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+PMW3901::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -445,7 +445,7 @@ PMW3901::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 }
 
 ssize_t
-PMW3901::read(device::file_t *filp, char *buffer, size_t buflen)
+PMW3901::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 	unsigned count = buflen / sizeof(struct optical_flow_s);
 	struct optical_flow_s *rbuf = reinterpret_cast<struct optical_flow_s *>(buffer);

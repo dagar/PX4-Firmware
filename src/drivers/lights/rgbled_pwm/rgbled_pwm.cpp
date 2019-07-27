@@ -50,7 +50,7 @@
 #define RGBLED_ONTIME 120
 #define RGBLED_OFFTIME 120
 
-class RGBLED_PWM : public device::CDev, public px4::ScheduledWorkItem
+class RGBLED_PWM : public cdev::CDev, public px4::ScheduledWorkItem
 {
 public:
 	RGBLED_PWM();

@@ -45,7 +45,7 @@
 #include <drivers/device/ringbuffer.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mag.h>
-
+#include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
 #include <systemlib/err.h>
 #include <px4_work_queue/ScheduledWorkItem.hpp>
@@ -108,7 +108,7 @@ enum OPERATING_MODE {
 };
 
 
-class LIS3MDL : public device::CDev, public px4::ScheduledWorkItem
+class LIS3MDL : public cdev::CDev, public px4::ScheduledWorkItem
 {
 public:
 	LIS3MDL(device::Device *interface, const char *path, enum Rotation rotation);
@@ -137,7 +137,7 @@ public:
 	void stop();
 
 protected:
-	Device *_interface;
+	device::Device *_interface;
 
 private:
 

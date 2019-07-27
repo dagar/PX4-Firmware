@@ -451,22 +451,18 @@ LSM303AGR::collect()
 		mag_report.device_id = _device_id.devid;
 		mag_report.is_external = external();
 
-		if (!(_pub_blocked)) {
+		if (_mag_topic != nullptr) {
+			/* publish it */
+			orb_publish(ORB_ID(sensor_mag), _mag_topic, &mag_report);
 
-			if (_mag_topic != nullptr) {
-				/* publish it */
-				orb_publish(ORB_ID(sensor_mag), _mag_topic, &mag_report);
+		} else {
+			_mag_topic = orb_advertise_multi(ORB_ID(sensor_mag), &mag_report, &_mag_orb_class_instance,
+								(mag_report.is_external) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
 
-			} else {
-				_mag_topic = orb_advertise_multi(ORB_ID(sensor_mag), &mag_report, &_mag_orb_class_instance,
-								 (mag_report.is_external) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
-
-				if (_mag_topic == nullptr) {
-					DEVICE_DEBUG("ADVERT FAIL");
-				}
+			if (_mag_topic == nullptr) {
+				DEVICE_DEBUG("ADVERT FAIL");
 			}
 		}
-
 
 		/* stop the perf counter */
 		perf_end(_mag_sample_perf);

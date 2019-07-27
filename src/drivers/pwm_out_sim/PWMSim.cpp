@@ -357,7 +357,7 @@ PWMSim::control_callback(uintptr_t handle, uint8_t control_group, uint8_t contro
 }
 
 int
-PWMSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+PWMSim::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	int ret = OK;
 

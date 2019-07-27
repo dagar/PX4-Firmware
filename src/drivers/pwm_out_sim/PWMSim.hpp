@@ -35,12 +35,13 @@
 
 #include <string.h>
 
-#include <drivers/device/device.h>
+#include <lib/drivers/device/Device.hpp>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
 #include <drivers/drv_pwm_output.h>
+#include <lib/cdev/CDev.hpp>
 #include <lib/mixer/mixer.h>
-#include <perf/perf_counter.h>
+#include <lib/perf/perf_counter.h>
 #include <px4_common.h>
 #include <px4_config.h>
 #include <px4_module.h>
@@ -88,7 +89,7 @@ public:
 	int print_status() override;
 
 
-	int		ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	int		ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	int		set_pwm_rate(unsigned rate);
 

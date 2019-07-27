@@ -533,9 +533,6 @@ int DfMPU6050Wrapper::_publish(struct imu_sensor_data &data)
 	accel_report.y_integral = accel_val_integ(1);
 	accel_report.z_integral = accel_val_integ(2);
 
-	// TODO: when is this ever blocked?
-	if (!(m_pub_blocked)) {
-
 		if (_gyro_topic == nullptr) {
 			_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &gyro_report,
 							  &_gyro_orb_class_instance, ORB_PRIO_DEFAULT);
@@ -566,7 +563,6 @@ int DfMPU6050Wrapper::_publish(struct imu_sensor_data &data)
 			_last_accel_range_hit_time = hrt_absolute_time();
 			_last_accel_range_hit_count = data.accel_range_hit_counter;
 		}
-	}
 
 	perf_end(_publish_perf);
 

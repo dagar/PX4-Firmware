@@ -35,6 +35,7 @@
 
 #include <drivers/device/device.h>
 #include <drivers/drv_accel.h>
+#include <lib/cdev/CDev.hpp>
 #include <uORB/uORB.h>
 
 class ICM20948;
@@ -42,7 +43,7 @@ class ICM20948;
 /**
  * Helper class implementing the accel driver node.
  */
-class ICM20948_accel : public device::CDev
+class ICM20948_accel : public cdev::CDev
 {
 public:
 	ICM20948_accel(ICM20948 *parent, const char *path);

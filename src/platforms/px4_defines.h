@@ -146,7 +146,6 @@ typedef param_t px4_param_t;
 #  include "dspal_math.h"
 #  define PX4_ROOTFSDIR "."
 #  define PX4_TICKS_PER_SEC 1000L
-#  define SIOCDEVPRIVATE 999999
 
 #else // __PX4_QURT
 

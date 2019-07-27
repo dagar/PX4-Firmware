@@ -111,7 +111,7 @@ typedef uint32_t 	adc_chan_t;
 #define rCLM1(adc)  REG(adc, KINETIS_ADC_CLM1_OFFSET) /* ADC minus-side general calibration value register */
 #define rCLM0(adc)  REG(adc, KINETIS_ADC_CLM0_OFFSET) /* ADC minus-side general calibration value register */
 
-class ADC : public device::CDev
+class ADC : public cdev::CDev
 {
 public:
 	ADC(adc_chan_t channels);

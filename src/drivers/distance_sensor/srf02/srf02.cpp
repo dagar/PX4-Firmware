@@ -95,14 +95,14 @@ public:
 
 	int init() override;
 
-	int ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	/**
 	 * Diagnostics - print some basic information about the driver.
 	 */
 	void print_info();
 
-	ssize_t read(device::file_t *filp, char *buffer, size_t buflen) override;
+	ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) override;
 
 protected:
 	int probe() override;
@@ -315,7 +315,7 @@ SRF02::init()
 }
 
 int
-SRF02::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+SRF02::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -410,7 +410,7 @@ SRF02::probe()
 }
 
 ssize_t
-SRF02::read(device::file_t *filp, char *buffer, size_t buflen)
+SRF02::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 
 	unsigned count = buflen / sizeof(struct distance_sensor_s);

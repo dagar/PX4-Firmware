@@ -43,6 +43,7 @@
 #include <px4_getopt.h>
 #include <px4_work_queue/ScheduledWorkItem.hpp>
 #include <drivers/device/i2c.h>
+#include <lib/cdev/CDev.hpp>
 #include <systemlib/err.h>
 #include <string.h>
 #include <stdlib.h>
@@ -111,7 +112,7 @@ struct BSTBattery {
 
 #pragma pack(pop)
 
-class BST : public device::I2C, public px4::ScheduledWorkItem
+class BST : public cdev::CDev, public device::I2C, public px4::ScheduledWorkItem
 {
 public:
 	BST(int bus);
@@ -124,7 +125,7 @@ public:
 
 	virtual int		info() { return 0; }
 
-	virtual int		ioctl(device::file_t *filp, int cmd, unsigned long arg) { return 0; }
+	virtual int		ioctl(cdev::file_t *filp, int cmd, unsigned long arg) { return 0; }
 
 	void stop();
 

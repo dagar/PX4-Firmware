@@ -223,8 +223,6 @@ int DfBebopBusWrapper::_publish(struct bebop_state_data &data)
 	}
 
 	// TODO: when is this ever blocked?
-	if (!(m_pub_blocked)) {
-
 		if (_battery_topic == nullptr) {
 			_battery_topic = orb_advertise_multi(ORB_ID(battery_status), &battery_report,
 							     &_battery_orb_class_instance, ORB_PRIO_LOW);
@@ -239,8 +237,6 @@ int DfBebopBusWrapper::_publish(struct bebop_state_data &data)
 		} else {
 			orb_publish(ORB_ID(esc_status), _esc_topic, &esc_status);
 		}
-
-	}
 
 	return 0;
 }

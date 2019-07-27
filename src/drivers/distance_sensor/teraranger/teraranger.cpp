@@ -101,8 +101,8 @@ public:
 
 	virtual int 		init() override;
 
-	virtual ssize_t		read(device::file_t *filp, char *buffer, size_t buflen) override;
-	virtual int			ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	virtual ssize_t		read(cdev::file_t *filp, char *buffer, size_t buflen) override;
+	virtual int			ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	/**
 	* Diagnostics - print some basic information about the driver.
@@ -405,7 +405,7 @@ TERARANGER::get_maximum_distance()
 }
 
 int
-TERARANGER::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+TERARANGER::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -465,7 +465,7 @@ TERARANGER::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 }
 
 ssize_t
-TERARANGER::read(device::file_t *filp, char *buffer, size_t buflen)
+TERARANGER::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 	unsigned count = buflen / sizeof(struct distance_sensor_s);
 	struct distance_sensor_s *rbuf = reinterpret_cast<struct distance_sensor_s *>(buffer);

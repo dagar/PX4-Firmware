@@ -42,6 +42,7 @@
 
 #include <drivers/device/device.h>
 #include <drivers/drv_range_finder.h>
+#include <lib/cdev/CDev.hpp>
 
 /* Device limits */
 #define LL40LS_MIN_DISTANCE (0.05f)
@@ -54,7 +55,7 @@
 // maximum time to wait for a conversion to complete.
 #define LL40LS_CONVERSION_TIMEOUT 100*1000UL /* 100ms */
 
-class LidarLite
+class LidarLite : public cdev::CDev
 {
 public:
 	LidarLite() = default;
@@ -62,7 +63,7 @@ public:
 
 	virtual int init() = 0;
 
-	virtual int ioctl(device::file_t *filp, int cmd, unsigned long arg);
+	virtual int ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 
 	virtual void start() = 0;
 

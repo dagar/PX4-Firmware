@@ -692,9 +692,6 @@ int DfLsm9ds1Wrapper::_publish(struct imu_sensor_data &data)
 	accel_report.z_integral = accel_val_integ(2);
 
 	// TODO: when is this ever blocked?
-	if (!(m_pub_blocked)) {
-
-
 		if (_gyro_topic != nullptr) {
 			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &gyro_report);
 		}
@@ -721,7 +718,6 @@ int DfLsm9ds1Wrapper::_publish(struct imu_sensor_data &data)
 			_last_accel_range_hit_time = hrt_absolute_time();
 			_last_accel_range_hit_count = data.accel_range_hit_counter;
 		}
-	}
 
 	perf_end(_publish_perf);
 
