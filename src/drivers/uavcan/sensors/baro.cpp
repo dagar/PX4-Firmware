@@ -42,101 +42,46 @@
 const char *const UavcanBarometerBridge::NAME = "baro";
 
 UavcanBarometerBridge::UavcanBarometerBridge(uavcan::INode &node) :
-	UavcanCDevSensorBridgeBase("uavcan_baro", "/dev/uavcan/baro", BARO_BASE_DEVICE_PATH, ORB_ID(sensor_baro)),
+	UavcanSensorBridgeBase(node, "uavcan_baro"),
 	_sub_air_pressure_data(node),
 	_sub_air_temperature_data(node),
-	_reports(2, sizeof(sensor_baro_s))
-{ }
-
-int UavcanBarometerBridge::init()
+	_px4_barometer(get_device_id(), ORB_PRIO_HIGH)
 {
-	int res = device::CDev::init();
+	_px4_barometer.set_device_type(DRV_BARO_DEVTYPE_MS5611); // not correct in general
+}
+
+int
+UavcanBarometerBridge::init()
+{
+	int res = _sub_air_pressure_data.start(AirPressureCbBinder(this, &UavcanBarometerBridge::air_pressure_sub_cb));
 
 	if (res < 0) {
-		return res;
-	}
-
-	res = _sub_air_pressure_data.start(AirPressureCbBinder(this, &UavcanBarometerBridge::air_pressure_sub_cb));
-
-	if (res < 0) {
-		DEVICE_LOG("failed to start uavcan sub: %d", res);
+		PX4_ERR("failed to start uavcan sub: %d", res);
 		return res;
 	}
 
 	res = _sub_air_temperature_data.start(AirTemperatureCbBinder(this, &UavcanBarometerBridge::air_temperature_sub_cb));
 
 	if (res < 0) {
-		DEVICE_LOG("failed to start uavcan sub: %d", res);
+		PX4_ERR("failed to start uavcan sub: %d", res);
 		return res;
 	}
 
 	return 0;
 }
 
-ssize_t UavcanBarometerBridge::read(struct file *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_baro_s);
-	sensor_baro_s *baro_buf = reinterpret_cast<sensor_baro_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	while (count--) {
-		if (_reports.get(baro_buf)) {
-			ret += sizeof(*baro_buf);
-			baro_buf++;
-		}
-	}
-
-	/* if there was no data, warn the caller */
-	return ret ? ret : -EAGAIN;
-}
-
-int UavcanBarometerBridge::ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case SENSORIOCSPOLLRATE: {
-			// not supported yet, pretend that everything is ok
-			return OK;
-		}
-
-	default: {
-			return CDev::ioctl(filp, cmd, arg);
-		}
-	}
-}
-
-void UavcanBarometerBridge::air_temperature_sub_cb(const
+void
+UavcanBarometerBridge::air_temperature_sub_cb(const
 		uavcan::ReceivedDataStructure<uavcan::equipment::air_data::StaticTemperature> &msg)
 {
-	last_temperature_kelvin = msg.static_temperature;
+	_px4_barometer.set_temperature(msg.static_temperature - 273.15F);	// Convert from Kelvin
 }
 
-void UavcanBarometerBridge::air_pressure_sub_cb(const
+void
+UavcanBarometerBridge::air_pressure_sub_cb(const
 		uavcan::ReceivedDataStructure<uavcan::equipment::air_data::StaticPressure> &msg)
 {
-	sensor_baro_s report{};
+	const float pressure = msg.static_pressure / 100.0F;  // Convert to millibar
 
-	/*
-	 * FIXME HACK
-	 * This code used to rely on msg.getMonotonicTimestamp().toUSec() instead of HRT.
-	 * It stopped working when the time sync feature has been introduced, because it caused libuavcan
-	 * to use an independent time source (based on hardware TIM5) instead of HRT.
-	 * The proper solution is to be developed.
-	 */
-	report.timestamp   = hrt_absolute_time();
-	report.temperature = last_temperature_kelvin - 273.15F;
-	report.pressure    = msg.static_pressure / 100.0F;  // Convert to millibar
-	report.error_count = 0;
-
-	/* TODO get device ID for sensor */
-	report.device_id = 0;
-
-	// add to the ring buffer
-	_reports.force(&report);
-
-	publish(msg.getSrcNodeID().get(), &report);
+	_px4_barometer.update(hrt_absolute_time(), pressure);
 }

@@ -39,9 +39,7 @@
 
 #include <containers/List.hpp>
 #include <uavcan/uavcan.hpp>
-#include <drivers/device/device.h>
-#include <drivers/drv_orb_dev.h>
-#include <uORB/uORB.h>
+#include <drivers/device/Device.hpp>
 
 /**
  * A sensor bridge class must implement this interface.
@@ -51,7 +49,7 @@ class IUavcanSensorBridge : uavcan::Noncopyable, public ListNode<IUavcanSensorBr
 public:
 	static constexpr unsigned MAX_NAME_LEN = 20;
 
-	virtual ~IUavcanSensorBridge() { }
+	virtual ~IUavcanSensorBridge() = default;
 
 	/**
 	 * Returns ASCII name of the bridge.
@@ -85,35 +83,24 @@ public:
  * This is the base class for redundant sensors with an independent ORB topic per each redundancy channel.
  * For example, sensor_mag0, sensor_mag1, etc.
  */
-class UavcanCDevSensorBridgeBase : public IUavcanSensorBridge, public device::CDev
+class UavcanSensorBridgeBase : public IUavcanSensorBridge, public device::Device
 {
 	struct Channel {
-		int node_id              = -1;
-		orb_advert_t orb_advert  = nullptr;
-		int class_instance       = -1;
-		int orb_instance	 = -1;
+		int node_id = -1;
 	};
 
 	const unsigned _max_channels;
-	const char *const _class_devname;
-	const orb_id_t _orb_topic;
 	Channel *const _channels;
 	bool _out_of_channels = false;
 
 protected:
-	static constexpr unsigned DEFAULT_MAX_CHANNELS = 5; // 640 KB ought to be enough for anybody
+	static constexpr unsigned DEFAULT_MAX_CHANNELS = 5;
 
-	UavcanCDevSensorBridgeBase(const char *name, const char *devname, const char *class_devname,
-				   const orb_id_t orb_topic_sensor,
-				   const unsigned max_channels = DEFAULT_MAX_CHANNELS) :
-		device::CDev(name, devname),
+	UavcanSensorBridgeBase(uavcan::INode &node, const char *name, const unsigned max_channels = DEFAULT_MAX_CHANNELS) :
+		Device(name, DeviceBusType_UAVCAN, 0, node.getNodeID().get(), 0),
 		_max_channels(max_channels),
-		_class_devname(class_devname),
-		_orb_topic(orb_topic_sensor),
 		_channels(new Channel[max_channels])
 	{
-		_device_id.devid_s.bus_type = DeviceBusType_UAVCAN;
-		_device_id.devid_s.bus = 0;
 	}
 
 	/**
@@ -125,7 +112,7 @@ protected:
 	void publish(const int node_id, const void *report);
 
 public:
-	virtual ~UavcanCDevSensorBridgeBase();
+	virtual ~UavcanSensorBridgeBase();
 
 	unsigned get_num_redundant_channels() const override;
 

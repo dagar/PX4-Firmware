@@ -99,6 +99,8 @@ px4_add_module(
 		sensors/baro.cpp
 
 	DEPENDS
+		drivers_barometer
+		drivers_magnetometer
 		mixer
 		version
 

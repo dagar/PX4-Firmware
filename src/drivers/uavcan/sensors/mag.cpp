@@ -43,110 +43,63 @@
 const char *const UavcanMagnetometerBridge::NAME = "mag";
 
 UavcanMagnetometerBridge::UavcanMagnetometerBridge(uavcan::INode &node) :
-	UavcanCDevSensorBridgeBase("uavcan_mag", "/dev/uavcan/mag", MAG_BASE_DEVICE_PATH, ORB_ID(sensor_mag)),
-	_sub_mag(node)
+	UavcanSensorBridgeBase(node, "uavcan_mag"),
+	_sub_mag(node),
+	_sub_mag2(node),
+	_px4_magnetometer(get_device_id(), ORB_PRIO_HIGH, ROTATION_NONE)
 {
-	_device_id.devid_s.devtype = DRV_MAG_DEVTYPE_HMC5883;     // <-- Why?
+	_px4_magnetometer.set_device_type(DRV_MAG_DEVTYPE_HMC5883);	// not correct in general
+	_px4_magnetometer.set_external(true);
 
-	_scale.x_scale = 1.0F;
-	_scale.y_scale = 1.0F;
-	_scale.z_scale = 1.0F;
+	// fake scaling for "raw data"
+	_px4_magnetometer.set_scale(1.0f / 1000.0f);
 }
 
-int UavcanMagnetometerBridge::init()
+int
+UavcanMagnetometerBridge::init()
 {
-	int res = device::CDev::init();
+	int res = _sub_mag.start(MagCbBinder(this, &UavcanMagnetometerBridge::mag_sub_cb));
 
 	if (res < 0) {
+		PX4_ERR("failed to start uavcan sub: %d", res);
 		return res;
 	}
 
-	res = _sub_mag.start(MagCbBinder(this, &UavcanMagnetometerBridge::mag_sub_cb));
+	int res2 = _sub_mag2.start(Mag2CbBinder(this, &UavcanMagnetometerBridge::mag2_sub_cb));
 
-	if (res < 0) {
-		DEVICE_LOG("failed to start uavcan sub: %d", res);
+	if (res2 < 0) {
+		PX4_ERR("failed to start uavcan sub2: %d", res);
 		return res;
 	}
 
 	return 0;
 }
 
-ssize_t UavcanMagnetometerBridge::read(struct file *filp, char *buffer, size_t buflen)
+void
+UavcanMagnetometerBridge::mag_sub_cb(const uavcan::ReceivedDataStructure<uavcan::equipment::ahrs::MagneticFieldStrength>
+				     &msg)
 {
-	static uint64_t last_read = 0;
-	struct mag_report *mag_buf = reinterpret_cast<struct mag_report *>(buffer);
+	// uavcan.equipment.ahrs.MagneticFieldStrength
 
-	/* buffer must be large enough */
-	unsigned count = buflen / sizeof(struct mag_report);
+	// parameters
+	// uavcan.pubp-mag - broadcast period
+	// uavcan.prio-mag - transfer priority
+	// mag.variance
+	// mag.scaling_coef
+	// mag.pwron_slftst
 
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	if (last_read < _report.timestamp) {
-		/* copy report */
-		lock();
-		*mag_buf = _report;
-		last_read = _report.timestamp;
-		unlock();
-		return sizeof(struct mag_report);
-
-	} else {
-		/* no new data available, warn caller */
-		return -EAGAIN;
-	}
+	_px4_magnetometer.update(hrt_absolute_time(),
+				 msg.magnetic_field_ga[0] * 1000,
+				 msg.magnetic_field_ga[1] * 1000,
+				 msg.magnetic_field_ga[2] * 1000);
 }
 
-int UavcanMagnetometerBridge::ioctl(struct file *filp, int cmd, unsigned long arg)
+void
+UavcanMagnetometerBridge::mag2_sub_cb(const
+				      uavcan::ReceivedDataStructure<uavcan::equipment::ahrs::MagneticFieldStrength2> &msg)
 {
-	switch (cmd) {
-
-	case MAGIOCSSCALE: {
-			std::memcpy(&_scale, reinterpret_cast<const void *>(arg), sizeof(_scale));
-			return 0;
-		}
-
-	case MAGIOCGSCALE: {
-			std::memcpy(reinterpret_cast<void *>(arg), &_scale, sizeof(_scale));
-			return 0;
-		}
-
-	case MAGIOCGEXTERNAL: {
-			return 1;           // declare it external rise it's priority and to allow for correct orientation compensation
-		}
-
-	case MAGIOCCALIBRATE:
-	case MAGIOCSRANGE:
-	case MAGIOCEXSTRAP: {
-			return -EINVAL;
-		}
-
-	default: {
-			return CDev::ioctl(filp, cmd, arg);
-		}
-	}
-}
-
-void UavcanMagnetometerBridge::mag_sub_cb(const
-		uavcan::ReceivedDataStructure<uavcan::equipment::ahrs::MagneticFieldStrength>
-		&msg)
-{
-	lock();
-	/*
-	 * FIXME HACK
-	 * This code used to rely on msg.getMonotonicTimestamp().toUSec() instead of HRT.
-	 * It stopped working when the time sync feature has been introduced, because it caused libuavcan
-	 * to use an independent time source (based on hardware TIM5) instead of HRT.
-	 * The proper solution is to be developed.
-	 */
-	_report.timestamp = hrt_absolute_time();
-	_report.device_id = _device_id.devid;
-	_report.is_external = true;
-
-	_report.x = (msg.magnetic_field_ga[0] - _scale.x_offset) * _scale.x_scale;
-	_report.y = (msg.magnetic_field_ga[1] - _scale.y_offset) * _scale.y_scale;
-	_report.z = (msg.magnetic_field_ga[2] - _scale.z_offset) * _scale.z_scale;
-	unlock();
-
-	publish(msg.getSrcNodeID().get(), &_report);
+	_px4_magnetometer.update(hrt_absolute_time(),
+				 msg.magnetic_field_ga[0] * 1000,
+				 msg.magnetic_field_ga[1] * 1000,
+				 msg.magnetic_field_ga[2] * 1000);
 }

@@ -42,9 +42,6 @@
 #include "mag.hpp"
 #include "baro.hpp"
 
-/*
- * IUavcanSensorBridge
- */
 void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge *> &list)
 {
 	list.add(new UavcanBarometerBridge(node));
@@ -52,21 +49,13 @@ void IUavcanSensorBridge::make_all(uavcan::INode &node, List<IUavcanSensorBridge
 	list.add(new UavcanGnssBridge(node));
 }
 
-/*
- * UavcanCDevSensorBridgeBase
- */
-UavcanCDevSensorBridgeBase::~UavcanCDevSensorBridgeBase()
+UavcanSensorBridgeBase::~UavcanSensorBridgeBase()
 {
-	for (unsigned i = 0; i < _max_channels; i++) {
-		if (_channels[i].node_id >= 0) {
-			(void)unregister_class_devname(_class_devname, _channels[i].class_instance);
-		}
-	}
-
 	delete [] _channels;
 }
 
-void UavcanCDevSensorBridgeBase::publish(const int node_id, const void *report)
+void
+UavcanSensorBridgeBase::publish(const int node_id, const void *report)
 {
 	assert(report != nullptr);
 
@@ -86,7 +75,7 @@ void UavcanCDevSensorBridgeBase::publish(const int node_id, const void *report)
 			return;           // Give up immediately - saves some CPU time
 		}
 
-		DEVICE_LOG("adding channel %d...", node_id);
+		PX4_INFO("adding channel %d...", node_id);
 
 		// Search for the first free channel
 		for (unsigned i = 0; i < _max_channels; i++) {
@@ -99,7 +88,7 @@ void UavcanCDevSensorBridgeBase::publish(const int node_id, const void *report)
 		// No free channels left
 		if (channel == nullptr) {
 			_out_of_channels = true;
-			DEVICE_LOG("out of channels");
+			PX4_ERR("out of channels");
 			return;
 		}
 
@@ -107,37 +96,38 @@ void UavcanCDevSensorBridgeBase::publish(const int node_id, const void *report)
 		_device_id.devid_s.address = static_cast<uint8_t>(node_id);
 
 		// Ask the CDev helper which class instance we can take
-		const int class_instance = register_class_devname(_class_devname);
+		const int class_instance = 0;//register_class_devname(_class_devname);
 
 		if (class_instance < 0 || class_instance >= int(_max_channels)) {
 			_out_of_channels = true;
-			DEVICE_LOG("out of class instances");
-			(void)unregister_class_devname(_class_devname, class_instance);
+			PX4_ERR("out of class instances");
+			//(void)unregister_class_devname(_name, class_instance);
 			return;
 		}
 
 		// Publish to the appropriate topic, abort on failure
 		channel->node_id        = node_id;
-		channel->class_instance = class_instance;
+		//channel->class_instance = class_instance;
 
-		channel->orb_advert = orb_advertise_multi(_orb_topic, report, &channel->orb_instance, ORB_PRIO_VERY_HIGH);
+		//channel->orb_advert = orb_advertise_multi(_orb_topic, report, &channel->orb_instance, ORB_PRIO_VERY_HIGH);
 
-		if (channel->orb_advert == nullptr) {
-			DEVICE_LOG("ADVERTISE FAILED");
-			(void)unregister_class_devname(_class_devname, class_instance);
-			*channel = Channel();
-			return;
-		}
+		// if (channel->orb_advert == nullptr) {
+		// 	DEVICE_LOG("ADVERTISE FAILED");
+		// 	(void)unregister_class_devname(_class_devname, class_instance);
+		// 	*channel = Channel();
+		// 	return;
+		// }
 
-		DEVICE_LOG("channel %d class instance %d ok", channel->node_id, channel->class_instance);
+		PX4_INFO("channel %d class instance %d ok", channel->node_id, 0);
 	}
 
 	assert(channel != nullptr);
 
-	(void)orb_publish(_orb_topic, channel->orb_advert, report);
+	//(void)orb_publish(_orb_topic, channel->orb_advert, report);
 }
 
-unsigned UavcanCDevSensorBridgeBase::get_num_redundant_channels() const
+unsigned
+UavcanSensorBridgeBase::get_num_redundant_channels() const
 {
 	unsigned out = 0;
 
@@ -150,14 +140,16 @@ unsigned UavcanCDevSensorBridgeBase::get_num_redundant_channels() const
 	return out;
 }
 
-void UavcanCDevSensorBridgeBase::print_status() const
+void
+UavcanSensorBridgeBase::print_status() const
 {
-	printf("devname: %s\n", _class_devname);
+	if (_name) {
+		printf("devname: %s\n", _name);
+	}
 
 	for (unsigned i = 0; i < _max_channels; i++) {
 		if (_channels[i].node_id >= 0) {
-			printf("channel %d: node id %d --> class instance %d\n",
-			       i, _channels[i].node_id, _channels[i].class_instance);
+			printf("channel %d: node id %d\n", i, _channels[i].node_id);
 
 		} else {
 			printf("channel %d: empty\n", i);
