@@ -92,6 +92,13 @@ UavcanMagnetometerBridge::mag_sub_cb(const uavcan::ReceivedDataStructure<uavcan:
 				 msg.magnetic_field_ga[0] * 1000,
 				 msg.magnetic_field_ga[1] * 1000,
 				 msg.magnetic_field_ga[2] * 1000);
+
+
+	// check msg.getSrcNodeID().get()
+
+
+	msg.getSrcNodeID().get();	// address
+	msg.getIfaceIndex();		// UAVCAN bus
 }
 
 void

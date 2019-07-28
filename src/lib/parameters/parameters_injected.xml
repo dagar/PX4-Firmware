@@ -92,7 +92,7 @@
       <min>0</min>
       <max>4000</max>
     </parameter>
-      <parameter default="0.0" name="mot_ls" type="FLOAT">
+    <parameter default="0.0" name="mot_ls" type="FLOAT">
       <short_desc>READ ONLY: Motor inductance in henries.</short_desc>
       <long_desc>READ ONLY: Motor inductance in henries. This is measured on start-up.</long_desc>
       <unit>henries</unit>

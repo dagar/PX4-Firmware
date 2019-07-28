@@ -57,8 +57,6 @@ UavcanSensorBridgeBase::~UavcanSensorBridgeBase()
 void
 UavcanSensorBridgeBase::publish(const int node_id, const void *report)
 {
-	assert(report != nullptr);
-
 	Channel *channel = nullptr;
 
 	// Checking if such channel already exists
