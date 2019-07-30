@@ -20,7 +20,9 @@ px4_add_board(
 
 	DRIVERS
 		adc
-		barometer # all available barometer drivers
+		#barometer # all available barometer drivers
+		barometer/bmp388
+		barometer/ms5611
 		batt_smbus
 		camera_capture
 		camera_trigger
