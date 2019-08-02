@@ -45,18 +45,13 @@ px4_add_board(
 	LABEL qurt-default
 
 	DRIVERS
+		barometer/bmp280
 		gps
 		imu/mpu9250
+		magnetometer/hmc5883
 		spektrum_rc
 		qshell/qurt
 		snapdragon_pwm_out
-
-	DF_DRIVERS
-		bmp280
-		hmc5883
-		trone
-		isl29501
-		ltc2946
 
 	MODULES
 		muorb/adsp

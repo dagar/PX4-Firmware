@@ -33,11 +33,10 @@
 #pragma once
 
 #include <lib/drivers/linux_gpio/linux_gpio.h>
-#include <DevObj.hpp>
 
 #include <lib/led/led.h>
 
-class RGBLED : public DriverFramework::DevObj
+class RGBLED : public cdev::CDev
 {
 public:
 	RGBLED(const char *name);

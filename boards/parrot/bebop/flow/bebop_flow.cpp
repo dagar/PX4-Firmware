@@ -52,8 +52,6 @@
 
 extern "C" { __EXPORT int bebop_flow_main(int argc, char *argv[]); }
 
-using namespace DriverFramework;
-
 namespace bebop_flow
 {
 MT9V117 *image_sensor = nullptr;				 // I2C image sensor

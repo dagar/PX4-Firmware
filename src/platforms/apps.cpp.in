@@ -19,14 +19,11 @@ ${builtin_apps_decl_string}
 int shutdown_main(int argc, char *argv[]);
 int list_tasks_main(int argc, char *argv[]);
 int list_files_main(int argc, char *argv[]);
-int list_devices_main(int argc, char *argv[]);
 int list_topics_main(int argc, char *argv[]);
 int sleep_main(int argc, char *argv[]);
 int wait_for_topic(int argc, char *argv[]);
 
 }
-
-extern void px4_show_devices(void);
 
 void init_app_map(apps_map_type &apps)
 {
@@ -34,7 +31,6 @@ ${builtin_apps_string}
 	apps["shutdown"] = shutdown_main;
 	apps["list_tasks"] = list_tasks_main;
 	apps["list_files"] = list_files_main;
-	apps["list_devices"] = list_devices_main;
 	apps["list_topics"] = list_topics_main;
 	apps["sleep"] = sleep_main;
 	apps["wait_for_topic"] = wait_for_topic;
@@ -57,12 +53,6 @@ int shutdown_main(int argc, char *argv[])
 int list_tasks_main(int argc, char *argv[])
 {
 	px4_show_tasks();
-	return 0;
-}
-
-int list_devices_main(int argc, char *argv[])
-{
-	px4_show_devices();
 	return 0;
 }
 

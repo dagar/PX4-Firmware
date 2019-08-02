@@ -41,10 +41,6 @@
 #include <drivers/drv_board_led.h>
 #include <stdio.h>
 
-#include "VirtDevObj.hpp"
-
-using namespace DriverFramework;
-
 /*
  * Ideally we'd be able to get these from up_internal.h,
  * but since we want to be able to disable the NuttX use
@@ -59,21 +55,21 @@ extern void led_off(int led);
 extern void led_toggle(int led);
 __END_DECLS
 
-class LED : public VirtDevObj
+class LED : public cdev::CDev
 {
 public:
 	LED();
 	virtual ~LED() = default;
 
 	virtual int		init();
-	virtual int		devIOCTL(unsigned long cmd, unsigned long arg);
+	virtual int		ioctl(unsigned long cmd, unsigned long arg);
 
 protected:
 	virtual void		_measure() {}
 };
 
 LED::LED() :
-	VirtDevObj("led", "/dev/ledsim", LED_BASE_DEVICE_PATH, 0)
+	CDev("led", "/dev/ledsim", LED_BASE_DEVICE_PATH, 0)
 {
 	// force immediate init/device registration
 	init();
@@ -82,7 +78,7 @@ LED::LED() :
 int
 LED::init()
 {
-	int ret = VirtDevObj::init();
+	int ret = CDev::init();
 
 	if (ret == 0) {
 		led_init();
@@ -92,7 +88,7 @@ LED::init()
 }
 
 int
-LED::devIOCTL(unsigned long cmd, unsigned long arg)
+LED::ioctl(unsigned long cmd, unsigned long arg)
 {
 	int result = OK;
 
@@ -111,7 +107,7 @@ LED::devIOCTL(unsigned long cmd, unsigned long arg)
 
 
 	default:
-		result = VirtDevObj::devIOCTL(cmd, arg);
+		result = CDev::ioctl(cmd, arg);
 	}
 
 	return result;

@@ -129,7 +129,6 @@ __END_DECLS
 __BEGIN_DECLS
 extern int px4_errno;
 
-__EXPORT void		px4_show_devices(void);
 __EXPORT void		px4_show_files(void);
 __EXPORT const char 	*px4_get_device_names(unsigned int *handle);
 

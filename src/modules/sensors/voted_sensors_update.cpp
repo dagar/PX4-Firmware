@@ -49,7 +49,6 @@
 #define CAL_ERROR_APPLY_CAL_MSG "FAILED APPLYING %s CAL #%u"
 
 using namespace sensors;
-using namespace DriverFramework;
 
 VotedSensorsUpdate::VotedSensorsUpdate(const Parameters &parameters, bool hil_enabled)
 	: _parameters(parameters), _hil_enabled(hil_enabled)
@@ -224,14 +223,13 @@ void VotedSensorsUpdate::parameters_update()
 
 		(void)sprintf(str, "%s%u", GYRO_BASE_DEVICE_PATH, driver_index);
 
-		DevHandle h;
-		DevMgr::getHandle(str, h);
+		int fd = px4_open(str, 0);
 
-		if (!h.isValid()) {
+		if (fd < 0) {
 			continue;
 		}
 
-		uint32_t driver_device_id = h.ioctl(DEVIOCGDEVICEID, 0);
+		uint32_t driver_device_id = px4_ioctl(fd, DEVIOCGDEVICEID, 0);
 		bool config_ok = false;
 
 		/* run through all stored calibrations that are applied at the driver level*/
@@ -278,7 +276,7 @@ void VotedSensorsUpdate::parameters_update()
 
 				} else {
 					/* apply new scaling and offsets */
-					if (h.ioctl(GYROIOCSSCALE, (long unsigned int)&gscale) != PX4_OK) {
+					if (px4_ioctl(fd, GYROIOCSSCALE, (long unsigned int)&gscale) != PX4_OK) {
 						PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "gyro ", i);
 					}
 				}
@@ -310,14 +308,13 @@ void VotedSensorsUpdate::parameters_update()
 
 		(void)sprintf(str, "%s%u", ACCEL_BASE_DEVICE_PATH, driver_index);
 
-		DevHandle h;
-		DevMgr::getHandle(str, h);
+		int fd = px4_open(str, 0);
 
-		if (!h.isValid()) {
+		if (fd < 0) {
 			continue;
 		}
 
-		uint32_t driver_device_id = h.ioctl(DEVIOCGDEVICEID, 0);
+		uint32_t driver_device_id = px4_ioctl(fd, DEVIOCGDEVICEID, 0);
 		bool config_ok = false;
 
 		/* run through all stored calibrations */
@@ -364,7 +361,7 @@ void VotedSensorsUpdate::parameters_update()
 
 				} else {
 					/* apply new scaling and offsets */
-					if (h.ioctl(ACCELIOCSSCALE, (long unsigned int)&ascale) == PX4_OK) {
+					if (px4_ioctl(fd, ACCELIOCSSCALE, (long unsigned int)&ascale) == PX4_OK) {
 						PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "accel ", i);
 					}
 				}
@@ -393,7 +390,6 @@ void VotedSensorsUpdate::parameters_update()
 
 	/* run through all mag sensors
 	 * Because we store the device id in _mag_device_id, we need to get the id via uorb topic since
-	 * the DevHandle method does not work on POSIX.
 	 */
 	for (int topic_instance = 0; topic_instance < MAG_COUNT_MAX
 	     && topic_instance < _mag.subscription_count; ++topic_instance) {
@@ -409,26 +405,24 @@ void VotedSensorsUpdate::parameters_update()
 		_mag_device_id[topic_instance] = topic_device_id;
 
 		// find the driver handle that matches the topic_device_id
-		DevHandle h;
-
 		for (unsigned driver_index = 0; driver_index < MAG_COUNT_MAX; ++driver_index) {
 
 			(void)sprintf(str, "%s%u", MAG_BASE_DEVICE_PATH, driver_index);
 
-			DevMgr::getHandle(str, h);
+			int fd = px4_open(str, 0);
 
-			if (!h.isValid()) {
+			if (fd < 0) {
 				/* the driver is not running, continue with the next */
 				continue;
 			}
 
-			int driver_device_id = h.ioctl(DEVIOCGDEVICEID, 0);
+			int driver_device_id = px4_ioctl(fd, DEVIOCGDEVICEID, 0);
 
 			if (driver_device_id == topic_device_id) {
 				break; // we found the matching driver
 
 			} else {
-				DevMgr::releaseHandle(h);
+				px4_close(fd);
 			}
 		}
 
@@ -503,9 +497,11 @@ void VotedSensorsUpdate::parameters_update()
 					PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "mag", i);
 
 				} else {
+					// TODO: dagar
+					int fd = -1;
 
 					/* apply new scaling and offsets */
-					if (h.ioctl(MAGIOCSSCALE, (long unsigned int)&mscale) == PX4_OK) {
+					if (px4_ioctl(fd, MAGIOCSSCALE, (long unsigned int)&mscale) == PX4_OK) {
 						PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "mag ", i);
 					}
 				}

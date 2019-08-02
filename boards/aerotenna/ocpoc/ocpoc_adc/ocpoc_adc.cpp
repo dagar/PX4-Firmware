@@ -45,8 +45,6 @@
 #include <px4_posix.h>
 #include <drivers/drv_adc.h>
 
-#include <VirtDevObj.hpp>
-
 #include <unistd.h>
 #include <stdio.h>
 #include <poll.h>
@@ -59,7 +57,7 @@ __BEGIN_DECLS
 __EXPORT int ocpoc_adc_main(int argc, char *argv[]);
 __END_DECLS
 
-class OcpocADC: public DriverFramework::VirtDevObj
+class OcpocADC : public cdev::CDev
 {
 public:
 	OcpocADC();
@@ -67,8 +65,8 @@ public:
 
 	virtual int init();
 
-	virtual ssize_t devRead(void *buf, size_t count) override;
-	virtual int devIOCTL(unsigned long request, unsigned long arg) override;
+	virtual ssize_t read(void *buf, size_t count) override;
+	virtual int ioctl(unsigned long request, unsigned long arg) override;
 
 protected:
 	virtual void _measure() override;
@@ -81,7 +79,7 @@ private:
 };
 
 OcpocADC::OcpocADC()
-	: DriverFramework::VirtDevObj("ocpoc_adc", ADC0_DEVICE_PATH, ADC_BASE_DEV_PATH, 1e6 / 100)
+	: CDev("ocpoc_adc", ADC0_DEVICE_PATH, ADC_BASE_DEV_PATH, 1e6 / 100)
 {
 	pthread_mutex_init(&_samples_lock, NULL);
 }
@@ -108,9 +106,7 @@ void OcpocADC::_measure()
 
 int OcpocADC::init()
 {
-	int ret;
-
-	ret = DriverFramework::VirtDevObj::init();
+	int ret = CDev::init();
 
 	if (ret != PX4_OK) {
 		PX4_ERR("init failed");
@@ -120,12 +116,14 @@ int OcpocADC::init()
 	return PX4_OK;
 }
 
-int OcpocADC::devIOCTL(unsigned long request, unsigned long arg)
+int
+OcpocADC::ioctl(unsigned long request, unsigned long arg)
 {
 	return -ENOTTY;
 }
 
-ssize_t OcpocADC::devRead(void *buf, size_t count)
+ssize_t
+OcpocADC::read(void *buf, size_t count)
 {
 	const size_t maxsize = sizeof(_samples);
 	int ret;
@@ -225,7 +223,7 @@ int ocpoc_adc_main(int argc, char *argv[])
 
 		px4_adc_msg_t adc_msgs[PX4_MAX_ADC_CHANNELS];
 
-		ret = instance->devRead((char *)&adc_msgs, sizeof(adc_msgs));
+		ret = instance->read((char *)&adc_msgs, sizeof(adc_msgs));
 
 		if (ret < 0) {
 			PX4_ERR("ret: %s (%d)\n", strerror(ret), ret);

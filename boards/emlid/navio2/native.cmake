@@ -8,6 +8,7 @@ px4_add_board(
 
 	DRIVERS
 		#barometer # all available barometer drivers
+		barometer/ms5611
 		batt_smbus
 		camera_trigger
 		differential_pressure # all available differential pressure drivers
@@ -16,18 +17,12 @@ px4_add_board(
 		#imu # all available imu drivers
 		imu/mpu9250
 		#magnetometer # all available magnetometer drivers
+		magnetometer/hmc5883
 		pwm_out_sim
 		#telemetry # all available telemetry drivers
 
 		linux_pwm_out
 		linux_sbus
-
-	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
-		hmc5883
-		isl29501
-		lsm9ds1
-		ms5611
-		trone
 
 	MODULES
 		attitude_estimator_q

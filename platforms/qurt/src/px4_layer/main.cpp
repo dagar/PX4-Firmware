@@ -52,10 +52,8 @@
 
 #include "get_commands.h"
 #include "apps.h"
-#include "DriverFramework.hpp"
 
 #define MAX_ARGS 8 // max number of whitespace separated args after app name
-
 
 static px4_task_t g_dspal_task = -1;
 
@@ -196,7 +194,6 @@ int dspal_entry(int argc, char *argv[])
 	PX4_INFO("In dspal_entry");
 	apps_map_type apps;
 	init_app_map(apps);
-	DriverFramework::Framework::initialize();
 	px4::init_once();
 	px4::init(argc, (char **)argv, "px4");
 	process_commands(apps, get_commands());

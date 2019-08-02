@@ -46,8 +46,6 @@
 #include <px4_posix.h>
 #include <drivers/drv_adc.h>
 
-#include <VirtDevObj.hpp>
-
 #include <unistd.h>
 #include <stdio.h>
 #include <poll.h>
@@ -75,7 +73,7 @@ __BEGIN_DECLS
 __EXPORT int navio_adc_main(int argc, char *argv[]);
 __END_DECLS
 
-class NavioADC: public DriverFramework::VirtDevObj
+class NavioADC: public cdev::CDev
 {
 public:
 	NavioADC();
@@ -83,8 +81,8 @@ public:
 
 	virtual int init() override;
 
-	virtual ssize_t devRead(void *buf, size_t count) override;
-	virtual int devIOCTL(unsigned long request, unsigned long arg) override;
+	virtual ssize_t read(void *buf, size_t count) override;
+	virtual int ioctl(unsigned long request, unsigned long arg) override;
 
 protected:
 	virtual void _measure() override;
@@ -98,7 +96,7 @@ private:
 };
 
 NavioADC::NavioADC()
-	: DriverFramework::VirtDevObj("navio_adc", ADC0_DEVICE_PATH, ADC_BASE_DEV_PATH, 1e6 / 100)
+	: CDev("navio_adc", ADC0_DEVICE_PATH, ADC_BASE_DEV_PATH, 1e6 / 100)
 {
 	pthread_mutex_init(&_samples_lock, NULL);
 
@@ -151,11 +149,10 @@ void NavioADC::_measure()
 	pthread_mutex_unlock(&_samples_lock);
 }
 
-int NavioADC::init()
+int
+NavioADC::init()
 {
-	int ret;
-
-	ret = DriverFramework::VirtDevObj::init();
+	int ret = CDev::init();
 
 	if (ret != PX4_OK) {
 		PX4_ERR("init failed");
@@ -190,12 +187,8 @@ cleanup:
 	return ret;
 }
 
-int NavioADC::devIOCTL(unsigned long request, unsigned long arg)
-{
-	return -ENOTTY;
-}
-
-ssize_t NavioADC::devRead(void *buf, size_t count)
+ssize_t
+NavioADC::read(void *buf, size_t count)
 {
 	const size_t maxsize = sizeof(_samples);
 	int ret;
@@ -306,7 +299,7 @@ int navio_adc_main(int argc, char *argv[])
 
 		px4_adc_msg_t adc_msgs[ADC_MAX_CHAN];
 
-		ret = instance->devRead((char *)&adc_msgs, sizeof(adc_msgs));
+		ret = instance->read((char *)&adc_msgs, sizeof(adc_msgs));
 
 		if (ret < 0) {
 			PX4_ERR("ret: %s (%d)\n", strerror(ret), ret);

@@ -40,15 +40,8 @@
 
 #define RGBLED_BASE_DEVICE_PATH "/dev/rgbled"
 
-using namespace DriverFramework;
-
-
 RGBLED::RGBLED(const char *name)
-	: DevObj(name,
-		 RGBLED0_DEVICE_PATH,
-		 RGBLED_BASE_DEVICE_PATH,
-		 DeviceBusType_UNKNOWN,
-		 0)
+	: CDev(name, RGBLED0_DEVICE_PATH, RGBLED_BASE_DEVICE_PATH, DeviceBusType_UNKNOWN, 0)
 	, _gpioR(4)
 	, _gpioG(27)
 	, _gpioB(6)

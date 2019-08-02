@@ -7,17 +7,16 @@ px4_add_board(
 	TOOLCHAIN arm-linux-gnueabihf
 
 	DRIVERS
+		barometer/ms5611 # ms5607
 		gps
 		linux_sbus
+		#magnetometer/ak8963 (mpu9250?)
+		imu/mpu6000 # mpu6050
 		pwm_out_sim
 
-	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
-		ms5607
-		mpu6050
-		ak8963
-		bebop_bus
-		bebop_rangefinder
-		mt9v117
+		#bebop_bus
+		#bebop_rangefinder
+		#mt9v117
 
 	MODULES
 		attitude_estimator_q

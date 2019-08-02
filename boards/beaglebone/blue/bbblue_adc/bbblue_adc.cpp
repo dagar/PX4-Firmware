@@ -43,8 +43,6 @@
 #include <px4_posix.h>
 #include <drivers/drv_adc.h>
 
-#include <VirtDevObj.hpp>
-
 #include <unistd.h>
 #include <stdio.h>
 #include <poll.h>
@@ -66,7 +64,7 @@ __BEGIN_DECLS
 __EXPORT int bbblue_adc_main(int argc, char *argv[]);
 __END_DECLS
 
-class BBBlueADC: public DriverFramework::VirtDevObj
+class BBBlueADC: public cdev::CDev
 {
 public:
 	BBBlueADC();
@@ -74,8 +72,7 @@ public:
 
 	virtual int init();
 
-	virtual ssize_t devRead(void *buf, size_t count) override;
-	virtual int devIOCTL(unsigned long request, unsigned long arg) override;
+	virtual ssize_t read(void *buf, size_t count) override;
 
 protected:
 	virtual void _measure() override;
@@ -86,7 +83,7 @@ private:
 };
 
 BBBlueADC::BBBlueADC()
-	: DriverFramework::VirtDevObj("bbblue_adc", ADC0_DEVICE_PATH, ADC_BASE_DEV_PATH, 1e6 / 100)
+	: CDev("bbblue_adc", ADC0_DEVICE_PATH, ADC_BASE_DEV_PATH, 1e6 / 100)
 {
 	pthread_mutex_init(&_samples_lock, NULL);
 }
@@ -124,7 +121,7 @@ int BBBlueADC::init()
 {
 	rc_init();
 
-	int ret = DriverFramework::VirtDevObj::init();
+	int ret = CDev::init();
 
 	if (ret != PX4_OK) {
 		PX4_ERR("init failed");
@@ -136,12 +133,8 @@ int BBBlueADC::init()
 	return PX4_OK;
 }
 
-int BBBlueADC::devIOCTL(unsigned long request, unsigned long arg)
-{
-	return -ENOTTY;
-}
-
-ssize_t BBBlueADC::devRead(void *buf, size_t count)
+ssize_t
+BBBlueADC::read(void *buf, size_t count)
 {
 	const size_t maxsize = sizeof(_samples);
 	int ret;
@@ -214,7 +207,7 @@ int bbblue_adc_main(int argc, char *argv[])
 
 		px4_adc_msg_t adc_msgs[BBBLUE_MAX_ADC_CHANNELS];
 
-		ret = instance->devRead((char *)&adc_msgs, sizeof(adc_msgs));
+		ret = instance->read((char *)&adc_msgs, sizeof(adc_msgs));
 
 		if (ret < 0) {
 			PX4_ERR("ret: %s (%d)\n", strerror(ret), ret);

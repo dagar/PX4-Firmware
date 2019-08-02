@@ -69,10 +69,7 @@ function(px4_os_add_flags)
 	# prevent using the toolchain's std c++ library
 	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
 
-	add_definitions(
-		-D__PX4_NUTTX
-		-D__DF_NUTTX
-		)
+	add_definitions(-D__PX4_NUTTX)
 
 	if("${CONFIG_ARMV7M_STACKCHECK}" STREQUAL "y")
 		message(STATUS "NuttX Stack Checking (CONFIG_ARMV7M_STACKCHECK) enabled")

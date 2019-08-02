@@ -60,8 +60,6 @@
 #include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/subsystem_info.h>
 
-#include <DevMgr.hpp>
-
 #include "temperature_compensation.h"
 #include "common.h"
 

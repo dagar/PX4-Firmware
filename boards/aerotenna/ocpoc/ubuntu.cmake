@@ -10,11 +10,13 @@ px4_add_board(
 
 	DRIVERS
 		#barometer # all available barometer drivers
+		barometer/ms5611
 		batt_smbus
 		camera_trigger
 		differential_pressure # all available differential pressure drivers
 		distance_sensor # all available distance sensor drivers
 		gps
+		magnetometer/hmc5883
 		#imu # all available imu drivers
 		imu/mpu9250
 		lights/rgbled
@@ -23,10 +25,6 @@ px4_add_board(
 		#magnetometer # all available magnetometer drivers
 		pwm_out_sim
 		#telemetry # all available telemetry drivers
-
-	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
-		ms5611
-		hmc5883
 
 	MODULES
 		attitude_estimator_q

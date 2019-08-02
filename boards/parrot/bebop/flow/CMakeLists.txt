@@ -34,14 +34,9 @@
 px4_add_module(
 	MODULE drivers__bebop_flow
 	MAIN bebop_flow
-	INCLUDES
-		${PX4_SOURCE_DIR}/src/lib/DriverFramework/drivers
 	SRCS
 		bebop_flow.cpp
 		video_device.cpp
 		dump_pgm.cpp
 	DEPENDS
-		git_driverframework
-		df_driver_framework
-		df_mt9v117
 	)

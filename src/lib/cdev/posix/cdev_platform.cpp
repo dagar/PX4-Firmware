@@ -44,10 +44,7 @@
 #include <px4_posix.h>
 #include <px4_time.h>
 
-#include "DevMgr.hpp"
-
 using namespace std;
-using namespace DriverFramework;
 
 const cdev::px4_file_operations_t cdev::CDev::fops = {};
 
@@ -435,36 +432,6 @@ extern "C" {
 
 		cdev::CDev *dev = getDev(pathname);
 		return (dev != nullptr) ? 0 : -1;
-	}
-
-	void px4_show_devices()
-	{
-		int i = 0;
-		PX4_INFO("PX4 Devices:");
-
-		pthread_mutex_lock(&devmutex);
-
-		for (const auto &dev : devmap) {
-			if (strncmp(dev.first.c_str(), "/dev/", 5) == 0) {
-				PX4_INFO("   %s", dev.first.c_str());
-			}
-		}
-
-		pthread_mutex_unlock(&devmutex);
-
-		PX4_INFO("DF Devices:");
-		const char *dev_path;
-		unsigned int index = 0;
-		i = 0;
-
-		do {
-			// Each look increments index and returns -1 if end reached
-			i = DevMgr::getNextDeviceName(index, &dev_path);
-
-			if (i == 0) {
-				PX4_INFO("   %s", dev_path);
-			}
-		} while (i == 0);
 	}
 
 	void px4_show_topics()

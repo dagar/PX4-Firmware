@@ -194,7 +194,6 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 
 int update_parameters(const ParameterHandles &parameter_handles, Parameters &parameters)
 {
-
 	bool rc_valid = true;
 	float tmpScaleFactor = 0.0f;
 	float tmpRevFactor = 0.0f;
