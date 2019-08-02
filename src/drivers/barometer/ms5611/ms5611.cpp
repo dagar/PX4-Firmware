@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,6 +37,8 @@
  */
 
 #include "ms5611.h"
+
+#include <lib/drivers/barometer/PX4Barometer.hpp>
 
 enum MS56XX_DEVICE_TYPES {
 	MS56XX_DEVICE   = 0,
@@ -88,64 +90,46 @@ enum MS5611_BUS {
  */
 #define MS5611_CONVERSION_INTERVAL	10000	/* microseconds */
 #define MS5611_MEASUREMENT_RATIO	3	/* pressure measurements per temperature measurement */
-#define MS5611_BARO_DEVICE_PATH_EXT	"/dev/ms5611_ext"
-#define MS5611_BARO_DEVICE_PATH_INT	"/dev/ms5611_int"
 
-class MS5611 : public cdev::CDev, public px4::ScheduledWorkItem
+class MS5611 : public px4::ScheduledWorkItem
 {
 public:
-	MS5611(device::Device *interface, ms5611::prom_u &prom_buf, const char *path, enum MS56XX_DEVICE_TYPES device_type);
+	MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type);
 	~MS5611();
 
 	virtual int		init();
 
-	virtual ssize_t		read(struct file *filp, char *buffer, size_t buflen);
-	virtual int		ioctl(struct file *filp, int cmd, unsigned long arg);
-
-	/**
-	 * Diagnostics - print some basic information about the driver.
-	 */
 	void			print_info();
 
 protected:
-	device::Device		*_interface;
+
+	PX4Barometer		_px4_barometer;
+
+	device::Device		*_interface{nullptr};
 
 	ms5611::prom_s		_prom;
 
 	unsigned		_measure_interval{0};
 
-	ringbuffer::RingBuffer	*_reports;
 	enum MS56XX_DEVICE_TYPES _device_type;
-	bool			_collect_phase;
+	bool			_collect_phase{false};
 	unsigned		_measure_phase;
 
 	/* intermediate temperature values per MS5611/MS5607 datasheet */
-	int32_t			_TEMP;
-	int64_t			_OFF;
-	int64_t			_SENS;
-	float			_P;
-	float			_T;
-
-	orb_advert_t		_baro_topic;
-	int			_orb_class_instance;
-	int			_class_instance;
+	int32_t			_TEMP{0};
+	int64_t			_OFF{0};
+	int64_t			_SENS{0};
+	float			_P{0.0f};
+	float			_T{0.0f};
 
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_measure_perf;
 	perf_counter_t		_comms_errors;
 
-	/**
-	 * Initialize the automatic measurement state machine and start it.
-	 *
-	 * @note This function is called at open and error time.  It might make sense
-	 *       to make it more aggressive about resetting the bus in case of errors.
-	 */
-	void			start();
 
-	/**
-	 * Stop the automatic measurement state machine.
-	 */
+	void			start();
 	void			stop();
+	bool			reset();
 
 	/**
 	 * Perform a poll cycle; collect from the previous measurement
@@ -175,27 +159,12 @@ protected:
 	virtual int		collect();
 };
 
-/*
- * Driver 'main' command.
- */
-extern "C" __EXPORT int ms5611_main(int argc, char *argv[]);
-
-MS5611::MS5611(device::Device *interface, ms5611::prom_u &prom_buf, const char *path,
-	       enum MS56XX_DEVICE_TYPES device_type) :
-	CDev(path),
+MS5611::MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type) :
 	ScheduledWorkItem(px4::device_bus_to_wq(interface->get_device_id())),
+	_px4_barometer(interface->get_device_id()),
 	_interface(interface),
 	_prom(prom_buf.s),
-	_reports(nullptr),
 	_device_type(device_type),
-	_collect_phase(false),
-	_measure_phase(0),
-	_TEMP(0),
-	_OFF(0),
-	_SENS(0),
-	_baro_topic(nullptr),
-	_orb_class_instance(-1),
-	_class_instance(-1),
 	_sample_perf(perf_alloc(PC_ELAPSED, "ms5611_read")),
 	_measure_perf(perf_alloc(PC_ELAPSED, "ms5611_measure")),
 	_comms_errors(perf_alloc(PC_COUNT, "ms5611_com_err"))
@@ -204,17 +173,8 @@ MS5611::MS5611(device::Device *interface, ms5611::prom_u &prom_buf, const char *
 
 MS5611::~MS5611()
 {
-	/* make sure we are truly inactive */
+	// make sure we are truly inactive
 	stop();
-
-	if (_class_instance != -1) {
-		unregister_class_devname(get_devname(), _class_instance);
-	}
-
-	/* free any existing reports */
-	if (_reports != nullptr) {
-		delete _reports;
-	}
 
 	// free perf counters
 	perf_free(_sample_perf);
@@ -227,41 +187,21 @@ MS5611::~MS5611()
 int
 MS5611::init()
 {
-	int ret;
-	bool autodetect = false;
+	int ret = PX4_OK;
 
-	ret = CDev::init();
-
-	if (ret != OK) {
-		PX4_DEBUG("CDev init failed");
-		goto out;
-	}
-
-	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_baro_s));
-
-	if (_reports == nullptr) {
-		PX4_DEBUG("can't get memory for reports");
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	/* register alternate interfaces if we have to */
-	_class_instance = register_class_devname(BARO_BASE_DEVICE_PATH);
-
-	sensor_baro_s brp;
-	/* do a first measurement cycle to populate reports with valid data */
+	// do a first measurement cycle to populate reports with valid data
 	_measure_phase = 0;
-	_reports->flush();
+
+	bool autodetect = false;
 
 	if (_device_type == MS56XX_DEVICE) {
 		autodetect = true;
-		/* try first with MS5611 and fallback to MS5607 */
+		// try first with MS5611 and fallback to MS5607
 		_device_type = MS5611_DEVICE;
 	}
 
 	while (true) {
-		/* do temperature first */
+		// do temperature first
 		if (OK != measure()) {
 			ret = -EIO;
 			break;
@@ -274,7 +214,7 @@ MS5611::init()
 			break;
 		}
 
-		/* now do a pressure measurement */
+		// now do a pressure measurement
 		if (OK != measure()) {
 			ret = -EIO;
 			break;
@@ -287,8 +227,7 @@ MS5611::init()
 			break;
 		}
 
-		/* state machine will have generated a report, copy it out */
-		_reports->get(&brp);
+		sensor_baro_s brp{};
 
 		if (autodetect) {
 			if (_device_type == MS5611_DEVICE) {
@@ -325,173 +264,20 @@ MS5611::init()
 		/* ensure correct devid */
 		brp.device_id = _interface->get_device_id();
 
-		ret = OK;
-
-		_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &brp,
-						  &_orb_class_instance, _interface->external() ? ORB_PRIO_HIGH : ORB_PRIO_DEFAULT);
-
-		if (_baro_topic == nullptr) {
-			warnx("failed to create sensor_baro publication");
-		}
-
 		break;
 	}
 
-out:
 	return ret;
-}
-
-ssize_t
-MS5611::read(struct file *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_baro_s);
-	sensor_baro_s *brp = reinterpret_cast<sensor_baro_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	/* if automatic measurement is enabled */
-	if (_measure_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the workq thread while we are doing this;
-		 * we are careful to avoid racing with them.
-		 */
-		while (count--) {
-			if (_reports->get(brp)) {
-				ret += sizeof(*brp);
-				brp++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement - run one conversion */
-	do {
-		_measure_phase = 0;
-		_reports->flush();
-
-		/* do temperature first */
-		if (OK != measure()) {
-			ret = -EIO;
-			break;
-		}
-
-		px4_usleep(MS5611_CONVERSION_INTERVAL);
-
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* now do a pressure measurement */
-		if (OK != measure()) {
-			ret = -EIO;
-			break;
-		}
-
-		px4_usleep(MS5611_CONVERSION_INTERVAL);
-
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* state machine will have generated a report, copy it out */
-		if (_reports->get(brp)) {
-			ret = sizeof(*brp);
-		}
-
-	} while (0);
-
-	return ret;
-}
-
-int
-MS5611::ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-
-	case SENSORIOCSPOLLRATE: {
-			switch (arg) {
-
-			/* zero would be bad */
-			case 0:
-				return -EINVAL;
-
-			/* set default polling rate */
-			case SENSOR_POLLRATE_DEFAULT: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* set interval for next measurement to minimum legal value */
-					_measure_interval = MS5611_CONVERSION_INTERVAL;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-
-			/* adjust to a legal polling interval in Hz */
-			default: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* convert hz to interval via microseconds */
-					unsigned interval = (1000000 / arg);
-
-					/* check against maximum rate */
-					if (_measure_interval < MS5611_CONVERSION_INTERVAL) {
-						return -EINVAL;
-					}
-
-					/* update interval for next measurement */
-					_measure_interval = interval;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-			}
-		}
-
-	case SENSORIOCRESET:
-		/*
-		 * Since we are initialized, we do not need to do anything, since the
-		 * PROM is correctly read and the part does not need to be configured.
-		 */
-		return OK;
-
-	default:
-		break;
-	}
-
-	/* give it to the bus-specific superclass */
-	// return bus_ioctl(filp, cmd, arg);
-	return CDev::ioctl(filp, cmd, arg);
 }
 
 void
 MS5611::start()
 {
-	/* reset the report ring and state machine */
+	// reset the report ring and state machine
 	_collect_phase = false;
 	_measure_phase = 0;
-	_reports->flush();
 
-	/* schedule a cycle to start things */
+	// schedule a cycle to start things
 	ScheduleNow();
 }
 
@@ -501,16 +287,25 @@ MS5611::stop()
 	ScheduleClear();
 }
 
+bool
+MS5611::reset()
+{
+	//uint8_t cmd = ADDR_RESET_CMD | DIR_WRITE;
+
+	//return  _transfer(&cmd, nullptr, 1);
+
+	return true;
+}
+
 void
 MS5611::Run()
 {
-	int ret;
-	unsigned dummy;
+	int ret = PX4_ERROR;
 
-	/* collection phase? */
+	// collection phase?
 	if (_collect_phase) {
 
-		/* perform collection */
+		// perform collection
 		ret = collect();
 
 		if (ret != OK) {
@@ -525,12 +320,15 @@ MS5611::Run()
 			}
 
 			/* issue a reset command to the sensor */
-			_interface->ioctl(IOCTL_RESET, dummy);
+			//_interface->ioctl(IOCTL_RESET, dummy);
+			reset();
+
 			/* reset the collection state machine and try again - we need
 			 * to wait 2.8 ms after issuing the sensor reset command
 			 * according to the MS5611 datasheet
 			 */
 			ScheduleDelayed(2800);
+
 			return;
 		}
 
@@ -552,40 +350,35 @@ MS5611::Run()
 		}
 	}
 
-	/* measurement phase */
+	// measurement phase
 	ret = measure();
 
 	if (ret != OK) {
-		/* issue a reset command to the sensor */
-		_interface->ioctl(IOCTL_RESET, dummy);
-		/* reset the collection state machine and try again */
+		// issue a reset command to the sensor
+		reset();
+
+		// reset the collection state machine and try again
 		start();
 		return;
 	}
 
-	/* next phase is collection */
+	// next phase is collection
 	_collect_phase = true;
 
-	/* schedule a fresh cycle call when the measurement is done */
+	// schedule a fresh cycle call when the measurement is done
 	ScheduleDelayed(MS5611_CONVERSION_INTERVAL);
 }
 
 int
 MS5611::measure()
 {
-	int ret;
-
 	perf_begin(_measure_perf);
 
-	/*
-	 * In phase zero, request temperature; in other phases, request pressure.
-	 */
+	// In phase zero, request temperature; in other phases, request pressure.
 	unsigned addr = (_measure_phase == 0) ? ADDR_CMD_CONVERT_D2 : ADDR_CMD_CONVERT_D1;
 
-	/*
-	 * Send the command to begin measuring.
-	 */
-	ret = _interface->ioctl(IOCTL_MEASURE, addr);
+	// Send the command to begin measuring.
+	int ret = _interface->ioctl(IOCTL_MEASURE, addr);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -599,18 +392,15 @@ MS5611::measure()
 int
 MS5611::collect()
 {
-	int ret;
 	uint32_t raw;
 
 	perf_begin(_sample_perf);
 
-	sensor_baro_s report;
 	/* this should be fairly close to the end of the conversion, so the best approximation of the time */
-	report.timestamp = hrt_absolute_time();
-	report.error_count = perf_event_count(_comms_errors);
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	/* read the most recent measurement - read offset/size are hardcoded in the interface */
-	ret = _interface->read(0, (void *)&raw, 0);
+	// read the most recent measurement - read offset/size are hardcoded in the interface
+	int ret = _interface->read(0, (void *)&raw, 0);
 
 	if (ret < 0) {
 		perf_count(_comms_errors);
@@ -618,7 +408,9 @@ MS5611::collect()
 		return ret;
 	}
 
-	/* handle a measurement */
+	_px4_barometer.set_error_count(perf_event_count(_comms_errors));
+
+	// handle a measurement
 	if (_measure_phase == 0) {
 
 		/* temperature offset (in ADC units) */
@@ -694,25 +486,15 @@ MS5611::collect()
 		_T = _TEMP * 0.01f;
 
 		/* generate a new report */
-		report.temperature = _TEMP / 100.0f;
-		report.pressure = P / 100.0f;		/* convert to millibar */
+		float temperature = _TEMP / 100.0f;
+		_px4_barometer.set_temperature(temperature);
 
-		/* return device ID */
-		report.device_id = _interface->get_device_id();
+		float pressure = P / 100.0f;		/* convert to millibar */
 
-		/* publish it */
-		if (_baro_topic != nullptr) {
-			/* publish it */
-			orb_publish(ORB_ID(sensor_baro), _baro_topic, &report);
-		}
-
-		_reports->force(&report);
-
-		/* notify anyone waiting for data */
-		poll_notify(POLLIN);
+		_px4_barometer.update(timestamp_sample, pressure);
 	}
 
-	/* update the measurement state machine */
+	// update the measurement state machine
 	INCREMENT(_measure_phase, MS5611_MEASUREMENT_RATIO + 1);
 
 	perf_end(_sample_perf);
@@ -726,12 +508,8 @@ MS5611::print_info()
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
 	printf("poll interval:  %u\n", _measure_interval);
-	_reports->print_info("report queue");
-	printf("device:         %s\n", _device_type == MS5611_DEVICE ? "ms5611" : "ms5607");
 
-	sensor_baro_s brp = {};
-	_reports->get(&brp);
-	print_message(brp);
+	printf("device:         %s\n", _device_type == MS5611_DEVICE ? "ms5611" : "ms5607");
 }
 
 /**
@@ -745,45 +523,43 @@ namespace ms5611
  */
 struct ms5611_bus_option {
 	enum MS5611_BUS busid;
-	const char *devpath;
 	MS5611_constructor interface_constructor;
 	uint8_t busnum;
 	MS5611 *dev;
 } bus_options[] = {
 #if defined(PX4_SPIDEV_EXT_BARO) && defined(PX4_SPI_BUS_EXT)
-	{ MS5611_BUS_SPI_EXTERNAL, "/dev/ms5611_spi_ext", &MS5611_spi_interface, PX4_SPI_BUS_EXT, NULL },
+	{ MS5611_BUS_SPI_EXTERNAL, &MS5611_spi_interface, PX4_SPI_BUS_EXT, NULL },
 #endif
 #ifdef PX4_SPIDEV_BARO
-	{ MS5611_BUS_SPI_INTERNAL, "/dev/ms5611_spi_int", &MS5611_spi_interface, PX4_SPI_BUS_BARO, NULL },
+	{ MS5611_BUS_SPI_INTERNAL, &MS5611_spi_interface, PX4_SPI_BUS_BARO, NULL },
 #endif
 #ifdef PX4_I2C_BUS_ONBOARD
-	{ MS5611_BUS_I2C_INTERNAL, "/dev/ms5611_int", &MS5611_i2c_interface, PX4_I2C_BUS_ONBOARD, NULL },
+	{ MS5611_BUS_I2C_INTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_ONBOARD, NULL },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION
-	{ MS5611_BUS_I2C_EXTERNAL, "/dev/ms5611_ext", &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION, NULL },
+	{ MS5611_BUS_I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION, NULL },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION1
-	{ MS5611_BUS_I2C_EXTERNAL, "/dev/ms5611_ext1", &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION1, NULL },
+	{ MS5611_BUS_I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION1, NULL },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION2
-	{ MS5611_BUS_I2C_EXTERNAL, "/dev/ms5611_ext2", &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION2, NULL },
+	{ MS5611_BUS_I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION2, NULL },
 #endif
 };
 #define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
 
 bool	start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type);
-struct ms5611_bus_option &find_bus(enum MS5611_BUS busid);
-void	start(enum MS5611_BUS busid, enum MS56XX_DEVICE_TYPES device_type);
-void	test(enum MS5611_BUS busid);
-void	reset(enum MS5611_BUS busid);
-void	info();
-void	usage();
+struct ms5611_bus_option *find_bus(enum MS5611_BUS busid);
+int	start(enum MS5611_BUS busid, enum MS56XX_DEVICE_TYPES device_type);
+int	test(enum MS5611_BUS busid);
+int	reset(enum MS5611_BUS busid);
+int	info();
+int	usage();
 
 /**
  * MS5611 crc4 cribbed from the datasheet
  */
-bool
-crc4(uint16_t *n_prom)
+bool crc4(uint16_t *n_prom)
 {
 	int16_t cnt;
 	uint16_t n_rem;
@@ -825,15 +601,14 @@ crc4(uint16_t *n_prom)
 	return (0x000F & crc_read) == (n_rem ^ 0x00);
 }
 
-
 /**
  * Start the driver.
  */
-bool
-start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
+bool start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
 {
 	if (bus.dev != nullptr) {
-		errx(1, "bus option already started");
+		PX4_ERR("bus option already started");
+		return false;
 	}
 
 	prom_u prom_buf;
@@ -841,11 +616,11 @@ start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
 
 	if (interface->init() != OK) {
 		delete interface;
-		warnx("no device on bus %u", (unsigned)bus.busid);
+		PX4_WARN("no device on bus %u", (unsigned)bus.busid);
 		return false;
 	}
 
-	bus.dev = new MS5611(interface, prom_buf, bus.devpath, device_type);
+	bus.dev = new MS5611(interface, prom_buf, device_type);
 
 	if (bus.dev != nullptr && OK != bus.dev->init()) {
 		delete bus.dev;
@@ -853,22 +628,8 @@ start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
 		return false;
 	}
 
-	int fd = open(bus.devpath, O_RDONLY);
-
-	/* set the poll rate to default, starts automatic data collection */
-	if (fd == -1) {
-		errx(1, "can't open baro device");
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		close(fd);
-		errx(1, "failed setting default poll rate");
-	}
-
-	close(fd);
 	return true;
 }
-
 
 /**
  * Start the driver.
@@ -876,8 +637,7 @@ start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
  * This function call only returns once the driver
  * is either successfully up and running or failed to start.
  */
-void
-start(enum MS5611_BUS busid, enum MS56XX_DEVICE_TYPES device_type)
+int start(enum MS5611_BUS busid, enum MS56XX_DEVICE_TYPES device_type)
 {
 	uint8_t i;
 	bool started = false;
@@ -897,134 +657,50 @@ start(enum MS5611_BUS busid, enum MS56XX_DEVICE_TYPES device_type)
 	}
 
 	if (!started) {
-		exit(1);
+		return 1;
 	}
 
 	// one or more drivers started OK
-	exit(0);
+	return 0;
 }
-
 
 /**
  * find a bus structure for a busid
  */
-struct ms5611_bus_option &find_bus(enum MS5611_BUS busid)
+struct ms5611_bus_option *find_bus(enum MS5611_BUS busid)
 {
 	for (uint8_t i = 0; i < NUM_BUS_OPTIONS; i++) {
 		if ((busid == MS5611_BUS_ALL ||
 		     busid == bus_options[i].busid) && bus_options[i].dev != NULL) {
-			return bus_options[i];
+			return &bus_options[i];
 		}
 	}
 
-	errx(1, "bus %u not started", (unsigned)busid);
-}
+	PX4_ERR("bus %u not started", (unsigned)busid);
 
-/**
- * Perform some basic functional tests on the driver;
- * make sure we can collect data from the sensor in polled
- * and automatic modes.
- */
-void
-test(enum MS5611_BUS busid)
-{
-	struct ms5611_bus_option &bus = find_bus(busid);
-	sensor_baro_s report;
-	ssize_t sz;
-	int ret;
-
-	int fd;
-
-	fd = open(bus.devpath, O_RDONLY);
-
-	if (fd < 0) {
-		err(1, "open failed (try 'ms5611 start' if the driver is not running)");
-	}
-
-	/* do a simple demand read */
-	sz = read(fd, &report, sizeof(report));
-
-	if (sz != sizeof(report)) {
-		err(1, "immediate read failed");
-	}
-
-	print_message(report);
-
-	/* read the sensor 5x and report each value */
-	for (unsigned i = 0; i < 5; i++) {
-		struct pollfd fds;
-
-		/* wait for data to be ready */
-		fds.fd = fd;
-		fds.events = POLLIN;
-		ret = poll(&fds, 1, 2000);
-
-		if (ret != 1) {
-			errx(1, "timed out waiting for sensor data");
-		}
-
-		/* now go get it */
-		sz = read(fd, &report, sizeof(report));
-
-		if (sz != sizeof(report)) {
-			err(1, "periodic read failed");
-		}
-
-		print_message(report);
-	}
-
-	close(fd);
-	errx(0, "PASS");
-}
-
-/**
- * Reset the driver.
- */
-void
-reset(enum MS5611_BUS busid)
-{
-	struct ms5611_bus_option &bus = find_bus(busid);
-	int fd;
-
-	fd = open(bus.devpath, O_RDONLY);
-
-	if (fd < 0) {
-		err(1, "failed ");
-	}
-
-	if (ioctl(fd, SENSORIOCRESET, 0) < 0) {
-		err(1, "driver reset failed");
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		err(1, "driver poll restart failed");
-	}
-
-	exit(0);
+	return nullptr;
 }
 
 /**
  * Print a little info about the driver.
  */
-void
+int
 info()
 {
 	for (uint8_t i = 0; i < NUM_BUS_OPTIONS; i++) {
-		struct ms5611_bus_option &bus = bus_options[i];
+		struct ms5611_bus_option *bus = &bus_options[i];
 
-		if (bus.dev != nullptr) {
-			warnx("%s", bus.devpath);
-			bus.dev->print_info();
+		if (bus->dev != nullptr) {
+			bus->dev->print_info();
 		}
 	}
 
-	exit(0);
+	return 0;
 }
 
-void
-usage()
+int usage()
 {
-	warnx("missing command: try 'start', 'info', 'test', 'test2', 'reset'");
+	warnx("missing command: try 'start', 'info', 'reset'");
 	warnx("options:");
 	warnx("    -X    (external I2C bus)");
 	warnx("    -I    (intternal I2C bus)");
@@ -1033,16 +709,21 @@ usage()
 	warnx("    -T    5611|5607 (default 5611)");
 	warnx("    -T    0 (autodetect version)");
 
+	return 0;
 }
 
 } // namespace
 
-int
-ms5611_main(int argc, char *argv[])
+/*
+ * Driver 'main' command.
+ */
+extern "C" __EXPORT int ms5611_main(int argc, char *argv[]);
+
+int ms5611_main(int argc, char *argv[])
 {
 	enum MS5611_BUS busid = MS5611_BUS_ALL;
 	enum MS56XX_DEVICE_TYPES device_type = MS5611_DEVICE;
-	int ch;
+	int ch = 0;
 	int myoptind = 1;
 	const char *myoptarg = NULL;
 
@@ -1085,13 +766,12 @@ ms5611_main(int argc, char *argv[])
 		/* FALLTHROUGH */
 
 		default:
-			ms5611::usage();
-			return 0;
+			return ms5611::usage();
 		}
 	}
 
 	if (myoptind >= argc) {
-		ms5611::usage();
+		return ms5611::usage();
 		return -1;
 	}
 
@@ -1101,30 +781,16 @@ ms5611_main(int argc, char *argv[])
 	 * Start/load the driver.
 	 */
 	if (!strcmp(verb, "start")) {
-		ms5611::start(busid, device_type);
-	}
-
-	/*
-	 * Test the driver/device.
-	 */
-	if (!strcmp(verb, "test")) {
-		ms5611::test(busid);
-	}
-
-	/*
-	 * Reset the driver.
-	 */
-	if (!strcmp(verb, "reset")) {
-		ms5611::reset(busid);
+		return ms5611::start(busid, device_type);
 	}
 
 	/*
 	 * Print driver information.
 	 */
 	if (!strcmp(verb, "info")) {
-		ms5611::info();
+		return ms5611::info();
 	}
 
-	PX4_ERR("unrecognised command, try 'start', 'test', 'reset' or 'info'");
+	PX4_ERR("unrecognised command, try 'start', 'reset' or 'info'");
 	return -1;
 }

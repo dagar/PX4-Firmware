@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,8 +41,6 @@
 
 #define MS5611_ADDRESS_1		0x76	/* address select pins pulled high (PX4FMU series v1.6+) */
 #define MS5611_ADDRESS_2		0x77    /* address select pins pulled low (PX4FMU prototypes) */
-
-
 
 device::Device *MS5611_i2c_interface(ms5611::prom_u &prom_buf);
 
@@ -183,13 +181,12 @@ MS5611_I2C::_probe_address(uint8_t address)
 int
 MS5611_I2C::_reset()
 {
-	unsigned	old_retrycount = _retries;
-	uint8_t		cmd = ADDR_RESET_CMD;
-	int		result;
+	unsigned old_retrycount = _retries;
+	uint8_t cmd = ADDR_RESET_CMD;
 
 	/* bump the retry count */
 	_retries = 10;
-	result = transfer(&cmd, 1, nullptr, 0);
+	int result = transfer(&cmd, 1, nullptr, 0);
 	_retries = old_retrycount;
 
 	return result;
@@ -211,7 +208,7 @@ MS5611_I2C::_measure(unsigned addr)
 int
 MS5611_I2C::_read_prom()
 {
-	uint8_t		prom_buf[2];
+	uint8_t	prom_buf[2];
 	union {
 		uint8_t		b[2];
 		uint16_t	w;
