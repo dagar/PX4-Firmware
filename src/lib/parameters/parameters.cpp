@@ -57,7 +57,6 @@
 #include <px4_posix.h>
 #include <px4_sem.h>
 #include <px4_shutdown.h>
-#include <systemlib/uthash/utarray.h>
 
 using namespace time_literals;
 
@@ -98,95 +97,18 @@ static volatile bool autosave_scheduled = false;
 static bool autosave_disabled = false;
 #endif /* PARAM_NO_AUTOSAVE */
 
-static constexpr uint16_t param_info_count = sizeof(px4::parameters) / sizeof(param_info_s);
-
-// Storage for modified parameters.
-struct param_wbuf_s {
-	union param_value_u	val;
-	param_t			param;
-	bool			unsaved;
-};
-
-static bitset<param_info_count> params_active;
-
-/** flexible array holding modified parameter values */
-UT_array *param_values{nullptr};
-
-/** array info for the modified parameters array */
-const UT_icd param_icd = {sizeof(param_wbuf_s), nullptr, nullptr, nullptr};
-
-#if !defined(PARAM_NO_ORB)
-/** parameter update topic handle */
-static orb_advert_t param_topic = nullptr;
-static unsigned int param_instance = 0;
-#endif
-
 static param_t param_find_internal(const char *name, bool notification);
 int param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes);
 const void *param_get_value_ptr(param_t param);
-
-// the following implements an RW-lock using 2 semaphores (used as mutexes). It gives
-// priority to readers, meaning a writer could suffer from starvation, but in our use-case
-// we only have short periods of reads and writes are rare.
-static px4_sem_t param_sem; ///< this protects against concurrent access to param_values
-static int reader_lock_holders = 0;
-static px4_sem_t reader_lock_holders_lock; ///< this protects against concurrent access to reader_lock_holders
-
-static perf_counter_t param_export_perf;
-static perf_counter_t param_find_perf;
-static perf_counter_t param_get_perf;
-static perf_counter_t param_set_perf;
 
 static px4_sem_t param_sem_save; ///< this protects against concurrent param saves (file or flash access).
 ///< we use a separate lock to allow concurrent param reads and saves.
 ///< a param_set could still be blocked by a param save, because it
 ///< needs to take the reader lock
 
-/** lock the parameter store for read access */
-static void
-param_lock_reader()
-{
-	do {} while (px4_sem_wait(&reader_lock_holders_lock) != 0);
+#include "ParameterBackend.hpp"
 
-	++reader_lock_holders;
-
-	if (reader_lock_holders == 1) {
-		// the first reader takes the lock, the next ones are allowed to just continue
-		do {} while (px4_sem_wait(&param_sem) != 0);
-	}
-
-	px4_sem_post(&reader_lock_holders_lock);
-}
-
-/** lock the parameter store for write access */
-static void
-param_lock_writer()
-{
-	do {} while (px4_sem_wait(&param_sem) != 0);
-}
-
-/** unlock the parameter store */
-static void
-param_unlock_reader()
-{
-	do {} while (px4_sem_wait(&reader_lock_holders_lock) != 0);
-
-	--reader_lock_holders;
-
-	if (reader_lock_holders == 0) {
-		// the last reader releases the lock
-		px4_sem_post(&param_sem);
-	}
-
-	px4_sem_post(&reader_lock_holders_lock);
-}
-
-/** unlock the parameter store */
-static void
-param_unlock_writer()
-{
-	px4_sem_post(&param_sem);
-}
+ParameterBackend* _backend{nullptr};
 
 /** assert that the parameter store is locked */
 static void
@@ -198,167 +120,39 @@ param_assert_locked()
 void
 param_init()
 {
-	px4_sem_init(&param_sem, 0, 1);
+	_backend = new ParameterBackend();
+
 	px4_sem_init(&param_sem_save, 0, 1);
-	px4_sem_init(&reader_lock_holders_lock, 0, 1);
-
-	param_export_perf = perf_alloc(PC_ELAPSED, "param_export");
-	param_find_perf = perf_alloc(PC_ELAPSED, "param_find");
-	param_get_perf = perf_alloc(PC_ELAPSED, "param_get");
-	param_set_perf = perf_alloc(PC_ELAPSED, "param_set");
-}
-
-/**
- * Test whether a param_t is value.
- *
- * @param param			The parameter handle to test.
- * @return			True if the handle is valid.
- */
-static constexpr bool
-handle_in_range(param_t param)
-{
-	return (param < param_info_count);
-}
-
-/**
- * Compare two modified parameter structures to determine ordering.
- *
- * This function is suitable for passing to qsort or bsearch.
- */
-static int
-param_compare_values(const void *a, const void *b)
-{
-	struct param_wbuf_s *pa = (struct param_wbuf_s *)a;
-	struct param_wbuf_s *pb = (struct param_wbuf_s *)b;
-
-	if (pa->param < pb->param) {
-		return -1;
-	}
-
-	if (pa->param > pb->param) {
-		return 1;
-	}
-
-	return 0;
-}
-
-/**
- * Locate the modified parameter structure for a parameter, if it exists.
- *
- * @param param			The parameter being searched.
- * @return			The structure holding the modified value, or
- *				nullptr if the parameter has not been modified.
- */
-static param_wbuf_s *
-param_find_changed(param_t param)
-{
-	param_wbuf_s *s = nullptr;
-
-	param_assert_locked();
-
-	if (params_active[param]) {
-
-		if (param_values != nullptr) {
-			param_wbuf_s key{};
-			key.param = param;
-			s = (param_wbuf_s *)utarray_find(param_values, &key, param_compare_values);
-		}
-	}
-
-	return s;
-}
-
-static void
-_param_notify_changes()
-{
-#if !defined(PARAM_NO_ORB)
-	parameter_update_s pup = {};
-	pup.timestamp = hrt_absolute_time();
-	pup.instance = param_instance++;
-
-	/*
-	 * If we don't have a handle to our topic, create one now; otherwise
-	 * just publish.
-	 */
-	if (param_topic == nullptr) {
-		param_topic = orb_advertise(ORB_ID(parameter_update), &pup);
-
-	} else {
-		orb_publish(ORB_ID(parameter_update), param_topic, &pup);
-	}
-
-#endif
 }
 
 void
 param_notify_changes()
 {
-	_param_notify_changes();
-}
-
-param_t
-param_find_internal(const char *name, bool notification)
-{
-	perf_begin(param_find_perf);
-
-	param_t middle;
-	param_t front = 0;
-	param_t last = param_info_count;
-
-	/* perform a binary search of the known parameters */
-
-	while (front <= last) {
-		middle = front + (last - front) / 2;
-		int ret = strcmp(name, param_name(middle));
-
-		if (ret == 0) {
-			if (notification) {
-				param_set_used(middle);
-			}
-
-			perf_end(param_find_perf);
-			return middle;
-
-		} else if (middle == front) {
-			/* An end point has been hit, but there has been no match */
-			break;
-
-		} else if (ret < 0) {
-			last = middle;
-
-		} else {
-			front = middle;
-		}
-	}
-
-	perf_end(param_find_perf);
-
-	/* not found */
-	return PARAM_INVALID;
+	_backend->notify_changes();
 }
 
 param_t
 param_find(const char *name)
 {
-	return param_find_internal(name, true);
+	return _backend->find_internal(name, true);
 }
 
 param_t
 param_find_no_notification(const char *name)
 {
-	return param_find_internal(name, false);
+	return _backend->find_internal(name, false);
 }
 
 unsigned
 param_count()
 {
-	return param_info_count;
+	return _backend->param_count();
 }
 
 unsigned
 param_count_used()
 {
-	return params_active.count();
+	return _backend->param_count_used();
 }
 
 param_t

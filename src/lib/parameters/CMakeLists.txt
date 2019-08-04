@@ -136,6 +136,8 @@ endif()
 if (NOT "${PX4_BOARD}" MATCHES "px4_io")
 	add_library(parameters
 		${SRCS}
+		ParameterBackend.cpp
+		ParameterBackend.hpp
 		px4_parameters.hpp
 		)
 

@@ -46,8 +46,8 @@ public:
 
 	~ReaderWriterLock()
 	{
-		px4_sem_destroy(_reader_lock_holders_sem);
-		px4_sem_destroy(_writer_sem);
+		px4_sem_destroy(&_reader_lock_holders_sem);
+		px4_sem_destroy(&_writer_sem);
 	}
 
 	void ReadLock()
