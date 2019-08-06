@@ -64,6 +64,8 @@ public:
 	DeviceNode(DeviceNode &&) = delete;
 	DeviceNode &operator=(DeviceNode &&) = delete;
 
+	int init() override;
+
 	/**
 	 * Method to create a subscriber instance and return the struct
 	 * pointing to the subscriber as a file pointer.

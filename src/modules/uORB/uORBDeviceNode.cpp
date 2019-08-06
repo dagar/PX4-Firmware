@@ -67,9 +67,27 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const uint8_t inst
 
 uORB::DeviceNode::~DeviceNode()
 {
-	if (_data != nullptr) {
-		delete[] _data;
+	delete[] _data;
+}
+
+int
+uORB::DeviceNode::init()
+{
+
+	int ret = CDev::init();
+
+	if (ret != PX4_OK) {
+		return ret;
 	}
+
+	_data = new uint8_t[_meta->o_size * _queue_size];
+
+	// failed to allocate
+	if (nullptr == _data) {
+		return -ENOMEM;
+	}
+
+	return PX4_OK;
 }
 
 int
@@ -168,7 +186,7 @@ uORB::DeviceNode::copy_locked(void *dst, unsigned &generation)
 {
 	bool updated = false;
 
-	if ((dst != nullptr) && (_data != nullptr)) {
+	if (dst != nullptr) {
 
 		if (_generation > generation + _queue_size) {
 			// Reader is too far behind: some messages are lost
@@ -235,11 +253,6 @@ uORB::DeviceNode::last_update()
 ssize_t
 uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
-	/* if the object has not been written yet, return zero */
-	if (_data == nullptr) {
-		return 0;
-	}
-
 	/* if the caller's buffer is the wrong size, that's an error */
 	if (buflen != _meta->o_size) {
 		return -EIO;
@@ -267,42 +280,6 @@ uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 ssize_t
 uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 {
-	/*
-	 * Writes are legal from interrupt context as long as the
-	 * object has already been initialised from thread context.
-	 *
-	 * Writes outside interrupt context will allocate the object
-	 * if it has not yet been allocated.
-	 *
-	 * Note that filp will usually be NULL.
-	 */
-	if (nullptr == _data) {
-
-#ifdef __PX4_NUTTX
-
-		if (!up_interrupt_context()) {
-#endif /* __PX4_NUTTX */
-
-			lock();
-
-			/* re-check size */
-			if (nullptr == _data) {
-				_data = new uint8_t[_meta->o_size * _queue_size];
-			}
-
-			unlock();
-
-#ifdef __PX4_NUTTX
-		}
-
-#endif /* __PX4_NUTTX */
-
-		/* failed or could not allocate */
-		if (nullptr == _data) {
-			return -ENOMEM;
-		}
-	}
-
 	/* If write size does not match, that is an error */
 	if (_meta->o_size != buflen) {
 		return -EIO;
@@ -545,11 +522,6 @@ uORB::DeviceNode::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
 bool
 uORB::DeviceNode::appears_updated(SubscriberData *sd)
 {
-	// check if this topic has been published yet, if not bail out
-	if (_data == nullptr) {
-		return false;
-	}
-
 	// if subscriber has interval check time since last update
 	if (sd->update_interval != nullptr) {
 		if (hrt_elapsed_time(&sd->update_interval->last_update) < sd->update_interval->interval) {
@@ -629,7 +601,7 @@ int16_t uORB::DeviceNode::process_add_subscription(int32_t rateInHz)
 	// send the data to the remote entity.
 	uORBCommunicator::IChannel *ch = uORB::Manager::get_instance()->get_uorb_communicator();
 
-	if (_data != nullptr && ch != nullptr) { // _data will not be null if there is a publisher.
+	if (ch != nullptr) { // _data will not be null if there is a publisher.
 		ch->send_message(_meta->o_name, _meta->o_size, _data);
 	}
 
