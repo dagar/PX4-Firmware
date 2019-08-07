@@ -111,47 +111,13 @@ private:
 	void _update_gyro_calibration();
 	void _update_mag_calibration();
 
-	orb_advert_t		    _accel_topic;
-	orb_advert_t		    _gyro_topic;
-	orb_advert_t        	    _mag_topic;
+	PX4Accelerometer	    _px4_accelerometer;
+	PX4Gyroscope		    _px4_gyroscope;
+	PX4Magnetometer		    _px4_magnetometer;
+
 	orb_advert_t		    _mavlink_log_pub;
 
 	int			    _param_update_sub;
-
-	struct accel_calibration_s {
-		float x_offset;
-		float x_scale;
-		float y_offset;
-		float y_scale;
-		float z_offset;
-		float z_scale;
-	} _accel_calibration;
-
-	struct gyro_calibration_s {
-		float x_offset;
-		float x_scale;
-		float y_offset;
-		float y_scale;
-		float z_offset;
-		float z_scale;
-	} _gyro_calibration;
-
-	struct mag_calibration_s {
-		float x_offset;
-		float x_scale;
-		float y_offset;
-		float y_scale;
-		float z_offset;
-		float z_scale;
-	} _mag_calibration;
-
-	matrix::Dcmf	    _rotation_matrix;
-	int			    _accel_orb_class_instance;
-	int			    _gyro_orb_class_instance;
-	int         _mag_orb_class_instance;
-
-	Integrator		    _accel_int;
-	Integrator		    _gyro_int;
 
 	unsigned		    _publish_count;
 
