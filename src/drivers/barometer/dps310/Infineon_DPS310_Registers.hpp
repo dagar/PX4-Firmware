@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,34 +33,47 @@
 
 #pragma once
 
-#include <drivers/drv_baro.h>
-#include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
-#include <lib/conversion/rotation.h>
-#include <uORB/uORB.h>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_baro.h>
-
-class PX4Barometer : public cdev::CDev
+namespace Infineon_DPS310
 {
 
-public:
-	PX4Barometer(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT);
-	~PX4Barometer() override;
+static constexpr uint8_t ID = 0x10;
 
-	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_baro_pub.get().error_count = error_count; }
+enum class
+Register : uint8_t {
 
-	void set_temperature(float temperature) { _sensor_baro_pub.get().temperature = temperature; }
+	PSR_B2		= 0x00,
+	PSR_B1		= 0x01,
+	PSR_B0		= 0x02,
+	TMP_B2		= 0x03,
+	TMP_B1		= 0x04,
+	TMP_B0		= 0x05,
+	PRS_CFG		= 0x06,
+	TMP_CFG		= 0x07,
+	MEAS_CFG	= 0x08,
+	CFG_REG		= 0x09,
+	INT_STS		= 0x0A,
+	FIFO_STS	= 0x0B,
+	RESET		= 0x0C,
+	Product_ID	= 0x0D,
 
-	void update(hrt_abstime timestamp, float pressure);
+	COEF		= 0x10,
 
-	void print_status();
-
-private:
-
-	uORB::PublicationMultiData<sensor_baro_s>	_sensor_baro_pub;
-
-	int			_class_device_instance{-1};
+	COEF_SRCE	= 0x28,
 
 };
+
+struct Calibration {
+	int16_t C0;	// 12bit
+	int16_t C1;	// 12bit
+	int32_t C00;	// 20bit
+	int32_t C10;	// 20bit
+	int16_t C01;	// 16bit
+	int16_t C11;	// 16bit
+	int16_t C20;	// 16bit
+	int16_t C21;	// 16bit
+	int16_t C30;	// 16bit
+
+	uint8_t temp_source;
+};
+
+} // namespace Infineon_DPS310

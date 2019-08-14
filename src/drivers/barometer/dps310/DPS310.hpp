@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,36 +31,65 @@
  *
  ****************************************************************************/
 
+/**
+ * @file dps310.cpp
+ *
+ * Driver for the DPS310 barometer connected via I2C or SPI.
+ */
+
 #pragma once
 
-#include <drivers/drv_baro.h>
-#include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
-#include <lib/conversion/rotation.h>
-#include <uORB/uORB.h>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_baro.h>
+#include <drivers/device/Device.hpp>
+#include <lib/drivers/barometer/PX4Barometer.hpp>
+#include <lib/perf/perf_counter.h>
+#include <px4_work_queue/ScheduledWorkItem.hpp>
 
-class PX4Barometer : public cdev::CDev
+#include "Infineon_DPS310_Registers.hpp"
+
+using Infineon_DPS310::Register;
+
+/*
+ * DPS310 internal constants and data structures.
+ */
+
+class DPS310 : public px4::ScheduledWorkItem
 {
-
 public:
-	PX4Barometer(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT);
-	~PX4Barometer() override;
+	DPS310(device::Device *interface);
+	virtual ~DPS310();
 
-	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_baro_pub.get().error_count = error_count; }
+	virtual int		init();
 
-	void set_temperature(float temperature) { _sensor_baro_pub.get().temperature = temperature; }
-
-	void update(hrt_abstime timestamp, float pressure);
-
-	void print_status();
+	void			print_info();
 
 private:
 
-	uORB::PublicationMultiData<sensor_baro_s>	_sensor_baro_pub;
+	void			Run() override;
 
-	int			_class_device_instance{-1};
+	void			start();
+	void			stop();
+	int			reset();
+
+	uint8_t			RegisterRead(Register reg);
+	void			RegisterWrite(Register reg, uint8_t val);
+	void			RegisterClearBits(Register reg, uint8_t clearbits);
+	void			RegisterSetBits(Register reg, uint8_t setbits);
+
+	void			calculate_PT(int32_t UT, int32_t UP, float &pressure, float &temperature);
+
+
+	PX4Barometer		_px4_barometer;
+
+	device::Device		*_interface;
+
+	Infineon_DPS310::Calibration	_calibration{};
+
+	unsigned		_measure_interval{0};
+
+	bool			_collect_phase{false};
+
+	perf_counter_t		_sample_perf;
+	perf_counter_t		_sample_interval_perf;
+	perf_counter_t		_comms_errors;
 
 };

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,36 +31,69 @@
  *
  ****************************************************************************/
 
-#pragma once
+/**
+ * @file DPS310_SPI.cpp
+ *
+ * SPI interface for DPS310
+ */
 
-#include <drivers/drv_baro.h>
-#include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
-#include <lib/conversion/rotation.h>
-#include <uORB/uORB.h>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_baro.h>
+#include <lib/drivers/device/spi.h>
 
-class PX4Barometer : public cdev::CDev
+/* SPI protocol address bits */
+#define DIR_READ			(1<<7)
+#define DIR_WRITE			(0<<7)
+
+device::Device *DPS310_SPI_interface(int bus);
+
+class DPS310_SPI : public device::SPI
 {
-
 public:
-	PX4Barometer(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT);
-	~PX4Barometer() override;
+	DPS310_SPI(int bus, uint32_t device);
+	virtual ~DPS310_SPI() = default;
 
-	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_baro_pub.get().error_count = error_count; }
-
-	void set_temperature(float temperature) { _sensor_baro_pub.get().temperature = temperature; }
-
-	void update(hrt_abstime timestamp, float pressure);
-
-	void print_status();
-
-private:
-
-	uORB::PublicationMultiData<sensor_baro_s>	_sensor_baro_pub;
-
-	int			_class_device_instance{-1};
+	virtual int	read(unsigned address, void *data, unsigned count);
+	virtual int	write(unsigned address, void *data, unsigned count);
 
 };
+
+device::Device *
+DPS310_SPI_interface(int bus)
+{
+	return new DPS310_SPI(bus, PX4_SPIDEV_BARO);
+}
+
+DPS310_SPI::DPS310_SPI(int bus, uint32_t device) :
+	SPI("DPS310_SPI", nullptr, bus, device, SPIDEV_MODE3, 10 * 1000 * 1000)
+{
+}
+
+int
+DPS310_SPI::read(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address | DIR_READ;
+
+	int ret = transfer(&buf[0], &buf[0], count + 1);
+	memcpy(data, &buf[1], count);
+	return ret;
+}
+
+int
+DPS310_SPI::write(unsigned address, void *data, unsigned count)
+{
+	uint8_t buf[32];
+
+	if (sizeof(buf) < (count + 1)) {
+		return -EIO;
+	}
+
+	buf[0] = address | DIR_WRITE;
+	memcpy(&buf[1], data, count);
+
+	return transfer(&buf[0], &buf[0], count + 1);
+}
