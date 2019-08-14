@@ -112,7 +112,7 @@ enum
 INT2_IO_CONF_BIT : uint8_t {
 	int2_io		= Bit4,
 	int2_out	= Bit3,
-
+	int2_od		= Bit2,
 	int2_lvl	= Bit1,
 };
 

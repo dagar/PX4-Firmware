@@ -37,7 +37,7 @@ px4_add_module(
 	STACK_MAIN 1500
 	COMPILE_FLAGS
 		#-DDEBUG_BUILD=1
-		#-Og
+		-O0
 	SRCS
 		Bosch_BMI088_Accelerometer_Registers.hpp
 		Bosch_BMI088_Gyroscope_Registers.hpp

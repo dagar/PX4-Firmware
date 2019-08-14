@@ -178,15 +178,11 @@ BMI088_Gyroscope::reset()
 
 
 	// GYRO_BANDWIDTH: reset default 2000 Hz
+	_px4_gyro.set_sample_rate(2000);
+	_px4_gyro.set_integrator_reset_interval(2500); // 400 Hz (2.5 ms)
+
 	// GYRO_RANGE: reset default ±2000 °/s
 	_px4_gyro.set_scale(math::radians(2000.0f) / 32767);
-
-
-	// GYRO_INT_CTRL: Enables the FIFO interrupt.
-	if (!registerSetBits(Register::GYRO_INT_CTRL, GYRO_INT_CTRL_BIT::fifo_en)) {
-		PX4_ERR("GYRO_INT_CTRL failed");
-		return PX4_ERROR;
-	}
 
 
 	// INT3_INT4_IO_CONF: Push-pull and Active low
@@ -195,40 +191,35 @@ BMI088_Gyroscope::reset()
 		return PX4_ERROR;
 	}
 
-
-	// INT3_INT4_IO_MAP: FIFO interrupt is mapped to INT3.
-	if (!registerSetBits(Register::INT3_INT4_IO_MAP, INT3_INT4_IO_MAP_BIT::Int3_fifo)) {
-		PX4_ERR("INT3_INT4_IO_MAP failed");
-		return PX4_ERROR;
-	}
-
-
-	// FIFO_WM_ENABLE: FIFO watermark level interrupt enabled
-	if (!registerWriteVerified(Register::FIFO_WM_ENABLE, FIFO_WM_ENABLE_BIT::enabled)) {
-		PX4_ERR("FIFO_WM_ENABLE failed");
+	if (!registerSetBits(Register::INT3_INT4_IO_CONF, INT3_INT4_IO_CONF_BIT::Int4_lvl)) {
+		PX4_ERR("INT3_INT4_IO_CONF Int4_lvl failed");
 		return PX4_ERROR;
 	}
 
 
 	// FIFO_EXT_INT_S: enable external FIFO synchronization on pin INT4
-	if (!registerWriteVerified(Register::FIFO_EXT_INT_S,
-				   FIFO_EXT_INT_S_BIT::ext_fifo_s_en | FIFO_EXT_INT_S_BIT::ext_fifo_s_sel)) {
+	if (!registerSetBits(Register::FIFO_EXT_INT_S,
+			     FIFO_EXT_INT_S_BIT::ext_fifo_s_en | FIFO_EXT_INT_S_BIT::ext_fifo_s_sel)) {
 		PX4_ERR("FIFO_EXT_INT_S failed");
 		return PX4_ERROR;
 	}
 
 
-	// FIFO_CONFIG_0: fifo_water_mark_level_trigger_retain<6:0>
-	uint8_t watermark = 6; // 1 frame (ODR 2000 Hz)
-
-	if (!registerWriteVerified(Register::FIFO_CONFIG_0, watermark)) {
-		PX4_ERR("FIFO_CONFIG_0 failed");
+	// GYRO_INT_CTRL: Enables the FIFO interrupt.
+	if (!registerSetBits(Register::GYRO_INT_CTRL, GYRO_INT_CTRL_BIT::data_en | GYRO_INT_CTRL_BIT::fifo_en)) {
+		PX4_ERR("GYRO_INT_CTRL failed");
 		return PX4_ERROR;
 	}
 
 
+	// INT3_INT4_IO_MAP: data ready interrupt is mapped to INT3.
+	if (!registerSetBits(Register::INT3_INT4_IO_MAP, INT3_INT4_IO_MAP_BIT::Int3_data)) {
+		PX4_ERR("INT3_INT4_IO_MAP failed");
+		return PX4_ERROR;
+	}
+
 	// FIFO_CONFIG_1: sampling continues when buffer is full (i.e. filled with 99 frames); old is discarded
-	if (!registerWriteVerified(Register::FIFO_CONFIG_1, FIFO_CONFIG_1_BIT::FIFO_MODE)) {
+	if (!registerWriteVerified(Register::FIFO_CONFIG_1, FIFO_CONFIG_1_BIT::STREAM_MODE)) {
 		PX4_ERR("FIFO_CONFIG_1 failed");
 		return PX4_ERROR;
 	}
@@ -287,7 +278,7 @@ BMI088_Gyroscope::resetFIFO()
 
 	// FIFO overrun condition can only be cleared by writing to the FIFO configuration register FIFO_CONFIG_1
 	registerWriteVerified(Register::FIFO_CONFIG_1, 0x00);
-	registerWriteVerified(Register::FIFO_CONFIG_1, FIFO_CONFIG_1_BIT::FIFO_MODE);
+	registerWriteVerified(Register::FIFO_CONFIG_1, FIFO_CONFIG_1_BIT::STREAM_MODE);
 
 	// Writing to water mark level trigger in register 0x3D clears the FIFO buffer.
 	uint8_t watermark = 6; // 1 frame (ODR 2000 Hz)
@@ -340,7 +331,7 @@ BMI088_Gyroscope::Run()
 	}
 
 	// empty FIFO_DATA
-	uint8_t fifo_buffer[fifo_frame_counter + 1] {};
+	uint8_t fifo_buffer[sizeof(FIFO::DATA)*fifo_frame_counter + 1] {};
 	fifo_buffer[0] = static_cast<uint8_t>(Register::FIFO_DATA) | DIR_READ;
 
 	if (transfer(&fifo_buffer[0], &fifo_buffer[0], sizeof(fifo_buffer)) != PX4_OK) {
@@ -355,6 +346,12 @@ BMI088_Gyroscope::Run()
 	while (fifo_buffer_index < sizeof(fifo_buffer)) {
 
 		FIFO::DATA *data = (FIFO::DATA *)&fifo_buffer[fifo_buffer_index];
+
+		// check for interrupt tag
+		// the least significant bit of the z-axis is used as tag-bit
+		if (data->RATE_Z_LSB & Bit0) {
+			//PX4_INFO("gyro tag bit set: %d", fifo_buffer_index);
+		}
 
 		int16_t x = (int16_t)(data->RATE_X_MSB << 8) + data->RATE_X_LSB;
 		int16_t y = (int16_t)(data->RATE_Y_MSB << 8) + data->RATE_Y_LSB;

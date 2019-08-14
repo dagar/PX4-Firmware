@@ -225,6 +225,7 @@ BMI088_Accelerometer::reset()
 	}
 
 	_px4_accel.set_sample_rate(1600); // 1600 Hz ODR
+	_px4_accel.set_integrator_reset_interval(2500); // 400 Hz (2.5 ms)
 
 	// Wait for > 2 ms
 	px4_usleep(2000);
@@ -238,7 +239,8 @@ BMI088_Accelerometer::reset()
 
 
 	// FIFO_WTM: 13 bit FIFO watermark level value
-	const uint16_t fifo_water_mark = 7 * 4; // 7 bytes per sensor reading * 4 (2.5 ms of data at 1600 Hz ODR)
+	const uint16_t fifo_water_mark = sizeof(FIFO::DATA) *
+					 5; // 7 bytes per sensor reading * 4 (2.5 ms of data at 1600 Hz ODR)
 	registerWriteVerified(Register::FIFO_WTM_0, (fifo_water_mark & 0x00FF));	// fifo_water_mark[7:0]
 	registerWriteVerified(Register::FIFO_WTM_1, (fifo_water_mark & 0x0700) >> 8);	// fifo_water_mark[12:8]
 
@@ -251,15 +253,14 @@ BMI088_Accelerometer::reset()
 
 
 	// INT2_IO_CONF: Enable INT2 as input pin
-	if (!registerWriteVerified(Register::INT2_IO_CONF, INT2_IO_CONF_BIT::int2_io)) {
+	if (!registerSetBits(Register::INT2_IO_CONF, INT2_IO_CONF_BIT::int2_io)) {
 		PX4_ERR("INT2_IO_CONF failed");
 		return PX4_ERROR;
 	}
 
 
 	// INT1_INT2_MAP_DATA: Map FIFO full interrupt and watermark to pin INT1
-	if (!registerWriteVerified(Register::INT1_INT2_MAP_DATA,
-				   INT1_INT2_MAP_DATA_BIT::int1_ffull | INT1_INT2_MAP_DATA_BIT::int1_fwm)) {
+	if (!registerSetBits(Register::INT1_INT2_MAP_DATA, INT1_INT2_MAP_DATA_BIT::int1_fwm)) {
 		PX4_ERR("INT1_INT2_MAP_DATA failed");
 		return PX4_ERROR;
 	}
@@ -377,8 +378,8 @@ BMI088_Accelerometer::Run()
 		return;
 	}
 
-	const uint8_t FIFO_LENGTH_0 = fifo_len_buf[2];		// fifo_byte_counter[13:8]
-	const uint8_t FIFO_LENGTH_1 = fifo_len_buf[3] & 0xFD;	// fifo_byte_counter[7:0]
+	const uint8_t FIFO_LENGTH_0 = fifo_len_buf[2];		// fifo_byte_counter[7:0]
+	const uint8_t FIFO_LENGTH_1 = fifo_len_buf[3] & 0xFD;	// fifo_byte_counter[13:8]
 
 	const uint16_t fifo_byte_counter = FIFO_LENGTH_0 + (FIFO_LENGTH_1 << 8);
 
@@ -402,17 +403,21 @@ BMI088_Accelerometer::Run()
 	fifo_buffer[0] = static_cast<uint8_t>(Register::FIFO_DATA) | DIR_READ;
 	// fifo_buffer[1] dummy byte
 
-	if (transfer(&fifo_buffer[0], &fifo_buffer[0], sizeof(fifo_buffer)) != PX4_OK) {
+	if (transfer(&fifo_buffer[0], &fifo_buffer[0], fifo_byte_counter + 2) != PX4_OK) {
 		perf_end(_sample_perf);
 		_px4_accel.set_error_count(perf_event_count(_bad_transfers) + perf_event_count(_bad_registers));
 		return;
 	}
 
+
+	// first find all sensor data frames in the buffer
 	unsigned fifo_buffer_index = 2;
-	int sensor_data_frame = 0;
+
+	// array to store the index to every sensor data frame
+	int sensor_data_frame_count = 0;
+	uint8_t sensor_data_frame_index_array[fifo_byte_counter / 7] {};
 
 	while (fifo_buffer_index < sizeof(fifo_buffer)) {
-
 		// header set by first 6 bits
 		switch (fifo_buffer[fifo_buffer_index] & 0xFC) {
 		case FIFO::header::sensor_data_frame: {
@@ -420,28 +425,22 @@ BMI088_Accelerometer::Run()
 				// Frame length: 7 bytes (1 byte header + 6 bytes payload)
 				PX4_DEBUG("Acceleration sensor data frame");
 
-				FIFO::DATA *data = (FIFO::DATA *)&fifo_buffer[fifo_buffer_index];
+				// check for [INT2 tag]
+				if (fifo_buffer[fifo_buffer_index] & Bit1) {
+					PX4_INFO("INT2 tag");
+				}
 
-				int16_t x = (int16_t)(data->ACC_X_MSB << 8) + data->ACC_X_LSB;
-				int16_t y = (int16_t)(data->ACC_Y_MSB << 8) + data->ACC_Y_LSB;
-				int16_t z = (int16_t)(data->ACC_Z_MSB << 8) + data->ACC_Z_LSB;
-
-				// 625 microseconds per sample (1600 Hz ODR)
-				const hrt_abstime timestamp_sample = _timestamp_drdy + sensor_data_frame * 625;
-
-				// Sensing axes orientation (see datasheet 8.2)
-				//  flip y and z
-				_px4_accel.update(timestamp_sample, x, -y, -z);
+				sensor_data_frame_index_array[sensor_data_frame_count] = fifo_buffer_index;
+				sensor_data_frame_count++;
 
 				fifo_buffer_index += 7;
-				sensor_data_frame++;
 			}
 			break;
 
 		case FIFO::header::skip_frame: {
 				// Skip Frame
 				// Frame length: 2 bytes (1 byte header + 1 byte payload)
-				PX4_INFO("Skip Frame");
+				PX4_DEBUG("Skip Frame");
 				fifo_buffer_index += 2;
 			}
 			break;
@@ -449,7 +448,7 @@ BMI088_Accelerometer::Run()
 		case FIFO::header::sensor_time_frame: {
 				// Sensortime Frame
 				// Frame length: 4 bytes (1 byte header + 3 bytes payload)
-				PX4_INFO("Sensortime Frame");
+				PX4_DEBUG("Sensortime Frame");
 				fifo_buffer_index += 4;
 			}
 			break;
@@ -457,7 +456,7 @@ BMI088_Accelerometer::Run()
 		case FIFO::header::FIFO_input_config_frame: {
 				// FIFO input config Frame
 				// Frame length: 2 bytes (1 byte header + 1 byte payload)
-				PX4_INFO("FIFO input config Frame");
+				PX4_DEBUG("FIFO input config Frame");
 				fifo_buffer_index += 2;
 			}
 			break;
@@ -465,7 +464,7 @@ BMI088_Accelerometer::Run()
 		case FIFO::header::sample_drop_frame: {
 				// Sample drop Frame
 				// Frame length: 2 bytes (1 byte header + 1 byte payload)
-				PX4_INFO("Sample drop Frame");
+				PX4_DEBUG("Sample drop Frame");
 				fifo_buffer_index += 2;
 			}
 			break;
@@ -475,6 +474,29 @@ BMI088_Accelerometer::Run()
 			break;
 		}
 	}
+
+	// assuming DRDY timestamp corresponds with last sample (1600 Hz ODR = 625 us between samples)
+	const hrt_abstime timestamp_first = _timestamp_drdy - (sensor_data_frame_count * 625);
+
+	for (int i = 0; i < sensor_data_frame_count; i++) {
+		const int fifo_index = sensor_data_frame_index_array[i];
+
+		if (fifo_index > 0) {
+			FIFO::DATA *data = (FIFO::DATA *)&fifo_buffer[fifo_index];
+
+			int16_t x = (int16_t)(data->ACC_X_MSB << 8) + data->ACC_X_LSB;
+			int16_t y = (int16_t)(data->ACC_Y_MSB << 8) + data->ACC_Y_LSB;
+			int16_t z = (int16_t)(data->ACC_Z_MSB << 8) + data->ACC_Z_LSB;
+
+			// 625 microseconds per sample (1600 Hz ODR)
+			const hrt_abstime timestamp_sample = timestamp_first + i * 625;
+
+			// Sensing axes orientation (see datasheet 8.2)
+			//  flip y and z
+			_px4_accel.update(timestamp_sample, x, -y, -z);
+		}
+	}
+
 
 	// Temperature: sensor data is updated every 1.28 s.
 	if (hrt_elapsed_time(&_last_temperature_update) > 1280000) {

@@ -86,7 +86,8 @@ FIFO_STATUS_BIT : uint8_t {
 // GYRO_INT_CTRL
 enum
 GYRO_INT_CTRL_BIT : uint8_t {
-	fifo_en = Bit6
+	data_en = Bit7,
+	fifo_en = Bit6,
 };
 
 // INT3_INT4_IO_CONF

@@ -222,5 +222,29 @@ bmi088_main(int argc, char *argv[])
 		return bmi088::regdump(external_bus);
 	}
 
+	if (!strcmp(verb, "testsync")) {
+#ifdef GPIO_DRDY_BMI088_INT2_ACCEL
+		PX4_INFO("GPIO_DRDY_BMI088_INT2_ACCEL: 0");
+		px4_arch_gpiowrite(GPIO_DRDY_BMI088_INT2_ACCEL, 0);
+
+		up_udelay(200);
+
+		PX4_INFO("GPIO_DRDY_BMI088_INT2_ACCEL: 1");
+		px4_arch_gpiowrite(GPIO_DRDY_BMI088_INT2_ACCEL, 1);
+#endif // GPIO_DRDY_BMI088_INT2_ACCEL
+
+#ifdef GPIO_DRDY_BMI088_INT4_GYRO
+		PX4_INFO("GPIO_DRDY_BMI088_INT4_GYRO: 0");
+		px4_arch_gpiowrite(GPIO_DRDY_BMI088_INT4_GYRO, 0);
+
+		up_udelay(200);
+
+		PX4_INFO("GPIO_DRDY_BMI088_INT4_GYRO: 1");
+		px4_arch_gpiowrite(GPIO_DRDY_BMI088_INT4_GYRO, 1);
+#endif // GPIO_DRDY_BMI088_INT2_ACCEL
+
+		return 0;
+	}
+
 	return bmi088::usage();
 }
