@@ -38,14 +38,13 @@
 #include <drivers/drv_hrt.h>
 #include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
-#include <mathlib/math/filter/LowPassFilter2pVector3f.hpp>
-#include <px4_module_params.h>
 #include <uORB/uORB.h>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/sensor_gyro.h>
-#include <uORB/topics/sensor_gyro_control.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/topics/sensor_gyro_raw.h>
 
-class PX4Gyroscope : public cdev::CDev, public ModuleParams
+class PX4Gyroscope : public cdev::CDev
 {
 
 public:
@@ -55,11 +54,9 @@ public:
 	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_gyro_pub.get().error_count = error_count; }
-	void set_scale(float scale) { _sensor_gyro_pub.get().scaling = scale; }
-	void set_temperature(float temperature) { _sensor_gyro_pub.get().temperature = temperature; }
-
-	void set_sample_rate(unsigned rate);
+	void set_error_count(uint64_t error_count) { _sensor_gyro_integrated_pub.get().error_count = error_count; }
+	void set_scale(float scale) { _sensor_gyro_raw_pub.get().scaling = scale; }
+	void set_temperature(float temperature) { _sensor_gyro_integrated_pub.get().temperature = temperature; }
 
 	void update(hrt_abstime timestamp, float x, float y, float z);
 
@@ -67,12 +64,10 @@ public:
 
 private:
 
-	void configure_filter(float cutoff_freq) { _filter.set_cutoff_frequency(_sample_rate, cutoff_freq); }
-
 	uORB::PublicationMultiData<sensor_gyro_s>		_sensor_gyro_pub;
-	uORB::PublicationMultiData<sensor_gyro_control_s>	_sensor_gyro_control_pub;
+	uORB::PublicationMultiData<sensor_gyro_integrated_s>	_sensor_gyro_integrated_pub;
+	uORB::PublicationMultiData<sensor_gyro_raw_s>		_sensor_gyro_raw_pub;
 
-	math::LowPassFilter2pVector3f _filter{1000, 100};
 	Integrator _integrator{4000, true};
 
 	const enum Rotation	_rotation;
@@ -81,11 +76,5 @@ private:
 	matrix::Vector3f	_calibration_offset{0.0f, 0.0f, 0.0f};
 
 	int			_class_device_instance{-1};
-
-	unsigned		_sample_rate{1000};
-
-	DEFINE_PARAMETERS(
-		(ParamFloat<px4::params::IMU_GYRO_CUTOFF>) _param_imu_gyro_cutoff
-	)
 
 };

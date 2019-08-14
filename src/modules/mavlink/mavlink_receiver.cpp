@@ -1904,10 +1904,9 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 		sensor_gyro_s gyro{};
 
 		gyro.timestamp = timestamp;
-		gyro.x_raw = imu.xgyro * 1000.0f;
-		gyro.y_raw = imu.ygyro * 1000.0f;
-		gyro.z_raw = imu.zgyro * 1000.0f;
-		gyro.temperature = imu.temperature;
+		gyro.xyz[0] = imu.xgyro * 1000.0f;
+		gyro.xyz[1] = imu.ygyro * 1000.0f;
+		gyro.xyz[2] = imu.zgyro * 1000.0f;
 
 		_gyro_pub.publish(gyro);
 	}
@@ -2303,10 +2302,9 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		sensor_gyro_s gyro{};
 
 		gyro.timestamp = timestamp;
-		gyro.x_raw = hil_state.rollspeed * 1e3f;
-		gyro.y_raw = hil_state.pitchspeed * 1e3f;
-		gyro.z_raw = hil_state.yawspeed * 1e3f;
-		gyro.temperature = 25.0f;
+		gyro.xyz[0] = hil_state.rollspeed * 1e3f;
+		gyro.xyz[1] = hil_state.pitchspeed * 1e3f;
+		gyro.xyz[2] = hil_state.yawspeed * 1e3f;
 
 		_gyro_pub.publish(gyro);
 	}

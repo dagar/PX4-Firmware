@@ -4,4 +4,7 @@ uint64 timestamp	# time since system start (microseconds)
 
 uint64 timestamp_sample	# time the raw data was sampled (microseconds)
 
-float32[3] xyz		# filtered angular velocity in the NED X board axis in rad/s
+float32 scaling		# scaling from raw to rad/s
+int16 x_raw
+int16 y_raw
+int16 z_raw

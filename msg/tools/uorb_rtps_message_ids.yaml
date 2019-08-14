@@ -258,8 +258,10 @@ rtps:
     id: 112
   - msg: vehicle_acceleration
     id: 113
-  - msg: sensor_gyro_control
+  - msg: sensor_gyro_integrated
     id: 114
+  - msg: sensor_gyro_raw
+    id: 115
   # multi topics
   - msg: actuator_controls_0
     id: 120

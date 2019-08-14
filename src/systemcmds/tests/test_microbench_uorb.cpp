@@ -49,7 +49,7 @@
 
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/sensor_accel.h>
-#include <uORB/topics/sensor_gyro_control.h>
+#include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_status.h>
 
@@ -105,7 +105,7 @@ private:
 
 	vehicle_status_s status;
 	vehicle_local_position_s lpos;
-	sensor_gyro_control_s gyro;
+	sensor_gyro_s gyro;
 };
 
 bool MicroBenchORB::run_tests()
@@ -143,7 +143,7 @@ bool MicroBenchORB::time_px4_uorb()
 {
 	int fd_status = orb_subscribe(ORB_ID(vehicle_status));
 	int fd_lpos = orb_subscribe(ORB_ID(vehicle_local_position));
-	int fd_gyro = orb_subscribe(ORB_ID(sensor_gyro_control));
+	int fd_gyro = orb_subscribe(ORB_ID(sensor_gyro));
 
 	int ret = 0;
 	bool updated = false;
@@ -163,7 +163,7 @@ bool MicroBenchORB::time_px4_uorb()
 
 	PERF("orb_check sensor_gyro", ret = orb_check(fd_gyro, &updated), 1000);
 	PERF("orb_stat sensor_gyro", ret = orb_stat(fd_gyro, &time), 1000);
-	PERF("orb_copy sensor_gyro", ret = orb_copy(ORB_ID(sensor_gyro_control), fd_gyro, &gyro), 1000);
+	PERF("orb_copy sensor_gyro", ret = orb_copy(ORB_ID(sensor_gyro), fd_gyro, &gyro), 1000);
 
 	printf("\n");
 
@@ -198,7 +198,7 @@ bool MicroBenchORB::time_px4_uorb_direct()
 
 	printf("\n");
 
-	uORB::Subscription sens_gyro{ORB_ID(sensor_gyro_control)};
+	uORB::Subscription sens_gyro{ORB_ID(sensor_gyro)};
 	PERF("uORB::Subscription orb_check sensor_gyro", ret = sens_gyro.updated(), 1000);
 	PERF("uORB::Subscription orb_copy sensor_gyro", ret = sens_gyro.copy(&gyro), 1000);
 

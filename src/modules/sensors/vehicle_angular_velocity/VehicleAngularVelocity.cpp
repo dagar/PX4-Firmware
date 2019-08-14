@@ -171,6 +171,9 @@ VehicleAngularVelocity::ParametersUpdate(bool force)
 				math::radians(_param_sens_board_z_off.get())));
 
 		_board_rotation = board_rotation_offset * board_rotation;
+
+		// set software low pass filter for controllers
+		configure_filter(_param_imu_gyro_cutoff.get());
 	}
 }
 
@@ -183,7 +186,7 @@ VehicleAngularVelocity::Run()
 	// update corrections first to set _selected_sensor
 	SensorCorrectionsUpdate();
 
-	sensor_gyro_control_s sensor_data;
+	sensor_gyro_s sensor_data;
 
 	if (_sensor_sub[_selected_sensor].update(&sensor_data)) {
 		perf_set_elapsed(_sensor_latency_perf, hrt_elapsed_time(&sensor_data.timestamp));
@@ -202,7 +205,7 @@ VehicleAngularVelocity::Run()
 
 		vehicle_angular_velocity_s angular_velocity;
 		angular_velocity.timestamp_sample = sensor_data.timestamp;
-		rates.copyTo(angular_velocity.xyz);
+		_filter.apply(rates).copyTo(angular_velocity.xyz);
 		angular_velocity.timestamp = hrt_absolute_time();
 
 		_vehicle_angular_velocity_pub.publish(angular_velocity);
@@ -215,6 +218,9 @@ void
 VehicleAngularVelocity::PrintStatus()
 {
 	PX4_INFO("selected sensor: %d", _selected_sensor);
+
+	PX4_INFO("sample rate: %d Hz", _sample_rate);
+	PX4_INFO("filter cutoff: %.3f Hz", (double)_filter.get_cutoff_freq());
 
 	perf_print_counter(_cycle_perf);
 	perf_print_counter(_interval_perf);

@@ -40,7 +40,7 @@
  */
 
 #include <mathlib/mathlib.h>
-#include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
 #include "gyro.h"
 #include <drivers/drv_hrt.h>
 
@@ -83,8 +83,8 @@ int TemperatureCalibrationGyro::update_sensor_instance(PerSensorData &data, int 
 		return finished ? 0 : 1;
 	}
 
-	sensor_gyro_s gyro_data;
-	orb_copy(ORB_ID(sensor_gyro), sensor_sub, &gyro_data);
+	sensor_gyro_integrated_s gyro_data{};
+	orb_copy(ORB_ID(sensor_gyro_integrated), sensor_sub, &gyro_data);
 
 	if (finished) {
 		// if we're done, return, but we need to return after orb_copy because of poll()

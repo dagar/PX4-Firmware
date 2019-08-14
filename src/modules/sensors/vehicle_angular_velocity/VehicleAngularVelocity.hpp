@@ -34,6 +34,7 @@
 #pragma once
 
 #include <lib/conversion/rotation.h>
+#include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
@@ -49,7 +50,7 @@
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/sensor_selection.h>
 
-#include <uORB/topics/sensor_gyro_control.h>
+#include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 
 class VehicleAngularVelocity : public ModuleParams, public px4::WorkItem
@@ -75,6 +76,8 @@ private:
 	static constexpr int MAX_SENSOR_COUNT = 3;
 
 	DEFINE_PARAMETERS(
+		(ParamFloat<px4::params::IMU_GYRO_CUTOFF>) _param_imu_gyro_cutoff,
+
 		(ParamInt<px4::params::SENS_BOARD_ROT>) _param_sens_board_rot,
 
 		(ParamFloat<px4::params::SENS_BOARD_X_OFF>) _param_sens_board_x_off,
@@ -90,9 +93,9 @@ private:
 
 	uORB::SubscriptionCallbackWorkItem	_sensor_selection_sub{this, ORB_ID(sensor_selection)};	/**< selected primary sensor subscription */
 	uORB::SubscriptionCallbackWorkItem	_sensor_sub[MAX_SENSOR_COUNT] {				/**< sensor data subscription */
-		{this, ORB_ID(sensor_gyro_control), 0},
-		{this, ORB_ID(sensor_gyro_control), 1},
-		{this, ORB_ID(sensor_gyro_control), 2}
+		{this, ORB_ID(sensor_gyro), 0},
+		{this, ORB_ID(sensor_gyro), 1},
+		{this, ORB_ID(sensor_gyro), 2}
 	};
 
 	matrix::Dcmf				_board_rotation;				/**< rotation matrix for the orientation that the board is mounted */
@@ -100,6 +103,10 @@ private:
 	matrix::Vector3f			_offset;
 	matrix::Vector3f			_scale;
 	matrix::Vector3f			_bias;
+
+	math::LowPassFilter2pVector3f		_filter{1000, 100};
+	unsigned				_sample_rate{1000};
+
 
 	perf_counter_t				_cycle_perf;
 	perf_counter_t				_interval_perf;

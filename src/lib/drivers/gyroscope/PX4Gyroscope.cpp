@@ -38,19 +38,16 @@
 
 PX4Gyroscope::PX4Gyroscope(uint32_t device_id, uint8_t priority, enum Rotation rotation) :
 	CDev(nullptr),
-	ModuleParams(nullptr),
 	_sensor_gyro_pub{ORB_ID(sensor_gyro), priority},
-	_sensor_gyro_control_pub{ORB_ID(sensor_gyro_control), priority},
+	_sensor_gyro_integrated_pub{ORB_ID(sensor_gyro_integrated), priority},
+	_sensor_gyro_raw_pub{ORB_ID(sensor_gyro_raw), priority},
 	_rotation{rotation}
 {
 	_class_device_instance = register_class_devname(GYRO_BASE_DEVICE_PATH);
 
 	_sensor_gyro_pub.get().device_id = device_id;
-	_sensor_gyro_control_pub.get().device_id = device_id;
-
-	// set software low pass filter for controllers
-	updateParams();
-	configure_filter(_param_imu_gyro_cutoff.get());
+	_sensor_gyro_integrated_pub.get().device_id = device_id;
+	_sensor_gyro_raw_pub.get().device_id = device_id;
 }
 
 PX4Gyroscope::~PX4Gyroscope()
@@ -95,67 +92,58 @@ PX4Gyroscope::set_device_type(uint8_t devtype)
 
 	// copy back to report
 	_sensor_gyro_pub.get().device_id = device_id.devid;
-	_sensor_gyro_control_pub.get().device_id = device_id.devid;
-}
-
-void
-PX4Gyroscope::set_sample_rate(unsigned rate)
-{
-	_sample_rate = rate;
-	_filter.set_cutoff_frequency(_sample_rate, _filter.get_cutoff_freq());
+	_sensor_gyro_integrated_pub.get().device_id = device_id.devid;
+	_sensor_gyro_raw_pub.get().device_id = device_id.devid;
 }
 
 void
 PX4Gyroscope::update(hrt_abstime timestamp, float x, float y, float z)
 {
-	sensor_gyro_s &report = _sensor_gyro_pub.get();
-	report.timestamp = timestamp;
-
 	// Apply rotation (before scaling)
 	rotate_3f(_rotation, x, y, z);
 
-	const matrix::Vector3f raw{x, y, z};
+	const matrix::Vector3f val{x, y, z};
 
 	// Apply range scale and the calibrating offset/scale
-	const matrix::Vector3f val_calibrated{(((raw * report.scaling) - _calibration_offset).emult(_calibration_scale))};
+	const matrix::Vector3f val_calibrated{(((val * _sensor_gyro_raw_pub.get().scaling) - _calibration_offset).emult(_calibration_scale))};
 
-	// Filtered values
-	const matrix::Vector3f val_filtered{_filter.apply(val_calibrated)};
-
-	// publish control data (filtered gyro) immediately
-	sensor_gyro_control_s &control = _sensor_gyro_control_pub.get();
-	control.timestamp_sample = timestamp;
-	val_filtered.copyTo(control.xyz);
-	control.timestamp = hrt_absolute_time();
-	_sensor_gyro_control_pub.update();	// publish
+	sensor_gyro_s &report = _sensor_gyro_pub.get();
+	report.timestamp_sample = timestamp;
+	val_calibrated.copyTo(report.xyz);
+	report.timestamp = hrt_absolute_time();
+	_sensor_gyro_pub.update(); //publish
 
 	// Integrated values
 	matrix::Vector3f integrated_value;
 	uint32_t integral_dt = 0;
 
 	if (_integrator.put(timestamp, val_calibrated, integrated_value, integral_dt)) {
+		sensor_gyro_integrated_s &report_int = _sensor_gyro_integrated_pub.get();
 
-		// Raw values (ADC units 0 - 65535)
-		report.x_raw = x;
-		report.y_raw = y;
-		report.z_raw = z;
+		report_int.timestamp_sample = timestamp;
+		report_int.integral_dt = integral_dt;
+		report_int.x_integral = integrated_value(0);
+		report_int.y_integral = integrated_value(1);
+		report_int.z_integral = integrated_value(2);
 
-		report.integral_dt = integral_dt;
-		report.x_integral = integrated_value(0);
-		report.y_integral = integrated_value(1);
-		report.z_integral = integrated_value(2);
-
-		poll_notify(POLLIN);
+		report_int.timestamp = hrt_absolute_time();
 		_sensor_gyro_pub.update();	// publish
 	}
+
+	// Raw values (ADC units 0 - 65535)
+	sensor_gyro_raw_s& raw = _sensor_gyro_raw_pub.get();
+	raw.x_raw = x;
+	raw.y_raw = y;
+	raw.z_raw = z;
+	raw.timestamp_sample = timestamp;
+	raw.timestamp = hrt_absolute_time();
+	_sensor_gyro_raw_pub.update();	// publish
 }
 
 void
 PX4Gyroscope::print_status()
 {
 	PX4_INFO(GYRO_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
-	PX4_INFO("sample rate: %d Hz", _sample_rate);
-	PX4_INFO("filter cutoff: %.3f Hz", (double)_filter.get_cutoff_freq());
 
 	PX4_INFO("calibration scale: %.5f %.5f %.5f", (double)_calibration_scale(0), (double)_calibration_scale(1),
 		 (double)_calibration_scale(2));
@@ -163,5 +151,6 @@ PX4Gyroscope::print_status()
 		 (double)_calibration_offset(2));
 
 	print_message(_sensor_gyro_pub.get());
-	print_message(_sensor_gyro_control_pub.get());
+	print_message(_sensor_gyro_integrated_pub.get());
+	print_message(_sensor_gyro_raw_pub.get());
 }
