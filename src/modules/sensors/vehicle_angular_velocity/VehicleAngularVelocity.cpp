@@ -183,7 +183,7 @@ VehicleAngularVelocity::Run()
 	// update corrections first to set _selected_sensor
 	SensorCorrectionsUpdate();
 
-	sensor_gyro_s sensor_data;
+	sensor_gyro_control_s sensor_data;
 
 	if (_sensor_sub[_selected_sensor].update(&sensor_data)) {
 		perf_set_elapsed(_sensor_latency_perf, hrt_elapsed_time(&sensor_data.timestamp));
@@ -191,11 +191,8 @@ VehicleAngularVelocity::Run()
 		ParametersUpdate();
 		SensorBiasUpdate();
 
-		// get the sensor data and correct for thermal errors
-		const Vector3f val{sensor_data.x, sensor_data.y, sensor_data.z};
-
-		// apply offsets and scale
-		Vector3f rates{(val - _offset).emult(_scale)};
+		// get the sensor data and correct for thermal errors (apply offsets and scale)
+		Vector3f rates{(Vector3f{sensor_data.xyz} - _offset).emult(_scale)};
 
 		// rotate corrected measurements from sensor to body frame
 		rates = _board_rotation * rates;

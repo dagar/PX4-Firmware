@@ -61,6 +61,7 @@
 #include <parameters/param.h>
 #include <systemlib/err.h>
 #include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/sensor_gyro_control.h>
 
 static const char *sensor_name = "mag";
 static constexpr unsigned max_mags = 4;
@@ -375,7 +376,7 @@ static calibrate_return mag_calibration_worker(detect_orientation_return orienta
 
 	const float gyro_int_thresh_rad = 0.5f;
 
-	int sub_gyro = orb_subscribe(ORB_ID(sensor_gyro));
+	int sub_gyro = orb_subscribe(ORB_ID(sensor_gyro_control));
 
 	while (fabsf(gyro_x_integral) < gyro_int_thresh_rad &&
 	       fabsf(gyro_y_integral) < gyro_int_thresh_rad &&
@@ -405,17 +406,17 @@ static calibrate_return mag_calibration_worker(detect_orientation_return orienta
 		int poll_ret = px4_poll(fds, fd_count, 1000);
 
 		if (poll_ret > 0) {
-			sensor_gyro_s gyro{};
-			orb_copy(ORB_ID(sensor_gyro), sub_gyro, &gyro);
+			sensor_gyro_control_s gyro{};
+			orb_copy(ORB_ID(sensor_gyro_control), sub_gyro, &gyro);
 
 			/* ensure we have a valid first timestamp */
 			if (last_gyro > 0) {
 
 				/* integrate */
 				float delta_t = (gyro.timestamp - last_gyro) / 1e6f;
-				gyro_x_integral += gyro.x * delta_t;
-				gyro_y_integral += gyro.y * delta_t;
-				gyro_z_integral += gyro.z * delta_t;
+				gyro_x_integral += gyro.xyz[0] * delta_t;
+				gyro_y_integral += gyro.xyz[1] * delta_t;
+				gyro_z_integral += gyro.xyz[2] * delta_t;
 			}
 
 			last_gyro = gyro.timestamp;

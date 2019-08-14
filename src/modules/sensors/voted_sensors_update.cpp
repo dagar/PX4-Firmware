@@ -664,40 +664,13 @@ void VotedSensorsUpdate::gyroPoll(struct sensor_combined_s &raw)
 
 			_gyro_device_id[uorb_index] = gyro_report.device_id;
 
-			Vector3f gyro_rate;
+			// convert the delta angles to an equivalent angular rate before application of corrections
+			const float dt_inv = 1.e6f / gyro_report.integral_dt;
+			matrix::Vector3f gyro_rate{gyro_report.x_integral * dt_inv,
+						   gyro_report.y_integral * dt_inv,
+						   gyro_report.z_integral * dt_inv};
 
-			if (gyro_report.integral_dt != 0) {
-				/*
-				 * Using data that has been integrated in the driver before downsampling is preferred
-				 * becasue it reduces aliasing errors. Correct the raw sensor data for scale factor errors
-				 * and offsets due to temperature variation. It is assumed that any filtering of input
-				 * data required is performed in the sensor driver, preferably before downsampling.
-				*/
-
-				// convert the delta angles to an equivalent angular rate before application of corrections
-				float dt_inv = 1.e6f / gyro_report.integral_dt;
-				gyro_rate = Vector3f(gyro_report.x_integral * dt_inv,
-						     gyro_report.y_integral * dt_inv,
-						     gyro_report.z_integral * dt_inv);
-
-				_last_sensor_data[uorb_index].gyro_integral_dt = gyro_report.integral_dt;
-
-			} else {
-				//using the value instead of the integral (the integral is the prefered choice)
-
-				// Correct each sensor for temperature effects
-				// Filtering and/or downsampling of temperature should be performed in the driver layer
-				gyro_rate = Vector3f(gyro_report.x, gyro_report.y, gyro_report.z);
-
-				// handle the case where this is our first output
-				if (_last_sensor_data[uorb_index].timestamp == 0) {
-					_last_sensor_data[uorb_index].timestamp = gyro_report.timestamp - 1000;
-				}
-
-				// approximate the delta time using the difference in gyro data time stamps
-				_last_sensor_data[uorb_index].gyro_integral_dt =
-					(gyro_report.timestamp - _last_sensor_data[uorb_index].timestamp);
-			}
+			_last_sensor_data[uorb_index].gyro_integral_dt = gyro_report.integral_dt;
 
 			// handle temperature compensation
 			if (_temperature_compensation.apply_corrections_gyro(uorb_index, gyro_rate, gyro_report.temperature,

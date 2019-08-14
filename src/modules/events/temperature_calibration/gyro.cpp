@@ -93,9 +93,11 @@ int TemperatureCalibrationGyro::update_sensor_instance(PerSensorData &data, int 
 
 	data.device_id = gyro_data.device_id;
 
-	data.sensor_sample_filt[0] = gyro_data.x;
-	data.sensor_sample_filt[1] = gyro_data.y;
-	data.sensor_sample_filt[2] = gyro_data.z;
+	const float dt_inv = 1.e6f / gyro_data.integral_dt;
+
+	data.sensor_sample_filt[0] = gyro_data.x_integral * dt_inv;
+	data.sensor_sample_filt[1] = gyro_data.y_integral * dt_inv;
+	data.sensor_sample_filt[2] = gyro_data.z_integral * dt_inv;
 	data.sensor_sample_filt[3] = gyro_data.temperature;
 
 	// wait for min start temp to be reached before starting calibration

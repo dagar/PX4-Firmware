@@ -49,7 +49,7 @@
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/sensor_selection.h>
 
-#include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_control.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 
 class VehicleAngularVelocity : public ModuleParams, public px4::WorkItem
@@ -90,9 +90,9 @@ private:
 
 	uORB::SubscriptionCallbackWorkItem	_sensor_selection_sub{this, ORB_ID(sensor_selection)};	/**< selected primary sensor subscription */
 	uORB::SubscriptionCallbackWorkItem	_sensor_sub[MAX_SENSOR_COUNT] {				/**< sensor data subscription */
-		{this, ORB_ID(sensor_gyro), 0},
-		{this, ORB_ID(sensor_gyro), 1},
-		{this, ORB_ID(sensor_gyro), 2}
+		{this, ORB_ID(sensor_gyro_control), 0},
+		{this, ORB_ID(sensor_gyro_control), 1},
+		{this, ORB_ID(sensor_gyro_control), 2}
 	};
 
 	matrix::Dcmf				_board_rotation;				/**< rotation matrix for the orientation that the board is mounted */

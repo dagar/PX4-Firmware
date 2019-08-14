@@ -54,13 +54,9 @@
 #include <systemlib/mavlink_log.h>
 
 #include <drivers/drv_hrt.h>
-#include <drivers/drv_accel.h>
-#include <drivers/drv_gyro.h>
-#include <drivers/device/integrator.h>
-
-#include <lib/conversion/rotation.h>
-
-#include <uORB/topics/parameter_update.h>
+#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
+#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
+#include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
 
 #include <mpu6050/MPU6050.hpp>
 #include <DevMgr.hpp>
@@ -103,41 +99,8 @@ public:
 private:
 	int _publish(struct imu_sensor_data &data);
 
-	void _update_accel_calibration();
-	void _update_gyro_calibration();
-
-	orb_advert_t		    _accel_topic;
-	orb_advert_t		    _gyro_topic;
-
-	orb_advert_t		    _mavlink_log_pub;
-
-	int			    _param_update_sub;
-
-	struct accel_calibration_s {
-		float x_offset;
-		float x_scale;
-		float y_offset;
-		float y_scale;
-		float z_offset;
-		float z_scale;
-	} _accel_calibration;
-
-	struct gyro_calibration_s {
-		float x_offset;
-		float x_scale;
-		float y_offset;
-		float y_scale;
-		float z_offset;
-		float z_scale;
-	} _gyro_calibration;
-
-	matrix::Dcmf	    _rotation_matrix;
-
-	int			    _accel_orb_class_instance;
-	int			    _gyro_orb_class_instance;
-
-	Integrator		    _accel_int;
-	Integrator		    _gyro_int;
+	PX4Accelerometer		_px4_accel;
+	PX4Gyroscope			_px4_gyro;
 
 	unsigned		    _publish_count;
 
@@ -156,16 +119,8 @@ private:
 
 DfMPU6050Wrapper::DfMPU6050Wrapper(enum Rotation rotation) :
 	MPU6050(IMU_DEVICE_PATH),
-	_accel_topic(nullptr),
-	_gyro_topic(nullptr),
-	_mavlink_log_pub(nullptr),
-	_param_update_sub(-1),
-	_accel_calibration{},
-	_gyro_calibration{},
-	_accel_orb_class_instance(-1),
-	_gyro_orb_class_instance(-1),
-	_accel_int(MPU6050_NEVER_AUTOPUBLISH_US, false),
-	_gyro_int(MPU6050_NEVER_AUTOPUBLISH_US, true),
+	_px4_accel(m_id.dev_id, ORB_PRIO_HIGH, rotation),
+	_px4_gyro(m_id.dev_id, ORB_PRIO_HIGH, rotation),
 	_publish_count(0),
 	_read_counter(perf_alloc(PC_COUNT, "mpu6050_reads")),
 	_error_counter(perf_alloc(PC_COUNT, "mpu6050_errors")),
@@ -177,23 +132,8 @@ DfMPU6050Wrapper::DfMPU6050Wrapper(enum Rotation rotation) :
 	_last_accel_range_hit_time(0),
 	_last_accel_range_hit_count(0)
 {
-	// Set sane default calibration values
-	_accel_calibration.x_scale = 1.0f;
-	_accel_calibration.y_scale = 1.0f;
-	_accel_calibration.z_scale = 1.0f;
-	_accel_calibration.x_offset = 0.0f;
-	_accel_calibration.y_offset = 0.0f;
-	_accel_calibration.z_offset = 0.0f;
-
-	_gyro_calibration.x_scale = 1.0f;
-	_gyro_calibration.y_scale = 1.0f;
-	_gyro_calibration.z_scale = 1.0f;
-	_gyro_calibration.x_offset = 0.0f;
-	_gyro_calibration.y_offset = 0.0f;
-	_gyro_calibration.z_offset = 0.0f;
-
-	// Get sensor rotation matrix
-	_rotation_matrix = get_rot_matrix(rotation);
+	_px4_accel.set_scale(1.0f / 1000.0f);
+	_px4_gyro.set_scale(1.0f / 1000.0f);
 }
 
 DfMPU6050Wrapper::~DfMPU6050Wrapper()
@@ -210,11 +150,6 @@ DfMPU6050Wrapper::~DfMPU6050Wrapper()
 
 int DfMPU6050Wrapper::start()
 {
-	/* Subscribe to param update topic. */
-	if (_param_update_sub < 0) {
-		_param_update_sub = orb_subscribe(ORB_ID(parameter_update));
-	}
-
 	/* Init device and start sensor. */
 	int ret = init();
 
@@ -229,12 +164,6 @@ int DfMPU6050Wrapper::start()
 		PX4_ERR("MPU6050 start fail: %d", ret);
 		return ret;
 	}
-
-	PX4_DEBUG("MPU6050 device id is: %d", m_id.dev_id);
-
-	/* Force getting the calibration values. */
-	_update_accel_calibration();
-	_update_gyro_calibration();
 
 	return 0;
 }
@@ -264,203 +193,11 @@ void DfMPU6050Wrapper::info()
 	perf_print_counter(_publish_perf);
 }
 
-void DfMPU6050Wrapper::_update_gyro_calibration()
-{
-	// TODO: replace magic number
-	for (unsigned i = 0; i < 3; ++i) {
-
-		// TODO: remove printfs and add error counter
-
-		char str[30];
-		(void)sprintf(str, "CAL_GYRO%u_ID", i);
-		int32_t device_id;
-		int res = param_get(param_find(str), &device_id);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-			continue;
-		}
-
-		if ((uint32_t)device_id != m_id.dev_id) {
-			continue;
-		}
-
-		(void)sprintf(str, "CAL_GYRO%u_XSCALE", i);
-		res = param_get(param_find(str), &_gyro_calibration.x_scale);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_GYRO%u_YSCALE", i);
-		res = param_get(param_find(str), &_gyro_calibration.y_scale);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_GYRO%u_ZSCALE", i);
-		res = param_get(param_find(str), &_gyro_calibration.z_scale);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_GYRO%u_XOFF", i);
-		res = param_get(param_find(str), &_gyro_calibration.x_offset);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_GYRO%u_YOFF", i);
-		res = param_get(param_find(str), &_gyro_calibration.y_offset);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_GYRO%u_ZOFF", i);
-		res = param_get(param_find(str), &_gyro_calibration.z_offset);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		// We got calibration values, let's exit.
-		return;
-	}
-
-	_gyro_calibration.x_scale = 1.0f;
-	_gyro_calibration.y_scale = 1.0f;
-	_gyro_calibration.z_scale = 1.0f;
-	_gyro_calibration.x_offset = 0.0f;
-	_gyro_calibration.y_offset = 0.0f;
-	_gyro_calibration.z_offset = 0.0f;
-}
-
-void DfMPU6050Wrapper::_update_accel_calibration()
-{
-	// TODO: replace magic number
-	for (unsigned i = 0; i < 3; ++i) {
-
-		// TODO: remove printfs and add error counter
-
-		char str[30];
-		(void)sprintf(str, "CAL_ACC%u_ID", i);
-		int32_t device_id;
-		int res = param_get(param_find(str), &device_id);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-			continue;
-		}
-
-		if ((uint32_t)device_id != m_id.dev_id) {
-			continue;
-		}
-
-		(void)sprintf(str, "CAL_ACC%u_XSCALE", i);
-		res = param_get(param_find(str), &_accel_calibration.x_scale);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_ACC%u_YSCALE", i);
-		res = param_get(param_find(str), &_accel_calibration.y_scale);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_ACC%u_ZSCALE", i);
-		res = param_get(param_find(str), &_accel_calibration.z_scale);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_ACC%u_XOFF", i);
-		res = param_get(param_find(str), &_accel_calibration.x_offset);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_ACC%u_YOFF", i);
-		res = param_get(param_find(str), &_accel_calibration.y_offset);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		(void)sprintf(str, "CAL_ACC%u_ZOFF", i);
-		res = param_get(param_find(str), &_accel_calibration.z_offset);
-
-		if (res != OK) {
-			PX4_ERR("Could not access param %s", str);
-		}
-
-		// We got calibration values, let's exit.
-		return;
-	}
-
-	// Set sane default calibration values
-	_accel_calibration.x_scale = 1.0f;
-	_accel_calibration.y_scale = 1.0f;
-	_accel_calibration.z_scale = 1.0f;
-	_accel_calibration.x_offset = 0.0f;
-	_accel_calibration.y_offset = 0.0f;
-	_accel_calibration.z_offset = 0.0f;
-}
-
 int DfMPU6050Wrapper::_publish(struct imu_sensor_data &data)
 {
-	/* Check if calibration values are still up-to-date. */
-	bool updated;
-	orb_check(_param_update_sub, &updated);
+	perf_begin(_publish_perf);
 
-	if (updated) {
-		parameter_update_s parameter_update;
-		orb_copy(ORB_ID(parameter_update), _param_update_sub, &parameter_update);
-
-		_update_accel_calibration();
-		_update_gyro_calibration();
-	}
-
-	uint64_t now = hrt_absolute_time();
-
-	matrix::Vector3f vec_integrated_unused;
-	uint32_t integral_dt_unused;
-
-	matrix::Vector3f accel_val(data.accel_m_s2_x, data.accel_m_s2_y, data.accel_m_s2_z);
-
-	// apply sensor rotation on the accel measurement
-	accel_val = _rotation_matrix * accel_val;
-
-	accel_val(0) = (accel_val(0) - _accel_calibration.x_offset) * _accel_calibration.x_scale;
-	accel_val(1) = (accel_val(1) - _accel_calibration.y_offset) * _accel_calibration.y_scale;
-	accel_val(2) = (accel_val(2) - _accel_calibration.z_offset) * _accel_calibration.z_scale;
-
-	_accel_int.put(now,
-		       accel_val,
-		       vec_integrated_unused,
-		       integral_dt_unused);
-
-	matrix::Vector3f gyro_val(data.gyro_rad_s_x, data.gyro_rad_s_y, data.gyro_rad_s_z);
-
-	// apply sensor rotation on the gyro measurement
-	gyro_val = _rotation_matrix * gyro_val;
-
-	gyro_val(0) = (gyro_val(0) - _gyro_calibration.x_offset) * _gyro_calibration.x_scale;
-	gyro_val(1) = (gyro_val(1) - _gyro_calibration.y_offset) * _gyro_calibration.y_scale;
-	gyro_val(2) = (gyro_val(2) - _gyro_calibration.z_offset) * _gyro_calibration.z_scale;
-
-	_gyro_int.put(now,
-		      gyro_val,
-		      vec_integrated_unused,
-		      integral_dt_unused);
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
 	// If we are not receiving the last sample from the FIFO buffer yet, let's stop here
 	// and wait for more packets.
@@ -486,87 +223,8 @@ int DfMPU6050Wrapper::_publish(struct imu_sensor_data &data)
 	perf_set_count(_gyro_range_hit_counter, data.gyro_range_hit_counter);
 	perf_set_count(_accel_range_hit_counter, data.accel_range_hit_counter);
 
-	perf_begin(_publish_perf);
-
-	sensor_accel_s accel_report = {};
-	sensor_gyro_s gyro_report = {};
-
-	accel_report.timestamp = gyro_report.timestamp = hrt_absolute_time();
-
-	// TODO: get these right
-	gyro_report.scaling = -1.0f;
-	gyro_report.device_id = m_id.dev_id;
-
-	accel_report.scaling = -1.0f;
-	accel_report.device_id = m_id.dev_id;
-
-	// TODO: remove these (or get the values)
-	gyro_report.x_raw = 0;
-	gyro_report.y_raw = 0;
-	gyro_report.z_raw = 0;
-
-	accel_report.x_raw = 0;
-	accel_report.y_raw = 0;
-	accel_report.z_raw = 0;
-
-	matrix::Vector3f gyro_val_filt;
-	matrix::Vector3f accel_val_filt;
-
-	// Read and reset.
-	matrix::Vector3f gyro_val_integ = _gyro_int.get_and_filtered(true, gyro_report.integral_dt, gyro_val_filt);
-	matrix::Vector3f accel_val_integ = _accel_int.get_and_filtered(true, accel_report.integral_dt, accel_val_filt);
-
-	// Use the filtered (by integration) values to get smoother / less noisy data.
-	gyro_report.x = gyro_val_filt(0);
-	gyro_report.y = gyro_val_filt(1);
-	gyro_report.z = gyro_val_filt(2);
-
-	accel_report.x = accel_val_filt(0);
-	accel_report.y = accel_val_filt(1);
-	accel_report.z = accel_val_filt(2);
-
-	gyro_report.x_integral = gyro_val_integ(0);
-	gyro_report.y_integral = gyro_val_integ(1);
-	gyro_report.z_integral = gyro_val_integ(2);
-
-	accel_report.x_integral = accel_val_integ(0);
-	accel_report.y_integral = accel_val_integ(1);
-	accel_report.z_integral = accel_val_integ(2);
-
-	// TODO: when is this ever blocked?
-	if (!(m_pub_blocked)) {
-
-		if (_gyro_topic == nullptr) {
-			_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &gyro_report,
-							  &_gyro_orb_class_instance, ORB_PRIO_DEFAULT);
-
-		} else {
-			orb_publish(ORB_ID(sensor_gyro), _gyro_topic, &gyro_report);
-		}
-
-		if (_accel_topic == nullptr) {
-			_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &accel_report,
-							   &_accel_orb_class_instance, ORB_PRIO_DEFAULT);
-
-		} else {
-			orb_publish(ORB_ID(sensor_accel), _accel_topic, &accel_report);
-		}
-
-		// Report if there are high vibrations, every 10 times it happens.
-		const bool threshold_reached = (data.accel_range_hit_counter - _last_accel_range_hit_count > 10);
-
-		// Report every 5s.
-		const bool due_to_report = (hrt_elapsed_time(&_last_accel_range_hit_time) > 5000000);
-
-		if (threshold_reached && due_to_report) {
-			mavlink_log_critical(&_mavlink_log_pub,
-					     "High accelerations, range exceeded %llu times",
-					     data.accel_range_hit_counter);
-
-			_last_accel_range_hit_time = hrt_absolute_time();
-			_last_accel_range_hit_count = data.accel_range_hit_counter;
-		}
-	}
+	_px4_accel.update(timestamp_sample, data.accel_m_s2_x, data.accel_m_s2_y, data.accel_m_s2_z);
+	_px4_gyro.update(timestamp_sample, data.gyro_rad_s_x, data.gyro_rad_s_y, data.gyro_rad_s_z);
 
 	perf_end(_publish_perf);
 
