@@ -55,5 +55,5 @@ px4_add_module(
 		ecl_validation
 		mathlib
 		sensors__vehicle_acceleration
-		sensors__vehicle_angular_velocity
+		vehicle_angular_velocity
 	)
