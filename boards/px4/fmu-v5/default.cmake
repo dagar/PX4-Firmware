@@ -69,6 +69,7 @@ px4_add_board(
 		ekf2
 		events
 		fw_att_control
+		fw_rate_control
 		fw_pos_control_l1
 		rover_pos_control
 		land_detector
