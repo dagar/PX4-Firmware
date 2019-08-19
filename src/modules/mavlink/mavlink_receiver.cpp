@@ -185,6 +185,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		handle_message_landing_target(msg);
 		break;
 
+	case MAVLINK_MSG_ID_LINK_NODE_STATUS:
+		handle_message_link_node_status(msg);
+		break;
+
 	case MAVLINK_MSG_ID_ADSB_VEHICLE:
 		handle_message_adsb_vehicle(msg);
 		break;
@@ -2045,6 +2049,18 @@ MavlinkReceiver::handle_message_landing_target(mavlink_message_t *msg)
 
 		_landing_target_pose_pub.publish(landing_target_pose);
 	}
+}
+
+void
+MavlinkReceiver::handle_message_link_node_status(mavlink_message_t *msg)
+{
+	mavlink_link_node_status_t link_node_status;
+	mavlink_msg_link_node_status_decode(msg, &link_node_status);
+
+	PX4_INFO("messages_sent: %d", link_node_status.messages_sent);
+	PX4_INFO("messages_received: %d", link_node_status.messages_received);
+	PX4_INFO("messages_lost: %d", link_node_status.messages_lost);
+
 }
 
 void

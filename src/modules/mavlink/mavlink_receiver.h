@@ -146,6 +146,7 @@ private:
 	void handle_message_hil_sensor(mavlink_message_t *msg);
 	void handle_message_hil_state_quaternion(mavlink_message_t *msg);
 	void handle_message_landing_target(mavlink_message_t *msg);
+	void handle_message_link_node_status(mavlink_message_t *msg);
 	void handle_message_logging_ack(mavlink_message_t *msg);
 	void handle_message_manual_control(mavlink_message_t *msg);
 	void handle_message_named_value_float(mavlink_message_t *msg);
