@@ -40,23 +40,15 @@
 
 PWMSim::PWMSim() :
 	CDev(PWM_OUTPUT0_DEVICE_PATH),
-	_perf_control_latency(perf_alloc(PC_ELAPSED, "pwm_out_sim control latency"))
+	ScheduledWorkItem(px4::wq_configurations::hp_default),
+	_cycle_perf(perf_alloc(PC_ELAPSED, "pwm_out_sim: cycle")),
+	_cycle_interval_perf(perf_alloc(PC_INTERVAL, "pwm_out_sim: cycle interval")),
+	_control_latency_perf(perf_alloc(PC_ELAPSED, "pwm_out_sim: control latency"))
 {
 	for (unsigned i = 0; i < MAX_ACTUATORS; i++) {
 		_pwm_min[i] = PWM_SIM_PWM_MIN_MAGIC;
 		_pwm_max[i] = PWM_SIM_PWM_MAX_MAGIC;
 	}
-
-	_control_topics[0] = ORB_ID(actuator_controls_0);
-	_control_topics[1] = ORB_ID(actuator_controls_1);
-	_control_topics[2] = ORB_ID(actuator_controls_2);
-	_control_topics[3] = ORB_ID(actuator_controls_3);
-
-	for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
-		_control_subs[i] = -1;
-	}
-
-	CDev::init();
 
 	// default to MODE_16PWM
 	set_mode(MODE_16PWM);
@@ -64,7 +56,47 @@ PWMSim::PWMSim() :
 
 PWMSim::~PWMSim()
 {
-	perf_free(_perf_control_latency);
+	/* clean up the alternate device node */
+	unregister_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH, _class_instance);
+
+	perf_free(_cycle_perf);
+	perf_free(_cycle_interval_perf);
+	perf_free(_control_latency_perf);
+}
+
+int
+PWMSim::init()
+{
+	/* do regular cdev init */
+	int ret = CDev::init();
+
+	if (ret != OK) {
+		return ret;
+	}
+
+	// XXX best would be to register / de-register the device depending on modes
+
+	/* try to claim the generic PWM output device node as well - it's OK if we fail at this */
+	_class_instance = register_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH);
+
+	if (_class_instance == CLASS_DEVICE_PRIMARY) {
+		/* lets not be too verbose */
+	} else if (_class_instance < 0) {
+		PX4_ERR("FAILED registering class device");
+	}
+
+	/* force a reset of the update rate */
+	_current_update_rate = 0;
+
+	/* initialize PWM limit lib */
+	pwm_limit_init(&_pwm_limit);
+
+	// Getting initial parameter values
+	update_params();
+
+	ScheduleOnInterval(100_ms); // run at 10 Hz until mixers loaded
+
+	return 0;
 }
 
 int
@@ -118,29 +150,67 @@ PWMSim::set_pwm_rate(unsigned rate)
 void
 PWMSim::subscribe()
 {
-	/* subscribe/unsubscribe to required actuator control groups */
-	uint32_t sub_groups = _groups_required & ~_groups_subscribed;
-	uint32_t unsub_groups = _groups_subscribed & ~_groups_required;
-	_poll_fds_num = 0;
+	// must be locked to potentially change WorkQueue
+	lock();
 
-	for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
-		if (sub_groups & (1 << i)) {
-			PX4_DEBUG("subscribe to actuator_controls_%d", i);
-			_control_subs[i] = orb_subscribe(_control_topics[i]);
-		}
+	// first clear everything
+	ScheduleClear();
 
-		if (unsub_groups & (1 << i)) {
-			PX4_DEBUG("unsubscribe from actuator_controls_%d", i);
-			orb_unsubscribe(_control_subs[i]);
-			_control_subs[i] = -1;
-		}
+	for (auto &control_sub : _control_subs) {
+		control_sub.unregister_callback();
+	}
 
-		if (_control_subs[i] >= 0) {
-			_poll_fds[_poll_fds_num].fd = _control_subs[i];
-			_poll_fds[_poll_fds_num].events = POLLIN;
-			_poll_fds_num++;
+	// if subscribed to control group 0 or 1 then move to the rate_ctrl WQ
+	const bool sub_group_0 = (_groups_required & (1 << 0));
+	const bool sub_group_1 = (_groups_required & (1 << 1));
+
+	if (_wq_hpdefault && (sub_group_0 || sub_group_1)) {
+		if (WorkItem::Init(px4::wq_configurations::rate_ctrl)) {
+			// let the new WQ handle the subscribe update
+			_wq_hpdefault = false;
+			ScheduleNow();
+			unlock();
+			return;
 		}
 	}
+
+	/*
+	* Adjust actuator topic update rate to keep up with
+	* the highest servo update rate configured.
+	*
+	* We always mix at max rate; some channels may update slower.
+	*/
+	int max_rate = (_pwm_default_rate > _pwm_alt_rate) ? _pwm_default_rate : _pwm_alt_rate;
+
+	// oneshot
+	if ((_pwm_default_rate == 0) || (_pwm_alt_rate == 0)) {
+		max_rate = 2000;
+	}
+
+	// max interval 0.5 - 100 ms (10 - 2000Hz)
+	_current_update_rate = max_rate;
+	_groups_subscribed = _groups_required;
+
+	// subscribe to all required actuator control groups with max interval set
+	for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
+		if (_groups_required & (1 << i)) {
+			PX4_DEBUG("subscribe to actuator_controls_%d", i);
+
+			if (!_control_subs[i].register_callback()) {
+				PX4_ERR("actuator_controls_%d register callback failed!", i);
+			}
+		}
+	}
+
+	// if nothing required keep periodic schedule
+	if (_groups_required == 0) {
+		ScheduleOnInterval(100_ms);
+	}
+
+	PX4_DEBUG("_groups_required 0x%08x", _groups_required);
+	PX4_DEBUG("_groups_subscribed 0x%08x", _groups_subscribed);
+
+	unlock();
 }
 
 void PWMSim::update_params()
@@ -154,196 +224,128 @@ void PWMSim::update_params()
 }
 
 void
-PWMSim::run()
+PWMSim::Run()
 {
-	/* force a reset of the update rate */
-	_current_update_rate = 0;
+	if (should_exit()) {
+		ScheduleClear();
 
-	_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
-
-	/* advertise the mixed control outputs, insist on the first group output */
-	_outputs_pub = orb_advertise(ORB_ID(actuator_outputs), &_actuator_outputs);
-
-	update_params();
-	int params_sub = orb_subscribe(ORB_ID(parameter_update));
-
-	/* loop until killed */
-	while (!should_exit()) {
-
-		if (_groups_subscribed != _groups_required) {
-			subscribe();
-			_groups_subscribed = _groups_required;
+		for (auto &control_sub : _control_subs) {
+			control_sub.unregister_callback();
 		}
 
-		/* handle update rate changes */
-		if (_current_update_rate != _update_rate) {
-			int update_rate_in_ms = int(1000 / _update_rate);
+		exit_and_cleanup();
+		return;
+	}
 
-			if (update_rate_in_ms < 2) {
-				update_rate_in_ms = 2;
-			}
+	perf_begin(_cycle_perf);
+	perf_count(_cycle_interval_perf);
 
-			for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
-				if (_control_subs[i] >= 0) {
-					orb_set_interval(_control_subs[i], update_rate_in_ms);
-				}
-			}
+	// check arming state
+	if (_armed_sub.update(&_armed)) {
+		/* Update the armed status and check that we're not locked down.
+		 * We also need to arm throttle for the ESC calibration. */
+		_throttle_armed = (_armed.armed && !_armed.lockdown) || _armed.in_esc_calibration_mode;
+	}
 
-			// up_pwm_servo_set_rate(_update_rate);
-			_current_update_rate = _update_rate;
-		}
+	unsigned n_updates = 0;
 
-		if (_mixers) {
-			_mixers->set_airmode(_airmode);
-		}
-
-		/* this can happen during boot, but after the sleep its likely resolved */
-		if (_poll_fds_num == 0) {
-			px4_sleep(1);
-
-			PX4_DEBUG("no valid fds");
-			continue;
-		}
-
-		/* sleep waiting for data, but no more than a second */
-		int ret = px4_poll(&_poll_fds[0], _poll_fds_num, 1000);
-
-		/* this would be bad... */
-		if (ret < 0) {
-			PX4_ERR("poll error %d", errno);
-			continue;
-		}
-
-		if (ret == 0) {
-			// timeout
-			continue;
-		}
-
+	if (_mixers != nullptr) {
 		/* get controls for required topics */
-		unsigned poll_id = 0;
-
 		for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
-			if (_control_subs[i] >= 0) {
-				if (_poll_fds[poll_id].revents & POLLIN) {
-					orb_copy(_control_topics[i], _control_subs[i], &_controls[i]);
-				}
-
-				poll_id++;
+			if (_control_subs[i].copy(&_controls[i])) {
+				n_updates++;
 			}
 		}
+
+		_mixers->set_airmode(_airmode);
 
 		/* can we mix? */
 		/* We also publish if not armed, this way we make sure SITL gets feedback. */
-		if (_mixers != nullptr) {
 
-			/* do mixing */
-			_actuator_outputs.noutputs = _mixers->mix(&_actuator_outputs.output[0], _num_outputs);
+		/* do mixing */
+		_actuator_outputs.noutputs = _mixers->mix(&_actuator_outputs.output[0], _num_outputs);
 
-			/* disable unused ports by setting their output to NaN */
-			const size_t actuator_outputs_size = sizeof(_actuator_outputs.output) / sizeof(_actuator_outputs.output[0]);
+		/* disable unused ports by setting their output to NaN */
+		const size_t actuator_outputs_size = sizeof(_actuator_outputs.output) / sizeof(_actuator_outputs.output[0]);
 
-			for (size_t i = _actuator_outputs.noutputs; i < actuator_outputs_size; i++) {
-				_actuator_outputs.output[i] = NAN;
+		for (size_t i = _actuator_outputs.noutputs; i < actuator_outputs_size; i++) {
+			_actuator_outputs.output[i] = NAN;
+		}
+
+		/* iterate actuators */
+		for (unsigned i = 0; i < _actuator_outputs.noutputs; i++) {
+			/* last resort: catch NaN, INF and out-of-band errors */
+			const bool sane_mixer_output = PX4_ISFINITE(_actuator_outputs.output[i]) &&
+						       _actuator_outputs.output[i] >= -1.0f &&
+						       _actuator_outputs.output[i] <= 1.0f;
+
+			if (_armed.armed && sane_mixer_output) {
+				/* scale for PWM output 1000 - 2000us */
+				_actuator_outputs.output[i] = 1500 + (500 * _actuator_outputs.output[i]);
+				_actuator_outputs.output[i] = math::constrain(_actuator_outputs.output[i], (float)_pwm_min[i], (float)_pwm_max[i]);
+
+			} else {
+				/* Disarmed or insane value - set disarmed pwm value
+				 * This will be clearly visible on the servo status and will limit the risk of accidentally
+				 * spinning motors. It would be deadly in flight. */
+				_actuator_outputs.output[i] = PWM_SIM_DISARMED_MAGIC;
 			}
+		}
 
-			/* iterate actuators */
-			for (unsigned i = 0; i < _actuator_outputs.noutputs; i++) {
-				/* last resort: catch NaN, INF and out-of-band errors */
-				const bool sane_mixer_output = PX4_ISFINITE(_actuator_outputs.output[i]) &&
-							       _actuator_outputs.output[i] >= -1.0f &&
-							       _actuator_outputs.output[i] <= 1.0f;
-
-				if (_armed && sane_mixer_output) {
-					/* scale for PWM output 1000 - 2000us */
-					_actuator_outputs.output[i] = 1500 + (500 * _actuator_outputs.output[i]);
-					_actuator_outputs.output[i] = math::constrain(_actuator_outputs.output[i], (float)_pwm_min[i], (float)_pwm_max[i]);
-
-				} else {
-					/* Disarmed or insane value - set disarmed pwm value
-					 * This will be clearly visible on the servo status and will limit the risk of accidentally
-					 * spinning motors. It would be deadly in flight. */
-					_actuator_outputs.output[i] = PWM_SIM_DISARMED_MAGIC;
-				}
+		/* overwrite outputs in case of force_failsafe */
+		if (_armed.force_failsafe) {
+			for (size_t i = 0; i < _actuator_outputs.noutputs; i++) {
+				_actuator_outputs.output[i] = PWM_SIM_FAILSAFE_MAGIC;
 			}
+		}
 
-			/* overwrite outputs in case of force_failsafe */
-			if (_failsafe) {
-				for (size_t i = 0; i < _actuator_outputs.noutputs; i++) {
-					_actuator_outputs.output[i] = PWM_SIM_FAILSAFE_MAGIC;
-				}
+		/* overwrite outputs in case of lockdown */
+		if (_armed.manual_lockdown) {
+			for (size_t i = 0; i < _actuator_outputs.noutputs; i++) {
+				_actuator_outputs.output[i] = 0.0;
 			}
+		}
 
-			/* overwrite outputs in case of lockdown */
-			if (_lockdown) {
-				for (size_t i = 0; i < _actuator_outputs.noutputs; i++) {
-					_actuator_outputs.output[i] = 0.0;
-				}
-			}
+		/* publish mixer status */
+		MultirotorMixer::saturation_status saturation_status;
+		saturation_status.value = _mixers->get_saturation_status();
 
-			/* publish mixer status */
-			MultirotorMixer::saturation_status saturation_status;
-			saturation_status.value = _mixers->get_saturation_status();
+		if (saturation_status.flags.valid) {
+			multirotor_motor_limits_s motor_limits{};
+			motor_limits.timestamp = hrt_absolute_time();
+			motor_limits.saturation_status = saturation_status.value;
 
-			if (saturation_status.flags.valid) {
-				multirotor_motor_limits_s motor_limits;
-				motor_limits.timestamp = hrt_absolute_time();
-				motor_limits.saturation_status = saturation_status.value;
+			_to_mixer_status.publish(motor_limits);
+		}
 
-				int instance;
-				orb_publish_auto(ORB_ID(multirotor_motor_limits), &_mixer_status, &motor_limits, &instance, ORB_PRIO_DEFAULT);
-			}
+		/* and publish for anyone that cares to see */
+		_actuator_outputs.timestamp = hrt_absolute_time();
+		_outputs_pub.publish(_actuator_outputs);
 
-			/* and publish for anyone that cares to see */
-			_actuator_outputs.timestamp = hrt_absolute_time();
-			orb_publish(ORB_ID(actuator_outputs), _outputs_pub, &_actuator_outputs);
+		// use first valid timestamp_sample for latency tracking
+		for (int i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
+			const bool required = _groups_required & (1 << i);
+			const hrt_abstime &timestamp_sample = _controls[i].timestamp_sample;
 
-			// use first valid timestamp_sample for latency tracking
-			for (int i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
-				const bool required = _groups_required & (1 << i);
-				const hrt_abstime &timestamp_sample = _controls[i].timestamp_sample;
-
-				if (required && (timestamp_sample > 0)) {
-					perf_set_elapsed(_perf_control_latency, _actuator_outputs.timestamp - timestamp_sample);
-					break;
-				}
+			if (required && (timestamp_sample > 0)) {
+				perf_set_elapsed(_control_latency_perf, _actuator_outputs.timestamp - timestamp_sample);
+				break;
 			}
 		}
 
 		/* how about an arming update? */
-		bool updated;
-
-		orb_check(_armed_sub, &updated);
-
-		if (updated) {
-			actuator_armed_s aa = {};
-
-			if (orb_copy(ORB_ID(actuator_armed), _armed_sub, &aa) == PX4_OK) {
-				/* do not obey the lockdown value, as lockdown is for PWMSim. Only obey manual lockdown */
-				_armed = aa.armed;
-				_failsafe = aa.force_failsafe;
-				_lockdown = aa.manual_lockdown;
-			}
-		}
-
-		/* check for parameter updates */
-		bool param_updated = false;
-		orb_check(params_sub, &param_updated);
-
-		if (param_updated) {
-			struct parameter_update_s update;
-			orb_copy(ORB_ID(parameter_update), params_sub, &update);
-			update_params();
-		}
+		_armed_sub.update(&_armed);
 	}
 
-	for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
-		if (_control_subs[i] >= 0) {
-			orb_unsubscribe(_control_subs[i]);
-		}
+	if (_param_sub.updated()) {
+		update_params();
 	}
 
-	orb_unsubscribe(_armed_sub);
-	orb_unsubscribe(params_sub);
+	if ((_groups_subscribed != _groups_required) || (_current_update_rate == 0)) {
+		subscribe();
+	}
+
+	perf_end(_cycle_perf);
 }
 
 int
@@ -513,6 +515,7 @@ PWMSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 			delete _mixers;
 			_mixers = nullptr;
 			_groups_required = 0;
+			ScheduleNow();	// run to clear schedule and callbacks
 		}
 
 		break;
@@ -542,8 +545,11 @@ PWMSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 
 				} else {
 					_mixers->groups_required(_groups_required);
+					PX4_DEBUG("loaded mixers \n%s\n", buf);
 				}
 			}
+
+			ScheduleNow();	// run to clear schedule and callbacks
 
 			break;
 		}
@@ -562,30 +568,25 @@ PWMSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 int
 PWMSim::task_spawn(int argc, char *argv[])
 {
-	_task_id = px4_task_spawn_cmd("pwm_out_sim",
-				      SCHED_DEFAULT,
-				      SCHED_PRIORITY_ACTUATOR_OUTPUTS,
-				      1100,
-				      (px4_main_t)&run_trampoline,
-				      nullptr);
+	PWMSim *instance = new PWMSim();
 
-	if (_task_id < 0) {
-		_task_id = -1;
-		return -errno;
+	if (instance) {
+		_object.store(instance);
+		_task_id = task_id_is_work_queue;
+
+		if (instance->init() == PX4_OK) {
+			return PX4_OK;
+		}
+
+	} else {
+		PX4_ERR("alloc failed");
 	}
 
-	// wait until task is up & running (the mode_* commands depend on it)
-	if (wait_until_running() < 0) {
-		_task_id = -1;
-		return -1;
-	}
+	delete instance;
+	_object.store(nullptr);
+	_task_id = -1;
 
-	return PX4_OK;
-}
-
-PWMSim *PWMSim::instantiate(int argc, char *argv[])
-{
-	return new PWMSim();
+	return PX4_ERROR;
 }
 
 int PWMSim::custom_command(int argc, char *argv[])
@@ -661,7 +662,6 @@ It is used in SITL and HITL.
 int PWMSim::print_status()
 {
 	PX4_INFO("Running max update rate: %i Hz", _current_update_rate);
-	PX4_INFO("Polling %i actuator controls", _poll_fds_num);
 
 	const char *mode_str = nullptr;
 
@@ -678,6 +678,10 @@ int PWMSim::print_status()
 	if (mode_str) {
 		PX4_INFO("PWM Mode: %s", mode_str);
 	}
+
+	perf_print_counter(_cycle_perf);
+	perf_print_counter(_cycle_interval_perf);
+	perf_print_counter(_control_latency_perf);
 
 	return 0;
 }
