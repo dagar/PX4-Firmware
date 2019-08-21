@@ -49,58 +49,14 @@ CollisionPrevention::CollisionPrevention(ModuleParams *parent) :
 
 CollisionPrevention::~CollisionPrevention()
 {
-	//unadvertise publishers
+	// unadvertise publishers
 	if (_mavlink_log_pub != nullptr) {
 		orb_unadvertise(_mavlink_log_pub);
 	}
-
-	if (_constraints_pub != nullptr) {
-		orb_unadvertise(_constraints_pub);
-	}
-
-	if (_obstacle_distance_pub != nullptr) {
-		orb_unadvertise(_obstacle_distance_pub);
-	}
-
-	if (_pub_vehicle_command != nullptr) {
-		orb_unadvertise(_pub_vehicle_command);
-	}
 }
 
-void CollisionPrevention::_publishConstrainedSetpoint(const Vector2f &original_setpoint,
-		const Vector2f &adapted_setpoint)
-{
-	collision_constraints_s	constraints{};	/**< collision constraints message */
-
-	//fill in values
-	constraints.timestamp = hrt_absolute_time();
-
-	constraints.original_setpoint[0] = original_setpoint(0);
-	constraints.original_setpoint[1] = original_setpoint(1);
-	constraints.adapted_setpoint[0] = adapted_setpoint(0);
-	constraints.adapted_setpoint[1] = adapted_setpoint(1);
-
-	// publish constraints
-	if (_constraints_pub != nullptr) {
-		orb_publish(ORB_ID(collision_constraints), _constraints_pub, &constraints);
-
-	} else {
-		_constraints_pub = orb_advertise(ORB_ID(collision_constraints), &constraints);
-	}
-}
-
-void CollisionPrevention::_publishObstacleDistance(obstacle_distance_s &obstacle)
-{
-	// publish fused obtacle distance message with data from offboard obstacle_distance and distance sensor
-	if (_obstacle_distance_pub != nullptr) {
-		orb_publish(ORB_ID(obstacle_distance_fused), _obstacle_distance_pub, &obstacle);
-
-	} else {
-		_obstacle_distance_pub = orb_advertise(ORB_ID(obstacle_distance_fused), &obstacle);
-	}
-}
-
-void CollisionPrevention::_updateOffboardObstacleDistance(obstacle_distance_s &obstacle)
+void
+CollisionPrevention::_updateOffboardObstacleDistance(obstacle_distance_s &obstacle)
 {
 	_sub_obstacle_distance.update();
 	const obstacle_distance_s &obstacle_distance = _sub_obstacle_distance.get();
@@ -111,7 +67,8 @@ void CollisionPrevention::_updateOffboardObstacleDistance(obstacle_distance_s &o
 	}
 }
 
-void CollisionPrevention::_updateDistanceSensor(obstacle_distance_s &obstacle)
+void
+CollisionPrevention::_updateDistanceSensor(obstacle_distance_s &obstacle)
 {
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		distance_sensor_s distance_sensor {};
@@ -194,11 +151,58 @@ void CollisionPrevention::_updateDistanceSensor(obstacle_distance_s &obstacle)
 		}
 	}
 
-	_publishObstacleDistance(obstacle);
+	_obstacle_distance_pub.publish(obstacle);
 }
 
-void CollisionPrevention::_calculateConstrainedSetpoint(Vector2f &setpoint,
-		const Vector2f &curr_pos, const Vector2f &curr_vel)
+float
+CollisionPrevention::_sensorOrientationToYawOffset(const distance_sensor_s &distance_sensor, float angle_offset)
+{
+	float offset = angle_offset > 0.f ? math::radians(angle_offset) : 0.0f;
+
+	switch (distance_sensor.orientation) {
+	case distance_sensor_s::ROTATION_FORWARD_FACING:
+		offset = 0.0f;
+		break;
+
+	case distance_sensor_s::ROTATION_YAW_45:
+		offset = M_PI_F / 4.0f;
+		break;
+
+	case distance_sensor_s::ROTATION_RIGHT_FACING:
+		offset = M_PI_F / 2.0f;
+		break;
+
+	case distance_sensor_s::ROTATION_YAW_135:
+		offset = 3.0f * M_PI_F / 4.0f;
+		break;
+
+	case distance_sensor_s::ROTATION_BACKWARD_FACING:
+		offset = M_PI_F;
+		break;
+
+	case distance_sensor_s::ROTATION_YAW_225:
+		offset = -3.0f * M_PI_F / 4.0f;
+		break;
+
+	case distance_sensor_s::ROTATION_LEFT_FACING:
+		offset = -M_PI_F / 2.0f;
+		break;
+
+	case distance_sensor_s::ROTATION_YAW_315:
+		offset = -M_PI_F / 4.0f;
+		break;
+
+	case distance_sensor_s::ROTATION_CUSTOM:
+		offset = matrix::Eulerf(matrix::Quatf(distance_sensor.q)).psi();
+		break;
+	}
+
+	return offset;
+}
+
+void
+CollisionPrevention::_calculateConstrainedSetpoint(Vector2f &setpoint, const Vector2f &curr_pos,
+		const Vector2f &curr_vel)
 {
 	obstacle_distance_s obstacle{};
 	_updateOffboardObstacleDistance(obstacle);
@@ -280,7 +284,7 @@ void CollisionPrevention::modifySetpoint(Vector2f &original_setpoint, const floa
 	Vector2f new_setpoint = original_setpoint;
 	_calculateConstrainedSetpoint(new_setpoint, curr_pos, curr_vel);
 
-	//warn user if collision prevention starts to interfere
+	// warn user if collision prevention starts to interfere
 	bool currently_interfering = (new_setpoint(0) < original_setpoint(0) - 0.05f * max_speed
 				      || new_setpoint(0) > original_setpoint(0) + 0.05f * max_speed
 				      || new_setpoint(1) < original_setpoint(1) - 0.05f * max_speed
@@ -291,7 +295,15 @@ void CollisionPrevention::modifySetpoint(Vector2f &original_setpoint, const floa
 	}
 
 	_interfering = currently_interfering;
-	_publishConstrainedSetpoint(original_setpoint, new_setpoint);
+
+	// publish collision constraints
+	collision_constraints_s	constraints;
+	original_setpoint.copyTo(constraints.original_setpoint);
+	new_setpoint.copyTo(constraints.adapted_setpoint);
+	constraints.timestamp = hrt_absolute_time();
+	_constraints_pub.publish(constraints);
+
+
 	original_setpoint = new_setpoint;
 }
 
@@ -310,12 +322,5 @@ void CollisionPrevention::_publishVehicleCmdDoLoiter()
 	command.param2 = (float)PX4_CUSTOM_MAIN_MODE_AUTO;
 	command.param3 = (float)PX4_CUSTOM_SUB_MODE_AUTO_LOITER;
 
-	// publish the vehicle command
-	if (_pub_vehicle_command == nullptr) {
-		_pub_vehicle_command = orb_advertise_queue(ORB_ID(vehicle_command), &command,
-				       vehicle_command_s::ORB_QUEUE_LENGTH);
-
-	} else {
-		orb_publish(ORB_ID(vehicle_command), _pub_vehicle_command, &command);
-	}
+	_pub_vehicle_command.publish(command);
 }
