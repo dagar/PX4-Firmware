@@ -48,6 +48,7 @@ include(px4_base)
 #			[ TOOLCHAIN <string> ]
 #			[ ARCHITECTURE <string> ]
 #			[ ROMFSROOT <string> ]
+#			[ AIRFRAMES ]
 #			[ IO <string> ]
 #			[ BOOTLOADER <string> ]
 #			[ UAVCAN_INTERFACES <string> ]
@@ -69,6 +70,7 @@ include(px4_base)
 #		TOOLCHAIN		: cmake toolchain
 #		ARCHITECTURE		: name of the CPU CMake is building for (used by the toolchain)
 #		ROMFSROOT		: relative path to the ROMFS root directory (currently NuttX only)
+#		AIRFRAMES		: Airframe includes and excludes
 #		IO			: name of IO board to be built and included in the ROMFS (requires a valid ROMFSROOT)
 #		BOOTLOADER		: bootloader file to include for flashing via bl_update (currently NuttX only)
 #		UAVCAN_INTERFACES	: number of interfaces for UAVCAN
@@ -147,6 +149,7 @@ function(px4_add_board)
 			MODULES
 			SYSTEMCMDS
 			EXAMPLES
+			AIRFRAMES
 			SERIAL_PORTS
 			DF_DRIVERS
 		OPTIONS
@@ -207,6 +210,25 @@ function(px4_add_board)
 		if(IO)
 			set(config_io_board ${IO} CACHE INTERNAL "IO" FORCE)
 		endif()
+	endif()
+
+	# AIRFRAMES
+	if(AIRFRAMES)
+		message(STATUS "AIRFRAMES: ${AIRFRAMES}")
+		set(board_airframe_adjustments ${AIRFRAMES} PARENT_SCOPE)
+
+		string(REPLACE "+" ";+" AIRFRAMES ${AIRFRAMES})
+		string(REPLACE "-" ";-" AIRFRAMES ${AIRFRAMES})
+
+		foreach(airframe IN LISTS AIRFRAMES)
+			message(STATUS "airframe: ${airframe}")
+
+			if(${airframe} MATCHES "^( +)")
+				message(STATUS "airframe include: ${airframe}")
+			elseif(${airframe} MATCHES "^(+)")
+				message(STATUS "airframe exclude: ${airframe}")
+			endif()
+		endforeach()
 	endif()
 
 	if(UAVCAN_INTERFACES)

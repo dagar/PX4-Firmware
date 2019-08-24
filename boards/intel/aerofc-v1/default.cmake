@@ -6,7 +6,9 @@ px4_add_board(
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m4
 	ROMFSROOT px4fmu_common
-
+	AIRFRAMES
+		+ 4070_aerofc
+		- test
 	SERIAL_PORTS
 		GPS1:/dev/ttyS5
 		TEL1:/dev/ttyS3
