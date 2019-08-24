@@ -93,6 +93,7 @@
         },
         "search.showLineNumbers": true,
         "telemetry.enableTelemetry": false,
+        "terminal.integrated.scrollback": 10000,
         "window.title": "${dirty} ${activeEditorMedium}${separator}${rootName}",
         "workbench.editor.highlightModifiedTabs": true,
         "workbench.enableExperiments": false,
