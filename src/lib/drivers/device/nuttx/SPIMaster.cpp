@@ -42,8 +42,7 @@
 namespace device
 {
 
-static constexpr uint32_t SPI_CLOCK{STM32_PCLK2_FREQUENCY};	// Clocking for the SPI module
-
+#define CONFIG_STM32F7_SPI_DMA 1
 
 uint8_t
 SPIMaster::RegisterRead8(Register reg)
@@ -76,9 +75,9 @@ void
 SPIMaster::Init()
 {
 	// Configure SPI1 pins: SCK, MISO, and MOSI
-	stm32_configgpio(GPIO_SPI1_SCK);
-	stm32_configgpio(GPIO_SPI1_MISO);
-	stm32_configgpio(GPIO_SPI1_MOSI);
+	stm32_configgpio(_config.SCK);
+	stm32_configgpio(_config.MISO);
+	stm32_configgpio(_config.MOSI);
 
 	for (const auto &dev : _devices) {
 		stm32_configgpio(dev.chip_select);
@@ -112,8 +111,8 @@ SPIMaster::Init()
 	nxsem_setprotocol(&_txsem, SEM_PRIO_NONE);
 
 	// Get DMA channels
-	_rxdma = stm32_dmachannel(_rxch);
-	_txdma = stm32_dmachannel(_txch);
+	_rxdma = stm32_dmachannel(_config.DMA_RX_channel);
+	_txdma = stm32_dmachannel(_config.DMA_TX_channel);
 
 	RegisterModify(Register::CR2, SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN, 0);
 #endif // CONFIG_STM32F7_SPI_DMA
@@ -143,31 +142,31 @@ SPIMaster::ChangeFrequency(uint32_t frequency)
 		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
 
 		// Choices are limited by PCLK frequency with a set of divisors
-		if (frequency >= SPI_CLOCK >> 1) {
+		if (frequency >= _config.clock >> 1) {
 			// More than fPCLK/2.  This is as fast as we can go
 			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd2, SPI_CR1_BR_MASK); /* 000: fPCLK/2 */
 
-		} else if (frequency >= SPI_CLOCK >> 2) {
+		} else if (frequency >= _config.clock >> 2) {
 			// Between fPCLCK/2 and fPCLCK/4, pick the slower
 			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd4, SPI_CR1_BR_MASK); /* 001: fPCLK/4 */
 
-		} else if (frequency >= SPI_CLOCK >> 3) {
+		} else if (frequency >= _config.clock >> 3) {
 			// Between fPCLCK/4 and fPCLCK/8, pick the slower
 			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd8, SPI_CR1_BR_MASK); /* 010: fPCLK/8 */
 
-		} else if (frequency >= SPI_CLOCK >> 4) {
+		} else if (frequency >= _config.clock >> 4) {
 			// Between fPCLCK/8 and fPCLCK/16, pick the slower
 			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd16, SPI_CR1_BR_MASK); /* 011: fPCLK/16 */
 
-		} else if (frequency >= SPI_CLOCK >> 5) {
+		} else if (frequency >= _config.clock >> 5) {
 			// Between fPCLCK/16 and fPCLCK/32, pick the slower
 			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd32, SPI_CR1_BR_MASK); /* 100: fPCLK/32 */
 
-		} else if (frequency >= SPI_CLOCK >> 6) {
+		} else if (frequency >= _config.clock >> 6) {
 			// Between fPCLCK/32 and fPCLCK/64, pick the slower
 			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd64, SPI_CR1_BR_MASK); /*  101: fPCLK/64 */
 
-		} else if (frequency >= SPI_CLOCK >> 7) {
+		} else if (frequency >= _config.clock >> 7) {
 			// Between fPCLCK/64 and fPCLCK/128, pick the slower
 			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd128, SPI_CR1_BR_MASK); /* 110: fPCLK/128 */
 

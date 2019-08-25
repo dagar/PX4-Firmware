@@ -54,16 +54,18 @@ using gpio_t = uint32_t;
 struct SPI_CONFIG {
 	uint8_t bus;
 
-	gpio_t SCK;
-	gpio_t MISO;
-	gpio_t MOSI;
+	gpio_t SCK;	// eg GPIO_SPI1_SCK
+	gpio_t MISO;	// eg GPIO_SPI1_MISO
+	gpio_t MOSI;	// eg GPIO_SPI1_MOSI
 
-	uint32_t *base_address;
+	uint32_t base_address;	// eg STM32_SPI1_BASE
+	uint32_t clock;		// eg STM32_PCLK2_FREQUENCY
 
-	uint32_t clock;
+	uint8_t	DMA_RX_channel;	// The RX DMA channel number (eg DMAMAP_SPI1_RX_1)
+	uint8_t	DMA_TX_channel;	// The TX DMA channel number (eg DMAMAP_SPI1_TX_2)
 
-	uint8_t	DMA_RX_channel;
-	uint8_t	DMA_TX_channel;
+
+	uint32_t devices[];
 };
 
 /**
@@ -105,7 +107,6 @@ protected:
 	};
 
 private:
-
 	enum class State {
 		Stopped,
 		Initializing,
@@ -157,14 +158,12 @@ private:
 	static void		DMARXCallback(DMA_HANDLE handle, uint8_t isr, void *arg);
 	DMA_HANDLE		_rxdma;			// DMA channel handle for RX transfers
 	sem_t			_rxsem;			// Wait for RX DMA to complete
-	uint8_t			_rxch{DMAMAP_SPI1_RX_1};	// The RX DMA channel number
 	volatile uint8_t	_rxresult;		// Result of the RX DMA
 
 	// TX DMA
 	static void		DMATXCallback(DMA_HANDLE handle, uint8_t isr, void *arg);
 	DMA_HANDLE		_txdma;			// DMA channel handle for TX transfers
 	sem_t			_txsem;			// Wait for TX DMA to complete
-	uint8_t			_txch{DMAMAP_SPI1_TX_2};	// The TX DMA channel number
 	volatile uint8_t	_txresult;		// Result of the RX DMA
 
 	SPIDevice	_devices[5] {
@@ -174,6 +173,9 @@ private:
 		SPIDevice(GPIO_SPI1_CS4_BMI055_ACC),
 		SPIDevice(GPIO_SPI1_CS5_AUX_MEM),
 	};
+
+	SPI_CONFIG	_config;
+
 
 };
 
