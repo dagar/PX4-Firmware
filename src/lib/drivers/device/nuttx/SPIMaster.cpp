@@ -42,6 +42,9 @@
 namespace device
 {
 
+static constexpr uint32_t SPI_CLOCK{STM32_PCLK2_FREQUENCY};	// Clocking for the SPI module
+
+
 uint8_t
 SPIMaster::RegisterRead8(Register reg)
 {
@@ -89,13 +92,12 @@ SPIMaster::Init()
 	 *   Replace NSS with SSI & SSI=1:  CR1.SSI=1 CR1.SSM=1 (prevents MODF error)
 	 *   Two lines full duplex:         CR1.BIDIMODE=0 CR1.BIDIOIE=(Don't care) and CR1.RXONLY=0
 	 */
-	uint16_t clrbits = SPI_CR1_CPHA | SPI_CR1_CPOL | SPI_CR1_BR_MASK | SPI_CR1_LSBFIRST | SPI_CR1_RXONLY | SPI_CR1_BIDIOE |
-			   SPI_CR1_BIDIMODE;
+	uint16_t clrbits = SPI_CR1_BR_MASK | SPI_CR1_LSBFIRST | SPI_CR1_RXONLY | SPI_CR1_BIDIOE | SPI_CR1_BIDIMODE;
 	uint16_t setbits = SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM;
 	RegisterModify(Register::CR1, setbits, clrbits);
 
 	ChangeMode(SPI_MODE::MODE_0);
-	ChangeBits(8);
+	ChangeBitMode(BIT_MODE::Bit8);
 	ChangeFrequency(400000);
 
 	// CRCPOLY configuration
@@ -132,66 +134,54 @@ SPIMaster::Deinit()
 	}
 }
 
-uint32_t
+void
 SPIMaster::ChangeFrequency(uint32_t frequency)
 {
 	// Has the frequency changed?
-	if (frequency != _frequency_requested) {
-		uint32_t actual = 0;
-		uint16_t setbits = 0;
+	if (frequency != _frequency) {
+		// Disable SPI then change frequency
+		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
 
 		// Choices are limited by PCLK frequency with a set of divisors
-		if (frequency >= _spiclock >> 1) {
+		if (frequency >= SPI_CLOCK >> 1) {
 			// More than fPCLK/2.  This is as fast as we can go
-			setbits = SPI_CR1_FPCLCKd2; /* 000: fPCLK/2 */
-			actual = _spiclock >> 1;
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd2, SPI_CR1_BR_MASK); /* 000: fPCLK/2 */
 
-		} else if (frequency >= _spiclock >> 2) {
+		} else if (frequency >= SPI_CLOCK >> 2) {
 			// Between fPCLCK/2 and fPCLCK/4, pick the slower
-			setbits = SPI_CR1_FPCLCKd4; /* 001: fPCLK/4 */
-			actual = _spiclock >> 2;
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd4, SPI_CR1_BR_MASK); /* 001: fPCLK/4 */
 
-		} else if (frequency >= _spiclock >> 3) {
+		} else if (frequency >= SPI_CLOCK >> 3) {
 			// Between fPCLCK/4 and fPCLCK/8, pick the slower
-			setbits = SPI_CR1_FPCLCKd8; /* 010: fPCLK/8 */
-			actual = _spiclock >> 3;
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd8, SPI_CR1_BR_MASK); /* 010: fPCLK/8 */
 
-		} else if (frequency >= _spiclock >> 4) {
+		} else if (frequency >= SPI_CLOCK >> 4) {
 			// Between fPCLCK/8 and fPCLCK/16, pick the slower
-			setbits = SPI_CR1_FPCLCKd16; /* 011: fPCLK/16 */
-			actual = _spiclock >> 4;
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd16, SPI_CR1_BR_MASK); /* 011: fPCLK/16 */
 
-		} else if (frequency >= _spiclock >> 5) {
+		} else if (frequency >= SPI_CLOCK >> 5) {
 			// Between fPCLCK/16 and fPCLCK/32, pick the slower
-			setbits = SPI_CR1_FPCLCKd32; /* 100: fPCLK/32 */
-			actual = _spiclock >> 5;
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd32, SPI_CR1_BR_MASK); /* 100: fPCLK/32 */
 
-		} else if (frequency >= _spiclock >> 6) {
+		} else if (frequency >= SPI_CLOCK >> 6) {
 			// Between fPCLCK/32 and fPCLCK/64, pick the slower
-			setbits = SPI_CR1_FPCLCKd64; /*  101: fPCLK/64 */
-			actual = _spiclock >> 6;
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd64, SPI_CR1_BR_MASK); /*  101: fPCLK/64 */
 
-		} else if (frequency >= _spiclock >> 7) {
+		} else if (frequency >= SPI_CLOCK >> 7) {
 			// Between fPCLCK/64 and fPCLCK/128, pick the slower
-			setbits = SPI_CR1_FPCLCKd128; /* 110: fPCLK/128 */
-			actual = _spiclock >> 7;
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd128, SPI_CR1_BR_MASK); /* 110: fPCLK/128 */
 
 		} else {
-			// Less than fPCLK/128.  This is as slow as we can go
-			setbits = SPI_CR1_FPCLCKd256; /* 111: fPCLK/256 */
-			actual = _spiclock >> 8;
+			// Less than fPCLK/128. This is as slow as we can go
+			RegisterModify(Register::CR1, SPI_CR1_FPCLCKd256, SPI_CR1_BR_MASK); /* 111: fPCLK/256 */
 		}
 
-		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
-		RegisterModify(Register::CR1, setbits, SPI_CR1_BR_MASK);
+		// Enable SPI
 		RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 
-		// Save the frequency selection so that subsequent reconfigurations will be faster.
-		_frequency_requested = frequency;
-		_frequency_actual = actual;
+		// Save the new frequency selection
+		_frequency = frequency;
 	}
-
-	return _frequency_actual;
 }
 
 void
@@ -203,6 +193,7 @@ SPIMaster::ChangeMode(SPI_MODE mode)
 		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
 
 		switch (mode) {
+		default:
 		case SPI_MODE::MODE_0: /* CPOL=0; CPHA=0 */
 			RegisterModify(Register::CR1, 0, SPI_CR1_CPOL | SPI_CR1_CPHA);
 			break;
@@ -244,50 +235,48 @@ SPIMaster::ChangeMode(SPI_MODE mode)
 		RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 #endif // CONFIG_STM32F7_SPI_DMA
 
-		// Save the mode so that subsequent re-configurations will be faster
+		// Save the new mode
 		_mode = mode;
 	}
 }
 
 void
-SPIMaster::ChangeBits(int nbits)
+SPIMaster::ChangeBitMode(BIT_MODE nbits)
 {
-	int savbits = nbits;
-
 	// Has the number of bits changed?
 	if (nbits != _nbits) {
-		// Yes... Set CR2 appropriately
-		// Set the number of bits (valid range 4-16)
-		if (nbits < 4 || nbits > 16) {
-			return;
-		}
 
-		uint16_t clrbits = SPI_CR2_DS_MASK;
-		uint16_t setbits = SPI_CR2_DS_VAL(nbits);
-
-		// If nbits is <=8, then we are in byte mode and FRXTH shall be set (else, transaction will not complete).
-		if (nbits < 9) {
-			setbits |= SPI_CR2_FRXTH; /* RX FIFO Threshold = 1 byte */
-
-		} else {
-			clrbits |= SPI_CR2_FRXTH; /* RX FIFO Threshold = 2 bytes */
-		}
-
+		// disable SPI
 		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
-		RegisterModify(Register::CR2, setbits, clrbits);
+
+		switch (nbits) {
+		default:
+		case BIT_MODE::Bit8:
+
+			// RX FIFO Threshold = 1 byte
+			RegisterModify(Register::CR2, SPI_CR2_DS_VAL(8) | SPI_CR2_FRXTH, SPI_CR2_DS_MASK);
+			break;
+
+		case BIT_MODE::Bit16:
+			// RX FIFO Threshold = 2 bytes
+			RegisterModify(Register::CR2, SPI_CR2_DS_VAL(16), SPI_CR2_DS_MASK | SPI_CR2_FRXTH);
+			break;
+		}
+
+		// enable SPI
 		RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 
-		// Save the selection so the subsequence re-configurations will be faster
-		_nbits = savbits; // nbits has been clobbered... save the signed value.
+		// Save the selection
+		_nbits = nbits;
 	}
 }
 
 void
-SPIMaster::Transfer(uint8_t buffer[], uint16_t len)
+SPIMaster::TransferStart(const SPIDevice &device)
 {
-	ChangeFrequency(_frequency_requested);
+	ChangeFrequency(1000000);
 	ChangeMode(_mode);
-	ChangeBits(8);
+	ChangeBitMode(BIT_MODE::Bit8);
 
 	// Making sure the other peripherals are not selected
 	for (const auto &dev : _devices) {
@@ -295,13 +284,23 @@ SPIMaster::Transfer(uint8_t buffer[], uint16_t len)
 	}
 
 	// SPI select is active low
-	stm32_gpiowrite(_devices[0].chip_select, false);
+	stm32_gpiowrite(device.chip_select, false);
+}
 
+void
+SPIMaster::TransferFinish(const SPIDevice &device)
+{
+	// and clean up
+	stm32_gpiowrite(device.chip_select, true);
+}
 
-	// do the transfer
+void
+SPIMaster::Transfer(uint8_t buffer[], uint16_t len)
+{
+	TransferStart(_devices[0]);
+
+	// Exchange one byte at a time
 	for (int i = 0; i < len; i++) {
-		// Exchange one word
-
 		// Wait until the transmit buffer is empty, then send the byte
 		while ((RegisterRead16(Register::SR) & SPI_SR_TXE) == 0);
 
@@ -316,8 +315,7 @@ SPIMaster::Transfer(uint8_t buffer[], uint16_t len)
 		RegisterRead16(Register::SR);
 	}
 
-	// and clean up
-	stm32_gpiowrite(_devices[0].chip_select, true);
+	TransferFinish(_devices[0]);
 }
 
 void
@@ -343,6 +341,8 @@ SPIMaster::DMATXCallback(DMA_HANDLE handle, uint8_t isr, void *arg)
 void
 SPIMaster::TransferDMA(uint8_t buffer[], uint16_t len)
 {
+	TransferStart(_devices[0]);
+
 	// setup the DMA
 	_rxresult = 0;
 	_txresult = 0;
@@ -379,6 +379,8 @@ SPIMaster::TransferDMA(uint8_t buffer[], uint16_t len)
 
 	// Force RAM re-read
 	up_invalidate_dcache((uintptr_t)buffer, (uintptr_t)buffer + len);
+
+	TransferFinish(_devices[0]);
 }
 
 } // namespace device

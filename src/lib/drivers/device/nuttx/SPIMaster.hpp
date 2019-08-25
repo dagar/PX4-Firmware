@@ -89,13 +89,43 @@ protected:
 	void	TransferDMA(uint8_t buffer[], uint16_t len);
 
 	enum class SPI_MODE {
-		MODE_0 = 0, // CPOL=0 CHPHA=0
-		MODE_1 = 1, // CPOL=0 CHPHA=1
-		MODE_2 = 2, // CPOL=1 CHPHA=0
-		MODE_3 = 3  // CPOL=1 CHPHA=1
+		MODE_0,	// CPOL=0 CHPHA=0
+		MODE_1,	// CPOL=0 CHPHA=1
+		MODE_2,	// CPOL=1 CHPHA=0
+		MODE_3,	// CPOL=1 CHPHA=1
+
+		INVALID,
+	};
+
+	enum class BIT_MODE {
+		Bit8,
+		Bit16,
+
+		INVALID,
 	};
 
 private:
+
+	enum class State {
+		Stopped,
+		Initializing,
+		Transferring,
+		WaitingForDMA,
+		Ready,
+	};
+
+	struct SPIDevice {
+		const gpio_t chip_select;
+		SPIDevice(gpio_t cs) : chip_select(cs) {}
+	};
+
+	void		TransferStart(const SPIDevice &device);
+	void		TransferFinish(const SPIDevice &device);
+
+	void		ChangeFrequency(uint32_t frequency);
+	void		ChangeMode(SPI_MODE mode);
+	void		ChangeBitMode(BIT_MODE nbits);
+
 
 	enum class Register : uint32_t {
 		CR1	= STM32_SPI1_BASE + STM32_SPI_CR1_OFFSET,
@@ -106,11 +136,6 @@ private:
 		RXCRCR	= STM32_SPI1_BASE + STM32_SPI_RXCRCR_OFFSET,
 		TXCRCR	= STM32_SPI1_BASE + STM32_SPI_TXCRCR_OFFSET,
 	};
-
-	uint32_t	ChangeFrequency(uint32_t frequency);
-	void		ChangeMode(SPI_MODE mode);
-	void		ChangeBits(int nbits);
-
 
 	uint8_t		RegisterRead8(Register reg);
 	uint16_t	RegisterRead16(Register reg);
@@ -124,14 +149,9 @@ private:
 	void		DMARXSetup(void *rxbuffer, size_t nwords);
 	void		DMATXSetup(const void *txbuffer, size_t nwords);
 
-
-	uint32_t		_spibase{STM32_SPI1_BASE};		// SPIn base address
-	uint32_t		_spiclock{STM32_PCLK2_FREQUENCY};	// Clocking for the SPI module
-
-	uint32_t		_frequency_requested{0};	// Requested clock frequency
-	uint32_t		_frequency_actual{0};		// Actual clock frequency
-	int8_t			_nbits{0};			// Width of word in bits
-	SPI_MODE		_mode{SPI_MODE::MODE_0};	// Mode 0,1,2,3
+	uint32_t		_frequency{0};			// Requested clock frequency
+	BIT_MODE		_nbits{BIT_MODE::INVALID};	// Width of word in bits
+	SPI_MODE		_mode{SPI_MODE::INVALID};	// Mode 0,1,2,3
 
 	// RX DMA
 	static void		DMARXCallback(DMA_HANDLE handle, uint8_t isr, void *arg);
@@ -146,12 +166,6 @@ private:
 	sem_t			_txsem;			// Wait for TX DMA to complete
 	uint8_t			_txch{DMAMAP_SPI1_TX_2};	// The TX DMA channel number
 	volatile uint8_t	_txresult;		// Result of the RX DMA
-
-
-	struct SPIDevice {
-		const gpio_t	chip_select;
-		SPIDevice(gpio_t cs) : chip_select(cs) {}
-	};
 
 	SPIDevice	_devices[5] {
 		SPIDevice(GPIO_SPI1_CS1_ICM20689),
