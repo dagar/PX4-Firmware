@@ -44,8 +44,27 @@
 
 #include <arch/board/board.h>
 
+#include <px4_config.h>
+
 namespace device
 {
+
+using gpio_t = uint32_t;
+
+struct SPI_CONFIG {
+	uint8_t bus;
+
+	gpio_t SCK;
+	gpio_t MISO;
+	gpio_t MOSI;
+
+	uint32_t *base_address;
+
+	uint32_t clock;
+
+	uint8_t	DMA_RX_channel;
+	uint8_t	DMA_TX_channel;
+};
 
 /**
  * Abstract class for character device on SPI
@@ -78,18 +97,28 @@ protected:
 
 private:
 
+	enum class Register : uint32_t {
+		CR1	= STM32_SPI1_BASE + STM32_SPI_CR1_OFFSET,
+		CR2	= STM32_SPI1_BASE + STM32_SPI_CR2_OFFSET,
+		SR	= STM32_SPI1_BASE + STM32_SPI_SR_OFFSET,
+		DR	= STM32_SPI1_BASE + STM32_SPI_DR_OFFSET,
+		CRCPR	= STM32_SPI1_BASE + STM32_SPI_CRCPR_OFFSET,
+		RXCRCR	= STM32_SPI1_BASE + STM32_SPI_RXCRCR_OFFSET,
+		TXCRCR	= STM32_SPI1_BASE + STM32_SPI_TXCRCR_OFFSET,
+	};
+
 	uint32_t	ChangeFrequency(uint32_t frequency);
 	void		ChangeMode(SPI_MODE mode);
 	void		ChangeBits(int nbits);
 
 
-	uint8_t		RegisterRead8(int reg);
-	uint16_t	RegisterRead16(int reg);
+	uint8_t		RegisterRead8(Register reg);
+	uint16_t	RegisterRead16(Register reg);
 
-	void		RegisterWrite8(int reg, uint8_t value);
-	void		RegisterWrite16(int reg, uint16_t value);
+	void		RegisterWrite8(Register reg, uint8_t value);
+	void		RegisterWrite16(Register reg, uint16_t value);
 
-	void		RegisterModify(int reg, uint16_t setbits, uint16_t clrbits);
+	void		RegisterModify(Register reg, uint16_t setbits, uint16_t clrbits);
 
 
 	void		DMARXSetup(void *rxbuffer, size_t nwords);
@@ -117,6 +146,20 @@ private:
 	sem_t			_txsem;			// Wait for TX DMA to complete
 	uint8_t			_txch{DMAMAP_SPI1_TX_2};	// The TX DMA channel number
 	volatile uint8_t	_txresult;		// Result of the RX DMA
+
+
+	struct SPIDevice {
+		const gpio_t	chip_select;
+		SPIDevice(gpio_t cs) : chip_select(cs) {}
+	};
+
+	SPIDevice	_devices[5] {
+		SPIDevice(GPIO_SPI1_CS1_ICM20689),
+		SPIDevice(GPIO_SPI1_CS2_ICM20602),
+		SPIDevice(GPIO_SPI1_CS3_BMI055_GYRO),
+		SPIDevice(GPIO_SPI1_CS4_BMI055_ACC),
+		SPIDevice(GPIO_SPI1_CS5_AUX_MEM),
+	};
 
 };
 

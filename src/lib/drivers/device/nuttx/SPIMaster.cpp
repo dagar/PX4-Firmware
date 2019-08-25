@@ -43,25 +43,25 @@ namespace device
 {
 
 uint8_t
-SPIMaster::RegisterRead8(int reg)
+SPIMaster::RegisterRead8(Register reg)
 {
-	return (*(volatile uint8_t *)(_spibase + reg));
+	return (*(volatile uint8_t *)(reg));
 }
 
 uint16_t
-SPIMaster::RegisterRead16(int reg)
+SPIMaster::RegisterRead16(Register reg)
 {
-	return (*(volatile uint16_t *)(_spibase + reg));
+	return (*(volatile uint16_t *)(reg));
 }
 
 void
-SPIMaster::RegisterWrite16(int reg, uint16_t value)
+SPIMaster::RegisterWrite16(Register reg, uint16_t value)
 {
-	(*(volatile uint16_t *)(_spibase + reg) = value);
+	(*(volatile uint16_t *)(reg) = value);
 }
 
 void
-SPIMaster::RegisterModify(int reg, uint16_t setbits, uint16_t clrbits)
+SPIMaster::RegisterModify(Register reg, uint16_t setbits, uint16_t clrbits)
 {
 	uint16_t cr = RegisterRead16(reg);
 	cr &= ~clrbits;
@@ -77,6 +77,11 @@ SPIMaster::Init()
 	stm32_configgpio(GPIO_SPI1_MISO);
 	stm32_configgpio(GPIO_SPI1_MOSI);
 
+	for (const auto &dev : _devices) {
+		stm32_configgpio(dev.chip_select);
+		stm32_gpiowrite(dev.chip_select, true);
+	}
+
 	/* Configure CR1 and CR2. Default configuration:
 	 *   Mode 0:                        CR1.CPHA=0 and CR1.CPOL=0
 	 *   Master:                        CR1.MSTR=1
@@ -87,14 +92,14 @@ SPIMaster::Init()
 	uint16_t clrbits = SPI_CR1_CPHA | SPI_CR1_CPOL | SPI_CR1_BR_MASK | SPI_CR1_LSBFIRST | SPI_CR1_RXONLY | SPI_CR1_BIDIOE |
 			   SPI_CR1_BIDIMODE;
 	uint16_t setbits = SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM;
-	RegisterModify(STM32_SPI_CR1_OFFSET, setbits, clrbits);
+	RegisterModify(Register::CR1, setbits, clrbits);
 
 	ChangeMode(SPI_MODE::MODE_0);
 	ChangeBits(8);
 	ChangeFrequency(400000);
 
 	// CRCPOLY configuration
-	RegisterWrite16(STM32_SPI_CRCPR_OFFSET, 7);
+	RegisterWrite16(Register::CRCPR, 7);
 
 #ifdef CONFIG_STM32F7_SPI_DMA
 	//  Initialize the SPI semaphores that is used to wait for DMA completion.
@@ -108,11 +113,11 @@ SPIMaster::Init()
 	_rxdma = stm32_dmachannel(_rxch);
 	_txdma = stm32_dmachannel(_txch);
 
-	RegisterModify(STM32_SPI_CR2_OFFSET, SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN, 0);
+	RegisterModify(Register::CR2, SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN, 0);
 #endif // CONFIG_STM32F7_SPI_DMA
 
 	// Enable SPI
-	RegisterModify(STM32_SPI_CR1_OFFSET, SPI_CR1_SPE, 0);
+	RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 }
 
 void
@@ -121,16 +126,15 @@ SPIMaster::Deinit()
 	stm32_unconfiggpio(GPIO_SPI1_SCK);
 	stm32_unconfiggpio(GPIO_SPI1_MISO);
 	stm32_unconfiggpio(GPIO_SPI1_MOSI);
+
+	for (const auto &dev : _devices) {
+		stm32_unconfiggpio(dev.chip_select);
+	}
 }
 
 uint32_t
 SPIMaster::ChangeFrequency(uint32_t frequency)
 {
-	// Limit to max possible (if STM32_SPI_CLK_MAX is defined in board.h)
-	if (frequency > STM32_SPI_CLK_MAX) {
-		frequency = STM32_SPI_CLK_MAX;
-	}
-
 	// Has the frequency changed?
 	if (frequency != _frequency_requested) {
 		uint32_t actual = 0;
@@ -178,9 +182,9 @@ SPIMaster::ChangeFrequency(uint32_t frequency)
 			actual = _spiclock >> 8;
 		}
 
-		RegisterModify(STM32_SPI_CR1_OFFSET, 0, SPI_CR1_SPE);
-		RegisterModify(STM32_SPI_CR1_OFFSET, setbits, SPI_CR1_BR_MASK);
-		RegisterModify(STM32_SPI_CR1_OFFSET, SPI_CR1_SPE, 0);
+		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
+		RegisterModify(Register::CR1, setbits, SPI_CR1_BR_MASK);
+		RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 
 		// Save the frequency selection so that subsequent reconfigurations will be faster.
 		_frequency_requested = frequency;
@@ -195,58 +199,49 @@ SPIMaster::ChangeMode(SPI_MODE mode)
 {
 	// Has the mode changed?
 	if (mode != _mode) {
-		uint16_t setbits = 0;
-		uint16_t clrbits = 0;
+		// Disable SPI then change mode
+		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
 
-		// Yes... Set CR1 appropriately
 		switch (mode) {
 		case SPI_MODE::MODE_0: /* CPOL=0; CPHA=0 */
-			setbits = 0;
-			clrbits = SPI_CR1_CPOL | SPI_CR1_CPHA;
+			RegisterModify(Register::CR1, 0, SPI_CR1_CPOL | SPI_CR1_CPHA);
 			break;
 
 		case SPI_MODE::MODE_1: /* CPOL=0; CPHA=1 */
-			setbits = SPI_CR1_CPHA;
-			clrbits = SPI_CR1_CPOL;
+			RegisterModify(Register::CR1, SPI_CR1_CPHA, SPI_CR1_CPOL);
 			break;
 
 		case SPI_MODE::MODE_2: /* CPOL=1; CPHA=0 */
-			setbits = SPI_CR1_CPOL;
-			clrbits = SPI_CR1_CPHA;
+			RegisterModify(Register::CR1, SPI_CR1_CPOL, SPI_CR1_CPHA);
 			break;
 
 		case SPI_MODE::MODE_3: /* CPOL=1; CPHA=1 */
-			setbits = SPI_CR1_CPOL | SPI_CR1_CPHA;
-			clrbits = 0;
+			RegisterModify(Register::CR1, SPI_CR1_CPOL | SPI_CR1_CPHA, 0);
 			break;
 		}
-
-		// Disable SPI then change mode
-		RegisterModify(STM32_SPI_CR1_OFFSET, 0, SPI_CR1_SPE);
-		RegisterModify(STM32_SPI_CR1_OFFSET, setbits, clrbits);
 
 #ifdef CONFIG_STM32F7_SPI_DMA
 		/* Enabling SPI causes a spurious received character indication
 		 * which confuse the DMA controller so we disable DMA during that
 		 * enabling; and flush the SPI RX FIFO before re-enabling DMA.
 		 */
-		uint16_t cr2bits = RegisterRead16(STM32_SPI_CR2_OFFSET);
-		RegisterModify(STM32_SPI_CR2_OFFSET, 0, SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN);
+		uint16_t cr2bits = RegisterRead16(Register::CR2);
+		RegisterModify(Register::CR2, 0, SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN);
 #endif // CONFIG_STM32F7_SPI_DMA
 
 		// Re-enable SPI
-		RegisterModify(STM32_SPI_CR1_OFFSET, SPI_CR1_SPE, 0);
+		RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 
-		while ((RegisterRead16(STM32_SPI_SR_OFFSET) & SPI_SR_FRLVL_MASK) != 0) {
+		while ((RegisterRead16(Register::SR) & SPI_SR_FRLVL_MASK) != 0) {
 			// Flush SPI read FIFO
-			RegisterRead16(STM32_SPI_DR_OFFSET);
+			RegisterRead16(Register::DR);
 		}
 
 #ifdef CONFIG_STM32F7_SPI_DMA
 		// Re-enable DMA (with SPI disabled)
-		RegisterModify(STM32_SPI_CR1_OFFSET, 0, SPI_CR1_SPE);
-		RegisterModify(STM32_SPI_CR2_OFFSET, cr2bits & (SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN), 0);
-		RegisterModify(STM32_SPI_CR1_OFFSET, SPI_CR1_SPE, 0);
+		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
+		RegisterModify(Register::CR2, cr2bits & (SPI_CR2_RXDMAEN | SPI_CR2_TXDMAEN), 0);
+		RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 #endif // CONFIG_STM32F7_SPI_DMA
 
 		// Save the mode so that subsequent re-configurations will be faster
@@ -278,9 +273,9 @@ SPIMaster::ChangeBits(int nbits)
 			clrbits |= SPI_CR2_FRXTH; /* RX FIFO Threshold = 2 bytes */
 		}
 
-		RegisterModify(STM32_SPI_CR1_OFFSET, 0, SPI_CR1_SPE);
-		RegisterModify(STM32_SPI_CR2_OFFSET, setbits, clrbits);
-		RegisterModify(STM32_SPI_CR1_OFFSET, SPI_CR1_SPE, 0);
+		RegisterModify(Register::CR1, 0, SPI_CR1_SPE);
+		RegisterModify(Register::CR2, setbits, clrbits);
+		RegisterModify(Register::CR1, SPI_CR1_SPE, 0);
 
 		// Save the selection so the subsequence re-configurations will be faster
 		_nbits = savbits; // nbits has been clobbered... save the signed value.
@@ -294,28 +289,35 @@ SPIMaster::Transfer(uint8_t buffer[], uint16_t len)
 	ChangeMode(_mode);
 	ChangeBits(8);
 
-	//stm32_spi1select(_dev, _device, true);
+	// Making sure the other peripherals are not selected
+	for (const auto &dev : _devices) {
+		stm32_gpiowrite(dev.chip_select, true);
+	}
+
+	// SPI select is active low
+	stm32_gpiowrite(_devices[0].chip_select, false);
+
 
 	// do the transfer
 	for (int i = 0; i < len; i++) {
 		// Exchange one word
 
 		// Wait until the transmit buffer is empty, then send the byte
-		while ((RegisterRead16(STM32_SPI_SR_OFFSET) & SPI_SR_TXE) == 0);
+		while ((RegisterRead16(Register::SR) & SPI_SR_TXE) == 0);
 
-		RegisterWrite8(STM32_SPI_DR_OFFSET, buffer[i]);
+		RegisterWrite8(Register::DR, buffer[i]);
 
 		// Wait until the receive buffer is not empty, then receive the byte
-		while ((RegisterRead16(STM32_SPI_SR_OFFSET) & SPI_SR_RXNE) == 0);
+		while ((RegisterRead16(Register::SR) & SPI_SR_RXNE) == 0);
 
-		buffer[i] = RegisterRead8(STM32_SPI_DR_OFFSET);
+		buffer[i] = RegisterRead8(Register::DR);
 
 		// Check and clear any error flags (Reading from the SR clears the error flags).
-		RegisterRead16(STM32_SPI_SR_OFFSET);
+		RegisterRead16(Register::SR);
 	}
 
 	// and clean up
-	//stm32_spi1select(_dev, _device, false);
+	stm32_gpiowrite(_devices[0].chip_select, true);
 }
 
 void
@@ -345,13 +347,11 @@ SPIMaster::TransferDMA(uint8_t buffer[], uint16_t len)
 	_rxresult = 0;
 	_txresult = 0;
 
-	static constexpr uint32_t RXDMA8 = (DMA_SCR_PRILO | DMA_SCR_MSIZE_8BITS | DMA_SCR_PSIZE_8BITS | DMA_SCR_MINC |
-					    DMA_SCR_DIR_P2M);
-	stm32_dmasetup(_rxdma, _spibase + STM32_SPI_DR_OFFSET, (uint32_t)buffer, len, RXDMA8);
+	uint32_t RXDMA8 = (DMA_SCR_PRILO | DMA_SCR_MSIZE_8BITS | DMA_SCR_PSIZE_8BITS | DMA_SCR_MINC | DMA_SCR_DIR_P2M);
+	stm32_dmasetup(_rxdma, (uint32_t)Register::DR, (uint32_t)buffer, len, RXDMA8);
 
-	static constexpr uint32_t TXDMA8 = (DMA_SCR_PRILO | DMA_SCR_MSIZE_8BITS | DMA_SCR_PSIZE_8BITS | DMA_SCR_MINC |
-					    DMA_SCR_DIR_M2P);
-	stm32_dmasetup(_txdma, _spibase + STM32_SPI_DR_OFFSET, (uint32_t)buffer, len, TXDMA8);
+	uint32_t TXDMA8 = (DMA_SCR_PRILO | DMA_SCR_MSIZE_8BITS | DMA_SCR_PSIZE_8BITS | DMA_SCR_MINC | DMA_SCR_DIR_M2P);
+	stm32_dmasetup(_txdma, (uint32_t)Register::DR, (uint32_t)buffer, len, TXDMA8);
 
 	// Flush cache to physical memory
 	up_flush_dcache((uintptr_t)buffer, (uintptr_t)buffer + len);
