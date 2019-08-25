@@ -86,7 +86,20 @@
         "githubPullRequests.telemetry.enabled": false,
         "gitlens.advanced.telemetry.enabled": false,
         "files.associations": {
-                "*.jinja": "jinja"
+                "*.jinja": "jinja",
+                "*.ipp": "cpp",
+                "cstddef": "cpp",
+                "istream": "cpp",
+                "optional": "cpp",
+                "ostream": "cpp",
+                "ratio": "cpp",
+                "system_error": "cpp",
+                "tuple": "cpp",
+                "type_traits": "cpp",
+                "functional": "cpp",
+                "utility": "cpp",
+                "random": "cpp",
+                "complex": "cpp"
         },
         "search.exclude": {
                 "build/**": true
