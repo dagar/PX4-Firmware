@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,28 +54,22 @@ using gpio_t = uint32_t;
 struct SPI_CONFIG {
 	uint8_t bus;
 
-	gpio_t SCK;	// eg GPIO_SPI1_SCK
-	gpio_t MISO;	// eg GPIO_SPI1_MISO
-	gpio_t MOSI;	// eg GPIO_SPI1_MOSI
+	gpio_t GPIO_SCK;	// eg GPIO_SPI1_SCK
+	gpio_t GPIO_MISO;	// eg GPIO_SPI1_MISO
+	gpio_t GPIO_MOSI;	// eg GPIO_SPI1_MOSI
 
-	uint32_t base_address;	// eg STM32_SPI1_BASE
-	uint32_t clock;		// eg STM32_PCLK2_FREQUENCY
+	uint32_t STM32_SPI_BASE;	// eg STM32_SPI1_BASE
+	uint32_t CLOCK;			// eg STM32_PCLK2_FREQUENCY
 
-	uint8_t	DMA_RX_channel;	// The RX DMA channel number (eg DMAMAP_SPI1_RX_1)
-	uint8_t	DMA_TX_channel;	// The TX DMA channel number (eg DMAMAP_SPI1_TX_2)
-
-
-	uint32_t devices[];
+	uint8_t	DMA_RX_channel;		// The RX DMA channel number (eg DMAMAP_SPI1_RX_1)
+	uint8_t	DMA_TX_channel;		// The TX DMA channel number (eg DMAMAP_SPI1_TX_2)
 };
 
-/**
- * Abstract class for character device on SPI
- */
 class SPIMaster
 {
 protected:
 
-	SPIMaster() = default;
+	SPIMaster(SPI_CONFIG config) : _config(config) {}
 	~SPIMaster() = default;
 
 	void	Init();
@@ -134,8 +128,6 @@ private:
 		SR	= STM32_SPI1_BASE + STM32_SPI_SR_OFFSET,
 		DR	= STM32_SPI1_BASE + STM32_SPI_DR_OFFSET,
 		CRCPR	= STM32_SPI1_BASE + STM32_SPI_CRCPR_OFFSET,
-		RXCRCR	= STM32_SPI1_BASE + STM32_SPI_RXCRCR_OFFSET,
-		TXCRCR	= STM32_SPI1_BASE + STM32_SPI_TXCRCR_OFFSET,
 	};
 
 	uint8_t		RegisterRead8(Register reg);
@@ -174,8 +166,7 @@ private:
 		SPIDevice(GPIO_SPI1_CS5_AUX_MEM),
 	};
 
-	SPI_CONFIG	_config;
-
+	const SPI_CONFIG	_config;
 
 };
 
