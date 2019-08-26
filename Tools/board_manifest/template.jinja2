@@ -1,0 +1,35 @@
+
+
+
+#include <board_config.h>
+#include <drivers/device/spi.h>
+
+void drivers_start()
+{
+
+{% for d in drivers.SPI1 %}
+    {{ d.name }}({{ d.spidev }}, {{ d.mode }}, {{ d.speed }})
+{% endfor %}
+
+{% for d in drivers.I2C1 %}
+    {{ d.name }}(I2C1, {{ d.address }}, {{ d.speed }})
+{% endfor %}
+
+}
+
+
+
+// PX4Driver<Schedule<SPI<MPU6000>>>
+// PX4Driver - start, stop, status, reset, test interface
+// Schedule - time or data ready interrupt driven
+// Interface - SPI, I2C, etc - bus, chipselect, speed, etc
+// Device driver - init, reset, read,
+
+
+// Questions
+//  - how do we pass arguments to each?
+//  - completely separate PX4DriverFrontend?
+//  - where does PX4Accel, etc fit in? get the raw data out and published
+//  - how do we handle different modes (fifo or not, filter setup, etc)
+//  - collect everything on every bus
+//  cmake template, add subdirectory and linking
