@@ -40,6 +40,7 @@
 constexpr uint8_t MPU6000::_checked_registers[MPU6000_NUM_CHECKED_REGISTERS];
 
 MPU6000::MPU6000(device::Device *interface, const char *path, enum Rotation rotation, int device_type) :
+	DriverInterface(MODULE_NAME),
 	CDev(path),
 	ScheduledWorkItem(px4::device_bus_to_wq(interface->get_device_id())),
 	_interface(interface),

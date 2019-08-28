@@ -44,7 +44,6 @@ namespace device
 
 class DriverInterface;
 extern BlockingList<DriverInterface *> _px4_drivers_list;
-extern pthread_mutex_t px4_drivers_mutex;
 
 class DriverInterface : public ListNode<DriverInterface *>
 {
@@ -52,7 +51,7 @@ public:
 
 	virtual ~DriverInterface()
 	{
-		_px4_drivers_list.remove(this);
+		Deinit();
 	};
 
 	// no copy, assignment, move, move assignment
@@ -60,6 +59,21 @@ public:
 	DriverInterface &operator=(const DriverInterface &) = delete;
 	DriverInterface(DriverInterface &&) = delete;
 	DriverInterface &operator=(DriverInterface &&) = delete;
+
+	bool Init()
+	{
+		// TODO: check for and prevent duplicate instances
+
+		if (true /* no dupes */) {
+			// automatically add driver to list
+			_px4_drivers_list.add(&_interface);
+		}
+	}
+
+	bool Deinit()
+	{
+		_px4_drivers_list.remove(&_interface);
+	}
 
 	virtual bool Start() = 0;
 	virtual bool Stop() = 0;
@@ -71,22 +85,20 @@ public:
 
 	const char *name() const { return _name; }
 
-	static void lock_driver() { pthread_mutex_lock(&px4_drivers_mutex); }
-	static void unlock_driver() { pthread_mutex_unlock(&px4_drivers_mutex); }
-
 protected:
 
-	explicit DriverInterface(const char *name) : _name(name)
+	explicit DriverInterface(Device interface) : _name(name)
 	{
-		// automatically add driver to list
-		_px4_drivers_list.add(this);
+
+
+		// TODO: Device dedup
 	};
 
 	px4::atomic_bool _driver_should_stop{false};
 
 protected:
 
-	const char *_name;
+	Device	_interface;
 
 };
 

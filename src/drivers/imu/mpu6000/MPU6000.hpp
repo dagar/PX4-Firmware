@@ -55,6 +55,7 @@
  * @author David Sidrane
  */
 
+#include <lib/drivers/device/DriverInterface.hpp>
 #include <lib/conversion/rotation.h>
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
@@ -300,12 +301,16 @@ enum MPU6000_BUS {
 	MPU6000_BUS_SPI_EXTERNAL2
 };
 
-class MPU6000 : public cdev::CDev, public px4::ScheduledWorkItem
+class MPU6000 : public device::DriverInterface, public cdev::CDev, public px4::ScheduledWorkItem
 {
 public:
 	MPU6000(device::Device *interface, const char *path, enum Rotation rotation, int device_type);
 
 	virtual ~MPU6000();
+
+
+	bool Start() override { return true; }
+	bool Stop() override { return true; }
 
 	virtual int		init();
 

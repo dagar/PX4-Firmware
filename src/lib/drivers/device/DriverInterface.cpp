@@ -48,9 +48,11 @@
 namespace device
 {
 
-pthread_mutex_t px4_drivers_mutex = PTHREAD_MUTEX_INITIALIZER;
-
+pthread_mutex_t _px4_drivers_mutex = PTHREAD_MUTEX_INITIALIZER;
 BlockingList<DriverInterface *> _px4_drivers_list;
+
+static void lock_drivers() { pthread_mutex_lock(&_px4_drivers_mutex); }
+static void unlock_drivers() { pthread_mutex_unlock(&_px4_drivers_mutex); }
 
 DriverInterface *get_driver_instance(const char *name)
 {
@@ -109,7 +111,7 @@ int driver_wait_until_running(const char *name)
 int driver_stop(const char *name)
 {
 	int ret = 0;
-	DriverInterface::lock_driver();
+	lock_drivers();
 
 	if (driver_running(name)) {
 
@@ -123,9 +125,9 @@ int driver_stop(const char *name)
 			if (object != nullptr) {
 				object->Stop();
 
-				DriverInterface::unlock_driver();
+				unlock_drivers();
 				px4_usleep(20000); // 20 ms
-				DriverInterface::lock_driver();
+				lock_drivers();
 
 				// search for driver again to check status
 				object = get_driver_instance(name);
@@ -145,7 +147,7 @@ int driver_stop(const char *name)
 		} while (object != nullptr);
 	}
 
-	DriverInterface::unlock_driver();
+	unlock_drivers();
 	return ret;
 }
 
@@ -153,7 +155,7 @@ void driver_exit_and_cleanup(const char *name)
 {
 	// Take the lock here:
 	// - deleting the object must take place inside the lock.
-	DriverInterface::lock_driver();
+	lock_drivers();
 
 	DriverInterface *object = get_driver_instance(name);
 
@@ -162,14 +164,14 @@ void driver_exit_and_cleanup(const char *name)
 		delete object;
 	}
 
-	DriverInterface::unlock_driver();
+	unlock_drivers();
 }
 
 int driver_status(const char *name)
 {
 	int ret = -1;
 
-	DriverInterface::lock_driver();
+	lock_drivers();
 	DriverInterface *object = get_driver_instance(name);
 
 	if (driver_running(name) && object) {
@@ -180,7 +182,7 @@ int driver_status(const char *name)
 		PX4_INFO("%s not running", name);
 	}
 
-	DriverInterface::unlock_driver();
+	unlock_drivers();
 
 	return ret;
 }
