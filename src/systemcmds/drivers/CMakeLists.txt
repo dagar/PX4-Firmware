@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,34 +31,10 @@
 #
 ############################################################################
 
-set(SRCS_PLATFORM)
-if (${PX4_PLATFORM} STREQUAL "nuttx")
-	if ("${CONFIG_I2C}" STREQUAL "y")
-		list(APPEND SRCS_PLATFORM nuttx/I2C.cpp)
-	endif()
-
-	if ("${CONFIG_SPI}" STREQUAL "y")
-		list(APPEND SRCS_PLATFORM nuttx/SPI.cpp)
-	endif()
-elseif(UNIX AND NOT APPLE AND NOT (${PX4_PLATFORM} MATCHES "qurt")) #TODO: add linux PX4 platform type
-	# Linux I2Cdev and SPIdev
-	list(APPEND SRCS_PLATFORM
-		posix/I2C.cpp
-		posix/SPI.cpp
+px4_add_module(
+	MODULE systemcmds__drivers
+	MAIN drivers
+	STACK_MAIN 900
+	SRCS
+		drivers.cpp
 	)
-endif()
-
-px4_add_library(drivers__device
-	CDev.cpp
-	DriverInterface.cpp
-	DriverInterface.hpp
-	ringbuffer.cpp
-	integrator.cpp
-	${SRCS_PLATFORM}
-	)
-
-if (${PX4_PLATFORM} STREQUAL "nuttx")
-	target_link_libraries(drivers__device PRIVATE nuttx_arch)
-endif()
-
-target_link_libraries(drivers__device PRIVATE cdev)

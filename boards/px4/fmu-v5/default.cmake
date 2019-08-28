@@ -91,6 +91,7 @@ px4_add_board(
 		bl_update
 		config
 		dmesg
+		drivers
 		dumpfile
 		esc_calib
 		hardfault_log
