@@ -7,8 +7,8 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    container: px4-dev-base:2019-07-29
-    
+    container: px4io/px4-dev-base:2019-07-29
+
     steps:
     - uses: actions/checkout@v1
     - name: make px4_sitl_default
