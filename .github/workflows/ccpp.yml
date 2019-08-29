@@ -5,6 +5,8 @@ on: [push]
 jobs:
   build:
 
+    runs-on: ubuntu-latest
+
     container: px4-dev-base:2019-07-29
     
     steps:
