@@ -33,33 +33,37 @@
 
 #pragma once
 
-#include <drivers/drv_baro.h>
+#include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
 #include <lib/cdev/CDev.hpp>
 #include <uORB/uORB.h>
 #include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_baro.h>
+#include <uORB/topics/differential_pressure.h>
 
-class PX4Barometer : public cdev::CDev
+class PX4DifferentialPressure : public cdev::CDev
 {
 
 public:
-	PX4Barometer(uint32_t device_id, uint8_t priority);
-	~PX4Barometer() override;
+	PX4DifferentialPressure(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT);
+	~PX4DifferentialPressure() override;
+
+	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_baro_pub.get().error_count = error_count; }
+	void set_error_count(uint64_t error_count) { _differential_pressure_pub.get().error_count = error_count; }
 
-	void set_temperature(float temperature) { _sensor_baro_pub.get().temperature = temperature; }
+	void set_temperature(float temperature) { _differential_pressure_pub.get().temperature = temperature; }
 
-	void update(hrt_abstime timestamp, float pressure);
+	void update(hrt_abstime timestamp, float differential_pressure);
 
 	void print_status();
 
 private:
 
-	uORB::PublicationMultiData<sensor_baro_s>	_sensor_baro_pub;
+	uORB::PublicationMultiData<differential_pressure_s>	_differential_pressure_pub;
 
-	int			_class_device_instance{-1};
+	float	_diff_pres_offset{0.0f};
+
+	int	_class_device_instance{-1};
 
 };

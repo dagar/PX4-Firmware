@@ -31,57 +31,81 @@
  *
  ****************************************************************************/
 
-#include "PX4Barometer.hpp"
+#include "PX4DifferentialPressure.hpp"
 
 #include <lib/drivers/device/Device.hpp>
 
-PX4Barometer::PX4Barometer(uint32_t device_id, uint8_t priority) :
-	CDev(nullptr),
-	_sensor_baro_pub{ORB_ID(sensor_baro), priority}
-{
-	_class_device_instance = register_class_devname(BARO_BASE_DEVICE_PATH);
+#include <string.h>
 
-	_sensor_baro_pub.get().device_id = device_id;
+PX4DifferentialPressure::PX4DifferentialPressure(uint32_t device_id, uint8_t priority) :
+	CDev(nullptr),
+	_differential_pressure_pub{ORB_ID(differential_pressure), priority}
+{
+	_class_device_instance = register_class_devname(AIRSPEED_BASE_DEVICE_PATH);
+
+	_differential_pressure_pub.get().device_id = device_id;
 }
 
-PX4Barometer::~PX4Barometer()
+PX4DifferentialPressure::~PX4DifferentialPressure()
 {
 	if (_class_device_instance != -1) {
-		unregister_class_devname(BARO_BASE_DEVICE_PATH, _class_device_instance);
+		unregister_class_devname(AIRSPEED_BASE_DEVICE_PATH, _class_device_instance);
+	}
+}
+
+int
+PX4DifferentialPressure::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case AIRSPEEDIOCSSCALE: {
+			airspeed_scale cal{};
+			memcpy(&cal, (airspeed_scale *) arg, sizeof(cal));
+
+			_diff_pres_offset = cal.offset_pa;
+		}
+
+		return PX4_OK;
+
+	case DEVIOCGDEVICEID:
+		return _differential_pressure_pub.get().device_id;
+
+	default:
+		return -ENOTTY;
 	}
 }
 
 void
-PX4Barometer::set_device_type(uint8_t devtype)
+PX4DifferentialPressure::set_device_type(uint8_t devtype)
 {
 	// current DeviceStructure
 	union device::Device::DeviceId device_id;
-	device_id.devid = _sensor_baro_pub.get().device_id;
+	device_id.devid = _differential_pressure_pub.get().device_id;
 
 	// update to new device type
 	device_id.devid_s.devtype = devtype;
 
 	// copy back to report
-	_sensor_baro_pub.get().device_id = device_id.devid;
+	_differential_pressure_pub.get().device_id = device_id.devid;
 }
 
 void
-PX4Barometer::update(hrt_abstime timestamp, float pressure)
+PX4DifferentialPressure::update(hrt_abstime timestamp, float differential_pressure)
 {
-	sensor_baro_s &report = _sensor_baro_pub.get();
+	differential_pressure_s &report = _differential_pressure_pub.get();
 
 	report.timestamp = timestamp;
-	report.pressure = pressure;
+	report.differential_pressure_raw_pa = differential_pressure;
+	report.differential_pressure_filtered_pa = differential_pressure;
 
 	poll_notify(POLLIN);
 
-	_sensor_baro_pub.update();
+	_differential_pressure_pub.update();
 }
 
 void
-PX4Barometer::print_status()
+PX4DifferentialPressure::print_status()
 {
-	PX4_INFO(BARO_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
+	PX4_INFO(AIRSPEED_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
 
-	print_message(_sensor_baro_pub.get());
+	print_message(_differential_pressure_pub.get());
 }

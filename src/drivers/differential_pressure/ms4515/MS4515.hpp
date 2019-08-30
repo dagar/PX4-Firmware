@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,35 +31,43 @@
  *
  ****************************************************************************/
 
+/**
+ *
+ * Driver for the MEAS Spec 4515 series connected via I2C.
+ *
+ */
+
 #pragma once
 
-#include <drivers/drv_baro.h>
+#include <drivers/device/i2c.h>
+#include <lib/perf/perf_counter.h>
 #include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
-#include <uORB/uORB.h>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_baro.h>
+#include <lib/drivers/differential_pressure/PX4DifferentialPressure.hpp>
+#include <px4_work_queue/ScheduledWorkItem.hpp>
 
-class PX4Barometer : public cdev::CDev
+class MS4515 : public device::I2C, public px4::ScheduledWorkItem
 {
-
 public:
-	PX4Barometer(uint32_t device_id, uint8_t priority);
-	~PX4Barometer() override;
+	MS4515(uint8_t bus, uint8_t address);
+	virtual ~MS4515() override = default;
 
-	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_baro_pub.get().error_count = error_count; }
-
-	void set_temperature(float temperature) { _sensor_baro_pub.get().temperature = temperature; }
-
-	void update(hrt_abstime timestamp, float pressure);
-
-	void print_status();
+	void	start();
+	void	stop();
 
 private:
 
-	uORB::PublicationMultiData<sensor_baro_s>	_sensor_baro_pub;
+	void	Run() override;
 
-	int			_class_device_instance{-1};
+	int	measure();
+	int	collect();
+
+	PX4DifferentialPressure	_px4_diff_press;
+
+	bool			_sensor_ok{true};
+	bool			_collect_phase{false};
+
+	perf_counter_t		_sample_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": read")};
+	perf_counter_t		_sample_interval_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": read interval")};
+	perf_counter_t		_comms_errors{perf_alloc(PC_COUNT, MODULE_NAME": com errors")};
 
 };

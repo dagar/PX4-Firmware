@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,9 +30,15 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-
-add_subdirectory(ets)
-add_subdirectory(ms4515)
-add_subdirectory(ms4525)
-add_subdirectory(ms5525)
-add_subdirectory(sdp3x)
+px4_add_module(
+	MODULE drivers__ms4515
+	MAIN ms4515
+	STACK_MAIN 1200
+	COMPILE_FLAGS
+	SRCS
+		MS4515.cpp
+		MS4515.hpp
+		ms4515_main.cpp
+	DEPENDS
+		drivers_differential_pressure
+	)

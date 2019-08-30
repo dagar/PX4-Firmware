@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,8 +31,4 @@
 #
 ############################################################################
 
-add_subdirectory(ets)
-add_subdirectory(ms4515)
-add_subdirectory(ms4525)
-add_subdirectory(ms5525)
-add_subdirectory(sdp3x)
+px4_add_library(drivers_differential_pressure PX4DifferentialPressure.cpp)

@@ -55,13 +55,7 @@
 
 #include <drivers/airspeed/airspeed.h>
 
-enum MS_DEVICE_TYPE {
-	DEVICE_TYPE_MS4515	= 4515,
-	DEVICE_TYPE_MS4525	= 4525
-};
-
 /* I2C bus address is 1010001x */
-#define I2C_ADDRESS_MS4515DO	0x46
 #define I2C_ADDRESS_MS4525DO	0x28	/**< 7-bit address. Depends on the order code (this is for code "I") */
 #define PATH_MS4525		"/dev/ms4525"
 
@@ -491,11 +485,9 @@ ms4525_airspeed_main(int argc, char *argv[])
 	int ch;
 	const char *myoptarg = nullptr;
 
-	int device_type = DEVICE_TYPE_MS4525;
-
 	bool start_all = false;
 
-	while ((ch = px4_getopt(argc, argv, "ab:T:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "ab:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 'b':
 			i2c_bus = atoi(myoptarg);
@@ -503,10 +495,6 @@ ms4525_airspeed_main(int argc, char *argv[])
 
 		case 'a':
 			start_all = true;
-			break;
-
-		case 'T':
-			device_type = atoi(myoptarg);
 			break;
 
 		default:
@@ -527,10 +515,7 @@ ms4525_airspeed_main(int argc, char *argv[])
 		if (start_all) {
 			return meas_airspeed::start();
 
-		} else if (device_type == DEVICE_TYPE_MS4515) {
-			return meas_airspeed::start_bus(i2c_bus, I2C_ADDRESS_MS4515DO);
-
-		} else if (device_type == DEVICE_TYPE_MS4525) {
+		} else {
 			return meas_airspeed::start_bus(i2c_bus, I2C_ADDRESS_MS4525DO);
 		}
 	}

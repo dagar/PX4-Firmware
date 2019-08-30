@@ -31,6 +31,11 @@
 #
 ############################################################################
 
+# allow adding link dependencies and link interface libraries to targets created in other directories
+if(POLICY CMP0079)
+	cmake_policy(SET CMP0079 NEW)
+endif()
+
 include(cygwin_cygpath)
 
 set(NUTTX_DIR ${PX4_BINARY_DIR}/NuttX/nuttx)
@@ -72,10 +77,6 @@ file(RELATIVE_PATH PX4_BINARY_DIR_REL ${CMAKE_CURRENT_BINARY_DIR} ${PX4_BINARY_D
 # only in the cygwin environment: convert absolute linker script path to mixed windows (C:/...)
 # because even relative linker script paths are different for linux, mac and windows
 CYGPATH(PX4_BINARY_DIR PX4_BINARY_DIR_CYG)
-
-if(POLICY CMP0079)
-	cmake_policy(SET CMP0079 NEW)
-endif()
 
 target_link_libraries(nuttx_arch
 	INTERFACE
