@@ -65,6 +65,7 @@ bool WorkItem::Init(const wq_config_t &config)
 		PX4_ERR("%s not available", config.name);
 
 	} else {
+		wq->Open(this);
 		_wq = wq;
 		return true;
 	}

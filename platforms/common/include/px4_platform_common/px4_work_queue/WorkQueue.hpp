@@ -35,6 +35,7 @@
 
 #include "WorkQueueManager.hpp"
 
+#include <containers/BlockingList.hpp>
 #include <containers/List.hpp>
 #include <containers/IntrusiveQueue.hpp>
 #include <px4_atomic.h>
@@ -56,6 +57,9 @@ public:
 	~WorkQueue();
 
 	const char *get_name() { return _config.name; }
+
+	void Open(WorkItem *item);
+	void Close(WorkItem *item);
 
 	void Add(WorkItem *item);
 	void Remove(WorkItem *item);
@@ -88,6 +92,8 @@ private:
 
 	px4::atomic_bool	_should_exit{false};
 	const wq_config_t	&_config;
+
+	BlockingList<WorkItem*>		_work_items;
 
 };
 

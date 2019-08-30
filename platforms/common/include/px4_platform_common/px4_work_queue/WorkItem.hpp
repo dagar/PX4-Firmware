@@ -44,7 +44,7 @@
 namespace px4
 {
 
-class WorkItem : public IntrusiveQueueNode<WorkItem *>
+class WorkItem : public ListNode<WorkItem *>, public IntrusiveQueueNode<WorkItem *>
 {
 public:
 

@@ -72,6 +72,16 @@ WorkQueue::~WorkQueue()
 #endif /* __PX4_NUTTX */
 }
 
+void WorkQueue::Open(WorkItem *item)
+{
+	work_lock();
+	_work_items.add(item);
+	work_unlock();
+
+	// Wake up the worker thread
+	px4_sem_post(&_process_lock);
+}
+
 void WorkQueue::Add(WorkItem *item)
 {
 	// TODO: prevent additions when shutting down
@@ -125,6 +135,8 @@ void WorkQueue::Run()
 void WorkQueue::print_status()
 {
 	PX4_INFO("WorkQueue: %s running", get_name());
+
+	// TODO: iterate list and print
 }
 
 } // namespace px4

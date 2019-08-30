@@ -293,4 +293,18 @@ int WorkQueueManagerStop()
 	return PX4_OK;
 }
 
+int WorkQueueManagerStatus()
+{
+	if (_wq_manager_wqs_list != nullptr) {
+		auto lg = _wq_manager_wqs_list->getLockGuard();
+
+		// ask all work queues (threads) to stop
+		// NOTE: not currently safe without all WorkItems stopping first
+		for (WorkQueue *wq : *_wq_manager_wqs_list) {
+			wq->PrintStatus();
+		}
+
+	}
+}
+
 } // namespace px4
