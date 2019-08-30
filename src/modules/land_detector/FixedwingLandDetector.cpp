@@ -56,7 +56,6 @@ FixedwingLandDetector::FixedwingLandDetector()
 void FixedwingLandDetector::_update_topics()
 {
 	_airspeed_sub.update(&_airspeed);
-	_vehicle_acceleration_sub.update(&_vehicle_acceleration);
 	_vehicle_local_position_sub.update(&_vehicle_local_position);
 }
 
@@ -107,8 +106,9 @@ bool FixedwingLandDetector::_get_landed_state()
 
 		// A leaking lowpass prevents biases from building up, but
 		// gives a mostly correct response for short impulses.
-		const matrix::Vector3f accel{_vehicle_acceleration.xyz};
-		const float acc_hor = sqrtf(accel(0) * accel(0) + accel(1) * accel(1));
+		const float vx = _vehicle_local_position.vx;
+		const float vy = _vehicle_local_position.vy;
+		const float acc_hor = sqrtf(vx * vx + vy * vy);
 
 		_xy_accel_filtered = _xy_accel_filtered * 0.8f + acc_hor * 0.18f;
 

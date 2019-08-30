@@ -44,7 +44,6 @@
 
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/airspeed.h>
-#include <uORB/topics/vehicle_acceleration.h>
 #include <uORB/topics/vehicle_local_position.h>
 
 #include "LandDetector.h"
@@ -74,11 +73,9 @@ private:
 
 	uORB::Subscription _airspeed_sub{ORB_ID(airspeed)};
 	uORB::Subscription _param_update_sub{ORB_ID(parameter_update)};
-	uORB::Subscription _vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 	uORB::Subscription _vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
 
 	airspeed_s _airspeed{};
-	vehicle_acceleration_s _vehicle_acceleration{};
 	vehicle_local_position_s _vehicle_local_position{};
 
 	float _airspeed_filtered{0.0f};

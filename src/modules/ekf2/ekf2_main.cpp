@@ -56,9 +56,9 @@
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/ekf2_innovations.h>
 #include <uORB/topics/ekf2_timestamps.h>
+#include <uORB/topics/ekf_gps_drift.h>
 #include <uORB/topics/ekf_gps_position.h>
 #include <uORB/topics/estimator_status.h>
-#include <uORB/topics/ekf_gps_drift.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
@@ -67,6 +67,8 @@
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_body_acceleration.h>
+#include <uORB/topics/vehicle_body_velocity.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
@@ -282,6 +284,8 @@ private:
 	uORB::Publication<estimator_status_s>			_estimator_status_pub{ORB_ID(estimator_status)};
 	uORB::Publication<sensor_bias_s>			_sensor_bias_pub{ORB_ID(sensor_bias)};
 	uORB::Publication<vehicle_attitude_s>			_att_pub{ORB_ID(vehicle_attitude)};
+	uORB::Publication<vehicle_body_acceleration_s>		_vehicle_body_acceleration_pub{ORB_ID(vehicle_body_acceleration)};
+	uORB::Publication<vehicle_body_velocity_s>		_vehicle_body_velocity_pub{ORB_ID(vehicle_body_velocity)};
 	uORB::Publication<vehicle_odometry_s>			_vehicle_odometry_pub{ORB_ID(vehicle_odometry)};
 	uORB::Publication<wind_estimate_s>			_wind_pub{ORB_ID(wind_estimate)};
 	uORB::PublicationData<vehicle_global_position_s>	_vehicle_global_position_pub{ORB_ID(vehicle_global_position)};
@@ -1736,11 +1740,37 @@ bool Ekf2::publish_attitude(const sensor_combined_s &sensors, const hrt_abstime 
 		att.timestamp = now;
 
 		const Quatf q{_ekf.calculate_quaternion()};
+		const matrix::Dcmf R_to_body{q.inversed()};
 		q.copyTo(att.q);
 
 		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
 
 		_att_pub.publish(att);
+
+
+		if (_ekf.local_position_is_valid() && !_preflt_horiz_fail) {
+
+			// Acceleration (without gravity) in body frame
+			vehicle_body_acceleration_s acceleration;
+			acceleration.timestamp = now;
+
+			float vel_deriv[3];
+			_ekf.get_vel_deriv_ned(vel_deriv);
+			const Vector3f a_b{R_to_body *Vector3f{vel_deriv}};
+			a_b.copyTo(acceleration.xyz);
+			_vehicle_body_acceleration_pub.publish(acceleration);
+
+
+			// Velocity in body frame
+			vehicle_body_velocity_s body_velocity;
+			body_velocity.timestamp = now;
+
+			float velocity[3];
+			_ekf.get_velocity(velocity);
+			const Vector3f v_b{R_to_body *Vector3f{velocity}};
+			v_b.copyTo(body_velocity.xyz);
+			_vehicle_body_velocity_pub.publish(body_velocity);
+		}
 
 		return true;
 
