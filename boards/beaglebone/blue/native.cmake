@@ -8,6 +8,7 @@ px4_add_board(
 
 	DRIVERS
 		#barometer # all available barometer drivers
+		barometer/bmp280
 		batt_smbus
 		camera_trigger
 		differential_pressure # all available differential pressure drivers
@@ -23,7 +24,6 @@ px4_add_board(
 
 	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
 		mpu9250
-		bmp280
 
 	MODULES
 		attitude_estimator_q
