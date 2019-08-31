@@ -38,7 +38,7 @@
  */
 
 
-#include "bmp280.h"
+#include "IBMP280.hpp"
 
 #if defined(PX4_I2C_OBDEV_BMP280) || defined(PX4_I2C_EXT_OBDEV_BMP280)
 

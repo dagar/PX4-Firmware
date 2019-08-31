@@ -45,7 +45,6 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/device/i2c.h>
 #include <drivers/device/spi.h>
-#include <lib/cdev/CDev.hpp>
 #include <perf/perf_counter.h>
 #include <px4_config.h>
 #include <px4_getopt.h>
@@ -85,7 +84,6 @@
 #define BMP280_CONFIG_F4		(0x2<<2)
 #define BMP280_CONFIG_F8		(0x3<<2)
 #define BMP280_CONFIG_F16		(0x4<<2)
-
 
 #define BMP280_CTRL_MODE_SLEEP	0x0
 #define BMP280_CTRL_MODE_FORCE	0x1		/* on demand, goes to sleep after */

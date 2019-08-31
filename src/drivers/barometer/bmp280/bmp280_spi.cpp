@@ -36,9 +36,7 @@
  *
  * SPI interface for BMP280
  */
-
-#include "bmp280.h"
-
+#include "IBMP280.hpp"
 
 /* SPI protocol address bits */
 #define DIR_READ			(1<<7)  //for set

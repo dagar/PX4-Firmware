@@ -32,14 +32,17 @@
 ############################################################################
 
 px4_add_module(
-	MODULE drivers__bmp280
+	MODULE drivers__barometer__bmp280
 	MAIN bmp280
 	COMPILE_FLAGS
 		-Wno-cast-align # TODO: fix and enable
 	SRCS
+		BMP280.hpp
 		bmp280_spi.cpp
 		bmp280_i2c.cpp
 		bmp280.cpp
+		bmp280_main.cpp
 	DEPENDS
+		drivers_barometer
 		px4_work_queue
 	)
