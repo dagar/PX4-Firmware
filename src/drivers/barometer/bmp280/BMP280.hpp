@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,24 +32,16 @@
  ****************************************************************************/
 
 /**
- * @file bmp280.h
- *
- * Shared defines for the bmp280 driver.
+ * @file bmp280.cpp
+ * Driver for the BMP280 barometric pressure sensor connected via I2C TODO or SPI.
  */
+
 #pragma once
 
-#include <math.h>
-#include <string.h>
-
-#include <drivers/drv_baro.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/device/i2c.h>
-#include <drivers/device/spi.h>
-#include <lib/cdev/CDev.hpp>
-#include <perf/perf_counter.h>
-#include <px4_config.h>
-#include <px4_getopt.h>
+#include <lib/drivers/device/Device.hpp>
+#include <lib/drivers/barometer/PX4Barometer.hpp>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#include <lib/perf/perf_counter.h>
 
 #define BMP280_ADDR_CAL		0x88	/* address of 12x 2 bytes calibration data */
 #define BMP280_ADDR_DATA	0xF7	/* address of 2x 3 bytes p-t data */
@@ -85,7 +77,6 @@
 #define BMP280_CONFIG_F4		(0x2<<2)
 #define BMP280_CONFIG_F8		(0x3<<2)
 #define BMP280_CONFIG_F16		(0x4<<2)
-
 
 #define BMP280_CTRL_MODE_SLEEP	0x0
 #define BMP280_CTRL_MODE_FORCE	0x1		/* on demand, goes to sleep after */
@@ -141,33 +132,56 @@ struct fcalibration_s {
 	float p9;
 };
 
-class IBMP280
+/*
+ * BMP280 internal constants and data structures.
+ */
+class BMP280 : public px4::ScheduledWorkItem
 {
 public:
-	virtual ~IBMP280() = default;
+	BMP280(device::Device *interface);
+	virtual ~BMP280();
 
-	virtual bool is_external() = 0;
-	virtual int init() = 0;
+	virtual int		init();
 
-	// read reg value
-	virtual uint8_t get_reg(uint8_t addr) = 0;
+	void			print_info();
 
-	// write reg value
-	virtual int set_reg(uint8_t value, uint8_t addr) = 0;
+private:
 
-	// bulk read of data into buffer, return same pointer
-	virtual bmp280::data_s *get_data(uint8_t addr) = 0;
+	void			start();
+	void			stop();
 
-	// bulk read of calibration data into buffer, return same pointer
-	virtual bmp280::calibration_s *get_calibration(uint8_t addr) = 0;
+	void			Run() override;
 
-	virtual uint32_t get_device_id() const = 0;
+	int			measure(); //start measure
+	int			collect(); //get results and publish
+
+	uint8_t			get_reg(uint8_t addr);
+	int			set_reg(uint8_t value, uint8_t addr);
+	data_s			*get_data(uint8_t addr);
+	calibration_s		*get_calibration(uint8_t addr);
+
+
+	device::Device		*_interface;
+
+	PX4Barometer		_px4_baro;
+
+	calibration_s		_cal{};		// stored calibration constants
+	data_s			_data{};	// pre processed calibration constants
+
+	bool                	_running{false};
+
+	uint8_t			_curr_ctrl{0};
+
+	unsigned		_report_interval{0}; // 0 - no cycling, otherwise period of sending a report
+	unsigned		_max_measure_interval{0}; // interval in microseconds needed to measure
+
+	bool			_collect_phase{false};
+
+	perf_counter_t		_sample_perf;
+	perf_counter_t		_measure_perf;
+	perf_counter_t		_comms_errors;
+
+	float			_P; /* in Pa */
+	float			_T; /* in K */
 
 };
-
-} /* namespace */
-
-/* interface factories */
-extern bmp280::IBMP280 *bmp280_spi_interface(uint8_t busnum, uint32_t device, bool external);
-extern bmp280::IBMP280 *bmp280_i2c_interface(uint8_t busnum, uint32_t device, bool external);
-typedef bmp280::IBMP280 *(*BMP280_constructor)(uint8_t, uint32_t, bool);
