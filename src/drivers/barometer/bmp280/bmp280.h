@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,16 +44,12 @@
 #include <drivers/drv_baro.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/device/i2c.h>
-#include <drivers/device/ringbuffer.h>
 #include <drivers/device/spi.h>
 #include <lib/cdev/CDev.hpp>
 #include <perf/perf_counter.h>
 #include <px4_config.h>
 #include <px4_getopt.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-
-#include "board_config.h"
-
 
 #define BMP280_ADDR_CAL		0x88	/* address of 12x 2 bytes calibration data */
 #define BMP280_ADDR_DATA	0xF7	/* address of 2x 3 bytes p-t data */
@@ -170,7 +166,6 @@ public:
 };
 
 } /* namespace */
-
 
 /* interface factories */
 extern bmp280::IBMP280 *bmp280_spi_interface(uint8_t busnum, uint32_t device, bool external);

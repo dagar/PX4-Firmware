@@ -45,6 +45,7 @@ px4_add_board(
 	LABEL qurt-default
 
 	DRIVERS
+		barometer/bmp280
 		gps
 		spektrum_rc
 		qshell/qurt
@@ -52,7 +53,6 @@ px4_add_board(
 
 	DF_DRIVERS
 		mpu9250
-		bmp280
 		hmc5883
 		trone
 		isl29501
