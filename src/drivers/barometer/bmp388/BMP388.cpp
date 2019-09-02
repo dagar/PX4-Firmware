@@ -37,95 +37,15 @@
  * (SPI still TODO/test).
  */
 
-#include "bmp388.h"
+#include "BMP388.hpp"
 
-#include <lib/drivers/barometer/PX4Barometer.hpp>
-
-enum BMP388_BUS {
-	BMP388_BUS_ALL = 0,
-	BMP388_BUS_I2C_INTERNAL,
-	BMP388_BUS_I2C_INTERNAL1,
-	BMP388_BUS_I2C_EXTERNAL,
-	BMP388_BUS_SPI_INTERNAL,
-	BMP388_BUS_SPI_EXTERNAL
-};
-
-/*
- * BMP388 internal constants and data structures.
- */
-
-class BMP388 : public cdev::CDev, public px4::ScheduledWorkItem
-{
-public:
-	BMP388(bmp388::IBMP388 *interface, const char *path);
-	virtual ~BMP388();
-
-	virtual int		init();
-
-	/**
-	 * Diagnostics - print some basic information about the driver.
-	 */
-	void			print_info();
-
-private:
-	PX4Barometer		_px4_baro;
-
-	bmp388::IBMP388		*_interface;
-
-	bool               	_running{false};
-
-	uint8_t				_curr_ctrl{0};
-
-	unsigned			_report_interval{0}; // 0 - no cycling, otherwise period of sending a report
-	unsigned			_max_measure_interval{0}; // interval in microseconds needed to measure
-
-
-	bool			_collect_phase{false};
-
-	perf_counter_t		_sample_perf;
-	perf_counter_t		_measure_perf;
-	perf_counter_t		_comms_errors;
-
-	struct bmp388::calibration_s *_cal; // stored calibration constants
-	struct bmp388::fcalibration_s _fcal; // pre processed calibration constants
-
-	float			_P; /* in Pa */
-	float			_T; /* in K */
-
-
-	/* periodic execution helpers */
-	void			start_cycle();
-	void			stop_cycle();
-
-	void			Run() override;
-
-	int		measure(); //start measure
-	int		collect(); //get results and publish
-
-	// from BMP3 library...
-	bool			soft_reset();
-	bool			get_calib_data();
-	bool			validate_trimming_param();
-	bool 			set_sensor_settings();
-	bool			set_op_mode(uint8_t op_mode);
-
-	bool 			get_sensor_data(uint8_t sensor_comp, struct bmp3_data *comp_data);
-	bool			compensate_data(uint8_t sensor_comp, const struct bmp3_uncomp_data *uncomp_data, struct bmp3_data *comp_data);
-};
-
-/*
- * Driver 'main' command.
- */
-extern "C" __EXPORT int bmp388_main(int argc, char *argv[]);
-
-BMP388::BMP388(bmp388::IBMP388 *interface, const char *path) :
-	CDev(path),
+BMP388::BMP388(bmp388::IBMP388 *interface) :
 	ScheduledWorkItem(px4::device_bus_to_wq(interface->get_device_id())),
 	_px4_baro(interface->get_device_id()),
 	_interface(interface),
-	_sample_perf(perf_alloc(PC_ELAPSED, "bmp388: read")),
-	_measure_perf(perf_alloc(PC_ELAPSED, "bmp388: measure")),
-	_comms_errors(perf_alloc(PC_COUNT, "bmp388: comms errors"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": comms errors"))
 {
 	_px4_baro.set_device_type(DRV_DEVTYPE_BMP388);
 }
@@ -173,7 +93,8 @@ BMP388::soft_reset()
  *
  * See https://github.com/BoschSensortec/BMP3-Sensor-API/blob/master/self-test/bmp3_selftest.c
  * */
-static int8_t cal_crc(uint8_t seed, uint8_t data)
+static int8_t
+cal_crc(uint8_t seed, uint8_t data)
 {
 	int8_t poly = 0x1D;
 	int8_t var2;
@@ -333,7 +254,8 @@ BMP388::set_op_mode(uint8_t op_mode)
  *  @brief This internal API is used to parse the pressure or temperature or
  *  both the data and store it in the bmp3_uncomp_data structure instance.
  */
-static void parse_sensor_data(const uint8_t *reg_data, struct bmp3_uncomp_data *uncomp_data)
+static void
+parse_sensor_data(const uint8_t *reg_data, struct bmp3_uncomp_data *uncomp_data)
 {
 	/* Temporary variables to store the sensor data */
 	uint32_t data_xlsb;
@@ -353,13 +275,13 @@ static void parse_sensor_data(const uint8_t *reg_data, struct bmp3_uncomp_data *
 	uncomp_data->temperature = data_msb | data_lsb | data_xlsb;
 }
 
-
 /*!
  * @brief This internal API is used to compensate the raw temperature data and
  * return the compensated temperature data in integer data type.
  * For eg if returned temperature is 2426 then it is 2426/100 = 24.26 deg Celsius
  */
-static int64_t compensate_temperature(const struct bmp3_uncomp_data *uncomp_data, struct bmp3_calib_data *calib_data)
+static int64_t
+compensate_temperature(const bmp3_uncomp_data *uncomp_data, bmp3_calib_data *calib_data)
 {
 	int64_t partial_data1;
 	int64_t partial_data2;
@@ -388,10 +310,10 @@ static int64_t compensate_temperature(const struct bmp3_uncomp_data *uncomp_data
  * return the compensated pressure data in integer data type.
  * for eg return if pressure is 9528709 which is 9528709/100 = 95287.09 Pascal or 952.8709 hecto Pascal
  */
-static uint64_t compensate_pressure(const struct bmp3_uncomp_data *uncomp_data,
-				    const struct bmp3_calib_data *calib_data)
+static uint64_t
+compensate_pressure(const bmp3_uncomp_data *uncomp_data, const bmp3_calib_data *calib_data)
 {
-	const struct bmp3_reg_calib_data *reg_calib_data = &calib_data->reg_calib_data;
+	const bmp3_reg_calib_data *reg_calib_data = &calib_data->reg_calib_data;
 	int64_t partial_data1;
 	int64_t partial_data2;
 	int64_t partial_data3;
@@ -434,9 +356,7 @@ static uint64_t compensate_pressure(const struct bmp3_uncomp_data *uncomp_data,
  * or both the data according to the component selected by the user.
  */
 bool
-BMP388::compensate_data(uint8_t sensor_comp,
-			const struct bmp3_uncomp_data *uncomp_data,
-			struct bmp3_data *comp_data)
+BMP388::compensate_data(uint8_t sensor_comp, const bmp3_uncomp_data *uncomp_data, bmp3_data *comp_data)
 {
 	int8_t rslt = OK;
 	struct bmp3_calib_data calib_data = {0};
@@ -466,7 +386,7 @@ BMP388::compensate_data(uint8_t sensor_comp,
  * instance passed by the user.
  */
 bool
-BMP388::get_sensor_data(uint8_t sensor_comp, struct bmp3_data *comp_data)
+BMP388::get_sensor_data(uint8_t sensor_comp, bmp3_data *comp_data)
 {
 	bool result = false;
 	int8_t rslt;
@@ -494,13 +414,6 @@ BMP388::get_sensor_data(uint8_t sensor_comp, struct bmp3_data *comp_data)
 int
 BMP388::init()
 {
-	int ret = CDev::init();
-
-	if (ret != OK) {
-		PX4_ERR("CDev init failed");
-		return ret;
-	}
-
 	if (!soft_reset()) {
 		PX4_WARN("failed to reset baro during init");
 		return -EIO;
@@ -652,248 +565,4 @@ BMP388::print_info()
 	printf("poll interval:  %u us \n", _report_interval);
 
 	_px4_baro.print_status();
-}
-
-/**
- * Local functions in support of the shell command.
- */
-namespace bmp388
-{
-
-/*
-  list of supported bus configurations
- */
-struct bmp388_bus_option {
-	enum BMP388_BUS busid;
-	const char *devpath;
-	BMP388_constructor interface_constructor;
-	uint8_t busnum;
-	uint32_t device;
-	bool external;
-	BMP388 *dev;
-} bus_options[] = {
-#if defined(PX4_SPIDEV_EXT_BARO) && defined(PX4_SPI_BUS_EXT)
-	{ BMP388_BUS_SPI_EXTERNAL, "/dev/bmp388_spi_ext", &bmp388_spi_interface, PX4_SPI_BUS_EXT, PX4_SPIDEV_EXT_BARO, true, NULL },
-#endif
-#if defined(PX4_SPIDEV_BARO)
-#  if defined(PX4_SPIDEV_BARO_BUS)
-	{ BMP388_BUS_SPI_INTERNAL, "/dev/bmp388_spi_int", &bmp388_spi_interface, PX4_SPIDEV_BARO_BUS, PX4_SPIDEV_BARO, false, NULL },
-#  else
-	{ BMP388_BUS_SPI_INTERNAL, "/dev/bmp388_spi_int", &bmp388_spi_interface, PX4_SPI_BUS_SENSORS, PX4_SPIDEV_BARO, false, NULL },
-#  endif
-#endif
-#if defined(PX4_I2C_BUS_ONBOARD) && defined(PX4_I2C_OBDEV_BMP388)
-	{ BMP388_BUS_I2C_INTERNAL, "/dev/bmp388_i2c_int", &bmp388_i2c_interface, PX4_I2C_BUS_ONBOARD, PX4_I2C_OBDEV_BMP388, false, NULL },
-#endif
-#if defined(PX4_I2C_BUS_ONBOARD) && defined(PX4_I2C_OBDEV1_BMP388)
-	{ BMP388_BUS_I2C_INTERNAL1, "/dev/bmp388_i2c_int1", &bmp388_i2c_interface, PX4_I2C_BUS_ONBOARD, PX4_I2C_OBDEV1_BMP388, false, NULL },
-#endif
-#if defined(PX4_I2C_BUS_EXPANSION) && defined(PX4_I2C_OBDEV_BMP388)
-	{ BMP388_BUS_I2C_EXTERNAL, "/dev/bmp388_i2c_ext", &bmp388_i2c_interface, PX4_I2C_BUS_EXPANSION, PX4_I2C_OBDEV_BMP388, true, NULL },
-#endif
-};
-#define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
-
-bool	start_bus(struct bmp388_bus_option &bus);
-struct bmp388_bus_option &find_bus(enum BMP388_BUS busid);
-void	start(enum BMP388_BUS busid);
-void	test(enum BMP388_BUS busid);
-void	reset(enum BMP388_BUS busid);
-void	info();
-void	usage();
-
-
-/**
- * Start the driver.
- */
-bool
-start_bus(struct bmp388_bus_option &bus)
-{
-	if (bus.dev != nullptr) {
-		PX4_ERR("bus option already started");
-		exit(1);
-	}
-
-	bmp388::IBMP388 *interface = bus.interface_constructor(bus.busnum, bus.device, bus.external);
-
-	if (interface->init() != OK) {
-		delete interface;
-		PX4_WARN("no device on bus %u", (unsigned)bus.busid);
-		return false;
-	}
-
-	bus.dev = new BMP388(interface, bus.devpath);
-
-	if (bus.dev == nullptr) {
-		return false;
-	}
-
-	if (OK != bus.dev->init()) {
-		delete bus.dev;
-		bus.dev = nullptr;
-		return false;
-	}
-
-	int fd = open(bus.devpath, O_RDONLY);
-
-	/* set the poll rate to default, starts automatic data collection */
-	if (fd == -1) {
-		PX4_ERR("can't open baro device");
-		exit(1);
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		close(fd);
-		PX4_ERR("failed setting default poll rate");
-		exit(1);
-	}
-
-	close(fd);
-	return true;
-}
-
-
-/**
- * Start the driver.
- *
- * This function call only returns once the driver
- * is either successfully up and running or failed to start.
- */
-void
-start(enum BMP388_BUS busid)
-{
-	uint8_t i;
-	bool started = false;
-
-	for (i = 0; i < NUM_BUS_OPTIONS; i++) {
-		if (busid == BMP388_BUS_ALL && bus_options[i].dev != NULL) {
-			// this device is already started
-			continue;
-		}
-
-		if (busid != BMP388_BUS_ALL && bus_options[i].busid != busid) {
-			// not the one that is asked for
-			continue;
-		}
-
-		started |= start_bus(bus_options[i]);
-	}
-
-	if (!started) {
-		PX4_WARN("bus option number is %d", i);
-		PX4_ERR("driver start failed");
-		exit(1);
-	}
-
-	// one or more drivers started OK
-	exit(0);
-}
-
-
-/**
- * find a bus structure for a busid
- */
-struct bmp388_bus_option &find_bus(enum BMP388_BUS busid)
-{
-	for (uint8_t i = 0; i < NUM_BUS_OPTIONS; i++) {
-		if ((busid == BMP388_BUS_ALL ||
-		     busid == bus_options[i].busid) && bus_options[i].dev != NULL) {
-			return bus_options[i];
-		}
-	}
-
-	PX4_ERR("bus %u not started", (unsigned)busid);
-	exit(1);
-}
-
-/**
- * Print a little info about the driver.
- */
-void
-info()
-{
-	for (uint8_t i = 0; i < NUM_BUS_OPTIONS; i++) {
-		struct bmp388_bus_option &bus = bus_options[i];
-
-		if (bus.dev != nullptr) {
-			PX4_WARN("%s", bus.devpath);
-			bus.dev->print_info();
-		}
-	}
-
-	exit(0);
-}
-
-void
-usage()
-{
-	PX4_WARN("missing command: try 'start', 'info'");
-	PX4_WARN("options:");
-	PX4_WARN("    -X    (external I2C bus TODO)");
-	PX4_WARN("    -I    (internal I2C bus TODO)");
-	PX4_WARN("    -S    (external SPI bus)");
-	PX4_WARN("    -s    (internal SPI bus)");
-}
-
-} // namespace
-
-int
-bmp388_main(int argc, char *argv[])
-{
-	int myoptind = 1;
-	int ch;
-	const char *myoptarg = nullptr;
-	enum BMP388_BUS busid = BMP388_BUS_ALL;
-
-	while ((ch = px4_getopt(argc, argv, "XIJSs", &myoptind, &myoptarg)) != EOF) {
-		switch (ch) {
-		case 'X':
-			busid = BMP388_BUS_I2C_EXTERNAL;
-			break;
-
-		case 'I':
-			busid = BMP388_BUS_I2C_INTERNAL;
-			break;
-
-		case 'J':
-			busid = BMP388_BUS_I2C_INTERNAL1;
-			break;
-
-		case 'S':
-			busid = BMP388_BUS_SPI_EXTERNAL;
-			break;
-
-		case 's':
-			busid = BMP388_BUS_SPI_INTERNAL;
-			break;
-
-		default:
-			bmp388::usage();
-			return 0;
-		}
-	}
-
-	if (myoptind >= argc) {
-		bmp388::usage();
-		return -1;
-	}
-
-	const char *verb = argv[myoptind];
-
-	/*
-	 * Start/load the driver.
-	 */
-	if (!strcmp(verb, "start")) {
-		bmp388::start(busid);
-	}
-
-	/*
-	 * Print driver information.
-	 */
-	if (!strcmp(verb, "info")) {
-		bmp388::info();
-	}
-
-	PX4_ERR("unrecognized command, try 'start', 'test', 'reset' or 'info'");
-	return -1;
 }

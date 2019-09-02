@@ -41,17 +41,6 @@
 #include <math.h>
 #include <string.h>
 
-#include <drivers/drv_baro.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/device/i2c.h>
-#include <drivers/device/ringbuffer.h>
-#include <drivers/device/spi.h>
-#include <lib/cdev/CDev.hpp>
-#include <perf/perf_counter.h>
-#include <px4_config.h>
-#include <px4_getopt.h>
-#include <px4_work_queue/ScheduledWorkItem.hpp>
-
 #include "board_config.h"
 #include "bmp3_defs.h"
 
@@ -127,7 +116,6 @@ class IBMP388
 public:
 	virtual ~IBMP388() = default;
 
-	virtual bool is_external() = 0;
 	virtual int init() = 0;
 
 	// read reg value
@@ -153,6 +141,6 @@ public:
 
 
 /* interface factories */
-extern bmp388::IBMP388 *bmp388_spi_interface(uint8_t busnum, uint32_t device, bool external);
-extern bmp388::IBMP388 *bmp388_i2c_interface(uint8_t busnum, uint32_t device, bool external);
-typedef bmp388::IBMP388 *(*BMP388_constructor)(uint8_t, uint32_t, bool);
+extern bmp388::IBMP388 *bmp388_spi_interface(uint8_t busnum, uint32_t device);
+extern bmp388::IBMP388 *bmp388_i2c_interface(uint8_t busnum, uint32_t device);
+typedef bmp388::IBMP388 *(*BMP388_constructor)(uint8_t, uint32_t);

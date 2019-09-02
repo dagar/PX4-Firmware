@@ -37,96 +37,113 @@
  * SPI interface for BMP388
  */
 
-#include "bmp388.h"
+#include "IBMP388.hpp"
 
-#if defined(PX4_I2C_OBDEV_BMP388) || defined(PX4_I2C_EXT_OBDEV_BMP388)
+#include <lib/drivers/device/spi.h>
 
-class BMP388_I2C: public device::I2C, public bmp388::IBMP388
+/* SPI protocol address bits */
+#define DIR_READ			(1<<7)  //for set
+#define DIR_WRITE			~(1<<7) //for clear
+
+#if defined(PX4_SPIDEV_BARO) || defined(PX4_SPIDEV_EXT_BARO)
+
+#pragma pack(push,1)
+struct spi_data_s {
+	uint8_t addr;
+	struct bmp388::data_s data;
+};
+
+struct spi_calibration_s {
+	uint8_t addr;
+	struct bmp388::calibration_s cal;
+};
+#pragma pack(pop)
+
+class BMP388_SPI: public device::SPI, public bmp388::IBMP388
 {
 public:
-	BMP388_I2C(uint8_t bus, uint32_t device, bool external);
-	virtual ~BMP388_I2C() = default;
+	BMP388_SPI(uint8_t bus, uint32_t device);
+	virtual ~BMP388_SPI() = default;
 
 	bool is_external();
 	int init();
 
 	uint8_t get_reg(uint8_t addr);
-	int get_reg_buf(uint8_t addr, uint8_t *buf, uint8_t len);
 	int set_reg(uint8_t value, uint8_t addr);
 	bmp388::data_s *get_data(uint8_t addr);
 	bmp388::calibration_s *get_calibration(uint8_t addr);
 
-	uint32_t get_device_id() const override { return device::I2C::get_device_id(); }
+	uint32_t get_device_id() const override { return device::SPI::get_device_id(); }
 
 private:
-	struct bmp388::calibration_s _cal;
-	struct bmp388::data_s _data;
-	bool _external;
+
+	spi_calibration_s _cal{};
+	spi_data_s _data{};
+
 };
 
-bmp388::IBMP388 *bmp388_i2c_interface(uint8_t busnum, uint32_t device, bool external)
+bmp388::IBMP388 *bmp388_spi_interface(uint8_t busnum, uint32_t device)
 {
-	return new BMP388_I2C(busnum, device, external);
+	return new BMP388_SPI(busnum, device);
 }
 
-BMP388_I2C::BMP388_I2C(uint8_t bus, uint32_t device, bool external) :
-	I2C("BMP388_I2C", nullptr, bus, device, 100 * 1000)
+BMP388_SPI::BMP388_SPI(uint8_t bus, uint32_t device) :
+	SPI("BMP388_SPI", nullptr, bus, device, SPIDEV_MODE3, 10 * 1000 * 1000)
 {
-	_external = external;
 }
 
-bool BMP388_I2C::is_external()
+bool
+BMP388_SPI::is_external()
 {
-	return _external;
+	return SPI::external();
 }
 
-int BMP388_I2C::init()
+int
+BMP388_SPI::init()
 {
-	return I2C::init();
+	return SPI::init();
 }
 
-uint8_t BMP388_I2C::get_reg(uint8_t addr)
+uint8_t
+BMP388_SPI::get_reg(uint8_t addr)
 {
-	uint8_t cmd[2] = { (uint8_t)(addr), 0};
-	transfer(&cmd[0], 1, &cmd[1], 1);
+	uint8_t cmd[2] = { (uint8_t)(addr | DIR_READ), 0}; //set MSB bit
+	transfer(&cmd[0], &cmd[0], 2);
 
 	return cmd[1];
 }
 
-int BMP388_I2C::get_reg_buf(uint8_t addr, uint8_t *buf, uint8_t len)
+int
+BMP388_SPI::set_reg(uint8_t value, uint8_t addr)
 {
-	const uint8_t cmd = (uint8_t)(addr);
-	return transfer(&cmd, sizeof(cmd), buf, len);
+	uint8_t cmd[2] = { (uint8_t)(addr & DIR_WRITE), value}; //clear MSB bit
+	return transfer(&cmd[0], nullptr, 2);
 }
 
-int BMP388_I2C::set_reg(uint8_t value, uint8_t addr)
+bmp388::data_s *
+BMP388_SPI::get_data(uint8_t addr)
 {
-	uint8_t cmd[2] = { (uint8_t)(addr), value};
-	return transfer(cmd, sizeof(cmd), nullptr, 0);
-}
+	_data.addr = (uint8_t)(addr | DIR_READ); //set MSB bit
 
-bmp388::data_s *BMP388_I2C::get_data(uint8_t addr)
-{
-	const uint8_t cmd = (uint8_t)(addr);
-
-	if (transfer(&cmd, sizeof(cmd), (uint8_t *)&_data, sizeof(struct bmp388::data_s)) == OK) {
-		return (&_data);
+	if (transfer((uint8_t *)&_data, (uint8_t *)&_data, sizeof(struct spi_data_s)) == OK) {
+		return &(_data.data);
 
 	} else {
 		return nullptr;
 	}
 }
 
-bmp388::calibration_s *BMP388_I2C::get_calibration(uint8_t addr)
+bmp388::calibration_s *
+BMP388_SPI::get_calibration(uint8_t addr)
 {
-	const uint8_t cmd = (uint8_t)(addr);
+	_cal.addr = addr | DIR_READ;
 
-	if (transfer(&cmd, sizeof(cmd), (uint8_t *)&_cal, sizeof(struct bmp388::calibration_s)) == OK) {
-		return &(_cal);
+	if (transfer((uint8_t *)&_cal, (uint8_t *)&_cal, sizeof(struct spi_calibration_s)) == OK) {
+		return &(_cal.cal);
 
 	} else {
 		return nullptr;
 	}
 }
 
-#endif /* PX4_I2C_OBDEV_BMP388 || PX4_I2C_EXT_OBDEV_BMP388 */
+#endif /* PX4_SPIDEV_BARO || PX4_SPIDEV_EXT_BARO */
