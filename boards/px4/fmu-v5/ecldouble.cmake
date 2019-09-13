@@ -1,21 +1,24 @@
 
+
+set(ECL_USE_DOUBLE_FPU ON)
+
 px4_add_board(
 	PLATFORM nuttx
 	VENDOR px4
-	MODEL fmu-v5x
-	LABEL fixedwing
+	MODEL fmu-v5
+	LABEL ecldouble
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
 	IO px4_io-v2_default
+	TESTING
 	UAVCAN_INTERFACES 2
 
 	SERIAL_PORTS
-		GPS1:/dev/ttyS1
-		TEL1:/dev/ttyS6
-		TEL2:/dev/ttyS4
-		TEL3:/dev/ttyS2
-		GPS2:/dev/ttyS0
+		GPS1:/dev/ttyS0
+		TEL1:/dev/ttyS1
+		TEL2:/dev/ttyS2
+		TEL4:/dev/ttyS3
 
 	DRIVERS
 		adc
@@ -30,29 +33,36 @@ px4_add_board(
 		imu/adis16448
 		imu/adis16497
 		#imu # all available imu drivers
-# TBD		imu/bmi088 - needs bus selection
-# TBD		imu/ism330dlc - needs bus selection
+		imu/bmi055
 		imu/mpu6000
+		imu/mpu9250
 		irlock
 		lights/blinkm
-		lights/oreoled
-		lights/pca8574
 		lights/rgbled
 		lights/rgbled_ncp5623c
+		lights/rgbled_pwm
 		magnetometer # all available magnetometer drivers
+		#md25
+		mkblctrl
 		optical_flow # all available optical flow drivers
+		pca9685
 		power_monitor/ina226
+		#protocol_splitter
 		pwm_input
 		pwm_out_sim
 		px4fmu
 		px4io
 		rc_input
+		roboclaw
 		safety_button
+		tap_esc
 		telemetry # all available telemetry drivers
+		test_ppm
 		tone_alarm
 		uavcan
 
 	MODULES
+		attitude_estimator_q
 		camera_feedback
 		commander
 		dataman
@@ -60,13 +70,20 @@ px4_add_board(
 		events
 		fw_att_control
 		fw_pos_control_l1
+		rover_pos_control
 		land_detector
+		landing_target_estimator
 		load_mon
+		local_position_estimator
 		logger
 		mavlink
+		mc_att_control
+		mc_pos_control
 		navigator
 		sensors
+		sih
 		vmount
+		vtol_att_control
 		airspeed_selector
 
 	SYSTEMCMDS
@@ -90,9 +107,23 @@ px4_add_board(
 		reflect
 		sd_bench
 		shutdown
+		tests # tests and test runner
 		top
 		topic_listener
 		tune_control
 		usb_connected
 		ver
+
+	EXAMPLES
+		bottle_drop # OBC challenge
+		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
+		hello
+		hwtest # Hardware test
+		#matlab_csv_serial
+		px4_mavlink_debug # Tutorial code from http://dev.px4.io/en/debug/debug_values.html
+		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
+		rover_steering_control # Rover example app
+		segway
+		uuv_example_app
+
 	)

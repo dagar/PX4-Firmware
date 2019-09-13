@@ -20,7 +20,7 @@ px4_add_board(
 	DRIVERS
 		adc
 		barometer # all available barometer drivers
-		batt_smbus
+		#batt_smbus
 		camera_capture
 		camera_trigger
 		differential_pressure # all available differential pressure drivers
@@ -34,23 +34,21 @@ px4_add_board(
 		#imu/mpu9250
 		#irlock
 		#lights/blinkm
-		#lights/oreoled
-		lights/pca8574
 		lights/rgbled
 		#lights/rgbled_ncp5623c
 		lights/rgbled_pwm
 		magnetometer # all available magnetometer drivers
 		#md25
-		mkblctrl
+		#mkblctrl
 		optical_flow # all available optical flow drivers
-		pca9685
+		#pca9685
 		#protocol_splitter
 		pwm_input
 		pwm_out_sim
 		px4fmu
 		px4io
 		rc_input
-		roboclaw
+		#roboclaw
 		safety_button
 		tap_esc
 		telemetry # all available telemetry drivers
