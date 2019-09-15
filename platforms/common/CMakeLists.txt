@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-include_directories(common)
+include_directories(include)
 
 set(SRCS)
 

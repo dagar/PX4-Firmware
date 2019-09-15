@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-px4_add_library(px4_work_queue
+add_library(px4_work_queue
 	ScheduledWorkItem.cpp
 	WorkItem.cpp
 	WorkQueue.cpp

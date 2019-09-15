@@ -43,7 +43,7 @@
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/ecl/geo/geo.h>
 #include <lib/perf/perf_counter.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#include <px4_work_queue/ScheduledWorkItem.hpp>
 
 #if !defined(BOARD_HAS_NOISY_FXOS8700_MAG)
 #include <lib/drivers/magnetometer/PX4Magnetometer.hpp>

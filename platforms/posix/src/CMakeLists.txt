@@ -31,5 +31,4 @@
 #
 ############################################################################
 
-add_subdirectory(common)
-add_subdirectory(tone_alarm)
+add_subdirectory(px4)

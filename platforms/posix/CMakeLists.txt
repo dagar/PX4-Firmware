@@ -31,111 +31,40 @@
 #
 ############################################################################
 
-add_definitions(
-	-D__PX4_POSIX
-	-Dnoreturn_function=__attribute__\(\(noreturn\)\)
-	)
+#=============================================================================
+# Testing - Automatic unit and integration testing with CTest
+#
 
-include_directories(platforms/posix/include)
-
-if ("${PX4_BOARD}" MATCHES "sitl")
-
-	if(UNIX AND APPLE)
-		add_definitions(
-			-D__PX4_DARWIN
-			-D__DF_DARWIN
-			)
-
-		if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0)
-			message(FATAL_ERROR "PX4 Firmware requires XCode 8 or newer on Mac OS. Version installed on this system: ${CMAKE_CXX_COMPILER_VERSION}")
-		endif()
-
-		execute_process(COMMAND uname -v OUTPUT_VARIABLE DARWIN_VERSION)
-		string(REGEX MATCH "[0-9]+" DARWIN_VERSION ${DARWIN_VERSION})
-		# message(STATUS "PX4 Darwin Version: ${DARWIN_VERSION}")
-		if (DARWIN_VERSION LESS 16)
-			add_definitions(
-				-DCLOCK_MONOTONIC=1
-				-DCLOCK_REALTIME=0
-				-D__PX4_APPLE_LEGACY
-				)
-		endif()
-
-	elseif(CYGWIN)
-		add_definitions(
-			-D__PX4_CYGWIN
-			-D_GNU_SOURCE
-			-D__USE_LINUX_IOCTL_DEFS
-			-U__CUSTOM_FILE_IO__
-			)
-	else()
-		add_definitions(
-			-D__PX4_LINUX
-			-D__DF_LINUX
-			)
-	endif()
-
-elseif (("${PX4_BOARD}" MATCHES "navio2") OR ("${PX4_BOARD}" MATCHES "raspberrypi"))
-
-	#TODO: move to board support
-
-	add_definitions(
-		-D__PX4_LINUX
-
-		# For DriverFramework
-		-D__DF_LINUX
-		-D__DF_RPI
-	)
-
-elseif ("${PX4_BOARD}" MATCHES "bebop")
-
-	#TODO: move to board support
-
-	add_definitions(
-		-D__PX4_LINUX
-		-D__PX4_POSIX_BEBOP # TODO: remove
-
-		# For DriverFramework
-		-D__DF_LINUX
-		-D__DF_BEBOP
-	)
-
-elseif ("${PX4_BOARD}" MATCHES "aerotenna_ocpoc")
-
-	#TODO: move to board support
-
-	add_definitions(
-		-D__PX4_LINUX
-		-D__PX4_POSIX_OCPOC # TODO: remove
-
-		# For DriverFramework
-		-D__DF_LINUX
-		-D__DF_OCPOC
-	)
-
-elseif ("${PX4_BOARD}" MATCHES "beaglebone_blue")
-	#TODO: move to board support
-	add_definitions(
-		-D__PX4_LINUX
-		-D__PX4_POSIX_BBBLUE # TODO: remove
-
-		# For DriverFramework
-		-D__DF_LINUX
-		-D__DF_BBBLUE
-		-D__DF_BBBLUE_USE_RC_BMP280_IMP # optional
-
-		-DRC_AUTOPILOT_EXT  # Enable extensions in Robotics Cape Library, TODO: remove
-	)
-
-	set(LIBROBOTCONTROL_INSTALL_DIR $ENV{LIBROBOTCONTROL_INSTALL_DIR})
-
-	# On cross compile host system and native build system:
-	#   a) select and define LIBROBOTCONTROL_INSTALL_DIR environment variable so that
-	#      other unwanted headers will not be included
-	#   b) install robotcontrol.h and rc/* into $LIBROBOTCONTROL_INSTALL_DIR/include
-	#   c) install pre-built native (ARM) version of librobotcontrol.* into $LIBROBOTCONTROL_INSTALL_DIR/lib
-	add_compile_options(-I${LIBROBOTCONTROL_INSTALL_DIR}/include)
-
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${LIBROBOTCONTROL_INSTALL_DIR}/lib")
-
+# optionally enable cmake testing (supported only on posix)
+option(CMAKE_TESTING "Configure test targets" OFF)
+if (${PX4_CONFIG} STREQUAL "px4_sitl_test")
+	set(CMAKE_TESTING ON)
 endif()
+if(CMAKE_TESTING)
+	include(CTest) # sets BUILD_TESTING variable
+endif()
+
+# enable test filtering to run only specific tests with the ctest -R regex functionality
+set(TESTFILTER "" CACHE STRING "Filter string for ctest to selectively only run specific tests (ctest -R)")
+
+# if testing is enabled download and configure gtest
+list(APPEND CMAKE_MODULE_PATH ${PX4_SOURCE_DIR}/cmake/gtest/)
+include(px4_add_gtest)
+if(BUILD_TESTING)
+	include(gtest)
+endif()
+
+add_custom_target(test_results
+		COMMAND GTEST_COLOR=1 ${CMAKE_CTEST_COMMAND} --output-on-failure -T Test -R ${TESTFILTER} USES_TERMINAL
+		DEPENDS
+			px4
+			examples__dyn_hello
+			test_mixer_multirotor
+		USES_TERMINAL
+		COMMENT "Running tests"
+		WORKING_DIRECTORY ${PX4_BINARY_DIR})
+set_target_properties(test_results PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+#=============================================================================
+
+add_subdirectory(src)

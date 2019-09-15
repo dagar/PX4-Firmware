@@ -60,7 +60,6 @@
 #pragma once
 
 #include <lib/tunes/tune_definition.h>
-#include <uORB/topics/tune_control.h>
 
 #define CBRK_BUZZER_KEY 782097
 #define CBRK_OFF        0

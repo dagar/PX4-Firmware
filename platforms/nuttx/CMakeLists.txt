@@ -186,3 +186,4 @@ if("${CONFIG_ARMV7M_STACKCHECK}" STREQUAL "y")
 endif()
 
 add_subdirectory(NuttX ${PX4_BINARY_DIR}/NuttX)
+add_subdirectory(src)

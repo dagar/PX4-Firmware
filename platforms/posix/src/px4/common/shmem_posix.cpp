@@ -68,14 +68,14 @@ struct param_wbuf_s {
 void update_to_shmem(param_t param, union param_value_u value)
 {
 	if (px4muorb_param_update_to_shmem(param, (unsigned char *) &value, sizeof(value))) {
-		PX4_ERR("krait update param %u failed", param);
+		fprintf(stderr, "krait update param %u failed\n", param);
 	}
 }
 
 void update_index_from_shmem(void)
 {
 	if (!adsp_changed_index) {
-		PX4_ERR("%s no param buffer", __FUNCTION__);
+		fprintf(stderr, "%s no param buffer\n", __FUNCTION__);
 		return;
 	}
 
@@ -85,7 +85,7 @@ void update_index_from_shmem(void)
 static void update_value_from_shmem(param_t param, union param_value_u *value)
 {
 	if (px4muorb_param_update_value_from_shmem(param, (unsigned char *) value, sizeof(union param_value_u))) {
-		PX4_ERR("%s get param failed", __FUNCTION__);
+		fprintf(stderr, "%s get param failed\n", __FUNCTION__);
 	}
 }
 
@@ -95,7 +95,7 @@ int update_from_shmem(param_t param, union param_value_u *value)
 	unsigned int retval = 0;
 
 	if (!adsp_changed_index) {
-		PX4_ERR("%s no param buffer", __FUNCTION__);
+		fprintf(stderr, "%s no param buffer\n", __FUNCTION__);
 		return 0;
 	}
 
@@ -115,8 +115,6 @@ int update_from_shmem(param_t param, union param_value_u *value)
 		adsp_changed_index[byte_changed] &= ~bit_changed; //clear the bit
 		retval = 1;
 	}
-
-	//else {PX4_INFO("no change to param %s", param_name(param));}
 
 	PX4_DEBUG("%s %d bit on adsp index[%d]",
 		  (retval) ? "cleared" : "unchanged", bit_changed, byte_changed);

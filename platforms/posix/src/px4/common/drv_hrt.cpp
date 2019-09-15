@@ -282,7 +282,7 @@ void	hrt_init()
 	int sem_ret = px4_sem_init(&_hrt_lock, 0, 1);
 
 	if (sem_ret) {
-		PX4_ERR("SEM INIT FAIL: %s", strerror(errno));
+		fprintf(stderr, "SEM INIT FAIL: %s\n", strerror(errno));
 	}
 
 	memset(&_hrt_work, 0, sizeof(_hrt_work));
@@ -293,12 +293,10 @@ hrt_call_enter(struct hrt_call *entry)
 {
 	struct hrt_call	*call, *next;
 
-	//PX4_INFO("hrt_call_enter");
 	call = (struct hrt_call *)sq_peek(&callout_queue);
 
 	if ((call == nullptr) || (entry->deadline < call->deadline)) {
 		sq_addfirst(&entry->link, &callout_queue);
-		//if (call != nullptr) PX4_INFO("call enter at head, reschedule (%lu %lu)", entry->deadline, call->deadline);
 		/* we changed the next deadline, reschedule the timer event */
 		hrt_call_reschedule();
 
@@ -313,8 +311,6 @@ hrt_call_enter(struct hrt_call *entry)
 			}
 		} while ((call = next) != nullptr);
 	}
-
-	//PX4_INFO("scheduled");
 }
 
 /**
@@ -325,8 +321,6 @@ hrt_call_enter(struct hrt_call *entry)
 static void
 hrt_tim_isr(void *p)
 {
-
-	//PX4_INFO("hrt_tim_isr");
 	/* run any callouts that have met their deadline */
 	hrt_call_invoke();
 
@@ -350,8 +344,6 @@ hrt_call_reschedule()
 	hrt_abstime	delay = HRT_INTERVAL_MAX;
 	struct hrt_call	*next = (struct hrt_call *)sq_peek(&callout_queue);
 	hrt_abstime	deadline = now + HRT_INTERVAL_MAX;
-
-	//PX4_INFO("hrt_call_reschedule");
 
 	/*
 	 * Determine what the next deadline will be.
@@ -393,7 +385,6 @@ hrt_call_internal(struct hrt_call *entry, hrt_abstime deadline, hrt_abstime inte
 	PX4_DEBUG("hrt_call_internal deadline=%lu interval = %lu", deadline, interval);
 	hrt_lock();
 
-	//PX4_INFO("hrt_call_internal after lock");
 	/* if the entry is currently queued, remove it */
 	/* note that we are using a potentially uninitialised
 	   entry->link here, but it is safe as sq_rem() doesn't
@@ -410,7 +401,7 @@ hrt_call_internal(struct hrt_call *entry, hrt_abstime deadline, hrt_abstime inte
 
 	// Use this to debug busy CPU that keeps rescheduling with 0 period time
 	/*if (interval < HRT_INTERVAL_MIN) {*/
-	/*PX4_ERR("hrt_call_internal interval too short: %" PRIu64, interval);*/
+	/*fprintf(stderr, "hrt_call_internal interval too short: %" PRIu64, interval);*/
 	/*abort();*/
 	/*}*/
 
@@ -491,7 +482,6 @@ hrt_call_invoke()
 		}
 
 		sq_rem(&call->link, &callout_queue);
-		//PX4_INFO("call pop");
 
 		/* save the intended deadline for periodic calls */
 		deadline = call->deadline;
@@ -504,7 +494,6 @@ hrt_call_invoke()
 			// Unlock so we don't deadlock in callback
 			hrt_unlock();
 
-			//PX4_INFO("call %p: %p(%p)", call, call->callout, call->arg);
 			call->callout(call->arg);
 
 			hrt_lock();
@@ -517,7 +506,6 @@ hrt_call_invoke()
 			// using hrt_call_delay()
 			if (call->deadline <= now) {
 				call->deadline = deadline + call->period;
-				//PX4_INFO("call deadline set to %lu now=%lu", call->deadline,  now);
 			}
 
 			hrt_call_enter(call);

@@ -72,3 +72,5 @@ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS)
 
 set(DF_TARGET "qurt" CACHE STRING "DriverFramework target" FORCE)
+
+add_subdirectory(src)

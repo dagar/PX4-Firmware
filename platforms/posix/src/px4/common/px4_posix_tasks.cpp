@@ -99,7 +99,7 @@ static void *entry_adapter(void *ptr)
 #endif
 
 	if (rv) {
-		PX4_ERR("px4_task_spawn_cmd: failed to set name of thread %d %d\n", rv, errno);
+		fprintf(stderr, "px4_task_spawn_cmd: failed to set name of thread %d %d\n", rv, errno);
 	}
 
 	data->entry(data->argc, data->argv);
@@ -173,7 +173,7 @@ px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int
 	int rv = pthread_attr_init(&attr);
 
 	if (rv != 0) {
-		PX4_ERR("px4_task_spawn_cmd: failed to init thread attrs");
+		fprintf(stderr, "px4_task_spawn_cmd: failed to init thread attrs\n");
 		free(taskdata);
 		return (rv < 0) ? rv : -rv;
 	}
@@ -187,7 +187,7 @@ px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int
 	rv = pthread_attr_setstacksize(&attr, PX4_STACK_ADJUSTED(stack_size));
 
 	if (rv != 0) {
-		PX4_ERR("pthread_attr_setstacksize to %d returned error (%d)", stack_size, rv);
+		fprintf(stderr, "pthread_attr_setstacksize to %d returned error (%d)\n", stack_size, rv);
 		pthread_attr_destroy(&attr);
 		free(taskdata);
 		return (rv < 0) ? rv : -rv;
@@ -198,7 +198,7 @@ px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int
 	rv = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 
 	if (rv != 0) {
-		PX4_ERR("px4_task_spawn_cmd: failed to set inherit sched");
+		fprintf(stderr, "px4_task_spawn_cmd: failed to set inherit sched\n");
 		pthread_attr_destroy(&attr);
 		free(taskdata);
 		return (rv < 0) ? rv : -rv;
@@ -207,7 +207,7 @@ px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int
 	rv = pthread_attr_setschedpolicy(&attr, scheduler);
 
 	if (rv != 0) {
-		PX4_ERR("px4_task_spawn_cmd: failed to set sched policy");
+		fprintf(stderr, "px4_task_spawn_cmd: failed to set sched policy\n");
 		pthread_attr_destroy(&attr);
 		free(taskdata);
 		return (rv < 0) ? rv : -rv;
@@ -223,7 +223,7 @@ px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int
 	rv = pthread_attr_setschedparam(&attr, &param);
 
 	if (rv != 0) {
-		PX4_ERR("px4_task_spawn_cmd: failed to set sched param");
+		fprintf(stderr, "px4_task_spawn_cmd: failed to set sched param\n");
 		pthread_attr_destroy(&attr);
 		free(taskdata);
 		return (rv < 0) ? rv : -rv;
@@ -258,7 +258,7 @@ px4_task_t px4_task_spawn_cmd(const char *name, int scheduler, int priority, int
 			rv = pthread_create(&taskmap[taskid].pid, nullptr, &entry_adapter, (void *) taskdata);
 
 			if (rv != 0) {
-				PX4_ERR("px4_task_spawn_cmd: failed to create thread %d %d\n", rv, errno);
+				fprintf(stderr, "px4_task_spawn_cmd: failed to create thread %d %d\n", rv, errno);
 				taskmap[taskid].isused = false;
 				pthread_attr_destroy(&attr);
 				pthread_mutex_unlock(&task_mutex);
@@ -327,7 +327,7 @@ void px4_task_exit(int ret)
 	}
 
 	if (i >= PX4_MAX_TASKS)  {
-		PX4_ERR("px4_task_exit: self task not found!");
+		fprintf(stderr, "px4_task_exit: self task not found!\n");
 
 	} else {
 		PX4_DEBUG("px4_task_exit: %s", taskmap[i].name.c_str());
@@ -364,17 +364,17 @@ void px4_show_tasks()
 	int idx;
 	int count = 0;
 
-	PX4_INFO("Active Tasks:");
+	fprintf(stdout, "Active Tasks:\n");
 
 	for (idx = 0; idx < PX4_MAX_TASKS; idx++) {
 		if (taskmap[idx].isused) {
-			PX4_INFO("   %-10s %lu", taskmap[idx].name.c_str(), (unsigned long)taskmap[idx].pid);
+			fprintf(stdout, "   %-10s %lu\n", taskmap[idx].name.c_str(), (unsigned long)taskmap[idx].pid);
 			count++;
 		}
 	}
 
 	if (count == 0) {
-		PX4_INFO("   No running tasks");
+		fprintf(stdout, "   No running tasks\n");
 	}
 
 }

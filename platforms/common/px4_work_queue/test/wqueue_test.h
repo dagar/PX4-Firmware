@@ -34,7 +34,7 @@
 #pragma once
 
 #include <px4_app.h>
-#include <px4_platform_common/px4_work_queue/WorkItem.hpp>
+#include <px4_work_queue/WorkItem.hpp>
 #include <string.h>
 
 using namespace px4;

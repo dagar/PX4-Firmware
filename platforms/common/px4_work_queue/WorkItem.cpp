@@ -31,10 +31,11 @@
  *
  ****************************************************************************/
 
-#include <px4_platform_common/px4_work_queue/WorkItem.hpp>
+#define MODULE_NAME "px4_work_queue"
 
-#include <px4_platform_common/px4_work_queue/WorkQueue.hpp>
-#include <px4_platform_common/px4_work_queue/WorkQueueManager.hpp>
+#include <px4_work_queue/WorkItem.hpp>
+#include <px4_work_queue/WorkQueue.hpp>
+#include <px4_work_queue/WorkQueueManager.hpp>
 
 #include <px4_log.h>
 #include <drivers/drv_hrt.h>

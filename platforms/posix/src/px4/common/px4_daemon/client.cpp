@@ -50,7 +50,6 @@
 
 #include <string>
 
-#include <px4_log.h>
 #include "client.h"
 
 namespace px4_daemon
@@ -69,7 +68,8 @@ Client::process_args(const int argc, const char **argv)
 	_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (_fd < 0) {
-		PX4_ERR("error creating socket");
+		fprintf(stderr, "error creating socket\n");
+
 		return -1;
 	}
 
@@ -78,14 +78,14 @@ Client::process_args(const int argc, const char **argv)
 	strncpy(addr.sun_path, sock_path.c_str(), sizeof(addr.sun_path) - 1);
 
 	if (connect(_fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
-		PX4_ERR("error connecting to socket");
+		fprintf(stderr, "error connecting to socket\n");
 		return -1;
 	}
 
 	int ret = _send_cmds(argc, argv);
 
 	if (ret != 0) {
-		PX4_ERR("Could not send commands");
+		fprintf(stderr, "Could not send commands\n");
 		return -3;
 	}
 
@@ -117,7 +117,7 @@ Client::_send_cmds(const int argc, const char **argv)
 		int n_sent = write(_fd, buf, n);
 
 		if (n_sent < 0) {
-			PX4_ERR("write() failed: %s", strerror(errno));
+			fprintf(stderr, "write() failed: %s\n", strerror(errno));
 			return -1;
 		}
 
@@ -141,7 +141,7 @@ Client::_listen()
 		int n_read = read(_fd, buffer + n_buffer_used, sizeof buffer - n_buffer_used);
 
 		if (n_read < 0) {
-			PX4_ERR("unable to read from socket");
+			fprintf(stderr, "unable to read from socket\n");
 			return -1;
 
 		} else if (n_read == 0) {

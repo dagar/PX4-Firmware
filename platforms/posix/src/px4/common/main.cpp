@@ -160,10 +160,10 @@ int main(int argc, char **argv)
 
 		if (!is_already_running(instance)) {
 			if (errno) {
-				PX4_ERR("Failed to communicate with daemon: %s", strerror(errno));
+				fprintf(stderr, "Failed to communicate with daemon: %s\n", strerror(errno));
 
 			} else {
-				PX4_ERR("PX4 daemon not running yet");
+				fprintf(stderr, "PX4 daemon not running yet\n");
 			}
 
 			return -1;
@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 				break;
 
 			default:
-				PX4_ERR("unrecognized flag");
+				fprintf(stderr, "unrecognized flag\n");
 				print_usage();
 				return -1;
 			}
@@ -242,7 +242,7 @@ int main(int argc, char **argv)
 
 		if (is_already_running(instance)) {
 			// allow running multiple instances, but the server is only started for the first
-			PX4_INFO("PX4 daemon already running for instance %i (%s)", instance, strerror(errno));
+			fprintf(stdout, "PX4 daemon already running for instance %i (%s)\n", instance, strerror(errno));
 			return -1;
 		}
 
@@ -265,7 +265,7 @@ int main(int argc, char **argv)
 		}
 
 		if (!file_exists(commands_file)) {
-			PX4_ERR("Error opening startup file, does not exist: %s", commands_file.c_str());
+			fprintf(stderr, "Error opening startup file, does not exist: %s\n", commands_file.c_str());
 			return -1;
 		}
 
@@ -321,13 +321,13 @@ int create_symlinks_if_needed(std::string &data_path)
 	if (data_path.empty()) {
 		// No data path given, we'll just try to use the current working dir.
 		data_path = current_path;
-		PX4_INFO("assuming working directory is rootfs, no symlinks needed.");
+		fprintf(stdout, "assuming working directory is rootfs, no symlinks needed.\n");
 		return PX4_OK;
 	}
 
 	if (data_path == current_path) {
 		// We are already running in the data path, so no need to symlink
-		PX4_INFO("working directory seems to be rootfs, no symlinks needed");
+		fprintf(stdout, "working directory seems to be rootfs, no symlinks needed\n");
 		return PX4_OK;
 	}
 
@@ -351,13 +351,13 @@ int create_symlinks_if_needed(std::string &data_path)
 
 	}
 
-	PX4_INFO("Creating symlink %s -> %s", src_path.c_str(), dest_path.c_str());
+	fprintf(stdout, "Creating symlink %s -> %s\n", src_path.c_str(), dest_path.c_str());
 
 	// create sym-link
 	int ret = symlink(src_path.c_str(), dest_path.c_str());
 
 	if (ret != 0) {
-		PX4_ERR("Error creating symlink %s -> %s", src_path.c_str(), dest_path.c_str());
+		fprintf(stderr, "Error creating symlink %s -> %s\n", src_path.c_str(), dest_path.c_str());
 		return ret;
 
 	} else {
@@ -524,7 +524,7 @@ int run_startup_script(const std::string &commands_file, const std::string &abso
 	}
 
 
-	PX4_INFO("Calling startup script: %s", shell_command.c_str());
+	fprintf(stdout, "Calling startup script: %s\n", shell_command.c_str());
 
 	int ret = 0;
 
@@ -532,14 +532,14 @@ int run_startup_script(const std::string &commands_file, const std::string &abso
 		ret = system(shell_command.c_str());
 
 		if (ret == 0) {
-			PX4_INFO("Startup script returned successfully");
+			fprintf(stdout, "Startup script returned successfully\n");
 
 		} else {
-			PX4_ERR("Startup script returned with return value: %d", ret);
+			fprintf(stderr, "Startup script returned with return value: %d\n", ret);
 		}
 
 	} else {
-		PX4_INFO("Startup script empty");
+		fprintf(stdout, "Startup script empty\n");
 	}
 
 	return ret;
@@ -647,7 +647,7 @@ int change_directory(const std::string &directory)
 		int ret = mkdir(directory.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
 
 		if (ret == -1) {
-			PX4_ERR("Error creating directory: %s (%s)", directory.c_str(), strerror(errno));
+			fprintf(stderr, "Error creating directory: %s (%s)\n", directory.c_str(), strerror(errno));
 			return -1;
 		}
 	}
@@ -656,7 +656,7 @@ int change_directory(const std::string &directory)
 	int ret = chdir(directory.c_str());
 
 	if (ret == -1) {
-		PX4_ERR("Error changing current path to: %s (%s)", directory.c_str(), strerror(errno));
+		fprintf(stderr, "Error changing current path to: %s (%s)\n", directory.c_str(), strerror(errno));
 		return -1;
 	}
 

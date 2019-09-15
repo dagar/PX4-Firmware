@@ -164,10 +164,7 @@ set_property(GLOBAL PROPERTY PX4_MODULE_CONFIG_FILES)
 
 include(platforms/${PX4_PLATFORM}/cmake/px4_impl_os.cmake)
 list(APPEND CMAKE_MODULE_PATH ${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake)
-
-if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/init.cmake")
-	include(init)
-endif()
+include_directories(platforms/${PX4_PLATFORM}/include)
 
 # CMake build type (Debug Release RelWithDebInfo MinSizeRel Coverage)
 if (NOT CMAKE_BUILD_TYPE)
@@ -261,7 +258,7 @@ endif()
 # build flags
 #
 include(px4_add_common_flags)
-
+include(platform_init)
 add_subdirectory(platforms EXCLUDE_FROM_ALL)
 
 #=============================================================================
@@ -320,40 +317,6 @@ if (NOT EXTERNAL_MODULES_LOCATION STREQUAL "")
 endif()
 
 #=============================================================================
-# Testing - Automatic unit and integration testing with CTest
-#
-
-# optionally enable cmake testing (supported only on posix)
-option(CMAKE_TESTING "Configure test targets" OFF)
-if (${PX4_CONFIG} STREQUAL "px4_sitl_test")
-	set(CMAKE_TESTING ON)
-endif()
-if(CMAKE_TESTING)
-	include(CTest) # sets BUILD_TESTING variable
-endif()
-
-# enable test filtering to run only specific tests with the ctest -R regex functionality
-set(TESTFILTER "" CACHE STRING "Filter string for ctest to selectively only run specific tests (ctest -R)")
-
-# if testing is enabled download and configure gtest
-list(APPEND CMAKE_MODULE_PATH ${PX4_SOURCE_DIR}/cmake/gtest/)
-include(px4_add_gtest)
-if(BUILD_TESTING)
-	include(gtest)
-endif()
-
-add_custom_target(test_results
-		COMMAND GTEST_COLOR=1 ${CMAKE_CTEST_COMMAND} --output-on-failure -T Test -R ${TESTFILTER} USES_TERMINAL
-		DEPENDS
-			px4
-			examples__dyn_hello
-			test_mixer_multirotor
-		USES_TERMINAL
-		COMMENT "Running tests"
-		WORKING_DIRECTORY ${PX4_BINARY_DIR})
-set_target_properties(test_results PROPERTIES EXCLUDE_FROM_ALL TRUE)
-
-#=============================================================================
 # subdirectories
 #
 add_library(parameters_interface INTERFACE)
@@ -376,7 +339,7 @@ add_subdirectory(src/lib/parameters EXCLUDE_FROM_ALL)
 target_link_libraries(parameters_interface INTERFACE parameters)
 
 # platform specific px4 binary last to generate the builtin for included modules
-include(platforms/${PX4_PLATFORM}/cmake/px4)
+include(px4)
 
 
 #=============================================================================

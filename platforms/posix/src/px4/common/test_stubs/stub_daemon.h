@@ -1,6 +1,6 @@
 #pragma once
 
-#include <platforms/posix/apps.h>
+#include <apps.h>
 
 #include <functional>
 

@@ -52,8 +52,6 @@
 #include <sys/un.h>
 #include <vector>
 
-#include <px4_log.h>
-
 #include "pxh.h"
 #include "server.h"
 
@@ -85,7 +83,7 @@ Server::start()
 	_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (_fd < 0) {
-		PX4_ERR("error creating socket");
+		fprintf(stderr, "error creating socket\n");
 		return -1;
 	}
 
@@ -94,12 +92,12 @@ Server::start()
 	strncpy(addr.sun_path, sock_path.c_str(), sizeof(addr.sun_path) - 1);
 
 	if (bind(_fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
-		PX4_ERR("error binding socket");
+		fprintf(stderr, "error binding socket\n");
 		return -1;
 	}
 
 	if (listen(_fd, 10) < 0) {
-		PX4_ERR("error listing to socket");
+		fprintf(stderr, "error listing to socket\n");
 		return -1;
 	}
 
@@ -107,7 +105,7 @@ Server::start()
 				nullptr,
 				_server_main_trampoline,
 				this)) {
-		PX4_ERR("error creating client handler thread");
+		fprintf(stderr, "error creating client handler thread\n");
 		return -1;
 	}
 
@@ -132,7 +130,7 @@ Server::_server_main()
 	int ret = pthread_key_create(&_key, _pthread_key_destructor);
 
 	if (ret != 0) {
-		PX4_ERR("failed to create pthread key");
+		fprintf(stderr, "failed to create pthread key\n");
 		return;
 	}
 
@@ -150,7 +148,7 @@ Server::_server_main()
 		int n_ready = poll(poll_fds.data(), poll_fds.size(), -1);
 
 		if (n_ready < 0) {
-			PX4_ERR("poll() failed: %s", strerror(errno));
+			fprintf(stderr, "poll() failed: %s\n", strerror(errno));
 			return;
 		}
 
@@ -162,7 +160,7 @@ Server::_server_main()
 			int client = accept(_fd, nullptr, nullptr);
 
 			if (client == -1) {
-				PX4_ERR("failed to accept client: %s", strerror(errno));
+				fprintf(stderr, "failed to accept client: %s\n", strerror(errno));
 				_unlock();
 				return;
 			}
@@ -170,7 +168,7 @@ Server::_server_main()
 			FILE *thread_stdout = fdopen(client, "w");
 
 			if (thread_stdout == nullptr) {
-				PX4_ERR("could not open stdout for new thread");
+				fprintf(stderr, "could not open stdout for new thread\n");
 				close(client);
 
 			} else {
@@ -182,7 +180,7 @@ Server::_server_main()
 				ret = pthread_create(thread, nullptr, Server::_handle_client, thread_stdout);
 
 				if (ret != 0) {
-					PX4_ERR("could not start pthread (%i)", ret);
+					fprintf(stderr, "could not start pthread (%i)\n", ret);
 					_fd_to_thread.erase(client);
 					fclose(thread_stdout);
 

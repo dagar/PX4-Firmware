@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-px4_add_library(px4_daemon
+add_library(px4_daemon
 		pxh.cpp
 		history.cpp
 		client.cpp
@@ -39,4 +39,3 @@ px4_add_library(px4_daemon
 		server_io.cpp
 		sock_protocol.cpp
 	)
-

@@ -46,7 +46,7 @@
 #include <px4_tasks.h>
 #include <parameters/param.h>
 #include <perf/perf_counter.h>
-#include <px4_platform_common/px4_work_queue/WorkItem.hpp>
+#include <px4_work_queue/WorkItem.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>

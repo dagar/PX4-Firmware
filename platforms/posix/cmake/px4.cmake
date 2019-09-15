@@ -82,7 +82,7 @@ if (("${PX4_BOARD}" MATCHES "atlflight_eagle") OR ("${PX4_BOARD}" MATCHES "atlfl
 
 else()
 	add_executable(px4
-		src/px4/common/main.cpp
+		platforms/posix/src/px4/common/main.cpp
 		apps.cpp
 		)
 
