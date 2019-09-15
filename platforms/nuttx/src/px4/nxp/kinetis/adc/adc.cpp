@@ -31,10 +31,11 @@
  *
  ****************************************************************************/
 
+#include "adc.h"
+
 #include <board_config.h>
 #include <drivers/drv_adc.h>
 #include <drivers/drv_hrt.h>
-#include <px4_arch/adc.h>
 
 #include <nuttx/analog/adc.h>
 #include <kinetis.h>

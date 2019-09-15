@@ -258,22 +258,11 @@ else()
 endif()
 
 #=============================================================================
-# get chip and chip manufacturer
-#
-px4_os_determine_build_chip()
-if(NOT PX4_CHIP_MANUFACTURER)
-	message(FATAL_ERROR "px4_os_determine_build_chip() needs to set PX4_CHIP_MANUFACTURER")
-endif()
-if(NOT PX4_CHIP)
-	message(FATAL_ERROR "px4_os_determine_build_chip() needs to set PX4_CHIP")
-endif()
-
-#=============================================================================
 # build flags
 #
 include(px4_add_common_flags)
-px4_add_common_flags()
-px4_os_add_flags()
+
+add_subdirectory(platforms EXCLUDE_FROM_ALL)
 
 #=============================================================================
 # message, and airframe generation
@@ -371,9 +360,6 @@ add_library(parameters_interface INTERFACE)
 
 include(px4_add_library)
 add_subdirectory(src/lib EXCLUDE_FROM_ALL)
-
-add_subdirectory(platforms/${PX4_PLATFORM}/src/px4)
-add_subdirectory(platforms EXCLUDE_FROM_ALL)
 add_subdirectory(src/modules/uORB EXCLUDE_FROM_ALL) # TODO: platform layer
 add_subdirectory(src/drivers/boards EXCLUDE_FROM_ALL)
 
@@ -389,8 +375,9 @@ endforeach()
 add_subdirectory(src/lib/parameters EXCLUDE_FROM_ALL)
 target_link_libraries(parameters_interface INTERFACE parameters)
 
-# firmware added last to generate the builtin for included modules
-add_subdirectory(platforms/${PX4_PLATFORM})
+# platform specific px4 binary last to generate the builtin for included modules
+include(platforms/${PX4_PLATFORM}/cmake/px4)
+
 
 #=============================================================================
 # uORB graph generation: add a custom target 'uorb_graph'

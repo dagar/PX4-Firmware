@@ -37,6 +37,7 @@
  * Serial interface for PX4IO on STM32F4
  */
 
+#define PX4IO_SERIAL_BUF_ALIGN 4
 #include <px4_arch/px4io_serial.h>
 
 /* serial register accessors */

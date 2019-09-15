@@ -1,6 +1,6 @@
 ############################################################################
 #
-# Copyright (c) 2015 PX4 Development Team. All rights reserved.
+# Copyright (c) 2015-2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,12 +41,6 @@
 #		* px4_qurt_generate_builtin_commands
 #		* px4_qurt_add_export
 #		* px4_qurt_generate_romfs
-#
-# 	Required OS Inteface Functions
-#
-# 		* px4_os_add_flags
-# 		* px4_os_determine_build_chip
-#		* px4_os_prebuild_targets
 #
 
 #=============================================================================
@@ -95,100 +89,4 @@ function(px4_qurt_generate_builtin_commands)
 	endforeach()
 	configure_file(${PX4_SOURCE_DIR}/platforms/common/apps.cpp.in ${OUT}.cpp)
 	configure_file(${PX4_SOURCE_DIR}/platforms/common/apps.h.in ${OUT}.h)
-endfunction()
-
-#=============================================================================
-#
-#	px4_os_add_flags
-#
-#	Set the qurt build flags.
-#
-#	Usage:
-#		px4_os_add_flags()
-#
-function(px4_os_add_flags)
-
-	set(DSPAL_ROOT src/lib/DriverFramework/dspal)
-	include_directories(
-		${DSPAL_ROOT}/include
-		${DSPAL_ROOT}/mpu_spi/inc
-		${DSPAL_ROOT}/sys
-		${DSPAL_ROOT}/sys/sys
-		${DSPAL_ROOT}/uart_esc/inc
-
-		platforms/posix/include
-		platforms/qurt/include
-		)
-
-	add_definitions(
-		-D__PX4_POSIX
-		-D__PX4_QURT
-
-		-D__DF_QURT # For DriverFramework
-		)
-
-	add_compile_options(
-		-fPIC
-		-fmath-errno
-
-		-Wno-unknown-warning-option
-		-Wno-cast-align
-	)
-
-	# Clear -rdynamic flag which fails for hexagon
-	set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
-	set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS)
-
-	set(DF_TARGET "qurt" CACHE STRING "DriverFramework target" FORCE)
-
-endfunction()
-
-#=============================================================================
-#
-#	px4_os_determine_build_chip
-#
-#	Sets PX4_CHIP and PX4_CHIP_MANUFACTURER.
-#
-#	Usage:
-#		px4_os_determine_build_chip()
-#
-function(px4_os_determine_build_chip)
-
-	# always use generic chip and chip manufacturer
-	set(PX4_CHIP "generic" CACHE STRING "PX4 Chip" FORCE)
-	set(PX4_CHIP_MANUFACTURER "generic" CACHE STRING "PX4 Chip Manufacturer" FORCE)
-
-endfunction()
-
-#=============================================================================
-#
-#	px4_os_prebuild_targets
-#
-#	This function generates os dependent targets
-#
-#	Usage:
-#		px4_os_prebuild_targets(
-#			OUT <out-list_of_targets>
-#			BOARD <in-string>
-#			)
-#
-#	Input:
-#		BOARD		: board
-#
-#	Output:
-#		OUT	: the target list
-#
-#	Example:
-#		px4_os_prebuild_targets(OUT target_list BOARD px4_fmu-v2)
-#
-function(px4_os_prebuild_targets)
-	px4_parse_function_args(
-			NAME px4_os_prebuild_targets
-			ONE_VALUE OUT BOARD
-			REQUIRED OUT
-			ARGN ${ARGN})
-
-	add_library(prebuild_targets INTERFACE)
-	add_dependencies(prebuild_targets DEPENDS uorb_headers)
-
 endfunction()

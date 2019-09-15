@@ -31,12 +31,4 @@
 #
 ############################################################################
 
-
-add_subdirectory(../kinetis/adc adc)
-add_subdirectory(../kinetis/led_pwm led_pwm)
-add_subdirectory(../kinetis/hrt hrt)
-add_subdirectory(../kinetis/io_pins io_pins)
-add_subdirectory(../kinetis/tone_alarm tone_alarm)
-
-
-
+include_directories(include)

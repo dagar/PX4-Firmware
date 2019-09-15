@@ -365,8 +365,15 @@ add_nuttx_dir(c libs/libc n "")
 add_nuttx_dir(xx libs/libxx n "")
 add_nuttx_dir(mm mm n "")
 
-if (CONFIG_NET)
+if(CONFIG_NET)
 	add_nuttx_dir(net net y -D__KERNEL__)
+endif()
+
+target_link_libraries(nuttx_c INTERFACE nuttx_drivers)
+target_link_libraries(nuttx_xx INTERFACE nuttx_c)
+
+if(CONFIG_NET)
+	target_link_libraries(nuttx_fs INTERFACE nuttx_net)
 endif()
 
 ###############################################################################

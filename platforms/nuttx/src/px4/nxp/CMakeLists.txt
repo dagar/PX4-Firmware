@@ -31,6 +31,11 @@
 #
 ############################################################################
 
+add_subdirectory(kinetis)
 
-add_subdirectory(${PX4_CHIP})
-
+# determine chip and chip manufacturer based on NuttX config
+if(CONFIG_ARCH_CHIP_MK66FN2M0VMD18)
+	add_subdirecotyr(k66)
+else()
+	message(FATAL_ERROR "Could not determine chip architecture from NuttX config. You may have to add it.")
+endif()

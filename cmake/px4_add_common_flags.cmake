@@ -31,164 +31,148 @@
 #
 ############################################################################
 
-#=============================================================================
-#
-#	px4_add_common_flags
-#
-#	Set the default build flags.
-#
-#	Usage:
-#		px4_add_common_flags()
-#
-function(px4_add_common_flags)
+add_compile_options(
+	-g # always build debug symbols
 
-	add_compile_options(
-		-g # always build debug symbols
+	# optimization options
+	-fdata-sections
+	-ffunction-sections
+	-fomit-frame-pointer
+	-fmerge-all-constants
 
-		# optimization options
-		-fdata-sections
-		-ffunction-sections
-		-fomit-frame-pointer
-		-fmerge-all-constants
+	#-funsafe-math-optimizations # Enables -fno-signed-zeros, -fno-trapping-math, -fassociative-math and -freciprocal-math
+	-fno-signed-zeros	# Allow optimizations for floating-point arithmetic that ignore the signedness of zero
+	-fno-trapping-math	# Compile code assuming that floating-point operations cannot generate user-visible traps
+	#-fassociative-math	# Allow re-association of operands in series of floating-point operations
+	-freciprocal-math	# Allow the reciprocal of a value to be used instead of dividing by the value if this enables optimizations
 
-		#-funsafe-math-optimizations # Enables -fno-signed-zeros, -fno-trapping-math, -fassociative-math and -freciprocal-math
-		-fno-signed-zeros	# Allow optimizations for floating-point arithmetic that ignore the signedness of zero
-		-fno-trapping-math	# Compile code assuming that floating-point operations cannot generate user-visible traps
-		#-fassociative-math	# Allow re-association of operands in series of floating-point operations
-		-freciprocal-math	# Allow the reciprocal of a value to be used instead of dividing by the value if this enables optimizations
+	-fno-math-errno		# Do not set errno after calling math functions that are executed with a single instruction, e.g., sqrt
 
-		-fno-math-errno		# Do not set errno after calling math functions that are executed with a single instruction, e.g., sqrt
+	-fno-strict-aliasing
 
-		-fno-strict-aliasing
+	# visibility
+	-fvisibility=hidden
+	-include visibility.h
 
-		# visibility
-		-fvisibility=hidden
-		-include visibility.h
+	# Warnings
+	-Wall
+	-Wextra
+	-Werror
 
-		# Warnings
-		-Wall
-		-Wextra
-		-Werror
+	-Warray-bounds
+	-Wcast-align
+	-Wdisabled-optimization
+	-Wdouble-promotion
+	-Wfatal-errors
+	-Wfloat-equal
+	-Wformat-security
+	-Winit-self
+	-Wlogical-op
+	-Wpointer-arith
+	-Wshadow
+	-Wuninitialized
+	-Wunknown-pragmas
+	-Wunused-variable
 
-		-Warray-bounds
-		-Wcast-align
-		-Wdisabled-optimization
-		-Wdouble-promotion
-		-Wfatal-errors
-		-Wfloat-equal
-		-Wformat-security
-		-Winit-self
-		-Wlogical-op
-		-Wpointer-arith
-		-Wshadow
-		-Wuninitialized
-		-Wunknown-pragmas
-		-Wunused-variable
+	# disabled warnings
+	-Wno-missing-field-initializers
+	-Wno-missing-include-dirs # TODO: fix and enable
+	-Wno-unused-parameter
+	)
 
-		# disabled warnings
-		-Wno-missing-field-initializers
-		-Wno-missing-include-dirs # TODO: fix and enable
-		-Wno-unused-parameter
-		)
+# compiler specific flags
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 
-	# compiler specific flags
-	if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+	# force color for clang (needed for clang + ccache)
+	add_compile_options(-fcolor-diagnostics)
 
-		# force color for clang (needed for clang + ccache)
-		add_compile_options(-fcolor-diagnostics)
-
-		# QuRT 6.4.X compiler identifies as Clang but does not support this option
-		if (NOT "${PX4_PLATFORM}" STREQUAL "qurt")
-			add_compile_options(
-				-Qunused-arguments
-
-				-Wno-unknown-warning-option
-				-Wno-unused-const-variable
-				-Wno-varargs
-			)
-		endif()
-
-	elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-
-		if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.9)
-			# force color for gcc > 4.9
-			add_compile_options(-fdiagnostics-color=always)
-		endif()
-
+	# QuRT 6.4.X compiler identifies as Clang but does not support this option
+	if (NOT "${PX4_PLATFORM}" STREQUAL "qurt")
 		add_compile_options(
-			-fno-builtin-printf
-			-fno-strength-reduce
+			-Qunused-arguments
 
-			-Wformat=1
-			-Wunused-but-set-variable
-
-			-Wno-format-truncation # TODO: fix
+			-Wno-unknown-warning-option
+			-Wno-unused-const-variable
+			-Wno-varargs
 		)
-
-		# -fcheck-new is a no-op for Clang in general
-		# and has no effect, but can generate a compile
-		# error for some OS
-		add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fcheck-new>)
-
-	elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-	  message(FATAL_ERROR "Intel compiler not yet supported")
-	elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-	  message(FATAL_ERROR "MS compiler not yet supported")
 	endif()
 
-	# C only flags
-	set(c_flags)
-	list(APPEND c_flags
-		-fno-common
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 
-		-Wbad-function-cast
-		-Wnested-externs
-		-Wstrict-prototypes
+	if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.9)
+		# force color for gcc > 4.9
+		add_compile_options(-fdiagnostics-color=always)
+	endif()
+
+	add_compile_options(
+		-fno-builtin-printf
+		-fno-strength-reduce
+
+		-Wformat=1
+		-Wunused-but-set-variable
+
+		-Wno-format-truncation # TODO: fix
 	)
-	foreach(flag ${c_flags})
-		add_compile_options($<$<COMPILE_LANGUAGE:C>:${flag}>)
-	endforeach()
+
+	# -fcheck-new is a no-op for Clang in general
+	# and has no effect, but can generate a compile
+	# error for some OS
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fcheck-new>)
+
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+	message(FATAL_ERROR "Intel compiler not yet supported")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+	message(FATAL_ERROR "MS compiler not yet supported")
+endif()
+
+# C only flags
+set(c_flags)
+list(APPEND c_flags
+	-fno-common
+
+	-Wbad-function-cast
+	-Wnested-externs
+	-Wstrict-prototypes
+)
+foreach(flag ${c_flags})
+	add_compile_options($<$<COMPILE_LANGUAGE:C>:${flag}>)
+endforeach()
 
 
-	# CXX only flags
-	set(cxx_flags)
-	list(APPEND cxx_flags
-		-fno-exceptions
-		-fno-rtti
-		-fno-threadsafe-statics
+# CXX only flags
+set(cxx_flags)
+list(APPEND cxx_flags
+	-fno-exceptions
+	-fno-rtti
+	-fno-threadsafe-statics
 
-		-Wreorder
+	-Wreorder
 
-		# disabled warnings
-		-Wno-overloaded-virtual # TODO: fix and remove
+	# disabled warnings
+	-Wno-overloaded-virtual # TODO: fix and remove
+)
+foreach(flag ${cxx_flags})
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
+endforeach()
+
+
+include_directories(
+	${PX4_BINARY_DIR}
+	${PX4_BINARY_DIR}/src
+	${PX4_BINARY_DIR}/src/lib
+	${PX4_BINARY_DIR}/src/modules
+
+	${PX4_SOURCE_DIR}/src
+	${PX4_SOURCE_DIR}/src/include
+	${PX4_SOURCE_DIR}/src/lib
+	${PX4_SOURCE_DIR}/src/lib/DriverFramework/framework/include
+	${PX4_SOURCE_DIR}/src/lib/matrix
+	${PX4_SOURCE_DIR}/src/modules
+	${PX4_SOURCE_DIR}/src/platforms
 	)
-	foreach(flag ${cxx_flags})
-		add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
-	endforeach()
 
-
-	include_directories(
-		${PX4_BINARY_DIR}
-		${PX4_BINARY_DIR}/src
-		${PX4_BINARY_DIR}/src/lib
-		${PX4_BINARY_DIR}/src/modules
-
-		${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/src/px4/${PX4_CHIP_MANUFACTURER}/${PX4_CHIP}/include
-		${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/src/px4/common/include
-		${PX4_SOURCE_DIR}/platforms/common/include
-		${PX4_SOURCE_DIR}/src
-		${PX4_SOURCE_DIR}/src/include
-		${PX4_SOURCE_DIR}/src/lib
-		${PX4_SOURCE_DIR}/src/lib/DriverFramework/framework/include
-		${PX4_SOURCE_DIR}/src/lib/matrix
-		${PX4_SOURCE_DIR}/src/modules
-		${PX4_SOURCE_DIR}/src/platforms
-		)
-
-	add_definitions(
-		-DCONFIG_ARCH_BOARD_${PX4_BOARD_NAME}
-		-D__CUSTOM_FILE_IO__
-		-D__STDC_FORMAT_MACROS
-		)
-
-endfunction()
+add_definitions(
+	-DCONFIG_ARCH_BOARD_${PX4_BOARD_NAME}
+	-D__CUSTOM_FILE_IO__
+	-D__STDC_FORMAT_MACROS
+	)

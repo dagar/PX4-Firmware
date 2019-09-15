@@ -224,8 +224,8 @@ function(px4_add_board)
 		set(PX4_TESTING "1" CACHE INTERNAL "testing enabled" FORCE)
 	endif()
 
-	include(px4_impl_os)
-	px4_os_prebuild_targets(OUT prebuild_targets BOARD ${PX4_BOARD})
+
+	add_library(prebuild_targets INTERFACE)
 
 
 	###########################################################################

@@ -31,6 +31,17 @@
 #
 ############################################################################
 
+add_subdirectory(common)
 
-add_subdirectory(${PX4_CHIP})
-
+# determine chip and chip manufacturer based on NuttX config
+if (CONFIG_STM32_STM32F10XX)
+	add_subdirecotyr(stm32f1)
+elseif(CONFIG_STM32_STM32F30XX)
+	add_subdirecotyr(stm32f3)
+elseif(CONFIG_STM32_STM32F4XXX)
+	add_subdirecotyr(stm32f4)
+elseif(CONFIG_ARCH_CHIP_STM32F7)
+	add_subdirecotyr(stm32f7)
+else()
+	message(FATAL_ERROR "Could not determine chip architecture from NuttX config. You may have to add it.")
+endif()

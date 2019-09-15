@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2012, 2017 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,7 +60,7 @@
 
 #include "io_timer.h"
 
-#include <kinetis.h>
+#include <stm32_tim.h>
 
 int up_pwm_servo_set(unsigned channel, servo_position_t value)
 {
@@ -75,9 +75,10 @@ servo_position_t up_pwm_servo_get(unsigned channel)
 int up_pwm_servo_init(uint32_t channel_mask)
 {
 	/* Init channels */
-	uint32_t current = io_timer_get_mode_channels(IOTimerChanMode_PWMOut);
+	uint32_t current = io_timer_get_mode_channels(IOTimerChanMode_PWMOut) |
+			   io_timer_get_mode_channels(IOTimerChanMode_OneShot);
 
-	// First free the current set of PWMs
+	/* First free the current set of PWMs */
 
 	for (unsigned channel = 0; current != 0 &&  channel < MAX_TIMER_IO_CHANNELS; channel++) {
 		if (current & (1 << channel)) {
@@ -86,16 +87,19 @@ int up_pwm_servo_init(uint32_t channel_mask)
 		}
 	}
 
-	// Now allocate the new set
+
+	/* Now allocate the new set */
 
 	for (unsigned channel = 0; channel_mask != 0 &&  channel < MAX_TIMER_IO_CHANNELS; channel++) {
 		if (channel_mask & (1 << channel)) {
 
-			// First free any that were not PWM mode before
+			/* First free any that were not PWM mode before */
 
 			if (-EBUSY == io_timer_is_channel_free(channel)) {
 				io_timer_free_channel(channel);
 			}
+
+			/* OneShot is set later, with the set_rate_group_update call. Init to PWM mode for now */
 
 			io_timer_channel_init(channel, IOTimerChanMode_PWMOut, NULL, NULL);
 			channel_mask &= ~(1 << channel);
@@ -151,7 +155,10 @@ int up_pwm_servo_set_rate(unsigned rate)
 
 uint32_t up_pwm_servo_get_rate_group(unsigned group)
 {
-	return io_timer_get_group(group);
+	/* only return the set of channels in the group which we own */
+	return (io_timer_get_mode_channels(IOTimerChanMode_PWMOut) |
+		io_timer_get_mode_channels(IOTimerChanMode_OneShot)) &
+	       io_timer_get_group(group);
 }
 
 void

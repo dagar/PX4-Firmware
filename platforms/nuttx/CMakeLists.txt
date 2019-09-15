@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,149 +31,158 @@
 #
 ############################################################################
 
-include(cygwin_cygpath)
+if(NOT PX4_BOARD)
+	message(FATAL_ERROR "PX4_BOARD must be set (eg px4_fmu-v2)")
+endif()
 
-set(NUTTX_DIR ${PX4_BINARY_DIR}/NuttX/nuttx)
-set(NUTTX_APPS_DIR ${PX4_BINARY_DIR}/NuttX/apps)
+if(NOT PX4_BINARY_DIR)
+	message(FATAL_ERROR "PX4_BINARY_DIR must be set")
+endif()
 
-add_executable(px4 ${PX4_SOURCE_DIR}/platforms/common/empty.c)
-set(FW_NAME ${PX4_BOARD_VENDOR}_${PX4_BOARD_MODEL}_${PX4_BOARD_LABEL}.elf)
-set_target_properties(px4 PROPERTIES OUTPUT_NAME ${FW_NAME})
-add_dependencies(px4 git_nuttx nuttx_build)
+if(NOT PX4_BOARD_DIR)
+	message(FATAL_ERROR "PX4_BOARD_DIR must be set")
+endif()
 
-get_property(module_libraries GLOBAL PROPERTY PX4_MODULE_LIBRARIES)
+set(NUTTX_CONFIG_DIR ${PX4_BOARD_DIR}/nuttx-config CACHE FILEPATH "PX4 NuttX config" FORCE)
 
-# build NuttX
-add_subdirectory(NuttX ${PX4_BINARY_DIR}/NuttX)
+set(NUTTX_SRC_DIR ${CMAKE_CURRENT_LIST_DIR}/../NuttX)
+set(NUTTX_DIR ${PX4_BINARY_DIR}/NuttX/nuttx CACHE FILEPATH "NuttX directory" FORCE)
+set(NUTTX_APPS_DIR ${PX4_BINARY_DIR}/NuttX/apps CACHE FILEPATH "NuttX apps directory" FORCE)
 
-set(nuttx_libs)
-list(APPEND nuttx_libs
-	nuttx_apps
-	nuttx_arch
-	nuttx_binfmt
-	nuttx_c
-	nuttx_configs
-	nuttx_xx
-	nuttx_drivers
-	nuttx_fs
-	nuttx_mm
-	nuttx_sched
+px4_add_git_submodule(TARGET git_nuttx PATH "${NUTTX_SRC_DIR}/nuttx")
+px4_add_git_submodule(TARGET git_nuttx_apps PATH "${NUTTX_SRC_DIR}/apps")
+
+if (CMAKE_HOST_APPLE OR CMAKE_HOST_WIN32)
+	# copy with rsync and create file dependencies
+	set(cp_cmd "rsync")
+	set(cp_opts)
+	list(APPEND cp_opts
+		-rp
+		--inplace
 	)
-
-if (CONFIG_NET)
-	list(APPEND nuttx_libs nuttx_net)
-	target_link_libraries(nuttx_fs INTERFACE nuttx_net)
+else()
+	# copy with hard links
+	# archive, recursive, force, link (hardlinks)
+	set(cp_cmd "cp")
+	set(cp_opts "-aRfl")
 endif()
 
-file(RELATIVE_PATH PX4_BINARY_DIR_REL ${CMAKE_CURRENT_BINARY_DIR} ${PX4_BINARY_DIR})
+###############################################################################
+# NuttX: copy to build directory
+###############################################################################
+file(RELATIVE_PATH CP_SRC ${CMAKE_SOURCE_DIR} ${NUTTX_SRC_DIR}/nuttx)
+file(RELATIVE_PATH CP_DST ${CMAKE_SOURCE_DIR} ${PX4_BINARY_DIR}/NuttX)
 
-# only in the cygwin environment: convert absolute linker script path to mixed windows (C:/...)
-# because even relative linker script paths are different for linux, mac and windows
-CYGPATH(PX4_BINARY_DIR PX4_BINARY_DIR_CYG)
+# copy during cmake configure
+execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${NUTTX_DIR})
+execute_process(COMMAND ${cp_cmd} ${cp_opts} ${CP_SRC} ${CP_DST} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-if(POLICY CMP0079)
-	cmake_policy(SET CMP0079 NEW)
+###############################################################################
+# NuttX apps: copy to build directory
+###############################################################################
+file(RELATIVE_PATH CP_SRC ${CMAKE_SOURCE_DIR} ${NUTTX_SRC_DIR}/apps)
+file(RELATIVE_PATH CP_DST ${CMAKE_SOURCE_DIR} ${PX4_BINARY_DIR}/NuttX)
+
+# copy during cmake configure
+execute_process(COMMAND ${cp_cmd} ${cp_opts} ${CP_SRC} ${CP_DST} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+###############################################################################
+# nuttx-config: copy to build directory
+###############################################################################
+
+set(NUTTX_DEFCONFIG ${NUTTX_CONFIG_DIR}/${NUTTX_CONFIG}/defconfig CACHE FILEPATH "path to defconfig" FORCE)
+
+# If the board provides a Kconfig Use it or create an empty one
+if(EXISTS ${NUTTX_CONFIG_DIR}/Kconfig)
+	execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_CONFIG_DIR}/Kconfig ${NUTTX_DIR}/configs/dummy/Kconfig)
+else()
+	execute_process(COMMAND ${CMAKE_COMMAND} -E touch ${NUTTX_DIR}/configs/dummy/Kconfig)
 endif()
 
-target_link_libraries(nuttx_arch
-	INTERFACE
-		drivers_board
-		drivers_boards_common
-		drivers_boards_common_arch
-		arch_hrt
+execute_process(
+	COMMAND ${CMAKE_COMMAND} -E make_directory ${PX4_BINARY_DIR}/NuttX/nuttx-config/src
+	COMMAND ${CMAKE_COMMAND} -E copy_directory ${NUTTX_CONFIG_DIR}/ ${PX4_BINARY_DIR}/NuttX/nuttx-config
 )
 
-target_link_libraries(nuttx_c INTERFACE nuttx_drivers)
-target_link_libraries(nuttx_xx INTERFACE nuttx_c)
+# NuttX extra files
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_SRC_DIR}/math.h ${NUTTX_DIR}/arch/arm/include/math.h) # copy arm math.h into NuttX source
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_SRC_DIR}/nsh_romfsimg.h ${PX4_BINARY_DIR}/NuttX/nuttx-config/include/nsh_romfsimg.h)
 
-target_link_libraries(px4 PRIVATE
+# copy defconfig
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NUTTX_DEFCONFIG} ${NUTTX_DIR}/.config)
 
-	-nostartfiles
-	-nodefaultlibs
-	-nostdlib
-	-nostdinc++
-
-	-fno-exceptions
-	-fno-rtti
-
-	-Wl,--script=${PX4_BINARY_DIR_CYG}/NuttX/nuttx-config/scripts/script.ld
-	-Wl,-Map=${PX4_CONFIG}.map
-	-Wl,--warn-common
-	-Wl,--gc-sections
-
-	-Wl,--start-group
-		drivers_boards_common_arch
-		${nuttx_libs}
-	-Wl,--end-group
-
-	m
-	gcc
+# copy PX4 board config into nuttx
+file(STRINGS ${NUTTX_DEFCONFIG} config_expanded REGEX "# Automatically generated file; DO NOT EDIT.")
+if (NOT config_expanded)
+	set(ENV{PATH} "${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/tools:$ENV{PATH}")
+	execute_process(
+		COMMAND make --no-print-directory --silent -C ${NUTTX_DIR} CONFIG_ARCH_BOARD_CUSTOM=y olddefconfig
+		WORKING_DIRECTORY ${NUTTX_DIR}
+		OUTPUT_FILE nuttx_olddefconfig.log
+		ERROR_FILE nuttx_olddefconfig.log
 	)
-
-target_link_libraries(px4 PRIVATE ${module_libraries})
-
-if (config_romfs_root)
-	add_subdirectory(${PX4_SOURCE_DIR}/ROMFS ${PX4_BINARY_DIR}/ROMFS)
-	target_link_libraries(px4 PRIVATE romfs)
 endif()
 
-add_custom_command(OUTPUT ${PX4_BINARY_DIR_REL}/${PX4_BOARD}.bin
-	COMMAND ${CMAKE_OBJCOPY} -O binary ${PX4_BINARY_DIR_REL}/${FW_NAME} ${PX4_BINARY_DIR_REL}/${PX4_BOARD}.bin
-	DEPENDS px4
-	)
+###############################################################################
+# NuttX cmake defconfig
+###############################################################################
 
-# create .px4 with parameter and airframe metadata
-if (TARGET parameters_xml AND TARGET airframes_xml)
+# parse nuttx config options for cmake
+file(STRINGS ${NUTTX_DIR}/.config ConfigContents)
+foreach(NameAndValue ${ConfigContents})
+	# Strip leading spaces
+	string(REGEX REPLACE "^[ ]+" "" NameAndValue ${NameAndValue})
 
-	string(REPLACE ".elf" ".px4" fw_package ${PX4_BINARY_DIR}/${FW_NAME})
+	# Find variable name
+	string(REGEX MATCH "^CONFIG[^=]+" Name ${NameAndValue})
 
-	add_custom_command(
-		OUTPUT ${fw_package}
-		COMMAND
-			${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/Tools/px_mkfw.py
-				--prototype ${PX4_SOURCE_DIR}/boards/${PX4_BOARD_VENDOR}/${PX4_BOARD_MODEL}/firmware.prototype
-				--git_identity ${PX4_SOURCE_DIR}
-				--parameter_xml ${PX4_BINARY_DIR}/parameters.xml
-				--airframe_xml ${PX4_BINARY_DIR}/airframes.xml
-				--image ${PX4_BINARY_DIR}/${PX4_BOARD}.bin > ${fw_package}
-		DEPENDS
-			${PX4_BINARY_DIR}/${PX4_BOARD}.bin
-			airframes_xml
-			parameters_xml
-		COMMENT "Creating ${fw_package}"
-		WORKING_DIRECTORY ${PX4_BINARY_DIR}
-		)
+	if (Name)
+		# Find the value
+		string(REPLACE "${Name}=" "" Value ${NameAndValue})
 
-	add_custom_target(px4_package ALL DEPENDS ${fw_package})
+		# remove extra quotes
+		string(REPLACE "\"" "" Value ${Value})
 
-	# upload helper
-	# create upload target helper if NuttX USB CDCACM is present
-	if (CONFIG_CDCACM)
-		include(upload)
+		# Set the variable
+		#message(STATUS "${Name} ${Value}")
+		set(${Name} ${Value} CACHE INTERNAL "NUTTX DEFCONFIG: ${Name}" FORCE)
 	endif()
+endforeach()
 
+
+###############################################################################
+# build NuttX
+###############################################################################
+
+include_directories(BEFORE SYSTEM
+	${PX4_BINARY_DIR}/NuttX/nuttx/include
+
+	${PX4_BINARY_DIR}/NuttX/nuttx/include/cxx
+	${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/include/cxx
+)
+
+include_directories(
+	${PX4_BINARY_DIR}/NuttX/nuttx/arch/${CONFIG_ARCH}/src/${CONFIG_ARCH_FAMILY}
+	${PX4_BINARY_DIR}/NuttX/nuttx/arch/${CONFIG_ARCH}/src/chip
+	${PX4_BINARY_DIR}/NuttX/nuttx/arch/${CONFIG_ARCH}/src/common
+
+	${PX4_BINARY_DIR}/NuttX/apps/include
+)
+
+# prevent using the toolchain's std c++ library
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+
+add_definitions(
+	-D__PX4_NUTTX
+	-D__DF_NUTTX
+)
+
+if("${CONFIG_ARMV7M_STACKCHECK}" STREQUAL "y")
+	message(STATUS "NuttX Stack Checking (CONFIG_ARMV7M_STACKCHECK) enabled")
+	add_compile_options(
+		-finstrument-functions
+		-ffixed-r10
+		)
 endif()
 
-# print weak symbols
-add_custom_target(weak_symbols
-	COMMAND ${CMAKE_NM} $<TARGET_FILE:px4> | ${GREP} " w " | cat
-	DEPENDS px4
-	VERBATIM
-	USES_TERMINAL
-	)
-
-
-# debugger helpers
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Debug/gdbinit.in ${PX4_BINARY_DIR}/.gdbinit)
-
-add_custom_target(debug
-	COMMAND ${GDB} -iex 'set auto-load safe-path ${PX4_BINARY_DIR}' $<TARGET_FILE:px4>
-	DEPENDS px4 ${PX4_BINARY_DIR}/.gdbinit
-	WORKING_DIRECTORY ${PX4_BINARY_DIR}
-	USES_TERMINAL
-	)
-
-include(blackmagic)
-include(jlink)
-include(profile)
-include(stack_check)
+add_subdirectory(NuttX ${PX4_BINARY_DIR}/NuttX)

@@ -33,5 +33,8 @@
 
 add_subdirectory(common)
 
-add_subdirectory(${PX4_CHIP_MANUFACTURER})
-
+if (${CONFIG_ARCH_CHIP} MATCHES "kinetis")
+	add_subdirectory(nxp)
+elseif (${CONFIG_ARCH_CHIP} MATCHES "stm32")
+	add_subdirectory(stm)
+endif()

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,78 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
+#pragma once
 
-/*
- * @file drv_pwm_trigger.c
- *
- */
+#include <board_config.h>
 
-#include <px4_config.h>
-#include <nuttx/arch.h>
-#include <nuttx/irq.h>
-
-#include <sys/types.h>
-#include <stdbool.h>
-
-#include <assert.h>
-#include <debug.h>
-#include <time.h>
-#include <queue.h>
-#include <errno.h>
-#include <string.h>
-#include <stdio.h>
-
-#include <arch/board/board.h>
-#include <drivers/drv_pwm_trigger.h>
-
-#include "io_timer.h"
-
-int up_pwm_trigger_set(unsigned channel, uint16_t value)
-{
-	return io_timer_set_ccr(channel, value);
-}
-
-int up_pwm_trigger_init(uint32_t channel_mask)
-{
-	/* Init channels */
-	for (unsigned channel = 0; channel_mask != 0 &&  channel < MAX_TIMER_IO_CHANNELS; channel++) {
-		if (channel_mask & (1 << channel)) {
-
-			// First free any that were not trigger mode before
-			if (-EBUSY == io_timer_is_channel_free(channel)) {
-				io_timer_free_channel(channel);
-			}
-
-			io_timer_channel_init(channel, IOTimerChanMode_Trigger, NULL, NULL);
-			channel_mask &= ~(1 << channel);
-		}
-	}
-
-	/* Enable the timers */
-	up_pwm_trigger_arm(true);
-
-	return OK;
-}
-
-void up_pwm_trigger_deinit()
-{
-	/* Disable the timers */
-	up_pwm_trigger_arm(false);
-
-	/* Deinit channels */
-	uint32_t current = io_timer_get_mode_channels(IOTimerChanMode_Trigger);
-
-	for (unsigned channel = 0; current != 0 &&  channel < MAX_TIMER_IO_CHANNELS; channel++) {
-		if (current & (1 << channel)) {
-
-			io_timer_channel_init(channel, IOTimerChanMode_NotUsed, NULL, NULL);
-			current &= ~(1 << channel);
-		}
-	}
-}
-
-void
-up_pwm_trigger_arm(bool armed)
-{
-	io_timer_set_enable(armed, IOTimerChanMode_Trigger, IO_TIMER_ALL_MODES_CHANNELS);
-}
+#define SYSTEM_ADC_BASE 0 // not used on kinetis
