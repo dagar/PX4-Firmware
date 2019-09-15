@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,11 +46,12 @@
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
 
-#include "common.h"
-
-
-namespace sensors
+namespace temperature_compensation
 {
+
+static constexpr uint8_t GYRO_COUNT_MAX = 3;
+static constexpr uint8_t ACCEL_COUNT_MAX = 3;
+static constexpr uint8_t BARO_COUNT_MAX = 3;
 
 static_assert(GYRO_COUNT_MAX == 3,
 	      "GYRO_COUNT_MAX must be 3 (if changed, add/remove TC_* params to match the count)");
@@ -58,6 +59,8 @@ static_assert(ACCEL_COUNT_MAX == 3,
 	      "ACCEL_COUNT_MAX must be 3 (if changed, add/remove TC_* params to match the count)");
 static_assert(BARO_COUNT_MAX == 3,
 	      "BARO_COUNT_MAX must be 3 (if changed, add/remove TC_* params to match the count)");
+
+static constexpr uint8_t SENSOR_COUNT_MAX = 3;
 
 /**
  ** class TemperatureCompensation
@@ -68,7 +71,7 @@ class TemperatureCompensation
 public:
 
 	/** (re)load the parameters. Make sure to call this on startup as well */
-	int parameters_update(bool hil_enabled = false);
+	int parameters_update();
 
 	/** supply information which device_id matches a specific uORB topic_instance
 	 *  (needed if a system has multiple sensors of the same type)
@@ -76,7 +79,6 @@ public:
 	int set_sensor_id_gyro(uint32_t device_id, int topic_instance);
 	int set_sensor_id_accel(uint32_t device_id, int topic_instance);
 	int set_sensor_id_baro(uint32_t device_id, int topic_instance);
-
 
 	/**
 	 * Apply Thermal corrections to gyro (& other) sensor data.
@@ -90,13 +92,11 @@ public:
 	 *         1: corrections applied but no changes to offsets & scales,
 	 *         2: corrections applied and offsets & scales updated
 	 */
-	int apply_corrections_gyro(int topic_instance, matrix::Vector3f &sensor_data, float temperature, float *offsets,
-				   float *scales);
+	int update_scales_and_offsets_gyro(int topic_instance, float temperature, float *offsets, float *scales);
 
-	int apply_corrections_accel(int topic_instance, matrix::Vector3f &sensor_data, float temperature, float *offsets,
-				    float *scales);
+	int update_scales_and_offsets_accel(int topic_instance, float temperature, float *offsets, float *scales);
 
-	int apply_corrections_baro(int topic_instance, float &sensor_data, float temperature, float *offsets, float *scales);
+	int update_scales_and_offsets_baro(int topic_instance, float temperature, float *offsets, float *scales);
 
 	/** output current configuration status to console */
 	void print_status();

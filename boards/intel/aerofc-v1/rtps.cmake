@@ -55,6 +55,7 @@ px4_add_board(
 		micrortps_bridge
 		navigator
 		sensors
+		temperature_compensation
 		sih
 		vmount
 		#vtol_att_control

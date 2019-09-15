@@ -61,7 +61,7 @@ public:
 		: _min_temperature_rise(min_temperature_rise), _min_start_temperature(min_start_temperature),
 		  _max_start_temperature(max_start_temperature) {}
 
-	virtual ~TemperatureCalibrationBase() {}
+	virtual ~TemperatureCalibrationBase() = default;
 
 	/**
 	 * check & update new sensor data.
@@ -95,7 +95,6 @@ protected:
 	float _min_start_temperature; ///< minimum temperature before the process starts
 	float _max_start_temperature; ///< maximum temperature above which the process does not start and an error is declared
 };
-
 
 
 int TemperatureCalibrationBase::set_parameter(const char *format_str, unsigned index, const void *value)

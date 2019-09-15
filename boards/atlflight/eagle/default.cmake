@@ -84,6 +84,7 @@ px4_add_board(
 		navigator
 		sensors
 		#sih
+		temperature_compensation
 		simulator
 		vmount
 		vtol_att_control

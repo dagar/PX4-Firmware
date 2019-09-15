@@ -43,7 +43,6 @@ px4_add_module(
 		rc_update.cpp
 		sensors.cpp
 		parameters.cpp
-		temperature_compensation.cpp
 
 	DEPENDS
 		airspeed

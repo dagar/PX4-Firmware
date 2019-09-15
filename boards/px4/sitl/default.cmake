@@ -42,6 +42,7 @@ px4_add_board(
 		replay
 		sensors
 		simulator
+		temperature_compensation
 		vmount
 		vtol_att_control
 		airspeed_selector

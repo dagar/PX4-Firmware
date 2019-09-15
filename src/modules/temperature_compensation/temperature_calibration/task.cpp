@@ -63,7 +63,6 @@ namespace temperature_calibration
 TemperatureCalibration *instance = nullptr;
 }
 
-
 class TemperatureCalibration
 {
 public:
@@ -103,12 +102,15 @@ private:
 	bool _gyro; ///< enable gyro calibration?
 };
 
-TemperatureCalibration::TemperatureCalibration(bool accel, bool baro, bool gyro)
-	: _accel(accel), _baro(baro), _gyro(gyro)
+TemperatureCalibration::TemperatureCalibration(bool accel, bool baro, bool gyro) :
+	_accel(accel),
+	_baro(baro),
+	_gyro(gyro)
 {
 }
 
-void TemperatureCalibration::task_main()
+void
+TemperatureCalibration::task_main()
 {
 	// subscribe to all gyro instances
 	int gyro_sub[SENSOR_COUNT_MAX] = {};
@@ -187,7 +189,7 @@ void TemperatureCalibration::task_main()
 	hrt_abstime next_progress_output = hrt_absolute_time() + 1e6;
 
 	// control LED's: blink, then turn solid according to progress
-	led_control_s led_control = {};
+	led_control_s led_control{};
 	led_control.led_mask = 0xff;
 	led_control.mode = led_control_s::MODE_BLINK_NORMAL;
 	led_control.priority = led_control_s::MAX_PRIORITY;
@@ -321,15 +323,16 @@ void TemperatureCalibration::task_main()
 	PX4_INFO("Exiting temperature calibration task");
 }
 
-int TemperatureCalibration::do_temperature_calibration(int argc, char *argv[])
+int
+TemperatureCalibration::do_temperature_calibration(int argc, char *argv[])
 {
 	temperature_calibration::instance->task_main();
 	return 0;
 }
 
-int TemperatureCalibration::start()
+int
+TemperatureCalibration::start()
 {
-
 	_control_task = px4_task_spawn_cmd("temperature_calib",
 					   SCHED_DEFAULT,
 					   SCHED_PRIORITY_MAX - 5,
@@ -347,7 +350,8 @@ int TemperatureCalibration::start()
 	return 0;
 }
 
-void TemperatureCalibration::publish_led_control(led_control_s &led_control)
+void
+TemperatureCalibration::publish_led_control(led_control_s &led_control)
 {
 	led_control.timestamp = hrt_absolute_time();
 	_led_control_pub.publish(led_control);

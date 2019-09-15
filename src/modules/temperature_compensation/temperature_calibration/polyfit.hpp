@@ -88,21 +88,15 @@ Author: Siddharth Bharat Purohit
 */
 
 #pragma once
+
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_tasks.h>
 #include <px4_posix.h>
 #include <px4_time.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <math.h>
-#include <poll.h>
-#include <time.h>
+
 #include <float.h>
+
 #include <matrix/math.hpp>
 
 #define DEBUG 0

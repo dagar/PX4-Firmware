@@ -48,10 +48,12 @@
 #include <drivers/drv_hrt.h>
 
 #include <mathlib/mathlib.h>
+#include <matrix/math.hpp>
 
 #include <lib/ecl/validation/data_validator.h>
 #include <lib/ecl/validation/data_validator_group.h>
 
+#include <uORB/Subscription.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationQueued.hpp>
 #include <uORB/topics/sensor_combined.h>
@@ -64,7 +66,6 @@
 
 #include <DevMgr.hpp>
 
-#include "temperature_compensation.h"
 #include "common.h"
 
 namespace sensors
@@ -249,7 +250,6 @@ private:
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 
-	uORB::Publication<sensor_correction_s>	_sensor_correction_pub{ORB_ID(sensor_correction)};	/**< handle to the sensor correction uORB topic */
 	uORB::Publication<sensor_selection_s>	_sensor_selection_pub{ORB_ID(sensor_selection)};	/**< handle to the sensor selection uORB topic */
 
 	sensor_combined_s _last_sensor_data[SENSOR_COUNT_MAX] {};	/**< latest sensor data from all sensors instances */
@@ -269,14 +269,14 @@ private:
 	float _mag_angle_diff[2] {};			/**< filtered mag angle differences between sensor instances (Ga) */
 
 	/* sensor thermal compensation */
-	TemperatureCompensation _temperature_compensation{};
+	uORB::Subscription _corrections_sub{ORB_ID(sensor_correction)};
 	sensor_correction_s _corrections {};		/**< struct containing the sensor corrections to be published to the uORB */
-	sensor_selection_s _selection {};		/**< struct containing the sensor selection to be published to the uORB */
-	subsystem_info_s _info {};			/**< subsystem info publication */
 
-	bool _corrections_changed{false};
+	/* sensor selection publication */
+	sensor_selection_s _selection {};		/**< struct containing the sensor selection to be published to the uORB */
 	bool _selection_changed{false};			/**< true when a sensor selection has changed and not been published */
 
+	subsystem_info_s _info {};			/**< subsystem info publication */
 	uORB::PublicationQueued<subsystem_info_s> _info_pub{ORB_ID(subsystem_info)};	/* subsystem info publication */
 
 	uint32_t _accel_device_id[SENSOR_COUNT_MAX] {};	/**< accel driver device id for each uorb instance */

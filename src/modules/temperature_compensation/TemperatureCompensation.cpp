@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,15 +39,16 @@
  * @author Paul Riseborough <gncsolns@gmail.com>
  */
 
-#include "temperature_compensation.h"
+#include "TemperatureCompensation.h"
 #include <parameters/param.h>
 #include <px4_defines.h>
 #include <px4_log.h>
 
-namespace sensors
+namespace temperature_compensation
 {
 
-int TemperatureCompensation::initialize_parameter_handles(ParameterHandles &parameter_handles)
+int
+TemperatureCompensation::initialize_parameter_handles(ParameterHandles &parameter_handles)
 {
 	char nbuf[16];
 	int ret = PX4_ERROR;
@@ -151,7 +152,8 @@ int TemperatureCompensation::initialize_parameter_handles(ParameterHandles &para
 	return PX4_OK;
 }
 
-int TemperatureCompensation::parameters_update(bool hil_enabled)
+int
+TemperatureCompensation::parameters_update()
 {
 	int ret = 0;
 
@@ -163,12 +165,7 @@ int TemperatureCompensation::parameters_update(bool hil_enabled)
 	}
 
 	/* rate gyro calibration parameters */
-	if (!hil_enabled) {
-		param_get(parameter_handles.gyro_tc_enable, &_parameters.gyro_tc_enable);
-
-	} else {
-		_parameters.gyro_tc_enable = 0;
-	}
+	param_get(parameter_handles.gyro_tc_enable, &_parameters.gyro_tc_enable);
 
 	if (_parameters.gyro_tc_enable == 1) {
 		for (unsigned j = 0; j < GYRO_COUNT_MAX; j++) {
@@ -201,12 +198,7 @@ int TemperatureCompensation::parameters_update(bool hil_enabled)
 	}
 
 	/* accelerometer calibration parameters */
-	if (!hil_enabled) {
-		param_get(parameter_handles.accel_tc_enable, &_parameters.accel_tc_enable);
-
-	} else {
-		_parameters.accel_tc_enable = 0;
-	}
+	param_get(parameter_handles.accel_tc_enable, &_parameters.accel_tc_enable);
 
 	if (_parameters.accel_tc_enable == 1) {
 		for (unsigned j = 0; j < ACCEL_COUNT_MAX; j++) {
@@ -239,12 +231,7 @@ int TemperatureCompensation::parameters_update(bool hil_enabled)
 	}
 
 	/* barometer calibration parameters */
-	if (!hil_enabled) {
-		param_get(parameter_handles.baro_tc_enable, &_parameters.baro_tc_enable);
-
-	} else {
-		_parameters.baro_tc_enable = 0;
-	}
+	param_get(parameter_handles.baro_tc_enable, &_parameters.baro_tc_enable);
 
 	if (_parameters.baro_tc_enable == 1) {
 		for (unsigned j = 0; j < BARO_COUNT_MAX; j++) {
@@ -283,7 +270,8 @@ int TemperatureCompensation::parameters_update(bool hil_enabled)
 	return ret;
 }
 
-bool TemperatureCompensation::calc_thermal_offsets_1D(SensorCalData1D &coef, float measured_temp, float &offset)
+bool
+TemperatureCompensation::calc_thermal_offsets_1D(SensorCalData1D &coef, float measured_temp, float &offset)
 {
 	bool ret = true;
 
@@ -319,7 +307,8 @@ bool TemperatureCompensation::calc_thermal_offsets_1D(SensorCalData1D &coef, flo
 
 }
 
-bool TemperatureCompensation::calc_thermal_offsets_3D(const SensorCalData3D &coef, float measured_temp, float offset[])
+bool
+TemperatureCompensation::calc_thermal_offsets_3D(const SensorCalData3D &coef, float measured_temp, float offset[])
 {
 	bool ret = true;
 
@@ -351,7 +340,8 @@ bool TemperatureCompensation::calc_thermal_offsets_3D(const SensorCalData3D &coe
 
 }
 
-int TemperatureCompensation::set_sensor_id_gyro(uint32_t device_id, int topic_instance)
+int
+TemperatureCompensation::set_sensor_id_gyro(uint32_t device_id, int topic_instance)
 {
 	if (_parameters.gyro_tc_enable != 1) {
 		return 0;
@@ -360,7 +350,8 @@ int TemperatureCompensation::set_sensor_id_gyro(uint32_t device_id, int topic_in
 	return set_sensor_id(device_id, topic_instance, _gyro_data, _parameters.gyro_cal_data, GYRO_COUNT_MAX);
 }
 
-int TemperatureCompensation::set_sensor_id_accel(uint32_t device_id, int topic_instance)
+int
+TemperatureCompensation::set_sensor_id_accel(uint32_t device_id, int topic_instance)
 {
 	if (_parameters.accel_tc_enable != 1) {
 		return 0;
@@ -369,7 +360,8 @@ int TemperatureCompensation::set_sensor_id_accel(uint32_t device_id, int topic_i
 	return set_sensor_id(device_id, topic_instance, _accel_data, _parameters.accel_cal_data, ACCEL_COUNT_MAX);
 }
 
-int TemperatureCompensation::set_sensor_id_baro(uint32_t device_id, int topic_instance)
+int
+TemperatureCompensation::set_sensor_id_baro(uint32_t device_id, int topic_instance)
 {
 	if (_parameters.baro_tc_enable != 1) {
 		return 0;
@@ -392,27 +384,31 @@ int TemperatureCompensation::set_sensor_id(uint32_t device_id, int topic_instanc
 	return -1;
 }
 
-int TemperatureCompensation::apply_corrections_gyro(int topic_instance, matrix::Vector3f &sensor_data,
-		float temperature, float *offsets, float *scales)
+int
+TemperatureCompensation::update_scales_and_offsets_gyro(int topic_instance, float temperature, float *offsets,
+		float *scales)
 {
+	// Check if temperature compensation is enabled
 	if (_parameters.gyro_tc_enable != 1) {
 		return 0;
 	}
 
+	// Map device ID to uORB topic instance
 	uint8_t mapping = _gyro_data.device_mapping[topic_instance];
 
 	if (mapping == 255) {
 		return -1;
 	}
 
+	// Calculate and update the offsets
 	calc_thermal_offsets_3D(_parameters.gyro_cal_data[mapping], temperature, offsets);
 
-	// get the sensor scale factors and correct the data
+	// Update the scales
 	for (unsigned axis_index = 0; axis_index < 3; axis_index++) {
 		scales[axis_index] = _parameters.gyro_cal_data[mapping].scale[axis_index];
-		sensor_data(axis_index) = (sensor_data(axis_index) - offsets[axis_index]) * scales[axis_index];
 	}
 
+	// Check if temperature delta is large enough to warrant a new publication
 	if (fabsf(temperature - _gyro_data.last_temperature[topic_instance]) > 1.0f) {
 		_gyro_data.last_temperature[topic_instance] = temperature;
 		return 2;
@@ -421,27 +417,31 @@ int TemperatureCompensation::apply_corrections_gyro(int topic_instance, matrix::
 	return 1;
 }
 
-int TemperatureCompensation::apply_corrections_accel(int topic_instance, matrix::Vector3f &sensor_data,
-		float temperature, float *offsets, float *scales)
+int
+TemperatureCompensation::update_scales_and_offsets_accel(int topic_instance, float temperature, float *offsets,
+		float *scales)
 {
+	// Check if temperature compensation is enabled
 	if (_parameters.accel_tc_enable != 1) {
 		return 0;
 	}
 
+	// Map device ID to uORB topic instance
 	uint8_t mapping = _accel_data.device_mapping[topic_instance];
 
 	if (mapping == 255) {
 		return -1;
 	}
 
+	// Calculate and update the offsets
 	calc_thermal_offsets_3D(_parameters.accel_cal_data[mapping], temperature, offsets);
 
-	// get the sensor scale factors and correct the data
+	// Update the scales
 	for (unsigned axis_index = 0; axis_index < 3; axis_index++) {
 		scales[axis_index] = _parameters.accel_cal_data[mapping].scale[axis_index];
-		sensor_data(axis_index) = (sensor_data(axis_index) - offsets[axis_index]) * scales[axis_index];
 	}
 
+	// Check if temperature delta is large enough to warrant a new publication
 	if (fabsf(temperature - _accel_data.last_temperature[topic_instance]) > 1.0f) {
 		_accel_data.last_temperature[topic_instance] = temperature;
 		return 2;
@@ -450,25 +450,29 @@ int TemperatureCompensation::apply_corrections_accel(int topic_instance, matrix:
 	return 1;
 }
 
-int TemperatureCompensation::apply_corrections_baro(int topic_instance, float &sensor_data, float temperature,
-		float *offsets, float *scales)
+int
+TemperatureCompensation::update_scales_and_offsets_baro(int topic_instance, float temperature, float *offsets,
+		float *scales)
 {
+	// Check if temperature compensation is enabled
 	if (_parameters.baro_tc_enable != 1) {
 		return 0;
 	}
 
+	// Map device ID to uORB topic instance
 	uint8_t mapping = _baro_data.device_mapping[topic_instance];
 
 	if (mapping == 255) {
 		return -1;
 	}
 
+	// Calculate and update the offsets
 	calc_thermal_offsets_1D(_parameters.baro_cal_data[mapping], temperature, *offsets);
 
-	// get the sensor scale factors and correct the data
+	// Update the scales
 	*scales = _parameters.baro_cal_data[mapping].scale;
-	sensor_data = (sensor_data - *offsets) * *scales;
 
+	// Check if temperature delta is large enough to warrant a new publication
 	if (fabsf(temperature - _baro_data.last_temperature[topic_instance]) > 1.0f) {
 		_baro_data.last_temperature[topic_instance] = temperature;
 		return 2;
@@ -477,7 +481,8 @@ int TemperatureCompensation::apply_corrections_baro(int topic_instance, float &s
 	return 1;
 }
 
-void TemperatureCompensation::print_status()
+void
+TemperatureCompensation::print_status()
 {
 	PX4_INFO("Temperature Compensation:");
 	PX4_INFO(" gyro: enabled: %i", _parameters.gyro_tc_enable);
@@ -517,4 +522,4 @@ void TemperatureCompensation::print_status()
 	}
 }
 
-}
+} // namespace temperature_compensation
