@@ -62,6 +62,7 @@
 #include <nuttx/mm/gran.h>
 #include <chip.h>
 #include <stm32_uart.h>
+#include <stm32_dtcm.h>
 #include <arch/board/board.h>
 #include "up_internal.h"
 
@@ -214,6 +215,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 	VDD_5V_RC_EN(true);
 	VDD_5V_WIFI_EN(true);
+
+	dtcm_initialize();
 
 	/* Need hrt running before using the ADC */
 

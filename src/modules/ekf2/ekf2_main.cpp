@@ -118,6 +118,9 @@ public:
 
 	int print_status() override;
 
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
+
 private:
 	int getRangeSubIndex(); ///< get subscription index of first downward-facing range sensor
 

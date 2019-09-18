@@ -276,7 +276,8 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 
 			/* re-check size */
 			if (nullptr == _data) {
-				_data = new uint8_t[_meta->o_size * _queue_size];
+				//_data = new uint8_t[_meta->o_size * _queue_size];
+				_data = (uint8_t *)dtcm_malloc(_meta->o_size * _queue_size);
 			}
 
 			unlock();

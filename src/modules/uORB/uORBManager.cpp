@@ -44,6 +44,8 @@
 #include "uORBUtils.hpp"
 #include "uORBManager.hpp"
 
+#include <stm32_dtcm.h>
+
 uORB::Manager *uORB::Manager::_Instance = nullptr;
 
 bool uORB::Manager::initialize()

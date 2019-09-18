@@ -37,6 +37,8 @@
 
 #include "BMI055.hpp"
 
+#include <stm32_dtcm.h>
+
 #define BMI055_DEVICE_PATH_ACCEL	"/dev/bmi055_accel"
 #define BMI055_DEVICE_PATH_ACCEL_EXT	"/dev/bmi055_accel_ext"
 
@@ -159,6 +161,9 @@ public:
 
 	// deliberately cause a sensor error
 	void            test_error();
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
 
 protected:
 

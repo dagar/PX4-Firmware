@@ -44,6 +44,7 @@
 #include <containers/BlockingQueue.hpp>
 #include <lib/drivers/device/Device.hpp>
 #include <lib/mathlib/mathlib.h>
+#include <stm32_dtcm.h>
 
 #include <limits.h>
 #include <string.h>
@@ -226,6 +227,20 @@ static int WorkQueueManagerRun(int, char **)
 			if (ret_setschedparam != 0) {
 				PX4_ERR("setting sched params for %s failed (%i)", wq->name, ret_setschedparam);
 			}
+
+
+			// stack in DTCM
+			void *mystack = dtcm_malloc(stacksize);
+			int ret_setstack = pthread_attr_setstack(&attr, mystack, stacksize);
+
+			if (ret_setstack != 0) {
+				PX4_ERR("pthread_attr_setstack returned: %d", ret_setstack);
+
+			} else {
+				//PX4_INFO("Set stackaddr to %X", mystack);
+				//PX4_INFO("Set stacksize to %d", stacksize);
+			}
+
 
 			// create thread
 			pthread_t thread;

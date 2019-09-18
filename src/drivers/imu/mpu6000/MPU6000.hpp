@@ -67,6 +67,8 @@
 #include <systemlib/conversions.h>
 #include <systemlib/px4_macros.h>
 
+#include <stm32_dtcm.h>
+
 
 /*
   we set the timer interrupt to run a bit faster than the desired
@@ -337,6 +339,9 @@ public:
 	 * Resets the chip and measurements ranges, but not scale and offset.
 	 */
 	int			reset();
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
 
 protected:
 	device::Device			*_interface;

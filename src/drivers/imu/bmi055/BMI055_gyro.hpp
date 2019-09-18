@@ -37,6 +37,8 @@
 
 #include "BMI055.hpp"
 
+#include <stm32_dtcm.h>
+
 #define BMI055_DEVICE_PATH_GYRO		"/dev/bmi055_gyro"
 #define BMI055_DEVICE_PATH_GYRO_EXT	"/dev/bmi055_gyro_ext"
 
@@ -151,6 +153,9 @@ public:
 
 	// deliberately cause a sensor error
 	void            test_error();
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
 
 protected:
 

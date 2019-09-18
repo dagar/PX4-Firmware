@@ -40,6 +40,8 @@
 
 #include <containers/List.hpp>
 
+#include <stm32_dtcm.h>
+
 namespace uORB
 {
 class DeviceNode;
@@ -63,6 +65,9 @@ public:
 	DeviceNode &operator=(const DeviceNode &) = delete;
 	DeviceNode(DeviceNode &&) = delete;
 	DeviceNode &operator=(DeviceNode &&) = delete;
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
 
 	/**
 	 * Method to create a subscriber instance and return the struct
