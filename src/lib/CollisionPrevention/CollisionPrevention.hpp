@@ -59,16 +59,19 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_command.h>
 
+using namespace time_literals;
+
 class CollisionPrevention : public ModuleParams
 {
 public:
 	CollisionPrevention(ModuleParams *parent);
 
 	virtual ~CollisionPrevention();
+
 	/**
 	 * Returs true if Collision Prevention is running
 	 */
-	bool is_active() { return _param_mpc_col_prev_d.get() > 0; }
+	bool is_active() const { return _param_mpc_col_prev_d.get() > 0; }
 
 	/**
 	 * Computes collision free setpoints
@@ -131,7 +134,9 @@ private:
 	uORB::Subscription _sub_distance_sensor[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(distance_sensor), 0}, {ORB_ID(distance_sensor), 1}, {ORB_ID(distance_sensor), 2}, {ORB_ID(distance_sensor), 3}}; /**< distance data received from onboard rangefinders */
 	uORB::SubscriptionData<vehicle_attitude_s> _sub_vehicle_attitude{ORB_ID(vehicle_attitude)};
 
-	static constexpr uint64_t RANGE_STREAM_TIMEOUT_US{500000};
+	hrt_abstime	_last_collision_warning{0};
+
+	static constexpr uint64_t RANGE_STREAM_TIMEOUT_US{500_ms};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MPC_COL_PREV_D>) _param_mpc_col_prev_d, /**< collision prevention keep minimum distance */
@@ -149,20 +154,39 @@ private:
 	 */
 	inline float _sensorOrientationToYawOffset(const distance_sensor_s &distance_sensor, float angle_offset)
 	{
-
-		float offset = angle_offset > 0.f ? math::radians(angle_offset) : 0.0f;
+		float offset = angle_offset > 0.0f ? math::radians(angle_offset) : 0.0f;
 
 		switch (distance_sensor.orientation) {
+		case distance_sensor_s::ROTATION_FORWARD_FACING:
+			offset = 0.0f;
+			break;
+
+		case distance_sensor_s::ROTATION_YAW_45:
+			offset = M_PI_F / 4.0f;
+			break;
+
 		case distance_sensor_s::ROTATION_RIGHT_FACING:
 			offset = M_PI_F / 2.0f;
+			break;
+
+		case distance_sensor_s::ROTATION_YAW_135:
+			offset = 3.0f * M_PI_F / 4.0f;
+			break;
+
+		case distance_sensor_s::ROTATION_BACKWARD_FACING:
+			offset = M_PI_F;
+			break;
+
+		case distance_sensor_s::ROTATION_YAW_225:
+			offset = -3.0f * M_PI_F / 4.0f;
 			break;
 
 		case distance_sensor_s::ROTATION_LEFT_FACING:
 			offset = -M_PI_F / 2.0f;
 			break;
 
-		case distance_sensor_s::ROTATION_BACKWARD_FACING:
-			offset = M_PI_F;
+		case distance_sensor_s::ROTATION_YAW_315:
+			offset = -M_PI_F / 4.0f;
 			break;
 
 		case distance_sensor_s::ROTATION_CUSTOM:
