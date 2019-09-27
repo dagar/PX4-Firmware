@@ -1775,6 +1775,7 @@ PX4IO::io_get_raw_rc_input(input_rc_s &input_rc)
 		input_rc.rssi = rssi_analog;
 	}
 
+	input_rc.link_quality = REG_TO_FLOAT(regs[PX4IO_P_RAW_RC_LINK_QUALITY]);
 	input_rc.rc_failsafe = (regs[PX4IO_P_RAW_RC_FLAGS] & PX4IO_P_RAW_RC_FLAGS_FAILSAFE);
 	input_rc.rc_lost = !(regs[PX4IO_P_RAW_RC_FLAGS] & PX4IO_P_RAW_RC_FLAGS_RC_OK);
 	input_rc.rc_lost_frame_count = regs[PX4IO_P_RAW_LOST_FRAME_COUNT];

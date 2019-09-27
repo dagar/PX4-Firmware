@@ -68,11 +68,16 @@ int _sbus_fd = -1;
 
 static uint16_t rc_value_override = 0;
 
+/* Link Quality indicator. Sliding window tracking lost frames. At about 45 frames per second
+   a 32 bit int is good for about 0.7 seconds, which seems like a reasonable amount of
+   local smoothing. */
+static uint32_t link_quality_bits = 0;
+
 #ifdef ADC_RSSI
 static unsigned _rssi_adc_counts = 0;
 #endif
 
-/* receive signal strenght indicator (RSSI). 0 = no connection, 100 (RC_INPUT_RSSI_MAX): perfect connection */
+/* receive signal strength indicator (RSSI). 0 = no connection, 100 (RC_INPUT_RSSI_MAX): perfect connection */
 /* Note: this is static because RC-provided telemetry does not occur every tick */
 static uint16_t _rssi = 0;
 
@@ -234,9 +239,10 @@ controls_tick()
 
 #endif
 
-	/* zero RSSI if signal is lost */
+	/* zero RSSI and Link Quality if signal is lost */
 	if (!(r_raw_rc_flags & (PX4IO_P_RAW_RC_FLAGS_RC_OK))) {
 		_rssi = 0;
+		link_quality_bits = 0;
 	}
 
 	perf_begin(c_gather_sbus);
@@ -250,12 +256,18 @@ controls_tick()
 
 		unsigned sbus_rssi = RC_INPUT_RSSI_MAX;
 
+		/* Slide Link Quality bitset one bit forward when we receive a frame */
+		link_quality_bits <<= 1;
+
 		if (sbus_frame_drop) {
 			r_raw_rc_flags |= PX4IO_P_RAW_RC_FLAGS_FRAME_DROP;
 			sbus_rssi = RC_INPUT_RSSI_MAX / 2;
 
 		} else {
 			r_raw_rc_flags &= ~(PX4IO_P_RAW_RC_FLAGS_FRAME_DROP);
+
+			/* Set most current bit in bitset to true, indicating we received a valid frame */
+			link_quality_bits |= 1;
 		}
 
 		if (sbus_failsafe) {
@@ -320,6 +332,12 @@ controls_tick()
 
 	/* store RSSI */
 	r_page_raw_rc_input[PX4IO_P_RAW_RC_NRSSI] = _rssi;
+
+	/* store Link Quality */
+	unsigned link_quality_bits_set = __builtin_popcount(link_quality_bits);
+	unsigned total_number_of_link_quality_bits = ((sizeof(link_quality_bits) * CHAR_BIT));
+	float link_quality_float = ((float)link_quality_bits_set) / ((float)total_number_of_link_quality_bits);
+	r_page_raw_rc_input[PX4IO_P_RAW_RC_LINK_QUALITY] = FLOAT_TO_REG(link_quality_float);
 
 	/*
 	 * In some cases we may have received a frame, but input has still
