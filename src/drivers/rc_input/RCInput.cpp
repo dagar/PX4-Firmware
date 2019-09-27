@@ -410,11 +410,11 @@ RCInput::cycle()
 			// int ret = poll(fds, sizeof(fds) / sizeof(fds[0]), 100);
 			// then update priority to SCHED_PRIORITY_FAST_DRIVER
 			// read all available data from the serial RC input UART
-			newBytes = ::read(_rcs_fd, &_rcs_buf[0], SBUS_BUFFER_SIZE);
+			newBytes = ::read(_rcs_fd, &_rcs_buf[0], sizeof(_rcs_buf));
 
 		} else {
 			// read all available data from the serial RC input UART
-			newBytes = ::read(_rcs_fd, &_rcs_buf[0], SBUS_BUFFER_SIZE);
+			newBytes = ::read(_rcs_fd, &_rcs_buf[0], sizeof(_rcs_buf));
 		}
 
 		switch (_rc_scan_state) {
@@ -429,7 +429,7 @@ RCInput::cycle()
 				   || cycle_timestamp - _rc_scan_begin < rc_scan_max) {
 
 				// parse new data
-				if (newBytes > 0) {
+				if (newBytes > 0 && newBytes <= SBUS_FRAME_SIZE) {
 					rc_updated = sbus_parse(cycle_timestamp, &_rcs_buf[0], newBytes, &_raw_rc_values[0], &_raw_rc_count, &sbus_failsafe,
 								&sbus_frame_drop, &frame_drops, input_rc_s::RC_INPUT_MAX_CHANNELS);
 
@@ -649,6 +649,44 @@ RCInput::cycle()
 			} else {
 				// Scan the next protocol
 				set_rc_scan_state(RC_SCAN_SBUS);
+			}
+
+			break;
+
+		case RC_SCAN_SRXL:
+			if (_rc_scan_begin == 0) {
+				_rc_scan_begin = _cycle_timestamp;
+				// Configure serial port for 115200, not inverted
+				dsm_config(_rcs_fd);
+				rc_io_invert(false);
+
+			} else if (_rc_scan_locked
+				   || _cycle_timestamp - _rc_scan_begin < rc_scan_max) {
+
+				if (newBytes > 0) {
+					// parse new data
+					rc_updated = false;
+					uint8_t srxl_chan_count;
+
+					for (unsigned i = 0; i < (unsigned)newBytes; i++) {
+						/* set updated flag if one complete packet was parsed */
+						rc_updated = (OK == srxl_decode(_cycle_timestamp, _rcs_buf[i],
+										&srxl_chan_count, raw_rc_values, input_rc_s::RC_INPUT_MAX_CHANNELS));
+					}
+
+					if (rc_updated) {
+						// we have a new SRXL frame. Publish it.
+						_rc_in.input_source = input_rc_s::RC_INPUT_SOURCE_PX4FMU_SRXL;
+
+						fill_rc_in(srxl_chan_count, raw_rc_values, _cycle_timestamp,
+							   false, false, 0);
+						_rc_scan_locked = true;
+					}
+				}
+
+			} else {
+				// Scan the next protocol
+				set_rc_scan_state(RC_SCAN_DSM);
 			}
 
 			break;

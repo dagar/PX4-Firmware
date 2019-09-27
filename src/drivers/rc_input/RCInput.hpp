@@ -42,6 +42,7 @@
 #include <lib/rc/crsf.h>
 #include <lib/rc/dsm.h>
 #include <lib/rc/sbus.h>
+#include <lib/rc/srxl.h>
 #include <lib/rc/st24.h>
 #include <lib/rc/sumd.h>
 #include <px4_config.h>
@@ -98,16 +99,18 @@ private:
 		RC_SCAN_DSM,
 		RC_SCAN_SUMD,
 		RC_SCAN_ST24,
-		RC_SCAN_CRSF
+		RC_SCAN_CRSF,
+		RC_SCAN_SRXL
 	} _rc_scan_state{RC_SCAN_SBUS};
 
-	static constexpr char const *RC_SCAN_STRING[6] {
+	static constexpr char const *RC_SCAN_STRING[] {
 		"PPM",
 		"SBUS",
 		"DSM",
 		"SUMD",
 		"ST24",
-		"CRSF"
+		"CRSF",
+		"SRXL"
 	};
 
 	hrt_abstime _rc_scan_begin{0};
@@ -134,7 +137,8 @@ private:
 	int		_rcs_fd{-1};
 	char		_device[20] {};					///< device / serial port path
 
-	uint8_t _rcs_buf[SBUS_BUFFER_SIZE] {};
+	// allow for RC frames up to 32 bytes.
+	uint8_t		_rcs_buf[32] {};
 
 	uint16_t _raw_rc_values[input_rc_s::RC_INPUT_MAX_CHANNELS] {};
 	uint16_t _raw_rc_count{};

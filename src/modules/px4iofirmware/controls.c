@@ -50,6 +50,7 @@
 #include <rc/sumd.h>
 #include <rc/sbus.h>
 #include <rc/dsm.h>
+#include <rc/srxl.h>
 
 #include "px4io.h"
 
@@ -57,7 +58,8 @@
 #define RC_CHANNEL_LOW_THRESH		-8000	/* 10% threshold */
 
 static bool	ppm_input(uint16_t *values, uint16_t *num_values, uint16_t *frame_len);
-static bool	dsm_port_input(uint16_t *rssi, bool *dsm_updated, bool *st24_updated, bool *sumd_updated);
+static bool	dsm_port_input(uint16_t *rssi, bool *dsm_updated, bool *st24_updated, bool *sumd_updated,
+			       bool *srxl_updated);
 
 static perf_counter_t c_gather_dsm;
 static perf_counter_t c_gather_sbus;
@@ -76,17 +78,22 @@ static unsigned _rssi_adc_counts = 0;
 /* Note: this is static because RC-provided telemetry does not occur every tick */
 static uint16_t _rssi = 0;
 
-bool dsm_port_input(uint16_t *rssi, bool *dsm_updated, bool *st24_updated, bool *sumd_updated)
+bool dsm_port_input(uint16_t *rssi, bool *dsm_updated, bool *st24_updated, bool *sumd_updated, bool *srxl_updated)
 {
 	perf_begin(c_gather_dsm);
 	uint8_t n_bytes = 0;
 	uint8_t *bytes;
 	bool dsm_11_bit;
-	int8_t spektrum_rssi;
-	*dsm_updated = dsm_input(_dsm_fd, r_raw_rc_values, &r_raw_rc_count, &dsm_11_bit, &n_bytes, &bytes,
-				 &spektrum_rssi, PX4IO_RC_INPUT_CHANNELS);
+	uint16_t dsm_chan_count;
 
-	if (*dsm_updated) {
+	// we don't accept DSM if we are currently decoding SRXL, as
+	// SRXL can be incorrectly interpreted as DSM
+	bool allow_dsm = !(r_status_flags & PX4IO_P_STATUS_FLAGS_RC_SRXL);
+
+	*dsm_updated = dsm_input(_dsm_fd, r_raw_rc_values, &dsm_chan_count, &dsm_11_bit, &n_bytes, &bytes,
+				 allow_dsm ? PX4IO_RC_INPUT_CHANNELS : 0);
+
+	if (*dsm_updated && dsm_chan_count > 0) {
 
 		if (dsm_11_bit) {
 			r_raw_rc_flags |= PX4IO_P_RAW_RC_FLAGS_RC_DSM11;
@@ -166,7 +173,36 @@ bool dsm_port_input(uint16_t *rssi, bool *dsm_updated, bool *st24_updated, bool 
 		}
 	}
 
-	return (*dsm_updated | *st24_updated | *sumd_updated);
+	/* attempt to parse with SRXL lib */
+	uint8_t srxl_channel_count = 0;
+	hrt_abstime now = hrt_absolute_time();
+	bool failsafe_state;
+
+	*srxl_updated = false;
+
+	for (unsigned i = 0; i < n_bytes; i++) {
+		/* set updated flag if one complete packet was parsed */
+		*srxl_updated |= (OK == srxl_decode(now, bytes[i],
+						    &srxl_channel_count, r_raw_rc_values, PX4IO_RC_INPUT_CHANNELS, &failsafe_state));
+	}
+
+	if (*srxl_updated) {
+
+		/* not setting RSSI since SRXL does not provide one */
+		r_raw_rc_count = srxl_channel_count;
+
+		r_status_flags |= PX4IO_P_STATUS_FLAGS_RC_SRXL;
+		r_raw_rc_flags &= ~(PX4IO_P_RAW_RC_FLAGS_FRAME_DROP);
+
+		if (failsafe_state) {
+			r_raw_rc_flags |= PX4IO_P_RAW_RC_FLAGS_FAILSAFE;
+
+		} else {
+			r_raw_rc_flags &= ~(PX4IO_P_RAW_RC_FLAGS_FAILSAFE);
+		}
+	}
+
+	return (*dsm_updated | *st24_updated | *sumd_updated | *srxl_updated);
 }
 
 void
@@ -291,12 +327,15 @@ controls_tick()
 
 	perf_end(c_gather_ppm);
 
-	bool dsm_updated = false, st24_updated = false, sumd_updated = false;
+	bool dsm_updated = false;
+	bool st24_updated = false;
+	bool sumd_updated = false;
+	bool srxl_updated = false;
 
 	if (!((r_status_flags & PX4IO_P_STATUS_FLAGS_RC_SBUS) || (r_status_flags & PX4IO_P_STATUS_FLAGS_RC_PPM))) {
 		perf_begin(c_gather_dsm);
 
-		(void)dsm_port_input(&_rssi, &dsm_updated, &st24_updated, &sumd_updated);
+		(void)dsm_port_input(&_rssi, &dsm_updated, &st24_updated, &sumd_updated, &srxl_updated);
 
 		if (dsm_updated) {
 			PX4_ATOMIC_MODIFY_OR(r_status_flags, PX4IO_P_STATUS_FLAGS_RC_DSM);
@@ -308,6 +347,10 @@ controls_tick()
 
 		if (sumd_updated) {
 			PX4_ATOMIC_MODIFY_OR(r_status_flags, PX4IO_P_STATUS_FLAGS_RC_SUMD);
+		}
+
+		if (srxl_updated) {
+			PX4_ATOMIC_MODIFY_OR(r_status_flags, PX4IO_P_STATUS_FLAGS_RC_SRXL);
 		}
 
 		perf_end(c_gather_dsm);
@@ -330,7 +373,7 @@ controls_tick()
 	/*
 	 * If we received a new frame from any of the RC sources, process it.
 	 */
-	if (dsm_updated || sbus_updated || ppm_updated || st24_updated || sumd_updated) {
+	if (dsm_updated || sbus_updated || ppm_updated || st24_updated || sumd_updated || srxl_updated) {
 
 		/* record a bitmask of channels assigned */
 		unsigned assigned_channels = 0;
@@ -468,6 +511,7 @@ controls_tick()
 						PX4IO_P_STATUS_FLAGS_RC_PPM |
 						PX4IO_P_STATUS_FLAGS_RC_DSM |
 						PX4IO_P_STATUS_FLAGS_RC_SBUS |
+						PX4IO_P_STATUS_FLAGS_RC_SRXL |
 						PX4IO_P_STATUS_FLAGS_RC_ST24 |
 						PX4IO_P_STATUS_FLAGS_RC_SUMD));
 
