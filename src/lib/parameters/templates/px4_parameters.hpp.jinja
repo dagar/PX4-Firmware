@@ -12,16 +12,23 @@ namespace px4 { {# wrap the enum in a namespace, otherwise we get shadowing erro
 enum class params : uint16_t {
 	{# enums are guaranteed to start with 0 (if the value for the first is not
 	   specified), and then incremented by 1 (the implementation depends on that!)  #}
+	// float32 parameters
+{% set count = namespace(a=0) %}
 {%- for param in params %}
-
-
-
-
+	{%- if param.attrib["type"] == "FLOAT" %}
+	{% set count.a = count.a + 1 %}
 	{{ param.attrib["name"] }},
 
-
+	{%- endif %}
 {%- endfor %}
+	// {{ count.a }}
 
+	// int32 parameters
+{%- for param in params %}
+	{%- if param.attrib["type"] == "INT32" %}
+	{{ param.attrib["name"] }},
+	{%- endif %}
+{%- endfor %}
 };
 
 static constexpr param_info_s parameters[] = {

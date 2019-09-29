@@ -86,7 +86,9 @@
         "githubPullRequests.telemetry.enabled": false,
         "gitlens.advanced.telemetry.enabled": false,
         "files.associations": {
-                "*.jinja": "jinja"
+                "*.jinja": "jinja",
+                "*.tcc": "cpp",
+                "random": "cpp"
         },
         "search.exclude": {
                 "build/**": true
