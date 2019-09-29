@@ -62,7 +62,7 @@
 #include <systemlib/err.h>
 #include <uORB/topics/sensor_combined.h>
 
-static const char *sensor_name = "mag";
+static constexpr char sensor_name[] = "mag";
 static constexpr unsigned max_mags = 4;
 static constexpr float mag_sphere_radius = 0.2f;
 static unsigned int calibration_sides = 6;			///< The total number of sides

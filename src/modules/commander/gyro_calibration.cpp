@@ -60,9 +60,8 @@
 #include <parameters/param.h>
 #include <systemlib/err.h>
 
-static const char *sensor_name = "gyro";
-
-static const unsigned max_gyros = 3;
+static constexpr char sensor_name[] = "gyro";
+static constexpr unsigned max_gyros = 3;
 
 /// Data passed to calibration worker routine
 typedef struct  {
