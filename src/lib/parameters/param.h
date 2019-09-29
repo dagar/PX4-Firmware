@@ -447,7 +447,6 @@ union param_value_u {
  * instead.
  */
 struct param_info_s {
-	const char	*name;
 	union param_value_u val;
 };
 

@@ -13,7 +13,13 @@ enum class params : uint16_t {
 	{# enums are guaranteed to start with 0 (if the value for the first is not
 	   specified), and then incremented by 1 (the implementation depends on that!)  #}
 {%- for param in params %}
+
+
+
+
 	{{ param.attrib["name"] }},
+
+
 {%- endfor %}
 
 };
@@ -21,7 +27,6 @@ enum class params : uint16_t {
 static constexpr param_info_s parameters[] = {
 {% for param in params %}
 	{
-		"{{ param.attrib["name"] }}",
 	{%- if param.attrib["type"] == "FLOAT" %}
 		.val = {{ "{" }} .f = {{ param.attrib["default"] }} {{ "}" }},
 	{%- elif param.attrib["type"] == "INT32" %}
@@ -29,6 +34,12 @@ static constexpr param_info_s parameters[] = {
 	{%- endif %}
 	},
 {% endfor %}
+};
+
+static constexpr const char * parameters_name[] = {
+{% for param in params %}
+	"{{ param.attrib["name"] }}",
+{%- endfor -%}
 };
 
 static constexpr param_type_t parameters_type[] = {
@@ -43,6 +54,23 @@ static constexpr params parameters_volatile[] = {
 	params::{{ param.attrib["name"] }},
 	{%- endif -%}
 {% endfor %}
+};
+
+
+static constexpr float parameters_value_float32[] = {
+{% for param in params %}
+	{%- if param.attrib["type"] == "FLOAT" %}
+		{{ param.attrib["default"] }},
+	{%- endif -%}
+{%- endfor -%}
+};
+
+static constexpr int32_t parameters_value_int32[] = {
+{% for param in params %}
+	{%- if param.attrib["type"] == "INT32" %}
+		{{ param.attrib["default"] }},
+	{%- endif -%}
+{%- endfor -%}
 };
 
 
