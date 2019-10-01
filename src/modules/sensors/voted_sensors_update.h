@@ -155,14 +155,13 @@ private:
 		int subscription[SENSOR_COUNT_MAX] {-1, -1, -1, -1}; /**< raw sensor data subscription */
 		uint8_t priority[SENSOR_COUNT_MAX] {}; /**< sensor priority */
 		uint8_t last_best_vote{0}; /**< index of the latest best vote */
-		int subscription_count{0};
-		DataValidatorGroup voter{1};
+		int8_t subscription_count{0};
+		DataValidatorGroup voter{SENSOR_COUNT_MAX};
 		unsigned int last_failover_count{0};
 		bool enabled[SENSOR_COUNT_MAX] {true, true, true, true};
 	};
 
-	void initSensorClassLegacy(const orb_metadata *meta, SensorData &sensor_data, uint8_t sensor_count_max);
-	void initSensorClass(uORB::Subscription subs[], SensorData &sensor_data, uint8_t sensor_count_max);
+	void initSensorClass(const orb_metadata *meta, SensorData &sensor_data, uint8_t sensor_count_max);
 
 	/**
 	 * Poll the accelerometer for updated data.
