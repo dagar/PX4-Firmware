@@ -55,18 +55,6 @@ using namespace matrix;
 VotedSensorsUpdate::VotedSensorsUpdate(const Parameters &parameters, bool hil_enabled)
 	: _parameters(parameters), _hil_enabled(hil_enabled)
 {
-	memset(&_last_sensor_data, 0, sizeof(_last_sensor_data));
-	memset(&_last_magnetometer, 0, sizeof(_last_magnetometer));
-	memset(&_last_airdata, 0, sizeof(_last_airdata));
-	memset(&_last_accel_timestamp, 0, sizeof(_last_accel_timestamp));
-	memset(&_accel_diff, 0, sizeof(_accel_diff));
-	memset(&_gyro_diff, 0, sizeof(_gyro_diff));
-	memset(&_mag_angle_diff, 0, sizeof(_mag_angle_diff));
-
-	// initialise the publication variables
-	memset(&_corrections, 0, sizeof(_corrections));
-	memset(&_info, 0, sizeof(_info));
-
 	for (unsigned i = 0; i < 3; i++) {
 		_corrections.gyro_scale_0[i] = 1.0f;
 		_corrections.accel_scale_0[i] = 1.0f;
@@ -105,28 +93,17 @@ int VotedSensorsUpdate::init(sensor_combined_s &raw)
 
 void VotedSensorsUpdate::initializeSensors()
 {
-	initSensorClass(ORB_ID(sensor_gyro), _gyro, GYRO_COUNT_MAX);
-	initSensorClass(ORB_ID(sensor_mag), _mag, MAG_COUNT_MAX);
-	initSensorClass(ORB_ID(sensor_accel), _accel, ACCEL_COUNT_MAX);
-	initSensorClass(ORB_ID(sensor_baro), _baro, BARO_COUNT_MAX);
+	initSensorClassLegacy(ORB_ID(sensor_gyro), _gyro, GYRO_COUNT_MAX);
+
+	initSensorClass(_sensor_mag_sub, _mag, MAG_COUNT_MAX);
+	initSensorClass(_sensor_accel_sub, _accel, ACCEL_COUNT_MAX);
+	initSensorClass(_sensor_baro_sub, _baro, BARO_COUNT_MAX);
 }
 
 void VotedSensorsUpdate::deinit()
 {
 	for (int i = 0; i < _gyro.subscription_count; i++) {
 		orb_unsubscribe(_gyro.subscription[i]);
-	}
-
-	for (int i = 0; i < _accel.subscription_count; i++) {
-		orb_unsubscribe(_accel.subscription[i]);
-	}
-
-	for (int i = 0; i < _mag.subscription_count; i++) {
-		orb_unsubscribe(_mag.subscription[i]);
-	}
-
-	for (int i = 0; i < _baro.subscription_count; i++) {
-		orb_unsubscribe(_baro.subscription[i]);
 	}
 }
 
@@ -400,12 +377,14 @@ void VotedSensorsUpdate::parametersUpdate()
 	 * Because we store the device id in _mag_device_id, we need to get the id via uorb topic since
 	 * the DevHandle method does not work on POSIX.
 	 */
-	for (int topic_instance = 0; topic_instance < MAG_COUNT_MAX
+	for (uint8_t topic_instance = 0; topic_instance < MAG_COUNT_MAX
 	     && topic_instance < _mag.subscription_count; ++topic_instance) {
 
-		struct mag_report report;
+		uORB::Subscription mag_sub{ORB_ID(sensor_mag), topic_instance};
 
-		if (orb_copy(ORB_ID(sensor_mag), _mag.subscription[topic_instance], &report) != 0) {
+		sensor_mag_s report{};
+
+		if (!mag_sub.copy(&report)) {
 			continue;
 		}
 
@@ -531,18 +510,10 @@ void VotedSensorsUpdate::accelPoll(struct sensor_combined_s &raw)
 	float *offsets[] = {_corrections.accel_offset_0, _corrections.accel_offset_1, _corrections.accel_offset_2 };
 	float *scales[] = {_corrections.accel_scale_0, _corrections.accel_scale_1, _corrections.accel_scale_2 };
 
-	for (int uorb_index = 0; uorb_index < _accel.subscription_count; uorb_index++) {
-		bool accel_updated;
-		orb_check(_accel.subscription[uorb_index], &accel_updated);
+	for (uint8_t uorb_index = 0; uorb_index < _accel.subscription_count; uorb_index++) {
+		sensor_accel_s accel_report;
 
-		if (accel_updated) {
-			sensor_accel_s accel_report;
-
-			int ret = orb_copy(ORB_ID(sensor_accel), _accel.subscription[uorb_index], &accel_report);
-
-			if (ret != PX4_OK || accel_report.timestamp == 0) {
-				continue; //ignore invalid data
-			}
+		if (_sensor_accel_sub[uorb_index].update(&accel_report)) {
 
 			if (!_accel.enabled[uorb_index]) {
 				continue;
@@ -550,9 +521,7 @@ void VotedSensorsUpdate::accelPoll(struct sensor_combined_s &raw)
 
 			// First publication with data
 			if (_accel.priority[uorb_index] == 0) {
-				int32_t priority = 0;
-				orb_priority(_accel.subscription[uorb_index], &priority);
-				_accel.priority[uorb_index] = (uint8_t)priority;
+				_accel.priority[uorb_index] = _sensor_accel_sub[uorb_index].get_priority();
 			}
 
 			_accel_device_id[uorb_index] = accel_report.device_id;
@@ -638,8 +607,8 @@ void VotedSensorsUpdate::gyroPoll(struct sensor_combined_s &raw)
 	float *offsets[] = {_corrections.gyro_offset_0, _corrections.gyro_offset_1, _corrections.gyro_offset_2 };
 	float *scales[] = {_corrections.gyro_scale_0, _corrections.gyro_scale_1, _corrections.gyro_scale_2 };
 
-	for (int uorb_index = 0; uorb_index < _gyro.subscription_count; uorb_index++) {
-		bool gyro_updated;
+	for (uint8_t uorb_index = 0; uorb_index < _gyro.subscription_count; uorb_index++) {
+		bool gyro_updated = false;
 		orb_check(_gyro.subscription[uorb_index], &gyro_updated);
 
 		if (gyro_updated) {
@@ -743,18 +712,11 @@ void VotedSensorsUpdate::gyroPoll(struct sensor_combined_s &raw)
 
 void VotedSensorsUpdate::magPoll(vehicle_magnetometer_s &magnetometer)
 {
-	for (int uorb_index = 0; uorb_index < _mag.subscription_count; uorb_index++) {
-		bool mag_updated;
-		orb_check(_mag.subscription[uorb_index], &mag_updated);
+	for (uint8_t uorb_index = 0; uorb_index < _mag.subscription_count; uorb_index++) {
 
-		if (mag_updated) {
-			struct mag_report mag_report;
+		sensor_mag_s mag_report;
 
-			int ret = orb_copy(ORB_ID(sensor_mag), _mag.subscription[uorb_index], &mag_report);
-
-			if (ret != PX4_OK || mag_report.timestamp == 0) {
-				continue; //ignore invalid data
-			}
+		if (_sensor_mag_sub[uorb_index].update(&mag_report)) {
 
 			if (!_mag.enabled[uorb_index]) {
 				continue;
@@ -762,9 +724,7 @@ void VotedSensorsUpdate::magPoll(vehicle_magnetometer_s &magnetometer)
 
 			// First publication with data
 			if (_mag.priority[uorb_index] == 0) {
-				int32_t priority = 0;
-				orb_priority(_mag.subscription[uorb_index], &priority);
-				_mag.priority[uorb_index] = (uint8_t)priority;
+				_mag.priority[uorb_index] = _sensor_mag_sub[uorb_index].get_priority();
 
 				/* force a scale and offset update the first time we get data */
 				parametersUpdate();
@@ -803,18 +763,11 @@ void VotedSensorsUpdate::baroPoll(vehicle_air_data_s &airdata)
 	float *offsets[] = {&_corrections.baro_offset_0, &_corrections.baro_offset_1, &_corrections.baro_offset_2 };
 	float *scales[] = {&_corrections.baro_scale_0, &_corrections.baro_scale_1, &_corrections.baro_scale_2 };
 
-	for (int uorb_index = 0; uorb_index < _baro.subscription_count; uorb_index++) {
-		bool baro_updated;
-		orb_check(_baro.subscription[uorb_index], &baro_updated);
+	for (uint8_t uorb_index = 0; uorb_index < _baro.subscription_count; uorb_index++) {
 
-		if (baro_updated) {
-			sensor_baro_s baro_report;
+		sensor_baro_s baro_report;
 
-			int ret = orb_copy(ORB_ID(sensor_baro), _baro.subscription[uorb_index], &baro_report);
-
-			if (ret != PX4_OK || baro_report.timestamp == 0) {
-				continue; //ignore invalid data
-			}
+		if (_sensor_baro_sub[uorb_index].update(&baro_report)) {
 
 			// Convert from millibar to Pa
 			float corrected_pressure = 100.0f * baro_report.pressure;
@@ -827,9 +780,7 @@ void VotedSensorsUpdate::baroPoll(vehicle_air_data_s &airdata)
 
 			// First publication with data
 			if (_baro.priority[uorb_index] == 0) {
-				int32_t priority = 0;
-				orb_priority(_baro.subscription[uorb_index], &priority);
-				_baro.priority[uorb_index] = (uint8_t)priority;
+				_baro.priority[uorb_index] = _sensor_baro_sub[uorb_index].get_priority();
 			}
 
 			_baro_device_id[uorb_index] = baro_report.device_id;
@@ -966,7 +917,8 @@ bool VotedSensorsUpdate::checkFailover(SensorData &sensor, const char *sensor_na
 	return false;
 }
 
-void VotedSensorsUpdate::initSensorClass(const struct orb_metadata *meta, SensorData &sensor_data,
+void
+VotedSensorsUpdate::initSensorClassLegacy(const struct orb_metadata *meta, SensorData &sensor_data,
 		uint8_t sensor_count_max)
 {
 	int max_sensor_index = -1;
@@ -985,6 +937,36 @@ void VotedSensorsUpdate::initSensorClass(const struct orb_metadata *meta, Sensor
 				/* the first always exists, but for each further sensor, add a new validator */
 				if (!sensor_data.voter.add_new_validator()) {
 					PX4_ERR("failed to add validator for sensor %s %i", meta->o_name, i);
+				}
+			}
+		}
+	}
+
+	// never decrease the sensor count, as we could end up with mismatching validators
+	if (max_sensor_index + 1 > sensor_data.subscription_count) {
+		sensor_data.subscription_count = max_sensor_index + 1;
+	}
+}
+
+void
+VotedSensorsUpdate::initSensorClass(uORB::Subscription subs[], SensorData &sensor_data, uint8_t sensor_count_max)
+{
+	int max_sensor_index = -1;
+
+	for (uint8_t i = 0; i < sensor_count_max; i++) {
+		if (!subs[i].valid()) {
+			continue;
+		}
+
+		max_sensor_index = i;
+
+		if (sensor_data.subscription[i] != SensorData::NON_FD_SUBSCRIPTION) {
+			sensor_data.subscription[i] = SensorData::NON_FD_SUBSCRIPTION;
+
+			if (i > 0) {
+				/* the first always exists, but for each further sensor, add a new validator */
+				if (!sensor_data.voter.add_new_validator()) {
+					PX4_ERR("failed to add validator for sensor %i", i);
 				}
 			}
 		}

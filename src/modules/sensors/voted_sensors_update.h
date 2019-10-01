@@ -54,6 +54,7 @@
 
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationQueued.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/sensor_correction.h>
@@ -148,30 +149,20 @@ public:
 private:
 
 	struct SensorData {
-		SensorData()
-			: last_best_vote(0),
-			  subscription_count(0),
-			  voter(1),
-			  last_failover_count(0)
-		{
-			for (unsigned i = 0; i < SENSOR_COUNT_MAX; i++) {
-				enabled[i] = true;
-				subscription[i] = -1;
-				priority[i] = 0;
-			}
-		}
 
-		bool enabled[SENSOR_COUNT_MAX];
+		static constexpr int NON_FD_SUBSCRIPTION = -2;
 
-		int subscription[SENSOR_COUNT_MAX]; /**< raw sensor data subscription */
-		uint8_t priority[SENSOR_COUNT_MAX]; /**< sensor priority */
-		uint8_t last_best_vote; /**< index of the latest best vote */
-		int subscription_count;
-		DataValidatorGroup voter;
-		unsigned int last_failover_count;
+		int subscription[SENSOR_COUNT_MAX] {-1, -1, -1, -1}; /**< raw sensor data subscription */
+		uint8_t priority[SENSOR_COUNT_MAX] {}; /**< sensor priority */
+		uint8_t last_best_vote{0}; /**< index of the latest best vote */
+		int subscription_count{0};
+		DataValidatorGroup voter{1};
+		unsigned int last_failover_count{0};
+		bool enabled[SENSOR_COUNT_MAX] {true, true, true, true};
 	};
 
-	void initSensorClass(const orb_metadata *meta, SensorData &sensor_data, uint8_t sensor_count_max);
+	void initSensorClassLegacy(const orb_metadata *meta, SensorData &sensor_data, uint8_t sensor_count_max);
+	void initSensorClass(uORB::Subscription subs[], SensorData &sensor_data, uint8_t sensor_count_max);
 
 	/**
 	 * Poll the accelerometer for updated data.
@@ -246,6 +237,25 @@ private:
 	SensorData _gyro {};
 	SensorData _mag {};
 	SensorData _baro {};
+
+	uORB::Subscription _sensor_accel_sub[ACCEL_COUNT_MAX] {
+		{ORB_ID(sensor_accel), 0},
+		{ORB_ID(sensor_accel), 1},
+		{ORB_ID(sensor_accel), 2}
+	};
+
+	uORB::Subscription _sensor_baro_sub[BARO_COUNT_MAX] {
+		{ORB_ID(sensor_baro), 0},
+		{ORB_ID(sensor_baro), 1},
+		{ORB_ID(sensor_baro), 2}
+	};
+
+	uORB::Subscription _sensor_mag_sub[MAG_COUNT_MAX] {
+		{ORB_ID(sensor_mag), 0},
+		{ORB_ID(sensor_mag), 1},
+		{ORB_ID(sensor_mag), 2},
+		{ORB_ID(sensor_mag), 3}
+	};
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 

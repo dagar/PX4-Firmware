@@ -123,6 +123,8 @@ public:
 	uint8_t		get_instance() const { return _instance; }
 	orb_id_t	get_topic() const { return _meta; }
 
+	uint8_t		get_priority() { return (valid() ? _node->get_priority() : 0); }
+
 protected:
 
 	friend class SubscriptionCallback;

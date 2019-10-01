@@ -193,7 +193,7 @@ public:
 
 	uint8_t get_instance() const { return _instance; }
 
-	int get_priority() const { return _priority; }
+	uint8_t get_priority() const { return _priority; }
 	void set_priority(uint8_t priority) { _priority = priority; }
 
 	/**
