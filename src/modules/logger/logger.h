@@ -69,7 +69,9 @@ enum class SDLogProfileMask : int32_t {
 	HIGH_RATE =             1 << 4,
 	DEBUG_TOPICS =          1 << 5,
 	SENSOR_COMPARISON =     1 << 6,
-	VISION_AND_AVOIDANCE =  1 << 7
+	VISION_AND_AVOIDANCE =  1 << 7,
+
+	ALL =               	1 << 31,
 };
 
 enum class MissionLogType : int32_t {
@@ -327,6 +329,7 @@ private:
 	 */
 	void initialize_configured_topics();
 
+	void add_all_topics();
 	void add_default_topics();
 	void add_estimator_replay_topics();
 	void add_thermal_calibration_topics();

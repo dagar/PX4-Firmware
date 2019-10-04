@@ -506,6 +506,15 @@ bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
 	return updated;
 }
 
+void Logger::add_all_topics()
+{
+	const orb_metadata *const *topics = orb_get_topics();
+
+	for (size_t i = 0; i < orb_topics_count(); i++) {
+		add_topic(topics[i]->o_name, 1000); // 1 Hz
+	}
+}
+
 void Logger::add_default_topics()
 {
 	add_topic("actuator_controls_0", 100);
@@ -556,25 +565,6 @@ void Logger::add_default_topics()
 	add_topic_multi("telemetry_status");
 	add_topic_multi("vehicle_gps_position");
 	add_topic_multi("wind_estimate", 200);
-
-#ifdef CONFIG_ARCH_BOARD_PX4_SITL
-
-	add_topic("actuator_controls_virtual_fw");
-	add_topic("actuator_controls_virtual_mc");
-	add_topic("fw_virtual_attitude_setpoint");
-	add_topic("mc_virtual_attitude_setpoint");
-	add_topic("offboard_control_mode");
-	add_topic("position_controller_status");
-	add_topic("time_offset");
-	add_topic("vehicle_angular_velocity", 10);
-	add_topic("vehicle_attitude_groundtruth", 10);
-	add_topic("vehicle_global_position_groundtruth", 100);
-	add_topic("vehicle_local_position_groundtruth", 100);
-	add_topic("vehicle_roi");
-
-	add_topic_multi("multirotor_motor_limits");
-
-#endif /* CONFIG_ARCH_BOARD_PX4_SITL */
 }
 
 void Logger::add_high_rate_topics()
@@ -747,6 +737,11 @@ void Logger::initialize_configured_topics()
 
 	// load appropriate topics for profile
 	// the order matters: if several profiles add the same topic, the logging rate of the last one will be used
+
+	if (sdlog_profile & SDLogProfileMask::ALL) {
+		add_all_topics();
+	}
+
 	if (sdlog_profile & SDLogProfileMask::DEFAULT) {
 		add_default_topics();
 	}

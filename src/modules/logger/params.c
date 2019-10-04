@@ -110,7 +110,7 @@ PARAM_DEFINE_INT32(SDLOG_MISSION, 0);
  * 7 : Topics for computer vision and collision avoidance
  *
  * @min 0
- * @max 255
+ * @max 2147483648
  * @bit 0 Default set (general log analysis)
  * @bit 1 Estimator replay (EKF2)
  * @bit 2 Thermal calibration
@@ -119,6 +119,7 @@ PARAM_DEFINE_INT32(SDLOG_MISSION, 0);
  * @bit 5 Debug
  * @bit 6 Sensor comparison
  * @bit 7 Computer Vision and Avoidance
+ * @bit 31 All topics (1 Hz)
  * @reboot_required true
  * @group SD Logging
  */
