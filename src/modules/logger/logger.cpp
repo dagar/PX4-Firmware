@@ -552,10 +552,17 @@ void Logger::add_default_topics()
 
 	add_topic_multi("actuator_outputs", 100);
 	add_topic_multi("battery_status", 500);
-	add_topic_multi("distance_sensor", 100);
 	add_topic_multi("telemetry_status");
 	add_topic_multi("vehicle_gps_position");
 	add_topic_multi("wind_estimate", 200);
+
+	// log all sensors by default at a low rate
+	add_topic_multi("differential_pressure", 500);
+	add_topic_multi("distance_sensor", 500);
+	add_topic_multi("sensor_accel", 500);
+	add_topic_multi("sensor_baro", 500);
+	add_topic_multi("sensor_gyro", 500);
+	add_topic_multi("sensor_mag", 500);
 
 #ifdef CONFIG_ARCH_BOARD_PX4_SITL
 
