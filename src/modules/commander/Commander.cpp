@@ -352,6 +352,9 @@ int commander_main(int argc, char *argv[])
 			} else if (!strcmp(argv[2], "airspeed")) {
 				calib_ret = do_airspeed_calibration(&mavlink_log_pub);
 
+			} else if (!strcmp(argv[2], "airspeed_quick")) {
+				calib_ret = do_airspeed_calibration(&mavlink_log_pub, true);
+
 			} else {
 				PX4_ERR("argument %s unsupported.", argv[2]);
 			}

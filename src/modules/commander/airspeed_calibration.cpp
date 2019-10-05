@@ -64,11 +64,11 @@ static void feedback_calibration_failed(orb_advert_t *mavlink_log_pub)
 	calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, sensor_name);
 }
 
-int do_airspeed_calibration(orb_advert_t *mavlink_log_pub)
+int do_airspeed_calibration(orb_advert_t *mavlink_log_pub, bool quick)
 {
 	int result = PX4_OK;
 	unsigned calibration_counter = 0;
-	const unsigned maxcount = 2400;
+	const unsigned maxcount = quick ? 240 : 2400;
 
 	/* give directions */
 	calibration_log_info(mavlink_log_pub, CAL_QGC_STARTED_MSG, sensor_name);
@@ -197,77 +197,79 @@ int do_airspeed_calibration(orb_advert_t *mavlink_log_pub)
 
 	calibration_log_info(mavlink_log_pub, "[cal] Offset of %d Pascal", (int)diff_pres_offset);
 
-	/* wait 500 ms to ensure parameter propagated through the system */
-	px4_usleep(500 * 1000);
+	if (!quick) {
+		/* wait 500 ms to ensure parameter propagated through the system */
+		px4_usleep(500 * 1000);
 
-	calibration_log_critical(mavlink_log_pub, "[cal] Blow across front of pitot without touching");
+		calibration_log_critical(mavlink_log_pub, "[cal] Blow across front of pitot without touching");
 
-	calibration_counter = 0;
+		calibration_counter = 0;
 
-	/* just take a few samples and make sure pitot tubes are not reversed, timeout after ~30 seconds */
-	while (calibration_counter < maxcount) {
+		/* just take a few samples and make sure pitot tubes are not reversed, timeout after ~30 seconds */
+		while (calibration_counter < maxcount) {
 
-		if (calibrate_cancel_check(mavlink_log_pub, cancel_sub)) {
-			goto error_return;
-		}
+			if (calibrate_cancel_check(mavlink_log_pub, cancel_sub)) {
+				goto error_return;
+			}
 
-		/* wait blocking for new data */
-		px4_pollfd_struct_t fds[1];
-		fds[0].fd = diff_pres_sub;
-		fds[0].events = POLLIN;
+			/* wait blocking for new data */
+			px4_pollfd_struct_t fds[1];
+			fds[0].fd = diff_pres_sub;
+			fds[0].events = POLLIN;
 
-		int poll_ret = px4_poll(fds, 1, 1000);
+			int poll_ret = px4_poll(fds, 1, 1000);
 
-		if (poll_ret) {
-			orb_copy(ORB_ID(differential_pressure), diff_pres_sub, &diff_pres);
+			if (poll_ret) {
+				orb_copy(ORB_ID(differential_pressure), diff_pres_sub, &diff_pres);
 
-			if (fabsf(diff_pres.differential_pressure_filtered_pa) > 50.0f) {
-				if (diff_pres.differential_pressure_filtered_pa > 0) {
-					calibration_log_info(mavlink_log_pub, "[cal] Positive pressure: OK (%d Pa)",
-							     (int)diff_pres.differential_pressure_filtered_pa);
-					break;
+				if (fabsf(diff_pres.differential_pressure_filtered_pa) > 50.0f) {
+					if (diff_pres.differential_pressure_filtered_pa > 0) {
+						calibration_log_info(mavlink_log_pub, "[cal] Positive pressure: OK (%d Pa)",
+								     (int)diff_pres.differential_pressure_filtered_pa);
+						break;
 
-				} else {
-					/* do not allow negative values */
-					calibration_log_critical(mavlink_log_pub, "[cal] Negative pressure difference detected (%d Pa)",
-								 (int)diff_pres.differential_pressure_filtered_pa);
-					calibration_log_critical(mavlink_log_pub, "[cal] Swap static and dynamic ports!");
+					} else {
+						/* do not allow negative values */
+						calibration_log_critical(mavlink_log_pub, "[cal] Negative pressure difference detected (%d Pa)",
+									 (int)diff_pres.differential_pressure_filtered_pa);
+						calibration_log_critical(mavlink_log_pub, "[cal] Swap static and dynamic ports!");
 
-					/* the user setup is wrong, wipe the calibration to force a proper re-calibration */
-					diff_pres_offset = 0.0f;
+						/* the user setup is wrong, wipe the calibration to force a proper re-calibration */
+						diff_pres_offset = 0.0f;
 
-					if (param_set(param_find("SENS_DPRES_OFF"), &(diff_pres_offset))) {
-						calibration_log_critical(mavlink_log_pub, CAL_ERROR_SET_PARAMS_MSG, 1);
+						if (param_set(param_find("SENS_DPRES_OFF"), &(diff_pres_offset))) {
+							calibration_log_critical(mavlink_log_pub, CAL_ERROR_SET_PARAMS_MSG, 1);
+							goto error_return;
+						}
+
+						/* save */
+						calibration_log_info(mavlink_log_pub, CAL_QGC_PROGRESS_MSG, 0);
+						param_save_default();
+
+						feedback_calibration_failed(mavlink_log_pub);
 						goto error_return;
 					}
-
-					/* save */
-					calibration_log_info(mavlink_log_pub, CAL_QGC_PROGRESS_MSG, 0);
-					param_save_default();
-
-					feedback_calibration_failed(mavlink_log_pub);
-					goto error_return;
 				}
+
+				if (calibration_counter % 500 == 0) {
+					calibration_log_info(mavlink_log_pub, "[cal] Create air pressure! (got %d, wanted: 50 Pa)",
+							     (int)diff_pres.differential_pressure_filtered_pa);
+					tune_neutral(true);
+				}
+
+				calibration_counter++;
+
+			} else if (poll_ret == 0) {
+				/* any poll failure for 1s is a reason to abort */
+				feedback_calibration_failed(mavlink_log_pub);
+				goto error_return;
 			}
+		}
 
-			if (calibration_counter % 500 == 0) {
-				calibration_log_info(mavlink_log_pub, "[cal] Create air pressure! (got %d, wanted: 50 Pa)",
-						     (int)diff_pres.differential_pressure_filtered_pa);
-				tune_neutral(true);
-			}
-
-			calibration_counter++;
-
-		} else if (poll_ret == 0) {
-			/* any poll failure for 1s is a reason to abort */
+		if (calibration_counter == maxcount) {
 			feedback_calibration_failed(mavlink_log_pub);
 			goto error_return;
 		}
-	}
-
-	if (calibration_counter == maxcount) {
-		feedback_calibration_failed(mavlink_log_pub);
-		goto error_return;
 	}
 
 	calibration_log_info(mavlink_log_pub, CAL_QGC_PROGRESS_MSG, 100);

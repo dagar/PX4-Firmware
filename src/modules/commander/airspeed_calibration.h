@@ -42,6 +42,6 @@
 #include <stdint.h>
 #include <uORB/uORB.h>
 
-int do_airspeed_calibration(orb_advert_t *mavlink_log_pub);
+int do_airspeed_calibration(orb_advert_t *mavlink_log_pub, bool quick = false);
 
 #endif /* AIRSPEED_CALIBRATION_H_ */
