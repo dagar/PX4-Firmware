@@ -50,30 +50,36 @@ Register : uint8_t {
 	PRS_CFG		= 0x06,
 	TMP_CFG		= 0x07,
 	MEAS_CFG	= 0x08,
-	CFG_REG		= 0x09,
-	INT_STS		= 0x0A,
-	FIFO_STS	= 0x0B,
+
 	RESET		= 0x0C,
-	Product_ID	= 0x0D,
+	ID		= 0x0D,
 
 	COEF		= 0x10,
+	//	c0	= 0x10
+	//	 .
+	//	c30	= 0x21
 
 	COEF_SRCE	= 0x28,
 
 };
 
-struct Calibration {
-	int16_t C0;	// 12bit
-	int16_t C1;	// 12bit
-	int32_t C00;	// 20bit
-	int32_t C10;	// 20bit
-	int16_t C01;	// 16bit
-	int16_t C11;	// 16bit
-	int16_t C20;	// 16bit
-	int16_t C21;	// 16bit
-	int16_t C30;	// 16bit
 
-	uint8_t temp_source;
+enum PRS_CFG : uint8_t
+{
+	PM_RATE_32HZ	= Bit6 | Bit4,	// 101 - 32 measurements pr. sec.
+	PM_PRC_32	= Bit1 | Bit0,	// 0011 // 8 times
+};
+
+struct CalibrationCoefficients {
+	int16_t c0;	// 12bit
+	int16_t c1;	// 12bit
+	int32_t c00;	// 20bit
+	int32_t c10;	// 20bit
+	int16_t c01;	// 16bit
+	int16_t c11;	// 16bit
+	int16_t c20;	// 16bit
+	int16_t c21;	// 16bit
+	int16_t c30;	// 16bit
 };
 
 } // namespace Infineon_DPS310

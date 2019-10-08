@@ -35,12 +35,6 @@
 
 #include <px4_getopt.h>
 
-/*
- * Driver 'main' command.
- */
-extern "C" __EXPORT int dps310_main(int argc, char *argv[]);
-
-
 enum DPS310_BUS {
 	DPS310_BUS_ALL = 0,
 	DPS310_BUS_I2C_INTERNAL,
@@ -48,14 +42,10 @@ enum DPS310_BUS {
 	DPS310_BUS_SPI
 };
 
-/* interface factories */
 extern device::Device *DPS310_SPI_interface(int bus);
 extern device::Device *DPS310_I2C_interface(int bus);
 typedef device::Device *(*DPS310_constructor)(int);
 
-/**
- * Local functions in support of the shell command.
- */
 namespace dps310
 {
 
@@ -78,16 +68,11 @@ struct dps310_bus_option {
 struct dps310_bus_option *find_bus(enum DPS310_BUS busid);
 
 bool	start_bus(struct dps310_bus_option &bus);
-
 int	start(enum DPS310_BUS busid);
 int	info();
 int	usage();
 
-/**
- * start driver for a specific bus option
- */
-bool
-start_bus(struct dps310_bus_option &bus)
+bool start_bus(struct dps310_bus_option &bus)
 {
 	if (bus.dev != nullptr) {
 		errx(1, "bus option already started");
@@ -97,7 +82,7 @@ start_bus(struct dps310_bus_option &bus)
 
 	if (interface->init() != OK) {
 		delete interface;
-		warnx("no device on bus %u", (unsigned)bus.busid);
+		PX4_WARN("no device on bus %u", (unsigned)bus.busid);
 		return false;
 	}
 
@@ -112,19 +97,12 @@ start_bus(struct dps310_bus_option &bus)
 	return true;
 }
 
-/**
- * Start the driver.
- *
- * This function call only returns once the driver
- * is either successfully up and running or failed to start.
- */
-int
-start(enum DPS310_BUS busid)
+int start(enum DPS310_BUS busid)
 {
 	bool started = false;
 
 	for (unsigned i = 0; i < NUM_BUS_OPTIONS; i++) {
-		if (busid == DPS310_BUS_ALL && bus_options[i].dev != NULL) {
+		if (busid == DPS310_BUS_ALL && bus_options[i].dev != nullptr) {
 			// this device is already started
 			continue;
 		}
@@ -144,9 +122,6 @@ start(enum DPS310_BUS busid)
 	return PX4_OK;
 }
 
-/**
- * find a bus structure for a busid
- */
 struct dps310_bus_option *find_bus(enum DPS310_BUS busid)
 {
 	for (unsigned i = 0; i < NUM_BUS_OPTIONS; i++) {
@@ -161,11 +136,7 @@ struct dps310_bus_option *find_bus(enum DPS310_BUS busid)
 	return nullptr;
 }
 
-/**
- * Print a little info about the driver.
- */
-int
-info()
+int info()
 {
 	for (uint8_t i = 0; i < NUM_BUS_OPTIONS; i++) {
 		struct dps310_bus_option &bus = bus_options[i];
@@ -178,8 +149,7 @@ info()
 	return 0;
 }
 
-int
-usage()
+int usage()
 {
 	PX4_INFO("missing command: try 'start', 'info', 'test', 'reset'");
 	PX4_INFO("options:");
@@ -193,8 +163,7 @@ usage()
 
 } // namespace
 
-int
-dps310_main(int argc, char *argv[])
+extern "C" __EXPORT int dps310_main(int argc, char *argv[])
 {
 	enum DPS310_BUS busid = DPS310_BUS_ALL;
 
@@ -227,17 +196,10 @@ dps310_main(int argc, char *argv[])
 
 	const char *verb = argv[myoptind];
 
-	/*
-	 * Start/load the driver.
-	 */
 	if (!strcmp(verb, "start")) {
 		return dps310::start(busid);
-	}
 
-	/*
-	 * Print driver information.
-	 */
-	if (!strcmp(verb, "info")) {
+	} else if (!strcmp(verb, "info")) {
 		return dps310::info();
 	}
 

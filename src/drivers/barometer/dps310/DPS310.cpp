@@ -39,19 +39,17 @@ DPS310::DPS310(device::Device *interface) :
 	ScheduledWorkItem(px4::device_bus_to_wq(interface->get_device_id())),
 	_px4_barometer(interface->get_device_id()),
 	_interface(interface),
-	_sample_perf(perf_alloc(PC_ELAPSED, "dps310: read")),
-	_sample_interval_perf(perf_alloc(PC_INTERVAL, "dps310: read interval")),
-	_comms_errors(perf_alloc(PC_COUNT, "dps310: comm errors"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_sample_interval_perf(perf_alloc(PC_INTERVAL, MODULE_NAME": read interval")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": comm errors"))
 {
 	_px4_barometer.set_device_type(DRV_BARO_DEVTYPE_DPS310);
 }
 
 DPS310::~DPS310()
 {
-	// make sure we are truly inactive
 	stop();
 
-	// free perf counters
 	perf_free(_sample_perf);
 	perf_free(_sample_interval_perf);
 	perf_free(_comms_errors);
@@ -62,9 +60,8 @@ DPS310::~DPS310()
 int
 DPS310::init()
 {
-	uint8_t id = RegisterRead(Register::Product_ID);
-
-	if (Infineon_DPS310::ID != id) {
+	if (RegisterRead(Register::Product_ID) != Infineon_DPS310::ID) {
+		PX4_ERR("Product_ID mismatch");
 		return PX4_ERROR;
 	}
 
@@ -77,20 +74,16 @@ DPS310::init()
 	return PX4_OK;
 }
 
-/*
-  handle bit width for 16 bit config registers
- */
-static void fix_config_bits16(int16_t &v, uint8_t bits)
+// handle bit width for 16 bit config registers
+static constexpr void fix_config_bits16(int16_t &v, uint8_t bits)
 {
 	if (v > int16_t((1U << (bits - 1)) - 1)) {
 		v = v - (1U << bits);
 	}
 }
 
-/*
-  handle bit width for 32 bit config registers
- */
-static void fix_config_bits32(int32_t &v, uint8_t bits)
+// handle bit width for 32 bit config registers
+static constexpr void fix_config_bits32(int32_t &v, uint8_t bits)
 {
 	if (v > int32_t((1U << (bits - 1)) - 1)) {
 		v = v - (1U << bits);
@@ -100,13 +93,48 @@ static void fix_config_bits32(int32_t &v, uint8_t bits)
 int
 DPS310::reset()
 {
+	// TODO: check sensor ready bit SENSOR_RDY
+
 	// read calibration data
+
+	// 1. Read the pressure calibration coefficients (c00, c10, c20, c30, c01, c11, and c21) from the Calibration Coefficient register.
+	//   Note: The coefficients read from the coefficient register are 2's complement numbers.
+
+	// TODO: check COEF_RDY (Register::MEAS_CFG) first
 	uint8_t buf[18] {};
+
+	struct CalibrationCoefficients {
+		uint8_t c0;	// 0x10 c0 [11:4]
+		uint8_t c0_c1;	// c0 [3:0] c1 [11:8]
+		uint8_t c1;	// 0x12 c1[7:0]
+
+		uint8_t c00;	// 0x13 c00 [19:12]
+		uint8_t c00;	// 0x14 c00 [11:4]
+		uint8_t c00_c10;	// c00 [3:0]
+		uint8_t c10;	// 20bit
+		uint8_t c01;	// 16bit
+		uint8_t c11;	// 16bit
+		uint8_t c20;	// 16bit
+		uint8_t c21;	// 16bit
+		uint8_t c30;	// 16bit
+	};
 
 	if (_interface->read((uint8_t)Register::COEF, &buf, 18)) {
 		return false;
 	}
 
+	// Note: Generate the decimal numbers out of the calibration coefficients registers data:
+	// C20 := reg0x1D + reg0x1C * 2^ 8
+	// if (C20 > (2^15 - 1))
+	//	C20 := C20 - 2^16
+	// end if
+
+	// C0 := (reg0x10 * 2^ 4) + ((reg0x11 / 2^4) & 0x0F)
+	// if (C0 > (2^11 - 1))
+	//	C0 := C0 - 2^12
+	// end if
+
+	// Note: The coefficients read from the coefficient register are 12 bit 2 ́s complement numbers.
 	_calibration.C0  = (buf[0] << 4) + ((buf[1] >> 4) & 0x0F);
 	_calibration.C1  = (buf[2] + ((buf[1] & 0x0F) << 8));
 	_calibration.C00 = ((buf[4] << 4) + (buf[3] << 12)) + ((buf[5] >> 4) & 0x0F);
@@ -127,14 +155,24 @@ DPS310::reset()
 	fix_config_bits16(_calibration.C21, 16);
 	fix_config_bits16(_calibration.C30, 16);
 
+	// 2. Choose scaling factors kT (for temperature) and kP (for pressure) based on the
+	//   chosen precision rate. The scaling factors are listed in Table 9.
+
+	// 3. Read the pressure and temperature result from the registers or FIFO.
+
+	// 4. Calculate scaled measurement results.
+		// Traw_sc = Traw/kT;
+		// Praw_sc = Praw/kP;
+
+
+
+
 	// get calibration source
 	if (_interface->read((uint8_t)Register::COEF_SRCE, &_calibration.temp_source, 1)) {
 		return PX4_ERROR;
 	}
 
 	_calibration.temp_source &= 0x80;
-
-
 
 	RegisterWrite(Register::CFG_REG, 0x0C);		// shift for 16x oversampling
 	RegisterWrite(Register::PRS_CFG, 0x54);		// 32 Hz, 16x oversample
@@ -220,6 +258,12 @@ DPS310::Run()
 
 	//float P_comp_Pa = c00 + P_raw_sc * (c10 + P_raw_sc * (c20 + P_raw_sc * c30)) + T_raw_sc * c01 + T_raw_sc * P_raw_sc * (c11 + P_raw_sc * c21);
 
+
+	// 5. Calculate compensated measurement results.
+	// Pcomp(Pa) = c00 + Praw_sc*(c10 + Praw_sc *(c20+ Praw_sc *c30)) + Traw_sc *c01 + Traw_sc *Praw_sc *(c11+Praw_sc*c21)
+
+	// Tcomp (°C) = c0*0.5 + c1*Traw_sc
+
 	_px4_barometer.set_error_count(perf_event_count(_comms_errors));
 	_px4_barometer.set_temperature(temperature);
 	_px4_barometer.update(timestamp_sample, pressure);
@@ -271,7 +315,6 @@ DPS310::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	printf("poll interval: %u \n", _measure_interval);
 
 	_px4_barometer.print_status();
 }
