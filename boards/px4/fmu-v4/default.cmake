@@ -27,6 +27,7 @@ px4_add_board(
 		heater
 		#imu # all available imu drivers
 		imu/icm20602
+		imu/icm20608-g
 		imu/mpu6000
 		imu/mpu9250
 		irlock

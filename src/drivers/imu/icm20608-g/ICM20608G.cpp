@@ -31,29 +31,29 @@
  *
  ****************************************************************************/
 
-#include "ICM20602.hpp"
+#include "ICM20608G.hpp"
 
 #include <drivers/boards/common/board_dma_alloc.h>
 
 using namespace time_literals;
-using namespace InvenSense_ICM20602;
+using namespace InvenSense_ICM20608G;
 
 static constexpr int16_t combine(uint8_t msb, uint8_t lsb) { return (msb << 8u) | lsb; }
 
-ICM20602::ICM20602(int bus, uint32_t device, enum Rotation rotation) :
-	SPI("ICM20602", nullptr, bus, device, SPIDEV_MODE3, 1000000),
+ICM20608G::ICM20608G(int bus, uint32_t device, enum Rotation rotation) :
+	SPI("ICM20608G", nullptr, bus, device, SPIDEV_MODE3, SPI_SPEED),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
 	_px4_accel(get_device_id(), ORB_PRIO_VERY_HIGH, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_VERY_HIGH, rotation)
 {
-	_px4_accel.set_device_type(DRV_ACC_DEVTYPE_ICM20602);
+	_px4_accel.set_device_type(DRV_ACC_DEVTYPE_ICM20608);
 	_px4_accel.set_sample_rate(_accel_rate);
 
-	_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_ICM20602);
+	_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_ICM20608);
 	_px4_gyro.set_sample_rate(_gyro_rate);
 }
 
-ICM20602::~ICM20602()
+ICM20608G::~ICM20608G()
 {
 	Stop();
 
@@ -69,13 +69,13 @@ ICM20602::~ICM20602()
 }
 
 int
-ICM20602::probe()
+ICM20608G::probe()
 {
 	for (int i = 0; i < 10; i++) {
 
 		uint8_t whoami = RegisterRead(Register::WHO_AM_I);
 
-		if (whoami != ICM_WHOAMI_20602) {
+		if (whoami != ICM20608G_WHO_AM_I) {
 			PX4_WARN("unexpected WHO_AM_I 0x%02x", whoami);
 			//return PX4_ERROR;
 
@@ -85,6 +85,7 @@ ICM20602::probe()
 			usleep(1000);
 
 		} else {
+			PX4_INFO("correct WHO_AM_I: 0x%02x", whoami);
 			return PX4_OK;
 		}
 	}
@@ -93,16 +94,16 @@ ICM20602::probe()
 }
 
 bool
-ICM20602::Init()
+ICM20608G::Init()
 {
 	if (SPI::init() != PX4_OK) {
 		PX4_ERR("SPI::init failed");
 		return false;
 	}
 
-	if (Reset() != PX4_OK) {
+	if (!Reset()) {
 		PX4_ERR("reset failed");
-		return PX4_ERROR;
+		return false;
 	}
 
 	// allocate DMA capable buffer
@@ -119,18 +120,18 @@ ICM20602::Init()
 }
 
 bool
-ICM20602::Reset()
+ICM20608G::Reset()
 {
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 15; i++) {
 
 		// PWR_MGMT_1: Device Reset
 		// CLKSEL[2:0] must be set to 001 to achieve full gyroscope performance.
 		RegisterWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::DEVICE_RESET);
-		usleep(100);
+		usleep(1000);
 
 		// PWR_MGMT_1: CLKSEL[2:0] must be set to 001 to achieve full gyroscope performance.
 		RegisterWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::CLKSEL_0);
-		usleep(100);
+		usleep(1000);
 
 		// ACCEL_CONFIG: Accel 16 G range
 		RegisterSetBits(Register::ACCEL_CONFIG, ACCEL_CONFIG_BIT::ACCEL_FS_SEL_16G);
@@ -141,6 +142,10 @@ ICM20602::Reset()
 		RegisterSetBits(Register::GYRO_CONFIG, GYRO_CONFIG_BIT::FS_SEL_2000_DPS);
 		_px4_gyro.set_scale(math::radians(1.0f / 16.4f));
 		_px4_gyro.set_range(math::radians(2000.0f));
+
+
+		// undocumented hack to fix large sensor bias
+	        RegisterWrite(Register::UNDOC1, UNDOC1::VALUE);
 
 		const bool reset_done = !(RegisterRead(Register::PWR_MGMT_1) & PWR_MGMT_1_BIT::DEVICE_RESET);
 		const bool clksel_done = (RegisterRead(Register::PWR_MGMT_1) & PWR_MGMT_1_BIT::CLKSEL_0);
@@ -156,7 +161,7 @@ ICM20602::Reset()
 }
 
 void
-ICM20602::ResetFIFO()
+ICM20608G::ResetFIFO()
 {
 	perf_count(_fifo_reset_perf);
 
@@ -181,12 +186,12 @@ ICM20602::ResetFIFO()
 	RegisterSetBits(Register::CONFIG, CONFIG_BIT::DLPF_CFG_BYPASS_DLPF_8KHZ);
 
 	// FIFO_EN: enable both gyro and accel
-	RegisterWrite(Register::FIFO_EN, FIFO_EN_BIT::GYRO_FIFO_EN | FIFO_EN_BIT::ACCEL_FIFO_EN);
+	RegisterWrite(Register::FIFO_EN, FIFO_EN_BIT::XG_FIFO_EN | FIFO_EN_BIT::YG_FIFO_EN | FIFO_EN_BIT::ZG_FIFO_EN | FIFO_EN_BIT::ACCEL_FIFO_EN);
 	up_udelay(10);
 }
 
 uint8_t
-ICM20602::RegisterRead(Register reg)
+ICM20608G::RegisterRead(Register reg)
 {
 	uint8_t cmd[2] {};
 	cmd[0] = static_cast<uint8_t>(reg) | DIR_READ;
@@ -195,14 +200,14 @@ ICM20602::RegisterRead(Register reg)
 }
 
 void
-ICM20602::RegisterWrite(Register reg, uint8_t value)
+ICM20608G::RegisterWrite(Register reg, uint8_t value)
 {
 	uint8_t cmd[2] { (uint8_t)reg, value };
 	transfer(cmd, cmd, sizeof(cmd));
 }
 
 void
-ICM20602::RegisterSetBits(Register reg, uint8_t setbits)
+ICM20608G::RegisterSetBits(Register reg, uint8_t setbits)
 {
 	uint8_t val = RegisterRead(reg);
 
@@ -213,7 +218,7 @@ ICM20602::RegisterSetBits(Register reg, uint8_t setbits)
 }
 
 void
-ICM20602::RegisterClearBits(Register reg, uint8_t clearbits)
+ICM20608G::RegisterClearBits(Register reg, uint8_t clearbits)
 {
 	uint8_t val = RegisterRead(reg);
 
@@ -224,7 +229,7 @@ ICM20602::RegisterClearBits(Register reg, uint8_t clearbits)
 }
 
 void
-ICM20602::Start()
+ICM20608G::Start()
 {
 	Stop();
 	ResetFIFO();
@@ -232,13 +237,13 @@ ICM20602::Start()
 }
 
 void
-ICM20602::Stop()
+ICM20608G::Stop()
 {
 	ScheduleClear();
 }
 
 void
-ICM20602::Run()
+ICM20608G::Run()
 {
 	perf_count(_interval_perf);
 
@@ -251,7 +256,9 @@ ICM20602::Run()
 		return;
 	}
 
-	const size_t fifo_count = combine(fifo_count_buf[1], fifo_count_buf[2]);
+	// FIFO_COUNTH - FIFO_COUNT[12:8]
+	// FIFO_COUNTL - FIFO_COUNT[7:0]
+	const size_t fifo_count = combine(fifo_count_buf[1] & 0xF, fifo_count_buf[2]);
 	const int samples = fifo_count / sizeof(FIFO::DATA);
 
 	if (samples < 1) {
@@ -310,7 +317,7 @@ ICM20602::Run()
 	gyro.dt = _fifo_interval / _gyro_readings_per_sample;
 
 	int accel_index = 0;
-	int16_t temperature[samples] {};
+	//int16_t temperature[samples] {};
 
 	for (int i = 0; i < samples; i++) {
 		const FIFO::DATA &fifo_sample = report->f[i];
@@ -323,41 +330,19 @@ ICM20602::Run()
 			accel_index++;
 		}
 
-		temperature[i] = combine(fifo_sample.TEMP_OUT_H, fifo_sample.TEMP_OUT_L);
+		//temperature[i] = combine(fifo_sample.TEMP_OUT_H, fifo_sample.TEMP_OUT_L);
 
 		gyro.x[i] = combine(fifo_sample.GYRO_XOUT_H, fifo_sample.GYRO_XOUT_L);
 		gyro.y[i] = combine(fifo_sample.GYRO_YOUT_H, fifo_sample.GYRO_YOUT_L);
 		gyro.z[i] = combine(fifo_sample.GYRO_ZOUT_H, fifo_sample.GYRO_ZOUT_L);
 	}
 
-	// Temperature
-	int32_t temperature_sum{0};
-
-	for (auto t : temperature) {
-		temperature_sum += t;
-	}
-
-	const int16_t temperature_avg = temperature_sum / samples;
-
-	for (auto t : temperature) {
-		// temperature changing wildly is likely a sign of a transfer error
-		if (abs(t - temperature_avg) > 1000) {
-			return;
-		}
-	}
-
-	// use average temperature reading
-	const float temperature_C = temperature_avg / 326.8f + 25.0f;	// 326.8 LSB/C
-
-	_px4_gyro.set_temperature(temperature_C);
 	_px4_gyro.updateFIFO(gyro);
-
-	_px4_accel.set_temperature(temperature_C);
 	_px4_accel.updateFIFO(accel);
 }
 
 void
-ICM20602::PrintInfo()
+ICM20608G::PrintInfo()
 {
 	perf_print_counter(_interval_perf);
 	perf_print_counter(_transfer_perf);
