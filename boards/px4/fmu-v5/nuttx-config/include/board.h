@@ -242,7 +242,7 @@
 #  define STM32_SDMMC_SDXFR_CLKDIV      (2 << STM32_SDMMC_CLKCR_CLKDIV_SHIFT)
 #endif
 
-/* DMA Channl/Stream Selections *****************************************************/
+/* DMA Channel/Stream Selections *****************************************************/
 /* Stream selections are arbitrary for now but might become important in the future
  * if we set aside more DMA channels/streams.
  *
@@ -381,6 +381,9 @@
 #define GPIO_SPI1_MISO   GPIO_SPI1_MISO_1   /* PA6 */
 #define GPIO_SPI1_MOSI   GPIO_SPI1_MOSI_3   /* PD7 */
 #define GPIO_SPI1_SCK    GPIO_SPI1_SCK_3    /* PG11 */
+
+#define DMAMAP_SPI1_RX DMAMAP_SPI1_RX_1
+#define DMAMAP_SPI1_TX DMAMAP_SPI1_TX_2
 
 #define GPIO_SPI2_MISO   GPIO_SPI2_MISO_3   /* PI2 */
 #define GPIO_SPI2_MOSI   GPIO_SPI2_MOSI_3   /* PI3 */

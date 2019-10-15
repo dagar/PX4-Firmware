@@ -24,11 +24,13 @@ px4_add_board(
 		camera_trigger
 		#differential_pressure # all available differential pressure drivers
 		distance_sensor # all available distance sensor drivers
+		dshot
 		gps
 		#heater
 		#imu # all available imu drivers
-		imu/mpu6000
-		imu/mpu9250
+		imu/invensense/icm20602
+		imu/invensense/icm20608-g
+		imu/invensense/mpu9250
 		irlock
 		#lights/blinkm
 		#lights/rgbled

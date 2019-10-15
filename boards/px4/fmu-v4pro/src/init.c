@@ -335,7 +335,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	SPI_SELECT(spi1, PX4_SPIDEV_ICM, false);
 	SPI_SELECT(spi1, PX4_SPIDEV_BARO, false);
 	SPI_SELECT(spi1, PX4_SPIDEV_LIS, false);
-	SPI_SELECT(spi1, PX4_SPIDEV_MPU, false);
+	SPI_SELECT(spi1, PX4_SPIDEV_MPU9250, false);
 	SPI_SELECT(spi1, PX4_SPIDEV_EEPROM, false);
 	up_udelay(20);
 

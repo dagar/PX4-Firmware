@@ -204,6 +204,9 @@ __EXPORT void board_spi_reset(int ms)
 	stm32_configgpio(_PIN_OFF(GPIO_SPI1_MISO));
 	stm32_configgpio(_PIN_OFF(GPIO_SPI1_MOSI));
 
+	stm32_configgpio(_PIN_OFF(GPIO_SPI1_DRDY1_ICM20602));
+	stm32_configgpio(_PIN_OFF(GPIO_SPI1_DRDY2_ICM20948));
+
 	// SPI5
 	for (auto cs : spi5selects_gpio) {
 		stm32_configgpio(_PIN_OFF(cs));
@@ -242,6 +245,10 @@ __EXPORT void board_spi_reset(int ms)
 	stm32_configgpio(GPIO_SPI1_SCK);
 	stm32_configgpio(GPIO_SPI1_MISO);
 	stm32_configgpio(GPIO_SPI1_MOSI);
+
+	stm32_configgpio(GPIO_SPI1_DRDY1_ICM20602);
+	stm32_configgpio(GPIO_SPI1_DRDY2_ICM20948);
+
 
 	// SPI5
 	for (auto cs : spi5selects_gpio) {

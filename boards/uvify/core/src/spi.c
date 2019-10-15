@@ -132,7 +132,7 @@ __EXPORT void stm32_spi1select(FAR struct spi_dev_s *dev, uint32_t devid, bool s
 	/* Shared PC2 CS devices */
 
 	case PX4_SPIDEV_BMI:
-	case PX4_SPIDEV_MPU:
+	case PX4_SPIDEV_MPU9250:
 		/* Making sure the other peripherals are not selected */
 		px4_arch_gpiowrite(GPIO_SPI1_CS_PORTC_PIN2,  !selected);
 		px4_arch_gpiowrite(GPIO_SPI1_CS_PORTC_PIN15, 1);

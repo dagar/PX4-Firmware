@@ -8,7 +8,7 @@ ina226 -b 1 start
 ina226 -b 2 start
 
 # Internal SPI bus ICM-20602
-mpu6000 -R 8 -s -T 20602 start
+icm20602 -R 2 start
 
 # Internal SPI bus ISM300DLC
 ism330dlc start

@@ -25,13 +25,16 @@ px4_add_board(
 		camera_trigger
 		differential_pressure # all available differential pressure drivers
 		distance_sensor # all available distance sensor drivers
+		dshot
 		gps
 		#heater
 		imu/adis16448
+		imu/adis16497
 		#imu # all available imu drivers
 		imu/bmi055
-		imu/mpu6000
 		imu/mpu9250
+		imu/invensense/icm20602
+		imu/invensense/icm20689
 		irlock
 		lights/blinkm
 		lights/rgbled
@@ -42,6 +45,7 @@ px4_add_board(
 		mkblctrl
 		optical_flow # all available optical flow drivers
 		pca9685
+		power_monitor/ina226
 		protocol_splitter
 		pwm_input
 		pwm_out_sim
@@ -86,6 +90,7 @@ px4_add_board(
 	SYSTEMCMDS
 		bl_update
 		config
+		dmesg
 		dumpfile
 		esc_calib
 		hardfault_log
@@ -121,4 +126,5 @@ px4_add_board(
 		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
 		rover_steering_control # Rover example app
 		uuv_example_app
+
 	)

@@ -7,7 +7,7 @@
 voxlpm -R start
 
 # Internal SPI bus ICM-20602
-mpu6000 -R 2 -s -T 20602 start
+icm20602 start -R 2
 
 # Internal SPI bus ICM-42688
 # TODO

@@ -136,7 +136,7 @@ __EXPORT void stm32_spi1select(FAR struct spi_dev_s *dev, uint32_t devid, bool s
 		stm32_gpiowrite(GPIO_SPI_CS_TEMPCAL_EEPROM, 1);
 		break;
 
-	case PX4_SPIDEV_MPU:
+	case PX4_SPIDEV_MPU9250:
 		/* Making sure the other peripherals are not selected */
 		stm32_gpiowrite(GPIO_SPI_CS_MPU9250, !selected);
 		stm32_gpiowrite(GPIO_SPI_CS_LIS3MDL, 1);

@@ -318,9 +318,7 @@ __EXPORT void board_spi_reset(int mask_ms)
 		stm32_configgpio(GPIO_SPI1_SCK_OFF);
 		stm32_configgpio(GPIO_SPI1_MISO_OFF);
 		stm32_configgpio(GPIO_SPI1_MOSI_OFF);
-#if BOARD_USE_DRDY
 		stm32_configgpio(GPIO_DRDY_OFF_SPI1_DRDY1_ICM20602);
-#endif
 
 		/* set the sensor rail off */
 		stm32_gpiowrite(GPIO_VDD_3V3_SENSORS1_EN, 0);
@@ -397,10 +395,7 @@ __EXPORT void board_spi_reset(int mask_ms)
 		stm32_configgpio(GPIO_SPI1_SCK);
 		stm32_configgpio(GPIO_SPI1_MISO);
 		stm32_configgpio(GPIO_SPI1_MOSI);
-#if BOARD_USE_DRDY
 		stm32_configgpio(GPIO_SPI1_DRDY1_ICM20602);
-#endif
-
 	}
 
 	if (mask & 2) {

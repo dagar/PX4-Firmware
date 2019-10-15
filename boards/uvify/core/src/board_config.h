@@ -150,7 +150,7 @@
 /* Use these in place of the uint32_t enumeration to select a specific SPI device on SPI1 */
 #define PX4_SPIDEV_GYRO              PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 1)
 #define PX4_SPIDEV_ACCEL_MAG         PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 2)
-#define PX4_SPIDEV_MPU               PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 4)
+#define PX4_SPIDEV_MPU9250           PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 4)
 #define PX4_SPIDEV_HMC               PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 5)
 #define PX4_SPIDEV_ICM               PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 6)
 #define PX4_SPIDEV_LIS               PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 7)
@@ -340,12 +340,14 @@
 #define BOARD_HAS_PWM    DIRECT_PWM_OUTPUT_CHANNELS
 
 /* This board provides a DMA pool and APIs. */
-#define BOARD_DMA_ALLOC_POOL_SIZE    5120
+#define BOARD_DMA_ALLOC_POOL_SIZE (5120 + 4096 + 1008)	// 5120 fat + 4096 + 1008 spi
 
 #define BOARD_HAS_ON_RESET 1
 
 #define BOARD_ENABLE_CONSOLE_BUFFER
 #define BOARD_CONSOLE_BUFFER_SIZE (1024*3)
+
+#define BOARD_DSHOT_MOTOR_ASSIGNMENT {3, 2, 1, 0, 4, 5};
 
 __BEGIN_DECLS
 

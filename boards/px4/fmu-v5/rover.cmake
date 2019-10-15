@@ -25,7 +25,8 @@ px4_add_board(
 		distance_sensor # all available distance sensor drivers
 		gps
 		imu/bmi055
-		imu/mpu6000
+		imu/invensense/icm20602
+		imu/invensense/icm20689
 		lights/rgbled
 		lights/rgbled_ncp5623c
 		lights/rgbled_pwm
@@ -64,6 +65,7 @@ px4_add_board(
 	SYSTEMCMDS
 		bl_update
 		config
+		dmesg
 		dumpfile
 		esc_calib
 		hardfault_log
