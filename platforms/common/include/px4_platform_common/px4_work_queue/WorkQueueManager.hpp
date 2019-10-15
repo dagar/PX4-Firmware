@@ -50,7 +50,7 @@ namespace wq_configurations
 {
 static constexpr wq_config_t rate_ctrl{"wq:rate_ctrl", 1600, 0}; // PX4 inner loop highest priority
 
-static constexpr wq_config_t SPI1{"wq:SPI1", 1400, -1};
+static constexpr wq_config_t SPI1{"wq:SPI1", 2100, -1};
 static constexpr wq_config_t SPI2{"wq:SPI2", 1400, -2};
 static constexpr wq_config_t SPI3{"wq:SPI3", 1400, -3};
 static constexpr wq_config_t SPI4{"wq:SPI4", 1400, -4};
@@ -67,7 +67,7 @@ static constexpr wq_config_t att_pos_ctrl{"wq:att_pos_ctrl", 6600, -11}; // PX4 
 static constexpr wq_config_t uavcan{"uavcan", 2400, -13};
 
 static constexpr wq_config_t hp_default{"wq:hp_default", 1500, -12};
-static constexpr wq_config_t lp_default{"wq:lp_default", 1700, -50};
+static constexpr wq_config_t lp_default{"wq:lp_default", 2000, -50};
 
 static constexpr wq_config_t test1{"wq:test1", 800, 0};
 static constexpr wq_config_t test2{"wq:test2", 800, 0};

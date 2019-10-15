@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017-2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,14 +31,16 @@
 #
 ############################################################################
 
-add_subdirectory(accelerometer)
-add_subdirectory(airspeed)
-add_subdirectory(barometer)
-add_subdirectory(device)
-add_subdirectory(gyroscope)
-add_subdirectory(imu)
-add_subdirectory(led)
-add_subdirectory(linux_gpio)
-add_subdirectory(magnetometer)
-add_subdirectory(rangefinder)
-add_subdirectory(smbus)
+px4_add_module(
+	MODULE drivers__imu__invensense__icm20608g
+	MAIN icm20608g
+	COMPILE_FLAGS
+	SRCS
+		ICM20608G.cpp
+		ICM20608G.hpp
+		icm20608g_main.cpp
+	DEPENDS
+		drivers_accelerometer
+		drivers_gyroscope
+		px4_work_queue
+	)

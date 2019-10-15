@@ -32,46 +32,46 @@
  ****************************************************************************/
 
 
-#include "PX4Gyroscope.hpp"
+#include "PX4IMU.hpp"
 
 #include <lib/drivers/device/Device.hpp>
 
 using namespace time_literals;
 using matrix::Vector3f;
 
-PX4Gyroscope::PX4Gyroscope(uint32_t device_id, uint8_t priority, enum Rotation rotation) :
+PX4IMU::PX4IMU(uint32_t device_id, uint8_t priority, enum Rotation rotation) :
 	CDev(nullptr),
 	ModuleParams(nullptr),
-	_sensor_pub{ORB_ID(sensor_gyro), priority},
-	_sensor_control_pub{ORB_ID(sensor_gyro_control), priority},
-	_sensor_fifo_pub{ORB_ID(sensor_gyro_fifo), priority},
-	_sensor_integrated_pub{ORB_ID(sensor_gyro_integrated), priority},
-	_sensor_status_pub{ORB_ID(sensor_gyro_status), priority},
+	_sensor_pub{ORB_ID(sensor_accel), priority},
+	_sensor_control_pub{ORB_ID(sensor_accel_control), priority},
+	_sensor_fifo_pub{ORB_ID(sensor_accel_fifo), priority},
+	_sensor_integrated_pub{ORB_ID(sensor_accel_integrated), priority},
+	_sensor_status_pub{ORB_ID(sensor_accel_status), priority},
 	_device_id{device_id},
 	_rotation{rotation}
 {
-	_class_device_instance = register_class_devname(GYRO_BASE_DEVICE_PATH);
+	_class_device_instance = register_class_devname(ACCEL_BASE_DEVICE_PATH);
 
 	// set software low pass filter for controllers
 	updateParams();
-	ConfigureFilter(_param_imu_gyro_cutoff.get());
+	ConfigureFilter(_param_imu_accel_cutoff.get());
 }
 
-PX4Gyroscope::~PX4Gyroscope()
+PX4IMU::~PX4IMU()
 {
 	if (_class_device_instance != -1) {
-		unregister_class_devname(GYRO_BASE_DEVICE_PATH, _class_device_instance);
+		unregister_class_devname(ACCEL_BASE_DEVICE_PATH, _class_device_instance);
 	}
 }
 
 int
-PX4Gyroscope::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
+PX4IMU::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
-	case GYROIOCSSCALE: {
+	case ACCELIOCSSCALE: {
 			// Copy offsets and scale factors in
-			gyro_calibration_s cal{};
-			memcpy(&cal, (gyro_calibration_s *) arg, sizeof(cal));
+			accel_calibration_s cal{};
+			memcpy(&cal, (accel_calibration_s *) arg, sizeof(cal));
 
 			_calibration_offset = Vector3f{cal.x_offset, cal.y_offset, cal.z_offset};
 			_calibration_scale = Vector3f{cal.x_scale, cal.y_scale, cal.z_scale};
@@ -88,7 +88,7 @@ PX4Gyroscope::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 }
 
 void
-PX4Gyroscope::set_device_type(uint8_t devtype)
+PX4IMU::set_device_type(uint8_t devtype)
 {
 	// current DeviceStructure
 	union device::Device::DeviceId device_id;
@@ -102,7 +102,7 @@ PX4Gyroscope::set_device_type(uint8_t devtype)
 }
 
 void
-PX4Gyroscope::set_sample_rate(uint16_t rate)
+PX4IMU::set_sample_rate(uint16_t rate)
 {
 	_sample_rate = rate;
 
@@ -110,7 +110,7 @@ PX4Gyroscope::set_sample_rate(uint16_t rate)
 }
 
 void
-PX4Gyroscope::set_update_rate(uint16_t rate)
+PX4IMU::set_update_rate(uint16_t rate)
 {
 	const uint32_t update_interval = 1000000 / rate;
 
@@ -118,7 +118,7 @@ PX4Gyroscope::set_update_rate(uint16_t rate)
 }
 
 void
-PX4Gyroscope::update(hrt_abstime timestamp, float x, float y, float z)
+PX4IMU::update(hrt_abstime timestamp, float x, float y, float z)
 {
 	// Apply rotation (before scaling)
 	rotate_3f(_rotation, x, y, z);
@@ -134,15 +134,7 @@ PX4Gyroscope::update(hrt_abstime timestamp, float x, float y, float z)
 
 	// publish control data (filtered) immediately
 	bool publish_control = true;
-	sensor_gyro_control_s control{};
-
-	if (_param_imu_gyro_rate_max.get() > 0) {
-		const uint64_t interval = 1e6f / _param_imu_gyro_rate_max.get();
-
-		if (hrt_elapsed_time(&_control_last_publish) < interval) {
-			publish_control = false;
-		}
-	}
+	sensor_accel_control_s control{};
 
 	if (publish_control) {
 		control.timestamp_sample = timestamp;
@@ -161,7 +153,7 @@ PX4Gyroscope::update(hrt_abstime timestamp, float x, float y, float z)
 
 	if (_integrator.put(timestamp, val_calibrated, integrated_value, integral_dt)) {
 
-		sensor_gyro_s report{};
+		sensor_accel_s report{};
 		report.timestamp = timestamp;
 		report.device_id = _device_id;
 		report.temperature = _temperature;
@@ -187,7 +179,7 @@ PX4Gyroscope::update(hrt_abstime timestamp, float x, float y, float z)
 }
 
 void
-PX4Gyroscope::updateFIFO(const FIFOSample &sample)
+PX4IMU::updateFIFO(const FIFOSample &sample)
 {
 	// filtered data (control)
 	float x_filtered = _filterArrayX.apply(sample.x, sample.samples);
@@ -207,15 +199,7 @@ PX4Gyroscope::updateFIFO(const FIFOSample &sample)
 	{
 		// publish control data (filtered) immediately
 		bool publish_control = true;
-		sensor_gyro_control_s control{};
-
-		if (_param_imu_gyro_rate_max.get() > 0) {
-			const uint64_t interval = 1e6f / _param_imu_gyro_rate_max.get();
-
-			if (hrt_elapsed_time(&_control_last_publish) < interval) {
-				publish_control = false;
-			}
-		}
+		sensor_accel_control_s control{};
 
 		if (publish_control) {
 			control.timestamp_sample = sample.timestamp_sample + ((sample.samples - 1) * sample.dt); // timestamp of last sample
@@ -231,7 +215,7 @@ PX4Gyroscope::updateFIFO(const FIFOSample &sample)
 
 	// status
 	{
-		sensor_gyro_status_s &status = _sensor_status_pub.get();
+		sensor_accel_status_s &status = _sensor_status_pub.get();
 
 		const int16_t clip_limit = (_range / _scale) * 0.9f;
 
@@ -260,25 +244,19 @@ PX4Gyroscope::updateFIFO(const FIFOSample &sample)
 		}
 
 
-		// // 0 : Gyro delta angle coning metric = filtered length of (delta_angle x prev_delta_angle)
-		// // 1 : Gyro high frequency vibe = filtered length of (delta_angle - prev_delta_angle)
+		// // Accel high frequency vibe = filtered length of (delta_velocity - prev_delta_velocity)
 		// for (int n = 1; n < sample.samples; n++) {
-		// 	// TODO: create delta angle from fifo
+
 		// 	// float delta_vel = (fifo.x[n] - fifo.x[n-1]) / fifo.dt;	// ADC units and time in microseconds
-		// 	const Vector3f delta_angle{0.0f, 0.0f, 0.0f};
+		// 	matrix::Vector3f delta_velocity;
 
-		// 	// calculate a metric which indicates the amount of coning vibration
-		// 	const Vector3f temp = delta_angle.cross(_delta_angle_prev);
-		// 	_delta_angle_coning_metric = 0.99f * _delta_angle_coning_metric + 0.01f * temp.norm();
+		// 	// calculate a metric which indicates the amount of high frequency accelerometer vibration
+		// 	const matrix::Vector3f temp = delta_velocity - _delta_velocity_prev;
 
-		// 	// calculate a metric which indicates the amount of high frequency gyro vibration
-		// 	const Vector3f temp2 = delta_angle - _delta_angle_prev;
+		// 	_high_frequency_vibration = 0.99f * _high_frequency_vibration + 0.01f * temp.norm();
 
-		// 	_high_frequency_vibration = 0.99f * _high_frequency_vibration + 0.01f * temp2.norm();
-
-		// 	_delta_angle_prev = delta_angle;
+		// 	_delta_velocity_prev = delta_velocity;
 		// }
-		status.coning_vibration = _delta_angle_coning_metric;
 		status.high_frequency_vibration = _high_frequency_vibration;
 
 		status.device_id = _device_id;
@@ -341,9 +319,9 @@ PX4Gyroscope::updateFIFO(const FIFOSample &sample)
 			val_int_calibrated *= (_integrator_fifo_samples * sample.dt * 1e-6f);	// restore
 
 			// publish
-			sensor_gyro_integrated_s integrated{};
+			sensor_accel_integrated_s integrated{};
 			integrated.device_id = _device_id;
-			val_int_calibrated.copyTo(integrated.delta_angle);
+			val_int_calibrated.copyTo(integrated.delta_velocity);
 			integrated.timestamp_sample = _integrator_timestamp_sample;
 			integrated.dt = integrator_dt_us;
 			integrated.samples = _integrator_samples;
@@ -353,7 +331,7 @@ PX4Gyroscope::updateFIFO(const FIFOSample &sample)
 
 
 			// legacy message
-			sensor_gyro_s report{};
+			sensor_accel_s report{};
 			report.device_id = _device_id;
 			report.temperature = _temperature;
 			report.scaling = _scale;
@@ -386,7 +364,7 @@ PX4Gyroscope::updateFIFO(const FIFOSample &sample)
 		_timestamp_sample_prev = sample.timestamp_sample;
 	}
 
-	sensor_gyro_fifo_s fifo{};
+	sensor_accel_fifo_s fifo{};
 
 	fifo.device_id = _device_id;
 	fifo.timestamp_sample = sample.timestamp_sample;
@@ -403,7 +381,7 @@ PX4Gyroscope::updateFIFO(const FIFOSample &sample)
 }
 
 void
-PX4Gyroscope::ResetIntegrator()
+PX4IMU::ResetIntegrator()
 {
 	_integrator_samples = 0;
 	_integrator_fifo_samples = 0;
@@ -417,7 +395,7 @@ PX4Gyroscope::ResetIntegrator()
 }
 
 void
-PX4Gyroscope::ConfigureFilter(float cutoff_freq)
+PX4IMU::ConfigureFilter(float cutoff_freq)
 {
 	_filter.set_cutoff_frequency(_sample_rate, cutoff_freq);
 
@@ -427,9 +405,9 @@ PX4Gyroscope::ConfigureFilter(float cutoff_freq)
 }
 
 void
-PX4Gyroscope::print_status()
+PX4IMU::print_status()
 {
-	PX4_INFO(GYRO_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
+	PX4_INFO(ACCEL_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
 	PX4_INFO("sample rate: %d Hz", _sample_rate);
 	PX4_INFO("filter cutoff: %.3f Hz", (double)_filter.get_cutoff_freq());
 

@@ -48,13 +48,14 @@
 #include <uORB/topics/sensor_accel_fifo.h>
 #include <uORB/topics/sensor_accel_integrated.h>
 #include <uORB/topics/sensor_accel_status.h>
+#include <uORB/topics/sensor_imu.h>
 
-class PX4Accelerometer : public cdev::CDev, public ModuleParams
+class PX4IMU : public cdev::CDev, public ModuleParams
 {
 
 public:
-	PX4Accelerometer(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
-	~PX4Accelerometer() override;
+	PX4IMU(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
+	~PX4IMU() override;
 
 	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
