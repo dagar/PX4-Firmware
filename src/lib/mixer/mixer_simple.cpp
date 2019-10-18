@@ -331,12 +331,6 @@ SimpleMixer::mix(float *outputs, unsigned space)
 	return 1;
 }
 
-uint16_t
-SimpleMixer::get_saturation_status()
-{
-	return 0;
-}
-
 void
 SimpleMixer::groups_required(uint32_t &groups)
 {

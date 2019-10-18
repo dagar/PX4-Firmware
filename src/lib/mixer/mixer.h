@@ -208,7 +208,7 @@ public:
 	 *
 	 * @return			Integer bitmask containing saturation_status from multirotor_motor_limits.msg.
 	 */
-	virtual uint16_t		get_saturation_status(void) = 0;
+	virtual uint16_t		get_saturation_status() { return 0; }
 
 	/**
 	 * Analyses the mix configuration and updates a bitmask of groups
@@ -489,17 +489,11 @@ public:
 	static NullMixer		*from_text(const char *buf, unsigned &buflen);
 
 	unsigned		mix(float *outputs, unsigned space) override;
-	uint16_t		get_saturation_status(void) override;
-	void			groups_required(uint32_t &groups) override;
-	unsigned set_trim(float trim) override
-	{
-		return 1;
-	}
 
-	unsigned get_trim(float *trim) override
-	{
-		return 1;
-	}
+	void			groups_required(uint32_t &groups) override;
+
+	unsigned		set_trim(float trim) override { return 1; }
+	unsigned		get_trim(float *trim) override { return 1; }
 
 };
 
@@ -561,7 +555,7 @@ public:
 			uint16_t mid, uint16_t max);
 
 	unsigned		mix(float *outputs, unsigned space) override;
-	uint16_t		get_saturation_status(void) override;
+
 	void			groups_required(uint32_t &groups) override;
 
 	/**
@@ -738,6 +732,24 @@ public:
 		uint16_t value;
 	};
 
+	struct saturation_status {
+		bool motor_positive = false,	// true when any motor has saturated in the positive direction
+		bool motor_negative = false,	// true when any motor has saturated in the negative direction
+
+		bool roll_positive = false,	// true when a positive roll demand change will increase saturation
+		bool roll_negative = false,	// true when a negative roll demand change will increase saturation
+
+		bool pitch_positive = false,	// true when a positive pitch demand change will increase saturation
+		bool pitch_negative = false,	// true when a negative pitch demand change will increase saturation
+
+		bool yaw_positive = false,	// true when a positive yaw demand change will increase saturation
+		bool yaw_negative = false,	// true when a negative yaw demand change will increase saturation
+
+		bool thrust_positive = false,	// true when a positive thrust demand change will increase saturation
+		bool thrust_negative = false,	// true when a negative thrust demand change will increase saturation
+
+	}
+
 private:
 	/**
 	 * Computes the gain k by which desaturation_vector has to be multiplied
@@ -870,9 +882,7 @@ public:
 	 * @param cb_handle		Passed to control_cb.
 	 * @param mixer_info		Pointer to heli mixer configuration
 	 */
-	HelicopterMixer(ControlCallback control_cb,
-			uintptr_t cb_handle,
-			mixer_heli_s *mixer_info);
+	HelicopterMixer(ControlCallback control_cb, uintptr_t cb_handle, mixer_heli_s *mixer_info);
 
 	~HelicopterMixer() = default;
 
@@ -898,17 +908,8 @@ public:
 	unsigned		mix(float *outputs, unsigned space) override;
 	void			groups_required(uint32_t &groups) override;
 
-	uint16_t		get_saturation_status(void) override { return 0; }
-
-	unsigned set_trim(float trim) override
-	{
-		return 4;
-	}
-
-	unsigned get_trim(float *trim) override
-	{
-		return 4;
-	}
+	unsigned		set_trim(float trim) override { return 4; }
+	unsigned		get_trim(float *trim) override { return 4; }
 
 private:
 	mixer_heli_s			_mixer_info;
