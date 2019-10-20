@@ -134,7 +134,7 @@ def main():
             print("Creating XML file " + args.xml)
         cur_dir = os.path.dirname(os.path.realpath(__file__))
         out = xmlout.XMLOutput(param_groups, args.board,
-                               os.path.join(cur_dir, args.inject_xml))
+                               os.path.join(cur_dir, args.inject_xml), parameter_version_major, parameter_version_minor)
         out.Save(args.xml)
 
     # Output to Markdown/HTML tables
