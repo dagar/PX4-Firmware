@@ -58,3 +58,6 @@
 	path = cmake/configs/uavcan_board_ident
 	url = https://github.com/PX4/uavcan_board_ident.git
 	branch = master
+[submodule "platforms/nuttx/NuttX/libcxx"]
+	path = platforms/nuttx/NuttX/libcxx
+	url = https://github.com/PX4/libcxx.git

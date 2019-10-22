@@ -1,0 +1,3 @@
+restrict_topics: actuator_controls_0
+module: replay
+ignore_others: false

@@ -69,27 +69,27 @@
  */
 #define system_exit exit
 #if !defined(__PX4_NUTTX)
-#include <stdlib.h>
+//#include <stdlib.h>
 #ifdef __cplusplus
-#include <cstdlib>
+//#include <cstdlib>
 #endif
 /* We should include cstdlib or stdlib.h but this doesn't
  * compile because many C++ files include stdlib.h and would
  * need to get changed. */
-#pragma GCC poison exit
+//#pragma GCC poison exit
 #endif // !defined(__PX4_NUTTX)
 
 
 /* For SITL lockstep we fake the clock, sleeping, and timedwaits
  * Therefore, we prefix these syscalls with system_. */
-#include <time.h>
+//#include <time.h>
 #define system_clock_gettime clock_gettime
 #define system_clock_settime clock_settime
 /* We can't poison clock_settime/clock_gettime because they are
  * used in DriverFramework. */
 
 #if !defined(__PX4_NUTTX)
-#include <pthread.h>
+//#include <pthread.h>
 // We can't include this for NuttX otherwise we get conflicts for read/write
 // symbols in cannode.
 #endif // !defined(__PX4_NUTTX)
@@ -101,7 +101,7 @@
 /* We don't poison usleep and sleep because it is used in dependencies
  * like uavcan and DriverFramework. */
 #if !defined(__PX4_NUTTX)
-#include <unistd.h>
+//#include <unistd.h>
 // We can't include this for NuttX otherwise we get conflicts for read/write
 // symbols in cannode.
 #endif // !defined(__PX4_NUTTX)
@@ -114,12 +114,12 @@
  * We need to include the headers declaring getenv() before the pragma,
  * otherwise it will trigger a poison error.  */
 #if defined(__PX4_NUTTX)
-#include <stdlib.h>
+//#include <stdlib.h>
 #ifdef __cplusplus
-#include <cstdlib>
+//#include <cstdlib>
 #endif
 /* We should include cstdlib or stdlib.h but this doesn't
  * compile because many C++ files include stdlib.h and would
  * need to get changed. */
-#pragma GCC poison getenv setenv putenv
+//#pragma GCC poison getenv setenv putenv
 #endif // defined(__PX4_NUTTX)

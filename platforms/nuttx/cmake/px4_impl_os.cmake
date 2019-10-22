@@ -52,9 +52,8 @@ function(px4_os_add_flags)
 
 	include_directories(BEFORE SYSTEM
 		${PX4_BINARY_DIR}/NuttX/nuttx/include
-
+		${PX4_BINARY_DIR}/NuttX/nuttx/include/libcxx
 		${PX4_BINARY_DIR}/NuttX/nuttx/include/cxx
-		${PX4_SOURCE_DIR}/platforms/nuttx/NuttX/include/cxx
 	)
 
 	include_directories(
@@ -67,6 +66,13 @@ function(px4_os_add_flags)
 
 	# prevent using the toolchain's std c++ library
 	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-D__NuttX__>)
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-D_LIBCPP_BUILD_STATIC>)
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-D_LIBCPP_NO_EXCEPTIONS>)
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-D_LIBCPP_HAS_THREAD_API_PTHREAD>)
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-DCLOCK_MONOTONIC>)
+
 
 	add_definitions(
 		-D__PX4_NUTTX
