@@ -76,8 +76,6 @@ ICM20608G::~ICM20608G()
 	perf_free(_fifo_empty_perf);
 	perf_free(_fifo_overflow_perf);
 	perf_free(_fifo_reset_perf);
-	perf_free(_drdy_count_perf);
-	perf_free(_drdy_interval_perf);
 }
 
 int
@@ -181,7 +179,6 @@ ICM20608G::ResetFIFO()
 	RegisterSetBits(Register::CONFIG, CONFIG_BIT::DLPF_CFG_BYPASS_DLPF_8KHZ);
 
 	// FIFO_EN: enable both gyro and accel
-	_data_ready_count = 0;
 	RegisterWrite(Register::FIFO_EN, FIFO_EN_BIT::XG_FIFO_EN | FIFO_EN_BIT::YG_FIFO_EN | FIFO_EN_BIT::ZG_FIFO_EN |
 		      FIFO_EN_BIT::ACCEL_FIFO_EN);
 	up_udelay(10);
@@ -225,32 +222,6 @@ ICM20608G::RegisterClearBits(Register reg, uint8_t clearbits)
 	}
 }
 
-int
-ICM20608G::DataReadyInterruptCallback(int irq, void *context, void *arg)
-{
-	ICM20608G *dev = reinterpret_cast<ICM20608G *>(arg);
-	dev->DataReady();
-	return 0;
-}
-
-void
-ICM20608G::DataReady()
-{
-	perf_count(_drdy_count_perf);
-	perf_count(_drdy_interval_perf);
-
-	_data_ready_count++;
-
-	if (_data_ready_count >= 8) {
-		_time_data_ready = hrt_absolute_time();
-
-		_data_ready_count = 0;
-
-		// make another measurement
-		ScheduleNow();
-	}
-}
-
 void
 ICM20608G::Start()
 {
@@ -258,36 +229,13 @@ ICM20608G::Start()
 
 	ResetFIFO();
 
-	// TODO: cleanup horrible DRDY define mess
-#if defined(GPIO_DRDY_PORTC_PIN14)
-	// Setup data ready on rising edge
-	px4_arch_gpiosetevent(GPIO_DRDY_PORTC_PIN14, true, false, true, &ICM20608G::DataReadyInterruptCallback, this);
-	RegisterSetBits(Register::INT_ENABLE, INT_ENABLE_BIT::DATA_RDY_INT_EN);
-#elif defined(GPIO_DRDY_ICM_2060X)
-	// Setup data ready on rising edge
-	px4_arch_gpiosetevent(GPIO_DRDY_ICM_2060X, true, false, true, &ICM20608G::DataReadyInterruptCallback, this);
-	RegisterSetBits(Register::INT_ENABLE, INT_ENABLE_BIT::DATA_RDY_INT_EN);
-#else
 	ScheduleOnInterval(_fifo_interval, _fifo_interval);
-#endif
 }
 
 void
 ICM20608G::Stop()
 {
-	// TODO: cleanup horrible DRDY define mess
-#if defined(GPIO_DRDY_PORTC_PIN14)
-	// Disable data ready callback
-	px4_arch_gpiosetevent(GPIO_DRDY_PORTC_PIN14, false, false, false, nullptr, nullptr);
-	RegisterClearBits(Register::INT_ENABLE, INT_ENABLE_BIT::DATA_RDY_INT_EN);
-#elif defined(GPIO_DRDY_ICM_2060X)
-	// Disable data ready callback
-	px4_arch_gpiosetevent(GPIO_DRDY_ICM_2060X, false, false, false, nullptr, nullptr);
-	RegisterClearBits(Register::INT_ENABLE, INT_ENABLE_BIT::DATA_RDY_INT_EN);
-#else
 	ScheduleClear();
-#endif
-
 }
 
 void
@@ -429,14 +377,12 @@ ICM20608G::Run()
 void
 ICM20608G::PrintInfo()
 {
+	_px4_accel.print_status();
+	_px4_gyro.print_status();
+
 	perf_print_counter(_interval_perf);
 	perf_print_counter(_transfer_perf);
 	perf_print_counter(_fifo_empty_perf);
 	perf_print_counter(_fifo_overflow_perf);
 	perf_print_counter(_fifo_reset_perf);
-	perf_print_counter(_drdy_count_perf);
-	perf_print_counter(_drdy_interval_perf);
-
-	_px4_accel.print_status();
-	_px4_gyro.print_status();
 }

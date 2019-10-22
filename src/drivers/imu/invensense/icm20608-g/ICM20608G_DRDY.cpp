@@ -31,66 +31,73 @@
  *
  ****************************************************************************/
 
-/**
- * @file ICM20608g.hpp
- *
- * Driver for the Invensense ICM20608G connected via SPI.
- *
- */
+#include "ICM20608G_DRDY.hpp"
 
-#pragma once
-
-#include "InvenSense_ICM20608G_registers.hpp"
-
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
-#include <lib/drivers/device/spi.h>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
-#include <lib/ecl/geo/geo.h>
-#include <lib/perf/perf_counter.h>
-#include <px4_config.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-
-using InvenSense_ICM20608G::Register;
-
-class ICM20608G : public device::SPI, public px4::ScheduledWorkItem
+ICM20608G_DRDY::ICM20608G_DRDY(int bus, uint32_t device, enum Rotation rotation, uint32_t drdy_gpio) :
+	ICM20608G(bus, device, rotation),
+	WorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
+	_drdy_gpio(drdy_gpio)
 {
-public:
-	ICM20608G(int bus, uint32_t device, enum Rotation rotation = ROTATION_NONE);
-	virtual ~ICM20608G();
+}
 
-	bool			Init();
-	virtual void		Start();
-	virtual void		Stop();
-	bool			Reset();
-	void			PrintInfo();
+ICM20608G_DRDY::~ICM20608G_DRDY()
+{
+	Stop();
 
-protected:
+	perf_free(_drdy_count_perf);
+	perf_free(_drdy_interval_perf);
+}
 
-	int			probe() override;
+int
+ICM20608G_DRDY::DataReadyInterruptCallback(int irq, void *context, void *arg)
+{
+	ICM20608G_DRDY *dev = reinterpret_cast<ICM20608G_DRDY *>(arg);
+	dev->DataReady();
+	return 0;
+}
 
-	void			Run() override;
+void
+ICM20608G_DRDY::DataReady()
+{
+	perf_count(_drdy_count_perf);
+	perf_count(_drdy_interval_perf);
 
-	uint8_t			RegisterRead(Register reg);
-	void			RegisterWrite(Register reg, uint8_t value);
-	void			RegisterSetBits(Register reg, uint8_t setbits);
-	void			RegisterClearBits(Register reg, uint8_t clearbits);
+	_data_ready_count++;
 
-	void			ResetFIFO();
+	if (_data_ready_count >= 8) {
+		_time_data_ready = hrt_absolute_time();
 
+		_data_ready_count = 0;
 
-	uint8_t			*_dma_data_buffer{nullptr};
+		// make another measurement
+		ScheduleNow();
+	}
+}
 
-	PX4Accelerometer	_px4_accel;
-	PX4Gyroscope		_px4_gyro;
+void
+ICM20608G_DRDY::Start()
+{
+	Stop();
 
-	perf_counter_t		_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": run interval")};
-	perf_counter_t		_transfer_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": transfer")};
-	perf_counter_t		_fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo empty")};
-	perf_counter_t		_fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo overflow")};
-	perf_counter_t		_fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo reset")};
+	ResetFIFO();
 
-	hrt_abstime		_time_data_ready{0};
-	hrt_abstime		_time_last_temperature_update{0};
+	// Setup data ready on rising edge
+	px4_arch_gpiosetevent(_drdy_gpio, true, false, true, &ICM20608G::DataReadyInterruptCallback, this);
+}
 
-};
+void
+ICM20608G_DRDY::Stop()
+{
+	// Disable data ready callback
+	px4_arch_gpiosetevent(_drdy_gpio, false, false, false, nullptr, nullptr);
+	RegisterClearBits(Register::INT_ENABLE, INT_ENABLE_BIT::DATA_RDY_INT_EN);
+}
+
+void
+ICM20608G_DRDY::PrintInfo()
+{
+	ICM20608G::PrintInfo();
+
+	perf_print_counter(_drdy_count_perf);
+	perf_print_counter(_drdy_interval_perf);
+}

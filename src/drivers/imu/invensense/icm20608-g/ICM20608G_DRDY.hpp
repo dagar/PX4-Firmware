@@ -40,57 +40,28 @@
 
 #pragma once
 
-#include "InvenSense_ICM20608G_registers.hpp"
+#include "ICM20608G.hpp"
 
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
-#include <lib/drivers/device/spi.h>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
-#include <lib/ecl/geo/geo.h>
-#include <lib/perf/perf_counter.h>
-#include <px4_config.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-
-using InvenSense_ICM20608G::Register;
-
-class ICM20608G : public device::SPI, public px4::ScheduledWorkItem
+class ICM20608G_DRDY : public px4::WorkItem
 {
 public:
-	ICM20608G(int bus, uint32_t device, enum Rotation rotation = ROTATION_NONE);
-	virtual ~ICM20608G();
+	ICM20608G_DRDY(int bus, uint32_t device, enum Rotation rotation, uint32_t drdy_gpio);
+	virtual ~ICM20608G_DRDY();
 
-	bool			Init();
-	virtual void		Start();
-	virtual void		Stop();
-	bool			Reset();
-	void			PrintInfo();
+	void			Start() override;
+	void			Stop() override;
 
-protected:
+private:
 
-	int			probe() override;
+	static int		DataReadyInterruptCallback(int irq, void *context, void *arg);
+	void			DataReady();
 
-	void			Run() override;
-
-	uint8_t			RegisterRead(Register reg);
-	void			RegisterWrite(Register reg, uint8_t value);
-	void			RegisterSetBits(Register reg, uint8_t setbits);
-	void			RegisterClearBits(Register reg, uint8_t clearbits);
-
-	void			ResetFIFO();
-
-
-	uint8_t			*_dma_data_buffer{nullptr};
-
-	PX4Accelerometer	_px4_accel;
-	PX4Gyroscope		_px4_gyro;
-
-	perf_counter_t		_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": run interval")};
-	perf_counter_t		_transfer_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": transfer")};
-	perf_counter_t		_fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo empty")};
-	perf_counter_t		_fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo overflow")};
-	perf_counter_t		_fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo reset")};
+	perf_counter_t		_drdy_count_perf{perf_alloc(PC_COUNT, MODULE_NAME": drdy count")};
+	perf_counter_t		_drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": drdy interval")};
 
 	hrt_abstime		_time_data_ready{0};
-	hrt_abstime		_time_last_temperature_update{0};
+	int			_data_ready_count{0};
+
+	const uint32_t		_drdy_gpio{0};
 
 };

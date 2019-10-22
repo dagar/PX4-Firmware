@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "ICM20608G.hpp"
+#include "ICM20608G_DRDY.hpp"
 
 #include <px4_getopt.h>
 
@@ -53,7 +53,14 @@ int start(enum Rotation rotation)
 	}
 
 	// create the driver
+
+#if defined(GPIO_DRDY_PORTC_PIN14)
+	g_dev = new ICM20608G_DRDY(PX4_SPI_BUS_SENSORS, PX4_SPIDEV_ICM_20602, rotation, GPIO_DRDY_PORTC_PIN14);
+#elif defined(GPIO_DRDY_ICM_2060X)
+	g_dev = new ICM20608G_DRDY(PX4_SPI_BUS_SENSORS, PX4_SPIDEV_ICM_20602, rotation, GPIO_DRDY_ICM_2060X);
+#else
 	g_dev = new ICM20608G(PX4_SPI_BUS_SENSORS, PX4_SPIDEV_ICM_20602, rotation);
+#endif
 
 	if (g_dev == nullptr) {
 		PX4_ERR("driver start failed");
