@@ -65,10 +65,22 @@ else()
 			px4_layer px4_platform
 			work_queue
 			parameters
+
+			# c++
+			#${CMAKE_BINARY_DIR}/libcxx/lib/libc++.a
+			c++
+
+			m
+			c
 	)
 
-	if (NOT APPLE)
-		target_link_libraries(px4 PRIVATE rt)
+	if(NOT APPLE)
+		target_link_libraries(px4
+			PRIVATE
+				rt
+				gcc_s
+				gcc
+		)
 	endif()
 
 	target_link_libraries(px4 PRIVATE modules__uORB)

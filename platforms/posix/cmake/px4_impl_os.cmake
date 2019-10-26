@@ -213,6 +213,12 @@ endfunction()
 #
 function(px4_os_add_flags)
 
+	# prevent using the toolchain's std c++ library
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nodefaultlibs>)
+
+	include_directories(${PX4_BINARY_DIR}/libcxx/include/c++/v1)
+
 	add_definitions(
 		-D__PX4_POSIX
 		-Dnoreturn_function=__attribute__\(\(noreturn\)\)

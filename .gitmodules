@@ -58,3 +58,6 @@
 	path = cmake/configs/uavcan_board_ident
 	url = https://github.com/PX4/uavcan_board_ident.git
 	branch = master
+[submodule "external/libcxx"]
+	path = external/libcxx
+	url = https://github.com/PX4/libcxx.git

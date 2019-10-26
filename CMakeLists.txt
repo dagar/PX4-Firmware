@@ -183,6 +183,42 @@ endif()
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release;RelWithDebInfo;MinSizeRel;Coverage;AddressSanitizer;UndefinedBehaviorSanitizer")
 message(STATUS "cmake build type: ${CMAKE_BUILD_TYPE}")
 
+
+# LLVM libcxx
+px4_add_git_submodule(TARGET git_libcxx PATH "${PX4_SOURCE_DIR}/external/libcxx")
+include(ExternalProject)
+ExternalProject_Add(project_libcxx
+	SOURCE_DIR
+		${CMAKE_CURRENT_SOURCE_DIR}/external/libcxx
+	CMAKE_ARGS
+		-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/libcxx
+		-DLIBCXX_ENABLE_EXCEPTIONS=NO
+		-DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=NO
+		-DLIBCXX_ENABLE_FILESYSTEM=NO
+		-DLIBCXX_ENABLE_RTTI=YES
+		-DLIBCXX_ENABLE_SHARED=NO
+		-DLIBCXX_ENABLE_STATIC=YES
+		-DLIBCXX_INCLUDE_BENCHMARKS=NO
+		-DLIBCXX_INCLUDE_TESTS=NO
+		-DCMAKE_CXX_FLAGS="-fno-exceptions"
+		-DLIBCXX_INSTALL_EXPERIMENTAL_LIBRARY=NO
+	INSTALL_DIR ${CMAKE_BINARY_DIR}/libcxx
+	BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/libcxx/lib/libc++.a
+	DEPENDS git_libcxx
+	USES_TERMINAL_CONFIGURE true
+	USES_TERMINAL_BUILD true
+	#EXCLUDE_FROM_ALL true
+	BUILD_ALWAYS 1
+)
+
+ExternalProject_Get_Property(project_libcxx install_dir)
+
+add_library(c++ STATIC IMPORTED GLOBAL)
+set_target_properties(c++ PROPERTIES IMPORTED_LOCATION ${install_dir}/lib/libc++.a)
+add_dependencies(c++ project_libcxx)
+
+include_directories(SYSTEM ${PX4_BINARY_DIR}/libcxx/include/c++/v1)
+
 #=============================================================================
 # project definition
 #
@@ -190,7 +226,7 @@ project(px4 CXX C ASM)
 
 set(package-contact "px4users@googlegroups.com")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
