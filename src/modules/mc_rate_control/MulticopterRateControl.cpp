@@ -89,11 +89,6 @@ MulticopterRateControl::parameters_updated()
 	_rate_control.setFeedForwardGain(
 		Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
 
-
-	// manual rate control acro mode rate limits
-	_acro_rate_max = Vector3f(radians(_param_mc_acro_r_max.get()), radians(_param_mc_acro_p_max.get()),
-				  radians(_param_mc_acro_y_max.get()));
-
 	_actuators_0_circuit_breaker_enabled = circuit_breaker_enabled_by_val(_param_cbrk_rate_ctrl.get(), CBRK_RATE_CTRL_KEY);
 }
 
@@ -112,30 +107,6 @@ MulticopterRateControl::vehicle_status_poll()
 			}
 		}
 	}
-}
-
-float
-MulticopterRateControl::get_landing_gear_state()
-{
-	// Only switch the landing gear up if we are not landed and if
-	// the user switched from gear down to gear up.
-	// If the user had the switch in the gear up position and took off ignore it
-	// until he toggles the switch to avoid retracting the gear immediately on takeoff.
-	if (_landed) {
-		_gear_state_initialized = false;
-	}
-
-	float landing_gear = landing_gear_s::GEAR_DOWN; // default to down
-
-	if (_manual_control_sp.gear_switch == manual_control_setpoint_s::SWITCH_POS_ON && _gear_state_initialized) {
-		landing_gear = landing_gear_s::GEAR_UP;
-
-	} else if (_manual_control_sp.gear_switch == manual_control_setpoint_s::SWITCH_POS_OFF) {
-		// Switching the gear off does put it into a safe defined state
-		_gear_state_initialized = true;
-	}
-
-	return landing_gear;
 }
 
 void
@@ -159,123 +130,31 @@ MulticopterRateControl::Run()
 		parameters_updated();
 	}
 
-	/* run controller on gyro changes */
-	vehicle_angular_velocity_s angular_velocity;
+	_v_control_mode_sub.update(&_v_control_mode);
 
-	if (_vehicle_angular_velocity_sub.update(&angular_velocity)) {
-		const hrt_abstime now = hrt_absolute_time();
+	if (_v_control_mode.flag_control_rates_enabled && !_actuators_0_circuit_breaker_enabled) {
+		// run controller on gyro changes
+		vehicle_angular_velocity_s angular_velocity;
 
-		// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
-		const float dt = math::constrain(((now - _last_run) / 1e6f), 0.0002f, 0.02f);
-		_last_run = now;
+		if (_vehicle_angular_velocity_sub.update(&angular_velocity)) {
 
-		const Vector3f rates{angular_velocity.xyz};
+			vehicle_status_poll();
 
-		/* check for updates in other topics */
-		_v_control_mode_sub.update(&_v_control_mode);
+			// update land detected
+			if (_vehicle_land_detected_sub.updated()) {
+				vehicle_land_detected_s vehicle_land_detected;
 
-		if (_vehicle_land_detected_sub.updated()) {
-			vehicle_land_detected_s vehicle_land_detected;
-
-			if (_vehicle_land_detected_sub.copy(&vehicle_land_detected)) {
-				_landed = vehicle_land_detected.landed;
-				_maybe_landed = vehicle_land_detected.maybe_landed;
-			}
-		}
-
-		vehicle_status_poll();
-
-		const bool manual_control_updated = _manual_control_sp_sub.update(&_manual_control_sp);
-
-		// generate the rate setpoint from sticks?
-		bool manual_rate_sp = false;
-
-		if (_v_control_mode.flag_control_manual_enabled &&
-		    !_v_control_mode.flag_control_altitude_enabled &&
-		    !_v_control_mode.flag_control_velocity_enabled &&
-		    !_v_control_mode.flag_control_position_enabled) {
-
-			// landing gear controlled from stick inputs if we are in Manual/Stabilized mode
-			//  limit landing gear update rate to 50 Hz
-			if (hrt_elapsed_time(&_landing_gear.timestamp) > 20_ms) {
-				_landing_gear.landing_gear = get_landing_gear_state();
-				_landing_gear.timestamp = hrt_absolute_time();
-				_landing_gear_pub.publish(_landing_gear);
+				if (_vehicle_land_detected_sub.copy(&vehicle_land_detected)) {
+					_landed = vehicle_land_detected.landed;
+					_maybe_landed = vehicle_land_detected.maybe_landed;
+				}
 			}
 
-			if (!_v_control_mode.flag_control_attitude_enabled) {
-				manual_rate_sp = true;
-			}
-
-			// Check if we are in rattitude mode and the pilot is within the center threshold on pitch and roll
-			//  if true then use published rate setpoint, otherwise generate from manual_control_setpoint (like acro)
-			if (_v_control_mode.flag_control_rattitude_enabled) {
-				manual_rate_sp =
-					(fabsf(_manual_control_sp.y) > _param_mc_ratt_th.get()) ||
-					(fabsf(_manual_control_sp.x) > _param_mc_ratt_th.get());
-			}
-
-		} else {
-			_landing_gear_sub.update(&_landing_gear);
-		}
-
-		if (manual_rate_sp) {
-			if (manual_control_updated) {
-
-				// manual rates control - ACRO mode
-				const Vector3f man_rate_sp{
-					math::superexpo(_manual_control_sp.y, _param_mc_acro_expo.get(), _param_mc_acro_supexpo.get()),
-					math::superexpo(-_manual_control_sp.x, _param_mc_acro_expo.get(), _param_mc_acro_supexpo.get()),
-					math::superexpo(_manual_control_sp.r, _param_mc_acro_expo_y.get(), _param_mc_acro_supexpoy.get())};
-
-				_rates_sp = man_rate_sp.emult(_acro_rate_max);
-				_thrust_sp = _manual_control_sp.z;
-
-				// publish rate setpoint
-				vehicle_rates_setpoint_s v_rates_sp{};
-				v_rates_sp.roll = _rates_sp(0);
-				v_rates_sp.pitch = _rates_sp(1);
-				v_rates_sp.yaw = _rates_sp(2);
-				v_rates_sp.thrust_body[0] = 0.0f;
-				v_rates_sp.thrust_body[1] = 0.0f;
-				v_rates_sp.thrust_body[2] = -_thrust_sp;
-				v_rates_sp.timestamp = hrt_absolute_time();
-
-				_v_rates_sp_pub.publish(v_rates_sp);
-			}
-
-		} else {
-			// use rates setpoint topic
-			vehicle_rates_setpoint_s v_rates_sp;
-
-			if (_v_rates_sp_sub.update(&v_rates_sp)) {
-				_rates_sp(0) = v_rates_sp.roll;
-				_rates_sp(1) = v_rates_sp.pitch;
-				_rates_sp(2) = v_rates_sp.yaw;
-				_thrust_sp = -v_rates_sp.thrust_body[2];
-			}
-		}
-
-		// calculate loop update rate while disarmed or at least a few times (updating the filter is expensive)
-		if (!_v_control_mode.flag_armed || (now - _task_start) < 3300000) {
-			_dt_accumulator += dt;
-			++_loop_counter;
-
-			if (_dt_accumulator > 1.0f) {
-				const float loop_update_rate = (float)_loop_counter / _dt_accumulator;
-				_loop_update_rate_hz = _loop_update_rate_hz * 0.5f + loop_update_rate * 0.5f;
-				_dt_accumulator = 0;
-				_loop_counter = 0;
-				_rate_control.setDTermCutoff(_loop_update_rate_hz, _param_mc_dterm_cutoff.get(), true);
-			}
-		}
-
-		// run the rate controller
-		if (_v_control_mode.flag_control_rates_enabled && !_actuators_0_circuit_breaker_enabled) {
-
-			// reset integral if disarmed
-			if (!_v_control_mode.flag_armed || _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
-				_rate_control.resetIntegral();
+			// update landing gear
+			if (_landing_gear_sub.updated()) {
+				landing_gear_s landing_gear{};
+				_landing_gear_sub.copy(&landing_gear);
+				_landing_gear_actuator = (float)landing_gear.landing_gear;
 			}
 
 			// update saturation status from mixer feedback
@@ -290,51 +169,80 @@ MulticopterRateControl::Run()
 				}
 			}
 
-			// run rate controller
-			const Vector3f att_control = _rate_control.update(rates, _rates_sp, dt, _maybe_landed || _landed);
+			// update rate setpoint
+			if (_v_rates_sp_sub.updated()) {
+				vehicle_rates_setpoint_s v_rates_sp;
+				_v_rates_sp_sub.copy(&v_rates_sp);
+				_rates_sp(0) = v_rates_sp.roll;
+				_rates_sp(1) = v_rates_sp.pitch;
+				_rates_sp(2) = v_rates_sp.yaw;
+				_thrust_sp = -v_rates_sp.thrust_body[2];
+			}
+
+			// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
+			const hrt_abstime now = hrt_absolute_time();
+			const float dt = math::constrain(((now - _last_run) / 1e6f), 0.0002f, 0.02f);
+			_last_run = now;
+
+			// calculate loop update rate while disarmed or at least a few times (updating the filter is expensive)
+			if (!_v_control_mode.flag_armed || (now - _task_start) < 3300000) {
+				_dt_accumulator += dt;
+				++_loop_counter;
+
+				if (_dt_accumulator > 1.0f) {
+					const float loop_update_rate = (float)_loop_counter / _dt_accumulator;
+					_loop_update_rate_hz = _loop_update_rate_hz * 0.5f + loop_update_rate * 0.5f;
+					_dt_accumulator = 0;
+					_loop_counter = 0;
+					_rate_control.setDTermCutoff(_loop_update_rate_hz, _param_mc_dterm_cutoff.get(), true);
+				}
+			}
+
+			actuator_controls_s actuators{};
+
+			if (!_v_control_mode.flag_control_termination_enabled) {
+
+				// reset integral if disarmed
+				if (!_v_control_mode.flag_armed || (_vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING)) {
+					_rate_control.resetIntegral();
+				}
+
+				// run rate controller and fill actuator controls
+				Vector3f att_control = _rate_control.update(Vector3f{angular_velocity.xyz}, _rates_sp, dt, _maybe_landed || _landed);
+				float throttle = _thrust_sp;
+
+				// scale effort by battery status if enabled
+				if (_param_mc_bat_scale_en.get()) {
+					if (_battery_status_sub.updated()) {
+						battery_status_s battery_status;
+
+						if (_battery_status_sub.copy(&battery_status)) {
+							_battery_status_scale = battery_status.scale;
+						}
+					}
+
+					if (_battery_status_scale > 0.0f) {
+						att_control *= _battery_status_scale;
+						throttle *= _battery_status_scale;
+					}
+				}
+
+				actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.0f;
+				actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(throttle) ? throttle : 0.0f;
+			}
+
+			actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear_actuator;
+			actuators.timestamp_sample = angular_velocity.timestamp_sample;
+			actuators.timestamp = hrt_absolute_time();
+			orb_publish_auto(_actuators_id, &_actuators_0_pub, &actuators, nullptr, ORB_PRIO_DEFAULT);
 
 			// publish rate controller status
 			rate_ctrl_status_s rate_ctrl_status{};
 			_rate_control.getRateControlStatus(rate_ctrl_status);
 			rate_ctrl_status.timestamp = hrt_absolute_time();
 			_controller_status_pub.publish(rate_ctrl_status);
-
-			// publish actuator controls
-			actuator_controls_s actuators{};
-			actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_thrust_sp) ? _thrust_sp : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = (float)_landing_gear.landing_gear;
-			actuators.timestamp_sample = angular_velocity.timestamp_sample;
-
-			// scale effort by battery status if enabled
-			if (_param_mc_bat_scale_en.get()) {
-				if (_battery_status_sub.updated()) {
-					battery_status_s battery_status;
-
-					if (_battery_status_sub.copy(&battery_status)) {
-						_battery_status_scale = battery_status.scale;
-					}
-				}
-
-				if (_battery_status_scale > 0.0f) {
-					for (int i = 0; i < 4; i++) {
-						actuators.control[i] *= _battery_status_scale;
-					}
-				}
-			}
-
-			actuators.timestamp = hrt_absolute_time();
-			orb_publish_auto(_actuators_id, &_actuators_0_pub, &actuators, nullptr, ORB_PRIO_DEFAULT);
-
-		} else if (_v_control_mode.flag_control_termination_enabled) {
-			if (!_vehicle_status.is_vtol) {
-				// publish actuator controls
-				actuator_controls_s actuators{};
-				actuators.timestamp = hrt_absolute_time();
-				orb_publish_auto(_actuators_id, &_actuators_0_pub, &actuators, nullptr, ORB_PRIO_DEFAULT);
-			}
 		}
 	}
 
@@ -387,8 +295,7 @@ int MulticopterRateControl::print_usage(const char *reason)
 	PRINT_MODULE_DESCRIPTION(
 		R"DESCR_STR(
 ### Description
-This implements the multicopter rate controller. It takes rate setpoints (in acro mode
-via `manual_control_setpoint` topic) as inputs and outputs actuator control messages.
+This implements the multicopter rate controller. It takes rate setpoints as inputs and outputs actuator control messages.
 
 The controller has a PID loop for angular rate error.
 

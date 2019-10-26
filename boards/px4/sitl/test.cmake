@@ -39,6 +39,7 @@ px4_add_board(
 		mc_att_control
 		mc_rate_control
 		mc_pos_control
+		mc_manual_stick_mapper
 		navigator
 		replay
 		sensors
