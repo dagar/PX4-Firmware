@@ -85,6 +85,7 @@ px4_add_board(
 
 	SYSTEMCMDS
 		bl_update
+		board
 		config
 		dmesg
 		dumpfile

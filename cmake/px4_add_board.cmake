@@ -276,4 +276,11 @@ function(px4_add_board)
 
 	set(config_module_list ${config_module_list} PARENT_SCOPE)
 
+
+	execute_process(
+		COMMAND python ./Tools/board_manifest/generate.py boards/px4/fmu-v5/board_manifest.yml
+		OUTPUT_FILE ${CMAKE_BINARY_DIR}/board_drivers.cpp
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		)
+
 endfunction()

@@ -1,0 +1,36 @@
+name: px4_fmu-v5
+id: 19
+drivers:
+  I2C1:
+    - name: rgbled
+      address: 0x84
+      speed: 100000
+    - name: ist8310
+      address: 0x72
+      speed: 400000
+  SPI1:
+    - name: icm20689
+      spidev: PX4_SPIDEV_ICM_20689
+      interrupt: GPIO_SPI1_DRDY1_ICM20689
+      mode: SPIDEV_MODE0
+      speed: 10000000
+    - name: icm20602
+      spidev: PX4_SPIDEV_ICM_20602
+      interrupt: GPIO_SPI1_DRDY4_ICM20602
+      mode: SPIDEV_MODE0
+      speed: 10000000
+    - name: bmi055_accel
+      spidev: PX4_SPIDEV_BMI055_GYR
+      interrupt: GPIO_SPI1_DRDY3_BMI055_ACC
+      mode: SPIDEV_MODE0
+      speed: 10000000
+    - name: bmi055_gyro
+      spidev: PX4_SPIDEV_BMI055_ACC
+      interrupt: GPIO_SPI1_DRDY2_BMI055_GYRO
+      mode: SPIDEV_MODE0
+      speed: 10000000
+  SPI2:
+    - name: ms5611
+      spidev: PX4_SPIDEV_BARO
+      mode: SPIDEV_MODE0
+      speed: 1000000
