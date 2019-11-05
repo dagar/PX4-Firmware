@@ -117,7 +117,7 @@ private:
 
 	bool changeMode(Mode newMode);
 
-	uORB::PublicationMulti<optical_flow_s> _optical_flow_pub{ORB_ID(optical_flow)};
+	PX4OpticalFlow	_px4_optical_flow;
 
 	perf_counter_t	_sample_perf;
 	perf_counter_t	_comms_errors;
@@ -128,8 +128,6 @@ private:
 	uint64_t	_previous_collect_timestamp{0};
 	uint64_t	_flow_dt_sum_usec{0};
 	unsigned	_frame_count_since_last{0};
-
-	enum Rotation	_yaw_rotation {ROTATION_NONE};
 
 	int		_flow_sum_x{0};
 	int		_flow_sum_y{0};

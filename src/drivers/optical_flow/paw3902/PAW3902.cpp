@@ -36,9 +36,9 @@
 PAW3902::PAW3902(int bus, enum Rotation yaw_rotation) :
 	SPI("PAW3902", nullptr, bus, PAW3902_SPIDEV, SPIDEV_MODE0, PAW3902_SPI_BUS_SPEED),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
-	_sample_perf(perf_alloc(PC_ELAPSED, "paw3902: read")),
-	_comms_errors(perf_alloc(PC_COUNT, "paw3902: com_err")),
-	_dupe_count_perf(perf_alloc(PC_COUNT, "paw3902: duplicate reading")),
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": com_err")),
+	_dupe_count_perf(perf_alloc(PC_COUNT, MODULE_NAME": duplicate reading")),
 	_yaw_rotation(yaw_rotation)
 {
 }
@@ -57,20 +57,6 @@ PAW3902::~PAW3902()
 int
 PAW3902::init()
 {
-	// get yaw rotation from sensor frame to body frame
-	param_t rot = param_find("SENS_FLOW_ROT");
-
-	if (rot != PARAM_INVALID) {
-		int32_t val = 0;
-
-		if (param_get(rot, &val) == PX4_OK) {
-			_yaw_rotation = (enum Rotation)val;
-		}
-	}
-
-	/* For devices competing with NuttX SPI drivers on a bus (Crazyflie SD Card expansion board) */
-	SPI::set_lockmode(LOCK_THREADS);
-
 	/* do SPI init (and probe) first */
 	if (SPI::init() != OK) {
 		return PX4_ERROR;
@@ -638,36 +624,8 @@ PAW3902::Run()
 		return;
 	}
 
-	optical_flow_s report{};
-	report.timestamp = timestamp_sample;
-
-
-	//PX4_INFO("X: %d Y: %d", _flow_sum_x, _flow_sum_y);
-
-	report.pixel_flow_x_integral = (float)_flow_sum_x / 500.0f;	// proportional factor + convert from pixels to radians
-	report.pixel_flow_y_integral = (float)_flow_sum_y / 500.0f;	// proportional factor + convert from pixels to radians
-
-	// rotate measurements in yaw from sensor frame to body frame according to parameter SENS_FLOW_ROT
-	float zeroval = 0.0f;
-	rotate_3f(_yaw_rotation, report.pixel_flow_x_integral, report.pixel_flow_y_integral, zeroval);
-
-	report.frame_count_since_last_readout = _frame_count_since_last;
-	report.integration_timespan = _flow_dt_sum_usec;	// microseconds
-
-	report.sensor_id = 0;
-	report.quality = buf.data.SQUAL;
-
-	/* No gyro on this board */
-	report.gyro_x_rate_integral = NAN;
-	report.gyro_y_rate_integral = NAN;
-	report.gyro_z_rate_integral = NAN;
-
-	// set (conservative) specs according to datasheet
-	report.max_flow_rate = 5.0f;       // Datasheet: 7.4 rad/s
-	report.min_ground_distance = 0.08f; // Datasheet: 80mm
-	report.max_ground_distance = 30.0f; // Datasheet: infinity
-
-	_optical_flow_pub.publish(report);
+	int quality = buf.data.SQUAL;
+	_px4_optical_flow.update(timestamp_sample, delta_x, delta_y, quality);
 
 	// reset
 	_flow_dt_sum_usec = 0;

@@ -46,6 +46,7 @@
 #include <conversion/rotation.h>
 #include <lib/perf/perf_counter.h>
 #include <lib/parameters/param.h>
+#include <lib/drivers/optical_flow/PX4OpticalFlow.hpp>
 #include <drivers/drv_hrt.h>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/optical_flow.h>
@@ -77,8 +78,6 @@
 #define DIR_WRITE(a) ((a) | (1 << 7))
 #define DIR_READ(a) ((a) & 0x7f)
 
-#define PMW3901_DEVICE_PATH "/dev/pmw3901"
-
 /* PMW3901 Registers addresses */
 #define PMW3901_US 1000 /*   1 ms */
 #define PMW3901_SAMPLE_INTERVAL 10000 /*  10 ms */
@@ -87,7 +86,7 @@
 class PMW3901 : public device::SPI, public px4::ScheduledWorkItem
 {
 public:
-	PMW3901(int bus = PMW3901_BUS, enum Rotation yaw_rotation = (enum Rotation)0);
+	PMW3901(int bus = PMW3901_BUS, enum Rotation yaw_rotation = ROTATION_NONE);
 
 	virtual ~PMW3901();
 
@@ -103,16 +102,14 @@ protected:
 
 private:
 
-	const uint64_t _collect_time{15000}; // usecs, ensures flow data is published every second iteration of Run() (100Hz -> 50Hz)
+	PX4OpticalFlow	_px4_optical_flow;
 
-	uORB::PublicationMulti<optical_flow_s> _optical_flow_pub{ORB_ID(optical_flow)};
+	const uint64_t _collect_time{15000}; // usecs, ensures flow data is published every second iteration of Run() (100Hz -> 50Hz)
 
 	perf_counter_t _sample_perf;
 	perf_counter_t _comms_errors;
 
 	uint64_t _previous_collect_timestamp{0};
-
-	enum Rotation _yaw_rotation;
 
 	int _flow_sum_x{0};
 	int _flow_sum_y{0};

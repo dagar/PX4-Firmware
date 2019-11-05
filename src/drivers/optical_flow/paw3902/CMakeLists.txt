@@ -37,4 +37,6 @@ px4_add_module(
 	SRCS
 		paw3902_main.cpp
 		PAW3902.cpp
+	DEPENDS
+		drivers_optical_flow
 	)
