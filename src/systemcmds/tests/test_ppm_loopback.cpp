@@ -121,7 +121,7 @@ int test_ppm_loopback(int argc, char *argv[])
 
 	warnx("servo count: %d", servo_count);
 
-	struct pwm_output_values pwm_out = {.values = {0}, .channel_count = 0};
+	struct pwm_output_values pwm_out{};
 
 	for (unsigned i = 0; (i < servo_count) && (i < sizeof(pwm_values) / sizeof(pwm_values[0])); i++) {
 		pwm_out.values[i] = pwm_values[i];

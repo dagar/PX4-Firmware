@@ -32,21 +32,23 @@
 ############################################################################
 
 set(SRCS
-	conversions.c
-	cpuload.c
-	crc.c
+	conversions.cpp
+	cpuload.cpp
+	crc.cpp
 	mavlink_log.cpp
-	otp.c
+	otp.cpp
 	)
 
 if(${PX4_PLATFORM} STREQUAL "nuttx")
 	list(APPEND SRCS
-		print_load_nuttx.c
+		print_load_nuttx.cpp
 		)
+	set_source_files_properties(print_load_nuttx.cpp PROPERTIES COMPILE_FLAGS -Wno-error=write-strings)
 else()
 	list(APPEND SRCS
-		print_load_posix.c
+		print_load_posix.cpp
 		)
+	set_source_files_properties(print_load_posix.cpp PROPERTIES COMPILE_FLAGS -Wno-error=write-strings)
 endif()
 
 px4_add_library(systemlib ${SRCS})

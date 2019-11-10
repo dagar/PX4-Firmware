@@ -87,7 +87,7 @@ int test_jig_voltages(int argc, char *argv[])
 	/* Expected values */
 	int16_t expected_min[] = {2800, 2800, 1800,  800};
 	int16_t expected_max[] = {3100, 3100, 2100, 1100};
-	char *check_res[channels];
+	const char* check_res[channels] {"FAIL", "FAIL", "FAIL", "FAIL"};
 
 	if (channels < 4) {
 		close(fd);

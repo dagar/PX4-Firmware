@@ -74,7 +74,7 @@ if (DEFINED ENV{BUILD_URI})
 	set(BUILD_URI $ENV{BUILD_URI})
 endif()
 
-add_library(version version.c)
+add_library(version version.cpp)
 
 target_compile_definitions(version
 	PUBLIC

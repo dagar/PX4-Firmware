@@ -31,54 +31,11 @@
 #
 ############################################################################
 
-set(srcs
-	test_adc.c
-	test_autodeclination.cpp
-	test_bezierQuad.cpp
-	test_bson.cpp
-	test_conv.cpp
-	test_dataman.c
-	test_file.c
-	test_file2.c
-	test_float.cpp
-	test_hott_telemetry.c
-	test_hrt.cpp
-	test_int.cpp
-	test_IntrusiveQueue.cpp
-	test_jig_voltages.c
-	test_led.c
-	test_List.cpp
-	test_mathlib.cpp
-	test_matrix.cpp
-	test_microbench_hrt.cpp
-	test_microbench_math.cpp
-	test_microbench_matrix.cpp
-	test_microbench_uorb.cpp
-	test_mixer.cpp
-	test_mount.c
-	test_param.c
-	test_parameters.cpp
-	test_perf.c
-	test_ppm.cpp
-	test_ppm_loopback.c
-	test_rc.c
-	test_search_min.cpp
-	test_servo.c
-	test_sleep.c
-	test_smooth_z.cpp
-	test_tone.cpp
-	test_uart_baudchange.c
-	test_uart_console.c
-	test_uart_loopback.c
-	test_uart_send.c
-	test_versioning.cpp
-	tests_main.c
-	)
-
+set(EXTRA_SRCS)
 if(${PX4_PLATFORM} STREQUAL "nuttx")
-	list(APPEND srcs
-		test_time.c
-		test_uart_break.c
+	list(APPEND EXTRA_SRCS
+		test_time.cpp
+		test_uart_break.cpp
 		)
 endif()
 
@@ -95,8 +52,50 @@ px4_add_module(
 		-Wno-unused-but-set-variable
 		-Wno-unused-result
 		-Wno-unused-variable
+		-fno-permissive
 	SRCS
-		${srcs}
+		test_adc.cpp
+		test_autodeclination.cpp
+		test_bezierQuad.cpp
+		test_bson.cpp
+		test_conv.cpp
+		test_dataman.cpp
+		test_file.cpp
+		test_file2.cpp
+		test_float.cpp
+		test_hott_telemetry.cpp
+		test_hrt.cpp
+		test_int.cpp
+		test_IntrusiveQueue.cpp
+		test_jig_voltages.cpp
+		test_led.cpp
+		test_List.cpp
+		test_mathlib.cpp
+		test_matrix.cpp
+		test_microbench_hrt.cpp
+		test_microbench_math.cpp
+		test_microbench_matrix.cpp
+		test_microbench_uorb.cpp
+		test_mixer.cpp
+		test_mount.cpp
+		test_param.cpp
+		test_parameters.cpp
+		test_perf.cpp
+		test_ppm.cpp
+		test_ppm_loopback.cpp
+		test_rc.cpp
+		test_search_min.cpp
+		test_servo.cpp
+		test_sleep.cpp
+		test_smooth_z.cpp
+		test_tone.cpp
+		test_uart_baudchange.cpp
+		test_uart_console.cpp
+		test_uart_loopback.cpp
+		test_uart_send.cpp
+		test_versioning.cpp
+		tests_main.cpp
+		${EXTRA_SRCS}
 	DEPENDS
 		git_ecl
 		ecl_geo_lookup # TODO: move this

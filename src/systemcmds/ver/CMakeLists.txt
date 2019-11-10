@@ -33,9 +33,8 @@
 px4_add_module(
 	MODULE systemcmds__ver
 	MAIN ver
-	COMPILE_FLAGS
 	SRCS
-		ver.c
+		ver.cpp
 	DEPENDS
 		version
 	)

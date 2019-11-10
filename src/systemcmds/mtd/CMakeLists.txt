@@ -33,10 +33,7 @@
 px4_add_module(
 	MODULE systemcmds__mtd
 	MAIN mtd
-	COMPILE_FLAGS
 	SRCS
-		mtd.c
-		24xxxx_mtd.c
-	DEPENDS
+		mtd.cpp
+		24xxxx_mtd.cpp
 	)
-

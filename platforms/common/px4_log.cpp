@@ -51,11 +51,6 @@
 
 static orb_advert_t orb_log_message_pub = NULL;
 
-__EXPORT const char *__px4_log_level_str[_PX4_LOG_LEVEL_PANIC + 1] = { "DEBUG", "INFO", "WARN", "ERROR", "PANIC" };
-__EXPORT const char *__px4_log_level_color[_PX4_LOG_LEVEL_PANIC + 1] =
-{ PX4_ANSI_COLOR_GREEN, PX4_ANSI_COLOR_RESET, PX4_ANSI_COLOR_YELLOW, PX4_ANSI_COLOR_RED, PX4_ANSI_COLOR_RED };
-
-
 void px4_log_initialize(void)
 {
 	assert(orb_log_message_pub == NULL);

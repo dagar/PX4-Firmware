@@ -33,9 +33,6 @@
 px4_add_module(
 	MODULE systemcmds__reflect
 	MAIN reflect
-	COMPILE_FLAGS
 	SRCS
-		reflect.c
-	DEPENDS
-	)
-
+		reflect.cpp
+)

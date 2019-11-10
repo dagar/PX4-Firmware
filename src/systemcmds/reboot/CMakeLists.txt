@@ -33,9 +33,7 @@
 px4_add_module(
 	MODULE systemcmds__reboot
 	MAIN reboot
-	COMPILE_FLAGS
 	SRCS
-		reboot.c
+		reboot.cpp
 	DEPENDS
-	)
-
+)

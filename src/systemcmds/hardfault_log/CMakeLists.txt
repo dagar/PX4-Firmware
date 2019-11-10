@@ -36,7 +36,7 @@ px4_add_module(
 	COMPILE_FLAGS
 		-Wno-cast-align # TODO: fix and enable
 	SRCS
-		hardfault_log.c
+		hardfault_log.cpp
 	DEPENDS
 		version
-	)
+)

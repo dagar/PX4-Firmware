@@ -34,9 +34,6 @@ px4_add_module(
 	MODULE systemcmds__dumpfile
 	MAIN dumpfile
 	STACK_MAIN 4096
-	COMPILE_FLAGS
 	SRCS
-		dumpfile.c
-	DEPENDS
+		dumpfile.cpp
 	)
-

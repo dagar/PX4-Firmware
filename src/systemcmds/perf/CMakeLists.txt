@@ -33,9 +33,8 @@
 px4_add_module(
 	MODULE systemcmds__perf
 	MAIN perf
-	COMPILE_FLAGS
 	SRCS
-		perf.c
+		perf.cpp
 	DEPENDS
 		perf
-	)
+)

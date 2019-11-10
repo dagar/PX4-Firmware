@@ -213,7 +213,7 @@ void print_load_buffer(uint64_t t, char *buffer, int buffer_length, print_load_c
 #if CONFIG_RR_INTERVAL > 0
 		unsigned tcb_timeslice = system_load.tasks[i].tcb->timeslice;
 #endif
-		unsigned tcb_task_state = system_load.tasks[i].tcb->task_state;
+		tstate_t tcb_task_state = (tstate_t)system_load.tasks[i].tcb->task_state;
 		unsigned tcb_sched_priority = system_load.tasks[i].tcb->sched_priority;
 
 		unsigned int tcb_num_used_fds = 0; // number of used file descriptors
@@ -254,6 +254,8 @@ void print_load_buffer(uint64_t t, char *buffer, int buffer_length, print_load_c
 		case TSTATE_TASK_INACTIVE:
 		case TSTATE_WAIT_SEM:
 			print_state->blocked_count++;
+			break;
+		default:
 			break;
 		}
 

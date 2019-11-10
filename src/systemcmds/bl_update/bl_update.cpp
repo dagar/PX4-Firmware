@@ -123,7 +123,7 @@ bl_update_main(int argc, char *argv[])
 		return 1;
 	}
 
-	uint8_t *buf = malloc(s.st_size);
+	uint8_t *buf = (uint8_t *)malloc(s.st_size);
 
 	if (buf == NULL)
 	{

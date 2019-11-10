@@ -34,6 +34,5 @@ px4_add_module(
 	MODULE examples__hwtest
 	MAIN ex_hwtest
 	SRCS
-		hwtest.c
-	DEPENDS
+		hwtest.cpp
 	)

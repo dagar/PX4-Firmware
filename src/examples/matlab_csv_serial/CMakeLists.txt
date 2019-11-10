@@ -34,6 +34,5 @@ px4_add_module(
 	MODULE examples__matlab_csv_serial
 	MAIN matlab_csv_serial
 	SRCS
-		matlab_csv_serial.c
-	DEPENDS
+		matlab_csv_serial.cpp
 	)

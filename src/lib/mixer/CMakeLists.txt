@@ -87,7 +87,7 @@ add_library(mixer
 	mixer.cpp
 	mixer_group.cpp
 	mixer_helicopter.cpp
-	mixer_load.c
+	mixer_load.cpp
 	mixer_multirotor.cpp
 	mixer_simple.cpp
 )
