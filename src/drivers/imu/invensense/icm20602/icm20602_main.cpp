@@ -49,14 +49,30 @@ static int start(enum Rotation rotation)
 	// create the driver
 #if defined(PX4_SPI_BUS_SENSORS)
 	g_dev = new ICM20602(PX4_SPI_BUS_SENSORS, PX4_SPIDEV_ICM_20602, rotation);
+
+
+
+
 #elif defined(PX4_SPI_BUS_SENSORS1)
 	g_dev = new ICM20602(PX4_SPI_BUS_SENSORS1, PX4_SPIDEV_ICM_20602, rotation);
 #endif
 
-	if (g_dev == nullptr) {
-		PX4_ERR("driver start failed");
-		return -1;
-	}
+	using interface = SPI<PX4_SPI_BUS_SENSORS1, PX4_SPIDEV_ICM_20602>
+
+				  SPIDevice<InvenSenseIMU<ICM20602>, PX4_SPI_BUS_SENSORS1, PX4_SPIDEV_ICM_20602>
+
+				  DataReadyInterruptScheduled<device, gpio_t>
+
+				  IntervalScheduled<device, 1000_Hz>
+
+
+	// SPI/I2C
+	//   - read dirs
+
+				  if (g_dev == nullptr) {
+			PX4_ERR("driver start failed");
+			return -1;
+		}
 
 	if (!g_dev->Init()) {
 		PX4_ERR("driver init failed");

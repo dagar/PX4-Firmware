@@ -31,70 +31,81 @@
  *
  ****************************************************************************/
 
-/**
- * @file ICM20602.hpp
- *
- * Driver for the Invensense ICM20602 connected via SPI.
- *
- */
-
-#pragma once
-
-#include "InvenSense_ICM20602_registers.hpp"
-
-#include <drivers/drv_hrt.h>
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
-#include <lib/drivers/device/spi.h>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
-#include <lib/ecl/geo/geo.h>
-#include <lib/perf/perf_counter.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-
-using InvenSense_ICM20602::Register;
-
-class ICM20602 : public device::SPI, public px4::ScheduledWorkItem
+template< class T >
+class LoggingTask : public T
 {
 public:
-	ICM20602(int bus, uint32_t device, enum Rotation rotation = ROTATION_NONE);
-	virtual ~ICM20602();
+	void Execute()
+	{
+		std::cout << "LOG: The task is starting - " << GetName().c_str() << std::endl;
+		T::Execute();
+		std::cout << "LOG: The task has completed - " << GetName().c_str() << std::endl;
+	}
+};
 
-	bool			Init();
-	void			Start();
-	void			Stop();
-	bool			Reset();
-	void			PrintInfo();
+template<class T>
+class TimingTask : public T
+{
+	Timer timer_;
+public:
+	void Execute()
+	{
+		timer_.Reset();
+		T::Execute();
+		double t = timer_.GetElapsedTimeSecs();
+		std::cout << "Task Duration: " << t << " seconds" << std::endl;
+	}
+};
+
+class MyTask
+{
+public:
+	void Execute()
+	{
+		std::cout << "...This is where the task is executed..." << std::endl;
+	}
+
+	std::string GetName()
+	{
+		return "My task name";
+	}
+};
+
+class PX4Driver
+{
+public:
+	virtual bool Start() = 0;
+	virtual bool Stop() = 0;
+	virtual bool Status() = 0;
+	virtual bool PrintStatus() = 0;
+}
+
+template<typename Interface, typename SchdedulePolicy>
+class MPU6000 : public PX4Driver, private Interface
+{
+public:
+	virtual void measure()
+	{
+		RegisterRead();
+	}
 
 private:
-
-	int			probe() override;
-
-	static int		DataReadyInterruptCallback(int irq, void *context, void *arg);
-	void			DataReady();
-
-	void			Run() override;
-
-	uint8_t			RegisterRead(Register reg);
-	void			RegisterWrite(Register reg, uint8_t value);
-	void			RegisterSetBits(Register reg, uint8_t setbits);
-	void			RegisterClearBits(Register reg, uint8_t clearbits);
-
-	void			ResetFIFO();
-
-
-	uint8_t			*_dma_data_buffer{nullptr};
-
-	PX4Accelerometer	_px4_accel;
-	PX4Gyroscope		_px4_gyro;
-
-	perf_counter_t		_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": run interval")};
-	perf_counter_t		_transfer_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": transfer")};
-	perf_counter_t		_fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo empty")};
-	perf_counter_t		_fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo overflow")};
-	perf_counter_t		_fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo reset")};
-	perf_counter_t		_drdy_count_perf{perf_alloc(PC_COUNT, MODULE_NAME": drdy count")};
-	perf_counter_t		_drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": drdy interval")};
-
-	hrt_abstime		_time_data_ready{0};
-	int			_data_ready_count{0};
-
+	using Interface::RegisterRead;
 };
+
+template<typename T>
+class IntervalScheduled : public T, public px4::ScheduledWorkItem
+{
+	void Run() override;
+};
+
+
+
+void main()
+{
+
+
+	InvervalScheduled<MPU6000<SPI>
+
+
+}
