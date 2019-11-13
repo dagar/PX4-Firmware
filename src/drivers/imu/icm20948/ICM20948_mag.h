@@ -43,39 +43,26 @@ static constexpr float ICM20948_MAG_RANGE_GA{1.5e-3f};
 #define ICM20948_AK09916_SAMPLE_RATE 100
 
 #define AK09916_I2C_ADDR         0x0C
-#define AK09916_DEVICE_ID        0x48
+
+#define AK09916_DEVICE_ID        0b00001001
 
 #define AK09916REG_WIA           0x00
-#define AK09916REG_CNTL1         0x0A
-#define AK09916REG_ASAX          0x10
-
-#define AK09916_SINGLE_MEAS_MODE 0x01
-#define AK09916_CONTINUOUS_MODE1 0x02
-#define AK09916_CONTINUOUS_MODE2 0x06
-#define AK09916_POWERDOWN_MODE   0x00
-#define AK09916_SELFTEST_MODE    0x08
-#define AK09916_FUZE_MODE        0x0F
-#define AK09916_16BIT_ADC        0x10
-#define AK09916_14BIT_ADC        0x00
-#define AK09916_RESET            0x01
-#define AK09916_HOFL             0x08
-
-/* ak09916 deviating register addresses and bit definitions */
-
-#define AK09916_DEVICE_ID_A		0x48	// same as AK09916
-#define AK09916_DEVICE_ID_B		0x09	// additional ID byte ("INFO" on AK9063 without content specification.)
-
+#define AK09916REG_ST1        0x10
 #define AK09916REG_HXL        0x11
 #define AK09916REG_HXH        0x12
 #define AK09916REG_HYL        0x13
 #define AK09916REG_HYH        0x14
 #define AK09916REG_HZL        0x15
 #define AK09916REG_HZH        0x16
-#define AK09916REG_ST1        0x10
 #define AK09916REG_ST2        0x18
+#define AK09916REG_CNTL1          0x30
 #define AK09916REG_CNTL2          0x31
 #define AK09916REG_CNTL3          0x32
 
+#define AK09916REG_ASAX          0x10
+#define AK09916_FUZE_MODE        0x0F
+#define AK09916_16BIT_ADC        0x10
+#define AK09916_RESET            0x01
 
 #define AK09916_CNTL2_POWERDOWN_MODE            0x00
 #define AK09916_CNTL2_SINGLE_MODE               0x01 /* default */
@@ -96,7 +83,6 @@ struct ak09916_regs {
 	int16_t x;
 	int16_t y;
 	int16_t z;
-	uint8_t tmps;
 	uint8_t st2;
 };
 #pragma pack(pop)
@@ -122,7 +108,6 @@ public:
 	int ak09916_reset();
 	int ak09916_setup();
 	int ak09916_setup_master_i2c();
-	bool ak09916_check_id(uint8_t &id);
 	bool ak09916_read_adjustments();
 
 	void print_status() { _px4_mag.print_status(); }

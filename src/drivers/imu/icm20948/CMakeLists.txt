@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,15 +31,20 @@
 #
 ############################################################################
 px4_add_module(
-	MODULE drivers__icm20948
+	MODULE drivers__imu__icm20948
 	MAIN icm20948
 	COMPILE_FLAGS
+		-DDEBUG_BUILD
 	SRCS
 		icm20948.cpp
 		icm20948_i2c.cpp
 		icm20948_spi.cpp
 		icm20948_main.cpp
 		ICM20948_mag.cpp
-		mag_i2c.cpp
+		AK09916_I2C.cpp
 	DEPENDS
+		px4_work_queue
+		drivers_accelerometer
+		drivers_gyroscope
+		drivers_magnetometer
 	)

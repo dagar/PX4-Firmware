@@ -62,34 +62,6 @@ static constexpr float MPU9250_MAG_RANGE_GA{1.5e-3f};
 #define AK8963_RESET            0x01
 #define AK8963_HOFL             0x08
 
-/* ak09916 deviating register addresses and bit definitions */
-
-#define AK09916_DEVICE_ID_A		0x48	// same as AK8963
-#define AK09916_DEVICE_ID_B		0x09	// additional ID byte ("INFO" on AK9063 without content specification.)
-
-#define AK09916REG_HXL        0x11
-#define AK09916REG_HXH        0x12
-#define AK09916REG_HYL        0x13
-#define AK09916REG_HYH        0x14
-#define AK09916REG_HZL        0x15
-#define AK09916REG_HZH        0x16
-#define AK09916REG_ST1        0x10
-#define AK09916REG_ST2        0x18
-#define AK09916REG_CNTL2          0x31
-#define AK09916REG_CNTL3          0x32
-
-
-#define AK09916_CNTL2_POWERDOWN_MODE            0x00
-#define AK09916_CNTL2_SINGLE_MODE               0x01 /* default */
-#define AK09916_CNTL2_CONTINOUS_MODE_10HZ       0x02
-#define AK09916_CNTL2_CONTINOUS_MODE_20HZ       0x04
-#define AK09916_CNTL2_CONTINOUS_MODE_50HZ       0x06
-#define AK09916_CNTL2_CONTINOUS_MODE_100HZ      0x08
-#define AK09916_CNTL2_SELFTEST_MODE             0x10
-#define AK09916_CNTL3_SRST                      0x01
-#define AK09916_ST1_DRDY                        0x01
-#define AK09916_ST1_DOR                         0x02
-
 class MPU9250;
 
 #pragma pack(push, 1)

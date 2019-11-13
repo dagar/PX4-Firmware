@@ -76,7 +76,7 @@ ICM20948_I2C::ICM20948_I2C(int bus, uint32_t address) :
 }
 
 int
-ICM20948_I2C::write(unsigned reg_speed, void *data, unsigned count)
+ICM20948_I2C::write(unsigned address, void *data, unsigned count)
 {
 	uint8_t cmd[2] {};
 
@@ -84,22 +84,21 @@ ICM20948_I2C::write(unsigned reg_speed, void *data, unsigned count)
 		return -EIO;
 	}
 
-	cmd[0] = ICM20948_REG(reg_speed);
+	cmd[0] = REG_ADDRESS(address);
 	cmd[1] = *(uint8_t *)data;
 	return transfer(&cmd[0], count + 1, nullptr, 0);
 }
 
 int
-ICM20948_I2C::read(unsigned reg_speed, void *data, unsigned count)
+ICM20948_I2C::read(unsigned address, void *data, unsigned count)
 {
-	/* We want to avoid copying the data of MPUReport: So if the caller
-	 * supplies a buffer not MPUReport in size, it is assume to be a reg or
-	 * reg 16 read
-	 * Since MPUReport has a cmd at front, we must return the data
+	/* We want to avoid copying the data of ICMReport: So if the caller
+	 * supplies a buffer not ICMReport in size, it is assume to be a reg read
+	 * Since ICMReport has a cmd at front, we must return the data
 	 * after that. Foe anthing else we must return it
 	 */
-	uint32_t offset = count < sizeof(MPUReport) ? 0 : offsetof(MPUReport, status);
-	uint8_t cmd = ICM20948_REG(reg_speed);
+	uint32_t offset = count < sizeof(ICMReport) ? 0 : offsetof(ICMReport, accel_x);
+	uint8_t cmd = REG_ADDRESS(address);
 	return transfer(&cmd, 1, &((uint8_t *)data)[offset], count);
 }
 
@@ -109,8 +108,7 @@ ICM20948_I2C::probe()
 	uint8_t whoami = 0;
 	uint8_t register_select = REG_BANK(BANK0);  // register bank containing WHOAMI for ICM20948
 
-	// Try first for icm20948/6500
-	read(MPUREG_WHOAMI, &whoami, 1);
+	read(ICMREG_20948_WHOAMI, &whoami, 1);
 
 	/*
 	 * If it's not an MPU it must be an ICM

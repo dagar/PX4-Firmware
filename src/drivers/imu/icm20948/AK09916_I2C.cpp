@@ -37,10 +37,12 @@
  * I2C interface for AK09916
  */
 
+#include <px4_platform_common/px4_config.h>
+#include <drivers/device/i2c.h>
+#include <drivers/drv_device.h>
+
 #include "icm20948.h"
 #include "ICM20948_mag.h"
-
-#include <drivers/device/i2c.h>
 
 #ifdef USE_I2C
 
@@ -66,14 +68,13 @@ AK09916_I2C_interface(int bus)
 	return new AK09916_I2C(bus);
 }
 
-AK09916_I2C::AK09916_I2C(int bus) :
-	I2C("AK09916_I2C", nullptr, bus, AK09916_I2C_ADDR, 400000)
+AK09916_I2C::AK09916_I2C(int bus) : I2C("AK09916_I2C", nullptr, bus, AK09916_I2C_ADDR, 400000)
 {
-	_device_id.devid_s.devtype = DRV_DEVTYPE_ICM20948;
+	_device_id.devid_s.devtype = DRV_MAG_DEVTYPE_AK09916;
 }
 
 int
-AK09916_I2C::write(unsigned reg_speed, void *data, unsigned count)
+AK09916_I2C::write(unsigned address, void *data, unsigned count)
 {
 	uint8_t cmd[2] {};
 
@@ -81,15 +82,15 @@ AK09916_I2C::write(unsigned reg_speed, void *data, unsigned count)
 		return -EIO;
 	}
 
-	cmd[0] = ICM20948_REG(reg_speed);
+	cmd[0] = address;
 	cmd[1] = *(uint8_t *)data;
 	return transfer(&cmd[0], count + 1, nullptr, 0);
 }
 
 int
-AK09916_I2C::read(unsigned reg_speed, void *data, unsigned count)
+AK09916_I2C::read(unsigned address, void *data, unsigned count)
 {
-	uint8_t cmd = ICM20948_REG(reg_speed);
+	uint8_t cmd = address;
 	return transfer(&cmd, 1, (uint8_t *)data, count);
 }
 

@@ -86,7 +86,7 @@ ICM20948_mag::measure()
 
 	/* Check if data ready is set.
 	 * This is not described to be set in continuous mode according to the
-	 * MPU9250 datasheet. However, the datasheet of the 8963 recommends to
+	 * ICM20948 datasheet. However, the datasheet of the AK09916 recommends to
 	 * check data ready before doing the read and before triggering the
 	 * next measurement by reading ST2. */
 	if (!(st1 & AK09916_ST1_DRDY)) {
@@ -119,7 +119,7 @@ ICM20948_mag::_measure(hrt_abstime timestamp_sample, ak09916_regs data)
 {
 	/* Check if data ready is set.
 	 * This is not described to be set in continuous mode according to the
-	 * MPU9250 datasheet. However, the datasheet of the 8963 recommends to
+	 * ICM20948 datasheet. However, the datasheet of the AK09916 recommends to
 	 * check data ready before doing the read and before triggering the
 	 * next measurement by reading ST2.
 	 *
@@ -191,14 +191,6 @@ ICM20948_mag::read_reg(unsigned int reg)
 	return buf;
 }
 
-bool
-ICM20948_mag::ak09916_check_id(uint8_t &deviceid)
-{
-	deviceid = read_reg(AK09916REG_WIA);
-
-	return (AK09916_DEVICE_ID == deviceid);
-}
-
 /*
  * 400kHz I2C bus speed = 2.5us per bit = 25us per byte
  */
@@ -218,7 +210,7 @@ ICM20948_mag::write_reg(unsigned reg, uint8_t value)
 		passthrough_write(reg, value);
 
 	} else {
-		_interface->write(ICM20948_LOW_SPEED_OP(reg), &value, 1);
+		_interface->write(reg, &value, 1);
 	}
 }
 
@@ -255,7 +247,7 @@ ICM20948_mag::ak09916_read_adjustments()
 		passthrough_read(AK09916REG_ASAX, response, 3);
 	}
 
-	write_reg(AK09916REG_CNTL1, AK09916_POWERDOWN_MODE);
+	write_reg(AK09916REG_CNTL1, AK09916_CNTL2_POWERDOWN_MODE);
 
 	for (int i = 0; i < 3; i++) {
 		if (0 != response[i] && 0xff != response[i]) {
@@ -292,25 +284,24 @@ ICM20948_mag::ak09916_setup_master_i2c()
 	return OK;
 }
 int
-ICM20948_mag::ak09916_setup(void)
+ICM20948_mag::ak09916_setup()
 {
 	int retries = 10;
 
 	do {
-
 		ak09916_setup_master_i2c();
 		write_reg(AK09916REG_CNTL3, AK09916_RESET);
 
-		uint8_t id = 0;
+		uint8_t deviceid = read_reg(AK09916REG_WIA);
 
-		if (ak09916_check_id(id)) {
+		if (AK09916_DEVICE_ID == deviceid) {
 			break;
 		}
 
 		retries--;
-		PX4_WARN("AK09916: bad id %d retries %d", id, retries);
+		PX4_WARN("AK09916: bad id %d retries %d", deviceid, retries);
 		_parent->modify_reg(ICMREG_20948_USER_CTRL, 0, BIT_I2C_MST_RST);
-		up_udelay(100);
+		px4_usleep(200);
 	} while (retries > 0);
 
 	if (retries == 0) {

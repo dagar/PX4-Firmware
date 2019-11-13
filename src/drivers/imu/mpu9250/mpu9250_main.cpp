@@ -197,7 +197,7 @@ static int usage()
 	return 0;
 }
 
-} // namespace
+} // namespace mpu9250
 
 extern "C" int mpu9250_main(int argc, char *argv[])
 {
@@ -208,7 +208,7 @@ extern "C" int mpu9250_main(int argc, char *argv[])
 	MPU9250_BUS busid = MPU9250_BUS::ALL;
 	enum Rotation rotation = ROTATION_NONE;
 
-	while ((ch = px4_getopt(argc, argv, "XISstMR:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "XISstR:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 'X':
 			busid = MPU9250_BUS::I2C_EXTERNAL;

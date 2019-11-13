@@ -40,17 +40,6 @@
  * based on the icm20948 driver
  */
 
-#include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/time.h>
-#include <lib/ecl/geo/geo.h>
-#include <lib/perf/perf_counter.h>
-#include <systemlib/conversions.h>
-#include <systemlib/px4_macros.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/device/spi.h>
-#include <lib/conversion/rotation.h>
-
-#include "ICM20948_mag.h"
 #include "icm20948.h"
 
 /*
@@ -61,28 +50,9 @@
  */
 #define ICM20948_TIMER_REDUCTION				200
 
-/* Set accel range used */
-#define ACCEL_RANGE_G  16
-/*
-  list of registers that will be checked in check_registers(). Note
-  that MPUREG_PRODUCT_ID must be first in the list.
- */
-const uint16_t ICM20948::_icm20948_checked_registers[ICM20948_NUM_CHECKED_REGISTERS] = { ICMREG_20948_USER_CTRL,
-											 ICMREG_20948_PWR_MGMT_1,
-											 ICMREG_20948_PWR_MGMT_2,
-											 ICMREG_20948_INT_PIN_CFG,
-											 ICMREG_20948_INT_ENABLE,
-											 ICMREG_20948_INT_ENABLE_1,
-											 ICMREG_20948_INT_ENABLE_2,
-											 ICMREG_20948_INT_ENABLE_3,
-											 ICMREG_20948_GYRO_SMPLRT_DIV,
-											 ICMREG_20948_GYRO_CONFIG_1,
-											 ICMREG_20948_GYRO_CONFIG_2,
-											 ICMREG_20948_ACCEL_SMPLRT_DIV_1,
-											 ICMREG_20948_ACCEL_SMPLRT_DIV_2,
-											 ICMREG_20948_ACCEL_CONFIG,
-											 ICMREG_20948_ACCEL_CONFIG_2
-										       };
+
+constexpr uint16_t ICM20948::_checked_registers[];
+
 
 ICM20948::ICM20948(device::Device *interface, device::Device *mag_interface, enum Rotation rotation) :
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
@@ -91,9 +61,6 @@ ICM20948::ICM20948(device::Device *interface, device::Device *mag_interface, enu
 	_px4_gyro(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_DEFAULT : ORB_PRIO_HIGH), rotation),
 	_mag(this, mag_interface, rotation),
 	_selected_bank(0xFF),	// invalid/improbable bank value, will be set on first read/write
-	_dlpf_freq(ICM20948_DEFAULT_ONCHIP_FILTER_FREQ),
-	_dlpf_freq_icm_gyro(ICM20948_DEFAULT_ONCHIP_FILTER_FREQ),
-	_dlpf_freq_icm_accel(ICM20948_DEFAULT_ONCHIP_FILTER_FREQ),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
 	_bad_transfers(perf_alloc(PC_COUNT, MODULE_NAME": bad_trans")),
 	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": bad_reg")),
@@ -111,7 +78,6 @@ ICM20948::~ICM20948()
 
 	// delete the perf counter
 	perf_free(_sample_perf);
-	perf_free(_interval_perf);
 	perf_free(_bad_transfers);
 	perf_free(_bad_registers);
 	perf_free(_good_transfers);
@@ -196,32 +162,20 @@ int ICM20948::reset()
 int
 ICM20948::reset_mpu()
 {
-	switch (_whoami) {
-	case ICM_WHOAMI_20948:
-		write_reg(ICMREG_20948_PWR_MGMT_1, BIT_H_RESET);
-		px4_usleep(1000);
+	write_reg(ICMREG_20948_PWR_MGMT_1, BIT_H_RESET);
+	px4_usleep(2000);
 
-		write_checked_reg(ICMREG_20948_PWR_MGMT_1, MPU_CLK_SEL_AUTO);
-		px4_usleep(200);
-		write_checked_reg(ICMREG_20948_PWR_MGMT_2, 0);
-		break;
-	}
+	write_checked_reg(ICMREG_20948_PWR_MGMT_1, MPU_CLK_SEL_AUTO);
+	px4_usleep(1500);
+	write_checked_reg(ICMREG_20948_PWR_MGMT_2, 0);
 
 	// Enable I2C bus or Disable I2C bus (recommended on data sheet)
 	const bool is_i2c = (_interface->get_device_bus_type() == device::Device::DeviceBusType_I2C);
 	write_checked_reg(ICMREG_20948_USER_CTRL, is_i2c ? 0 : BIT_I2C_IF_DIS);
 
-	// SAMPLE RATE
-	_set_sample_rate(_sample_rate);
 
-	_set_dlpf_filter(ICM20948_DEFAULT_ONCHIP_FILTER_FREQ);
-
-	// Gyro scale 2000 deg/s ()
-	switch (_whoami) {
-	case ICM_WHOAMI_20948:
-		modify_checked_reg(ICMREG_20948_GYRO_CONFIG_1, ICM_BITS_GYRO_FS_SEL_MASK, ICM_BITS_GYRO_FS_SEL_2000DPS);
-		break;
-	}
+	// Gyro scale 2000 deg/s with DLPF
+	modify_checked_reg(ICMREG_20948_GYRO_CONFIG_1, 0, ICM_BITS_GYRO_DLPF_CFG_119HZ | ICM_BITS_GYRO_FS_SEL_2000DPS | 1);
 
 	// correct gyro scale factors
 	// scale to rad/s in SI units
@@ -230,10 +184,11 @@ ICM20948::reset_mpu()
 	// 1/(2^15)*(2000/180)*PI
 	_px4_gyro.set_scale(0.0174532 / 16.4); //1.0f / (32768.0f * (2000.0f / 180.0f) * M_PI_F);
 
-	set_accel_range(ACCEL_RANGE_G);
+	// Accel 16G with DLPF
+	modify_checked_reg(ICMREG_20948_ACCEL_CONFIG, 0, ICM_BITS_ACCEL_DLPF_CFG_111HZ | ICM_BITS_ACCEL_FS_SEL_16G | 1);
+	_px4_accel.set_scale(CONSTANTS_ONE_G / 16384);
 
-	// INT CFG => Interrupt on Data Ready
-	write_checked_reg(ICMREG_20948_INT_ENABLE_1, BIT_RAW_RDY_EN);        // INT: Raw data ready
+	modify_checked_reg(ICMREG_20948_ACCEL_CONFIG_2, 0, ICM_BITS_DEC3_CFG_32);
 
 #ifdef USE_I2C
 	bool bypass = !_mag.is_passthrough();
@@ -250,9 +205,8 @@ ICM20948::reset_mpu()
 	 * so bypass is true if the mag has an i2c non null interfaces.
 	 */
 
-	write_checked_reg(ICMREG_20948_INT_PIN_CFG, BIT_INT_ANYRD_2CLEAR | (bypass ? BIT_INT_BYPASS_EN : 0));
+	write_reg(ICMREG_20948_INT_PIN_CFG, BIT_INT_ANYRD_2CLEAR | (bypass ? BIT_INT_BYPASS_EN : 0));
 
-	write_checked_reg(ICMREG_20948_ACCEL_CONFIG_2, ICM_BITS_DEC3_CFG_32);
 
 	uint8_t retries = 3;
 	bool all_ok = false;
@@ -261,16 +215,19 @@ ICM20948::reset_mpu()
 
 		// Assume all checked values are as expected
 		all_ok = true;
-		uint8_t reg = 0;
-		uint8_t bankcheck = 0;
 
-		for (uint8_t i = 0; i < _num_checked_registers; i++) {
-			if ((reg = read_reg(_checked_registers[i])) != _checked_values[i]) {
-				_interface->read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &bankcheck, 1);
+		for (uint8_t i = 0; i < ICM20948_NUM_CHECKED_REGISTERS; i++) {
+			uint8_t value = read_reg(_checked_registers[i]);
+
+			if (value != _checked_values[i]) {
+				uint8_t bankcheck = 0;
+				_interface->read(ICMREG_20948_BANK_SEL, &bankcheck, 1);
+
+				PX4_ERR("Reg %d is: %d s/b: %d Tries: %d - bank s/b %d, is %d", REG_ADDRESS(_checked_registers[i]), value,
+					_checked_values[i], retries, REG_BANK(_checked_registers[i]), bankcheck);
 
 				write_reg(_checked_registers[i], _checked_values[i]);
-				PX4_ERR("Reg %d is:%d s/b:%d Tries:%d - bank s/b %d, is %d", _checked_registers[i], reg, _checked_values[i], retries,
-					REG_BANK(_checked_registers[i]), bankcheck);
+
 				all_ok = false;
 			}
 		}
@@ -282,196 +239,53 @@ ICM20948::reset_mpu()
 int
 ICM20948::probe()
 {
-	int ret = PX4_ERROR;
-
-	// Try first for icm20948/6500
-	_whoami = read_reg(MPUREG_WHOAMI);
-
-	// must be an ICM
-	// Make sure selected register bank is bank 0 (which contains WHOAMI)
-	select_register_bank(REG_BANK(ICMREG_20948_WHOAMI));
 	_whoami = read_reg(ICMREG_20948_WHOAMI);
 
-	if (_whoami == ICM_WHOAMI_20948) {
-		_num_checked_registers = ICM20948_NUM_CHECKED_REGISTERS;
-		_checked_registers = _icm20948_checked_registers;
-		memset(_checked_values, 0, ICM20948_NUM_CHECKED_REGISTERS);
-		memset(_checked_bad, 0, ICM20948_NUM_CHECKED_REGISTERS);
-		ret = PX4_OK;
+	if (_whoami != ICM_WHOAMI_20948) {
+		PX4_ERR("invalid WHOAMI: 0x%02x", _whoami);
+		return PX4_ERROR;
 	}
 
-	_checked_values[0] = _whoami;
-	_checked_bad[0] = _whoami;
-
-	if (ret != PX4_OK) {
-		PX4_DEBUG("unexpected whoami 0x%02x", _whoami);
-	}
-
-	return ret;
-}
-
-/*
-  set sample rate (approximate) - 1kHz to 5Hz, for both accel and gyro
-  For ICM20948 accel and gyro samplerates are both set to the same value.
-*/
-void
-ICM20948::_set_sample_rate(unsigned desired_sample_rate_hz)
-{
-	uint8_t div = 1;
-
-	if (desired_sample_rate_hz == 0) {
-		desired_sample_rate_hz = ICM20948_GYRO_DEFAULT_RATE;
-	}
-
-	switch (_whoami) {
-	case ICM_WHOAMI_20948:
-		div = 1100 / desired_sample_rate_hz;
-		break;
-	}
-
-	if (div > 200) { div = 200; }
-
-	if (div < 1) { div = 1; }
-
-
-	switch (_whoami) {
-	case ICM_WHOAMI_20948:
-		write_checked_reg(ICMREG_20948_GYRO_SMPLRT_DIV, div - 1);
-		// There's also an MSB for this allowing much higher dividers for the accelerometer.
-		// For 1 < div < 200 the LSB is sufficient.
-		write_checked_reg(ICMREG_20948_ACCEL_SMPLRT_DIV_2, div - 1);
-		_sample_rate = 1100 / div;
-		break;
-	}
-}
-
-/*
-  set the DLPF filter frequency. This affects both accel and gyro.
- */
-void
-ICM20948::_set_dlpf_filter(uint16_t frequency_hz)
-{
-	uint8_t filter;
-
-	switch (_whoami) {
-	case ICM_WHOAMI_20948:
-
-		/*
-		   choose next highest filter frequency available for gyroscope
-		 */
-		if (frequency_hz == 0) {
-			//_dlpf_freq_icm_gyro = 0;
-			filter = ICM_BITS_GYRO_DLPF_CFG_361HZ;
-
-		} else if (frequency_hz <= 5) {
-			//_dlpf_freq_icm_gyro = 5;
-			filter = ICM_BITS_GYRO_DLPF_CFG_5HZ;
-
-		} else if (frequency_hz <= 11) {
-			//_dlpf_freq_icm_gyro = 11;
-			filter = ICM_BITS_GYRO_DLPF_CFG_11HZ;
-
-		} else if (frequency_hz <= 23) {
-			//_dlpf_freq_icm_gyro = 23;
-			filter = ICM_BITS_GYRO_DLPF_CFG_23HZ;
-
-		} else if (frequency_hz <= 51) {
-			//_dlpf_freq_icm_gyro = 51;
-			filter = ICM_BITS_GYRO_DLPF_CFG_51HZ;
-
-		} else if (frequency_hz <= 119) {
-			//_dlpf_freq_icm_gyro = 119;
-			filter = ICM_BITS_GYRO_DLPF_CFG_119HZ;
-
-		} else if (frequency_hz <= 151) {
-			//_dlpf_freq_icm_gyro = 151;
-			filter = ICM_BITS_GYRO_DLPF_CFG_151HZ;
-
-		} else if (frequency_hz <= 197) {
-			//_dlpf_freq_icm_gyro = 197;
-			filter = ICM_BITS_GYRO_DLPF_CFG_197HZ;
-
-		} else {
-			//_dlpf_freq_icm_gyro = 0;
-			filter = ICM_BITS_GYRO_DLPF_CFG_361HZ;
-		}
-
-		write_checked_reg(ICMREG_20948_GYRO_CONFIG_1, filter);
-
-		/*
-		   choose next highest filter frequency available for accelerometer
-		 */
-		if (frequency_hz == 0) {
-			//_dlpf_freq_icm_accel = 0;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_473HZ;
-
-		} else if (frequency_hz <= 5) {
-			//_dlpf_freq_icm_accel = 5;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_5HZ;
-
-		} else if (frequency_hz <= 11) {
-			//_dlpf_freq_icm_accel = 11;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_11HZ;
-
-		} else if (frequency_hz <= 23) {
-			//_dlpf_freq_icm_accel = 23;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_23HZ;
-
-		} else if (frequency_hz <= 50) {
-			//_dlpf_freq_icm_accel = 50;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_50HZ;
-
-		} else if (frequency_hz <= 111) {
-			//_dlpf_freq_icm_accel = 111;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_111HZ;
-
-		} else if (frequency_hz <= 246) {
-			//_dlpf_freq_icm_accel = 246;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_246HZ;
-
-		} else {
-			//_dlpf_freq_icm_accel = 0;
-			filter = ICM_BITS_ACCEL_DLPF_CFG_473HZ;
-		}
-
-		write_checked_reg(ICMREG_20948_ACCEL_CONFIG, filter);
-		break;
-	}
+	return PX4_OK;
 }
 
 int
 ICM20948::select_register_bank(uint8_t bank)
 {
-	uint8_t ret;
-	uint8_t buf;
+	uint8_t ret = 0;
+	uint8_t buf{};
 	uint8_t retries = 3;
 
 	if (_selected_bank != bank) {
-		ret = _interface->write(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &bank, 1);
+		ret = _interface->write(ICMREG_20948_BANK_SEL, &bank, 1);
 
 		if (ret != OK) {
+			PX4_ERR("ICMREG_20948_BANK_SEL write error");
 			return ret;
 		}
+
+		px4_usleep(20);
 	}
 
 	/*
 	 * Making sure the right register bank is selected (even if it should be). Observed some
 	 * unexpected changes to this, don't risk writing to the wrong register bank.
 	 */
-	_interface->read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &buf, 1);
+	_interface->read(ICMREG_20948_BANK_SEL, &buf, 1);
 
 	while (bank != buf && retries > 0) {
-		//PX4_WARN("user bank: expected %d got %d",bank,buf);
-		ret = _interface->write(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &bank, 1);
+		PX4_WARN("user bank: expected %d got %d", bank, buf);
+		ret = _interface->write(ICMREG_20948_BANK_SEL, &bank, 1);
+
+		px4_usleep(20);
 
 		if (ret != OK) {
+			PX4_ERR("ICMREG_20948_BANK_SEL write error");
 			return ret;
 		}
 
+		_interface->read(ICMREG_20948_BANK_SEL, &buf, 1);
 		retries--;
-		//PX4_WARN("BANK retries: %d", 4-retries);
-
-		_interface->read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &buf, 1);
 	}
 
 
@@ -487,37 +301,25 @@ ICM20948::select_register_bank(uint8_t bank)
 }
 
 uint8_t
-ICM20948::read_reg(unsigned reg, uint32_t speed)
+ICM20948::read_reg(unsigned reg)
 {
-	uint8_t buf{};
-
 	select_register_bank(REG_BANK(reg));
-	_interface->read(ICM20948_SET_SPEED(REG_ADDRESS(reg), speed), &buf, 1);
+
+	uint8_t buf{};
+	_interface->read(reg, &buf, 1);
 
 	return buf;
 }
 
 uint8_t
-ICM20948::read_reg_range(unsigned start_reg, uint32_t speed, uint8_t *buf, uint16_t count)
+ICM20948::read_reg_range(unsigned start_reg, uint8_t *buf, uint16_t count)
 {
 	if (buf == NULL) {
 		return PX4_ERROR;
 	}
 
 	select_register_bank(REG_BANK(start_reg));
-	return _interface->read(ICM20948_SET_SPEED(REG_ADDRESS(start_reg), speed), buf, count);
-}
-
-uint16_t
-ICM20948::read_reg16(unsigned reg)
-{
-	uint8_t buf[2] {};
-
-	// general register transfer at low clock speed
-	select_register_bank(REG_BANK(reg));
-	_interface->read(ICM20948_LOW_SPEED_OP(REG_ADDRESS(reg)), &buf, arraySize(buf));
-
-	return (uint16_t)(buf[0] << 8) | buf[1];
+	return _interface->read(start_reg, buf, count);
 }
 
 void
@@ -525,7 +327,7 @@ ICM20948::write_reg(unsigned reg, uint8_t value)
 {
 	// general register transfer at low clock speed
 	select_register_bank(REG_BANK(reg));
-	_interface->write(ICM20948_LOW_SPEED_OP(REG_ADDRESS(reg)), &value, 1);
+	_interface->write(reg, &value, 1);
 }
 
 void
@@ -551,52 +353,13 @@ ICM20948::write_checked_reg(unsigned reg, uint8_t value)
 {
 	write_reg(reg, value);
 
-	for (uint8_t i = 0; i < _num_checked_registers; i++) {
+	for (uint8_t i = 0; i < ICM20948_NUM_CHECKED_REGISTERS; i++) {
 		if (reg == _checked_registers[i]) {
 			_checked_values[i] = value;
 			_checked_bad[i] = value;
-			break;
+			return;
 		}
 	}
-}
-
-int
-ICM20948::set_accel_range(unsigned max_g_in)
-{
-	uint8_t afs_sel;
-	float lsb_per_g;
-	//float max_accel_g;
-
-	if (max_g_in > 8) { // 16g - AFS_SEL = 3
-		afs_sel = 3;
-		lsb_per_g = 2048;
-		//max_accel_g = 16;
-
-	} else if (max_g_in > 4) { //  8g - AFS_SEL = 2
-		afs_sel = 2;
-		lsb_per_g = 4096;
-		//max_accel_g = 8;
-
-	} else if (max_g_in > 2) { //  4g - AFS_SEL = 1
-		afs_sel = 1;
-		lsb_per_g = 8192;
-		//max_accel_g = 4;
-
-	} else {                //  2g - AFS_SEL = 0
-		afs_sel = 0;
-		lsb_per_g = 16384;
-		//max_accel_g = 2;
-	}
-
-	switch (_whoami) {
-	case ICM_WHOAMI_20948:
-		modify_checked_reg(ICMREG_20948_ACCEL_CONFIG, ICM_BITS_ACCEL_FS_SEL_MASK, afs_sel << 1);
-		break;
-	}
-
-	_px4_accel.set_scale(CONSTANTS_ONE_G / lsb_per_g);
-
-	return OK;
 }
 
 void
@@ -624,19 +387,9 @@ ICM20948::Run()
 void
 ICM20948::check_registers(void)
 {
-	/*
-	  we read the register at full speed, even though it isn't
-	  listed as a high speed register. The low speed requirement
-	  for some registers seems to be a propagation delay
-	  requirement for changing sensor configuration, which should
-	  not apply to reading a single register. It is also a better
-	  test of SPI bus health to read at the same speed as we read
-	  the data registers.
-	*/
-	uint8_t v;
+	uint8_t v = 0;
 
-	if ((v = read_reg(_checked_registers[_checked_next], ICM20948_HIGH_BUS_SPEED)) !=
-	    _checked_values[_checked_next]) {
+	if ((v = read_reg(_checked_registers[_checked_next])) != _checked_values[_checked_next]) {
 
 		_checked_bad[_checked_next] = v;
 
@@ -679,7 +432,7 @@ ICM20948::check_registers(void)
 		_register_wait = 20;
 	}
 
-	_checked_next = (_checked_next + 1) % _num_checked_registers;
+	_checked_next = (_checked_next + 1) % ICM20948_NUM_CHECKED_REGISTERS;
 }
 
 bool
@@ -731,7 +484,6 @@ void
 ICM20948::measure()
 {
 	perf_begin(_sample_perf);
-	perf_count(_interval_perf);
 
 	if (hrt_absolute_time() < _reset_wait) {
 		// we're waiting for a reset to complete
@@ -739,7 +491,6 @@ ICM20948::measure()
 		return;
 	}
 
-	MPUReport mpu_report{};
 	ICMReport icm_report{};
 
 	struct Report {
@@ -759,15 +510,14 @@ ICM20948::measure()
 
 		select_register_bank(REG_BANK(ICMREG_20948_ACCEL_XOUT_H));
 
-		if (OK != read_reg_range(ICMREG_20948_ACCEL_XOUT_H, ICM20948_HIGH_BUS_SPEED, (uint8_t *)&icm_report,
-					 sizeof(icm_report))) {
+		if (OK != read_reg_range(ICMREG_20948_ACCEL_XOUT_H, (uint8_t *)&icm_report, sizeof(icm_report))) {
 			perf_end(_sample_perf);
 			return;
 		}
 
 		check_registers();
 
-		if (check_duplicate(MPU_OR_ICM(&mpu_report.accel_x[0], &icm_report.accel_x[0]))) {
+		if (check_duplicate(&icm_report.accel_x[0])) {
 			return;
 		}
 	}
@@ -782,7 +532,7 @@ ICM20948::measure()
 	if (_mag.is_passthrough()) {
 #   endif
 
-		_mag._measure(timestamp_sample, mpu_report.mag);
+		_mag._measure(timestamp_sample, icm_report.mag);
 
 #   ifdef USE_I2C
 

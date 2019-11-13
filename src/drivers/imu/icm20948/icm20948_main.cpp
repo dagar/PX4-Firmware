@@ -31,190 +31,118 @@
  *
  ****************************************************************************/
 
-/**
- * @file main.cpp
- *
- * Driver for the Invensense icm20948 connected via I2C or SPI.
- *
- * based on the icm20948 driver
- */
-
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
-#include <lib/perf/perf_counter.h>
-#include <lib/systemlib/conversions.h>
-#include <board_config.h>
-#include <drivers/drv_hrt.h>
-#include <drivers/device/spi.h>
-#include <lib/conversion/rotation.h>
 
 #include "icm20948.h"
 
-/** driver 'main' command */
-extern "C" { __EXPORT int icm20948_main(int argc, char *argv[]); }
-
-enum ICM20948_BUS {
-	ICM20948_BUS_ALL = 0,
-	ICM20948_BUS_I2C_INTERNAL,
-	ICM20948_BUS_I2C_EXTERNAL,
-	ICM20948_BUS_SPI_INTERNAL,
-	ICM20948_BUS_SPI_EXTERNAL
+enum class ICM20948_BUS {
+	ALL = 0,
+	I2C_INTERNAL,
+	I2C_EXTERNAL,
+	SPI_INTERNAL,
+	SPI_EXTERNAL
 };
 
-/**
- * Local functions in support of the shell command.
- */
 namespace icm20948
 {
 
 // list of supported bus configurations
 struct icm20948_bus_option {
-	enum ICM20948_BUS busid;
+	ICM20948_BUS busid;
 	ICM20948_constructor interface_constructor;
 	bool magpassthrough;
 	uint8_t busnum;
 	uint32_t address;
 	ICM20948 *dev;
 } bus_options[] = {
-
-#if defined(PX4_SPIDEV_ICM_20948) && defined(PX4_SPI_BUS_1)
-	{ ICM20948_BUS_SPI_INTERNAL, &ICM20948_SPI_interface, true, PX4_SPI_BUS_1, PX4_SPIDEV_ICM_20948, nullptr },
+#if defined(USE_I2C)
+#  if defined(PX4_I2C_BUS_EXPANSION)
+	{ ICM20948_BUS::I2C_EXTERNAL, &ICM20948_I2C_interface, false, PX4_I2C_BUS_EXPANSION, PX4_I2C_EXT_ICM20948_1, nullptr },
+#  endif
 #endif
 
-#if defined (USE_I2C)
-#  if defined(PX4_I2C_BUS_EXPANSION)
-	{ ICM20948_BUS_I2C_EXTERNAL, &ICM20948_I2C_interface, false, PX4_I2C_BUS_EXPANSION, PX4_I2C_EXT_ICM20948_1, nullptr },
-#  endif
+#if defined(PX4_SPI_BUS_SENSORS) && defined(PX4_SPIDEV_ICM_20948)
+	{ ICM20948_BUS::SPI_INTERNAL, &ICM20948_SPI_interface, true, PX4_SPI_BUS_SENSORS, PX4_SPIDEV_ICM_20948, nullptr },
+#endif
+#if defined(PX4_SPI_BUS_1) && defined(PX4_SPIDEV_ICM_20948)
+	{ ICM20948_BUS::SPI_INTERNAL, &ICM20948_SPI_interface, true, PX4_SPI_BUS_1, PX4_SPIDEV_ICM_20948, nullptr },
 #endif
 };
 
-#define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
-
-
-bool	start_bus(icm20948_bus_option &bus, enum Rotation rotation);
-icm20948_bus_option *find_bus(enum ICM20948_BUS busid);
-
-int	start(enum ICM20948_BUS busid, enum Rotation rotation);
-int	stop(enum ICM20948_BUS busid);
-int	info(enum ICM20948_BUS busid);
-int	usage();
-
-/**
- * find a bus structure for a busid
- */
-struct icm20948_bus_option *find_bus(enum ICM20948_BUS busid)
+// find a bus structure for a busid
+static struct icm20948_bus_option *find_bus(ICM20948_BUS busid)
 {
-	for (uint8_t i = 0; i < NUM_BUS_OPTIONS; i++) {
-		if ((busid == ICM20948_BUS_ALL ||
-		     busid == bus_options[i].busid) && bus_options[i].dev != nullptr) {
-			return &bus_options[i];
+	for (icm20948_bus_option &bus_option : bus_options) {
+		if ((busid == ICM20948_BUS::ALL ||
+		     busid == bus_option.busid) && bus_option.dev != nullptr) {
+
+			return &bus_option;
 		}
 	}
 
-	PX4_ERR("bus %u not started", (unsigned)busid);
 	return nullptr;
 }
 
-/**
- * start driver for a specific bus option
- */
-bool
-start_bus(icm20948_bus_option &bus, enum Rotation rotation)
+static bool start_bus(icm20948_bus_option &bus, enum Rotation rotation)
 {
-	PX4_INFO("Bus probed: %d", bus.busid);
-
-	if (bus.dev != nullptr) {
-		PX4_ERR("SPI %d not available", bus.busid);
-		return false;
-	}
-
 	device::Device *interface = bus.interface_constructor(bus.busnum, bus.address);
 
-	if (interface == nullptr) {
+	if ((interface == nullptr) || (interface->init() != PX4_OK)) {
 		PX4_WARN("no device on bus %u", (unsigned)bus.busid);
-		return false;
-	}
-
-	if (interface->init() != OK) {
 		delete interface;
-		PX4_WARN("no device on bus %u", (unsigned)bus.busid);
 		return false;
 	}
 
 	device::Device *mag_interface = nullptr;
 
 #ifdef USE_I2C
-	/* For i2c interfaces, connect to the magnetomer directly */
-	const bool is_i2c = bus.busid == ICM20948_BUS_I2C_INTERNAL || bus.busid == ICM20948_BUS_I2C_EXTERNAL;
 
-	if (is_i2c) {
+	// For i2c interfaces, connect to the magnetomer directly
+	if ((bus.busid == ICM20948_BUS::I2C_INTERNAL) || (bus.busid == ICM20948_BUS::I2C_EXTERNAL)) {
 		mag_interface = AK09916_I2C_interface(bus.busnum);
 	}
 
-#endif
+#endif // USE_I2C
 
-	bus.dev = new ICM20948(interface, mag_interface, rotation);
+	ICM20948 *dev = new ICM20948(interface, mag_interface, rotation);
 
-	if (bus.dev == nullptr) {
+	if (dev == nullptr || (dev->init() != PX4_OK)) {
+		PX4_ERR("driver start failed");
+		delete dev;
 		delete interface;
-
-		if (mag_interface != nullptr) {
-			delete mag_interface;
-		}
-
+		delete mag_interface;
 		return false;
 	}
 
-	if (OK != bus.dev->init()) {
-		goto fail;
-	}
+	bus.dev = dev;
 
 	return true;
-
-fail:
-
-	if (bus.dev != nullptr) {
-		delete (bus.dev);
-		bus.dev = nullptr;
-	}
-
-	PX4_ERR("driver start failed");
-
-	return false;
 }
 
-/**
- * Start the driver.
- *
- * This function only returns if the driver is up and running
- * or failed to detect the sensor.
- */
-int
-start(enum ICM20948_BUS busid, enum Rotation rotation)
+static int start(ICM20948_BUS busid, enum Rotation rotation)
 {
-	bool started = false;
-
-	for (unsigned i = 0; i < NUM_BUS_OPTIONS; i++) {
-		if (bus_options[i].dev != nullptr) {
+	for (icm20948_bus_option &bus_option : bus_options) {
+		if (bus_option.dev != nullptr) {
 			// this device is already started
+			PX4_WARN("already started");
 			continue;
 		}
 
-		if (busid != ICM20948_BUS_ALL && bus_options[i].busid != busid) {
+		if (busid != ICM20948_BUS::ALL && bus_option.busid != busid) {
 			// not the one that is asked for
 			continue;
 		}
 
-		started |= start_bus(bus_options[i], rotation);
-
-		if (started) { break; }
+		if (start_bus(bus_option, rotation)) {
+			return PX4_OK;
+		}
 	}
 
-	return PX4_OK;
+	return PX4_ERROR;
 }
 
-int
-stop(enum ICM20948_BUS busid)
+static int stop(ICM20948_BUS busid)
 {
 	icm20948_bus_option *bus = find_bus(busid);
 
@@ -223,35 +151,29 @@ stop(enum ICM20948_BUS busid)
 		bus->dev = nullptr;
 
 	} else {
-		/* warn, but not an error */
-		PX4_WARN("already stopped.");
-	}
-
-	return PX4_OK;
-}
-
-/**
- * Print a little info about the driver.
- */
-int
-info(enum ICM20948_BUS busid)
-{
-	icm20948_bus_option *bus = find_bus(busid);
-
-	if (bus != nullptr && bus->dev != nullptr) {
 		PX4_WARN("driver not running");
 		return PX4_ERROR;
 	}
 
-	bus->dev->print_info();
-
 	return PX4_OK;
 }
 
-int
-usage()
+static int status(ICM20948_BUS busid)
 {
-	PX4_INFO("missing command: try 'start', 'stop', 'info'");
+	icm20948_bus_option *bus = find_bus(busid);
+
+	if (bus != nullptr && bus->dev != nullptr) {
+		bus->dev->print_info();
+		return PX4_OK;
+	}
+
+	PX4_WARN("driver not running");
+	return PX4_ERROR;
+}
+
+static int usage()
+{
+	PX4_INFO("missing command: try 'start', 'stop', 'status'");
 	PX4_INFO("options:");
 	PX4_INFO("    -X    (i2c external bus)");
 	PX4_INFO("    -I    (i2c internal bus)");
@@ -260,25 +182,36 @@ usage()
 	PX4_INFO("    -t    (spi internal bus, 2nd instance)");
 	PX4_INFO("    -R rotation");
 
-	return PX4_OK;
+	return 0;
 }
 
 } // namespace icm20948
 
-int
-icm20948_main(int argc, char *argv[])
+extern "C" int icm20948_main(int argc, char *argv[])
 {
 	int myoptind = 1;
 	int ch;
 	const char *myoptarg = nullptr;
 
-	enum ICM20948_BUS busid = ICM20948_BUS_ALL;
+	ICM20948_BUS busid = ICM20948_BUS::ALL;
 	enum Rotation rotation = ROTATION_NONE;
 
-	while ((ch = px4_getopt(argc, argv, "XISstMR:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "XISsR:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 'X':
-			busid = ICM20948_BUS_I2C_EXTERNAL;
+			busid = ICM20948_BUS::I2C_EXTERNAL;
+			break;
+
+		case 'I':
+			busid = ICM20948_BUS::I2C_INTERNAL;
+			break;
+
+		case 'S':
+			busid = ICM20948_BUS::SPI_EXTERNAL;
+			break;
+
+		case 's':
+			busid = ICM20948_BUS::SPI_INTERNAL;
 			break;
 
 		case 'R':
@@ -296,22 +229,14 @@ icm20948_main(int argc, char *argv[])
 
 	const char *verb = argv[myoptind];
 
-	/*
-	 * Start/load the driver.
-	 */
 	if (!strcmp(verb, "start")) {
 		return icm20948::start(busid, rotation);
-	}
 
-	if (!strcmp(verb, "stop")) {
+	} else if (!strcmp(verb, "stop")) {
 		return icm20948::stop(busid);
-	}
 
-	/*
-	 * Print driver information.
-	 */
-	if (!strcmp(verb, "info")) {
-		return icm20948::info(busid);
+	} else if (!strcmp(verb, "status")) {
+		return icm20948::status(busid);
 	}
 
 	return icm20948::usage();

@@ -47,18 +47,6 @@
 #define DIR_READ			0x80
 #define DIR_WRITE			0x00
 
-/*
- * The ICM20948 can only handle high SPI bus speeds of 20Mhz on the sensor and
- * interrupt status registers. All other registers have a maximum 1MHz
- * SPI speed
- *
- * The Actual Value will be rounded down by the spi driver.
- * for a 168Mhz CPU this will be 10.5 Mhz and for a 180 Mhz CPU
- * it will be 11.250 Mhz
- */
-#define ICM20948_LOW_SPI_BUS_SPEED	1000*1000
-#define ICM20948_HIGH_SPI_BUS_SPEED	20*1000*1000
-
 device::Device *ICM20948_SPI_interface(int bus, uint32_t cs);
 
 class ICM20948_SPI : public device::SPI
@@ -90,23 +78,13 @@ ICM20948_SPI_interface(int bus, uint32_t cs)
 }
 
 ICM20948_SPI::ICM20948_SPI(int bus, uint32_t device) :
-	SPI("ICM20948", nullptr, bus, device, SPIDEV_MODE3, ICM20948_LOW_SPI_BUS_SPEED)
+	SPI("ICM20948", nullptr, bus, device, SPIDEV_MODE3, 7 * 1000 * 1000)
 {
 	_device_id.devid_s.devtype = DRV_DEVTYPE_ICM20948;
 }
 
-void
-ICM20948_SPI::set_bus_frequency(unsigned &reg_speed)
-{
-	/* Set the desired speed */
-	set_frequency(ICM20948_IS_HIGH_SPEED(reg_speed) ? ICM20948_HIGH_SPI_BUS_SPEED : ICM20948_LOW_SPI_BUS_SPEED);
-
-	/* Isoolate the register on return */
-	reg_speed = ICM20948_REG(reg_speed);
-}
-
 int
-ICM20948_SPI::write(unsigned reg_speed, void *data, unsigned count)
+ICM20948_SPI::write(unsigned address, void *data, unsigned count)
 {
 	uint8_t cmd[2] {};
 
@@ -114,36 +92,31 @@ ICM20948_SPI::write(unsigned reg_speed, void *data, unsigned count)
 		return -EIO;
 	}
 
-	/* Set the desired speed and isolate the register */
-	set_bus_frequency(reg_speed);
-
-	cmd[0] = reg_speed | DIR_WRITE;
+	cmd[0] = REG_ADDRESS(address) | DIR_WRITE;
 	cmd[1] = *(uint8_t *)data;
 
 	return transfer(&cmd[0], &cmd[0], count + 1);
 }
 
 int
-ICM20948_SPI::read(unsigned reg_speed, void *data, unsigned count)
+ICM20948_SPI::read(unsigned address, void *data, unsigned count)
 {
-	/* We want to avoid copying the data of MPUReport: So if the caller
-	 * supplies a buffer not MPUReport in size, it is assume to be a reg or reg 16 read
+	/* We want to avoid copying the data of ICMReport: So if the caller
+	 * supplies a buffer not ICMReport in size, it is assume to be a reg or reg 16 read
 	 * and we need to provied the buffer large enough for the callers data
 	 * and our command.
 	 */
 	uint8_t cmd[3] {};
 
-	uint8_t *pbuff  =  count < sizeof(MPUReport) ? cmd : (uint8_t *) data ;
+	uint8_t *pbuff = count < sizeof(ICMReport) ? cmd : (uint8_t *) data ;
 
-	if (count < sizeof(MPUReport))  {
+	if (count < sizeof(ICMReport))  {
 		/* add command */
 		count++;
 	}
 
-	set_bus_frequency(reg_speed);
-
 	/* Set command */
-	pbuff[0] = reg_speed | DIR_READ ;
+	pbuff[0] = REG_ADDRESS(address) | DIR_READ ;
 
 	/* Transfer the command and get the data */
 	int ret = transfer(pbuff, pbuff, count);
@@ -164,7 +137,7 @@ ICM20948_SPI::probe()
 {
 	uint8_t whoami = 0;
 
-	int ret = read(MPUREG_WHOAMI, &whoami, 1);
+	int ret = read(ICMREG_20948_WHOAMI, &whoami, 1);
 
 	if (ret != OK) {
 		return -EIO;

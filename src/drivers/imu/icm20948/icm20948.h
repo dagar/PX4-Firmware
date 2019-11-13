@@ -47,68 +47,6 @@
 #  define USE_I2C
 #endif
 
-
-// ICM20948 registers
-#define MPUREG_WHOAMI			0x75
-#define MPUREG_SMPLRT_DIV		0x19
-#define MPUREG_CONFIG			0x1A
-#define MPUREG_GYRO_CONFIG		0x1B
-#define MPUREG_ACCEL_CONFIG		0x1C
-#define MPUREG_ACCEL_CONFIG2		0x1D
-#define MPUREG_LPACCEL_ODR		0x1E
-#define MPUREG_WOM_THRESH		0x1F
-#define MPUREG_FIFO_EN			0x23
-#define MPUREG_I2C_MST_CTRL		0x24
-#define MPUREG_I2C_SLV0_ADDR		0x25
-#define MPUREG_I2C_SLV0_REG		0x26
-#define MPUREG_I2C_SLV0_CTRL		0x27
-#define MPUREG_I2C_SLV1_ADDR		0x28
-#define MPUREG_I2C_SLV1_REG		0x29
-#define MPUREG_I2C_SLV1_CTRL		0x2A
-#define MPUREG_I2C_SLV2_ADDR		0x2B
-#define MPUREG_I2C_SLV2_REG		0x2C
-#define MPUREG_I2C_SLV2_CTRL		0x2D
-#define MPUREG_I2C_SLV3_ADDR		0x2E
-#define MPUREG_I2C_SLV3_REG		0x2F
-#define MPUREG_I2C_SLV3_CTRL		0x30
-#define MPUREG_I2C_SLV4_ADDR		0x31
-#define MPUREG_I2C_SLV4_REG		0x32
-#define MPUREG_I2C_SLV4_DO		0x33
-#define MPUREG_I2C_SLV4_CTRL		0x34
-#define MPUREG_I2C_SLV4_DI		0x35
-#define MPUREG_I2C_MST_STATUS		0x36
-#define MPUREG_INT_PIN_CFG		0x37
-#define MPUREG_INT_ENABLE		0x38
-#define MPUREG_INT_STATUS		0x3A
-#define MPUREG_ACCEL_XOUT_H		0x3B
-#define MPUREG_ACCEL_XOUT_L		0x3C
-#define MPUREG_ACCEL_YOUT_H		0x3D
-#define MPUREG_ACCEL_YOUT_L		0x3E
-#define MPUREG_ACCEL_ZOUT_H		0x3F
-#define MPUREG_ACCEL_ZOUT_L		0x40
-#define MPUREG_TEMP_OUT_H		0x41
-#define MPUREG_TEMP_OUT_L		0x42
-#define MPUREG_GYRO_XOUT_H		0x43
-#define MPUREG_GYRO_XOUT_L		0x44
-#define MPUREG_GYRO_YOUT_H		0x45
-#define MPUREG_GYRO_YOUT_L		0x46
-#define MPUREG_GYRO_ZOUT_H		0x47
-#define MPUREG_GYRO_ZOUT_L		0x48
-#define MPUREG_EXT_SENS_DATA_00		0x49
-#define MPUREG_I2C_SLV0_D0		0x63
-#define MPUREG_I2C_SLV1_D0		0x64
-#define MPUREG_I2C_SLV2_D0		0x65
-#define MPUREG_I2C_SLV3_D0		0x66
-#define MPUREG_I2C_MST_DELAY_CTRL	0x67
-#define MPUREG_SIGNAL_PATH_RESET	0x68
-#define MPUREG_MOT_DETECT_CTRL		0x69
-#define MPUREG_USER_CTRL		0x6A
-#define MPUREG_PWR_MGMT_1		0x6B
-#define MPUREG_PWR_MGMT_2		0x6C
-#define MPUREG_FIFO_COUNTH		0x72
-#define MPUREG_FIFO_COUNTL		0x73
-#define MPUREG_FIFO_R_W			0x74
-
 // Configuration bits ICM20948
 #define BIT_SLEEP			0x40
 #define BIT_H_RESET			0x80
@@ -169,14 +107,7 @@
 #define ICM_WHOAMI_20948            0xEA
 
 #define ICM20948_ACCEL_DEFAULT_RATE	1000
-#define ICM20948_ACCEL_MAX_OUTPUT_RATE			280
-#define ICM20948_ACCEL_DEFAULT_DRIVER_FILTER_FREQ 30
 #define ICM20948_GYRO_DEFAULT_RATE	1000
-/* rates need to be the same between accel and gyro */
-#define ICM20948_GYRO_MAX_OUTPUT_RATE			ICM20948_ACCEL_MAX_OUTPUT_RATE
-#define ICM20948_GYRO_DEFAULT_DRIVER_FILTER_FREQ 30
-
-#define ICM20948_DEFAULT_ONCHIP_FILTER_FREQ	92
 
 
 // ICM20948 registers and data
@@ -202,12 +133,12 @@
 #define BANK3	0x0300
 
 #define BANK_REG_MASK	0x0300
-#define REG_BANK(r) 			(((r) & BANK_REG_MASK)>>4)
-#define REG_ADDRESS(r)			((r) & ~BANK_REG_MASK)
+#define REG_BANK(r) 			((((r) & BANK_REG_MASK)>>8) & 0x3)
+#define REG_ADDRESS(r)			((r) & 0xFF)
 
 #define ICMREG_20948_BANK_SEL 0x7F
 
-#define	ICMREG_20948_WHOAMI					(0x00 | BANK0)
+#define	ICMREG_20948_WHOAMI				(0x00 | BANK0)
 #define ICMREG_20948_USER_CTRL				(0x03 | BANK0)
 #define ICMREG_20948_PWR_MGMT_1				(0x06 | BANK0)
 #define ICMREG_20948_PWR_MGMT_2				(0x07 | BANK0)
@@ -217,14 +148,16 @@
 #define ICMREG_20948_ACCEL_XOUT_H			(0x2D | BANK0)
 #define ICMREG_20948_INT_ENABLE_2			(0x12 | BANK0)
 #define ICMREG_20948_INT_ENABLE_3			(0x13 | BANK0)
-#define ICMREG_20948_EXT_SLV_SENS_DATA_00	(0x3B | BANK0)
-#define ICMREG_20948_GYRO_SMPLRT_DIV		(0x00 | BANK2)
+#define ICMREG_20948_EXT_SLV_SENS_DATA_00	        (0x3B | BANK0)
+
+#define ICMREG_20948_GYRO_SMPLRT_DIV		        (0x00 | BANK2)
 #define ICMREG_20948_GYRO_CONFIG_1			(0x01 | BANK2)
 #define ICMREG_20948_GYRO_CONFIG_2			(0x02 | BANK2)
-#define ICMREG_20948_ACCEL_SMPLRT_DIV_1		(0x10 | BANK2)
-#define ICMREG_20948_ACCEL_SMPLRT_DIV_2		(0x11 | BANK2)
+#define ICMREG_20948_ACCEL_SMPLRT_DIV_1		        (0x10 | BANK2)
+#define ICMREG_20948_ACCEL_SMPLRT_DIV_2		        (0x11 | BANK2)
 #define ICMREG_20948_ACCEL_CONFIG			(0x14 | BANK2)
 #define ICMREG_20948_ACCEL_CONFIG_2			(0x15 | BANK2)
+
 #define ICMREG_20948_I2C_MST_CTRL			(0x01 | BANK3)
 #define ICMREG_20948_I2C_SLV0_ADDR			(0x03 | BANK3)
 #define ICMREG_20948_I2C_SLV0_REG			(0x04 | BANK3)
@@ -242,48 +175,17 @@
 #define ICM_BIT_PWR_MGMT_1_ENABLE       	0x00
 #define ICM_BIT_USER_CTRL_I2C_MST_DISABLE   0x00
 
-#define ICM_BITS_GYRO_DLPF_CFG_197HZ		0x01
-#define ICM_BITS_GYRO_DLPF_CFG_151HZ		0x09
-#define ICM_BITS_GYRO_DLPF_CFG_119HZ		0x11
-#define ICM_BITS_GYRO_DLPF_CFG_51HZ			0x19
-#define ICM_BITS_GYRO_DLPF_CFG_23HZ			0x21
-#define ICM_BITS_GYRO_DLPF_CFG_11HZ			0x29
-#define ICM_BITS_GYRO_DLPF_CFG_5HZ			0x31
-#define ICM_BITS_GYRO_DLPF_CFG_361HZ		0x39
-#define ICM_BITS_GYRO_DLPF_CFG_MASK			0x39
+#define ICM_BITS_GYRO_DLPF_CFG_119HZ		0b10000
+#define ICM_BITS_GYRO_FS_SEL_2000DPS		0b110
 
-#define ICM_BITS_GYRO_FS_SEL_250DPS			0x00
-#define ICM_BITS_GYRO_FS_SEL_500DPS			0x02
-#define ICM_BITS_GYRO_FS_SEL_1000DPS		0x04
-#define ICM_BITS_GYRO_FS_SEL_2000DPS		0x06
-#define ICM_BITS_GYRO_FS_SEL_MASK			0x06
+#define ICM_BITS_ACCEL_DLPF_CFG_111HZ		0b10000
+#define ICM_BITS_ACCEL_FS_SEL_16G		0b110
 
-#define ICM_BITS_ACCEL_DLPF_CFG_246HZ		0x09
-#define ICM_BITS_ACCEL_DLPF_CFG_111HZ		0x11
-#define ICM_BITS_ACCEL_DLPF_CFG_50HZ		0x19
-#define ICM_BITS_ACCEL_DLPF_CFG_23HZ		0x21
-#define ICM_BITS_ACCEL_DLPF_CFG_11HZ		0x29
-#define ICM_BITS_ACCEL_DLPF_CFG_5HZ			0x31
-#define ICM_BITS_ACCEL_DLPF_CFG_473HZ		0x39
-#define ICM_BITS_ACCEL_DLPF_CFG_MASK		0x39
-
-#define ICM_BITS_ACCEL_FS_SEL_250DPS		0x00
-#define ICM_BITS_ACCEL_FS_SEL_500DPS		0x02
-#define ICM_BITS_ACCEL_FS_SEL_1000DPS		0x04
-#define ICM_BITS_ACCEL_FS_SEL_2000DPS		0x06
-#define ICM_BITS_ACCEL_FS_SEL_MASK			0x06
-
-#define ICM_BITS_DEC3_CFG_4					0x00
-#define ICM_BITS_DEC3_CFG_8					0x01
-#define ICM_BITS_DEC3_CFG_16				0x10
-#define ICM_BITS_DEC3_CFG_32				0x11
-#define ICM_BITS_DEC3_CFG_MASK				0x11
+#define ICM_BITS_DEC3_CFG_32			0b11
 
 #define ICM_BITS_I2C_MST_CLOCK_370KHZ    	0x00
 #define ICM_BITS_I2C_MST_CLOCK_400HZ    	0x07	// recommended by datasheet for 400kHz target clock
 
-
-#define MPU_OR_ICM(m,i)					((_whoami==ICM_WHOAMI_20948) ? i : m)
 
 #pragma pack(push, 1)
 /**
@@ -291,52 +193,17 @@
  * interrupt status.
  */
 struct ICMReport {
-	uint8_t		accel_x[2];
-	uint8_t		accel_y[2];
-	uint8_t		accel_z[2];
-	uint8_t		gyro_x[2];
-	uint8_t		gyro_y[2];
-	uint8_t		gyro_z[2];
-	uint8_t		temp[2];
-	struct ak09916_regs mag;
-};
-#pragma pack(pop)
-
-
-#pragma pack(push, 1)
-/**
- * Report conversation within the mpu, including command byte and
- * interrupt status.
- */
-struct MPUReport {
 	uint8_t		cmd;
-	uint8_t		status;
 	uint8_t		accel_x[2];
 	uint8_t		accel_y[2];
 	uint8_t		accel_z[2];
-	uint8_t		temp[2];
 	uint8_t		gyro_x[2];
 	uint8_t		gyro_y[2];
 	uint8_t		gyro_z[2];
-	struct ak09916_regs mag;
+	uint8_t		temp[2];
+	ak09916_regs	mag;
 };
 #pragma pack(pop)
-
-/*
-  The ICM20948 can only handle high bus speeds on the sensor and
-  interrupt status registers. All other registers have a maximum 1MHz
-  Communication with all registers of the device is performed using either
-  I2C at 400kHz or SPI at 1MHz. For applications requiring faster communications,
-  the sensor and interrupt registers may be read using SPI at 20MHz
- */
-#define ICM20948_LOW_BUS_SPEED				0
-#define ICM20948_HIGH_BUS_SPEED				0x8000
-#define ICM20948_REG_MASK					0x00FF
-#  define ICM20948_IS_HIGH_SPEED(r) 			((r) & ICM20948_HIGH_BUS_SPEED)
-#  define ICM20948_REG(r) 					((r) & ICM20948_REG_MASK)
-#  define ICM20948_SET_SPEED(r, s) 			((r)|(s))
-#  define ICM20948_HIGH_SPEED_OP(r) 			ICM20948_SET_SPEED((r), ICM20948_HIGH_BUS_SPEED)
-#  define ICM20948_LOW_SPEED_OP(r)			((r) &~ICM20948_HIGH_BUS_SPEED)
 
 /* interface factories */
 extern device::Device *ICM20948_SPI_interface(int bus, uint32_t cs);
@@ -388,7 +255,6 @@ private:
 	unsigned		_sample_rate{1000};
 
 	perf_counter_t		_sample_perf;
-	perf_counter_t		_interval_perf;
 	perf_counter_t		_bad_transfers;
 	perf_counter_t		_bad_registers;
 	perf_counter_t		_good_transfers;
@@ -401,15 +267,24 @@ private:
 	// configuration registers to detect SPI bus errors and sensor
 	// reset
 
-	static constexpr int ICM20948_NUM_CHECKED_REGISTERS{15};
-	static const uint16_t	_icm20948_checked_registers[ICM20948_NUM_CHECKED_REGISTERS];
-
-	const uint16_t			*_checked_registers{nullptr};
+	static constexpr int ICM20948_NUM_CHECKED_REGISTERS{7};
+	/*
+	list of registers that will be checked in check_registers(). Note
+	that MPUREG_PRODUCT_ID must be first in the list.
+	*/
+	static constexpr uint16_t _checked_registers[ICM20948_NUM_CHECKED_REGISTERS] {
+		ICMREG_20948_PWR_MGMT_1,
+		ICMREG_20948_PWR_MGMT_2,
+		ICMREG_20948_USER_CTRL,
+		ICMREG_20948_ACCEL_CONFIG,
+		ICMREG_20948_ACCEL_CONFIG_2,
+		ICMREG_20948_GYRO_CONFIG_1,
+		ICMREG_20948_GYRO_CONFIG_2,
+	};
 
 	uint8_t					_checked_values[ICM20948_NUM_CHECKED_REGISTERS] {};
 	uint8_t					_checked_bad[ICM20948_NUM_CHECKED_REGISTERS] {};
-	unsigned				_checked_next{0};
-	unsigned				_num_checked_registers{0};
+	uint8_t 				_checked_next{0};
 
 
 	// last temperature reading for print_info()
@@ -445,7 +320,7 @@ private:
 	 * @param		The index of the register bank to switch to (0-3)
 	 * @return		Error code
 	 */
-	int				select_register_bank(uint8_t bank);
+	int			select_register_bank(uint8_t bank);
 
 	/**
 	 * Read a register from the mpu
@@ -454,9 +329,7 @@ private:
 	* @param       The bus speed to read with.
 	 * @return		The value that was read.
 	 */
-	uint8_t			read_reg(unsigned reg, uint32_t speed = ICM20948_LOW_BUS_SPEED);
-	uint16_t		read_reg16(unsigned reg);
-
+	uint8_t			read_reg(unsigned reg);
 
 	/**
 	 * Read a register range from the mpu
@@ -467,7 +340,7 @@ private:
 	 * @param       The count of bytes to be read.
 	 * @return      The value that was read.
 	 */
-	uint8_t read_reg_range(unsigned start_reg, uint32_t speed, uint8_t *buf, uint16_t count);
+	uint8_t                 read_reg_range(unsigned start_reg, uint8_t *buf, uint16_t count);
 
 	/**
 	 * Write a register in the mpu
@@ -508,14 +381,6 @@ private:
 	void			modify_checked_reg(unsigned reg, uint8_t clearbits, uint8_t setbits);
 
 	/**
-	 * Set the mpu measurement range.
-	 *
-	 * @param max_g		The maximum G value the range must support.
-	 * @return		OK if the value can be supported, -ERANGE otherwise.
-	 */
-	int			set_accel_range(unsigned max_g);
-
-	/**
 	 * Swap a 16-bit value read from the mpu to native byte order.
 	 */
 	uint16_t		swap16(uint16_t val) { return (val >> 8) | (val << 8);	}
@@ -526,16 +391,6 @@ private:
 	 * @return true if the sensor is not on the main MCU board
 	 */
 	bool			is_external() { return _interface->external(); }
-
-	/*
-	  set low pass filter frequency
-	 */
-	void _set_dlpf_filter(uint16_t frequency_hz);
-
-	/*
-	  set sample rate (approximate) - 1kHz to 5Hz
-	*/
-	void _set_sample_rate(unsigned desired_sample_rate_hz);
 
 	/*
 	  check that key registers still have the right value
