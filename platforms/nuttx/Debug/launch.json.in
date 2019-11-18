@@ -18,6 +18,7 @@
                 "source ${workspaceRoot}/platforms/nuttx/Debug/ARMv7M",
                 "set mem inaccessible-by-default off",
                 "set print pretty",
+                "source /home/dagar/git/Firmware/platforms/nuttx/Debug/hardfault.cmd"
             ]
         },
         {

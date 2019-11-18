@@ -31,28 +31,45 @@
 #
 ############################################################################
 
-add_custom_target(jlink_upload
-	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/Debug/jlink_gdb_start.sh
-	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/Debug/jlink_gdb_upload.sh $<TARGET_FILE:px4>
-	DEPENDS px4
-	WORKING_DIRECTORY ${PX4_BINARY_DIR}
-	USES_TERMINAL
+# JLinkGDBServerCLExe (command line)
+find_program(JLinkGDBServerCLExe_PATH JLinkGDBServerCLExe)
+if(JLinkGDBServerCLExe_PATH)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Debug/jlink_gdb_start.sh.in ${PX4_BINARY_DIR}/jlink_gdb_start.sh @ONLY)
+	add_custom_target(jlink_upload
+		COMMAND ${PX4_BINARY_DIR}/jlink_gdb_start.sh
+		COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/Debug/jlink_gdb_upload.sh $<TARGET_FILE:px4>
+		DEPENDS
+			px4
+			${PX4_BINARY_DIR}/jlink_gdb_start.sh
+		WORKING_DIRECTORY ${PX4_BINARY_DIR}
+		USES_TERMINAL
 	)
+endif()
 
-add_custom_target(jlink_debug
-	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/Debug/jlink_gdb_start.sh
-	COMMAND ${CMAKE_GDB} -nh
-		-iex 'set auto-load safe-path ${PX4_BINARY_DIR}'
-		-ex 'target remote localhost:2331'
-		-ex 'monitor reset 0'
-		-ex 'load'
-		-ex 'compare-sections'
-		-ex 'monitor reset 0'
-		-ex 'monitor sleep 1000'
-		-ex 'monitor go'
-		-ex 'continue'
-		$<TARGET_FILE:px4>
-	DEPENDS px4 ${PX4_BINARY_DIR}/.gdbinit
-	WORKING_DIRECTORY ${PX4_BINARY_DIR}
-	USES_TERMINAL
+# JLinkGDBServerExe (GUI)
+find_program(JLinkGDBServerExe_PATH JLinkGDBServerExe)
+if(JLinkGDBServerExe_PATH AND CMAKE_GDB)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Debug/jlink_gdb_debug.sh.in ${PX4_BINARY_DIR}/jlink_gdb_debug.sh @ONLY)
+	add_custom_target(jlink_debug_gdb
+		COMMAND ${PX4_BINARY_DIR}/jlink_gdb_debug.sh
+		DEPENDS
+			px4
+			${PX4_BINARY_DIR}/.gdbinit
+			${PX4_BINARY_DIR}/jlink_gdb_debug.sh
+		WORKING_DIRECTORY ${PX4_BINARY_DIR}
+		USES_TERMINAL
 	)
+endif()
+
+find_program(Ozone_PATH Ozone)
+if(Ozone_PATH)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Debug/jlink_ozone_start.sh.in ${PX4_BINARY_DIR}/jlink_ozone_start.sh @ONLY)
+	add_custom_target(jlink_debug_ozone
+		COMMAND ${PX4_BINARY_DIR}/jlink_ozone_start.sh
+		DEPENDS
+			px4
+			${PX4_BINARY_DIR}/jlink_ozone_start.sh
+		WORKING_DIRECTORY ${PX4_BINARY_DIR}
+		USES_TERMINAL
+	)
+endif()

@@ -174,6 +174,7 @@ add_custom_target(weak_symbols
 
 # debugger helpers
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Debug/gdbinit.in ${PX4_BINARY_DIR}/.gdbinit)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Debug/gdbinit_jlink_connect.in ${PX4_BINARY_DIR}/gdbinit_jlink_connect @ONLY)
 
 # vscode launch.json
 #  FIXME: hack to skip if px4_io-v2 because it's a built within another build (eg px4_fmu-v5)
