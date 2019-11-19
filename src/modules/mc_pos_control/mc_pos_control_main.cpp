@@ -42,6 +42,7 @@
 #include <lib/flight_tasks/FlightTasks.hpp>
 #include <lib/hysteresis/hysteresis.h>
 #include <lib/mathlib/mathlib.h>
+#include <mathlib/math/filter/LowPassFilter2pVector3f.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/systemlib/mavlink_log.h>
 #include <lib/weather_vane/WeatherVane.hpp>
@@ -104,6 +105,9 @@ public:
 	int print_status() override;
 
 private:
+
+	static constexpr int LOOP_RATE_HZ = 50; // 50 Hz (20 ms interval)
+
 	Takeoff _takeoff; /**< state machine and ramp to bring the vehicle off the ground without jumps */
 
 	orb_id_t _attitude_setpoint_id{nullptr}; ///< orb metadata to publish attitude setpoint dependent if VTOL or not
@@ -163,12 +167,11 @@ private:
 		(ParamFloat<px4::params::MPC_THR_MIN>)_param_mpc_thr_min,
 		(ParamFloat<px4::params::MPC_THR_HOVER>)_param_mpc_thr_hover,
 		(ParamFloat<px4::params::MPC_THR_MAX>)_param_mpc_thr_max,
-		(ParamFloat<px4::params::MPC_Z_VEL_P>)_param_mpc_z_vel_p
+		(ParamFloat<px4::params::MPC_Z_VEL_P>)_param_mpc_z_vel_p,
+		(ParamFloat<px4::params::MPC_VELD_LP>)_param_mpc_veld_lp
 	);
 
-	control::BlockDerivative _vel_x_deriv; /**< velocity derivative in x */
-	control::BlockDerivative _vel_y_deriv; /**< velocity derivative in y */
-	control::BlockDerivative _vel_z_deriv; /**< velocity derivative in z */
+	math::LowPassFilter2pVector3f _accel_filter{LOOP_RATE_HZ, 5};
 
 	FlightTasks _flight_tasks; /**< class generating position controller setpoints depending on vehicle task */
 	PositionControl _control; /**< class for core PID position control */
@@ -272,9 +275,6 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	SuperBlock(nullptr, "MPC"),
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::att_pos_ctrl),
-	_vel_x_deriv(this, "VELD"),
-	_vel_y_deriv(this, "VELD"),
-	_vel_z_deriv(this, "VELD"),
 	_control(this),
 	_cycle_perf(perf_alloc_once(PC_ELAPSED, MODULE_NAME": cycle time"))
 {
@@ -300,7 +300,7 @@ MulticopterPositionControl::init()
 		return false;
 	}
 
-	_local_pos_sub.set_interval_us(20_ms); // 50 Hz max update rate
+	_local_pos_sub.set_interval_us(1000000 / LOOP_RATE_HZ);
 
 	_time_stamp_last_loop = hrt_absolute_time();
 
@@ -366,6 +366,12 @@ MulticopterPositionControl::parameters_update(bool force)
 		if (_wv_controller != nullptr) {
 			_wv_controller->update_parameters();
 		}
+
+		// update accel_filter if MPC_VELD_LP changed
+		if (force || fabsf(_accel_filter.get_cutoff_freq() - _param_mpc_veld_lp.get()) > 0.01f) {
+			_accel_filter.set_cutoff_frequency(LOOP_RATE_HZ, _param_mpc_veld_lp.get());
+			_accel_filter.reset(Vector3f{_local_pos.ax, _local_pos.ay, _local_pos.az});
+		}
 	}
 
 	return OK;
@@ -426,10 +432,6 @@ MulticopterPositionControl::limit_altitude(vehicle_local_position_setpoint_s &se
 void
 MulticopterPositionControl::set_vehicle_states(const float &vel_sp_z)
 {
-	if (_local_pos.timestamp == 0) {
-		return;
-	}
-
 	// only set position states if valid and finite
 	if (PX4_ISFINITE(_local_pos.x) && PX4_ISFINITE(_local_pos.y) && _local_pos.xy_valid) {
 		_states.position(0) = _local_pos.x;
@@ -446,25 +448,19 @@ MulticopterPositionControl::set_vehicle_states(const float &vel_sp_z)
 		_states.position(2) = NAN;
 	}
 
+	_states.acceleration = _accel_filter.apply(Vector3f{_local_pos.ax, _local_pos.ay, _local_pos.az});
+
 	if (PX4_ISFINITE(_local_pos.vx) && PX4_ISFINITE(_local_pos.vy) && _local_pos.v_xy_valid) {
 		_states.velocity(0) = _local_pos.vx;
 		_states.velocity(1) = _local_pos.vy;
-		_states.acceleration(0) = _vel_x_deriv.update(-_states.velocity(0));
-		_states.acceleration(1) = _vel_y_deriv.update(-_states.velocity(1));
 
 	} else {
 		_states.velocity(0) = _states.velocity(1) = NAN;
-		_states.acceleration(0) = _states.acceleration(1) = NAN;
-
-		// since no valid velocity, update derivate with 0
-		_vel_x_deriv.update(0.0f);
-		_vel_y_deriv.update(0.0f);
 	}
 
 	if (_param_mpc_alt_mode.get() && _local_pos.dist_bottom_valid && PX4_ISFINITE(_local_pos.dist_bottom_rate)) {
 		// terrain following
 		_states.velocity(2) = -_local_pos.dist_bottom_rate;
-		_states.acceleration(2) = _vel_z_deriv.update(-_states.velocity(2));
 
 	} else if (PX4_ISFINITE(_local_pos.vz)) {
 
@@ -477,13 +473,8 @@ MulticopterPositionControl::set_vehicle_states(const float &vel_sp_z)
 			_states.velocity(2) = _local_pos.z_deriv * weighting + _local_pos.vz * (1.0f - weighting);
 		}
 
-		_states.acceleration(2) = _vel_z_deriv.update(-_states.velocity(2));
-
 	} else {
-		_states.velocity(2) = _states.acceleration(2) = NAN;
-		// since no valid velocity, update derivate with 0
-		_vel_z_deriv.update(0.0f);
-
+		_states.velocity(2) = NAN;
 	}
 }
 
@@ -702,12 +693,6 @@ MulticopterPositionControl::Run()
 			}
 
 			_old_landing_gear_position = gear.landing_gear;
-
-		} else {
-			// reset the numerical derivatives to not generate d term spikes when coming from non-position controlled operation
-			_vel_x_deriv.reset();
-			_vel_y_deriv.reset();
-			_vel_z_deriv.reset();
 		}
 	}
 
