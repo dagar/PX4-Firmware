@@ -33,15 +33,6 @@
 
 #pragma once
 
-/** simple channel scaler */
-struct mixer_scaler_s {
-	float			negative_scale;
-	float			positive_scale;
-	float			offset;
-	float			min_output;
-	float			max_output;
-};
-
 /**
  * Abstract class defining a mixer mixing zero or more inputs to
  * one or more outputs.
@@ -152,23 +143,6 @@ protected:
 	 * @return			The control value.
 	 */
 	float				get_control(uint8_t group, uint8_t index);
-
-	/**
-	 * Perform simpler linear scaling.
-	 *
-	 * @param scaler		The scaler configuration.
-	 * @param input			The value to be scaled.
-	 * @return			The scaled value.
-	 */
-	static float			scale(const mixer_scaler_s &scaler, float input);
-
-	/**
-	 * Validate a scaler
-	 *
-	 * @param scaler		The scaler to be validated.
-	 * @return			Zero if good, nonzero otherwise.
-	 */
-	static int			scale_check(struct mixer_scaler_s &scaler);
 
 	/**
 	 * Find a tag

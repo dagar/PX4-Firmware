@@ -33,6 +33,15 @@
 
 #pragma once
 
+/** simple channel scaler */
+struct mixer_scaler_s {
+	float			negative_scale;
+	float			positive_scale;
+	float			offset;
+	float			min_output;
+	float			max_output;
+};
+
 /** mixer input */
 struct mixer_control_s {
 	uint8_t			control_group;	/**< group from which the input reads */
@@ -104,6 +113,24 @@ public:
 	unsigned			get_trim(float *trim) override;
 
 private:
+
+	/**
+	 * Perform simpler linear scaling.
+	 *
+	 * @param scaler		The scaler configuration.
+	 * @param input			The value to be scaled.
+	 * @return			The scaled value.
+	 */
+	static float			scale(const mixer_scaler_s &scaler, float input);
+
+	/**
+	 * Validate a scaler
+	 *
+	 * @param scaler		The scaler to be validated.
+	 * @return			Zero if good, nonzero otherwise.
+	 */
+	static int			scale_check(struct mixer_scaler_s &scaler);
+
 	mixer_simple_s			*_pinfo{nullptr};
 
 	static int parse_output_scaler(const char *buf, unsigned &buflen, mixer_scaler_s &scaler);
