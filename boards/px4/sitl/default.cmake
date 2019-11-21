@@ -4,6 +4,7 @@ px4_add_board(
 	VENDOR px4
 	MODEL sitl
 	LABEL default
+	ROMFSROOT px4fmu_common
 	TESTING
 
 	DRIVERS

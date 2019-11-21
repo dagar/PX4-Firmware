@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# PX4 SITL specific board sensors init
+#------------------------------------------------------------------------------
+
+replay tryapplyparams
+simulator start -c $simulator_tcp_port
+tone_alarm start
+gpssim start

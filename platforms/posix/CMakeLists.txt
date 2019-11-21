@@ -93,6 +93,11 @@ else()
 
 endif()
 
+if(config_romfs_root)
+	add_subdirectory(${PX4_SOURCE_DIR}/ROMFS ${PX4_BINARY_DIR}/ROMFS)
+	target_link_libraries(px4 PRIVATE romfs)
+endif()
+
 # Module Symlinks
 px4_posix_generate_symlinks(
 	MODULE_LIST ${module_libraries}
