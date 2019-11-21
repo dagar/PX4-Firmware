@@ -60,56 +60,17 @@
 //#include <debug.h>
 //#define debug(fmt, args...)	syslog(fmt "\n", ##args)
 
-MixerGroup::MixerGroup(ControlCallback control_cb, uintptr_t cb_handle) :
-	Mixer(control_cb, cb_handle)
-{
-}
-
-MixerGroup::~MixerGroup()
-{
-	reset();
-}
-
-void
-MixerGroup::add_mixer(Mixer *mixer)
-{
-	Mixer **mpp = &_first;
-
-	while (*mpp != nullptr) {
-		mpp = &((*mpp)->_next);
-	}
-
-	*mpp = mixer;
-	mixer->_next = nullptr;
-}
-
-void
-MixerGroup::reset()
-{
-	Mixer *mixer;
-	Mixer *next = _first;
-
-	/* flag mixer as invalid */
-	_first = nullptr;
-
-	/* discard sub-mixers */
-	while (next != nullptr) {
-		mixer = next;
-		next = mixer->_next;
-		delete mixer;
-		mixer = nullptr;
-	}
-}
-
 unsigned
 MixerGroup::mix(float *outputs, unsigned space)
 {
-	Mixer *mixer = _first;
 	unsigned index = 0;
 
-	while ((mixer != nullptr) && (index < space)) {
+	for (auto mixer : _mixers) {
 		index += mixer->mix(outputs + index, space - index);
-		mixer = mixer->_next;
+
+		if (index >= space) {
+			break;
+		}
 	}
 
 	return index;
@@ -124,21 +85,19 @@ MixerGroup::mix(float *outputs, unsigned space)
 unsigned
 MixerGroup::set_trims(int16_t *values, unsigned n)
 {
-	Mixer *mixer = _first;
 	unsigned index = 0;
 
-	while ((mixer != nullptr) && (index < n)) {
-		/* convert from integer to float */
-		float offset = (float)values[index] / 10000;
-
-		/* to be safe, clamp offset to range of [-500, 500] usec */
-		if (offset < -1.0f) { offset = -1.0f; }
-
-		if (offset > 1.0f) { offset = 1.0f; }
+	for (auto mixer : _mixers) {
+		// convert from integer to float
+		// to be safe, clamp offset to range of [-500, 500] usec
+		float offset = math::constrain((float)values[index] / 10000, -1.0f, 1.0f);
 
 		debug("set trim: %d, offset: %5.3f", values[index], (double)offset);
 		index += mixer->set_trim(offset);
-		mixer = mixer->_next;
+
+		if (index >= n) {
+			break;
+		}
 	}
 
 	return index;
@@ -153,12 +112,11 @@ MixerGroup::set_trims(int16_t *values, unsigned n)
 unsigned
 MixerGroup::get_trims(int16_t *values)
 {
-	Mixer *mixer = _first;
 	unsigned index_mixer = 0;
 	unsigned index = 0;
-	float trim;
+	float trim = 0;
 
-	while (mixer != nullptr) {
+	for (auto mixer : _mixers) {
 		trim = 0;
 		index_mixer += mixer->get_trim(&trim);
 
@@ -168,8 +126,6 @@ MixerGroup::get_trims(int16_t *values)
 			values[index] = trim * 10000;
 			index++;
 		}
-
-		mixer = mixer->_next;
 	}
 
 	return index;
@@ -178,38 +134,28 @@ MixerGroup::get_trims(int16_t *values)
 void
 MixerGroup::set_thrust_factor(float val)
 {
-	Mixer *mixer = _first;
-
-	while (mixer != nullptr) {
+	for (auto mixer : _mixers) {
 		mixer->set_thrust_factor(val);
-		mixer = mixer->_next;
 	}
 }
 
 void
-MixerGroup::set_airmode(Airmode airmode)
+MixerGroup::set_airmode(Mixer::Airmode airmode)
 {
-	Mixer *mixer = _first;
-
-	while (mixer != nullptr) {
+	for (auto mixer : _mixers) {
 		mixer->set_airmode(airmode);
-		mixer = mixer->_next;
 	}
 }
 
 unsigned
 MixerGroup::get_multirotor_count()
 {
-	Mixer *mixer = _first;
-
-	while (mixer != nullptr) {
+	for (auto mixer : _mixers) {
 		unsigned rotor_count = mixer->get_multirotor_count();
 
 		if (rotor_count > 0) {
 			return rotor_count;
 		}
-
-		mixer = mixer->_next;
 	}
 
 	return 0;
@@ -218,39 +164,20 @@ MixerGroup::get_multirotor_count()
 uint16_t
 MixerGroup::get_saturation_status()
 {
-	Mixer *mixer = _first;
 	uint16_t sat = 0;
 
-	while (mixer != nullptr) {
+	for (auto mixer : _mixers) {
 		sat |= mixer->get_saturation_status();
-		mixer = mixer->_next;
 	}
 
 	return sat;
 }
 
-unsigned
-MixerGroup::count()
-{
-	Mixer *mixer = _first;
-	unsigned index = 0;
-
-	while (mixer != nullptr) {
-		mixer = mixer->_next;
-		index++;
-	}
-
-	return index;
-}
-
 void
 MixerGroup::groups_required(uint32_t &groups)
 {
-	Mixer *mixer = _first;
-
-	while (mixer != nullptr) {
+	for (auto mixer : _mixers) {
 		mixer->groups_required(groups);
-		mixer = mixer->_next;
 	}
 }
 
@@ -324,10 +251,7 @@ MixerGroup::load_from_buf(const char *buf, unsigned &buflen)
 
 void MixerGroup::set_max_delta_out_once(float delta_out_max)
 {
-	Mixer *mixer = _first;
-
-	while (mixer != nullptr) {
+	for (auto mixer : _mixers) {
 		mixer->set_max_delta_out_once(delta_out_max);
-		mixer = mixer->_next;
 	}
 }

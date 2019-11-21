@@ -33,15 +33,28 @@
 
 #pragma once
 
+#include <containers/List.hpp>
+
+#include "Mixer.hpp"
+
 /**
  * Group of mixers, built up from single mixers and processed
  * in order when mixing.
  */
-class MixerGroup : public Mixer
+class MixerGroup
 {
 public:
-	MixerGroup(ControlCallback control_cb, uintptr_t cb_handle);
-	virtual ~MixerGroup();
+
+	MixerGroup(Mixer::ControlCallback control_cb, uintptr_t cb_handle) :
+		_control_cb(control_cb),
+		_cb_handle(cb_handle)
+	{
+	}
+
+	~MixerGroup()
+	{
+		reset();
+	}
 
 	// no copy, assignment, move, move assignment
 	MixerGroup(const MixerGroup &) = delete;
@@ -49,26 +62,28 @@ public:
 	MixerGroup(MixerGroup &&) = delete;
 	MixerGroup &operator=(MixerGroup &&) = delete;
 
-	unsigned		mix(float *outputs, unsigned space) override;
-	uint16_t		get_saturation_status(void) override;
-	void			groups_required(uint32_t &groups) override;
+	unsigned			mix(float *outputs, unsigned space);
+
+	uint16_t			get_saturation_status();
+
+	void				groups_required(uint32_t &groups);
 
 	/**
 	 * Add a mixer to the group.
 	 *
 	 * @param mixer			The mixer to be added.
 	 */
-	void				add_mixer(Mixer *mixer);
+	void				add_mixer(Mixer *mixer) { _mixers.add(mixer); }
 
 	/**
 	 * Remove all the mixers from the group.
 	 */
-	void				reset();
+	void				reset() { _mixers.clear(); }
 
 	/**
 	 * Count the mixers in the group.
 	 */
-	unsigned			count();
+	unsigned			count() const { return _mixers.size(); }
 
 	/**
 	 * Adds mixers to the group based on a text description in a buffer.
@@ -137,26 +152,31 @@ public:
 	 * @param[in]  delta_out_max  Maximum delta output.
 	 *
 	 */
-	void 			set_max_delta_out_once(float delta_out_max) override;
+	void 				set_max_delta_out_once(float delta_out_max);
 
 	/*
 	 * Invoke the set_offset method of each mixer in the group
 	 * for each value in page r_page_servo_control_trim
 	 */
-	unsigned set_trims(int16_t *v, unsigned n);
-	unsigned get_trims(int16_t *values);
+	unsigned			set_trims(int16_t *v, unsigned n);
+	unsigned			get_trims(int16_t *values);
 
 	/**
 	 * @brief      Sets the thrust factor used to calculate mapping from desired thrust to motor control signal output.
 	 *
 	 * @param[in]  val   The value
 	 */
-	void	set_thrust_factor(float val) override;
+	void				set_thrust_factor(float val);
 
-	void 	set_airmode(Airmode airmode) override;
+	void				set_airmode(Mixer::Airmode airmode);
 
-	unsigned get_multirotor_count() override;
+	unsigned			get_multirotor_count();
 
 private:
-	Mixer				*_first{nullptr};	/**< linked list of mixers */
+	List<Mixer *>			_mixers;	/**< linked list of mixers */
+
+	/** client-supplied callback used when fetching control values */
+	Mixer::ControlCallback		_control_cb;
+	uintptr_t			_cb_handle;
+
 };

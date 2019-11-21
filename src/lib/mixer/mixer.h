@@ -127,9 +127,6 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <lib/mathlib/mathlib.h>
-
 #include "Mixer.hpp"
 #include "MixerGroup.hpp"
 #include "NullMixer.hpp"
