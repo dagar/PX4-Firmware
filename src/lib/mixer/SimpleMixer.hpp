@@ -33,20 +33,22 @@
 
 #pragma once
 
+#include "Mixer.hpp"
+
 /** simple channel scaler */
 struct mixer_scaler_s {
-	float			negative_scale;
-	float			positive_scale;
-	float			offset;
-	float			min_output;
-	float			max_output;
+	float negative_scale{1.0f};
+	float positive_scale{1.0f};
+	float offset{0.0f};
+	float min_output{-1.0f};
+	float max_output{1.0f};
 };
 
 /** mixer input */
 struct mixer_control_s {
 	uint8_t			control_group;	/**< group from which the input reads */
 	uint8_t			control_index;	/**< index within the control group */
-	struct mixer_scaler_s 	scaler;		/**< scaling applied to the input before use */
+	mixer_scaler_s		scaler;		/**< scaling applied to the input before use */
 };
 
 #define MIXER_SIMPLE_SIZE(_icount)	(sizeof(struct mixer_simple_s) + (_icount) * sizeof(struct mixer_control_s))
@@ -54,8 +56,8 @@ struct mixer_control_s {
 /** simple mixer */
 struct mixer_simple_s {
 	uint8_t			control_count;	/**< number of inputs */
-	struct mixer_scaler_s	output_scaler;	/**< scaling for the output */
-	struct mixer_control_s	controls[0];	/**< actual size of the array is set by control_count */
+	mixer_scaler_s		output_scaler;	/**< scaling for the output */
+	mixer_control_s		controls[];	/**< actual size of the array is set by control_count */
 };
 
 /**
@@ -98,8 +100,7 @@ public:
 	 * @return			A new SimpleMixer instance, or nullptr
 	 *				if the text format is bad.
 	 */
-	static SimpleMixer		*from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, const char *buf,
-			unsigned &buflen);
+	static SimpleMixer		*from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, const char *buf, unsigned &buflen);
 
 	unsigned			mix(float *outputs, unsigned space) override;
 
@@ -137,9 +138,9 @@ private:
 	 */
 	static int			scale_check(struct mixer_scaler_s &scaler);
 
-	mixer_simple_s			*_pinfo{nullptr};
-
 	static int parse_output_scaler(const char *buf, unsigned &buflen, mixer_scaler_s &scaler);
 	static int parse_control_scaler(const char *buf, unsigned &buflen, mixer_scaler_s &scaler, uint8_t &control_group,
 					uint8_t &control_index);
+
+	mixer_simple_s		*_pinfo ;
 };

@@ -45,13 +45,13 @@
 
 int load_mixer_file(const char *fname, char *buf, unsigned maxlen)
 {
-	FILE		*fp;
-	char		line[120];
+	FILE* fp;
+	char line[120];
 
 	/* open the mixer definition file */
 	fp = fopen(fname, "r");
 
-	if (fp == NULL) {
+	if (fp == nullptr) {
 		printf("file not found\n");
 		return -1;
 	}

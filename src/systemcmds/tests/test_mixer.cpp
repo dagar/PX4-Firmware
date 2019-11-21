@@ -43,8 +43,8 @@
 #include <math.h>
 
 #include <px4_platform_common/px4_config.h>
-#include <mixer/mixer.h>
-#include <mixer/mixer_load.h>
+#include <lib/mixer/MixerGroup.hpp>
+#include <lib/mixer/mixer_load.h>
 #include <output_limit/output_limit.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>

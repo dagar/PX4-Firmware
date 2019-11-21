@@ -37,15 +37,13 @@
  * Multi-rotor mixers.
  */
 
-#include "mixer.h"
+#include "MultirotorMixer.hpp"
 
 #include <float.h>
 #include <cstring>
 #include <cstdio>
 
 #include <mathlib/mathlib.h>
-
-#include "MultirotorMixer.hpp"
 
 #ifdef MIXER_MULTIROTOR_USE_MOCK_GEOMETRY
 enum class MultirotorGeometry : MultirotorGeometryUnderlyingType {

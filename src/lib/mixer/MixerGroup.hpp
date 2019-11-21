@@ -36,6 +36,11 @@
 #include <containers/List.hpp>
 
 #include "Mixer.hpp"
+#include "MixerGroup.hpp"
+#include "NullMixer.hpp"
+#include "SimpleMixer.hpp"
+#include "MultirotorMixer.hpp"
+#include "HelicopterMixer.hpp"
 
 /**
  * Group of mixers, built up from single mixers and processed

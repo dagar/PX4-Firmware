@@ -37,7 +37,8 @@
  * Simple summing mixer.
  */
 
-#include "mixer.h"
+#include "SimpleMixer.hpp"
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -190,7 +191,6 @@ SimpleMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, c
 	next_tag = findnexttag(end - buflen, buflen);
 
 	if (next_tag == 'S') {
-
 		/* No output scalers specified. Use default values.
 		 * Corresponds to:
 		 * O:      10000  10000      0 -10000  10000
@@ -200,9 +200,7 @@ SimpleMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, c
 		mixinfo->output_scaler.offset		= 0.f;
 		mixinfo->output_scaler.min_output	= -1.0f;
 		mixinfo->output_scaler.max_output	= 1.0f;
-
 	} else {
-
 		if (parse_output_scaler(end - buflen, buflen, mixinfo->output_scaler)) {
 			debug("simple mixer parser failed parsing out scaler tag, ret: '%s'", buf);
 			goto out;
@@ -217,7 +215,6 @@ SimpleMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, c
 			debug("simple mixer parser failed parsing ctrl scaler tag, ret: '%s'", buf);
 			goto out;
 		}
-
 	}
 
 	sm = new SimpleMixer(control_cb, cb_handle, mixinfo);
@@ -225,7 +222,6 @@ SimpleMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, c
 	if (sm != nullptr) {
 		mixinfo = nullptr;
 		debug("loaded mixer with %d input(s)", inputs);
-
 	} else {
 		debug("could not allocate memory for mixer");
 	}
@@ -331,7 +327,7 @@ SimpleMixer::scale(const mixer_scaler_s &scaler, float input)
 }
 
 int
-SimpleMixer::scale_check(struct mixer_scaler_s &scaler)
+SimpleMixer::scale_check(mixer_scaler_s &scaler)
 {
 	if (scaler.offset > 1.001f) {
 		return 1;

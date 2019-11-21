@@ -37,8 +37,6 @@
  * Programmable multi-channel mixer library.
  */
 
-#include "mixer.h"
-
 #include "Mixer.hpp"
 
 #include <math.h>

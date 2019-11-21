@@ -37,7 +37,6 @@
  * Helicopter mixers.
  */
 
-#include "mixer.h"
 
 #include "HelicopterMixer.hpp"
 
@@ -52,9 +51,9 @@
 
 using math::constrain;
 
-HelicopterMixer::HelicopterMixer(ControlCallback control_cb, uintptr_t cb_handle, mixer_heli_s *mixer_info) :
+HelicopterMixer::HelicopterMixer(ControlCallback control_cb, uintptr_t cb_handle, mixer_heli_s mixer_info) :
 	Mixer(control_cb, cb_handle),
-	_mixer_info(*mixer_info)
+	_mixer_info(mixer_info)
 {
 }
 
@@ -182,10 +181,7 @@ HelicopterMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handl
 
 	debug("remaining in buf: %d, first char: %c", buflen, buf[0]);
 
-	HelicopterMixer *hm = new HelicopterMixer(
-		control_cb,
-		cb_handle,
-		&mixer_info);
+	HelicopterMixer *hm = new HelicopterMixer(control_cb, cb_handle, mixer_info);
 
 	if (hm != nullptr) {
 		debug("loaded heli mixer with %d swash plate input(s)", mixer_info.control_count);
