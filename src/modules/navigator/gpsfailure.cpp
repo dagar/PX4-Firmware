@@ -124,7 +124,7 @@ GpsFailure::on_active()
 void
 GpsFailure::set_gpsf_item()
 {
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	/* Set pos sp triplet to invalid to stop pos controller */
 	pos_sp_triplet->previous.valid = false;

@@ -94,7 +94,7 @@ void FollowTarget::on_activation()
 
 void FollowTarget::on_active()
 {
-	struct map_projection_reference_s target_ref;
+	map_projection_reference_s target_ref;
 	follow_target_s target_motion_with_offset = {};
 	uint64_t current_time = hrt_absolute_time();
 	bool _radius_entered = false;
@@ -317,11 +317,9 @@ void FollowTarget::on_active()
 void FollowTarget::update_position_sp(bool use_velocity, bool use_position, float yaw_rate)
 {
 	// convert mission item to current setpoint
-
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	// activate line following in pos control if position is valid
-
 	pos_sp_triplet->previous.valid = use_position;
 	pos_sp_triplet->previous = pos_sp_triplet->current;
 	mission_apply_limitation(_mission_item);
@@ -365,7 +363,7 @@ bool FollowTarget::target_position_valid()
 }
 
 void
-FollowTarget::set_follow_target_item(struct mission_item_s *item, float min_clearance, follow_target_s &target,
+FollowTarget::set_follow_target_item(MissionItem *item, float min_clearance, follow_target_s &target,
 				     float yaw)
 {
 	if (_navigator->get_land_detected()->landed) {

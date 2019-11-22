@@ -144,5 +144,5 @@ private:
 	/**
 	 * Set follow_target item
 	 */
-	void set_follow_target_item(struct mission_item_s *item, float min_clearance, follow_target_s &target, float yaw);
+	void set_follow_target_item(MissionItem *item, float min_clearance, follow_target_s &target, float yaw);
 };

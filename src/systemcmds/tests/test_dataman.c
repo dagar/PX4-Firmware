@@ -94,7 +94,7 @@ task_main(int argc, char *argv[])
 		unsigned hash = i ^ my_id;
 		unsigned len = (hash % (DM_MAX_DATA_SIZE / 2)) + 2;
 
-		int ret = dm_write(DM_KEY_WAYPOINTS_OFFBOARD_1, hash, DM_PERSIST_IN_FLIGHT_RESET, buffer, len);
+		int ret = dm_write(DM_KEY_WAYPOINTS_1, hash, buffer, len);
 		//PX4_INFO("ret: %d", ret);
 
 		if (ret != len) {
@@ -117,7 +117,7 @@ task_main(int argc, char *argv[])
 		unsigned len2;
 		unsigned len = (hash % (DM_MAX_DATA_SIZE / 2)) + 2;
 
-		if ((len2 = dm_read(DM_KEY_WAYPOINTS_OFFBOARD_1, hash, buffer, sizeof(buffer))) < 2) {
+		if ((len2 = dm_read(DM_KEY_WAYPOINTS_1, hash, buffer, sizeof(buffer))) < 2) {
 			PX4_WARN("task %d: read failed length test, index %d", my_id, hash);
 			goto fail;
 		}
@@ -206,29 +206,6 @@ int test_dataman(int argc, char *argv[])
 
 	if (got_error) {
 		return -1;
-	}
-
-	dm_restart(DM_INIT_REASON_IN_FLIGHT);
-
-	for (i = 0; i < NUM_MISSIONS_TEST; i++) {
-		if (dm_read(DM_KEY_WAYPOINTS_OFFBOARD_1, i, buffer, sizeof(buffer)) != 0) {
-			break;
-		}
-	}
-
-	if (i >= NUM_MISSIONS_TEST) {
-		PX4_ERR("Restart in-flight failed");
-		return -1;
-
-	}
-
-	dm_restart(DM_INIT_REASON_POWER_ON);
-
-	for (i = 0; i < NUM_MISSIONS_TEST; i++) {
-		if (dm_read(DM_KEY_WAYPOINTS_OFFBOARD_1, i, buffer, sizeof(buffer)) != 0) {
-			PX4_ERR("Restart power-on failed");
-			return -1;
-		}
 	}
 
 	return 0;

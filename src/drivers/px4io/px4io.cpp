@@ -576,35 +576,16 @@ PX4IO::detect()
 	return 0;
 }
 
-int
-PX4IO::init(bool rc_handling_disabled, bool hitl_mode)
+int PX4IO::init(bool rc_handling_disabled, bool hitl_mode)
 {
 	_rc_handling_disabled = rc_handling_disabled;
 	_hitl_mode = hitl_mode;
 	return init();
 }
 
-int
-PX4IO::init()
+int PX4IO::init()
 {
-	int ret;
-	param_t sys_restart_param;
-	int32_t sys_restart_val = DM_INIT_REASON_VOLATILE;
-
-	sys_restart_param = param_find("SYS_RESTART_TYPE");
-
-	if (sys_restart_param != PARAM_INVALID) {
-		/* Indicate restart type is unknown */
-		int32_t prev_val;
-		param_get(sys_restart_param, &prev_val);
-
-		if (prev_val != DM_INIT_REASON_POWER_ON) {
-			param_set_no_notification(sys_restart_param, &sys_restart_val);
-		}
-	}
-
-	/* do regular cdev init */
-	ret = CDev::init();
+	int ret = CDev::init();
 
 	if (ret != OK) {
 		return ret;
@@ -814,15 +795,6 @@ PX4IO::init()
 			/* keep waiting for state change for 2 s */
 		} while (!actuator_armed.armed);
 
-		/* Indicate restart type is in-flight */
-		sys_restart_val = DM_INIT_REASON_IN_FLIGHT;
-		int32_t prev_val;
-		param_get(sys_restart_param, &prev_val);
-
-		if (prev_val != sys_restart_val) {
-			param_set(sys_restart_param, &sys_restart_val);
-		}
-
 		/* regular boot, no in-air restart, init IO */
 
 	} else {
@@ -852,16 +824,6 @@ PX4IO::init()
 				return ret;
 			}
 		}
-
-		/* Indicate restart type is power on */
-		sys_restart_val = DM_INIT_REASON_POWER_ON;
-		int32_t prev_val;
-		param_get(sys_restart_param, &prev_val);
-
-		if (prev_val != sys_restart_val) {
-			param_set(sys_restart_param, &sys_restart_val);
-		}
-
 	}
 
 	/* set safety to off if circuit breaker enabled */

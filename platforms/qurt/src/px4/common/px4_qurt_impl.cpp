@@ -69,32 +69,18 @@ unsigned int sleep(unsigned int sec)
 	return 0;
 }
 
-extern void hrt_init(void);
-
-#if 0
-void qurt_log(const char *fmt, ...)
-{
-	va_list	args;
-	va_start(args, fmt);
-	printf(fmt, args);
-	printf("n");
-	va_end(args);
-}
-#endif
-
 //extern int _posix_init(void);
 
 __END_DECLS
 
 extern struct wqueue_s gwork[NWORKERS];
 
-
 namespace px4
 {
 
-void init_once(void);
+void init_once();
 
-void init_once(void)
+void init_once()
 {
 	// Required for QuRT
 	//_posix_init();
@@ -106,38 +92,6 @@ void init_once(void)
 	hrt_work_queue_init();
 
 	px4_platform_init();
-}
-
-void init(int argc, char *argv[], const char *app_name)
-{
-	PX4_DEBUG("App name: %s\n", app_name);
-}
-
-}
-
-/** Retrieve from the data manager store */
-ssize_t
-dm_read(
-	dm_item_t item,                 /* The item type to retrieve */
-	unsigned index,                 /* The index of the item */
-	void *buffer,                   /* Pointer to caller data buffer */
-	size_t buflen                   /* Length in bytes of data to retrieve */
-)
-{
-	return 0;
-}
-
-/** write to the data manager store */
-ssize_t
-dm_write(
-	dm_item_t  item,                /* The item type to store */
-	unsigned index,                 /* The index of the item */
-	dm_persitence_t persistence,    /* The persistence level of this item */
-	const void *buffer,             /* Pointer to caller data buffer */
-	size_t buflen                   /* Length in bytes of data to retrieve */
-)
-{
-	return 0;
 }
 
 size_t strnlen(const char *s, size_t maxlen)

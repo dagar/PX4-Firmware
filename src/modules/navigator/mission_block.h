@@ -72,21 +72,21 @@ public:
 	 *
 	 * @return false if the mission item does not contain a valid position
 	 */
-	static bool item_contains_position(const mission_item_s &item);
+	static bool item_contains_position(const MissionItem &item);
 
 	/**
 	 * Check if the mission item contains a gate condition
 	 *
 	 * @return true if mission item is a gate
 	 */
-	static bool item_contains_gate(const mission_item_s &item);
+	static bool item_contains_gate(const MissionItem &item);
 
 	/**
 	 * Check if the mission item contains a marker
 	 *
 	 * @return true if mission item is a marker
 	 */
-	static bool item_contains_marker(const mission_item_s &item);
+	static bool item_contains_marker(const MissionItem &item);
 
 protected:
 	/**
@@ -106,45 +106,45 @@ protected:
 	 * @param the mission item to convert
 	 * @param the position setpoint that needs to be set
 	 */
-	bool mission_item_to_position_setpoint(const mission_item_s &item, position_setpoint_s *sp);
+	bool mission_item_to_position_setpoint(const MissionItem &item, position_setpoint_s *sp);
 
 	/**
 	 * Set a loiter mission item, if possible reuse the position setpoint, otherwise take the current position
 	 */
-	void set_loiter_item(struct mission_item_s *item, float min_clearance = -1.0f);
+	void set_loiter_item(MissionItem *item, float min_clearance = -1.0f);
 
 	/**
 	 * Set a takeoff mission item
 	 */
-	void set_takeoff_item(struct mission_item_s *item, float abs_altitude, float min_pitch = 0.0f);
+	void set_takeoff_item(MissionItem *item, float abs_altitude, float min_pitch = 0.0f);
 
 	/**
 	 * Set a land mission item
 	 */
-	void set_land_item(struct mission_item_s *item, bool at_current_location);
+	void set_land_item(MissionItem *item, bool at_current_location);
 
 	/**
 	 * Set idle mission item
 	 */
-	void set_idle_item(struct mission_item_s *item);
+	void set_idle_item(MissionItem *item);
 
 	/**
 	 * Set vtol transition item
 	 */
-	void set_vtol_transition_item(struct mission_item_s *item, const uint8_t new_mode);
+	void set_vtol_transition_item(MissionItem *item, const uint8_t new_mode);
 
 	/**
 	 * General function used to adjust the mission item based on vehicle specific limitations
 	 */
-	void mission_apply_limitation(mission_item_s &item);
+	void mission_apply_limitation(MissionItem &item);
 
-	void issue_command(const mission_item_s &item);
+	void issue_command(const MissionItem &item);
 
-	float get_time_inside(const mission_item_s &item) const ;
+	float get_time_inside(const MissionItem &item) const ;
 
-	float get_absolute_altitude_for_item(const mission_item_s &mission_item) const;
+	float get_absolute_altitude_for_item(const MissionItem &mission_item) const;
 
-	mission_item_s _mission_item{};
+	MissionItem _mission_item{};
 
 	bool _waypoint_position_reached{false};
 	bool _waypoint_yaw_reached{false};

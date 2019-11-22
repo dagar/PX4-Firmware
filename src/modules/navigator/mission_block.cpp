@@ -154,7 +154,7 @@ MissionBlock::is_mission_item_reached()
 		if (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING &&
 		    (_mission_item.nav_cmd == NAV_CMD_WAYPOINT)) {
 
-			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
+			position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
 
 			/* close to waypoint, but altitude error greater than twice acceptance */
 			if ((dist >= 0.0f)
@@ -242,7 +242,7 @@ MissionBlock::is_mission_item_reached()
 
 			// NAV_CMD_LOITER_TO_ALT only uses mission item altitude once it's in the loiter
 			//  first check if the altitude setpoint is the mission setpoint
-			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
+			position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
 
 			if (fabsf(curr_sp->alt - altitude_amsl) >= FLT_EPSILON) {
 				// check if the initial loiter has been accepted
@@ -289,7 +289,7 @@ MissionBlock::is_mission_item_reached()
 
 		} else if (_mission_item.nav_cmd == NAV_CMD_CONDITION_GATE) {
 
-			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
+			position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
 
 			// if the setpoint is valid we are checking if we reached the gate
 			// in the case of an invalid setpoint we are defaulting to
@@ -298,7 +298,7 @@ MissionBlock::is_mission_item_reached()
 			if (curr_sp->valid) {
 
 				// location of gate (mission item)
-				struct map_projection_reference_s ref_pos;
+				map_projection_reference_s ref_pos;
 				map_projection_init(&ref_pos, _mission_item.lat, _mission_item.lon);
 
 				// current setpoint
@@ -455,8 +455,7 @@ MissionBlock::is_mission_item_reached()
 	return false;
 }
 
-void
-MissionBlock::reset_mission_item_reached()
+void MissionBlock::reset_mission_item_reached()
 {
 	_waypoint_position_reached = false;
 	_waypoint_yaw_reached = false;
@@ -464,8 +463,7 @@ MissionBlock::reset_mission_item_reached()
 	_time_wp_reached = 0;
 }
 
-void
-MissionBlock::issue_command(const mission_item_s &item)
+void MissionBlock::issue_command(const MissionItem &item)
 {
 	if (item_contains_position(item)
 	    || item_contains_gate(item)
@@ -515,8 +513,7 @@ MissionBlock::issue_command(const mission_item_s &item)
 	}
 }
 
-float
-MissionBlock::get_time_inside(const mission_item_s &item) const
+float MissionBlock::get_time_inside(const MissionItem &item) const
 {
 	if ((item.nav_cmd == NAV_CMD_WAYPOINT
 	     && _navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) ||
@@ -530,8 +527,7 @@ MissionBlock::get_time_inside(const mission_item_s &item) const
 	return 0.0f;
 }
 
-bool
-MissionBlock::item_contains_position(const mission_item_s &item)
+bool MissionBlock::item_contains_position(const MissionItem &item)
 {
 	return item.nav_cmd == NAV_CMD_WAYPOINT ||
 	       item.nav_cmd == NAV_CMD_LOITER_UNLIMITED ||
@@ -544,20 +540,17 @@ MissionBlock::item_contains_position(const mission_item_s &item)
 	       item.nav_cmd == NAV_CMD_DO_FOLLOW_REPOSITION;
 }
 
-bool
-MissionBlock::item_contains_gate(const mission_item_s &item)
+bool MissionBlock::item_contains_gate(const MissionItem &item)
 {
 	return item.nav_cmd == NAV_CMD_CONDITION_GATE;
 }
 
-bool
-MissionBlock::item_contains_marker(const mission_item_s &item)
+bool MissionBlock::item_contains_marker(const MissionItem &item)
 {
 	return item.nav_cmd == NAV_CMD_DO_LAND_START;
 }
 
-bool
-MissionBlock::mission_item_to_position_setpoint(const mission_item_s &item, position_setpoint_s *sp)
+bool MissionBlock::mission_item_to_position_setpoint(const MissionItem &item, position_setpoint_s *sp)
 {
 	/* don't change the setpoint for non-position items */
 	if (!item_contains_position(item)) {
@@ -643,8 +636,7 @@ MissionBlock::mission_item_to_position_setpoint(const mission_item_s &item, posi
 	return sp->valid;
 }
 
-void
-MissionBlock::set_loiter_item(struct mission_item_s *item, float min_clearance)
+void MissionBlock::set_loiter_item(MissionItem *item, float min_clearance)
 {
 	if (_navigator->get_land_detected()->landed) {
 		/* landed, don't takeoff, but switch to IDLE mode */
@@ -653,7 +645,7 @@ MissionBlock::set_loiter_item(struct mission_item_s *item, float min_clearance)
 	} else {
 		item->nav_cmd = NAV_CMD_LOITER_UNLIMITED;
 
-		struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+		position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 		if (_navigator->get_can_loiter_at_sp() && pos_sp_triplet->current.valid) {
 			/* use current position setpoint */
@@ -682,8 +674,7 @@ MissionBlock::set_loiter_item(struct mission_item_s *item, float min_clearance)
 	}
 }
 
-void
-MissionBlock::set_takeoff_item(struct mission_item_s *item, float abs_altitude, float min_pitch)
+void MissionBlock::set_takeoff_item(MissionItem *item, float abs_altitude, float min_pitch)
 {
 	item->nav_cmd = NAV_CMD_TAKEOFF;
 
@@ -701,8 +692,7 @@ MissionBlock::set_takeoff_item(struct mission_item_s *item, float abs_altitude, 
 	item->origin = ORIGIN_ONBOARD;
 }
 
-void
-MissionBlock::set_land_item(struct mission_item_s *item, bool at_current_location)
+void MissionBlock::set_land_item(MissionItem *item, bool at_current_location)
 {
 	/* VTOL transition to RW before landing */
 	if (_navigator->force_vtol()) {
@@ -738,8 +728,7 @@ MissionBlock::set_land_item(struct mission_item_s *item, bool at_current_locatio
 	item->origin = ORIGIN_ONBOARD;
 }
 
-void
-MissionBlock::set_idle_item(struct mission_item_s *item)
+void MissionBlock::set_idle_item(MissionItem *item)
 {
 	item->nav_cmd = NAV_CMD_IDLE;
 	item->lat = _navigator->get_home_position()->lat;
@@ -754,8 +743,7 @@ MissionBlock::set_idle_item(struct mission_item_s *item)
 	item->origin = ORIGIN_ONBOARD;
 }
 
-void
-MissionBlock::set_vtol_transition_item(struct mission_item_s *item, const uint8_t new_mode)
+void MissionBlock::set_vtol_transition_item(MissionItem *item, const uint8_t new_mode)
 {
 	item->nav_cmd = NAV_CMD_DO_VTOL_TRANSITION;
 	item->params[0] = (float) new_mode;
@@ -763,8 +751,7 @@ MissionBlock::set_vtol_transition_item(struct mission_item_s *item, const uint8_
 	item->autocontinue = true;
 }
 
-void
-MissionBlock::mission_apply_limitation(mission_item_s &item)
+void MissionBlock::mission_apply_limitation(MissionItem &item)
 {
 	/*
 	 * Limit altitude
@@ -792,8 +779,7 @@ MissionBlock::mission_apply_limitation(mission_item_s &item)
 	 */
 }
 
-float
-MissionBlock::get_absolute_altitude_for_item(const mission_item_s &mission_item) const
+float MissionBlock::get_absolute_altitude_for_item(const MissionItem &mission_item) const
 {
 	if (mission_item.altitude_is_relative) {
 		return mission_item.altitude + _navigator->get_home_position()->alt;

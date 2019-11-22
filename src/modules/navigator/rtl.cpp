@@ -52,34 +52,29 @@ RTL::RTL(Navigator *navigator) :
 {
 }
 
-void
-RTL::on_inactivation()
+void RTL::on_inactivation()
 {
 	if (_navigator->get_precland()->is_activated()) {
 		_navigator->get_precland()->on_inactivation();
 	}
 }
 
-void
-RTL::on_inactive()
+void RTL::on_inactive()
 {
 	// Reset RTL state.
 	_rtl_state = RTL_STATE_NONE;
 
 	find_RTL_destination();
-
 }
 
-void
-RTL::find_RTL_destination()
+void RTL::find_RTL_destination()
 {
-	// get home position:
-	home_position_s &home_landing_position = *_navigator->get_home_position();
-	// get global position
+	const home_position_s &home_landing_position = *_navigator->get_home_position();
 	const vehicle_global_position_s &global_position = *_navigator->get_global_position();
 
 	// set destination to home per default, then check if other valid landing spot is closer
 	_destination.set(home_landing_position);
+
 	// get distance to home position
 	double dlat = home_landing_position.lat - global_position.lat;
 	double dlon = home_landing_position.lon - global_position.lon;
@@ -114,23 +109,25 @@ RTL::find_RTL_destination()
 	}
 
 	// compare to safe landing positions
-	mission_safe_point_s closest_safe_point {} ;
-	mission_stats_entry_s stats;
-	int ret = dm_read(DM_KEY_SAFE_POINTS, 0, &stats, sizeof(mission_stats_entry_s));
+	mission_safe_points_s stats{};
+	int ret = dm_read(DM_KEY_SAFE_POINTS, 0, &stats, sizeof(mission_safe_points_s));
 	int num_safe_points = 0;
 
-	if (ret == sizeof(mission_stats_entry_s)) {
+	if (ret == sizeof(mission_safe_points_s)) {
 		num_safe_points = stats.num_items;
 	}
+
+	MissionSafePointItem closest_safe_point{} ;
 
 	// check if a safe point is closer than home or landing
 	int closest_index = 0;
 
 	for (int current_seq = 1; current_seq <= num_safe_points; ++current_seq) {
-		mission_safe_point_s mission_safe_point;
+		MissionSafePointItem mission_safe_point;
 
-		if (dm_read(DM_KEY_SAFE_POINTS, current_seq, &mission_safe_point, sizeof(mission_safe_point_s)) !=
-		    sizeof(mission_safe_point_s)) {
+		if (dm_read(DM_KEY_SAFE_POINTS, current_seq, &mission_safe_point,
+			    sizeof(MissionSafePointItem)) != sizeof(MissionSafePointItem)) {
+
 			PX4_ERR("dm_read failed");
 			continue;
 		}
@@ -172,19 +169,10 @@ RTL::find_RTL_destination()
 			break;
 		}
 	}
-
 }
 
-int
-RTL::rtl_type() const
+void RTL::on_activation()
 {
-	return _param_rtl_type.get();
-}
-
-void
-RTL::on_activation()
-{
-
 	// output the correct message, depending on where the RTL destination is
 	switch (_destination.type) {
 	case RTL_DESTINATION_HOME:
@@ -225,13 +213,11 @@ RTL::on_activation()
 	set_rtl_item();
 }
 
-void
-RTL::on_active()
+void RTL::on_active()
 {
 	if (_rtl_state != RTL_STATE_LANDED && is_mission_item_reached()) {
 		advance_rtl();
 		set_rtl_item();
-
 	}
 
 	if (_rtl_state == RTL_STATE_LAND && _param_rtl_pld_md.get() > 0) {
@@ -242,14 +228,7 @@ RTL::on_active()
 	}
 }
 
-void
-RTL::set_return_alt_min(bool min)
-{
-	_rtl_alt_min = min;
-}
-
-void
-RTL::set_rtl_item()
+void RTL::set_rtl_item()
 {
 	// RTL_TYPE: mission landing.
 	// Landing using planned mission landing, fly to DO_LAND_START instead of returning _destination.
@@ -445,8 +424,7 @@ RTL::set_rtl_item()
 	}
 }
 
-void
-RTL::advance_rtl()
+void RTL::advance_rtl()
 {
 	switch (_rtl_state) {
 	case RTL_STATE_CLIMB:
@@ -498,7 +476,6 @@ RTL::advance_rtl()
 		break;
 	}
 }
-
 
 float RTL::calculate_return_alt_from_cone_half_angle(float cone_half_angle_deg)
 {

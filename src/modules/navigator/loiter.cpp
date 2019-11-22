@@ -104,7 +104,7 @@ Loiter::set_loiter_position()
 	set_loiter_item(&_mission_item, _navigator->get_loiter_min_alt());
 
 	// convert mission item to current setpoint
-	struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	pos_sp_triplet->current.velocity_valid = false;
 	pos_sp_triplet->previous.valid = false;
 	mission_apply_limitation(_mission_item);
@@ -123,13 +123,13 @@ Loiter::reposition()
 		return;
 	}
 
-	struct position_setpoint_triplet_s *rep = _navigator->get_reposition_triplet();
+	position_setpoint_triplet_s *rep = _navigator->get_reposition_triplet();
 
 	if (rep->current.valid) {
 		// set loiter position based on reposition command
 
 		// convert mission item to current setpoint
-		struct position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+		position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 		pos_sp_triplet->current.velocity_valid = false;
 		pos_sp_triplet->previous.yaw = _navigator->get_global_position()->yaw;
 		pos_sp_triplet->previous.lat = _navigator->get_global_position()->lat;

@@ -42,12 +42,15 @@
 
 #include <float.h>
 
+#include "navigation.h"
+
 #include <px4_platform_common/module_params.h>
 #include <drivers/drv_hrt.h>
 #include <lib/ecl/geo/geo.h>
 #include <px4_platform_common/defines.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/home_position.h>
+#include <uORB/topics/mission_fence_points.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_air_data.h>
@@ -88,14 +91,14 @@ public:
 	 * @return true: system is obeying fence, false: system is violating fence
 	 */
 	bool check(const vehicle_global_position_s &global_position,
-		   const vehicle_gps_position_s &gps_position, const home_position_s home_pos, bool home_position_set);
+		   const vehicle_gps_position_s &gps_position, const home_position_s &home_pos, bool home_position_set);
 
 	/**
 	 * Return whether a mission item obeys the geofence.
 	 *
 	 * @return true: system is obeying fence, false: system is violating fence
 	 */
-	bool check(const struct mission_item_s &mission_item);
+	bool check(const MissionItem &mission_item);
 
 	int clearDm();
 
@@ -166,7 +169,10 @@ private:
 		(ParamFloat<px4::params::GF_MAX_VER_DIST>) _param_gf_max_ver_dist
 	)
 
-	uORB::SubscriptionData<vehicle_air_data_s>	_sub_airdata;
+	mission_fence_points_s _mission_fence_points{};
+
+	uORB::Subscription _mission_fence_points_sub{ORB_ID(mission_fence_points)};
+	uORB::Subscription _vehicle_air_data_sub{ORB_ID(vehicle_air_data)};
 
 	int _outside_counter{0};
 	uint16_t _update_counter{0}; ///< dataman update counter: if it does not match, we polygon data was updated

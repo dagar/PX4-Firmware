@@ -48,6 +48,9 @@
 #include <dataman/dataman.h>
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
+#include <uORB/topics/mission.h>
+#include <uORB/topics/mission_fence_points.h>
+#include <uORB/topics/mission_safe_points.h>
 #include <uORB/topics/mission_result.h>
 
 #include "mavlink_bridge_header.h"
@@ -104,8 +107,8 @@ private:
 
 	unsigned		_filesystem_errcount{0};		///< File system error count
 
-	static dm_item_t		_dataman_id;				///< Global Dataman storage ID for active mission
-	dm_item_t			_my_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_0};			///< class Dataman storage ID
+	static dm_item_t	_dataman_id;				///< Global Dataman storage ID for active mission
+	dm_item_t		_my_dataman_id{DM_KEY_WAYPOINTS_0};     ///< class Dataman storage ID
 
 	static bool		_dataman_init;				///< Dataman initialized
 
@@ -114,7 +117,7 @@ private:
 
 	int32_t			_last_reached{-1};			///< Last reached waypoint in active mission (-1 means nothing reached)
 
-	dm_item_t			_transfer_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_1};		///< Dataman storage ID for current transmission
+	dm_item_t		_transfer_dataman_id{DM_KEY_WAYPOINTS_1}; ///< Dataman storage ID for current transmission
 
 	uint16_t		_transfer_count{0};			///< Items count in current transmission
 	uint16_t		_transfer_seq{0};			///< Item sequence in current transmission
@@ -128,7 +131,9 @@ private:
 
 	uORB::Subscription	_mission_result_sub{ORB_ID(mission_result)};
 
-	uORB::Publication<mission_s>	_offboard_mission_pub{ORB_ID(mission)};
+	uORB::Publication<mission_s>               _mission_pub{ORB_ID(mission)};
+	uORB::Publication<mission_fence_points_s>  _mission_fence_points_pub{ORB_ID(mission_fence_points)};
+	uORB::Publication<mission_safe_points_s>   _mission_safe_points_pub{ORB_ID(mission_safe_points)};
 
 	static uint16_t		_geofence_update_counter;
 	static uint16_t		_safepoint_update_counter;
@@ -138,14 +143,14 @@ private:
 
 	Mavlink *_mavlink;
 
-	static constexpr unsigned int	FILESYSTEM_ERRCOUNT_NOTIFY_LIMIT =
-		2;	///< Error count limit before stopping to report FS errors
-	static constexpr uint16_t	MAX_COUNT[] = {
-		DM_KEY_WAYPOINTS_OFFBOARD_0_MAX,
+	static constexpr unsigned int FILESYSTEM_ERRCOUNT_NOTIFY_LIMIT =
+		2; ///< Error count limit before stopping to report FS errors
+
+	static constexpr uint16_t MAX_COUNT[] {
+		DM_KEY_WAYPOINTS_0_MAX,
 		DM_KEY_FENCE_POINTS_MAX - 1,
 		DM_KEY_SAFE_POINTS_MAX - 1
-	};	/**< Maximum number of mission items for each type
-					(fence & safe points use the first item for the stats) */
+	}; /**< Maximum number of mission items for each type (fence & safe points use the first item for the stats) */
 
 	/** get the maximum number of item count for the current _mission_type */
 	uint16_t current_max_item_count();
@@ -157,7 +162,7 @@ private:
 	MavlinkMissionManager(MavlinkMissionManager &);
 	MavlinkMissionManager &operator = (const MavlinkMissionManager &);
 
-	void init_offboard_mission();
+	void init_mission();
 
 	int update_active_mission(dm_item_t dataman_id, uint16_t count, int32_t seq);
 
@@ -223,23 +228,22 @@ private:
 	void handle_mission_clear_all(const mavlink_message_t *msg);
 
 	/**
-	 * Parse mavlink MISSION_ITEM message to get mission_item_s.
+	 * Parse mavlink MISSION_ITEM message to get mission_item.
 	 *
 	 * @param mavlink_mission_item pointer to mavlink_mission_item_t or mavlink_mission_item_int_t
 	 *			       depending on _int_mode
 	 * @param mission_item	       pointer to mission_item to construct
 	 */
-	int parse_mavlink_mission_item(const mavlink_mission_item_t *mavlink_mission_item, struct mission_item_s *mission_item);
+	int parse_mavlink_mission_item(const mavlink_mission_item_t *mavlink_mission_item, MissionItem *mission_item);
 
 	/**
-	 * Format mission_item_s as mavlink MISSION_ITEM(_INT) message.
+	 * Format mission_item as mavlink MISSION_ITEM(_INT) message.
 	 *
 	 * @param mission_item:		pointer to the existing mission item
 	 * @param mavlink_mission_item: pointer to mavlink_mission_item_t or mavlink_mission_item_int_t
 	 *				depending on _int_mode.
 	 */
-	int format_mavlink_mission_item(const struct mission_item_s *mission_item,
-					mavlink_mission_item_t *mavlink_mission_item);
+	int format_mavlink_mission_item(const MissionItem *mission_item, mavlink_mission_item_t *mavlink_mission_item);
 
 	/**
 	 * set _state to idle (and do necessary cleanup)

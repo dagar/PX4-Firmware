@@ -147,15 +147,15 @@ public:
 	/**
 	 * Getters
 	 */
-	struct home_position_s *get_home_position() { return &_home_pos; }
-	struct mission_result_s *get_mission_result() { return &_mission_result; }
-	struct position_setpoint_triplet_s *get_position_setpoint_triplet() { return &_pos_sp_triplet; }
-	struct position_setpoint_triplet_s *get_reposition_triplet() { return &_reposition_triplet; }
-	struct position_setpoint_triplet_s *get_takeoff_triplet() { return &_takeoff_triplet; }
-	struct vehicle_global_position_s *get_global_position() { return &_global_pos; }
-	struct vehicle_land_detected_s *get_land_detected() { return &_land_detected; }
-	struct vehicle_local_position_s *get_local_position() { return &_local_pos; }
-	struct vehicle_status_s *get_vstatus() { return &_vstatus; }
+	home_position_s *get_home_position() { return &_home_pos; }
+	mission_result_s *get_mission_result() { return &_mission_result; }
+	position_setpoint_triplet_s *get_position_setpoint_triplet() { return &_pos_sp_triplet; }
+	position_setpoint_triplet_s *get_reposition_triplet() { return &_reposition_triplet; }
+	position_setpoint_triplet_s *get_takeoff_triplet() { return &_takeoff_triplet; }
+	vehicle_global_position_s *get_global_position() { return &_global_pos; }
+	vehicle_land_detected_s *get_land_detected() { return &_land_detected; }
+	vehicle_local_position_s *get_local_position() { return &_local_pos; }
+	vehicle_status_s *get_vstatus() { return &_vstatus; }
 	PrecLand *get_precland() { return &_precland; } /**< allow others, e.g. Mission, to use the precision land block */
 
 	const vehicle_roi_s &get_vroi() { return _vroi; }

@@ -145,7 +145,7 @@ enum NAV_FRAME {
 #pragma GCC diagnostic error "-Wpadded"
 #endif // GCC >= 5 || Clang
 
-struct mission_item_s {
+struct MissionItem {
 	double lat;					/**< latitude in degrees				*/
 	double lon;					/**< longitude in degrees				*/
 	union {
@@ -191,19 +191,10 @@ struct mission_item_s {
 };
 
 /**
- * dataman housekeeping information for a specific item.
- * Corresponds to the first dataman entry of DM_KEY_FENCE_POINTS and DM_KEY_SAFE_POINTS
- */
-struct mission_stats_entry_s {
-	uint16_t num_items;			/**< total number of items stored (excluding this one) */
-	uint16_t update_counter;			/**< This counter is increased when (some) items change (this can wrap) */
-};
-
-/**
  * Geofence vertex point.
  * Corresponds to the DM_KEY_FENCE_POINTS dataman item
  */
-struct mission_fence_point_s {
+struct MissionFencePointItem {
 	double lat;
 	double lon;
 	float alt;
@@ -223,7 +214,7 @@ struct mission_fence_point_s {
  * Safe Point (Rally Point).
  * Corresponds to the DM_KEY_SAFE_POINTS dataman item
  */
-struct mission_safe_point_s {
+struct MissionSafePointItem {
 	double lat;
 	double lon;
 	float alt;
@@ -235,8 +226,6 @@ struct mission_safe_point_s {
 #if (__GNUC__ >= 5) || __clang__
 #pragma GCC diagnostic pop
 #endif // GCC >= 5 || Clang
-
-#include <uORB/topics/mission.h>
 
 /**
  * @}
