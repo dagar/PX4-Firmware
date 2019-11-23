@@ -63,31 +63,29 @@ namespace ms5611
  */
 struct ms5611_bus_option {
 	enum MS5611_BUS busid;
-	const char *devpath;
 	MS5611_constructor interface_constructor;
 	uint8_t busnum;
 	MS5611 *dev;
 } bus_options[] = {
 #if defined(PX4_SPIDEV_EXT_BARO) && defined(PX4_SPI_BUS_EXT)
-	{ MS5611_BUS_SPI_EXTERNAL, "/dev/ms5611_spi_ext", &MS5611_spi_interface, PX4_SPI_BUS_EXT, NULL },
+	{ MS5611_BUS_SPI_EXTERNAL, &MS5611_spi_interface, PX4_SPI_BUS_EXT, nullptr },
 #endif
 #ifdef PX4_SPIDEV_BARO
-	{ MS5611_BUS_SPI_INTERNAL, "/dev/ms5611_spi_int", &MS5611_spi_interface, PX4_SPI_BUS_BARO, NULL },
+	{ MS5611_BUS_SPI_INTERNAL, &MS5611_spi_interface, PX4_SPI_BUS_BARO, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_ONBOARD
-	{ MS5611_BUS_I2C_INTERNAL, "/dev/ms5611_int", &MS5611_i2c_interface, PX4_I2C_BUS_ONBOARD, NULL },
+	{ MS5611_BUS_I2C_INTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_ONBOARD, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION
-	{ MS5611_BUS_I2C_EXTERNAL, "/dev/ms5611_ext", &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION, NULL },
+	{ MS5611_BUS_I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION1
-	{ MS5611_BUS_I2C_EXTERNAL, "/dev/ms5611_ext1", &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION1, NULL },
+	{ MS5611_BUS_I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION1, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION2
-	{ MS5611_BUS_I2C_EXTERNAL, "/dev/ms5611_ext2", &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION2, NULL },
+	{ MS5611_BUS_I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION2, nullptr },
 #endif
 };
-#define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
 
 /**
  * Start the driver.
@@ -109,7 +107,7 @@ start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
 		return false;
 	}
 
-	bus.dev = new MS5611(interface, prom_buf, bus.devpath, device_type);
+	bus.dev = new MS5611(interface, prom_buf, device_type);
 
 	if (bus.dev != nullptr && OK != bus.dev->init()) {
 		delete bus.dev;
@@ -117,21 +115,6 @@ start_bus(struct ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
 		return false;
 	}
 
-	int fd = px4_open(bus.devpath, O_RDONLY);
-
-	/* set the poll rate to default, starts automatic data collection */
-	if (fd == -1) {
-		PX4_ERR("can't open baro device");
-		return false;
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		px4_close(fd);
-		PX4_ERR("failed setting default poll rate");
-		return false;
-	}
-
-	px4_close(fd);
 	return true;
 }
 
@@ -247,7 +230,6 @@ ms5611_main(int argc, char *argv[])
 			}
 
 		/* FALLTHROUGH */
-
 		default:
 			return ms5611::usage();
 		}

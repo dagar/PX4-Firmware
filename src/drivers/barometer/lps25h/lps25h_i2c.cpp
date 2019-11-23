@@ -66,23 +66,6 @@ LPS25H_I2C::LPS25H_I2C(int bus) :
 }
 
 int
-LPS25H_I2C::ioctl(unsigned operation, unsigned &arg)
-{
-	int ret;
-
-	switch (operation) {
-
-	case DEVIOCGDEVICEID:
-		return CDev::ioctl(nullptr, operation, arg);
-
-	default:
-		ret = -EINVAL;
-	}
-
-	return ret;
-}
-
-int
 LPS25H_I2C::probe()
 {
 	uint8_t id;

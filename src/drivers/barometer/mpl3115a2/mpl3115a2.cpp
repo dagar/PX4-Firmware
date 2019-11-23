@@ -58,8 +58,6 @@ enum MPL3115A2_BUS {
 #define MPL3115A2_CONVERSION_INTERVAL	10000	/* microseconds */
 #define MPL3115A2_OSR                   2       /* Over Sample rate of 4 18MS Minimum time between data samples */
 #define MPL3115A2_CTRL_TRIGGER          (CTRL_REG1_OST | CTRL_REG1_OS(MPL3115A2_OSR))
-#define MPL3115A2_BARO_DEVICE_PATH_EXT  "/dev/mpl3115a2_ext"
-#define MPL3115A2_BARO_DEVICE_PATH_INT  "/dev/mpl3115a2_int"
 
 class MPL3115A2 : public cdev::CDev, public px4::ScheduledWorkItem
 {
@@ -69,12 +67,6 @@ public:
 
 	virtual int		init();
 
-	virtual ssize_t		read(struct file *filp, char *buffer, size_t buflen);
-	virtual int		ioctl(struct file *filp, int cmd, unsigned long arg);
-
-	/**
-	 * Diagnostics - print some basic information about the driver.
-	 */
 	void			print_info();
 
 protected:
@@ -82,16 +74,10 @@ protected:
 
 	unsigned		_measure_interval;
 
-	ringbuffer::RingBuffer	*_reports;
 	bool			_collect_phase;
 
-	/*  */
 	float			_P;
 	float			_T;
-
-	orb_advert_t		_baro_topic;
-	int			_orb_class_instance;
-	int			_class_instance;
 
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_measure_perf;
@@ -141,43 +127,21 @@ protected:
 
 };
 
-/*
- * Driver 'main' command.
- */
-extern "C" __EXPORT int mpl3115a2_main(int argc, char *argv[]);
-
 MPL3115A2::MPL3115A2(device::Device *interface, const char *path) :
 	CDev(path),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
+	_px4_baro(interface->get_device_id())
 	_interface(interface),
-	_measure_interval(0),
-	_reports(nullptr),
-	_collect_phase(false),
-	_P(0),
-	_T(0),
-	_baro_topic(nullptr),
-	_orb_class_instance(-1),
-	_class_instance(-1),
-	_sample_perf(perf_alloc(PC_ELAPSED, "mpl3115a2_read")),
-	_measure_perf(perf_alloc(PC_ELAPSED, "mpl3115a2_measure")),
-	_comms_errors(perf_alloc(PC_COUNT, "mpl3115a2_com_err"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": com err"))
 {
-	_interface->set_device_type(DRV_BARO_DEVTYPE_MPL3115A2);
+	_px4_baro.set_device_type(DRV_BARO_DEVTYPE_MPL3115A2);
 }
 
 MPL3115A2::~MPL3115A2()
 {
-	/* make sure we are truly inactive */
 	stop();
-
-	if (_class_instance != -1) {
-		unregister_class_devname(get_devname(), _class_instance);
-	}
-
-	/* free any existing reports */
-	if (_reports != nullptr) {
-		delete _reports;
-	}
 
 	// free perf counters
 	perf_free(_sample_perf);
@@ -190,30 +154,6 @@ MPL3115A2::~MPL3115A2()
 int
 MPL3115A2::init()
 {
-	int ret;
-
-	ret = CDev::init();
-
-	if (ret != OK) {
-		PX4_DEBUG("CDev init failed");
-		goto out;
-	}
-
-	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_baro_s));
-
-	if (_reports == nullptr) {
-		PX4_DEBUG("can't get memory for reports");
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	/* register alternate interfaces if we have to */
-	_class_instance = register_class_devname(BARO_BASE_DEVICE_PATH);
-
-	sensor_baro_s brp;
-	_reports->flush();
-
 	while (true) {
 
 		/* First reading */
@@ -244,23 +184,6 @@ MPL3115A2::init()
 			break;
 		}
 
-		/* state machine will have generated a report, copy it out */
-		_reports->get(&brp);
-
-		// DEVICE_LOG("altitude (%u) = %.2f", _device_type, (double)brp.altitude);
-
-		/* ensure correct devid */
-		brp.device_id = _interface->get_device_id();
-
-		ret = OK;
-
-		_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &brp,
-						  &_orb_class_instance, (_interface->external()) ? ORB_PRIO_HIGH : ORB_PRIO_DEFAULT);
-
-		if (_baro_topic == nullptr) {
-			warnx("failed to create sensor_baro publication");
-		}
-
 		break;
 	}
 
@@ -268,149 +191,11 @@ out:
 	return ret;
 }
 
-ssize_t
-MPL3115A2::read(struct file *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_baro_s);
-	sensor_baro_s *brp = reinterpret_cast<sensor_baro_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	/* if automatic measurement is enabled */
-	if (_measure_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the workq thread while we are doing this;
-		 * we are careful to avoid racing with them.
-		 */
-		while (count--) {
-			if (_reports->get(brp)) {
-				ret += sizeof(*brp);
-				brp++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement - run one conversion */
-	do {
-		_reports->flush();
-
-		/* First reading */
-		do  {
-			ret = measure();
-
-			if (ret == -EAGAIN) {
-				usleep(1000);
-			}
-		} while (ret == -EAGAIN);
-
-		if (ret != OK) {
-			ret = -EIO;
-			break;
-		}
-
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* state machine will have generated a report, copy it out */
-		if (_reports->get(brp)) {
-			ret = sizeof(*brp);
-		}
-
-	} while (0);
-
-	return ret;
-}
-
-int
-MPL3115A2::ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-
-	case SENSORIOCSPOLLRATE: {
-			switch (arg) {
-
-			/* zero would be bad */
-			case 0:
-				return -EINVAL;
-
-			/* set default polling rate */
-			case SENSOR_POLLRATE_DEFAULT: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* set interval for next measurement to minimum legal value */
-					_measure_interval = MPL3115A2_CONVERSION_INTERVAL;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-
-			/* adjust to a legal polling interval in Hz */
-			default: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* convert hz to tick interval via microseconds */
-					unsigned interval = (1000000 / arg);
-
-					/* check against maximum rate */
-					if (interval < MPL3115A2_CONVERSION_INTERVAL) {
-						return -EINVAL;
-					}
-
-					/* update interval for next measurement */
-					_measure_interval = interval;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-			}
-		}
-
-	case SENSORIOCRESET: {
-			/*
-			 * Since we are initialized, we do not need to do anything, since the
-			 * PROM is correctly read and the part does not need to be configured.
-			 */
-			unsigned int dummy;
-			_interface->ioctl(IOCTL_RESET, dummy);
-			return OK;
-		}
-
-	default:
-		break;
-	}
-
-	/* give it to the bus-specific superclass */
-	// return bus_ioctl(filp, cmd, arg);
-	return CDev::ioctl(filp, cmd, arg);
-}
-
 void
 MPL3115A2::start(unsigned delay_us)
 {
 	/* reset the report ring and state machine */
 	_collect_phase = false;
-	_reports->flush();
 
 	/* schedule a cycle to start things */
 	ScheduleDelayed(delay_us);
@@ -479,15 +264,13 @@ MPL3115A2::Run()
 int
 MPL3115A2::measure()
 {
-	int ret;
-
 	perf_begin(_measure_perf);
 
 	/*
 	 * Send the command to read the ADC for P and T.
 	 */
 	unsigned addr = (MPL3115A2_CTRL_REG1 << 8) | MPL3115A2_CTRL_TRIGGER;
-	ret = _interface->ioctl(IOCTL_MEASURE, addr);
+	int ret = _interface->ioctl(IOCTL_MEASURE, addr);
 
 	if (ret == -EIO) {
 		perf_count(_comms_errors);
@@ -519,12 +302,11 @@ MPL3115A2::collect()
 		return -EAGAIN;
 	}
 
-	sensor_baro_s report;
 
 	/* this should be fairly close to the end of the conversion, so the best approximation of the time */
-	report.timestamp = hrt_absolute_time();
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	report.error_count = perf_event_count(_comms_errors);
+	_px4_baro.set_error_count(perf_event_count(_comms_errors));
 
 	/* read the most recent measurement - read offset/size are hardcoded in the interface */
 	ret = _interface->read(OUT_P_MSB, (void *)&reading, sizeof(reading));
@@ -535,25 +317,13 @@ MPL3115A2::collect()
 		return ret;
 	}
 
-	_T = (float) reading.temperature.b[1] + ((float)(reading.temperature.b[0]) / 16.0f);
-	_P = (float)(reading.pressure.q >> 8) + ((float)(reading.pressure.b[0]) / 4.0f);
+	const float temperature = (float) reading.temperature.b[1] + ((float)(reading.temperature.b[0]) / 16.0f);
+	const float P = (float)(reading.pressure.q >> 8) + ((float)(reading.pressure.b[0]) / 4.0f);
 
-	report.temperature = _T;
-	report.pressure = _P / 100.0f;		/* convert to millibar */
+	const float pressure = _P / 100.0f;	// convert to millibar
 
-	/* return device ID */
-	report.device_id = _interface->get_device_id();
-
-	/* publish it */
-	if (_baro_topic != nullptr) {
-		/* publish it */
-		orb_publish(ORB_ID(sensor_baro), _baro_topic, &report);
-	}
-
-	_reports->force(&report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
+	_px4_baro.set_temperature(temperature);
+	_px4_baro.update(timestamp_sample, pressure);
 
 	perf_end(_sample_perf);
 
@@ -565,12 +335,8 @@ MPL3115A2::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	printf("poll interval:  %u\n", _measure_interval);
-	_reports->print_info("report queue");
 
-	sensor_baro_s brp = {};
-	_reports->get(&brp);
-	print_message(brp);
+	_px4_baro.print_status();
 }
 
 /**
@@ -584,39 +350,29 @@ namespace mpl3115a2
  */
 struct mpl3115a2_bus_option {
 	enum MPL3115A2_BUS busid;
-	const char *devpath;
 	MPL3115A2_constructor interface_constructor;
 	uint8_t busnum;
 	MPL3115A2 *dev;
 } bus_options[] = {
 #if defined(PX4_SPIDEV_EXT_BARO) && defined(PX4_SPI_BUS_EXT)
-	{ MPL3115A2_BUS_SPI_EXTERNAL, "/dev/mpl3115a2_spi_ext", &MPL3115A2_spi_interface, PX4_SPI_BUS_EXT, NULL },
+	{ MPL3115A2_BUS_SPI_EXTERNAL, &MPL3115A2_spi_interface, PX4_SPI_BUS_EXT, nullptr },
 #endif
 #ifdef PX4_SPIDEV_BARO
-	{ MPL3115A2_BUS_SPI_INTERNAL, "/dev/mpl3115a2_spi_int", &MPL3115A2_spi_interface, PX4_SPI_BUS_BARO, NULL },
+	{ MPL3115A2_BUS_SPI_INTERNAL, &MPL3115A2_spi_interface, PX4_SPI_BUS_BARO, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_ONBOARD
-	{ MPL3115A2_BUS_I2C_INTERNAL, "/dev/mpl3115a2_int", &MPL3115A2_i2c_interface, PX4_I2C_BUS_ONBOARD, NULL },
+	{ MPL3115A2_BUS_I2C_INTERNAL, &MPL3115A2_i2c_interface, PX4_I2C_BUS_ONBOARD, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION
-	{ MPL3115A2_BUS_I2C_EXTERNAL, "/dev/mpl3115a2_ext", &MPL3115A2_i2c_interface, PX4_I2C_BUS_EXPANSION, NULL },
+	{ MPL3115A2_BUS_I2C_EXTERNAL, &MPL3115A2_i2c_interface, PX4_I2C_BUS_EXPANSION, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION1
-	{ MPL3115A2_BUS_I2C_EXTERNAL, "/dev/mpl3115a2_ext1", &MPL3115A2_i2c_interface, PX4_I2C_BUS_EXPANSION1, NULL },
+	{ MPL3115A2_BUS_I2C_EXTERNAL, &MPL3115A2_i2c_interface, PX4_I2C_BUS_EXPANSION1, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION2
-	{ MPL3115A2_BUS_I2C_EXTERNAL, "/dev/mpl3115a2_ext2", &MPL3115A2_i2c_interface, PX4_I2C_BUS_EXPANSION2, NULL },
+	{ MPL3115A2_BUS_I2C_EXTERNAL, &MPL3115A2_i2c_interface, PX4_I2C_BUS_EXPANSION2, nullptr },
 #endif
 };
-#define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
-
-bool	start_bus(struct mpl3115a2_bus_option &bus);
-struct mpl3115a2_bus_option &find_bus(enum MPL3115A2_BUS busid);
-void	start(enum MPL3115A2_BUS busid);
-void	test(enum MPL3115A2_BUS busid);
-void	reset(enum MPL3115A2_BUS busid);
-void	info();
-void	usage();
 
 /**
  * Start the driver.
@@ -644,19 +400,6 @@ start_bus(struct mpl3115a2_bus_option &bus)
 		return false;
 	}
 
-	int fd = open(bus.devpath, O_RDONLY);
-
-	/* set the poll rate to default, starts automatic data collection */
-	if (fd == -1) {
-		errx(1, "can't open baro device");
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		close(fd);
-		errx(1, "failed setting default poll rate");
-	}
-
-	close(fd);
 	return true;
 }
 
@@ -774,24 +517,7 @@ test(enum MPL3115A2_BUS busid)
 void
 reset(enum MPL3115A2_BUS busid)
 {
-	struct mpl3115a2_bus_option &bus = find_bus(busid);
-	int fd;
 
-	fd = open(bus.devpath, O_RDONLY);
-
-	if (fd < 0) {
-		err(1, "failed ");
-	}
-
-	if (ioctl(fd, SENSORIOCRESET, 0) < 0) {
-		err(1, "driver reset failed");
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		err(1, "driver poll restart failed");
-	}
-
-	exit(0);
 }
 
 /**

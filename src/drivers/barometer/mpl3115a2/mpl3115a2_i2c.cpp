@@ -51,7 +51,6 @@ public:
 
 	virtual int	init();
 	virtual int	read(unsigned offset, void *data, unsigned count);
-	virtual int	ioctl(unsigned operation, unsigned &arg);
 
 protected:
 	virtual int	probe();
@@ -109,7 +108,6 @@ MPL3115A2_I2C::reset()
 int
 MPL3115A2_I2C::read(unsigned offset, void *data, unsigned count)
 {
-
 	int ret = -EINVAL;
 
 	switch (offset) {
@@ -192,7 +190,6 @@ MPL3115A2_I2C::_measure(unsigned addr)
 	_retries = 0;
 	return reg_write((addr >> 8) & 0xff, addr & 0xff);
 }
-
 
 int MPL3115A2_I2C::reg_read(uint8_t reg, void *data, unsigned count)
 {

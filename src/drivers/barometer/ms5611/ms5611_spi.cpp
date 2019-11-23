@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,7 +46,7 @@
 
 #if defined(PX4_SPIDEV_BARO) || defined(PX4_SPIDEV_EXT_BARO)
 
-device::Device *MS5611_spi_interface(ms5611::prom_u &prom_buf, bool external_bus);
+device::Device *MS5611_spi_interface(ms5611::prom_u &prom_buf);
 
 class MS5611_SPI : public device::SPI
 {
@@ -217,7 +217,6 @@ MS5611_SPI::_measure(unsigned addr)
 
 	return _transfer(&cmd, nullptr, 1);
 }
-
 
 int
 MS5611_SPI::_read_prom()

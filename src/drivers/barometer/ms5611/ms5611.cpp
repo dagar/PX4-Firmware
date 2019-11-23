@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,27 +39,15 @@
 #include "MS5611.hpp"
 #include "ms5611.h"
 
-#include <cdev/CDev.hpp>
-
-MS5611::MS5611(device::Device *interface, ms5611::prom_u &prom_buf, const char *path,
-	       enum MS56XX_DEVICE_TYPES device_type) :
-	CDev(path),
+MS5611::MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type) :
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
+	_px4_baro(interface->get_device_id()),
 	_interface(interface),
 	_prom(prom_buf.s),
-	_reports(nullptr),
 	_device_type(device_type),
-	_collect_phase(false),
-	_measure_phase(0),
-	_TEMP(0),
-	_OFF(0),
-	_SENS(0),
-	_baro_topic(nullptr),
-	_orb_class_instance(-1),
-	_class_instance(-1),
-	_sample_perf(perf_alloc(PC_ELAPSED, "ms5611_read")),
-	_measure_perf(perf_alloc(PC_ELAPSED, "ms5611_measure")),
-	_comms_errors(perf_alloc(PC_COUNT, "ms5611_com_err"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": com err"))
 {
 }
 
@@ -90,30 +78,8 @@ MS5611::init()
 {
 	int ret;
 	bool autodetect = false;
-
-	ret = CDev::init();
-
-	if (ret != OK) {
-		PX4_DEBUG("CDev init failed");
-		goto out;
-	}
-
-	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_baro_s));
-
-	if (_reports == nullptr) {
-		PX4_DEBUG("can't get memory for reports");
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	/* register alternate interfaces if we have to */
-	_class_instance = register_class_devname(BARO_BASE_DEVICE_PATH);
-
-	sensor_baro_s brp;
 	/* do a first measurement cycle to populate reports with valid data */
 	_measure_phase = 0;
-	_reports->flush();
 
 	if (_device_type == MS56XX_DEVICE) {
 		autodetect = true;
@@ -183,165 +149,11 @@ MS5611::init()
 			break;
 		}
 
-		/* ensure correct devid */
-		brp.device_id = _interface->get_device_id();
-
-		ret = OK;
-
-		_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &brp,
-						  &_orb_class_instance, _interface->external() ? ORB_PRIO_HIGH : ORB_PRIO_DEFAULT);
-
-		if (_baro_topic == nullptr) {
-			warnx("failed to create sensor_baro publication");
-		}
-
 		break;
 	}
 
 out:
 	return ret;
-}
-
-ssize_t
-MS5611::read(cdev::file_t *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_baro_s);
-	sensor_baro_s *brp = reinterpret_cast<sensor_baro_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	/* if automatic measurement is enabled */
-	if (_measure_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the workq thread while we are doing this;
-		 * we are careful to avoid racing with them.
-		 */
-		while (count--) {
-			if (_reports->get(brp)) {
-				ret += sizeof(*brp);
-				brp++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement - run one conversion */
-	do {
-		_measure_phase = 0;
-		_reports->flush();
-
-		/* do temperature first */
-		if (OK != measure()) {
-			ret = -EIO;
-			break;
-		}
-
-		px4_usleep(MS5611_CONVERSION_INTERVAL);
-
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* now do a pressure measurement */
-		if (OK != measure()) {
-			ret = -EIO;
-			break;
-		}
-
-		px4_usleep(MS5611_CONVERSION_INTERVAL);
-
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* state machine will have generated a report, copy it out */
-		if (_reports->get(brp)) {
-			ret = sizeof(*brp);
-		}
-
-	} while (0);
-
-	return ret;
-}
-
-int
-MS5611::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-
-	case SENSORIOCSPOLLRATE: {
-			switch (arg) {
-
-			/* zero would be bad */
-			case 0:
-				return -EINVAL;
-
-			/* set default polling rate */
-			case SENSOR_POLLRATE_DEFAULT: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* set interval for next measurement to minimum legal value */
-					_measure_interval = MS5611_CONVERSION_INTERVAL;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-
-			/* adjust to a legal polling interval in Hz */
-			default: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* convert hz to interval via microseconds */
-					unsigned interval = (1000000 / arg);
-
-					/* check against maximum rate */
-					if (_measure_interval < MS5611_CONVERSION_INTERVAL) {
-						return -EINVAL;
-					}
-
-					/* update interval for next measurement */
-					_measure_interval = interval;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-			}
-		}
-
-	case SENSORIOCRESET:
-		/*
-		 * Since we are initialized, we do not need to do anything, since the
-		 * PROM is correctly read and the part does not need to be configured.
-		 */
-		return OK;
-
-	default:
-		break;
-	}
-
-	/* give it to the bus-specific superclass */
-	// return bus_ioctl(filp, cmd, arg);
-	return CDev::ioctl(filp, cmd, arg);
 }
 
 void
@@ -350,7 +162,6 @@ MS5611::start()
 	/* reset the report ring and state machine */
 	_collect_phase = false;
 	_measure_phase = 0;
-	_reports->flush();
 
 	/* schedule a cycle to start things */
 	ScheduleNow();
@@ -460,18 +271,13 @@ MS5611::measure()
 int
 MS5611::collect()
 {
-	int ret;
 	uint32_t raw;
 
 	perf_begin(_sample_perf);
 
-	sensor_baro_s report;
-	/* this should be fairly close to the end of the conversion, so the best approximation of the time */
-	report.timestamp = hrt_absolute_time();
-	report.error_count = perf_event_count(_comms_errors);
-
 	/* read the most recent measurement - read offset/size are hardcoded in the interface */
-	ret = _interface->read(0, (void *)&raw, 0);
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
+	int ret = _interface->read(0, (void *)&raw, 0);
 
 	if (ret < 0) {
 		perf_count(_comms_errors);
@@ -492,7 +298,6 @@ MS5611::collect()
 		if (_device_type == MS5611_DEVICE) {
 
 			/* Perform MS5611 Caculation */
-
 			_OFF  = ((int64_t)_prom.c2_pressure_offset << 16) + (((int64_t)_prom.c4_temp_coeff_pres_offset * dT) >> 7);
 			_SENS = ((int64_t)_prom.c1_pressure_sens << 15) + (((int64_t)_prom.c3_temp_coeff_pres_sens * dT) >> 8);
 
@@ -567,10 +372,6 @@ MS5611::collect()
 			orb_publish(ORB_ID(sensor_baro), _baro_topic, &report);
 		}
 
-		_reports->force(&report);
-
-		/* notify anyone waiting for data */
-		poll_notify(POLLIN);
 	}
 
 	/* update the measurement state machine */
@@ -586,13 +387,8 @@ MS5611::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	printf("poll interval:  %u\n", _measure_interval);
-	_reports->print_info("report queue");
-	printf("device:         %s\n", _device_type == MS5611_DEVICE ? "ms5611" : "ms5607");
 
-	sensor_baro_s brp = {};
-	_reports->get(&brp);
-	print_message(brp);
+	_px4_baro.print_status();
 }
 
 /**
