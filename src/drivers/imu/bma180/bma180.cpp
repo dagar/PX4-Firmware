@@ -120,86 +120,37 @@
 #define ADDR_OFFSET_T			0x37
 #define OFFSET_T_READOUT_12BIT			(1<<0)
 
-extern "C" { __EXPORT int bma180_main(int argc, char *argv[]); }
-
 class BMA180 : public device::SPI, public px4::ScheduledWorkItem
 {
 public:
 	BMA180(int bus, uint32_t device);
 	virtual ~BMA180();
 
-	virtual int		init();
-
-	virtual ssize_t		read(struct file *filp, char *buffer, size_t buflen);
-	virtual int		ioctl(struct file *filp, int cmd, unsigned long arg);
-
-	/**
-	 * Diagnostics - print some basic information about the driver.
-	 */
+	int		init();
 	void			print_info();
-
-protected:
-	virtual int		probe();
 
 private:
 
+	void			start();
+	void			stop();
+	void			Run() override;
+	virtual int		probe();
+
 	unsigned		_call_interval;
-
-	ringbuffer::RingBuffer		*_reports;
-
-	struct accel_calibration_s	_accel_scale;
-	float			_accel_range_scale;
-	float			_accel_range_m_s2;
-	orb_advert_t		_accel_topic;
-	int			_class_instance;
 
 	unsigned		_current_lowpass;
 	unsigned		_current_range;
 
 	perf_counter_t		_sample_perf;
 
-	/**
-	 * Start automatic measurement.
-	 */
-	void			start();
 
-	/**
-	 * Stop automatic measurement.
-	 */
-	void			stop();
-
-	void		Run() override;
 
 	/**
 	 * Fetch measurements from the sensor and update the report ring.
 	 */
 	void			measure();
-
-	/**
-	 * Read a register from the BMA180
-	 *
-	 * @param		The register to read.
-	 * @return		The value that was read.
-	 */
 	uint8_t			read_reg(unsigned reg);
-
-	/**
-	 * Write a register in the BMA180
-	 *
-	 * @param reg		The register to write.
-	 * @param value		The new value to write.
-	 */
 	void			write_reg(unsigned reg, uint8_t value);
-
-	/**
-	 * Modify a register in the BMA180
-	 *
-	 * Bits are cleared before bits are set.
-	 *
-	 * @param reg		The register to modify.
-	 * @param clearbits	Bits in the register to clear.
-	 * @param setbits	Bits in the register to set.
-	 */
 	void			modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits);
 
 	/**
@@ -222,38 +173,20 @@ private:
 };
 
 BMA180::BMA180(int bus, uint32_t device) :
-	SPI("BMA180", ACCEL_DEVICE_PATH, bus, device, SPIDEV_MODE3, 8000000),
+	SPI("BMA180", nullptr, bus, device, SPIDEV_MODE3, 8000000),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(this->get_device_id())),
-	_call_interval(0),
-	_reports(nullptr),
-	_accel_range_scale(0.0f),
-	_accel_range_m_s2(0.0f),
-	_accel_topic(nullptr),
-	_class_instance(-1),
-	_current_lowpass(0),
-	_current_range(0),
-	_sample_perf(perf_alloc(PC_ELAPSED, "bma180_read"))
+	_px4_accel(get_device_id()),
+	_px4_gyro(get_device_id()),
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read"))
 {
+	_px4_accel.set_device_type
 	_device_id.devid_s.devtype = DRV_ACC_DEVTYPE_BMA180;
-
-	// default scale factors
-	_accel_scale.x_offset = 0;
-	_accel_scale.x_scale  = 1.0f;
-	_accel_scale.y_offset = 0;
-	_accel_scale.y_scale  = 1.0f;
-	_accel_scale.z_offset = 0;
-	_accel_scale.z_scale  = 1.0f;
 }
 
 BMA180::~BMA180()
 {
 	/* make sure we are truly inactive */
 	stop();
-
-	/* free any existing reports */
-	if (_reports != nullptr) {
-		delete _reports;
-	}
 
 	/* delete the perf counter */
 	perf_free(_sample_perf);
@@ -266,13 +199,6 @@ BMA180::init()
 
 	/* do SPI init (and probe) first */
 	if (SPI::init() != OK) {
-		goto out;
-	}
-
-	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
-
-	if (_reports == nullptr) {
 		goto out;
 	}
 
@@ -311,18 +237,7 @@ BMA180::init()
 		ret = PX4_ERROR;
 	}
 
-	_class_instance = register_class_devname(ACCEL_DEVICE_PATH);
-
-	/* advertise sensor topic, measure manually to initialize valid report */
-	measure();
-
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
-		sensor_accel_s arp;
-		_reports->get(&arp);
-
-		/* measurement will have generated a report, publish */
-		_accel_topic = orb_advertise(ORB_ID(sensor_accel), &arp);
-	}
+`	start();
 
 out:
 	return ret;
@@ -339,105 +254,6 @@ BMA180::probe()
 	}
 
 	return -EIO;
-}
-
-ssize_t
-BMA180::read(struct file *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_accel_s);
-	sensor_accel_s *arp = reinterpret_cast<sensor_accel_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	/* if automatic measurement is enabled */
-	if (_call_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the measurement code while we are doing this;
-		 * we are careful to avoid racing with it.
-		 */
-		while (count--) {
-			if (_reports->get(arp)) {
-				ret += sizeof(*arp);
-				arp++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement */
-	_reports->flush();
-	measure();
-
-	/* measurement will have generated a report, copy it out */
-	if (_reports->get(arp)) {
-		ret = sizeof(*arp);
-	}
-
-	return ret;
-}
-
-int
-BMA180::ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-
-	case SENSORIOCSPOLLRATE: {
-			switch (arg) {
-
-			/* zero would be bad */
-			case 0:
-				return -EINVAL;
-
-
-			/* set default polling rate */
-			case SENSOR_POLLRATE_DEFAULT:
-				/* With internal low pass filters enabled, 250 Hz is sufficient */
-				return ioctl(filp, SENSORIOCSPOLLRATE, 250);
-
-			/* adjust to a legal polling interval in Hz */
-			default: {
-					/* do we need to start internal polling? */
-					bool want_start = (_call_interval == 0);
-
-					/* convert hz to hrt interval via microseconds */
-					unsigned interval = 1000000 / arg;
-
-					/* check against maximum sane rate */
-					if (interval < 1000) {
-						return -EINVAL;
-					}
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-			}
-		}
-
-	case SENSORIOCRESET:
-		/* XXX implement */
-		return -EINVAL;
-
-	case ACCELIOCSSCALE:
-		/* copy scale in */
-		memcpy(&_accel_scale, (struct accel_calibration_s *) arg, sizeof(_accel_scale));
-		return OK;
-
-	default:
-		/* give it to the superclass */
-		return SPI::ioctl(filp, cmd, arg);
-	}
 }
 
 uint8_t
@@ -581,9 +397,6 @@ BMA180::start()
 {
 	/* make sure we are stopped first */
 	stop();
-
-	/* reset the report ring */
-	_reports->flush();
 
 	/* start polling at the specified rate */
 	ScheduleOnInterval(_call_interval, 10000);

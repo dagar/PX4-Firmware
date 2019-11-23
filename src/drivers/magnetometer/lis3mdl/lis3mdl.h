@@ -108,10 +108,10 @@ enum OPERATING_MODE {
 };
 
 
-class LIS3MDL : public device::CDev, public px4::ScheduledWorkItem
+class LIS3MDL : public px4::ScheduledWorkItem
 {
 public:
-	LIS3MDL(device::Device *interface, const char *path, enum Rotation rotation);
+	LIS3MDL(device::Device *interface, enum Rotation rotation);
 
 	virtual ~LIS3MDL();
 

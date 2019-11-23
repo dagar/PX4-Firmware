@@ -71,7 +71,6 @@
 /* Configuration Constants */
 #define SRF02_BASEADDR 				0x70 	// 7-bit address. 8-bit address is 0xE0.
 #define SRF02_BUS_DEFAULT			PX4_I2C_BUS_EXPANSION
-#define SRF02_DEVICE_PATH			"/dev/srf02"
 
 /* SRF02 Registers addresses */
 #define SRF02_TAKE_RANGE_REG			0x51	// Measure range Register.
@@ -95,16 +94,11 @@ public:
 
 	int init() override;
 
-	int ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
-
 	/**
 	 * Diagnostics - print some basic information about the driver.
 	 */
 	void print_info();
 
-	ssize_t read(device::file_t *filp, char *buffer, size_t buflen) override;
-
-protected:
 	int probe() override;
 
 private:
@@ -145,10 +139,8 @@ private:
 	bool _sensor_ok{false};
 	bool _collect_phase{false};
 
-	int _class_instance{-1};
 	int _cycling_rate{0};           // Initialize cycling rate to zero, (can differ depending on one sonar or multiple).
 	int _measure_interval{0};
-	int _orb_class_instance{-1};
 
 	uint8_t _cycle_counter{0};      // Initialize counter to zero - used to change i2c adresses for multiple devices.
 	uint8_t _index_counter{0};      // Initialize temp sonar i2c address to zero.
@@ -159,21 +151,11 @@ private:
 
 	perf_counter_t _comms_errors{perf_alloc(PC_COUNT, "srf02_com_err")};
 	perf_counter_t _sample_perf{perf_alloc(PC_ELAPSED, "srf02_read")};
-
-	orb_advert_t _distance_sensor_topic{nullptr};
-
-	ringbuffer::RingBuffer *_reports{nullptr};
 };
-
-/*
- * Driver 'main' command.
- */
-extern "C" __EXPORT int srf02_main(int argc, char *argv[]);
 
 SRF02::SRF02(uint8_t rotation, int bus, int address) :
 	I2C("SRF02", SRF02_DEVICE_PATH, bus, address, 100000),
-	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
-	_rotation(rotation)
+	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id()))
 {
 }
 
@@ -181,15 +163,6 @@ SRF02::~SRF02()
 {
 	// Ensure we are truly inactive.
 	stop();
-
-	// Free any existing reports.
-	if (_reports != nullptr) {
-		delete _reports;
-	}
-
-	if (_class_instance != -1) {
-		unregister_class_devname(RANGE_FINDER_BASE_DEVICE_PATH, _class_instance);
-	}
 
 	// Free perf counters.
 	perf_free(_sample_perf);
@@ -315,67 +288,6 @@ SRF02::init()
 }
 
 int
-SRF02::ioctl(device::file_t *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-
-	case SENSORIOCSPOLLRATE: {
-			switch (arg) {
-
-			// Zero would be bad.
-			case 0:
-				return -EINVAL;
-
-			// Set default polling rate.
-			case SENSOR_POLLRATE_DEFAULT: {
-					// Do we need to start internal polling?.
-					bool want_start = (_measure_interval == 0);
-
-					// Set interval for next measurement to minimum legal value.
-					_measure_interval = _cycling_rate;
-
-					// If we need to start the poll state machine, do it.
-					if (want_start) {
-						start();
-
-					}
-
-					return OK;
-				}
-
-			// Adjust to a legal polling interval in Hz.
-			default: {
-					// Do we need to start internal polling?.
-					bool want_start = (_measure_interval == 0);
-
-					// Convert hz to tick interval via microseconds.
-					int interval = (1000000 / arg);
-
-					// check against maximum rate.
-					if (interval < _cycling_rate) {
-						return -EINVAL;
-					}
-
-					// Update interval for next measurement.
-					_measure_interval = interval;
-
-					// If we need to start the poll state machine, do it.
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-			}
-		}
-
-	default:
-		// Give it to the superclass.
-		return I2C::ioctl(filp, cmd, arg);
-	}
-}
-
-int
 SRF02::measure()
 {
 	uint8_t cmd[2];
@@ -399,75 +311,14 @@ SRF02::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	printf("poll interval:  %u\n", _measure_interval);
-	_reports->print_info("report queue");
+
+	_px4_rangefinder.print_status();
 }
 
 int
 SRF02::probe()
 {
 	return measure();
-}
-
-ssize_t
-SRF02::read(device::file_t *filp, char *buffer, size_t buflen)
-{
-
-	unsigned count = buflen / sizeof(struct distance_sensor_s);
-	struct distance_sensor_s *rbuf = reinterpret_cast<struct distance_sensor_s *>(buffer);
-	int ret = 0;
-
-	// Buffer must be large enough.
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	// If automatic measurement is enabled.
-	if (_measure_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the workq thread while we are doing this;
-		 * we are careful to avoid racing with them.
-		 */
-		while (count--) {
-			if (_reports->get(rbuf)) {
-				ret += sizeof(*rbuf);
-				rbuf++;
-			}
-		}
-
-		// If there was no data, warn the caller.
-		return ret ? ret : -EAGAIN;
-	}
-
-	// Manual measurement - run one conversion.
-	do {
-		_reports->flush();
-
-		// Trigger a measurement.
-		if (OK != measure()) {
-			ret = -EIO;
-			break;
-		}
-
-		// Wait for it to complete.
-		px4_usleep(_cycling_rate * 2);
-
-		// Run the collection phase.
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		// State machine will have generated a report, copy it out.
-		if (_reports->get(rbuf)) {
-			ret = sizeof(*rbuf);
-		}
-
-	} while (0);
-
-	return ret;
 }
 
 void

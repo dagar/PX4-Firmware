@@ -59,10 +59,10 @@ enum MPL3115A2_BUS {
 #define MPL3115A2_OSR                   2       /* Over Sample rate of 4 18MS Minimum time between data samples */
 #define MPL3115A2_CTRL_TRIGGER          (CTRL_REG1_OST | CTRL_REG1_OS(MPL3115A2_OSR))
 
-class MPL3115A2 : public cdev::CDev, public px4::ScheduledWorkItem
+class MPL3115A2 : public px4::ScheduledWorkItem
 {
 public:
-	MPL3115A2(device::Device *interface, const char *path);
+	MPL3115A2(device::Device *interface);
 	~MPL3115A2();
 
 	virtual int		init();

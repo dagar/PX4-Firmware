@@ -104,15 +104,14 @@ struct __attribute__((__packed__)) reading_msg {
 	uint16_t crc; /* little-endian */
 };
 
-class LeddarOne : public cdev::CDev, public px4::ScheduledWorkItem
+class LeddarOne : public px4::ScheduledWorkItem
 {
 public:
-	LeddarOne(const char *device_path,
-		  const char *serial_port = LEDDAR_ONE_DEFAULT_SERIAL_PORT,
+	LeddarOne(const char *serial_port = LEDDAR_ONE_DEFAULT_SERIAL_PORT,
 		  const uint8_t device_orientation = distance_sensor_s::ROTATION_DOWNWARD_FACING);
 	virtual ~LeddarOne();
 
-	virtual int init() override;
+	int init() override;
 
 	/**
 	 * Diagnostics - print some basic information about the driver.
@@ -161,19 +160,17 @@ private:
 	PX4Rangefinder _px4_rangefinder;
 
 	int _file_descriptor{-1};
-	int _orb_class_instance{-1};
 
 	uint8_t _buffer[sizeof(reading_msg)];
 	uint8_t _buffer_len{0};
 
 	hrt_abstime _measurement_time{0};
 
-	perf_counter_t _comms_error{perf_alloc(PC_COUNT, "leddar_one_comms_error")};
-	perf_counter_t _sample_perf{perf_alloc(PC_ELAPSED, "leddar_one_sample")};
+	perf_counter_t _comms_error{perf_alloc(PC_COUNT, MODULE_NAME": comms_error")};
+	perf_counter_t _sample_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": sample")};
 };
 
-LeddarOne::LeddarOne(const char *device_path, const char *serial_port, uint8_t device_orientation):
-	CDev(device_path),
+LeddarOne::LeddarOne(const char *serial_port, uint8_t device_orientation):
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::hp_default),
 	_px4_rangefinder(0 /* device id not yet used */, ORB_PRIO_DEFAULT, device_orientation)
 {

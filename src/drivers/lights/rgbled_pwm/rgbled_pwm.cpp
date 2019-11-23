@@ -46,7 +46,7 @@
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
-class RGBLED_PWM : public device::CDev, public px4::ScheduledWorkItem
+class RGBLED_PWM : public px4::ScheduledWorkItem
 {
 public:
 	RGBLED_PWM();
@@ -87,7 +87,6 @@ RGBLED_PWM *g_rgbled = nullptr;
 }
 
 RGBLED_PWM::RGBLED_PWM() :
-	CDev("rgbled_pwm", RGBLED_PWM0_DEVICE_PATH),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::lp_default)
 {
 }
@@ -106,7 +105,6 @@ int
 RGBLED_PWM::init()
 {
 	/* switch off LED on start */
-	CDev::init();
 	led_pwm_servo_init();
 	send_led_rgb();
 
@@ -246,7 +244,6 @@ rgbled_pwm_main(int argc, char *argv[])
 	int myoptind = 1;
 	int ch;
 	const char *myoptarg = nullptr;
-
 
 	/* jump over start/off/etc and look at options first */
 	while ((ch = px4_getopt(argc, argv, "a:b:", &myoptind, &myoptarg)) != EOF) {

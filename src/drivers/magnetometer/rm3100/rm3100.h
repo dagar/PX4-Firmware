@@ -115,18 +115,13 @@ enum OPERATING_MODE {
 };
 
 
-class RM3100 : public device::CDev, public px4::ScheduledWorkItem
+class RM3100 : ppublic px4::ScheduledWorkItem
 {
 public:
-	RM3100(device::Device *interface, const char *path, enum Rotation rotation);
-
+	RM3100(device::Device *interface, enum Rotation rotation);
 	virtual ~RM3100();
 
-	virtual int init();
-
-	virtual int ioctl(struct file *file_pointer, int cmd, unsigned long arg);
-
-	virtual int read(struct file *file_pointer, char *buffer, size_t buffer_len);
+	int init();
 
 	/**
 	 * Diagnostics - print some basic information about the driver.
@@ -143,18 +138,8 @@ public:
 	 */
 	void stop();
 
-protected:
-	Device *_interface;
-
 private:
-
-	ringbuffer::RingBuffer *_reports;
-
-	struct mag_calibration_s _scale;
-
-	struct mag_report _last_report {};      /**< used for info() */
-
-	orb_advert_t _mag_topic;
+	Device *_interface;
 
 	perf_counter_t _comms_errors;
 	perf_counter_t _conf_errors;
@@ -169,9 +154,6 @@ private:
 	enum Rotation _rotation;
 
 	unsigned int _measure_interval;
-
-	int _class_instance;
-	int _orb_class_instance;
 
 	float _range_scale;
 
@@ -236,8 +218,4 @@ private:
 	 */
 	void start();
 
-	/* this class has pointer data members, do not allow copying it */
-	RM3100(const RM3100 &);
-
-	RM3100 operator=(const RM3100 &);
 }; // class RM3100
