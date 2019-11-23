@@ -50,33 +50,24 @@ namespace lps22hb
 
 struct lps22hb_bus_option {
 	enum LPS22HB_BUS busid;
-	const char *devpath;
 	LPS22HB_constructor interface_constructor;
 	uint8_t busnum;
 	LPS22HB	*dev;
 } bus_options[] = {
-	{ LPS22HB_BUS_I2C_EXTERNAL, "/dev/lps22hb_ext", &LPS22HB_I2C_interface, PX4_I2C_BUS_EXPANSION, NULL },
+	{ LPS22HB_BUS_I2C_EXTERNAL, &LPS22HB_I2C_interface, PX4_I2C_BUS_EXPANSION, nullptr },
 #ifdef PX4_I2C_BUS_EXPANSION1
-	{ LPS22HB_BUS_I2C_EXTERNAL, "/dev/lps22hb_ext1", &LPS22HB_I2C_interface, PX4_I2C_BUS_EXPANSION1, NULL },
+	{ LPS22HB_BUS_I2C_EXTERNAL, &LPS22HB_I2C_interface, PX4_I2C_BUS_EXPANSION1, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION2
-	{ LPS22HB_BUS_I2C_EXTERNAL, "/dev/lps22hb_ext2", &LPS22HB_I2C_interface, PX4_I2C_BUS_EXPANSION2, NULL },
+	{ LPS22HB_BUS_I2C_EXTERNAL, &LPS22HB_I2C_interface, PX4_I2C_BUS_EXPANSION2, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_ONBOARD
-	{ LPS22HB_BUS_I2C_INTERNAL, "/dev/lps22hb_int", &LPS22HB_I2C_interface, PX4_I2C_BUS_ONBOARD, NULL },
+	{ LPS22HB_BUS_I2C_INTERNAL, &LPS22HB_I2C_interface, PX4_I2C_BUS_ONBOARD, nullptr },
 #endif
 #ifdef PX4_SPIDEV_LPS22HB
-	{ LPS22HB_BUS_SPI, "/dev/lps22hb_spi", &LPS22HB_SPI_interface, PX4_SPI_BUS_SENSOR4, NULL },
+	{ LPS22HB_BUS_SPI, &LPS22HB_SPI_interface, PX4_SPI_BUS_SENSOR4, nullptr },
 #endif
 };
-#define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
-
-int		start(enum LPS22HB_BUS busid);
-bool	start_bus(struct lps22hb_bus_option &bus);
-struct lps22hb_bus_option &find_bus(enum LPS22HB_BUS busid);
-int		reset(enum LPS22HB_BUS busid);
-int		info();
-void	usage();
 
 /**
  * start driver for a specific bus option
@@ -99,7 +90,7 @@ start_bus(struct lps22hb_bus_option &bus)
 		return false;
 	}
 
-	bus.dev = new LPS22HB(interface, bus.devpath);
+	bus.dev = new LPS22HB(interface);
 
 	if (bus.dev != nullptr && OK != bus.dev->init()) {
 		PX4_WARN("init failed");
@@ -107,22 +98,6 @@ start_bus(struct lps22hb_bus_option &bus)
 		bus.dev = nullptr;
 		return false;
 	}
-
-	int fd = px4_open(bus.devpath, O_RDONLY);
-
-	/* set the poll rate to default, starts automatic data collection */
-	if (fd == -1) {
-		PX4_ERR("can't open baro device");
-		return false;
-	}
-
-	if (px4_ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		px4_close(fd);
-		PX4_ERR("failed setting default poll rate");
-		return false;
-	}
-
-	px4_close(fd);
 
 	return true;
 }
@@ -184,22 +159,6 @@ reset(enum LPS22HB_BUS busid)
 	struct lps22hb_bus_option &bus = find_bus(busid);
 	const char *path = bus.devpath;
 
-	int fd = open(path, O_RDONLY);
-
-	if (fd < 0) {
-		PX4_ERR("failed");
-		return PX4_ERROR;
-	}
-
-	if (px4_ioctl(fd, SENSORIOCRESET, 0) < 0) {
-		PX4_ERR("driver reset failed");
-		return PX4_ERROR;
-	}
-
-	if (px4_ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		PX4_ERR("driver poll restart failed");
-		return PX4_ERROR;
-	}
 
 	return 0;
 }
