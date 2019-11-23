@@ -33,40 +33,19 @@
 
 #include "BMP280.hpp"
 
-BMP280::BMP280(bmp280::IBMP280 *interface, const char *path) :
-	CDev(path),
+BMP280::BMP280(bmp280::IBMP280 *interface) :
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
 	_interface(interface),
-	_running(false),
-	_report_interval(0),
-	_reports(nullptr),
-	_collect_phase(false),
-	_baro_topic(nullptr),
-	_orb_class_instance(-1),
-	_class_instance(-1),
-	_sample_perf(perf_alloc(PC_ELAPSED, "bmp280_read")),
-	_measure_perf(perf_alloc(PC_ELAPSED, "bmp280_measure")),
-	_comms_errors(perf_alloc(PC_COUNT, "bmp280_comms_errors"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": comms errors"))
 {
 }
 
 BMP280::~BMP280()
 {
-	/* make sure we are truly inactive */
-	stop_cycle();
-
-	if (_class_instance != -1) {
-		unregister_class_devname(BARO_BASE_DEVICE_PATH, _class_instance);
-	}
-
-	/* free any existing reports */
-	if (_reports != nullptr) {
-		delete _reports;
-	}
-
-	if (_baro_topic != nullptr) {
-		orb_unadvertise(_baro_topic);
-	}
+	// make sure we are truly inactive
+	Stop();
 
 	// free perf counters
 	perf_free(_sample_perf);
@@ -79,26 +58,7 @@ BMP280::~BMP280()
 int
 BMP280::init()
 {
-	int ret = CDev::init();
-
-	if (ret != OK) {
-		PX4_ERR("CDev init failed");
-		return ret;
-	}
-
-	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_baro_s));
-
-	if (_reports == nullptr) {
-		PX4_ERR("can't get memory for reports");
-		ret = -ENOMEM;
-		return ret;
-	}
-
-	/* register alternate interfaces if we have to */
-	_class_instance = register_class_devname(BARO_BASE_DEVICE_PATH);
-
-	/* reset sensor */
+	// reset sensor
 	_interface->set_reg(BMP280_VALUE_RESET, BMP280_ADDR_RESET);
 	usleep(10000);
 
@@ -108,7 +68,7 @@ BMP280::init()
 		return -EIO;
 	}
 
-	/* set config, recommended settings */
+	// set config, recommended settings
 	_curr_ctrl = BMP280_CTRL_P16 | BMP280_CTRL_T2;
 	_interface->set_reg(_curr_ctrl, BMP280_ADDR_CTRL);
 	_max_measure_interval = (BMP280_MT_INIT + BMP280_MT * (16 - 1 + 2 - 1));
@@ -133,158 +93,24 @@ BMP280::init()
 	_fcal.p8 = _cal->p8 * powf(2, -19) + 1.0f;
 	_fcal.p9 = _cal->p9 * powf(2, -35);
 
-	/* do a first measurement cycle to populate reports with valid data */
-	sensor_baro_s brp;
-	_reports->flush();
-
-	if (measure()) {
-		return -EIO;
-	}
-
-	usleep(_max_measure_interval);
-
-	if (collect()) {
-		return -EIO;
-	}
-
-	_reports->get(&brp);
-
-	_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &brp,
-					  &_orb_class_instance, _interface->is_external() ? ORB_PRIO_HIGH : ORB_PRIO_DEFAULT);
-
-	if (_baro_topic == nullptr) {
-		PX4_WARN("failed to create sensor_baro publication");
-		return -ENOMEM;
-	}
+	Start();
 
 	return OK;
-
-}
-
-ssize_t
-BMP280::read(cdev::file_t *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_baro_s);
-	sensor_baro_s *brp = reinterpret_cast<sensor_baro_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	/* if automatic measurement is enabled */
-	if (_report_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the workq thread while we are doing this;
-		 * we are careful to avoid racing with them.
-		 */
-		while (count--) {
-			if (_reports->get(brp)) {
-				ret += sizeof(*brp);
-				brp++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement - run one conversion */
-
-	_reports->flush();
-
-	if (measure()) {
-		return -EIO;
-	}
-
-	usleep(_max_measure_interval);
-
-	if (collect()) {
-		return -EIO;
-	}
-
-	if (_reports->get(brp)) { //get new generated report
-		ret = sizeof(*brp);
-	}
-
-	return ret;
-}
-
-int
-BMP280::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-
-	case SENSORIOCSPOLLRATE: {
-
-			unsigned interval = 0;
-
-			switch (arg) {
-
-			case 0:
-				return -EINVAL;
-
-			case SENSOR_POLLRATE_DEFAULT:
-				interval = _max_measure_interval;
-
-			/* FALLTHROUGH */
-			default: {
-					if (interval == 0) {
-						interval = (1000000 / arg);
-					}
-
-					/* do we need to start internal polling? */
-					bool want_start = (_report_interval == 0);
-
-					/* check against maximum rate */
-					if (interval < _max_measure_interval) {
-						return -EINVAL;
-					}
-
-					_report_interval = interval;
-
-					if (want_start) {
-						start_cycle();
-					}
-
-					return OK;
-				}
-			}
-
-			break;
-		}
-
-	case SENSORIOCRESET:
-		/*
-		 * Since we are initialized, we do not need to do anything, since the
-		 * PROM is correctly read and the part does not need to be configured.
-		 */
-		return OK;
-
-	default:
-		break;
-	}
-
-	return CDev::ioctl(filp, cmd, arg);
 }
 
 void
-BMP280::start_cycle()
+BMP280::Start()
 {
-	/* reset the report ring and state machine */
+	// reset the report ring and state machine
 	_collect_phase = false;
 	_running = true;
-	_reports->flush();
 
-	/* schedule a cycle to start things */
+	// schedule a cycle to start things
 	ScheduleNow();
 }
 
 void
-BMP280::stop_cycle()
+BMP280::Stop()
 {
 	_running = false;
 	ScheduleClear();
@@ -297,13 +123,12 @@ BMP280::Run()
 		collect();
 		unsigned wait_gap = _report_interval - _max_measure_interval;
 
-		if ((wait_gap != 0) && (_running)) {
+		if ((wait_gap != 0) && _running) {
 			//need to wait some time before new measurement
 			ScheduleDelayed(wait_gap);
 
 			return;
 		}
-
 	}
 
 	measure();
@@ -341,12 +166,8 @@ BMP280::collect()
 
 	perf_begin(_sample_perf);
 
-	sensor_baro_s report;
-	/* this should be fairly close to the end of the conversion, so the best approximation of the time */
-	report.timestamp = hrt_absolute_time();
-	report.error_count = perf_event_count(_comms_errors);
-	report.device_id = _interface->get_device_id();
-
+	// this should be fairly close to the end of the conversion, so the best approximation of the time
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
 	bmp280::data_s *data = _interface->get_data(BMP280_ADDR_DATA);
 
 	if (data == nullptr) {
@@ -355,14 +176,14 @@ BMP280::collect()
 		return -EIO;
 	}
 
-	//convert data to number 20 bit
+	// convert data to number 20 bit
 	uint32_t p_raw =  data->p_msb << 12 | data->p_lsb << 4 | data->p_xlsb >> 4;
 	uint32_t t_raw =  data->t_msb << 12 | data->t_lsb << 4 | data->t_xlsb >> 4;
 
 	// Temperature
 	float ofs = (float) t_raw - _fcal.t1;
 	float t_fine = (ofs * _fcal.t3 + _fcal.t2) * ofs;
-	_T = t_fine * (1.0f / 5120.0f);
+	const float T = t_fine * (1.0f / 5120.0f);
 
 	// Pressure
 	float tf = t_fine - 128000.0f;
@@ -370,19 +191,13 @@ BMP280::collect()
 	float x2 = (tf * _fcal.p3 + _fcal.p2) * tf + _fcal.p1;
 
 	float pf = ((float) p_raw + x1) / x2;
-	_P = (pf * _fcal.p9 + _fcal.p8) * pf + _fcal.p7;
+	const float P = (pf * _fcal.p9 + _fcal.p8) * pf + _fcal.p7;
 
+	_px4_baro.set_error_count(perf_event_count(_comms_errors));
+	_px4_baro.set_temperature(T);
 
-	report.temperature = _T;
-	report.pressure = _P / 100.0f; // to mbar
-
-	/* publish it */
-	orb_publish(ORB_ID(sensor_baro), _baro_topic, &report);
-
-	_reports->force(&report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
+	float pressure = P / 100.0f; // to mbar
+	_px4_baro.update(timestamp_sample, pressure);
 
 	perf_end(_sample_perf);
 
@@ -394,10 +209,6 @@ BMP280::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	printf("poll interval:  %u us \n", _report_interval);
-	_reports->print_info("report queue");
 
-	sensor_baro_s brp = {};
-	_reports->get(&brp);
-	print_message(brp);
+	_px4_baro.print_status();
 }

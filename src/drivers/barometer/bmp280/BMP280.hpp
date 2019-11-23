@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,57 +39,40 @@
  * BMP280 internal constants and data structures.
  */
 
-class BMP280 : public cdev::CDev, public px4::ScheduledWorkItem
+class BMP280 : public px4::ScheduledWorkItem
 {
 public:
-	BMP280(bmp280::IBMP280 *interface, const char *path);
+	BMP280(bmp280::IBMP280 *interface);
 	virtual ~BMP280();
 
-	virtual int		init();
-
-	virtual ssize_t	read(cdev::file_t *filp, char *buffer, size_t buflen);
-	virtual int		ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
-
-	/**
-	 * Diagnostics - print some basic information about the driver.
-	 */
+	int			init();
 	void			print_info();
 
 private:
-	bmp280::IBMP280	*_interface;
+	void			Start();
+	void			Stop();
+	void			Run() override;
 
-	bool                _running;
+	int			measure(); //start measure
+	int			collect(); //get results and publish
 
-	uint8_t				_curr_ctrl;
+	bmp280::IBMP280		*_interface;
 
-	unsigned			_report_interval; // 0 - no cycling, otherwise period of sending a report
-	unsigned			_max_measure_interval; // interval in microseconds needed to measure
+	PX4Barometer		_px4_baro;
 
-	ringbuffer::RingBuffer	*_reports;
+	bool                	_running{false};
 
-	bool			_collect_phase;
+	uint8_t			_curr_ctrl{0};
 
-	orb_advert_t		_baro_topic;
-	int					_orb_class_instance;
-	int					_class_instance;
+	unsigned		_report_interval{0};		// 0 - no cycling, otherwise period of sending a report
+	unsigned		_max_measure_interval{0};	// interval in microseconds needed to measure
+
+	bool			_collect_phase{false};
 
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_measure_perf;
 	perf_counter_t		_comms_errors;
 
-	struct bmp280::calibration_s *_cal; //stored calibration constants
-	struct bmp280::fcalibration_s _fcal; //pre processed calibration constants
-
-	float			_P; /* in Pa */
-	float			_T; /* in K */
-
-
-	/* periodic execution helpers */
-	void			start_cycle();
-	void			stop_cycle();
-
-	void			Run() override;
-
-	int		measure(); //start measure
-	int		collect(); //get results and publish
+	bmp280::calibration_s	*_cal{nullptr}; //stored calibration constants
+	bmp280::fcalibration_s	_fcal{}; //pre processed calibration constants
 };

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +36,8 @@
  * Driver for the BMP280 barometric pressure sensor connected via I2C TODO or SPI.
  */
 
+#include <px4_platform_common/getopt.h>
+
 #include "BMP280.hpp"
 
 enum BMP280_BUS {
@@ -62,31 +64,28 @@ namespace bmp280
  */
 struct bmp280_bus_option {
 	enum BMP280_BUS busid;
-	const char *devpath;
 	BMP280_constructor interface_constructor;
 	uint8_t busnum;
 	uint32_t device;
-	bool external;
 	BMP280 *dev;
 } bus_options[] = {
 #if defined(PX4_SPIDEV_EXT_BARO) && defined(PX4_SPI_BUS_EXT)
-	{ BMP280_BUS_SPI_EXTERNAL, "/dev/bmp280_spi_ext", &bmp280_spi_interface, PX4_SPI_BUS_EXT, PX4_SPIDEV_EXT_BARO, true, NULL },
+	{ BMP280_BUS_SPI_EXTERNAL, &bmp280_spi_interface, PX4_SPI_BUS_EXT, PX4_SPIDEV_EXT_BARO, nullptr },
 #endif
 #if defined(PX4_SPIDEV_BARO)
 #  if defined(PX4_SPIDEV_BARO_BUS)
-	{ BMP280_BUS_SPI_INTERNAL, "/dev/bmp280_spi_int", &bmp280_spi_interface, PX4_SPIDEV_BARO_BUS, PX4_SPIDEV_BARO, false, NULL },
+	{ BMP280_BUS_SPI_INTERNAL, &bmp280_spi_interface, PX4_SPIDEV_BARO_BUS, PX4_SPIDEV_BARO, nullptr },
 #  else
-	{ BMP280_BUS_SPI_INTERNAL, "/dev/bmp280_spi_int", &bmp280_spi_interface, PX4_SPI_BUS_SENSORS, PX4_SPIDEV_BARO, false, NULL },
+	{ BMP280_BUS_SPI_INTERNAL, &bmp280_spi_interface, PX4_SPI_BUS_SENSORS, PX4_SPIDEV_BARO, nullptr },
 #  endif
 #endif
 #if defined(PX4_I2C_BUS_ONBOARD) && defined(PX4_I2C_OBDEV_BMP280)
-	{ BMP280_BUS_I2C_INTERNAL, "/dev/bmp280_i2c_int", &bmp280_i2c_interface, PX4_I2C_BUS_ONBOARD, PX4_I2C_OBDEV_BMP280, false, NULL },
+	{ BMP280_BUS_I2C_INTERNAL, &bmp280_i2c_interface, PX4_I2C_BUS_ONBOARD, PX4_I2C_OBDEV_BMP280, nullptr },
 #endif
 #if defined(PX4_I2C_BUS_EXPANSION) && defined(PX4_I2C_OBDEV_BMP280)
-	{ BMP280_BUS_I2C_EXTERNAL, "/dev/bmp280_i2c_ext", &bmp280_i2c_interface, PX4_I2C_BUS_EXPANSION, PX4_I2C_OBDEV_BMP280, true, NULL },
+	{ BMP280_BUS_I2C_EXTERNAL, &bmp280_i2c_interface, PX4_I2C_BUS_EXPANSION, PX4_I2C_OBDEV_BMP280, nullptr },
 #endif
 };
-#define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
 
 /**
  * Start the driver.
@@ -99,15 +98,15 @@ start_bus(struct bmp280_bus_option &bus)
 		return false;
 	}
 
-	bmp280::IBMP280 *interface = bus.interface_constructor(bus.busnum, bus.device, bus.external);
+	bmp280::IBMP280 *interface = bus.interface_constructor(bus.busnum, bus.device);
 
-	if (interface->init() != OK) {
+	if (interface->init() != PX4_OK) {
 		delete interface;
 		PX4_WARN("no device on bus %u", (unsigned)bus.busid);
 		return false;
 	}
 
-	bus.dev = new BMP280(interface, bus.devpath);
+	bus.dev = new BMP280(interface);
 
 	if (bus.dev == nullptr) {
 		return false;
@@ -119,21 +118,6 @@ start_bus(struct bmp280_bus_option &bus)
 		return false;
 	}
 
-	int fd = px4_open(bus.devpath, O_RDONLY);
-
-	/* set the poll rate to default, starts automatic data collection */
-	if (fd == -1) {
-		PX4_ERR("can't open baro device");
-		return false;
-	}
-
-	if (px4_ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		px4_close(fd);
-		PX4_ERR("failed setting default poll rate");
-		return false;
-	}
-
-	px4_close(fd);
 	return true;
 }
 
