@@ -49,11 +49,6 @@ public:
 	LPS25H_I2C(int bus);
 	virtual ~LPS25H_I2C() = default;
 
-	virtual int	read(unsigned address, void *data, unsigned count);
-	virtual int	write(unsigned address, void *data, unsigned count);
-
-	virtual int	ioctl(unsigned operation, unsigned &arg);
-
 protected:
 	virtual int	probe();
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -151,138 +151,53 @@ enum LPS25H_BUS {
 	LPS25H_BUS_SPI
 };
 
-class LPS25H : public cdev::CDev, public px4::ScheduledWorkItem
+class LPS25H : public px4::ScheduledWorkItem
 {
 public:
 	LPS25H(device::Device *interface, const char *path);
 	virtual ~LPS25H();
 
-	virtual int		init();
+	int			init();
 
-	virtual ssize_t		read(struct file *filp, char *buffer, size_t buflen);
-	virtual int		ioctl(struct file *filp, int cmd, unsigned long arg);
-
-	/**
-	 * Diagnostics - print some basic information about the driver.
-	 */
 	void			print_info();
 
-protected:
-	device::Device			*_interface;
 
 private:
+	device::Device			*_interface;
+
 	unsigned		_measure_interval{0};
 
-	ringbuffer::RingBuffer	*_reports{nullptr};
 	bool			_collect_phase{false};
-
-	orb_advert_t		_baro_topic{nullptr};
-	int			_orb_class_instance{-1};
-	int			_class_instance{-1};
 
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_comms_errors;
 
-	sensor_baro_s	_last_report{};           /**< used for info() */
-
-	/**
-	 * Initialise the automatic measurement state machine and start it.
-	 *
-	 * @note This function is called at open and error time.  It might make sense
-	 *       to make it more aggressive about resetting the bus in case of errors.
-	 */
 	void			start();
-
-	/**
-	 * Stop the automatic measurement state machine.
-	 */
 	void			stop();
-
-	/**
-	 * Reset the device
-	 */
 	int			reset();
-
-	/**
-	 * Perform a poll cycle; collect from the previous measurement
-	 * and start a new one.
-	 *
-	 * This is the heart of the measurement state machine.  This function
-	 * alternately starts a measurement, or collects the data from the
-	 * previous measurement.
-	 *
-	 * When the interval between measurements is greater than the minimum
-	 * measurement interval, a gap is inserted between collection
-	 * and measurement to provide the most recent measurement possible
-	 * at the next interval.
-	 */
 	void			Run() override;
 
-	/**
-	 * Write a register.
-	 *
-	 * @param reg		The register to write.
-	 * @param val		The value to write.
-	 * @return		OK on write success.
-	 */
-	int			write_reg(uint8_t reg, uint8_t val);
 
-	/**
-	 * Read a register.
-	 *
-	 * @param reg		The register to read.
-	 * @param val		The value read.
-	 * @return		OK on read success.
-	 */
+	int			write_reg(uint8_t reg, uint8_t val);
 	int			read_reg(uint8_t reg, uint8_t &val);
 
-	/**
-	 * Issue a measurement command.
-	 *
-	 * @return		OK if the measurement command was successful.
-	 */
 	int			measure();
-
-	/**
-	 * Collect the result of the most recent measurement.
-	 */
 	int			collect();
-
-	/* this class has pointer data members, do not allow copying it */
-	LPS25H(const LPS25H &);
-	LPS25H operator=(const LPS25H &);
 };
 
-/*
- * Driver 'main' command.
- */
-extern "C" __EXPORT int lps25h_main(int argc, char *argv[]);
-
-
-LPS25H::LPS25H(device::Device *interface, const char *path) :
-	CDev(path),
+LPS25H::LPS25H(device::Device *interface) :
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
 	_interface(interface),
-	_sample_perf(perf_alloc(PC_ELAPSED, "lps25h_read")),
-	_comms_errors(perf_alloc(PC_COUNT, "lps25h_comms_errors"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": comms errors"))
 {
-	_interface->set_device_type(DRV_BARO_DEVTYPE_LPS25H);
+	_px4_baro.set_device_type(DRV_BARO_DEVTYPE_LPS25H);
 }
 
 LPS25H::~LPS25H()
 {
-	/* make sure we are truly inactive */
 	stop();
 
-	if (_class_instance != -1) {
-		unregister_class_devname(BARO_BASE_DEVICE_PATH, _class_instance);
-	}
-
-	if (_reports != nullptr) {
-		delete _reports;
-	}
-
-	// free perf counters
 	perf_free(_sample_perf);
 	perf_free(_comms_errors);
 
@@ -292,161 +207,7 @@ LPS25H::~LPS25H()
 int
 LPS25H::init()
 {
-	int ret;
-
-	ret = CDev::init();
-
-	if (ret != OK) {
-		PX4_DEBUG("CDev init failed");
-		goto out;
-	}
-
-	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_baro_s));
-
-	if (_reports == nullptr) {
-		PX4_DEBUG("can't get memory for reports");
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	if (reset() != OK) {
-		goto out;
-	}
-
-	/* register alternate interfaces if we have to */
-	_class_instance = register_class_devname(BARO_BASE_DEVICE_PATH);
-
-	ret = OK;
-
-out:
-	return ret;
-}
-
-ssize_t
-LPS25H::read(struct file *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_baro_s);
-	sensor_baro_s *brp = reinterpret_cast<sensor_baro_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	/* if automatic measurement is enabled */
-	if (_measure_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the workq thread while we are doing this;
-		 * we are careful to avoid racing with them.
-		 */
-		while (count--) {
-			if (_reports->get(brp)) {
-				ret += sizeof(*brp);
-				brp++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement - run one conversion */
-	/* XXX really it'd be nice to lock against other readers here */
-	do {
-		_reports->flush();
-
-		/* trigger a measurement */
-		if (OK != measure()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* wait for it to complete */
-		usleep(LPS25H_CONVERSION_INTERVAL);
-
-		/* run the collection phase */
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		if (_reports->get(brp)) {
-			ret = sizeof(sensor_baro_s);
-		}
-	} while (0);
-
-	return ret;
-}
-
-int
-LPS25H::ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	unsigned dummy = arg;
-
-	switch (cmd) {
-	case SENSORIOCSPOLLRATE: {
-			switch (arg) {
-
-			/* zero would be bad */
-			case 0:
-				return -EINVAL;
-
-			/* set default polling rate */
-			case SENSOR_POLLRATE_DEFAULT: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* set interval for next measurement to minimum legal value */
-					_measure_interval = (LPS25H_CONVERSION_INTERVAL);
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-
-			/* adjust to a legal polling interval in Hz */
-			default: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_interval == 0);
-
-					/* convert hz to tick interval via microseconds */
-					unsigned interval = (1000000 / arg);
-
-					/* check against maximum rate */
-					if (interval < (LPS25H_CONVERSION_INTERVAL)) {
-						return -EINVAL;
-					}
-
-					/* update interval for next measurement */
-					_measure_interval = interval;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start) {
-						start();
-					}
-
-					return OK;
-				}
-			}
-		}
-
-	case SENSORIOCRESET:
-		return reset();
-
-	case DEVIOCGDEVICEID:
-		return _interface->ioctl(cmd, dummy);
-
-	default:
-		/* give it to the superclass */
-		return CDev::ioctl(filp, cmd, arg);
-	}
+	return reset();
 }
 
 void
@@ -454,7 +215,6 @@ LPS25H::start()
 {
 	/* reset the report ring and state machine */
 	_collect_phase = false;
-	_reports->flush();
 
 	/* schedule a cycle to start things */
 	ScheduleNow();
@@ -473,17 +233,14 @@ LPS25H::reset()
 
 	// Power on
 	ret = write_reg(ADDR_CTRL_REG1, CTRL_REG1_PD);
-
 	usleep(1000);
 
 	// Reset
 	ret = write_reg(ADDR_CTRL_REG2, CTRL_REG2_BOOT | CTRL_REG2_SWRESET);
-
 	usleep(5000);
 
 	// Power on
 	ret = write_reg(ADDR_CTRL_REG1, CTRL_REG1_PD);
-
 	usleep(1000);
 
 	return ret;
@@ -533,12 +290,8 @@ LPS25H::Run()
 int
 LPS25H::measure()
 {
-	int ret;
-
-	/*
-	 * Send the command to begin a 16-bit measurement.
-	 */
-	ret = write_reg(ADDR_CTRL_REG2, CTRL_REG2_ONE_SHOT);
+	// Send the command to begin a 16-bit measurement.
+	int ret = write_reg(ADDR_CTRL_REG2, CTRL_REG2_ONE_SHOT);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -558,15 +311,7 @@ LPS25H::collect()
 	} report;
 #pragma pack(pop)
 
-	int	ret;
-
 	perf_begin(_sample_perf);
-	sensor_baro_s new_report;
-	bool sensor_is_onboard = false;
-
-	/* this should be fairly close to the end of the measurement, so the best approximation of the time */
-	new_report.timestamp = hrt_absolute_time();
-	new_report.error_count = perf_event_count(_comms_errors);
 
 	/*
 	 * @note  We could read the status register 1 here, which could tell us that
@@ -576,7 +321,8 @@ LPS25H::collect()
 	 */
 
 	/* get measurements from the device : MSB enables register address auto-increment */
-	ret = _interface->read(ADDR_STATUS_REG | (1 << 7), (uint8_t *)&report, sizeof(report));
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
+	int ret = _interface->read(ADDR_STATUS_REG | (1 << 7), (uint8_t *)&report, sizeof(report));
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
@@ -584,46 +330,21 @@ LPS25H::collect()
 		return ret;
 	}
 
-	/* get measurements from the device */
-	new_report.temperature = 42.5f + (report.t / 480);
+	const float temperature = 42.5f + (report.t / 480);
 
-	/* raw pressure */
+	// raw pressure
 	uint32_t raw = report.p_xl + (report.p_l << 8) + (report.p_h << 16);
 
-	/* Pressure and MSL in mBar */
+	// Pressure and MSL in mBar
 	float p = raw / 4096.0f;
 
-	new_report.pressure = p;
-
-	/* get device ID */
-	new_report.device_id = _interface->get_device_id();
-
-	if (_baro_topic != nullptr) {
-		/* publish it */
-		orb_publish(ORB_ID(sensor_baro), _baro_topic, &new_report);
-
-	} else {
-		_baro_topic = orb_advertise_multi(ORB_ID(sensor_baro), &new_report,
-						  &_orb_class_instance, (sensor_is_onboard) ? ORB_PRIO_HIGH : ORB_PRIO_MAX);
-
-		if (_baro_topic == nullptr) {
-			PX4_DEBUG("ADVERT FAIL");
-		}
-	}
-
-	_last_report = new_report;
-
-	/* post a report to the ring */
-	_reports->force(&new_report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
-
-
-	ret = OK;
+	_px4_baro.set_error_count(perf_event_count(_comms_errors));
+	_px4_baro.set_temperature(temperature);
+	_px4_baro.update(timestamp_sample, p);
 
 	perf_end(_sample_perf);
-	return ret;
+
+	return PX4_OK;
 }
 
 int
@@ -647,10 +368,8 @@ LPS25H::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	printf("poll interval:  %u \n", _measure_interval);
-	print_message(_last_report);
 
-	_reports->print_info("report queue");
+	_px4_baro.print_status();
 }
 
 /**
@@ -664,34 +383,24 @@ namespace lps25h
  */
 struct lps25h_bus_option {
 	enum LPS25H_BUS busid;
-	const char *devpath;
 	LPS25H_constructor interface_constructor;
 	uint8_t busnum;
 	LPS25H	*dev;
 } bus_options[] = {
-	{ LPS25H_BUS_I2C_EXTERNAL, "/dev/lps25h_ext", &LPS25H_I2C_interface, PX4_I2C_BUS_EXPANSION, NULL },
+	{ LPS25H_BUS_I2C_EXTERNAL, &LPS25H_I2C_interface, PX4_I2C_BUS_EXPANSION, nullptr },
 #ifdef PX4_I2C_BUS_EXPANSION1
-	{ LPS25H_BUS_I2C_EXTERNAL, "/dev/lps25h_ext1", &LPS25H_I2C_interface, PX4_I2C_BUS_EXPANSION1, NULL },
+	{ LPS25H_BUS_I2C_EXTERNAL, &LPS25H_I2C_interface, PX4_I2C_BUS_EXPANSION1, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_EXPANSION2
-	{ LPS25H_BUS_I2C_EXTERNAL, "/dev/lps25h_ext2", &LPS25H_I2C_interface, PX4_I2C_BUS_EXPANSION2, NULL },
+	{ LPS25H_BUS_I2C_EXTERNAL, &LPS25H_I2C_interface, PX4_I2C_BUS_EXPANSION2, nullptr },
 #endif
 #ifdef PX4_I2C_BUS_ONBOARD
-	{ LPS25H_BUS_I2C_INTERNAL, "/dev/lps25h_int", &LPS25H_I2C_interface, PX4_I2C_BUS_ONBOARD, NULL },
+	{ LPS25H_BUS_I2C_INTERNAL, &LPS25H_I2C_interface, PX4_I2C_BUS_ONBOARD, nullptr },
 #endif
 #ifdef PX4_SPIDEV_HMC
-	{ LPS25H_BUS_SPI, "/dev/lps25h_spi", &LPS25H_SPI_interface, PX4_SPI_BUS_SENSORS, NULL },
+	{ LPS25H_BUS_SPI, &LPS25H_SPI_interface, PX4_SPI_BUS_SENSORS, nullptr },
 #endif
 };
-#define NUM_BUS_OPTIONS (sizeof(bus_options)/sizeof(bus_options[0]))
-
-void	start(enum LPS25H_BUS busid);
-bool	start_bus(struct lps25h_bus_option &bus);
-struct lps25h_bus_option &find_bus(enum LPS25H_BUS busid);
-void	test(enum LPS25H_BUS busid);
-void	reset(enum LPS25H_BUS busid);
-void	info();
-void	usage();
 
 /**
  * start driver for a specific bus option
@@ -718,20 +427,6 @@ start_bus(struct lps25h_bus_option &bus)
 		bus.dev = NULL;
 		return false;
 	}
-
-	int fd = open(bus.devpath, O_RDONLY);
-
-	/* set the poll rate to default, starts automatic data collection */
-	if (fd == -1) {
-		errx(1, "can't open baro device");
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		close(fd);
-		errx(1, "failed setting default poll rate");
-	}
-
-	close(fd);
 
 	return true;
 }
@@ -782,88 +477,11 @@ struct lps25h_bus_option &find_bus(enum LPS25H_BUS busid)
 	errx(1, "bus %u not started", (unsigned)busid);
 }
 
-
-/**
- * Perform some basic functional tests on the driver;
- * make sure we can collect data from the sensor in polled
- * and automatic modes.
- */
-void
-test(enum LPS25H_BUS busid)
-{
-	struct lps25h_bus_option &bus = find_bus(busid);
-	sensor_baro_s report;
-	ssize_t sz;
-	int ret;
-
-	int fd;
-
-	fd = open(bus.devpath, O_RDONLY);
-
-	if (fd < 0) {
-		err(1, "open failed (try 'lps25h start' if the driver is not running)");
-	}
-
-	/* do a simple demand read */
-	sz = read(fd, &report, sizeof(report));
-
-	if (sz != sizeof(report)) {
-		err(1, "immediate read failed");
-	}
-
-	print_message(report);
-
-	/* read the sensor 5x and report each value */
-	for (unsigned i = 0; i < 5; i++) {
-		struct pollfd fds;
-
-		/* wait for data to be ready */
-		fds.fd = fd;
-		fds.events = POLLIN;
-		ret = poll(&fds, 1, 2000);
-
-		if (ret != 1) {
-			errx(1, "timed out waiting for sensor data");
-		}
-
-		/* now go get it */
-		sz = read(fd, &report, sizeof(report));
-
-		if (sz != sizeof(report)) {
-			err(1, "periodic read failed");
-		}
-
-		print_message(report);
-	}
-
-	close(fd);
-	errx(0, "PASS");
-}
-
-/**
- * Reset the driver.
- */
 void
 reset(enum LPS25H_BUS busid)
 {
 	struct lps25h_bus_option &bus = find_bus(busid);
 	const char *path = bus.devpath;
-
-	int fd = open(path, O_RDONLY);
-
-	if (fd < 0) {
-		err(1, "failed ");
-	}
-
-	if (ioctl(fd, SENSORIOCRESET, 0) < 0) {
-		err(1, "driver reset failed");
-	}
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		err(1, "driver poll restart failed");
-	}
-
-	exit(0);
 }
 
 /**
