@@ -92,6 +92,7 @@
 
 #include "vehicle_acceleration/VehicleAcceleration.hpp"
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
+#include "vehicle_gps_position/VehicleGPSPosition.hpp"
 
 using namespace DriverFramework;
 using namespace sensors;
@@ -172,6 +173,7 @@ private:
 
 	VehicleAcceleration	_vehicle_acceleration;
 	VehicleAngularVelocity	_vehicle_angular_velocity;
+	VehicleGPSPosition	_vehicle_gps_position;
 
 
 	/**

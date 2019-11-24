@@ -52,8 +52,6 @@ rtps:
     id: 19
   - msg: ekf_gps_drift
     id: 20
-  - msg: ekf_gps_position
-    id: 21
   - msg: esc_report
     id: 22
   - msg: esc_status

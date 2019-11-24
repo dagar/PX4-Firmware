@@ -603,7 +603,6 @@ void Logger::add_estimator_replay_topics()
 {
 	// for estimator replay (need to be at full rate)
 	add_topic("ekf2_timestamps");
-	add_topic("ekf_gps_position");
 
 	// current EKF2 subscriptions
 	add_topic("airspeed");

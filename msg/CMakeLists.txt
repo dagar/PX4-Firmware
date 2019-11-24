@@ -58,7 +58,6 @@ set(msg_files
 	ekf2_innovations.msg		# TODO: remove as soon as https://github.com/PX4/Firmware/pull/13127 is rebased over this
 	ekf2_timestamps.msg
 	ekf_gps_drift.msg
-	ekf_gps_position.msg
 	esc_report.msg
 	esc_status.msg
 	estimator_status.msg
@@ -108,6 +107,7 @@ set(msg_files
 	sensor_bias.msg
 	sensor_combined.msg
 	sensor_correction.msg
+	sensor_gps.msg
 	sensor_gyro.msg
 	sensor_gyro_control.msg
 	sensor_mag.msg
