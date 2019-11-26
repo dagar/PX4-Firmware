@@ -118,7 +118,7 @@ void up_pwm_servo_deinit(void)
 int up_pwm_servo_set_rate_group_update(unsigned group, unsigned rate)
 {
 	if ((group >= MAX_IO_TIMERS) || (io_timers[group].base == 0)) {
-		return ERROR;
+		return -1;
 	}
 
 	/* Allow a rate of 0 to enter oneshot mode */

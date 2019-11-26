@@ -59,6 +59,7 @@
 #include <stm32_gpio.h>
 #include <stm32_tim.h>
 
+
 #if defined(HAVE_GTIM_CCXNP)
 #define HW_GTIM_CCER_CC1NP GTIM_CCER_CC1NP
 #else
@@ -441,7 +442,7 @@ int io_timer_free_channel(unsigned channel)
 	int mode = io_timer_get_channel_mode(channel);
 
 	if (mode > IOTimerChanMode_NotUsed) {
-		io_timer_set_enable(false, mode, 1 << channel);
+		io_timer_set_enable(false, (io_timer_channel_mode_t)mode, 1 << channel);
 		free_channel_resource(channel);
 
 	}
@@ -520,7 +521,7 @@ int io_timer_set_dshot_mode(uint8_t timer, unsigned dshot_pwm_freq, uint8_t dma_
 		tim_dma_burst_length = TIM_DMABURSTLENGTH_4TRANSFERS;
 
 	} else {
-		ret_val = ERROR;
+		ret_val = -1;
 	}
 
 	if (OK == ret_val) {

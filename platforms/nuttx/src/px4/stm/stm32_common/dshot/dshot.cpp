@@ -149,7 +149,7 @@ int up_dshot_init(uint32_t channel_mask, unsigned dshot_pwm_freq)
 			dshot_handler[timer_index].dma_handle = stm32_dmachannel(io_timers[timer_index].dshot.dmamap);
 
 			if (NULL == dshot_handler[timer_index].dma_handle) {
-				ret_val = ERROR;
+				ret_val = -1;
 			}
 		}
 	}

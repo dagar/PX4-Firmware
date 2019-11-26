@@ -74,21 +74,18 @@
 #include <drivers/drv_input_capture.h>
 #include <px4_arch/io_timer.h>
 
-#include <stm32_gpio.h>
-#include <stm32_tim.h>
+#include <kinetis.h>
+#include "hardware/kinetis_sim.h"
+#include "hardware/kinetis_ftm.h"
 
-#if defined(BOARD_HAS_CAPTURE)
-
-/* Support Input capture  */
-
+#define _REG(_addr)	(*(volatile uint32_t *)(_addr))
 #define _REG32(_base, _reg)	(*(volatile uint32_t *)(_base + _reg))
 #define REG(_tmr, _reg)		_REG32(io_timers[_tmr].base, _reg)
 
-#define rCCMR1(_tmr)  	REG(_tmr, STM32_GTIM_CCMR1_OFFSET)
-#define rCCMR2(_tmr)  	REG(_tmr, STM32_GTIM_CCMR2_OFFSET)
-#define rCCER(_tmr)   	REG(_tmr, STM32_GTIM_CCER_OFFSET)
 
-#define GTIM_SR_CCOF (GTIM_SR_CC4OF|GTIM_SR_CC3OF|GTIM_SR_CC2OF|GTIM_SR_CC1OF)
+/* Timer register accessors */
+
+#define rFILTER(_tmr)     REG(_tmr,KINETIS_FTM_FILTER_OFFSET)
 
 static input_capture_stats_t channel_stats[MAX_TIMER_IO_CHANNELS];
 
@@ -101,9 +98,9 @@ static struct channel_handler_entry {
 
 static void input_capture_chan_handler(void *context, const io_timers_t *timer, uint32_t chan_index,
 				       const timer_io_channels_t *chan,
-				       hrt_abstime isrs_time, uint16_t isrs_rcnt)
+				       hrt_abstime isrs_time, uint16_t isrs_rcnt,
+				       uint16_t capture)
 {
-	uint16_t capture = _REG32(timer->base, chan->ccr_offset);
 	channel_stats[chan_index].last_edge = px4_arch_gpioread(chan->gpio_in);
 
 	if ((isrs_rcnt - capture) > channel_stats[chan_index].latnecy) {
@@ -112,7 +109,7 @@ static void input_capture_chan_handler(void *context, const io_timers_t *timer, 
 
 	channel_stats[chan_index].chan_in_edges_out++;
 	channel_stats[chan_index].last_time = isrs_time - (isrs_rcnt - capture);
-	uint32_t overflow = _REG32(timer->base, STM32_GTIM_SR_OFFSET) & chan->masks & GTIM_SR_CCOF;
+	uint32_t overflow = _REG32(timer, KINETIS_FTM_CSC_OFFSET(chan->timer_channel - 1)) & FTM_CSC_CHF;
 
 	if (overflow) {
 
@@ -144,7 +141,7 @@ static void input_capture_unbind(unsigned channel)
 int up_input_capture_set(unsigned channel, input_capture_edge edge, capture_filter_t filter,
 			 capture_callback_t callback, void *context)
 {
-	if (filter > GTIM_CCMR1_IC1F_MASK) {
+	if (filter > FTM_FILTER_CH0FVAL_MASK) {
 		return -EINVAL;
 	}
 
@@ -155,6 +152,15 @@ int up_input_capture_set(unsigned channel, input_capture_edge edge, capture_filt
 	int rv = io_timer_validate_channel_index(channel);
 
 	if (rv == 0) {
+
+		/* This register selects the filter value for the inputs of channels.
+		   Channels 4, 5, 6 and 7 do not have an input filter.
+		*/
+		if (filter && timer_io_channels[channel].timer_channel - 1 > 3) {
+			return -EINVAL;
+		}
+
+
 		if (edge == Disabled) {
 
 			io_timer_set_enable(false, IOTimerChanMode_Capture, 1 << channel);
@@ -195,40 +201,44 @@ int up_input_capture_get_filter(unsigned channel, capture_filter_t *filter)
 
 	if (rv == 0) {
 
-		rv = -ENXIO;
+		rv = -EINVAL;
 
-		/* Any pins in capture mode */
+		if (timer_io_channels[channel].timer_channel - 1 <= 3) {
+			rv = -ENXIO;
 
-		if (io_timer_get_channel_mode(channel) == IOTimerChanMode_Capture) {
+			/* Any pins in capture mode */
 
-			uint32_t timer = timer_io_channels[channel].timer_index;
-			uint16_t rvalue;
-			rv = OK;
+			if (io_timer_get_channel_mode(channel) == IOTimerChanMode_Capture) {
 
-			switch (timer_io_channels[channel].timer_channel) {
+				uint32_t timer = timer_io_channels[channel].timer_index;
+				uint16_t rvalue;
+				rv = OK;
 
-			case 1:
-				rvalue = rCCMR1(timer) & GTIM_CCMR1_IC1F_MASK;
-				*filter = (rvalue >> GTIM_CCMR1_IC1F_SHIFT);
-				break;
+				switch (timer_io_channels[channel].timer_channel) {
 
-			case 2:
-				rvalue = rCCMR1(timer) & GTIM_CCMR1_IC2F_MASK;
-				*filter = (rvalue >> GTIM_CCMR1_IC2F_SHIFT);
-				break;
+				case 1:
+					rvalue = rFILTER(timer) & FTM_FILTER_CH0FVAL_MASK;
+					*filter = (rvalue >> FTM_FILTER_CH0FVAL_SHIFT);
+					break;
 
-			case 3:
-				rvalue = rCCMR2(timer) & GTIM_CCMR2_IC3F_MASK;
-				*filter = (rvalue >> GTIM_CCMR2_IC3F_SHIFT);
-				break;
+				case 2:
+					rvalue = rFILTER(timer) & FTM_FILTER_CH1FVAL_MASK;
+					*filter = (rvalue >> FTM_FILTER_CH1FVAL_SHIFT);
+					break;
 
-			case 4:
-				rvalue = rCCMR2(timer) & GTIM_CCMR2_IC4F_MASK;
-				*filter = (rvalue >> GTIM_CCMR2_IC4F_SHIFT);
-				break;
+				case 3:
+					rvalue = rFILTER(timer) & FTM_FILTER_CH2FVAL_MASK;
+					*filter = (rvalue >> FTM_FILTER_CH2FVAL_SHIFT);
+					break;
 
-			default:
-				rv = -EIO;
+				case 4:
+					rvalue = rFILTER(timer) & FTM_FILTER_CH3FVAL_MASK;
+					*filter = (rvalue >> FTM_FILTER_CH3FVAL_SHIFT);
+					break;
+
+				default:
+					rv = -EIO;
+				}
 			}
 		}
 	}
@@ -237,7 +247,7 @@ int up_input_capture_get_filter(unsigned channel, capture_filter_t *filter)
 }
 int up_input_capture_set_filter(unsigned channel,  capture_filter_t filter)
 {
-	if (filter > GTIM_CCMR1_IC1F_MASK) {
+	if (filter > FTM_FILTER_CH0FVAL_MASK) {
 		return -EINVAL;
 	}
 
@@ -260,27 +270,27 @@ int up_input_capture_set_filter(unsigned channel,  capture_filter_t filter)
 			switch (timer_io_channels[channel].timer_channel) {
 
 			case 1:
-				rvalue = rCCMR1(timer) & ~GTIM_CCMR1_IC1F_MASK;
-				rvalue |= (filter << GTIM_CCMR1_IC1F_SHIFT);
-				rCCMR1(timer) = rvalue;
+				rvalue = rFILTER(timer) & ~FTM_FILTER_CH0FVAL_MASK;
+				rvalue |= (filter << FTM_FILTER_CH0FVAL_SHIFT);
+				rFILTER(timer) = rvalue;
 				break;
 
 			case 2:
-				rvalue = rCCMR1(timer) & ~GTIM_CCMR1_IC2F_MASK;
-				rvalue |= (filter << GTIM_CCMR1_IC2F_SHIFT);
-				rCCMR1(timer) = rvalue;
+				rvalue = rFILTER(timer) & ~FTM_FILTER_CH1FVAL_MASK;
+				rvalue |= (filter << FTM_FILTER_CH1FVAL_SHIFT);
+				rFILTER(timer) = rvalue;
 				break;
 
 			case 3:
-				rvalue = rCCMR2(timer) & ~GTIM_CCMR2_IC3F_MASK;
-				rvalue |= (filter << GTIM_CCMR2_IC3F_SHIFT);
-				rCCMR2(timer) = rvalue;
+				rvalue = rFILTER(timer) & ~FTM_FILTER_CH2FVAL_MASK;
+				rvalue |= (filter << FTM_FILTER_CH2FVAL_SHIFT);
+				rFILTER(timer) = rvalue;
 				break;
 
 			case 4:
-				rvalue = rCCMR2(timer) & ~GTIM_CCMR2_IC4F_MASK;
-				rvalue |= (filter << GTIM_CCMR2_IC4F_SHIFT);
-				rCCMR2(timer) = rvalue;
+				rvalue = rFILTER(timer) & ~FTM_FILTER_CH2FVAL_MASK;
+				rvalue |= (filter << FTM_FILTER_CH2FVAL_SHIFT);
+				rFILTER(timer) = rvalue;
 				break;
 
 			default:
@@ -309,51 +319,25 @@ int up_input_capture_get_trigger(unsigned channel,  input_capture_edge *edge)
 			rv = OK;
 
 			uint32_t timer = timer_io_channels[channel].timer_index;
-			uint16_t rvalue;
+			uint16_t rvalue = _REG32(timer, KINETIS_FTM_CSC_OFFSET(timer_io_channels[channel].timer_channel - 1));
+			rvalue &= (FTM_CSC_MSB | FTM_CSC_MSA);
 
-			switch (timer_io_channels[channel].timer_channel) {
+			switch (rvalue) {
 
-			case 1:
-				rvalue = rCCER(timer) & (GTIM_CCER_CC1P | GTIM_CCER_CC1NP);
+			case (FTM_CSC_MSA):
+				*edge = Rising;
 				break;
 
-			case 2:
-				rvalue = rCCER(timer) & (GTIM_CCER_CC2P | GTIM_CCER_CC2NP);
-				rvalue >>= 4;
+			case (FTM_CSC_MSB):
+				*edge = Falling;
 				break;
 
-			case 3:
-				rvalue = rCCER(timer) & (GTIM_CCER_CC3P | GTIM_CCER_CC3NP);
-				rvalue >>= 8;
-				break;
-
-			case 4:
-				rvalue = rCCER(timer) & (GTIM_CCER_CC4P | GTIM_CCER_CC4NP);
-				rvalue >>= 12;
+			case (FTM_CSC_MSB|FTM_CSC_MSA):
+				*edge = Both;
 				break;
 
 			default:
 				rv = -EIO;
-			}
-
-			if (rv == 0) {
-				switch (rvalue) {
-
-				case 0:
-					*edge = Rising;
-					break;
-
-				case (GTIM_CCER_CC1P | GTIM_CCER_CC1NP):
-					*edge = Both;
-					break;
-
-				case (GTIM_CCER_CC1P):
-					*edge = Falling;
-					break;
-
-				default:
-					rv = -EIO;
-				}
 			}
 		}
 	}
@@ -372,69 +356,36 @@ int up_input_capture_set_trigger(unsigned channel,  input_capture_edge edge)
 
 		if (io_timer_get_channel_mode(channel) == IOTimerChanMode_Capture) {
 
-			uint16_t edge_bits = 0xffff;
+			uint16_t edge_bits = 0;
 
 			switch (edge) {
 			case Disabled:
 				break;
 
 			case Rising:
-				edge_bits = 0;
+				edge_bits = FTM_CSC_MSA;
 				break;
 
 			case Falling:
-				edge_bits = GTIM_CCER_CC1P;
+				edge_bits = FTM_CSC_MSB;
 				break;
 
 			case Both:
-				edge_bits = GTIM_CCER_CC1P | GTIM_CCER_CC1NP;
+				edge_bits = (FTM_CSC_MSB | FTM_CSC_MSA);
 				break;
 
 			default:
-				return -EINVAL;
+				return -EINVAL;;
 			}
 
 			uint32_t timer = timer_io_channels[channel].timer_index;
-			uint16_t rvalue;
-			rv = OK;
-
 			irqstate_t flags = px4_enter_critical_section();
-
-			switch (timer_io_channels[channel].timer_channel) {
-
-			case 1:
-				rvalue = rCCER(timer);
-				rvalue &= ~(GTIM_CCER_CC1P | GTIM_CCER_CC1NP);
-				rvalue |=  edge_bits;
-				rCCER(timer) = rvalue;
-				break;
-
-			case 2:
-				rvalue = rCCER(timer);
-				rvalue &= ~(GTIM_CCER_CC2P | GTIM_CCER_CC2NP);
-				rvalue |= (edge_bits << 4);
-				rCCER(timer) = rvalue;
-				break;
-
-			case 3:
-				rvalue = rCCER(timer);
-				rvalue &= ~(GTIM_CCER_CC3P | GTIM_CCER_CC3NP);
-				rvalue |=  edge_bits << 8;
-				rCCER(timer) = rvalue;
-				break;
-
-			case 4:
-				rvalue = rCCER(timer);
-				rvalue &= ~(GTIM_CCER_CC4P | GTIM_CCER_CC4NP);
-				rvalue |=  edge_bits << 12;
-				rCCER(timer) = rvalue;
-				break;
-
-			default:
-				rv = -EIO;
-			}
-
+			uint32_t rvalue = _REG32(timer, KINETIS_FTM_CSC_OFFSET(timer_io_channels[channel].timer_channel - 1));
+			rvalue &= (FTM_CSC_MSB | FTM_CSC_MSA);
+			rvalue |=  edge_bits;
+			_REG32(timer, KINETIS_FTM_CSC_OFFSET(timer_io_channels[channel].timer_channel - 1)) = rvalue;
 			px4_leave_critical_section(flags);
+			rv = OK;
 		}
 	}
 
@@ -501,4 +452,3 @@ int up_input_capture_get_stats(unsigned channel, input_capture_stats_t *stats, b
 
 	return rv;
 }
-#endif // defined(BOARD_HAS_CAPTURE)
