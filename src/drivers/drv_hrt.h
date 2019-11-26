@@ -118,7 +118,7 @@ __EXPORT extern hrt_abstime hrt_elapsed_time_atomic(const volatile hrt_abstime *
  *
  * This function ensures that the timestamp cannot be seen half-written by an interrupt handler.
  */
-__EXPORT extern hrt_abstime hrt_store_absolute_time(volatile hrt_abstime *now);
+__EXPORT extern void hrt_store_absolute_time(hrt_abstime *now);
 
 #ifdef __PX4_QURT
 /**

@@ -97,20 +97,18 @@ void cpuload_initialize_once()
 		system_load.tasks[system_load.total_count].total_runtime = 0;
 		system_load.tasks[system_load.total_count].curr_start_time = 0;
 		system_load.tasks[system_load.total_count].tcb = sched_gettcb(
-					system_load.total_count);	// it is assumed that these static threads have consecutive PIDs
+					system_load.total_count); // it is assumed that these static threads have consecutive PIDs
 		system_load.tasks[system_load.total_count].valid = true;
 	}
 
 	system_load.initialized = true;
 }
 
-void sched_note_start(FAR struct tcb_s *tcb)
+void sched_note_start(tcb_s *tcb)
 {
-	/* search first free slot */
-	int i;
-
 	if (system_load.initialized) {
-		for (i = 1; i < CONFIG_MAX_TASKS; i++) {
+		/* search first free slot */
+		for (int i = 1; i < CONFIG_MAX_TASKS; i++) {
 			if (!system_load.tasks[i].valid) {
 				/* slot is available */
 				system_load.tasks[i].total_runtime = 0;
@@ -118,61 +116,59 @@ void sched_note_start(FAR struct tcb_s *tcb)
 				system_load.tasks[i].tcb = tcb;
 				system_load.tasks[i].valid = true;
 				system_load.total_count++;
-				break;
+
+				return;
 			}
 		}
 	}
 }
 
-void sched_note_stop(FAR struct tcb_s *tcb)
+void sched_note_stop(tcb_s *tcb)
 {
-	int i;
-
 	if (system_load.initialized) {
-		for (i = 1; i < CONFIG_MAX_TASKS; i++) {
-			if (system_load.tasks[i].tcb != 0 && system_load.tasks[i].tcb->pid == tcb->pid) {
+		const auto pid = tcb->pid;
+
+		for (auto &task : system_load.tasks) {
+			if (task.tcb != nullptr && task.tcb->pid == pid) {
 				/* mark slot as fee */
-				system_load.tasks[i].valid = false;
-				system_load.tasks[i].total_runtime = 0;
-				system_load.tasks[i].curr_start_time = 0;
-				system_load.tasks[i].tcb = NULL;
+				task.valid = false;
+				task.total_runtime = 0;
+				task.curr_start_time = 0;
+				task.tcb = nullptr;
 				system_load.total_count--;
-				break;
+
+				return;
 			}
 		}
 	}
 }
 
-void sched_note_suspend(FAR struct tcb_s *tcb)
+void sched_note_suspend(tcb_s *tcb)
 {
-
 	if (system_load.initialized) {
-		uint64_t new_time = hrt_absolute_time();
+		const auto pid = tcb->pid;
 
-		for (int i = 0; i < CONFIG_MAX_TASKS; i++) {
+		for (auto &task : system_load.tasks) {
 			/* Task ending its current scheduling run */
-			if (system_load.tasks[i].valid && system_load.tasks[i].tcb != 0 && system_load.tasks[i].tcb->pid == tcb->pid) {
-				system_load.tasks[i].total_runtime += new_time - system_load.tasks[i].curr_start_time;
-				break;
+			if (task.valid && task.tcb->pid == pid) {
+				task.total_runtime += hrt_elapsed_time(&task.curr_start_time);
+				return;
 			}
 		}
 	}
 }
 
-void sched_note_resume(FAR struct tcb_s *tcb)
+void sched_note_resume(tcb_s *tcb)
 {
-
 	if (system_load.initialized) {
-		uint64_t new_time = hrt_absolute_time();
+		const auto pid = tcb->pid;
 
-		for (int i = 0; i < CONFIG_MAX_TASKS; i++) {
-			if (system_load.tasks[i].valid && system_load.tasks[i].tcb->pid == tcb->pid) {
+		for (auto &task : system_load.tasks) {
+			if (task.valid && task.tcb->pid == pid) {
 				// curr_start_time is accessed from an IRQ handler (in logger), so we need
 				// to make the update atomic
-				irqstate_t irq_state = px4_enter_critical_section();
-				system_load.tasks[i].curr_start_time = new_time;
-				px4_leave_critical_section(irq_state);
-				break;
+				hrt_store_absolute_time(&task.curr_start_time);
+				return;
 			}
 		}
 	}

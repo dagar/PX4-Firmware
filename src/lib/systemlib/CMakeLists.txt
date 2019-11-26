@@ -33,7 +33,7 @@
 
 set(SRCS
 	conversions.c
-	cpuload.c
+	cpuload.cpp
 	crc.c
 	mavlink_log.cpp
 	otp.c
