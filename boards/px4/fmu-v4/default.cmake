@@ -57,6 +57,7 @@ px4_add_board(
 		battery_status
 		camera_feedback
 		commander
+		control_status_leds
 		dataman
 		ekf2
 		events

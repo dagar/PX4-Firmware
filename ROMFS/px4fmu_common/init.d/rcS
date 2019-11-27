@@ -316,6 +316,8 @@ else
 	#
 	rc_update start
 
+	control_status_leds start
+
 	#
 	# Sensors System (start before Commander so Preflight checks are properly run).
 	# Commander needs to be this early for in-air-restarts.

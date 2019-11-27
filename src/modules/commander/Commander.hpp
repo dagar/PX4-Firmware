@@ -329,8 +329,6 @@ private:
 
 	bool		_last_overload{false};
 
-	unsigned int	_leds_counter{0};
-
 	manual_control_setpoint_s	_sp_man{};		///< the current manual control setpoint
 	manual_control_setpoint_s	_last_sp_man{};	///< the manual control setpoint valid at the last mode switch
 	uint64_t	_rc_signal_lost_timestamp{0};		///< Time at which the RC reception was lost

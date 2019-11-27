@@ -2373,58 +2373,10 @@ Commander::control_status_leds(vehicle_status_s *status_local, const actuator_ar
 
 	_last_overload = overload;
 
-	/* board supports HW armed indicator */
-
+#if defined(BOARD_INDICATE_ARMED_STATE)
 	BOARD_INDICATE_ARMED_STATE(actuator_armed->armed);
+#endif // BOARD_INDICATE_ARMED_STATE
 
-#if !defined(CONFIG_ARCH_LEDS) && defined(BOARD_HAS_CONTROL_STATUS_LEDS)
-
-	/* this runs at around 20Hz, full cycle is 16 ticks = 10/16Hz */
-	if (actuator_armed->armed) {
-		if (status.failsafe) {
-			BOARD_ARMED_LED_OFF();
-
-			if (_leds_counter % 5 == 0) {
-				BOARD_ARMED_STATE_LED_TOGGLE();
-			}
-
-		} else {
-			BOARD_ARMED_STATE_LED_OFF();
-
-			/* armed, solid */
-			BOARD_ARMED_LED_ON();
-		}
-
-	} else if (actuator_armed->ready_to_arm) {
-		BOARD_ARMED_LED_OFF();
-
-		/* ready to arm, blink at 1Hz */
-		if (_leds_counter % 20 == 0) {
-			BOARD_ARMED_STATE_LED_TOGGLE();
-		}
-
-	} else {
-		BOARD_ARMED_LED_OFF();
-
-		/* not ready to arm, blink at 10Hz */
-		if (_leds_counter % 2 == 0) {
-			BOARD_ARMED_STATE_LED_TOGGLE();
-		}
-	}
-
-#endif
-
-	/* give system warnings on error LED */
-	if (overload) {
-		if (_leds_counter % 2 == 0) {
-			BOARD_OVERLOAD_LED_TOGGLE();
-		}
-
-	} else {
-		BOARD_OVERLOAD_LED_OFF();
-	}
-
-	_leds_counter++;
 }
 
 transition_result_t
