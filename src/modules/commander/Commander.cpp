@@ -166,8 +166,8 @@ static int power_button_state_notification_cb(board_power_button_state_notificat
 	return ret;
 }
 
-static bool send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 = NAN, float param3 = NAN,
-				 float param4 = NAN, float param5 = NAN, float param6 = NAN, float param7 = NAN)
+static int send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 = NAN, float param3 = NAN,
+				float param4 = NAN, float param5 = NAN, float param6 = NAN, float param7 = NAN)
 {
 	vehicle_command_s vcmd{};
 
@@ -194,7 +194,53 @@ static bool send_vehicle_command(uint16_t cmd, float param1 = NAN, float param2 
 
 	uORB::PublicationQueued<vehicle_command_s> vcmd_pub{ORB_ID(vehicle_command)};
 
-	return vcmd_pub.publish(vcmd);
+	vcmd_pub.publish(vcmd);
+
+	// now wait for response
+	px4_pollfd_struct_t fds[1] {};
+	fds[0].fd = orb_subscribe(ORB_ID(vehicle_command_ack));
+	fds[0].events = POLLIN;
+
+	int ret = px4_poll(fds, sizeof(fds) / sizeof(fds[0]), 1000);
+
+	if (ret <= 0) {
+		return -1;
+	}
+
+	if (fds[0].revents & POLLIN) {
+		vehicle_command_ack_s ack{};
+		orb_copy(ORB_ID(vehicle_command_ack), fds[0].fd, &ack);
+
+		if (ack.command == cmd) {
+			if (ack.result == vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED) {
+				PX4_INFO("command accepted");
+				return 0;
+
+			} else if (ack.result == vehicle_command_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED) {
+				PX4_WARN("command temporarily rejected");
+				return -1;
+
+			} else if (ack.result == vehicle_command_s::VEHICLE_CMD_RESULT_DENIED) {
+				PX4_ERR("command denied");
+				return -1;
+
+			} else if (ack.result == vehicle_command_s::VEHICLE_CMD_RESULT_UNSUPPORTED) {
+				PX4_ERR("command unsupported");
+				return -1;
+
+			} else if (ack.result == vehicle_command_s::VEHICLE_CMD_RESULT_FAILED) {
+				PX4_ERR("command failed");
+				return -1;
+
+			} else if (ack.result == vehicle_command_s::VEHICLE_CMD_RESULT_IN_PROGRESS) {
+				PX4_ERR("command result in progress");
+				return 0;
+			}
+		}
+	}
+
+	PX4_ERR("command not acknowledged");
+	return -1;
 }
 
 extern "C" __EXPORT int commander_main(int argc, char *argv[])
@@ -252,46 +298,41 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 	if (!thread_running) {
 		PX4_ERR("not started");
 		return 1;
-	}
 
-	if (!strcmp(argv[1], "status")) {
+	} else if (!strcmp(argv[1], "status")) {
 		PX4_INFO("arming: %s", arming_state_names[status.arming_state]);
 		return 0;
-	}
 
-	if (!strcmp(argv[1], "calibrate")) {
+	} else if (!strcmp(argv[1], "calibrate")) {
 		if (argc > 2) {
 			if (!strcmp(argv[2], "gyro")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 1);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 1);
 
 			} else if (!strcmp(argv[2], "mag")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 1);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 1);
 
 			} else if (!strcmp(argv[2], "accel")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 1);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 1);
 
 			} else if (!strcmp(argv[2], "level")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 2);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 2);
 
 			} else if (!strcmp(argv[2], "airspeed")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 0, 1);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 0, 1);
 
 			} else if (!strcmp(argv[2], "esc")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 0, 0, 1);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION, 0, 0, 0, 0, 0, 0, 1);
 
 			} else {
 				PX4_ERR("argument %s unsupported.", argv[2]);
 				return 1;
 			}
 
-			return 0;
-
 		} else {
 			PX4_ERR("missing argument");
 		}
-	}
 
-	if (!strcmp(argv[1], "check")) {
+	} else if (!strcmp(argv[1], "check")) {
 		bool preflight_check_res = Commander::preflight_check(true);
 		PX4_INFO("Preflight check: %s", preflight_check_res ? "OK" : "FAILED");
 
@@ -299,9 +340,8 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 		PX4_INFO("Prearm check: %s", prearm_check_res ? "OK" : "FAILED");
 
 		return 0;
-	}
 
-	if (!strcmp(argv[1], "arm")) {
+	} else if (!strcmp(argv[1], "arm")) {
 		bool force_arming = false;
 
 		if (argc > 2 && !strcmp(argv[2], "-f")) {
@@ -313,25 +353,21 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 		}
 
 		return 0;
-	}
 
-	if (!strcmp(argv[1], "disarm")) {
+	} else if (!strcmp(argv[1], "disarm")) {
 		if (TRANSITION_DENIED == arm_disarm(false, true, &mavlink_log_pub, "command line")) {
 			PX4_ERR("rejected disarm");
 		}
 
 		return 0;
-	}
 
-	if (!strcmp(argv[1], "takeoff")) {
-
-		bool ret = false;
+	} else if (!strcmp(argv[1], "takeoff")) {
 
 		/* see if we got a home position */
 		if (status_flags.condition_local_position_valid) {
 
 			if (TRANSITION_DENIED != arm_disarm(true, true, &mavlink_log_pub, "command line")) {
-				ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF);
 
 			} else {
 				PX4_ERR("arming failed");
@@ -341,95 +377,81 @@ extern "C" __EXPORT int commander_main(int argc, char *argv[])
 			PX4_ERR("rejecting takeoff, no position lock yet. Please retry..");
 		}
 
-		return (ret ? 0 : 1);
-	}
+		return -1;
 
-	if (!strcmp(argv[1], "land")) {
-		bool ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_NAV_LAND);
+	} else if (!strcmp(argv[1], "land")) {
+		return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_NAV_LAND);
 
-		return (ret ? 0 : 1);
-	}
+	} else if (!strcmp(argv[1], "transition")) {
+		return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_VTOL_TRANSITION,
+					    (float)(status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING ?
+						    vtol_vehicle_status_s::VEHICLE_VTOL_STATE_FW :
+						    vtol_vehicle_status_s::VEHICLE_VTOL_STATE_MC));
 
-	if (!strcmp(argv[1], "transition")) {
-
-		const bool ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_VTOL_TRANSITION,
-						      (float)(status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING ?
-								      vtol_vehicle_status_s::VEHICLE_VTOL_STATE_FW :
-								      vtol_vehicle_status_s::VEHICLE_VTOL_STATE_MC));
-
-		return (ret ? 0 : 1);
-	}
-
-	if (!strcmp(argv[1], "mode")) {
+	} else if (!strcmp(argv[1], "mode")) {
 		if (argc > 2) {
-
 			if (!strcmp(argv[2], "manual")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_MANUAL);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_MANUAL);
 
 			} else if (!strcmp(argv[2], "altctl")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_ALTCTL);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_ALTCTL);
 
 			} else if (!strcmp(argv[2], "posctl")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_POSCTL);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_POSCTL);
 
 			} else if (!strcmp(argv[2], "auto:mission")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
-						     PX4_CUSTOM_SUB_MODE_AUTO_MISSION);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
+							    PX4_CUSTOM_SUB_MODE_AUTO_MISSION);
 
 			} else if (!strcmp(argv[2], "auto:loiter")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
-						     PX4_CUSTOM_SUB_MODE_AUTO_LOITER);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
+							    PX4_CUSTOM_SUB_MODE_AUTO_LOITER);
 
 			} else if (!strcmp(argv[2], "auto:rtl")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
-						     PX4_CUSTOM_SUB_MODE_AUTO_RTL);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
+							    PX4_CUSTOM_SUB_MODE_AUTO_RTL);
 
 			} else if (!strcmp(argv[2], "acro")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_ACRO);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_ACRO);
 
 			} else if (!strcmp(argv[2], "offboard")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_OFFBOARD);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_OFFBOARD);
 
 			} else if (!strcmp(argv[2], "stabilized")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_STABILIZED);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_STABILIZED);
 
 			} else if (!strcmp(argv[2], "rattitude")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_RATTITUDE);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_RATTITUDE);
 
 			} else if (!strcmp(argv[2], "auto:takeoff")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
-						     PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
+							    PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF);
 
 			} else if (!strcmp(argv[2], "auto:land")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
-						     PX4_CUSTOM_SUB_MODE_AUTO_LAND);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
+							    PX4_CUSTOM_SUB_MODE_AUTO_LAND);
 
 			} else if (!strcmp(argv[2], "auto:precland")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
-						     PX4_CUSTOM_SUB_MODE_AUTO_PRECLAND);
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
+							    PX4_CUSTOM_SUB_MODE_AUTO_PRECLAND);
 
 			} else {
 				PX4_ERR("argument %s unsupported.", argv[2]);
 			}
 
-			return 0;
-
 		} else {
 			PX4_ERR("missing argument");
 		}
-	}
 
-	if (!strcmp(argv[1], "lockdown")) {
+	} else if (!strcmp(argv[1], "lockdown")) {
 
 		if (argc < 3) {
 			Commander::print_usage("not enough arguments, missing [on, off]");
 			return 1;
 		}
 
-		bool ret = send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION,
-						strcmp(argv[2], "off") ? 2.0f : 0.0f /* lockdown */, 0.0f);
-
-		return (ret ? 0 : 1);
+		return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION, strcmp(argv[2],
+					    "off") ? 2.0f : 0.0f /* lockdown */, 0.0f);
 	}
 
 	Commander::print_usage("unrecognized command");
@@ -996,6 +1018,11 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		cmd_result = handle_command_motor_test(cmd);
 		break;
 
+	case vehicle_command_s::VEHICLE_CMD_START_RX_PAIR:
+		/* just ack, implementation handled in the IO driver */
+		answer_command(cmd, vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED, command_ack_pub);
+		break;
+
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_0:
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_1:
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_2:
@@ -1018,7 +1045,6 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 	case vehicle_command_s::VEHICLE_CMD_DO_CHANGE_SPEED:
 	case vehicle_command_s::VEHICLE_CMD_DO_LAND_START:
 	case vehicle_command_s::VEHICLE_CMD_DO_GO_AROUND:
-	case vehicle_command_s::VEHICLE_CMD_START_RX_PAIR:
 	case vehicle_command_s::VEHICLE_CMD_LOGGING_START:
 	case vehicle_command_s::VEHICLE_CMD_LOGGING_STOP:
 	case vehicle_command_s::VEHICLE_CMD_NAV_DELAY:
@@ -3248,20 +3274,10 @@ void *commander_low_prio_loop(void *arg)
 			continue;
 
 		} else if (pret != 0) {
-			struct vehicle_command_s cmd {};
+			vehicle_command_s cmd {};
 
 			/* if we reach here, we have a valid command */
 			orb_copy(ORB_ID(vehicle_command), cmd_sub, &cmd);
-
-			/* ignore commands the high-prio loop or the navigator handles */
-			if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_SET_MODE ||
-			    cmd.command == vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM ||
-			    cmd.command == vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF ||
-			    cmd.command == vehicle_command_s::VEHICLE_CMD_DO_SET_SERVO ||
-			    cmd.command == vehicle_command_s::VEHICLE_CMD_DO_CHANGE_SPEED) {
-
-				continue;
-			}
 
 			/* only handle low-priority commands here */
 			switch (cmd.command) {
@@ -3472,11 +3488,6 @@ void *commander_low_prio_loop(void *arg)
 
 					break;
 				}
-
-			case vehicle_command_s::VEHICLE_CMD_START_RX_PAIR:
-				/* just ack, implementation handled in the IO driver */
-				answer_command(cmd, vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED, command_ack_pub);
-				break;
 
 			default:
 				/* don't answer on unsupported commands, it will be done in main loop */
