@@ -125,12 +125,11 @@ private:
 	static constexpr unsigned RC_MAX_CHAN_COUNT{input_rc_s::RC_INPUT_MAX_CHANNELS}; /**< maximum number of r/c channels we handle */
 
 	struct Parameters {
-		float min[RC_MAX_CHAN_COUNT];
-		float trim[RC_MAX_CHAN_COUNT];
-		float max[RC_MAX_CHAN_COUNT];
-		float rev[RC_MAX_CHAN_COUNT];
-		float dz[RC_MAX_CHAN_COUNT];
-		float scaling_factor[RC_MAX_CHAN_COUNT];
+		uint16_t min[RC_MAX_CHAN_COUNT];
+		uint16_t trim[RC_MAX_CHAN_COUNT];
+		uint16_t max[RC_MAX_CHAN_COUNT];
+		uint16_t dz[RC_MAX_CHAN_COUNT];
+		bool rev[RC_MAX_CHAN_COUNT];
 
 		int32_t rc_map_param[rc_parameter_map_s::RC_PARAM_MAP_NCHAN];
 	} _parameters{};

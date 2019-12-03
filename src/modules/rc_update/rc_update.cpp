@@ -119,39 +119,28 @@ RCUpdate::parameters_updated()
 		_param_rc_flt_cutoff.commit_no_notification();
 	}
 
-	/* read the parameter values into _parameters */
-	bool rc_valid = true;
-
-	/* rc values */
+	// rc values
 	for (unsigned int i = 0; i < RC_MAX_CHAN_COUNT; i++) {
 
-		param_get(_parameter_handles.min[i], &(_parameters.min[i]));
-		param_get(_parameter_handles.trim[i], &(_parameters.trim[i]));
-		param_get(_parameter_handles.max[i], &(_parameters.max[i]));
-		param_get(_parameter_handles.rev[i], &(_parameters.rev[i]));
-		param_get(_parameter_handles.dz[i], &(_parameters.dz[i]));
+		float min = 0.0f;
+		param_get(_parameter_handles.min[i], &min);
+		_parameters.min[i] = min;
 
-		const float tmpScaleFactor = (1.0f / ((_parameters.max[i] - _parameters.min[i]) / 2.0f) * _parameters.rev[i]);
-		const float tmpRevFactor = tmpScaleFactor * _parameters.rev[i];
+		float trim = 0.0f;
+		param_get(_parameter_handles.trim[i], &trim);
+		_parameters.trim[i] = trim;
 
-		/* handle blowup in the scaling factor calculation */
-		if (!PX4_ISFINITE(tmpScaleFactor) ||
-		    (tmpRevFactor < 0.000001f) ||
-		    (tmpRevFactor > 0.2f)) {
+		float max = 0.0f;
+		param_get(_parameter_handles.max[i], &max);
+		_parameters.max[i] = max;
 
-			PX4_WARN("RC chan %u not sane, scaling: %8.6f, rev: %d", i, (double)tmpScaleFactor, (int)(_parameters.rev[i]));
-			/* scaling factors do not make sense, lock them down */
-			_parameters.scaling_factor[i] = 0.0f;
-			rc_valid = false;
+		float rev = 0.0f;
+		param_get(_parameter_handles.rev[i], &rev);
+		_parameters.rev[i] = rev < 0.0f;
 
-		} else {
-			_parameters.scaling_factor[i] = tmpScaleFactor;
-		}
-	}
-
-	/* handle wrong values */
-	if (!rc_valid) {
-		PX4_ERR("WARNING     WARNING     WARNING\n\nRC CALIBRATION NOT SANE!\n\n");
+		float dz = 0.0f;
+		param_get(_parameter_handles.dz[i], &dz);
+		_parameters.dz[i] = dz;
 	}
 
 	for (int i = 0; i < rc_parameter_map_s::RC_PARAM_MAP_NCHAN; i++) {
@@ -426,7 +415,10 @@ RCUpdate::Run()
 				_rc.channels[i] = 0.0f;
 			}
 
-			_rc.channels[i] *= _parameters.rev[i];
+			if (_parameters.rev[i]) {
+				_rc.channels[i] = -1.0f * _rc.channels[i];
+			}
+
 
 			/* handle any parameter-induced blowups */
 			if (!PX4_ISFINITE(_rc.channels[i])) {
