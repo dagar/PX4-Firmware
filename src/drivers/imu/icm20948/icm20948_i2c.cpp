@@ -97,7 +97,7 @@ ICM20948_I2C::read(unsigned address, void *data, unsigned count)
 	 * Since ICMReport has a cmd at front, we must return the data
 	 * after that. Foe anthing else we must return it
 	 */
-	uint32_t offset = count < sizeof(ICMReport) ? 0 : offsetof(ICMReport, accel_x);
+	uint32_t offset = count < sizeof(ICMReport) ? 0 : offsetof(ICMReport, ACCEL_XOUT_H);
 	uint8_t cmd = REG_ADDRESS(address);
 	return transfer(&cmd, 1, &((uint8_t *)data)[offset], count);
 }

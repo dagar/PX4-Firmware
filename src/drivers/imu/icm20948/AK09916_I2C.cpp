@@ -100,7 +100,7 @@ AK09916_I2C::probe()
 	uint8_t whoami = 0;
 	uint8_t expected = AK09916_DEVICE_ID;
 
-	if (PX4_OK != read(AK09916REG_WIA, &whoami, 1)) {
+	if (PX4_OK != read(AK09916REG_WIA2, &whoami, 1)) {
 		return -EIO;
 	}
 

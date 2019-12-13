@@ -35,6 +35,7 @@ px4_add_module(
 	MAIN icm20948
 	COMPILE_FLAGS
 		-DDEBUG_BUILD
+		-O0
 	SRCS
 		icm20948.cpp
 		icm20948_i2c.cpp

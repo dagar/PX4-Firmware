@@ -146,7 +146,7 @@ ICM20948_mag::set_passthrough(uint8_t reg, uint8_t size, uint8_t *out)
 {
 	uint8_t addr;
 
-	_parent->write_reg(ICMREG_20948_I2C_SLV0_CTRL, 0); // ensure slave r/w is disabled before changing the registers
+	//_parent->write_reg(ICMREG_20948_I2C_SLV0_CTRL, 0); // ensure slave r/w is disabled before changing the registers
 
 	if (out) {
 		_parent->write_reg(ICMREG_20948_I2C_SLV0_DO, *out);
@@ -157,32 +157,27 @@ ICM20948_mag::set_passthrough(uint8_t reg, uint8_t size, uint8_t *out)
 	}
 
 	_parent->write_reg(ICMREG_20948_I2C_SLV0_ADDR, addr);
-	_parent->write_reg(ICMREG_20948_I2C_SLV0_REG,  reg);
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_REG, reg);
 	_parent->write_reg(ICMREG_20948_I2C_SLV0_CTRL, size | BIT_I2C_SLV0_EN);
 }
 
-void
-ICM20948_mag::read_block(uint8_t reg, uint8_t *val, uint8_t count)
+uint8_t ICM20948_mag::passthrough_register_read(uint8_t reg)
 {
-	_parent->_interface->read(reg, val, count);
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_ADDR, AK09916_I2C_ADDR | BIT_I2C_READ_FLAG);
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_REG, reg);
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_CTRL, 1 | BIT_I2C_SLV0_EN);
+
+	up_udelay(50); // wait for the value to be read from slave
+
+	return _parent->read_reg(ICMREG_20948_EXT_SLV_SENS_DATA_00);
 }
 
-void
-ICM20948_mag::passthrough_read(uint8_t reg, uint8_t *buf, uint8_t size)
-{
-	set_passthrough(reg, size);
-	px4_usleep(25 + 25 * size); // wait for the value to be read from slave
-	read_block(ICMREG_20948_EXT_SLV_SENS_DATA_00, buf, size);
-	_parent->write_reg(ICMREG_20948_I2C_SLV0_CTRL, 0); // disable new reads
-}
-
-uint8_t
-ICM20948_mag::read_reg(unsigned int reg)
+uint8_t ICM20948_mag::read_reg(unsigned int reg)
 {
 	uint8_t buf{};
 
 	if (_interface == nullptr) {
-		passthrough_read(reg, &buf, 0x01);
+		return passthrough_register_read(reg);
 
 	} else {
 		_interface->read(reg, &buf, 1);
@@ -195,11 +190,12 @@ ICM20948_mag::read_reg(unsigned int reg)
  * 400kHz I2C bus speed = 2.5us per bit = 25us per byte
  */
 void
-ICM20948_mag::passthrough_write(uint8_t reg, uint8_t val)
+ICM20948_mag::passthrough_register_write(uint8_t reg, uint8_t val)
 {
-	set_passthrough(reg, 1, &val);
-	px4_usleep(50); // wait for the value to be written to slave
-	_parent->write_reg(ICMREG_20948_I2C_SLV0_CTRL, 0); // disable new writes
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_ADDR, AK09916_I2C_ADDR);
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_REG, reg);
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_DO, val);
+	_parent->write_reg(ICMREG_20948_I2C_SLV0_CTRL, 1 | BIT_I2C_SLV0_EN);
 }
 
 void
@@ -207,7 +203,7 @@ ICM20948_mag::write_reg(unsigned reg, uint8_t value)
 {
 	// general register transfer at low clock speed
 	if (_interface == nullptr) {
-		passthrough_write(reg, value);
+		passthrough_register_write(reg, value);
 
 	} else {
 		_interface->write(reg, &value, 1);
@@ -231,38 +227,6 @@ ICM20948_mag::ak09916_reset()
 	return rv;
 }
 
-bool
-ICM20948_mag::ak09916_read_adjustments()
-{
-	uint8_t response[3];
-	float ak09916_ASA[3];
-
-	write_reg(AK09916REG_CNTL1, AK09916_FUZE_MODE | AK09916_16BIT_ADC);
-	px4_usleep(50);
-
-	if (_interface != nullptr) {
-		_interface->read(AK09916REG_ASAX, response, 3);
-
-	} else {
-		passthrough_read(AK09916REG_ASAX, response, 3);
-	}
-
-	write_reg(AK09916REG_CNTL1, AK09916_CNTL2_POWERDOWN_MODE);
-
-	for (int i = 0; i < 3; i++) {
-		if (0 != response[i] && 0xff != response[i]) {
-			ak09916_ASA[i] = ((float)(response[i] - 128) / 256.0f) + 1.0f;
-
-		} else {
-			return false;
-		}
-	}
-
-	_px4_mag.set_sensitivity(ak09916_ASA[0], ak09916_ASA[1], ak09916_ASA[2]);
-
-	return true;
-}
-
 int
 ICM20948_mag::ak09916_setup_master_i2c()
 {
@@ -271,14 +235,13 @@ ICM20948_mag::ak09916_setup_master_i2c()
 	 * in master mode (SPI to I2C bridge)
 	 */
 	if (_interface == nullptr) {
-		// ICM20948 -> AK09916
-		_parent->modify_checked_reg(ICMREG_20948_USER_CTRL, 0, BIT_I2C_MST_EN);
+		_parent->modify_reg(ICMREG_20948_USER_CTRL, 0, BIT_I2C_MST_EN);
 
 		// WAIT_FOR_ES does not exist for ICM20948. Not sure how to replace this (or if that is needed)
-		_parent->write_reg(ICMREG_20948_I2C_MST_CTRL, BIT_I2C_MST_P_NSR | ICM_BITS_I2C_MST_CLOCK_400HZ);
+		_parent->write_reg(ICMREG_20948_I2C_MST_CTRL, ICM_BITS_I2C_MST_CLOCK_400HZ);
 
 	} else {
-		_parent->modify_checked_reg(ICMREG_20948_USER_CTRL, BIT_I2C_MST_EN, 0);
+		_parent->modify_reg(ICMREG_20948_USER_CTRL, BIT_I2C_MST_EN, 0);
 	}
 
 	return OK;
@@ -286,27 +249,26 @@ ICM20948_mag::ak09916_setup_master_i2c()
 int
 ICM20948_mag::ak09916_setup()
 {
+	ak09916_setup_master_i2c();
+	px4_usleep(2000);
+
 	int retries = 10;
 
 	do {
-		ak09916_setup_master_i2c();
-		write_reg(AK09916REG_CNTL3, AK09916_RESET);
-
-		uint8_t deviceid = read_reg(AK09916REG_WIA);
+		const uint8_t deviceid = read_reg(AK09916REG_WIA2);
 
 		if (AK09916_DEVICE_ID == deviceid) {
 			break;
 		}
 
+		PX4_WARN("AK09916: bad id %02X retry: %d", deviceid, retries);
+
 		retries--;
-		PX4_WARN("AK09916: bad id %d retries %d", deviceid, retries);
-		_parent->modify_reg(ICMREG_20948_USER_CTRL, 0, BIT_I2C_MST_RST);
-		px4_usleep(200);
 	} while (retries > 0);
 
 	if (retries == 0) {
 		PX4_ERR("AK09916: failed to initialize, disabled!");
-		_parent->modify_checked_reg(ICMREG_20948_USER_CTRL, BIT_I2C_MST_EN, 0);
+		_parent->modify_reg(ICMREG_20948_USER_CTRL, BIT_I2C_MST_EN, 0);
 		_parent->write_reg(ICMREG_20948_I2C_MST_CTRL, 0);
 		return -EIO;
 	}

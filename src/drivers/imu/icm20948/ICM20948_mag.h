@@ -46,7 +46,7 @@ static constexpr float ICM20948_MAG_RANGE_GA{1.5e-3f};
 
 #define AK09916_DEVICE_ID        0b00001001
 
-#define AK09916REG_WIA           0x00
+#define AK09916REG_WIA2       0x01
 #define AK09916REG_ST1        0x10
 #define AK09916REG_HXL        0x11
 #define AK09916REG_HXH        0x12
@@ -59,9 +59,6 @@ static constexpr float ICM20948_MAG_RANGE_GA{1.5e-3f};
 #define AK09916REG_CNTL2          0x31
 #define AK09916REG_CNTL3          0x32
 
-#define AK09916REG_ASAX          0x10
-#define AK09916_FUZE_MODE        0x0F
-#define AK09916_16BIT_ADC        0x10
 #define AK09916_RESET            0x01
 
 #define AK09916_CNTL2_POWERDOWN_MODE            0x00
@@ -101,19 +98,17 @@ public:
 	~ICM20948_mag();
 
 	void set_passthrough(uint8_t reg, uint8_t size, uint8_t *out = NULL);
-	void passthrough_read(uint8_t reg, uint8_t *buf, uint8_t size);
-	void passthrough_write(uint8_t reg, uint8_t val);
-	void read_block(uint8_t reg, uint8_t *val, uint8_t count);
+	uint8_t passthrough_register_read(uint8_t reg);
+	void passthrough_register_write(uint8_t reg, uint8_t val);
 
 	int ak09916_reset();
 	int ak09916_setup();
 	int ak09916_setup_master_i2c();
-	bool ak09916_read_adjustments();
 
 	void print_status() { _px4_mag.print_status(); }
 
 protected:
-	device::Device			*_interface;
+	device::Device			*_interface{nullptr};
 
 	friend class ICM20948;
 

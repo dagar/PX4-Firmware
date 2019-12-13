@@ -42,6 +42,15 @@
 
 #include "icm20948.h"
 
+static constexpr uint8_t Bit0 = (1 << 0);
+static constexpr uint8_t Bit1 = (1 << 1);
+static constexpr uint8_t Bit2 = (1 << 2);
+static constexpr uint8_t Bit3 = (1 << 3);
+static constexpr uint8_t Bit4 = (1 << 4);
+static constexpr uint8_t Bit5 = (1 << 5);
+static constexpr uint8_t Bit6 = (1 << 6);
+static constexpr uint8_t Bit7 = (1 << 7);
+
 /*
   we set the timer interrupt to run a bit faster than the desired
   sample rate and then throw away duplicates by comparing
@@ -53,6 +62,8 @@
 
 constexpr uint16_t ICM20948::_checked_registers[];
 
+
+static constexpr int16_t combine(uint8_t msb, uint8_t lsb) { return (msb << 8u) | lsb; }
 
 ICM20948::ICM20948(device::Device *interface, device::Device *mag_interface, enum Rotation rotation) :
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
@@ -92,9 +103,7 @@ ICM20948::init()
 	 * make the integration autoreset faster so that we integrate just one
 	 * sample since the sampling rate is already low.
 	*/
-	const bool is_i2c = (_interface->get_device_bus_type() == device::Device::DeviceBusType_I2C);
-
-	if (is_i2c) {
+	if (_interface->get_device_bus_type() == device::Device::DeviceBusType_I2C) {
 		_sample_rate = 200;
 	}
 
@@ -150,7 +159,7 @@ int ICM20948::reset()
 
 	int ret = reset_mpu();
 
-	if (ret == OK && (_whoami == ICM_WHOAMI_20948)) {
+	if (ret == OK) {
 		ret = _mag.ak09916_reset();
 	}
 
@@ -159,20 +168,23 @@ int ICM20948::reset()
 	return ret;
 }
 
-int
-ICM20948::reset_mpu()
+int ICM20948::reset_mpu()
 {
 	write_reg(ICMREG_20948_PWR_MGMT_1, BIT_H_RESET);
 	px4_usleep(2000);
 
-	write_checked_reg(ICMREG_20948_PWR_MGMT_1, MPU_CLK_SEL_AUTO);
+	modify_reg(ICMREG_20948_PWR_MGMT_1, MPU_SLEEP, MPU_CLK_SEL_AUTO);
 	px4_usleep(1500);
-	write_checked_reg(ICMREG_20948_PWR_MGMT_2, 0);
+
+	write_reg(ICMREG_20948_PWR_MGMT_2, 0);
 
 	// Enable I2C bus or Disable I2C bus (recommended on data sheet)
-	const bool is_i2c = (_interface->get_device_bus_type() == device::Device::DeviceBusType_I2C);
-	write_checked_reg(ICMREG_20948_USER_CTRL, is_i2c ? 0 : BIT_I2C_IF_DIS);
+	if (_interface->get_device_bus_type() == device::Device::DeviceBusType_I2C) {
+		modify_reg(ICMREG_20948_USER_CTRL, BIT_I2C_IF_DIS, 0);
 
+	} else {
+		modify_reg(ICMREG_20948_USER_CTRL, 0, BIT_I2C_IF_DIS);
+	}
 
 	// Gyro scale 2000 deg/s with DLPF
 	modify_checked_reg(ICMREG_20948_GYRO_CONFIG_1, 0, ICM_BITS_GYRO_DLPF_CFG_119HZ | ICM_BITS_GYRO_FS_SEL_2000DPS | 1);
@@ -208,7 +220,7 @@ ICM20948::reset_mpu()
 	write_reg(ICMREG_20948_INT_PIN_CFG, BIT_INT_ANYRD_2CLEAR | (bypass ? BIT_INT_BYPASS_EN : 0));
 
 
-	uint8_t retries = 3;
+	uint8_t retries = 5;
 	bool all_ok = false;
 
 	while (!all_ok && retries--) {
@@ -224,9 +236,7 @@ ICM20948::reset_mpu()
 				_interface->read(ICMREG_20948_BANK_SEL, &bankcheck, 1);
 
 				PX4_ERR("Reg %d is: %d s/b: %d Tries: %d - bank s/b %d, is %d", REG_ADDRESS(_checked_registers[i]), value,
-					_checked_values[i], retries, REG_BANK(_checked_registers[i]), bankcheck);
-
-				write_reg(_checked_registers[i], _checked_values[i]);
+					_checked_values[i], retries, REG_BANK(_checked_registers[i]), bankcheck >> 4);
 
 				all_ok = false;
 			}
@@ -252,47 +262,46 @@ ICM20948::probe()
 int
 ICM20948::select_register_bank(uint8_t bank)
 {
-	uint8_t ret = 0;
-	uint8_t buf{};
-	uint8_t retries = 3;
+	const uint8_t write_bank_buf = bank << 4;
 
 	if (_selected_bank != bank) {
-		ret = _interface->write(ICMREG_20948_BANK_SEL, &bank, 1);
+		uint8_t buf = write_bank_buf;
+		uint8_t ret = _interface->write(ICMREG_20948_BANK_SEL, &buf, 1);
 
 		if (ret != OK) {
 			PX4_ERR("ICMREG_20948_BANK_SEL write error");
 			return ret;
 		}
 
-		px4_usleep(20);
+		up_udelay(50);
+
+	} else {
+		return PX4_OK;
 	}
 
 	/*
 	 * Making sure the right register bank is selected (even if it should be). Observed some
 	 * unexpected changes to this, don't risk writing to the wrong register bank.
 	 */
+	uint8_t buf{};
 	_interface->read(ICMREG_20948_BANK_SEL, &buf, 1);
+	int retries = 5;
 
-	while (bank != buf && retries > 0) {
-		PX4_WARN("user bank: expected %d got %d", bank, buf);
-		ret = _interface->write(ICMREG_20948_BANK_SEL, &bank, 1);
+	while (buf != write_bank_buf && retries > 0) {
+		buf = write_bank_buf;
+		_interface->write(ICMREG_20948_BANK_SEL, &buf, 1);
+		up_udelay(50);
 
-		px4_usleep(20);
-
-		if (ret != OK) {
-			PX4_ERR("ICMREG_20948_BANK_SEL write error");
-			return ret;
-		}
-
+		buf = 0;
 		_interface->read(ICMREG_20948_BANK_SEL, &buf, 1);
+
 		retries--;
 	}
 
+	_selected_bank = (buf & 0b110000) >> 4;
 
-	_selected_bank = bank;
-
-	if (bank != buf) {
-		PX4_DEBUG("SELECT FAILED %d %d %d %d", retries, _selected_bank, bank, buf);
+	if (bank != _selected_bank) {
+		PX4_DEBUG("bank select failed selected: %d requsted: %d buf: %d", _selected_bank, bank, buf);
 		return PX4_ERROR;
 
 	} else {
@@ -300,8 +309,7 @@ ICM20948::select_register_bank(uint8_t bank)
 	}
 }
 
-uint8_t
-ICM20948::read_reg(unsigned reg)
+uint8_t ICM20948::read_reg(unsigned reg)
 {
 	select_register_bank(REG_BANK(reg));
 
@@ -311,10 +319,9 @@ ICM20948::read_reg(unsigned reg)
 	return buf;
 }
 
-uint8_t
-ICM20948::read_reg_range(unsigned start_reg, uint8_t *buf, uint16_t count)
+uint8_t ICM20948::read_reg_range(unsigned start_reg, uint8_t *buf, uint8_t count)
 {
-	if (buf == NULL) {
+	if (buf == nullptr) {
 		return PX4_ERROR;
 	}
 
@@ -356,14 +363,12 @@ ICM20948::write_checked_reg(unsigned reg, uint8_t value)
 	for (uint8_t i = 0; i < ICM20948_NUM_CHECKED_REGISTERS; i++) {
 		if (reg == _checked_registers[i]) {
 			_checked_values[i] = value;
-			_checked_bad[i] = value;
 			return;
 		}
 	}
 }
 
-void
-ICM20948::start()
+void ICM20948::start()
 {
 	/* make sure we are stopped first */
 	stop();
@@ -371,28 +376,24 @@ ICM20948::start()
 	ScheduleOnInterval(_call_interval - ICM20948_TIMER_REDUCTION, 1000);
 }
 
-void
-ICM20948::stop()
+void ICM20948::stop()
 {
 	ScheduleClear();
 }
 
-void
-ICM20948::Run()
+void ICM20948::Run()
 {
 	/* make another measurement */
 	measure();
 }
 
-void
-ICM20948::check_registers(void)
+void ICM20948::check_registers()
 {
 	uint8_t v = 0;
 
 	if ((v = read_reg(_checked_registers[_checked_next])) != _checked_values[_checked_next]) {
 
-		_checked_bad[_checked_next] = v;
-
+		PX4_DEBUG("reg: %d bad value %d (%d)", REG_ADDRESS(_checked_registers[_checked_next]), v, _checked_values[_checked_next]);
 		/*
 		  if we get the wrong value then we know the SPI bus
 		  or sensor is very sick. We set _register_wait to 20
@@ -435,28 +436,7 @@ ICM20948::check_registers(void)
 	_checked_next = (_checked_next + 1) % ICM20948_NUM_CHECKED_REGISTERS;
 }
 
-bool
-ICM20948::check_null_data(uint16_t *data, uint8_t size)
-{
-	while (size--) {
-		if (*data++) {
-			perf_count(_good_transfers);
-			return false;
-		}
-	}
-
-	// all zero data - probably a SPI bus error
-	perf_count(_bad_transfers);
-	perf_end(_sample_perf);
-	// note that we don't call reset() here as a reset()
-	// costs 20ms with interrupts disabled. That means if
-	// the icm20948 does go bad it would cause a FMU failure,
-	// regardless of whether another sensor is available,
-	return true;
-}
-
-bool
-ICM20948::check_duplicate(uint8_t *accel_data)
+bool ICM20948::check_duplicate(uint8_t *accel_data)
 {
 	/*
 	   see if this is duplicate accelerometer data. Note that we
@@ -468,7 +448,6 @@ ICM20948::check_duplicate(uint8_t *accel_data)
 	*/
 	if (!_got_duplicate && memcmp(accel_data, &_last_accel_data, sizeof(_last_accel_data)) == 0) {
 		// it isn't new data - wait for next timer
-		perf_end(_sample_perf);
 		perf_count(_duplicates);
 		_got_duplicate = true;
 
@@ -480,8 +459,7 @@ ICM20948::check_duplicate(uint8_t *accel_data)
 	return _got_duplicate;
 }
 
-void
-ICM20948::measure()
+void ICM20948::measure()
 {
 	perf_begin(_sample_perf);
 
@@ -491,17 +469,7 @@ ICM20948::measure()
 		return;
 	}
 
-	ICMReport icm_report{};
-
-	struct Report {
-		int16_t		accel_x;
-		int16_t		accel_y;
-		int16_t		accel_z;
-		int16_t		temp;
-		int16_t		gyro_x;
-		int16_t		gyro_y;
-		int16_t		gyro_z;
-	} report{};
+	ICMReport report{};
 
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
@@ -510,14 +478,15 @@ ICM20948::measure()
 
 		select_register_bank(REG_BANK(ICMREG_20948_ACCEL_XOUT_H));
 
-		if (OK != read_reg_range(ICMREG_20948_ACCEL_XOUT_H, (uint8_t *)&icm_report, sizeof(icm_report))) {
+		if (OK != read_reg_range(ICMREG_20948_ACCEL_XOUT_H, (uint8_t *)&report, sizeof(report))) {
 			perf_end(_sample_perf);
 			return;
 		}
 
 		check_registers();
 
-		if (check_duplicate(&icm_report.accel_x[0])) {
+		if (check_duplicate((uint8_t *)&report)) {
+			perf_end(_sample_perf);
 			return;
 		}
 	}
@@ -532,7 +501,14 @@ ICM20948::measure()
 	if (_mag.is_passthrough()) {
 #   endif
 
-		_mag._measure(timestamp_sample, icm_report.mag);
+/* 		select_register_bank(REG_BANK(ICMREG_20948_EXT_SLV_SENS_DATA_00));
+		ak09916_regs mag{};
+		if (OK != read_reg_range(ICMREG_20948_EXT_SLV_SENS_DATA_00, (uint8_t *)&mag, sizeof(mag))) {
+			perf_end(_sample_perf);
+			return;
+		}
+
+		_mag._measure(timestamp_sample, mag); */
 
 #   ifdef USE_I2C
 
@@ -545,47 +521,34 @@ ICM20948::measure()
 	// Continue evaluating gyro and accelerometer results
 	if (_register_wait == 0) {
 		// Convert from big to little endian
-		report.accel_x = int16_t_from_bytes(icm_report.accel_x);
-		report.accel_y = int16_t_from_bytes(icm_report.accel_y);
-		report.accel_z = int16_t_from_bytes(icm_report.accel_z);
-		report.temp    = int16_t_from_bytes(icm_report.temp);
-		report.gyro_x  = int16_t_from_bytes(icm_report.gyro_x);
-		report.gyro_y  = int16_t_from_bytes(icm_report.gyro_y);
-		report.gyro_z  = int16_t_from_bytes(icm_report.gyro_z);
+		int16_t accel_x = combine(report.ACCEL_XOUT_H, report.ACCEL_XOUT_L);
+		int16_t accel_y = combine(report.ACCEL_YOUT_H, report.ACCEL_YOUT_L);
+		int16_t accel_z = combine(report.ACCEL_ZOUT_H, report.ACCEL_ZOUT_L);
 
-		if (check_null_data((uint16_t *)&report, sizeof(report) / 2)) {
-			return;
-		}
-	}
+		int16_t gyro_x = combine(report.GYRO_XOUT_H, report.GYRO_XOUT_L);
+		int16_t gyro_y = combine(report.GYRO_YOUT_H, report.GYRO_YOUT_L);
+		int16_t gyro_z = combine(report.GYRO_ZOUT_H, report.GYRO_ZOUT_L);
 
-	if (_register_wait != 0) {
+		//int16_t temp = combine(report.TEMP_OUT_H, report.TEMP_OUT_L);
+
+		// Get sensor temperature
+		//_last_temperature = temp / 333.87f + 21.0f;
+
+		//_px4_accel.set_temperature(_last_temperature);
+		//_px4_gyro.set_temperature(_last_temperature);
+
+		/* NOTE: Axes have been swapped to match the board a few lines above. */
+		_px4_accel.update(timestamp_sample, accel_x, accel_y, accel_z);
+		_px4_gyro.update(timestamp_sample, gyro_x, gyro_y, gyro_z);
+	} else {
 		/*
 		 * We are waiting for some good transfers before using the sensor again.
 		 * We still increment _good_transfers, but don't return any data yet.
 		*/
 		_register_wait--;
+		perf_end(_sample_perf);
 		return;
 	}
-
-	// Get sensor temperature
-	_last_temperature = (report.temp) / 333.87f + 21.0f;
-
-	_px4_accel.set_temperature(_last_temperature);
-	_px4_gyro.set_temperature(_last_temperature);
-
-
-	// Swap axes and negate y
-	int16_t accel_xt = report.accel_y;
-	int16_t accel_yt = ((report.accel_x == -32768) ? 32767 : -report.accel_x);
-
-	int16_t gyro_xt = report.gyro_y;
-	int16_t gyro_yt = ((report.gyro_x == -32768) ? 32767 : -report.gyro_x);
-
-	// Apply the swap
-	report.accel_x = accel_xt;
-	report.accel_y = accel_yt;
-	report.gyro_x = gyro_xt;
-	report.gyro_y = gyro_yt;
 
 	// report the error count as the sum of the number of bad
 	// transfers and bad register reads. This allows the higher
@@ -594,10 +557,6 @@ ICM20948::measure()
 	const uint64_t error_count = perf_event_count(_bad_transfers) + perf_event_count(_bad_registers);
 	_px4_accel.set_error_count(error_count);
 	_px4_gyro.set_error_count(error_count);
-
-	/* NOTE: Axes have been swapped to match the board a few lines above. */
-	_px4_accel.update(timestamp_sample, report.accel_x, report.accel_y, report.accel_z);
-	_px4_gyro.update(timestamp_sample, report.gyro_x, report.gyro_y, report.gyro_z);
 
 	/* stop measuring */
 	perf_end(_sample_perf);

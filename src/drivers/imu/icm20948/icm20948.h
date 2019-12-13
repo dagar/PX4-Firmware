@@ -48,32 +48,10 @@
 #endif
 
 // Configuration bits ICM20948
-#define BIT_SLEEP			0x40
 #define BIT_H_RESET			0x80
 #define MPU_CLK_SEL_AUTO		0x01
+#define MPU_SLEEP			0b1000000
 
-#define BITS_GYRO_ST_X			0x80
-#define BITS_GYRO_ST_Y			0x40
-#define BITS_GYRO_ST_Z			0x20
-#define BITS_FS_250DPS			0x00
-#define BITS_FS_500DPS			0x08
-#define BITS_FS_1000DPS			0x10
-#define BITS_FS_2000DPS			0x18
-#define BITS_FS_MASK			0x18
-
-#define BITS_DLPF_CFG_250HZ		0x00
-#define BITS_DLPF_CFG_184HZ		0x01
-#define BITS_DLPF_CFG_92HZ		0x02
-#define BITS_DLPF_CFG_41HZ		0x03
-#define BITS_DLPF_CFG_20HZ		0x04
-#define BITS_DLPF_CFG_10HZ		0x05
-#define BITS_DLPF_CFG_5HZ		0x06
-#define BITS_DLPF_CFG_3600HZ		0x07
-#define BITS_DLPF_CFG_MASK		0x07
-
-#define BITS_ACCEL_CONFIG2_41HZ		0x03
-
-#define BIT_RAW_RDY_EN			0x01
 #define BIT_INT_ANYRD_2CLEAR		0x10
 #define BIT_INT_BYPASS_EN		0x02
 
@@ -106,9 +84,6 @@
 
 #define ICM_WHOAMI_20948            0xEA
 
-#define ICM20948_ACCEL_DEFAULT_RATE	1000
-#define ICM20948_GYRO_DEFAULT_RATE	1000
-
 
 // ICM20948 registers and data
 
@@ -127,13 +102,13 @@
  * in one place than a solution with a lookup table for address/bank pairs.
  */
 
-#define BANK0	0x0000
-#define BANK1	0x0100
-#define BANK2	0x0200
-#define BANK3	0x0300
+#define BANK0	0x000
+#define BANK1	0x100
+#define BANK2	0x200
+#define BANK3	0x300
 
 #define BANK_REG_MASK	0x0300
-#define REG_BANK(r) 			((((r) & BANK_REG_MASK)>>8) & 0x3)
+#define REG_BANK(r) 			(((r) & BANK_REG_MASK)>>8)
 #define REG_ADDRESS(r)			((r) & 0xFF)
 
 #define ICMREG_20948_BANK_SEL 0x7F
@@ -193,15 +168,19 @@
  * interrupt status.
  */
 struct ICMReport {
-	uint8_t		cmd;
-	uint8_t		accel_x[2];
-	uint8_t		accel_y[2];
-	uint8_t		accel_z[2];
-	uint8_t		gyro_x[2];
-	uint8_t		gyro_y[2];
-	uint8_t		gyro_z[2];
-	uint8_t		temp[2];
-	ak09916_regs	mag;
+	uint8_t cmd;
+	uint8_t ACCEL_XOUT_H;
+	uint8_t ACCEL_XOUT_L;
+	uint8_t ACCEL_YOUT_H;
+	uint8_t ACCEL_YOUT_L;
+	uint8_t ACCEL_ZOUT_H;
+	uint8_t ACCEL_ZOUT_L;
+	uint8_t GYRO_XOUT_H;
+	uint8_t GYRO_XOUT_L;
+	uint8_t GYRO_YOUT_H;
+	uint8_t GYRO_YOUT_L;
+	uint8_t GYRO_ZOUT_H;
+	uint8_t GYRO_ZOUT_L;
 };
 #pragma pack(pop)
 
@@ -267,15 +246,12 @@ private:
 	// configuration registers to detect SPI bus errors and sensor
 	// reset
 
-	static constexpr int ICM20948_NUM_CHECKED_REGISTERS{7};
+	static constexpr int ICM20948_NUM_CHECKED_REGISTERS{4};
 	/*
 	list of registers that will be checked in check_registers(). Note
 	that MPUREG_PRODUCT_ID must be first in the list.
 	*/
 	static constexpr uint16_t _checked_registers[ICM20948_NUM_CHECKED_REGISTERS] {
-		ICMREG_20948_PWR_MGMT_1,
-		ICMREG_20948_PWR_MGMT_2,
-		ICMREG_20948_USER_CTRL,
 		ICMREG_20948_ACCEL_CONFIG,
 		ICMREG_20948_ACCEL_CONFIG_2,
 		ICMREG_20948_GYRO_CONFIG_1,
@@ -283,7 +259,6 @@ private:
 	};
 
 	uint8_t					_checked_values[ICM20948_NUM_CHECKED_REGISTERS] {};
-	uint8_t					_checked_bad[ICM20948_NUM_CHECKED_REGISTERS] {};
 	uint8_t 				_checked_next{0};
 
 
@@ -340,7 +315,7 @@ private:
 	 * @param       The count of bytes to be read.
 	 * @return      The value that was read.
 	 */
-	uint8_t                 read_reg_range(unsigned start_reg, uint8_t *buf, uint16_t count);
+	uint8_t                 read_reg_range(unsigned start_reg, uint8_t *buf, uint8_t count);
 
 	/**
 	 * Write a register in the mpu
