@@ -74,6 +74,7 @@
 #include "voted_sensors_update.h"
 #include "vehicle_acceleration/VehicleAcceleration.hpp"
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
+#include "vehicle_imu/VehicleIMU.hpp"
 
 using namespace DriverFramework;
 using namespace sensors;
@@ -141,8 +142,9 @@ private:
 
 	VotedSensorsUpdate _voted_sensors_update;
 
-	VehicleAcceleration	_vehicle_acceleration;
-	VehicleAngularVelocity	_vehicle_angular_velocity;
+	VehicleAcceleration    _vehicle_acceleration;
+	VehicleAngularVelocity _vehicle_angular_velocity;
+	VehicleIMU             _vehicle_imu;
 
 
 	/**
@@ -191,12 +193,14 @@ Sensors::Sensors(bool hil_enabled) :
 
 	_vehicle_acceleration.Start();
 	_vehicle_angular_velocity.Start();
+	_vehicle_imu.Start();
 }
 
 Sensors::~Sensors()
 {
 	_vehicle_acceleration.Stop();
 	_vehicle_angular_velocity.Stop();
+	_vehicle_imu.Stop();
 }
 
 int
@@ -530,6 +534,7 @@ int Sensors::print_status()
 
 	_vehicle_acceleration.PrintStatus();
 	_vehicle_angular_velocity.PrintStatus();
+	_vehicle_imu.PrintStatus();
 
 	return 0;
 }
