@@ -201,6 +201,8 @@ VehicleIMU::ParametersUpdate(bool force)
 
 		_board_rotation = board_rotation_offset * board_rotation;
 	}
+
+	// TODO: calibrations?
 }
 
 void
