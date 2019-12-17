@@ -72,17 +72,21 @@ public:
 	void print_status();
 
 	struct FIFOSample {
+
+		static constexpr uint8_t MAX_SAMPLES = sizeof(sensor_accel_fifo_s::x);
+		static_assert(sizeof(sensor_accel_fifo_s::x) == sizeof(sensor_accel_fifo_s::y));
+		static_assert(sizeof(sensor_accel_fifo_s::y) == sizeof(sensor_accel_fifo_s::z));
+
 		hrt_abstime timestamp_sample;
-		uint8_t samples; // number of samples
+
 		float dt; // in microseconds
 
-		int16_t x[8];
-		int16_t y[8];
-		int16_t z[8];
+		int16_t x[MAX_SAMPLES];
+		int16_t y[MAX_SAMPLES];
+		int16_t z[MAX_SAMPLES];
+
+		uint8_t samples; // number of samples
 	};
-	static_assert(sizeof(FIFOSample::x) == sizeof(sensor_accel_fifo_s::x), "FIFOSample.x invalid size");
-	static_assert(sizeof(FIFOSample::y) == sizeof(sensor_accel_fifo_s::y), "FIFOSample.y invalid size");
-	static_assert(sizeof(FIFOSample::z) == sizeof(sensor_accel_fifo_s::z), "FIFOSample.z invalid size");
 
 	void updateFIFO(const FIFOSample &sample);
 

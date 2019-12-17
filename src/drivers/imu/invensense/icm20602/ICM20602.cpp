@@ -358,6 +358,16 @@ void ICM20602::Run()
 	perf_end(_transfer_perf);
 
 	static constexpr uint32_t gyro_dt = FIFO_INTERVAL / FIFO_GYRO_SAMPLES;
+
+	const int processed_samples = math::min(samples, (int)PX4Accelerometer::FIFOSample::MAX_SAMPLES);
+
+	uint8_t first_sample = 0;
+	uint8_t last_sample = samples - 1;
+
+	if (samples > PX4Accelerometer::FIFOSample::MAX_SAMPLES) {
+		first_sample = last_sample - PX4Accelerometer::FIFOSample::MAX_SAMPLES;
+	}
+
 	// estimate timestamp of first sample in the FIFO from number of samples and fill rate
 	const hrt_abstime timestamp_sample = _time_data_ready - ((samples - 1) * gyro_dt);
 
