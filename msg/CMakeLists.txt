@@ -60,8 +60,8 @@ set(msg_files
 	ekf_gps_position.msg
 	esc_report.msg
 	esc_status.msg
-	estimator_status.msg
 	estimator_innovations.msg
+	estimator_status.msg
 	follow_target.msg
 	geofence_result.msg
 	gps_dump.msg
@@ -76,6 +76,7 @@ set(msg_files
 	led_control.msg
 	log_message.msg
 	manual_control_setpoint.msg
+	manual_control_switches.msg
 	mavlink_log.msg
 	mission.msg
 	mission_result.msg

@@ -187,7 +187,11 @@ float FlightTaskAutoMapper2::_getLandSpeed()
 	float throttle = 0.5f;
 
 	if (rc_is_valid && rc_assist_enabled) {
-		throttle = _sub_manual_control_setpoint.get().z;
+		manual_control_setpoint_s manual_control_setpoint{};
+
+		if (_manual_control_setpoint_sub.copy(&manual_control_setpoint)) {
+			throttle = manual_control_setpoint.z;
+		}
 	}
 
 	float speed = 0;
