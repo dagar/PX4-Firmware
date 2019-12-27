@@ -41,44 +41,50 @@ using namespace time_literals;
 
 Sticks::Sticks(ModuleParams *parent) :
 	ModuleParams(parent)
-{};
+{
+	manual_control_switches_s manual_control_switches{};
+	_manual_control_switches_sub.copy(&manual_control_switches);
+
+	if (manual_control_switches.timestamp != 0) {
+		_gear_switch_old = manual_control_switches.gear_switch;
+	}
+};
 
 bool Sticks::checkAndSetStickInputs(hrt_abstime now)
 {
-	_sub_manual_control_setpoint.update();
+	_vehicle_status_sub.update();
 
-	hrt_abstime rc_timeout = (_param_com_rc_loss_t.get() * 1.5f) * 1_s;
+	if (!_vehicle_status_sub.get().rc_signal_lost) {
 
-	// Sticks are rescaled linearly and exponentially to [-1,1]
-	if ((now - _sub_manual_control_setpoint.get().timestamp) < rc_timeout) {
-		// Linear scale
-		_positions(0) = _sub_manual_control_setpoint.get().x; // NED x, pitch [-1,1]
-		_positions(1) = _sub_manual_control_setpoint.get().y; // NED y, roll [-1,1]
-		_positions(2) = -(_sub_manual_control_setpoint.get().z - 0.5f) * 2.f; // NED z, thrust resacaled from [0,1] to [-1,1]
-		_positions(3) = _sub_manual_control_setpoint.get().r; // yaw [-1,1]
+		manual_control_setpoint_s manual_control_setpoint;
 
-		// Exponential scale
-		_positions_expo(0) = math::expo_deadzone(_positions(0), _param_mpc_xy_man_expo.get(), _param_mpc_hold_dz.get());
-		_positions_expo(1) = math::expo_deadzone(_positions(1), _param_mpc_xy_man_expo.get(), _param_mpc_hold_dz.get());
-		_positions_expo(2) = math::expo_deadzone(_positions(2), _param_mpc_z_man_expo.get(), _param_mpc_hold_dz.get());
-		_positions_expo(3) = math::expo_deadzone(_positions(3), _param_mpc_yaw_expo.get(), _param_mpc_hold_dz.get());
+		if (_manual_control_setpoint_sub.update(&manual_control_setpoint)) {
+			// Linear scale
+			_positions(0) = manual_control_setpoint.x; // NED x, pitch [-1,1]
+			_positions(1) = manual_control_setpoint.y; // NED y, roll [-1,1]
+			_positions(2) = -(manual_control_setpoint.z - 0.5f) * 2.f; // NED z, thrust rescaled from [0,1] to [-1,1]
+			_positions(3) = manual_control_setpoint.r; // yaw [-1,1]
 
-		// valid stick inputs are required
-		const bool valid_sticks =  PX4_ISFINITE(_positions(0))
-					   && PX4_ISFINITE(_positions(1))
-					   && PX4_ISFINITE(_positions(2))
-					   && PX4_ISFINITE(_positions(3));
+			// Exponential scale
+			_positions_expo(0) = math::expo_deadzone(_positions(0), _param_mpc_xy_man_expo.get(), _param_mpc_hold_dz.get());
+			_positions_expo(1) = math::expo_deadzone(_positions(1), _param_mpc_xy_man_expo.get(), _param_mpc_hold_dz.get());
+			_positions_expo(2) = math::expo_deadzone(_positions(2), _param_mpc_z_man_expo.get(), _param_mpc_hold_dz.get());
+			_positions_expo(3) = math::expo_deadzone(_positions(3), _param_mpc_yaw_expo.get(), _param_mpc_hold_dz.get());
 
-		_input_available = valid_sticks;
+			// valid stick inputs are required
+			const bool valid_sticks = PX4_ISFINITE(_positions(0))
+						  && PX4_ISFINITE(_positions(1))
+						  && PX4_ISFINITE(_positions(2))
+						  && PX4_ISFINITE(_positions(3));
+
+			_input_available = valid_sticks;
+		}
 
 	} else {
-		_input_available = false;
-	}
-
-	if (!_input_available) {
 		// Timeout: set all sticks to zero
 		_positions.zero();
 		_positions_expo.zero();
+		_input_available = false;
 	}
 
 	return _input_available;
@@ -89,22 +95,18 @@ void Sticks::setGearAccordingToSwitch(landing_gear_s &gear)
 	// Only switch the landing gear up if the user switched from gear down to gear up.
 	// If the user had the switch in the gear up position and took off ignore it
 	// until he toggles the switch to avoid retracting the gear immediately on takeoff.
-	if (!isAvailable()) {
-		gear.landing_gear = landing_gear_s::GEAR_KEEP;
+	manual_control_switches_s manual_control_switches;
 
-	} else {
-		const int8_t gear_switch = _sub_manual_control_setpoint.get().gear_switch;
-
-		if (_gear_switch_old != gear_switch) {
-			if (gear_switch == manual_control_setpoint_s::SWITCH_POS_OFF) {
+	if (_manual_control_switches_sub.update(&manual_control_switches)) {
+		if (_gear_switch_old != manual_control_switches.gear_switch) {
+			if (manual_control_switches.gear_switch == manual_control_switches_s::SWITCH_POS_OFF) {
 				gear.landing_gear = landing_gear_s::GEAR_DOWN;
-			}
 
-			if (gear_switch == manual_control_setpoint_s::SWITCH_POS_ON) {
+			} else if (manual_control_switches.gear_switch == manual_control_switches_s::SWITCH_POS_ON) {
 				gear.landing_gear = landing_gear_s::GEAR_UP;
 			}
 		}
 
-		_gear_switch_old = gear_switch;
+		_gear_switch_old = manual_control_switches.gear_switch;
 	}
 }
