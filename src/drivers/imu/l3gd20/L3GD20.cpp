@@ -277,15 +277,10 @@ L3GD20::reset()
 	write_checked_reg(ADDR_CTRL_REG5, 0);
 	write_checked_reg(ADDR_CTRL_REG5, REG5_FIFO_ENABLE);		/* disable wake-on-interrupt */
 
-	/* disable FIFO. This makes things simpler and ensures we
-	 * aren't getting stale data. It means we must run the hrt
-	 * callback fast enough to not miss data. */
-	write_checked_reg(ADDR_FIFO_CTRL_REG, FIFO_CTRL_BYPASS_MODE);
+	write_checked_reg(ADDR_FIFO_CTRL_REG, FIFO_CTRL_FIFO_MODE);
 
 	set_samplerate(0); // 760Hz or 800Hz
 	set_range(L3GD20_DEFAULT_RANGE_DPS);
-
-	_read = 0;
 }
 
 void
@@ -328,17 +323,36 @@ L3GD20::check_registers()
 void
 L3GD20::measure()
 {
+	// check FIFO
+	const uint8_t fifo_src_reg = read_reg(ADDR_FIFO_SRC_REG);
+
+	if (fifo_src_reg & 1 << 5) {
+		// FIFO empty bit.
+	}
+
+	if (fifo_src_reg & 1 << 6) {
+		// Overrun bit status.
+	}
+
+	const uint8_t fifo_level = fifo_src_reg & 0x1F; // FSS4-FSS1: FIFO stored data level
+
+
 	/* status register and data as read back from the device */
-#pragma pack(push, 1)
+
+	struct FIFO {
+		uint8_t OUT_X_L;
+		uint8_t OUT_X_H;
+		uint8_t OUT_Y_L;
+		uint8_t OUT_Y_H;
+		uint8_t OUT_Z_L;
+		uint8_t OUT_Z_H;
+	};
+
 	struct {
 		uint8_t		cmd;
-		int8_t		temp;
-		uint8_t		status;
-		int16_t		x;
-		int16_t		y;
-		int16_t		z;
+		FIFO		fifo[fifo_level]
 	} raw_report{};
-#pragma pack(pop)
+	//static_assert(sizeof(raw_report) = 9);
 
 	/* start the performance counter */
 	perf_begin(_sample_perf);
@@ -347,14 +361,14 @@ L3GD20::measure()
 
 	/* fetch data from the sensor */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	raw_report.cmd = ADDR_OUT_TEMP | DIR_READ | ADDR_INCREMENT;
+	raw_report.cmd = ADDR_OUT_X_L | DIR_READ;
 	transfer((uint8_t *)&raw_report, (uint8_t *)&raw_report, sizeof(raw_report));
 
-	if (!(raw_report.status & STATUS_ZYXDA)) {
-		perf_end(_sample_perf);
-		perf_count(_duplicates);
-		return;
-	}
+	// if (!(raw_report.status & STATUS_ZYXDA)) {
+	// 	perf_end(_sample_perf);
+	// 	perf_count(_duplicates);
+	// 	return;
+	// }
 
 	/*
 	 * 1) Scale raw value to SI units using scaling from datasheet.
@@ -405,7 +419,7 @@ L3GD20::measure()
 		_px4_gyro.update(timestamp_sample, raw_report.x, raw_report.y, raw_report.z);
 	}
 
-	_read++;
+	// todo: read temperature at low rate
 
 	/* stop the perf counter */
 	perf_end(_sample_perf);
@@ -414,7 +428,6 @@ L3GD20::measure()
 void
 L3GD20::print_info()
 {
-	printf("gyro reads:          %u\n", _read);
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_errors);
 	perf_print_counter(_bad_registers);

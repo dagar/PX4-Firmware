@@ -33,8 +33,6 @@
 px4_add_module(
 	MODULE drivers__imu__l3gd20
 	MAIN l3gd20
-	COMPILE_FLAGS
-		-Wno-cast-align # TODO: fix and enable
 	SRCS
 		L3GD20.hpp
 		L3GD20.cpp

@@ -186,8 +186,6 @@ private:
 
 	unsigned		_orientation{SENSOR_BOARD_ROTATION_DEFAULT};
 
-	unsigned		_read{0};
-
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_errors;
 	perf_counter_t		_bad_registers;
