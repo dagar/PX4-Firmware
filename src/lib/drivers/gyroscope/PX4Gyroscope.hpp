@@ -38,8 +38,8 @@
 #include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
 #include <lib/drivers/device/integrator.h>
+#include <lib/mathlib/math/filter/LowPassFilter.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2pArray.hpp>
-#include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
 #include <lib/mathlib/math/filter/NotchFilter.hpp>
 #include <px4_platform_common/module_params.h>
 #include <uORB/PublicationMulti.hpp>
@@ -99,8 +99,8 @@ private:
 	uORB::PublicationMulti<sensor_gyro_fifo_s>		_sensor_fifo_pub;
 	uORB::PublicationMultiData<sensor_gyro_status_s>	_sensor_status_pub;
 
-	math::LowPassFilter2pVector3f _filter{1000, 100};
-	math::NotchFilter<matrix::Vector3f> _notch_filter{};
+	math::LowPassFilter<matrix::Vector3f> _lp_filter{};
+	math::NotchFilter<matrix::Vector3f>   _notch_filter{};
 
 	hrt_abstime	_control_last_publish{0};
 

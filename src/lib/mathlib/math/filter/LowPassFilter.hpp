@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,24 +31,77 @@
  *
  ****************************************************************************/
 
-#include "LowPassFilter2pVector3f.hpp"
+/*
+ * @file LowPassFilter.hpp
+ *
+ * @brief Implementation of a low-pass filter.
+ *
+ */
+
+#pragma once
 
 #include <px4_platform_common/defines.h>
-
-#include <math.h>
+#include <cmath>
+#include <float.h>
+#include <matrix/math.hpp>
 
 namespace math
 {
 
-void LowPassFilter2pVector3f::set_cutoff_frequency(float sample_freq, float cutoff_freq)
+template<typename T>
+class LowPassFilter
+{
+public:
+	LowPassFilter() = default;
+	~LowPassFilter() = default;
+
+	void setParameters(float sample_freq, float cutoff_freq);
+
+	/**
+	 * Add a new raw value to the filter
+	 *
+	 * @return retrieve the filtered result
+	 */
+	inline T apply(const T &sample)
+	{
+		// Direct Form II implementation
+		const T delay_element_0{sample - _delay_element_1 *_a1 - _delay_element_2 * _a2};
+		const T output{delay_element_0 *_b0 + _delay_element_1 *_b1 + _delay_element_2 * _b2};
+
+		_delay_element_2 = _delay_element_1;
+		_delay_element_1 = delay_element_0;
+
+		return output;
+	}
+
+	float getCutoffFreq() const { return _cutoff_freq; }
+
+	T reset(const T &sample);
+
+protected:
+	float _cutoff_freq{0.f};
+
+	float _a1{0.f};
+	float _a2{0.f};
+
+	float _b0{1.f};
+	float _b1{0.f};
+	float _b2{0.f};
+
+	T _delay_element_1{};
+	T _delay_element_2{};
+};
+
+template<typename T>
+void LowPassFilter<T>::setParameters(float sample_freq, float cutoff_freq)
 {
 	_cutoff_freq = cutoff_freq;
 
 	// reset delay elements on filter change
-	_delay_element_1.zero();
-	_delay_element_2.zero();
+	_delay_element_1 = {};
+	_delay_element_2 = {};
 
-	if (_cutoff_freq <= 0.0f) {
+	if (cutoff_freq <= 0.f) {
 		// no filtering
 		_b0 = 1.0f;
 		_b1 = 0.0f;
@@ -72,18 +125,17 @@ void LowPassFilter2pVector3f::set_cutoff_frequency(float sample_freq, float cuto
 	_a2 = (1.0f - 2.0f * cosf(M_PI_F / 4.0f) * ohm + ohm * ohm) / c;
 }
 
-matrix::Vector3f LowPassFilter2pVector3f::reset(const matrix::Vector3f &sample)
+template<typename T>
+T LowPassFilter<T>::reset(const T &sample)
 {
-	const matrix::Vector3f dval = sample / (_b0 + _b1 + _b2);
+	T dval = sample;
 
-	if (PX4_ISFINITE(dval(0)) && PX4_ISFINITE(dval(1)) && PX4_ISFINITE(dval(2))) {
-		_delay_element_1 = dval;
-		_delay_element_2 = dval;
-
-	} else {
-		_delay_element_1 = sample;
-		_delay_element_2 = sample;
+	if (fabsf(_b0 + _b1 + _b2) > FLT_EPSILON) {
+		dval = dval / (_b0 + _b1 + _b2);
 	}
+
+	_delay_element_1 = dval;
+	_delay_element_2 = dval;
 
 	return apply(sample);
 }

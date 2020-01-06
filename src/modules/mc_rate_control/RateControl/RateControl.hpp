@@ -40,7 +40,7 @@
 #pragma once
 
 #include <matrix/matrix/math.hpp>
-#include <mathlib/math/filter/LowPassFilter2pVector3f.hpp>
+#include <mathlib/math/filter/LowPassFilter.hpp>
 
 #include <lib/mixer/MultirotorMixer/MultirotorMixer.hpp>
 #include <uORB/topics/rate_ctrl_status.h>
@@ -122,7 +122,7 @@ private:
 	matrix::Vector3f _rate_prev; ///< angular rates of previous update
 	matrix::Vector3f _rate_prev_filtered; ///< low-pass filtered angular rates of previous update
 	matrix::Vector3f _rate_int; ///< integral term of the rate controller
-	math::LowPassFilter2pVector3f _lp_filters_d{0.f, 0.f}; ///< low-pass filters for D-term (roll, pitch & yaw)
+	math::LowPassFilter<matrix::Vector3f> _lp_filters_d; ///< low-pass filters for D-term (roll, pitch & yaw)
 	bool _mixer_saturation_positive[3] {};
 	bool _mixer_saturation_negative[3] {};
 };

@@ -35,7 +35,7 @@
 
 #include <RateControl.hpp>
 
-#include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
+#include <lib/mathlib/math/filter/LowPassFilter.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/defines.h>

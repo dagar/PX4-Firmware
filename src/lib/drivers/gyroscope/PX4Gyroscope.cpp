@@ -105,7 +105,7 @@ PX4Gyroscope::set_sample_rate(uint16_t rate)
 {
 	_sample_rate = rate;
 
-	ConfigureFilter(_filter.get_cutoff_freq());
+	ConfigureFilter(_lp_filter.getCutoffFreq());
 	ConfigureNotchFilter(_notch_filter.getNotchFreq(), _notch_filter.getBandwidth());
 }
 
@@ -141,7 +141,7 @@ PX4Gyroscope::update(hrt_abstime timestamp, float x, float y, float z)
 
 	// Filtered values: apply notch and then low-pass
 	Vector3f val_filtered{_notch_filter.apply(val_calibrated)};
-	val_filtered = _filter.apply(val_filtered);
+	val_filtered = _lp_filter.apply(val_filtered);
 
 	// publish control data (filtered) immediately
 	bool publish_control = true;
@@ -423,7 +423,7 @@ PX4Gyroscope::ResetIntegrator()
 void
 PX4Gyroscope::ConfigureFilter(float cutoff_freq)
 {
-	_filter.set_cutoff_frequency(_sample_rate, cutoff_freq);
+	_lp_filter.setParameters(_sample_rate, cutoff_freq);
 
 	_filterArrayX.set_cutoff_frequency(_sample_rate, cutoff_freq);
 	_filterArrayY.set_cutoff_frequency(_sample_rate, cutoff_freq);
@@ -455,7 +455,7 @@ PX4Gyroscope::print_status()
 {
 	PX4_INFO(GYRO_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
 	PX4_INFO("sample rate: %d Hz", _sample_rate);
-	PX4_INFO("filter cutoff: %.3f Hz", (double)_filter.get_cutoff_freq());
+	PX4_INFO("filter cutoff: %.3f Hz", (double)_lp_filter.getCutoffFreq());
 	PX4_INFO("notch filter freq: %.3f Hz\tbandwidth: %.3f Hz", (double)_notch_filter.getNotchFreq(),
 		 (double)_notch_filter.getBandwidth());
 

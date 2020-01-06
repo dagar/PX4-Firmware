@@ -104,7 +104,7 @@ PX4Accelerometer::set_sample_rate(uint16_t rate)
 {
 	_sample_rate = rate;
 
-	ConfigureFilter(_filter.get_cutoff_freq());
+	ConfigureFilter(_lp_filter.getCutoffFreq());
 }
 
 void
@@ -138,7 +138,7 @@ PX4Accelerometer::update(hrt_abstime timestamp, float x, float y, float z)
 	const Vector3f val_calibrated{(((raw * _scale) - _calibration_offset).emult(_calibration_scale))};
 
 	// Filtered values
-	const Vector3f val_filtered{_filter.apply(val_calibrated)};
+	const Vector3f val_filtered{_lp_filter.apply(val_calibrated)};
 
 	// Integrated values
 	Vector3f integrated_value;
@@ -370,7 +370,7 @@ PX4Accelerometer::ResetIntegrator()
 void
 PX4Accelerometer::ConfigureFilter(float cutoff_freq)
 {
-	_filter.set_cutoff_frequency(_sample_rate, cutoff_freq);
+	_lp_filter.setParameters(_sample_rate, cutoff_freq);
 
 	_filterArrayX.set_cutoff_frequency(_sample_rate, cutoff_freq);
 	_filterArrayY.set_cutoff_frequency(_sample_rate, cutoff_freq);
@@ -392,7 +392,7 @@ PX4Accelerometer::print_status()
 {
 	PX4_INFO(ACCEL_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
 	PX4_INFO("sample rate: %d Hz", _sample_rate);
-	PX4_INFO("filter cutoff: %.3f Hz", (double)_filter.get_cutoff_freq());
+	PX4_INFO("filter cutoff: %.3f Hz", (double)_lp_filter.getCutoffFreq());
 
 	PX4_INFO("calibration scale: %.5f %.5f %.5f", (double)_calibration_scale(0), (double)_calibration_scale(1),
 		 (double)_calibration_scale(2));

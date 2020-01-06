@@ -39,8 +39,8 @@
 #include <lib/conversion/rotation.h>
 #include <lib/drivers/device/integrator.h>
 #include <lib/ecl/geo/geo.h>
+#include <lib/mathlib/math/filter/LowPassFilter.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2pArray.hpp>
-#include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
 #include <px4_platform_common/module_params.h>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/sensor_accel.h>
@@ -96,7 +96,7 @@ private:
 	uORB::PublicationMulti<sensor_accel_fifo_s>		_sensor_fifo_pub;
 	uORB::PublicationMultiData<sensor_accel_status_s>	_sensor_status_pub;
 
-	math::LowPassFilter2pVector3f _filter{1000, 100};
+	math::LowPassFilter<matrix::Vector3f> _lp_filter{};
 
 	math::LowPassFilter2pArray _filterArrayX{4000, 100};
 	math::LowPassFilter2pArray _filterArrayY{4000, 100};

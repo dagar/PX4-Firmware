@@ -50,8 +50,8 @@ void RateControl::setGains(const Vector3f &P, const Vector3f &I, const Vector3f 
 void RateControl::setDTermCutoff(const float loop_rate, const float cutoff, const bool force)
 {
 	// only do expensive filter update if the cutoff changed
-	if (force || fabsf(_lp_filters_d.get_cutoff_freq() - cutoff) > 0.01f) {
-		_lp_filters_d.set_cutoff_frequency(loop_rate, cutoff);
+	if (force || fabsf(_lp_filters_d.getCutoffFreq() - cutoff) > 0.01f) {
+		_lp_filters_d.setParameters(loop_rate, cutoff);
 		_lp_filters_d.reset(_rate_prev);
 	}
 }

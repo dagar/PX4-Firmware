@@ -45,6 +45,17 @@
 
 namespace math
 {
+
+inline bool isFinite(const float &value)
+{
+	return PX4_ISFINITE(value);
+}
+
+inline bool isFinite(const matrix::Vector3f &value)
+{
+	return PX4_ISFINITE(value(0)) && PX4_ISFINITE(value(1)) && PX4_ISFINITE(value(2));
+}
+
 template<typename T>
 class NotchFilterArray : public NotchFilter<T>
 {

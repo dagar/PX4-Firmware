@@ -49,16 +49,6 @@
 namespace math
 {
 
-inline bool isFinite(const float &value)
-{
-	return PX4_ISFINITE(value);
-}
-
-inline bool isFinite(const matrix::Vector3f &value)
-{
-	return PX4_ISFINITE(value(0)) && PX4_ISFINITE(value(1)) && PX4_ISFINITE(value(2));
-}
-
 template<typename T>
 class NotchFilter
 {
@@ -102,19 +92,19 @@ public:
 	T reset(const T &sample);
 
 protected:
-	float _notch_freq{};
-	float _bandwidth{};
+	float _notch_freq{0.f};
+	float _bandwidth{0.f};
 
 	// All the coefficients are normalized by a0, so a0 becomes 1 here
-	float _a1{};
-	float _a2{};
+	float _a1{0.f};
+	float _a2{0.f};
 
-	float _b0{};
-	float _b1{};
-	float _b2{};
+	float _b0{1.f};
+	float _b1{0.f};
+	float _b2{0.f};
 
-	T _delay_element_1;
-	T _delay_element_2;
+	T _delay_element_1{};
+	T _delay_element_2{};
 };
 
 template<typename T>
