@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,53 +31,80 @@
  *
  ****************************************************************************/
 
-/**
- * @file board_config.h
- *
- * Emlid Navio2 internal definitions
- */
+#include <board_config.h>
 
-#pragma once
+#include <drivers/drv_adc.h>
+#include <drivers/drv_hrt.h>
+#include <px4_arch/adc.h>
 
-#define BOARD_OVERRIDE_UUID "RPIID00000000000" // must be of length 16
-#define PX4_SOC_ARCH_ID     PX4_SOC_ARCH_ID_RPI
+#include <stdint.h>
+#include <unistd.h>
 
-#define BOARD_BATTERY1_V_DIV   (10.177939394f)
-#define BOARD_BATTERY1_A_PER_V (15.391030303f)
+// A0 - board voltage (shows 5V)
+// A1 - servo rail voltage
+// A2 - power module voltage (ADC0, POWER port)
+// A3 - power module current (ADC1, POWER port)
+// A4 - ADC2 (ADC port)
+// A5 - ADC3 (ADC port)
 
-#define BOARD_HAS_NO_RESET
-#define BOARD_HAS_NO_BOOTLOADER
+#define ADC_SYSFS_PATH "/sys/kernel/rcio/adc"
 
-#define BOARD_MAX_LEDS 1 // Number of external LED's this board has
+#define ADC_MAX_CHAN 6
+int _fd[ADC_MAX_CHAN];
 
-/*
- * I2C busses
- */
-#define PX4_I2C_BUS_EXPANSION   1
+int px4_arch_adc_init(uint32_t base_address)
+{
+	for (int i = 0; i < ADC_MAX_CHAN; i++) {
+		_fd[i] = -1;
+	}
 
-#define PX4_NUMBER_I2C_BUSES    1
+	return OK;
+}
 
-// SPI
-#define PX4_SPI_BUS_SENSORS    0
-#define PX4_SPIDEV_UBLOX       PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 0) // spidev0.0 - ublox m8n
-#define PX4_SPIDEV_MPU         PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 1) // spidev0.1 - mpu9250
-#define PX4_SPIDEV_LSM9DS1_M   PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 2) // spidev0.2 - lsm9ds1 mag
-#define PX4_SPIDEV_LSM9DS1_AG  PX4_MK_SPI_SEL(PX4_SPI_BUS_SENSORS, 3) // spidev0.3 - lsm9ds1 accel/gyro
+void px4_arch_adc_uninit(uint32_t base_address)
+{
+	for (int i = 0; i < ADC_MAX_CHAN; i++) {
+		::close(_fd[i]);
+		_fd[i] = -1;
+	}
+}
 
-// Battery ADC channels
-#define ADC_BATTERY_VOLTAGE_CHANNEL 2
-#define ADC_BATTERY_CURRENT_CHANNEL 3
+uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
+{
+	if (channel > ADC_MAX_CHAN) {
+		PX4_ERR("channel %d out of range: ", channel, ADC_MAX_CHAN);
+		return UINT32_MAX; // error
+	}
 
-/**
- * ADC channels:
- * These are the channel numbers of the ADCs of the microcontroller that can be used by the Px4 Firmware in the adc driver.
- */
-#define ADC_CHANNELS (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3)
+	// open channel if necessary
+	if (_fd[channel] == -1) {
+		// ADC_SYSFS_PATH
+		char channel_path[strlen(ADC_SYSFS_PATH) + 5] {};
 
-/* ADC defines to be used in sensors.cpp to read from a particular channel. */
-#define ADC_BATTERY_VOLTAGE_CHANNEL  2
-#define ADC_BATTERY_CURRENT_CHANNEL  3
-#define ADC_5V_RAIL_SENSE            1
+		if (asprintf(&channel_path, "%s/ch%d", ADC_SYSFS_PATH, channel) == -1) {
+			PX4_ERR("adc channel: %d\n", channel);
+			return UINT32_MAX; // error
+		}
 
-#include <system_config.h>
-#include <px4_platform_common/board_common.h>
+		_fd[channel] = ::open(channel_path, O_RDONLY);
+	}
+
+	char buffer[10] {};
+
+	if (::pread(channels[channel], buffer, size(buffer), 0) < 0) {
+		PX4_ERR("read channel %d failed", channel);
+		return UINT32_MAX; // error
+	}
+
+	return atoi(buffer);
+}
+
+uint32_t px4_arch_adc_temp_sensor_mask()
+{
+	return 0;
+}
+
+uint32_t px4_arch_adc_dn_fullcount()
+{
+	return 1 << 16; // 16 bit ADC
+}

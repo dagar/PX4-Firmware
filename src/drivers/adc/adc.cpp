@@ -215,7 +215,6 @@ ADC::update_adc_report(hrt_abstime now)
 	for (unsigned i = 0; i < max_num; i++) {
 		adc.channel_id[i] = _samples[i].am_channel;
 		adc.channel_value[i] = _samples[i].am_data * 3.3f / px4_arch_adc_dn_fullcount();
-		;
 	}
 
 	_to_adc_report.publish(adc);
