@@ -379,9 +379,15 @@ private:
 	uORB::Subscription					_sp_man_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription					_subsys_sub{ORB_ID(subsystem_info)};
 	uORB::Subscription					_system_power_sub{ORB_ID(system_power)};
-	uORB::Subscription					_telemetry_status_sub{ORB_ID(telemetry_status)};
 	uORB::Subscription					_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 	uORB::Subscription					_vtol_vehicle_status_sub{ORB_ID(vtol_vehicle_status)};
+
+	uORB::Subscription					_telemetry_status_sub[4] {
+		{ORB_ID(telemetry_status), 0},
+		{ORB_ID(telemetry_status), 1},
+		{ORB_ID(telemetry_status), 2},
+		{ORB_ID(telemetry_status), 3},
+	};
 
 	uORB::SubscriptionData<airspeed_s>			_airspeed_sub{ORB_ID(airspeed)};
 	uORB::SubscriptionData<estimator_status_s>		_estimator_status_sub{ORB_ID(estimator_status)};

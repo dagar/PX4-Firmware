@@ -1968,12 +1968,74 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 		mavlink_heartbeat_t hb;
 		mavlink_msg_heartbeat_decode(msg, &hb);
 
+		// Mavlink component id (compid in header)
+		switch (msg->compid) {
+		case MAV_COMP_ID_ALL: /* Target id (target_component) used to broadcast messages to all components of the receiving system. Components should attempt to process messages with this component ID and forward to components on any other interfaces. Note: This is not a valid *source* component id for a message. | */
+		case MAV_COMP_ID_AUTOPILOT1: /* System flight controller component ("autopilot"). Only one autopilot is expected in a particular system. | */
+		case MAV_COMP_ID_GIMBAL: /* Gimbal #1. | */
+		case MAV_COMP_ID_LOG: /* Logging component. | */
+		case MAV_COMP_ID_ADSB: /* Automatic Dependent Surveillance-Broadcast (ADS-B) component. | */
+		case MAV_COMP_ID_OSD: /* On Screen Display (OSD) devices for video links. | */
+		case MAV_COMP_ID_PERIPHERAL:
+		case MAV_COMP_ID_FLARM: /* FLARM collision alert component. | */
+		case MAV_COMP_ID_MISSIONPLANNER:
+		case MAV_COMP_ID_PATHPLANNER:
+		case MAV_COMP_ID_OBSTACLE_AVOIDANCE: /* Component that plans a collision free path between two points. | */
+		case MAV_COMP_ID_VISUAL_INERTIAL_ODOMETRY: /* Component that provides position estimates using VIO techniques. | */
+		case MAV_COMP_ID_PAIRING_MANAGER: /* Component that manages pairing of vehicle and GCS. | */
+		case MAV_COMP_ID_GPS: /* GPS #1. | */
+		case MAV_COMP_ID_GPS2: /* GPS #2. | */
+		case MAV_COMP_ID_UDP_BRIDGE: /* Component to bridge MAVLink to UDP (i.e. from a UART). | */
+		case MAV_COMP_ID_UART_BRIDGE: /* Component to bridge to UART (i.e. from UDP). | */
+		case MAV_COMP_ID_TUNNEL_NODE: /* Component handling TUNNEL messages (e.g. vendor specific GUI of a component). | */
+		case MAV_COMP_ID_SYSTEM_CONTROL: /* Component for handling system messages (e.g. to ARM, takeoff, etc.). | */
+		}
+
+		// HEARTBEAT type (MAV_TYPE)
+		switch (hb.type) {
+		case MAV_TYPE_ANTENNA_TRACKER: /* Ground installation | */
+		case MAV_TYPE_GCS: /* Operator control unit / ground control station | */
+		case MAV_TYPE_ONBOARD_CONTROLLER: /* Onboard companion controller | */
+		case MAV_TYPE_GIMBAL: /* Gimbal | */
+		case MAV_TYPE_ADSB: /* ADSB system | */
+		case MAV_TYPE_DODECAROTOR: /* Dodecarotor | */
+		case MAV_TYPE_CAMERA: /* Camera | */
+		case MAV_TYPE_CHARGING_STATION: /* Charging station | */
+		case MAV_TYPE_FLARM: /* FLARM collision avoidance system | */
+		case MAV_TYPE_SERVO: /* Servo | */
+		}
+
+
+
 		/* Accept only heartbeats from GCS or ONBOARD Controller, skip heartbeats from other vehicles */
-		if ((msg->sysid != mavlink_system.sysid && hb.type == MAV_TYPE_GCS) || (msg->sysid == mavlink_system.sysid
-				&& hb.type == MAV_TYPE_ONBOARD_CONTROLLER)) {
+		bool update = false;
+		telemetry_status_s &tstatus = _mavlink->get_telemetry_status();
 
-			telemetry_status_s &tstatus = _mavlink->get_telemetry_status();
+		if (msg->sysid == mavlink_system.sysid) {
+			// same system id
+			switch (hb.type) {
+			case MAV_TYPE_GCS:
+			case MAV_TYPE_ONBOARD_CONTROLLER:
+			case MAV_TYPE_GIMBAL:
+			case MAV_TYPE_ADSB:
+			case MAV_TYPE_CAMERA:
 
+			}
+
+			if (hb.type == MAV_TYPE_ONBOARD_CONTROLLER) {
+				update = true;
+				tstatus.heartbeat_onboard_controller = hrt_absolute_time();
+			}
+
+		} else {
+			// different system id (eg GCS)
+			if (hb.type == MAV_TYPE_GCS) {
+				update = true;
+				tstatus.heartbeat_gcs = hrt_absolute_time();
+			}
+		}
+
+		if (update) {
 			/* set heartbeat time and topic time and publish -
 			 * the telem status also gets updated on telemetry events
 			 */
@@ -1983,7 +2045,6 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 			tstatus.remote_type = hb.type;
 			tstatus.remote_system_status = hb.system_status;
 		}
-
 	}
 }
 

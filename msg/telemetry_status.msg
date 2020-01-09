@@ -29,7 +29,8 @@ uint8 MAV_STATE_FLIGHT_TERMINATION = 8
 
 uint64 timestamp			# time since system start (microseconds)
 
-uint64 heartbeat_time			# Time of last received heartbeat from remote system
+uint64 heartbeat_gcs			# Time of last received heartbeat from remote ground control system
+uint64 heartbeat_onboard_controller	# Time of last received heartbeat from onboard controller system
 
 uint8 remote_system_id			# system id of the remote system (Mavlink header sys_id)
 uint8 remote_component_id		# component id of the remote system (Mavlink header comp_id)
@@ -55,5 +56,3 @@ float32 rate_rx
 
 float32 rate_tx
 float32 rate_txerr
-
-uint8 ORB_QUEUE_LENGTH = 3
