@@ -294,7 +294,7 @@ int UavcanNode::init(uavcan::NodeID node_id, uavcan_stm32::BusEvent &bus_events)
 	// Do regular cdev init
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 

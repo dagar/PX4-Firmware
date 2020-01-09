@@ -123,5 +123,5 @@ int ex_hwtest_main(int argc, char *argv[])
 		count++;
 	}
 
-	return OK;
+	return PX4_OK;
 }

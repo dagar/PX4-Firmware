@@ -116,5 +116,5 @@ reflect_main(int argc, char *argv[])
 		}
 	}
 
-	return OK;
+	return PX4_OK;
 }

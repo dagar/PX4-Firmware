@@ -91,7 +91,7 @@ int test_uart_baudchange(int argc, char *argv[])
 	/* Set baud rate */
 	if (cfsetispeed(&uart2_config, B9600) < 0 || cfsetospeed(&uart2_config, B9600) < 0) {
 		printf("ERROR setting termios config for UART2: %d\n", termios_state);
-		ret = ERROR;
+		ret = PX4_ERROR;
 		goto cleanup;
 	}
 
@@ -125,7 +125,7 @@ int test_uart_baudchange(int argc, char *argv[])
 
 	printf("uart2_nwrite %d\n", uart2_nwrite);
 
-	return OK;
+	return PX4_OK;
 cleanup:
 	close(uart2);
 	return ret;

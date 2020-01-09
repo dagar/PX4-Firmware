@@ -493,7 +493,7 @@ MavlinkParametersManager::send_param(param_t param, int component_id)
 	 */
 	float param_value{};
 
-	if (param_get(param, &param_value) != OK) {
+	if (param_get(param, &param_value) != PX4_OK) {
 		return 2;
 	}
 

@@ -112,7 +112,7 @@ MPU9250::init()
 
 	int ret = probe();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("probe failed");
 		return ret;
 	}
@@ -138,7 +138,7 @@ MPU9250::init()
 
 		ret = _mag.ak8963_reset();
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_DEBUG("mag reset failed");
 			return ret;
 		}

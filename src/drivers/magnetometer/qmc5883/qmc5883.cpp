@@ -324,7 +324,7 @@ QMC5883::init()
 
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("CDev init failed");
 		goto out;
 	}
@@ -640,7 +640,7 @@ QMC5883::collect()
 	/* get measurements from the device */
 	ret = _interface->read(QMC5883_ADDR_DATA_OUT_X_LSB, (uint8_t *)&qmc_report, sizeof(qmc_report));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		DEVICE_DEBUG("data/status read error");
 		goto out;

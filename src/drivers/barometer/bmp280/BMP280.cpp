@@ -137,7 +137,7 @@ BMP280::measure()
 	// start measure
 	int ret = _interface->set_reg(_curr_ctrl | BMP280_CTRL_MODE_FORCE, BMP280_ADDR_CTRL);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		perf_cancel(_measure_perf);
 		return -EIO;

@@ -30,7 +30,7 @@ void BlockLocalPositionEstimator::gpsInit()
 	// measure
 	Vector<double, n_y_gps> y;
 
-	if (gpsMeasure(y) != OK) {
+	if (gpsMeasure(y) != PX4_OK) {
 		_gpsStats.reset();
 		return;
 	}
@@ -102,7 +102,7 @@ int BlockLocalPositionEstimator::gpsMeasure(Vector<double, n_y_gps> &y)
 	// increament sums for mean
 	_gpsStats.update(y);
 	_time_last_gps = _timeStamp;
-	return OK;
+	return PX4_OK;
 }
 
 void BlockLocalPositionEstimator::gpsCorrect()
@@ -110,7 +110,7 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	// measure
 	Vector<double, n_y_gps> y_global;
 
-	if (gpsMeasure(y_global) != OK) { return; }
+	if (gpsMeasure(y_global) != PX4_OK) { return; }
 
 	// gps measurement in local frame
 	double lat = y_global(Y_gps_x);
@@ -223,7 +223,7 @@ void BlockLocalPositionEstimator::gpsCorrect()
 
 	} else if (_sensorFault & SENSOR_GPS) {
 		_sensorFault &= ~SENSOR_GPS;
-		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] GPS OK");
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] GPS PX4_OK");
 	}
 
 	// kalman filter correction always for GPS

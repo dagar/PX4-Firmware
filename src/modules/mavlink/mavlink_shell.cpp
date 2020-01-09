@@ -172,7 +172,7 @@ size_t MavlinkShell::available()
 {
 	int ret = 0;
 
-	if (ioctl(_from_shell_fd, FIONREAD, (unsigned long)&ret) == OK) {
+	if (ioctl(_from_shell_fd, FIONREAD, (unsigned long)&ret) == PX4_OK) {
 		return ret;
 	}
 

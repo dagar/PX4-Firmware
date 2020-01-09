@@ -165,7 +165,7 @@ int LPS25H::collect()
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 	int ret = _interface->read(ADDR_STATUS_REG | (1 << 7), (uint8_t *)&report, sizeof(report));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		perf_end(_sample_perf);
 		return ret;

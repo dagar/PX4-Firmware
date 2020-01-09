@@ -305,7 +305,7 @@ INA226::collect()
 		perf_count(_comms_errors);
 	}
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("error reading from sensor: %d", ret);
 	}
 

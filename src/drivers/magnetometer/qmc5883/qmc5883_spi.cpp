@@ -103,7 +103,7 @@ QMC5883_SPI::init()
 
 	ret = SPI::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("SPI init failed");
 		return -EIO;
 	}

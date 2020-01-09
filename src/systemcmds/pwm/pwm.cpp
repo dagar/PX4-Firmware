@@ -300,7 +300,7 @@ pwm_main(int argc, char *argv[])
 	unsigned servo_count;
 	ret = px4_ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)&servo_count);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_ERR("PWM_SERVO_GET_COUNT");
 		return error_on_warn;
 	}
@@ -311,14 +311,14 @@ pwm_main(int argc, char *argv[])
 		/* tell safety that its ok to disable it with the switch */
 		ret = px4_ioctl(fd, PWM_SERVO_SET_ARM_OK, 0);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			err(1, "PWM_SERVO_SET_ARM_OK");
 		}
 
 		/* tell IO that the system is armed (it will output values if safety is off) */
 		ret = px4_ioctl(fd, PWM_SERVO_ARM, 0);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			err(1, "PWM_SERVO_ARM");
 		}
 
@@ -332,7 +332,7 @@ pwm_main(int argc, char *argv[])
 		/* disarm, but do not revoke the SET_ARM_OK flag */
 		ret = px4_ioctl(fd, PWM_SERVO_DISARM, 0);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			err(1, "PWM_SERVO_DISARM");
 		}
 
@@ -354,7 +354,7 @@ pwm_main(int argc, char *argv[])
 		if (oneshot || alt_rate >= 0) {
 			ret = px4_ioctl(fd, PWM_SERVO_SET_UPDATE_RATE, oneshot ? 0 : alt_rate);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("PWM_SERVO_SET_UPDATE_RATE (check rate for sanity)");
 				return error_on_warn;
 			}
@@ -364,7 +364,7 @@ pwm_main(int argc, char *argv[])
 		if (set_mask > 0) {
 			ret = px4_ioctl(fd, PWM_SERVO_SET_SELECT_UPDATE_RATE, set_mask);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("PWM_SERVO_SET_SELECT_UPDATE_RATE");
 				return error_on_warn;
 			}
@@ -380,7 +380,7 @@ pwm_main(int argc, char *argv[])
 
 					ret = px4_ioctl(fd, PWM_SERVO_GET_RATEGROUP(group), (unsigned long)&group_mask);
 
-					if (ret != OK) {
+					if (ret != PX4_OK) {
 						PX4_ERR("PWM_SERVO_GET_RATEGROUP(%u)", group);
 						return error_on_warn;
 					}
@@ -391,7 +391,7 @@ pwm_main(int argc, char *argv[])
 
 			ret = px4_ioctl(fd, PWM_SERVO_SET_SELECT_UPDATE_RATE, mask);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("PWM_SERVO_SET_SELECT_UPDATE_RATE");
 				return error_on_warn;
 			}
@@ -422,7 +422,7 @@ pwm_main(int argc, char *argv[])
 		/* first get current state before modifying it */
 		ret = px4_ioctl(fd, PWM_SERVO_GET_MIN_PWM, (long unsigned int)&pwm_values);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("failed get min values");
 			return 1;
 		}
@@ -445,7 +445,7 @@ pwm_main(int argc, char *argv[])
 
 			ret = px4_ioctl(fd, PWM_SERVO_SET_MIN_PWM, (long unsigned int)&pwm_values);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("failed setting min values (%d)", ret);
 				return error_on_warn;
 			}
@@ -476,7 +476,7 @@ pwm_main(int argc, char *argv[])
 		/* first get current state before modifying it */
 		ret = px4_ioctl(fd, PWM_SERVO_GET_MAX_PWM, (long unsigned int)&pwm_values);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("failed get max values");
 			return 1;
 		}
@@ -499,7 +499,7 @@ pwm_main(int argc, char *argv[])
 
 			ret = px4_ioctl(fd, PWM_SERVO_SET_MAX_PWM, (long unsigned int)&pwm_values);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("failed setting max values (%d)", ret);
 				return error_on_warn;
 			}
@@ -529,7 +529,7 @@ pwm_main(int argc, char *argv[])
 		/* first get current state before modifying it */
 		ret = px4_ioctl(fd, PWM_SERVO_GET_DISARMED_PWM, (long unsigned int)&pwm_values);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("failed get disarmed values");
 			return ret;
 		}
@@ -552,7 +552,7 @@ pwm_main(int argc, char *argv[])
 
 			ret = px4_ioctl(fd, PWM_SERVO_SET_DISARMED_PWM, (long unsigned int)&pwm_values);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("failed setting disarmed values (%d)", ret);
 				return error_on_warn;
 			}
@@ -583,7 +583,7 @@ pwm_main(int argc, char *argv[])
 		/* first get current state before modifying it */
 		ret = px4_ioctl(fd, PWM_SERVO_GET_FAILSAFE_PWM, (long unsigned int)&pwm_values);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("failed get failsafe values");
 			return 1;
 		}
@@ -606,7 +606,7 @@ pwm_main(int argc, char *argv[])
 
 			ret = px4_ioctl(fd, PWM_SERVO_SET_FAILSAFE_PWM, (long unsigned int)&pwm_values);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("BAD input VAL");
 				return 1;
 			}
@@ -634,7 +634,7 @@ pwm_main(int argc, char *argv[])
 
 			ret = px4_ioctl(fd, PWM_SERVO_GET(i), (unsigned long)&last_spos.values[i]);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("PWM_SERVO_GET(%d)", i);
 				return 1;
 			}
@@ -659,7 +659,7 @@ pwm_main(int argc, char *argv[])
 				if (set_mask & 1 << i) {
 					ret = px4_ioctl(fd, PWM_SERVO_SET(i), pwm_value);
 
-					if (ret != OK) {
+					if (ret != PX4_OK) {
 						PX4_ERR("PWM_SERVO_SET(%d)", i);
 						goto err_out;
 					}
@@ -680,7 +680,7 @@ pwm_main(int argc, char *argv[])
 						if (set_mask & 1 << i) {
 							ret = px4_ioctl(fd, PWM_SERVO_SET(i), last_spos.values[i]);
 
-							if (ret != OK) {
+							if (ret != PX4_OK) {
 								PX4_ERR("PWM_SERVO_SET(%d)", i);
 								goto err_out;
 							}
@@ -730,7 +730,7 @@ err_out_no_test:
 
 			ret = px4_ioctl(fd, PWM_SERVO_GET(i), (unsigned long)&last_spos.values[i]);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("PWM_SERVO_GET(%d)", i);
 				return 1;
 			}
@@ -785,7 +785,7 @@ err_out_no_test:
 
 						ret = px4_ioctl(fd, PWM_SERVO_SET(i), val);
 
-						if (ret != OK) {
+						if (ret != PX4_OK) {
 							PX4_ERR("PWM_SERVO_SET(%d)", i);
 							goto err_out;
 						}
@@ -806,7 +806,7 @@ err_out_no_test:
 							if (set_mask & 1 << i) {
 								ret = px4_ioctl(fd, PWM_SERVO_SET(i), last_spos.values[i]);
 
-								if (ret != OK) {
+								if (ret != PX4_OK) {
 									PX4_ERR("PWM_SERVO_SET(%d)", i);
 									goto err_out;
 								}
@@ -855,21 +855,21 @@ err_out_no_test:
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_DEFAULT_UPDATE_RATE, (unsigned long)&info_default_rate);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_DEFAULT_UPDATE_RATE");
 			return 1;
 		}
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_UPDATE_RATE, (unsigned long)&info_alt_rate);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_UPDATE_RATE");
 			return 1;
 		}
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_SELECT_UPDATE_RATE, (unsigned long)&info_alt_rate_mask);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_SELECT_UPDATE_RATE");
 			return 1;
 		}
@@ -886,35 +886,35 @@ err_out_no_test:
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_FAILSAFE_PWM, (unsigned long)&failsafe_pwm);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_FAILSAFE_PWM");
 			return 1;
 		}
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_DISARMED_PWM, (unsigned long)&disarmed_pwm);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_DISARMED_PWM");
 			return 1;
 		}
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_MIN_PWM, (unsigned long)&min_pwm);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_MIN_PWM");
 			return 1;
 		}
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_MAX_PWM, (unsigned long)&max_pwm);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_MAX_PWM");
 			return 1;
 		}
 
 		ret = px4_ioctl(fd, PWM_SERVO_GET_TRIM_PWM, (unsigned long)&trim_pwm);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_GET_TRIM_PWM");
 			return 1;
 		}
@@ -925,7 +925,7 @@ err_out_no_test:
 
 			ret = px4_ioctl(fd, PWM_SERVO_GET(i), (unsigned long)&spos);
 
-			if (ret == OK) {
+			if (ret == PX4_OK) {
 				printf("channel %u: %u us", i + 1, spos);
 
 				if (info_alt_rate_mask & (1 << i)) {
@@ -952,7 +952,7 @@ err_out_no_test:
 
 			ret = px4_ioctl(fd, PWM_SERVO_GET_RATEGROUP(i), (unsigned long)&group_mask);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				break;
 			}
 
@@ -988,7 +988,7 @@ err_out_no_test:
 				ret = px4_ioctl(fd, PWM_SERVO_SET_FORCE_FAILSAFE, 0);
 			}
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("FAILED setting forcefail %s", argv[2]);
 			}
 		}
@@ -1012,7 +1012,7 @@ err_out_no_test:
 				ret = px4_ioctl(fd, PWM_SERVO_SET_TERMINATION_FAILSAFE, 0);
 			}
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("FAILED setting termination failsafe %s", argv[2]);
 			}
 		}

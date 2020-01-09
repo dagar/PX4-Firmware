@@ -49,25 +49,10 @@
 #define _DEVICEIOCBASE          (0x100)
 #define _DEVICEIOC(_n)          (_PX4_IOC(_DEVICEIOCBASE, _n))
 
-/** ask device to stop publishing */
-#define DEVIOCSPUBBLOCK _DEVICEIOC(0)
-
-/** check publication block status */
-#define DEVIOCGPUBBLOCK _DEVICEIOC(1)
-
 /**
  * Return device ID, to enable matching of configuration parameters
  * (such as compass offsets) to specific sensors
  */
 #define DEVIOCGDEVICEID _DEVICEIOC(2)
-
-#ifdef __PX4_POSIX
-
-#ifndef SIOCDEVPRIVATE
-#define SIOCDEVPRIVATE 1
-#endif
-
-#define DIOC_GETPRIV    SIOCDEVPRIVATE
-#endif
 
 #endif /* _DRV_DEVICE_H */

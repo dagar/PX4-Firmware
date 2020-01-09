@@ -216,7 +216,7 @@ int test_uart_break(int argc, char *argv[])
 	printf("uart2_buffer_size %d wait %d uart2_nwrite0 %d uart2_nwrite1 %d\n", uart2_buffer_size, wait, uart2_nwrite0,
 	       uart2_nwrite1);
 
-	return OK;
+	return PX4_OK;
 cleanup:
 	close(uart2);
 	return ret;

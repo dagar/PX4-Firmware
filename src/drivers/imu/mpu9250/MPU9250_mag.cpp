@@ -79,7 +79,7 @@ MPU9250_mag::measure()
 	uint8_t st1 = 0;
 	int ret = _interface->read(AK8963REG_ST1, &st1, sizeof(st1));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_mag_errors);
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
 		return;
@@ -102,7 +102,7 @@ MPU9250_mag::measure()
 	ak8963_regs data{};
 	ret = _interface->read(AK8963REG_ST1, &data, sizeof(data));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
 		return;
 	}

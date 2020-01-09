@@ -386,7 +386,7 @@ MulticopterPositionControl::parameters_update(bool force)
 		}
 	}
 
-	return OK;
+	return PX4_OK;
 }
 
 void

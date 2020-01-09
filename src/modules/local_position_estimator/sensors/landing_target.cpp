@@ -15,7 +15,7 @@ void BlockLocalPositionEstimator::landingTargetInit()
 
 	Vector<float, n_y_target> y;
 
-	if (landingTargetMeasure(y) == OK) {
+	if (landingTargetMeasure(y) == PX4_OK) {
 		mavlink_and_console_log_info(&mavlink_log_pub, "Landing target init");
 		_sensorTimeout &= ~SENSOR_LAND_TARGET;
 		_sensorFault &= ~SENSOR_LAND_TARGET;
@@ -34,7 +34,7 @@ int BlockLocalPositionEstimator::landingTargetMeasure(Vector<float, n_y_target> 
 			return -1;
 		}
 
-		return OK;
+		return PX4_OK;
 
 	}
 
@@ -51,7 +51,7 @@ void BlockLocalPositionEstimator::landingTargetCorrect()
 	// measure
 	Vector<float, n_y_target> y;
 
-	if (landingTargetMeasure(y) != OK) { return; }
+	if (landingTargetMeasure(y) != PX4_OK) { return; }
 
 	// calculate covariance
 	float cov_vx = _sub_landing_target_pose.get().cov_vx_rel;
@@ -98,7 +98,7 @@ void BlockLocalPositionEstimator::landingTargetCorrect()
 
 	} else if (_sensorFault & SENSOR_LAND_TARGET) {
 		_sensorFault &= ~SENSOR_LAND_TARGET;
-		mavlink_and_console_log_info(&mavlink_log_pub, "Landing target OK");
+		mavlink_and_console_log_info(&mavlink_log_pub, "Landing target PX4_OK");
 	}
 
 	// kalman filter correction

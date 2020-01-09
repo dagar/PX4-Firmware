@@ -162,7 +162,7 @@ MPU9250_SPI::probe()
 
 	int ret = read(MPUREG_WHOAMI, &whoami, 1);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return -EIO;
 	}
 

@@ -92,7 +92,7 @@ test_mount(int argc, char *argv[])
 		/* failed opening dir */
 		PX4_ERR("FAILED LISTING MICROSD ROOT DIRECTORY");
 
-		if (stat(cmd_filename, &buffer) == OK) {
+		if (stat(cmd_filename, &buffer) == PX4_OK) {
 			(void)unlink(cmd_filename);
 		}
 
@@ -107,7 +107,7 @@ test_mount(int argc, char *argv[])
 
 	int cmd_fd;
 
-	if (stat(cmd_filename, &buffer) == OK) {
+	if (stat(cmd_filename, &buffer) == PX4_OK) {
 
 		/* command file exists, read off state */
 		cmd_fd = open(cmd_filename, O_RDWR | O_NONBLOCK);

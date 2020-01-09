@@ -252,7 +252,7 @@ LidarLiteI2C::print_registers()
 		uint8_t val = 0;
 		int ret = lidar_transfer(&reg, 1, &val, 1);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			printf("%02x:XX ", (unsigned)reg);
 
 		} else {

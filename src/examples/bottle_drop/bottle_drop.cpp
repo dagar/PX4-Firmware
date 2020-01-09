@@ -235,7 +235,7 @@ BottleDrop::start()
 		return -errno;
 	}
 
-	return OK;
+	return PX4_OK;
 }
 
 
@@ -327,10 +327,10 @@ BottleDrop::actuators_publish()
 		_actuator_pub = orb_advertise(ORB_ID(actuator_controls_2), &_actuators);
 
 		if (_actuator_pub != nullptr) {
-			return OK;
+			return PX4_OK;
 
 		} else {
-			return -1;
+			return PX4_ERROR;
 		}
 	}
 }
@@ -896,7 +896,7 @@ int bottle_drop_main(int argc, char *argv[])
 			errx(1, "alloc failed");
 		}
 
-		if (OK != bottle_drop::g_bottle_drop->start()) {
+		if (PX4_OK != bottle_drop::g_bottle_drop->start()) {
 			delete bottle_drop::g_bottle_drop;
 			bottle_drop::g_bottle_drop = nullptr;
 			err(1, "start failed");

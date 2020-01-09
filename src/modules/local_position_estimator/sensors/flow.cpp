@@ -15,7 +15,7 @@ void BlockLocalPositionEstimator::flowInit()
 	// measure
 	Vector<float, n_y_flow> y;
 
-	if (flowMeasure(y) != OK) {
+	if (flowMeasure(y) != PX4_OK) {
 		_flowQStats.reset();
 		return;
 	}
@@ -102,7 +102,7 @@ int BlockLocalPositionEstimator::flowMeasure(Vector<float, n_y_flow> &y)
 
 	_flowQStats.update(Scalarf(_sub_flow.get().quality));
 
-	return OK;
+	return PX4_OK;
 }
 
 void BlockLocalPositionEstimator::flowCorrect()
@@ -110,7 +110,7 @@ void BlockLocalPositionEstimator::flowCorrect()
 	// measure flow
 	Vector<float, n_y_flow> y;
 
-	if (flowMeasure(y) != OK) { return; }
+	if (flowMeasure(y) != PX4_OK) { return; }
 
 	// flow measurement matrix and noise matrix
 	Matrix<float, n_y_flow, n_x> C;
@@ -191,7 +191,7 @@ void BlockLocalPositionEstimator::flowCorrect()
 
 	} else if (_sensorFault & SENSOR_FLOW) {
 		_sensorFault &= ~SENSOR_FLOW;
-		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] flow OK");
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] flow PX4_OK");
 	}
 
 	if (!(_sensorFault & SENSOR_FLOW)) {

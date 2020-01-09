@@ -61,7 +61,7 @@ SyslinkBridge::init()
 	int ret = CDev::init();
 
 	/* if init failed, bail now */
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("CDev init failed");
 		return ret;
 	}

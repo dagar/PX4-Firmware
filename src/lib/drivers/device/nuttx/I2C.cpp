@@ -141,7 +141,7 @@ I2C::init()
 	// call the probe function to check whether the device is present
 	ret = probe();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("probe failed");
 		goto out;
 	}
@@ -149,7 +149,7 @@ I2C::init()
 	// do base class init, which will create device node, etc
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("cdev init failed");
 		goto out;
 	}

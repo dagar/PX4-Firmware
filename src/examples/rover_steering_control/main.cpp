@@ -138,14 +138,14 @@ int parameters_init(struct param_handles *h)
 	/* PID parameters */
 	h->yaw_p 	=	param_find("RV_YAW_P");
 
-	return OK;
+	return PX4_OK;
 }
 
 int parameters_update(const struct param_handles *h, struct params *p)
 {
 	param_get(h->yaw_p, &(p->yaw_p));
 
-	return OK;
+	return PX4_OK;
 }
 
 void control_attitude(const struct vehicle_attitude_setpoint_s *att_sp, const struct vehicle_attitude_s *att,

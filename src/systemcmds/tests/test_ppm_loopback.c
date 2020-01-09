@@ -77,11 +77,11 @@ int test_ppm_loopback(int argc, char *argv[])
 	unsigned servo_count;
 	result = ioctl(servo_fd, PWM_SERVO_GET_COUNT, (unsigned long)&servo_count);
 
-	if (result != OK) {
+	if (result != PX4_OK) {
 		warnx("PWM_SERVO_GET_COUNT");
 
 		(void)close(servo_fd);
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	for (unsigned i = 0; i < servo_count; i++) {
@@ -97,11 +97,11 @@ int test_ppm_loopback(int argc, char *argv[])
 
 	// /* tell safety that its ok to disable it with the switch */
 	// result = ioctl(servo_fd, PWM_SERVO_SET_ARM_OK, 0);
-	// if (result != OK)
+	// if (result != PX4_OK)
 	// 	warnx("FAIL: PWM_SERVO_SET_ARM_OK");
 	//  tell output device that the system is armed (it will output values if safety is off)
 	// result = ioctl(servo_fd, PWM_SERVO_ARM, 0);
-	// if (result != OK)
+	// if (result != PX4_OK)
 	// 	warnx("FAIL: PWM_SERVO_ARM");
 
 	int pwm_values[] = {1200, 1300, 1900, 1700, 1500, 1250, 1800, 1400};
@@ -112,7 +112,7 @@ int test_ppm_loopback(int argc, char *argv[])
 
 		if (result) {
 			(void)close(servo_fd);
-			return ERROR;
+			return PX4_ERROR;
 
 		} else {
 			warnx("channel %d set to %d", i, pwm_values[i]);
@@ -158,7 +158,7 @@ int test_ppm_loopback(int argc, char *argv[])
 		// 	warnx("Error reading RC output");
 		// 	(void)close(servo_fd);
 		// 	(void)close(ppm_fd);
-		// 	return ERROR;
+		// 	return PX4_ERROR;
 		// }
 
 		/* go and check values */
@@ -166,14 +166,14 @@ int test_ppm_loopback(int argc, char *argv[])
 			if (abs(rc_input.values[i] - pwm_values[i]) > 10) {
 				warnx("comparison fail: RC: %d, expected: %d", rc_input.values[i], pwm_values[i]);
 				(void)close(servo_fd);
-				return ERROR;
+				return PX4_ERROR;
 			}
 		}
 
 	} else {
 		warnx("failed reading RC input data");
 		(void)close(servo_fd);
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	close(servo_fd);

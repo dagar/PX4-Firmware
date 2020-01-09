@@ -119,7 +119,7 @@ public:
 	/**
 	* Start the mavlink task.
 	 *
-	 * @return OK on success.
+	 * @return PX4_OK on success.
 	 */
 	static int		start(int argc, char *argv[]);
 

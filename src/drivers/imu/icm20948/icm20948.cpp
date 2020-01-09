@@ -134,7 +134,7 @@ ICM20948::init()
 
 	int ret = probe();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("probe failed");
 		return ret;
 	}
@@ -159,7 +159,7 @@ ICM20948::init()
 
 	ret = _mag.ak09916_reset();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("mag reset failed");
 		return ret;
 	}
@@ -449,7 +449,7 @@ ICM20948::select_register_bank(uint8_t bank)
 	if (_selected_bank != bank) {
 		ret = _interface->write(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &bank, 1);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			return ret;
 		}
 	}
@@ -464,7 +464,7 @@ ICM20948::select_register_bank(uint8_t bank)
 		//PX4_WARN("user bank: expected %d got %d",bank,buf);
 		ret = _interface->write(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &bank, 1);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			return ret;
 		}
 

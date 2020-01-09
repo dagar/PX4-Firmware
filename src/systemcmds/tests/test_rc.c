@@ -107,7 +107,7 @@ int test_rc(int argc, char *argv[])
 						if (abs(rc_input.values[i] - rc_last.values[i]) > 20) {
 							PX4_ERR("comparison fail: RC: %d, expected: %d", rc_input.values[i], rc_last.values[i]);
 							(void)orb_unsubscribe(_rc_sub);
-							return ERROR;
+							return PX4_ERROR;
 						}
 
 						rc_last.values[i] = rc_input.values[i];
@@ -116,13 +116,13 @@ int test_rc(int argc, char *argv[])
 					if (rc_last.channel_count != rc_input.channel_count) {
 						PX4_ERR("channel count mismatch: last: %d, now: %d", rc_last.channel_count, rc_input.channel_count);
 						(void)orb_unsubscribe(_rc_sub);
-						return ERROR;
+						return PX4_ERROR;
 					}
 
 					if (hrt_absolute_time() - rc_input.timestamp_last_signal > 100000) {
 						PX4_ERR("TIMEOUT, less than 10 Hz updates");
 						(void)orb_unsubscribe(_rc_sub);
-						return ERROR;
+						return PX4_ERROR;
 					}
 
 				} else {
@@ -135,7 +135,7 @@ int test_rc(int argc, char *argv[])
 
 	} else {
 		PX4_ERR("failed reading RC input data");
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	PX4_INFO("PPM CONTINUITY TEST PASSED SUCCESSFULLY!");

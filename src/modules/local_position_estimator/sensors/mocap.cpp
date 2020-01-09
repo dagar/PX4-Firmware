@@ -18,7 +18,7 @@ void BlockLocalPositionEstimator::mocapInit()
 	// measure
 	Vector<float, n_y_mocap> y;
 
-	if (mocapMeasure(y) != OK) {
+	if (mocapMeasure(y) != PX4_OK) {
 		_mocapStats.reset();
 		return;
 	}
@@ -92,7 +92,7 @@ int BlockLocalPositionEstimator::mocapMeasure(Vector<float, n_y_mocap> &y)
 			y(Y_mocap_z) = _sub_mocap_odom.get().z;
 			_mocapStats.update(y);
 
-			return OK;
+			return PX4_OK;
 
 		} else {
 			return -1;
@@ -105,7 +105,7 @@ void BlockLocalPositionEstimator::mocapCorrect()
 	// measure
 	Vector<float, n_y_mocap> y;
 
-	if (mocapMeasure(y) != OK) {
+	if (mocapMeasure(y) != PX4_OK) {
 		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap data invalid. eph: %f epv: %f", (double)_mocap_eph,
 					     (double)_mocap_epv);
 		return;
@@ -174,7 +174,7 @@ void BlockLocalPositionEstimator::mocapCorrect()
 
 	} else if (_sensorFault & SENSOR_MOCAP) {
 		_sensorFault &= ~SENSOR_MOCAP;
-		//mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap OK");
+		//mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] mocap PX4_OK");
 	}
 
 	// kalman filter correction always

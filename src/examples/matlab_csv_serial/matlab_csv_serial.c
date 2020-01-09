@@ -165,7 +165,7 @@ int matlab_csv_serial_thread_main(int argc, char *argv[])
 	uart_config.c_oflag &= ~ONLCR;
 
 	/* USB serial is indicated by /dev/ttyACM0*/
-	if (strcmp(uart_name, "/dev/ttyACM0") != OK && strcmp(uart_name, "/dev/ttyACM1") != OK) {
+	if (strcmp(uart_name, "/dev/ttyACM0") != 0 && strcmp(uart_name, "/dev/ttyACM1") != 0) {
 
 		/* Set baud rate */
 		if (cfsetispeed(&uart_config, speed) < 0 || cfsetospeed(&uart_config, speed) < 0) {

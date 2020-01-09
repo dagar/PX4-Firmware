@@ -98,7 +98,7 @@ HMC5883::init()
 
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("CDev init failed");
 		goto out;
 	}
@@ -521,7 +521,7 @@ HMC5883::collect()
 	/* get measurements from the device */
 	ret = _interface->read(ADDR_DATA_OUT_X_MSB, (uint8_t *)&hmc_report, sizeof(hmc_report));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		DEVICE_DEBUG("data/status read error");
 		goto out;

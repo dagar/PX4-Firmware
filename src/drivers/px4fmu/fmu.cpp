@@ -235,7 +235,7 @@ PX4FMU::init()
 	/* do regular cdev init */
 	int ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 

@@ -52,13 +52,8 @@
 #include <parameters/param.h>
 #include "hrt_work.h"
 
-//extern pthread_t _shell_task_id;
-
-
 __BEGIN_DECLS
 extern uint64_t get_ticks_per_us();
-
-//long PX4_TICKS_PER_SEC = 1000L;
 
 unsigned int sleep(unsigned int sec)
 {
@@ -81,8 +76,6 @@ void qurt_log(const char *fmt, ...)
 	va_end(args);
 }
 #endif
-
-//extern int _posix_init(void);
 
 __END_DECLS
 

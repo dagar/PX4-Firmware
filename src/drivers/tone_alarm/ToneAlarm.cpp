@@ -58,7 +58,7 @@ ToneAlarm::~ToneAlarm()
 
 int ToneAlarm::init()
 {
-	if (CDev::init() != OK) {
+	if (CDev::init() != PX4_OK) {
 		return PX4_ERROR;
 	}
 
@@ -69,7 +69,7 @@ int ToneAlarm::init()
 
 	ScheduleNow();
 
-	return OK;
+	return PX4_OK;
 }
 
 void ToneAlarm::next_note()
@@ -194,7 +194,7 @@ extern "C" __EXPORT int tone_alarm_main(int argc, char *argv[])
 					PX4_ERR("could not allocate the driver.");
 				}
 
-				if (g_dev->init() != OK) {
+				if (g_dev->init() != PX4_OK) {
 					delete g_dev;
 					g_dev = nullptr;
 					PX4_ERR("driver init failed.");

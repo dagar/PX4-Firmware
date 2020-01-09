@@ -596,7 +596,7 @@ UavcanNode::init(uavcan::NodeID node_id, UAVCAN_DRIVER::BusEvent &bus_events)
 	// Do regular cdev init
 	int ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 

@@ -80,7 +80,7 @@ int test_servo(int argc, char *argv[])
 	unsigned servo_count;
 	result = ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)&servo_count);
 
-	if (result != OK) {
+	if (result != PX4_OK) {
 		warnx("PWM_SERVO_GET_COUNT");
 		goto out;
 	}
@@ -100,7 +100,7 @@ int test_servo(int argc, char *argv[])
 	/* tell safety that its ok to disable it with the switch */
 	result = ioctl(fd, PWM_SERVO_SET_ARM_OK, 0);
 
-	if (result != OK) {
+	if (result != PX4_OK) {
 		warnx("FAIL: PWM_SERVO_SET_ARM_OK");
 		goto out;
 	}
@@ -108,7 +108,7 @@ int test_servo(int argc, char *argv[])
 	/* tell output device that the system is armed (it will output values if safety is off) */
 	result = ioctl(fd, PWM_SERVO_ARM, 0);
 
-	if (result != OK) {
+	if (result != PX4_OK) {
 		warnx("FAIL: PWM_SERVO_ARM");
 		goto out;
 	}

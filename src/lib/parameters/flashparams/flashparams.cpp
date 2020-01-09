@@ -173,7 +173,7 @@ out:
 		uint8_t *buffer;
 		result = parameter_flashfs_alloc(parameters_token, &buffer, &buf_size);
 
-		if (result == OK) {
+		if (result == PX4_OK) {
 
 			/* Check for a write that has no changes */
 
@@ -183,13 +183,13 @@ out:
 
 			void *enc_buff = bson_encoder_buf_data(&encoder);
 
-			bool commit = was_result < OK || was_buf_size != buf_size || 0 != memcmp(was_buffer, enc_buff, was_buf_size);
+			bool commit = was_result < PX4_OK || was_buf_size != buf_size || 0 != memcmp(was_buffer, enc_buff, was_buf_size);
 
 			if (commit) {
 
 				memcpy(buffer, enc_buff, buf_size);
 				result = parameter_flashfs_write(parameters_token, buffer, buf_size);
-				result = result == buf_size ? OK : -EFBIG;
+				result = result == buf_size ? PX4_OK : -EFBIG;
 
 			}
 

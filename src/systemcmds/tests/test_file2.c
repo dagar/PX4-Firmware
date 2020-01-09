@@ -156,7 +156,7 @@ static int test_corruption(const char *filename, uint32_t write_chunk, uint32_t 
 	printf("read ofs=%u\n", ofs);
 	close(fd);
 	unlink(filename);
-	printf("All OK\n");
+	printf("All PX4_OK\n");
 	return 0;
 }
 

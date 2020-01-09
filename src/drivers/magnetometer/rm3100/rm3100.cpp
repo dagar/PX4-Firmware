@@ -204,7 +204,7 @@ RM3100::collect()
 
 	ret = _interface->read(ADDR_MX, (uint8_t *)&rm_report, sizeof(rm_report));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		PX4_WARN("Register read error.");
 		return ret;
@@ -320,7 +320,7 @@ RM3100::init()
 
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("CDev init failed");
 		return ret;
 	}
@@ -453,7 +453,7 @@ RM3100::measure()
 			cmd = (CMM_DEFAULT | POLLING_MODE);
 			ret = _interface->write(ADDR_CMM, &cmd, 1);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				perf_count(_comms_errors);
 				return ret;
 			}
@@ -466,7 +466,7 @@ RM3100::measure()
 	}
 
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 	}
 
@@ -490,7 +490,7 @@ RM3100::reset()
 
 	ret = set_default_register_values();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return PX4_ERROR;
 	}
 

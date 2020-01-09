@@ -284,7 +284,7 @@ BlinkM::init()
 {
 	int ret = I2C::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		warnx("I2C init failed");
 		return ret;
 	}
@@ -359,7 +359,7 @@ BlinkM::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 			while ((lines < 50) && (script[1] != 0)) {
 				ret = write_script_line(lines, script[0], script[1], script[2], script[3], script[4]);
 
-				if (ret != OK) {
+				if (ret != PX4_OK) {
 					break;
 				}
 

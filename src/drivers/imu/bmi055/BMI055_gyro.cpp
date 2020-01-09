@@ -76,7 +76,7 @@ BMI055_gyro::init()
 	int ret = SPI::init();
 
 	/* if probe/setup failed, bail now */
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("SPI setup failed");
 		return ret;
 	}

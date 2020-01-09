@@ -1125,7 +1125,7 @@ __EXPORT int hardfault_write(char *caller, int fd, int format, bool rearm)
 			ret = rv;
 		}
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			identify(caller);
 			syslog(LOG_INFO, "Failed to Write Fault Log (%d)\n", ret);
 		}

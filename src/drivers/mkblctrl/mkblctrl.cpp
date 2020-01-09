@@ -285,7 +285,7 @@ MK::init(unsigned motors)
 
 	ret = I2C::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		warnx("I2C init failed");
 		return ret;
 	}

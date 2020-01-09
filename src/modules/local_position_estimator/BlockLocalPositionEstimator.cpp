@@ -990,7 +990,7 @@ int BlockLocalPositionEstimator::getDelayPeriods(float delay, uint8_t *periods)
 		return -1;
 	}
 
-	return OK;
+	return PX4_OK;
 }
 
 int

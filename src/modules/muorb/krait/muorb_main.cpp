@@ -68,7 +68,7 @@ muorb_main(int argc, char *argv[])
 			uORB::KraitFastRpcChannel::GetInstance()->Start();
 		}
 
-		return OK;
+		return PX4_OK;
 
 	}
 
@@ -81,7 +81,7 @@ muorb_main(int argc, char *argv[])
 			PX4_WARN("muorb not running");
 		}
 
-		return OK;
+		return PX4_OK;
 	}
 
 	/*
@@ -95,7 +95,7 @@ muorb_main(int argc, char *argv[])
 			PX4_WARN("muorb not running");
 		}
 
-		return OK;
+		return PX4_OK;
 	}
 
 	usage();

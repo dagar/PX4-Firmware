@@ -422,7 +422,7 @@ IST8310::init()
 
 	ret = I2C::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("CDev init failed");
 		goto out;
 	}
@@ -805,7 +805,7 @@ IST8310::collect()
 	/* get measurements from the device */
 	ret = read(ADDR_DATA_OUT_X_LSB, (uint8_t *)&report_buffer, sizeof(report_buffer));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		DEVICE_DEBUG("I2C read error");
 		goto out;

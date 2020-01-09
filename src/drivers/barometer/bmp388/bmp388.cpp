@@ -374,7 +374,7 @@ BMP388::set_sensor_settings()
 
 	int ret = _interface->set_reg(pwc_ctl_reg, BMP3_PWR_CTRL_ADDR);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_WARN("failed to set settings BMP3_PWR_CTRL_ADDR");
 		return false;
 	}
@@ -386,7 +386,7 @@ BMP388::set_sensor_settings()
 
 	ret = _interface->set_reg(osr_ctl_reg, BMP3_OSR_ADDR);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_WARN("failed to set settings BMP3_OSR_ADDR");
 		return false;
 	}
@@ -397,7 +397,7 @@ BMP388::set_sensor_settings()
 
 	ret = _interface->set_reg(odr_ctl_reg, BMP3_ODR_ADDR);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_WARN("failed to set output data rate register");
 		return false;
 	}
@@ -406,7 +406,7 @@ BMP388::set_sensor_settings()
 	iir_ctl_reg = BMP3_SET_BITS(iir_ctl_reg, BMP3_IIR_FILTER, _iir_coef);
 	ret = _interface->set_reg(iir_ctl_reg, BMP3_IIR_ADDR);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_WARN("failed to set IIR settings");
 		return false;
 	}
@@ -436,7 +436,7 @@ BMP388::set_op_mode(uint8_t op_mode)
 		op_mode_reg_val = op_mode_reg_val & (~(BMP3_OP_MODE_MSK));
 		ret = _interface->set_reg(op_mode_reg_val, BMP3_PWR_CTRL_ADDR);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			return false;
 		}
 
@@ -448,7 +448,7 @@ BMP388::set_op_mode(uint8_t op_mode)
 		op_mode_reg_val = BMP3_SET_BITS(op_mode_reg_val, BMP3_OP_MODE, op_mode);
 		ret = _interface->set_reg(op_mode_reg_val, BMP3_PWR_CTRL_ADDR);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			return false;
 		}
 

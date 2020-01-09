@@ -184,7 +184,7 @@ MS5611::Run()
 		/* perform collection */
 		ret = collect();
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			if (ret == -6) {
 				/*
 				 * The ms5611 seems to regularly fail to respond to
@@ -226,7 +226,7 @@ MS5611::Run()
 	/* measurement phase */
 	ret = measure();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		/* issue a reset command to the sensor */
 		_interface->ioctl(IOCTL_RESET, dummy);
 		/* reset the collection state machine and try again */

@@ -88,5 +88,5 @@ errout_with_dev:
 
 	if (fd != 0) { px4_close(fd); }
 
-	return OK;
+	return PX4_OK;
 }

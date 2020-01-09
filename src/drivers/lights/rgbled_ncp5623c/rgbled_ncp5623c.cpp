@@ -136,7 +136,7 @@ RGBLED_NPC5623C::init()
 {
 	int ret = I2C::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 

@@ -15,7 +15,7 @@ void BlockLocalPositionEstimator::landInit()
 	// measure
 	Vector<float, n_y_land> y;
 
-	if (landMeasure(y) != OK) {
+	if (landMeasure(y) != PX4_OK) {
 		_landCount = 0;
 	}
 
@@ -32,7 +32,7 @@ int BlockLocalPositionEstimator::landMeasure(Vector<float, n_y_land> &y)
 	_time_last_land = _timeStamp;
 	y.setZero();
 	_landCount += 1;
-	return OK;
+	return PX4_OK;
 }
 
 void BlockLocalPositionEstimator::landCorrect()
@@ -40,7 +40,7 @@ void BlockLocalPositionEstimator::landCorrect()
 	// measure land
 	Vector<float, n_y_land> y;
 
-	if (landMeasure(y) != OK) { return; }
+	if (landMeasure(y) != PX4_OK) { return; }
 
 	// measurement matrix
 	Matrix<float, n_y_land, n_x> C;
@@ -81,7 +81,7 @@ void BlockLocalPositionEstimator::landCorrect()
 
 	} else if (_sensorFault & SENSOR_LAND) {
 		_sensorFault &= ~SENSOR_LAND;
-		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] land OK");
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] land PX4_OK");
 	}
 
 	// kalman filter correction always for land detector

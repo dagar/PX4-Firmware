@@ -14,7 +14,7 @@ void BlockLocalPositionEstimator::baroInit()
 	// measure
 	Vector<float, n_y_baro> y;
 
-	if (baroMeasure(y) != OK) {
+	if (baroMeasure(y) != PX4_OK) {
 		_baroStats.reset();
 		return;
 	}
@@ -44,7 +44,7 @@ int BlockLocalPositionEstimator::baroMeasure(Vector<float, n_y_baro> &y)
 	y(0) = _sub_airdata.get().baro_alt_meter;
 	_baroStats.update(y);
 	_time_last_baro = _sub_airdata.get().timestamp;
-	return OK;
+	return PX4_OK;
 }
 
 void BlockLocalPositionEstimator::baroCorrect()
@@ -52,7 +52,7 @@ void BlockLocalPositionEstimator::baroCorrect()
 	// measure
 	Vector<float, n_y_baro> y;
 
-	if (baroMeasure(y) != OK) { return; }
+	if (baroMeasure(y) != PX4_OK) { return; }
 
 	// subtract baro origin alt
 	y -= _baroAltOrigin;
@@ -83,7 +83,7 @@ void BlockLocalPositionEstimator::baroCorrect()
 
 	} else if (_sensorFault & SENSOR_BARO) {
 		_sensorFault &= ~SENSOR_BARO;
-		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] baro OK");
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] baro PX4_OK");
 	}
 
 	// kalman filter correction always

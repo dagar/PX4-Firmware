@@ -332,7 +332,7 @@ int BMM150::init()
 	ret = I2C::init();
 
 	/* if probe/setup failed, bail now */
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("I2C setup failed");
 		return ret;
 	}
@@ -519,7 +519,7 @@ BMM150::measure()
 	/* start measure */
 	int ret = set_power_mode(BMM150_FORCED_MODE);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		perf_cancel(_measure_perf);
 		return -EIO;

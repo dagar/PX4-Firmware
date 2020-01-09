@@ -65,7 +65,7 @@ static int open_uart(const char *device)
 
 	if (uart < 0) {
 		PX4_ERR("FAIL: Error opening port");
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	/* Try to set baud rate */
@@ -80,12 +80,12 @@ static int open_uart(const char *device)
 	/* Set baud rate */
 	if (cfsetispeed(&uart_config, speed) < 0 || cfsetospeed(&uart_config, speed) < 0) {
 		PX4_ERR("FAIL: Error setting baudrate / termios config for cfsetispeed, cfsetospeed");
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	if (tcsetattr(uart, TCSANOW, &uart_config) < 0) {
 		PX4_ERR("FAIL: Error setting baudrate / termios config for tcsetattr");
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	return uart;
@@ -104,7 +104,7 @@ int test_hott_telemetry(int argc, char *argv[])
 
 	if (fd < 0) {
 		close(fd);
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 #ifdef TIOCSSINGLEWIRE

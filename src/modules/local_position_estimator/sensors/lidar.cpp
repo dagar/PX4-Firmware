@@ -15,7 +15,7 @@ void BlockLocalPositionEstimator::lidarInit()
 	// measure
 	Vector<float, n_y_lidar> y;
 
-	if (lidarMeasure(y) != OK) {
+	if (lidarMeasure(y) != PX4_OK) {
 		_lidarStats.reset();
 	}
 
@@ -56,7 +56,7 @@ int BlockLocalPositionEstimator::lidarMeasure(Vector<float, n_y_lidar> &y)
 	y(0) = (d + _param_lpe_ldr_off_z.get()) *
 	       cosf(euler.phi()) *
 	       cosf(euler.theta());
-	return OK;
+	return PX4_OK;
 }
 
 void BlockLocalPositionEstimator::lidarCorrect()
@@ -64,7 +64,7 @@ void BlockLocalPositionEstimator::lidarCorrect()
 	// measure lidar
 	Vector<float, n_y_lidar> y;
 
-	if (lidarMeasure(y) != OK) { return; }
+	if (lidarMeasure(y) != PX4_OK) { return; }
 
 	// measurement matrix
 	Matrix<float, n_y_lidar, n_x> C;
@@ -112,7 +112,7 @@ void BlockLocalPositionEstimator::lidarCorrect()
 
 	} else if (_sensorFault & SENSOR_LIDAR) {
 		_sensorFault &= ~SENSOR_LIDAR;
-		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] lidar OK");
+		mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] lidar PX4_OK");
 	}
 
 	// kalman filter correction always

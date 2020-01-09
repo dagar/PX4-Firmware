@@ -125,7 +125,7 @@ MS5611_SPI::init()
 {
 	int ret = SPI::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("SPI init failed");
 		goto out;
 	}
@@ -133,7 +133,7 @@ MS5611_SPI::init()
 	/* send reset command */
 	ret = _reset();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("reset failed");
 		goto out;
 	}
@@ -141,7 +141,7 @@ MS5611_SPI::init()
 	/* read PROM */
 	ret = _read_prom();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("prom readout failed");
 		goto out;
 	}
@@ -193,7 +193,7 @@ MS5611_SPI::ioctl(unsigned operation, unsigned &arg)
 		ret = EINVAL;
 	}
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		errno = ret;
 		return -1;
 	}
@@ -244,7 +244,7 @@ MS5611_SPI::_read_prom()
 	/* calculate CRC and return success/failure accordingly */
 	int ret = ms5611::crc4(&_prom.c[0]) ? OK : -EIO;
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("crc failed");
 	}
 

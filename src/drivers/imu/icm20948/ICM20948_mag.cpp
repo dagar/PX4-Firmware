@@ -79,7 +79,7 @@ ICM20948_mag::measure()
 	uint8_t st1 = 0;
 	int ret = _interface->read(AK09916REG_ST1, &st1, sizeof(st1));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
 		return;
 	}
@@ -101,7 +101,7 @@ ICM20948_mag::measure()
 	ak09916_regs data{};
 	ret = _interface->read(AK09916REG_ST1, &data, sizeof(data));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
 		return;
 	}

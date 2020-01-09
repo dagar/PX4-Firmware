@@ -120,7 +120,7 @@ uorb_main(int argc, char *argv[])
 		px4_log_initialize();
 #endif
 
-		return OK;
+		return PX4_OK;
 	}
 
 	/*
@@ -134,7 +134,7 @@ uorb_main(int argc, char *argv[])
 			PX4_INFO("uorb is not running");
 		}
 
-		return OK;
+		return PX4_OK;
 	}
 
 	if (!strcmp(argv[1], "top")) {
@@ -145,7 +145,7 @@ uorb_main(int argc, char *argv[])
 			PX4_INFO("uorb is not running");
 		}
 
-		return OK;
+		return PX4_OK;
 	}
 
 	usage();

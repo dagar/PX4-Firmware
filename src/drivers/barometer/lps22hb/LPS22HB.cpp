@@ -74,7 +74,7 @@ LPS22HB::init()
 {
 	int ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("CDev init failed");
 		goto out;
 	}
@@ -266,7 +266,7 @@ LPS22HB::collect()
 	new_report.timestamp = hrt_absolute_time();
 	int ret = _interface->read(STATUS, (uint8_t *)&report, sizeof(report));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		perf_end(_sample_perf);
 		return ret;

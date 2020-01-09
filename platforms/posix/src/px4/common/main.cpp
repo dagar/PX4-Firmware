@@ -385,7 +385,7 @@ int create_dirs()
 		// create dirs
 		int ret = mkdir(dir_path.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_WARN("failed creating new dir: %s", dir_path.c_str());
 			return ret;
 

@@ -283,7 +283,7 @@ int set_min_pwm(int fd, unsigned long max_channels, int pwm_value)
 
 	ret = px4_ioctl(fd, PWM_SERVO_SET_MIN_PWM, (long unsigned int)&pwm_values);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_ERR("failed setting min values");
 		return 1;
 	}
@@ -300,7 +300,7 @@ int set_out(int fd, unsigned long max_channels, float output)
 
 		ret = ioctl(fd, PWM_SERVO_SET(i), pwm);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_SET(%d), value: %d", i, pwm);
 			return 1;
 		}
@@ -333,25 +333,25 @@ int prepare(int fd, unsigned long *max_channels)
 	}
 
 	/* get number of channels available on the device */
-	if (px4_ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)max_channels) != OK) {
+	if (px4_ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)max_channels) != PX4_OK) {
 		PX4_ERR("PWM_SERVO_GET_COUNT");
 		return 1;
 	}
 
 	/* tell IO/FMU that its ok to disable its safety with the switch */
-	if (px4_ioctl(fd, PWM_SERVO_SET_ARM_OK, 0) != OK) {
+	if (px4_ioctl(fd, PWM_SERVO_SET_ARM_OK, 0) != PX4_OK) {
 		PX4_ERR("PWM_SERVO_SET_ARM_OK");
 		return 1;
 	}
 
 	/* tell IO/FMU that the system is armed (it will output values if safety is off) */
-	if (px4_ioctl(fd, PWM_SERVO_ARM, 0) != OK) {
+	if (px4_ioctl(fd, PWM_SERVO_ARM, 0) != PX4_OK) {
 		PX4_ERR("PWM_SERVO_ARM");
 		return 1;
 	}
 
 	/* tell IO to switch off safety without using the safety switch */
-	if (px4_ioctl(fd, PWM_SERVO_SET_FORCE_SAFETY_OFF, 0) != OK) {
+	if (px4_ioctl(fd, PWM_SERVO_SET_FORCE_SAFETY_OFF, 0) != PX4_OK) {
 		PX4_ERR("PWM_SERVO_SET_FORCE_SAFETY_OFF");
 		return 1;
 	}
@@ -411,7 +411,7 @@ int motor_ramp_thread_main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (prepare(fd, &max_channels) != OK) {
+	if (prepare(fd, &max_channels) != PX4_OK) {
 		_thread_should_exit = true;
 	}
 

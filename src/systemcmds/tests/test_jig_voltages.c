@@ -55,7 +55,7 @@
 int test_jig_voltages(int argc, char *argv[])
 {
 	int fd = open(ADC0_DEVICE_PATH, O_RDONLY);
-	int ret = OK;
+	int ret = PX4_OK;
 
 	if (fd < 0) {
 		PX4_ERR("can't open ADC device");
@@ -117,7 +117,7 @@ int test_jig_voltages(int argc, char *argv[])
 		PX4_INFO("channel: %d value: %d (allowed min: %d, allowed max: %d), result: %s",
 			 data[3].am_channel, (int)(data[3].am_data), expected_min[3], expected_max[3], check_res[3]);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("\t JIG voltages test FAILED. Some channels where out of allowed range. Check supply voltages.");
 			goto errout_with_dev;
 		}

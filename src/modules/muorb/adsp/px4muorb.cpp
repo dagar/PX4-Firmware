@@ -197,7 +197,7 @@ int px4muorb_add_subscriber(const char *name)
 	if (rxHandler != nullptr) {
 		rc = rxHandler->process_add_subscription(name, 0);
 
-		if (rc != OK) {
+		if (rc != PX4_OK) {
 			channel->RemoveRemoteSubscriber(name);
 		}
 

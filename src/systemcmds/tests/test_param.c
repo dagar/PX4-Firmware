@@ -57,7 +57,7 @@ test_param(int argc, char *argv[])
 		return 1;
 	}
 
-	if (param_reset(p) != OK) {
+	if (param_reset(p) != PX4_OK) {
 		warnx("failed param reset");
 		return 1;
 	}
@@ -71,7 +71,7 @@ test_param(int argc, char *argv[])
 
 	int32_t	val = -1;
 
-	if (param_get(p, &val) != OK) {
+	if (param_get(p, &val) != PX4_OK) {
 		warnx("failed to read test parameter");
 		return 1;
 	}
@@ -83,12 +83,12 @@ test_param(int argc, char *argv[])
 
 	val = PARAM_MAGIC2;
 
-	if (param_set(p, &val) != OK) {
+	if (param_set(p, &val) != PX4_OK) {
 		warnx("failed to write test parameter");
 		return 1;
 	}
 
-	if (param_get(p, &val) != OK) {
+	if (param_get(p, &val) != PX4_OK) {
 		warnx("failed to re-read test parameter");
 		return 1;
 	}

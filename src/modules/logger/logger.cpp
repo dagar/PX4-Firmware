@@ -1043,7 +1043,7 @@ int Logger::create_log_dir(LogType type, tm *tt, char *log_dir, int log_dir_len)
 		strncpy(log_dir + n, file_name.log_dir, log_dir_len - n);
 		int mkdir_ret = mkdir(log_dir, S_IRWXU | S_IRWXG | S_IRWXO);
 
-		if (mkdir_ret != OK && errno != EEXIST) {
+		if (mkdir_ret != 0 && errno != EEXIST) {
 			PX4_ERR("failed creating new dir: %s", log_dir);
 			return -1;
 		}

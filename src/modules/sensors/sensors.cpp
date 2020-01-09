@@ -226,7 +226,7 @@ Sensors::adc_init()
 #endif // ADC_AIRSPEED_VOLTAGE_CHANNEL
 	}
 
-	return OK;
+	return PX4_OK;
 }
 
 void
@@ -310,7 +310,7 @@ Sensors::parameter_update_poll(bool forced)
 				1.0f,
 			};
 
-			if (OK != px4_ioctl(fd, AIRSPEEDIOCSSCALE, (long unsigned int)&airscale)) {
+			if (PX4_OK != px4_ioctl(fd, AIRSPEEDIOCSSCALE, (long unsigned int)&airscale)) {
 				warn("WARNING: failed to set scale / offsets for airspeed sensor");
 			}
 

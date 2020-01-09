@@ -88,7 +88,7 @@ LSM303D::init()
 	/* do SPI init (and probe) first */
 	int ret = SPI::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_ERR("SPI init failed (%i)", ret);
 		return PX4_ERROR;
 	}

@@ -173,7 +173,7 @@ int IRLOCK::init()
 	/** initialise I2C bus **/
 	int ret = I2C::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 

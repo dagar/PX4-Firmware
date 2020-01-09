@@ -366,7 +366,7 @@ LIS3MDL::collect()
 	 */
 	ret = _interface->read(ADDR_OUT_T_L, (uint8_t *)&buf_rx, sizeof(buf_rx));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 		PX4_WARN("Register read error.");
 		return ret;
@@ -471,7 +471,7 @@ LIS3MDL::init()
 
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("CDev init failed");
 		return ret;
 	}
@@ -591,7 +591,7 @@ LIS3MDL::measure()
 	}
 
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 	}
 
@@ -615,13 +615,13 @@ LIS3MDL::reset()
 
 	ret = set_default_register_values();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return PX4_ERROR;
 	}
 
 	ret = set_range(_range_ga);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return PX4_ERROR;
 	}
 
@@ -705,7 +705,7 @@ LIS3MDL::set_excitement(unsigned enable)
 	/* arm the excitement strap */
 	ret = read_reg(ADDR_CTRL_REG1, _cntl_reg1);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 	}
 
@@ -719,7 +719,7 @@ LIS3MDL::set_excitement(unsigned enable)
 
 	ret = write_reg(ADDR_CTRL_REG1, _cntl_reg1);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 	}
 
@@ -762,14 +762,14 @@ LIS3MDL::set_range(unsigned range)
 	 */
 	ret = write_reg(ADDR_CTRL_REG2, (_range_bits << 5));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 	}
 
 	uint8_t range_bits_in = 0;
 	ret = read_reg(ADDR_CTRL_REG2, range_bits_in);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		perf_count(_comms_errors);
 	}
 

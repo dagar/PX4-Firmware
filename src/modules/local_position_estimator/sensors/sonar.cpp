@@ -19,7 +19,7 @@ void BlockLocalPositionEstimator::sonarInit()
 		_time_init_sonar = _timeStamp;
 	}
 
-	if (sonarMeasure(y) != OK) {
+	if (sonarMeasure(y) != PX4_OK) {
 		return;
 	}
 
@@ -70,7 +70,7 @@ int BlockLocalPositionEstimator::sonarMeasure(Vector<float, n_y_sonar> &y)
 	y(0) = (d + _param_lpe_snr_off_z.get()) *
 	       cosf(euler.phi()) *
 	       cosf(euler.theta());
-	return OK;
+	return PX4_OK;
 }
 
 void BlockLocalPositionEstimator::sonarCorrect()
@@ -78,7 +78,7 @@ void BlockLocalPositionEstimator::sonarCorrect()
 	// measure
 	Vector<float, n_y_sonar> y;
 
-	if (sonarMeasure(y) != OK) { return; }
+	if (sonarMeasure(y) != PX4_OK) { return; }
 
 	// do not use sonar if lidar is active and not faulty or timed out
 	if (_lidarUpdated
@@ -132,7 +132,7 @@ void BlockLocalPositionEstimator::sonarCorrect()
 
 	} else if (_sensorFault & SENSOR_SONAR) {
 		_sensorFault &= ~SENSOR_SONAR;
-		//mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] sonar OK");
+		//mavlink_and_console_log_info(&mavlink_log_pub, "[lpe] sonar PX4_OK");
 	}
 
 	// kalman filter correction if no fault

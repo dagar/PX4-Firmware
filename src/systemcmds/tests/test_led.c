@@ -64,14 +64,14 @@ int test_led(int argc, char *argv[])
 
 	if (fd < 0) {
 		printf("\tLED: open fail\n");
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	if (px4_ioctl(fd, LED_ON, LED_BLUE) ||
 	    px4_ioctl(fd, LED_ON, LED_AMBER)) {
 
 		printf("\tLED: ioctl fail\n");
-		return ERROR;
+		return PX4_ERROR;
 	}
 
 	/* let them blink for fun */

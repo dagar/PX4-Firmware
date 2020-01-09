@@ -70,5 +70,5 @@ test_perf(int argc, char *argv[])
 	perf_free(cc);
 	perf_free(ec);
 
-	return OK;
+	return PX4_OK;
 }

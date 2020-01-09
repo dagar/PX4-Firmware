@@ -160,7 +160,7 @@ AK09916::init()
 {
 	int ret = I2C::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_WARN("AK09916 mag init failed");
 		return ret;
 	}
@@ -192,7 +192,7 @@ AK09916::is_ready()
 	uint8_t st1;
 	const int ret = transfer(&AK09916REG_ST1, sizeof(AK09916REG_ST1), &st1, sizeof(st1));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return false;
 	}
 
@@ -214,7 +214,7 @@ AK09916::measure()
 	const int ret = transfer(&AK09916REG_HXL, sizeof(AK09916REG_HXL),
 				 reinterpret_cast<uint8_t *>(&regs), sizeof(regs));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
 		return;
 	}

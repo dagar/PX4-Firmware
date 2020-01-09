@@ -394,7 +394,7 @@ Mavlink::destroy_all_instances()
 
 	printf("\n");
 	PX4_INFO("all instances stopped");
-	return OK;
+	return PX4_OK;
 }
 
 int
@@ -680,7 +680,7 @@ Mavlink::enable_flow_control(enum FLOW_CONTROL_MODE mode)
 	// We can't do this on USB - skip
 	if (_is_usb_uart) {
 		_flow_control_mode = FLOW_CONTROL_OFF;
-		return OK;
+		return PX4_OK;
 	}
 
 	struct termios uart_config;
@@ -707,7 +707,7 @@ Mavlink::enable_flow_control(enum FLOW_CONTROL_MODE mode)
 int
 Mavlink::set_hil_enabled(bool hil_enabled)
 {
-	int ret = OK;
+	int ret = PX4_OK;
 
 	/* enable HIL (only on links with sufficient bandwidth) */
 	if (hil_enabled && !_hil_enabled && _datarate > 5000) {
@@ -1289,16 +1289,16 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 			} else {
 				/* delete stream */
 				_streams.deleteNode(stream);
-				return OK; // must finish with loop after node is deleted
+				return PX4_OK; // must finish with loop after node is deleted
 			}
 
-			return OK;
+			return PX4_OK;
 		}
 	}
 
 	if (interval == 0) {
 		/* stream was not active and is requested to be disabled, do nothing */
-		return OK;
+		return PX4_OK;
 	}
 
 	// search for stream with specified name in supported streams list
@@ -1309,7 +1309,7 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 		stream->set_interval(interval);
 		_streams.add(stream);
 
-		return OK;
+		return PX4_OK;
 	}
 
 	/* if we reach here, the stream list does not contain the stream */
@@ -1363,7 +1363,7 @@ Mavlink::message_buffer_init(int size)
 		_message_buffer.size = 0;
 
 	} else {
-		ret = OK;
+		ret = PX4_OK;
 	}
 
 	return ret;
@@ -2057,7 +2057,7 @@ Mavlink::task_main(int argc, char *argv[])
 	}
 
 	/* USB serial is indicated by /dev/ttyACMx */
-	if (strcmp(_device_name, "/dev/ttyACM0") == OK || strcmp(_device_name, "/dev/ttyACM1") == OK) {
+	if (strcmp(_device_name, "/dev/ttyACM0") == 0 || strcmp(_device_name, "/dev/ttyACM1") == 0) {
 		if (_datarate == 0) {
 			_datarate = 800000;
 		}
@@ -2119,7 +2119,7 @@ Mavlink::task_main(int argc, char *argv[])
 		 * make space for two messages plus off-by-one space as we use the empty element
 		 * marker ring buffer approach.
 		 */
-		if (OK != message_buffer_init(2 * sizeof(mavlink_message_t) + 1)) {
+		if (PX4_OK != message_buffer_init(2 * sizeof(mavlink_message_t) + 1)) {
 			PX4_ERR("msg buf alloc fail");
 			return 1;
 		}
@@ -2514,7 +2514,7 @@ Mavlink::task_main(int argc, char *argv[])
 
 	PX4_INFO("exiting channel %i", (int)_channel);
 
-	return OK;
+	return PX4_OK;
 }
 
 void Mavlink::check_requested_subscriptions()
@@ -2987,7 +2987,7 @@ Mavlink::stream_command(int argc, char *argv[])
 		return 1;
 	}
 
-	return OK;
+	return PX4_OK;
 }
 
 void

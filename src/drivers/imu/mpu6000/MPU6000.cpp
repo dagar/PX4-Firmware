@@ -95,7 +95,7 @@ MPU6000::init()
 	int ret = probe();
 
 	/* if probe failed, bail now */
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("probe init failed");
 		return ret;
 	}

@@ -241,7 +241,7 @@ ramtron_attach(void)
 
 	int ret = mtd_dev->ioctl(mtd_dev, MTDIOC_SETSPEED, (unsigned long)10 * 1000 * 1000);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		// FIXME: From the previous warning call, it looked like this should have been fatal error instead. Tried
 		// that but setting the bus speed does fail all the time. Which was then exiting and the board would
 		// not run correctly. So changed to PX4_WARN.
@@ -413,7 +413,7 @@ static ssize_t mtd_get_partition_size(void)
 	int ret = mtd_get_geometry(&blocksize, &erasesize, &neraseblocks, &blkpererase, &nblocks, &partsize,
 				   n_partitions_current);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_ERR("Failed to get geometry");
 		return 0;
 	}

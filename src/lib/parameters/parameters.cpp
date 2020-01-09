@@ -996,7 +996,7 @@ param_save_default()
 
 	int attempts = 5;
 
-	while (res != OK && attempts > 0) {
+	while (res != PX4_OK && attempts > 0) {
 		res = param_export(fd, false);
 		attempts--;
 
@@ -1006,7 +1006,7 @@ param_save_default()
 		}
 	}
 
-	if (res != OK) {
+	if (res != PX4_OK) {
 		PX4_ERR("failed to write parameters to file: %s", filename);
 	}
 

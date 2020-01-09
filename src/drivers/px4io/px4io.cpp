@@ -606,7 +606,7 @@ PX4IO::init()
 	/* do regular cdev init */
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -679,7 +679,7 @@ PX4IO::init()
 	/* get IO's last seen FMU state */
 	ret = io_reg_get(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_ARMING, &reg, sizeof(reg));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -837,7 +837,7 @@ PX4IO::init()
 		if (_rc_handling_disabled) {
 			ret = io_disable_rc_handling();
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				PX4_ERR("failed disabling RC handling");
 				return ret;
 			}
@@ -846,7 +846,7 @@ PX4IO::init()
 			/* publish RC config to IO */
 			ret = io_set_rc_config();
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				mavlink_log_critical(&_mavlink_log_pub, "IO RC config upload fail");
 				return ret;
 			}
@@ -1636,7 +1636,7 @@ PX4IO::io_set_rc_config()
 		/* send channel config to IO */
 		ret = io_reg_set(PX4IO_PAGE_RC_CONFIG, offset, regs, PX4IO_P_RC_CONFIG_STRIDE);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("rc config upload failed");
 			break;
 		}
@@ -1769,7 +1769,7 @@ PX4IO::io_get_status()
 	 * in that order */
 	ret = io_reg_get(PX4IO_PAGE_STATUS, PX4IO_P_STATUS_FLAGS, &regs[0], sizeof(regs) / sizeof(regs[0]));
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -1800,7 +1800,7 @@ PX4IO::io_get_raw_rc_input(input_rc_s &input_rc)
 	 */
 	ret = io_reg_get(PX4IO_PAGE_RAW_RC_INPUT, PX4IO_P_RAW_RC_COUNT, &regs[0], prolog + 9);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -1857,7 +1857,7 @@ PX4IO::io_get_raw_rc_input(input_rc_s &input_rc)
 	if (channel_count > 9) {
 		ret = io_reg_get(PX4IO_PAGE_RAW_RC_INPUT, PX4IO_P_RAW_RC_BASE + 9, &regs[prolog + 9], channel_count - 9);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			return ret;
 		}
 	}
@@ -1896,7 +1896,7 @@ PX4IO::io_publish_raw_rc()
 
 	int ret = io_get_raw_rc_input(rc_val);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -1939,7 +1939,7 @@ PX4IO::io_publish_pwm_outputs()
 	uint16_t ctl[_max_actuators];
 	int ret = io_reg_get(PX4IO_PAGE_SERVOS, 0, ctl, _max_actuators);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -1958,7 +1958,7 @@ PX4IO::io_publish_pwm_outputs()
 	MultirotorMixer::saturation_status saturation_status;
 	ret = io_reg_get(PX4IO_PAGE_STATUS, PX4IO_P_STATUS_MIXER, &saturation_status.value, 1);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -2038,7 +2038,7 @@ PX4IO::io_reg_modify(uint8_t page, uint8_t offset, uint16_t clearbits, uint16_t 
 
 	ret = io_reg_get(page, offset, &value, 1);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -2520,7 +2520,7 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 
 			ret = io_reg_get(PX4IO_PAGE_FAILSAFE_PWM, 0, pwm->values, _max_actuators);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				ret = -EIO;
 			}
 
@@ -2547,7 +2547,7 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 
 			ret = io_reg_get(PX4IO_PAGE_DISARMED_PWM, 0, pwm->values, _max_actuators);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				ret = -EIO;
 			}
 
@@ -2574,7 +2574,7 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 
 			ret = io_reg_get(PX4IO_PAGE_CONTROL_MIN_PWM, 0, pwm->values, _max_actuators);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				ret = -EIO;
 			}
 
@@ -2601,7 +2601,7 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 
 			ret = io_reg_get(PX4IO_PAGE_CONTROL_MAX_PWM, 0, pwm->values, _max_actuators);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				ret = -EIO;
 			}
 		}
@@ -2628,7 +2628,7 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 
 			ret = io_reg_get(PX4IO_PAGE_CONTROL_TRIM_PWM, 0, pwm->values, _max_actuators);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				ret = -EIO;
 			}
 		}
@@ -2842,7 +2842,7 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 			uint32_t io_crc = 0;
 			ret = io_reg_get(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_CRC, (uint16_t *)&io_crc, 2);
 
-			if (ret != OK) {
+			if (ret != PX4_OK) {
 				return ret;
 			}
 
@@ -2935,7 +2935,7 @@ PX4IO::write(file * /*filp*/, const char *buffer, size_t len)
 
 		perf_end(_perf_write);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			return ret;
 		}
 	}
@@ -3122,7 +3122,7 @@ checkcrc(int argc, char *argv[])
 		g_dev = nullptr;
 	}
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		warn("check CRC failed: %d", ret);
 		exit(1);
 	}
@@ -3193,7 +3193,7 @@ test(void)
 	/* tell IO that its ok to disable its safety with the switch */
 	ret = ioctl(fd, PWM_SERVO_SET_ARM_OK, 0);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		err(1, "PWM_SERVO_SET_ARM_OK");
 	}
 
@@ -3501,7 +3501,7 @@ px4io_main(int argc, char *argv[])
 		uint16_t arg = atol(argv[2]);
 		int ret = g_dev->ioctl(nullptr, PX4IO_REBOOT_BOOTLOADER, arg);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			warnx("reboot failed - %d", ret);
 			exit(1);
 		}
@@ -3549,7 +3549,7 @@ px4io_main(int argc, char *argv[])
 	if (!strcmp(argv[1], "safety_off")) {
 		int ret = g_dev->ioctl(NULL, PWM_SERVO_SET_FORCE_SAFETY_OFF, 0);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			warnx("failed to disable safety");
 			exit(1);
 		}
@@ -3560,7 +3560,7 @@ px4io_main(int argc, char *argv[])
 	if (!strcmp(argv[1], "safety_on")) {
 		int ret = g_dev->ioctl(NULL, PWM_SERVO_SET_FORCE_SAFETY_ON, 0);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			warnx("failed to enable safety");
 			exit(1);
 		}

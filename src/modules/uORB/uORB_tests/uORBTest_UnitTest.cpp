@@ -190,37 +190,37 @@ int uORBTest::UnitTest::test()
 {
 	int ret = test_single();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
 	ret = test_multi();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
 	ret = test_multi_reversed();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
 	ret = test_unadvertise();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
 	ret = test_multi2();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
 	ret = test_queue();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		return ret;
 	}
 
@@ -262,7 +262,7 @@ int uORBTest::UnitTest::test_unadvertise()
 
 int uORBTest::UnitTest::info()
 {
-	return OK;
+	return PX4_OK;
 }
 
 int uORBTest::UnitTest::test_single()
@@ -863,7 +863,7 @@ int uORBTest::UnitTest::test_note(const char *fmt, ...)
 	va_end(ap);
 	fprintf(stderr, "\n");
 	fflush(stderr);
-	return OK;
+	return PX4_OK;
 }
 
 int uORBTest::UnitTest::pubsubtest_threadEntry(int argc, char *argv[])
