@@ -199,7 +199,7 @@ void work_queues_init(void)
 	// Create high priority worker thread
 	g_work[HPWORK].pid = px4_task_spawn_cmd("hpwork",
 						SCHED_DEFAULT,
-						SCHED_PRIORITY_MAX - 1,
+						PX4_WQ_HP_BASE,
 						2000,
 						work_hpthread,
 						(char *const *)NULL);

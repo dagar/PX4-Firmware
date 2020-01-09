@@ -51,7 +51,7 @@ int uORB::Utils::node_mkpath(char *buf, const struct orb_metadata *meta, int *in
 		return -ENAMETOOLONG;
 	}
 
-	return OK;
+	return PX4_OK;
 }
 
 //-----------------------------------------------------------------------------
@@ -68,5 +68,5 @@ int uORB::Utils::node_mkpath(char *buf, const char *orbMsgName)
 		return -ENAMETOOLONG;
 	}
 
-	return OK;
+	return PX4_OK;
 }

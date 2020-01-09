@@ -94,9 +94,7 @@ HMC5883::~HMC5883()
 int
 HMC5883::init()
 {
-	int ret = PX4_ERROR;
-
-	ret = CDev::init();
+	int ret = CDev::init();
 
 	if (ret != OK) {
 		DEVICE_DEBUG("CDev init failed");
@@ -104,7 +102,7 @@ HMC5883::init()
 	}
 
 	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(mag_report));
+	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_mag_s));
 
 	if (_reports == nullptr) {
 		goto out;
@@ -243,8 +241,8 @@ void HMC5883::check_conf(void)
 ssize_t
 HMC5883::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(struct mag_report);
-	struct mag_report *mag_buf = reinterpret_cast<struct mag_report *>(buffer);
+	unsigned count = buflen / sizeof(sensor_mag_s);
+	sensor_mag_s *mag_buf = reinterpret_cast<sensor_mag_s *>(buffer);
 	int ret = 0;
 
 	/* buffer must be large enough */
@@ -261,7 +259,7 @@ HMC5883::read(cdev::file_t *filp, char *buffer, size_t buflen)
 		 */
 		while (count--) {
 			if (_reports->get(mag_buf)) {
-				ret += sizeof(struct mag_report);
+				ret += sizeof(sensor_mag_s);
 				mag_buf++;
 			}
 		}
@@ -291,7 +289,7 @@ HMC5883::read(cdev::file_t *filp, char *buffer, size_t buflen)
 		}
 
 		if (_reports->get(mag_buf)) {
-			ret = sizeof(struct mag_report);
+			ret = sizeof(sensor_mag_s);
 		}
 	} while (0);
 
@@ -498,7 +496,7 @@ HMC5883::collect()
 	uint8_t check_counter;
 
 	perf_begin(_sample_perf);
-	struct mag_report new_report;
+	sensor_mag_s new_report{};
 	bool sensor_is_onboard = false;
 
 	float xraw_f;

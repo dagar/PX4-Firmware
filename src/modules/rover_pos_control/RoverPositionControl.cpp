@@ -550,7 +550,7 @@ int RoverPositionControl::task_spawn(int argc, char *argv[])
 		return -errno;
 	}
 
-	return OK;
+	return PX4_OK;
 }
 
 RoverPositionControl *RoverPositionControl::instantiate(int argc, char *argv[])

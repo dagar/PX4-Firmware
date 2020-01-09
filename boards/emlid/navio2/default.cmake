@@ -28,11 +28,6 @@ px4_add_board(
 		pwm_out_sim
 		rc_input
 		#telemetry # all available telemetry drivers
-	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
-		isl29501
-		lsm9ds1
-		mpu9250
-		trone
 	MODULES
 		airspeed_selector
 		attitude_estimator_q

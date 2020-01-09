@@ -283,7 +283,7 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 
 	/* ---- RC CALIBRATION ---- */
 	if (checkRC) {
-		if (rcCalibrationCheck(mavlink_log_pub, reportFailures && !failed, status.is_vtol) != OK) {
+		if (rcCalibrationCheck(mavlink_log_pub, reportFailures && !failed, status.is_vtol) != PX4_OK) {
 			if (reportFailures) {
 				mavlink_log_critical(mavlink_log_pub, "RC calibration check failed");
 			}

@@ -113,14 +113,14 @@ uorb_main(int argc, char *argv[])
 			return -errno;
 		}
 
-#if !defined(__PX4_QURT) && !defined(__PX4_POSIX_EAGLE) && !defined(__PX4_POSIX_EXCELSIOR)
+#if !defined(__PX4_QURT)
 		/* FIXME: this fails on Snapdragon (see https://github.com/PX4/Firmware/issues/5406),
 		 * so we disable logging messages to the ulog for now. This needs further investigations.
 		 */
 		px4_log_initialize();
 #endif
 
-		return OK;
+		return PX4_OK;
 	}
 
 	/*
@@ -134,7 +134,7 @@ uorb_main(int argc, char *argv[])
 			PX4_INFO("uorb is not running");
 		}
 
-		return OK;
+		return PX4_OK;
 	}
 
 	if (!strcmp(argv[1], "top")) {
@@ -145,7 +145,7 @@ uorb_main(int argc, char *argv[])
 			PX4_INFO("uorb is not running");
 		}
 
-		return OK;
+		return PX4_OK;
 	}
 
 	usage();

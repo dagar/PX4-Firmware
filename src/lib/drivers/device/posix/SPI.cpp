@@ -94,7 +94,7 @@ SPI::init()
 	/* call the probe function to check whether the device is present */
 	int ret = probe();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("probe failed");
 		return ret;
 	}
@@ -102,7 +102,7 @@ SPI::init()
 	/* do base class init, which will create the device node, etc. */
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("cdev init failed");
 		return ret;
 	}

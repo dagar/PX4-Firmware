@@ -91,7 +91,7 @@ CDev::register_class_devname(const char *class_devname)
 		snprintf(name, sizeof(name), "%s%d", class_devname, class_instance);
 		ret = register_driver(name, &fops, 0666, (void *)this);
 
-		if (ret == OK) {
+		if (ret == PX4_OK) {
 			break;
 		}
 
@@ -184,27 +184,6 @@ CDev::close(file_t *filep)
 	}
 
 	unlock();
-
-	return ret;
-}
-
-int
-CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
-{
-	PX4_DEBUG("CDev::ioctl");
-	int ret = -ENOTTY;
-
-	switch (cmd) {
-
-	/* fetch a pointer to the driver's private data */
-	case DIOC_GETPRIV:
-		*(void **)(uintptr_t)arg = (void *)this;
-		ret = PX4_OK;
-		break;
-
-	default:
-		break;
-	}
 
 	return ret;
 }

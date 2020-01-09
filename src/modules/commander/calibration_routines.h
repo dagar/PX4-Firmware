@@ -111,7 +111,7 @@ typedef calibrate_return(*calibration_from_orientation_worker_t)(detect_orientat
 		void				*worker_data);	///< Opaque worker data
 
 /// Perform calibration sequence which require a rest orientation detection prior to calibration.
-///	@return OK: Calibration succeeded, ERROR: Calibration failed
+///	@return PX4_OK: Calibration succeeded, ERROR: Calibration failed
 calibrate_return calibrate_from_orientation(orb_advert_t *mavlink_log_pub,		///< uORB handle to write output to
 		int		cancel_sub,						///< Cancel subscription from calibration_cancel_subscribe
 		bool	side_data_collected[detect_orientation_side_count],	///< Sides for which data still needs calibration
