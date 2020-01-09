@@ -79,9 +79,8 @@ int Simulator::start(int argc, char *argv[])
 			_instance->set_port(atoi(argv[3]));
 		}
 
-#ifndef __PX4_QURT
 		_instance->run();
-#endif
+
 		return 0;
 
 	} else {
@@ -119,7 +118,7 @@ int simulator_main(int argc, char *argv[])
 						Simulator::start,
 						argv);
 
-#if !defined(__PX4_QURT) && defined(ENABLE_LOCKSTEP_SCHEDULER)
+#if defined(ENABLE_LOCKSTEP_SCHEDULER)
 
 		// We want to prevent the rest of the startup script from running until time
 		// is initialized by the HIL_SENSOR messages from the simulator.

@@ -172,8 +172,6 @@ private:
 		}
 	} _battery;
 
-#ifndef __PX4_QURT
-
 	void run();
 	void handle_message(const mavlink_message_t *msg);
 	void handle_message_distance_sensor(const mavlink_message_t *msg);
@@ -248,6 +246,4 @@ private:
 		(ParamInt<px4::params::MAV_SYS_ID>) _param_mav_sys_id,
 		(ParamInt<px4::params::MAV_COMP_ID>) _param_mav_comp_id
 	)
-
-#endif
 };

@@ -27,11 +27,6 @@ px4_add_board(
 		magnetometer/lsm9ds1_mag
 		pwm_out_sim
 		#telemetry # all available telemetry drivers
-	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
-		isl29501
-		lsm9ds1
-		mpu9250
-		trone
 	MODULES
 		airspeed_selector
 		attitude_estimator_q

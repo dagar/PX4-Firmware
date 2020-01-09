@@ -79,19 +79,3 @@ void rc_cleaning(void);
 #ifdef __cplusplus
 }
 #endif
-
-#ifdef __RC_V0_3
-#define rc_i2c_lock_bus 	rc_i2c_claim_bus
-#define rc_i2c_unlock_bus	rc_i2c_release_bus
-#define rc_i2c_get_lock		rc_i2c_get_in_use_state
-
-#define rc_servo_send_pulse_us			rc_send_servo_pulse_us
-
-#define rc_filter_empty					rc_empty_filter
-#define rc_filter_march					rc_march_filter
-#define rc_filter_prefill_inputs		rc_prefill_filter_inputs
-#define rc_filter_prefill_outputs		rc_prefill_filter_outputs
-#define rc_filter_butterworth_lowpass	rc_butterworth_lowpass
-
-#endif
-
