@@ -107,7 +107,7 @@ __END_DECLS
 __EXPORT void board_rc_input(bool invert_on, uint32_t uxart_base)
 {
 
-	irqstate_t irqstate = px4_enter_critical_section();
+	irqstate_t irqstate = enter_critical_section();
 
 	uint32_t cr1 =	getreg32(STM32_USART_CR1_OFFSET + uxart_base);
 	uint32_t cr2 =	getreg32(STM32_USART_CR2_OFFSET + uxart_base);

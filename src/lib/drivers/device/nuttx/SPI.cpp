@@ -102,7 +102,7 @@ SPI::init()
 	/* call the probe function to check whether the device is present */
 	int ret = probe();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("probe failed");
 		return ret;
 	}
@@ -110,7 +110,7 @@ SPI::init()
 	/* do base class init, which will create the device node, etc. */
 	ret = CDev::init();
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		DEVICE_DEBUG("cdev init failed");
 		return ret;
 	}
@@ -136,9 +136,9 @@ SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 	switch (mode) {
 	default:
 	case LOCK_PREEMPTION: {
-			irqstate_t state = px4_enter_critical_section();
+			irqstate_t state = enter_critical_section();
 			result = _transfer(send, recv, len);
-			px4_leave_critical_section(state);
+			leave_critical_section(state);
 		}
 		break;
 
@@ -188,9 +188,9 @@ SPI::transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 	switch (mode) {
 	default:
 	case LOCK_PREEMPTION: {
-			irqstate_t state = px4_enter_critical_section();
+			irqstate_t state = enter_critical_section();
 			result = _transferhword(send, recv, len);
-			px4_leave_critical_section(state);
+			leave_critical_section(state);
 		}
 		break;
 

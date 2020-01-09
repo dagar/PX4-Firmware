@@ -53,14 +53,3 @@
 #define board_mcu_version(rev, revstr, errata) BOARD_OVERRIDE_CPU_VERSION
 
 #define BOARD_HAS_NO_UUID
-
-#define CONFIG_NFILE_STREAMS 1
-#define CONFIG_SCHED_WORKQUEUE 1
-#define CONFIG_SCHED_HPWORK 1
-#define CONFIG_SCHED_LPWORK 1
-
-/** time in ms between checks for work in work queues **/
-#define CONFIG_SCHED_WORKPERIOD 50000
-
-#define CONFIG_SCHED_INSTRUMENTATION 1
-#define CONFIG_MAX_TASKS 32

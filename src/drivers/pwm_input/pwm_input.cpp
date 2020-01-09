@@ -67,7 +67,7 @@ PWMIN::timer_init(void)
 {
 	/* run with interrupts disabled in case the timer is already
 	 * setup. We don't want it firing while we are doing the setup */
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	/* configure input pin */
 	px4_arch_configgpio(GPIO_PWM_IN);
@@ -112,7 +112,7 @@ PWMIN::timer_init(void)
 	/* enable the timer */
 	rCR1 = GTIM_CR1_CEN;
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	/* enable interrupts */
 	up_enable_irq(PWMIN_TIMER_VECTOR);

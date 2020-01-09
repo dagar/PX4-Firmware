@@ -52,7 +52,7 @@
 #include <math.h>
 #include <poll.h>
 
-#include <arch/board/board.h>
+
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
 
@@ -283,7 +283,7 @@ int set_min_pwm(int fd, unsigned long max_channels, int pwm_value)
 
 	ret = px4_ioctl(fd, PWM_SERVO_SET_MIN_PWM, (long unsigned int)&pwm_values);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_ERR("failed setting min values");
 		return 1;
 	}
@@ -300,7 +300,7 @@ int set_out(int fd, unsigned long max_channels, float output)
 
 		ret = ioctl(fd, PWM_SERVO_SET(i), pwm);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			PX4_ERR("PWM_SERVO_SET(%d), value: %d", i, pwm);
 			return 1;
 		}

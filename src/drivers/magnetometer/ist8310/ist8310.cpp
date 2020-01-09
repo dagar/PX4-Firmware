@@ -51,7 +51,6 @@
 #include <semaphore.h>
 #include <string.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <errno.h>
 #include <stdio.h>
 #include <math.h>
@@ -781,7 +780,7 @@ IST8310::collect()
 	uint8_t check_counter;
 
 	perf_begin(_sample_perf);
-	sensor_mag_s new_report;
+	sensor_mag_s new_report{};
 	const bool sensor_is_external = external();
 
 	float xraw_f;
@@ -874,9 +873,6 @@ IST8310::collect()
 	/* post a report to the ring */
 	_reports->force(&new_report);
 
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
-
 	/*
 	  periodically check the range register and configuration
 	  registers. With a bad I2C cable it is possible for the
@@ -899,7 +895,7 @@ out:
 
 int IST8310::calibrate(struct file *filp, unsigned enable)
 {
-	sensor_mag_s report {};
+	sensor_mag_s report{};
 	ssize_t sz;
 	int ret = 1;
 	float total_x = 0.0f;

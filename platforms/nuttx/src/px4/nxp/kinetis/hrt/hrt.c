@@ -542,7 +542,7 @@ hrt_absolute_time(void)
 	static volatile uint32_t last_count;
 
 	/* prevent re-entry */
-	flags = px4_enter_critical_section();
+	flags = enter_critical_section();
 
 	/* get the current counter value */
 	count = rCNT;
@@ -564,7 +564,7 @@ hrt_absolute_time(void)
 	/* compute the current time */
 	abstime = HRT_COUNTER_SCALE(base_time + count);
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return abstime;
 }
@@ -600,11 +600,11 @@ abstime_to_ts(struct timespec *ts, hrt_abstime abstime)
 hrt_abstime
 hrt_elapsed_time_atomic(const volatile hrt_abstime *then)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	hrt_abstime delta = hrt_absolute_time() - *then;
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return delta;
 }
@@ -615,11 +615,11 @@ hrt_elapsed_time_atomic(const volatile hrt_abstime *then)
 hrt_abstime
 hrt_store_absolute_time(volatile hrt_abstime *now)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	hrt_abstime ts = hrt_absolute_time();
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return ts;
 }
@@ -677,7 +677,7 @@ hrt_call_every(struct hrt_call *entry, hrt_abstime delay, hrt_abstime interval, 
 static void
 hrt_call_internal(struct hrt_call *entry, hrt_abstime deadline, hrt_abstime interval, hrt_callout callout, void *arg)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	/* if the entry is currently queued, remove it */
 	/* note that we are using a potentially uninitialized
@@ -698,7 +698,7 @@ hrt_call_internal(struct hrt_call *entry, hrt_abstime deadline, hrt_abstime inte
 
 	hrt_call_enter(entry);
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 /**
@@ -718,7 +718,7 @@ hrt_called(struct hrt_call *entry)
 void
 hrt_cancel(struct hrt_call *entry)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	sq_rem(&entry->link, &callout_queue);
 	entry->deadline = 0;
@@ -728,7 +728,7 @@ hrt_cancel(struct hrt_call *entry)
 	 */
 	entry->period = 0;
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 static void

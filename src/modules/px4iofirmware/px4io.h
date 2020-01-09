@@ -184,7 +184,7 @@ extern output_limit_t pwm_limit;
 
 #define CONTROL_PAGE_INDEX(_group, _channel) (_group * PX4IO_CONTROL_CHANNELS + _channel)
 
-#define PX4_CRITICAL_SECTION(cmd)	{ irqstate_t flags = px4_enter_critical_section(); cmd; px4_leave_critical_section(flags); }
+#define PX4_CRITICAL_SECTION(cmd)	{ irqstate_t flags = enter_critical_section(); cmd; leave_critical_section(flags); }
 
 void atomic_modify_or(volatile uint16_t *target, uint16_t modification);
 void atomic_modify_clear(volatile uint16_t *target, uint16_t modification);

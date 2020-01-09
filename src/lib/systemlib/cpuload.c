@@ -51,7 +51,7 @@
 
 #include <sys/time.h>
 
-#include <arch/board/board.h>
+
 #include <drivers/drv_hrt.h>
 
 #include "cpuload.h"
@@ -169,9 +169,9 @@ void sched_note_resume(FAR struct tcb_s *tcb)
 			if (system_load.tasks[i].valid && system_load.tasks[i].tcb->pid == tcb->pid) {
 				// curr_start_time is accessed from an IRQ handler (in logger), so we need
 				// to make the update atomic
-				irqstate_t irq_state = px4_enter_critical_section();
+				irqstate_t irq_state = enter_critical_section();
 				system_load.tasks[i].curr_start_time = new_time;
-				px4_leave_critical_section(irq_state);
+				leave_critical_section(irq_state);
 				break;
 			}
 		}

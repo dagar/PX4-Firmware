@@ -132,7 +132,7 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 
 	ret = uORB::Utils::node_mkpath(path, meta, &inst);
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		errno = -ret;
 		return PX4_ERROR;
 	}
@@ -140,7 +140,7 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 	ret = px4_access(path, F_OK);
 
 	if (ret == -1 && meta != nullptr && !_remote_topics.empty()) {
-		ret = (_remote_topics.find(meta->o_name) != _remote_topics.end()) ? OK : PX4_ERROR;
+		ret = (_remote_topics.find(meta->o_name) != _remote_topics.end()) ? PX4_OK : PX4_ERROR;
 	}
 
 	if (ret == 0) {
@@ -366,7 +366,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 		 */
 		ret = uORB::Utils::node_mkpath(path, meta, instance);
 
-		if (ret != OK) {
+		if (ret != PX4_OK) {
 			errno = -ret;
 			return PX4_ERROR;
 		}
@@ -416,7 +416,7 @@ int uORB::Manager::node_open(const struct orb_metadata *meta, bool advertiser, i
 		return PX4_ERROR;
 	}
 
-	/* everything has been OK, we can return the handle now */
+	/* everything has been PX4_OK, we can return the handle now */
 	return fd;
 }
 
@@ -459,7 +459,7 @@ int16_t uORB::Manager::process_add_subscription(const char *messageName, int32_t
 	int ret = uORB::Utils::node_mkpath(nodepath, messageName);
 	DeviceMaster *device_master = get_device_master();
 
-	if (ret == OK && device_master) {
+	if (ret == PX4_OK && device_master) {
 		uORB::DeviceNode *node = device_master->getDeviceNode(nodepath);
 
 		if (node == nullptr) {
@@ -485,7 +485,7 @@ int16_t uORB::Manager::process_remove_subscription(const char *messageName)
 	int ret = uORB::Utils::node_mkpath(nodepath, messageName);
 	DeviceMaster *device_master = get_device_master();
 
-	if (ret == OK && device_master) {
+	if (ret == PX4_OK && device_master) {
 		uORB::DeviceNode *node = device_master->getDeviceNode(nodepath);
 
 		// get the node name.
@@ -510,7 +510,7 @@ int16_t uORB::Manager::process_received_message(const char *messageName, int32_t
 	int ret = uORB::Utils::node_mkpath(nodepath, messageName);
 	DeviceMaster *device_master = get_device_master();
 
-	if (ret == OK && device_master) {
+	if (ret == PX4_OK && device_master) {
 		uORB::DeviceNode *node = device_master->getDeviceNode(nodepath);
 
 		// get the node name.

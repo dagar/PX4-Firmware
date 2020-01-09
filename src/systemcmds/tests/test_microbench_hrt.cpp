@@ -58,14 +58,14 @@ static irqstate_t flags;
 void lock()
 {
 #ifdef __PX4_NUTTX
-	flags = px4_enter_critical_section();
+	flags = enter_critical_section();
 #endif
 }
 
 void unlock()
 {
 #ifdef __PX4_NUTTX
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 #endif
 }
 
@@ -99,14 +99,14 @@ private:
 	void lock()
 	{
 #ifdef __PX4_NUTTX
-		flags = px4_enter_critical_section();
+		flags = enter_critical_section();
 #endif
 	}
 
 	void unlock()
 	{
 #ifdef __PX4_NUTTX
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 #endif
 	}
 

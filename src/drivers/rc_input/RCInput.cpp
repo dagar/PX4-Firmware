@@ -626,9 +626,9 @@ bool bind_spektrum(int arg)
 		dsm_bind(DSM_CMD_BIND_POWER_UP, 0);
 		usleep(72000);
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 		dsm_bind(DSM_CMD_BIND_SEND_PULSES, arg);
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 
 		usleep(50000);
 

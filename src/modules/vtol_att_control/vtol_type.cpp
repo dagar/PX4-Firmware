@@ -301,7 +301,7 @@ bool VtolType::apply_pwm_limits(struct pwm_output_values &pwm_values, pwm_limit_
 	px4_close(fd);
 
 
-	if (ret != OK) {
+	if (ret != PX4_OK) {
 		PX4_DEBUG("failed setting max values");
 		return false;
 	}

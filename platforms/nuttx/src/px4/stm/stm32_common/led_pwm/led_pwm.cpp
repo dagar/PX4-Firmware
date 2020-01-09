@@ -118,7 +118,7 @@ static void led_pwm_timer_init_timer(unsigned timer)
 {
 	if (led_pwm_timers[timer].base) {
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 
 		/* enable the timer clock before we try to talk to it */
 
@@ -160,7 +160,7 @@ static void led_pwm_timer_init_timer(unsigned timer)
 		/* generate an update event; reloads the counter and all registers */
 		rEGR(timer) = GTIM_EGR_UG;
 
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 
 }

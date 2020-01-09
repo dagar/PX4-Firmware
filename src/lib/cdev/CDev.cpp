@@ -91,7 +91,7 @@ CDev::register_class_devname(const char *class_devname)
 		snprintf(name, sizeof(name), "%s%d", class_devname, class_instance);
 		ret = register_driver(name, &fops, 0666, (void *)this);
 
-		if (ret == OK) {
+		if (ret == PX4_OK) {
 			break;
 		}
 
@@ -189,27 +189,6 @@ CDev::close(file_t *filep)
 }
 
 int
-CDev::ioctl(file_t *filep, int cmd, unsigned long arg)
-{
-	PX4_DEBUG("CDev::ioctl");
-	int ret = -ENOTTY;
-
-	switch (cmd) {
-
-	/* fetch a pointer to the driver's private data */
-	case DIOC_GETPRIV:
-		*(void **)(uintptr_t)arg = (void *)this;
-		ret = PX4_OK;
-		break;
-
-	default:
-		break;
-	}
-
-	return ret;
-}
-
-int
 CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 {
 	PX4_DEBUG("CDev::Poll %s", setup ? "setup" : "teardown");
@@ -245,12 +224,12 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 
 #ifdef __PX4_NUTTX
 			// malloc uses a semaphore, we need to call it enabled IRQ's
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 #endif
 			px4_pollfd_struct_t **new_pollset = new px4_pollfd_struct_t *[new_count];
 
 #ifdef __PX4_NUTTX
-			flags = px4_enter_critical_section();
+			flags = enter_critical_section();
 #endif
 
 			if (prev_pollset == _pollset) {
@@ -271,7 +250,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 
 				// free the previous _pollset (we need to unlock here which is fine because we don't access _pollset anymore)
 #ifdef __PX4_NUTTX
-				px4_leave_critical_section(flags);
+				leave_critical_section(flags);
 #endif
 
 				if (prev_pollset) {
@@ -279,7 +258,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 				}
 
 #ifdef __PX4_NUTTX
-				flags = px4_enter_critical_section();
+				flags = enter_critical_section();
 #endif
 
 				// Success
@@ -288,12 +267,12 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 			}
 
 #ifdef __PX4_NUTTX
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 #endif
 			// We have to retry
 			delete[] new_pollset;
 #ifdef __PX4_NUTTX
-			flags = px4_enter_critical_section();
+			flags = enter_critical_section();
 #endif
 		}
 
@@ -327,7 +306,7 @@ CDev::poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup)
 }
 
 void
-CDev::poll_notify(pollevent_t events)
+CDev::poll_notify(px4_pollevent_t events)
 {
 	PX4_DEBUG("CDev::poll_notify events = %0x", events);
 
@@ -344,7 +323,7 @@ CDev::poll_notify(pollevent_t events)
 }
 
 void
-CDev::poll_notify_one(px4_pollfd_struct_t *fds, pollevent_t events)
+CDev::poll_notify_one(px4_pollfd_struct_t *fds, px4_pollevent_t events)
 {
 	PX4_DEBUG("CDev::poll_notify_one");
 

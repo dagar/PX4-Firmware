@@ -49,7 +49,6 @@
 #include <semaphore.h>
 #include <string.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <errno.h>
 #include <stdio.h>
 #include <math.h>
@@ -617,7 +616,7 @@ QMC5883::collect()
 	uint8_t check_counter;
 
 	perf_begin(_sample_perf);
-	sensor_mag_s new_report;
+	sensor_mag_s new_report{};
 	bool sensor_is_onboard = false;
 
 	float xraw_f;
@@ -746,9 +745,6 @@ QMC5883::collect()
 
 	/* post a report to the ring */
 	_reports->force(&new_report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
 
 	/*
 	  periodically check the configuration
@@ -953,7 +949,7 @@ void
 test(enum QMC5883_BUS busid)
 {
 	struct qmc5883_bus_option &bus = find_bus(busid);
-	sensor_mag_s report;
+	sensor_mag_s report{};
 	ssize_t sz;
 	int ret;
 	const char *path = bus.devpath;

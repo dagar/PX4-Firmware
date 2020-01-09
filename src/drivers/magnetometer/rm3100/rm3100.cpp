@@ -192,7 +192,7 @@ RM3100::collect()
 	float yraw_f;
 	float zraw_f;
 
-	sensor_mag_s new_mag_report;
+	sensor_mag_s new_mag_report{};
 	bool sensor_is_onboard = false;
 
 	perf_begin(_sample_perf);
@@ -267,9 +267,6 @@ RM3100::collect()
 
 	/* post a report to the ring */
 	_reports->force(&new_mag_report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
 
 	ret = OK;
 

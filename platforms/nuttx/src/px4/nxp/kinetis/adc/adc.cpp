@@ -80,14 +80,14 @@ int px4_arch_adc_init(uint32_t base_address)
 {
 	/* Input is Buss Clock 56 Mhz We will use /8 for 7 Mhz */
 
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	_REG(KINETIS_SIM_SCGC3) |= SIM_SCGC3_ADC1;
 	rCFG1(1) = ADC_CFG1_ADICLK_BUSCLK | ADC_CFG1_MODE_1213BIT | ADC_CFG1_ADIV_DIV8;
 	rCFG2(1) = 0;
 	rSC2(1) = ADC_SC2_REFSEL_DEFAULT;
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	/* Clear the CALF and begin the calibration */
 
@@ -141,14 +141,14 @@ int px4_arch_adc_init(uint32_t base_address)
 
 void px4_arch_adc_uninit(uint32_t base_address)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 	_REG(KINETIS_SIM_SCGC3) &= ~SIM_SCGC3_ADC1;
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	/* clear any previous COCC */
 	rRA(1);
@@ -163,7 +163,7 @@ uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
 
 		/* don't wait for more than 10us, since that means something broke - should reset here if we see this */
 		if ((hrt_absolute_time() - now) > 10) {
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 			return 0xffff;
 		}
 	}
@@ -171,7 +171,7 @@ uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
 	/* read the result and clear EOC */
 	uint32_t result = rRA(1);
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return result;
 }

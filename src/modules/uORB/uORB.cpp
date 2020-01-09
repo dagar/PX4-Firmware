@@ -111,7 +111,7 @@ int  orb_group_count(const struct orb_metadata *meta)
 {
 	unsigned instance = 0;
 
-	while (uORB::Manager::get_instance()->orb_exists(meta, instance) == OK) {
+	while (uORB::Manager::get_instance()->orb_exists(meta, instance) == PX4_OK) {
 		++instance;
 	};
 

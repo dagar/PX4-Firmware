@@ -94,9 +94,7 @@ HMC5883::~HMC5883()
 int
 HMC5883::init()
 {
-	int ret = PX4_ERROR;
-
-	ret = CDev::init();
+	int ret = CDev::init();
 
 	if (ret != OK) {
 		DEVICE_DEBUG("CDev init failed");
@@ -498,7 +496,7 @@ HMC5883::collect()
 	uint8_t check_counter;
 
 	perf_begin(_sample_perf);
-	sensor_mag_s new_report;
+	sensor_mag_s new_report{};
 	bool sensor_is_onboard = false;
 
 	float xraw_f;
@@ -648,9 +646,6 @@ HMC5883::collect()
 
 	/* post a report to the ring */
 	_reports->force(&new_report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
 
 	/*
 	  periodically check the range register and configuration

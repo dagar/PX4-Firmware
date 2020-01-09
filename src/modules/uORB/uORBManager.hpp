@@ -183,7 +183,7 @@ public:
 	 *      for the topic.
 	 * @handle    The handle returned from orb_advertise.
 	 * @param data    A pointer to the data to be published.
-	 * @return    OK on success, PX4_ERROR otherwise with errno set accordingly.
+	 * @return    PX4_OK on success, PX4_ERROR otherwise with errno set accordingly.
 	 */
 	int  orb_publish(const struct orb_metadata *meta, orb_advert_t handle, const void *data);
 
@@ -259,7 +259,7 @@ public:
 	 * Unsubscribe from a topic.
 	 *
 	 * @param handle  A handle returned from orb_subscribe.
-	 * @return    OK on success, PX4_ERROR otherwise with errno set accordingly.
+	 * @return    PX4_OK on success, PX4_ERROR otherwise with errno set accordingly.
 	 */
 	int  orb_unsubscribe(int handle);
 
@@ -277,7 +277,7 @@ public:
 	 * @param buffer  Pointer to the buffer receiving the data, or NULL
 	 *      if the caller wants to clear the updated flag without
 	 *      using the data.
-	 * @return    OK on success, PX4_ERROR otherwise with errno set accordingly.
+	 * @return    PX4_OK on success, PX4_ERROR otherwise with errno set accordingly.
 	 */
 	int  orb_copy(const struct orb_metadata *meta, int handle, void *buffer);
 
@@ -296,7 +296,7 @@ public:
 	 * @param handle  A handle returned from orb_subscribe.
 	 * @param updated Set to true if the topic has been updated since the
 	 *      last time it was copied using this handle.
-	 * @return    OK if the check was successful, PX4_ERROR otherwise with
+	 * @return    PX4_OK if the check was successful, PX4_ERROR otherwise with
 	 *      errno set accordingly.
 	 */
 	int  orb_check(int handle, bool *updated);
@@ -308,7 +308,7 @@ public:
 	 * @param handle  A handle returned from orb_subscribe.
 	 * @param time    Returns the absolute time that the topic was updated, or zero if it has
 	 *      never been updated. Time is measured in microseconds.
-	 * @return    OK on success, PX4_ERROR otherwise with errno set accordingly.
+	 * @return    PX4_OK on success, PX4_ERROR otherwise with errno set accordingly.
 	 */
 	int  orb_stat(int handle, uint64_t *time);
 
@@ -317,7 +317,7 @@ public:
 	 *
 	 * @param meta    ORB topic metadata.
 	 * @param instance  ORB instance
-	 * @return    OK if the topic exists, PX4_ERROR otherwise.
+	 * @return    PX4_OK if the topic exists, PX4_ERROR otherwise.
 	 */
 	int  orb_exists(const struct orb_metadata *meta, int instance);
 
@@ -329,7 +329,7 @@ public:
 	 *      topics which are published by multiple publishers (e.g. mag0, mag1, etc.)
 	 *      and allows a subscriber to pick the topic with the highest priority,
 	 *      independent of the startup order of the associated publishers.
-	 * @return    OK on success, PX4_ERROR otherwise with errno set accordingly.
+	 * @return    PX4_OK on success, PX4_ERROR otherwise with errno set accordingly.
 	 */
 	int  orb_priority(int handle, int32_t *priority);
 
@@ -349,7 +349,7 @@ public:
 	 *
 	 * @param handle  A handle returned from orb_subscribe.
 	 * @param interval  An interval period in milliseconds.
-	 * @return    OK on success, PX4_ERROR otherwise with ERRNO set accordingly.
+	 * @return    PX4_OK on success, PX4_ERROR otherwise with ERRNO set accordingly.
 	 */
 	int  orb_set_interval(int handle, unsigned interval);
 
@@ -361,7 +361,7 @@ public:
 	 *
 	 * @param handle  A handle returned from orb_subscribe.
 	 * @param interval  The returned interval period in milliseconds.
-	 * @return    OK on success, PX4_ERROR otherwise with ERRNO set accordingly.
+	 * @return    PX4_OK on success, PX4_ERROR otherwise with ERRNO set accordingly.
 	 */
 	int	orb_get_interval(int handle, unsigned *interval);
 

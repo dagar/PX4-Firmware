@@ -505,9 +505,6 @@ SF1XX::collect()
 
 	_reports->force(&report);
 
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
-
 	ret = OK;
 
 	perf_end(_sample_perf);

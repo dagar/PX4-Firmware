@@ -11,7 +11,6 @@
 #include <semaphore.h>
 #include <string.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <errno.h>
 #include <stdio.h>
 #include <math.h>

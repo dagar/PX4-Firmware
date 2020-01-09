@@ -456,7 +456,7 @@ static int allocate_channel(unsigned channel, io_timer_channel_mode_t mode)
 static int timer_set_rate(unsigned timer, unsigned rate)
 {
 
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	uint32_t save = rSC(timer);
 	rSC(timer) = save & ~(FTM_SC_CLKS_MASK);
@@ -468,7 +468,7 @@ static int timer_set_rate(unsigned timer, unsigned rate)
 	/* generate an update event; reloads the counter and all registers */
 	rSYNC(timer) = FTM_SYNC;
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return 0;
 }
@@ -488,19 +488,19 @@ static inline void io_timer_set_oneshot_mode(unsigned timer)
 	 *  On 16 bit timers this is 4.68 Ms.
 	 */
 
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 	rSC(timer) &= ~(FTM_SC_CLKS_MASK | FTM_SC_PS_MASK);
 	rMOD(timer) = 0xffff;
 	rSC(timer) |= (FTM_SC_CLKS_EXTCLK | div2psc(FTM_SRC_CLOCK_FREQ / BOARD_ONESHOT_FREQ));
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 static inline void io_timer_set_PWM_mode(unsigned timer)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 	rSC(timer) &= ~(FTM_SC_CLKS_MASK | FTM_SC_PS_MASK);
 	rSC(timer) |= (FTM_SC_CLKS_EXTCLK | div2psc(FTM_SRC_CLOCK_FREQ / BOARD_PWM_FREQ));
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 void io_timer_trigger(void)
@@ -523,13 +523,13 @@ void io_timer_trigger(void)
 
 	/* Now do them all wit the shortest delay in between */
 
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	for (actions = 0; actions < MAX_IO_TIMERS && action_cache[actions] != 0; actions++) {
 		_REG32(action_cache[actions], KINETIS_FTM_SYNC_OFFSET) |= FTM_SYNC;
 	}
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 int io_timer_init_timer(unsigned timer)
@@ -540,7 +540,7 @@ int io_timer_init_timer(unsigned timer)
 
 	if (rv == 0) {
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 
 		set_timer_initalized(timer);
 
@@ -582,7 +582,7 @@ int io_timer_init_timer(unsigned timer)
 
 		up_enable_irq(io_timers[timer].vectorno);
 
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 
 	return rv;
@@ -682,7 +682,7 @@ int io_timer_channel_init(unsigned channel, io_timer_channel_mode_t mode,
 
 		io_timer_init_timer(channels_timer(channel));
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 
 		/* Set up IO */
 		if (gpio) {
@@ -706,7 +706,7 @@ int io_timer_channel_init(unsigned channel, io_timer_channel_mode_t mode,
 
 		channel_handlers[channel].callback = channel_handler;
 		channel_handlers[channel].context = context;
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 
 	return rv;
@@ -791,7 +791,7 @@ int io_timer_set_enable(bool state, io_timer_channel_mode_t mode, io_timer_chann
 		}
 	}
 
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 
 	for (unsigned actions = 0; actions < arraySize(action_cache); actions++) {
@@ -827,7 +827,7 @@ int io_timer_set_enable(bool state, io_timer_channel_mode_t mode, io_timer_chann
 		}
 	}
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return 0;
 }
@@ -855,12 +855,12 @@ int io_timer_set_ccr(unsigned channel, uint16_t value)
 			 * So we stop the counter to get an immediate update.
 			 */
 			uint32_t timer = channels_timer(channel);
-			irqstate_t flags = px4_enter_critical_section();
+			irqstate_t flags = enter_critical_section();
 			uint32_t save = rSC(timer);
 			rSC(timer) = save & ~(FTM_SC_CLKS_MASK);
 			REG(timer, KINETIS_FTM_CV_OFFSET(timer_io_channels[channel].timer_channel - 1)) = value;
 			rSC(timer) = save;
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 		}
 	}
 

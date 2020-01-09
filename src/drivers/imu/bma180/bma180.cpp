@@ -48,7 +48,6 @@
 #include <semaphore.h>
 #include <string.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <errno.h>
 #include <stdio.h>
 #include <math.h>
@@ -663,9 +662,6 @@ BMA180::measure()
 	report.scaling = _accel_range_scale;
 
 	_reports->force(&report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
 
 	/* publish for subscribers */
 	if (_accel_topic != nullptr && !(_pub_blocked)) {

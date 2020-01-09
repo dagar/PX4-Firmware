@@ -238,8 +238,6 @@ VL53LXX::collect()
 
 	_reports->force(&report);
 
-	// Notify anyone waiting for data.
-	poll_notify(POLLIN);
 	perf_end(_sample_perf);
 
 	return PX4_OK;

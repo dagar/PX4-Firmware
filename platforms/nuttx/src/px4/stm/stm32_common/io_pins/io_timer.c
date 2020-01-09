@@ -560,13 +560,13 @@ void io_timer_trigger(void)
 
 		/* Now do them all with the shortest delay in between */
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 
 		for (actions = 0; actions < MAX_IO_TIMERS && action_cache[actions] != 0; actions++) {
 			_REG32(action_cache[actions], STM32_GTIM_EGR_OFFSET) |= GTIM_EGR_UG;
 		}
 
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 }
 
@@ -578,7 +578,7 @@ int io_timer_init_timer(unsigned timer)
 
 	if (rv == 0) {
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 
 		set_timer_initalized(timer);
 
@@ -626,7 +626,7 @@ int io_timer_init_timer(unsigned timer)
 
 		up_enable_irq(io_timers[timer].vectorno);
 
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 
 	return rv;
@@ -748,7 +748,7 @@ int io_timer_channel_init(unsigned channel, io_timer_channel_mode_t mode,
 
 		io_timer_init_timer(channels_timer(channel));
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 
 		/* Set up IO */
 		if (gpio) {
@@ -802,7 +802,7 @@ int io_timer_channel_init(unsigned channel, io_timer_channel_mode_t mode,
 		channel_handlers[channel].context = context;
 		rDIER(timer) |= dier_setbits << shifts;
 #endif
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 
 	return rv;
@@ -888,7 +888,7 @@ int io_timer_set_enable(bool state, io_timer_channel_mode_t mode, io_timer_chann
 		}
 	}
 
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 
 	for (unsigned actions = 0; actions < arraySize(action_cache); actions++) {
@@ -928,7 +928,7 @@ int io_timer_set_enable(bool state, io_timer_channel_mode_t mode, io_timer_chann
 		}
 	}
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return 0;
 }

@@ -130,10 +130,10 @@ static void input_capture_chan_handler(void *context, const io_timers_t *timer, 
 
 static void input_capture_bind(unsigned channel, capture_callback_t callback, void *context)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 	channel_handlers[channel].callback = callback;
 	channel_handlers[channel].context = context;
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 static void input_capture_unbind(unsigned channel)
@@ -255,7 +255,7 @@ int up_input_capture_set_filter(unsigned channel,  capture_filter_t filter)
 			uint32_t timer = timer_io_channels[channel].timer_index;
 			uint16_t rvalue;
 
-			irqstate_t flags = px4_enter_critical_section();
+			irqstate_t flags = enter_critical_section();
 
 			switch (timer_io_channels[channel].timer_channel) {
 
@@ -287,7 +287,7 @@ int up_input_capture_set_filter(unsigned channel,  capture_filter_t filter)
 				rv = -EIO;
 			}
 
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 		}
 	}
 
@@ -398,7 +398,7 @@ int up_input_capture_set_trigger(unsigned channel,  input_capture_edge edge)
 			uint16_t rvalue;
 			rv = OK;
 
-			irqstate_t flags = px4_enter_critical_section();
+			irqstate_t flags = enter_critical_section();
 
 			switch (timer_io_channels[channel].timer_channel) {
 
@@ -434,7 +434,7 @@ int up_input_capture_set_trigger(unsigned channel,  input_capture_edge edge)
 				rv = -EIO;
 			}
 
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 		}
 	}
 
@@ -453,10 +453,10 @@ int up_input_capture_get_callback(unsigned channel, capture_callback_t *callback
 
 		if (io_timer_get_channel_mode(channel) == IOTimerChanMode_Capture) {
 
-			irqstate_t flags = px4_enter_critical_section();
+			irqstate_t flags = enter_critical_section();
 			*callback = channel_handlers[channel].callback;
 			*context = channel_handlers[channel].context;
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 			rv = OK;
 		}
 	}
@@ -489,14 +489,14 @@ int up_input_capture_get_stats(unsigned channel, input_capture_stats_t *stats, b
 	int rv = io_timer_validate_channel_index(channel);
 
 	if (rv == 0) {
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 		*stats =  channel_stats[channel];
 
 		if (clear) {
 			memset(&channel_stats[channel], 0, sizeof(*stats));
 		}
 
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 
 	return rv;

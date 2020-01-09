@@ -117,7 +117,7 @@ int MPU6000::reset()
 	irqstate_t state;
 
 	while (--tries != 0) {
-		state = px4_enter_critical_section();
+		state = enter_critical_section();
 
 		// Hold off sampling for 60 ms
 		_reset_wait = hrt_absolute_time() + 60000;
@@ -135,7 +135,7 @@ int MPU6000::reset()
 		const bool is_i2c = (_interface->get_device_bus_type() == device::Device::DeviceBusType_I2C);
 		write_checked_reg(MPUREG_USER_CTRL, is_i2c ? 0 : BIT_I2C_IF_DIS);
 
-		px4_leave_critical_section(state);
+		leave_critical_section(state);
 
 		if (read_reg(MPUREG_PWR_MGMT_1) == MPU_CLK_SEL_PLLGYROZ) {
 			break;
@@ -147,9 +147,9 @@ int MPU6000::reset()
 
 	// Hold off sampling for 30 ms
 
-	state = px4_enter_critical_section();
+	state = enter_critical_section();
 	_reset_wait = hrt_absolute_time() + 30000;
-	px4_leave_critical_section(state);
+	leave_critical_section(state);
 
 	if (read_reg(MPUREG_PWR_MGMT_1) != MPU_CLK_SEL_PLLGYROZ) {
 		return -EIO;

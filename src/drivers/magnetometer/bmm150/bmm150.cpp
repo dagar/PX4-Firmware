@@ -135,7 +135,7 @@ void test(bool external_bus)
 {
 	int fd = -1;
 	const char *path = (external_bus ? BMM150_DEVICE_PATH_MAG_EXT : BMM150_DEVICE_PATH_MAG);
-	sensor_mag_s m_report;
+	sensor_mag_s m_report{};
 	ssize_t sz;
 
 
@@ -540,7 +540,7 @@ BMM150::collect()
 	bool mag_notify = true;
 	uint8_t mag_data[8], status;
 	uint16_t resistance, lsb, msb, msblsb;
-	sensor_mag_s mrb{};
+	sensor_mag_s  mrb{};
 
 
 	/* start collecting data */
@@ -687,11 +687,6 @@ BMM150::collect()
 	_last_report.z = mrb.z;
 
 	_reports->force(&mrb);
-
-	/* notify anyone waiting for data */
-	if (mag_notify) {
-		poll_notify(POLLIN);
-	}
 
 	if (mag_notify && !(_pub_blocked)) {
 		/* publish it */

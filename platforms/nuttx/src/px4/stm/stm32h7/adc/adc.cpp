@@ -270,7 +270,7 @@ void px4_arch_adc_uninit(uint32_t base_address)
 
 uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	/* clear any previous EOC */
 
@@ -291,7 +291,7 @@ uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
 
 		/* don't wait for more than 50us, since that means something broke - should reset here if we see this */
 		if ((hrt_absolute_time() - now) > 50) {
-			px4_leave_critical_section(flags);
+			leave_critical_section(flags);
 			return UINT32_MAX;
 		}
 	}
@@ -299,7 +299,7 @@ uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
 	/* read the result and clear EOC */
 	uint32_t result = rDR(base_address);
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 
 	return result;
 }

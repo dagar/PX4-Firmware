@@ -1034,7 +1034,7 @@ param_get_default_file()
 int
 param_save_default()
 {
-	int res = OK;
+	int res = PX4_OK;
 	int fd = -1;
 
 	const char *filename = param_get_default_file();
@@ -1048,7 +1048,7 @@ param_save_default()
 
 	res = param_export(fd, false);
 
-	if (res != OK) {
+	if (res != PX4_OK) {
 		PX4_ERR("failed to write parameters to file: %s", filename);
 		goto do_exit;
 	}
@@ -1064,7 +1064,7 @@ do_exit:
 		close(fd);
 	}
 
-	if (res == OK) {
+	if (res == PX4_OK) {
 		PX4_DEBUG("saving params completed successfully");
 	}
 

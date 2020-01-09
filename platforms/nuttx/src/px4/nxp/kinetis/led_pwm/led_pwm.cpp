@@ -146,7 +146,7 @@ unsigned led_pwm_timer_get_period(unsigned timer);
 static void led_pwm_timer_set_rate(unsigned timer, unsigned rate)
 {
 
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 
 	uint32_t save = rSC(timer);
 	rSC(timer) = save & ~(FTM_SC_CLKS_MASK);
@@ -155,7 +155,7 @@ static void led_pwm_timer_set_rate(unsigned timer, unsigned rate)
 	rMOD(timer) = (LED_PWM_FREQ / rate) - 1;
 	rSC(timer) = save;
 
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 static inline uint32_t div2psc(int div)
@@ -165,10 +165,10 @@ static inline uint32_t div2psc(int div)
 
 static inline void led_pwm_timer_set_PWM_mode(unsigned timer)
 {
-	irqstate_t flags = px4_enter_critical_section();
+	irqstate_t flags = enter_critical_section();
 	rSC(timer) &= ~(FTM_SC_CLKS_MASK | FTM_SC_PS_MASK);
 	rSC(timer) |= (FTM_SC_CLKS_EXTCLK | div2psc(FTM_SRC_CLOCK_FREQ / LED_PWM_FREQ));
-	px4_leave_critical_section(flags);
+	leave_critical_section(flags);
 }
 
 
@@ -231,7 +231,7 @@ led_pwm_channel_init(unsigned channel)
 	if (led_pwm_channels[channel].timer_channel) {
 		unsigned timer = led_pwm_channels[channel].timer_index;
 
-		irqstate_t flags = px4_enter_critical_section();
+		irqstate_t flags = enter_critical_section();
 
 		/* configure the GPIO first */
 
@@ -246,7 +246,7 @@ led_pwm_channel_init(unsigned channel)
 		rvalue |=  CnSC_PWMOUT_INIT;
 		REG(timer, KINETIS_FTM_CSC_OFFSET(chan)) = rvalue;
 		REG(timer, KINETIS_FTM_CV_OFFSET(0)) = 0;
-		px4_leave_critical_section(flags);
+		leave_critical_section(flags);
 	}
 }
 

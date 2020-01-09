@@ -51,31 +51,10 @@
 #include <drivers/drv_hrt.h>
 #include "work_lock.h"
 
-#ifdef CONFIG_SCHED_WORKQUEUE
-
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-/****************************************************************************
- * Private Type Declarations
- ****************************************************************************/
-
-/****************************************************************************
- * Public Variables
- ****************************************************************************/
-
 /* The state of each work queue. */
 struct wqueue_s g_work[NWORKERS];
 
-/****************************************************************************
- * Private Variables
- ****************************************************************************/
 px4_sem_t _work_lock[NWORKERS];
-
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
 /****************************************************************************
  * Name: work_process
@@ -104,7 +83,8 @@ static void work_process(struct wqueue_s *wqueue, int lock_id)
 	 * we process items in the work list.
 	 */
 
-	next  = CONFIG_SCHED_WORKPERIOD;
+	/** time in ms between checks for work in work queues **/
+	next = 50000;
 
 	work_lock(lock_id);
 
@@ -192,14 +172,11 @@ void work_queues_init(void)
 {
 	px4_sem_init(&_work_lock[HPWORK], 0, 1);
 	px4_sem_init(&_work_lock[LPWORK], 0, 1);
-#ifdef CONFIG_SCHED_USRWORK
-	px4_sem_init(&_work_lock[USRWORK], 0, 1);
-#endif
 
 	// Create high priority worker thread
 	g_work[HPWORK].pid = px4_task_spawn_cmd("hpwork",
 						SCHED_DEFAULT,
-						SCHED_PRIORITY_MAX - 1,
+						PX4_WQ_HP_BASE,
 						2000,
 						work_hpthread,
 						(char *const *)NULL);
@@ -215,7 +192,7 @@ void work_queues_init(void)
 }
 
 /****************************************************************************
- * Name: work_hpthread, work_lpthread, and work_usrthread
+ * Name: work_hpthread, work_lpthread
  *
  * Description:
  *   These are the worker threads that performs actions placed on the work
@@ -228,12 +205,6 @@ void work_queues_init(void)
  *
  *     These worker threads are started by the OS during normal bringup.
  *
- *   work_usrthread:  This is a user mode work queue.  It must be built into
- *     the applicatino blob during the user phase of a kernel build.  The
- *     user work thread will then automatically be started when the system
- *     boots by calling through the pointer found in the header on the user
- *     space blob.
- *
  *   All of these entrypoints are referenced by OS internally and should not
  *   not be accessed by application logic.
  *
@@ -245,25 +216,12 @@ void work_queues_init(void)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_SCHED_HPWORK
-
 int work_hpthread(int argc, char *argv[])
 {
 	/* Loop forever */
 
 	for (;;) {
-		/* First, perform garbage collection.  This cleans-up memory de-allocations
-		 * that were queued because they could not be freed in that execution
-		 * context (for example, if the memory was freed from an interrupt handler).
-		 * NOTE: If the work thread is disabled, this clean-up is performed by
-		 * the IDLE thread (at a very, very low priority).
-		 */
-
-#ifndef CONFIG_SCHED_LPWORK
-		sched_garbagecollection();
-#endif
-
-		/* Then process queued work.  We need to keep interrupts disabled while
+		/* process queued work.  We need to keep interrupts disabled while
 		 * we process items in the work list.
 		 */
 
@@ -273,23 +231,12 @@ int work_hpthread(int argc, char *argv[])
 	return PX4_OK; /* To keep some compilers happy */
 }
 
-#ifdef CONFIG_SCHED_LPWORK
-
 int work_lpthread(int argc, char *argv[])
 {
 	/* Loop forever */
 
 	for (;;) {
-		/* First, perform garbage collection.  This cleans-up memory de-allocations
-		 * that were queued because they could not be freed in that execution
-		 * context (for example, if the memory was freed from an interrupt handler).
-		 * NOTE: If the work thread is disabled, this clean-up is performed by
-		 * the IDLE thread (at a very, very low priority).
-		 */
-
-		//sched_garbagecollection();
-
-		/* Then process queued work.  We need to keep interrupts disabled while
+		/* process queued work.  We need to keep interrupts disabled while
 		 * we process items in the work list.
 		 */
 
@@ -299,39 +246,8 @@ int work_lpthread(int argc, char *argv[])
 	return PX4_OK; /* To keep some compilers happy */
 }
 
-#endif /* CONFIG_SCHED_LPWORK */
-#endif /* CONFIG_SCHED_HPWORK */
-
-#ifdef CONFIG_SCHED_USRWORK
-
-int work_usrthread(int argc, char *argv[])
-{
-	/* Loop forever */
-
-	int rv;
-	// set the threads name
-#ifdef __PX4_DARWIN
-	rv = pthread_setname_np("USR");
-#else
-	rv = pthread_setname_np(pthread_self(), "USR");
-#endif
-
-	for (;;) {
-		/* Then process queued work.  We need to keep interrupts disabled while
-		 * we process items in the work list.
-		 */
-
-		work_process(&g_work[USRWORK], USRWORK);
-	}
-
-	return PX4_OK; /* To keep some compilers happy */
-}
-
-#endif /* CONFIG_SCHED_USRWORK */
-
 uint32_t clock_systimer()
 {
 	//printf("clock_systimer: %0lx\n", hrt_absolute_time());
 	return (0x00000000ffffffff & hrt_absolute_time());
 }
-#endif /* CONFIG_SCHED_WORKQUEUE */
