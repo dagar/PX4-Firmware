@@ -251,7 +251,7 @@ int motor_ramp_main(int argc, char *argv[])
 
 	_motor_ramp_task = px4_task_spawn_cmd("motor_ramp",
 					      SCHED_DEFAULT,
-					      SCHED_PRIORITY_DEFAULT + 40,
+					      SCHED_PRIORITY_ACTUATOR_OUTPUTS,
 					      2000,
 					      motor_ramp_thread_main,
 					      (argv) ? (char *const *)&argv[2] : (char *const *)nullptr);

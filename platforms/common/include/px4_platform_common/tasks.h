@@ -91,38 +91,21 @@ typedef int px4_task_t;
 
 typedef int px4_task_t;
 
-typedef struct {
-	int argc;
-	char **argv;
-} px4_task_args_t;
-
 #else
 #error "No target OS defined"
 #endif
 
-// PX4 work queue starting high priority
-#define PX4_WQ_HP_BASE (SCHED_PRIORITY_MAX - 12)
 
-// Fast drivers - they need to run as quickly as possible to minimize control
-// latency.
-#define SCHED_PRIORITY_FAST_DRIVER		(SCHED_PRIORITY_MAX - 0)
+#define PX4_WQ_HP_BASE (SCHED_PRIORITY_MAX - 14) // PX4 work queue high priority
+#define PX4_WQ_LP_BASE (SCHED_PRIORITY_MAX - 50) // PX4 work queue low priority
+
+#define SCHED_PRIORITY_DEFAULT PX4_WQ_LP_BASE + 10
+
+
 
 // Actuator outputs should run as soon as the rate controller publishes
 // the actuator controls topic
 #define SCHED_PRIORITY_ACTUATOR_OUTPUTS		(PX4_WQ_HP_BASE - 3)
-
-// Attitude controllers typically are in a blocking wait on driver data
-// they should be the first to run on an update, using the current sensor
-// data and the *previous* attitude reference from the position controller
-// which typically runs at a slower rate
-#define SCHED_PRIORITY_ATTITUDE_CONTROL		(PX4_WQ_HP_BASE - 4)
-
-// Estimators should run after the attitude controller but before anything
-// else in the system. They wait on sensor data which is either coming
-// from the sensor hub or from a driver. Keeping this class at a higher
-// priority ensures that the estimator runs first if it can, but will
-// wait for the sensor hub if its data is coming from it.
-#define SCHED_PRIORITY_ESTIMATOR		(PX4_WQ_HP_BASE - 5)
 
 // The sensor hub conditions sensor data. It is not the fastest component
 // in the controller chain, but provides easy-to-use data to the more
@@ -141,13 +124,13 @@ typedef struct {
 
 // Slow drivers should run at a rate where they do not impact the overall
 // system execution
-#define SCHED_PRIORITY_SLOW_DRIVER		(PX4_WQ_HP_BASE - 35)
+#define SCHED_PRIORITY_SLOW_DRIVER		(PX4_WQ_LP_BASE + 5)
 
 // The navigation system needs to execute regularly but has no realtime needs
-#define SCHED_PRIORITY_NAVIGATION		(SCHED_PRIORITY_DEFAULT + 5)
+#define SCHED_PRIORITY_NAVIGATION		(SCHED_PRIORITY_DEFAULT + 1)
 //      SCHED_PRIORITY_DEFAULT
-#define SCHED_PRIORITY_LOG_WRITER		(SCHED_PRIORITY_DEFAULT - 10)
-#define SCHED_PRIORITY_PARAMS			(SCHED_PRIORITY_DEFAULT - 15)
+#define SCHED_PRIORITY_LOG_WRITER		(SCHED_PRIORITY_DEFAULT - 1)
+
 //      SCHED_PRIORITY_IDLE
 
 typedef int (*px4_main_t)(int argc, char *argv[]);

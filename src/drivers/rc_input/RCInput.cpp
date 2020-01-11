@@ -348,7 +348,6 @@ void RCInput::Run()
 
 		// TODO: needs work (poll _rcs_fd)
 		// int ret = poll(fds, sizeof(fds) / sizeof(fds[0]), 100);
-		// then update priority to SCHED_PRIORITY_FAST_DRIVER
 		// read all available data from the serial RC input UART
 
 		// read all available data from the serial RC input UART
