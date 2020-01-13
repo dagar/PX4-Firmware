@@ -42,7 +42,6 @@
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
 #include <lib/perf/perf_counter.h>
-#include <lib/systemlib/conversions.h>
 #include <board_config.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/device/spi.h>

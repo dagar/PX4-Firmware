@@ -38,7 +38,6 @@
 #include <lib/ecl/geo/geo.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-#include <lib/systemlib/conversions.h>
 #include <lib/systemlib/px4_macros.h>
 
 #include "MPU9250_mag.h"

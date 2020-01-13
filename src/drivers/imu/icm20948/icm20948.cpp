@@ -44,7 +44,6 @@
 #include <px4_platform_common/time.h>
 #include <lib/ecl/geo/geo.h>
 #include <lib/perf/perf_counter.h>
-#include <systemlib/conversions.h>
 #include <systemlib/px4_macros.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/device/spi.h>

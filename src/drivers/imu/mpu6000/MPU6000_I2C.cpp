@@ -98,7 +98,7 @@ MPU6000_I2C::read(unsigned reg_speed, void *data, unsigned count)
 	 * Since MPUReport has a cmd at front, we must return the data
 	 * after that. Foe anthing else we must return it
 	 */
-	uint32_t offset = count < sizeof(MPUReport) ? 0 : offsetof(MPUReport, status);
+	uint32_t offset = count < sizeof(MPUReport) ? 0 : offsetof(MPUReport, ACCEL_XOUT_H);
 	uint8_t cmd = MPU6000_REG(reg_speed);
 	int ret = transfer(&cmd, 1, &((uint8_t *)data)[offset], count);
 	return ret == OK ? count : ret;

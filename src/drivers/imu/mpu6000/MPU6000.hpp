@@ -64,7 +64,6 @@
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-#include <systemlib/conversions.h>
 #include <systemlib/px4_macros.h>
 
 
@@ -227,23 +226,27 @@ enum MPU_DEVICE_TYPE {
 
 #define MPU6000_DEFAULT_ONCHIP_FILTER_FREQ			98
 
-#pragma pack(push, 1)
 /**
  * Report conversation within the MPU6000, including command byte and
  * interrupt status.
  */
 struct MPUReport {
-	uint8_t		cmd;
-	uint8_t		status;
-	uint8_t		accel_x[2];
-	uint8_t		accel_y[2];
-	uint8_t		accel_z[2];
-	uint8_t		temp[2];
-	uint8_t		gyro_x[2];
-	uint8_t		gyro_y[2];
-	uint8_t		gyro_z[2];
+	uint8_t	cmd;
+	uint8_t ACCEL_XOUT_H;
+	uint8_t ACCEL_XOUT_L;
+	uint8_t ACCEL_YOUT_H;
+	uint8_t ACCEL_YOUT_L;
+	uint8_t ACCEL_ZOUT_H;
+	uint8_t ACCEL_ZOUT_L;
+	uint8_t TEMP_OUT_H;
+	uint8_t TEMP_OUT_L;
+	uint8_t GYRO_XOUT_H;
+	uint8_t GYRO_XOUT_L;
+	uint8_t GYRO_YOUT_H;
+	uint8_t GYRO_YOUT_L;
+	uint8_t GYRO_ZOUT_H;
+	uint8_t GYRO_ZOUT_L;
 };
-#pragma pack(pop)
 
 #define MPU_MAX_READ_BUFFER_SIZE (sizeof(MPUReport) + 1)
 #define MPU_MAX_WRITE_BUFFER_SIZE (2)

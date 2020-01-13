@@ -21,7 +21,7 @@
 #include <perf/perf_counter.h>
 #include <systemlib/err.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-#include <systemlib/conversions.h>
+
 
 #include <nuttx/arch.h>
 #include <nuttx/clock.h>

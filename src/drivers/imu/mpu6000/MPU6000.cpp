@@ -33,6 +33,8 @@
 
 #include "MPU6000.hpp"
 
+static constexpr int16_t combine(uint8_t msb, uint8_t lsb) { return (msb << 8u) | lsb; }
+
 /*
   list of registers that will be checked in check_registers(). Note
   that MPUREG_PRODUCT_ID must be first in the list.
@@ -402,15 +404,15 @@ MPU6000::factory_self_test()
 	// get baseline values without self-test enabled
 	for (uint8_t i = 0; i < repeats; i++) {
 		up_udelay(1000);
-		_interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
+		_interface->read(MPU6000_SET_SPEED(MPUREG_ACCEL_XOUT_H, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
 				 sizeof(mpu_report));
 
-		accel_baseline[0] += int16_t_from_bytes(mpu_report.accel_x);
-		accel_baseline[1] += int16_t_from_bytes(mpu_report.accel_y);
-		accel_baseline[2] += int16_t_from_bytes(mpu_report.accel_z);
-		gyro_baseline[0] += int16_t_from_bytes(mpu_report.gyro_x);
-		gyro_baseline[1] += int16_t_from_bytes(mpu_report.gyro_y);
-		gyro_baseline[2] += int16_t_from_bytes(mpu_report.gyro_z);
+		accel_baseline[0] += combine(mpu_report.ACCEL_XOUT_H, mpu_report.ACCEL_XOUT_L);
+		accel_baseline[1] += combine(mpu_report.ACCEL_YOUT_H, mpu_report.ACCEL_YOUT_L);
+		accel_baseline[2] += combine(mpu_report.ACCEL_ZOUT_H, mpu_report.ACCEL_ZOUT_L);
+		gyro_baseline[0]  += combine(mpu_report.GYRO_XOUT_H, mpu_report.GYRO_XOUT_L);
+		gyro_baseline[1]  += combine(mpu_report.GYRO_YOUT_H, mpu_report.GYRO_YOUT_L);
+		gyro_baseline[2]  += combine(mpu_report.GYRO_ZOUT_H, mpu_report.GYRO_ZOUT_L);
 	}
 
 #if 1
@@ -429,15 +431,15 @@ MPU6000::factory_self_test()
 	// get values with self-test enabled
 	for (uint8_t i = 0; i < repeats; i++) {
 		up_udelay(1000);
-		_interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
+		_interface->read(MPU6000_SET_SPEED(MPUREG_ACCEL_XOUT_H, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
 				 sizeof(mpu_report));
 
-		accel[0] += int16_t_from_bytes(mpu_report.accel_x);
-		accel[1] += int16_t_from_bytes(mpu_report.accel_y);
-		accel[2] += int16_t_from_bytes(mpu_report.accel_z);
-		gyro[0] += int16_t_from_bytes(mpu_report.gyro_x);
-		gyro[1] += int16_t_from_bytes(mpu_report.gyro_y);
-		gyro[2] += int16_t_from_bytes(mpu_report.gyro_z);
+		accel[0] = combine(mpu_report.ACCEL_XOUT_H, mpu_report.ACCEL_XOUT_L);
+		accel[1] = combine(mpu_report.ACCEL_YOUT_H, mpu_report.ACCEL_YOUT_L);
+		accel[2] = combine(mpu_report.ACCEL_ZOUT_H, mpu_report.ACCEL_ZOUT_L);
+		gyro[0]  = combine(mpu_report.GYRO_XOUT_H, mpu_report.GYRO_XOUT_L);
+		gyro[1]  = combine(mpu_report.GYRO_YOUT_H, mpu_report.GYRO_YOUT_L);
+		gyro[2]  = combine(mpu_report.GYRO_ZOUT_H, mpu_report.GYRO_ZOUT_L);
 	}
 
 	for (uint8_t i = 0; i < 3; i++) {
@@ -529,7 +531,7 @@ MPU6000::test_error()
 	// deliberately trigger an error. This was noticed during
 	// development as a handy way to test the reset logic
 	uint8_t data[sizeof(MPUReport)] {};
-	_interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_LOW_BUS_SPEED), data, sizeof(data));
+	_interface->read(MPU6000_SET_SPEED(MPUREG_ACCEL_XOUT_H, MPU6000_LOW_BUS_SPEED), data, sizeof(data));
 	PX4_WARN("error triggered");
 	print_registers();
 	_in_factory_test = false;
@@ -730,17 +732,6 @@ MPU6000::measure()
 		return OK;
 	}
 
-	struct MPUReport mpu_report;
-
-	struct Report {
-		int16_t		accel_x;
-		int16_t		accel_y;
-		int16_t		accel_z;
-		int16_t		temp;
-		int16_t		gyro_x;
-		int16_t		gyro_y;
-		int16_t		gyro_z;
-	} report;
 
 	/* start measuring */
 	perf_begin(_sample_perf);
@@ -750,10 +741,10 @@ MPU6000::measure()
 	 */
 
 	// sensor transfer at high clock speed
-
+	MPUReport mpu_report{};
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	if (sizeof(mpu_report) != _interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED),
+	if (sizeof(mpu_report) != _interface->read(MPU6000_SET_SPEED(MPUREG_ACCEL_XOUT_H, MPU6000_HIGH_BUS_SPEED),
 			(uint8_t *)&mpu_report, sizeof(mpu_report))) {
 
 		return -EIO;
@@ -769,7 +760,7 @@ MPU6000::measure()
 	   sampled at 8kHz, so we would incorrectly think we have new
 	   data when we are in fact getting duplicate accelerometer data.
 	*/
-	if (!_got_duplicate && memcmp(&mpu_report.accel_x[0], &_last_accel[0], 6) == 0) {
+	if (!_got_duplicate && memcmp(&mpu_report.ACCEL_XOUT_H, &_last_accel[0], 6) == 0) {
 		// it isn't new data - wait for next timer
 		perf_end(_sample_perf);
 		perf_count(_duplicates);
@@ -777,30 +768,25 @@ MPU6000::measure()
 		return OK;
 	}
 
-	memcpy(&_last_accel[0], &mpu_report.accel_x[0], 6);
+	memcpy(&_last_accel[0], &mpu_report.ACCEL_XOUT_H, 6);
 	_got_duplicate = false;
 
-	/*
-	 * Convert from big to little endian
-	 */
+	// Convert from big to little endian
+	int16_t accel_x = combine(mpu_report.ACCEL_XOUT_H, mpu_report.ACCEL_XOUT_L);
+	int16_t accel_y = combine(mpu_report.ACCEL_YOUT_H, mpu_report.ACCEL_YOUT_L);
+	int16_t accel_z = combine(mpu_report.ACCEL_ZOUT_H, mpu_report.ACCEL_ZOUT_L);
+	int16_t temp    = combine(mpu_report.TEMP_OUT_H, mpu_report.TEMP_OUT_L);
+	int16_t gyro_x  = combine(mpu_report.GYRO_XOUT_H, mpu_report.GYRO_XOUT_L);
+	int16_t gyro_y  = combine(mpu_report.GYRO_YOUT_H, mpu_report.GYRO_YOUT_L);
+	int16_t gyro_z  = combine(mpu_report.GYRO_ZOUT_H, mpu_report.GYRO_ZOUT_L);
 
-	report.accel_x = int16_t_from_bytes(mpu_report.accel_x);
-	report.accel_y = int16_t_from_bytes(mpu_report.accel_y);
-	report.accel_z = int16_t_from_bytes(mpu_report.accel_z);
-
-	report.temp = int16_t_from_bytes(mpu_report.temp);
-
-	report.gyro_x = int16_t_from_bytes(mpu_report.gyro_x);
-	report.gyro_y = int16_t_from_bytes(mpu_report.gyro_y);
-	report.gyro_z = int16_t_from_bytes(mpu_report.gyro_z);
-
-	if (report.accel_x == 0 &&
-	    report.accel_y == 0 &&
-	    report.accel_z == 0 &&
-	    report.temp == 0 &&
-	    report.gyro_x == 0 &&
-	    report.gyro_y == 0 &&
-	    report.gyro_z == 0) {
+	if (accel_x == 0 &&
+	    accel_y == 0 &&
+	    accel_z == 0 &&
+	    temp == 0 &&
+	    gyro_x == 0 &&
+	    gyro_y == 0 &&
+	    gyro_z == 0) {
 
 		// all zero data - probably a SPI bus error
 		perf_count(_bad_transfers);
@@ -824,19 +810,19 @@ MPU6000::measure()
 	/*
 	 * Swap axes and negate y
 	 */
-	int16_t accel_xt = report.accel_y;
-	int16_t accel_yt = ((report.accel_x == -32768) ? 32767 : -report.accel_x);
+	int16_t accel_xt = accel_y;
+	int16_t accel_yt = ((accel_x == -32768) ? 32767 : -accel_x);
 
-	int16_t gyro_xt = report.gyro_y;
-	int16_t gyro_yt = ((report.gyro_x == -32768) ? 32767 : -report.gyro_x);
+	int16_t gyro_xt = gyro_y;
+	int16_t gyro_yt = ((gyro_x == -32768) ? 32767 : -gyro_x);
 
 	/*
 	 * Apply the swap
 	 */
-	report.accel_x = accel_xt;
-	report.accel_y = accel_yt;
-	report.gyro_x = gyro_xt;
-	report.gyro_y = gyro_yt;
+	accel_x = accel_xt;
+	accel_y = accel_yt;
+	gyro_x = gyro_xt;
+	gyro_y = gyro_yt;
 
 	// report the error count as the sum of the number of bad
 	// transfers and bad register reads. This allows the higher
@@ -865,17 +851,17 @@ MPU6000::measure()
 	float temperature = 0.0f;
 
 	if (is_icm_device()) { // if it is an ICM20608
-		temperature = (report.temp / 326.8f + 25.0f);
+		temperature = (temp / 326.8f + 25.0f);
 
 	} else { // If it is an MPU6000
-		temperature = (report.temp / 340.0f + 35.0f);
+		temperature = (temp / 340.0f + 35.0f);
 	}
 
 	_px4_accel.set_temperature(temperature);
 	_px4_gyro.set_temperature(temperature);
 
-	_px4_accel.update(timestamp_sample, report.accel_x, report.accel_y, report.accel_z);
-	_px4_gyro.update(timestamp_sample, report.gyro_x, report.gyro_y, report.gyro_z);
+	_px4_accel.update(timestamp_sample, accel_x, accel_y, accel_z);
+	_px4_gyro.update(timestamp_sample, gyro_x, gyro_y, gyro_z);
 
 	/* stop measuring */
 	perf_end(_sample_perf);
