@@ -792,7 +792,6 @@ IST8310::collect()
 	new_report.timestamp = hrt_absolute_time();
 	new_report.is_external = sensor_is_external;
 	new_report.error_count = perf_event_count(_comms_errors);
-	new_report.scaling = _range_scale;
 	new_report.device_id = _device_id.devid;
 
 	/*
@@ -831,16 +830,6 @@ IST8310::collect()
 
 	/* temperature measurement is not available on IST8310 */
 	new_report.temperature = 0;
-
-	/*
-	 * raw outputs
-	 *
-	 * Sensor doesn't follow right hand rule, swap x and y to make it obey
-	 * it.
-	 */
-	new_report.x_raw = report.y;
-	new_report.y_raw = report.x;
-	new_report.z_raw = report.z;
 
 	/* scale values for output */
 	xraw_f = report.y;
@@ -984,9 +973,9 @@ int IST8310::calibrate(struct file *filp, unsigned enable)
 			}
 
 			if (i > 10) {
-				sum[0] += report.x_raw;
-				sum[1] += report.y_raw;
-				sum[2] += report.z_raw;
+				sum[0] += report.x;
+				sum[1] += report.y;
+				sum[2] += report.z;
 			}
 		}
 	}

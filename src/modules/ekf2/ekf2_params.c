@@ -806,6 +806,13 @@ PARAM_DEFINE_FLOAT(EKF2_TERR_NOISE, 5.0f);
 PARAM_DEFINE_FLOAT(EKF2_TERR_GRAD, 0.5f);
 
 /**
+ * Device id of IMU
+ *
+ * @group EKF2
+ */
+PARAM_DEFINE_INT32(EKF2_IMU_ID, 0);
+
+/**
  * X position of IMU in body frame
  *
  * @group EKF2

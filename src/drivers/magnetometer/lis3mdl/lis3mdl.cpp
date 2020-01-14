@@ -355,7 +355,6 @@ LIS3MDL::collect()
 
 	new_mag_report.timestamp = hrt_absolute_time();
 	new_mag_report.error_count = perf_event_count(_comms_errors);
-	new_mag_report.scaling = _range_scale;
 	new_mag_report.device_id = _device_id.devid;
 
 	ret = _interface->read(ADDR_OUT_X_L, (uint8_t *)&lis_report, sizeof(lis_report));
@@ -386,13 +385,6 @@ LIS3MDL::collect()
 	unsigned dummy = 0;
 	sensor_is_onboard = !_interface->ioctl(MAGIOCGEXTERNAL, dummy);
 	new_mag_report.is_external = !sensor_is_onboard;
-
-	/**
-	 * RAW outputs
-	 */
-	new_mag_report.x_raw = report.x;
-	new_mag_report.y_raw = report.y;
-	new_mag_report.z_raw = report.z;
 
 	xraw_f = report.x;
 	yraw_f = report.y;

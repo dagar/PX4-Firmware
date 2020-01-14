@@ -44,20 +44,22 @@
 #include <px4_platform_common/module_params.h>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/sensor_gyro.h>
-#include <uORB/topics/sensor_gyro_control.h>
 #include <uORB/topics/sensor_gyro_fifo.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
 #include <uORB/topics/sensor_gyro_status.h>
 
 class PX4Gyroscope : public cdev::CDev, public ModuleParams
 {
-
 public:
 	PX4Gyroscope(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
 	~PX4Gyroscope() override;
 
 	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
-	uint32_t get_device_id() const { return _device_id; }
+	uint32_t device_id() const { return _device_id; }
+	bool integrator_updated() const { return _integrator_updated; }
+	uint16_t integrator_dt() const { return _integrator_last_dt; }
+	const matrix::Vector3f &delta_angle() { return _delta_angle_prev; }
 
 	void set_device_id(uint32_t device_id) { _device_id = device_id; }
 	void set_device_type(uint8_t devtype);
@@ -68,7 +70,7 @@ public:
 	void set_temperature(float temperature) { _temperature = temperature; }
 	void set_update_rate(uint16_t rate);
 
-	void update(hrt_abstime timestamp, float x, float y, float z);
+	void update(hrt_abstime timestamp_sample, float x, float y, float z);
 
 	void print_status();
 
@@ -87,17 +89,18 @@ public:
 
 	void updateFIFO(const FIFOSample &sample);
 
+	void ResetIntegrator();
+
 private:
 
 	void ConfigureFilter(float cutoff_freq);
 	void ConfigureNotchFilter(float notch_freq, float bandwidth);
-	void ResetIntegrator();
 	void UpdateVibrationMetrics(const matrix::Vector3f &delta_angle);
 
-	uORB::PublicationMulti<sensor_gyro_s>			_sensor_pub;		// legacy message
-	uORB::PublicationMulti<sensor_gyro_control_s>		_sensor_control_pub;
-	uORB::PublicationMulti<sensor_gyro_fifo_s>		_sensor_fifo_pub;
-	uORB::PublicationMultiData<sensor_gyro_status_s>	_sensor_status_pub;
+	uORB::PublicationMulti<sensor_gyro_s>            _sensor_pub;
+	uORB::PublicationMulti<sensor_gyro_fifo_s>       _sensor_fifo_pub;
+	uORB::PublicationMulti<sensor_gyro_integrated_s> _sensor_integrated_pub;
+	uORB::PublicationMultiData<sensor_gyro_status_s> _sensor_status_pub;
 
 	math::LowPassFilter2pVector3f _filter{1000, 100};
 	math::NotchFilter<matrix::Vector3f> _notch_filter{};
@@ -118,9 +121,7 @@ private:
 
 	int			_class_device_instance{-1};
 
-
 	uint32_t		_device_id{0};
-
 	const enum Rotation	_rotation;
 
 	float			_range{math::radians(2000.0f)};
@@ -136,10 +137,12 @@ private:
 	hrt_abstime		_integrator_timestamp_sample{0};
 	hrt_abstime		_timestamp_sample_prev{0};
 	float			_integrator_accum[3] {};
+	uint16_t		_integrator_last_dt{0};
 	uint8_t			_integrator_reset_samples{4};
 	uint8_t			_integrator_samples{0};
 	uint8_t			_integrator_fifo_samples{0};
 	uint8_t			_integrator_clipping{0};
+	bool			_integrator_updated{false};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::IMU_GYRO_CUTOFF>) _param_imu_gyro_cutoff,
@@ -147,5 +150,4 @@ private:
 		(ParamFloat<px4::params::IMU_GYRO_NF_BW>) _param_imu_gyro_nf_bw,
 		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_rate_max
 	)
-
 };

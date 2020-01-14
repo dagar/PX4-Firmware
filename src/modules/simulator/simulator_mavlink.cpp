@@ -193,21 +193,26 @@ void Simulator::update_sensors(const hrt_abstime &time, const mavlink_hil_sensor
 		PX4_DEBUG("All sensor fields in mavlink HIL_SENSOR packet not updated.  Got %08x", imu.fields_updated);
 	}
 
-	// gyro
-	if (!_param_sim_gyro_block.get()) {
-		static constexpr float scaling = 1000.0f;
-		_px4_gyro.set_scale(1 / scaling);
-		_px4_gyro.set_temperature(imu.temperature);
-		_px4_gyro.update(time, imu.xgyro * scaling, imu.ygyro * scaling, imu.zgyro * scaling);
+	// IMU
+	_px4_imu.set_temperature(imu.temperature);
+
+	matrix::Vector3f accel{};
+	matrix::Vector3f gyro{};
+
+	if (!_param_sim_accel_block.get()) {
+		accel(0) = imu.xacc;
+		accel(1) = imu.yacc;
+		accel(2) = imu.zacc;
 	}
 
-	// accel
-	if (!_param_sim_accel_block.get()) {
-		static constexpr float scaling = 1000.0f;
-		_px4_accel.set_scale(1 / scaling);
-		_px4_accel.set_temperature(imu.temperature);
-		_px4_accel.update(time, imu.xacc * scaling, imu.yacc * scaling, imu.zacc * scaling);
+	if (!_param_sim_gyro_block.get()) {
+		gyro(0) = imu.xgyro;
+		gyro(1) = imu.ygyro;
+		gyro(2) = imu.zgyro;
 	}
+
+	_px4_imu.update(time, accel, gyro);
+
 
 	// magnetometer
 	if (!_param_sim_mag_block.get()) {

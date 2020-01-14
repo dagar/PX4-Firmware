@@ -33,6 +33,8 @@
 
 #include "MPU6000.hpp"
 
+using matrix::Vector3f;
+
 /*
   list of registers that will be checked in check_registers(). Note
   that MPUREG_PRODUCT_ID must be first in the list.
@@ -43,34 +45,33 @@ MPU6000::MPU6000(device::Device *interface, enum Rotation rotation, int device_t
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
 	_interface(interface),
 	_device_type(device_type),
-	_px4_accel(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
-	_px4_gyro(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
-	_sample_perf(perf_alloc(PC_ELAPSED, "mpu6k_read")),
-	_bad_transfers(perf_alloc(PC_COUNT, "mpu6k_bad_trans")),
-	_bad_registers(perf_alloc(PC_COUNT, "mpu6k_bad_reg")),
-	_reset_retries(perf_alloc(PC_COUNT, "mpu6k_reset")),
-	_duplicates(perf_alloc(PC_COUNT, "mpu6k_duplicates"))
+	_px4_imu(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_bad_transfers(perf_alloc(PC_COUNT, MODULE_NAME": bad trans")),
+	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": bad reg")),
+	_reset_retries(perf_alloc(PC_COUNT, MODULE_NAME": reset")),
+	_duplicates(perf_alloc(PC_COUNT, MODULE_NAME": duplicates"))
 {
 	switch (_device_type) {
 	default:
 	case MPU_DEVICE_TYPE_MPU6000:
-		_px4_accel.set_device_type(DRV_ACC_DEVTYPE_MPU6000);
-		_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_MPU6000);
+		_px4_imu.accel().set_device_type(DRV_ACC_DEVTYPE_MPU6000);
+		_px4_imu.gyro().set_device_type(DRV_GYR_DEVTYPE_MPU6000);
 		break;
 
 	case MPU_DEVICE_TYPE_ICM20602:
-		_px4_accel.set_device_type(DRV_ACC_DEVTYPE_ICM20602);
-		_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_ICM20602);
+		_px4_imu.accel().set_device_type(DRV_ACC_DEVTYPE_ICM20602);
+		_px4_imu.gyro().set_device_type(DRV_GYR_DEVTYPE_ICM20602);
 		break;
 
 	case MPU_DEVICE_TYPE_ICM20608:
-		_px4_accel.set_device_type(DRV_ACC_DEVTYPE_ICM20608);
-		_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_ICM20608);
+		_px4_imu.accel().set_device_type(DRV_ACC_DEVTYPE_ICM20608);
+		_px4_imu.gyro().set_device_type(DRV_GYR_DEVTYPE_ICM20608);
 		break;
 
 	case MPU_DEVICE_TYPE_ICM20689:
-		_px4_accel.set_device_type(DRV_ACC_DEVTYPE_ICM20689);
-		_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_ICM20689);
+		_px4_imu.accel().set_device_type(DRV_ACC_DEVTYPE_ICM20689);
+		_px4_imu.gyro().set_device_type(DRV_GYR_DEVTYPE_ICM20689);
 		break;
 	}
 }
@@ -177,7 +178,7 @@ int MPU6000::reset()
 	// 2000 deg/s = (2000/180)*PI = 34.906585 rad/s
 	// scaling factor:
 	// 1/(2^15)*(2000/180)*PI
-	_px4_gyro.set_scale(0.0174532f / 16.4f);//1.0f / (32768.0f * (2000.0f / 180.0f) * M_PI_F);
+	_px4_imu.gyro().set_scale(0.0174532f / 16.4f);//1.0f / (32768.0f * (2000.0f / 180.0f) * M_PI_F);
 
 	set_accel_range(MPU6000_ACCEL_DEFAULT_RANGE_G);
 
@@ -592,7 +593,7 @@ MPU6000::set_accel_range(unsigned max_g_in)
 		case MPU6000_REV_C4:
 		case MPU6000_REV_C5:
 			write_checked_reg(MPUREG_ACCEL_CONFIG, 1 << 3);
-			_px4_accel.set_scale(CONSTANTS_ONE_G / 4096.0f);
+			_px4_imu.accel().set_scale(CONSTANTS_ONE_G / 4096.0f);
 			return OK;
 		}
 	}
@@ -624,7 +625,7 @@ MPU6000::set_accel_range(unsigned max_g_in)
 
 	write_checked_reg(MPUREG_ACCEL_CONFIG, afs_sel << 3);
 
-	_px4_accel.set_scale(CONSTANTS_ONE_G / lsb_per_g);
+	_px4_imu.accel().set_scale(CONSTANTS_ONE_G / lsb_per_g);
 
 	return OK;
 }
@@ -820,32 +821,25 @@ MPU6000::measure()
 		return OK;
 	}
 
-
 	/*
 	 * Swap axes and negate y
 	 */
-	int16_t accel_xt = report.accel_y;
-	int16_t accel_yt = ((report.accel_x == -32768) ? 32767 : -report.accel_x);
+	Vector3f accel;
+	accel(0) = report.accel_y;
+	accel(1) = ((report.accel_x == -32768) ? 32767 : -report.accel_x);
+	accel(2) = report.accel_z;
 
-	int16_t gyro_xt = report.gyro_y;
-	int16_t gyro_yt = ((report.gyro_x == -32768) ? 32767 : -report.gyro_x);
-
-	/*
-	 * Apply the swap
-	 */
-	report.accel_x = accel_xt;
-	report.accel_y = accel_yt;
-	report.gyro_x = gyro_xt;
-	report.gyro_y = gyro_yt;
+	Vector3f gyro;
+	gyro(0) = report.gyro_y;
+	gyro(1) = ((report.gyro_x == -32768) ? 32767 : -report.gyro_x);
+	gyro(2) = report.gyro_z;
 
 	// report the error count as the sum of the number of bad
 	// transfers and bad register reads. This allows the higher
 	// level code to decide if it should use this sensor based on
 	// whether it has had failures
-
 	const uint64_t error_count = perf_event_count(_bad_transfers) + perf_event_count(_bad_registers);
-	_px4_accel.set_error_count(error_count);
-	_px4_gyro.set_error_count(error_count);
+	_px4_imu.set_error_count(error_count);
 
 	/*
 	 * 1) Scale raw value to SI units using scaling from datasheet.
@@ -871,11 +865,9 @@ MPU6000::measure()
 		temperature = (report.temp / 340.0f + 35.0f);
 	}
 
-	_px4_accel.set_temperature(temperature);
-	_px4_gyro.set_temperature(temperature);
+	_px4_imu.set_temperature(temperature);
 
-	_px4_accel.update(timestamp_sample, report.accel_x, report.accel_y, report.accel_z);
-	_px4_gyro.update(timestamp_sample, report.gyro_x, report.gyro_y, report.gyro_z);
+	_px4_imu.update(timestamp_sample, accel, gyro);
 
 	/* stop measuring */
 	perf_end(_sample_perf);
@@ -891,8 +883,7 @@ MPU6000::print_info()
 	perf_print_counter(_reset_retries);
 	perf_print_counter(_duplicates);
 
-	_px4_accel.print_status();
-	_px4_gyro.print_status();
+	_px4_imu.print_status();
 }
 
 void

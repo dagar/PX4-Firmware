@@ -49,8 +49,7 @@ VehicleAcceleration::~VehicleAcceleration()
 	Stop();
 }
 
-bool
-VehicleAcceleration::Start()
+bool VehicleAcceleration::Start()
 {
 	// initialize thermal corrections as we might not immediately get a topic update (only non-zero values)
 	_scale = Vector3f{1.0f, 1.0f, 1.0f};
@@ -60,15 +59,13 @@ VehicleAcceleration::Start()
 	// force initial updates
 	ParametersUpdate(true);
 	SensorBiasUpdate(true);
+	SensorCorrectionsUpdate(true);
 
 	// needed to change the active sensor if the primary stops updating
-	_sensor_selection_sub.registerCallback();
-
-	return SensorCorrectionsUpdate(true);
+	return _sensor_selection_sub.registerCallback() && SensorSelectionUpdate(true);
 }
 
-void
-VehicleAcceleration::Stop()
+void VehicleAcceleration::Stop()
 {
 	Deinit();
 
@@ -80,8 +77,7 @@ VehicleAcceleration::Stop()
 	_sensor_selection_sub.unregisterCallback();
 }
 
-void
-VehicleAcceleration::SensorBiasUpdate(bool force)
+void VehicleAcceleration::SensorBiasUpdate(bool force)
 {
 	if (_sensor_bias_sub.updated() || force) {
 		sensor_bias_s bias;
@@ -93,8 +89,7 @@ VehicleAcceleration::SensorBiasUpdate(bool force)
 	}
 }
 
-bool
-VehicleAcceleration::SensorCorrectionsUpdate(bool force)
+void VehicleAcceleration::SensorCorrectionsUpdate(bool force)
 {
 	// check if the selected sensor has updated
 	if (_sensor_correction_sub.updated() || force) {
@@ -102,49 +97,71 @@ VehicleAcceleration::SensorCorrectionsUpdate(bool force)
 		sensor_correction_s corrections{};
 		_sensor_correction_sub.copy(&corrections);
 
-		// TODO: should be checking device ID
-		if (_selected_sensor == 0) {
+		// selected sensor has changed, find updated index
+		if ((_corrections_selected_instance != corrections.selected_accel_instance) || force) {
+
+			// find sensor_corrections index
+			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+				if (corrections.accel_device_ids[i] == _selected_sensor_device_id) {
+					_corrections_selected_instance = i;
+				}
+			}
+		}
+
+		switch (_corrections_selected_instance) {
+		case 0:
 			_offset = Vector3f{corrections.accel_offset_0};
 			_scale = Vector3f{corrections.accel_scale_0};
-
-		} else if (_selected_sensor == 1) {
+			break;
+		case 1:
 			_offset = Vector3f{corrections.accel_offset_1};
 			_scale = Vector3f{corrections.accel_scale_1};
-
-		} else if (_selected_sensor == 2) {
+			break;
+		case 2:
 			_offset = Vector3f{corrections.accel_offset_2};
 			_scale = Vector3f{corrections.accel_scale_2};
-
-		} else {
+			break;
+		default:
 			_offset = Vector3f{0.0f, 0.0f, 0.0f};
 			_scale = Vector3f{1.0f, 1.0f, 1.0f};
 		}
+	}
+}
 
-		// update the latest sensor selection
-		if ((_selected_sensor != corrections.selected_accel_instance) || force) {
-			if (corrections.selected_accel_instance < MAX_SENSOR_COUNT) {
-				// clear all registered callbacks
-				for (auto &sub : _sensor_sub) {
-					sub.unregisterCallback();
-				}
+bool VehicleAcceleration::SensorSelectionUpdate(bool force)
+{
+	if (_sensor_selection_sub.updated() || (_selected_sensor_device_id == 0) || force) {
+		sensor_selection_s sensor_selection{};
+		_sensor_selection_sub.copy(&sensor_selection);
 
-				const int sensor_new = corrections.selected_accel_instance;
+		if (_selected_sensor_device_id != sensor_selection.accel_device_id) {
+			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+				sensor_accel_s report{};
+				_sensor_sub[i].copy(&report);
 
-				if (_sensor_sub[sensor_new].registerCallback()) {
-					PX4_DEBUG("selected sensor changed %d -> %d", _selected_sensor, sensor_new);
-					_selected_sensor = sensor_new;
+				if ((report.device_id != 0) && (report.device_id == sensor_selection.accel_device_id)) {
+					if (_sensor_sub[i].registerCallback()) {
+						PX4_DEBUG("selected sensor (control) changed %d -> %d", _selected_sensor_sub_index, i);
 
-					return true;
+						// record selected sensor (array index)
+						_selected_sensor_sub_index = i;
+						_selected_sensor_device_id = sensor_selection.accel_device_id;
+
+						return true;
+					}
 				}
 			}
+
+			PX4_ERR("unable to find or subscribe to selected sensor (%d)", sensor_selection.accel_device_id);
+			_selected_sensor_device_id = 0;
+			_selected_sensor_sub_index = 0;
 		}
 	}
 
 	return false;
 }
 
-void
-VehicleAcceleration::ParametersUpdate(bool force)
+void VehicleAcceleration::ParametersUpdate(bool force)
 {
 	// Check if parameters have changed
 	if (_params_sub.updated() || force) {
@@ -167,20 +184,19 @@ VehicleAcceleration::ParametersUpdate(bool force)
 	}
 }
 
-void
-VehicleAcceleration::Run()
+void VehicleAcceleration::Run()
 {
 	// update corrections first to set _selected_sensor
-	bool sensor_select_update = SensorCorrectionsUpdate();
+	bool sensor_select_update = SensorSelectionUpdate();
+	SensorCorrectionsUpdate(sensor_select_update);
+	ParametersUpdate();
+	SensorBiasUpdate();
 
-	if (_sensor_sub[_selected_sensor].updated() || sensor_select_update) {
+	if (_sensor_sub[_selected_sensor_sub_index].updated() || sensor_select_update) {
 		sensor_accel_s sensor_data;
-		_sensor_sub[_selected_sensor].copy(&sensor_data);
+		_sensor_sub[_selected_sensor_sub_index].copy(&sensor_data);
 
-		ParametersUpdate();
-		SensorBiasUpdate();
-
-		// get the sensor data and correct for thermal errors
+		// get the sensor data and correct for thermal errors (apply offsets and scale)
 		const Vector3f val{sensor_data.x, sensor_data.y, sensor_data.z};
 
 		// apply offsets and scale
@@ -201,8 +217,7 @@ VehicleAcceleration::Run()
 	}
 }
 
-void
-VehicleAcceleration::PrintStatus()
+void VehicleAcceleration::PrintStatus()
 {
-	PX4_INFO("selected sensor: %d", _selected_sensor);
+	PX4_INFO("selected sensor: %d (%d)", _selected_sensor_device_id, _selected_sensor_sub_index);
 }

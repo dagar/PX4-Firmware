@@ -31,7 +31,7 @@
 #
 ############################################################################
 px4_add_module(
-	MODULE drivers__mpu6000
+	MODULE drivers__imu__mpu6000
 	MAIN mpu6000
 	SRCS
 		MPU6000.cpp
@@ -39,6 +39,6 @@ px4_add_module(
 		mpu6000_main.cpp
 		MPU6000_SPI.cpp
 	DEPENDS
-		drivers_accelerometer
-		drivers_gyroscope
+		drivers_imu
+		px4_work_queue
 	)

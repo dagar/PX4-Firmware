@@ -43,7 +43,6 @@ px4_add_module(
 		mpu9250_spi.cpp
 	DEPENDS
 		px4_work_queue
-		drivers_accelerometer
-		drivers_gyroscope
+		drivers_imu
 		drivers_magnetometer
 	)

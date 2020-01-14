@@ -66,10 +66,10 @@ public:
 	void	PrintStatus();
 
 private:
-
-	void	ParametersUpdate(bool force = false);
-	void	SensorBiasUpdate(bool force = false);
-	bool	SensorCorrectionsUpdate(bool force = false);
+	void ParametersUpdate(bool force = false);
+	void SensorBiasUpdate(bool force = false);
+	void SensorCorrectionsUpdate(bool force = false);
+	bool SensorSelectionUpdate(bool force = false);
 
 	static constexpr int MAX_SENSOR_COUNT = 3;
 
@@ -100,6 +100,7 @@ private:
 	matrix::Vector3f			_scale;
 	matrix::Vector3f			_bias;
 
-	uint8_t					_selected_sensor{0};
-
+	uint32_t				_selected_sensor_device_id{0};
+	uint8_t					_selected_sensor_sub_index{0};
+	int8_t					_corrections_selected_instance{-1};
 };

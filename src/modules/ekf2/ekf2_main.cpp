@@ -65,12 +65,12 @@
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_bias.h>
-#include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/vehicle_imu.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_magnetometer.h>
@@ -129,7 +129,7 @@ private:
 	template<typename Param>
 	bool update_mag_decl(Param &mag_decl_param);
 
-	bool publish_attitude(const sensor_combined_s &sensors, const hrt_abstime &now);
+	bool publish_attitude(const hrt_abstime &now);
 	bool publish_wind_estimate(const hrt_abstime &timestamp);
 
 	const Vector3f get_vel_body_wind();
@@ -256,7 +256,13 @@ private:
 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 
-	uORB::SubscriptionCallbackWorkItem _sensors_sub{this, ORB_ID(sensor_combined)};
+	static constexpr int MAX_SENSOR_COUNT = 3;
+	uORB::SubscriptionCallbackWorkItem _vehicle_imu_subs[MAX_SENSOR_COUNT] {
+		{this, ORB_ID(vehicle_imu), 0},
+		{this, ORB_ID(vehicle_imu), 1},
+		{this, ORB_ID(vehicle_imu), 2}
+	};
+	int _imu_sub_index{0};
 
 	// because we can have several distance sensor instances with different orientations
 	uORB::Subscription _range_finder_subs[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(distance_sensor), 0}, {ORB_ID(distance_sensor), 1}, {ORB_ID(distance_sensor), 2}, {ORB_ID(distance_sensor), 3}};
@@ -432,6 +438,8 @@ private:
 		_param_ekf2_of_qmin,	///< minimum acceptable quality integer from  the flow sensor
 		(ParamExtFloat<px4::params::EKF2_OF_GATE>)
 		_param_ekf2_of_gate,	///< optical flow fusion innovation consistency gate size (STD)
+
+		(ParamInt<px4::params::EKF2_IMU_ID>) _param_ekf2_imu_id,
 
 		// sensor positions in body frame
 		(ParamExtFloat<px4::params::EKF2_IMU_POS_X>) _param_ekf2_imu_pos_x,		///< X position of IMU in body frame (m)
@@ -647,15 +655,35 @@ Ekf2::~Ekf2()
 	perf_free(_ekf_update_perf);
 }
 
-bool
-Ekf2::init()
+bool Ekf2::init()
 {
-	if (!_sensors_sub.registerCallback()) {
-		PX4_ERR("sensor combined callback registration failed!");
-		return false;
+	uint32_t device_id = _param_ekf2_imu_id.get();
+
+	if (device_id == 0) {
+		if (_sensor_selection_sub.copy(&_sensor_selection)) {
+			device_id = _sensor_selection.accel_device_id;
+		}
 	}
 
-	return true;
+	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+		vehicle_imu_s imu{};
+
+		if (_vehicle_imu_subs[i].copy(&imu)) {
+			if ((imu.accel_device_id > 0) && (imu.accel_device_id == device_id)) {
+				if (_vehicle_imu_subs[i].registerCallback()) {
+					_imu_sub_index = i;
+					return true;
+
+				} else {
+					PX4_ERR("failed to register callback: %d", i);
+				}
+			}
+		}
+	}
+
+	PX4_ERR("unable to find and subscribe to vehicle_imu %d", device_id);
+
+	return false;
 }
 
 int Ekf2::print_status()
@@ -707,14 +735,18 @@ bool Ekf2::update_mag_decl(Param &mag_decl_param)
 void Ekf2::Run()
 {
 	if (should_exit()) {
-		_sensors_sub.unregisterCallback();
+
+		for (auto &i : _vehicle_imu_subs) {
+			i.unregisterCallback();
+		}
+
 		exit_and_cleanup();
 		return;
 	}
 
-	sensor_combined_s sensors;
+	vehicle_imu_s imu;
 
-	if (_sensors_sub.update(&sensors)) {
+	if (_vehicle_imu_subs[_imu_sub_index].update(&imu)) {
 
 		// check for parameter updates
 		if (_parameter_update_sub.updated()) {
@@ -728,7 +760,7 @@ void Ekf2::Run()
 
 		// ekf2_timestamps (using 0.1 ms relative timestamps)
 		ekf2_timestamps_s ekf2_timestamps{};
-		ekf2_timestamps.timestamp = sensors.timestamp;
+		ekf2_timestamps.timestamp = imu.timestamp;
 
 		ekf2_timestamps.airspeed_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
 		ekf2_timestamps.distance_sensor_timestamp_rel = ekf2_timestamps_s::RELATIVE_TIMESTAMP_INVALID;
@@ -756,14 +788,17 @@ void Ekf2::Run()
 
 			if (_sensor_selection_sub.copy(&_sensor_selection)) {
 				if ((sensor_selection_prev.timestamp > 0) && (_sensor_selection.timestamp > sensor_selection_prev.timestamp)) {
-					if (_sensor_selection.accel_device_id != sensor_selection_prev.accel_device_id) {
-						PX4_WARN("accel id changed, resetting IMU bias");
-						_imu_bias_reset_request = true;
-					}
 
-					if (_sensor_selection.gyro_device_id != sensor_selection_prev.gyro_device_id) {
-						PX4_WARN("gyro id changed, resetting IMU bias");
-						_imu_bias_reset_request = true;
+					if (_param_ekf2_imu_id.get() == 0) {
+						if (_sensor_selection.accel_device_id != sensor_selection_prev.accel_device_id) {
+							PX4_WARN("accel id changed, resetting IMU bias");
+							_imu_bias_reset_request = true;
+						}
+
+						if (_sensor_selection.gyro_device_id != sensor_selection_prev.gyro_device_id) {
+							PX4_WARN("gyro id changed, resetting IMU bias");
+							_imu_bias_reset_request = true;
+						}
 					}
 				}
 			}
@@ -774,20 +809,20 @@ void Ekf2::Run()
 			_imu_bias_reset_request = !_ekf.reset_imu_bias();
 		}
 
-		const hrt_abstime now = sensors.timestamp;
+		const hrt_abstime now = imu.timestamp;
 
 		// push imu data into estimator
 		imuSample imu_sample_new;
 		imu_sample_new.time_us = now;
-		imu_sample_new.delta_ang_dt = sensors.gyro_integral_dt * 1.e-6f;
-		imu_sample_new.delta_ang = Vector3f{sensors.gyro_rad} * imu_sample_new.delta_ang_dt;
-		imu_sample_new.delta_vel_dt = sensors.accelerometer_integral_dt * 1.e-6f;
-		imu_sample_new.delta_vel = Vector3f{sensors.accelerometer_m_s2} * imu_sample_new.delta_vel_dt;
+		imu_sample_new.delta_ang_dt = imu.dt * 1.e-6f;
+		imu_sample_new.delta_ang = Vector3f{imu.delta_angle};
+		imu_sample_new.delta_vel_dt = imu.dt * 1.e-6f;
+		imu_sample_new.delta_vel = Vector3f{imu.delta_velocity};
 
 		_ekf.setIMUData(imu_sample_new);
 
 		// publish attitude immediately (uses quaternion from output predictor)
-		publish_attitude(sensors, now);
+		publish_attitude(now);
 
 		// read mag data
 		if (_magnetometer_sub.updated()) {
@@ -1199,7 +1234,7 @@ void Ekf2::Run()
 			_last_time_slip_us = 0;
 
 		} else if (_start_time_us > 0) {
-			_integrated_time_us += sensors.gyro_integral_dt;
+			_integrated_time_us += imu.dt;
 			_last_time_slip_us = (now - _start_time_us) - _integrated_time_us;
 		}
 
@@ -1289,9 +1324,10 @@ void Ekf2::Run()
 				// Vehicle odometry angular rates
 				float gyro_bias[3];
 				_ekf.get_gyro_bias(gyro_bias);
-				odom.rollspeed = sensors.gyro_rad[0] - gyro_bias[0];
-				odom.pitchspeed = sensors.gyro_rad[1] - gyro_bias[1];
-				odom.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
+				const Vector3f rates{imu_sample_new.delta_ang * imu_sample_new.delta_ang_dt};
+				odom.rollspeed = rates(0) - gyro_bias[0];
+				odom.pitchspeed = rates(1) - gyro_bias[1];
+				odom.yawspeed = rates(2) - gyro_bias[2];
 
 				lpos.dist_bottom_valid = _ekf.get_terrain_valid();
 
@@ -1471,6 +1507,9 @@ void Ekf2::Run()
 				sensor_bias_s bias{};
 
 				bias.timestamp = now;
+
+				bias.gyro_device_id = imu.accel_device_id;
+				bias.accel_device_id = imu.gyro_device_id;
 
 				// In-run bias estimates
 				_ekf.get_gyro_bias(bias.gyro_bias);
@@ -1675,7 +1714,7 @@ void Ekf2::Run()
 
 				// calculate noise filtered velocity innovations which are used for pre-flight checking
 				if (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY) {
-					float dt_seconds = sensors.accelerometer_integral_dt * 1e-6f;
+					float dt_seconds = imu_sample_new.delta_ang_dt;
 					runPreFlightChecks(dt_seconds, control_status, _vehicle_status, innovations);
 
 				} else {
@@ -1753,7 +1792,7 @@ int Ekf2::getRangeSubIndex()
 	return -1;
 }
 
-bool Ekf2::publish_attitude(const sensor_combined_s &sensors, const hrt_abstime &now)
+bool Ekf2::publish_attitude(const hrt_abstime &now)
 {
 	if (_ekf.attitude_valid()) {
 		// generate vehicle attitude quaternion data

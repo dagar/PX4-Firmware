@@ -45,18 +45,21 @@
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_accel_fifo.h>
+#include <uORB/topics/sensor_accel_integrated.h>
 #include <uORB/topics/sensor_accel_status.h>
 
 class PX4Accelerometer : public cdev::CDev, public ModuleParams
 {
-
 public:
 	PX4Accelerometer(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
 	~PX4Accelerometer() override;
 
 	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
-	uint32_t get_device_id() const { return _device_id; }
+	uint32_t device_id() const { return _device_id; }
+	bool integrator_updated() const { return _integrator_updated; }
+	uint16_t integrator_dt() const { return _integrator_last_dt; }
+	const matrix::Vector3f &delta_velocity() { return _delta_velocity_prev; }
 
 	void set_device_id(uint32_t device_id) { _device_id = device_id; }
 	void set_device_type(uint8_t devtype);
@@ -67,7 +70,7 @@ public:
 	void set_temperature(float temperature) { _temperature = temperature; }
 	void set_update_rate(uint16_t rate);
 
-	void update(hrt_abstime timestamp, float x, float y, float z);
+	void update(hrt_abstime timestamp_sample, float x, float y, float z);
 
 	void print_status();
 
@@ -86,15 +89,17 @@ public:
 
 	void updateFIFO(const FIFOSample &sample);
 
+	void ResetIntegrator();
+
 private:
 
 	void ConfigureFilter(float cutoff_freq);
-	void ResetIntegrator();
 	void UpdateVibrationMetrics(const matrix::Vector3f &delta_velocity);
 
-	uORB::PublicationMulti<sensor_accel_s>			_sensor_pub;		// legacy message
-	uORB::PublicationMulti<sensor_accel_fifo_s>		_sensor_fifo_pub;
-	uORB::PublicationMultiData<sensor_accel_status_s>	_sensor_status_pub;
+	uORB::PublicationMulti<sensor_accel_s>            _sensor_pub;
+	uORB::PublicationMulti<sensor_accel_fifo_s>       _sensor_fifo_pub;
+	uORB::PublicationMulti<sensor_accel_integrated_s> _sensor_integrated_pub;
+	uORB::PublicationMultiData<sensor_accel_status_s> _sensor_status_pub;
 
 	math::LowPassFilter2pVector3f _filter{1000, 100};
 
@@ -112,9 +117,7 @@ private:
 
 	int			_class_device_instance{-1};
 
-
 	uint32_t		_device_id{0};
-
 	const enum Rotation	_rotation;
 
 	float			_range{16.0f * CONSTANTS_ONE_G};
@@ -130,13 +133,14 @@ private:
 	hrt_abstime		_integrator_timestamp_sample{0};
 	hrt_abstime		_timestamp_sample_prev{0};
 	float			_integrator_accum[3] {};
+	uint16_t		_integrator_last_dt{0};
 	uint8_t			_integrator_reset_samples{4};
 	uint8_t			_integrator_samples{0};
 	uint8_t			_integrator_fifo_samples{0};
 	uint8_t			_integrator_clipping{0};
+	bool			_integrator_updated{false};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::IMU_ACCEL_CUTOFF>) _param_imu_accel_cutoff
 	)
-
 };

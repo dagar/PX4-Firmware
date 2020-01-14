@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,47 +33,36 @@
 
 #pragma once
 
-#include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
 #include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_mag.h>
+#include <uORB/topics/sensor_imu.h>
 
-class PX4Magnetometer : public cdev::CDev
+#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
+#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
+
+class PX4IMU
 {
 public:
-	PX4Magnetometer(uint32_t device_id, uint8_t priority, enum Rotation rotation);
-	~PX4Magnetometer() override;
+	PX4IMU(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
+	~PX4IMU() = default;
 
-	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
+	void set_error_count(uint64_t error_count);
+	void set_sample_rate(uint16_t rate);
+	void set_temperature(float temperature);
+	void set_update_rate(uint16_t rate);
 
-	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _error_count = error_count; }
-	void set_scale(float scale) { _scale = scale; }
-	void set_temperature(float temperature) { _sensor_mag_pub.get().temperature = temperature; }
-	void set_external(bool external) { _sensor_mag_pub.get().is_external = external; }
-	void set_sensitivity(float x, float y, float z) { _sensitivity = matrix::Vector3f{x, y, z}; }
+	PX4Accelerometer &accel() { return _accel; }
+	PX4Gyroscope &gyro() { return _gyro; }
 
-	void update(hrt_abstime timestamp_sample, float x, float y, float z);
+	void update(hrt_abstime timestamp_sample, matrix::Vector3f accel, matrix::Vector3f gyro);
 
 	void print_status();
 
 private:
 
-	uORB::PublicationMultiData<sensor_mag_s>	_sensor_mag_pub;
+	PX4Accelerometer _accel;
+	PX4Gyroscope     _gyro;
 
-	matrix::Vector3f	_calibration_scale{1.0f, 1.0f, 1.0f};
-	matrix::Vector3f	_calibration_offset{0.0f, 0.0f, 0.0f};
-
-	matrix::Vector3f	_sensitivity{1.0f, 1.0f, 1.0f};
-
-	int			_class_device_instance{-1};
-
-	uint32_t		_device_id{0};
-	const enum Rotation	_rotation;
-
-	float			_scale{1.0f};
-
-	uint64_t		_error_count{0};
+	uORB::PublicationMulti<sensor_imu_s> _sensor_imu_pub;
 };

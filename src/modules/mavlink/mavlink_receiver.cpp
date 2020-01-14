@@ -80,6 +80,11 @@
 
 using matrix::wrap_2pi;
 
+MavlinkReceiver::~MavlinkReceiver()
+{
+	delete _px4_imu;
+}
+
 MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	ModuleParams(nullptr),
 	_mavlink(parent),
@@ -2067,6 +2072,25 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 
 	const uint64_t timestamp = hrt_absolute_time();
 
+	// IMU
+	{
+		if (_px4_imu == nullptr) {
+			// 1311244: DRV_ACC_DEVTYPE_ACCELSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+			_px4_imu = new PX4IMU(1311244, ORB_PRIO_DEFAULT, ROTATION_NONE);
+
+			_px4_imu->accel().set_device_type(DRV_ACC_DEVTYPE_ACCELSIM);
+			_px4_imu->gyro().set_device_type(DRV_GYR_DEVTYPE_GYROSIM);
+		}
+
+		if (_px4_imu != nullptr) {
+			_px4_imu->set_temperature(imu.temperature);
+
+			matrix::Vector3f accel{imu.xacc, imu.yacc, imu.zacc};
+			matrix::Vector3f gyro{imu.xgyro, imu.ygyro, imu.zgyro};
+			_px4_imu->update(timestamp, accel, gyro);
+		}
+	}
+
 	/* airspeed */
 	{
 		airspeed_s airspeed{};
@@ -2083,46 +2107,11 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 		_airspeed_pub.publish(airspeed);
 	}
 
-	/* gyro */
-	{
-		sensor_gyro_s gyro{};
-
-		gyro.timestamp = timestamp;
-		gyro.x_raw = imu.xgyro * 1000.0f;
-		gyro.y_raw = imu.ygyro * 1000.0f;
-		gyro.z_raw = imu.zgyro * 1000.0f;
-		gyro.x = imu.xgyro;
-		gyro.y = imu.ygyro;
-		gyro.z = imu.zgyro;
-		gyro.temperature = imu.temperature;
-
-		_gyro_pub.publish(gyro);
-	}
-
-	/* accelerometer */
-	{
-		sensor_accel_s accel{};
-
-		accel.timestamp = timestamp;
-		accel.x_raw = imu.xacc / (CONSTANTS_ONE_G / 1000.0f);
-		accel.y_raw = imu.yacc / (CONSTANTS_ONE_G / 1000.0f);
-		accel.z_raw = imu.zacc / (CONSTANTS_ONE_G / 1000.0f);
-		accel.x = imu.xacc;
-		accel.y = imu.yacc;
-		accel.z = imu.zacc;
-		accel.temperature = imu.temperature;
-
-		_accel_pub.publish(accel);
-	}
-
 	/* magnetometer */
 	{
 		sensor_mag_s mag{};
 
 		mag.timestamp = timestamp;
-		mag.x_raw = imu.xmag * 1000.0f;
-		mag.y_raw = imu.ymag * 1000.0f;
-		mag.z_raw = imu.zmag * 1000.0f;
 		mag.x = imu.xmag;
 		mag.y = imu.ymag;
 		mag.z = imu.zmag;
@@ -2489,36 +2478,24 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		_local_pos_pub.publish(hil_local_pos);
 	}
 
-	/* accelerometer */
+	// IMU
 	{
-		sensor_accel_s accel{};
+		if (_px4_imu == nullptr) {
+			// 1311244: DRV_ACC_DEVTYPE_ACCELSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+			_px4_imu = new PX4IMU(1311244, ORB_PRIO_DEFAULT, ROTATION_NONE);
 
-		accel.timestamp = timestamp;
-		accel.x_raw = hil_state.xacc / CONSTANTS_ONE_G * 1e3f;
-		accel.y_raw = hil_state.yacc / CONSTANTS_ONE_G * 1e3f;
-		accel.z_raw = hil_state.zacc / CONSTANTS_ONE_G * 1e3f;
-		accel.x = hil_state.xacc;
-		accel.y = hil_state.yacc;
-		accel.z = hil_state.zacc;
-		accel.temperature = 25.0f;
+			_px4_imu->accel().set_device_type(DRV_ACC_DEVTYPE_ACCELSIM);
+			_px4_imu->gyro().set_device_type(DRV_GYR_DEVTYPE_GYROSIM);
+		}
 
-		_accel_pub.publish(accel);
-	}
+		if (_px4_imu != nullptr) {
+			// accel in mG
+			_px4_imu->accel().set_scale(CONSTANTS_ONE_G / 1000.0f);
 
-	/* gyroscope */
-	{
-		sensor_gyro_s gyro{};
-
-		gyro.timestamp = timestamp;
-		gyro.x_raw = hil_state.rollspeed * 1e3f;
-		gyro.y_raw = hil_state.pitchspeed * 1e3f;
-		gyro.z_raw = hil_state.yawspeed * 1e3f;
-		gyro.x = hil_state.rollspeed;
-		gyro.y = hil_state.pitchspeed;
-		gyro.z = hil_state.yawspeed;
-		gyro.temperature = 25.0f;
-
-		_gyro_pub.publish(gyro);
+			matrix::Vector3f accel{(float)hil_state.xacc, (float)hil_state.yacc, (float)hil_state.zacc};
+			matrix::Vector3f gyro{hil_state.rollspeed, hil_state.pitchspeed, hil_state.yawspeed};
+			_px4_imu->update(timestamp, accel, gyro);
+		}
 	}
 
 	/* battery status */

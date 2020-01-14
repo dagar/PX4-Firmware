@@ -66,11 +66,8 @@ void Simulator::parameters_update(bool force)
 
 void Simulator::print_status()
 {
-	PX4_INFO("accelerometer");
-	_px4_accel.print_status();
-
-	PX4_INFO("gyroscope");
-	_px4_gyro.print_status();
+	PX4_INFO("imu");
+	_px4_imu.print_status();
 
 	PX4_INFO("magnetometer");
 	_px4_mag.print_status();

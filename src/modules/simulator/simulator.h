@@ -45,9 +45,8 @@
 #include <battery/battery.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_rc_input.h>
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
+#include <lib/drivers/imu/PX4IMU.hpp>
 #include <lib/drivers/barometer/PX4Barometer.hpp>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
 #include <lib/ecl/geo/geo.h>
 #include <lib/perf/perf_counter.h>
@@ -103,8 +102,9 @@ public:
 private:
 	Simulator() : ModuleParams(nullptr)
 	{
-		_px4_accel.set_sample_rate(250);
-		_px4_gyro.set_sample_rate(250);
+		_px4_imu.set_sample_rate(250);
+		_px4_imu.set_update_rate(250);
+		_px4_imu.gyro().set_device_type(DRV_GYR_DEVTYPE_GYROSIM);
 	}
 
 	~Simulator()
@@ -125,8 +125,7 @@ private:
 	static Simulator *_instance;
 
 	// simulated sensor instances
-	PX4Accelerometer	_px4_accel{1311244, ORB_PRIO_DEFAULT, ROTATION_NONE}; // 1311244: DRV_ACC_DEVTYPE_ACCELSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-	PX4Gyroscope		_px4_gyro{2294028, ORB_PRIO_DEFAULT, ROTATION_NONE}; // 2294028: DRV_GYR_DEVTYPE_GYROSIM, BUS: 1, ADDR: 2, TYPE: SIMULATION
+	PX4IMU	_px4_imu{1311244, ORB_PRIO_DEFAULT, ROTATION_NONE}; // 1311244: DRV_ACC_DEVTYPE_ACCELSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
 	PX4Magnetometer		_px4_mag{197388, ORB_PRIO_DEFAULT, ROTATION_NONE}; // 197388: DRV_MAG_DEVTYPE_MAGSIM, BUS: 3, ADDR: 1, TYPE: SIMULATION
 	PX4Barometer		_px4_baro{6620172, ORB_PRIO_DEFAULT}; // 6620172: DRV_BARO_DEVTYPE_BAROSIM, BUS: 1, ADDR: 4, TYPE: SIMULATION
 

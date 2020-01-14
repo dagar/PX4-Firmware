@@ -72,6 +72,7 @@
 #include "voted_sensors_update.h"
 #include "vehicle_acceleration/VehicleAcceleration.hpp"
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
+#include "vehicle_imu/VehicleIMU.hpp"
 
 using namespace sensors;
 using namespace time_literals;
@@ -138,8 +139,10 @@ private:
 
 	VotedSensorsUpdate _voted_sensors_update;
 
-	VehicleAcceleration	_vehicle_acceleration;
-	VehicleAngularVelocity	_vehicle_angular_velocity;
+	VehicleAcceleration    _vehicle_acceleration;
+	VehicleAngularVelocity _vehicle_angular_velocity;
+
+	VehicleIMU      *_vehicle_imu_list[3] {};
 
 
 	/**
@@ -188,12 +191,37 @@ Sensors::Sensors(bool hil_enabled) :
 
 	_vehicle_acceleration.Start();
 	_vehicle_angular_velocity.Start();
+
+
+	// find accel/gyro pairs
+	// _vehicle_imu_list
+	for (uint8_t i = 0; i < 3; i++) {
+		uORB::Subscription accel{ORB_ID(sensor_accel_integrated), i};
+		uORB::Subscription gyro{ORB_ID(sensor_gyro_integrated), i};
+	}
+
+	// find and match up accels and gyros
+	_vehicle_imu_list[0] = new VehicleIMU(0, 0);
+	_vehicle_imu_list[0]->Start();
+
+	// for (auto i : _vehicle_imu_list) {
+	// 	if (i != nullptr) {
+	// 		i->Start();
+	// 	}
+	// }
+
 }
 
 Sensors::~Sensors()
 {
 	_vehicle_acceleration.Stop();
 	_vehicle_angular_velocity.Stop();
+
+	for (auto i : _vehicle_imu_list) {
+		if (i != nullptr) {
+			i->Stop();
+		}
+	}
 }
 
 int
@@ -523,6 +551,12 @@ int Sensors::print_status()
 
 	_vehicle_acceleration.PrintStatus();
 	_vehicle_angular_velocity.PrintStatus();
+
+	for (auto i : _vehicle_imu_list) {
+		if (i != nullptr) {
+			i->PrintStatus();
+		}
+	}
 
 	return 0;
 }

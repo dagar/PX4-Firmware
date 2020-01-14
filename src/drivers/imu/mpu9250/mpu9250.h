@@ -33,8 +33,7 @@
 
 #pragma once
 
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
+#include <lib/drivers/imu/PX4IMU.hpp>
 #include <lib/ecl/geo/geo.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
@@ -258,8 +257,7 @@ protected:
 
 private:
 
-	PX4Accelerometer	_px4_accel;
-	PX4Gyroscope		_px4_gyro;
+	PX4IMU	_px4_imu;
 
 	MPU9250_mag		_mag;
 

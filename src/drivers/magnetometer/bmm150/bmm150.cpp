@@ -50,7 +50,6 @@ BMM150 *g_dev_ext;
 BMM150 *g_dev_int;
 
 void start(bool, enum Rotation);
-void test(bool);
 void reset(bool);
 void info(bool);
 void regdump(bool external_bus);
@@ -129,52 +128,6 @@ fail:
 	exit(1);
 
 }
-
-
-void test(bool external_bus)
-{
-	int fd = -1;
-	const char *path = (external_bus ? BMM150_DEVICE_PATH_MAG_EXT : BMM150_DEVICE_PATH_MAG);
-	sensor_mag_s m_report;
-	ssize_t sz;
-
-
-	/* get the driver */
-	fd = open(path, O_RDONLY);
-
-	if (fd < 0) {
-		PX4_ERR("%s open failed (try 'bmm150 start' if the driver is not running)", path);
-		exit(1);
-	}
-
-	/* reset to default polling rate*/
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0) {
-		PX4_ERR("reset to Max polling rate");
-		exit(1);
-	}
-
-	/* do a simple demand read */
-	sz = read(fd, &m_report, sizeof(m_report));
-
-	if (sz != sizeof(m_report)) {
-		PX4_ERR("immediate mag read failed");
-		exit(1);
-	}
-
-	PX4_WARN("single read");
-	PX4_WARN("time:     %lld", m_report.timestamp);
-	PX4_WARN("mag  x:  \t%8.4f\t", (double)m_report.x);
-	PX4_WARN("mag  y:  \t%8.4f\t", (double)m_report.y);
-	PX4_WARN("mag  z:  \t%8.4f\t", (double)m_report.z);
-	PX4_WARN("mag  x:  \t%d\traw 0x%0x", (short)m_report.x_raw, (unsigned short)m_report.x_raw);
-	PX4_WARN("mag  y:  \t%d\traw 0x%0x", (short)m_report.y_raw, (unsigned short)m_report.y_raw);
-	PX4_WARN("mag  z:  \t%d\traw 0x%0x", (short)m_report.z_raw, (unsigned short)m_report.z_raw);
-
-	PX4_ERR("PASS");
-	exit(0);
-
-}
-
 
 void
 reset(bool external_bus)
@@ -568,20 +521,20 @@ BMM150::collect()
 	lsb = ((mag_data[0] & 0xF8) >> 3);
 	msb = (((int8_t)mag_data[1]) << 5);
 	msblsb = (msb | lsb);
-	mrb.x_raw = (int16_t)msblsb;
+	int16_t x_raw = (int16_t)msblsb;
 
 
 	/* Extract Y axis data */
 	lsb = ((mag_data[2] & 0xF8) >> 3);
 	msb = (((int8_t)mag_data[3]) << 5);
 	msblsb = (msb | lsb);
-	mrb.y_raw = (int16_t)msblsb;
+	int16_t y_raw = (int16_t)msblsb;
 
 	/* Extract Z axis data */
 	lsb = ((mag_data[4] & 0xFE) >> 1);
 	msb = (((int8_t)mag_data[5]) << 7);
 	msblsb = (msb | lsb);
-	mrb.z_raw = (int16_t)msblsb;
+	int16_t z_raw = (int16_t)msblsb;
 
 	/* Extract Resistance data */
 	lsb = ((mag_data[6] & 0xFC) >> 2);
@@ -599,26 +552,15 @@ BMM150::collect()
 
 	_got_duplicate = false;
 
-	if (mrb.x_raw == 0 &&
-	    mrb.y_raw == 0 &&
-	    mrb.z_raw == 0 &&
-	    resistance == 0) {
-		// all zero data - probably a I2C bus error
-		perf_count(_comms_errors);
-		perf_count(_bad_transfers);
-		perf_end(_sample_perf);
-		return -EIO;
-	}
-
 	perf_count(_good_transfers);
 
 	/* Compensation for X axis */
-	if (mrb.x_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
+	if (x_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
 		/* no overflow */
 		if ((resistance != 0) && (dig_xyz1 != 0)) {
 			mrb.x = ((dig_xyz1 * 16384.0 / resistance) - 16384.0);
-			mrb.x = (((mrb.x_raw * ((((dig_xy2 * ((float)(mrb.x * mrb.x / (float)268435456.0)) + mrb.x * dig_xy1 /
-						   (float)16384.0)) + (float)256.0) * (dig_x2 + (float)160.0))) / (float)8192.0) + (dig_x1 * (float)8.0)) / (float)16.0;
+			mrb.x = (((x_raw * ((((dig_xy2 * ((float)(mrb.x * mrb.x / (float)268435456.0)) + mrb.x * dig_xy1 /
+					       (float)16384.0)) + (float)256.0) * (dig_x2 + (float)160.0))) / (float)8192.0) + (dig_x1 * (float)8.0)) / (float)16.0;
 
 		} else {
 			mrb.x = BMM150_OVERFLOW_OUTPUT_FLOAT;
@@ -629,13 +571,13 @@ BMM150::collect()
 	}
 
 	/* Compensation for Y axis */
-	if (mrb.y_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
+	if (y_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
 		/* no overflow */
 		if ((resistance != 0) && (dig_xyz1 != 0)) {
 
 			mrb.y = ((((float)dig_xyz1) * (float)16384.0 / resistance) - (float)16384.0);
-			mrb.y = (((mrb.y_raw * ((((dig_xy2 * (mrb.y * mrb.y / (float)268435456.0) + mrb.y * dig_xy1 / (float)16384.0)) +
-						 (float)256.0) * (dig_y2 + (float)160.0))) / (float)8192.0) + (dig_y1 * (float)8.0)) / (float)16.0;
+			mrb.y = (((y_raw * ((((dig_xy2 * (mrb.y * mrb.y / (float)268435456.0) + mrb.y * dig_xy1 / (float)16384.0)) +
+					     (float)256.0) * (dig_y2 + (float)160.0))) / (float)8192.0) + (dig_y1 * (float)8.0)) / (float)16.0;
 
 
 		} else {
@@ -649,10 +591,10 @@ BMM150::collect()
 
 
 	/* Compensation for Z axis */
-	if (mrb.z_raw != BMM150_HALL_OVERFLOW_ADCVAL) {
+	if (z_raw != BMM150_HALL_OVERFLOW_ADCVAL) {
 		/* no overflow */
 		if ((dig_z2 != 0) && (dig_z1 != 0) && (dig_xyz1 != 0) && (resistance != 0)) {
-			mrb.z = ((((mrb.z_raw - dig_z4) * (float)131072.0) - (dig_z3 * (resistance - dig_xyz1))) / ((
+			mrb.z = ((((z_raw - dig_z4) * (float)131072.0) - (dig_z3 * (resistance - dig_xyz1))) / ((
 						dig_z2 + dig_z1 * resistance / (float)32768.0) * (float)4.0)) / (float)16.0;
 		}
 
@@ -679,7 +621,6 @@ BMM150::collect()
 	mrb.y = ((mrb.y * _range_scale) - _scale.y_offset) * _scale.y_scale;
 	mrb.z = ((mrb.z * _range_scale) - _scale.z_offset) * _scale.z_scale;
 
-	mrb.scaling = _range_scale;
 	mrb.device_id = _device_id.devid;
 
 	_last_report.x = mrb.x;
@@ -1098,14 +1039,6 @@ bmm150_main(int argc, char *argv[])
 	 */
 	if (!strcmp(verb, "start")) {
 		bmm150::start(external_bus, rotation);
-	}
-
-
-	/*
-	 * Test the driver/device.
-	 */
-	if (!strcmp(verb, "test")) {
-		bmm150::test(external_bus);
 	}
 
 	/*

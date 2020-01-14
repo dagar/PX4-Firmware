@@ -627,7 +627,6 @@ QMC5883::collect()
 	/* this should be fairly close to the end of the measurement, so the best approximation of the time */
 	new_report.timestamp = hrt_absolute_time();
 	new_report.error_count = perf_event_count(_comms_errors);
-	new_report.scaling = _range_scale;
 	new_report.device_id = _device_id.devid;
 
 	/*
@@ -682,18 +681,6 @@ QMC5883::collect()
 	} else {
 		new_report.temperature = _last_report.temperature;
 	}
-
-
-	/*
-	 * RAW outputs
-	 *
-	 * to align the sensor axes with the board, x and y need to be flipped
-	 * and y needs to be negated
-	 */
-	new_report.x_raw = -report.y;
-	new_report.y_raw = report.x;
-	/* z remains z */
-	new_report.z_raw = report.z;
 
 	/* scale values for output */
 

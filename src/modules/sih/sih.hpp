@@ -41,9 +41,8 @@
 #include <conversion/rotation.h>    // math::radians,
 #include <ecl/geo/geo.h>            // to get the physical constants
 #include <drivers/drv_hrt.h>        // to get the real time
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
+#include <lib/drivers/imu/PX4IMU.hpp>
 #include <lib/drivers/barometer/PX4Barometer.hpp>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
 #include <perf/perf_counter.h>
 #include <uORB/Publication.hpp>
@@ -98,8 +97,7 @@ private:
 	void parameters_updated();
 
 	// simulated sensor instances
-	PX4Accelerometer _px4_accel{ 1311244, ORB_PRIO_DEFAULT, ROTATION_NONE }; // 1311244: DRV_ACC_DEVTYPE_ACCELSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-	PX4Gyroscope _px4_gyro{ 2294028, ORB_PRIO_DEFAULT, ROTATION_NONE }; // 2294028: DRV_GYR_DEVTYPE_GYROSIM, BUS: 1, ADDR: 2, TYPE: SIMULATION
+	PX4IMU _px4_imu{ 1311244, ORB_PRIO_DEFAULT, ROTATION_NONE }; // 1311244: DRV_ACC_DEVTYPE_ACCELSIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
 	PX4Magnetometer _px4_mag{ 197388, ORB_PRIO_DEFAULT, ROTATION_NONE }; // 197388: DRV_MAG_DEVTYPE_MAGSIM, BUS: 3, ADDR: 1, TYPE: SIMULATION
 	PX4Barometer _px4_baro{ 6620172, ORB_PRIO_DEFAULT }; // 6620172: DRV_BARO_DEVTYPE_BAROSIM, BUS: 1, ADDR: 4, TYPE: SIMULATION
 

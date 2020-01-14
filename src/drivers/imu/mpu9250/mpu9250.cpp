@@ -73,16 +73,15 @@ const uint16_t MPU9250::_mpu9250_checked_registers[MPU9250_NUM_CHECKED_REGISTERS
 MPU9250::MPU9250(device::Device *interface, device::Device *mag_interface, enum Rotation rotation) :
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
 	_interface(interface),
-	_px4_accel(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
-	_px4_gyro(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
+	_px4_imu(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
 	_mag(this, mag_interface, rotation),
 	_dlpf_freq(MPU9250_DEFAULT_ONCHIP_FILTER_FREQ),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
 	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": bad_reg")),
 	_duplicates(perf_alloc(PC_COUNT, MODULE_NAME": dupe"))
 {
-	_px4_accel.set_device_type(DRV_ACC_DEVTYPE_MPU9250);
-	_px4_gyro.set_device_type(DRV_GYR_DEVTYPE_MPU9250);
+	_px4_imu.accel().set_device_type(DRV_ACC_DEVTYPE_MPU9250);
+	_px4_imu.gyro().set_device_type(DRV_GYR_DEVTYPE_MPU9250);
 }
 
 MPU9250::~MPU9250()
@@ -209,7 +208,7 @@ MPU9250::reset_mpu()
 	// 2000 deg/s = (2000/180)*PI = 34.906585 rad/s
 	// scaling factor:
 	// 1/(2^15)*(2000/180)*PI
-	_px4_gyro.set_scale(0.0174532 / 16.4); //1.0f / (32768.0f * (2000.0f / 180.0f) * M_PI_F);
+	_px4_imu.gyro().set_scale(0.0174532 / 16.4); //1.0f / (32768.0f * (2000.0f / 180.0f) * M_PI_F);
 
 	set_accel_range(ACCEL_RANGE_G);
 
@@ -465,7 +464,7 @@ MPU9250::set_accel_range(unsigned max_g_in)
 		break;
 	}
 
-	_px4_accel.set_scale(CONSTANTS_ONE_G / lsb_per_g);
+	_px4_imu.accel().set_scale(CONSTANTS_ONE_G / lsb_per_g);
 
 	return OK;
 }
@@ -649,27 +648,27 @@ MPU9250::measure()
 	// Get sensor temperature
 	_last_temperature = temp / 333.87f + 21.0f;
 
-	_px4_accel.set_temperature(_last_temperature);
-	_px4_gyro.set_temperature(_last_temperature);
+	_px4_imu.set_temperature(_last_temperature);
 
 	// Swap axes and negate y
-	int16_t accel_xt = accel_y;
-	int16_t accel_yt = ((accel_x == -32768) ? 32767 : -accel_x);
+	matrix::Vector3f accel;
+	accel(0) = accel_y;
+	accel(1) = ((accel_x == -32768) ? 32767 : -accel_x);
+	accel(2) = accel_z;
 
-	int16_t gyro_xt = gyro_y;
-	int16_t gyro_yt = ((gyro_x == -32768) ? 32767 : -gyro_x);
+	matrix::Vector3f gyro;
+	gyro(0) = gyro_y;
+	gyro(1) = ((gyro_x == -32768) ? 32767 : -gyro_x);
+	gyro(2) = gyro_z;
 
 	// report the error count as the sum of the number of bad
 	// transfers and bad register reads. This allows the higher
 	// level code to decide if it should use this sensor based on
 	// whether it has had failures
 	const uint64_t error_count = perf_event_count(_bad_registers);
-	_px4_accel.set_error_count(error_count);
-	_px4_gyro.set_error_count(error_count);
+	_px4_imu.set_error_count(error_count);
 
-	/* NOTE: Axes have been swapped to match the board a few lines above. */
-	_px4_accel.update(timestamp_sample, accel_xt, accel_yt, accel_z);
-	_px4_gyro.update(timestamp_sample, gyro_xt, gyro_yt, gyro_z);
+	_px4_imu.update(timestamp_sample, accel, gyro);
 
 	/* stop measuring */
 	perf_end(_sample_perf);
@@ -682,7 +681,6 @@ MPU9250::print_info()
 	perf_print_counter(_bad_registers);
 	perf_print_counter(_duplicates);
 
-	_px4_accel.print_status();
-	_px4_gyro.print_status();
+	_px4_imu.print_status();
 	_mag.print_status();
 }

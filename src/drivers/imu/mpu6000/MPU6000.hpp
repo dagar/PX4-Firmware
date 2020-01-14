@@ -56,8 +56,7 @@
  */
 
 #include <lib/conversion/rotation.h>
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
+#include <lib/drivers/imu/PX4IMU.hpp>
 #include <lib/drivers/device/i2c.h>
 #include <lib/drivers/device/spi.h>
 #include <lib/ecl/geo/geo.h>
@@ -336,8 +335,7 @@ private:
 
 	unsigned		_call_interval{1000};
 
-	PX4Accelerometer	_px4_accel;
-	PX4Gyroscope		_px4_gyro;
+	PX4IMU	_px4_imu;
 
 	unsigned		_sample_rate{1000};
 

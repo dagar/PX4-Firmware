@@ -256,8 +256,6 @@ rtps:
     id: 112
   - msg: vehicle_acceleration
     id: 113
-  - msg: sensor_gyro_control
-    id: 114
   - msg: airspeed_validated
     id: 115
   - msg: onboard_computer_status

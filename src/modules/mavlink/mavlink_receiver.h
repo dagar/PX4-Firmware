@@ -47,6 +47,7 @@
 #include "mavlink_parameters.h"
 #include "mavlink_timesync.h"
 
+#include <lib/drivers/imu/PX4IMU.hpp>
 #include <px4_platform_common/module_params.h>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationQueued.hpp>
@@ -79,10 +80,8 @@
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/radio_status.h>
 #include <uORB/topics/rc_channels.h>
-#include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/telemetry_status.h>
 #include <uORB/topics/transponder_report.h>
@@ -107,7 +106,7 @@ class MavlinkReceiver : public ModuleParams
 {
 public:
 	MavlinkReceiver(Mavlink *parent);
-	~MavlinkReceiver() = default;
+	~MavlinkReceiver() override;
 
 	/**
 	 * Start the receiver thread
@@ -258,9 +257,7 @@ private:
 	uORB::PublicationMulti<manual_control_setpoint_s>	_manual_pub{ORB_ID(manual_control_setpoint), ORB_PRIO_LOW};
 	uORB::PublicationMulti<ping_s>				_ping_pub{ORB_ID(ping), ORB_PRIO_LOW};
 	uORB::PublicationMulti<radio_status_s>			_radio_status_pub{ORB_ID(radio_status), ORB_PRIO_LOW};
-	uORB::PublicationMulti<sensor_accel_s>			_accel_pub{ORB_ID(sensor_accel), ORB_PRIO_LOW};
 	uORB::PublicationMulti<sensor_baro_s>			_baro_pub{ORB_ID(sensor_baro), ORB_PRIO_LOW};
-	uORB::PublicationMulti<sensor_gyro_s>			_gyro_pub{ORB_ID(sensor_gyro), ORB_PRIO_LOW};
 	uORB::PublicationMulti<sensor_mag_s>			_mag_pub{ORB_ID(sensor_mag), ORB_PRIO_LOW};
 
 	// ORB publications (queue length > 1)
@@ -276,6 +273,8 @@ private:
 	uORB::Subscription	_vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
 	uORB::Subscription	_vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription	_vehicle_status_sub{ORB_ID(vehicle_status)};
+
+	PX4IMU *_px4_imu{nullptr}; // hil_sensor and hil_state_quaternion
 
 	static constexpr unsigned int	MOM_SWITCH_COUNT{8};
 	uint8_t				_mom_switch_pos[MOM_SWITCH_COUNT] {};

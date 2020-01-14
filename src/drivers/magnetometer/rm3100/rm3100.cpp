@@ -199,7 +199,6 @@ RM3100::collect()
 
 	new_mag_report.timestamp = hrt_absolute_time();
 	new_mag_report.error_count = perf_event_count(_comms_errors);
-	new_mag_report.scaling = _range_scale;
 	new_mag_report.device_id = _device_id.devid;
 
 	ret = _interface->read(ADDR_MX, (uint8_t *)&rm_report, sizeof(rm_report));
@@ -228,17 +227,9 @@ RM3100::collect()
 	sensor_is_onboard = !_interface->ioctl(MAGIOCGEXTERNAL, dummy);
 	new_mag_report.is_external = !sensor_is_onboard;
 
-	/**
-	 * RAW outputs
-	 * As we only have 16 bits to store raw data, the following values are not correct
-	 */
-	new_mag_report.x_raw = (int16_t)(xraw >> 8);
-	new_mag_report.y_raw = (int16_t)(yraw >> 8);
-	new_mag_report.z_raw = (int16_t)(zraw >> 8);
-
-	xraw_f = xraw;
-	yraw_f = yraw;
-	zraw_f = zraw;
+	xraw_f = (int16_t)(xraw >> 8);
+	yraw_f = (int16_t)(yraw >> 8);
+	zraw_f = (int16_t)(zraw >> 8);
 
 	/* apply user specified rotation */
 	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);

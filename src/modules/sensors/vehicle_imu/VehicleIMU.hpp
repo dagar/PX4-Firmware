@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <containers/List.hpp>
 #include <lib/conversion/rotation.h>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
@@ -40,67 +41,63 @@
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_work_queue/WorkItem.hpp>
-#include <uORB/Publication.hpp>
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_bias.h>
+#include <uORB/topics/sensor_accel_integrated.h>
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/sensor_selection.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/topics/vehicle_imu.h>
 
-#include <uORB/topics/sensor_gyro.h>
-#include <uORB/topics/vehicle_angular_velocity.h>
-
-class VehicleAngularVelocity : public ModuleParams, public px4::WorkItem
+class VehicleIMU : public ModuleParams, public px4::WorkItem
 {
 public:
+	VehicleIMU() = delete;
+	VehicleIMU(uint8_t accel_index = 0, uint8_t gyro_index = 0);
+	~VehicleIMU() override;
 
-	VehicleAngularVelocity();
-	virtual ~VehicleAngularVelocity();
+	void Run() override;
 
-	void	Run() override;
+	bool Start();
+	void Stop();
 
-	bool	Start();
-	void	Stop();
-
-	void	PrintStatus();
+	void PrintStatus();
 
 private:
 	void ParametersUpdate(bool force = false);
-	void SensorBiasUpdate(bool force = false);
 	void SensorCorrectionsUpdate(bool force = false);
-	bool SensorSelectionUpdate(bool force = false);
 
 	static constexpr int MAX_SENSOR_COUNT = 3;
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::SENS_BOARD_ROT>) _param_sens_board_rot,
-
 		(ParamFloat<px4::params::SENS_BOARD_X_OFF>) _param_sens_board_x_off,
 		(ParamFloat<px4::params::SENS_BOARD_Y_OFF>) _param_sens_board_y_off,
 		(ParamFloat<px4::params::SENS_BOARD_Z_OFF>) _param_sens_board_z_off
 	)
 
-	uORB::Publication<vehicle_angular_velocity_s>	_vehicle_angular_velocity_pub{ORB_ID(vehicle_angular_velocity)};
+	uORB::PublicationMulti<vehicle_imu_s> _vehicle_imu_pub{ORB_ID(vehicle_imu)};
 
-	uORB::Subscription			_params_sub{ORB_ID(parameter_update)};			/**< parameter updates subscription */
-	uORB::Subscription			_sensor_bias_sub{ORB_ID(sensor_bias)};			/**< sensor in-run bias correction subscription */
-	uORB::Subscription			_sensor_correction_sub{ORB_ID(sensor_correction)};	/**< sensor thermal correction subscription */
+	uORB::Subscription _params_sub{ORB_ID(parameter_update)};
+	uORB::Subscription _sensor_correction_sub{ORB_ID(sensor_correction)};
+	uORB::Subscription _sensor_gyro_integrated_sub;
+	uORB::SubscriptionCallbackWorkItem _sensor_accel_integrated_sub;
 
-	uORB::SubscriptionCallbackWorkItem	_sensor_selection_sub{this, ORB_ID(sensor_selection)};	/**< selected primary sensor subscription */
-	uORB::SubscriptionCallbackWorkItem	_sensor_sub[MAX_SENSOR_COUNT] {				/**< sensor data subscription */
-		{this, ORB_ID(sensor_gyro), 0},
-		{this, ORB_ID(sensor_gyro), 1},
-		{this, ORB_ID(sensor_gyro), 2}
-	};
+	matrix::Dcmf _board_rotation;
 
-	matrix::Dcmf				_board_rotation;				/**< rotation matrix for the orientation that the board is mounted */
+	matrix::Vector3f _accel_offset;
+	matrix::Vector3f _gyro_offset;
+	matrix::Vector3f _accel_scale;
+	matrix::Vector3f _gyro_scale;
 
-	matrix::Vector3f			_offset;
-	matrix::Vector3f			_scale;
-	matrix::Vector3f			_bias;
+	uint8_t _corrections_selected_accel_instance{0};
+	uint8_t _corrections_selected_gyro_instance{0};
 
-	uint32_t				_selected_sensor_device_id{0};
-	uint8_t					_selected_sensor_sub_index{0};
-	int8_t					_corrections_selected_instance{-1};
+	uint32_t _accel_device_id{0};
+	uint32_t _gyro_device_id{0};
+
+	uint8_t _accel_index{0};
+	uint8_t _gyro_index{0};
 };
