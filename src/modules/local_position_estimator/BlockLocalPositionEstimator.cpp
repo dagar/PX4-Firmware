@@ -725,6 +725,7 @@ void BlockLocalPositionEstimator::publishEstimatorStatus()
 	_pub_est_status.get().covariances[11] = NAN;
 	_pub_est_status.get().covariances[12] = NAN;
 	// accel bias
+	// TODO: publish sensor_bias
 	_pub_est_status.get().covariances[13] = m_P(X_bx, X_bx);
 	_pub_est_status.get().covariances[14] = m_P(X_by, X_by);
 	_pub_est_status.get().covariances[15] = m_P(X_bz, X_bz);
