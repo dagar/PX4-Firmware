@@ -367,13 +367,13 @@ void ICM20602::Run()
 
 	PX4Gyroscope::FIFOSample gyro{};
 	gyro.timestamp_sample = timestamp_sample;
-	gyro.samples = samples;
 	gyro.dt = FIFO_INTERVAL / FIFO_GYRO_SAMPLES;
 
 	int accel_samples = 0;
+	int gyro_samples = 0;
 	int16_t temperature[samples] {};
 
-	for (int i = 0; i < samples; i++) {
+	for (int i = 0; i < math::min(samples, 8); i++) {
 		const FIFO::DATA &fifo_sample = report->f[i];
 
 		// accel data is doubled
@@ -392,9 +392,11 @@ void ICM20602::Run()
 		gyro.x[i] = combine(fifo_sample.GYRO_XOUT_H, fifo_sample.GYRO_XOUT_L);
 		gyro.y[i] = -combine(fifo_sample.GYRO_YOUT_H, fifo_sample.GYRO_YOUT_L);
 		gyro.z[i] = -combine(fifo_sample.GYRO_ZOUT_H, fifo_sample.GYRO_ZOUT_L);
+		gyro_samples++;
 	}
 
 	accel.samples = accel_samples;
+	gyro.samples = gyro_samples;
 
 	// Temperature
 	int32_t temperature_sum{0};
