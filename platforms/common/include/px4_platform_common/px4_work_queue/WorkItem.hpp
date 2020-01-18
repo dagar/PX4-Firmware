@@ -60,7 +60,13 @@ public:
 	inline void ScheduleNow()
 	{
 		if (_wq != nullptr) {
-			_wq->Add(this);
+			if (_wq->Add(this)) {
+				perf_begin(_run_latency_perf);
+
+			} else {
+				perf_cancel(_run_latency_perf);
+				_overflow_count++;
+			}
 		}
 	}
 
@@ -83,7 +89,17 @@ protected:
 
 protected:
 
-	void RunPreamble() { _run_count++; }
+	void RunPreamble()
+	{
+		perf_begin(_cycle_perf);
+		perf_end(_run_latency_perf);
+		_run_count++;
+	}
+
+	void PostPreamble()
+	{
+		perf_end(_cycle_perf);
+	}
 
 	friend void WorkQueue::Run();
 	virtual void Run() = 0;
@@ -106,7 +122,13 @@ protected:
 
 	hrt_abstime	_start_time{0};
 	unsigned	_run_count{0};
+	unsigned	_overflow_count{0};
 	const char 	*_item_name;
+
+	perf_counter_t	_run_latency_perf;
+	char 		*_run_latency_perf_name{nullptr};
+	perf_counter_t	_cycle_perf;
+	char 		*_cycle_perf_name{nullptr};
 
 private:
 

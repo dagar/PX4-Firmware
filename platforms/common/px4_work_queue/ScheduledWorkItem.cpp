@@ -73,7 +73,7 @@ void
 ScheduledWorkItem::print_run_status() const
 {
 	if (_call.period > 0) {
-		PX4_INFO_RAW("%-24s %8.1f Hz %12.1f us (%" PRId64 " us)\n", _item_name, (double)average_rate(),
+		PX4_INFO_RAW("%-24s %d %8.1f Hz %12.1f us (%" PRId64 " us)\n", _item_name, _overflow_count, (double)average_rate(),
 			     (double)average_interval(), _call.period);
 
 	} else {

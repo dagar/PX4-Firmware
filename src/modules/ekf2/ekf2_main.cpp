@@ -181,6 +181,7 @@ private:
 	int64_t _last_time_slip_us = 0;		///< Last time slip (uSec)
 
 	perf_counter_t _ekf_update_perf;
+	perf_counter_t _ekf_sensors_latency_perf;
 
 	// Initialise time stamps used to send sensor data to the EKF and for logging
 	uint8_t _invalid_mag_id_count = 0;	///< number of times an invalid magnetomer device ID has been detected
@@ -539,6 +540,7 @@ Ekf2::Ekf2(bool replay_mode):
 	WorkItem(MODULE_NAME, px4::wq_configurations::att_pos_ctrl),
 	_replay_mode(replay_mode),
 	_ekf_update_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": update")),
+	_ekf_sensors_latency_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": sensors latency")),
 	_params(_ekf.getParamHandle()),
 	_param_ekf2_min_obs_dt(_params->sensor_interval_min_ms),
 	_param_ekf2_mag_delay(_params->mag_delay_ms),
@@ -645,6 +647,7 @@ Ekf2::Ekf2(bool replay_mode):
 Ekf2::~Ekf2()
 {
 	perf_free(_ekf_update_perf);
+	perf_free(_ekf_sensors_latency_perf);
 }
 
 bool
@@ -666,6 +669,7 @@ int Ekf2::print_status()
 	PX4_INFO("time slip: %" PRId64 " us", _last_time_slip_us);
 
 	perf_print_counter(_ekf_update_perf);
+	perf_print_counter(_ekf_sensors_latency_perf);
 
 	return 0;
 }
@@ -715,6 +719,8 @@ void Ekf2::Run()
 	sensor_combined_s sensors;
 
 	if (_sensors_sub.update(&sensors)) {
+
+		perf_set_elapsed(_ekf_sensors_latency_perf, hrt_elapsed_time(&sensors.timestamp));
 
 		// check for parameter updates
 		if (_parameter_update_sub.updated()) {

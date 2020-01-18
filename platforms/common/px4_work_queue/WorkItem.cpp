@@ -48,11 +48,29 @@ WorkItem::WorkItem(const char *name, const wq_config_t &config) :
 	if (!Init(config)) {
 		PX4_ERR("init failed");
 	}
+
+	if (asprintf(&_run_latency_perf_name, "%s: %s latency", config.name, name) > 0) {
+		_run_latency_perf = perf_alloc(PC_ELAPSED, _run_latency_perf_name);
+	}
+
+	if (asprintf(&_cycle_perf_name, "%s: %s cycle time", config.name, name) > 0) {
+		_cycle_perf = perf_alloc(PC_ELAPSED, _cycle_perf_name);
+	}
 }
 
 WorkItem::~WorkItem()
 {
 	Deinit();
+	perf_free(_run_latency_perf);
+	perf_free(_cycle_perf);
+
+	if (_run_latency_perf_name) {
+		free(_run_latency_perf_name);
+	}
+
+	if (_cycle_perf_name) {
+		free(_cycle_perf_name);
+	}
 }
 
 bool
@@ -122,7 +140,8 @@ WorkItem::average_interval() const
 void
 WorkItem::print_run_status() const
 {
-	PX4_INFO_RAW("%-24s %8.1f Hz %12.1f us\n", _item_name, (double)average_rate(), (double)average_interval());
+	PX4_INFO_RAW("%-24s %d %8.1f Hz %12.1f us\n", _item_name, _overflow_count, (double)average_rate(),
+		     (double)average_interval());
 }
 
 } // namespace px4

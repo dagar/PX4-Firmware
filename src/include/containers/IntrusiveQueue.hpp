@@ -56,11 +56,11 @@ public:
 		return sz;
 	}
 
-	void push(T newNode)
+	bool push(T newNode)
 	{
 		// error, node already queued or already inserted
 		if ((newNode->next_intrusive_queue_node() != nullptr) || (newNode == _tail)) {
-			return;
+			return false;
 		}
 
 		if (_head == nullptr) {
@@ -72,6 +72,8 @@ public:
 		}
 
 		_tail = newNode;
+
+		return true;
 	}
 
 	T pop()

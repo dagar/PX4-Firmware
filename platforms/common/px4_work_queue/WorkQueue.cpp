@@ -105,14 +105,16 @@ WorkQueue::Detach(WorkItem *item)
 	work_unlock();
 }
 
-void
+bool
 WorkQueue::Add(WorkItem *item)
 {
 	work_lock();
-	_q.push(item);
+	bool ret = _q.push(item);
 	work_unlock();
 
 	signal_worker_thread();
+
+	return ret;
 }
 
 void
@@ -160,6 +162,7 @@ WorkQueue::Run()
 			work_unlock(); // unlock work queue to run (item may requeue itself)
 			work->RunPreamble();
 			work->Run();
+			work->PostPreamble();
 			work_lock(); // re-lock
 		}
 
