@@ -37,6 +37,7 @@
 
 using namespace matrix;
 using namespace time_literals;
+using math::radians;
 
 VehicleAngularVelocity::VehicleAngularVelocity() :
 	ModuleParams(nullptr),
@@ -53,11 +54,12 @@ bool VehicleAngularVelocity::Start()
 {
 	// force initial updates
 	ParametersUpdate(true);
+	SensorSelectionUpdate(true);
 	SensorBiasUpdate(true);
 	SensorCorrectionsUpdate(true);
 
 	// needed to change the active sensor if the primary stops updating
-	return _sensor_selection_sub.registerCallback() && SensorSelectionUpdate(true);
+	return _sensor_selection_sub.registerCallback();
 }
 
 void VehicleAngularVelocity::Stop()
@@ -97,9 +99,7 @@ void VehicleAngularVelocity::SensorCorrectionsUpdate(bool force)
 		_sensor_correction_sub.copy(&corrections);
 
 		// selected sensor has changed, find updated index
-		if ((_corrections_selected_instance != corrections.selected_gyro_instance) || force) {
-			_corrections_selected_instance = -1;
-
+		if (_corrections_selected_instance < 0 || force) {
 			// find sensor_corrections index
 			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
 				if (corrections.gyro_device_ids[i] == _selected_sensor_device_id) {
@@ -156,6 +156,9 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(bool force)
 						_bias.zero();
 						_offset = Vector3f{0.0f, 0.0f, 0.0f};
 						_scale = Vector3f{1.0f, 1.0f, 1.0f};
+
+						// force corrections reselection
+						_corrections_selected_instance = -1;
 
 						return true;
 					}

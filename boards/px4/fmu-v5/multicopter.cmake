@@ -68,6 +68,7 @@ px4_add_board(
 		navigator
 		rc_update
 		sensors
+		temperature_compensation
 		sih
 		vmount
 	SYSTEMCMDS

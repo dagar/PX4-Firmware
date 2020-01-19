@@ -37,6 +37,7 @@
 
 using namespace matrix;
 using namespace time_literals;
+using math::radians;
 
 VehicleAcceleration::VehicleAcceleration() :
 	ModuleParams(nullptr),
@@ -97,9 +98,7 @@ void VehicleAcceleration::SensorCorrectionsUpdate(bool force)
 		_sensor_correction_sub.copy(&corrections);
 
 		// selected sensor has changed, find updated index
-		if ((_corrections_selected_instance != corrections.selected_accel_instance) || force) {
-			_corrections_selected_instance = -1;
-
+		if ((_corrections_selected_instance < 0) || force) {
 			// find sensor_corrections index
 			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
 				if (corrections.accel_device_ids[i] == _selected_sensor_device_id) {
@@ -157,6 +156,9 @@ bool VehicleAcceleration::SensorSelectionUpdate(bool force)
 						_offset = Vector3f{0.0f, 0.0f, 0.0f};
 						_scale = Vector3f{1.0f, 1.0f, 1.0f};
 
+						// force reselection
+						_corrections_selected_instance = -1;
+
 						return true;
 					}
 				}
@@ -182,13 +184,13 @@ void VehicleAcceleration::ParametersUpdate(bool force)
 		updateParams();
 
 		// get transformation matrix from sensor/board to body frame
-		const matrix::Dcmf board_rotation = get_rot_matrix((enum Rotation)_param_sens_board_rot.get());
+		const Dcmf board_rotation = get_rot_matrix((enum Rotation)_param_sens_board_rot.get());
 
 		// fine tune the rotation
 		const Dcmf board_rotation_offset(Eulerf(
-				math::radians(_param_sens_board_x_off.get()),
-				math::radians(_param_sens_board_y_off.get()),
-				math::radians(_param_sens_board_z_off.get())));
+				radians(_param_sens_board_x_off.get()),
+				radians(_param_sens_board_y_off.get()),
+				radians(_param_sens_board_z_off.get())));
 
 		_board_rotation = board_rotation_offset * board_rotation;
 	}
