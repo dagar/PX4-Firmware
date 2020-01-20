@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -162,6 +162,7 @@ enum MPU_DEVICE_TYPE {
 #define BIT_RAW_RDY_EN			0x01
 #define BIT_I2C_IF_DIS			0x10
 #define BIT_INT_STATUS_DATA		0x01
+#define BIT_INT_STATUS_FIFO_OFLOW_INT	0x10
 
 #define MPU_WHOAMI_6000			0x68
 #define ICM_WHOAMI_20602		0x12
@@ -227,7 +228,6 @@ enum MPU_DEVICE_TYPE {
 
 #define MPU6000_DEFAULT_ONCHIP_FILTER_FREQ			98
 
-#pragma pack(push, 1)
 /**
  * Report conversation within the MPU6000, including command byte and
  * interrupt status.
@@ -243,7 +243,29 @@ struct MPUReport {
 	uint8_t		gyro_y[2];
 	uint8_t		gyro_z[2];
 };
-#pragma pack(pop)
+
+namespace FIFO
+{
+static constexpr size_t SIZE = 1024;
+
+// FIFO_DATA layout when FIFO_EN has both GYRO_FIFO_EN and ACCEL_FIFO_EN set
+struct DATA {
+	uint8_t ACCEL_XOUT_H;
+	uint8_t ACCEL_XOUT_L;
+	uint8_t ACCEL_YOUT_H;
+	uint8_t ACCEL_YOUT_L;
+	uint8_t ACCEL_ZOUT_H;
+	uint8_t ACCEL_ZOUT_L;
+	uint8_t GYRO_XOUT_H;
+	uint8_t GYRO_XOUT_L;
+	uint8_t GYRO_YOUT_H;
+	uint8_t GYRO_YOUT_L;
+	uint8_t GYRO_ZOUT_H;
+	uint8_t GYRO_ZOUT_L;
+};
+static_assert(sizeof(DATA) == 12);
+}
+
 
 #define MPU_MAX_READ_BUFFER_SIZE (sizeof(MPUReport) + 1)
 #define MPU_MAX_WRITE_BUFFER_SIZE (2)
@@ -331,6 +353,8 @@ private:
 
 	void Run() override;
 
+	void ResetFIFO();
+
 	int 			_device_type;
 	uint8_t			_product{0};	/** product code */
 
@@ -376,10 +400,6 @@ private:
 	// self test
 	volatile bool		_in_factory_test{false};
 
-	// keep last accel reading for duplicate detection
-	uint16_t		_last_accel[3] {};
-	bool			_got_duplicate{false};
-
 	/**
 	 * Stop automatic measurement.
 	 */
@@ -393,11 +413,6 @@ private:
 	 * is_mpu_device
 	 */
 	bool 		is_mpu_device() { return _device_type == MPU_DEVICE_TYPE_MPU6000; }
-
-	/**
-	 * Fetch measurements from the sensor and update the report buffers.
-	 */
-	int			measure();
 
 	/**
 	 * Read a register from the MPU6000
@@ -460,8 +475,12 @@ private:
 	 */
 	void			check_registers(void);
 
-	/* do not allow to copy this class due to pointer data members */
-	MPU6000(const MPU6000 &);
-	MPU6000 operator=(const MPU6000 &);
+	perf_counter_t _interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": run interval")};
+	perf_counter_t _transfer_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": transfer")};
+	perf_counter_t _fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo empty")};
+	perf_counter_t _fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo overflow")};
+	perf_counter_t _fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo reset")};
+	perf_counter_t _drdy_count_perf{perf_alloc(PC_COUNT, MODULE_NAME": drdy count")};
+	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": drdy interval")};
 
 };

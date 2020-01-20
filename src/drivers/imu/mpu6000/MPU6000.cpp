@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,8 @@
 
 #include "MPU6000.hpp"
 
+static constexpr int16_t combine(uint8_t msb, uint8_t lsb) { return (msb << 8u) | lsb; }
+
 /*
   list of registers that will be checked in check_registers(). Note
   that MPUREG_PRODUCT_ID must be first in the list.
@@ -45,11 +47,11 @@ MPU6000::MPU6000(device::Device *interface, enum Rotation rotation, int device_t
 	_device_type(device_type),
 	_px4_accel(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
 	_px4_gyro(_interface->get_device_id(), (_interface->external() ? ORB_PRIO_MAX : ORB_PRIO_HIGH), rotation),
-	_sample_perf(perf_alloc(PC_ELAPSED, "mpu6k_read")),
-	_bad_transfers(perf_alloc(PC_COUNT, "mpu6k_bad_trans")),
-	_bad_registers(perf_alloc(PC_COUNT, "mpu6k_bad_reg")),
-	_reset_retries(perf_alloc(PC_COUNT, "mpu6k_reset")),
-	_duplicates(perf_alloc(PC_COUNT, "mpu6k_duplicates"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_bad_transfers(perf_alloc(PC_COUNT, MODULE_NAME": bad_trans")),
+	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": bad_reg")),
+	_reset_retries(perf_alloc(PC_COUNT, MODULE_NAME": reset")),
+	_duplicates(perf_alloc(PC_COUNT, MODULE_NAME": duplicates"))
 {
 	switch (_device_type) {
 	default:
@@ -86,6 +88,14 @@ MPU6000::~MPU6000()
 	perf_free(_bad_registers);
 	perf_free(_reset_retries);
 	perf_free(_duplicates);
+
+	perf_free(_interval_perf);
+	perf_free(_transfer_perf);
+	perf_free(_fifo_empty_perf);
+	perf_free(_fifo_overflow_perf);
+	perf_free(_fifo_reset_perf);
+	perf_free(_drdy_count_perf);
+	perf_free(_drdy_interval_perf);
 }
 
 int
@@ -199,8 +209,32 @@ int MPU6000::reset()
 	return OK;
 }
 
-int
-MPU6000::probe()
+
+void MPU6000::ResetFIFO()
+{
+	perf_count(_fifo_reset_perf);
+
+	// FIFO_EN: disable FIFO
+	write_reg(MPUREG_FIFO_EN, 0);
+	write_reg(MPUREG_USER_CTRL, 0);
+
+	// USER_CTRL: reset FIFO then re-enable
+	write_reg(MPUREG_USER_CTRL, 0x4); // FIFO_RST
+	up_udelay(1); // bit auto clears after one clock cycle of the internal 20 MHz clock
+	write_reg(MPUREG_USER_CTRL, 0x20); // FIFO_EN
+
+	// CONFIG: should ensure that bit 7 of register 0x1A is set to 0 before using FIFO watermark feature
+	RegisterSetBits(Register::CONFIG, CONFIG_BIT::FIFO_MODE);
+	RegisterClearBits(Register::CONFIG, CONFIG_BIT::FIFO_WM);
+	RegisterSetBits(Register::CONFIG, CONFIG_BIT::DLPF_CFG_BYPASS_DLPF_8KHZ);
+
+	// FIFO_EN: enable both gyro and accel
+	_data_ready_count = 0;
+	RegisterWrite(Register::FIFO_EN, FIFO_EN_BIT::GYRO_FIFO_EN | FIFO_EN_BIT::ACCEL_FIFO_EN);
+	up_udelay(10);
+}
+
+int MPU6000::probe()
 {
 	uint8_t whoami = read_reg(MPUREG_WHOAMI);
 	uint8_t expected = 0;
@@ -274,11 +308,7 @@ MPU6000::probe()
 	return OK;
 }
 
-/*
-  set sample rate (approximate) - 1kHz to 5Hz, for both accel and gyro
-*/
-void
-MPU6000::_set_sample_rate(unsigned desired_sample_rate_hz)
+void MPU6000::_set_sample_rate(unsigned desired_sample_rate_hz)
 {
 	if (desired_sample_rate_hz == 0) {
 		desired_sample_rate_hz = MPU6000_GYRO_DEFAULT_RATE;
@@ -298,11 +328,7 @@ MPU6000::_set_sample_rate(unsigned desired_sample_rate_hz)
 	_sample_rate = 1000 / div;
 }
 
-/*
-  set the DLPF filter frequency. This affects both accel and gyro.
- */
-void
-MPU6000::_set_dlpf_filter(uint16_t frequency_hz)
+void MPU6000::_set_dlpf_filter(uint16_t frequency_hz)
 {
 	uint8_t filter = MPU_GYRO_DLPF_CFG_2100HZ_NOLPF;
 
@@ -337,8 +363,7 @@ MPU6000::_set_dlpf_filter(uint16_t frequency_hz)
 	write_checked_reg(MPUREG_CONFIG, filter);
 }
 
-void
-MPU6000::_set_icm_acc_dlpf_filter(uint16_t frequency_hz)
+void MPU6000::_set_icm_acc_dlpf_filter(uint16_t frequency_hz)
 {
 	uint8_t filter = ICM_ACC_DLPF_CFG_1046HZ_NOLPF;
 
@@ -379,8 +404,7 @@ MPU6000::_set_icm_acc_dlpf_filter(uint16_t frequency_hz)
   about 200ms and will return OK if the current values are within 14%
   of the expected values (as per datasheet)
  */
-int
-MPU6000::factory_self_test()
+int MPU6000::factory_self_test()
 {
 	_in_factory_test = true;
 	uint8_t saved_gyro_config = read_reg(MPUREG_GYRO_CONFIG);
@@ -522,8 +546,7 @@ MPU6000::factory_self_test()
 /*
   deliberately trigger an error in the sensor to trigger recovery
  */
-void
-MPU6000::test_error()
+void MPU6000::test_error()
 {
 	_in_factory_test = true;
 	// deliberately trigger an error. This was noticed during
@@ -535,33 +558,29 @@ MPU6000::test_error()
 	_in_factory_test = false;
 }
 
-uint8_t
-MPU6000::read_reg(unsigned reg, uint32_t speed)
+uint8_t MPU6000::read_reg(unsigned reg, uint32_t speed)
 {
 	uint8_t buf{};
 	_interface->read(MPU6000_SET_SPEED(reg, speed), &buf, 1);
 	return buf;
 }
 
-uint16_t
-MPU6000::read_reg16(unsigned reg)
+uint16_t MPU6000::read_reg16(unsigned reg)
 {
 	uint8_t buf[2] {};
 
 	// general register transfer at low clock speed
-	_interface->read(MPU6000_LOW_SPEED_OP(reg), &buf, arraySize(buf));
+	_interface->read(MPU6000_HIGH_SPEED_OP(reg), &buf, arraySize(buf));
 	return (uint16_t)(buf[0] << 8) | buf[1];
 }
 
-int
-MPU6000::write_reg(unsigned reg, uint8_t value)
+int MPU6000::write_reg(unsigned reg, uint8_t value)
 {
 	// general register transfer at low clock speed
 	return _interface->write(MPU6000_LOW_SPEED_OP(reg), &value, 1);
 }
 
-void
-MPU6000::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
+void MPU6000::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
 	uint8_t	val = read_reg(reg);
 	val &= ~clearbits;
@@ -569,8 +588,7 @@ MPU6000::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 	write_reg(reg, val);
 }
 
-void
-MPU6000::write_checked_reg(unsigned reg, uint8_t value)
+void MPU6000::write_checked_reg(unsigned reg, uint8_t value)
 {
 	write_reg(reg, value);
 
@@ -581,8 +599,7 @@ MPU6000::write_checked_reg(unsigned reg, uint8_t value)
 	}
 }
 
-int
-MPU6000::set_accel_range(unsigned max_g_in)
+int MPU6000::set_accel_range(unsigned max_g_in)
 {
 	// workaround for bugged versions of MPU6k (rev C)
 	if (is_mpu_device()) {
@@ -629,8 +646,7 @@ MPU6000::set_accel_range(unsigned max_g_in)
 	return OK;
 }
 
-void
-MPU6000::start()
+void MPU6000::start()
 {
 	/* make sure we are stopped first */
 	uint32_t last_call_interval = _call_interval;
@@ -640,24 +656,12 @@ MPU6000::start()
 	ScheduleOnInterval(_call_interval - MPU6000_TIMER_REDUCTION, 1000);
 }
 
-void
-MPU6000::stop()
+void MPU6000::stop()
 {
 	ScheduleClear();
-
-	/* reset internal states */
-	memset(_last_accel, 0, sizeof(_last_accel));
 }
 
-void
-MPU6000::Run()
-{
-	/* make another measurement */
-	measure();
-}
-
-void
-MPU6000::check_registers(void)
+void MPU6000::check_registers()
 {
 	/*
 	  we read the register at full speed, even though it isn't
@@ -717,126 +721,99 @@ MPU6000::check_registers(void)
 	_checked_next = (_checked_next + 1) % MPU6000_NUM_CHECKED_REGISTERS;
 }
 
-int
-MPU6000::measure()
+void MPU6000::Run()
 {
 	if (_in_factory_test) {
 		// don't publish any data while in factory test mode
-		return OK;
+		return;
 	}
 
 	if (hrt_absolute_time() < _reset_wait) {
 		// we're waiting for a reset to complete
-		return OK;
+		return;
 	}
 
-	struct MPUReport mpu_report;
 
-	struct Report {
-		int16_t		accel_x;
-		int16_t		accel_y;
-		int16_t		accel_z;
-		int16_t		temp;
-		int16_t		gyro_x;
-		int16_t		gyro_y;
-		int16_t		gyro_z;
-	} report;
+	// read FIFO count
+	const size_t fifo_count = read_reg16(MPUREG_FIFO_COUNTH);
+	const int samples = fifo_count / sizeof(FIFO::DATA);
 
-	/* start measuring */
-	perf_begin(_sample_perf);
+	if (samples < 1) {
+		perf_count(_fifo_empty_perf);
+		return;
 
-	/*
-	 * Fetch the full set of measurements from the MPU6000 in one pass.
-	 */
-
-	// sensor transfer at high clock speed
-
-	const hrt_abstime timestamp_sample = hrt_absolute_time();
-
-	if (sizeof(mpu_report) != _interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED),
-			(uint8_t *)&mpu_report, sizeof(mpu_report))) {
-
-		return -EIO;
+	} else if (samples > 16) {
+		// not technically an overflow, but more samples than we expected
+		//perf_count(_fifo_overflow_perf);
+		ResetFIFO();
+		PX4_ERR("too many samples: %d", samples);
+		return;
 	}
+
+	// check for FIFO overflow
+	if (read_reg(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED) & BIT_INT_STATUS_FIFO_OFLOW_INT) {
+		perf_count(_fifo_overflow_perf);
+		ResetFIFO();
+		PX4_ERR("FIFO overflow");
+		return;
+	}
+
+	// Transfer data
+	struct TransferBuffer {
+		uint8_t cmd;
+		FIFO::DATA f[16]; // max 16 samples
+	} report{};
+	static_assert(sizeof(TransferBuffer) == (sizeof(uint8_t) + 16 * sizeof(FIFO::DATA))); // ensure no struct padding
+
+	const ssize_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 1, FIFO::SIZE);
+
+	const hrt_abstime &timestamp_sample = hrt_absolute_time();
+	perf_begin(_transfer_perf);
+
+	if (transfer_size != _interface->read(MPU6000_SET_SPEED(MPUREG_FIFO_R_W, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&report,
+					      transfer_size)) {
+		perf_end(_transfer_perf);
+		return;
+	}
+
+	perf_end(_transfer_perf);
+
 
 	check_registers();
 
-	/*
-	   see if this is duplicate accelerometer data. Note that we
-	   can't use the data ready interrupt status bit in the status
-	   register as that also goes high on new gyro data, and when
-	   we run with BITS_DLPF_CFG_256HZ_NOLPF2 the gyro is being
-	   sampled at 8kHz, so we would incorrectly think we have new
-	   data when we are in fact getting duplicate accelerometer data.
-	*/
-	if (!_got_duplicate && memcmp(&mpu_report.accel_x[0], &_last_accel[0], 6) == 0) {
-		// it isn't new data - wait for next timer
-		perf_end(_sample_perf);
-		perf_count(_duplicates);
-		_got_duplicate = true;
-		return OK;
-	}
+	const FIFO::DATA &fifo_sample = report.f[0];
 
-	memcpy(&_last_accel[0], &mpu_report.accel_x[0], 6);
-	_got_duplicate = false;
-
-	/*
-	 * Convert from big to little endian
-	 */
-
-	report.accel_x = int16_t_from_bytes(mpu_report.accel_x);
-	report.accel_y = int16_t_from_bytes(mpu_report.accel_y);
-	report.accel_z = int16_t_from_bytes(mpu_report.accel_z);
-
-	report.temp = int16_t_from_bytes(mpu_report.temp);
-
-	report.gyro_x = int16_t_from_bytes(mpu_report.gyro_x);
-	report.gyro_y = int16_t_from_bytes(mpu_report.gyro_y);
-	report.gyro_z = int16_t_from_bytes(mpu_report.gyro_z);
-
-	if (report.accel_x == 0 &&
-	    report.accel_y == 0 &&
-	    report.accel_z == 0 &&
-	    report.temp == 0 &&
-	    report.gyro_x == 0 &&
-	    report.gyro_y == 0 &&
-	    report.gyro_z == 0) {
-
-		// all zero data - probably a SPI bus error
-		perf_count(_bad_transfers);
-		perf_end(_sample_perf);
-
-		// note that we don't call reset() here as a reset()
-		// costs 20ms with interrupts disabled. That means if
-		// the mpu6k does go bad it would cause a FMU failure,
-		// regardless of whether another sensor is available,
-		return -EIO;
-	}
+	// coordinate convention (x forward, y right, z down)
+	int16_t accel_x = combine(fifo_sample.ACCEL_XOUT_H, fifo_sample.ACCEL_XOUT_L);
+	int16_t accel_y = -combine(fifo_sample.ACCEL_YOUT_H, fifo_sample.ACCEL_YOUT_L);
+	int16_t accel_z = -combine(fifo_sample.ACCEL_ZOUT_H, fifo_sample.ACCEL_ZOUT_L);
+	int16_t gyro_x = combine(fifo_sample.GYRO_XOUT_H, fifo_sample.GYRO_XOUT_L);
+	int16_t gyro_y = -combine(fifo_sample.GYRO_YOUT_H, fifo_sample.GYRO_YOUT_L);
+	int16_t gyro_z = -combine(fifo_sample.GYRO_ZOUT_H, fifo_sample.GYRO_ZOUT_L);
 
 	if (_register_wait != 0) {
 		// we are waiting for some good transfers before using
 		// the sensor again, don't return any data yet
 		_register_wait--;
-		return OK;
+		return;
 	}
-
 
 	/*
 	 * Swap axes and negate y
 	 */
-	int16_t accel_xt = report.accel_y;
-	int16_t accel_yt = ((report.accel_x == -32768) ? 32767 : -report.accel_x);
+	int16_t accel_xt = accel_y;
+	int16_t accel_yt = ((accel_x == -32768) ? 32767 : -accel_x);
 
-	int16_t gyro_xt = report.gyro_y;
-	int16_t gyro_yt = ((report.gyro_x == -32768) ? 32767 : -report.gyro_x);
+	int16_t gyro_xt = gyro_y;
+	int16_t gyro_yt = ((gyro_x == -32768) ? 32767 : -gyro_x);
 
 	/*
 	 * Apply the swap
 	 */
-	report.accel_x = accel_xt;
-	report.accel_y = accel_yt;
-	report.gyro_x = gyro_xt;
-	report.gyro_y = gyro_yt;
+	accel_x = accel_xt;
+	accel_y = accel_yt;
+	gyro_x = gyro_xt;
+	gyro_y = gyro_yt;
 
 	// report the error count as the sum of the number of bad
 	// transfers and bad register reads. This allows the higher
@@ -847,43 +824,25 @@ MPU6000::measure()
 	_px4_accel.set_error_count(error_count);
 	_px4_gyro.set_error_count(error_count);
 
-	/*
-	 * 1) Scale raw value to SI units using scaling from datasheet.
-	 * 2) Subtract static offset (in SI units)
-	 * 3) Scale the statically calibrated values with a linear
-	 *    dynamically obtained factor
-	 *
-	 * Note: the static sensor offset is the number the sensor outputs
-	 * 	 at a nominally 'zero' input. Therefore the offset has to
-	 * 	 be subtracted.
-	 *
-	 *	 Example: A gyro outputs a value of 74 at zero angular rate
-	 *	 	  the offset is 74 from the origin and subtracting
-	 *		  74 from all measurements centers them around zero.
-	 */
 
+	// temperature
 	float temperature = 0.0f;
 
 	if (is_icm_device()) { // if it is an ICM20608
-		temperature = (report.temp / 326.8f + 25.0f);
+		//temperature = (report.temp / 326.8f + 25.0f);
 
 	} else { // If it is an MPU6000
-		temperature = (report.temp / 340.0f + 35.0f);
+		//temperature = (report.temp / 340.0f + 35.0f);
 	}
 
 	_px4_accel.set_temperature(temperature);
 	_px4_gyro.set_temperature(temperature);
 
-	_px4_accel.update(timestamp_sample, report.accel_x, report.accel_y, report.accel_z);
-	_px4_gyro.update(timestamp_sample, report.gyro_x, report.gyro_y, report.gyro_z);
-
-	/* stop measuring */
-	perf_end(_sample_perf);
-	return OK;
+	_px4_accel.update(timestamp_sample, accel_x, accel_y, accel_z);
+	_px4_gyro.update(timestamp_sample, gyro_x, gyro_y, gyro_z);
 }
 
-void
-MPU6000::print_info()
+void MPU6000::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_bad_transfers);
@@ -891,12 +850,19 @@ MPU6000::print_info()
 	perf_print_counter(_reset_retries);
 	perf_print_counter(_duplicates);
 
+	perf_print_counter(_interval_perf);
+	perf_print_counter(_transfer_perf);
+	perf_print_counter(_fifo_empty_perf);
+	perf_print_counter(_fifo_overflow_perf);
+	perf_print_counter(_fifo_reset_perf);
+	perf_print_counter(_drdy_count_perf);
+	perf_print_counter(_drdy_interval_perf);
+
 	_px4_accel.print_status();
 	_px4_gyro.print_status();
 }
 
-void
-MPU6000::print_registers()
+void MPU6000::print_registers()
 {
 	PX4_INFO("registers");
 
