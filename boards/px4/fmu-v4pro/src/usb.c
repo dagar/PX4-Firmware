@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file px4fmu_usb.c
+ * @file usb.c
  *
  * Board-specific USB functions.
  */
@@ -105,3 +105,4 @@ __EXPORT void stm32_usbsuspend(FAR struct usbdev_s *dev, bool resume)
 {
 	uinfo("resume: %d\n", resume);
 }
+
