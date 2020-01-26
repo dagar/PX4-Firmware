@@ -81,7 +81,7 @@ void VehicleAngularVelocity::Stop()
 	_sensor_selection_sub.unregisterCallback();
 }
 
-void VehicleAngularVelocity::CheckFilters(const Vector3f &rates)
+void VehicleAngularVelocity::CheckFilters()
 {
 	if ((hrt_elapsed_time(&_filter_check_last) > 100_ms)) {
 		_filter_check_last = hrt_absolute_time();
@@ -113,10 +113,10 @@ void VehicleAngularVelocity::CheckFilters(const Vector3f &rates)
 
 			// update software low pass filters
 			_lowpass_filter.set_cutoff_frequency(_filter_sample_rate, _param_imu_gyro_cutoff.get());
-			_lowpass_filter.reset(rates);
+			_lowpass_filter.reset(_previous_sample);
 
 			_notch_filter.setParameters(_filter_sample_rate, _param_imu_gyro_nf_freq.get(), _param_imu_gyro_nf_bw.get());
-			_notch_filter.reset(rates);
+			_notch_filter.reset(_previous_sample);
 
 			// reset state
 			_sample_rate_incorrect_count = 0;
@@ -264,52 +264,64 @@ void VehicleAngularVelocity::Run()
 	bool sensor_updated = _sensor_sub[_selected_sensor_sub_index].updated();
 
 	if (sensor_updated || selection_updated) {
-		sensor_gyro_s sensor_data;
 
-		if (_sensor_sub[_selected_sensor_sub_index].copy(&sensor_data)) {
+		Vector3f gyro_filtered{};
 
-			if (sensor_updated) {
-				perf_count_interval(_interval_perf, sensor_data.timestamp_sample);
-			}
+		sensor_gyro_s sensor_data{};
 
-			// get the sensor data and correct for thermal errors (apply offsets and scale)
-			const Vector3f val{sensor_data.x, sensor_data.y, sensor_data.z};
+		// process all outstanding messages
+		while (sensor_updated || selection_updated) {
 
-			// apply offsets and scale
-			Vector3f rates{(val - _offset).emult(_scale)};
+			if (_sensor_sub[_selected_sensor_sub_index].copy(&sensor_data)) {
 
-			// rotate corrected measurements from sensor to body frame
-			rates = _board_rotation * rates;
-
-			// correct for in-run bias errors
-			rates -= _bias;
-
-			// Filter: apply notch and then low-pass
-			CheckFilters(rates);
-			const Vector3f rates_filtered = _lowpass_filter.apply(_notch_filter.apply(rates));
-
-
-			bool publish = true;
-
-			if (_param_imu_gyro_rate_max.get() > 0) {
-				const uint64_t interval = 1e6f / _param_imu_gyro_rate_max.get();
-
-				if (hrt_elapsed_time(&_last_publish) < interval) {
-					publish = false;
+				if (sensor_updated) {
+					perf_count_interval(_interval_perf, sensor_data.timestamp_sample);
 				}
+
+				// get the sensor data and correct for thermal errors (apply offsets and scale)
+				const Vector3f gyro{sensor_data.x, sensor_data.y, sensor_data.z};
+
+				// Filter: apply notch and then low-pass
+				CheckFilters();
+				gyro_filtered = _lowpass_filter.apply(_notch_filter.apply(gyro));
+
+				_previous_sample = gyro_filtered;
 			}
 
-			if (publish) {
-				vehicle_angular_velocity_s out;
+			sensor_updated = _sensor_sub[_selected_sensor_sub_index].updated();
+			selection_updated = false;
+		}
 
-				out.timestamp_sample = sensor_data.timestamp_sample;
-				rates_filtered.copyTo(out.xyz);
-				out.timestamp = hrt_absolute_time();
+		// apply offsets and scale
+		Vector3f rates{(gyro_filtered - _offset).emult(_scale)};
 
-				_vehicle_angular_velocity_pub.publish(out);
+		// rotate corrected measurements from sensor to body frame
+		rates = _board_rotation * rates;
 
-				_last_publish = out.timestamp_sample;
+		// correct for in-run bias errors
+		rates -= _bias;
+
+
+		bool publish = true;
+
+		if (_param_imu_gyro_rate_max.get() > 0) {
+			const uint64_t interval = 1e6f / _param_imu_gyro_rate_max.get();
+
+			if (hrt_elapsed_time(&_last_publish) < interval) {
+				publish = false;
 			}
+		}
+
+		if (publish) {
+			vehicle_angular_velocity_s out;
+
+			out.timestamp_sample = sensor_data.timestamp_sample;
+			rates.copyTo(out.xyz);
+			out.timestamp = hrt_absolute_time();
+
+			_vehicle_angular_velocity_pub.publish(out);
+
+			_last_publish = out.timestamp_sample;
 		}
 	}
 }

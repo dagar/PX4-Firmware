@@ -69,7 +69,7 @@ public:
 private:
 	void Run() override;
 
-	void CheckFilters(const matrix::Vector3f &rates);
+	void CheckFilters();
 	void ParametersUpdate(bool force = false);
 	void SensorBiasUpdate(bool force = false);
 	void SensorCorrectionsUpdate(bool force = false);
@@ -110,6 +110,8 @@ private:
 	matrix::Vector3f _bias{0.f, 0.f, 0.f};
 	matrix::Vector3f _offset{0.f, 0.f, 0.f};
 	matrix::Vector3f _scale{1.f, 1.f, 1.f};
+
+	matrix::Vector3f _previous_sample{0.f, 0.f, 0.f};
 
 	hrt_abstime _last_publish{0};
 	hrt_abstime _filter_check_last{0};
