@@ -342,15 +342,6 @@ public:
 
 	void			handle_message(const mavlink_message_t *msg);
 
-	/**
-	 * Add a mavlink orb topic subscription while ensuring that only a single object exists
-	 * for a given topic id and instance.
-	 * @param topic orb topic id
-	 * @param instance topic instance
-	 * @param disable_sharing if true, force creating a new instance
-	 */
-	MavlinkOrbSubscription *add_orb_subscription(const orb_id_t topic, int instance = 0, bool disable_sharing = false);
-
 	int			get_instance_id() const { return _instance_id; }
 
 	/**
@@ -565,7 +556,6 @@ private:
 
 	unsigned		_main_loop_delay{1000};	/**< mainloop delay, depends on data rate */
 
-	List<MavlinkOrbSubscription *>	_subscriptions;
 	List<MavlinkStream *>		_streams;
 
 	MavlinkShell		*_mavlink_shell{nullptr};

@@ -113,20 +113,4 @@ Subscription::init()
 	return false;
 }
 
-bool
-Subscription::update(uint64_t *time, void *dst)
-{
-	if ((time != nullptr) && (dst != nullptr) && advertised()) {
-		// always copy data to dst regardless of update
-		const uint64_t t = _node->copy_and_get_timestamp(dst, _last_generation);
-
-		if (*time == 0 || *time != t) {
-			*time = t;
-			return true;
-		}
-	}
-
-	return false;
-}
-
 } // namespace uORB

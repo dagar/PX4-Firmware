@@ -1151,11 +1151,10 @@ Mavlink::send_statustext_emergency(const char *string)
 void
 Mavlink::send_autopilot_capabilites()
 {
-	struct vehicle_status_s status;
+	uORB::Subscription status_sub{ORB_ID(vehicle_status)};
+	vehicle_status_s status;
 
-	MavlinkOrbSubscription *status_sub = this->add_orb_subscription(ORB_ID(vehicle_status));
-
-	if (status_sub->update(&status)) {
+	if (status_sub->copy(&status)) {
 		mavlink_autopilot_version_t msg = {};
 
 		msg.capabilities = MAV_PROTOCOL_CAPABILITY_MISSION_FLOAT;
@@ -1236,27 +1235,6 @@ Mavlink::send_protocol_version()
 	mavlink_msg_protocol_version_send_struct(get_channel(), &msg);
 	// Reset to previous value
 	set_proto_version(curr_proto_ver);
-}
-
-MavlinkOrbSubscription *
-Mavlink::add_orb_subscription(const orb_id_t topic, int instance, bool disable_sharing)
-{
-	if (!disable_sharing) {
-		/* check if already subscribed to this topic */
-		for (MavlinkOrbSubscription *sub : _subscriptions) {
-			if (sub->get_topic() == topic && sub->get_instance() == instance) {
-				/* already subscribed */
-				return sub;
-			}
-		}
-	}
-
-	/* add new subscription */
-	MavlinkOrbSubscription *sub_new = new MavlinkOrbSubscription(topic, instance);
-
-	_subscriptions.add(sub_new);
-
-	return sub_new;
 }
 
 int
@@ -2125,10 +2103,9 @@ Mavlink::task_main(int argc, char *argv[])
 
 	uORB::Subscription parameter_update_sub{ORB_ID(parameter_update)};
 
-	MavlinkOrbSubscription *cmd_sub = add_orb_subscription(ORB_ID(vehicle_command), 0, true);
-	MavlinkOrbSubscription *status_sub = add_orb_subscription(ORB_ID(vehicle_status));
-	uint64_t status_time = 0;
-	MavlinkOrbSubscription *ack_sub = add_orb_subscription(ORB_ID(vehicle_command_ack), 0, true);
+	uORB::Subscription cmd_sub{ORB_ID(vehicle_command)};
+	uORB::Subscription status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription ack_sub{ORB_ID(vehicle_command_ack)};
 	/* We don't want to miss the first advertise of an ACK, so we subscribe from the
 	 * beginning and not just when the topic exists. */
 	ack_sub->subscribe_from_beginning(true);
@@ -2137,10 +2114,10 @@ Mavlink::task_main(int argc, char *argv[])
 	/* command ack */
 	uORB::PublicationQueued<vehicle_command_ack_s> command_ack_pub{ORB_ID(vehicle_command_ack)};
 
-	MavlinkOrbSubscription *mavlink_log_sub = add_orb_subscription(ORB_ID(mavlink_log));
+	uORB::Subscription mavlink_log_sub{ORB_ID(mavlink_log)};
 
 	vehicle_status_s status{};
-	status_sub->update(&status_time, &status);
+	status_sub->copy(&status);
 
 	/* Activate sending the data by default (for the IRIDIUM mode it will be disabled after the first round of packages is sent)*/
 	_transmitting_enabled = true;
@@ -2483,9 +2460,6 @@ Mavlink::task_main(int argc, char *argv[])
 
 	/* delete streams */
 	_streams.clear();
-
-	/* delete subscriptions */
-	_subscriptions.clear();
 
 	if (_uart_fd >= 0 && !_is_usb_uart) {
 		/* close UART */

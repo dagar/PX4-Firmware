@@ -212,21 +212,6 @@ public:
 	 */
 	bool copy(void *dst, unsigned &generation);
 
-	/**
-	 * Copies data and the corresponding generation
-	 * from a node to the buffer provided.
-	 *
-	 * @param dst
-	 *   The buffer into which the data is copied.
-	 *   If topic was not updated since last check it will return false but
-	 *   still copy the data.
-	 * @param generation
-	 *   The generation that was copied.
-	 * @return uint64_t
-	 *   Returns the timestamp of the copied data.
-	 */
-	uint64_t copy_and_get_timestamp(void *dst, unsigned &generation);
-
 	// add item to list of work items to schedule on node update
 	bool register_callback(SubscriptionCallback *callback_sub);
 
@@ -269,7 +254,6 @@ private:
 	const orb_metadata *_meta; /**< object metadata information */
 	const uint8_t _instance; /**< orb multi instance identifier */
 	uint8_t     *_data{nullptr};   /**< allocated object buffer */
-	hrt_abstime   _last_update{0}; /**< time the object was last updated */
 	px4::atomic<unsigned>  _generation{0};  /**< object generation count */
 	List<uORB::SubscriptionCallback *>	_callbacks;
 	uint8_t   _priority;  /**< priority of the topic */

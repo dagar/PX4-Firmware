@@ -61,35 +61,8 @@
 
 using matrix::wrap_2pi;
 
-MavlinkStreamHighLatency2::MavlinkStreamHighLatency2(Mavlink *mavlink) : MavlinkStream(mavlink),
-	_actuator_sub_0(_mavlink->add_orb_subscription(ORB_ID(actuator_controls_0))),
-	_actuator_time_0(0),
-	_actuator_sub_1(_mavlink->add_orb_subscription(ORB_ID(actuator_controls_1))),
-	_actuator_time_1(0),
-	_airspeed_sub(_mavlink->add_orb_subscription(ORB_ID(airspeed))),
-	_airspeed_time(0),
-	_attitude_sp_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_attitude_setpoint))),
-	_attitude_sp_time(0),
-	_estimator_status_sub(_mavlink->add_orb_subscription(ORB_ID(estimator_status))),
-	_estimator_status_time(0),
-	_pos_ctrl_status_sub(_mavlink->add_orb_subscription(ORB_ID(position_controller_status))),
-	_pos_ctrl_status_time(0),
-	_geofence_sub(_mavlink->add_orb_subscription(ORB_ID(geofence_result))),
-	_geofence_time(0),
-	_global_pos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_global_position))),
-	_global_pos_time(0),
-	_gps_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_gps_position))),
-	_gps_time(0),
-	_mission_result_sub(_mavlink->add_orb_subscription(ORB_ID(mission_result))),
-	_mission_result_time(0),
-	_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
-	_status_time(0),
-	_status_flags_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status_flags))),
-	_status_flags_time(0),
-	_tecs_status_sub(_mavlink->add_orb_subscription(ORB_ID(tecs_status))),
-	_tecs_time(0),
-	_wind_sub(_mavlink->add_orb_subscription(ORB_ID(wind_estimate))),
-	_wind_time(0),
+MavlinkStreamHighLatency2::MavlinkStreamHighLatency2(Mavlink *mavlink) :
+	MavlinkStream(mavlink),
 	_airspeed(SimpleAnalyzer::AVERAGE),
 	_airspeed_sp(SimpleAnalyzer::AVERAGE),
 	_climb_rate(SimpleAnalyzer::MAX),
@@ -100,11 +73,6 @@ MavlinkStreamHighLatency2::MavlinkStreamHighLatency2(Mavlink *mavlink) : Mavlink
 	_throttle(SimpleAnalyzer::AVERAGE),
 	_windspeed(SimpleAnalyzer::AVERAGE)
 {
-
-	for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-		_batteries[i].subscription = _mavlink->add_orb_subscription(ORB_ID(battery_status), i);
-	}
-
 	reset_last_sent();
 }
 

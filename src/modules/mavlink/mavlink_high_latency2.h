@@ -86,53 +86,26 @@ private:
 
 	struct PerBatteryData {
 		PerBatteryData() {}
-		MavlinkOrbSubscription *subscription{nullptr};
+		uORB::Subscription subscription{nullptr};
 		SimpleAnalyzer analyzer{SimpleAnalyzer::AVERAGE};
 		uint64_t timestamp{0};
 		bool connected{false};
 	};
 
-	MavlinkOrbSubscription *_actuator_sub_0;
-	uint64_t _actuator_time_0;
-
-	MavlinkOrbSubscription *_actuator_sub_1;
-	uint64_t _actuator_time_1;
-
-	MavlinkOrbSubscription *_airspeed_sub;
-	uint64_t _airspeed_time;
-
-	MavlinkOrbSubscription *_attitude_sp_sub;
-	uint64_t _attitude_sp_time;
-
-	MavlinkOrbSubscription *_estimator_status_sub;
-	uint64_t _estimator_status_time;
-
-	MavlinkOrbSubscription *_pos_ctrl_status_sub;
-	uint64_t _pos_ctrl_status_time;
-
-	MavlinkOrbSubscription *_geofence_sub;
-	uint64_t _geofence_time;
-
-	MavlinkOrbSubscription *_global_pos_sub;
-	uint64_t _global_pos_time;
-
-	MavlinkOrbSubscription *_gps_sub;
-	uint64_t _gps_time;
-
-	MavlinkOrbSubscription *_mission_result_sub;
-	uint64_t _mission_result_time;
-
-	MavlinkOrbSubscription *_status_sub;
-	uint64_t _status_time;
-
-	MavlinkOrbSubscription *_status_flags_sub;
-	uint64_t _status_flags_time;
-
-	MavlinkOrbSubscription *_tecs_status_sub;
-	uint64_t _tecs_time;
-
-	MavlinkOrbSubscription *_wind_sub;
-	uint64_t _wind_time;
+	uORB::Subscription _actuator_sub_0;
+	uORB::Subscription _actuator_sub_1;
+	uORB::Subscription _airspeed_sub;
+	uORB::Subscription _attitude_sp_sub;
+	uORB::Subscription _estimator_status_sub;
+	uORB::Subscription _pos_ctrl_status_sub;
+	uORB::Subscription _geofence_sub;
+	uORB::Subscription _global_pos_sub;
+	uORB::Subscription _gps_sub;
+	uORB::Subscription _mission_result_sub;
+	uORB::Subscription _status_sub;
+	uORB::Subscription _status_flags_sub;
+	uORB::Subscription _tecs_status_sub;
+	uORB::Subscription _wind_sub;
 
 	SimpleAnalyzer _airspeed;
 	SimpleAnalyzer _airspeed_sp;

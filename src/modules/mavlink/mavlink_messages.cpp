@@ -343,15 +343,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_status_sub;
+	uORB::Subscription _status_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamHeartbeat(MavlinkStreamHeartbeat &) = delete;
 	MavlinkStreamHeartbeat &operator = (const MavlinkStreamHeartbeat &) = delete;
 
 protected:
-	explicit MavlinkStreamHeartbeat(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status)))
+	explicit MavlinkStreamHeartbeat(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -475,15 +474,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_cmd_sub;
+	uORB::Subscription _cmd_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamCommandLong(MavlinkStreamCommandLong &) = delete;
 	MavlinkStreamCommandLong &operator = (const MavlinkStreamCommandLong &) = delete;
 
 protected:
-	explicit MavlinkStreamCommandLong(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_cmd_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_command), 0, true))
+	explicit MavlinkStreamCommandLong(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -544,27 +542,17 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_status_sub;
-	MavlinkOrbSubscription *_cpuload_sub;
-	MavlinkOrbSubscription *_battery_status_sub[ORB_MULTI_MAX_INSTANCES];
-
-	uint64_t _status_timestamp{0};
-	uint64_t _cpuload_timestamp{0};
-	uint64_t _battery_status_timestamp[ORB_MULTI_MAX_INSTANCES] {};
+	uORB::Subscription _status_sub;
+	uORB::Subscription _cpuload_sub;
+	uORB::Subscription _battery_status_sub[ORB_MULTI_MAX_INSTANCES];
 
 	/* do not allow top copying this class */
 	MavlinkStreamSysStatus(MavlinkStreamSysStatus &) = delete;
 	MavlinkStreamSysStatus &operator = (const MavlinkStreamSysStatus &) = delete;
 
 protected:
-	explicit MavlinkStreamSysStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
-		_cpuload_sub(_mavlink->add_orb_subscription(ORB_ID(cpuload)))
+	explicit MavlinkStreamSysStatus(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{
-		for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-			_battery_status_sub[i] = _mavlink->add_orb_subscription(ORB_ID(battery_status), i);
-			_battery_status_timestamp[i] = 0;
-		}
 	}
 
 	bool send(const hrt_abstime t) override
@@ -573,8 +561,10 @@ protected:
 		cpuload_s cpuload{};
 		battery_status_s battery_status[ORB_MULTI_MAX_INSTANCES] {};
 
-		const bool updated_status = _status_sub->update(&_status_timestamp, &status);
-		const bool updated_cpuload = _cpuload_sub->update(&_cpuload_timestamp, &cpuload);
+		const bool updated_status = _status_sub->update(&status);
+		_status_timestamp = status.timestamp;
+		const bool updated_cpuload = _cpuload_sub->update(&cpuload);
+		_cpuload_timestamp = cpuload.timestamp;
 
 		bool updated_battery = false;
 
@@ -662,9 +652,7 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_battery_status_sub[ORB_MULTI_MAX_INSTANCES] {};
-
-	uint64_t _battery_status_timestamp[ORB_MULTI_MAX_INSTANCES] {};
+	uORB::Subscription _battery_status_sub[ORB_MULTI_MAX_INSTANCES] {};
 
 	/* do not allow top copying this class */
 	MavlinkStreamBatteryStatus(MavlinkStreamSysStatus &) = delete;
@@ -673,9 +661,6 @@ private:
 protected:
 	explicit MavlinkStreamBatteryStatus(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{
-		for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
-			_battery_status_sub[i] = _mavlink->add_orb_subscription(ORB_ID(battery_status), i);
-		}
 	}
 
 	bool send(const hrt_abstime t) override
@@ -794,37 +779,18 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_sensor_sub;
-	uint64_t _sensor_time;
-
-	MavlinkOrbSubscription *_bias_sub;
-	MavlinkOrbSubscription *_differential_pressure_sub;
-	MavlinkOrbSubscription *_magnetometer_sub;
-	MavlinkOrbSubscription *_air_data_sub;
-
-	uint64_t _accel_timestamp;
-	uint64_t _gyro_timestamp;
-	uint64_t _mag_timestamp;
-	uint64_t _baro_timestamp;
-	uint64_t _dpres_timestamp;
+	uORB::Subscription _sensor_sub;
+	uORB::Subscription _bias_sub;
+	uORB::Subscription _differential_pressure_sub;
+	uORB::Subscription _magnetometer_sub;
+	uORB::Subscription _air_data_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamHighresIMU(MavlinkStreamHighresIMU &) = delete;
 	MavlinkStreamHighresIMU &operator = (const MavlinkStreamHighresIMU &) = delete;
 
 protected:
-	explicit MavlinkStreamHighresIMU(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_sensor_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_combined))),
-		_sensor_time(0),
-		_bias_sub(_mavlink->add_orb_subscription(ORB_ID(estimator_sensor_bias))),
-		_differential_pressure_sub(_mavlink->add_orb_subscription(ORB_ID(differential_pressure))),
-		_magnetometer_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_magnetometer))),
-		_air_data_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_air_data))),
-		_accel_timestamp(0),
-		_gyro_timestamp(0),
-		_mag_timestamp(0),
-		_baro_timestamp(0),
-		_dpres_timestamp(0)
+	explicit MavlinkStreamHighresIMU(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -938,9 +904,9 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_raw_accel_sub;
-	MavlinkOrbSubscription *_raw_gyro_sub;
-	MavlinkOrbSubscription *_raw_mag_sub;
+	uORB::Subscription _raw_accel_sub;
+	uORB::Subscription _raw_gyro_sub;
+	uORB::Subscription _raw_mag_sub;
 
 	uint64_t _raw_accel_time;
 	uint64_t _raw_gyro_time;
@@ -951,13 +917,7 @@ private:
 	MavlinkStreamScaledIMU &operator = (const MavlinkStreamScaledIMU &) = delete;
 
 protected:
-	explicit MavlinkStreamScaledIMU(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_integrated), 0)),
-		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro_integrated), 0)),
-		_raw_mag_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_mag), 0)),
-		_raw_accel_time(0),
-		_raw_gyro_time(0),
-		_raw_mag_time(0)
+	explicit MavlinkStreamScaledIMU(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1038,26 +998,16 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_raw_accel_sub;
-	MavlinkOrbSubscription *_raw_gyro_sub;
-	MavlinkOrbSubscription *_raw_mag_sub;
-
-	uint64_t _raw_accel_time;
-	uint64_t _raw_gyro_time;
-	uint64_t _raw_mag_time;
+	uORB::Subscription _raw_accel_sub;
+	uORB::Subscription _raw_gyro_sub;
+	uORB::Subscription _raw_mag_sub;
 
 	// do not allow top copy this class
 	MavlinkStreamScaledIMU2(MavlinkStreamScaledIMU2 &) = delete;
 	MavlinkStreamScaledIMU2 &operator = (const MavlinkStreamScaledIMU2 &) = delete;
 
 protected:
-	explicit MavlinkStreamScaledIMU2(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_integrated), 1)),
-		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro_integrated), 1)),
-		_raw_mag_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_mag), 1)),
-		_raw_accel_time(0),
-		_raw_gyro_time(0),
-		_raw_mag_time(0)
+	explicit MavlinkStreamScaledIMU2(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1137,9 +1087,9 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_raw_accel_sub;
-	MavlinkOrbSubscription *_raw_gyro_sub;
-	MavlinkOrbSubscription *_raw_mag_sub;
+	uORB::Subscription _raw_accel_sub;
+	uORB::Subscription _raw_gyro_sub;
+	uORB::Subscription _raw_mag_sub;
 
 	uint64_t _raw_accel_time;
 	uint64_t _raw_gyro_time;
@@ -1150,13 +1100,7 @@ private:
 	MavlinkStreamScaledIMU3 &operator = (const MavlinkStreamScaledIMU3 &) = delete;
 
 protected:
-	explicit MavlinkStreamScaledIMU3(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_integrated), 2)),
-		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro_integrated), 2)),
-		_raw_mag_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_mag), 2)),
-		_raw_accel_time(0),
-		_raw_gyro_time(0),
-		_raw_mag_time(0)
+	explicit MavlinkStreamScaledIMU3(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1237,8 +1181,8 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_att_sub;
-	MavlinkOrbSubscription *_angular_velocity_sub;
+	uORB::Subscription _att_sub;
+	uORB::Subscription _angular_velocity_sub;
 	uint64_t _att_time{0};
 
 	/* do not allow top copying this class */
@@ -1247,9 +1191,7 @@ private:
 
 
 protected:
-	explicit MavlinkStreamAttitude(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_att_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_attitude))),
-		_angular_velocity_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_angular_velocity)))
+	explicit MavlinkStreamAttitude(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1316,20 +1258,16 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_att_sub;
-	MavlinkOrbSubscription *_angular_velocity_sub;
-	MavlinkOrbSubscription *_status_sub;
-	uint64_t _att_time{0};
+	uORB::Subscription _att_sub;
+	uORB::Subscription _angular_velocity_sub;
+	uORB::Subscription _status_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamAttitudeQuaternion(MavlinkStreamAttitudeQuaternion &) = delete;
 	MavlinkStreamAttitudeQuaternion &operator = (const MavlinkStreamAttitudeQuaternion &) = delete;
 
 protected:
-	explicit MavlinkStreamAttitudeQuaternion(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_att_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_attitude))),
-		_angular_velocity_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_angular_velocity))),
-		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status)))
+	explicit MavlinkStreamAttitudeQuaternion(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1415,35 +1353,26 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_pos_sub;
+	uORB::Subscription _pos_sub;
 	uint64_t _pos_time;
 
-	MavlinkOrbSubscription *_armed_sub;
+	uORB::Subscription _armed_sub;
 	uint64_t _armed_time;
 
-	MavlinkOrbSubscription *_act0_sub;
-	MavlinkOrbSubscription *_act1_sub;
+	uORB::Subscription _act0_sub;
+	uORB::Subscription _act1_sub;
 
-	MavlinkOrbSubscription *_airspeed_validated_sub;
+	uORB::Subscription _airspeed_validated_sub;
 	uint64_t _airspeed_time;
 
-	MavlinkOrbSubscription *_air_data_sub;
+	uORB::Subscription _air_data_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamVFRHUD(MavlinkStreamVFRHUD &) = delete;
 	MavlinkStreamVFRHUD &operator = (const MavlinkStreamVFRHUD &) = delete;
 
 protected:
-	explicit MavlinkStreamVFRHUD(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_pos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position))),
-		_pos_time(0),
-		_armed_sub(_mavlink->add_orb_subscription(ORB_ID(actuator_armed))),
-		_armed_time(0),
-		_act0_sub(_mavlink->add_orb_subscription(ORB_ID(actuator_controls_0))),
-		_act1_sub(_mavlink->add_orb_subscription(ORB_ID(actuator_controls_1))),
-		_airspeed_validated_sub(_mavlink->add_orb_subscription(ORB_ID(airspeed_validated))),
-		_airspeed_time(0),
-		_air_data_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_air_data)))
+	explicit MavlinkStreamVFRHUD(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1544,17 +1473,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_gps_sub;
-	uint64_t _gps_time;
+	uORB::Subscription _gps_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamGPSRawInt(MavlinkStreamGPSRawInt &) = delete;
 	MavlinkStreamGPSRawInt &operator = (const MavlinkStreamGPSRawInt &) = delete;
 
 protected:
-	explicit MavlinkStreamGPSRawInt(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_gps_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_gps_position))),
-		_gps_time(0)
+	explicit MavlinkStreamGPSRawInt(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1623,17 +1549,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_gps_sub;
-	uint64_t _gps_time;
+	uORB::Subscription _gps_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamGPS2Raw(MavlinkStreamGPS2Raw &) = delete;
 	MavlinkStreamGPS2Raw &operator = (const MavlinkStreamGPS2Raw &) = delete;
 
 protected:
-	explicit MavlinkStreamGPS2Raw(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_gps_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_gps_position), 1)),
-		_gps_time(0)
+	explicit MavlinkStreamGPS2Raw(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1822,7 +1745,7 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_pos_sub;
+	uORB::Subscription _pos_sub;
 	uint64_t _pos_time;
 
 	/* do not allow top copying this class */
@@ -1830,9 +1753,7 @@ private:
 	MavlinkStreamADSBVehicle &operator = (const MavlinkStreamADSBVehicle &) = delete;
 
 protected:
-	explicit MavlinkStreamADSBVehicle(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_pos_sub(_mavlink->add_orb_subscription(ORB_ID(transponder_report))),
-		_pos_time(0)
+	explicit MavlinkStreamADSBVehicle(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -1919,23 +1840,23 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_local_pos_sub;
+	uORB::Subscription _local_pos_sub;
 	uint64_t _local_pos_time = 0;
 	vehicle_local_position_s _local_position   = {};
 
-	MavlinkOrbSubscription *_global_pos_sub;
+	uORB::Subscription _global_pos_sub;
 	uint64_t _global_pos_time = 0;
 	vehicle_global_position_s _global_position = {};
 
-	MavlinkOrbSubscription *_position_setpoint_triplet_sub;
+	uORB::Subscription _position_setpoint_triplet_sub;
 	uint64_t _setpoint_triplet_time = 0;
 	position_setpoint_triplet_s _setpoint_triplet = {};
 
-	MavlinkOrbSubscription *_vehicle_status_sub;
+	uORB::Subscription _vehicle_status_sub;
 	uint64_t _vehicle_status_time = 0;
 	vehicle_status_s _vehicle_status = {};
 
-	MavlinkOrbSubscription *_land_detected_sub;
+	uORB::Subscription _land_detected_sub;
 	uint64_t _land_detected_time = 0;
 	vehicle_land_detected_s _land_detected = {};
 
@@ -1944,12 +1865,7 @@ private:
 	MavlinkStreamUTMGlobalPosition &operator = (const MavlinkStreamUTMGlobalPosition &) = delete;
 
 protected:
-	explicit MavlinkStreamUTMGlobalPosition(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_local_pos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position))),
-		_global_pos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_global_position))),
-		_position_setpoint_triplet_sub(_mavlink->add_orb_subscription(ORB_ID(position_setpoint_triplet))),
-		_vehicle_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
-		_land_detected_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_land_detected)))
+	explicit MavlinkStreamUTMGlobalPosition(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2103,17 +2019,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_collision_sub;
-	uint64_t _collision_time;
+	uORB::Subscription _collision_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamCollision(MavlinkStreamCollision &) = delete;
 	MavlinkStreamCollision &operator = (const MavlinkStreamCollision &) = delete;
 
 protected:
-	explicit MavlinkStreamCollision(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_collision_sub(_mavlink->add_orb_subscription(ORB_ID(collision_report))),
-		_collision_time(0)
+	explicit MavlinkStreamCollision(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2179,17 +2092,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_trigger_sub;
-	uint64_t _trigger_time;
+	uORB::Subscription _trigger_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamCameraTrigger(MavlinkStreamCameraTrigger &) = delete;
 	MavlinkStreamCameraTrigger &operator = (const MavlinkStreamCameraTrigger &) = delete;
 
 protected:
-	explicit MavlinkStreamCameraTrigger(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_trigger_sub(_mavlink->add_orb_subscription(ORB_ID(camera_trigger))),
-		_trigger_time(0)
+	explicit MavlinkStreamCameraTrigger(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2287,17 +2197,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_capture_sub;
-	uint64_t _capture_time;
+	uORB::Subscription _capture_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamCameraImageCaptured(MavlinkStreamCameraImageCaptured &) = delete;
 	MavlinkStreamCameraImageCaptured &operator = (const MavlinkStreamCameraImageCaptured &) = delete;
 
 protected:
-	explicit MavlinkStreamCameraImageCaptured(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_capture_sub(_mavlink->add_orb_subscription(ORB_ID(camera_capture))),
-		_capture_time(0)
+	explicit MavlinkStreamCameraImageCaptured(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2366,27 +2273,18 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_gpos_sub;
-	uint64_t _gpos_time;
 
-	MavlinkOrbSubscription *_lpos_sub;
-	uint64_t _lpos_time;
-
-	MavlinkOrbSubscription *_home_sub;
-	MavlinkOrbSubscription *_air_data_sub;
+	uORB::Subscription _gpos_sub;
+	uORB::Subscription _lpos_sub;
+	uORB::Subscription _home_sub;
+	uORB::Subscription _air_data_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamGlobalPositionInt(MavlinkStreamGlobalPositionInt &) = delete;
 	MavlinkStreamGlobalPositionInt &operator = (const MavlinkStreamGlobalPositionInt &) = delete;
 
 protected:
-	explicit MavlinkStreamGlobalPositionInt(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_gpos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_global_position))),
-		_gpos_time(0),
-		_lpos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position))),
-		_lpos_time(0),
-		_home_sub(_mavlink->add_orb_subscription(ORB_ID(home_position))),
-		_air_data_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_air_data)))
+	explicit MavlinkStreamGlobalPositionInt(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2483,10 +2381,10 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_odom_sub;
+	uORB::Subscription _odom_sub;
 	uint64_t _odom_time;
 
-	MavlinkOrbSubscription *_vodom_sub;
+	uORB::Subscription _vodom_sub;
 	uint64_t _vodom_time;
 
 	/* do not allow top copying this class */
@@ -2494,11 +2392,7 @@ private:
 	MavlinkStreamOdometry &operator = (const MavlinkStreamOdometry &) = delete;
 
 protected:
-	explicit MavlinkStreamOdometry(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_odom_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_odometry))),
-		_odom_time(0),
-		_vodom_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_visual_odometry))),
-		_vodom_time(0)
+	explicit MavlinkStreamOdometry(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2618,17 +2512,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_pos_sub;
-	uint64_t _pos_time;
+	uORB::Subscription _pos_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamLocalPositionNED(MavlinkStreamLocalPositionNED &) = delete;
 	MavlinkStreamLocalPositionNED &operator = (const MavlinkStreamLocalPositionNED &) = delete;
 
 protected:
-	explicit MavlinkStreamLocalPositionNED(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_pos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position))),
-		_pos_time(0)
+	explicit MavlinkStreamLocalPositionNED(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2689,24 +2580,19 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_est_sub;
+	uORB::Subscription _est_sub;
 	uint64_t _est_time;
 
-	MavlinkOrbSubscription *_sensor_accel_status_0_sub;
-	MavlinkOrbSubscription *_sensor_accel_status_1_sub;
-	MavlinkOrbSubscription *_sensor_accel_status_2_sub;
+	uORB::Subscription _sensor_accel_status_0_sub;
+	uORB::Subscription _sensor_accel_status_1_sub;
+	uORB::Subscription _sensor_accel_status_2_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamEstimatorStatus(MavlinkStreamEstimatorStatus &) = delete;
 	MavlinkStreamEstimatorStatus &operator = (const MavlinkStreamEstimatorStatus &) = delete;
 
 protected:
-	explicit MavlinkStreamEstimatorStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_est_sub(_mavlink->add_orb_subscription(ORB_ID(estimator_status))),
-		_est_time(0),
-		_sensor_accel_status_0_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_status), 0)),
-		_sensor_accel_status_1_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_status), 1)),
-		_sensor_accel_status_2_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_status), 2))
+	explicit MavlinkStreamEstimatorStatus(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2796,17 +2682,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_mocap_sub;
-	uint64_t _mocap_time;
+	uORB::Subscription _mocap_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamAttPosMocap(MavlinkStreamAttPosMocap &) = delete;
 	MavlinkStreamAttPosMocap &operator = (const MavlinkStreamAttPosMocap &) = delete;
 
 protected:
-	explicit MavlinkStreamAttPosMocap(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_mocap_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_mocap_odometry))),
-		_mocap_time(0)
+	explicit MavlinkStreamAttPosMocap(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2869,15 +2752,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_home_sub;
+	uORB::Subscription _home_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamHomePosition(MavlinkStreamHomePosition &) = delete;
 	MavlinkStreamHomePosition &operator = (const MavlinkStreamHomePosition &) = delete;
 
 protected:
-	explicit MavlinkStreamHomePosition(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_home_sub(_mavlink->add_orb_subscription(ORB_ID(home_position)))
+	explicit MavlinkStreamHomePosition(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -2964,17 +2846,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_act_sub;
-	uint64_t _act_time;
+	uORB::Subscription _act_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamServoOutputRaw(MavlinkStreamServoOutputRaw &) = delete;
 	MavlinkStreamServoOutputRaw &operator = (const MavlinkStreamServoOutputRaw &) = delete;
 
 protected:
-	explicit MavlinkStreamServoOutputRaw(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_act_sub(_mavlink->add_orb_subscription(ORB_ID(actuator_outputs), N)),
-		_act_time(0)
+	explicit MavlinkStreamServoOutputRaw(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3061,36 +2940,15 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_act_ctrl_sub;
-	uint64_t _act_ctrl_time;
+	uORB::Subscription _act_ctrl_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamActuatorControlTarget(MavlinkStreamActuatorControlTarget &) = delete;
 	MavlinkStreamActuatorControlTarget &operator = (const MavlinkStreamActuatorControlTarget &) = delete;
 
 protected:
-	explicit MavlinkStreamActuatorControlTarget(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_act_ctrl_sub(nullptr),
-		_act_ctrl_time(0)
+	explicit MavlinkStreamActuatorControlTarget(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{
-		// XXX this can be removed once the multiplatform system remaps topics
-		switch (N) {
-		case 0:
-			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_0));
-			break;
-
-		case 1:
-			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_1));
-			break;
-
-		case 2:
-			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_2));
-			break;
-
-		case 3:
-			_act_ctrl_sub = _mavlink->add_orb_subscription(ORB_ID(actuator_controls_3));
-			break;
-		}
 	}
 
 	bool send(const hrt_abstime t) override
@@ -3150,20 +3008,15 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_status_sub;
-
-	MavlinkOrbSubscription *_act_sub;
-	uint64_t _act_time;
+	uORB::Subscription _status_sub;
+	uORB::Subscription _act_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamHILActuatorControls(MavlinkStreamHILActuatorControls &) = delete;
 	MavlinkStreamHILActuatorControls &operator = (const MavlinkStreamHILActuatorControls &) = delete;
 
 protected:
-	explicit MavlinkStreamHILActuatorControls(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
-		_act_sub(_mavlink->add_orb_subscription(ORB_ID(actuator_outputs))),
-		_act_time(0)
+	explicit MavlinkStreamHILActuatorControls(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3311,19 +3164,16 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_control_mode_sub;
-	MavlinkOrbSubscription *_lpos_sp_sub;
-	MavlinkOrbSubscription *_pos_sp_triplet_sub;
+	uORB::Subscription _control_mode_sub;
+	uORB::Subscription _lpos_sp_sub;
+	uORB::Subscription _pos_sp_triplet_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamPositionTargetGlobalInt(MavlinkStreamPositionTargetGlobalInt &) = delete;
 	MavlinkStreamPositionTargetGlobalInt &operator = (const MavlinkStreamPositionTargetGlobalInt &) = delete;
 
 protected:
-	explicit MavlinkStreamPositionTargetGlobalInt(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_control_mode_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_control_mode))),
-		_lpos_sp_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position_setpoint))),
-		_pos_sp_triplet_sub(_mavlink->add_orb_subscription(ORB_ID(position_setpoint_triplet)))
+	explicit MavlinkStreamPositionTargetGlobalInt(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3410,17 +3260,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_pos_sp_sub;
-	uint64_t _pos_sp_time;
+	uORB::Subscription _pos_sp_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamLocalPositionSetpoint(MavlinkStreamLocalPositionSetpoint &) = delete;
 	MavlinkStreamLocalPositionSetpoint &operator = (const MavlinkStreamLocalPositionSetpoint &) = delete;
 
 protected:
-	explicit MavlinkStreamLocalPositionSetpoint(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_pos_sp_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position_setpoint))),
-		_pos_sp_time(0)
+	explicit MavlinkStreamLocalPositionSetpoint(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3488,20 +3335,15 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_att_sp_sub;
-	MavlinkOrbSubscription *_att_rates_sp_sub;
-
-	uint64_t _att_sp_time;
+	uORB::Subscription _att_sp_sub;
+	uORB::Subscription _att_rates_sp_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamAttitudeTarget(MavlinkStreamAttitudeTarget &) = delete;
 	MavlinkStreamAttitudeTarget &operator = (const MavlinkStreamAttitudeTarget &) = delete;
 
 protected:
-	explicit MavlinkStreamAttitudeTarget(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_att_sp_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_attitude_setpoint))),
-		_att_rates_sp_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_rates_setpoint))),
-		_att_sp_time(0)
+	explicit MavlinkStreamAttitudeTarget(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3578,17 +3420,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_rc_sub;
-	uint64_t _rc_time;
+	uORB::Subscription _rc_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamRCChannels(MavlinkStreamRCChannels &) = delete;
 	MavlinkStreamRCChannels &operator = (const MavlinkStreamRCChannels &) = delete;
 
 protected:
-	explicit MavlinkStreamRCChannels(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_rc_sub(_mavlink->add_orb_subscription(ORB_ID(input_rc))),
-		_rc_time(0)
+	explicit MavlinkStreamRCChannels(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3666,17 +3505,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_manual_sub;
-	uint64_t _manual_time;
+	uORB::Subscription _manual_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamManualControl(MavlinkStreamManualControl &) = delete;
 	MavlinkStreamManualControl &operator = (const MavlinkStreamManualControl &) = delete;
 
 protected:
-	explicit MavlinkStreamManualControl(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_manual_sub(_mavlink->add_orb_subscription(ORB_ID(manual_control_setpoint))),
-		_manual_time(0)
+	explicit MavlinkStreamManualControl(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3745,17 +3581,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_traj_wp_avoidance_sub;
-	uint64_t _traj_wp_avoidance_time;
+	uORB::Subscription _traj_wp_avoidance_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamTrajectoryRepresentationWaypoints(MavlinkStreamTrajectoryRepresentationWaypoints &);
 	MavlinkStreamTrajectoryRepresentationWaypoints &operator = (const MavlinkStreamTrajectoryRepresentationWaypoints &);
 
 protected:
-	explicit MavlinkStreamTrajectoryRepresentationWaypoints(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_traj_wp_avoidance_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_trajectory_waypoint_desired))),
-		_traj_wp_avoidance_time(0)
+	explicit MavlinkStreamTrajectoryRepresentationWaypoints(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3852,17 +3685,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_flow_sub;
-	uint64_t _flow_time;
+	uORB::Subscription _flow_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamOpticalFlowRad(MavlinkStreamOpticalFlowRad &) = delete;
 	MavlinkStreamOpticalFlowRad &operator = (const MavlinkStreamOpticalFlowRad &) = delete;
 
 protected:
-	explicit MavlinkStreamOpticalFlowRad(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_flow_sub(_mavlink->add_orb_subscription(ORB_ID(optical_flow))),
-		_flow_time(0)
+	explicit MavlinkStreamOpticalFlowRad(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -3929,22 +3759,19 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_debug_sub;
-	uint64_t _debug_time;
+	uORB::Subscription _debug_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamNamedValueFloat(MavlinkStreamNamedValueFloat &) = delete;
 	MavlinkStreamNamedValueFloat &operator = (const MavlinkStreamNamedValueFloat &) = delete;
 
 protected:
-	explicit MavlinkStreamNamedValueFloat(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_debug_sub(_mavlink->add_orb_subscription(ORB_ID(debug_key_value))),
-		_debug_time(0)
+	explicit MavlinkStreamNamedValueFloat(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
 	{
-		struct debug_key_value_s debug;
+		debug_key_value_s debug;
 
 		if (_debug_sub->update(&_debug_time, &debug)) {
 			mavlink_named_value_float_t msg = {};
@@ -3998,17 +3825,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_debug_sub;
-	uint64_t _debug_time;
+	uORB::Subscription _debug_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamDebug(MavlinkStreamDebug &) = delete;
 	MavlinkStreamDebug &operator = (const MavlinkStreamDebug &) = delete;
 
 protected:
-	explicit MavlinkStreamDebug(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_debug_sub(_mavlink->add_orb_subscription(ORB_ID(debug_value))),
-		_debug_time(0)
+	explicit MavlinkStreamDebug(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4065,17 +3889,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_debug_sub;
-	uint64_t _debug_time;
+	uORB::Subscription _debug_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamDebugVect(MavlinkStreamDebugVect &) = delete;
 	MavlinkStreamDebugVect &operator = (const MavlinkStreamDebugVect &) = delete;
 
 protected:
-	explicit MavlinkStreamDebugVect(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_debug_sub(_mavlink->add_orb_subscription(ORB_ID(debug_vect))),
-		_debug_time(0)
+	explicit MavlinkStreamDebugVect(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4136,7 +3957,7 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_debug_array_sub;
+	uORB::Subscription _debug_array_sub;
 	uint64_t _debug_time;
 
 	/* do not allow top copying this class */
@@ -4144,9 +3965,7 @@ private:
 	MavlinkStreamDebugFloatArray &operator = (const MavlinkStreamDebugFloatArray &);
 
 protected:
-	explicit MavlinkStreamDebugFloatArray(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_debug_array_sub(_mavlink->add_orb_subscription(ORB_ID(debug_array))),
-		_debug_time(0)
+	explicit MavlinkStreamDebugFloatArray(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4210,20 +4029,15 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_pos_ctrl_status_sub;
-	MavlinkOrbSubscription *_tecs_status_sub;
-
-	uint64_t _pos_ctrl_status_timestamp{0};
-	uint64_t _tecs_status_timestamp{0};
+	uORB::Subscription _pos_ctrl_status_sub;
+	uORB::Subscription _tecs_status_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamNavControllerOutput(MavlinkStreamNavControllerOutput &) = delete;
 	MavlinkStreamNavControllerOutput &operator = (const MavlinkStreamNavControllerOutput &) = delete;
 
 protected:
-	explicit MavlinkStreamNavControllerOutput(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_pos_ctrl_status_sub(_mavlink->add_orb_subscription(ORB_ID(position_controller_status))),
-		_tecs_status_sub(_mavlink->add_orb_subscription(ORB_ID(tecs_status)))
+	explicit MavlinkStreamNavControllerOutput(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4290,15 +4104,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_status_sub;
+	uORB::Subscription _status_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamCameraCapture(MavlinkStreamCameraCapture &) = delete;
 	MavlinkStreamCameraCapture &operator = (const MavlinkStreamCameraCapture &) = delete;
 
 protected:
-	explicit MavlinkStreamCameraCapture(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status)))
+	explicit MavlinkStreamCameraCapture(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4362,7 +4175,7 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_distance_sensor_sub;
+	uORB::Subscription _distance_sensor_sub;
 	uint64_t _dist_sensor_time;
 
 	/* do not allow top copying this class */
@@ -4370,9 +4183,7 @@ private:
 	MavlinkStreamDistanceSensor &operator = (const MavlinkStreamDistanceSensor &) = delete;
 
 protected:
-	explicit MavlinkStreamDistanceSensor(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_distance_sensor_sub(_mavlink->add_orb_subscription(ORB_ID(distance_sensor))),
-		_dist_sensor_time(0)
+	explicit MavlinkStreamDistanceSensor(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4453,10 +4264,10 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_status_sub;
-	MavlinkOrbSubscription *_landed_sub;
-	MavlinkOrbSubscription *_pos_sp_triplet_sub;
-	MavlinkOrbSubscription *_control_mode_sub;
+	uORB::Subscription _status_sub;
+	uORB::Subscription _landed_sub;
+	uORB::Subscription _pos_sp_triplet_sub;
+	uORB::Subscription _control_mode_sub;
 	mavlink_extended_sys_state_t _msg;
 
 	/* do not allow top copying this class */
@@ -4465,10 +4276,6 @@ private:
 
 protected:
 	explicit MavlinkStreamExtendedSysState(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
-		_landed_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_land_detected))),
-		_pos_sp_triplet_sub(_mavlink->add_orb_subscription(ORB_ID(position_setpoint_triplet))),
-		_control_mode_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_control_mode))),
 		_msg()
 	{
 		_msg.vtol_state = MAV_VTOL_STATE_UNDEFINED;
@@ -4569,21 +4376,16 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_local_pos_sub;
-	MavlinkOrbSubscription *_home_sub;
-	MavlinkOrbSubscription *_air_data_sub;
-
-	uint64_t _local_pos_time{0};
+	uORB::Subscription _local_pos_sub;
+	uORB::Subscription _home_sub;
+	uORB::Subscription _air_data_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamAltitude(MavlinkStreamAltitude &) = delete;
 	MavlinkStreamAltitude &operator = (const MavlinkStreamAltitude &) = delete;
 
 protected:
-	explicit MavlinkStreamAltitude(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_local_pos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position))),
-		_home_sub(_mavlink->add_orb_subscription(ORB_ID(home_position))),
-		_air_data_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_air_data)))
+	explicit MavlinkStreamAltitude(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4692,20 +4494,15 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_wind_estimate_sub;
-	uint64_t _wind_estimate_time;
-
-	MavlinkOrbSubscription *_local_pos_sub;
+	uORB::Subscription _wind_estimate_sub;
+	uORB::Subscription _local_pos_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamWind(MavlinkStreamWind &) = delete;
 	MavlinkStreamWind &operator = (const MavlinkStreamWind &) = delete;
 
 protected:
-	explicit MavlinkStreamWind(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_wind_estimate_sub(_mavlink->add_orb_subscription(ORB_ID(wind_estimate))),
-		_wind_estimate_time(0),
-		_local_pos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position)))
+	explicit MavlinkStreamWind(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4774,18 +4571,15 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_mount_orientation_sub;
-	MavlinkOrbSubscription *_gpos_sub;
-	uint64_t _mount_orientation_time{0};
+	uORB::Subscription _mount_orientation_sub;
+	uORB::Subscription _gpos_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamMountOrientation(MavlinkStreamMountOrientation &) = delete;
 	MavlinkStreamMountOrientation &operator = (const MavlinkStreamMountOrientation &) = delete;
 
 protected:
-	explicit MavlinkStreamMountOrientation(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_mount_orientation_sub(_mavlink->add_orb_subscription(ORB_ID(mount_orientation))),
-		_gpos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_global_position)))
+	explicit MavlinkStreamMountOrientation(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -4847,26 +4641,17 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_angular_velocity_sub;
-	MavlinkOrbSubscription *_att_sub;
-	MavlinkOrbSubscription *_gpos_sub;
-	MavlinkOrbSubscription *_lpos_sub;
-
-	uint64_t _angular_velocity_time{0};
-	uint64_t _att_time{0};
-	uint64_t _gpos_time{0};
-	uint64_t _lpos_time{0};
+	uORB::Subscription _angular_velocity_sub;
+	uORB::Subscription _att_sub;
+	uORB::Subscription _gpos_sub;
+	uORB::Subscription _lpos_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamGroundTruth(MavlinkStreamGroundTruth &) = delete;
 	MavlinkStreamGroundTruth &operator = (const MavlinkStreamGroundTruth &) = delete;
 
 protected:
-	explicit MavlinkStreamGroundTruth(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_angular_velocity_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_angular_velocity_groundtruth))),
-		_att_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_attitude_groundtruth))),
-		_gpos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_global_position_groundtruth))),
-		_lpos_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_local_position_groundtruth)))
+	explicit MavlinkStreamGroundTruth(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -5018,17 +4803,14 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_sub;
-	uint64_t _orbit_status_time;
+	uORB::Subscription _sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamOrbitStatus(MavlinkStreamOrbitStatus &);
 	MavlinkStreamOrbitStatus &operator = (const MavlinkStreamOrbitStatus &);
 
 protected:
-	explicit MavlinkStreamOrbitStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_sub(_mavlink->add_orb_subscription(ORB_ID(orbit_status))),
-		_orbit_status_time(0)
+	explicit MavlinkStreamOrbitStatus(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
@@ -5088,25 +4870,22 @@ public:
 	}
 
 private:
-	MavlinkOrbSubscription *_obstacle_distance_fused_sub;
-	uint64_t _obstacle_distance_time;
+	uORB::Subscription _obstacle_distance_fused_sub;
 
 	/* do not allow top copying this class */
 	MavlinkStreamObstacleDistance(MavlinkStreamObstacleDistance &) = delete;
 	MavlinkStreamObstacleDistance &operator = (const MavlinkStreamObstacleDistance &) = delete;
 
 protected:
-	explicit MavlinkStreamObstacleDistance(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_obstacle_distance_fused_sub(_mavlink->add_orb_subscription(ORB_ID(obstacle_distance_fused))),
-		_obstacle_distance_time(0)
+	explicit MavlinkStreamObstacleDistance(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{}
 
 	bool send(const hrt_abstime t) override
 	{
 		obstacle_distance_s obstacke_distance;
 
-		if (_obstacle_distance_fused_sub->update(&_obstacle_distance_time, &obstacke_distance)) {
-			mavlink_obstacle_distance_t msg = {};
+		if (_obstacle_distance_fused_sub.updated(&obstacke_distance)) {
+			mavlink_obstacle_distance_t msg{};
 
 			msg.time_usec = obstacke_distance.timestamp;
 			msg.sensor_type = obstacke_distance.sensor_type;
