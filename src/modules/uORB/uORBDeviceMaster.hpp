@@ -91,9 +91,7 @@ private:
 
 	struct DeviceNodeStatisticsData {
 		DeviceNode *node;
-		uint32_t last_lost_msg_count;
 		unsigned int last_pub_msg_count;
-		uint32_t lost_msg_delta;
 		unsigned int pub_msg_delta;
 		DeviceNodeStatisticsData *next = nullptr;
 	};

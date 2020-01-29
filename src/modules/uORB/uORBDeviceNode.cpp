@@ -148,7 +148,6 @@ uORB::DeviceNode::copy_locked(void *dst, unsigned &generation)
 
 		if (current_generation > generation + _queue_size) {
 			// Reader is too far behind: some messages are lost
-			_lost_messages += current_generation - (generation + _queue_size);
 			generation = current_generation - _queue_size;
 		}
 
@@ -525,27 +524,6 @@ uORB::DeviceNode::appears_updated(SubscriberData *sd)
 
 	// finally, compare the generation
 	return (sd->generation != published_message_count());
-}
-
-bool
-uORB::DeviceNode::print_statistics(bool reset)
-{
-	if (!_lost_messages) {
-		return false;
-	}
-
-	lock();
-	//This can be wrong: if a reader never reads, _lost_messages will not be increased either
-	uint32_t lost_messages = _lost_messages;
-
-	if (reset) {
-		_lost_messages = 0;
-	}
-
-	unlock();
-
-	PX4_INFO("%s: %i", _meta->o_name, lost_messages);
-	return true;
 }
 
 void uORB::DeviceNode::add_internal_subscriber()
