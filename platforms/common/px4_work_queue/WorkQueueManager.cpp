@@ -43,6 +43,7 @@
 #include <containers/BlockingList.hpp>
 #include <containers/BlockingQueue.hpp>
 #include <lib/drivers/device/Device.hpp>
+#include <lib/drivers/device/nuttx/SPIMaster.hpp>
 #include <lib/mathlib/mathlib.h>
 
 #include <limits.h>
@@ -205,15 +206,19 @@ static void *
 WorkQueueRunner(void *context)
 {
 	wq_config_t *config = static_cast<wq_config_t *>(context);
-	WorkQueue wq(*config);
 
-	// add to work queue list
-	_wq_manager_wqs_list->add(&wq);
+	if (strstr(config->name, "SPI")) {
+		device::SPIMaster wq(*config);
+		_wq_manager_wqs_list->add(&wq);
+		wq.Run();
+		_wq_manager_wqs_list->remove(&wq);
 
-	wq.Run();
-
-	// remove from work queue list
-	_wq_manager_wqs_list->remove(&wq);
+	} else {
+		WorkQueue wq(*config);
+		_wq_manager_wqs_list->add(&wq);
+		wq.Run();
+		_wq_manager_wqs_list->remove(&wq);
+	}
 
 	return nullptr;
 }

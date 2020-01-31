@@ -44,13 +44,15 @@
 
 #include <nuttx/spi/spi.h>
 
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+
 namespace device __EXPORT
 {
 
 /**
  * Abstract class for character device on SPI
  */
-class __EXPORT SPI : public CDev
+class __EXPORT SPI : public CDev, public px4::ScheduledWorkItem
 {
 public:
 	// no copy, assignment, move, move assignment

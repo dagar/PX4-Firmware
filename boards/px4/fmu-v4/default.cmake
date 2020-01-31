@@ -15,30 +15,30 @@ px4_add_board(
 		TEL2:/dev/ttyS2
 	DRIVERS
 		adc
-		barometer # all available barometer drivers
+		#barometer # all available barometer drivers
 		batt_smbus
 		camera_capture
 		camera_trigger
-		differential_pressure # all available differential pressure drivers
+		#differential_pressure # all available differential pressure drivers
 		distance_sensor # all available distance sensor drivers
 		dshot
 		gps
 		heater
 		#imu # all available imu drivers
-		imu/adis16448
-		imu/adis16477
-		imu/adis16497
+		#imu/adis16448
+		#imu/adis16477
+		#imu/adis16497
 		imu/invensense/icm20602
-		imu/invensense/icm20608-g
-		imu/mpu6000
-		imu/mpu9250
+		#imu/invensense/icm20608-g
+		#imu/mpu6000
+		#imu/mpu9250
 		irlock
 		lights/blinkm
 		lights/rgbled
 		lights/rgbled_ncp5623c
-		magnetometer # all available magnetometer drivers
+		#magnetometer # all available magnetometer drivers
 		mkblctrl
-		optical_flow # all available optical flow drivers
+		#optical_flow # all available optical flow drivers
 		#osd
 		pca9685
 		#protocol_splitter

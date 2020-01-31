@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,70 +31,78 @@
  *
  ****************************************************************************/
 
-#pragma once
+/**
+ * @file SPIMaster.cpp
+ *
+ * Base class for devices connected via SPI.
+ *
+ * @todo Work out if caching the mode/frequency would save any time.
+ *
+ * @todo A separate bus/device abstraction would allow for mixed interrupt-mode
+ * and non-interrupt-mode clients to arbitrate for the bus.  As things stand,
+ * a bus shared between clients of both kinds is vulnerable to races between
+ * the two, where an interrupt-mode client will ignore the lock held by the
+ * non-interrupt-mode client.
+ */
 
-#include "WorkQueueManager.hpp"
+#include "SPIMaster.hpp"
 
-#include <containers/BlockingList.hpp>
-#include <containers/List.hpp>
-#include <containers/IntrusiveQueue.hpp>
-#include <px4_platform_common/atomic.h>
-#include <px4_platform_common/defines.h>
-#include <px4_platform_common/sem.h>
-#include <px4_platform_common/tasks.h>
+#include <px4_platform_common/px4_config.h>
 
-namespace px4
+namespace device
 {
 
-class WorkItem;
-
-class WorkQueue : public ListNode<WorkQueue *>
+SPIMaster::SPIMaster(const px4::wq_config_t &config) :
+	WorkQueue(config)
 {
-public:
-	explicit WorkQueue(const wq_config_t &wq_config);
-	WorkQueue() = delete;
+	if (config == px4::wq_configurations::SPI0) {
+		_bus = 0;
 
-	virtual ~WorkQueue();
+	} else if (config == px4::wq_configurations::SPI1) {
+		_bus = 1;
 
-	const char *get_name() { return _config.name; }
+	} else if (config == px4::wq_configurations::SPI2) {
+		_bus = 2;
 
-	bool Attach(WorkItem *item);
-	void Detach(WorkItem *item);
+	} else if (config == px4::wq_configurations::SPI3) {
+		_bus = 3;
 
-	void Add(WorkItem *item);
-	void Remove(WorkItem *item);
+	} else if (config == px4::wq_configurations::SPI4) {
+		_bus = 4;
 
-	void Clear();
+	} else if (config == px4::wq_configurations::SPI5) {
+		_bus = 5;
 
-	void Run();
+	} else if (config == px4::wq_configurations::SPI6) {
+		_bus = 6;
+	}
 
-	void request_stop() { _should_exit.store(true); }
+	_initialized = Init();
+}
 
-	void print_status(bool last = false);
+SPIMaster::~SPIMaster()
+{
+	// XXX no way to let go of the bus...
+}
 
-private:
+bool SPIMaster::Init()
+{
+	// attach to the spi bus
+	if (_dev == nullptr) {
+		if (!board_has_bus(BOARD_SPI_BUS, _bus)) {
+			return false;
+		}
 
-	bool should_exit() const { return _should_exit.load(); }
+		_dev = px4_spibus_initialize(_bus);
+	}
 
-	inline void signal_worker_thread();
+	if (_dev == nullptr) {
+		PX4_ERR("failed to init SPI: %d", _bus);
+		return false;
+	}
 
-#ifdef __PX4_NUTTX
-	// In NuttX work can be enqueued from an ISR
-	void work_lock() { _flags = enter_critical_section(); }
-	void work_unlock() { leave_critical_section(_flags); }
-	irqstate_t _flags;
-#else
-	void work_lock() { px4_sem_wait(&_qlock); }
-	void work_unlock() { px4_sem_post(&_qlock); }
-	px4_sem_t _qlock;
-#endif
+	_initialized = true;
+	return true;
+}
 
-	IntrusiveQueue<WorkItem *>	_q;
-	px4_sem_t			_process_lock;
-	const wq_config_t		&_config;
-	BlockingList<WorkItem *>	_work_items;
-	px4::atomic_bool		_should_exit{false};
-
-};
-
-} // namespace px4
+} // namespace device

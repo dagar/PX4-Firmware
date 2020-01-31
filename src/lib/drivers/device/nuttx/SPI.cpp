@@ -48,6 +48,7 @@
 #include "SPI.hpp"
 
 #include <px4_platform_common/px4_config.h>
+
 #include <nuttx/arch.h>
 
 #ifndef CONFIG_SPI_EXCHANGE
@@ -59,6 +60,7 @@ namespace device
 
 SPI::SPI(const char *name, const char *devname, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency) :
 	CDev(name, devname),
+	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
 	_device(device),
 	_mode(mode),
 	_frequency(frequency),

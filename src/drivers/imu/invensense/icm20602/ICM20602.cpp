@@ -50,7 +50,6 @@ static constexpr uint32_t FIFO_ACCEL_SAMPLES{FIFO_INTERVAL / (1000000 / ACCEL_RA
 
 ICM20602::ICM20602(int bus, uint32_t device, enum Rotation rotation) :
 	SPI(MODULE_NAME, nullptr, bus, device, SPIDEV_MODE3, SPI_SPEED),
-	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
 	_px4_accel(get_device_id(), ORB_PRIO_VERY_HIGH, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_VERY_HIGH, rotation)
 {

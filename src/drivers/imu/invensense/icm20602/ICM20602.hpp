@@ -48,11 +48,10 @@
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/ecl/geo/geo.h>
 #include <lib/perf/perf_counter.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
 using InvenSense_ICM20602::Register;
 
-class ICM20602 : public device::SPI, public px4::ScheduledWorkItem
+class ICM20602 : public device::SPI
 {
 public:
 	ICM20602(int bus, uint32_t device, enum Rotation rotation = ROTATION_NONE);

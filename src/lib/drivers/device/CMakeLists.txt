@@ -38,7 +38,12 @@ if (${PX4_PLATFORM} STREQUAL "nuttx")
 	endif()
 
 	if ("${CONFIG_SPI}" STREQUAL "y")
-		list(APPEND SRCS_PLATFORM nuttx/SPI.cpp)
+		list(APPEND SRCS_PLATFORM
+			nuttx/SPI.cpp
+			nuttx/SPI.hpp
+			nuttx/SPIMaster.cpp
+			nuttx/SPIMaster.hpp
+		)
 	endif()
 elseif((${PX4_PLATFORM} MATCHES "qurt"))
 	list(APPEND SRCS_PLATFORM

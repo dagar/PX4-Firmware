@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,82 +31,68 @@
  *
  ****************************************************************************/
 
+/**
+ * @file SPIMaster.hpp
+ *
+ * Base class for devices connected via SPI.
+ */
+
 #pragma once
 
-#include "WorkQueueManager.hpp"
-#include "WorkQueue.hpp"
+#include <nuttx/spi/spi.h>
 
-#include <containers/IntrusiveQueue.hpp>
-#include <px4_platform_common/defines.h>
-#include <drivers/drv_hrt.h>
+#include <px4_platform_common/px4_work_queue/WorkQueue.hpp>
 
-#include <lib/perf/perf_counter.h>
-
-namespace px4
+namespace device
 {
 
-class WorkItem : public ListNode<WorkItem *>, public IntrusiveQueueNode<WorkItem *>
+/**
+ * Abstract class for character device on SPI
+ */
+class SPIMaster : public px4::WorkQueue
 {
 public:
-
-	WorkItem() = delete;
+	SPIMaster(const px4::wq_config_t &config);
+	~SPIMaster() override;
 
 	// no copy, assignment, move, move assignment
-	WorkItem(const WorkItem &) = delete;
-	WorkItem &operator=(const WorkItem &) = delete;
-	WorkItem(WorkItem &&) = delete;
-	WorkItem &operator=(WorkItem &&) = delete;
-
-	inline void ScheduleNow()
-	{
-		if (_wq != nullptr) {
-			_wq->Add(this);
-		}
-	}
-
-	virtual void print_run_status() const;
+	SPIMaster(const SPIMaster &) = delete;
+	SPIMaster &operator=(const SPIMaster &) = delete;
+	SPIMaster(SPIMaster &&) = delete;
+	SPIMaster &operator=(SPIMaster &&) = delete;
 
 	/**
-	 * Switch to a different WorkQueue.
-	 * NOTE: Caller is responsible for synchronization.
-	 *
-	 * @param config The WorkQueue configuration (see WorkQueueManager.hpp).
-	 * @return true if initialization was successful
+	 * Locking modes supported by the driver.
 	 */
-	bool ChangeWorkQeue(const wq_config_t &config) { return Init(config); }
+	enum LockMode {
+		LOCK_PREEMPTION,	/**< the default; lock against all forms of preemption. */
+		LOCK_THREADS,		/**< lock only against other threads, using SPI_LOCK */
+		LOCK_NONE		/**< perform no locking, only safe if the bus is entirely private */
+	};
 
-protected:
-
-	explicit WorkItem(const char *name, const wq_config_t &config);
-	virtual ~WorkItem();
-
-	void RunPreamble() { _run_count++; }
-
-	friend void WorkQueue::Run();
-	virtual void Run() = 0;
+	bool Init();
 
 	/**
-	 * Initialize WorkItem given a WorkQueue config. This call
-	 * can also be used to switch to a different WorkQueue.
-	 * NOTE: Caller is responsible for synchronization.
+	 * Set the SPI bus locking mode
 	 *
-	 * @param config The WorkQueue configuration (see WorkQueueManager.hpp).
-	 * @return true if initialization was successful
+	 * This set the SPI locking mode. For devices competing with NuttX SPI
+	 * drivers on a bus the right lock mode is LOCK_THREADS.
+	 *
+	 * @param mode	Locking mode
 	 */
-	bool Init(const wq_config_t &config);
-	void Deinit();
+	void		set_lockmode(enum LockMode mode) { _locking_mode = mode; }
 
-	float elapsed_time() const;
-	float average_rate() const;
-	float average_interval() const;
+private:
 
+	struct spi_dev_s	*_dev;
 
-	hrt_abstime	_start_time{0};
-	unsigned	_run_count{0};
-	const char 	*_item_name;
+	int _bus{-1};
 
-	WorkQueue	*_wq{nullptr};
+	bool _initialized{false};
 
+	LockMode		_locking_mode{LOCK_THREADS};	/**< selected locking mode */
+
+	//bool	external() const { return px4_spi_bus_external(_bus); }
 };
 
-} // namespace px4
+} // namespace device
