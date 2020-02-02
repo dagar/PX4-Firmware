@@ -37,16 +37,10 @@
  */
 
 #include "MS5611.hpp"
-#include "ms5611.h"
 
-#include <cdev/CDev.hpp>
-
-MS5611::MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type) :
-	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id())),
-	_px4_barometer(interface->get_device_id()),
-	_interface(interface),
-	_prom(prom_buf.s),
-	_device_type(device_type),
+MS5611::MS5611() :
+	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
+	_px4_barometer(get_device_id()),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
 	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
 	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": com_err"))
@@ -62,12 +56,9 @@ MS5611::~MS5611()
 	perf_free(_sample_perf);
 	perf_free(_measure_perf);
 	perf_free(_comms_errors);
-
-	delete _interface;
 }
 
-int
-MS5611::init()
+int MS5611::init()
 {
 	int ret;
 	bool autodetect = false;
@@ -135,12 +126,12 @@ MS5611::init()
 
 		/* fall through */
 		case MS5611_DEVICE:
-			_interface->set_device_type(DRV_BARO_DEVTYPE_MS5611);
+			//set_device_type(DRV_BARO_DEVTYPE_MS5611);
 			_px4_barometer.set_device_type(DRV_BARO_DEVTYPE_MS5611);
 			break;
 
 		case MS5607_DEVICE:
-			_interface->set_device_type(DRV_BARO_DEVTYPE_MS5607);
+			//set_device_type(DRV_BARO_DEVTYPE_MS5607);
 			_px4_barometer.set_device_type(DRV_BARO_DEVTYPE_MS5607);
 			break;
 		}
@@ -166,17 +157,14 @@ MS5611::start()
 	ScheduleNow();
 }
 
-void
-MS5611::stop()
+void MS5611::stop()
 {
 	ScheduleClear();
 }
 
-void
-MS5611::Run()
+void MS5611::Run()
 {
 	int ret;
-	unsigned dummy;
 
 	/* collection phase? */
 	if (_collect_phase) {
@@ -196,7 +184,8 @@ MS5611::Run()
 			}
 
 			/* issue a reset command to the sensor */
-			_interface->ioctl(IOCTL_RESET, dummy);
+			_reset();
+
 			/* reset the collection state machine and try again - we need
 			 * to wait 2.8 ms after issuing the sensor reset command
 			 * according to the MS5611 datasheet
@@ -228,7 +217,8 @@ MS5611::Run()
 
 	if (ret != OK) {
 		/* issue a reset command to the sensor */
-		_interface->ioctl(IOCTL_RESET, dummy);
+		_reset();
+
 		/* reset the collection state machine and try again */
 		start();
 		return;
@@ -254,7 +244,7 @@ MS5611::measure()
 	/*
 	 * Send the command to begin measuring.
 	 */
-	int ret = _interface->ioctl(IOCTL_MEASURE, addr);
+	int ret = _measure(addr);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -276,7 +266,7 @@ MS5611::collect()
 
 	/* read the most recent measurement - read offset/size are hardcoded in the interface */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	int ret = _interface->read(0, (void *)&raw, 0);
+	int ret = read(0, (void *)&raw, 0);
 
 	if (ret < 0) {
 		perf_count(_comms_errors);
@@ -377,16 +367,9 @@ void MS5611::print_info()
 }
 
 /**
- * Local functions in support of the shell command.
- */
-namespace ms5611
-{
-
-/**
  * MS5611 crc4 cribbed from the datasheet
  */
-bool
-crc4(uint16_t *n_prom)
+static bool crc4(uint16_t *n_prom)
 {
 	int16_t cnt;
 	uint16_t n_rem;
@@ -426,6 +409,43 @@ crc4(uint16_t *n_prom)
 
 	/* return true if CRCs match */
 	return (0x000F & crc_read) == (n_rem ^ 0x00);
+}
+
+int MS5611_SPI::_read_prom()
+{
+	/*
+	 * Wait for PROM contents to be in the device (2.8 ms) in the case we are
+	 * called immediately after reset.
+	 */
+	px4_usleep(3000);
+
+	/* read and convert PROM words */
+	bool all_zero = true;
+
+	for (int i = 0; i < 8; i++) {
+		uint8_t cmd = (ADDR_PROM_SETUP + (i * 2));
+		_prom.c[i] = _reg16(cmd);
+
+		if (_prom.c[i] != 0) {
+			all_zero = false;
+		}
+
+		//PX4_DEBUG("prom[%u]=0x%x", (unsigned)i, (unsigned)_prom.c[i]);
+	}
+
+	/* calculate CRC and return success/failure accordingly */
+	int ret = crc4(&_prom.c[0]) ? PX4_OK : -EIO;
+
+	if (ret != OK) {
+		PX4_DEBUG("crc failed");
+	}
+
+	if (all_zero) {
+		PX4_DEBUG("prom all zero");
+		ret = -EIO;
+	}
+
+	return ret;
 }
 
 } // namespace ms5611

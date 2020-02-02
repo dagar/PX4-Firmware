@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,65 +32,89 @@
  ****************************************************************************/
 
 /**
- * @file ms5611.h
+ * @file ms5611_spi.cpp
  *
- * Shared defines for the ms5611 driver.
+ * SPI interface for MS5611
  */
 
-#pragma once
 
-#include <string.h>
+#include "MS5611_SPI.hpp"
 
-#include <drivers/device/i2c.h>
-#include <drivers/device/device.h>
-#include <drivers/device/spi.h>
-#include <lib/cdev/CDev.hpp>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-#include <systemlib/err.h>
-#include <uORB/uORB.h>
-
-#include "board_config.h"
-
-#define ADDR_RESET_CMD			0x1E	/* write to this address to reset chip */
-#define ADDR_PROM_SETUP			0xA0	/* address of 8x 2 bytes factory and calibration data */
-
-/* interface ioctls */
-#define IOCTL_RESET			2
-#define IOCTL_MEASURE			3
-
-namespace ms5611
+MS5611_SPI::MS5611_SPI(uint8_t bus, uint32_t device) :
+	SPI("MS5611_SPI", nullptr, bus, device, SPIDEV_MODE3, 20 * 1000 * 1000)
 {
+}
 
-/**
- * Calibration PROM as reported by the device.
- */
-#pragma pack(push,1)
-struct prom_s {
-	uint16_t factory_setup;
-	uint16_t c1_pressure_sens;
-	uint16_t c2_pressure_offset;
-	uint16_t c3_temp_coeff_pres_sens;
-	uint16_t c4_temp_coeff_pres_offset;
-	uint16_t c5_reference_temp;
-	uint16_t c6_temp_coeff_temp;
-	uint16_t serial_and_crc;
-};
+int MS5611_SPI::init()
+{
+	int ret = SPI::init();
 
-/**
- * Grody hack for crc4()
- */
-union prom_u {
-	uint16_t c[8];
-	prom_s s;
-};
-#pragma pack(pop)
+	if (ret != OK) {
+		PX4_DEBUG("SPI init failed");
+		goto out;
+	}
 
-extern bool crc4(uint16_t *n_prom);
+	/* send reset command */
+	ret = _reset();
 
-} /* namespace */
+	if (ret != OK) {
+		PX4_DEBUG("reset failed");
+		goto out;
+	}
 
-/* interface factories */
-extern device::Device *MS5611_spi_interface(ms5611::prom_u &prom_buf, uint8_t busnum);
-extern device::Device *MS5611_i2c_interface(ms5611::prom_u &prom_buf, uint8_t busnum);
+	/* read PROM */
+	ret = _read_prom();
 
-typedef device::Device *(*MS5611_constructor)(ms5611::prom_u &prom_buf, uint8_t busnum);
+	if (ret != OK) {
+		PX4_DEBUG("prom readout failed");
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
+int MS5611_SPI::read(unsigned offset, void *data, unsigned count)
+{
+	union _cvt {
+		uint8_t	b[4];
+		uint32_t w;
+	} *cvt = (_cvt *)data;
+	uint8_t buf[4] = { 0 | DIR_WRITE, 0, 0, 0 };
+
+	/* read the most recent measurement */
+	int ret = _transfer(&buf[0], &buf[0], sizeof(buf));
+
+	if (ret == OK) {
+		/* fetch the raw value */
+		cvt->b[0] = buf[3];
+		cvt->b[1] = buf[2];
+		cvt->b[2] = buf[1];
+		cvt->b[3] = 0;
+
+		ret = count;
+	}
+
+	return ret;
+}
+
+int MS5611_SPI::_reset()
+{
+	uint8_t cmd = ADDR_RESET_CMD | DIR_WRITE;
+	return  _transfer(&cmd, nullptr, 1);
+}
+
+int MS5611_SPI::_measure(unsigned addr)
+{
+	uint8_t cmd = addr | DIR_WRITE;
+	return _transfer(&cmd, nullptr, 1);
+}
+
+uint16_t MS5611_SPI::_reg16(unsigned reg)
+{
+	uint8_t cmd[3] = { (uint8_t)(reg | DIR_READ), 0, 0 };
+	transfer(cmd, cmd, sizeof(cmd));
+	return (uint16_t)(cmd[1] << 8) | cmd[2];
+}
+
+#endif /* PX4_SPIDEV_BARO || PX4_SPIDEV_EXT_BARO */

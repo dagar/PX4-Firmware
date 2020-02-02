@@ -34,8 +34,7 @@
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
 
-#include "MS5611.hpp"
-#include "ms5611.h"
+#include "MS5611_SPI.hpp"
 
 enum class MS5611_BUS {
 	ALL = 0,
@@ -51,27 +50,26 @@ namespace ms5611
 // list of supported bus configurations
 struct ms5611_bus_option {
 	MS5611_BUS busid;
-	MS5611_constructor interface_constructor;
 	uint8_t busnum;
 	MS5611 *dev;
 } bus_options[] = {
 #if defined(PX4_I2C_BUS_ONBOARD)
-	{ MS5611_BUS::I2C_INTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_ONBOARD, nullptr },
+	{ MS5611_BUS::I2C_INTERNAL, PX4_I2C_BUS_ONBOARD, nullptr },
 #endif
 #if defined(PX4_I2C_BUS_EXPANSION)
-	{ MS5611_BUS::I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION, nullptr },
+	{ MS5611_BUS::I2C_EXTERNAL, PX4_I2C_BUS_EXPANSION, nullptr },
 #endif
 #if defined(PX4_I2C_BUS_EXPANSION1)
-	{ MS5611_BUS::I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION1, nullptr },
+	{ MS5611_BUS::I2C_EXTERNAL, PX4_I2C_BUS_EXPANSION1, nullptr },
 #endif
 #if defined(PX4_I2C_BUS_EXPANSION2)
-	{ MS5611_BUS::I2C_EXTERNAL, &MS5611_i2c_interface, PX4_I2C_BUS_EXPANSION2, nullptr },
+	{ MS5611_BUS::I2C_EXTERNAL, PX4_I2C_BUS_EXPANSION2, nullptr },
 #endif
 #if defined(PX4_SPI_BUS_BARO) && defined(PX4_SPIDEV_BARO)
-	{ MS5611_BUS::SPI_INTERNAL, &MS5611_spi_interface, PX4_SPI_BUS_BARO, nullptr },
+	{ MS5611_BUS::SPI_INTERNAL, PX4_SPI_BUS_BARO, nullptr },
 #endif
 #if defined(PX4_SPI_BUS_EXT) && defined(PX4_SPIDEV_EXT_BARO)
-	{ MS5611_BUS::SPI_EXTERNAL, &MS5611_spi_interface, PX4_SPI_BUS_EXT, nullptr },
+	{ MS5611_BUS::SPI_EXTERNAL, PX4_SPI_BUS_EXT, nullptr },
 #endif
 };
 
@@ -91,16 +89,7 @@ static struct ms5611_bus_option *find_bus(MS5611_BUS busid)
 
 static bool start_bus(ms5611_bus_option &bus, enum MS56XX_DEVICE_TYPES device_type)
 {
-	prom_u prom_buf;
-	device::Device *interface = bus.interface_constructor(prom_buf, bus.busnum);
-
-	if ((interface == nullptr) || (interface->init() != PX4_OK)) {
-		PX4_WARN("no device on bus %u", (unsigned)bus.busid);
-		delete interface;
-		return false;
-	}
-
-	MS5611 *dev = new MS5611(interface, prom_buf, device_type);
+	MS5611_SPI *dev = new MS5611_SPI(bus.busnum, PX4_SPIDEV_BARO);
 
 	if (dev == nullptr) {
 		PX4_ERR("alloc failed");

@@ -31,73 +31,14 @@
  *
  ****************************************************************************/
 
-/**
- * @file ms5611_i2c.cpp
- *
- * I2C interface for MS5611
- */
-
-#include <drivers/device/i2c.h>
-
-#include "ms5611.h"
-
-#define MS5611_ADDRESS_1		0x76	/* address select pins pulled high (PX4FMU series v1.6+) */
-#define MS5611_ADDRESS_2		0x77    /* address select pins pulled low (PX4FMU prototypes) */
-
-class MS5611_I2C : public device::I2C
-{
-public:
-	MS5611_I2C(uint8_t bus, ms5611::prom_u &prom_buf);
-	~MS5611_I2C() override = default;
-
-	int	read(unsigned offset, void *data, unsigned count) override;
-	int	ioctl(unsigned operation, unsigned &arg) override;
-
-protected:
-	int	probe() override;
-
-private:
-	ms5611::prom_u	&_prom;
-
-	int		_probe_address(uint8_t address);
-
-	/**
-	 * Send a reset command to the MS5611.
-	 *
-	 * This is required after any bus reset.
-	 */
-	int		_reset();
-
-	/**
-	 * Send a measure command to the MS5611.
-	 *
-	 * @param addr		Which address to use for the measure operation.
-	 */
-	int		_measure(unsigned addr);
-
-	/**
-	 * Read the MS5611 PROM
-	 *
-	 * @return		PX4_OK if the PROM reads successfully.
-	 */
-	int		_read_prom();
-
-};
-
-device::Device *
-MS5611_i2c_interface(ms5611::prom_u &prom_buf, uint8_t busnum)
-{
-	return new MS5611_I2C(busnum, prom_buf);
-}
+#include "MS5611_I2C.hpp"
 
 MS5611_I2C::MS5611_I2C(uint8_t bus, ms5611::prom_u &prom) :
-	I2C("MS5611_I2C", nullptr, bus, 0, 400000),
-	_prom(prom)
+	I2C("MS5611_I2C", nullptr, bus, 0, 400000)
 {
 }
 
-int
-MS5611_I2C::read(unsigned offset, void *data, unsigned count)
+int MS5611_I2C::read(unsigned offset, void *data, unsigned count)
 {
 	union _cvt {
 		uint8_t	b[4];
@@ -120,29 +61,7 @@ MS5611_I2C::read(unsigned offset, void *data, unsigned count)
 	return ret;
 }
 
-int
-MS5611_I2C::ioctl(unsigned operation, unsigned &arg)
-{
-	int ret;
-
-	switch (operation) {
-	case IOCTL_RESET:
-		ret = _reset();
-		break;
-
-	case IOCTL_MEASURE:
-		ret = _measure(arg);
-		break;
-
-	default:
-		ret = EINVAL;
-	}
-
-	return ret;
-}
-
-int
-MS5611_I2C::probe()
+int MS5611_I2C::probe()
 {
 	_retries = 10;
 
@@ -159,8 +78,7 @@ MS5611_I2C::probe()
 	return -EIO;
 }
 
-int
-MS5611_I2C::_probe_address(uint8_t address)
+int MS5611_I2C::_probe_address(uint8_t address)
 {
 	/* select the address we are going to try */
 	set_device_address(address);
@@ -178,8 +96,7 @@ MS5611_I2C::_probe_address(uint8_t address)
 	return PX4_OK;
 }
 
-int
-MS5611_I2C::_reset()
+int MS5611_I2C::_reset()
 {
 	unsigned	old_retrycount = _retries;
 	uint8_t		cmd = ADDR_RESET_CMD;
@@ -193,8 +110,7 @@ MS5611_I2C::_reset()
 	return result;
 }
 
-int
-MS5611_I2C::_measure(unsigned addr)
+int MS5611_I2C::_measure(unsigned addr)
 {
 	/*
 	 * Disable retries on this command; we can't know whether failure
@@ -206,8 +122,7 @@ MS5611_I2C::_measure(unsigned addr)
 	return transfer(&cmd, 1, nullptr, 0);
 }
 
-int
-MS5611_I2C::_read_prom()
+int MS5611_I2C::_read_prom()
 {
 	uint8_t		prom_buf[2];
 	union {

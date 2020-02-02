@@ -33,13 +33,47 @@
 
 #pragma once
 
+#include <string.h>
+
+#include <drivers/device/i2c.h>
+#include <drivers/device/device.h>
+#include <drivers/device/spi.h>
+#include <lib/cdev/CDev.hpp>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#include <systemlib/err.h>
+#include <uORB/uORB.h>
 #include <drivers/device/device.h>
 #include <lib/drivers/barometer/PX4Barometer.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <systemlib/err.h>
 
-#include "ms5611.h"
+#define ADDR_RESET_CMD			0x1E	/* write to this address to reset chip */
+#define ADDR_PROM_SETUP			0xA0	/* address of 8x 2 bytes factory and calibration data */
+
+/**
+ * Calibration PROM as reported by the device.
+ */
+struct prom_s {
+	uint16_t factory_setup;
+	uint16_t c1_pressure_sens;
+	uint16_t c2_pressure_offset;
+	uint16_t c3_temp_coeff_pres_sens;
+	uint16_t c4_temp_coeff_pres_offset;
+	uint16_t c5_reference_temp;
+	uint16_t c6_temp_coeff_temp;
+	uint16_t serial_and_crc;
+};
+
+/**
+ * Grody hack for crc4()
+ */
+union prom_u {
+	uint16_t c[8];
+	prom_s s;
+};
+
+extern bool crc4(uint16_t *n_prom);
 
 enum MS56XX_DEVICE_TYPES {
 	MS56XX_DEVICE   = 0,
@@ -87,7 +121,7 @@ enum MS56XX_DEVICE_TYPES {
 class MS5611 : public px4::ScheduledWorkItem
 {
 public:
-	MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type);
+	MS5611();
 	~MS5611() override;
 
 	int		init();
@@ -101,13 +135,11 @@ protected:
 
 	PX4Barometer		_px4_barometer;
 
-	device::Device		*_interface;
-
 	ms5611::prom_s		_prom;
 
 	unsigned		_measure_interval{0};
 
-	enum MS56XX_DEVICE_TYPES _device_type;
+	enum MS56XX_DEVICE_TYPES _device_type {MS5611_DEVICE};
 	bool			_collect_phase{false};
 	unsigned		_measure_phase{false};
 
