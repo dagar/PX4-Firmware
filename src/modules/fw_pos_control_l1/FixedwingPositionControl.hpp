@@ -83,7 +83,6 @@
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
-#include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_status.h>
@@ -148,10 +147,9 @@ private:
 
 	orb_advert_t	_mavlink_log_pub{nullptr};
 
-	uORB::SubscriptionCallbackWorkItem _global_pos_sub{this, ORB_ID(vehicle_global_position)};
+	uORB::SubscriptionCallbackWorkItem _local_pos_sub{this, ORB_ID(vehicle_local_position)};
 
 	uORB::Subscription _control_mode_sub{ORB_ID(vehicle_control_mode)};		///< control mode subscription
-	uORB::Subscription _local_pos_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _manual_control_sub{ORB_ID(manual_control_setpoint)};	///< notification of manual control updates
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};		///< notification of parameter updates
 	uORB::Subscription _pos_sp_triplet_sub{ORB_ID(position_setpoint_triplet)};
@@ -173,13 +171,16 @@ private:
 	vehicle_attitude_setpoint_s	_att_sp {};			///< vehicle attitude setpoint
 	vehicle_command_s		_vehicle_command {};		///< vehicle commands
 	vehicle_control_mode_s		_control_mode {};		///< control mode
-	vehicle_global_position_s	_global_pos {};			///< global vehicle position
 	vehicle_local_position_s	_local_pos {};			///< vehicle local position
 	vehicle_land_detected_s		_vehicle_land_detected {};	///< vehicle land detected
 	vehicle_status_s		_vehicle_status {};		///< vehicle status
 
 	SubscriptionData<airspeed_validated_s>			_airspeed_validated_sub{ORB_ID(airspeed_validated)};
 	SubscriptionData<vehicle_acceleration_s>	_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
+
+	float _current_latitude{0.f};
+	float _current_longitude{0.f};
+	float _current_altitude{0.f};
 
 	perf_counter_t	_loop_perf;				///< loop performance counter
 
@@ -249,6 +250,8 @@ private:
 	bool _was_in_transition{false};
 
 	bool _vtol_tailsitter{false};
+
+	map_projection_reference_s _reference_position{}; /**< Structure used to project lat/lon setpoint into local frame. */
 
 	// estimator reset counters
 	uint8_t _pos_reset_counter{0};				///< captures the number of times the estimator has reset the horizontal position
@@ -402,7 +405,7 @@ private:
 	/**
 	 * Return the terrain estimate during takeoff or takeoff_alt if terrain estimate is not available
 	 */
-	float		get_terrain_altitude_takeoff(float takeoff_alt, const vehicle_global_position_s &global_pos);
+	float		get_terrain_altitude_takeoff(float takeoff_alt);
 
 	/**
 	 * Check if we are in a takeoff situation
