@@ -148,40 +148,6 @@ MissionBlock::is_mission_item_reached()
 				_navigator->get_global_position()->alt,
 				&dist_xy, &dist_z);
 
-		/* FW special case for NAV_CMD_WAYPOINT to achieve altitude via loiter */
-		if (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING &&
-		    (_mission_item.nav_cmd == NAV_CMD_WAYPOINT)) {
-
-			struct position_setpoint_s *curr_sp = &_navigator->get_position_setpoint_triplet()->current;
-
-			/* close to waypoint, but altitude error greater than twice acceptance */
-			if ((dist >= 0.0f)
-			    && (dist_z > 2 * _navigator->get_altitude_acceptance_radius())
-			    && (dist_xy < 2 * _navigator->get_loiter_radius())) {
-
-				/* SETPOINT_TYPE_POSITION -> SETPOINT_TYPE_LOITER */
-				if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_POSITION) {
-					curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
-					curr_sp->loiter_radius = _navigator->get_loiter_radius();
-					curr_sp->loiter_direction = 1;
-					_navigator->set_position_setpoint_triplet_updated();
-				}
-
-			} else {
-				/* restore SETPOINT_TYPE_POSITION */
-				if (curr_sp->type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-					/* loiter acceptance criteria required to revert back to SETPOINT_TYPE_POSITION */
-					if ((dist >= 0.0f)
-					    && (dist_z < _navigator->get_loiter_radius())
-					    && (dist_xy <= _navigator->get_loiter_radius() * 1.2f)) {
-
-						curr_sp->type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-						_navigator->set_position_setpoint_triplet_updated();
-					}
-				}
-			}
-		}
-
 		if ((_mission_item.nav_cmd == NAV_CMD_TAKEOFF || _mission_item.nav_cmd == NAV_CMD_VTOL_TAKEOFF)
 		    && _navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
 
@@ -213,27 +179,7 @@ MissionBlock::is_mission_item_reached()
 				_waypoint_position_reached = true;
 			}
 
-		} else if (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING &&
-			   (_mission_item.nav_cmd == NAV_CMD_LOITER_UNLIMITED ||
-			    _mission_item.nav_cmd == NAV_CMD_LOITER_TIME_LIMIT)) {
-			/* Loiter mission item on a non rotary wing: the aircraft is going to circle the
-			 * coordinates with a radius equal to the loiter_radius field. It is not flying
-			 * through the waypoint center.
-			 * Therefore the item is marked as reached once the system reaches the loiter
-			 * radius (+ some margin). Time inside and turn count is handled elsewhere.
-			 */
-			if (dist >= 0.0f && dist <= _navigator->get_acceptance_radius(fabsf(_mission_item.loiter_radius) * 1.2f)
-			    && dist_z <= _navigator->get_altitude_acceptance_radius()) {
-
-				_waypoint_position_reached = true;
-
-			} else {
-				_time_first_inside_orbit = 0;
-			}
-
-		} else if (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING &&
-			   (_mission_item.nav_cmd == NAV_CMD_LOITER_TO_ALT)) {
-
+		} else if (_mission_item.nav_cmd == NAV_CMD_LOITER_TO_ALT) {
 
 			// NAV_CMD_LOITER_TO_ALT only uses mission item altitude once it's in the loiter
 			//  first check if the altitude setpoint is the mission setpoint
@@ -269,9 +215,9 @@ MissionBlock::is_mission_item_reached()
 						const position_setpoint_s &next_sp = _navigator->get_position_setpoint_triplet()->next;
 
 						if (next_sp.valid) {
-							_mission_item.yaw = get_bearing_to_next_waypoint(_navigator->get_global_position()->lat,
-									    _navigator->get_global_position()->lon,
-									    next_sp.lat, next_sp.lon);
+							_mission_item.yaw = get_bearing_to_next_waypoint(
+								_navigator->get_global_position()->lat, _navigator->get_global_position()->lon,
+								next_sp.lat, next_sp.lon);
 
 							_waypoint_yaw_reached = false;
 

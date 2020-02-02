@@ -156,11 +156,6 @@ private:
 	void heading_sp_update();
 
 	/**
-	 * Updates the altitude sp to follow a foh
-	 */
-	void altitude_sp_foh_update();
-
-	/**
 	 * Update the cruising speed setpoint.
 	 */
 	void cruising_speed_sp_update();
@@ -242,7 +237,6 @@ private:
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MIS_DIST_1WP>) _param_mis_dist_1wp,
 		(ParamFloat<px4::params::MIS_DIST_WPS>) _param_mis_dist_wps,
-		(ParamInt<px4::params::MIS_ALTMODE>) _param_mis_altmode,
 		(ParamInt<px4::params::MIS_MNT_YAW_CTL>) _param_mis_mnt_yaw_ctl
 	)
 
@@ -270,11 +264,6 @@ private:
 	bool _need_mission_reset{false};
 	bool _mission_waypoints_changed{false};
 	bool _mission_changed{false}; /** < true if the mission changed since the mission mode was active */
-
-	float _min_current_sp_distance_xy{FLT_MAX}; /**< minimum distance which was achieved to the current waypoint  */
-
-	float _distance_current_previous{0.0f}; /**< distance from previous to current sp in pos_sp_triplet,
-					    only use if current and previous are valid */
 
 	enum work_item_type {
 		WORK_ITEM_TYPE_DEFAULT,		/**< default mission item */

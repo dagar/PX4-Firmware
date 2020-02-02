@@ -245,6 +245,10 @@ private:
 	bool _is_tecs_running{false};
 	hrt_abstime _last_tecs_update{0};
 
+	float _min_current_sp_distance_xy{FLT_MAX}; /**< minimum distance which was achieved to the current waypoint  */
+
+	float _acceptance_radius{0.f};
+
 	float _asp_after_transition{0.0f};
 	bool _was_in_transition{false};
 
