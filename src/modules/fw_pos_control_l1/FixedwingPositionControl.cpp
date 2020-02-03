@@ -337,10 +337,11 @@ FixedwingPositionControl::airspeed_poll()
 {
 	bool airspeed_valid = _airspeed_valid;
 
-	if (!_parameters.airspeed_disabled && _airspeed_validated_sub.update()) {
+	if (!_parameters.airspeed_disabled && _airspeed_validated_sub.updated()) {
 
-		const airspeed_validated_s &airspeed_validated = _airspeed_validated_sub.get();
-		_eas2tas = 1.0f; //this is the default value, taken in case of invalid airspeed
+		airspeed_validated_s airspeed_validated{};
+		_airspeed_validated_sub.copy(&airspeed_validated);
+		_eas2tas = 1.0f; // this is the default value, taken in case of invalid airspeed
 
 		if (PX4_ISFINITE(airspeed_validated.equivalent_airspeed_m_s)
 		    && PX4_ISFINITE(airspeed_validated.true_airspeed_m_s)
@@ -365,27 +366,6 @@ FixedwingPositionControl::airspeed_poll()
 	if (airspeed_valid != _airspeed_valid) {
 		_tecs.enable_airspeed(airspeed_valid);
 		_airspeed_valid = airspeed_valid;
-	}
-}
-
-void
-FixedwingPositionControl::vehicle_attitude_poll()
-{
-	if (_vehicle_attitude_sub.update(&_att)) {
-		/* set rotation matrix and euler angles */
-		_R_nb = Quatf(_att.q);
-
-		// if the vehicle is a tailsitter we have to rotate the attitude by the pitch offset
-		// between multirotor and fixed wing flight
-		if (_vtol_tailsitter) {
-			Dcmf R_offset = Eulerf(0, M_PI_2_F, 0);
-			_R_nb = _R_nb * R_offset;
-		}
-
-		const Eulerf euler_angles(_R_nb);
-		_roll    = euler_angles(0);
-		_pitch   = euler_angles(1);
-		_yaw     = euler_angles(2);
 	}
 }
 
@@ -604,7 +584,7 @@ FixedwingPositionControl::get_terrain_altitude_takeoff(float takeoff_alt)
 {
 	float terrain_alt = _local_pos.ref_alt - (_local_pos.dist_bottom + _local_pos.z);
 
-	if (PX4_ISFINITE(terrain_alt) && lpos.dist_bottom_valid) {
+	if (PX4_ISFINITE(terrain_alt) && _local_pos.dist_bottom_valid) {
 		return terrain_alt;
 	}
 
@@ -950,7 +930,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 			/* reset setpoints from other modes (auto) otherwise we won't
 			 * level out without new manual input */
 			_att_sp.roll_body = _manual.y * _parameters.man_roll_max_rad;
-			_att_sp.yaw_body = 0;
+			_att_sp.yaw_body = 0.f;
 		}
 
 		_control_mode_current = FW_POSCTRL_MODE_POSITION;
@@ -989,10 +969,9 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 		    fabsf(_manual.r) < HDG_HOLD_MAN_INPUT_THRESH) {
 
 			/* heading / roll is zero, lock onto current heading */
-			if (fabsf(_vehicle_rates_sub.get().xyz[2]) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
+			if (fabsf(_yawspeed) < HDG_HOLD_YAWRATE_THRESH && !_yaw_lock_engaged) {
 				// little yaw movement, lock to current heading
 				_yaw_lock_engaged = true;
-
 			}
 
 			/* user tries to do a takeoff in heading hold mode, reset the yaw setpoint on every iteration
@@ -1010,19 +989,19 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 					_hdg_hold_enabled = true;
 					_hdg_hold_yaw = _yaw;
 
-					get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, true);
+					get_waypoint_heading_distance(_hdg_hold_yaw, _pos_sp_triplet.previous, _pos_sp_triplet.current, true);
 				}
 
 				/* we have a valid heading hold position, are we too close? */
-				float dist = get_distance_to_next_waypoint(_current_latitude, _current_longitude, _hdg_hold_curr_wp.lat,
-						_hdg_hold_curr_wp.lon);
+				float dist = get_distance_to_next_waypoint(_current_latitude, _current_longitude, _pos_sp_triplet.current.lat,
+						_pos_sp_triplet.current.lon);
 
 				if (dist < HDG_HOLD_REACHED_DIST) {
-					get_waypoint_heading_distance(_hdg_hold_yaw, _hdg_hold_prev_wp, _hdg_hold_curr_wp, false);
+					get_waypoint_heading_distance(_hdg_hold_yaw, _pos_sp_triplet.previous, _pos_sp_triplet.current, false);
 				}
 
-				Vector2f prev_wp{(float)_hdg_hold_prev_wp.lat, (float)_hdg_hold_prev_wp.lon};
-				Vector2f curr_wp{(float)_hdg_hold_curr_wp.lat, (float)_hdg_hold_curr_wp.lon};
+				Vector2f prev_wp{(float)_pos_sp_triplet.previous.lat, (float)_pos_sp_triplet.previous.lon};
+				Vector2f curr_wp{(float)_pos_sp_triplet.current.lat, (float)_pos_sp_triplet.current.lon};
 
 				/* populate l1 control setpoint */
 				_l1_control.navigate_waypoints(prev_wp, curr_wp, curr_pos, ground_speed);
@@ -1204,8 +1183,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 
 	if (_runway_takeoff.runwayTakeoffEnabled()) {
 		if (!_runway_takeoff.isInitialized()) {
-			Eulerf euler(Quatf(_att.q));
-			_runway_takeoff.init(euler.psi(), _current_latitude, _current_longitude);
+			_runway_takeoff.init(_yaw, _current_latitude, _current_longitude);
 
 			/* need this already before takeoff is detected
 			 * doesn't matter if it gets reset when takeoff is detected eventually */
@@ -1265,7 +1243,7 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 				}
 
 				/* Detect launch using body X (forward) acceleration */
-				_launchDetector.update(_vehicle_acceleration_sub.get().xyz[0]);
+				_launchDetector.update(_acceleration_body(0));
 
 				/* update our copy of the launch detection state */
 				_launch_detection_state = _launchDetector.getLaunchDetected();
@@ -1454,8 +1432,8 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 	if (_parameters.land_use_terrain_estimate == 1) {
 		if (_local_pos.dist_bottom_valid) {
 			// all good, have valid terrain altitude
-			float terrain_vpos = lpos.dist_bottom + lpos.z;
-			terrain_alt = (lpos.ref_alt - terrain_vpos);
+			float terrain_vpos = _local_pos.dist_bottom + _local_pos.z;
+			terrain_alt = (_local_pos.ref_alt - terrain_vpos);
 			_t_alt_prev_valid = terrain_alt;
 			_time_last_t_alt = hrt_absolute_time();
 
@@ -1646,8 +1624,7 @@ FixedwingPositionControl::handle_command()
 	}
 }
 
-void
-FixedwingPositionControl::Run()
+void FixedwingPositionControl::Run()
 {
 	if (should_exit()) {
 		_local_pos_sub.unregisterCallback();
@@ -1660,7 +1637,10 @@ FixedwingPositionControl::Run()
 	/* only run controller if position changed */
 	float lpos_x_prev = _local_pos.x;
 	float lpos_y_prev = _local_pos.y;
+
 	if (_local_pos_sub.update(&_local_pos)) {
+
+		// TODO: always update TECS state
 
 		// check for parameter updates
 		if (_parameter_update_sub.updated()) {
@@ -1672,63 +1652,69 @@ FixedwingPositionControl::Run()
 			parameters_update();
 		}
 
-		if (fabsf(lpos_x_prev - lpos.x) > FLT_EPSILON || fabsf(lpos_y_prev - lpos.y) > FLT_EPSILON) {
-			map_projection_reproject(&_reference_position, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
-		}
-
-		// Convert from global to local frame.
-		map_projection_project(&_reference_position,
-				       _sub_triplet_setpoint.get().current.lat, _sub_triplet_setpoint.get().current.lon, &tmp_target(0), &tmp_target(1));
-
 		if (_local_pos.ref_timestamp >= _reference_position.timestamp) {
 			// init projection
 			map_projection_init(&_reference_position, _local_pos.ref_lat, _local_pos.ref_lon);
 		}
 
-		map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
+		if (fabsf(lpos_x_prev - _local_pos.x) > FLT_EPSILON || fabsf(lpos_y_prev - _local_pos.y) > FLT_EPSILON) {
+			map_projection_reproject(&_reference_position, _local_pos.x, _local_pos.y, &_current_latitude, &_current_longitude);
+		}
 
-
-		_current_latitude =
-		_current_longitude =
 		_current_altitude = -_local_pos.z + _local_pos.ref_alt; // Altitude AMSL in meters
+
+		// TODO: handle all estimator resets (yaw, etc)
+
+		airspeed_poll();
+
+		vehicle_attitude_s att{};
+
+		if (_vehicle_attitude_sub.update(&att)) {
+			/* set rotation matrix and euler angles */
+			_R_nb = Quatf(att.q);
+
+			// if the vehicle is a tailsitter we have to rotate the attitude by the pitch offset
+			// between multirotor and fixed wing flight
+			if (_vtol_tailsitter) {
+				_R_nb = _R_nb * Dcmf{Eulerf(0, M_PI_2_F, 0)};
+			}
+
+			const Eulerf euler_angles(_R_nb);
+			_roll = euler_angles(0);
+			_pitch = euler_angles(1);
+			_yaw = euler_angles(2);
+		}
+
+		_acceleration_body = _R_nb * Vector3f{_local_pos.ax, _local_pos.ay, _local_pos.az};
+
+		vehicle_command_poll();
+		vehicle_control_mode_poll();
+
+		if (_control_mode.flag_control_altitude_enabled && _local_pos.z_reset_counter != _alt_reset_counter) {
+			_hold_alt += -_local_pos.delta_z;
+			// make TECS accept step in altitude and demanded altitude
+			_tecs.handle_alt_step(-_local_pos.delta_z, _current_altitude);
+		}
 
 		// handle estimator reset events. we only adjust setpoins for manual modes
 		if (_control_mode.flag_control_manual_enabled) {
-			if (_control_mode.flag_control_altitude_enabled && _current_altitude_reset_counter != _alt_reset_counter) {
-				_hold_alt += -_local_pos.delta_z;
-				// make TECS accept step in altitude and demanded altitude
-				_tecs.handle_alt_step(-_local_pos.delta_z, _current_altitude);
-			}
+			_manual_control_sub.update(&_manual);
 
 			// adjust navigation waypoints in position control mode
 			if (_control_mode.flag_control_altitude_enabled && _control_mode.flag_control_velocity_enabled
-			    && _current_latitude_lon_reset_counter != _pos_reset_counter) {
+			    && _local_pos.xy_reset_counter != _pos_reset_counter) {
 
 				// reset heading hold flag, which will re-initialise position control
 				_hdg_hold_enabled = false;
 			}
-		}
 
-		// update the reset counters in any case
-		_alt_reset_counter = _current_altitude_reset_counter;
-		_pos_reset_counter = _current_latitude_lon_reset_counter;
+		} else if (_control_mode.flag_control_auto_enabled || _control_mode.flag_control_offboard_enabled) {
 
-		airspeed_poll();
-		_manual_control_sub.update(&_manual);
-		_pos_sp_triplet_sub.update(&_pos_sp_triplet);
-		vehicle_attitude_poll();
-		vehicle_command_poll();
-		vehicle_control_mode_poll();
-		_vehicle_land_detected_sub.update(&_vehicle_land_detected);
-		_vehicle_status_sub.update(&_vehicle_status);
-		_vehicle_acceleration_sub.update();
-		_vehicle_rates_sub.update();
+			_pos_sp_triplet_sub.update(&_pos_sp_triplet);
 
-		Vector2f curr_pos((float)_current_latitude, (float)_current_longitude);
-		Vector2f ground_speed(_local_pos.vx, _local_pos.vy);
 
-		//Convert Local setpoints to global setpoints
-		if (_control_mode.flag_control_offboard_enabled) {
+			// Convert Local setpoints to global setpoints
+
 			if (!globallocalconverter_initialized()) {
 				globallocalconverter_init(_local_pos.ref_lat, _local_pos.ref_lon,
 							  _local_pos.ref_alt, _local_pos.ref_timestamp);
@@ -1739,12 +1725,29 @@ FixedwingPositionControl::Run()
 			}
 		}
 
+		// update the reset counters in any case
+		_alt_reset_counter = _local_pos.z_reset_counter;
+		_pos_reset_counter = _local_pos.xy_reset_counter;
+
+		_vehicle_land_detected_sub.update(&_vehicle_land_detected);
+		_vehicle_status_sub.update(&_vehicle_status);
+
+		if (_vehicle_angular_velocity_sub.updated()) {
+			vehicle_angular_velocity_s angular_velocity;
+
+			if (_vehicle_angular_velocity_sub.copy(&angular_velocity)) {
+				_yawspeed = angular_velocity.xyz[2];
+			}
+		}
+
+		Vector2f curr_pos((float)_current_latitude, (float)_current_longitude);
+		Vector2f ground_speed(_local_pos.vx, _local_pos.vy);
+
 		/*
 		 * Attempt to control position, on success (= sensors present and not in manual mode),
 		 * publish setpoint.
 		 */
 		if (control_position(curr_pos, ground_speed, _pos_sp_triplet.previous, _pos_sp_triplet.current, _pos_sp_triplet.next)) {
-			_att_sp.timestamp = hrt_absolute_time();
 
 			// add attitude setpoint offsets
 			_att_sp.roll_body += _parameters.rollsp_offset_rad;
@@ -1755,7 +1758,7 @@ FixedwingPositionControl::Run()
 				_att_sp.pitch_body = constrain(_att_sp.pitch_body, -_parameters.man_pitch_max_rad, _parameters.man_pitch_max_rad);
 			}
 
-			Quatf q(Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body));
+			const Quatf q(Eulerf(_att_sp.roll_body, _att_sp.pitch_body, _att_sp.yaw_body));
 			q.copyTo(_att_sp.q_d);
 			_att_sp.q_d_valid = true;
 
@@ -1765,12 +1768,59 @@ FixedwingPositionControl::Run()
 			    _control_mode.flag_control_acceleration_enabled ||
 			    _control_mode.flag_control_altitude_enabled) {
 
+				_att_sp.timestamp = hrt_absolute_time();
 				_attitude_sp_pub.publish(_att_sp);
 
 				// only publish status in full FW mode
 				if (_vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING
 				    && !_vehicle_status.in_transition_mode) {
 					status_publish();
+
+					// publish vehicle_local_position_setpoint
+					vehicle_local_position_setpoint_s local_position_setpoint{};
+
+					// Convert from global to local frame.
+					map_projection_project(&_reference_position, _pos_sp_triplet.current.lat, _pos_sp_triplet.current.lon, &local_position_setpoint.x, &local_position_setpoint.y);
+					local_position_setpoint.z = -(_local_pos.ref_alt + _tecs.hgt_setpoint_adj());
+
+					local_position_setpoint.yaw = _att_sp.yaw_body;
+					local_position_setpoint.yawspeed = _yawspeed;
+
+					// TODO: difference between airspeed and ground speed to get velocity setpoint
+					// airspeed_sp = _tecs.TAS_setpoint_adj();
+					// altitude_sp = _tecs.hgt_setpoint_adj();
+					// airspeed_derivative_sp = _tecs.TAS_rate_setpoint(); (body X acceleration?)
+
+					//_state.wind_vel(0) = _state.vel(0) - _airspeed_sample_delayed.true_airspeed * cosf(euler_yaw);
+					//_state.wind_vel(1) = _state.vel(1) - _airspeed_sample_delayed.true_airspeed * sinf(euler_yaw);
+
+					// rotate wind velocity into earth frame aligned with vehicle yaw
+					//const float Wx = _state.wind_vel(0) * cosf(euler_yaw) + _state.wind_vel(1) * sinf(euler_yaw);
+					//const float Wy = -_state.wind_vel(0) * sinf(euler_yaw) + _state.wind_vel(1) * cosf(euler_yaw);
+
+
+					Vector3f vel_sp{ground_speed(0), ground_speed(1), -_tecs.hgt_rate_setpoint()};
+					Vector3f vel_sp_ned = _R_nb * vel_sp;
+
+					local_position_setpoint.vx = vel_sp_ned(0);
+					local_position_setpoint.vy = vel_sp_ned(1);
+					local_position_setpoint.vz = vel_sp_ned(2);
+
+					// lateral acceleration from L1
+					Vector3f accel{_tecs.TAS_rate_setpoint(), _l1_control.nav_lateral_acceleration_demand(), 0.f};
+					Vector3f accel_sp_ned = _R_nb * accel; // rotate into local ned
+					accel_sp_ned.copyTo(local_position_setpoint.acceleration);
+
+					local_position_setpoint.jerk[0] = NAN;
+					local_position_setpoint.jerk[1] = NAN;
+					local_position_setpoint.jerk[2] = NAN;
+
+					local_position_setpoint.thrust[0] = _att_sp.thrust_body[0];
+					local_position_setpoint.thrust[1] = _att_sp.thrust_body[1];
+					local_position_setpoint.thrust[2] = _att_sp.thrust_body[2];
+
+					local_position_setpoint.timestamp = hrt_absolute_time();
+					_vehicle_local_position_setpoint_pub.publish(local_position_setpoint);
 				}
 			}
 		}
@@ -1779,8 +1829,7 @@ FixedwingPositionControl::Run()
 	}
 }
 
-void
-FixedwingPositionControl::reset_takeoff_state(bool force)
+void FixedwingPositionControl::reset_takeoff_state(bool force)
 {
 	// only reset takeoff if !armed or just landed
 	if (!_control_mode.flag_armed || (_was_in_air && _vehicle_land_detected.landed) || force) {
@@ -1897,17 +1946,6 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 	/* Using tecs library */
 	float pitch_for_tecs = _pitch - _parameters.pitchsp_offset_rad;
 
-	/* filter speed and altitude for controller */
-	Vector3f accel_body(_vehicle_acceleration_sub.get().xyz);
-
-	// tailsitters use the multicopter frame as reference, in fixed wing
-	// we need to use the fixed wing frame
-	if (_vtol_tailsitter) {
-		float tmp = accel_body(0);
-		accel_body(0) = -accel_body(2);
-		accel_body(2) = tmp;
-	}
-
 	/* tell TECS to update its state, but let it know when it cannot actually control the plane */
 	bool in_air_alt_control = (!_vehicle_land_detected.landed &&
 				   (_control_mode.flag_control_auto_enabled ||
@@ -1917,17 +1955,19 @@ FixedwingPositionControl::tecs_update_pitch_throttle(float alt_sp, float airspee
 
 	/* update TECS vehicle state estimates */
 	_tecs.update_vehicle_state_estimates(_airspeed, _R_nb,
-					     accel_body, (_local_pos.timestamp > 0), in_air_alt_control,
+					     _acceleration_body, (_local_pos.timestamp > 0), in_air_alt_control,
 					     _current_altitude, _local_pos.vz);
 
 	/* scale throttle cruise by baro pressure */
 	if (_parameters.throttle_alt_scale > FLT_EPSILON) {
-		sensor_baro_s baro{};
+		vehicle_air_data_s air_data{};
 
-		if (_sensor_baro_sub.update(&baro)) {
-			if (PX4_ISFINITE(baro.pressure) && PX4_ISFINITE(_parameters.throttle_alt_scale)) {
+		if (_vehicle_air_data_sub.update(&air_data)) {
+			float pressure_mbar = air_data.baro_pressure_pa * 0.01f;
+
+			if (PX4_ISFINITE(pressure_mbar) && PX4_ISFINITE(_parameters.throttle_alt_scale)) {
 				// scale throttle as a function of sqrt(p0/p) (~ EAS -> TAS at low speeds and altitudes ignoring temperature)
-				const float eas2tas = sqrtf(CONSTANTS_STD_PRESSURE_MBAR / baro.pressure);
+				const float eas2tas = sqrtf(CONSTANTS_STD_PRESSURE_MBAR / pressure_mbar);
 				const float scale = constrain((eas2tas - 1.0f) * _parameters.throttle_alt_scale + 1.0f, 1.0f, 2.0f);
 
 				throttle_max = constrain(throttle_max * scale, throttle_min, 1.0f);

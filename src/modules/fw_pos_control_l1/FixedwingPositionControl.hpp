@@ -75,9 +75,8 @@
 #include <uORB/topics/position_controller_landing_status.h>
 #include <uORB/topics/position_controller_status.h>
 #include <uORB/topics/position_setpoint_triplet.h>
-#include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/tecs_status.h>
-#include <uORB/topics/vehicle_acceleration.h>
+#include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
@@ -85,8 +84,8 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/uORB.h>
 #include <vtol_att_control/vtol_type.h>
 
 using math::constrain;
@@ -100,8 +99,6 @@ using matrix::Quatf;
 using matrix::Vector2f;
 using matrix::Vector3f;
 using matrix::wrap_pi;
-
-using uORB::SubscriptionData;
 
 using namespace launchdetection;
 using namespace runwaytakeoff;
@@ -149,25 +146,26 @@ private:
 
 	uORB::SubscriptionCallbackWorkItem _local_pos_sub{this, ORB_ID(vehicle_local_position)};
 
+	uORB::Subscription _airspeed_validated_sub{ORB_ID(airspeed_validated)};
 	uORB::Subscription _control_mode_sub{ORB_ID(vehicle_control_mode)};		///< control mode subscription
 	uORB::Subscription _manual_control_sub{ORB_ID(manual_control_setpoint)};	///< notification of manual control updates
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};		///< notification of parameter updates
 	uORB::Subscription _pos_sp_triplet_sub{ORB_ID(position_setpoint_triplet)};
-	uORB::Subscription _sensor_baro_sub{ORB_ID(sensor_baro)};
+	uORB::Subscription _vehicle_air_data_sub{ORB_ID(vehicle_air_data)};
 	uORB::Subscription _vehicle_attitude_sub{ORB_ID(vehicle_attitude)};		///< vehicle attitude subscription
 	uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};		///< vehicle command subscription
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};	///< vehicle land detected subscription
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};			///< vehicle status subscription
-	uORB::SubscriptionData<vehicle_angular_velocity_s>	_vehicle_rates_sub{ORB_ID(vehicle_angular_velocity)};
+	uORB::Subscription _vehicle_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 
 	uORB::Publication<vehicle_attitude_setpoint_s>		_attitude_sp_pub;
 	uORB::Publication<position_controller_status_s>		_pos_ctrl_status_pub{ORB_ID(position_controller_status)};			///< navigation capabilities publication
 	uORB::Publication<position_controller_landing_status_s>	_pos_ctrl_landing_status_pub{ORB_ID(position_controller_landing_status)};	///< landing status publication
 	uORB::Publication<tecs_status_s>			_tecs_status_pub{ORB_ID(tecs_status)};						///< TECS status publication
+	uORB::Publication<vehicle_local_position_setpoint_s>	_vehicle_local_position_setpoint_pub{ORB_ID(vehicle_local_position_setpoint)};
 
 	manual_control_setpoint_s	_manual {};			///< r/c channel data
 	position_setpoint_triplet_s	_pos_sp_triplet {};		///< triplet of mission items
-	vehicle_attitude_s		_att {};			///< vehicle attitude setpoint
 	vehicle_attitude_setpoint_s	_att_sp {};			///< vehicle attitude setpoint
 	vehicle_command_s		_vehicle_command {};		///< vehicle commands
 	vehicle_control_mode_s		_control_mode {};		///< control mode
@@ -175,11 +173,10 @@ private:
 	vehicle_land_detected_s		_vehicle_land_detected {};	///< vehicle land detected
 	vehicle_status_s		_vehicle_status {};		///< vehicle status
 
-	SubscriptionData<airspeed_validated_s>			_airspeed_validated_sub{ORB_ID(airspeed_validated)};
-	SubscriptionData<vehicle_acceleration_s>	_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
+	matrix::Vector3f _acceleration_body;
 
-	float _current_latitude{0.f};
-	float _current_longitude{0.f};
+	double _current_latitude{0};
+	double _current_longitude{0};
 	float _current_altitude{0.f};
 
 	perf_counter_t	_loop_perf;				///< loop performance counter
@@ -191,9 +188,6 @@ private:
 	bool	_yaw_lock_engaged{false};			///< yaw is locked for heading hold
 	float	_althold_epv{0.0f};				///< the position estimate accuracy when engaging alt hold
 	bool	_was_in_deadband{false};			///< wether the last stick input was in althold deadband
-
-	position_setpoint_s _hdg_hold_prev_wp {};		///< position where heading hold started
-	position_setpoint_s _hdg_hold_curr_wp {};		///< position to which heading hold flies
 
 	hrt_abstime _control_position_last_called{0};		///< last call of control_position
 
@@ -238,9 +232,10 @@ private:
 	float _groundspeed_undershoot{0.0f};			///< ground speed error to min. speed in m/s
 
 	Dcmf _R_nb;				///< current attitude
-	float _roll{0.0f};
-	float _pitch{0.0f};
-	float _yaw{0.0f};
+	float _roll{0.f};
+	float _pitch{0.f};
+	float _yaw{0.f};
+	float _yawspeed{0.f};
 
 	bool _reinitialize_tecs{true};				///< indicates if the TECS states should be reinitialized (used for VTOL)
 	bool _is_tecs_running{false};
@@ -383,7 +378,6 @@ private:
 	void		vehicle_attitude_poll();
 	void		vehicle_command_poll();
 	void		vehicle_control_mode_poll();
-	void		vehicle_status_poll();
 
 	void		status_publish();
 	void		landing_status_publish();

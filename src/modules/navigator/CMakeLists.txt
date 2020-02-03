@@ -49,7 +49,6 @@ px4_add_module(
 		datalinkloss.cpp
 		rcloss.cpp
 		enginefailure.cpp
-		gpsfailure.cpp
 		follow_target.cpp
 	DEPENDS
 		git_ecl

@@ -31,7 +31,6 @@ uint8 NAVIGATION_STATE_AUTO_RTL = 5		# Auto return to launch mode
 uint8 NAVIGATION_STATE_AUTO_RCRECOVER = 6	# RC recover mode
 uint8 NAVIGATION_STATE_AUTO_RTGS = 7		# Auto return to groundstation on data link loss
 uint8 NAVIGATION_STATE_AUTO_LANDENGFAIL = 8 	# Auto land on engine failure
-uint8 NAVIGATION_STATE_AUTO_LANDGPSFAIL = 9	# Auto land on gps failure (e.g. open loop loiter down)
 uint8 NAVIGATION_STATE_ACRO = 10		# Acro mode
 uint8 NAVIGATION_STATE_UNUSED = 11		# Free slot
 uint8 NAVIGATION_STATE_DESCEND = 12		# Descend mode (no position control)

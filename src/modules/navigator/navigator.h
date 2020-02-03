@@ -45,7 +45,6 @@
 #include "enginefailure.h"
 #include "follow_target.h"
 #include "geofence.h"
-#include "gpsfailure.h"
 #include "land.h"
 #include "precland.h"
 #include "loiter.h"
@@ -83,7 +82,7 @@
 /**
  * Number of navigation modes that need on_active/on_inactive calls
  */
-#define NAVIGATOR_MODE_ARRAY_SIZE 11
+#define NAVIGATOR_MODE_ARRAY_SIZE 10
 
 
 class Navigator : public ModuleBase<Navigator>, public ModuleParams
@@ -385,7 +384,6 @@ private:
 	RCLoss 		_rcLoss;				/**< class that handles RTL according to OBC rules (rc loss mode) */
 	DataLinkLoss	_dataLinkLoss;			/**< class that handles the OBC datalink loss mode */
 	EngineFailure	_engineFailure;			/**< class that handles the engine failure mode (FW only!) */
-	GpsFailure	_gpsFailure;			/**< class that handles the OBC gpsfailure loss mode */
 	FollowTarget	_follow_target;
 
 	NavigatorMode *_navigation_mode_array[NAVIGATOR_MODE_ARRAY_SIZE];	/**< array of navigation modes */
