@@ -64,22 +64,6 @@ bool PreFlightCheck::airspeedCheck(orb_advert_t *mavlink_log_pub, vehicle_status
 	}
 
 	/*
-	 * Check if voter thinks the confidence is low. High-end sensors might have virtually zero noise
-	 * on the bench and trigger false positives of the voter. Therefore only fail this
-	 * for a pre-arm check, as then the cover is off and the natural airflow in the field
-	 * will ensure there is not zero noise.
-	 */
-	if (prearm && fabsf(airspeed.confidence) < 0.95f) {
-		if (report_fail) {
-			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Airspeed Sensor stuck");
-		}
-
-		present = true;
-		success = false;
-		goto out;
-	}
-
-	/*
 	 * Check if airspeed is higher than 4m/s (accepted max) while the vehicle is landed / not flying
 	 * Negative and positive offsets are considered. Do not check anymore while arming because pitot cover
 	 * might have been removed.

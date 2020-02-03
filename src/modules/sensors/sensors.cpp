@@ -42,9 +42,7 @@
  */
 
 #include <drivers/drv_adc.h>
-#include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
-#include <lib/airspeed/airspeed.h>
 #include <lib/conversion/rotation.h>
 #include <lib/mathlib/mathlib.h>
 #include <lib/parameters/param.h>
@@ -60,16 +58,16 @@
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/airspeed.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_preflight.h>
-#include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 
 #include "parameters.h"
 #include "voted_sensors_update.h"
+
+#include "airspeed/VehicleAirspeed.hpp"
 #include "vehicle_acceleration/VehicleAcceleration.hpp"
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
 #include "vehicle_air_data/VehicleAirData.hpp"
@@ -77,12 +75,6 @@
 
 using namespace sensors;
 using namespace time_literals;
-
-/**
- * HACK - true temperature is much less than indicated temperature in baro,
- * subtract 5 degrees in an attempt to account for the electrical upheating of the PCB
- */
-#define PCB_TEMP_ESTIMATE_DEG		5.0f
 
 class Sensors : public ModuleBase<Sensors>, public ModuleParams
 {
@@ -113,19 +105,14 @@ private:
 	bool		_armed{false};				/**< arming status of the vehicle */
 
 	uORB::Subscription	_actuator_ctrl_0_sub{ORB_ID(actuator_controls_0)};		/**< attitude controls sub */
-	uORB::Subscription	_diff_pres_sub{ORB_ID(differential_pressure)};			/**< raw differential pressure subscription */
 	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};				/**< notification of parameter updates */
 	uORB::Subscription	_vcontrol_mode_sub{ORB_ID(vehicle_control_mode)};		/**< vehicle control mode subscription */
-	uORB::Subscription	_vehicle_air_data_sub{ORB_ID(vehicle_air_data)};
 
-	uORB::Publication<airspeed_s>			_airspeed_pub{ORB_ID(airspeed)};			/**< airspeed */
 	uORB::Publication<sensor_combined_s>		_sensor_pub{ORB_ID(sensor_combined)};			/**< combined sensor data topic */
 	uORB::Publication<sensor_preflight_s>		_sensor_preflight{ORB_ID(sensor_preflight)};		/**< sensor preflight topic */
 	uORB::Publication<vehicle_magnetometer_s>	_magnetometer_pub{ORB_ID(vehicle_magnetometer)};	/**< combined sensor data topic */
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
-
-	DataValidator	_airspeed_validator;		/**< data validator to monitor airspeed */
 
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	int	_adc_fd {-1};				/**< ADC driver handle */
@@ -144,6 +131,7 @@ private:
 	VehicleAcceleration	_vehicle_acceleration;
 	VehicleAngularVelocity	_vehicle_angular_velocity;
 	VehicleAirData          _vehicle_air_data;
+	VehicleAirspeed         *_vehicle_airspeed{nullptr};
 
 	static constexpr int MAX_SENSOR_COUNT = 3;
 	VehicleIMU      *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
@@ -153,14 +141,6 @@ private:
 	 * Update our local parameter cache.
 	 */
 	int		parameters_update();
-
-	/**
-	 * Poll the differential pressure sensor for updated data.
-	 *
-	 * @param raw			Combined sensor data structure into which
-	 *				data should be returned.
-	 */
-	void		diff_pres_poll();
 
 	/**
 	 * Check for changes in parameters.
@@ -180,6 +160,7 @@ private:
 	 */
 	void		adc_poll();
 
+	void		InitializeVehicleAirspeed();
 	void		InitializeVehicleIMU();
 
 };
@@ -192,13 +173,11 @@ Sensors::Sensors(bool hil_enabled) :
 {
 	initialize_parameter_handles(_parameter_handles);
 
-	_airspeed_validator.set_timeout(300000);
-	_airspeed_validator.set_equal_value_threshold(100);
-
 	_vehicle_acceleration.Start();
 	_vehicle_angular_velocity.Start();
 	_vehicle_air_data.Start();
 
+	InitializeVehicleAirspeed();
 	InitializeVehicleIMU();
 }
 
@@ -208,9 +187,15 @@ Sensors::~Sensors()
 	_vehicle_angular_velocity.Stop();
 	_vehicle_air_data.Stop();
 
+	if (_vehicle_airspeed != nullptr) {
+		_vehicle_airspeed->Stop();
+		delete _vehicle_airspeed;
+	}
+
 	for (auto &i : _vehicle_imu_list) {
 		if (i != nullptr) {
 			i->Stop();
+			delete i;
 		}
 	}
 }
@@ -248,66 +233,6 @@ Sensors::adc_init()
 	return OK;
 }
 
-void Sensors::diff_pres_poll()
-{
-	differential_pressure_s diff_pres{};
-
-	if (_diff_pres_sub.update(&diff_pres)) {
-
-		vehicle_air_data_s air_data{};
-		_vehicle_air_data_sub.copy(&air_data);
-
-		float air_temperature_celsius = (diff_pres.temperature > -300.0f) ? diff_pres.temperature :
-						(air_data.baro_temp_celcius - PCB_TEMP_ESTIMATE_DEG);
-
-		airspeed_s airspeed;
-		airspeed.timestamp = diff_pres.timestamp;
-
-		/* push data into validator */
-		float airspeed_input[3] = { diff_pres.differential_pressure_raw_pa, diff_pres.temperature, 0.0f };
-
-		_airspeed_validator.put(airspeed.timestamp, airspeed_input, diff_pres.error_count,
-					ORB_PRIO_HIGH);
-
-		airspeed.confidence = _airspeed_validator.confidence(hrt_absolute_time());
-
-		enum AIRSPEED_SENSOR_MODEL smodel;
-
-		switch ((diff_pres.device_id >> 16) & 0xFF) {
-		case DRV_DIFF_PRESS_DEVTYPE_SDP31:
-
-		/* fallthrough */
-		case DRV_DIFF_PRESS_DEVTYPE_SDP32:
-
-		/* fallthrough */
-		case DRV_DIFF_PRESS_DEVTYPE_SDP33:
-			/* fallthrough */
-			smodel = AIRSPEED_SENSOR_MODEL_SDP3X;
-			break;
-
-		default:
-			smodel = AIRSPEED_SENSOR_MODEL_MEMBRANE;
-			break;
-		}
-
-		/* don't risk to feed negative airspeed into the system */
-		airspeed.indicated_airspeed_m_s = calc_IAS_corrected((enum AIRSPEED_COMPENSATION_MODEL)
-						  _parameters.air_cmodel,
-						  smodel, _parameters.air_tube_length, _parameters.air_tube_diameter_mm,
-						  diff_pres.differential_pressure_filtered_pa, air_data.baro_pressure_pa,
-						  air_temperature_celsius);
-
-		airspeed.true_airspeed_m_s = calc_TAS_from_EAS(airspeed.indicated_airspeed_m_s, air_data.baro_pressure_pa,
-					     air_temperature_celsius); // assume that EAS = IAS as we don't have an EAS-scale here
-
-		airspeed.air_temperature_celsius = air_temperature_celsius;
-
-		if (PX4_ISFINITE(airspeed.indicated_airspeed_m_s) && PX4_ISFINITE(airspeed.true_airspeed_m_s)) {
-			_airspeed_pub.publish(airspeed);
-		}
-	}
-}
-
 void
 Sensors::parameter_update_poll(bool forced)
 {
@@ -320,23 +245,6 @@ Sensors::parameter_update_poll(bool forced)
 		// update parameters from storage
 		parameters_update();
 		updateParams();
-
-		/* update airspeed scale */
-		int fd = px4_open(AIRSPEED0_DEVICE_PATH, 0);
-
-		/* this sensor is optional, abort without error */
-		if (fd >= 0) {
-			struct airspeed_scale airscale = {
-				_parameters.diff_pres_offset_pa,
-				1.0f,
-			};
-
-			if (OK != px4_ioctl(fd, AIRSPEEDIOCSSCALE, (long unsigned int)&airscale)) {
-				warn("WARNING: failed to set scale / offsets for airspeed sensor");
-			}
-
-			px4_close(fd);
-		}
 	}
 }
 
@@ -397,6 +305,30 @@ Sensors::adc_poll()
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
 }
 
+void Sensors::InitializeVehicleAirspeed()
+{
+	// create a VehicleAirspeed instance only if differential pressure sensors exist
+	if (_vehicle_airspeed == nullptr) {
+		uORB::Subscription differential_pressure_sub{ORB_ID(differential_pressure)};
+		differential_pressure_s dpres{};
+		differential_pressure_sub.copy(&dpres);
+
+		if ((dpres.timestamp > 0) && PX4_ISFINITE(dpres.differential_pressure_raw_pa)) {
+			VehicleAirspeed *airspeed = new VehicleAirspeed();
+
+			if (airspeed != nullptr) {
+				// Start VehicleIMU instance and store
+				if (airspeed->Start()) {
+					_vehicle_airspeed = airspeed;
+
+				} else {
+					delete airspeed;
+				}
+			}
+		}
+	}
+}
+
 void Sensors::InitializeVehicleIMU()
 {
 	// create a VehicleIMU instance for each accel/gyro pair
@@ -444,8 +376,6 @@ Sensors::run()
 
 	/* get a set of initial values */
 	_voted_sensors_update.sensorsPoll(raw, magnetometer);
-
-	diff_pres_poll();
 
 	/* wakeup source */
 	px4_pollfd_struct_t poll_fds = {};
@@ -496,8 +426,6 @@ Sensors::run()
 		/* check analog airspeed */
 		adc_poll();
 
-		diff_pres_poll();
-
 		if (raw.timestamp > 0) {
 
 			_voted_sensors_update.setRelativeTimestamps(raw);
@@ -528,7 +456,9 @@ Sensors::run()
 		 */
 		if (!_armed && hrt_elapsed_time(&last_config_update) > 500_ms) {
 			_voted_sensors_update.initializeSensors();
+			InitializeVehicleAirspeed();
 			InitializeVehicleIMU();
+
 			last_config_update = hrt_absolute_time();
 
 		} else {
@@ -567,9 +497,6 @@ int Sensors::print_status()
 
 	PX4_INFO_RAW("\n");
 
-	PX4_INFO("Airspeed status:");
-	_airspeed_validator.print();
-
 	PX4_INFO_RAW("\n");
 	_vehicle_acceleration.PrintStatus();
 
@@ -578,6 +505,11 @@ int Sensors::print_status()
 
 	PX4_INFO_RAW("\n");
 	_vehicle_air_data.PrintStatus();
+
+	if (_vehicle_airspeed != nullptr) {
+		PX4_INFO_RAW("\n");
+		_vehicle_airspeed->PrintStatus();
+	}
 
 	PX4_INFO_RAW("\n");
 

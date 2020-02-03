@@ -44,10 +44,10 @@ namespace sensors
 
 void initialize_parameter_handles(ParameterHandles &parameter_handles)
 {
-	/* Differential pressure offset */
-	parameter_handles.diff_pres_offset_pa = param_find("SENS_DPRES_OFF");
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	parameter_handles.diff_pres_analog_scale = param_find("SENS_DPRES_ANSC");
+	/* Differential pressure offset */
+	parameter_handles.diff_pres_offset_pa = param_find("SENS_DPRES_OFF");
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
 
 	/* rotations */
@@ -57,10 +57,6 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 	parameter_handles.board_offset[0] = param_find("SENS_BOARD_X_OFF");
 	parameter_handles.board_offset[1] = param_find("SENS_BOARD_Y_OFF");
 	parameter_handles.board_offset[2] = param_find("SENS_BOARD_Z_OFF");
-
-	parameter_handles.air_cmodel = param_find("CAL_AIR_CMODEL");
-	parameter_handles.air_tube_length = param_find("CAL_AIR_TUBELEN");
-	parameter_handles.air_tube_diameter_mm = param_find("CAL_AIR_TUBED_MM");
 
 	(void)param_find("BAT_V_DIV");
 	(void)param_find("BAT_A_PER_V");
@@ -92,10 +88,9 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 
 void update_parameters(const ParameterHandles &parameter_handles, Parameters &parameters)
 {
-	/* Airspeed offset */
-	param_get(parameter_handles.diff_pres_offset_pa, &(parameters.diff_pres_offset_pa));
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	param_get(parameter_handles.diff_pres_analog_scale, &(parameters.diff_pres_analog_scale));
+	param_get(parameter_handles.diff_pres_offset_pa, &(parameters.diff_pres_offset_pa));
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
 
 	param_get(parameter_handles.board_rotation, &(parameters.board_rotation));
@@ -103,10 +98,6 @@ void update_parameters(const ParameterHandles &parameter_handles, Parameters &pa
 	param_get(parameter_handles.board_offset[0], &(parameters.board_offset[0]));
 	param_get(parameter_handles.board_offset[1], &(parameters.board_offset[1]));
 	param_get(parameter_handles.board_offset[2], &(parameters.board_offset[2]));
-
-	param_get(parameter_handles.air_cmodel, &parameters.air_cmodel);
-	param_get(parameter_handles.air_tube_length, &parameters.air_tube_length);
-	param_get(parameter_handles.air_tube_diameter_mm, &parameters.air_tube_diameter_mm);
 }
 
 } /* namespace sensors */
