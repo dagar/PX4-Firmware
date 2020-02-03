@@ -43,7 +43,6 @@
 
 #include <drivers/drv_accel.h>
 #include <drivers/drv_gyro.h>
-#include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
 
 #include <mathlib/mathlib.h>
@@ -61,7 +60,6 @@
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/sensor_gyro_integrated.h>
 #include <uORB/topics/sensor_selection.h>
-#include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/subsystem_info.h>
 
 #include "common.h"
@@ -110,7 +108,7 @@ public:
 	/**
 	 * read new sensor data
 	 */
-	void sensorsPoll(sensor_combined_s &raw, vehicle_magnetometer_s &magnetometer);
+	void sensorsPoll(sensor_combined_s &raw);
 
 	/**
 	 * set the relative timestamps of each sensor timestamp, based on the last sensorsPoll,
@@ -138,11 +136,6 @@ public:
 	 * Calculates the magnitude in rad/s of the largest difference between the primary and any other gyro sensor
 	 */
 	void calcGyroInconsistency(sensor_preflight_s &preflt);
-
-	/**
-	 * Calculates the magnitude in Gauss of the largest difference between the primary and any other magnetometers
-	 */
-	void calcMagInconsistency(sensor_preflight_s &preflt);
 
 private:
 
@@ -189,14 +182,6 @@ private:
 	void gyroPoll(sensor_combined_s &raw);
 
 	/**
-	 * Poll the magnetometer for updated data.
-	 *
-	 * @param raw	Combined sensor data structure into which
-	 *		data should be returned.
-	 */
-	void magPoll(vehicle_magnetometer_s &magnetometer);
-
-	/**
 	 * Check & handle failover of a sensor
 	 * @return true if a switch occured (could be for a non-critical reason)
 	 */
@@ -204,7 +189,6 @@ private:
 
 	SensorData _accel {};
 	SensorData _gyro {};
-	SensorData _mag {};
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 
@@ -215,10 +199,8 @@ private:
 	uORB::Subscription _corrections_sub{ORB_ID(sensor_correction)};
 
 	sensor_combined_s _last_sensor_data[SENSOR_COUNT_MAX] {};	/**< latest sensor data from all sensors instances */
-	vehicle_magnetometer_s _last_magnetometer[SENSOR_COUNT_MAX] {}; /**< latest sensor data from all sensors instances */
 
 	matrix::Dcmf _board_rotation {};		/**< rotation matrix for the orientation that the board is mounted */
-	matrix::Dcmf _mag_rotation[MAG_COUNT_MAX] {};	/**< rotation matrix for the orientation that the external mag0 is mounted */
 
 	const Parameters &_parameters;
 	const bool _hil_enabled{false};			/**< is hardware-in-the-loop mode enabled? */
@@ -227,11 +209,9 @@ private:
 
 	float _accel_diff[3][2] {};			/**< filtered accel differences between IMU units (m/s/s) */
 	float _gyro_diff[3][2] {};			/**< filtered gyro differences between IMU uinits (rad/s) */
-	float _mag_angle_diff[2] {};			/**< filtered mag angle differences between sensor instances (Ga) */
 
 	uint32_t _accel_device_id[SENSOR_COUNT_MAX] {};	/**< accel driver device id for each uorb instance */
 	uint32_t _gyro_device_id[SENSOR_COUNT_MAX] {};	/**< gyro driver device id for each uorb instance */
-	uint32_t _mag_device_id[SENSOR_COUNT_MAX] {};	/**< mag driver device id for each uorb instance */
 
 	uint64_t _last_accel_timestamp[ACCEL_COUNT_MAX] {};	/**< latest full timestamp */
 

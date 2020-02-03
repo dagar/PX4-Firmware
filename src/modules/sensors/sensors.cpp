@@ -62,7 +62,6 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/vehicle_control_mode.h>
-#include <uORB/topics/vehicle_magnetometer.h>
 
 #include "parameters.h"
 #include "voted_sensors_update.h"
@@ -72,6 +71,7 @@
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
 #include "vehicle_air_data/VehicleAirData.hpp"
 #include "vehicle_imu/VehicleIMU.hpp"
+#include "vehicle_magnetometer/VehicleMagnetometer.hpp"
 
 using namespace sensors;
 using namespace time_literals;
@@ -110,7 +110,6 @@ private:
 
 	uORB::Publication<sensor_combined_s>		_sensor_pub{ORB_ID(sensor_combined)};			/**< combined sensor data topic */
 	uORB::Publication<sensor_preflight_s>		_sensor_preflight{ORB_ID(sensor_preflight)};		/**< sensor preflight topic */
-	uORB::Publication<vehicle_magnetometer_s>	_magnetometer_pub{ORB_ID(vehicle_magnetometer)};	/**< combined sensor data topic */
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
@@ -131,6 +130,7 @@ private:
 	VehicleAcceleration	_vehicle_acceleration;
 	VehicleAngularVelocity	_vehicle_angular_velocity;
 	VehicleAirData          _vehicle_air_data;
+	VehicleMagnetometer	_vehicle_magnetometer;
 	VehicleAirspeed         *_vehicle_airspeed{nullptr};
 
 	static constexpr int MAX_SENSOR_COUNT = 3;
@@ -176,6 +176,7 @@ Sensors::Sensors(bool hil_enabled) :
 	_vehicle_acceleration.Start();
 	_vehicle_angular_velocity.Start();
 	_vehicle_air_data.Start();
+	_vehicle_magnetometer.Start();
 
 	InitializeVehicleAirspeed();
 	InitializeVehicleIMU();
@@ -186,6 +187,7 @@ Sensors::~Sensors()
 	_vehicle_acceleration.Stop();
 	_vehicle_angular_velocity.Stop();
 	_vehicle_air_data.Stop();
+	_vehicle_magnetometer.Stop();
 
 	if (_vehicle_airspeed != nullptr) {
 		_vehicle_airspeed->Stop();
@@ -367,7 +369,6 @@ Sensors::run()
 
 	sensor_combined_s raw = {};
 	sensor_preflight_s preflt = {};
-	vehicle_magnetometer_s magnetometer = {};
 
 	_voted_sensors_update.init(raw);
 
@@ -375,7 +376,7 @@ Sensors::run()
 	parameter_update_poll(true);
 
 	/* get a set of initial values */
-	_voted_sensors_update.sensorsPoll(raw, magnetometer);
+	_voted_sensors_update.sensorsPoll(raw);
 
 	/* wakeup source */
 	px4_pollfd_struct_t poll_fds = {};
@@ -417,11 +418,7 @@ Sensors::run()
 			_armed = vcontrol_mode.flag_armed;
 		}
 
-		/* the timestamp of the raw struct is updated by the gyroPoll() method (this makes the gyro
-		 * a mandatory sensor) */
-		const uint64_t magnetometer_prev_timestamp = magnetometer.timestamp;
-
-		_voted_sensors_update.sensorsPoll(raw, magnetometer);
+		_voted_sensors_update.sensorsPoll(raw);
 
 		/* check analog airspeed */
 		adc_poll();
@@ -432,10 +429,6 @@ Sensors::run()
 
 			_sensor_pub.publish(raw);
 
-			if (magnetometer.timestamp != magnetometer_prev_timestamp) {
-				_magnetometer_pub.publish(magnetometer);
-			}
-
 			_voted_sensors_update.checkFailover();
 
 			/* If the the vehicle is disarmed calculate the length of the maximum difference between
@@ -445,7 +438,6 @@ Sensors::run()
 				preflt.timestamp = hrt_absolute_time();
 				_voted_sensors_update.calcAccelInconsistency(preflt);
 				_voted_sensors_update.calcGyroInconsistency(preflt);
-				_voted_sensors_update.calcMagInconsistency(preflt);
 
 				_sensor_preflight.publish(preflt);
 			}
@@ -505,6 +497,9 @@ int Sensors::print_status()
 
 	PX4_INFO_RAW("\n");
 	_vehicle_air_data.PrintStatus();
+
+	PX4_INFO_RAW("\n");
+	_vehicle_magnetometer.PrintStatus();
 
 	if (_vehicle_airspeed != nullptr) {
 		PX4_INFO_RAW("\n");

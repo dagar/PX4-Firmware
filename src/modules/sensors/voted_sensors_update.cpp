@@ -63,9 +63,6 @@ VotedSensorsUpdate::VotedSensorsUpdate(const Parameters &parameters, bool hil_en
 		_corrections.accel_scale_2[i] = 1.0f;
 	}
 
-	_mag.voter.set_timeout(300000);
-	_mag.voter.set_equal_value_threshold(1000);
-
 	if (_hil_enabled) { // HIL has less accurate timing so increase the timeouts a bit
 		_gyro.voter.set_timeout(500000);
 		_accel.voter.set_timeout(500000);
@@ -87,7 +84,6 @@ int VotedSensorsUpdate::init(sensor_combined_s &raw)
 void VotedSensorsUpdate::initializeSensors()
 {
 	initSensorClass(ORB_ID(sensor_gyro_integrated), _gyro, GYRO_COUNT_MAX);
-	initSensorClass(ORB_ID(sensor_mag), _mag, MAG_COUNT_MAX);
 	initSensorClass(ORB_ID(sensor_accel_integrated), _accel, ACCEL_COUNT_MAX);
 }
 
@@ -100,10 +96,6 @@ void VotedSensorsUpdate::deinit()
 	for (int i = 0; i < _accel.subscription_count; i++) {
 		orb_unsubscribe(_accel.subscription[i]);
 	}
-
-	for (int i = 0; i < _mag.subscription_count; i++) {
-		orb_unsubscribe(_mag.subscription[i]);
-	}
 }
 
 void VotedSensorsUpdate::parametersUpdate()
@@ -115,11 +107,6 @@ void VotedSensorsUpdate::parametersUpdate()
 					     M_DEG_TO_RAD_F * _parameters.board_offset[2]);
 
 	_board_rotation = board_rotation_offset * get_rot_matrix((enum Rotation)_parameters.board_rotation);
-
-	// initialze all mag rotations with the board rotation in case there is no calibration data available
-	for (int topic_instance = 0; topic_instance < MAG_COUNT_MAX; ++topic_instance) {
-		_mag_rotation[topic_instance] = _board_rotation;
-	}
 
 	/* set offset parameters to new values */
 	bool failed = false;
@@ -324,157 +311,6 @@ void VotedSensorsUpdate::parametersUpdate()
 			(void)param_set(param_find(str), &device_id);
 		}
 	}
-
-	/* run through all mag sensors
-	 * Because we store the device id in _mag_device_id, we need to get the id via uorb topic since
-	 * the DevHandle method does not work on POSIX.
-	 */
-
-	/* first we have to reset all possible mags, since we are looping through the uORB instances instead of the drivers,
-	 * and not all uORB instances have to be published yet at the initial call of parametersUpdate()
-	 */
-	for (int i = 0; i < MAG_COUNT_MAX; i++) {
-		_mag.enabled[i] = true;
-	}
-
-	for (int topic_instance = 0; topic_instance < MAG_COUNT_MAX
-	     && topic_instance < _mag.subscription_count; ++topic_instance) {
-
-		sensor_mag_s report{};
-
-		if (orb_copy(ORB_ID(sensor_mag), _mag.subscription[topic_instance], &report) != 0) {
-			continue;
-		}
-
-		uint32_t topic_device_id = report.device_id;
-		bool is_external = report.is_external;
-		_mag_device_id[topic_instance] = topic_device_id;
-
-		// find the driver handle that matches the topic_device_id
-		int fd = -1;
-		char str[30] {};
-
-		for (unsigned driver_index = 0; driver_index < MAG_COUNT_MAX; ++driver_index) {
-
-			(void)sprintf(str, "%s%u", MAG_BASE_DEVICE_PATH, driver_index);
-
-			fd = px4_open(str, O_RDWR);
-
-			if (fd < 0) {
-				/* the driver is not running, continue with the next */
-				continue;
-			}
-
-			uint32_t driver_device_id = (uint32_t)px4_ioctl(fd, DEVIOCGDEVICEID, 0);
-
-			if (driver_device_id == topic_device_id) {
-				break; // we found the matching driver
-
-			} else {
-				px4_close(fd);
-			}
-		}
-
-		bool config_ok = false;
-
-		/* run through all stored calibrations */
-		for (unsigned i = 0; i < MAG_COUNT_MAX; i++) {
-			/* initially status is ok per config */
-			failed = false;
-
-			(void)sprintf(str, "CAL_MAG%u_ID", i);
-			int32_t device_id = 0;
-			failed = failed || (PX4_OK != param_get(param_find(str), &device_id));
-
-			(void)sprintf(str, "CAL_MAG%u_EN", i);
-			int32_t device_enabled = 1;
-			failed = failed || (PX4_OK != param_get(param_find(str), &device_enabled));
-
-			if (failed) {
-				continue;
-			}
-
-			/* if the calibration is for this device, apply it */
-			if ((uint32_t)device_id == _mag_device_id[topic_instance]) {
-				_mag.enabled[topic_instance] = (device_enabled == 1);
-
-				// the mags that were published after the initial parameterUpdate
-				// would be given the priority even if disabled. Reset it to 0 in this case
-				if (!_mag.enabled[topic_instance]) {
-					_mag.priority[topic_instance] = 0;
-				}
-
-				mag_calibration_s mscale{};
-
-				(void)sprintf(str, "CAL_MAG%u_XOFF", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.x_offset));
-
-				(void)sprintf(str, "CAL_MAG%u_YOFF", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.y_offset));
-
-				(void)sprintf(str, "CAL_MAG%u_ZOFF", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.z_offset));
-
-				(void)sprintf(str, "CAL_MAG%u_XSCALE", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.x_scale));
-
-				(void)sprintf(str, "CAL_MAG%u_YSCALE", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.y_scale));
-
-				(void)sprintf(str, "CAL_MAG%u_ZSCALE", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.z_scale));
-
-				(void)sprintf(str, "CAL_MAG%u_ROT", i);
-				int32_t mag_rot = 0;
-				param_get(param_find(str), &mag_rot);
-
-				if (is_external) {
-
-					/* check if this mag is still set as internal, otherwise leave untouched */
-					if (mag_rot < 0) {
-						/* it was marked as internal, change to external with no rotation */
-						mag_rot = 0;
-						param_set_no_notification(param_find(str), &mag_rot);
-					}
-
-				} else {
-					/* mag is internal - reset param to -1 to indicate internal mag */
-					if (mag_rot != MAG_ROT_VAL_INTERNAL) {
-						mag_rot = MAG_ROT_VAL_INTERNAL;
-						param_set_no_notification(param_find(str), &mag_rot);
-					}
-				}
-
-				/* now get the mag rotation */
-				if (mag_rot >= 0) {
-					// Set external magnetometers to use the parameter value
-					_mag_rotation[topic_instance] = get_rot_matrix((enum Rotation)mag_rot);
-
-				} else {
-					// Set internal magnetometers to use the board rotation
-					_mag_rotation[topic_instance] = _board_rotation;
-				}
-
-				if (failed) {
-					PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "mag", i);
-
-				} else {
-
-					/* apply new scaling and offsets */
-					config_ok = (px4_ioctl(fd, MAGIOCSSCALE, (long unsigned int)&mscale) == 0);
-
-					if (!config_ok) {
-						PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "mag ", i);
-					}
-				}
-
-				break;
-			}
-		}
-
-		px4_close(fd);
-	}
-
 }
 
 void VotedSensorsUpdate::accelPoll(struct sensor_combined_s &raw)
@@ -640,71 +476,6 @@ void VotedSensorsUpdate::gyroPoll(struct sensor_combined_s &raw)
 	}
 }
 
-void VotedSensorsUpdate::magPoll(vehicle_magnetometer_s &magnetometer)
-{
-	for (int uorb_index = 0; uorb_index < _mag.subscription_count; uorb_index++) {
-		bool mag_updated;
-		orb_check(_mag.subscription[uorb_index], &mag_updated);
-
-		if (mag_updated) {
-			sensor_mag_s mag_report{};
-
-			int ret = orb_copy(ORB_ID(sensor_mag), _mag.subscription[uorb_index], &mag_report);
-
-			if (ret != PX4_OK || mag_report.timestamp == 0) {
-				continue; //ignore invalid data
-			}
-
-			if (!_mag.enabled[uorb_index]) {
-				continue;
-			}
-
-			// First publication with data
-			if (_mag.priority[uorb_index] == 0) {
-				int32_t priority = 0;
-				orb_priority(_mag.subscription[uorb_index], &priority);
-				_mag.priority[uorb_index] = (uint8_t)priority;
-
-				/* force a scale and offset update the first time we get data */
-				parametersUpdate();
-
-				if (!_mag.enabled[uorb_index]) {
-					/* in case the data on the mag topic comes after the initial parameterUpdate(), we would get here since the sensor
-					 * is enabled by default. The latest parameterUpdate() call would set enabled to false and reset priority to zero
-					 * for disabled sensors, and we shouldn't cal voter.put() in that case
-					 */
-					continue;
-				}
-
-			}
-
-			Vector3f vect(mag_report.x, mag_report.y, mag_report.z);
-			vect = _mag_rotation[uorb_index] * vect;
-
-			_last_magnetometer[uorb_index].timestamp = mag_report.timestamp;
-			_last_magnetometer[uorb_index].magnetometer_ga[0] = vect(0);
-			_last_magnetometer[uorb_index].magnetometer_ga[1] = vect(1);
-			_last_magnetometer[uorb_index].magnetometer_ga[2] = vect(2);
-
-			_mag.voter.put(uorb_index, mag_report.timestamp, _last_magnetometer[uorb_index].magnetometer_ga, mag_report.error_count,
-				       _mag.priority[uorb_index]);
-		}
-	}
-
-	int best_index;
-	_mag.voter.get_best(hrt_absolute_time(), &best_index);
-
-	if (best_index >= 0) {
-		magnetometer = _last_magnetometer[best_index];
-		_mag.last_best_vote = (uint8_t)best_index;
-
-		if (_selection.mag_device_id != _mag_device_id[best_index]) {
-			_selection_changed = true;
-			_selection.mag_device_id = _mag_device_id[best_index];
-		}
-	}
-}
-
 bool VotedSensorsUpdate::checkFailover(SensorData &sensor, const char *sensor_name, const uint64_t type)
 {
 	if (sensor.last_failover_count != sensor.voter.failover_count() && !_hil_enabled) {
@@ -810,17 +581,14 @@ void VotedSensorsUpdate::printStatus()
 	_gyro.voter.print();
 	PX4_INFO("accel status:");
 	_accel.voter.print();
-	PX4_INFO("mag status:");
-	_mag.voter.print();
 }
 
-void VotedSensorsUpdate::sensorsPoll(sensor_combined_s &raw, vehicle_magnetometer_s &magnetometer)
+void VotedSensorsUpdate::sensorsPoll(sensor_combined_s &raw)
 {
 	_corrections_sub.update(&_corrections);
 
 	accelPoll(raw);
 	gyroPoll(raw);
-	magPoll(magnetometer);
 
 	// publish sensor selection if changed
 	if (_selection_changed) {
@@ -836,7 +604,6 @@ void VotedSensorsUpdate::checkFailover()
 {
 	checkFailover(_accel, "Accel", subsystem_info_s::SUBSYSTEM_TYPE_ACC);
 	checkFailover(_gyro, "Gyro", subsystem_info_s::SUBSYSTEM_TYPE_GYRO);
-	checkFailover(_mag, "Mag", subsystem_info_s::SUBSYSTEM_TYPE_MAG);
 }
 
 void VotedSensorsUpdate::setRelativeTimestamps(sensor_combined_s &raw)
@@ -944,39 +711,4 @@ void VotedSensorsUpdate::calcGyroInconsistency(sensor_preflight_s &preflt)
 		// get the vector length of the largest difference and write to the combined sensor struct
 		preflt.gyro_inconsistency_rad_s = sqrtf(gyro_diff_sum_max_sq);
 	}
-}
-
-void VotedSensorsUpdate::calcMagInconsistency(sensor_preflight_s &preflt)
-{
-	Vector3f primary_mag(_last_magnetometer[_mag.last_best_vote].magnetometer_ga); // primary mag field vector
-	float mag_angle_diff_max = 0.0f; // the maximum angle difference
-	unsigned check_index = 0; // the number of sensors the primary has been checked against
-
-	// Check each sensor against the primary
-	for (int i = 0; i < _mag.subscription_count; i++) {
-		// check that the sensor we are checking against is not the same as the primary
-		if ((_mag.priority[i] > 0) && (i != _mag.last_best_vote)) {
-			// calculate angle to 3D magnetic field vector of the primary sensor
-			Vector3f current_mag(_last_magnetometer[i].magnetometer_ga);
-			float angle_error = AxisAnglef(Quatf(current_mag, primary_mag)).angle();
-
-			// complementary filter to not fail/pass on single outliers
-			_mag_angle_diff[check_index] *= 0.95f;
-			_mag_angle_diff[check_index] += 0.05f * angle_error;
-
-			mag_angle_diff_max = math::max(mag_angle_diff_max, _mag_angle_diff[check_index]);
-
-			// increment the check index
-			check_index++;
-		}
-
-		// check to see if the maximum number of checks has been reached and break
-		if (check_index >= 2) {
-			break;
-		}
-	}
-
-	// get the vector length of the largest difference and write to the combined sensor struct
-	// will be zero if there is only one magnetometer and hence nothing to compare
-	preflt.mag_inconsistency_angle = mag_angle_diff_max;
 }
