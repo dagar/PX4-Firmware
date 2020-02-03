@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,53 +31,57 @@
  *
  ****************************************************************************/
 
-#pragma once
-
 /**
- * @file parameters.h
+ * Airspeed sensor compensation model for the SDP3x
  *
- * defines the list of parameters that are used within the sensors module
+ * Model with Pitot
+ * 		CAL_AIR_TUBED_MM: Not used, 1.5 mm tubes assumed.
+ * 		CAL_AIR_TUBELEN: Length of the tubes connecting the pitot to the sensor.
+ * Model without Pitot (1.5 mm tubes)
+ * 		CAL_AIR_TUBED_MM: Not used, 1.5 mm tubes assumed.
+ * 		CAL_AIR_TUBELEN: Length of the tubes connecting the pitot to the sensor.
+ * Tube Pressure Drop
+ * 		CAL_AIR_TUBED_MM: Diameter in mm of the pitot and tubes, must have the same diameter.
+ * 		CAL_AIR_TUBELEN: Length of the tubes connecting the pitot to the sensor and the static + dynamic port length of the pitot.
  *
- * @author Beat Kueng <beat-kueng@gmx.net>
+ * @value 0 Model with Pitot
+ * @value 1 Model without Pitot (1.5 mm tubes)
+ * @value 2 Tube Pressure Drop
+ *
+ * @group Sensors
  */
-
-#include <lib/parameters/param.h>
-
-namespace sensors
-{
-
-struct Parameters {
-#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
-	float diff_pres_analog_scale;
-	float diff_pres_offset_pa;
-#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
-
-	int32_t board_rotation;
-
-	float board_offset[3];
-};
-
-struct ParameterHandles {
-#ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
-	param_t diff_pres_analog_scale;
-	param_t diff_pres_offset_pa;
-#endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
-
-	param_t board_rotation;
-
-	param_t board_offset[3];
-};
+PARAM_DEFINE_INT32(CAL_AIR_CMODEL, 0);
 
 /**
- * initialize ParameterHandles struct
+ * Airspeed sensor tube length.
+ *
+ * See the CAL_AIR_CMODEL explanation on how this parameter should be set.
+ *
+ * @min 0.01
+ * @max 2.00
+ * @unit meter
+ *
+ * @group Sensors
  */
-void initialize_parameter_handles(ParameterHandles &parameter_handles);
-
+PARAM_DEFINE_FLOAT(CAL_AIR_TUBELEN, 0.2f);
 
 /**
- * Read out the parameters using the handles into the parameters struct.
- * @return 0 on success, <0 on error
+ * Airspeed sensor tube diameter. Only used for the Tube Pressure Drop Compensation.
+ *
+ * @min 0.1
+ * @max 100
+ * @unit millimeter
+ *
+ * @group Sensors
  */
-void update_parameters(const ParameterHandles &parameter_handles, Parameters &parameters);
+PARAM_DEFINE_FLOAT(CAL_AIR_TUBED_MM, 1.5f);
 
-} /* namespace sensors */
+/**
+ * Differential pressure sensor offset
+ *
+ * The offset (zero-reading) in Pascal
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_FLOAT(SENS_DPRES_OFF, 0.0f);

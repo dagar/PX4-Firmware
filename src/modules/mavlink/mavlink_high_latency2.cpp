@@ -252,7 +252,7 @@ bool MavlinkStreamHighLatency2::write_airspeed(mavlink_high_latency2_t *msg)
 	const bool updated = _airspeed_sub->update(&_airspeed_time, &airspeed);
 
 	if (_airspeed_time > 0) {
-		if (airspeed.confidence < 0.95f) { // the same threshold as for the commander
+		if (hrt_elapsed_time(&airspeed.timestamp) > 5_s) {
 			msg->failure_flags |= HL_FAILURE_FLAG_DIFFERENTIAL_PRESSURE;
 		}
 	}
