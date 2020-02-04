@@ -36,7 +36,7 @@
 
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/px4_config.h>
-#include <uORB/uORBTopics.h>
+#include <uORB/topics/uORBTopics.hpp>
 
 #include <string.h>
 

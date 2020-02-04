@@ -36,6 +36,8 @@
 #include <stdint.h>
 
 #include "uORBCommon.hpp"
+#include <uORB/topics/uORBTopics.hpp>
+
 #include <px4_platform_common/posix.h>
 
 namespace uORB
@@ -48,7 +50,10 @@ class Manager;
 #include <string.h>
 #include <stdlib.h>
 
+#include <containers/Bitset.hpp>
 #include <containers/List.hpp>
+
+using px4::Bitset;
 
 /**
  * Master control device for ObjDev.
@@ -68,6 +73,10 @@ public:
 	 */
 	uORB::DeviceNode *getDeviceNode(const char *node_name);
 	uORB::DeviceNode *getDeviceNode(const struct orb_metadata *meta, const uint8_t instance);
+
+	bool deviceNodeAdvertised(const struct orb_metadata *meta, const uint8_t instance);
+
+	bool deviceNodeAdvertised(ORB_ID id, const uint8_t instance) { return _node_advertised[instance][static_cast<int>(id)]; }
 
 	/**
 	 * Print statistics for each existing topic.
@@ -111,6 +120,8 @@ private:
 	uORB::DeviceNode *getDeviceNodeLocked(const struct orb_metadata *meta, const uint8_t instance);
 
 	List<uORB::DeviceNode *> _node_list;
+
+	Bitset<ORB_TOPICS_COUNT> _node_advertised[ORB_MULTI_MAX_INSTANCES];
 
 	hrt_abstime       _last_statistics_output;
 

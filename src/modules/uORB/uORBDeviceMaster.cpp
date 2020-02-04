@@ -458,6 +458,8 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const struct orb_metadata *m
 		return nullptr;
 	}
 
+	deviceNodeAdvertised(ORB_ID::actuator_armed, 0);
+
 	lock();
 	uORB::DeviceNode *node = getDeviceNodeLocked(meta, instance);
 	unlock();
