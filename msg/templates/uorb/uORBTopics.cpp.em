@@ -67,3 +67,12 @@ const struct orb_metadata *const*orb_get_topics()
 {
 	return _uorb_topics_list;
 }
+
+const struct orb_metadata* get_orb_meta(ORB_ID id)
+{
+	if (id == ORB_ID::INVALID) {
+		return nullptr;
+	}
+
+	return _uorb_topics_list[static_cast<uint8_t>(id) - 1];
+}

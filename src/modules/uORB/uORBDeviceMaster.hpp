@@ -74,9 +74,7 @@ public:
 	uORB::DeviceNode *getDeviceNode(const char *node_name);
 	uORB::DeviceNode *getDeviceNode(const struct orb_metadata *meta, const uint8_t instance);
 
-	bool deviceNodeAdvertised(const struct orb_metadata *meta, const uint8_t instance);
-
-	bool deviceNodeAdvertised(ORB_ID id, const uint8_t instance) { return _node_advertised[instance][static_cast<int>(id)]; }
+	bool deviceNodeExists(ORB_ID id, const uint8_t instance) { return _node_exists[instance][(uint8_t)id]; }
 
 	/**
 	 * Print statistics for each existing topic.
@@ -120,8 +118,7 @@ private:
 	uORB::DeviceNode *getDeviceNodeLocked(const struct orb_metadata *meta, const uint8_t instance);
 
 	List<uORB::DeviceNode *> _node_list;
-
-	Bitset<ORB_TOPICS_COUNT> _node_advertised[ORB_MULTI_MAX_INSTANCES];
+	Bitset<ORB_TOPICS_COUNT> _node_exists[ORB_MULTI_MAX_INSTANCES];
 
 	hrt_abstime       _last_statistics_output;
 

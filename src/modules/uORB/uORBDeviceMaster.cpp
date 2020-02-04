@@ -163,6 +163,7 @@ uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_advertise
 
 			// add to the node map.
 			_node_list.add(node);
+			_node_exists[node->get_instance()].set((uint8_t)node->id(), true);
 		}
 
 		group_tries++;
@@ -458,8 +459,6 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const struct orb_metadata *m
 		return nullptr;
 	}
 
-	deviceNodeAdvertised(ORB_ID::actuator_armed, 0);
-
 	lock();
 	uORB::DeviceNode *node = getDeviceNodeLocked(meta, instance);
 	unlock();
@@ -471,6 +470,10 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const struct orb_metadata *m
 
 uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(const struct orb_metadata *meta, const uint8_t instance)
 {
+	if (!_node_exists[instance][meta->o_id]) {
+		return nullptr;
+	}
+
 	for (uORB::DeviceNode *node : _node_list) {
 		if ((strcmp(node->get_name(), meta->o_name) == 0) && (node->get_instance() == instance)) {
 			return node;

@@ -113,11 +113,13 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 	}
 
 	if (get_device_master()) {
-		uORB::DeviceNode *node = _device_master->getDeviceNode(meta, instance);
+		if (_device_master->deviceNodeExists((ORB_ID)meta->o_id, instance)) {
+			uORB::DeviceNode *node = _device_master->getDeviceNode(meta, instance);
 
-		if (node != nullptr) {
-			if (node->is_advertised()) {
-				return PX4_OK;
+			if (node != nullptr) {
+				if (node->is_advertised()) {
+					return PX4_OK;
+				}
 			}
 		}
 	}

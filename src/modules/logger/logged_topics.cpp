@@ -295,9 +295,9 @@ bool LoggedTopics::add_topic(const orb_metadata *topic, uint16_t interval_ms, ui
 	}
 
 	RequestedSubscription &sub = _subscriptions.sub[_subscriptions.count++];
-	sub.topic = topic;
 	sub.interval_ms = interval_ms;
 	sub.instance = instance;
+	sub.id = static_cast<ORB_ID>(topic->o_id);
 	return true;
 }
 
@@ -312,7 +312,7 @@ bool LoggedTopics::add_topic(const char *name, uint16_t interval_ms, uint8_t ins
 
 			// check if already added: if so, only update the interval
 			for (int j = 0; j < _subscriptions.count; ++j) {
-				if (_subscriptions.sub[j].topic == topics[i] &&
+				if (_subscriptions.sub[j].id == static_cast<ORB_ID>(topics[i]->o_id) &&
 				    _subscriptions.sub[j].instance == instance) {
 
 					PX4_DEBUG("logging topic %s(%d), interval: %i, already added, only setting interval",
