@@ -31,4 +31,7 @@
 #
 ############################################################################
 
-px4_add_library(drivers_rangefinder PX4Rangefinder.cpp)
+px4_add_library(drivers_rangefinder
+	PX4Rangefinder.cpp
+	PX4Rangefinder.hpp
+)

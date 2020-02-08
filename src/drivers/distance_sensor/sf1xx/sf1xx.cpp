@@ -187,10 +187,6 @@ SF1XX::~SF1XX()
 		orb_unadvertise(_distance_sensor_topic);
 	}
 
-	if (_class_instance != -1) {
-		unregister_class_devname(RANGE_FINDER_BASE_DEVICE_PATH, _class_instance);
-	}
-
 	/* free perf counters */
 	perf_free(_sample_perf);
 	perf_free(_comms_errors);
@@ -265,8 +261,6 @@ SF1XX::init()
 	if (_reports == nullptr) {
 		return ret;
 	}
-
-	_class_instance = register_class_devname(RANGE_FINDER_BASE_DEVICE_PATH);
 
 	/* get a publish handle on the range finder topic */
 	struct distance_sensor_s ds_report = {};

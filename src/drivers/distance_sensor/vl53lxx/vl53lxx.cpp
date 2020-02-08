@@ -184,10 +184,6 @@ VL53LXX::~VL53LXX()
 		delete _reports;
 	}
 
-	if (_class_instance != -1) {
-		unregister_class_devname(RANGE_FINDER_BASE_DEVICE_PATH, _class_instance);
-	}
-
 	// Unadvertise uORB topics.
 	if (_distance_sensor_topic != nullptr) {
 		orb_unadvertise(_distance_sensor_topic);
@@ -261,8 +257,6 @@ VL53LXX::init()
 	if (_reports == nullptr) {
 		return PX4_ERROR;
 	}
-
-	_class_instance = register_class_devname(RANGE_FINDER_BASE_DEVICE_PATH);
 
 	// Get a publish handle on the obstacle distance topic.
 	distance_sensor_s report {};
