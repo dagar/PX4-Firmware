@@ -242,6 +242,9 @@ __EXPORT size_t		param_size(param_t param);
  */
 __EXPORT int		param_get(param_t param, void *val);
 
+__EXPORT int		param_instance_get(param_t param, uint8_t instance, void *val);
+
+
 /**
  * Set the value of a parameter.
  *
@@ -251,6 +254,7 @@ __EXPORT int		param_get(param_t param, void *val);
  * @return		Zero if the parameter's value could be set from a scalar, nonzero otherwise.
  */
 __EXPORT int		param_set(param_t param, const void *val);
+__EXPORT int		param_instance_set(param_t param, const void *val, uint8_t instance);
 
 /**
  * Mark a parameter as used. Only marked parameters will be sent to a GCS.
@@ -444,7 +448,10 @@ struct param_info_s {
 	;
 #endif
 	param_type_t	type;
-	uint16_t		volatile_param: 1;
+
+	uint16_t volatile_param: 1;
+	uint16_t max_instances: 3; // 8 instances max
+
 	union param_value_u val;
 };
 

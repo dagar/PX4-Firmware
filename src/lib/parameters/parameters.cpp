@@ -112,6 +112,7 @@ struct param_wbuf_s {
 	union param_value_u	val;
 	param_t			param;
 	bool			unsaved;
+	uint8_t			instance;
 };
 
 
@@ -271,7 +272,7 @@ param_compare_values(const void *a, const void *b)
 		return 1;
 	}
 
-	return 0;
+	return pa->instance == pb->instance;
 }
 
 /**
@@ -282,7 +283,7 @@ param_compare_values(const void *a, const void *b)
  *				nullptr if the parameter has not been modified.
  */
 static param_wbuf_s *
-param_find_changed(param_t param)
+param_find_changed(param_t param, uint8_t instance = 0)
 {
 	param_wbuf_s	*s = nullptr;
 
@@ -291,6 +292,7 @@ param_find_changed(param_t param)
 	if (param_values != nullptr) {
 		param_wbuf_s key{};
 		key.param = param;
+		key.instance = instance;
 		s = (param_wbuf_s *)utarray_find(param_values, &key, param_compare_values);
 	}
 
@@ -494,6 +496,11 @@ param_is_volatile(param_t param)
 	return handle_in_range(param) ? param_info_base[param].volatile_param : false;
 }
 
+bool param_is_multiinstance(param_t param)
+{
+	return handle_in_range(param) ? param_info_base[param].max_instances > 1 : false;
+}
+
 bool
 param_value_is_default(param_t param)
 {
@@ -552,7 +559,7 @@ param_size(param_t param)
  *				if the parameter does not exist.
  */
 static const void *
-param_get_value_ptr(param_t param)
+param_get_value_ptr(param_t param, uint8_t instance = 0)
 {
 	const void *result = nullptr;
 
@@ -563,7 +570,7 @@ param_get_value_ptr(param_t param)
 		const union param_value_u *v;
 
 		/* work out whether we're fetching the default or a written value */
-		struct param_wbuf_s *s = param_find_changed(param);
+		struct param_wbuf_s *s = param_find_changed(param, instance);
 
 		if (s != nullptr) {
 			v = &s->val;
@@ -587,6 +594,26 @@ param_get_value_ptr(param_t param)
 
 int
 param_get(param_t param, void *val)
+{
+	int result = -1;
+
+	param_lock_reader();
+	perf_begin(param_get_perf);
+
+	const void *v = param_get_value_ptr(param);
+
+	if (val && v) {
+		memcpy(val, v, param_size(param));
+		result = 0;
+	}
+
+	perf_end(param_get_perf);
+	param_unlock_reader();
+
+	return result;
+}
+
+int param_instance_get(param_t param, uint8_t instance, void *val)
 {
 	int result = -1;
 
@@ -700,7 +727,7 @@ param_control_autosave(bool enable)
 }
 
 static int
-param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes)
+param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes, uint8_t instance = 0)
 {
 	int result = -1;
 	bool params_changed = false;
@@ -719,13 +746,14 @@ param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_
 
 	if (handle_in_range(param)) {
 
-		param_wbuf_s *s = param_find_changed(param);
+		param_wbuf_s *s = param_find_changed(param, instance);
 
 		if (s == nullptr) {
 
 			/* construct a new parameter */
-			param_wbuf_s buf = {};
+			param_wbuf_s buf{};
 			buf.param = param;
+			buf.instance = instance;
 
 			params_changed = true;
 
@@ -734,7 +762,7 @@ param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_
 			utarray_sort(param_values, param_compare_values);
 
 			/* find it after sorting */
-			s = param_find_changed(param);
+			s = param_find_changed(param, instance);
 		}
 
 		/* update the changed value */
@@ -810,10 +838,14 @@ const void *param_get_value_ptr_external(param_t param)
 }
 #endif
 
-int
-param_set(param_t param, const void *val)
+int param_set(param_t param, const void *val)
 {
 	return param_set_internal(param, val, false, true);
+}
+
+int param_instance_set(param_t param, const void *val, uint8_t instance)
+{
+	return param_set_internal(param, val, false, true, instance);
 }
 
 int

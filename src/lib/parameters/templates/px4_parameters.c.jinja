@@ -16,6 +16,7 @@ struct px4_parameters_t px4_parameters = {
 	{
 		"{{ param.attrib["name"] }}",
 		PARAM_TYPE_{{ param.attrib["type"] }},
+		.max_instances = 1,
 	{%- if param.attrib["volatile"] == "true" %}
 		.volatile_param = 1,
 	{%- else %}
