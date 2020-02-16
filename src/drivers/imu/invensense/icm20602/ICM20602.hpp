@@ -72,8 +72,17 @@ private:
 
 	void Run() override;
 
+	bool Configure();
+	void CheckRegister();
+	void ConfigureAccel();
+	void ConfigureGyro();
+
+	void SetAccelRange(uint8_t accel_full_scale_selection);
+	void SetGyroRange(uint8_t gyro_full_scale_selection);
+
 	uint8_t RegisterRead(Register reg);
 	void RegisterWrite(Register reg, uint8_t value);
+	void RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t clearbits);
 	void RegisterSetBits(Register reg, uint8_t setbits);
 	void RegisterClearBits(Register reg, uint8_t clearbits);
 
@@ -84,11 +93,21 @@ private:
 	PX4Accelerometer _px4_accel;
 	PX4Gyroscope _px4_gyro;
 
+	uint8_t _accel_full_scale_selection{InvenSense_ICM20602::ACCEL_FS_SEL_2G};
+	uint8_t _gyro_full_scale_selection{InvenSense_ICM20602::FS_SEL_250_DPS};
+
 	perf_counter_t _transfer_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": transfer")};
+	perf_counter_t _bad_register_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad register")};
+	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad transfer")};
 	perf_counter_t _fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo empty")};
 	perf_counter_t _fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo overflow")};
 	perf_counter_t _fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": fifo reset")};
 	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": drdy interval")};
 
-	hrt_abstime _time_data_ready{0};
+	hrt_abstime _last_config_check{0};
+
+	uint8_t _checked_register{0};
+
+	uint8_t _accel_clipping_count{0};
+	uint8_t _gyro_clipping_count{0};
 };
