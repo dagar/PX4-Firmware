@@ -191,7 +191,7 @@ void ICM20602::ConfigureAccel()
 
 void ICM20602::ConfigureGyro()
 {
-	const uint8_t FS_SEL = RegisterRead(Register::GYRO_CONFIG) & (Bit4 | Bit3); // [4:3] FS_SEL[1:0];
+	const uint8_t FS_SEL = RegisterRead(Register::GYRO_CONFIG) & (Bit4 | Bit3); // [4:3] FS_SEL[1:0]
 
 	switch (FS_SEL) {
 	case FS_SEL_250_DPS:
