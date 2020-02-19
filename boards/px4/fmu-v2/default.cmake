@@ -11,7 +11,7 @@ px4_add_board(
 	IO px4_io-v2_default
 	#TESTING
 	#UAVCAN_INTERFACES 2
-	CONSTRAINED_FLASH
+	#CONSTRAINED_FLASH
 	SERIAL_PORTS
 		GPS1:/dev/ttyS3
 		TEL1:/dev/ttyS1
@@ -30,21 +30,21 @@ px4_add_board(
 		#distance_sensor/ll40ls
 		#distance_sensor/sf0x
 		#dshot
-		gps
+		#gps
 		#heater
 		#imu # all available imu drivers
 		#imu/adis16448
 		#imu/adis16477
 		#imu/adis16497
-		#imu/invensense/mpu6000 # WIP
-		imu/l3gd20
-		imu/lsm303d
-		imu/mpu6000
+		imu/invensense/mpu6000
+		#imu/l3gd20
+		#imu/lsm303d
+		#imu/mpu6000
 		#imu/mpu9250
 		#iridiumsbd
 		#irlock
 		#lights/blinkm
-		lights/rgbled
+		#lights/rgbled
 		#magnetometer # all available magnetometer drivers
 		magnetometer/hmc5883
 		#mkblctrl
@@ -61,7 +61,7 @@ px4_add_board(
 		#tap_esc
 		#telemetry # all available telemetry drivers
 		#test_ppm
-		tone_alarm
+		#tone_alarm
 		#uavcan
 	MODULES
 		airspeed_selector
@@ -72,8 +72,8 @@ px4_add_board(
 		dataman
 		ekf2
 		#events
-		fw_att_control
-		fw_pos_control_l1
+		#fw_att_control
+		#fw_pos_control_l1
 		land_detector
 		#landing_target_estimator
 		load_mon
@@ -89,8 +89,8 @@ px4_add_board(
 		sensors
 		#sih
 		#temperature_compensation
-		vmount
-		vtol_att_control
+		#vmount
+		#vtol_att_control
 	SYSTEMCMDS
 		bl_update
 		#config
@@ -114,7 +114,7 @@ px4_add_board(
 		#shutdown
 		#tests # tests and test runner
 		top
-		#topic_listener
+		topic_listener
 		tune_control
 		#usb_connected
 		ver

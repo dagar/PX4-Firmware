@@ -40,6 +40,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 // TODO: move to a central header
 static constexpr uint8_t Bit0 = (1 << 0);
 static constexpr uint8_t Bit1 = (1 << 1);
@@ -52,10 +54,14 @@ static constexpr uint8_t Bit7 = (1 << 7);
 
 namespace InvenSense_MPU6000
 {
+static constexpr uint32_t SPI_SPEED_SLOW = 1 * 1000 * 1000;
 static constexpr uint32_t SPI_SPEED = 20 * 1000 * 1000;
 static constexpr uint8_t DIR_READ = 0x80;
 
 static constexpr uint8_t WHOAMI = 0x68;
+
+static constexpr float TEMPERATURE_SENSITIVITY = 326.8f; // LSB/C
+static constexpr float ROOM_TEMPERATURE_OFFSET = 25.f; // C
 
 enum class Register : uint8_t {
 	CONFIG        = 0x1A,
@@ -63,8 +69,6 @@ enum class Register : uint8_t {
 	ACCEL_CONFIG  = 0x1C,
 
 	FIFO_EN       = 0x23,
-
-	INT_STATUS    = 0x3A,
 
 	INT_ENABLE    = 0x38,
 
@@ -115,28 +119,26 @@ enum FIFO_EN_BIT : uint8_t {
 // INT_ENABLE
 enum INT_ENABLE_BIT : uint8_t {
 	FIFO_OFLOW_EN   = Bit4,
-	DATA_RDY_INT_EN = Bit0
-};
-
-// INT_STATUS
-enum INT_STATUS_BIT : uint8_t {
-	FIFO_OFLOW_INT = Bit4,
-	DATA_RDY_INT   = Bit0,
+	DATA_RDY_EN     = Bit0
 };
 
 // USER_CTRL
 enum USER_CTRL_BIT : uint8_t {
-	FIFO_EN    = Bit6,
-	FIFO_RESET = Bit2,
+	FIFO_EN        = Bit6,
+	I2C_MST_EN     = Bit5,
+	I2C_IF_DIS     = Bit4,
+	FIFO_RESET     = Bit2,
+	SIG_COND_RESET = Bit0,
 };
 
 // PWR_MGMT_1
 enum PWR_MGMT_1_BIT : uint8_t {
 	DEVICE_RESET = Bit7,
+	SLEEP        = Bit6,
 
-	CLKSEL_2   = Bit2,
-	CLKSEL_1   = Bit1,
-	CLKSEL_0   = Bit0,
+	CLKSEL_2     = Bit2,
+	CLKSEL_1     = Bit1,
+	CLKSEL_0     = Bit0,
 };
 
 
