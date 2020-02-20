@@ -30,18 +30,16 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-
 px4_add_module(
-	MODULE drivers__imu__invensense__icm20602
-	MAIN icm20602
-	COMPILE_FLAGS
+	MODULE drivers__imu__icm20948
+	MAIN icm20948
 	SRCS
-		ICM20602.cpp
-		ICM20602.hpp
-		icm20602_main.cpp
-		InvenSense_ICM20602_registers.hpp
+		ICM20948.cpp
+		ICM20948.hpp
+		icm20948_main.cpp
 	DEPENDS
+		px4_work_queue
 		drivers_accelerometer
 		drivers_gyroscope
-		px4_work_queue
+		drivers_magnetometer
 	)

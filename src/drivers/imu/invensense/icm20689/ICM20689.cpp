@@ -151,60 +151,6 @@ bool ICM20689::Reset()
 	return false;
 }
 
-void ICM20689::ConfigureAccel()
-{
-	const uint8_t ACCEL_FS_SEL = RegisterRead(Register::ACCEL_CONFIG) & (Bit4 | Bit3); // [4:3] ACCEL_FS_SEL[1:0]
-
-	switch (ACCEL_FS_SEL) {
-	case ACCEL_FS_SEL_2G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 16384);
-		_px4_accel.set_range(2 * CONSTANTS_ONE_G);
-		break;
-
-	case ACCEL_FS_SEL_4G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 8192);
-		_px4_accel.set_range(4 * CONSTANTS_ONE_G);
-		break;
-
-	case ACCEL_FS_SEL_8G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 4096);
-		_px4_accel.set_range(8 * CONSTANTS_ONE_G);
-		break;
-
-	case ACCEL_FS_SEL_16G:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 2048);
-		_px4_accel.set_range(16 * CONSTANTS_ONE_G);
-		break;
-	}
-}
-
-void ICM20689::ConfigureGyro()
-{
-	const uint8_t GYRO_FS_SEL = RegisterRead(Register::GYRO_CONFIG) & (Bit4 | Bit3); // [4:3] GYRO_FS_SEL[1:0]
-
-	switch (GYRO_FS_SEL) {
-	case FS_SEL_250_DPS:
-		_px4_gyro.set_scale(math::radians(1.0f / 131.f));
-		_px4_gyro.set_range(math::radians(250.f));
-		break;
-
-	case FS_SEL_500_DPS:
-		_px4_gyro.set_scale(math::radians(1.0f / 65.5f));
-		_px4_gyro.set_range(math::radians(500.f));
-		break;
-
-	case FS_SEL_1000_DPS:
-		_px4_gyro.set_scale(math::radians(1.0f / 32.8f));
-		_px4_gyro.set_range(math::radians(1000.0f));
-		break;
-
-	case FS_SEL_2000_DPS:
-		_px4_gyro.set_scale(math::radians(1.0f / 16.4f));
-		_px4_gyro.set_range(math::radians(2000.0f));
-		break;
-	}
-}
-
 void ICM20689::ResetFIFO()
 {
 	perf_count(_fifo_reset_perf);
@@ -261,13 +207,6 @@ bool ICM20689::CheckRegister(const register_config_t &reg_cfg, bool notify)
 
 	if (!success) {
 		RegisterSetAndClearBits(reg_cfg.reg, reg_cfg.set_bits, reg_cfg.clear_bits);
-
-		if (reg_cfg.reg == Register::ACCEL_CONFIG) {
-			ConfigureAccel();
-
-		} else if (reg_cfg.reg == Register::GYRO_CONFIG) {
-			ConfigureGyro();
-		}
 
 		if (notify) {
 			perf_count(_bad_register_perf);

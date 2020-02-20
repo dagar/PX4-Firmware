@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file InvenSense_ICM20602_registers.hpp
+ * @file InvenSense_ICM20948_registers.hpp
  *
  * Invensense ICM-20602 registers.
  *
@@ -52,93 +52,75 @@ static constexpr uint8_t Bit5 = (1 << 5);
 static constexpr uint8_t Bit6 = (1 << 6);
 static constexpr uint8_t Bit7 = (1 << 7);
 
-namespace InvenSense_ICM20602
+namespace InvenSense_ICM20948
 {
-static constexpr uint32_t SPI_SPEED = 10 * 1000 * 1000; // 10MHz SPI serial interface
+static constexpr uint32_t SPI_SPEED = 7 * 1000 * 1000; // 7 MHz SPI
 static constexpr uint8_t DIR_READ = 0x80;
 
-static constexpr uint8_t WHOAMI = 0x12;
+static constexpr uint8_t WHOAMI = 0xEA;
 
 static constexpr float TEMPERATURE_SENSITIVITY = 326.8f; // LSB/C
 static constexpr float ROOM_TEMPERATURE_OFFSET = 25.f; // C
 
-enum class Register : uint8_t {
-	CONFIG        = 0x1A,
-	GYRO_CONFIG   = 0x1B,
-	ACCEL_CONFIG  = 0x1C,
-	ACCEL_CONFIG2 = 0x1D,
+namespace Register
+{
 
-	FIFO_EN       = 0x23,
+enum class BANK_0 : uint8_t {
+	WHO_AM_I             = 0x00,
 
-	INT_ENABLE    = 0x38,
+	USER_CTRL            = 0x03,
 
-	TEMP_OUT_H    = 0x41,
-	TEMP_OUT_L    = 0x42,
+	PWR_MGMT_1           = 0x06,
 
-	FIFO_WM_TH1   = 0x60,
-	FIFO_WM_TH2   = 0x61,
+	INT_ENABLE_1         = 0x11,
 
-	USER_CTRL     = 0x6A,
-	PWR_MGMT_1    = 0x6B,
+	I2C_MST_STATUS       = 0x17,
 
-	I2C_IF        = 0x70,
+	TEMP_OUT_H           = 0x39,
+	TEMP_OUT_L           = 0x3A,
+	EXT_SLV_SENS_DATA_00 = 0x3B,
 
-	FIFO_COUNTH   = 0x72,
-	FIFO_COUNTL   = 0x73,
-	FIFO_R_W      = 0x74,
-	WHO_AM_I      = 0x75,
+	FIFO_EN_2            = 0x67,
+	FIFO_RST             = 0x68,
+
+	FIFO_COUNTH          = 0x70,
+	FIFO_COUNTL          = 0x71,
+	FIFO_R_W             = 0x72,
+
+	REG_BANK_SEL         = 0x7F,
 };
 
-// CONFIG
-enum CONFIG_BIT : uint8_t {
-	FIFO_MODE = Bit6, // when the FIFO is full, additional writes will not be written to FIFO
+enum class BANK_2 : uint8_t {
+	GYRO_CONFIG_1        = 0x01,
 
-	DLPF_CFG_BYPASS_DLPF_8KHZ = 7, // Rate 8 kHz [2:0]
+	ACCEL_CONFIG         = 0x14,
+
+	REG_BANK_SEL         = 0x7F,
 };
 
-// GYRO_CONFIG
-enum GYRO_CONFIG_BIT : uint8_t {
-	// FS_SEL [4:3]
-	FS_SEL_250_DPS	= 0,           // 0b00000
-	FS_SEL_500_DPS	= Bit3,        // 0b01000
-	FS_SEL_1000_DPS	= Bit4,        // 0b10000
-	FS_SEL_2000_DPS	= Bit4 | Bit3, // 0b11000
+enum class BANK_3 : uint8_t {
+	I2C_MST_ODR_CONFIG   = 0x00,
+	I2C_MST_CTRL         = 0x01,
 
-	// FCHOICE_B [1:0]
-	FCHOICE_B_8KHZ_BYPASS_DLPF = Bit1 | Bit0, // 0b00 - 3-dB BW: 3281 Noise BW (Hz): 3451.0   8 kHz
+	I2C_SLV0_ADDR        = 0x03,
+	I2C_SLV0_REG         = 0x04,
+	I2C_SLV0_CTRL        = 0x05,
+	I2C_SLV0_DO          = 0x06,
+	I2C_SLV1_ADDR        = 0x07,
+
+	REG_BANK_SEL         = 0x7F,
+};
 };
 
-// ACCEL_CONFIG
-enum ACCEL_CONFIG_BIT : uint8_t {
-	// ACCEL_FS_SEL [4:3]
-	ACCEL_FS_SEL_2G  = 0,           // 0b00000
-	ACCEL_FS_SEL_4G  = Bit3,        // 0b01000
-	ACCEL_FS_SEL_8G  = Bit4,        // 0b10000
-	ACCEL_FS_SEL_16G = Bit4 | Bit3, // 0b11000
-};
 
-// ACCEL_CONFIG2
-enum ACCEL_CONFIG2_BIT : uint8_t {
-	ACCEL_FCHOICE_B_BYPASS_DLPF = Bit3,
-};
-
-// FIFO_EN
-enum FIFO_EN_BIT : uint8_t {
-	GYRO_FIFO_EN  = Bit4,
-	ACCEL_FIFO_EN = Bit3,
-};
-
-// INT_ENABLE
-enum INT_ENABLE_BIT : uint8_t {
-	FIFO_OFLOW_EN   = Bit4,
-	DATA_RDY_INT_EN = Bit0
-};
-
+//---------------- BANK0 Register bits
 // USER_CTRL
 enum USER_CTRL_BIT : uint8_t {
-	FIFO_EN      = Bit6,
-	FIFO_RST     = Bit2,
-	SIG_COND_RST = Bit0,
+	FIFO_EN     = Bit6,
+	I2C_MST_EN  = Bit5, // Enable the I2C Master I/F module
+	I2C_IF_DIS  = Bit4, // Reset I2C Slave module and put the serial interface in SPI mode only
+
+	I2C_MST_RST = Bit1, // Reset I2C Master module.
 };
 
 // PWR_MGMT_1
@@ -151,17 +133,61 @@ enum PWR_MGMT_1_BIT : uint8_t {
 	CLKSEL_0     = Bit0,
 };
 
-// I2C_IF
-enum I2C_IF_BIT : uint8_t {
-	I2C_IF_DIS = Bit6, // 1 – Disable I2C Slave module and put the serial interface in SPI mode only.
+// INT_ENABLE_1
+enum INT_ENABLE_1_BIT : uint8_t {
+	RAW_DATA_0_RDY_EN = Bit0,
 };
 
+// FIFO_EN_2
+enum FIFO_EN_2_BIT : uint8_t {
+	ACCEL_FIFO_EN  = Bit4,
+	GYRO_Z_FIFO_EN = Bit3,
+	GYRO_Y_FIFO_EN = Bit2,
+	GYRO_X_FIFO_EN = Bit1,
+	TEMP_FIFO_EN   = Bit0,
+};
+
+// FIFO_RST
+enum FIFO_RST_BIT : uint8_t {
+	FIFO_RESET = Bit0,
+};
+
+// REG_BANK_SEL
+enum REG_BANK_SEL_BIT : uint8_t {
+	USER_BANK_0 = 0,           // 0: Select USER BANK 0.
+	USER_BANK_1 = Bit3,        // 1: Select USER BANK 0.
+	USER_BANK_2 = Bit4,        // 2: Select USER BANK 0.
+	USER_BANK_3 = Bit4 | Bit3, // 3: Select USER BANK 0.
+};
+
+//---------------- BANK2 Register bits
+// GYRO_CONFIG_1
+enum GYRO_CONFIG_1_BIT : uint8_t {
+	// GYRO_FS_SEL[1:0]
+	GYRO_FS_SEL_250_DPS  = 0,           // 0b00 = ±250 dps
+	GYRO_FS_SEL_500_DPS  = Bit1,        // 0b01 = ±500 dps
+	GYRO_FS_SEL_1000_DPS = Bit2,        // 0b10 = ±1000 dps
+	GYRO_FS_SEL_2000_DPS = Bit2 | Bit1, // 0b11 = ±2000 dps
+
+	GYRO_FCHOICE         = Bit0,        // 0 – Bypass gyro DLPF
+};
+
+// ACCEL_CONFIG
+enum ACCEL_CONFIG_BIT : uint8_t {
+	// ACCEL_FS_SEL[1:0]
+	ACCEL_FS_SEL_2G  = 0,           // 0b00: ±2g
+	ACCEL_FS_SEL_4G  = Bit1,        // 0b01: ±4g
+	ACCEL_FS_SEL_8G  = Bit2,        // 0b10: ±8g
+	ACCEL_FS_SEL_16G = Bit2 | Bit1, // 0b11: ±16g
+
+	ACCEL_FCHOICE    = Bit0,        // 0: Bypass accel DLPF
+};
 
 namespace FIFO
 {
-static constexpr size_t SIZE = 1008;
+static constexpr size_t SIZE = 512;
 
-// FIFO_DATA layout when FIFO_EN has both GYRO_FIFO_EN and ACCEL_FIFO_EN set
+// FIFO_DATA layout when FIFO_EN has ACCEL_FIFO_EN and GYRO_{Z, Y, X}_FIFO_EN set
 struct DATA {
 	uint8_t ACCEL_XOUT_H;
 	uint8_t ACCEL_XOUT_L;
@@ -169,8 +195,6 @@ struct DATA {
 	uint8_t ACCEL_YOUT_L;
 	uint8_t ACCEL_ZOUT_H;
 	uint8_t ACCEL_ZOUT_L;
-	uint8_t TEMP_OUT_H;
-	uint8_t TEMP_OUT_L;
 	uint8_t GYRO_XOUT_H;
 	uint8_t GYRO_XOUT_L;
 	uint8_t GYRO_YOUT_H;
@@ -179,5 +203,4 @@ struct DATA {
 	uint8_t GYRO_ZOUT_L;
 };
 }
-
-} // namespace InvenSense_ICM20602
+} // namespace InvenSense_ICM20948

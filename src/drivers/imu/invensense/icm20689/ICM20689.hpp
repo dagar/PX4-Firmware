@@ -82,8 +82,6 @@ private:
 
 	bool CheckRegister(const register_config_t &reg_cfg, bool notify = true);
 	bool Configure(bool notify = true);
-	void ConfigureAccel();
-	void ConfigureGyro();
 	void ConfigureSampleRate(int sample_rate);
 
 	uint8_t RegisterRead(Register reg);
