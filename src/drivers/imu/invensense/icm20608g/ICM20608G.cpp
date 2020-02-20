@@ -518,6 +518,7 @@ void ICM20608G::Run()
 	// Temperature
 	if (hrt_elapsed_time(&_time_last_temperature_update) > 1_s) {
 		// read current temperature
+		_time_last_temperature_update = hrt_absolute_time();
 		uint8_t temperature_buf[3] {};
 		temperature_buf[0] = static_cast<uint8_t>(Register::TEMP_OUT_H) | DIR_READ;
 

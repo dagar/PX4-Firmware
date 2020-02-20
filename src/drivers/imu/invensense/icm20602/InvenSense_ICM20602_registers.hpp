@@ -64,30 +64,31 @@ static constexpr float TEMPERATURE_SENSITIVITY = 326.8f; // LSB/C
 static constexpr float ROOM_TEMPERATURE_OFFSET = 25.f; // C
 
 enum class Register : uint8_t {
-	CONFIG        = 0x1A,
-	GYRO_CONFIG   = 0x1B,
-	ACCEL_CONFIG  = 0x1C,
-	ACCEL_CONFIG2 = 0x1D,
+	CONFIG             = 0x1A,
+	GYRO_CONFIG        = 0x1B,
+	ACCEL_CONFIG       = 0x1C,
+	ACCEL_CONFIG2      = 0x1D,
 
-	FIFO_EN       = 0x23,
+	FIFO_EN            = 0x23,
 
-	INT_ENABLE    = 0x38,
+	INT_ENABLE         = 0x38,
+	FIFO_WM_INT_STATUS = 0x39,
 
-	TEMP_OUT_H    = 0x41,
-	TEMP_OUT_L    = 0x42,
+	TEMP_OUT_H         = 0x41,
+	TEMP_OUT_L         = 0x42,
 
-	FIFO_WM_TH1   = 0x60,
-	FIFO_WM_TH2   = 0x61,
+	FIFO_WM_TH1        = 0x60,
+	FIFO_WM_TH2        = 0x61,
 
-	USER_CTRL     = 0x6A,
-	PWR_MGMT_1    = 0x6B,
+	USER_CTRL          = 0x6A,
+	PWR_MGMT_1         = 0x6B,
 
-	I2C_IF        = 0x70,
+	I2C_IF             = 0x70,
 
-	FIFO_COUNTH   = 0x72,
-	FIFO_COUNTL   = 0x73,
-	FIFO_R_W      = 0x74,
-	WHO_AM_I      = 0x75,
+	FIFO_COUNTH        = 0x72,
+	FIFO_COUNTL        = 0x73,
+	FIFO_R_W           = 0x74,
+	WHO_AM_I           = 0x75,
 };
 
 // CONFIG
@@ -133,6 +134,11 @@ enum FIFO_EN_BIT : uint8_t {
 enum INT_ENABLE_BIT : uint8_t {
 	FIFO_OFLOW_EN   = Bit4,
 	DATA_RDY_INT_EN = Bit0
+};
+
+// FIFO_WM_INT_STATUS
+enum FIFO_WM_INT_STATUS_BIT : uint8_t {
+	FIFO_WM_INT = Bit6,
 };
 
 // USER_CTRL
