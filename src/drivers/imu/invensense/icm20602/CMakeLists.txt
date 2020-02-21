@@ -36,6 +36,7 @@ px4_add_module(
 	MAIN icm20602
 	COMPILE_FLAGS
 		-DDEBUG_BUILD=1
+		-O0
 	SRCS
 		ICM20602.cpp
 		ICM20602.hpp

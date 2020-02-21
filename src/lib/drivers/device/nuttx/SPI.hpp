@@ -153,6 +153,41 @@ protected:
 	 */
 	void		set_lockmode(enum LockMode mode) { _locking_mode = mode; }
 
+	void enable_spi_trigger()
+	{
+		int ret = SPI_HWFEATURES(_dev, HWFEAT_TRIGGER);
+
+		if (ret < 0) {
+			PX4_ERR("unable to enable SPI_TRIGGER: %d", ret);
+		}
+	}
+
+	void disable_spi_trigger()
+	{
+		int ret = SPI_HWFEATURES(_dev, 0);
+
+		if (ret < 0) {
+			PX4_ERR("unable to disable SPI_TRIGGER: %d", ret);
+		}
+	}
+
+	void trigger()
+	{
+		int ret = SPI_TRIGGER(_dev);
+
+		if (ret < 0) {
+			// Trigger not fired due to lack of DMA support
+			if (ret == -ENOTSUP) {
+				PX4_ERR("SPI_TRIGGER error: ENOTSUP");
+			}
+
+			// Trigger not fired because not previously primed
+			if (ret == -EIO) {
+				PX4_ERR("SPI_TRIGGER error: EIO");
+			}
+		}
+	}
+
 private:
 	uint32_t		_device;
 	enum spi_mode_e		_mode;

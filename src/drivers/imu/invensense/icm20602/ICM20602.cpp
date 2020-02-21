@@ -95,7 +95,7 @@ void ICM20602::ConfigureSampleRate(int sample_rate)
 	_px4_gyro.set_update_rate(1000000 / _fifo_empty_interval_us);
 
 	// FIFO watermark threshold in number of bytes
-	const uint16_t fifo_watermark_threshold = _fifo_gyro_samples * sizeof(FIFO::DATA);
+	const uint16_t fifo_watermark_threshold = 0;
 
 	for (auto &r : _register_cfg) {
 		if (r.reg == Register::FIFO_WM_TH1) {
@@ -220,6 +220,7 @@ void ICM20602::ResetFIFO()
 
 	// FIFO_EN: enable both gyro and accel
 	RegisterSetBits(Register::FIFO_EN, FIFO_EN_BIT::GYRO_FIFO_EN | FIFO_EN_BIT::ACCEL_FIFO_EN);
+	_data_ready_count.store(0);
 }
 
 bool ICM20602::Configure()
@@ -317,10 +318,24 @@ int ICM20602::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM20602::DataReady()
 {
-	_fifo_watermark_timestamp = hrt_absolute_time();
-	_data_ready_samples.store(_fifo_gyro_samples);
 	perf_count(_drdy_interval_perf);
-	ScheduleNow();
+
+	int data_ready_count = _data_ready_count.fetch_add(1) + 1;
+
+	// schedule thread to prepare
+	if (data_ready_count == (_fifo_gyro_samples - 1)) {
+		_fifo_watermark_timestamp = hrt_absolute_time();
+		_data_ready_samples.store(_fifo_gyro_samples);
+		enable_spi_trigger();
+		ScheduleNow();
+	}
+
+	if (data_ready_count == _fifo_gyro_samples) {
+		_spi_trigger_timestamp = hrt_absolute_time();
+		_data_ready_count.store(0);
+		trigger();
+		disable_spi_trigger();
+	}
 }
 
 bool ICM20602::ConfigureDataReadyInterrupt()
@@ -432,14 +447,11 @@ void ICM20602::Run()
 
 		if (Configure()) {
 			// if configure succeeded then start reading from FIFO
-			_state.store(STATE::FIFO_READ);
-
-			ResetFIFO();
+			_state.store(STATE::FIFO_RESET);
+			ScheduleNow();
 
 			if (ConfigureDataReadyInterrupt()) {
 				_using_data_ready_interrupt = true;
-				// backup schedule as a health check
-				ScheduleDelayed(10_ms);
 
 			} else {
 				_using_data_ready_interrupt = false;
@@ -455,53 +467,26 @@ void ICM20602::Run()
 		break;
 
 	case STATE::FIFO_READ: {
-			hrt_abstime timestamp_sample = 0;
-			uint8_t samples = 0;
+			uint8_t samples = _data_ready_samples.load();
+			hrt_abstime timestamp_sample = _fifo_watermark_timestamp;
 
-			if (_using_data_ready_interrupt) {
-				// re-schedule as watchdog
-				ScheduleDelayed(10_ms);
+			if (samples != 0 && hrt_elapsed_time(&timestamp_sample) < _fifo_empty_interval_us) {
+				ReadFIFO(timestamp_sample, samples);
 
-				// timestamp set in data ready interrupt
-				samples = _data_ready_samples.load();
-				timestamp_sample = _fifo_watermark_timestamp;
-			}
-
-			bool failure = false;
-
-			// manually check FIFO count if no samples from DRDY or timestamp looks bogus
-			if (!_using_data_ready_interrupt || (samples == 0)
-			    || (hrt_elapsed_time(&timestamp_sample) > (_fifo_empty_interval_us / 2))) {
-				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
-				timestamp_sample = hrt_absolute_time();
-				const uint16_t fifo_count = ReadFIFOCount();
-
-				if (fifo_count == 0) {
-					perf_count(_fifo_empty_perf);
-				}
-
-				samples = (fifo_count / sizeof(FIFO::DATA) / 2) * 2; // round down to nearest 2
-			}
-
-			if (samples > FIFO_MAX_SAMPLES) {
-				// not technically an overflow, but more samples than we expected or can publish
+			} else {
+				disable_spi_trigger();
 				perf_count(_fifo_overflow_perf);
-				failure = true;
-				ResetFIFO();
 
-			} else if (samples >= 2) {
-				// require at least 2 samples (we want at least 1 new accel sample per transfer)
-				if (!ReadFIFO(timestamp_sample, samples)) {
-					failure = true;
-				}
-			}
-
-			if (failure || hrt_elapsed_time(&_last_config_check_timestamp) > 100_ms) {
-				_state.store(STATE::CHECK_HEALTH);
+				_state.store(STATE::FIFO_RESET);
 				ScheduleNow();
 			}
 		}
 
+		break;
+
+	case STATE::FIFO_RESET:
+		ResetFIFO();
+		_state.store(STATE::FIFO_READ);
 		break;
 
 	case STATE::CHECK_HEALTH:
@@ -570,7 +555,7 @@ bool ICM20602::ReadFIFO(const hrt_abstime &timestamp_sample, uint16_t samples)
 bool ICM20602::ProcessAccel(const hrt_abstime &timestamp_sample, const TransferBuffer *const report, uint16_t samples)
 {
 	PX4Accelerometer::FIFOSample accel;
-	accel.timestamp_sample = timestamp_sample;
+	accel.timestamp_sample = _spi_trigger_timestamp;
 	accel.dt = _fifo_empty_interval_us / _fifo_accel_samples;
 
 	// accel data is doubled in FIFO, but might be shifted
@@ -618,7 +603,7 @@ bool ICM20602::ProcessAccel(const hrt_abstime &timestamp_sample, const TransferB
 bool ICM20602::ProcessGyro(const hrt_abstime &timestamp_sample, const TransferBuffer *const report, uint16_t samples)
 {
 	PX4Gyroscope::FIFOSample gyro;
-	gyro.timestamp_sample = timestamp_sample;
+	gyro.timestamp_sample = _spi_trigger_timestamp;
 	gyro.samples = samples;
 	gyro.dt = _fifo_empty_interval_us / _fifo_gyro_samples;
 

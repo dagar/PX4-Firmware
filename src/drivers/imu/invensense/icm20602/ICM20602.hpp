@@ -132,14 +132,21 @@ private:
 	hrt_abstime _last_config_check_timestamp{0};
 	hrt_abstime _temperature_update_timestamp{0};
 	hrt_abstime _fifo_watermark_timestamp{0};
+	hrt_abstime _spi_trigger_timestamp{0};
 
 	px4::atomic<uint8_t> _data_ready_samples{0};
+
+	px4::atomic<bool> _thread_scheduled{false};
+
+
+	px4::atomic<int> _data_ready_count{0};
 
 	enum class STATE : uint8_t {
 		RESET,
 		WAIT_FOR_RESET,
 		CONFIGURE,
 		FIFO_READ,
+		FIFO_RESET,
 		CHECK_HEALTH,
 		REQUEST_STOP,
 		STOPPED,
@@ -163,11 +170,11 @@ private:
 		{ Register::ACCEL_CONFIG,  ACCEL_CONFIG_BIT::ACCEL_FS_SEL_16G, 0 },
 		{ Register::ACCEL_CONFIG2, ACCEL_CONFIG2_BIT::ACCEL_FCHOICE_B_BYPASS_DLPF, 0 },
 		{ Register::GYRO_CONFIG,   GYRO_CONFIG_BIT::FS_SEL_2000_DPS, GYRO_CONFIG_BIT::FCHOICE_B_8KHZ_BYPASS_DLPF },
-		{ Register::CONFIG,        CONFIG_BIT::DLPF_CFG_BYPASS_DLPF_8KHZ, Bit7 | CONFIG_BIT::FIFO_MODE },
+		{ Register::CONFIG,        CONFIG_BIT::DLPF_CFG_BYPASS_DLPF_8KHZ, CONFIG_BIT::FIFO_MODE },
 		{ Register::FIFO_WM_TH1,   0, 0 }, // FIFO_WM_TH[9:8]
 		{ Register::FIFO_WM_TH2,   0, 0 }, // FIFO_WM_TH[7:0]
 		{ Register::USER_CTRL,     USER_CTRL_BIT::FIFO_EN, 0 },
 		{ Register::FIFO_EN,       FIFO_EN_BIT::GYRO_FIFO_EN | FIFO_EN_BIT::ACCEL_FIFO_EN, 0 },
-		{ Register::INT_ENABLE,    0, INT_ENABLE_BIT::DATA_RDY_INT_EN }
+		{ Register::INT_ENABLE,    INT_ENABLE_BIT::DATA_RDY_INT_EN, 0 }
 	};
 };
