@@ -329,11 +329,12 @@ __EXPORT int		param_export(int fd, bool only_unsaved, param_filter_func filter);
  * This function merges the imported parameters with the current parameter set.
  *
  * @param fd		File descriptor to import from (-1 selects the FLASH storage).
- * @param mark_saved	Whether to mark imported parameters as already saved
+ * @param import_as_airframe_default If true then the actual parameter will not be modified
+ *				but the default value will be set.
  * @return		Zero on success, nonzero if an error occurred during import.
  *			Note that in the failure case, parameters may be inconsistent.
  */
-__EXPORT int		param_import(int fd, bool mark_saved);
+__EXPORT int		param_import(int fd, bool import_as_airframe_default);
 
 /**
  * Load parameters from a file.

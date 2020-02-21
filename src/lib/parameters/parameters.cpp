@@ -114,6 +114,8 @@ uint8_t  *param_changed_storage = nullptr;
 int size_param_changed_storage_bytes = 0;
 const int bits_per_allocation_unit  = (sizeof(*param_changed_storage) * 8);
 
+static bool set_as_default = false;
+
 
 static unsigned
 get_param_info_count()
@@ -137,9 +139,11 @@ get_param_info_count()
 
 /** flexible array holding modified parameter values */
 UT_array *param_values{nullptr};
+UT_array *param_airframe_default_values{nullptr};
 
 /** array info for the modified parameters array */
 const UT_icd param_icd = {sizeof(param_wbuf_s), nullptr, nullptr, nullptr};
+const UT_icd param_default_icd = {sizeof(param_wbuf_s), nullptr, nullptr, nullptr};
 
 /** parameter update topic handle */
 static orb_advert_t param_topic = nullptr;
@@ -485,11 +489,34 @@ param_is_volatile(param_t param)
 bool
 param_value_is_default(param_t param)
 {
-	struct param_wbuf_s *s;
-	param_lock_reader();
-	s = param_find_changed(param);
-	param_unlock_reader();
-	return s == nullptr;
+	param_type_t pType = param_type(param);
+	int current_default_i, current_val_i;
+	float current_default_f, current_val_f;
+	bool is_default = false;
+
+	switch (pType) {
+	case PARAM_TYPE_INT32:
+		if (!param_get(param, &current_val_i)) {
+
+			if (!param_get_default_value(param, &current_default_i)) {
+				is_default = (current_default_i == current_val_i);
+			}
+		}
+
+		break;
+
+	case PARAM_TYPE_FLOAT:
+		if (!param_get(param, &current_val_f)) {
+
+			if (!param_get_default_value(param, &current_default_f)) {
+				is_default = (fabsf(current_val_f - current_default_f) < FLT_EPSILON);
+			}
+		}
+
+		break;
+	}
+
+	return is_default;
 }
 
 bool
@@ -524,6 +551,31 @@ param_size(param_t param)
 	}
 
 	return 0;
+}
+
+static const void *
+param_get_default_value_ptr(param_t param)
+{
+	const void *result = nullptr;
+
+	if (handle_in_range(param)) {
+		param_wbuf_s	*s = nullptr;
+
+		if (param_airframe_default_values != nullptr) {
+			param_wbuf_s key{};
+			key.param = param;
+			s = (param_wbuf_s *)utarray_find(param_airframe_default_values, &key, param_compare_values);
+		}
+
+		if (s != nullptr) {
+			result = &s->val;
+
+		} else {
+			result = &param_info_base[param].val;
+		}
+	}
+
+	return result;
 }
 
 /**
@@ -681,6 +733,60 @@ param_control_autosave(bool enable)
 	param_unlock_writer();
 }
 
+int param_set_as_config_default(param_t param, const void *val)
+{
+	int result = -1;
+
+	if (!handle_in_range(param)) {
+		return result;
+	}
+
+	param_wbuf_s *s = nullptr;
+
+	if (param_airframe_default_values == nullptr) {
+		utarray_new(param_airframe_default_values, &param_default_icd);
+	}
+
+	if (param_airframe_default_values == nullptr) {
+		PX4_ERR("failed to allocate array for configuration specific parameters");
+		return result;
+	}
+
+	param_wbuf_s key{};
+	key.param = param;
+	s = (param_wbuf_s *)utarray_find(param_airframe_default_values, &key, param_compare_values);
+
+	if (s == nullptr) {
+		/* construct a new parameter */
+		param_wbuf_s buf = {};
+		buf.param = param;
+
+		/* add it to the array and sort */
+		utarray_push_back(param_airframe_default_values, &buf);
+		utarray_sort(param_airframe_default_values, param_compare_values);
+
+		key.param = param;
+		s = (param_wbuf_s *)utarray_find(param_airframe_default_values, &key, param_compare_values);
+	}
+
+	switch (param_type(param)) {
+	case PARAM_TYPE_INT32:
+		s->val.i = *(int32_t *)val;
+		break;
+
+	case PARAM_TYPE_FLOAT:
+		s->val.f = *(float *)val;
+		break;
+
+	default:
+		break;
+	}
+
+	result = 0;
+	return result;
+
+}
+
 static int
 param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes)
 {
@@ -700,66 +806,64 @@ param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_
 	}
 
 	if (handle_in_range(param)) {
-		// check if param being set to default value
-		bool set_to_default = false;
-
-		switch (param_type(param)) {
-		case PARAM_TYPE_INT32:
-			set_to_default = (param_info_base[param].val.i == *(int32_t *)val);
-			break;
-
-		case PARAM_TYPE_FLOAT:
-			set_to_default = (fabsf(param_info_base[param].val.f - * (float *)val) < FLT_EPSILON);
-			break;
-		}
 
 		param_wbuf_s *s = param_find_changed(param);
 
-		if (set_to_default) {
-			if (s != nullptr) {
-				// param in memory and set to non-default value, clear
-				int pos = utarray_eltidx(param_values, s);
-				utarray_erase(param_values, pos, 1);
-				params_changed = true;
-			}
+		if (s == nullptr) {
 
-			// do nothing if param not already set and being set to default
+			/* construct a new parameter */
+			param_wbuf_s buf = {};
+			buf.param = param;
 
-		} else {
-			if (s == nullptr) {
-				/* construct a new parameter */
-				param_wbuf_s buf = {};
-				buf.param = param;
+			params_changed = true;
 
-				params_changed = true;
+			/* add it to the array and sort */
+			utarray_push_back(param_values, &buf);
+			utarray_sort(param_values, param_compare_values);
 
-				/* add it to the array and sort */
-				utarray_push_back(param_values, &buf);
-				utarray_sort(param_values, param_compare_values);
-
-				/* find it after sorting */
-				s = param_find_changed(param);
-			}
-
-			/* update the changed value */
-			switch (param_type(param)) {
-			case PARAM_TYPE_INT32:
-				params_changed = params_changed || s->val.i != *(int32_t *)val;
-				s->val.i = *(int32_t *)val;
-				break;
-
-			case PARAM_TYPE_FLOAT:
-				params_changed = params_changed || fabsf(s->val.f - * (float *)val) > FLT_EPSILON;
-				s->val.f = *(float *)val;
-				break;
-
-			default:
-				goto out;
-			}
-
-			s->unsaved = !mark_saved;
+			/* find it after sorting */
+			s = param_find_changed(param);
 		}
 
+		/* update the changed value */
+		switch (param_type(param)) {
+
+		case PARAM_TYPE_INT32:
+			params_changed = params_changed || s->val.i != *(int32_t *)val;
+			s->val.i = *(int32_t *)val;
+			break;
+
+		case PARAM_TYPE_FLOAT:
+			params_changed = params_changed || fabsf(s->val.f - * (float *)val) > FLT_EPSILON;
+			s->val.f = *(float *)val;
+			break;
+
+		case PARAM_TYPE_STRUCT ... PARAM_TYPE_STRUCT_MAX:
+			if (s->val.p == nullptr) {
+				size_t psize = param_size(param);
+
+				if (psize > 0) {
+					s->val.p = malloc(psize);
+
+				} else {
+					s->val.p = nullptr;
+				}
+
+				if (s->val.p == nullptr) {
+					PX4_ERR("failed to allocate parameter storage");
+					goto out;
+				}
+			}
+
+			memcpy(s->val.p, val, param_size(param));
+			params_changed = true;
+			break;
+
+		default:
+			goto out;
+		}
+
+		s->unsaved = !mark_saved;
 		result = 0;
 
 		if (!mark_saved) { // this is false when importing parameters
@@ -837,7 +941,8 @@ void param_set_used_internal(param_t param)
 		(1 << param_index % bits_per_allocation_unit);
 }
 
-static int param_reset_internal(param_t param, bool notify = true)
+int
+param_reset(param_t param)
 {
 	param_wbuf_s *s = nullptr;
 	bool param_found = false;
@@ -862,16 +967,12 @@ static int param_reset_internal(param_t param, bool notify = true)
 
 	param_unlock_writer();
 
-	if (s != nullptr && notify) {
+	if (s != nullptr) {
 		_param_notify_changes();
 	}
 
 	return (!param_found);
 }
-
-int param_reset(param_t param) { return param_reset_internal(param, true); }
-int param_reset_no_notification(param_t param) { return param_reset_internal(param, false); }
-
 static void
 param_reset_all_internal(bool auto_save)
 {
@@ -924,33 +1025,8 @@ param_reset_excludes(const char *excludes[], int num_excludes)
 			param_reset(param);
 		}
 	}
-}
 
-void
-param_reset_specific(const char *resets[], int num_resets)
-{
-	param_t	param;
-
-	for (param = 0; handle_in_range(param); param++) {
-		const char *name = param_name(param);
-		bool reset = false;
-
-		for (int index = 0; index < num_resets; index++) {
-			int len = strlen(resets[index]);
-
-			if ((resets[index][len - 1] == '*'
-			     && strncmp(name, resets[index], len - 1) == 0)
-			    || strcmp(name, resets[index]) == 0) {
-
-				reset = true;
-				break;
-			}
-		}
-
-		if (reset) {
-			param_reset(param);
-		}
-	}
+	_param_notify_changes();
 }
 
 int
@@ -982,18 +1058,19 @@ param_get_default_file()
 	return (param_user_file != nullptr) ? param_user_file : param_default_file;
 }
 
-int param_save_default()
+int
+param_save_default()
 {
 	int res = PX4_ERROR;
 
 	const char *filename = param_get_default_file();
 
 	if (!filename) {
-		param_lock_writer();
 		perf_begin(param_export_perf);
-		res = flash_param_save(false, nullptr);
-		perf_end(param_export_perf);
+		param_lock_writer();
+		res = flash_param_save(false);
 		param_unlock_writer();
+		perf_end(param_export_perf);
 		return res;
 	}
 
@@ -1002,14 +1079,13 @@ int param_save_default()
 
 	if (fd < 0) {
 		PX4_ERR("failed to open param file: %s", filename);
-
 		return PX4_ERROR;
 	}
 
 	int attempts = 5;
 
 	while (res != OK && attempts > 0) {
-		res = param_export(fd, false, nullptr);
+		res = param_export(fd, false);
 		attempts--;
 
 		if (res != PX4_OK) {
@@ -1064,7 +1140,7 @@ param_load_default()
 }
 
 int
-param_export(int fd, bool only_unsaved, param_filter_func filter)
+param_export(int fd, bool only_unsaved)
 {
 	int	result = -1;
 	perf_begin(param_export_perf);
@@ -1072,7 +1148,7 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 	if (fd < 0) {
 		param_lock_writer();
 		// flash_param_save() will take the shutdown lock
-		result = flash_param_save(only_unsaved, filter);
+		result = flash_param_save(only_unsaved);
 		param_unlock_writer();
 		perf_end(param_export_perf);
 		return result;
@@ -1110,7 +1186,26 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 			continue;
 		}
 
-		if (filter && !filter(s->param)) {
+		s->unsaved = false;
+
+		bool val_is_default = false;
+
+		switch (param_type(s->param)) {
+		case PARAM_TYPE_INT32:
+			int32_t val_default_i;
+			param_get_default_value(s->param, &val_default_i);
+			val_is_default = (val_default_i == s->val.i);
+			break;
+
+		case PARAM_TYPE_FLOAT:
+			float val_default_f;
+			param_get_default_value(s->param, &val_default_f);
+			val_is_default = (fabsf(val_default_f - s->val.f) < FLT_EPSILON);
+
+			break;
+		}
+
+		if (val_is_default) {
 			continue;
 		}
 
@@ -1284,14 +1379,17 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 		goto out;
 	}
 
-	if (param_set_internal(param, v, state->mark_saved, true)) {
+	param_modify_on_import(node->name, node->type, v);
+
+	if (set_as_default) {
+		if (param_set_as_config_default(param, v)) {
+			PX4_DEBUG("error setting default value for '%s'", node->name);
+			goto out;
+		}
+
+	} else if (param_set_internal(param, v, state->mark_saved, true)) {
 		PX4_DEBUG("error setting value for '%s'", node->name);
 		goto out;
-	}
-
-	if (tmp != nullptr) {
-		free(tmp);
-		tmp = nullptr;
 	}
 
 	/* don't return zero, that means EOF */
@@ -1307,11 +1405,12 @@ out:
 }
 
 static int
-param_import_internal(int fd, bool mark_saved)
+param_import_internal(int fd, bool mark_saved, bool import_as_default = false)
 {
 	bson_decoder_s decoder;
 	param_import_state state;
 	int result = -1;
+	set_as_default = import_as_default;
 
 	if (bson_decoder_init_file(&decoder, fd, param_import_callback, &state)) {
 		PX4_ERR("decoder init failed");
@@ -1325,17 +1424,19 @@ param_import_internal(int fd, bool mark_saved)
 
 	} while (result > 0);
 
+	set_as_default = false;
+
 	return result;
 }
 
 int
-param_import(int fd, bool mark_saved)
+param_import(int fd, bool import_as_airframe_default)
 {
 	if (fd < 0) {
 		return flash_param_import();
 	}
 
-	return param_import_internal(fd, mark_saved);
+	return param_import_internal(fd, false, import_as_airframe_default);
 }
 
 int
