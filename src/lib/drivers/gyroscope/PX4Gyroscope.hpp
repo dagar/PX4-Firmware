@@ -115,7 +115,7 @@ private:
 
 	float			_range{math::radians(2000.f)};
 	float			_scale{1.f};
-	float			_temperature{0.f};
+	float			_temperature{NAN};
 
 	int16_t			_clip_limit{(int16_t)(_range / _scale)};
 
