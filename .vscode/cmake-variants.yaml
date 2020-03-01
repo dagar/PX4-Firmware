@@ -61,6 +61,11 @@ CONFIG:
       buildType: MinSizeRel
       settings:
         CONFIG: av_x-v1_default
+    cuav_cannode-v1_gps:
+      short: cuav_cannode-v1_gps
+      buildType: MinSizeRel
+      settings:
+        CONFIG: cuav_cannode-v1_gps
     holybro_durandal-v1_default:
       short: holybro_durandal-v1
       buildType: MinSizeRel

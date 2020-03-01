@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,18 +30,19 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-px4_add_module(
-	MODULE drivers__rm3100
-	MAIN rm3100
-	COMPILE_FLAGS
-		-Wno-cast-align # TODO: fix and enable
-	SRCS
-		rm3100_i2c.cpp
-		rm3100_spi.cpp
-		rm3100_main.cpp
-		rm3100.cpp
-	DEPENDS
-		conversion
-		drivers_magnetometer
-		px4_work_queue
-	)
+
+add_library(drivers_board
+	can.c
+	i2c.cpp
+	init.c
+	spi.cpp
+)
+
+target_link_libraries(drivers_board
+	PRIVATE
+		arch_spi
+		nuttx_arch
+		nuttx_drivers
+		px4_layer
+		arch_io_pins
+)

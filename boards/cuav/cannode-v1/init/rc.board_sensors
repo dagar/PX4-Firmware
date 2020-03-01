@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# PX4 FMUv4 specific board sensors init
+#------------------------------------------------------------------------------
+
+#adc start
+
+# Internal SPI
+ms5611 -s start
+rm3100 start
