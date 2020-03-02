@@ -53,7 +53,6 @@ public:
 		Gyroscope,
 	};
 
-	SensorCorrections() = delete;
 	SensorCorrections(ModuleParams *parent, SensorType type);
 	~SensorCorrections() override = default;
 
@@ -64,14 +63,21 @@ public:
 
 	// apply offsets and scale
 	// rotate corrected measurements from sensor to body frame
-	matrix::Vector3f Correct(const matrix::Vector3f &data) const { return _board_rotation * matrix::Vector3f{(data - _offset).emult(_scale)}; }
+	matrix::Vector3f Correct(const matrix::Vector3f &data);
 
 	void ParametersUpdate();
 	void SensorCorrectionsUpdate(bool force = false);
 
 private:
 
+	void updateParams() override;
+
 	static constexpr int MAX_SENSOR_COUNT = 3;
+
+	int FindCalibrationIndex(uint32_t device_id) const;
+
+	matrix::Vector3f CalibrationOffset(uint8_t calibration_index) const;
+	matrix::Vector3f CalibrationScale(uint8_t calibration_index) const;
 
 	const char *SensorString() const;
 
@@ -81,6 +87,8 @@ private:
 
 	matrix::Vector3f _offset{0.f, 0.f, 0.f};
 	matrix::Vector3f _scale{1.f, 1.f, 1.f};
+
+	matrix::Vector3f _thermal_offset{0.f, 0.f, 0.f};
 
 	uint32_t _device_id{0};
 	int8_t _corrections_selected_instance{-1};
