@@ -64,7 +64,6 @@ static constexpr unsigned clipping(const int16_t samples[16], int16_t clip_limit
 }
 
 PX4Accelerometer::PX4Accelerometer(uint32_t device_id, uint8_t priority, enum Rotation rotation) :
-	CDev(nullptr),
 	_sensor_pub{ORB_ID(sensor_accel), priority},
 	_sensor_fifo_pub{ORB_ID(sensor_accel_fifo), priority},
 	_sensor_integrated_pub{ORB_ID(sensor_accel_integrated), priority},
@@ -73,36 +72,6 @@ PX4Accelerometer::PX4Accelerometer(uint32_t device_id, uint8_t priority, enum Ro
 	_rotation{rotation},
 	_rotation_dcm{get_rot_matrix(rotation)}
 {
-	_class_device_instance = register_class_devname(ACCEL_BASE_DEVICE_PATH);
-}
-
-PX4Accelerometer::~PX4Accelerometer()
-{
-	if (_class_device_instance != -1) {
-		unregister_class_devname(ACCEL_BASE_DEVICE_PATH, _class_device_instance);
-	}
-}
-
-int PX4Accelerometer::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case ACCELIOCSSCALE: {
-			// Copy offsets and scale factors in
-			accel_calibration_s cal{};
-			memcpy(&cal, (accel_calibration_s *) arg, sizeof(cal));
-
-			_calibration_offset = Vector3f{cal.x_offset, cal.y_offset, cal.z_offset};
-			_calibration_scale = Vector3f{cal.x_scale, cal.y_scale, cal.z_scale};
-		}
-
-		return PX4_OK;
-
-	case DEVIOCGDEVICEID:
-		return _device_id;
-
-	default:
-		return -ENOTTY;
-	}
 }
 
 void PX4Accelerometer::set_device_type(uint8_t devtype)
@@ -208,17 +177,16 @@ void PX4Accelerometer::updateFIFO(const FIFOSample &sample)
 		// Apply rotation (before scaling)
 		rotate_3f(_rotation, x, y, z);
 
-		// Apply range scale and the calibrating offset/scale
-		const Vector3f val_calibrated{((Vector3f{x, y, z} * _scale) - _calibration_offset).emult(_calibration_scale)};
+		const Vector3f raw{x, y, z};
 
 		sensor_accel_s report;
 
 		report.timestamp_sample = sample.timestamp_sample;
 		report.device_id = _device_id;
 		report.temperature = _temperature;
-		report.x = val_calibrated(0);
-		report.y = val_calibrated(1);
-		report.z = val_calibrated(2);
+		report.x = raw(0);
+		report.y = raw(1);
+		report.z = raw(2);
 		report.timestamp = hrt_absolute_time();
 
 		_sensor_pub.publish(report);
@@ -365,7 +333,10 @@ void PX4Accelerometer::UpdateVibrationMetrics(const Vector3f &delta_velocity)
 
 void PX4Accelerometer::print_status()
 {
-	PX4_INFO(ACCEL_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
+	char device_id_buffer[80] {};
+	device::Device::device_id_print_buffer(device_id_buffer, sizeof(device_id_buffer), _device_id);
+	PX4_INFO("device id: %d (%s)", _device_id, device_id_buffer);
+	PX4_INFO("rotation: %d", _rotation);
 
 	PX4_INFO("calibration scale: %.5f %.5f %.5f", (double)_calibration_scale(0), (double)_calibration_scale(1),
 		 (double)_calibration_scale(2));

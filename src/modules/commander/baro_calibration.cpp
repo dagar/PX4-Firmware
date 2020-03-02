@@ -43,7 +43,6 @@
 #include <px4_platform_common/defines.h>
 #include <drivers/drv_hrt.h>
 #include <uORB/topics/sensor_combined.h>
-#include <drivers/drv_baro.h>
 #include <systemlib/mavlink_log.h>
 #include <parameters/param.h>
 

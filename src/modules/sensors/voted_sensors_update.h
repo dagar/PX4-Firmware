@@ -41,22 +41,19 @@
 
 #include "parameters.h"
 
-#include <drivers/drv_accel.h>
-#include <drivers/drv_gyro.h>
 #include <drivers/drv_mag.h>
-#include <drivers/drv_baro.h>
 #include <drivers/drv_hrt.h>
-
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
-
 #include <lib/ecl/validation/data_validator.h>
 #include <lib/ecl/validation/data_validator_group.h>
-
+#include <px4_platform_common/module_params.h>
+#include <sensor_corrections/SensorCorrections.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationQueued.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/sensor_accel_integrated.h>
+#include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/sensor_correction.h>
@@ -76,7 +73,7 @@ namespace sensors
  *
  * Handling of sensor updates with voting
  */
-class VotedSensorsUpdate
+class VotedSensorsUpdate : ModuleParams
 {
 public:
 	/**
@@ -217,6 +214,18 @@ private:
 	SensorData _mag {};
 	SensorData _baro {};
 
+	SensorCorrections _accel_corrections[ACCEL_COUNT_MAX] {
+		{this, SensorCorrections::SensorType::Accelerometer},
+		{this, SensorCorrections::SensorType::Accelerometer},
+		{this, SensorCorrections::SensorType::Accelerometer},
+	};
+
+	SensorCorrections _gyro_corrections[GYRO_COUNT_MAX] {
+		{this, SensorCorrections::SensorType::Gyroscope},
+		{this, SensorCorrections::SensorType::Gyroscope},
+		{this, SensorCorrections::SensorType::Gyroscope},
+	};
+
 	orb_advert_t _mavlink_log_pub{nullptr};
 
 	uORB::Publication<sensor_selection_s> _sensor_selection_pub{ORB_ID(sensor_selection)};	/**< handle to the sensor selection uORB topic */
@@ -224,6 +233,8 @@ private:
 
 	/* sensor thermal compensation */
 	uORB::Subscription _corrections_sub{ORB_ID(sensor_correction)};
+	float _baro_scale[BARO_COUNT_MAX] {1.f, 1.f, 1.f};
+	float _baro_offset[BARO_COUNT_MAX] {0.f, 0.f, 0.f};
 
 	sensor_combined_s _last_sensor_data[SENSOR_COUNT_MAX] {};	/**< latest sensor data from all sensors instances */
 	vehicle_air_data_s _last_airdata[SENSOR_COUNT_MAX] {};		/**< latest sensor data from all sensors instances */
@@ -248,7 +259,6 @@ private:
 
 	uint64_t _last_accel_timestamp[ACCEL_COUNT_MAX] {};	/**< latest full timestamp */
 
-	sensor_correction_s _corrections {};		/**< struct containing the sensor corrections to be published to the uORB */
 	sensor_selection_s _selection {};		/**< struct containing the sensor selection to be published to the uORB */
 	subsystem_info_s _info {};			/**< subsystem info publication */
 };
