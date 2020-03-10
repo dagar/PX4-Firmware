@@ -44,8 +44,8 @@ namespace sensors
 VehicleIMU::VehicleIMU(uint8_t accel_index, uint8_t gyro_index) :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::att_pos_ctrl),
-	_sensor_accel_integrated_sub(this, ORB_ID(sensor_accel_integrated), accel_index),
-	_sensor_gyro_integrated_sub(this, ORB_ID(sensor_gyro_integrated), gyro_index),
+	_sensor_accel_sub(this, ORB_ID(sensor_accel), accel_index),
+	_sensor_gyro_sub(this, ORB_ID(sensor_gyro), gyro_index),
 	_accel_corrections(this, SensorCorrections::SensorType::Accelerometer),
 	_gyro_corrections(this, SensorCorrections::SensorType::Gyroscope)
 {
@@ -61,14 +61,14 @@ bool VehicleIMU::Start()
 	// force initial updates
 	ParametersUpdate(true);
 
-	return _sensor_accel_integrated_sub.registerCallback() && _sensor_gyro_integrated_sub.registerCallback();
+	return _sensor_accel_sub.registerCallback() && _sensor_gyro_sub.registerCallback();
 }
 
 void VehicleIMU::Stop()
 {
 	// clear all registered callbacks
-	_sensor_accel_integrated_sub.unregisterCallback();
-	_sensor_gyro_integrated_sub.unregisterCallback();
+	_sensor_accel_sub.unregisterCallback();
+	_sensor_gyro_sub.unregisterCallback();
 
 	Deinit();
 }
@@ -90,13 +90,13 @@ void VehicleIMU::ParametersUpdate(bool force)
 
 void VehicleIMU::Run()
 {
-	if (_sensor_accel_integrated_sub.updated() && _sensor_gyro_integrated_sub.updated()) {
-		sensor_accel_integrated_s accel;
-		_sensor_accel_integrated_sub.copy(&accel);
+	if (_sensor_accel_sub.updated() && _sensor_gyro_sub.updated()) {
+		sensor_accel_s accel;
+		_sensor_accel_sub.copy(&accel);
 		_accel_corrections.set_device_id(accel.device_id);
 
-		sensor_gyro_integrated_s gyro;
-		_sensor_gyro_integrated_sub.copy(&gyro);
+		sensor_gyro_s gyro;
+		_sensor_gyro_sub.copy(&gyro);
 		_gyro_corrections.set_device_id(gyro.device_id);
 
 		ParametersUpdate();
@@ -104,12 +104,12 @@ void VehicleIMU::Run()
 		_gyro_corrections.SensorCorrectionsUpdate();
 
 		// delta angle: apply offsets, scale, and board rotation
-		const float gyro_dt = 1.e-6f * gyro.dt;
-		Vector3f delta_angle = _gyro_corrections.Correct(Vector3f{gyro.delta_angle} * gyro_dt) / gyro_dt;
+		const float gyro_dt = 1.e-6f; // TODO: fix
+		Vector3f delta_angle = _gyro_corrections.Correct(Vector3f{gyro.x, gyro.y, gyro.z} * gyro_dt) / gyro_dt;
 
 		// delta velocity: apply offsets, scale, and board rotation
-		const float accel_dt = 1.e-6f * accel.dt;
-		Vector3f delta_velocity = _accel_corrections.Correct(Vector3f{accel.delta_velocity} * accel_dt) / accel_dt;
+		const float accel_dt = 1.e-6f; // TODO: fix
+		Vector3f delta_velocity = _accel_corrections.Correct(Vector3f{accel.x, accel.y, accel.z} * accel_dt) / accel_dt;
 
 		// publich vehicle_imu
 		vehicle_imu_s imu;
@@ -120,9 +120,9 @@ void VehicleIMU::Run()
 		delta_angle.copyTo(imu.delta_angle);
 		delta_velocity.copyTo(imu.delta_velocity);
 
-		imu.dt = accel.dt;
-		imu.integrated_samples = accel.samples;
-		imu.clip_count = accel.clip_count;
+		imu.dt = 1.0f;  // TODO: fix
+		imu.integrated_samples = 2; // TODO: fix
+		//imu.clip_count = accel.clip_count;
 		imu.timestamp = hrt_absolute_time();
 
 		_vehicle_imu_pub.publish(imu);

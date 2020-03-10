@@ -109,14 +109,12 @@ set(msg_files
 	satellite_info.msg
 	sensor_accel.msg
 	sensor_accel_fifo.msg
-	sensor_accel_integrated.msg
 	sensor_accel_status.msg
 	sensor_baro.msg
 	sensor_combined.msg
 	sensor_correction.msg
 	sensor_gyro.msg
 	sensor_gyro_fifo.msg
-	sensor_gyro_integrated.msg
 	sensor_gyro_status.msg
 	sensor_mag.msg
 	sensor_preflight.msg

@@ -230,9 +230,18 @@ void SensorCorrections::ParametersUpdate()
 				_scale = Vector3f{1.f, 1.f, 1.f};
 			}
 
+			// sensor enabled (CAL_ACC%u_EN, CAL_GYRO%u_EN)
+			char str[20] {};
+			sprintf(str, "CAL_%s%u_EN", SensorString(), calibration_index);
+			int32_t enabled = 1;
+			param_get(param_find(str), &enabled);
+
+			_enabled = (enabled == 1);
+
 		} else {
 			_offset.zero();
 			_scale = Vector3f{1.f, 1.f, 1.f};
+			_enabled = true;
 		}
 	}
 }

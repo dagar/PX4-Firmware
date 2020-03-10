@@ -45,8 +45,8 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_accel_integrated.h>
-#include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/vehicle_imu.h>
 
 namespace sensors
@@ -70,9 +70,10 @@ private:
 	void Run() override;
 
 	uORB::PublicationMulti<vehicle_imu_s> _vehicle_imu_pub{ORB_ID(vehicle_imu)};
+
 	uORB::Subscription _params_sub{ORB_ID(parameter_update)};
-	uORB::SubscriptionCallbackWorkItem _sensor_accel_integrated_sub;
-	uORB::SubscriptionCallbackWorkItem _sensor_gyro_integrated_sub;
+	uORB::SubscriptionCallbackWorkItem _sensor_accel_sub;
+	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub;
 
 	SensorCorrections _accel_corrections;
 	SensorCorrections _gyro_corrections;

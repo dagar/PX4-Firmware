@@ -41,7 +41,6 @@
 #include <uORB/PublicationQueuedMulti.hpp>
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/sensor_gyro_fifo.h>
-#include <uORB/topics/sensor_gyro_integrated.h>
 #include <uORB/topics/sensor_gyro_status.h>
 
 class PX4Gyroscope : public ModuleParams
@@ -63,7 +62,7 @@ public:
 	void set_temperature(float temperature) { _temperature = temperature; }
 	void set_update_rate(uint16_t rate);
 
-	void update(hrt_abstime timestamp_sample, float x, float y, float z);
+	void update(const hrt_abstime &timestamp_sample, float x, float y, float z);
 
 	void print_status();
 
@@ -85,28 +84,16 @@ public:
 private:
 
 	void PublishStatus();
-	void ResetIntegrator();
 	void UpdateClipLimit();
-	void UpdateVibrationMetrics(const matrix::Vector3f &delta_angle);
 
 	uORB::PublicationQueuedMulti<sensor_gyro_s>      _sensor_pub;
-	uORB::PublicationMulti<sensor_gyro_fifo_s>       _sensor_fifo_pub;
-	uORB::PublicationMulti<sensor_gyro_integrated_s> _sensor_integrated_pub;
+	uORB::PublicationQueuedMulti<sensor_gyro_fifo_s> _sensor_fifo_pub;
 	uORB::PublicationMulti<sensor_gyro_status_s>     _sensor_status_pub;
 
 	hrt_abstime	_status_last_publish{0};
 
-	Integrator		_integrator{4000, true};
-
-	matrix::Vector3f	_calibration_offset{0.f, 0.f, 0.f};
-
-	matrix::Vector3f _delta_angle_prev{0.f, 0.f, 0.f};	// delta angle from the previous IMU measurement
-	float _vibration_metric{0.f};	// high frequency vibration level in the IMU delta angle data (rad)
-	float _coning_vibration{0.f};	// Level of coning vibration in the IMU delta angles (rad^2)
-
 	uint32_t		_device_id{0};
 	const enum Rotation	_rotation;
-	const matrix::Dcmf	_rotation_dcm;
 
 	float			_range{math::radians(2000.f)};
 	float			_scale{1.f};
@@ -119,15 +106,6 @@ private:
 	uint32_t		_clipping[3] {};
 
 	uint16_t		_update_rate{1000};
-
-	// integrator
-	hrt_abstime		_timestamp_sample_prev{0};
-	matrix::Vector3f	_integration_raw{};
-	int16_t			_last_sample[3] {};
-	uint8_t			_integrator_reset_samples{4};
-	uint8_t			_integrator_samples{0};
-	uint8_t			_integrator_fifo_samples{0};
-	uint8_t			_integrator_clipping{0};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_rate_max

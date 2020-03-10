@@ -271,24 +271,20 @@ rtps:
     id: 120
   - msg: sensor_gyro_status
     id: 121
-  - msg: sensor_accel_integrated
-    id: 122
-  - msg: sensor_gyro_integrated
-    id: 123
   - msg: vehicle_imu
-    id: 124
+    id: 122
   - msg: vehicle_angular_acceleration
-    id: 125
+    id: 123
   - msg: logger_status
-    id: 126
+    id: 124
   - msg: rpm
-    id: 127
+    id: 125
   - msg: hover_thrust_estimate
-    id: 128
+    id: 126
   - msg: trajectory_bezier
-    id: 129
+    id: 127
   - msg: vehicle_trajectory_bezier
-    id: 130
+    id: 128
   ########## multi topics: begin ##########
   - msg: actuator_controls_0
     id: 150

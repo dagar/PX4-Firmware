@@ -83,11 +83,11 @@
 #include <uORB/topics/orbit_status.h>
 #include <uORB/topics/position_controller_status.h>
 #include <uORB/topics/position_setpoint_triplet.h>
-#include <uORB/topics/sensor_accel_integrated.h>
+#include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_accel_status.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/tecs_status.h>
 #include <uORB/topics/telemetry_status.h>
@@ -1108,8 +1108,8 @@ private:
 
 protected:
 	explicit MavlinkStreamScaledIMU(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_integrated), 0)),
-		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro_integrated), 0)),
+		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel), 0)),
+		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro), 0)),
 		_raw_mag_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_mag), 0)),
 		_raw_accel_time(0),
 		_raw_gyro_time(0),
@@ -1118,8 +1118,8 @@ protected:
 
 	bool send(const hrt_abstime t) override
 	{
-		sensor_accel_integrated_s sensor_accel{};
-		sensor_gyro_integrated_s sensor_gyro{};
+		sensor_accel_s sensor_accel{};
+		sensor_gyro_s sensor_gyro{};
 		sensor_mag_s sensor_mag{};
 
 		bool updated = false;
@@ -1133,12 +1133,10 @@ protected:
 			msg.time_boot_ms = sensor_accel.timestamp / 1000;
 
 			// Accelerometer in mG
-			const float accel_dt_inv = 1.e6f / (float)sensor_accel.dt;
-			const Vector3f accel = Vector3f{sensor_accel.delta_velocity} * accel_dt_inv * 1000.0f / CONSTANTS_ONE_G;
+			const Vector3f accel = Vector3f{sensor_accel.x, sensor_accel.y, sensor_accel.z} * 1000.0f / CONSTANTS_ONE_G;
 
 			// Gyroscope in mrad/s
-			const float gyro_dt_inv = 1.e6f / (float)sensor_gyro.dt;
-			const Vector3f gyro = Vector3f{sensor_gyro.delta_angle} * gyro_dt_inv * 1000.0f;
+			const Vector3f gyro = Vector3f{sensor_gyro.x, sensor_gyro.y, sensor_gyro.z} * 1000.0f;
 
 			msg.xacc = (int16_t)accel(0);
 			msg.yacc = (int16_t)accel(1);
@@ -1208,8 +1206,8 @@ private:
 
 protected:
 	explicit MavlinkStreamScaledIMU2(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_integrated), 1)),
-		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro_integrated), 1)),
+		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel), 1)),
+		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro), 1)),
 		_raw_mag_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_mag), 1)),
 		_raw_accel_time(0),
 		_raw_gyro_time(0),
@@ -1218,8 +1216,8 @@ protected:
 
 	bool send(const hrt_abstime t) override
 	{
-		sensor_accel_integrated_s sensor_accel{};
-		sensor_gyro_integrated_s sensor_gyro{};
+		sensor_accel_s sensor_accel{};
+		sensor_gyro_s sensor_gyro{};
 		sensor_mag_s sensor_mag{};
 
 		bool updated = false;
@@ -1233,12 +1231,10 @@ protected:
 			msg.time_boot_ms = sensor_accel.timestamp / 1000;
 
 			// Accelerometer in mG
-			const float accel_dt_inv = 1.e6f / (float)sensor_accel.dt;
-			const Vector3f accel = Vector3f{sensor_accel.delta_velocity} * accel_dt_inv * 1000.0f / CONSTANTS_ONE_G;
+			const Vector3f accel = Vector3f{sensor_accel.x, sensor_accel.y, sensor_accel.z} * 1000.0f / CONSTANTS_ONE_G;
 
 			// Gyroscope in mrad/s
-			const float gyro_dt_inv = 1.e6f / (float)sensor_gyro.dt;
-			const Vector3f gyro = Vector3f{sensor_gyro.delta_angle} * gyro_dt_inv * 1000.0f;
+			const Vector3f gyro = Vector3f{sensor_gyro.x, sensor_gyro.y, sensor_gyro.z} * 1000.0f;
 
 			msg.xacc = (int16_t)accel(0);
 			msg.yacc = (int16_t)accel(1);
@@ -1306,8 +1302,8 @@ private:
 
 protected:
 	explicit MavlinkStreamScaledIMU3(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel_integrated), 2)),
-		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro_integrated), 2)),
+		_raw_accel_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_accel), 2)),
+		_raw_gyro_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_gyro), 2)),
 		_raw_mag_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_mag), 2)),
 		_raw_accel_time(0),
 		_raw_gyro_time(0),
@@ -1316,8 +1312,8 @@ protected:
 
 	bool send(const hrt_abstime t) override
 	{
-		sensor_accel_integrated_s sensor_accel{};
-		sensor_gyro_integrated_s sensor_gyro{};
+		sensor_accel_s sensor_accel{};
+		sensor_gyro_s sensor_gyro{};
 		sensor_mag_s sensor_mag{};
 
 		bool updated = false;
@@ -1331,12 +1327,10 @@ protected:
 			msg.time_boot_ms = sensor_accel.timestamp / 1000;
 
 			// Accelerometer in mG
-			const float accel_dt_inv = 1.e6f / (float)sensor_accel.dt;
-			const Vector3f accel = Vector3f{sensor_accel.delta_velocity} * accel_dt_inv * 1000.0f / CONSTANTS_ONE_G;
+			const Vector3f accel = Vector3f{sensor_accel.x, sensor_accel.y, sensor_accel.z} * 1000.0f / CONSTANTS_ONE_G;
 
 			// Gyroscope in mrad/s
-			const float gyro_dt_inv = 1.e6f / (float)sensor_gyro.dt;
-			const Vector3f gyro = Vector3f{sensor_gyro.delta_angle} * gyro_dt_inv * 1000.0f;
+			const Vector3f gyro = Vector3f{sensor_gyro.x, sensor_gyro.y, sensor_gyro.z} * 1000.0f;
 
 			msg.xacc = (int16_t)accel(0);
 			msg.yacc = (int16_t)accel(1);

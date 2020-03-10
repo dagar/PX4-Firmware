@@ -53,6 +53,7 @@ public:
 		Gyroscope,
 	};
 
+	SensorCorrections() = delete;
 	SensorCorrections(ModuleParams *parent, SensorType type);
 	~SensorCorrections() override = default;
 
@@ -60,6 +61,8 @@ public:
 
 	void set_device_id(uint32_t device_id);
 	uint32_t get_device_id() const { return _device_id; }
+
+	bool enabled() const { return _enabled; }
 
 	// apply offsets and scale
 	// rotate corrected measurements from sensor to body frame
@@ -88,6 +91,8 @@ private:
 
 	uint32_t _device_id{0};
 	int8_t _corrections_selected_instance{-1};
+
+	bool _enabled{true};
 
 	const SensorType _type;
 

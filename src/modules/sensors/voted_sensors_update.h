@@ -47,21 +47,19 @@
 #include <matrix/math.hpp>
 #include <lib/ecl/validation/data_validator.h>
 #include <lib/ecl/validation/data_validator_group.h>
-#include <px4_platform_common/module_params.h>
-#include <sensor_corrections/SensorCorrections.hpp>
+
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationQueued.hpp>
 #include <uORB/Subscription.hpp>
-#include <uORB/topics/sensor_accel_integrated.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/sensor_correction.h>
-#include <uORB/topics/sensor_gyro_integrated.h>
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/subsystem_info.h>
+#include <uORB/topics/vehicle_imu.h>
 
 #include "common.h"
 
@@ -73,7 +71,7 @@ namespace sensors
  *
  * Handling of sensor updates with voting
  */
-class VotedSensorsUpdate : ModuleParams
+class VotedSensorsUpdate
 {
 public:
 	/**
@@ -172,20 +170,12 @@ private:
 	void initSensorClass(const orb_metadata *meta, SensorData &sensor_data, uint8_t sensor_count_max);
 
 	/**
-	 * Poll the accelerometer for updated data.
+	 * Poll the accel & gyro for updated data.
 	 *
 	 * @param raw	Combined sensor data structure into which
 	 *		data should be returned.
 	 */
-	void accelPoll(sensor_combined_s &raw);
-
-	/**
-	 * Poll the gyro for updated data.
-	 *
-	 * @param raw	Combined sensor data structure into which
-	 *		data should be returned.
-	 */
-	void gyroPoll(sensor_combined_s &raw);
+	void imuPoll(sensor_combined_s &raw);
 
 	/**
 	 * Poll the magnetometer for updated data.
@@ -213,18 +203,6 @@ private:
 	SensorData _gyro {};
 	SensorData _mag {};
 	SensorData _baro {};
-
-	SensorCorrections _accel_corrections[ACCEL_COUNT_MAX] {
-		{this, SensorCorrections::SensorType::Accelerometer},
-		{this, SensorCorrections::SensorType::Accelerometer},
-		{this, SensorCorrections::SensorType::Accelerometer},
-	};
-
-	SensorCorrections _gyro_corrections[GYRO_COUNT_MAX] {
-		{this, SensorCorrections::SensorType::Gyroscope},
-		{this, SensorCorrections::SensorType::Gyroscope},
-		{this, SensorCorrections::SensorType::Gyroscope},
-	};
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 
