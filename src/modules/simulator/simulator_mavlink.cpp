@@ -283,7 +283,7 @@ void Simulator::handle_message_hil_gps(const mavlink_message_t *msg)
 	mavlink_msg_hil_gps_decode(msg, &hil_gps);
 
 	if (!_param_sim_gps_block.get()) {
-		vehicle_gps_position_s gps{};
+		sensor_gps_s gps{};
 
 		gps.timestamp = hrt_absolute_time();
 		gps.time_utc_usec = hil_gps.time_usec;
@@ -308,7 +308,7 @@ void Simulator::handle_message_hil_gps(const mavlink_message_t *msg)
 			gps.lon += (int32_t)(_param_sim_gps_noise_x.get() * normal_distribution(_gen));
 		}
 
-		_vehicle_gps_position_pub.publish(gps);
+		_sensor_gps_pub.publish(gps);
 	}
 }
 

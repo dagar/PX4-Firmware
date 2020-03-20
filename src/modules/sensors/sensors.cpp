@@ -76,6 +76,7 @@
 #include "vehicle_acceleration/VehicleAcceleration.hpp"
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
 #include "vehicle_air_data/VehicleAirData.hpp"
+#include "vehicle_gps_position/VehicleGPSPosition.hpp"
 #include "vehicle_imu/VehicleIMU.hpp"
 
 using namespace sensors;
@@ -162,6 +163,7 @@ private:
 	VehicleAcceleration	_vehicle_acceleration;
 	VehicleAngularVelocity	_vehicle_angular_velocity;
 	VehicleAirData          _vehicle_air_data;
+	VehicleGPSPosition	_vehicle_gps_position;
 
 	static constexpr int MAX_SENSOR_COUNT = 3;
 	VehicleIMU      *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
@@ -212,6 +214,7 @@ Sensors::Sensors(bool hil_enabled) :
 	_vehicle_acceleration.Start();
 	_vehicle_angular_velocity.Start();
 	_vehicle_air_data.Start();
+	_vehicle_gps_position.Start();
 
 	InitializeVehicleIMU();
 }
@@ -221,6 +224,7 @@ Sensors::~Sensors()
 	_vehicle_acceleration.Stop();
 	_vehicle_angular_velocity.Stop();
 	_vehicle_air_data.Stop();
+	_vehicle_gps_position.Stop();
 
 	for (auto &i : _vehicle_imu_list) {
 		if (i != nullptr) {
@@ -625,6 +629,9 @@ int Sensors::print_status()
 
 	PX4_INFO_RAW("\n");
 	_vehicle_air_data.PrintStatus();
+
+	PX4_INFO_RAW("\n");
+	_vehicle_gps_position.PrintStatus();
 
 	PX4_INFO_RAW("\n");
 

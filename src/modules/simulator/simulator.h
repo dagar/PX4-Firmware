@@ -70,7 +70,7 @@
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_global_position.h>
-#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_odometry.h>
 #include <uORB/topics/vehicle_status.h>
@@ -242,7 +242,7 @@ private:
 	uORB::Publication<input_rc_s>			_input_rc_pub{ORB_ID(input_rc)};
 
 	// HIL GPS
-	uORB::Publication<vehicle_gps_position_s>	_vehicle_gps_position_pub{ORB_ID(vehicle_gps_position)};
+	uORB::Publication<sensor_gps_s>	_sensor_gps_pub{ORB_ID(sensor_gps)};
 	std::default_random_engine _gen{};
 
 	// uORB subscription handlers
