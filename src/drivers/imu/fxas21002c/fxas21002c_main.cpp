@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2017-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,188 +32,141 @@
  ****************************************************************************/
 
 #include "FXAS21002C.hpp"
+#include <px4_platform_common/i2c_spi_buses.h>
+#include <px4_platform_common/module.h>
 
-extern "C" { __EXPORT int fxas21002c_main(int argc, char *argv[]); }
-
-/**
- * Local functions in support of the shell command.
- */
-namespace fxas21002c
+void FXAS21002C::print_usage()
 {
+	PRINT_MODULE_USAGE_NAME("fxas21002c", "driver");
+	PRINT_MODULE_USAGE_SUBCATEGORY("imu");
+	PRINT_MODULE_USAGE_COMMAND("start");
+	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, true);
+	PRINT_MODULE_USAGE_PARAM_INT('R', 0, 0, 35, "Rotation", true);
 
-FXAS21002C	*g_dev;
+	PRINT_MODULE_USAGE_COMMAND("reset");
+	PRINT_MODULE_USAGE_COMMAND("regdump");
+	PRINT_MODULE_USAGE_COMMAND("testerror");
 
-void	start(bool external_bus, enum Rotation rotation);
-void	info();
-void	regdump();
-void	usage();
-void	test_error();
+	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
+}
 
-/**
- * Start the driver.
- *
- * This function call only returns once the driver is
- * up and running or failed to detect the sensor.
- */
-void
-start(bool external_bus, enum Rotation rotation)
+void FXAS21002C::custom_method(const BusCLIArguments &cli)
 {
-	if (g_dev != nullptr) {
-		PX4_INFO("already started");
-		exit(0);
-	}
+	switch (cli.custom1) {
+	case 0: reset();
+		break;
 
-	/* create the driver */
-	if (external_bus) {
-#if defined(PX4_SPI_BUS_EXT) && defined(PX4_SPIDEV_EXT_GYRO)
-		g_dev = new FXAS21002C(PX4_SPI_BUS_EXT, PX4_SPIDEV_EXT_GYRO, rotation);
-#else
-		PX4_ERR("External SPI not available");
-		exit(0);
+	case 1: print_registers();
+		break;
+#ifndef CONSTRAINED_FLASH
+
+	case 2: factory_self_test();
+		break;
 #endif
 
-	} else {
-		g_dev = new FXAS21002C(PX4_SPI_BUS_SENSORS, PX4_SPIDEV_GYRO, rotation);
+	case 3: test_error();
+		break;
 	}
-
-	if (g_dev == nullptr) {
-		PX4_ERR("failed instantiating FXAS21002C obj");
-		goto fail;
-	}
-
-	if (OK != g_dev->init()) {
-		goto fail;
-	}
-
-	exit(0);
-fail:
-
-	if (g_dev != nullptr) {
-		delete g_dev;
-		g_dev = nullptr;
-	}
-
-	errx(1, "driver start failed");
 }
 
-/**
- * Print a little info about the driver.
- */
-void
-info()
+I2CSPIDriverBase *FXAS21002C::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
+		int runtime_instance)
 {
-	if (g_dev == nullptr) {
-		PX4_ERR("driver not running\n");
-		exit(1);
+	device::Device *interface = nullptr;
+	int device_type = cli.type;
+
+	if (iterator.busType() == BOARD_I2C_BUS) {
+		interface = FXAS21002C_I2C_interface(iterator.bus(), iterator.devid(), device_type, iterator.external(),
+							     cli.bus_frequency);
+
+	} else if (iterator.busType() == BOARD_SPI_BUS) {
+		// interface = FXAS21002C_SPI_interface(iterator.bus(), iterator.devid(), device_type, iterator.external(), cli.bus_frequency, cli.spi_mode);
 	}
 
-	printf("state @ %p\n", g_dev);
-	g_dev->print_info();
-
-	exit(0);
-}
-
-/**
- * dump registers from device
- */
-void
-regdump()
-{
-	if (g_dev == nullptr) {
-		PX4_ERR("driver not running\n");
-		exit(1);
+	if (interface == nullptr) {
+		PX4_ERR("alloc failed");
+		return nullptr;
 	}
 
-	printf("regdump @ %p\n", g_dev);
-	g_dev->print_registers();
-
-	exit(0);
-}
-
-/**
- * trigger an error
- */
-void
-test_error()
-{
-	if (g_dev == nullptr) {
-		PX4_ERR("driver not running\n");
-		exit(1);
+	if (interface->init() != OK) {
+		delete interface;
+		PX4_DEBUG("no device on bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
+		return nullptr;
 	}
 
-	g_dev->test_error();
+	FXAS21002C *dev = new FXAS21002C(interface, cli.rotation, device_type, iterator.configuredBusOption(), iterator.bus());
 
-	exit(0);
+	if (dev == nullptr) {
+		delete interface;
+		return nullptr;
+	}
+
+	if (OK != dev->init()) {
+		delete dev;
+		return nullptr;
+	}
+
+	dev->start();
+	return dev;
 }
 
-void
-usage()
+/** driver 'main' command */
+extern "C" { __EXPORT int fxas21002c_main(int argc, char *argv[]); }
+
+int fxas21002c_main(int argc, char *argv[])
 {
-	PX4_INFO("missing command: try 'start', 'info', 'testerror' or 'regdump'");
-	PX4_INFO("options:");
-	PX4_INFO("    -X    (external bus)");
-	PX4_INFO("    -R rotation");
-}
+	int ch;
+	using ThisDriver = FXAS21002C;
+	BusCLIArguments cli{true, true};
+	cli.type = DRV_IMU_DEVTYPE_FXAS21002C;
+	cli.default_i2c_frequency = 400000;
+	cli.default_spi_frequency = 1000 * 1000; // low speed bus frequency
 
-} // namespace
-
-int
-fxas21002c_main(int argc, char *argv[])
-{
-	bool external_bus = false;
-	enum Rotation rotation = ROTATION_NONE;
-
-	int ch = 0;
-	int myoptind = 1;
-	const char *myoptarg = NULL;
-
-	while ((ch = px4_getopt(argc, argv, "XR:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = cli.getopt(argc, argv, "T:R:")) != EOF) {
 		switch (ch) {
-		case 'X':
-			external_bus = true;
-			break;
 
 		case 'R':
-			rotation = (enum Rotation)atoi(myoptarg);
+			cli.rotation = (enum Rotation)atoi(cli.optarg());
 			break;
-
-		default:
-			fxas21002c::usage();
-			return 0;
 		}
 	}
 
-	const char *verb = argv[myoptind];
+	const char *verb = cli.optarg();
 
-	/*
-	 * Start/load the driver.
+	if (!verb) {
+		ThisDriver::print_usage();
+		return -1;
+	}
 
-	 */
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_IMU_DEVTYPE_FXAS21002C);
+
 	if (!strcmp(verb, "start")) {
-		fxas21002c::start(external_bus, rotation);
+		return ThisDriver::module_start(cli, iterator);
 	}
 
-	/*
-	 * Print driver information.
-	 */
-	if (!strcmp(verb, "info")) {
-		fxas21002c::info();
+	if (!strcmp(verb, "stop")) {
+		return ThisDriver::module_stop(iterator);
 	}
 
-	/*
-	 * dump device registers
-	 */
+	if (!strcmp(verb, "status")) {
+		return ThisDriver::module_status(iterator);
+	}
+
+	if (!strcmp(verb, "reset")) {
+		cli.custom1 = 0;
+		return ThisDriver::module_custom_method(cli, iterator);
+	}
+
 	if (!strcmp(verb, "regdump")) {
-		fxas21002c::regdump();
+		cli.custom1 = 1;
+		return ThisDriver::module_custom_method(cli, iterator);
 	}
 
-	/*
-	 * trigger an error
-	 */
 	if (!strcmp(verb, "testerror")) {
-		fxas21002c::test_error();
+		cli.custom1 = 3;
+		return ThisDriver::module_custom_method(cli, iterator);
 	}
 
-	PX4_WARN("unrecognized command, try 'start', 'info', 'testerror' or 'regdump'");
+	ThisDriver::print_usage();
 	return -1;
 }
