@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "ICM20608G.hpp"
+#include "MPU6500.hpp"
 
 using namespace time_literals;
 
@@ -40,23 +40,23 @@ static constexpr int16_t combine(uint8_t msb, uint8_t lsb)
 	return (msb << 8u) | lsb;
 }
 
-ICM20608G::ICM20608G(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
-		     spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio) :
+MPU6500::MPU6500(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
+		 spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio) :
 	SPI(MODULE_NAME, nullptr, bus, device, spi_mode, bus_frequency),
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
 	_drdy_gpio(drdy_gpio),
 	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_HIGH, rotation)
 {
-	set_device_type(DRV_IMU_DEVTYPE_ICM20608G);
+	set_device_type(DRV_IMU_DEVTYPE_MPU6500);
 
-	_px4_accel.set_device_type(DRV_IMU_DEVTYPE_ICM20608G);
-	_px4_gyro.set_device_type(DRV_IMU_DEVTYPE_ICM20608G);
+	_px4_accel.set_device_type(DRV_IMU_DEVTYPE_MPU6500);
+	_px4_gyro.set_device_type(DRV_IMU_DEVTYPE_MPU6500);
 
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
 }
 
-ICM20608G::~ICM20608G()
+MPU6500::~MPU6500()
 {
 	perf_free(_transfer_perf);
 	perf_free(_bad_register_perf);
@@ -67,7 +67,7 @@ ICM20608G::~ICM20608G()
 	perf_free(_drdy_interval_perf);
 }
 
-int ICM20608G::init()
+int MPU6500::init()
 {
 	int ret = SPI::init();
 
@@ -79,7 +79,7 @@ int ICM20608G::init()
 	return Reset() ? 0 : -1;
 }
 
-bool ICM20608G::Reset()
+bool MPU6500::Reset()
 {
 	_state = STATE::RESET;
 	ScheduleClear();
@@ -87,13 +87,13 @@ bool ICM20608G::Reset()
 	return true;
 }
 
-void ICM20608G::exit_and_cleanup()
+void MPU6500::exit_and_cleanup()
 {
 	DataReadyInterruptDisable();
 	I2CSPIDriverBase::exit_and_cleanup();
 }
 
-void ICM20608G::print_status()
+void MPU6500::print_status()
 {
 	I2CSPIDriverBase::print_status();
 	PX4_INFO("FIFO empty interval: %d us (%.3f Hz)", _fifo_empty_interval_us,
@@ -111,7 +111,7 @@ void ICM20608G::print_status()
 	_px4_gyro.print_status();
 }
 
-int ICM20608G::probe()
+int MPU6500::probe()
 {
 	const uint8_t whoami = RegisterRead(Register::WHO_AM_I);
 
@@ -123,27 +123,31 @@ int ICM20608G::probe()
 	return PX4_OK;
 }
 
-void ICM20608G::RunImpl()
+void MPU6500::RunImpl()
 {
 	switch (_state) {
 	case STATE::RESET:
 		// PWR_MGMT_1: Device Reset
-		RegisterWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::DEVICE_RESET);
+		RegisterWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::H_RESET);
 		_reset_timestamp = hrt_absolute_time();
 		_state = STATE::WAIT_FOR_RESET;
-		ScheduleDelayed(1_ms);
+		ScheduleDelayed(100_ms);
 		break;
 
 	case STATE::WAIT_FOR_RESET:
 
 		// The reset value is 0x00 for all registers other than the registers below
-		//  Document Number: RM-000030 Page 5 of 23
+		//  Document Number: RM-MPU-6500A-00 Page 9 of 47
 		if ((RegisterRead(Register::WHO_AM_I) == WHOAMI)
-		    && (RegisterRead(Register::PWR_MGMT_1) == 0x40)) {
+		    && (RegisterRead(Register::PWR_MGMT_1) == 0x01)) {
+
+			// SIGNAL_PATH_RESET: ensure the reset is performed properly
+			RegisterWrite(Register::SIGNAL_PATH_RESET,
+				      SIGNAL_PATH_RESET_BIT::GYRO_RESET | SIGNAL_PATH_RESET_BIT::ACCEL_RESET | SIGNAL_PATH_RESET_BIT::TEMP_RESET);
 
 			// if reset succeeded then configure
 			_state = STATE::CONFIGURE;
-			ScheduleNow();
+			ScheduleDelayed(100_ms);
 
 		} else {
 			// RESET not complete
@@ -188,35 +192,23 @@ void ICM20608G::RunImpl()
 
 	case STATE::FIFO_READ: {
 			hrt_abstime timestamp_sample = 0;
-			uint8_t samples = 0;
 
-			if (_data_ready_interrupt_enabled) {
+			if (_data_ready_interrupt_enabled && (hrt_elapsed_time(&timestamp_sample) < (_fifo_empty_interval_us / 2))) {
 				// re-schedule as watchdog timeout
 				ScheduleDelayed(10_ms);
 
-				// timestamp set in data ready interrupt
-				if (!_force_fifo_count_check) {
-					samples = _fifo_read_samples.load();
-
-				} else {
-					const uint16_t fifo_count = FIFOReadCount();
-					samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) * SAMPLES_PER_TRANSFER; // round down to nearest
-				}
-
 				timestamp_sample = _fifo_watermark_interrupt_timestamp;
-			}
 
-			bool failure = false;
-
-			// manually check FIFO count if no samples from DRDY or timestamp looks bogus
-			if (!_data_ready_interrupt_enabled || (samples == 0)
-			    || (hrt_elapsed_time(&timestamp_sample) > (_fifo_empty_interval_us / 2))) {
-
+			} else {
 				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
 				timestamp_sample = hrt_absolute_time();
-				const uint16_t fifo_count = FIFOReadCount();
-				samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) * SAMPLES_PER_TRANSFER; // round down to nearest
 			}
+
+			const uint16_t fifo_count = FIFOReadCount();
+			const uint8_t samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) *
+						SAMPLES_PER_TRANSFER; // round down to nearest
+
+			bool failure = false;
 
 			if (samples > FIFO_MAX_SAMPLES) {
 				// not technically an overflow, but more samples than we expected or can publish
@@ -263,7 +255,7 @@ void ICM20608G::RunImpl()
 	}
 }
 
-void ICM20608G::ConfigureAccel()
+void MPU6500::ConfigureAccel()
 {
 	const uint8_t ACCEL_FS_SEL = RegisterRead(Register::ACCEL_CONFIG) & (Bit4 | Bit3); // [4:3] ACCEL_FS_SEL[1:0]
 
@@ -290,34 +282,34 @@ void ICM20608G::ConfigureAccel()
 	}
 }
 
-void ICM20608G::ConfigureGyro()
+void MPU6500::ConfigureGyro()
 {
-	const uint8_t FS_SEL = RegisterRead(Register::GYRO_CONFIG) & (Bit4 | Bit3); // [4:3] FS_SEL[1:0]
+	const uint8_t GYRO_FS_SEL = RegisterRead(Register::GYRO_CONFIG) & (Bit4 | Bit3); // [4:3] GYRO_FS_SEL[1:0]
 
-	switch (FS_SEL) {
-	case FS_SEL_250_DPS:
+	switch (GYRO_FS_SEL) {
+	case GYRO_FS_SEL_250_DPS:
 		_px4_gyro.set_scale(math::radians(1.f / 131.f));
 		_px4_gyro.set_range(math::radians(250.f));
 		break;
 
-	case FS_SEL_500_DPS:
+	case GYRO_FS_SEL_500_DPS:
 		_px4_gyro.set_scale(math::radians(1.f / 65.5f));
 		_px4_gyro.set_range(math::radians(500.f));
 		break;
 
-	case FS_SEL_1000_DPS:
+	case GYRO_FS_SEL_1000_DPS:
 		_px4_gyro.set_scale(math::radians(1.f / 32.8f));
 		_px4_gyro.set_range(math::radians(1000.f));
 		break;
 
-	case FS_SEL_2000_DPS:
+	case GYRO_FS_SEL_2000_DPS:
 		_px4_gyro.set_scale(math::radians(1.f / 16.4f));
 		_px4_gyro.set_range(math::radians(2000.f));
 		break;
 	}
 }
 
-void ICM20608G::ConfigureSampleRate(int sample_rate)
+void MPU6500::ConfigureSampleRate(int sample_rate)
 {
 	if (sample_rate == 0) {
 		sample_rate = 1000; // default to 1 kHz
@@ -338,7 +330,7 @@ void ICM20608G::ConfigureSampleRate(int sample_rate)
 	_px4_gyro.set_update_rate(1e6f / _fifo_empty_interval_us);
 }
 
-bool ICM20608G::Configure()
+bool MPU6500::Configure()
 {
 	bool success = true;
 
@@ -354,13 +346,13 @@ bool ICM20608G::Configure()
 	return success;
 }
 
-int ICM20608G::DataReadyInterruptCallback(int irq, void *context, void *arg)
+int MPU6500::DataReadyInterruptCallback(int irq, void *context, void *arg)
 {
-	static_cast<ICM20608G *>(arg)->DataReady();
+	static_cast<MPU6500 *>(arg)->DataReady();
 	return 0;
 }
 
-void ICM20608G::DataReady()
+void MPU6500::DataReady()
 {
 	perf_count(_drdy_interval_perf);
 
@@ -372,17 +364,17 @@ void ICM20608G::DataReady()
 	}
 }
 
-bool ICM20608G::DataReadyInterruptConfigure()
+bool MPU6500::DataReadyInterruptConfigure()
 {
 	if (_drdy_gpio == 0) {
 		return false;
 	}
 
 	// Setup data ready on falling edge
-	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &ICM20608G::DataReadyInterruptCallback, this) == 0;
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &MPU6500::DataReadyInterruptCallback, this) == 0;
 }
 
-bool ICM20608G::DataReadyInterruptDisable()
+bool MPU6500::DataReadyInterruptDisable()
 {
 	if (_drdy_gpio == 0) {
 		return false;
@@ -391,7 +383,7 @@ bool ICM20608G::DataReadyInterruptDisable()
 	return px4_arch_gpiosetevent(_drdy_gpio, false, false, false, nullptr, nullptr) == 0;
 }
 
-bool ICM20608G::RegisterCheck(const register_config_t &reg_cfg, bool notify)
+bool MPU6500::RegisterCheck(const register_config_t &reg_cfg, bool notify)
 {
 	bool success = true;
 
@@ -420,21 +412,23 @@ bool ICM20608G::RegisterCheck(const register_config_t &reg_cfg, bool notify)
 	return success;
 }
 
-uint8_t ICM20608G::RegisterRead(Register reg)
+uint8_t MPU6500::RegisterRead(Register reg)
 {
 	uint8_t cmd[2] {};
 	cmd[0] = static_cast<uint8_t>(reg) | DIR_READ;
+	set_frequency(SPI_SPEED); // low speed for regular registers
 	transfer(cmd, cmd, sizeof(cmd));
 	return cmd[1];
 }
 
-void ICM20608G::RegisterWrite(Register reg, uint8_t value)
+void MPU6500::RegisterWrite(Register reg, uint8_t value)
 {
 	uint8_t cmd[2] { (uint8_t)reg, value };
+	set_frequency(SPI_SPEED); // low speed for regular registers
 	transfer(cmd, cmd, sizeof(cmd));
 }
 
-void ICM20608G::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t clearbits)
+void MPU6500::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t clearbits)
 {
 	const uint8_t orig_val = RegisterRead(reg);
 	uint8_t val = orig_val;
@@ -450,11 +444,12 @@ void ICM20608G::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t c
 	RegisterWrite(reg, val);
 }
 
-uint16_t ICM20608G::FIFOReadCount()
+uint16_t MPU6500::FIFOReadCount()
 {
 	// read FIFO count
 	uint8_t fifo_count_buf[3] {};
 	fifo_count_buf[0] = static_cast<uint8_t>(Register::FIFO_COUNTH) | DIR_READ;
+	set_frequency(SPI_SPEED_SENSOR);
 
 	if (transfer(fifo_count_buf, fifo_count_buf, sizeof(fifo_count_buf)) != PX4_OK) {
 		perf_count(_bad_transfer_perf);
@@ -464,11 +459,13 @@ uint16_t ICM20608G::FIFOReadCount()
 	return combine(fifo_count_buf[1], fifo_count_buf[2]);
 }
 
-bool ICM20608G::FIFORead(const hrt_abstime &timestamp_sample, uint16_t samples)
+bool MPU6500::FIFORead(const hrt_abstime &timestamp_sample, uint16_t samples)
 {
 	perf_begin(_transfer_perf);
+
 	FIFOTransferBuffer buffer{};
-	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 3, FIFO::SIZE);
+	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 1, FIFO::SIZE);
+	set_frequency(SPI_SPEED_SENSOR);
 
 	if (transfer((uint8_t *)&buffer, (uint8_t *)&buffer, transfer_size) != PX4_OK) {
 		perf_end(_transfer_perf);
@@ -478,44 +475,11 @@ bool ICM20608G::FIFORead(const hrt_abstime &timestamp_sample, uint16_t samples)
 
 	perf_end(_transfer_perf);
 
-	const uint16_t fifo_count_bytes = combine(buffer.FIFO_COUNTH, buffer.FIFO_COUNTL);
-	const uint16_t fifo_count_samples = fifo_count_bytes / sizeof(FIFO::DATA);
-
-	if (fifo_count_samples == 0) {
-		perf_count(_fifo_empty_perf);
-		return false;
-	}
-
-	if (fifo_count_bytes >= FIFO::SIZE) {
-		perf_count(_fifo_overflow_perf);
-		FIFOReset();
-		return false;
-	}
-
-	const uint16_t valid_samples = math::min(samples, fifo_count_samples);
-
-	if (fifo_count_samples < samples) {
-		// force check if there is somehow fewer samples actually in the FIFO (potentially a serious error)
-		_force_fifo_count_check = true;
-
-	} else if (fifo_count_samples > samples + 4) {
-		// if we're more than a few samples behind force FIFO_COUNT check
-		_force_fifo_count_check = true;
-
-	} else {
-		// skip earlier FIFO_COUNT and trust DRDY count if we're in sync
-		_force_fifo_count_check = false;
-	}
-
-	if (valid_samples > 0) {
-		ProcessGyro(timestamp_sample, buffer, valid_samples);
-		return ProcessAccel(timestamp_sample, buffer, valid_samples);
-	}
-
-	return false;
+	ProcessGyro(timestamp_sample, buffer, samples);
+	return ProcessAccel(timestamp_sample, buffer, samples);
 }
 
-void ICM20608G::FIFOReset()
+void MPU6500::FIFOReset()
 {
 	perf_count(_fifo_reset_perf);
 
@@ -544,8 +508,7 @@ static bool fifo_accel_equal(const FIFO::DATA &f0, const FIFO::DATA &f1)
 	return (memcmp(&f0.ACCEL_XOUT_H, &f1.ACCEL_XOUT_H, 6) == 0);
 }
 
-bool ICM20608G::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTransferBuffer &buffer,
-			     const uint8_t samples)
+bool MPU6500::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTransferBuffer &buffer, const uint8_t samples)
 {
 	PX4Accelerometer::FIFOSample accel;
 	accel.timestamp_sample = timestamp_sample;
@@ -596,8 +559,7 @@ bool ICM20608G::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFOTran
 	return !bad_data;
 }
 
-void ICM20608G::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFOTransferBuffer &buffer,
-			    const uint8_t samples)
+void MPU6500::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFOTransferBuffer &buffer, const uint8_t samples)
 {
 	PX4Gyroscope::FIFOSample gyro;
 	gyro.timestamp_sample = timestamp_sample;
@@ -621,11 +583,12 @@ void ICM20608G::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFOTrans
 	_px4_gyro.updateFIFO(gyro);
 }
 
-void ICM20608G::UpdateTemperature()
+void MPU6500::UpdateTemperature()
 {
 	// read current temperature
 	uint8_t temperature_buf[3] {};
 	temperature_buf[0] = static_cast<uint8_t>(Register::TEMP_OUT_H) | DIR_READ;
+	set_frequency(SPI_SPEED_SENSOR);
 
 	if (transfer(temperature_buf, temperature_buf, sizeof(temperature_buf)) != PX4_OK) {
 		perf_count(_bad_transfer_perf);
