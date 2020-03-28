@@ -24,10 +24,10 @@ px4_add_board(
 		camera_trigger
 		distance_sensor # all available distance sensor drivers
 		gps
-		imu/l3gd20
 		imu/lsm303d
 		imu/mpu6000
 		#imu/mpu9250
+		imu/st/l3gd20
 		lights/rgbled
 		magnetometer/hmc5883
 		optical_flow/px4flow

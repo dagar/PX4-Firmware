@@ -73,7 +73,7 @@ then
 	param set SENS_EN_THERMAL 0
 
 	# (external) L3GD20H is rotated 180 degrees yaw
-	l3gd20 -s -R 4 start
+	l3gd20 -s -R 12 start
 
 	# (external) LSM303D is rotated 270 degrees yaw
 	lsm303d -s -R 6 start
@@ -107,7 +107,7 @@ else
 	# else: On the PixhawkMini the mpu9250 has been disabled due to HW errata
 	fi
 
-	l3gd20 -s start
+	l3gd20 -s -R 14 start
 	lsm303d -s start
 fi
 

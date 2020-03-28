@@ -26,10 +26,10 @@ px4_add_board(
 		differential_pressure # all available differential pressure drivers
 		distance_sensor # all available distance sensor drivers
 		gps
-		imu/l3gd20
 		imu/lsm303d
 		imu/mpu6000
 		#imu/mpu9250
+		imu/st/l3gd20
 		lights/rgbled
 		#magnetometer # all available magnetometer drivers
 		magnetometer/hmc5883
