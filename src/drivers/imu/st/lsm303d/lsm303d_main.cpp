@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,11 +31,6 @@
  *
  ****************************************************************************/
 
-/**
- * @file lsm303d_main.cpp
- * Driver for the ST LSM303D MEMS accelerometer / magnetometer connected via SPI.
- */
-
 #include "LSM303D.hpp"
 
 #include <px4_platform_common/getopt.h>
@@ -49,6 +44,7 @@ LSM303D::print_usage()
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(false, true);
 	PRINT_MODULE_USAGE_PARAM_INT('R', 0, 0, 35, "Rotation", true);
+	PRINT_MODULE_USAGE_COMMAND("reset");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
@@ -56,7 +52,7 @@ I2CSPIDriverBase *LSM303D::instantiate(const BusCLIArguments &cli, const BusInst
 				       int runtime_instance)
 {
 	LSM303D *instance = new LSM303D(iterator.configuredBusOption(), iterator.bus(), iterator.devid(), cli.rotation,
-					cli.bus_frequency, cli.spi_mode);
+					cli.bus_frequency, cli.spi_mode, iterator.DRDYGPIO());
 
 	if (!instance) {
 		PX4_ERR("alloc failed");
@@ -71,12 +67,17 @@ I2CSPIDriverBase *LSM303D::instantiate(const BusCLIArguments &cli, const BusInst
 	return instance;
 }
 
+void LSM303D::custom_method(const BusCLIArguments &cli)
+{
+	Reset();
+}
+
 extern "C" int lsm303d_main(int argc, char *argv[])
 {
 	int ch;
 	using ThisDriver = LSM303D;
 	BusCLIArguments cli{false, true};
-	cli.default_spi_frequency = 11 * 1000 * 1000;
+	cli.default_spi_frequency = ST_LSM303D::SPI_SPEED;
 
 	while ((ch = cli.getopt(argc, argv, "R:")) != EOF) {
 		switch (ch) {
@@ -105,6 +106,10 @@ extern "C" int lsm303d_main(int argc, char *argv[])
 
 	if (!strcmp(verb, "status")) {
 		return ThisDriver::module_status(iterator);
+	}
+
+	if (!strcmp(verb, "reset")) {
+		return ThisDriver::module_custom_method(cli, iterator);
 	}
 
 	ThisDriver::print_usage();

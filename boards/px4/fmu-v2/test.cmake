@@ -35,10 +35,10 @@ px4_add_board(
 		#imu/adis16448
 		#imu/adis16477
 		#imu/adis16497
-		imu/lsm303d
 		imu/mpu6000
 		#imu/mpu9250
 		imu/st/l3gd20
+		imu/st/lsm303d
 		#iridiumsbd
 		#irlock
 		#lights/blinkm

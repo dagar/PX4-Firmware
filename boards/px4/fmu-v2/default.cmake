@@ -7,11 +7,11 @@ px4_add_board(
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m4
 	ROMFSROOT px4fmu_common
-	BOOTLOADER ${PX4_SOURCE_DIR}/ROMFS/px4fmu_common/extras/px4fmuv3_bl.bin
-	IO px4_io-v2_default
+	#BOOTLOADER ${PX4_SOURCE_DIR}/ROMFS/px4fmu_common/extras/px4fmuv3_bl.bin
+	#IO px4_io-v2_default
 	#TESTING
 	#UAVCAN_INTERFACES 2
-	CONSTRAINED_FLASH
+	#CONSTRAINED_FLASH
 	SERIAL_PORTS
 		GPS1:/dev/ttyS3
 		TEL1:/dev/ttyS1
@@ -37,10 +37,10 @@ px4_add_board(
 		#imu/adis16477
 		#imu/adis16497
 		#imu/invensense/mpu6000 # WIP
-		imu/lsm303d
-		imu/mpu6000
+		#imu/mpu6000
 		#imu/mpu9250
 		imu/st/l3gd20
+		imu/st/lsm303d
 		#iridiumsbd
 		#irlock
 		#lights/blinkm
@@ -56,7 +56,7 @@ px4_add_board(
 		#pwm_input
 		#pwm_out_sim
 		px4fmu
-		px4io
+		#px4io
 		#roboclaw
 		#tap_esc
 		#telemetry # all available telemetry drivers
@@ -64,7 +64,7 @@ px4_add_board(
 		tone_alarm
 		#uavcan
 	MODULES
-		airspeed_selector
+		#airspeed_selector
 		#attitude_estimator_q
 		battery_status
 		#camera_feedback
@@ -72,8 +72,8 @@ px4_add_board(
 		dataman
 		ekf2
 		#events
-		fw_att_control
-		fw_pos_control_l1
+		#fw_att_control
+		#fw_pos_control_l1
 		land_detector
 		#landing_target_estimator
 		load_mon
@@ -90,10 +90,10 @@ px4_add_board(
 		sensors
 		#sih
 		#temperature_compensation
-		vmount
+		#vmount
 		#vtol_att_control
 	SYSTEMCMDS
-		bl_update
+		#bl_update
 		#config
 		#dmesg
 		#dumpfile
@@ -107,7 +107,7 @@ px4_add_board(
 		mtd
 		#nshterm
 		param
-		#perf
+		perf
 		pwm
 		reboot
 		#reflect
@@ -115,11 +115,11 @@ px4_add_board(
 		#shutdown
 		#tests # tests and test runner
 		top
-		#topic_listener
+		topic_listener
 		tune_control
 		#usb_connected
 		ver
-		#work_queue
+		work_queue
 	EXAMPLES
 		#fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		#hello

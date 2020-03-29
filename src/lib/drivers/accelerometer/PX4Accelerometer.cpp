@@ -65,6 +65,7 @@ static constexpr unsigned clipping(const int16_t samples[16], int16_t clip_limit
 
 PX4Accelerometer::PX4Accelerometer(uint32_t device_id, uint8_t priority, enum Rotation rotation) :
 	CDev(nullptr),
+	ModuleParams(nullptr),
 	_sensor_pub{ORB_ID(sensor_accel), priority},
 	_sensor_fifo_pub{ORB_ID(sensor_accel_fifo), priority},
 	_sensor_integrated_pub{ORB_ID(sensor_accel_integrated), priority},

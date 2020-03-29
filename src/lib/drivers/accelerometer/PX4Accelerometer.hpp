@@ -39,6 +39,7 @@
 #include <lib/conversion/rotation.h>
 #include <lib/drivers/device/integrator.h>
 #include <lib/ecl/geo/geo.h>
+#include <px4_platform_common/module_params.h>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/PublicationQueuedMulti.hpp>
 #include <uORB/topics/sensor_accel.h>
@@ -46,7 +47,7 @@
 #include <uORB/topics/sensor_accel_integrated.h>
 #include <uORB/topics/sensor_accel_status.h>
 
-class PX4Accelerometer : public cdev::CDev
+class PX4Accelerometer : public cdev::CDev, public ModuleParams
 {
 public:
 	PX4Accelerometer(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
@@ -55,6 +56,8 @@ public:
 	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	uint32_t get_device_id() const { return _device_id; }
+
+	float get_max_rate_hz() const { return _param_imu_gyro_rate_max.get(); }
 
 	void set_device_id(uint32_t device_id) { _device_id = device_id; }
 	void set_device_type(uint8_t devtype);
@@ -133,4 +136,7 @@ private:
 	uint8_t			_integrator_fifo_samples{0};
 	uint8_t			_integrator_clipping{0};
 
+	DEFINE_PARAMETERS(
+		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_rate_max
+	)
 };
