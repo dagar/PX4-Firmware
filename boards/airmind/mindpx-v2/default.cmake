@@ -25,10 +25,10 @@ px4_add_board(
 		gps
 		#heater
 		#imu # all available imu drivers
-		imu/lsm303d
 		imu/invensense/mpu6000
 		imu/invensense/mpu6500
 		imu/st/l3gd20
+		imu/st/lsm303d
 		irlock
 		lights/blinkm
 		lights/rgbled

@@ -68,7 +68,7 @@ then
 	l3gd20 -s -b 4 -R 12 start
 
 	# lsm303d (external/isolated SPI4)
-	lsm303d -s -b 4 -R 6 start
+	lsm303d -s -b 4 -R 12 start
 
 	# ms5611 (external/isolated SPI4)
 	ms5611 -s -b 4 start
@@ -103,7 +103,7 @@ else
 	fi
 
 	l3gd20 -s -b 1 -R 14 start
-	lsm303d -s -b 1 start
+	lsm303d -s -b 1 -R 14 start
 fi
 
 unset BOARD_FMUV3
