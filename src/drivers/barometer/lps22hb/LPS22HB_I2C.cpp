@@ -47,13 +47,13 @@ class LPS22HB_I2C : public device::I2C
 {
 public:
 	LPS22HB_I2C(int bus, int bus_frequency);
-	virtual ~LPS22HB_I2C() = default;
+	~LPS22HB_I2C() override = default;
 
-	virtual int	read(unsigned address, void *data, unsigned count);
-	virtual int	write(unsigned address, void *data, unsigned count);
+	int read(unsigned address, void *data, unsigned count) override;
+	int write(unsigned address, void *data, unsigned count) override;
 
 protected:
-	virtual int	probe();
+	int probe() override;
 
 };
 
@@ -71,7 +71,7 @@ LPS22HB_I2C::LPS22HB_I2C(int bus, int bus_frequency) :
 int
 LPS22HB_I2C::probe()
 {
-	uint8_t id;
+	uint8_t id = 0;
 
 	_retries = 10;
 
@@ -90,8 +90,7 @@ LPS22HB_I2C::probe()
 	return OK;
 }
 
-int
-LPS22HB_I2C::write(unsigned address, void *data, unsigned count)
+int LPS22HB_I2C::write(unsigned address, void *data, unsigned count)
 {
 	uint8_t buf[32];
 

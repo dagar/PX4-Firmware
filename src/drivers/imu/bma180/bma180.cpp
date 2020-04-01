@@ -40,33 +40,10 @@
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
-#include <ecl/geo/geo.h>
-
-#include <sys/types.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <semaphore.h>
-#include <string.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <errno.h>
-#include <stdio.h>
-#include <math.h>
-#include <unistd.h>
-
-#include <perf/perf_counter.h>
-#include <systemlib/err.h>
-#include <nuttx/arch.h>
-#include <nuttx/clock.h>
-
+#include <lib/ecl/geo/geo.h>
+#include <lib/perf/perf_counter.h>
 #include <drivers/drv_hrt.h>
-#include <board_config.h>
-
 #include <drivers/device/spi.h>
-#include <drivers/drv_accel.h>
-#include <drivers/device/ringbuffer.h>
 #include <px4_platform_common/i2c_spi_buses.h>
 
 #define ACCEL_DEVICE_PATH	"/dev/bma180"
@@ -121,8 +98,6 @@
 #define ADDR_OFFSET_T			0x37
 #define OFFSET_T_READOUT_12BIT			(1<<0)
 
-extern "C" __EXPORT int bma180_main(int argc, char *argv[]);
-
 class BMA180 : public device::SPI, public I2CSPIDriver<BMA180>
 {
 public:
@@ -132,30 +107,13 @@ public:
 
 	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 					     int runtime_instance);
-	static void print_usage();
-
+	static void     print_usage();
 	int		init() override;
-
-	ssize_t		read(struct file *filp, char *buffer, size_t buflen) override;
-	int		ioctl(struct file *filp, int cmd, unsigned long arg) override;
-
-	void			print_status() override;
-
+	void		print_status() override;
 	void		RunImpl();
-protected:
-	int		probe() override;
 
 private:
-
-	unsigned		_call_interval;
-
-	ringbuffer::RingBuffer		*_reports;
-
-	struct accel_calibration_s	_accel_scale;
-	float			_accel_range_scale;
-	float			_accel_range_m_s2;
-	orb_advert_t		_accel_topic;
-	int			_class_instance;
+	int		probe() override;
 
 	unsigned		_current_lowpass;
 	unsigned		_current_range;
@@ -222,50 +180,22 @@ BMA180::BMA180(I2CSPIBusOption bus_option, int bus, int32_t device, enum Rotatio
 	       spi_mode_e spi_mode) :
 	SPI(DRV_ACC_DEVTYPE_BMA180, MODULE_NAME, bus, device, spi_mode, bus_frequency),
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
-	_call_interval(0),
-	_reports(nullptr),
-	_accel_range_scale(0.0f),
-	_accel_range_m_s2(0.0f),
-	_accel_topic(nullptr),
-	_class_instance(-1),
-	_current_lowpass(0),
-	_current_range(0),
-	_sample_perf(perf_alloc(PC_ELAPSED, "bma180_read"))
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read"))
 {
-	// default scale factors
-	_accel_scale.x_offset = 0;
-	_accel_scale.x_scale  = 1.0f;
-	_accel_scale.y_offset = 0;
-	_accel_scale.y_scale  = 1.0f;
-	_accel_scale.z_offset = 0;
-	_accel_scale.z_scale  = 1.0f;
 }
 
 BMA180::~BMA180()
 {
-	/* free any existing reports */
-	if (_reports != nullptr) {
-		delete _reports;
-	}
-
 	/* delete the perf counter */
 	perf_free(_sample_perf);
 }
 
-int
-BMA180::init()
+int BMA180::init()
 {
 	int ret = PX4_ERROR;
 
 	/* do SPI init (and probe) first */
 	if (SPI::init() != OK) {
-		goto out;
-	}
-
-	/* allocate basic report buffers */
-	_reports = new ringbuffer::RingBuffer(2, sizeof(sensor_accel_s));
-
-	if (_reports == nullptr) {
 		goto out;
 	}
 
@@ -304,28 +234,16 @@ BMA180::init()
 		ret = PX4_ERROR;
 	}
 
-	_class_instance = register_class_devname(ACCEL_DEVICE_PATH);
-
 	/* advertise sensor topic, measure manually to initialize valid report */
 	measure();
 
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
-		sensor_accel_s arp;
-		_reports->get(&arp);
-
-		/* measurement will have generated a report, publish */
-		_accel_topic = orb_advertise(ORB_ID(sensor_accel), &arp);
-	}
-
-	_call_interval = 1000000 / 250;
 	start();
 
 out:
 	return ret;
 }
 
-int
-BMA180::probe()
+int BMA180::probe()
 {
 	/* dummy read to ensure SPI state machine is sane */
 	read_reg(ADDR_CHIP_ID);
@@ -337,89 +255,23 @@ BMA180::probe()
 	return -EIO;
 }
 
-ssize_t
-BMA180::read(struct file *filp, char *buffer, size_t buflen)
-{
-	unsigned count = buflen / sizeof(sensor_accel_s);
-	sensor_accel_s *arp = reinterpret_cast<sensor_accel_s *>(buffer);
-	int ret = 0;
-
-	/* buffer must be large enough */
-	if (count < 1) {
-		return -ENOSPC;
-	}
-
-	/* if automatic measurement is enabled */
-	if (_call_interval > 0) {
-
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the measurement code while we are doing this;
-		 * we are careful to avoid racing with it.
-		 */
-		while (count--) {
-			if (_reports->get(arp)) {
-				ret += sizeof(*arp);
-				arp++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement */
-	_reports->flush();
-	measure();
-
-	/* measurement will have generated a report, copy it out */
-	if (_reports->get(arp)) {
-		ret = sizeof(*arp);
-	}
-
-	return ret;
-}
-
-int
-BMA180::ioctl(struct file *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case ACCELIOCSSCALE:
-		/* copy scale in */
-		memcpy(&_accel_scale, (struct accel_calibration_s *) arg, sizeof(_accel_scale));
-		return OK;
-
-	default:
-		/* give it to the superclass */
-		return SPI::ioctl(filp, cmd, arg);
-	}
-}
-
-uint8_t
-BMA180::read_reg(unsigned reg)
+uint8_t BMA180::read_reg(unsigned reg)
 {
 	uint8_t cmd[2];
-
 	cmd[0] = reg | DIR_READ;
-
 	transfer(cmd, cmd, sizeof(cmd));
-
 	return cmd[1];
 }
 
-void
-BMA180::write_reg(unsigned reg, uint8_t value)
+void BMA180::write_reg(unsigned reg, uint8_t value)
 {
 	uint8_t	cmd[2];
-
 	cmd[0] = reg | DIR_WRITE;
 	cmd[1] = value;
-
 	transfer(cmd, nullptr, sizeof(cmd));
 }
 
-void
-BMA180::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
+void BMA180::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
 	uint8_t	val;
 
@@ -429,8 +281,7 @@ BMA180::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 	write_reg(reg, val);
 }
 
-int
-BMA180::set_range(unsigned max_g)
+int BMA180::set_range(unsigned max_g)
 {
 	uint8_t rangebits;
 
@@ -484,8 +335,7 @@ BMA180::set_range(unsigned max_g)
 		 (OFFSET_LSB1_RANGE_MASK & rangebits));
 }
 
-int
-BMA180::set_lowpass(unsigned frequency)
+int BMA180::set_lowpass(unsigned frequency)
 {
 	uint8_t	bwbits;
 
@@ -527,22 +377,16 @@ BMA180::set_lowpass(unsigned frequency)
 	modify_reg(ADDR_CTRL_REG0, REG0_WRITE_ENABLE, 0);
 
 	/* check if wanted value is now in register */
-	return !((read_reg(ADDR_BW_TCS) & BW_TCS_BW_MASK) ==
-		 (BW_TCS_BW_MASK & bwbits));
+	return !((read_reg(ADDR_BW_TCS) & BW_TCS_BW_MASK) == (BW_TCS_BW_MASK & bwbits));
 }
 
-void
-BMA180::start()
+void BMA180::start()
 {
-	/* reset the report ring */
-	_reports->flush();
-
 	/* start polling at the specified rate */
 	ScheduleOnInterval(_call_interval, 10000);
 }
 
-void
-BMA180::RunImpl()
+void BMA180::RunImpl()
 {
 	/* make another measurement */
 	measure();
@@ -552,16 +396,6 @@ void
 BMA180::measure()
 {
 	/* BMA180 measurement registers */
-// #pragma pack(push, 1)
-// 	struct {
-// 		uint8_t		cmd;
-// 		int16_t	x;
-// 		int16_t	y;
-// 		int16_t	z;
-// 	} raw_report;
-// #pragma pack(pop)
-
-	sensor_accel_s report;
 
 	/* start the performance counter */
 	perf_begin(_sample_perf);
@@ -608,31 +442,20 @@ BMA180::measure()
 	report.z = ((report.z_raw * _accel_range_scale) - _accel_scale.z_offset) * _accel_scale.z_scale;
 	report.scaling = _accel_range_scale;
 
-	_reports->force(&report);
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
-
-	/* publish for subscribers */
-	if (_accel_topic != nullptr) {
-		orb_publish(ORB_ID(sensor_accel), _accel_topic, &report);
-	}
+	_px4_accel.update(timestamp_sample, x, y, z);
 
 	/* stop the perf counter */
 	perf_end(_sample_perf);
 }
 
-void
-BMA180::print_status()
+void BMA180::print_status()
 {
 	I2CSPIDriverBase::print_status();
 	perf_print_counter(_sample_perf);
-	_reports->print_info("report queue");
+	_px4_accel.print_status();
 }
 
-
-void
-BMA180::print_usage()
+void BMA180::print_usage()
 {
 	PRINT_MODULE_USAGE_NAME("bma180", "driver");
 	PRINT_MODULE_USAGE_SUBCATEGORY("imu");
@@ -661,7 +484,7 @@ I2CSPIDriverBase *BMA180::instantiate(const BusCLIArguments &cli, const BusInsta
 	return instance;
 }
 
-extern "C" int bma180_main(int argc, char *argv[])
+extern "C" __EXPORT int bma180_main(int argc, char *argv[])
 {
 	int ch;
 	using ThisDriver = BMA180;
