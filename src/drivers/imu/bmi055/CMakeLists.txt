@@ -37,6 +37,10 @@ px4_add_module(
 		-Wno-cast-align # TODO: fix and enable
 	SRCS
 		BMI055_accel.cpp
+		BMI055_accel.hpp
 		BMI055_gyro.cpp
+		BMI055_gyro.hpp
 		bmi055_main.cpp
+		BMI055.cpp
+		BMI055.hpp
 	)

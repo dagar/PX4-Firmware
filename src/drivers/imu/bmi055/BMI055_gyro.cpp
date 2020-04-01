@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,13 +49,13 @@ const uint8_t BMI055_gyro::_checked_registers[BMI055_GYRO_NUM_CHECKED_REGISTERS]
 											BMI055_GYR_INT_MAP_1
 										   };
 
-BMI055_gyro::BMI055_gyro(I2CSPIBusOption bus_option, int bus, const char *path_gyro, uint32_t device,
-			 enum Rotation rotation, int bus_frequency, spi_mode_e spi_mode) :
-	BMI055(DRV_GYR_DEVTYPE_BMI055, "bmi055_gyro", path_gyro, bus_option, bus, device, spi_mode, bus_frequency, rotation),
-	_px4_gyro(get_device_id(), (external() ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1), rotation),
-	_sample_perf(perf_alloc(PC_ELAPSED, "bmi055_gyro_read")),
-	_bad_transfers(perf_alloc(PC_COUNT, "bmi055_gyro_bad_transfers")),
-	_bad_registers(perf_alloc(PC_COUNT, "bmi055_gyro_bad_registers"))
+BMI055_gyro::BMI055_gyro(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation,
+			 int bus_frequency, spi_mode_e spi_mode) :
+	BMI055(DRV_GYR_DEVTYPE_BMI055, "BMI055_gyro", bus_option, bus, device, spi_mode, bus_frequency),
+	_px4_gyro(get_device_id(), ORB_PRIO_DEFAULT, rotation),
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": gyro read")),
+	_bad_transfers(perf_alloc(PC_COUNT, MODULE_NAME": gyro bad transfers")),
+	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": gyro bad registers"))
 {
 }
 
@@ -66,8 +66,7 @@ BMI055_gyro::~BMI055_gyro()
 	perf_free(_bad_registers);
 }
 
-int
-BMI055_gyro::init()
+int BMI055_gyro::init()
 {
 	/* do SPI init (and probe) first */
 	int ret = SPI::init();
@@ -83,19 +82,20 @@ BMI055_gyro::init()
 
 int BMI055_gyro::reset()
 {
-	write_reg(BMI055_GYR_SOFTRESET, BMI055_SOFT_RESET);//Soft-reset
-	usleep(5000);
-	write_checked_reg(BMI055_GYR_BW,     0); // Write Gyro Bandwidth (will be overwritten in gyro_set_sample_rate())
-	write_checked_reg(BMI055_GYR_RANGE,     0);// Write Gyro range
-	write_checked_reg(BMI055_GYR_INT_EN_0,      BMI055_GYR_DRDY_INT_EN); //Enable DRDY interrupt
-	write_checked_reg(BMI055_GYR_INT_MAP_1,     BMI055_GYR_DRDY_INT1); //Map DRDY interrupt on pin INT1
+	write_reg(BMI055_GYR_SOFTRESET, BMI055_SOFT_RESET); // Soft-reset
+	px4_usleep(5000);
 
-	set_gyro_range(BMI055_GYRO_DEFAULT_RANGE_DPS);// set Gyro range
-	gyro_set_sample_rate(BMI055_GYRO_DEFAULT_RATE);// set Gyro ODR & Filter Bandwidth
+	write_checked_reg(BMI055_GYR_BW, 0); // Write Gyro Bandwidth (will be overwritten in gyro_set_sample_rate())
+	write_checked_reg(BMI055_GYR_RANGE, 0); // Write Gyro range
+	write_checked_reg(BMI055_GYR_INT_EN_0, BMI055_GYR_DRDY_INT_EN); // Enable DRDY interrupt
+	write_checked_reg(BMI055_GYR_INT_MAP_1, BMI055_GYR_DRDY_INT1);  // Map DRDY interrupt on pin INT1
 
-	//Enable Gyroscope in normal mode
+	set_gyro_range(BMI055_GYRO_DEFAULT_RANGE_DPS); // set Gyro range
+	gyro_set_sample_rate(BMI055_GYRO_DEFAULT_RATE); // set Gyro ODR & Filter Bandwidth
+
+	// Enable Gyroscope in normal mode
 	write_reg(BMI055_GYR_LPM1, BMI055_GYRO_NORMAL);
-	up_udelay(1000);
+	px4_usleep(1000);
 
 	uint8_t retries = 10;
 
@@ -117,8 +117,7 @@ int BMI055_gyro::reset()
 	return OK;
 }
 
-int
-BMI055_gyro::probe()
+int BMI055_gyro::probe()
 {
 	/* look for device ID */
 	_whoami = read_reg(BMI055_GYR_CHIP_ID);
@@ -137,8 +136,7 @@ BMI055_gyro::probe()
 	return -EIO;
 }
 
-int
-BMI055_gyro::gyro_set_sample_rate(float frequency)
+int BMI055_gyro::gyro_set_sample_rate(float frequency)
 {
 	uint8_t setbits = 0;
 	uint8_t clearbits = BMI055_GYRO_BW_MASK;
@@ -168,19 +166,7 @@ BMI055_gyro::gyro_set_sample_rate(float frequency)
 	return OK;
 }
 
-/*
-  deliberately trigger an error in the sensor to trigger recovery
- */
-void
-BMI055_gyro::test_error()
-{
-	write_reg(BMI055_GYR_SOFTRESET, BMI055_SOFT_RESET);
-	::printf("error triggered\n");
-	print_registers();
-}
-
-void
-BMI055_gyro::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
+void BMI055_gyro::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
 	uint8_t val = read_reg(reg);
 	val &= ~clearbits;
@@ -188,8 +174,7 @@ BMI055_gyro::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 	write_checked_reg(reg, val);
 }
 
-void
-BMI055_gyro::write_checked_reg(unsigned reg, uint8_t value)
+void BMI055_gyro::write_checked_reg(unsigned reg, uint8_t value)
 {
 	write_reg(reg, value);
 
@@ -201,8 +186,7 @@ BMI055_gyro::write_checked_reg(unsigned reg, uint8_t value)
 	}
 }
 
-int
-BMI055_gyro::set_gyro_range(unsigned max_dps)
+int BMI055_gyro::set_gyro_range(unsigned max_dps)
 {
 	uint8_t setbits = 0;
 	uint8_t clearbits = BMI055_GYRO_RANGE_125_DPS | BMI055_GYRO_RANGE_250_DPS;
@@ -241,22 +225,20 @@ BMI055_gyro::set_gyro_range(unsigned max_dps)
 		return -EINVAL;
 	}
 
-	_px4_gyro.set_scale(M_PI_F / (180.0f * lsb_per_dps));
+	_px4_gyro.set_scale(M_PI_F / (180.f * lsb_per_dps));
 
 	modify_reg(BMI055_GYR_RANGE, clearbits, setbits);
 
 	return OK;
 }
 
-void
-BMI055_gyro::start()
+void BMI055_gyro::start()
 {
 	/* start polling at the specified rate */
 	ScheduleOnInterval((1_s / BMI055_GYRO_DEFAULT_RATE) - BMI055_TIMER_REDUCTION, 1000);
 }
 
-void
-BMI055_gyro::check_registers(void)
+void BMI055_gyro::check_registers()
 {
 	uint8_t v;
 
@@ -298,22 +280,19 @@ BMI055_gyro::check_registers(void)
 	_checked_next = (_checked_next + 1) % BMI055_GYRO_NUM_CHECKED_REGISTERS;
 }
 
-void
-BMI055_gyro::RunImpl()
+void BMI055_gyro::RunImpl()
 {
 	if (hrt_absolute_time() < _reset_wait) {
 		// we're waiting for a reset to complete
 		return;
 	}
 
-	struct BMI_GyroReport bmi_gyroreport;
-
 	struct Report {
 		int16_t     temp;
 		int16_t     gyro_x;
 		int16_t     gyro_y;
 		int16_t     gyro_z;
-	} report;
+	} report{};
 
 	/* start measuring */
 	perf_begin(_sample_perf);
@@ -321,6 +300,19 @@ BMI055_gyro::RunImpl()
 	/*
 	 * Fetch the full set of measurements from the BMI055 gyro in one pass.
 	 */
+
+#pragma pack(push, 1)
+	/**
+	 * Report conversation within the BMI055_gyro, including command byte and
+	 * interrupt status.
+	 */
+	struct BMI_GyroReport {
+		uint8_t     cmd;
+		int16_t     gyro_x;
+		int16_t     gyro_y;
+		int16_t     gyro_z;
+	} bmi_gyroreport{};
+#pragma pack(pop)
 	bmi_gyroreport.cmd = BMI055_GYR_X_L | DIR_READ;
 
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
@@ -342,6 +334,7 @@ BMI055_gyro::RunImpl()
 	    report.gyro_x == 0 &&
 	    report.gyro_y == 0 &&
 	    report.gyro_z == 0) {
+
 		// all zero data - probably a SPI bus error
 		perf_count(_bad_transfers);
 		perf_end(_sample_perf);
@@ -392,78 +385,12 @@ BMI055_gyro::RunImpl()
 	perf_end(_sample_perf);
 }
 
-void
-BMI055_gyro::print_status()
+void BMI055_gyro::print_status()
 {
 	I2CSPIDriverBase::print_status();
 	PX4_INFO("Type: Gyro");
-
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_bad_transfers);
 	perf_print_counter(_bad_registers);
-
-	::printf("checked_next: %u\n", _checked_next);
-
-	for (uint8_t i = 0; i < BMI055_GYRO_NUM_CHECKED_REGISTERS; i++) {
-		uint8_t v = read_reg(_checked_registers[i]);
-
-		if (v != _checked_values[i]) {
-			::printf("reg %02x:%02x should be %02x\n",
-				 (unsigned)_checked_registers[i],
-				 (unsigned)v,
-				 (unsigned)_checked_values[i]);
-		}
-
-		if (v != _checked_bad[i]) {
-			::printf("reg %02x:%02x was bad %02x\n",
-				 (unsigned)_checked_registers[i],
-				 (unsigned)v,
-				 (unsigned)_checked_bad[i]);
-		}
-	}
-
 	_px4_gyro.print_status();
-}
-
-void
-BMI055_gyro::print_registers()
-{
-	uint8_t index = 0;
-	printf("BMI055 gyro registers\n");
-
-	uint8_t reg = _checked_registers[index++];
-	uint8_t v = read_reg(reg);
-	printf("Gyro Chip Id: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Gyro Power: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Gyro Bw: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Gyro Range: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Gyro Int-en-0: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Gyro Int-en-1: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Gyro Int-Map-1: %02x:%02x ", (unsigned)reg, (unsigned)v);
-
-	printf("\n");
 }

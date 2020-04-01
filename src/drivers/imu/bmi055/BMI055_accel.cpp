@@ -33,6 +33,8 @@
 
 #include "BMI055_accel.hpp"
 
+using namespace time_literals;
+
 /*
   list of registers that will be checked in check_registers(). Note
   that ADDR_WHO_AM_I must be first in the list.
@@ -44,15 +46,14 @@ const uint8_t BMI055_accel::_checked_registers[BMI055_ACCEL_NUM_CHECKED_REGISTER
 											  BMI055_ACC_INT_MAP_1,
 										     };
 
-BMI055_accel::BMI055_accel(I2CSPIBusOption bus_option, int bus, const char *path_accel, uint32_t device,
-			   enum Rotation rotation, int bus_frequency, spi_mode_e spi_mode) :
-	BMI055(DRV_ACC_DEVTYPE_BMI055, "bmi055_accel", path_accel, bus_option, bus, device, spi_mode, bus_frequency, rotation),
-	_px4_accel(get_device_id(), (external() ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1), rotation),
-	_sample_perf(perf_alloc(PC_ELAPSED, "bmi055_accel_read")),
-	_bad_transfers(perf_alloc(PC_COUNT, "bmi055_accel_bad_transfers")),
-	_bad_registers(perf_alloc(PC_COUNT, "bmi055_accel_bad_registers")),
-	_duplicates(perf_alloc(PC_COUNT, "bmi055_accel_duplicates")),
-	_got_duplicate(false)
+BMI055_accel::BMI055_accel(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation,
+			   int bus_frequency, spi_mode_e spi_mode) :
+	BMI055(DRV_ACC_DEVTYPE_BMI055, "BMI055_accel", bus_option, bus, device, spi_mode, bus_frequency),
+	_px4_accel(get_device_id(), ORB_PRIO_DEFAULT, rotation),
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": accel read")),
+	_bad_transfers(perf_alloc(PC_COUNT, MODULE_NAME": accel bad transfers")),
+	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": accel bad registers")),
+	_duplicates(perf_alloc(PC_COUNT, MODULE_NAME": accel duplicates"))
 {
 }
 
@@ -64,8 +65,7 @@ BMI055_accel::~BMI055_accel()
 	perf_free(_duplicates);
 }
 
-int
-BMI055_accel::init()
+int BMI055_accel::init()
 {
 	/* do SPI init (and probe) first */
 	int ret = SPI::init();
@@ -82,18 +82,18 @@ BMI055_accel::init()
 int BMI055_accel::reset()
 {
 	write_reg(BMI055_ACC_SOFTRESET, BMI055_SOFT_RESET); // Soft-reset
-	up_udelay(5000);
+	px4_usleep(5000);
 
-	write_checked_reg(BMI055_ACC_BW,    BMI055_ACCEL_BW_500); //Write accel bandwidth (DLPF)
-	write_checked_reg(BMI055_ACC_RANGE,     BMI055_ACCEL_RANGE_2_G);//Write range
-	write_checked_reg(BMI055_ACC_INT_EN_1,      BMI055_ACC_DRDY_INT_EN); //Enable DRDY interrupt
-	write_checked_reg(BMI055_ACC_INT_MAP_1,     BMI055_ACC_DRDY_INT1); //Map DRDY interrupt on pin INT1
+	write_checked_reg(BMI055_ACC_BW, BMI055_ACCEL_BW_500);          // Write accel bandwidth (DLPF)
+	write_checked_reg(BMI055_ACC_RANGE, BMI055_ACCEL_RANGE_2_G);    // Write range
+	write_checked_reg(BMI055_ACC_INT_EN_1, BMI055_ACC_DRDY_INT_EN); // Enable DRDY interrupt
+	write_checked_reg(BMI055_ACC_INT_MAP_1, BMI055_ACC_DRDY_INT1);  // Map DRDY interrupt on pin INT1
 
-	set_accel_range(BMI055_ACCEL_DEFAULT_RANGE_G);//set accel range
+	set_accel_range(BMI055_ACCEL_DEFAULT_RANGE_G); // set accel range
 
 	//Enable Accelerometer in normal mode
 	write_reg(BMI055_ACC_PMU_LPW, BMI055_ACCEL_NORMAL);
-	up_udelay(1000);
+	px4_usleep(1000);
 
 	uint8_t retries = 10;
 
@@ -115,8 +115,7 @@ int BMI055_accel::reset()
 	return OK;
 }
 
-int
-BMI055_accel::probe()
+int BMI055_accel::probe()
 {
 	/* look for device ID */
 	_whoami = read_reg(BMI055_ACC_CHIP_ID);
@@ -135,19 +134,7 @@ BMI055_accel::probe()
 	return -EIO;
 }
 
-/*
-  deliberately trigger an error in the sensor to trigger recovery
- */
-void
-BMI055_accel::test_error()
-{
-	write_reg(BMI055_ACC_SOFTRESET, BMI055_SOFT_RESET);
-	::printf("error triggered\n");
-	print_registers();
-}
-
-void
-BMI055_accel::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
+void BMI055_accel::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
 	uint8_t val = read_reg(reg);
 	val &= ~clearbits;
@@ -155,8 +142,7 @@ BMI055_accel::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 	write_checked_reg(reg, val);
 }
 
-void
-BMI055_accel::write_checked_reg(unsigned reg, uint8_t value)
+void BMI055_accel::write_checked_reg(unsigned reg, uint8_t value)
 {
 	write_reg(reg, value);
 
@@ -168,8 +154,7 @@ BMI055_accel::write_checked_reg(unsigned reg, uint8_t value)
 	}
 }
 
-int
-BMI055_accel::set_accel_range(unsigned max_g)
+int BMI055_accel::set_accel_range(unsigned max_g)
 {
 	uint8_t setbits = 0;
 	uint8_t clearbits = BMI055_ACCEL_RANGE_2_G | BMI055_ACCEL_RANGE_16_G;
@@ -210,15 +195,13 @@ BMI055_accel::set_accel_range(unsigned max_g)
 	return OK;
 }
 
-void
-BMI055_accel::start()
+void BMI055_accel::start()
 {
 	/* start polling at the specified rate */
-	ScheduleOnInterval(BMI055_ACCEL_DEFAULT_RATE - BMI055_TIMER_REDUCTION, 1000);
+	ScheduleOnInterval((1_s / BMI055_ACCEL_DEFAULT_RATE) - BMI055_TIMER_REDUCTION, 1000);
 }
 
-void
-BMI055_accel::check_registers(void)
+void BMI055_accel::check_registers()
 {
 	uint8_t v;
 
@@ -260,8 +243,7 @@ BMI055_accel::check_registers(void)
 	_checked_next = (_checked_next + 1) % BMI055_ACCEL_NUM_CHECKED_REGISTERS;
 }
 
-void
-BMI055_accel::RunImpl()
+void BMI055_accel::RunImpl()
 {
 	if (hrt_absolute_time() < _reset_wait) {
 		// we're waiting for a reset to complete
@@ -273,7 +255,7 @@ BMI055_accel::RunImpl()
 		int16_t     accel_y;
 		int16_t     accel_z;
 		int8_t     temp;
-	} report;
+	} report{};
 
 	/* start measuring */
 	perf_begin(_sample_perf);
@@ -333,6 +315,7 @@ BMI055_accel::RunImpl()
 	    report.accel_y == 0 &&
 	    report.accel_z == 0 &&
 	    report.temp == 0) {
+
 		// all zero data - probably a SPI bus error
 		perf_count(_bad_transfers);
 		perf_end(_sample_perf);
@@ -380,8 +363,7 @@ BMI055_accel::RunImpl()
 	perf_end(_sample_perf);
 }
 
-void
-BMI055_accel::print_status()
+void BMI055_accel::print_status()
 {
 	I2CSPIDriverBase::print_status();
 	PX4_INFO("Type: Accel");
@@ -389,59 +371,5 @@ BMI055_accel::print_status()
 	perf_print_counter(_bad_transfers);
 	perf_print_counter(_bad_registers);
 	perf_print_counter(_duplicates);
-
-	::printf("checked_next: %u\n", _checked_next);
-
-	for (uint8_t i = 0; i < BMI055_ACCEL_NUM_CHECKED_REGISTERS; i++) {
-		uint8_t v = read_reg(_checked_registers[i]);
-
-		if (v != _checked_values[i]) {
-			::printf("reg %02x:%02x should be %02x\n",
-				 (unsigned)_checked_registers[i],
-				 (unsigned)v,
-				 (unsigned)_checked_values[i]);
-		}
-
-		if (v != _checked_bad[i]) {
-			::printf("reg %02x:%02x was bad %02x\n",
-				 (unsigned)_checked_registers[i],
-				 (unsigned)v,
-				 (unsigned)_checked_bad[i]);
-		}
-	}
-
 	_px4_accel.print_status();
-}
-
-void
-BMI055_accel::print_registers()
-{
-	uint8_t index = 0;
-	printf("BMI055 accel registers\n");
-
-	uint8_t reg = _checked_registers[index++];
-	uint8_t v = read_reg(reg);
-	printf("Accel Chip Id: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Accel Bw: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Accel Range: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Accel Int-en-1: %02x:%02x ", (unsigned)reg, (unsigned)v);
-	printf("\n");
-
-	reg = _checked_registers[index++];
-	v = read_reg(reg);
-	printf("Accel Int-Map-1: %02x:%02x ", (unsigned)reg, (unsigned)v);
-
-	printf("\n");
 }

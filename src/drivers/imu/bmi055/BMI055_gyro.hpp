@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,9 +36,6 @@
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 
 #include "BMI055.hpp"
-
-#define BMI055_DEVICE_PATH_GYRO		"/dev/bmi055_gyro"
-#define BMI055_DEVICE_PATH_GYRO_EXT	"/dev/bmi055_gyro_ext"
 
 // BMI055 Gyro registers
 #define BMI055_GYR_CHIP_ID          0x00
@@ -121,10 +118,6 @@
 // Default and Max values
 #define BMI055_GYRO_DEFAULT_RANGE_DPS		2000
 #define BMI055_GYRO_DEFAULT_RATE            1000
-#define BMI055_GYRO_MAX_RATE                1000
-#define BMI055_GYRO_MAX_PUBLISH_RATE        280
-
-#define BMI055_GYRO_DEFAULT_DRIVER_FILTER_FREQ  50
 
 /* Mask definitions for Gyro bandwidth */
 #define BMI055_GYRO_BW_MASK                  0x0F
@@ -134,8 +127,8 @@
 class BMI055_gyro : public BMI055
 {
 public:
-	BMI055_gyro(I2CSPIBusOption bus_option, int bus, const char *path_accel, uint32_t device, enum Rotation rotation,
-		    int bus_frequency, spi_mode_e spi_mode);
+	BMI055_gyro(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
+		    spi_mode_e spi_mode);
 	virtual ~BMI055_gyro();
 
 	int init() override;
@@ -145,17 +138,10 @@ public:
 
 	void print_status() override;
 
-	void print_registers() override;
-
-	/// deliberately cause a sensor error
-	void test_error() override;
-
 	void RunImpl() override;
-protected:
+private:
 
 	int probe() override;
-
-private:
 
 	PX4Gyroscope	_px4_gyro;
 
@@ -166,10 +152,10 @@ private:
 	// this is used to support runtime checking of key
 	// configuration registers to detect SPI bus errors and sensor
 	// reset
-#define BMI055_GYRO_NUM_CHECKED_REGISTERS 7
-	static const uint8_t    _checked_registers[BMI055_GYRO_NUM_CHECKED_REGISTERS];
-	uint8_t         _checked_values[BMI055_GYRO_NUM_CHECKED_REGISTERS];
-	uint8_t         _checked_bad[BMI055_GYRO_NUM_CHECKED_REGISTERS];
+	static constexpr int BMI055_GYRO_NUM_CHECKED_REGISTERS{7};
+	static const uint8_t _checked_registers[BMI055_GYRO_NUM_CHECKED_REGISTERS];
+	uint8_t         _checked_values[BMI055_GYRO_NUM_CHECKED_REGISTERS] {};
+	uint8_t         _checked_bad[BMI055_GYRO_NUM_CHECKED_REGISTERS] {};
 
 	/**
 	 * Reset chip.
@@ -213,23 +199,5 @@ private:
 	/*
 	 * check that key registers still have the right value
 	 */
-	void check_registers(void);
-
-	/* do not allow to copy this class due to pointer data members */
-	BMI055_gyro(const BMI055_gyro &);
-	BMI055_gyro operator=(const BMI055_gyro &);
-
-#pragma pack(push, 1)
-	/**
-	 * Report conversation within the BMI055_gyro, including command byte and
-	 * interrupt status.
-	 */
-	struct BMI_GyroReport {
-		uint8_t     cmd;
-		int16_t     gyro_x;
-		int16_t     gyro_y;
-		int16_t     gyro_z;
-	};
-#pragma pack(pop)
-
+	void check_registers();
 };

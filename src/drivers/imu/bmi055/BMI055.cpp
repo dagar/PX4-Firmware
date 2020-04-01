@@ -31,61 +31,24 @@
  *
  ****************************************************************************/
 
-#pragma once
+#include "BMI055.hpp"
 
-#include <drivers/device/spi.h>
-#include <ecl/geo/geo.h>
-#include <lib/perf/perf_counter.h>
-#include <px4_platform_common/getopt.h>
-#include <px4_platform_common/i2c_spi_buses.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-
-static constexpr uint8_t DIR_READ = 0x80;
-
-//Soft-reset command Value
-#define BMI055_SOFT_RESET       0xB6
-
-#define BMI055_BUS_SPEED				10*1000*1000
-
-#define BMI055_TIMER_REDUCTION				200
-
-class BMI055 : public device::SPI, public I2CSPIDriver<BMI055>
+BMI055::BMI055(uint8_t devtype, const char *name, I2CSPIBusOption bus_option, int bus, uint32_t device,
+	       enum spi_mode_e mode, uint32_t frequency):
+	SPI(devtype, name, bus, device, mode, frequency),
+	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus, devtype)
 {
-public:
-	BMI055(uint8_t devtype, const char *name, I2CSPIBusOption bus_option, int bus, uint32_t device, enum spi_mode_e mode,
-	       uint32_t frequency);
-	virtual ~BMI055() = default;
+}
 
-	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
-					     int runtime_instance);
-	static void print_usage();
+uint8_t BMI055::read_reg(uint8_t reg)
+{
+	uint8_t cmd[2] = { (uint8_t)(reg | DIR_READ), 0};
+	transfer(cmd, cmd, sizeof(cmd));
+	return cmd[1];
+}
 
-	virtual void start() = 0;
-
-	virtual void RunImpl() = 0;
-protected:
-
-	uint8_t         _whoami{0};    ///< whoami result
-
-	uint8_t         _register_wait{0};
-	uint64_t        _reset_wait{0};
-
-	uint8_t         _checked_next{0};
-
-	/**
-	* Read a register from the BMI055
-	*
-	* @param       The register to read.
-	* @return      The value that was read.
-	*/
-	uint8_t         read_reg(uint8_t reg);
-
-	/**
-	* Write a register in the BMI055
-	*
-	* @param reg       The register to write.
-	* @param value     The new value to write.
-	*/
-	void            write_reg(uint8_t reg, uint8_t value);
-
-};
+void BMI055::write_reg(uint8_t reg, uint8_t value)
+{
+	uint8_t cmd[2] {reg, value};
+	transfer(cmd, nullptr, sizeof(cmd));
+}
