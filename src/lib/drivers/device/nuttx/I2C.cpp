@@ -72,26 +72,7 @@ I2C::~I2C()
 	}
 }
 
-int
-I2C::set_bus_clock(unsigned bus, unsigned clock_hz)
-{
-	int index = bus - 1;
-
-	if (index < 0 || index >= static_cast<int>(sizeof(_bus_clocks) / sizeof(_bus_clocks[0]))) {
-		return -EINVAL;
-	}
-
-	if (_bus_clocks[index] > 0) {
-		// DEVICE_DEBUG("overriding clock of %u with %u Hz\n", _bus_clocks[index], clock_hz);
-	}
-
-	_bus_clocks[index] = clock_hz;
-
-	return OK;
-}
-
-int
-I2C::init()
+int I2C::init()
 {
 	int ret = PX4_ERROR;
 	unsigned bus_index;
@@ -166,8 +147,7 @@ out:
 	return ret;
 }
 
-int
-I2C::transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len)
+int I2C::transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len)
 {
 	int ret = PX4_ERROR;
 	unsigned retry_count = 0;

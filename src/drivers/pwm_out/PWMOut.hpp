@@ -38,7 +38,6 @@
 
 #include <board_config.h>
 #include <drivers/device/device.h>
-#include <drivers/device/i2c.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_input_capture.h>
 #include <drivers/drv_mixer.h>
@@ -141,8 +140,6 @@ public:
 
 	int		set_mode(Mode mode);
 	Mode		get_mode() { return _mode; }
-
-	static int	set_i2c_bus_clock(unsigned bus, unsigned clock_hz);
 
 	static void	capture_trampoline(void *context, uint32_t chan_index,
 					   hrt_abstime edge_time, uint32_t edge_state,

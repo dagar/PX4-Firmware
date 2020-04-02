@@ -379,11 +379,6 @@ int PWMOut::set_pwm_rate(uint32_t rate_map, unsigned default_rate, unsigned alt_
 	return OK;
 }
 
-int PWMOut::set_i2c_bus_clock(unsigned bus, unsigned clock_hz)
-{
-	return device::I2C::set_bus_clock(bus, clock_hz);
-}
-
 void PWMOut::update_current_rate()
 {
 	/*
@@ -1600,17 +1595,6 @@ int PWMOut::fmu_new_mode(PortMode new_mode)
 	return OK;
 }
 
-
-namespace
-{
-
-int fmu_new_i2c_speed(unsigned bus, unsigned clock_hz)
-{
-	return PWMOut::set_i2c_bus_clock(bus, clock_hz);
-}
-
-} // namespace
-
 int PWMOut::test()
 {
 	int	 fd;
@@ -1806,23 +1790,6 @@ int PWMOut::custom_command(int argc, char *argv[])
 {
 	PortMode new_mode = PORT_MODE_UNSET;
 	const char *verb = argv[0];
-
-	/* does not operate on a FMU instance */
-	if (!strcmp(verb, "i2c")) {
-		if (argc > 2) {
-			int bus = strtol(argv[1], 0, 0);
-			int clock_hz = strtol(argv[2], 0, 0);
-			int ret = fmu_new_i2c_speed(bus, clock_hz);
-
-			if (ret) {
-				PX4_ERR("setting I2C clock failed");
-			}
-
-			return ret;
-		}
-
-		return print_usage("not enough arguments");
-	}
 
 	if (!strcmp(verb, "sensor_reset")) {
 		if (argc > 1) {
@@ -2064,9 +2031,6 @@ mixer files.
 	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
 	PRINT_MODULE_USAGE_COMMAND_DESCR("peripheral_reset", "Reset board peripherals");
 	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("i2c", "Configure I2C clock rate");
-	PRINT_MODULE_USAGE_ARG("<bus_id> <rate>", "Specify the bus id (>=0) and rate in Hz", false);
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("test", "Test inputs and outputs");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
