@@ -42,6 +42,8 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
+#include <stm32_dtcm.h>
+
 uORB::DeviceNode::SubscriberData *uORB::DeviceNode::filp_to_sd(cdev::file_t *filp)
 {
 #ifndef __PX4_NUTTX
@@ -238,7 +240,7 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 
 			/* re-check size */
 			if (nullptr == _data) {
-				_data = new uint8_t[_meta->o_size * _queue_size];
+				_data = (uint8_t *)dtcm_zalloc(_meta->o_size * _queue_size);
 			}
 
 			unlock();

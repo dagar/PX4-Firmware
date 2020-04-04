@@ -31,6 +31,8 @@
  *
  ****************************************************************************/
 
+#include <px4_platform_common/px4_config.h>
+
 #include <px4_platform_common/px4_work_queue/WorkQueue.hpp>
 #include <px4_platform_common/px4_work_queue/WorkItem.hpp>
 
@@ -105,8 +107,7 @@ WorkQueue::Detach(WorkItem *item)
 	work_unlock();
 }
 
-void
-WorkQueue::Add(WorkItem *item)
+void __ramfunc__ WorkQueue::Add(WorkItem *item)
 {
 	work_lock();
 	_q.push(item);
@@ -115,8 +116,7 @@ WorkQueue::Add(WorkItem *item)
 	signal_worker_thread();
 }
 
-void
-WorkQueue::signal_worker_thread()
+void WorkQueue::signal_worker_thread()
 {
 	int sem_val;
 
@@ -149,7 +149,9 @@ void
 WorkQueue::Run()
 {
 	while (!should_exit()) {
-		px4_sem_wait(&_process_lock);
+
+		// loop
+		do {} while (px4_sem_wait(&_process_lock) != 0);
 
 		work_lock();
 

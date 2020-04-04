@@ -447,7 +447,7 @@ hrt_tim_init(void)
 /**
  * Handle the PPM decoder state machine.
  */
-static void
+static void __ramfunc__
 hrt_ppm_decode(uint32_t status)
 {
 	uint16_t count = rCCR_PPM;
@@ -602,7 +602,7 @@ error:
  * Handle the compare interrupt by calling the callout dispatcher
  * and then re-scheduling the next deadline.
  */
-static int
+static int __ramfunc__
 hrt_tim_isr(int irq, void *context, void *arg)
 {
 	uint32_t status;
@@ -650,7 +650,7 @@ hrt_tim_isr(int irq, void *context, void *arg)
  * Fetch a never-wrapping absolute time value in microseconds from
  * some arbitrary epoch shortly after system start.
  */
-hrt_abstime
+hrt_abstime __ramfunc__
 hrt_absolute_time(void)
 {
 	hrt_abstime	abstime;
@@ -722,7 +722,7 @@ abstime_to_ts(struct timespec *ts, hrt_abstime abstime)
 /**
  * Compare a time value with the current time as atomic operation
  */
-hrt_abstime
+hrt_abstime __ramfunc__
 hrt_elapsed_time_atomic(const volatile hrt_abstime *then)
 {
 	irqstate_t flags = px4_enter_critical_section();
@@ -767,7 +767,7 @@ hrt_init(void)
 /**
  * Call callout(arg) after interval has elapsed.
  */
-void
+void __ramfunc__
 hrt_call_after(struct hrt_call *entry, hrt_abstime delay, hrt_callout callout, void *arg)
 {
 	hrt_call_internal(entry,
@@ -780,7 +780,7 @@ hrt_call_after(struct hrt_call *entry, hrt_abstime delay, hrt_callout callout, v
 /**
  * Call callout(arg) at calltime.
  */
-void
+void __ramfunc__
 hrt_call_at(struct hrt_call *entry, hrt_abstime calltime, hrt_callout callout, void *arg)
 {
 	hrt_call_internal(entry, calltime, 0, callout, arg);
@@ -789,7 +789,7 @@ hrt_call_at(struct hrt_call *entry, hrt_abstime calltime, hrt_callout callout, v
 /**
  * Call callout(arg) every period.
  */
-void
+void __ramfunc__
 hrt_call_every(struct hrt_call *entry, hrt_abstime delay, hrt_abstime interval, hrt_callout callout, void *arg)
 {
 	hrt_call_internal(entry,
@@ -799,7 +799,7 @@ hrt_call_every(struct hrt_call *entry, hrt_abstime delay, hrt_abstime interval, 
 			  arg);
 }
 
-static void
+static void __ramfunc__
 hrt_call_internal(struct hrt_call *entry, hrt_abstime deadline, hrt_abstime interval, hrt_callout callout, void *arg)
 {
 	irqstate_t flags = px4_enter_critical_section();
@@ -831,7 +831,7 @@ hrt_call_internal(struct hrt_call *entry, hrt_abstime deadline, hrt_abstime inte
  *
  * Always returns false for repeating callouts.
  */
-bool
+bool __ramfunc__
 hrt_called(struct hrt_call *entry)
 {
 	return (entry->deadline == 0);
@@ -840,7 +840,7 @@ hrt_called(struct hrt_call *entry)
 /**
  * Remove the entry from the callout list.
  */
-void
+void __ramfunc__
 hrt_cancel(struct hrt_call *entry)
 {
 	irqstate_t flags = px4_enter_critical_section();
@@ -856,7 +856,7 @@ hrt_cancel(struct hrt_call *entry)
 	px4_leave_critical_section(flags);
 }
 
-static void
+static void __ramfunc__
 hrt_call_enter(struct hrt_call *entry)
 {
 	struct hrt_call	*call, *next;
@@ -884,7 +884,7 @@ hrt_call_enter(struct hrt_call *entry)
 	hrtinfo("scheduled\n");
 }
 
-static void
+static void __ramfunc__
 hrt_call_invoke(void)
 {
 	struct hrt_call	*call;
@@ -938,7 +938,7 @@ hrt_call_invoke(void)
  *
  * This routine must be called with interrupts disabled.
  */
-static void
+static void __ramfunc__
 hrt_call_reschedule()
 {
 	hrt_abstime	now = hrt_absolute_time();
@@ -977,7 +977,7 @@ hrt_call_reschedule()
 	rCCR_HRT = latency_baseline = deadline & 0xffff;
 }
 
-static void
+static void __ramfunc__
 hrt_latency_update(void)
 {
 	uint16_t latency = latency_actual - latency_baseline;
@@ -995,13 +995,13 @@ hrt_latency_update(void)
 	latency_counters[index]++;
 }
 
-void
+void __ramfunc__
 hrt_call_init(struct hrt_call *entry)
 {
 	memset(entry, 0, sizeof(*entry));
 }
 
-void
+void __ramfunc__
 hrt_call_delay(struct hrt_call *entry, hrt_abstime delay)
 {
 	entry->deadline = hrt_absolute_time() + delay;

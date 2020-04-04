@@ -69,13 +69,28 @@
  * organization (256 bits read width)
  */
 
+/*
+ * FLASH-ITCM 0x0020 0000 - 0x003F FFFF    ITCM (64-bit)
+ * FLASH_AXIM 0x0800 0000 - 0x081F FFFF     AHB (64-bit)/AHB (32-bit)
+ *
+ * DTCM_RAM   0x2000 0000 - 0x2001 FFFF    128 Kbytes DTCM (64-bit)
+ * ITCM_RAM   0x0000 0000 - 0x0000 3FFF     16 Kbytes ITCM (64-bit)
+ * SRAM1      0x2002 0000 - 0x2007 BFFF    368 Kbytes AHB (32-bit)
+ * SRAM2      0x2007 C000 - 0x2007 FFFF     16 KBytes AHB (32-bit)
+ */
+
+
+
+
 MEMORY
 {
-    itcm  (rwx) : ORIGIN = 0x00208000, LENGTH = 2016K
-    flash (rx)  : ORIGIN = 0x08008000, LENGTH = 2016K
-    dtcm  (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
-    sram1 (rwx) : ORIGIN = 0x20020000, LENGTH = 368K
-    sram2 (rwx) : ORIGIN = 0x2007c000, LENGTH = 16K
+    FLASH_ITCM (rx) : ORIGIN = 0x00208000, LENGTH = 2016K
+    FLASH_AXIM (rx) : ORIGIN = 0x08008000, LENGTH = 2016K
+
+    DTCM_RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+    SRAM1    (rwx) : ORIGIN = 0x20020000, LENGTH = 368K
+    SRAM2    (rwx) : ORIGIN = 0x2007c000, LENGTH = 16K
+    ITCM_RAM (rwx) : ORIGIN = 0x00000000, LENGTH = 16K
 }
 
 OUTPUT_ARCH(arm)
@@ -118,7 +133,7 @@ SECTIONS
 		 * use the NuttX get_errno_ptr() function.
 		 */
 		__errno = get_errno_ptr;
-	} > flash
+	} > FLASH_AXIM
 
 	/*
 	 * Init functions (static constructors and the like)
@@ -127,7 +142,7 @@ SECTIONS
 		_sinit = ABSOLUTE(.);
 		KEEP(*(.init_array .init_array.*))
 		_einit = ABSOLUTE(.);
-	} > flash
+	} > FLASH_AXIM
 
 	/*
 	 * Construction data for parameters.
@@ -136,19 +151,20 @@ SECTIONS
 		__param_start = ABSOLUTE(.);
 		KEEP(*(__param*))
 		__param_end = ABSOLUTE(.);
-	} > flash
+	} > FLASH_AXIM
 
 	.ARM.extab : {
 		*(.ARM.extab*)
-	} > flash
+	} > FLASH_AXIM
 
 	__exidx_start = ABSOLUTE(.);
 	.ARM.exidx : {
 		*(.ARM.exidx*)
-	} > flash
+	} > FLASH_AXIM
 	__exidx_end = ABSOLUTE(.);
 
 	_eronly = ABSOLUTE(.);
+
 
 	.data : {
 		_sdata = ABSOLUTE(.);
@@ -156,7 +172,8 @@ SECTIONS
 		*(.gnu.linkonce.d.*)
 		CONSTRUCTORS
 		_edata = ABSOLUTE(.);
-	} > sram1 AT > flash
+	} > SRAM1 AT > FLASH_AXIM
+
 
 	.bss : {
 		_sbss = ABSOLUTE(.);
@@ -165,7 +182,7 @@ SECTIONS
 		*(COMMON)
 		. = ALIGN(4);
 		_ebss = ABSOLUTE(.);
-	} > sram1
+	} > SRAM1
 
 	/* Stabs debugging sections. */
 	.stab 0 : { *(.stab) }
@@ -180,4 +197,14 @@ SECTIONS
 	.debug_line 0 : { *(.debug_line) }
 	.debug_pubnames 0 : { *(.debug_pubnames) }
 	.debug_aranges 0 : { *(.debug_aranges) }
+
+
+	.ramfunc : {
+	 	_sramfuncs = .;
+		*(.ramfunc  .ramfunc.*)
+		. = ALIGN(4);
+		_eramfuncs = .;
+	} > ITCM_RAM AT > FLASH_AXIM
+
+	_framfuncs = LOADADDR(.ramfunc);
 }

@@ -349,13 +349,13 @@ bool ICM20689::Configure()
 	return success;
 }
 
-int ICM20689::DataReadyInterruptCallback(int irq, void *context, void *arg)
+int __ramfunc__ ICM20689::DataReadyInterruptCallback(int irq, void *context, void *arg)
 {
 	static_cast<ICM20689 *>(arg)->DataReady();
 	return 0;
 }
 
-void ICM20689::DataReady()
+void __ramfunc__ ICM20689::DataReady()
 {
 	perf_count(_drdy_interval_perf);
 

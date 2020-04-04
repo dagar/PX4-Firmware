@@ -64,6 +64,7 @@
 #include <stm32_uart.h>
 #include <arch/board/board.h>
 #include "up_internal.h"
+#include <stm32_dtcm.h>
 
 #include <px4_arch/io_timer.h>
 #include <drivers/drv_hrt.h>
@@ -214,6 +215,9 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 	VDD_5V_RC_EN(true);
 	VDD_5V_WIFI_EN(true);
+
+	dtcm_initialize();
+	dtcm_procfs_register();
 
 	/* Need hrt running before using the ADC */
 

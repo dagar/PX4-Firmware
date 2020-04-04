@@ -31,6 +31,8 @@
  *
  ****************************************************************************/
 
+#include <px4_platform_common/px4_config.h>
+
 #include <px4_platform_common/px4_work_queue/WorkItem.hpp>
 
 #include <px4_platform_common/px4_work_queue/WorkQueue.hpp>

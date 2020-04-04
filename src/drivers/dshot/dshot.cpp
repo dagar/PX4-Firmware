@@ -65,7 +65,6 @@
 
 #include "telemetry.h"
 
-
 using namespace time_literals;
 
 /** Mode given via CLI */
@@ -115,8 +114,12 @@ public:
 		MODE_5CAP,
 		MODE_6CAP,
 	};
+
 	DShotOutput();
-	virtual ~DShotOutput();
+	~DShotOutput() override;
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);

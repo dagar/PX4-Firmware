@@ -37,6 +37,8 @@
  * @brief Performance measuring tools.
  */
 
+#include <px4_platform_common/px4_config.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -45,6 +47,8 @@
 #include <math.h>
 #include <pthread.h>
 #include <systemlib/err.h>
+
+#include <stm32_dtcm.h>
 
 #include "perf_counter.h"
 
@@ -57,6 +61,10 @@
  * Header common to all counters.
  */
 struct perf_ctr_header {
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
+
 	sq_entry_t		link;	/**< list linkage */
 	enum perf_counter_type	type;	/**< counter type */
 	const char		*name;	/**< counter name */
@@ -175,8 +183,7 @@ perf_alloc_once(enum perf_counter_type type, const char *name)
 	return perf_alloc(type, name);
 }
 
-void
-perf_free(perf_counter_t handle)
+void perf_free(perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -186,11 +193,10 @@ perf_free(perf_counter_t handle)
 	sq_rem(&handle->link, &perf_counters);
 	pthread_mutex_unlock(&perf_counters_mutex);
 
-	delete handle;
+	dtcm_free(handle);
 }
 
-void
-perf_count(perf_counter_t handle)
+void __ramfunc__ perf_count(perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -210,8 +216,7 @@ perf_count(perf_counter_t handle)
 	}
 }
 
-void
-perf_begin(perf_counter_t handle)
+void __ramfunc__ perf_begin(perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -227,8 +232,7 @@ perf_begin(perf_counter_t handle)
 	}
 }
 
-void
-perf_end(perf_counter_t handle)
+void __ramfunc__ perf_end(perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -272,8 +276,7 @@ perf_end(perf_counter_t handle)
 	}
 }
 
-void
-perf_set_elapsed(perf_counter_t handle, int64_t elapsed)
+void __ramfunc__ perf_set_elapsed(perf_counter_t handle, int64_t elapsed)
 {
 	if (handle == nullptr) {
 		return;
@@ -313,8 +316,7 @@ perf_set_elapsed(perf_counter_t handle, int64_t elapsed)
 	}
 }
 
-void
-perf_count_interval(perf_counter_t handle, hrt_abstime now)
+void __ramfunc__ perf_count_interval(perf_counter_t handle, hrt_abstime now)
 {
 	if (handle == nullptr) {
 		return;
@@ -367,8 +369,7 @@ perf_count_interval(perf_counter_t handle, hrt_abstime now)
 	}
 }
 
-void
-perf_set_count(perf_counter_t handle, uint64_t count)
+void __ramfunc__ perf_set_count(perf_counter_t handle, uint64_t count)
 {
 	if (handle == nullptr) {
 		return;
@@ -386,8 +387,7 @@ perf_set_count(perf_counter_t handle, uint64_t count)
 
 }
 
-void
-perf_cancel(perf_counter_t handle)
+void perf_cancel(perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -406,8 +406,7 @@ perf_cancel(perf_counter_t handle)
 	}
 }
 
-void
-perf_reset(perf_counter_t handle)
+void perf_reset(perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -441,8 +440,7 @@ perf_reset(perf_counter_t handle)
 	}
 }
 
-void
-perf_print_counter(perf_counter_t handle)
+void perf_print_counter(perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -451,8 +449,7 @@ perf_print_counter(perf_counter_t handle)
 	perf_print_counter_fd(1, handle);
 }
 
-void
-perf_print_counter_fd(int fd, perf_counter_t handle)
+void perf_print_counter_fd(int fd, perf_counter_t handle)
 {
 	if (handle == nullptr) {
 		return;
@@ -498,9 +495,7 @@ perf_print_counter_fd(int fd, perf_counter_t handle)
 	}
 }
 
-
-int
-perf_print_counter_buffer(char *buffer, int length, perf_counter_t handle)
+int __ramfunc__ perf_print_counter_buffer(char *buffer, int length, perf_counter_t handle)
 {
 	int num_written = 0;
 

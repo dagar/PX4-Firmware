@@ -53,6 +53,8 @@ class Manager;
 #include <containers/List.hpp>
 #include <px4_platform_common/atomic_bitset.h>
 
+#include <stm32_dtcm.h>
+
 using px4::AtomicBitset;
 
 /**
@@ -64,6 +66,9 @@ using px4::AtomicBitset;
 class uORB::DeviceMaster
 {
 public:
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
 
 	int advertise(const struct orb_metadata *meta, bool is_advertiser, int *instance, int priority);
 

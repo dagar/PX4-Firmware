@@ -104,7 +104,7 @@ void cpuload_initialize_once()
 	system_load.initialized = true;
 }
 
-void sched_note_start(FAR struct tcb_s *tcb)
+void __ramfunc__ sched_note_start(FAR struct tcb_s *tcb)
 {
 	/* search first free slot */
 	int i;
@@ -124,7 +124,7 @@ void sched_note_start(FAR struct tcb_s *tcb)
 	}
 }
 
-void sched_note_stop(FAR struct tcb_s *tcb)
+void __ramfunc__ sched_note_stop(FAR struct tcb_s *tcb)
 {
 	int i;
 
@@ -143,7 +143,7 @@ void sched_note_stop(FAR struct tcb_s *tcb)
 	}
 }
 
-void sched_note_suspend(FAR struct tcb_s *tcb)
+void __ramfunc__ sched_note_suspend(FAR struct tcb_s *tcb)
 {
 
 	if (system_load.initialized) {
@@ -159,7 +159,7 @@ void sched_note_suspend(FAR struct tcb_s *tcb)
 	}
 }
 
-void sched_note_resume(FAR struct tcb_s *tcb)
+void __ramfunc__ sched_note_resume(FAR struct tcb_s *tcb)
 {
 
 	if (system_load.initialized) {

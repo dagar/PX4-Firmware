@@ -92,6 +92,9 @@ public:
 	explicit Sensors(bool hil_enabled);
 	~Sensors() override;
 
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
+
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
 

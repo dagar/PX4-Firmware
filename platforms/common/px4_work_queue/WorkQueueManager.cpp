@@ -45,6 +45,8 @@
 #include <lib/drivers/device/Device.hpp>
 #include <lib/mathlib/mathlib.h>
 
+#include <stm32_dtcm.h>
+
 #include <limits.h>
 #include <string.h>
 
@@ -263,6 +265,14 @@ WorkQueueManagerRun(int, char **)
 				PX4_ERR("setting stack size for %s failed (%i)", wq->name, ret_setstacksize);
 			}
 
+			void *stackaddr = dtcm_zalloc(stacksize);
+			int ret_setstack = pthread_attr_setstack(&attr, stackaddr, stacksize);
+
+			if (ret_setstack != 0) {
+				PX4_ERR("setting stack for %s failed (%i)", wq->name, ret_setstack);
+			}
+
+
 #ifndef __PX4_QURT
 
 			// schedule policy FIFO
@@ -283,6 +293,7 @@ WorkQueueManagerRun(int, char **)
 			}
 
 			// create thread
+			// TODO: store pthread_t and dtcm_free stack when finished
 			pthread_t thread;
 			int ret_create = pthread_create(&thread, &attr, WorkQueueRunner, (void *)wq);
 
@@ -305,8 +316,7 @@ WorkQueueManagerRun(int, char **)
 	return 0;
 }
 
-int
-WorkQueueManagerStart()
+int WorkQueueManagerStart()
 {
 	if (_wq_manager_should_exit.load() && (_wq_manager_create_queue == nullptr)) {
 
@@ -333,8 +343,7 @@ WorkQueueManagerStart()
 	return PX4_OK;
 }
 
-int
-WorkQueueManagerStop()
+int WorkQueueManagerStop()
 {
 	if (!_wq_manager_should_exit.load()) {
 
@@ -384,8 +393,7 @@ WorkQueueManagerStop()
 	return PX4_OK;
 }
 
-int
-WorkQueueManagerStatus()
+int WorkQueueManagerStatus()
 {
 	if (!_wq_manager_should_exit.load() && (_wq_manager_wqs_list != nullptr)) {
 

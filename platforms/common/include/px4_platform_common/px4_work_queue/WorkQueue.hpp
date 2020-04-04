@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include <px4_platform_common/px4_config.h>
+
 #include "WorkQueueManager.hpp"
 
 #include <containers/BlockingList.hpp>
@@ -84,7 +86,7 @@ private:
 	void work_unlock() { leave_critical_section(_flags); }
 	irqstate_t _flags;
 #else
-	void work_lock() { px4_sem_wait(&_qlock); }
+	void work_lock() { do {} while (px4_sem_wait(&_qlock) != 0); }
 	void work_unlock() { px4_sem_post(&_qlock); }
 	px4_sem_t _qlock;
 #endif

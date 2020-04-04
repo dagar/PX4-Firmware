@@ -60,6 +60,9 @@ public:
 
 	~VehicleIMU() override;
 
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
+
 	bool Start();
 	void Stop();
 

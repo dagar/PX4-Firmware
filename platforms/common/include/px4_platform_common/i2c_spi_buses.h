@@ -46,6 +46,8 @@
 #include <board_config.h>
 #include <drivers/device/spi.h>
 
+#include <stm32_dtcm.h>
+
 enum class I2CSPIBusOption : uint8_t {
 	All = 0, ///< select all runnning instances
 	I2CInternal,
@@ -227,6 +229,9 @@ public:
 	{
 		return I2CSPIDriverBase::module_start(cli, iterator, &T::print_usage, &T::instantiate);
 	}
+
+	void *operator new (size_t size) { return dtcm_malloc(size); }
+	void operator delete (void *p) { dtcm_free(p); }
 
 protected:
 	I2CSPIDriver(const char *module_name, const px4::wq_config_t &config, I2CSPIBusOption bus_option, int bus,

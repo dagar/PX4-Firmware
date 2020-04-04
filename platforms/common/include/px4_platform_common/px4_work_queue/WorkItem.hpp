@@ -91,7 +91,7 @@ protected:
 	void ScheduleClear();
 protected:
 
-	void RunPreamble() { _run_count++; }
+	inline void RunPreamble() { _run_count++; }
 
 	friend void WorkQueue::Run();
 	virtual void Run() = 0;

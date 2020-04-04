@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ WorkItemExample::~WorkItemExample()
 
 bool WorkItemExample::init()
 {
-	ScheduleOnInterval(250);
+	ScheduleOnInterval(125_us);
 
 	return true;
 }
@@ -67,15 +67,27 @@ void WorkItemExample::Run()
 	perf_begin(_loop_perf);
 	perf_count(_loop_interval_perf);
 
+
+
+	// DO WORK
+
+
+
+
+	// grab latest accelerometer data
+	_sensor_accel_sub.update();
+	const sensor_accel_s &accel = _sensor_accel_sub.get();
+
+
+
+	// publish some data
 	orb_test_s data{};
 	data.timestamp = hrt_absolute_time();
+	data.val = accel.device_id;
 	_orb_test_pub.publish(data);
 
-	orb_test_medium_s data_medium{};
-	data_medium.timestamp = hrt_absolute_time();
-	_orb_test_medium_pub.publish(data_medium);
 
-	// DO NOTHING
+
 
 	perf_end(_loop_perf);
 }
@@ -101,6 +113,13 @@ int WorkItemExample::task_spawn(int argc, char *argv[])
 	_task_id = -1;
 
 	return PX4_ERROR;
+}
+
+int WorkItemExample::print_status()
+{
+	perf_print_counter(_loop_perf);
+	perf_print_counter(_loop_interval_perf);
+	return 0;
 }
 
 int WorkItemExample::custom_command(int argc, char *argv[])
