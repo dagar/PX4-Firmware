@@ -65,6 +65,7 @@
 #include <stm32.h>
 #include "board_config.h"
 #include <stm32_uart.h>
+#include <stm32_ccm.h>
 
 #include <arch/board/board.h>
 
@@ -259,6 +260,9 @@ static struct spi_dev_s *spi4;
 
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
+	ccm_initialize();
+	ccm_procfs_register();
+
 	px4_platform_init();
 
 	// Configure the DMA allocator.
