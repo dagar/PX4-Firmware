@@ -80,6 +80,19 @@
 
 using matrix::wrap_2pi;
 
+MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
+	ModuleParams(nullptr),
+	ScheduledWorkItem(MODULE_NAME, px4::serial_port_to_wq(parent->get_device_name())),
+	_mavlink(parent),
+	_mavlink_ftp(parent),
+	_mavlink_log_handler(parent),
+	_mission_manager(parent),
+	_parameters_manager(parent),
+	_mavlink_timesync(parent)
+{
+	// TODO: set work queue name
+}
+
 MavlinkReceiver::~MavlinkReceiver()
 {
 	delete _px4_accel;
@@ -88,19 +101,7 @@ MavlinkReceiver::~MavlinkReceiver()
 	delete _px4_mag;
 }
 
-MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
-	ModuleParams(nullptr),
-	_mavlink(parent),
-	_mavlink_ftp(parent),
-	_mavlink_log_handler(parent),
-	_mission_manager(parent),
-	_parameters_manager(parent),
-	_mavlink_timesync(parent)
-{
-}
-
-void
-MavlinkReceiver::acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result)
+void MavlinkReceiver::acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result)
 {
 	vehicle_command_ack_s command_ack{};
 
@@ -2741,15 +2742,9 @@ void MavlinkReceiver::handle_message_statustext(mavlink_message_t *msg)
 /**
  * Receive data from UART/UDP
  */
-void
-MavlinkReceiver::Run()
+void MavlinkReceiver::Run()
 {
-	/* set thread name */
-	{
-		char thread_name[17];
-		snprintf(thread_name, sizeof(thread_name), "mavlink_rcv_if%d", _mavlink->get_instance_id());
-		px4_prctl(PR_SET_NAME, thread_name, px4_getpid());
-	}
+	const hrt_abstime start_time = hrt_absolute_time();
 
 	// make sure mavlink app has booted before we start processing anything (parameter sync, etc)
 	while (!_mavlink->boot_complete()) {
@@ -2758,7 +2753,8 @@ MavlinkReceiver::Run()
 			_mavlink->set_boot_complete();
 		}
 
-		px4_usleep(100000);
+		ScheduleDelayed(100_ms);
+		return;
 	}
 
 	// poll timeout in ms. Also defines the max update frequency of the mission & param manager, etc.
@@ -2795,9 +2791,8 @@ MavlinkReceiver::Run()
 #endif // MAVLINK_UDP
 
 	ssize_t nread = 0;
-	hrt_abstime last_send_update = 0;
 
-	while (!_mavlink->_task_should_exit) {
+	if (!_mavlink->_task_should_exit) {
 
 		// check for parameter updates
 		if (_parameter_update_sub.updated()) {
@@ -2809,10 +2804,27 @@ MavlinkReceiver::Run()
 			updateParams();
 		}
 
-		if (poll(&fds[0], 1, timeout) > 0) {
+		if (::poll(&fds[0], 1, 0) > 0) {
 			if (_mavlink->get_protocol() == Protocol::SERIAL) {
-				/* non-blocking read. read may return negative values */
-				nread = ::read(fds[0].fd, buf, sizeof(buf));
+				if (fds[0].revents & POLLIN) {
+
+					// Check the number of bytes available in the buffer
+					int bytes_available = 0;
+					::ioctl(fds[0].fd, FIONREAD, (unsigned long)&bytes_available);
+
+					// to avoid reading very small chunks wait for data before reading
+					// this is designed to target one message, so >20 bytes at a time
+					const int character_count = 20;
+
+					if (bytes_available < character_count) {
+						const unsigned sleeptime = character_count * 1000000 / (_mavlink->get_baudrate() / 10);
+						ScheduleDelayed(sleeptime);
+						return;
+					} else {
+						// non-blocking read. read may return negative values
+						nread = ::read(fds[0].fd, buf, sizeof(buf));
+					}
+				}
 			}
 
 #if defined(MAVLINK_UDP)
@@ -2897,9 +2909,9 @@ MavlinkReceiver::Run()
 #endif // MAVLINK_UDP
 		}
 
-		hrt_abstime t = hrt_absolute_time();
+		const hrt_abstime t = hrt_absolute_time();
 
-		if (t - last_send_update > timeout * 1000) {
+		if (t - _last_send_update > timeout * 1000) {
 			_mission_manager.check_active_mission();
 			_mission_manager.send(t);
 
@@ -2910,36 +2922,18 @@ MavlinkReceiver::Run()
 			}
 
 			_mavlink_log_handler.send(t);
-			last_send_update = t;
+			_last_send_update = t;
 		}
-
 	}
-}
 
-void *
-MavlinkReceiver::start_helper(void *context)
-{
-	MavlinkReceiver rcv{(Mavlink *)context};
-	rcv.Run();
-
-	return nullptr;
-}
-
-void
-MavlinkReceiver::receive_start(pthread_t *thread, Mavlink *parent)
-{
-	pthread_attr_t receiveloop_attr;
-	pthread_attr_init(&receiveloop_attr);
-
-	struct sched_param param;
-	(void)pthread_attr_getschedparam(&receiveloop_attr, &param);
-	param.sched_priority = SCHED_PRIORITY_MAX - 80;
-	(void)pthread_attr_setschedparam(&receiveloop_attr, &param);
-
-	pthread_attr_setstacksize(&receiveloop_attr,
-				  PX4_STACK_ADJUSTED(sizeof(MavlinkReceiver) + 2840 + MAVLINK_RECEIVER_NET_ADDED_STACK));
-
-	pthread_create(thread, &receiveloop_attr, MavlinkReceiver::start_helper, (void *)parent);
-
-	pthread_attr_destroy(&receiveloop_attr);
+	if (!Scheduled()) {
+		const hrt_abstime next_run = start_time + (timeout * 1000); // timeout in milliseconds
+		const hrt_abstime now = hrt_absolute_time();
+		if (next_run > now) {
+			ScheduleDelayed(next_run - now);
+		} else {
+			// we're already behind run again "soon", but don't overdue it
+			ScheduleDelayed(1_ms);
+		}
+	}
 }

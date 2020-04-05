@@ -64,6 +64,11 @@ public:
 	 */
 	void ScheduleClear();
 
+	/**
+	 * Returns true if still scheduled to run.
+	 */
+	bool Scheduled() { return !hrt_called(&_call); }
+
 protected:
 
 	ScheduledWorkItem(const char *name, const wq_config_t &config) : WorkItem(name, config) {}

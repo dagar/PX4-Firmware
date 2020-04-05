@@ -53,8 +53,9 @@
 #include <lib/version/version.h>
 #include <uORB/PublicationQueued.hpp>
 
-#include "mavlink_receiver.h"
 #include "mavlink_main.h"
+
+#include "mavlink_receiver.h"
 
 // Guard against MAVLink misconfiguration
 #ifndef MAVLINK_CRC_EXTRA
@@ -2208,7 +2209,8 @@ Mavlink::task_main(int argc, char *argv[])
 	}
 
 	/* start the MAVLink receiver last to avoid a race */
-	MavlinkReceiver::receive_start(&_receive_thread, this);
+	MavlinkReceiver mavlink_receiver{this};
+	mavlink_receiver.ScheduleDelayed(10_ms);
 
 	while (!_task_should_exit) {
 		/* main loop */
@@ -2466,8 +2468,7 @@ Mavlink::task_main(int argc, char *argv[])
 		perf_end(_loop_perf);
 	}
 
-	/* first wait for threads to complete before tearing down anything */
-	pthread_join(_receive_thread, nullptr);
+	mavlink_receiver.ScheduleClear();
 
 	delete _subscribe_to_stream;
 	_subscribe_to_stream = nullptr;

@@ -52,6 +52,7 @@
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
 #include <px4_platform_common/module_params.h>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationQueued.hpp>
 #include <uORB/PublicationMulti.hpp>
@@ -103,18 +104,11 @@
 
 class Mavlink;
 
-class MavlinkReceiver : public ModuleParams
+class MavlinkReceiver : public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
 	MavlinkReceiver(Mavlink *parent);
 	~MavlinkReceiver() override;
-
-	/**
-	 * Start the receiver thread
-	 */
-	static void receive_start(pthread_t *thread, Mavlink *parent);
-
-	static void *start_helper(void *context);
 
 private:
 
@@ -174,7 +168,7 @@ private:
 	void handle_message_onboard_computer_status(mavlink_message_t *msg);
 
 
-	void Run();
+	void Run() override;
 
 	/**
 	 * Set the interval at which the given message stream is published.
@@ -291,6 +285,7 @@ private:
 	float				_hil_local_alt0{0.0f};
 	bool				_hil_local_proj_inited{false};
 
+	hrt_abstime			_last_send_update{0};
 	hrt_abstime			_last_utm_global_pos_com{0};
 
 	DEFINE_PARAMETERS(

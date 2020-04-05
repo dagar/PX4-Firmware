@@ -342,6 +342,7 @@ public:
 	void			handle_message(const mavlink_message_t *msg);
 
 	int			get_instance_id() const { return _instance_id; }
+	const char *            get_device_name() const { return _device_name; }
 
 	/**
 	 * Enable / disable hardware flow control.
@@ -526,6 +527,7 @@ protected:
 	Mavlink			*next{nullptr};
 
 private:
+
 	int			_instance_id{0};
 
 	bool			_transmitting_enabled{true};
@@ -567,8 +569,6 @@ private:
 	mavlink_channel_t	_channel{MAVLINK_COMM_0};
 
 	ringbuffer::RingBuffer	_logbuffer{5, sizeof(mavlink_log_s)};
-
-	pthread_t		_receive_thread {};
 
 	bool			_forwarding_on{false};
 	bool			_ftp_on{false};
