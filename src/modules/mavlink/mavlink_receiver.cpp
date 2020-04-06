@@ -82,15 +82,9 @@ using matrix::wrap_2pi;
 
 MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	ModuleParams(nullptr),
-	ScheduledWorkItem(MODULE_NAME, px4::serial_port_to_wq(parent->get_device_name())),
-	_mavlink(parent),
-	_mavlink_ftp(parent),
-	_mavlink_log_handler(parent),
-	_mission_manager(parent),
-	_parameters_manager(parent),
-	_mavlink_timesync(parent)
+	_mavlink_timesync(parent),
+	_mavlink(parent)
 {
-	// TODO: set work queue name
 }
 
 MavlinkReceiver::~MavlinkReceiver()
@@ -2875,21 +2869,6 @@ void MavlinkReceiver::Run()
 						/* handle generic messages and commands */
 						handle_message(&msg);
 
-						/* handle packet with mission manager */
-						_mission_manager.handle_message(&msg);
-
-
-						/* handle packet with parameter component */
-						_parameters_manager.handle_message(&msg);
-
-						if (_mavlink->ftp_enabled()) {
-							/* handle packet with ftp component */
-							_mavlink_ftp.handle_message(&msg);
-						}
-
-						/* handle packet with log component */
-						_mavlink_log_handler.handle_message(&msg);
-
 						/* handle packet with timesync component */
 						_mavlink_timesync.handle_message(&msg);
 
@@ -2907,33 +2886,6 @@ void MavlinkReceiver::Run()
 			}
 
 #endif // MAVLINK_UDP
-		}
-
-		const hrt_abstime t = hrt_absolute_time();
-
-		if (t - _last_send_update > timeout * 1000) {
-			_mission_manager.check_active_mission();
-			_mission_manager.send(t);
-
-			_parameters_manager.send(t);
-
-			if (_mavlink->ftp_enabled()) {
-				_mavlink_ftp.send(t);
-			}
-
-			_mavlink_log_handler.send(t);
-			_last_send_update = t;
-		}
-	}
-
-	if (!Scheduled()) {
-		const hrt_abstime next_run = start_time + (timeout * 1000); // timeout in milliseconds
-		const hrt_abstime now = hrt_absolute_time();
-		if (next_run > now) {
-			ScheduleDelayed(next_run - now);
-		} else {
-			// we're already behind run again "soon", but don't overdue it
-			ScheduleDelayed(1_ms);
 		}
 	}
 }

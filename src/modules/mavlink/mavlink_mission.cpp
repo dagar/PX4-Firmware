@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,13 +71,25 @@ uint16_t MavlinkMissionManager::_safepoint_update_counter = 0;
 		 (_msg.target_component == MAV_COMP_ID_ALL)))
 
 MavlinkMissionManager::MavlinkMissionManager(Mavlink *mavlink) :
-	_mavlink(mavlink)
+	MavlinkStream(mavlink),
+	_slow_rate_limiter(_interval / 5.0f),
 {
 	init_offboard_mission();
 }
+unsigned MavlinkMissionManager::get_size()
+{
+	if (_state == MAVLINK_WPM_STATE_SENDLIST) {
+		return MAVLINK_MSG_ID_MISSION_ITEM_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
 
-void
-MavlinkMissionManager::init_offboard_mission()
+	} else if (_state == MAVLINK_WPM_STATE_GETLIST) {
+		return MAVLINK_MSG_ID_MISSION_REQUEST + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+
+	} else {
+		return 0;
+	}
+}
+
+void MavlinkMissionManager::init_offboard_mission()
 {
 	if (!_dataman_init) {
 		_dataman_init = true;

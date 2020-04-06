@@ -41,11 +41,10 @@
 
 #pragma once
 
-#include "mavlink_ftp.h"
-#include "mavlink_log_handler.h"
 #include "mavlink_mission.h"
 #include "mavlink_parameters.h"
-#include "mavlink_timesync.h"
+#include "mavlink_ftp.h"
+#include "mavlink_log_handler.h"
 
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/drivers/barometer/PX4Barometer.hpp>
@@ -205,13 +204,9 @@ private:
 	 */
 	void update_params();
 
-	Mavlink				*_mavlink;
-
-	MavlinkFTP			_mavlink_ftp;
-	MavlinkLogHandler		_mavlink_log_handler;
-	MavlinkMissionManager		_mission_manager;
-	MavlinkParametersManager	_parameters_manager;
 	MavlinkTimesync			_mavlink_timesync;
+
+	Mavlink				*_mavlink;
 
 	mavlink_status_t		_status{}; ///< receiver status, used for mavlink_parse_char()
 
@@ -285,7 +280,6 @@ private:
 	float				_hil_local_alt0{0.0f};
 	bool				_hil_local_proj_inited{false};
 
-	hrt_abstime			_last_send_update{0};
 	hrt_abstime			_last_utm_global_pos_com{0};
 
 	DEFINE_PARAMETERS(

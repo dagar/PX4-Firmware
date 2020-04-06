@@ -38,7 +38,6 @@
  * @author Beat Küng <beat-kueng@gmx.net>
  */
 
-
 #include <stddef.h>
 #include <stdint.h>
 #include <px4_platform_common/tasks.h>

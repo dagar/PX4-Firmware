@@ -1125,9 +1125,19 @@ Mavlink::init_udp()
 void
 Mavlink::handle_message(const mavlink_message_t *msg)
 {
-	/*
-	 *  NOTE: this is called from the receiver thread
-	 */
+	/* handle packet with mission manager */
+	_mission_manager.handle_message(msg);
+
+	/* handle packet with parameter component */
+	_parameters_manager.handle_message(msg);
+
+	/* handle packet with log component */
+	_mavlink_log_handler.handle_message(msg);
+
+	if (_mavlink->ftp_enabled()) {
+		/* handle packet with ftp component */
+		_mavlink_ftp.handle_message(&msg);
+	}
 
 	if (get_forwarding_on()) {
 		/* forward any messages to other mavlink instances */
@@ -1242,8 +1252,7 @@ Mavlink::send_protocol_version()
 	set_proto_version(curr_proto_ver);
 }
 
-int
-Mavlink::configure_stream(const char *stream_name, const float rate)
+int Mavlink::configure_stream(const char *stream_name, const float rate)
 {
 	PX4_DEBUG("configure_stream(%s, %.3f)", stream_name, (double)rate);
 
@@ -1558,8 +1567,7 @@ Mavlink::update_radio_status(const radio_status_s &radio_status)
 	}
 }
 
-int
-Mavlink::configure_streams_to_default(const char *configure_single_stream)
+int Mavlink::configure_streams_to_default(const char *configure_single_stream)
 {
 	int ret = 0;
 	bool stream_configured = false;
@@ -2153,8 +2161,26 @@ Mavlink::task_main(int argc, char *argv[])
 
 		/* COMMAND_LONG stream: use unlimited rate to send all commands */
 		configure_stream("COMMAND_LONG");
-
 	}
+
+	/* PARAM_VALUE stream */
+	_parameters_manager.set_interval(interval_from_rate(300.0f));
+	_streams.add(&_parameters_manager);
+
+	/* MAVLINK_FTP stream */
+	_mavlink_ftp.set_interval(interval_from_rate(80.0f));
+	_streams.add(_mavlink_ftp);
+
+	/* MAVLINK_Log_Handler */
+	_mavlink_log_handler.set_interval(interval_from_rate(80.0f));
+	_streams.add(&_mavlink_log_handler);
+
+	/* MISSION_STREAM stream, actually sends all MISSION_XXX messages at some rate depending on
+	 * remote requests rate. Rate specified here controls how much bandwidth we will reserve for
+	 * mission messages. */
+	_mission_manager.set_interval(interval_from_rate(10.0f));
+	//_mission_manager.set_verbose(_verbose);
+	_streams.add(&_mission_manager);
 
 	if (configure_streams_to_default() != 0) {
 		PX4_ERR("configure_streams_to_default() failed");
@@ -2227,6 +2253,8 @@ Mavlink::task_main(int argc, char *argv[])
 		hrt_abstime t = hrt_absolute_time();
 
 		update_rate_mult();
+
+		_mission_manager->check_active_mission();
 
 		// check for parameter updates
 		if (parameter_update_sub.updated()) {

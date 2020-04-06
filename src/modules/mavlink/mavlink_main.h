@@ -79,6 +79,10 @@
 
 #include "mavlink_command_sender.h"
 #include "mavlink_messages.h"
+#include "mavlink_mission.h"
+#include "mavlink_parameters.h"
+#include "mavlink_ftp.h"
+#include "mavlink_log_handler.h"
 #include "mavlink_shell.h"
 #include "mavlink_ulog.h"
 
@@ -559,8 +563,13 @@ private:
 
 	List<MavlinkStream *>		_streams;
 
-	MavlinkShell		*_mavlink_shell{nullptr};
-	MavlinkULog		*_mavlink_ulog{nullptr};
+	MavlinkFTP			_mavlink_ftp{this};
+	MavlinkLogHandler		_mavlink_log_handler{this};
+	MavlinkMissionManager		_mission_manager{this};
+	MavlinkParametersManager	_parameters_manager{this};
+
+	MavlinkShell			*_mavlink_shell{nullptr};
+	MavlinkULog			*_mavlink_ulog{nullptr};
 
 	volatile bool		_mavlink_ulog_stop_requested{false};
 

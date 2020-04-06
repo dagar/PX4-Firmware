@@ -41,8 +41,10 @@
 #include <time.h>
 #include <stdio.h>
 #include <cstdbool>
+
 #include <v2.0/mavlink_types.h>
 #include <drivers/drv_hrt.h>
+#include "mavlink_stream.h"
 
 class Mavlink;
 
@@ -68,17 +70,17 @@ public:
 		LOG_HANDLER_SENDING_DATA
 	};
 
-	int         next_entry;
-	int         last_entry;
-	int         log_count;
+	int         next_entry{0};
+	int         last_entry{0};
+	int         log_count{0};
 
-	int         current_status;
-	uint16_t    current_log_index;
-	uint32_t    current_log_size;
-	uint32_t    current_log_data_offset;
-	uint32_t    current_log_data_remaining;
-	FILE       *current_log_filep;
-	char        current_log_filename[128];
+	int         current_status{LOG_HANDLER_IDLE};
+	uint16_t    current_log_index{UINT16_MAX};
+	uint32_t    current_log_size{0};
+	uint32_t    current_log_data_offset{0};
+	uint32_t    current_log_data_remaining{0};
+	FILE       *current_log_filep{nullptr};
+	char        current_log_filename[128]{};
 
 private:
 	void        _init();
@@ -88,21 +90,23 @@ private:
 };
 
 // MAVLink LOG_* Message Handler
-class MavlinkLogHandler
+class MavlinkLogHandler : public MavlinkStream
 {
 public:
 	MavlinkLogHandler(Mavlink *mavlink);
 
+	static constexpr const char *get_name_static() { return "MAVLINK_LOG_HANDLER"; }
+	const char *get_name() const override { return MavlinkFTP::get_name_static(); }
+
+	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_LOG_ENTRY; }
+	uint16_t get_id() override { return get_id_static(); }
+
+	unsigned get_size() override;
+
+	void send(const hrt_abstime t) override;
+
 	// Handle possible LOG message
 	void handle_message(const mavlink_message_t *msg);
-
-	/**
-	 * Handle sending of messages. Call this regularly at a fixed frequency.
-	 * @param t current time
-	 */
-	void send(const hrt_abstime t);
-
-	unsigned get_size();
 
 private:
 	void _log_message(const mavlink_message_t *msg);
@@ -115,5 +119,4 @@ private:
 	size_t _log_send_data();
 
 	LogListHelper    *_pLogHandlerHelper;
-	Mavlink *_mavlink;
 };

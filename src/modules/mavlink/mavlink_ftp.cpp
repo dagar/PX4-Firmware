@@ -51,11 +51,10 @@
 #include <v2.0/standard/mavlink.h>
 #endif
 
-
 constexpr const char MavlinkFTP::_root_dir[];
 
 MavlinkFTP::MavlinkFTP(Mavlink *mavlink) :
-	_mavlink(mavlink)
+	MavlinkStream(mavlink)
 {
 	// initialize session
 	_session_info.fd = -1;
