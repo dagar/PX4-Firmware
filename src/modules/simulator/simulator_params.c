@@ -136,3 +136,28 @@ PARAM_DEFINE_INT32(SIM_BARO_BLOCK, 0);
  * @group SITL
  */
 PARAM_DEFINE_INT32(SIM_DPRES_BLOCK, 0);
+
+
+/**
+ * Simulator accelerometer clipping on X.
+ *
+ * @boolean
+ * @group SITL
+ */
+PARAM_DEFINE_INT32(SIM_ACCEL_CLIP_X, 0);
+
+/**
+ * Simulator accelerometer clipping on Y.
+ *
+ * @boolean
+ * @group SITL
+ */
+PARAM_DEFINE_INT32(SIM_ACCEL_CLIP_Y, 0);
+
+/**
+ * Simulator accelerometer clipping on Z.
+ *
+ * @boolean
+ * @group SITL
+ */
+PARAM_DEFINE_INT32(SIM_ACCEL_CLIP_Z, 0);

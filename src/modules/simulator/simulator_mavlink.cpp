@@ -88,6 +88,9 @@ mavlink_hil_actuator_controls_t Simulator::actuator_controls_from_outputs()
 
 	int _system_type = _param_mav_type.get();
 
+	// reset clipping
+	_clipping = false;
+
 	/* scale outputs depending on system type */
 	if (_system_type == MAV_TYPE_QUADROTOR ||
 	    _system_type == MAV_TYPE_HEXAROTOR ||
@@ -132,6 +135,12 @@ mavlink_hil_actuator_controls_t Simulator::actuator_controls_from_outputs()
 					/* scale PWM out PWM_DEFAULT_MIN..PWM_DEFAULT_MAX us to 0..1 for rotors */
 					msg.controls[i] = (_actuator_outputs.output[i] - PWM_DEFAULT_MIN) / (PWM_DEFAULT_MAX - PWM_DEFAULT_MIN);
 
+					int throttle_percentage = round(msg.controls[i] * 100);
+
+					if (throttle_percentage >= CLIPPING_MAGIC_PERCENTAGE_MIN && throttle_percentage <= CLIPPING_MAGIC_PERCENTAGE_MAX) {
+						_clipping = true;
+					}
+
 				} else {
 					/* scale PWM out PWM_DEFAULT_MIN..PWM_DEFAULT_MAX us to -1..1 for other channels */
 					msg.controls[i] = (_actuator_outputs.output[i] - pwm_center) / ((PWM_DEFAULT_MAX - PWM_DEFAULT_MIN) / 2);
@@ -155,6 +164,12 @@ mavlink_hil_actuator_controls_t Simulator::actuator_controls_from_outputs()
 				} else {
 					/* scale PWM out PWM_DEFAULT_MIN..PWM_DEFAULT_MAX us to 0..1 for throttle */
 					msg.controls[i] = (_actuator_outputs.output[i] - PWM_DEFAULT_MIN) / (PWM_DEFAULT_MAX - PWM_DEFAULT_MIN);
+
+					int throttle_percentage = round(msg.controls[i] * 100);
+
+					if (throttle_percentage >= CLIPPING_MAGIC_PERCENTAGE_MIN && throttle_percentage <= CLIPPING_MAGIC_PERCENTAGE_MAX) {
+						_clipping = true;
+					}
 				}
 
 			} else {
@@ -202,7 +217,32 @@ void Simulator::update_sensors(const hrt_abstime &time, const mavlink_hil_sensor
 	// accel
 	if ((sensors.fields_updated & SensorSource::ACCEL) == SensorSource::ACCEL && !_param_sim_accel_block.get()) {
 		_px4_accel.set_temperature(sensors.temperature);
-		_px4_accel.update(time, sensors.xacc, sensors.yacc, sensors.zacc);
+
+		float x = sensors.xacc;
+		float y = sensors.yacc;
+		float z = sensors.zacc;
+
+		if (_clipping) {
+			// X
+			if (_param_sim_accel_clip_x.get()) {
+				x = CONSTANTS_ONE_G * 16.f * _last_clipping_high[0];
+				_last_clipping_high[0] = !_last_clipping_high[0];
+			}
+
+			// Y
+			if (_param_sim_accel_clip_y.get()) {
+				y = CONSTANTS_ONE_G * 16.f * _last_clipping_high[1];
+				_last_clipping_high[1] = !_last_clipping_high[1];
+			}
+
+			// Z
+			if (_param_sim_accel_clip_z.get()) {
+				z = CONSTANTS_ONE_G * 16.f * _last_clipping_high[2];
+				_last_clipping_high[2] = !_last_clipping_high[2];
+			}
+		}
+
+		_px4_accel.update(time, x, y, z);
 	}
 
 	// magnetometer

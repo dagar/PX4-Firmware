@@ -276,12 +276,22 @@ private:
 	};
 #endif
 
+	// throttle 73-76% = clipping
+	static constexpr int CLIPPING_MAGIC_PERCENTAGE_MIN = 73;
+	static constexpr int CLIPPING_MAGIC_PERCENTAGE_MAX = 76;
+
+	bool _clipping{false};
+	bool _last_clipping_high[3] {false};
+
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::SIM_BAT_DRAIN>) _param_sim_bat_drain, ///< battery drain interval
 		(ParamFloat<px4::params::SIM_BAT_MIN_PCT>) _battery_min_percentage, //< minimum battery percentage
 		(ParamFloat<px4::params::SIM_GPS_NOISE_X>) _param_sim_gps_noise_x,
 		(ParamBool<px4::params::SIM_GPS_BLOCK>) _param_sim_gps_block,
 		(ParamBool<px4::params::SIM_ACCEL_BLOCK>) _param_sim_accel_block,
+		(ParamBool<px4::params::SIM_ACCEL_CLIP_X>) _param_sim_accel_clip_x,
+		(ParamBool<px4::params::SIM_ACCEL_CLIP_Y>) _param_sim_accel_clip_y,
+		(ParamBool<px4::params::SIM_ACCEL_CLIP_Z>) _param_sim_accel_clip_z,
 		(ParamBool<px4::params::SIM_GYRO_BLOCK>) _param_sim_gyro_block,
 		(ParamBool<px4::params::SIM_BARO_BLOCK>) _param_sim_baro_block,
 		(ParamBool<px4::params::SIM_MAG_BLOCK>) _param_sim_mag_block,
