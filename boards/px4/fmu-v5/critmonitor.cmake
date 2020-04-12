@@ -52,6 +52,7 @@ px4_add_board(
 		px4io
 		rc_input
 		roboclaw
+		rpm
 		safety_button
 		tap_esc
 		telemetry # all available telemetry drivers
@@ -66,6 +67,7 @@ px4_add_board(
 		commander
 		dataman
 		ekf2
+		esc_battery
 		events
 		fw_att_control
 		fw_pos_control_l1

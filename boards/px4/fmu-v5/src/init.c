@@ -65,6 +65,12 @@
 #include <arch/board/board.h>
 #include "up_internal.h"
 
+#ifdef CONFIG_SCHED_CRITMONITOR
+#include "dwt.h"
+#include "itm.h"
+#include "nvic.h"
+#endif
+
 #include <px4_arch/io_timer.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
@@ -160,22 +166,19 @@ __EXPORT void board_on_reset(int status)
 __EXPORT void
 stm32_boardinitialize(void)
 {
-	board_on_reset(-1); /* Reset PWM first thing */
+	/* Reset PWM first thing */
+	board_on_reset(-1);
 
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure pins */
-
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
 	board_control_spi_sensors_power_configgpio();
 
 	/* configure USB interfaces */
-
 	stm32_usbinitialize();
-
 }
 
 /****************************************************************************
@@ -218,7 +221,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	/* Need hrt running before using the ADC */
 
 	px4_platform_init();
-
 
 	if (OK == board_determine_hw_info()) {
 		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n", board_get_hw_revision(), board_get_hw_version(),
@@ -288,6 +290,14 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 #endif /* CONFIG_MMCSD */
+
+#ifdef CONFIG_SCHED_CRITMONITOR
+	/* Make sure the high speed cycle counter is running.  It will be started
+	* automatically only if a debugger is connected.
+	*/
+	putreg32(0xc5acce55, ITM_LAR);
+	modifyreg32(DWT_CTRL, 0, DWT_CTRL_CYCCNTENA_MASK);
+#endif
 
 	return OK;
 }
