@@ -50,6 +50,9 @@
  */
 #define PX4_NUMBER_I2C_BUSES    3
 
+// RC Serial port
+#define RC_SERIAL_PORT               "/dev/tty-3" // Snapdraogon: use J12 (next to J13, power module side)
+
 // Battery ADC channels
 
 #include <system_config.h>

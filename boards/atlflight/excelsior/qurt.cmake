@@ -49,7 +49,8 @@ px4_add_board(
 		imu/invensense/mpu9250
 		magnetometer/hmc5883
 		qshell/qurt
-		snapdragon_pwm_out
+		rc_input
+		pwm_out
 		spektrum_rc
 	MODULES
 		airspeed_selector

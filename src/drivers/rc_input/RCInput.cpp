@@ -144,6 +144,11 @@ RCInput::task_spawn(int argc, char *argv[])
 	}
 
 	if (device == nullptr) {
+		PX4_ERR("device required");
+		return -1;
+	}
+
+	if (device == nullptr) {
 		PX4_ERR("valid device required");
 		return PX4_ERROR;
 	}

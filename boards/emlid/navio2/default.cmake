@@ -23,10 +23,10 @@ px4_add_board(
 		#imu # all available imu drivers
 		imu/invensense/mpu9250
 		imu/st/lsm9ds1
-		linux_pwm_out
 		#magnetometer # all available magnetometer drivers
 		magnetometer/hmc5883
 		magnetometer/lsm9ds1_mag
+		pwm_out
 		pwm_out_sim
 		rc_input
 		#telemetry # all available telemetry drivers

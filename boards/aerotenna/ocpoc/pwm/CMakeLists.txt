@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,12 +31,6 @@
 #
 ############################################################################
 
-px4_add_module(
-	MODULE drivers__spektrum_rc
-	MAIN spektrum_rc
-	SRCS
-		spektrum_rc.cpp
-	DEPENDS
-		rc
-	)
-
+px4_add_library(arch_io_pins
+	pwm_servo.cpp
+)

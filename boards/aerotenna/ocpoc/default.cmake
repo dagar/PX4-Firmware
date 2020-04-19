@@ -29,9 +29,9 @@ px4_add_board(
 		gps
 		imu/invensense/mpu9250
 		lights/rgbled
-		linux_pwm_out
 		#magnetometer # all available magnetometer drivers
 		magnetometer/hmc5883
+		pwm_out
 		pwm_out_sim
 		rc_input
 		#telemetry # all available telemetry drivers

@@ -140,15 +140,6 @@ void up_pwm_update(void)
 	io_timer_trigger();
 }
 
-int up_pwm_servo_set_rate(unsigned rate)
-{
-	for (unsigned i = 0; i < MAX_IO_TIMERS; i++) {
-		up_pwm_servo_set_rate_group_update(i, rate);
-	}
-
-	return 0;
-}
-
 uint32_t up_pwm_servo_get_rate_group(unsigned group)
 {
 	/* only return the set of channels in the group which we own */

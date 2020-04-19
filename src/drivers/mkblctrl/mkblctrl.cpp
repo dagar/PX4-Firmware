@@ -503,8 +503,6 @@ MK::task_main()
 	fds[1].fd = _t_actuator_armed;
 	fds[1].events = POLLIN;
 
-	up_pwm_servo_set_rate(_update_rate);	/* unnecessary ? */
-
 	DEVICE_LOG("starting");
 
 	/* loop until killed */

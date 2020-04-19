@@ -369,14 +369,6 @@ __EXPORT extern void	up_pwm_servo_deinit(void);
 __EXPORT extern void	up_pwm_servo_arm(bool armed);
 
 /**
- * Set the servo update rate for all rate groups.
- *
- * @param rate		The update rate in Hz to set.
- * @return		OK on success, -ERANGE if an unsupported update rate is set.
- */
-__EXPORT extern int	up_pwm_servo_set_rate(unsigned rate);
-
-/**
  * Get a bitmap of output channels assigned to a given rate group.
  *
  * @param group		The rate group to query. Rate groups are assigned contiguously

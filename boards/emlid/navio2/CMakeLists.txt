@@ -34,3 +34,4 @@
 add_subdirectory(adc)
 add_subdirectory(navio_rgbled)
 add_subdirectory(navio_sysfs_rc_in)
+add_subdirectory(pwm)
