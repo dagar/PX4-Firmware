@@ -73,7 +73,7 @@ bool ICM20948_AK09916::Reset()
 {
 	_state = STATE::RESET;
 	ScheduleClear();
-	ScheduleNow();
+	ScheduleDelayed(100_ms);
 	return true;
 }
 
@@ -95,21 +95,19 @@ void ICM20948_AK09916::Run()
 		RegisterWrite(Register::CNTL3, CNTL3_BIT::SRST);
 		_reset_timestamp = hrt_absolute_time();
 		_state = STATE::READ_WHO_AM_I;
-		ScheduleDelayed(100_ms);
+		ScheduleDelayed(1000_ms);
 		break;
 
 	case STATE::READ_WHO_AM_I:
 		_icm20948.I2CSlaveRegisterStartRead(I2C_ADDRESS_DEFAULT, (uint8_t)Register::WIA);
 		_state = STATE::WAIT_FOR_RESET;
-		ScheduleDelayed(10_ms);
+		ScheduleDelayed(100_ms);
 		break;
 
 	case STATE::WAIT_FOR_RESET: {
 
 			uint8_t WIA = 0;
 			_icm20948.I2CSlaveExternalSensorDataRead(&WIA, 1);
-
-			PX4_INFO("WIA: %d", WIA);
 
 			if (WIA == WHOAMI) {
 				// if reset succeeded then configure
@@ -118,7 +116,7 @@ void ICM20948_AK09916::Run()
 
 			} else {
 				// RESET not complete
-				if (hrt_elapsed_time(&_reset_timestamp) > 100_ms) {
+				if (hrt_elapsed_time(&_reset_timestamp) > 1000_ms) {
 					PX4_DEBUG("Reset failed, retrying");
 					_state = STATE::RESET;
 					ScheduleDelayed(100_ms);
@@ -135,17 +133,13 @@ void ICM20948_AK09916::Run()
 	// TODO: read FUSE ROM (to get ASA corrections)
 
 	case STATE::CONFIGURE:
-		if (Configure()) {
-			// if configure succeeded then start reading
-			_icm20948.I2CSlaveExternalSensorDataEnable(I2C_ADDRESS_DEFAULT, (uint8_t)Register::HXL, sizeof(TransferBuffer));
-			_state = STATE::READ;
-			ScheduleOnInterval(20_ms, 20_ms); // 50 Hz
 
-		} else {
-			PX4_DEBUG("Configure failed, retrying");
-			// try again in 100 ms
-			ScheduleDelayed(100_ms);
-		}
+		RegisterWrite(Register::CNTL2, CNTL2_BIT::MODE3);
+
+		// if configure succeeded then start reading
+		_icm20948.I2CSlaveExternalSensorDataEnable(I2C_ADDRESS_DEFAULT, (uint8_t)Register::ST1, sizeof(TransferBuffer));
+		_state = STATE::READ;
+		ScheduleOnInterval(20_ms, 20_ms); // 50 Hz
 
 		break;
 
@@ -158,7 +152,7 @@ void ICM20948_AK09916::Run()
 
 			perf_end(_transfer_perf);
 
-			if (success && !(buffer.ST2 & ST2_BIT::HOFL)) {
+			if (success) {
 				// sensor's frame is +y forward (x), -x right, +z down
 				int16_t x = combine(buffer.HYH, buffer.HYL); // +Y
 				int16_t y = combine(buffer.HXH, buffer.HXL); // +X
@@ -186,7 +180,12 @@ void ICM20948_AK09916::Run()
 
 			if (!success) {
 				perf_count(_bad_transfer_perf);
+
+				//Configure();
 			}
+
+			// next read
+			_icm20948.I2CSlaveExternalSensorDataEnable(I2C_ADDRESS_DEFAULT, (uint8_t)Register::ST1, sizeof(TransferBuffer));
 		}
 
 		break;

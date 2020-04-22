@@ -69,7 +69,7 @@ public:
 private:
 
 	struct TransferBuffer {
-		//uint8_t ST1;
+		uint8_t ST1;
 		uint8_t HXL;
 		uint8_t HXH;
 		uint8_t HYL;
@@ -119,12 +119,13 @@ private:
 		WAIT_FOR_RESET,
 		CONFIGURE,
 		READ,
-	} _state{STATE::RESET};;
+	} _state{STATE::RESET};
 
-	static constexpr uint8_t size_register_cfg{1};
+	static constexpr uint8_t size_register_cfg{2};
 	register_config_t _register_cfg[size_register_cfg] {
 		// Register                       | Set bits, Clear bits
-		{ AKM_AK09916::Register::CNTL2,   AKM_AK09916::CNTL2_BIT::MODE3, Bit0 },
+		{ AKM_AK09916::Register::CNTL2,   AKM_AK09916::CNTL2_BIT::MODE3, Bit4 | Bit3 | Bit0 },
+		{ AKM_AK09916::Register::CNTL3,   0, AKM_AK09916::CNTL3_BIT::SRST },
 	};
 };
 

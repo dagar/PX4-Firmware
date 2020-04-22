@@ -196,7 +196,7 @@ private:
 	static constexpr uint8_t size_register_bank0_cfg{6};
 	register_bank0_config_t _register_bank0_cfg[size_register_bank0_cfg] {
 		// Register                             | Set bits, Clear bits
-		{ Register::BANK_0::USER_CTRL,          USER_CTRL_BIT::FIFO_EN | USER_CTRL_BIT::I2C_MST_EN | USER_CTRL_BIT::I2C_IF_DIS, 0 },
+		{ Register::BANK_0::USER_CTRL,          USER_CTRL_BIT::FIFO_EN | USER_CTRL_BIT::I2C_MST_EN | USER_CTRL_BIT::I2C_IF_DIS, USER_CTRL_BIT::I2C_MST_RST },
 		{ Register::BANK_0::PWR_MGMT_1,         PWR_MGMT_1_BIT::CLKSEL_0, PWR_MGMT_1_BIT::DEVICE_RESET | PWR_MGMT_1_BIT::SLEEP },
 		{ Register::BANK_0::INT_PIN_CFG,        INT_PIN_CFG_BIT::INT1_ACTL, 0 },
 		{ Register::BANK_0::INT_ENABLE_1,       INT_ENABLE_1_BIT::RAW_DATA_0_RDY_EN, 0 },
@@ -214,12 +214,11 @@ private:
 	};
 
 	uint8_t _checked_register_bank3{0};
-	static constexpr uint8_t size_register_bank3_cfg{4};
+	static constexpr uint8_t size_register_bank3_cfg{3};
 	register_bank3_config_t _register_bank3_cfg[size_register_bank3_cfg] {
 		// Register                             | Set bits, Clear bits
-		{ Register::BANK_3::I2C_MST_ODR_CONFIG, 0, 0 },
-		{ Register::BANK_3::I2C_MST_CTRL,       0, 0 },
-		{ Register::BANK_3::I2C_MST_DELAY_CTRL, 0, 0 },
-		{ Register::BANK_3::I2C_SLV4_CTRL,      0, 0 },
+		{ Register::BANK_3::I2C_MST_CTRL,       I2C_MST_CTRL_BIT::I2C_MST_P_NSR | I2C_MST_CTRL_BIT::I2C_MST_CLK_400_kHz, 0 },
+		{ Register::BANK_3::I2C_MST_DELAY_CTRL, I2C_MST_DELAY_CTRL_BIT::I2C_SLVX_DLY_EN, 0 },
+		{ Register::BANK_3::I2C_SLV4_CTRL,      I2C_SLV4_CTRL_BIT::I2C_MST_DLY, 0 },
 	};
 };

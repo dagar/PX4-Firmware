@@ -50,26 +50,10 @@ ICM20948::ICM20948(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Ro
 	_px4_accel(get_device_id(), ORB_PRIO_DEFAULT, rotation),
 	_px4_gyro(get_device_id(), ORB_PRIO_DEFAULT, rotation)
 {
-	_debug_enabled = true;
-
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
 
 	if (enable_magnetometer) {
 		_slave_ak09916_magnetometer = new AKM_AK09916::ICM20948_AK09916(*this, rotation);
-
-		if (_slave_ak09916_magnetometer) {
-			for (auto &r : _register_bank3_cfg) {
-				if (r.reg == Register::BANK_3::I2C_SLV4_CTRL) {
-					r.set_bits = I2C_SLV4_CTRL_BIT::I2C_MST_DLY;
-
-				} else if (r.reg == Register::BANK_3::I2C_MST_CTRL) {
-					r.set_bits = I2C_MST_CTRL_BIT::I2C_MST_P_NSR | I2C_MST_CTRL_BIT::I2C_MST_CLK_400_kHz;
-
-				} else if (r.reg == Register::BANK_3::I2C_MST_DELAY_CTRL) {
-					r.set_bits = I2C_MST_DELAY_CTRL_BIT::I2C_SLVX_DLY_EN;
-				}
-			}
-		}
 	}
 }
 
@@ -202,6 +186,7 @@ void ICM20948::RunImpl()
 
 			// start AK09916 magnetometer (I2C aux)
 			if (_slave_ak09916_magnetometer) {
+				RegisterSetBits(Register::BANK_0::USER_CTRL, USER_CTRL_BIT::I2C_MST_RST);
 				_slave_ak09916_magnetometer->Reset();
 			}
 
@@ -283,8 +268,8 @@ void ICM20948::RunImpl()
 			if (failure || hrt_elapsed_time(&_last_config_check_timestamp) > 10_ms) {
 				// check BANK_0 & BANK_2 registers incrementally
 				if (RegisterCheck(_register_bank0_cfg[_checked_register_bank0], true)
-				    && RegisterCheck(_register_bank2_cfg[_checked_register_bank2], true)) {
-					// TODO: check bank 3
+				    && RegisterCheck(_register_bank2_cfg[_checked_register_bank2], true)
+				    && RegisterCheck(_register_bank3_cfg[_checked_register_bank3], true)) {
 
 					_last_config_check_timestamp = timestamp_sample;
 					_checked_register_bank0 = (_checked_register_bank0 + 1) % size_register_bank0_cfg;
@@ -735,15 +720,18 @@ void ICM20948::I2CSlaveRegisterStartRead(uint8_t slave_i2c_addr, uint8_t reg)
 
 void ICM20948::I2CSlaveRegisterWrite(uint8_t slave_i2c_addr, uint8_t reg, uint8_t val)
 {
+	RegisterWrite(Register::BANK_3::I2C_SLV0_CTRL, 0); // disable
+
 	RegisterWrite(Register::BANK_3::I2C_SLV0_ADDR, slave_i2c_addr);
 	RegisterWrite(Register::BANK_3::I2C_SLV0_REG, reg);
 	RegisterWrite(Register::BANK_3::I2C_SLV0_DO, val);
-	RegisterSetBits(Register::BANK_3::I2C_SLV0_CTRL, 1 | I2C_SLV0_CTRL_BIT::I2C_SLV0_EN);
+	RegisterWrite(Register::BANK_3::I2C_SLV0_CTRL, 1 | I2C_SLV0_CTRL_BIT::I2C_SLV0_EN);
 }
 
 void ICM20948::I2CSlaveExternalSensorDataEnable(uint8_t slave_i2c_addr, uint8_t reg, uint8_t size)
 {
-	//RegisterWrite(Register::I2C_SLV0_ADDR, 0); // disable slave
+	RegisterWrite(Register::BANK_3::I2C_SLV0_CTRL, 0); // disable
+
 	RegisterWrite(Register::BANK_3::I2C_SLV0_ADDR, slave_i2c_addr | I2C_SLV0_ADDR_BIT::I2C_SLV0_RNW);
 	RegisterWrite(Register::BANK_3::I2C_SLV0_REG, reg);
 	RegisterWrite(Register::BANK_3::I2C_SLV0_CTRL, size | I2C_SLV0_CTRL_BIT::I2C_SLV0_EN);

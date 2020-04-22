@@ -56,7 +56,7 @@ MPU9250_AK8963::MPU9250_AK8963(MPU9250 &mpu9250, enum Rotation rotation) :
 
 MPU9250_AK8963::~MPU9250_AK8963()
 {
-	Stop();
+	ScheduleClear();
 
 	perf_free(_transfer_perf);
 	perf_free(_bad_register_perf);
@@ -69,19 +69,9 @@ bool MPU9250_AK8963::Init()
 	return Reset();
 }
 
-void MPU9250_AK8963::Stop()
-{
-	// wait until stopped
-	while (_state.load() != STATE::STOPPED) {
-		_state.store(STATE::REQUEST_STOP);
-		ScheduleNow();
-		px4_usleep(10);
-	}
-}
-
 bool MPU9250_AK8963::Reset()
 {
-	_state.store(STATE::RESET);
+	_state = STATE::RESET;
 	ScheduleClear();
 	ScheduleNow();
 	return true;
@@ -99,18 +89,18 @@ void MPU9250_AK8963::PrintInfo()
 
 void MPU9250_AK8963::Run()
 {
-	switch (_state.load()) {
+	switch (_state) {
 	case STATE::RESET:
 		// CNTL2 SRST: Soft reset
 		RegisterWrite(Register::CNTL2, CNTL2_BIT::SRST);
 		_reset_timestamp = hrt_absolute_time();
-		_state.store(STATE::READ_WHO_AM_I);
+		_state = STATE::READ_WHO_AM_I;
 		ScheduleDelayed(100_ms);
 		break;
 
 	case STATE::READ_WHO_AM_I:
 		_mpu9250.I2CSlaveRegisterStartRead(I2C_ADDRESS_DEFAULT, (uint8_t)Register::WIA);
-		_state.store(STATE::WAIT_FOR_RESET);
+		_state = STATE::WAIT_FOR_RESET;
 		ScheduleDelayed(10_ms);
 		break;
 
@@ -121,14 +111,14 @@ void MPU9250_AK8963::Run()
 
 			if (WIA == WHOAMI) {
 				// if reset succeeded then configure
-				_state.store(STATE::CONFIGURE);
+				_state = STATE::CONFIGURE;
 				ScheduleDelayed(10_ms);
 
 			} else {
 				// RESET not complete
 				if (hrt_elapsed_time(&_reset_timestamp) > 100_ms) {
 					PX4_DEBUG("Reset failed, retrying");
-					_state.store(STATE::RESET);
+					_state = STATE::RESET;
 					ScheduleDelayed(100_ms);
 
 				} else {
@@ -146,7 +136,7 @@ void MPU9250_AK8963::Run()
 		if (Configure()) {
 			// if configure succeeded then start reading
 			_mpu9250.I2CSlaveExternalSensorDataEnable(I2C_ADDRESS_DEFAULT, (uint8_t)Register::HXL, sizeof(TransferBuffer));
-			_state.store(STATE::READ);
+			_state = STATE::READ;
 			ScheduleOnInterval(10_ms, 10_ms); // 100 Hz
 
 		} else {
@@ -197,15 +187,6 @@ void MPU9250_AK8963::Run()
 			}
 		}
 
-		break;
-
-	case STATE::REQUEST_STOP:
-		ScheduleClear();
-		_state.store(STATE::STOPPED);
-		break;
-
-	case STATE::STOPPED:
-		// DO NOTHING
 		break;
 	}
 }

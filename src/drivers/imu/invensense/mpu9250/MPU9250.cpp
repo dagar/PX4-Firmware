@@ -80,6 +80,8 @@ MPU9250::~MPU9250()
 	perf_free(_fifo_overflow_perf);
 	perf_free(_fifo_reset_perf);
 	perf_free(_drdy_interval_perf);
+
+	delete _slave_ak8963_magnetometer;
 }
 
 int MPU9250::init()
