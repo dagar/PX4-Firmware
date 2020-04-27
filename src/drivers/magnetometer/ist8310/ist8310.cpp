@@ -49,7 +49,6 @@
 #include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
 #include <lib/perf/perf_counter.h>
 #include <drivers/device/i2c.h>
-#include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_device.h>
 

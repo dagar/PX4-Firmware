@@ -42,6 +42,8 @@
 #include <systemlib/err.h>
 #include <uORB/uORB.h>
 
+#include "uORBDeviceNode.hpp"
+
 namespace uORB
 {
 
@@ -86,6 +88,15 @@ public:
 		}
 
 		return false;
+	}
+
+	int get_instance()
+	{
+		if (_handle) {
+			return static_cast<uORB::DeviceNode *>(_handle)->get_instance();
+		}
+
+		return -1;
 	}
 
 protected:

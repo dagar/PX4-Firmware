@@ -119,11 +119,13 @@ void VotedSensorsUpdate::parametersUpdate()
 			if ((device_id > 0) && ((uint32_t)device_id == report.get().device_id)) {
 				sprintf(str, "CAL_GYRO%u_EN", i);
 				int32_t device_enabled = 1;
-				int ret = param_get(param_find(str), &device_enabled);
 
-				if ((ret == PX4_OK) && (device_enabled != 1)) {
-					_gyro.enabled[driver_index] = false;
-					_gyro.priority[driver_index] = 0;
+				if (param_get(param_find(str), &device_enabled) == PX4_OK) {
+					_gyro.enabled[driver_index] = (device_enabled != 1);
+
+					if (!_gyro.enabled[driver_index]) {
+						_gyro.priority[driver_index] = 0;
+					}
 				}
 
 				break;
@@ -147,11 +149,13 @@ void VotedSensorsUpdate::parametersUpdate()
 			if ((device_id > 0) && ((uint32_t)device_id == report.get().device_id)) {
 				sprintf(str, "CAL_ACC%u_EN", i);
 				int32_t device_enabled = 1;
-				int ret = param_get(param_find(str), &device_enabled);
 
-				if ((ret == PX4_OK) && (device_enabled != 1)) {
-					_accel.enabled[driver_index] = false;
-					_accel.priority[driver_index] = 0;
+				if (param_get(param_find(str), &device_enabled) == PX4_OK) {
+					_accel.enabled[driver_index] = (device_enabled != 1);
+
+					if (!_accel.enabled[driver_index]) {
+						_accel.priority[driver_index] = 0;
+					}
 				}
 
 				break;
@@ -184,31 +188,6 @@ void VotedSensorsUpdate::parametersUpdate()
 		bool is_external = report.is_external;
 		_mag_device_id[topic_instance] = topic_device_id;
 
-		// find the driver handle that matches the topic_device_id
-		int fd = -1;
-		char str[30] {};
-
-		for (unsigned driver_index = 0; driver_index < MAG_COUNT_MAX; ++driver_index) {
-
-			(void)sprintf(str, "%s%u", MAG_BASE_DEVICE_PATH, driver_index);
-
-			fd = px4_open(str, O_RDWR);
-
-			if (fd < 0) {
-				/* the driver is not running, continue with the next */
-				continue;
-			}
-
-			uint32_t driver_device_id = (uint32_t)px4_ioctl(fd, DEVIOCGDEVICEID, 0);
-
-			if (driver_device_id == topic_device_id) {
-				break; // we found the matching driver
-
-			} else {
-				px4_close(fd);
-			}
-		}
-
 		bool config_ok = false;
 
 		/* run through all stored calibrations */
@@ -238,26 +217,6 @@ void VotedSensorsUpdate::parametersUpdate()
 				if (!_mag.enabled[topic_instance]) {
 					_mag.priority[topic_instance] = 0;
 				}
-
-				mag_calibration_s mscale{};
-
-				(void)sprintf(str, "CAL_MAG%u_XOFF", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.x_offset));
-
-				(void)sprintf(str, "CAL_MAG%u_YOFF", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.y_offset));
-
-				(void)sprintf(str, "CAL_MAG%u_ZOFF", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.z_offset));
-
-				(void)sprintf(str, "CAL_MAG%u_XSCALE", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.x_scale));
-
-				(void)sprintf(str, "CAL_MAG%u_YSCALE", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.y_scale));
-
-				(void)sprintf(str, "CAL_MAG%u_ZSCALE", i);
-				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.z_scale));
 
 				(void)sprintf(str, "CAL_MAG%u_ROT", i);
 				int32_t mag_rot = 0;
@@ -290,24 +249,9 @@ void VotedSensorsUpdate::parametersUpdate()
 					_mag_rotation[topic_instance] = _board_rotation;
 				}
 
-				if (failed) {
-					PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "mag", i);
-
-				} else {
-
-					/* apply new scaling and offsets */
-					config_ok = (px4_ioctl(fd, MAGIOCSSCALE, (long unsigned int)&mscale) == 0);
-
-					if (!config_ok) {
-						PX4_ERR(CAL_ERROR_APPLY_CAL_MSG, "mag ", i);
-					}
-				}
-
 				break;
 			}
 		}
-
-		px4_close(fd);
 	}
 }
 
@@ -459,7 +403,8 @@ void VotedSensorsUpdate::magPoll(vehicle_magnetometer_s &magnetometer)
 				}
 			}
 
-			Vector3f vect(mag_report.x, mag_report.y, mag_report.z);
+			// apply corrections (calibration)
+			Vector3f vect{_mag_corrections[uorb_index].Correct(Vector3f{mag_report.x, mag_report.y, mag_report.z})};
 
 			//throttle-/current-based mag compensation
 			_mag_compensator.calculate_mag_corrected(vect, _mag.power_compensation[uorb_index]);

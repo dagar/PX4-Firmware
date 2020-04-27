@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,22 +33,18 @@
 
 #pragma once
 
-#include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
 #include <lib/conversion/rotation.h>
 #include <uORB/uORB.h>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/topics/sensor_mag.h>
 
-class PX4Magnetometer : public cdev::CDev
+class PX4Magnetometer
 {
 
 public:
 	PX4Magnetometer(uint32_t device_id, uint8_t priority = ORB_PRIO_DEFAULT, enum Rotation rotation = ROTATION_NONE);
-	~PX4Magnetometer() override;
-
-	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
+	~PX4Magnetometer() = default;
 
 	bool external() { return _sensor_mag_pub.get().is_external; }
 
@@ -60,9 +56,9 @@ public:
 	void set_external(bool external) { _sensor_mag_pub.get().is_external = external; }
 	void set_sensitivity(float x, float y, float z) { _sensitivity = matrix::Vector3f{x, y, z}; }
 
-	void update(hrt_abstime timestamp_sample, float x, float y, float z);
+	void update(const hrt_abstime &timestamp_sample, float x, float y, float z);
 
-	int get_class_instance() { return _class_device_instance; };
+	int get_instance() { return _sensor_mag_pub.get_instance(); }
 
 	void print_status();
 
@@ -72,11 +68,5 @@ private:
 
 	const enum Rotation	_rotation;
 
-	matrix::Vector3f	_calibration_scale{1.0f, 1.0f, 1.0f};
-	matrix::Vector3f	_calibration_offset{0.0f, 0.0f, 0.0f};
-
 	matrix::Vector3f	_sensitivity{1.0f, 1.0f, 1.0f};
-
-	int			_class_device_instance{-1};
-
 };

@@ -121,7 +121,7 @@ UavcanMagnetometerBridge::mag2_sub_cb(const
 {
 	uavcan_bridge::Channel *channel = get_channel_for_node(msg.getSrcNodeID().get());
 
-	if (channel == nullptr || channel->class_instance < 0) {
+	if (channel == nullptr || channel->instance < 0) {
 		// Something went wrong - no channel to publish on; return
 		return;
 	}
@@ -156,9 +156,9 @@ int UavcanMagnetometerBridge::init_driver(uavcan_bridge::Channel *channel)
 
 	PX4Magnetometer *mag = (PX4Magnetometer *)channel->h_driver;
 
-	channel->class_instance = mag->get_class_instance();
+	channel->instance = mag->get_instance();
 
-	if (channel->class_instance < 0) {
+	if (channel->instance < 0) {
 		PX4_ERR("UavcanMag: Unable to get a class instance");
 		delete mag;
 		channel->h_driver = nullptr;

@@ -39,8 +39,6 @@
 
 #include "sensor_bridge.hpp"
 
-#include <drivers/drv_mag.h>
-
 #include <uavcan/equipment/ahrs/MagneticFieldStrength.hpp>
 #include <uavcan/equipment/ahrs/MagneticFieldStrength2.hpp>
 

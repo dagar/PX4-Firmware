@@ -51,6 +51,7 @@ public:
 	enum class SensorType : uint8_t {
 		Accelerometer,
 		Gyroscope,
+		Magnetometer,
 	};
 
 	SensorCorrections(ModuleParams *parent, SensorType type);
@@ -59,7 +60,10 @@ public:
 	void PrintStatus();
 
 	void set_device_id(uint32_t device_id);
-	uint32_t get_device_id() const { return _device_id; }
+	void set_external(bool external = true) { _external = external; }
+
+	uint32_t device_id() const { return _device_id; }
+	bool external() const { return _external; }
 
 	// apply offsets and scale
 	// rotate corrected measurements from sensor to body frame
@@ -83,7 +87,7 @@ private:
 
 	uORB::Subscription _sensor_correction_sub{ORB_ID(sensor_correction)};
 
-	matrix::Dcmf _board_rotation;
+	matrix::Dcmf _rotation;
 
 	matrix::Vector3f _offset{0.f, 0.f, 0.f};
 	matrix::Vector3f _scale{1.f, 1.f, 1.f};
@@ -94,6 +98,8 @@ private:
 	int8_t _corrections_selected_instance{-1};
 
 	const SensorType _type;
+
+	bool _external{false};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::SENS_BOARD_ROT>) _param_sens_board_rot,

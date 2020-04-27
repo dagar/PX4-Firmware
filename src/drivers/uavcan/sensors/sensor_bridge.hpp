@@ -87,7 +87,7 @@ namespace uavcan_bridge
 struct Channel {
 	int node_id              = -1;
 	orb_advert_t orb_advert  = nullptr;
-	int class_instance       = -1;
+	int instance       = -1;
 	int orb_instance         = -1;
 	cdev::CDev *h_driver     = nullptr;
 };

@@ -41,7 +41,6 @@
 
 #include "parameters.h"
 
-#include <drivers/drv_mag.h>
 #include <drivers/drv_hrt.h>
 
 #include <mathlib/mathlib.h>
@@ -60,6 +59,7 @@
 #include <uORB/topics/sensor_preflight.h>
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/subsystem_info.h>
@@ -213,6 +213,13 @@ private:
 		{this, SensorCorrections::SensorType::Gyroscope},
 		{this, SensorCorrections::SensorType::Gyroscope},
 		{this, SensorCorrections::SensorType::Gyroscope},
+	};
+
+	SensorCorrections _mag_corrections[MAG_COUNT_MAX] {
+		{this, SensorCorrections::SensorType::Magnetometer},
+		{this, SensorCorrections::SensorType::Magnetometer},
+		{this, SensorCorrections::SensorType::Magnetometer},
+		{this, SensorCorrections::SensorType::Magnetometer},
 	};
 
 	orb_advert_t _mavlink_log_pub{nullptr};

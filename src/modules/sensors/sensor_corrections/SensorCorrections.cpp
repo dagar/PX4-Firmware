@@ -58,7 +58,7 @@ void SensorCorrections::set_device_id(uint32_t device_id)
 matrix::Vector3f SensorCorrections::Correct(const matrix::Vector3f &data)
 {
 	SensorCorrectionsUpdate();
-	return _board_rotation * matrix::Vector3f{(data - _thermal_offset - _offset).emult(_scale)};
+	return _rotation * matrix::Vector3f{(data - _thermal_offset - _offset).emult(_scale)};
 }
 
 const char *SensorCorrections::SensorString() const
@@ -69,6 +69,9 @@ const char *SensorCorrections::SensorString() const
 
 	case SensorType::Gyroscope:
 		return "GYRO";
+
+	case SensorType::Magnetometer:
+		return "MAG";
 	}
 
 	return nullptr;
@@ -121,24 +124,29 @@ Vector3f SensorCorrections::CalibrationScale(uint8_t calibration_index) const
 {
 	// scale factors (x, y, z)
 	Vector3f scale{1.f, 1.f, 1.f};
-	char str[20] {};
 
-	sprintf(str, "CAL_%s%u_XSCALE", SensorString(), calibration_index);
-	param_get(param_find(str), &scale(0));
+	// gyroscope doesn't have a scale factor calibration
+	if (_type != SensorType::Gyroscope) {
+		char str[20] {};
 
-	sprintf(str, "CAL_%s%u_YSCALE", SensorString(), calibration_index);
-	param_get(param_find(str), &scale(1));
+		sprintf(str, "CAL_%s%u_XSCALE", SensorString(), calibration_index);
+		param_get(param_find(str), &scale(0));
 
-	sprintf(str, "CAL_%s%u_ZSCALE", SensorString(), calibration_index);
-	param_get(param_find(str), &scale(2));
+		sprintf(str, "CAL_%s%u_YSCALE", SensorString(), calibration_index);
+		param_get(param_find(str), &scale(1));
+
+		sprintf(str, "CAL_%s%u_ZSCALE", SensorString(), calibration_index);
+		param_get(param_find(str), &scale(2));
+	}
 
 	return scale;
 }
 
 void SensorCorrections::SensorCorrectionsUpdate(bool force)
 {
-	// check if the selected sensor has updated
-	if (_sensor_correction_sub.updated() || force) {
+	// check if the selected sensor has updated (only available for accel and gyro)
+	if (((_type == SensorType::Accelerometer) || (_type == SensorType::Gyroscope))
+	    && (_sensor_correction_sub.updated() || force)) {
 
 		sensor_correction_s corrections;
 
@@ -164,6 +172,11 @@ void SensorCorrections::SensorCorrectionsUpdate(bool force)
 						}
 
 						break;
+
+					case SensorType::Magnetometer:
+						// sensor_corrections not implementated for magnetometer
+						_corrections_selected_instance = -1;
+						break;
 					}
 				}
 			}
@@ -180,6 +193,11 @@ void SensorCorrections::SensorCorrectionsUpdate(bool force)
 				case 2:
 					_thermal_offset = Vector3f{corrections.accel_offset_2};
 					return;
+				default:
+					PX4_ERR("invalid accel corrections index: %d, resetting", _corrections_selected_instance);
+					_corrections_selected_instance = -1;
+					_thermal_offset.zero();
+					return;
 				}
 
 				break;
@@ -195,8 +213,17 @@ void SensorCorrections::SensorCorrectionsUpdate(bool force)
 				case 2:
 					_thermal_offset = Vector3f{corrections.gyro_offset_2};
 					return;
+				default:
+					PX4_ERR("invalid gyro corrections index: %d, resetting", _corrections_selected_instance);
+					_corrections_selected_instance = -1;
+					_thermal_offset.zero();
+					return;
 				}
 
+				break;
+
+			case SensorType::Magnetometer:
+				_thermal_offset.zero();
 				break;
 			}
 		}
@@ -205,28 +232,27 @@ void SensorCorrections::SensorCorrectionsUpdate(bool force)
 
 void SensorCorrections::ParametersUpdate()
 {
-	// fine tune the rotation
-	const Dcmf board_rotation_offset(Eulerf(
-			radians(_param_sens_board_x_off.get()),
-			radians(_param_sens_board_y_off.get()),
-			radians(_param_sens_board_z_off.get())));
+	if (!_external) {
+		// fine tune the rotation
+		const Dcmf board_rotation_offset(Eulerf(
+				radians(_param_sens_board_x_off.get()),
+				radians(_param_sens_board_y_off.get()),
+				radians(_param_sens_board_z_off.get())));
 
-	// get transformation matrix from sensor/board to body frame
-	_board_rotation = board_rotation_offset * get_rot_matrix((enum Rotation)_param_sens_board_rot.get());
+		// get transformation matrix from sensor/board to body frame
+		_rotation = board_rotation_offset * get_rot_matrix((enum Rotation)_param_sens_board_rot.get());
+
+	} else {
+		// TODO: per sensor external rotation
+		_rotation.setIdentity();
+	}
 
 
 	int calibration_index = FindCalibrationIndex(_device_id);
 
 	if (calibration_index >= 0) {
 		_offset = CalibrationOffset(calibration_index);
-
-		// gyroscope doesn't have a scale factor calibration
-		if (_type != SensorType::Gyroscope) {
-			_scale = CalibrationScale(calibration_index);
-
-		} else {
-			_scale = Vector3f{1.f, 1.f, 1.f};
-		}
+		_scale = CalibrationScale(calibration_index);
 
 	} else {
 		_offset.zero();
@@ -244,7 +270,7 @@ void SensorCorrections::PrintStatus()
 	PX4_INFO("%s %d offset: [%.4f %.4f %.4f]", SensorString(), _device_id,
 		 (double)_offset(0), (double)_offset(1), (double)_offset(2));
 
-	if (_type == SensorType::Accelerometer) {
+	if (_type != SensorType::Gyroscope) {
 		PX4_INFO("%s %d scale: [%.4f %.4f %.4f]", SensorString(), _device_id,
 			 (double)_scale(0), (double)_scale(1), (double)_scale(2));
 	}

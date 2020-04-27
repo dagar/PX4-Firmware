@@ -125,9 +125,9 @@ int UavcanBarometerBridge::init_driver(uavcan_bridge::Channel *channel)
 
 	PX4Barometer *baro = (PX4Barometer *)channel->h_driver;
 
-	channel->class_instance = baro->get_class_instance();
+	channel->instance = baro->get_instance();
 
-	if (channel->class_instance < 0) {
+	if (channel->instance < 0) {
 		PX4_ERR("UavcanBaro: Unable to get a class instance");
 		delete baro;
 		channel->h_driver = nullptr;

@@ -37,61 +37,12 @@
 #include <lib/drivers/device/Device.hpp>
 
 PX4Magnetometer::PX4Magnetometer(uint32_t device_id, uint8_t priority, enum Rotation rotation) :
-	CDev(nullptr),
 	_sensor_mag_pub{ORB_ID(sensor_mag), priority},
 	_rotation{rotation}
 {
-	_class_device_instance = register_class_devname(MAG_BASE_DEVICE_PATH);
-
 	_sensor_mag_pub.get().device_id = device_id;
 	_sensor_mag_pub.get().scaling = 1.0f;
 	_sensor_mag_pub.get().temperature = NAN;
-}
-
-PX4Magnetometer::~PX4Magnetometer()
-{
-	if (_class_device_instance != -1) {
-		unregister_class_devname(MAG_BASE_DEVICE_PATH, _class_device_instance);
-	}
-}
-
-int PX4Magnetometer::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case MAGIOCSSCALE: {
-			// Copy offsets and scale factors in
-			mag_calibration_s cal{};
-			memcpy(&cal, (mag_calibration_s *) arg, sizeof(cal));
-
-			_calibration_offset = matrix::Vector3f{cal.x_offset, cal.y_offset, cal.z_offset};
-			_calibration_scale = matrix::Vector3f{cal.x_scale, cal.y_scale, cal.z_scale};
-		}
-
-		return PX4_OK;
-
-	case MAGIOCGSCALE: {
-			// copy out scale factors
-			mag_calibration_s cal{};
-			cal.x_offset = _calibration_offset(0);
-			cal.y_offset = _calibration_offset(1);
-			cal.z_offset = _calibration_offset(2);
-			cal.x_scale = _calibration_scale(0);
-			cal.y_scale = _calibration_scale(1);
-			cal.z_scale = _calibration_scale(2);
-			memcpy((mag_calibration_s *)arg, &cal, sizeof(cal));
-		}
-
-		return 0;
-
-	case MAGIOCGEXTERNAL:
-		return _sensor_mag_pub.get().is_external;
-
-	case DEVIOCGDEVICEID:
-		return _sensor_mag_pub.get().device_id;
-
-	default:
-		return -ENOTTY;
-	}
 }
 
 void PX4Magnetometer::set_device_type(uint8_t devtype)
@@ -107,7 +58,7 @@ void PX4Magnetometer::set_device_type(uint8_t devtype)
 	_sensor_mag_pub.get().device_id = device_id.devid;
 }
 
-void PX4Magnetometer::update(hrt_abstime timestamp_sample, float x, float y, float z)
+void PX4Magnetometer::update(const hrt_abstime &timestamp_sample, float x, float y, float z)
 {
 	sensor_mag_s &report = _sensor_mag_pub.get();
 	report.timestamp = timestamp_sample;
@@ -117,27 +68,25 @@ void PX4Magnetometer::update(hrt_abstime timestamp_sample, float x, float y, flo
 
 	const matrix::Vector3f raw_f{x, y, z};
 
-	// Apply range scale and the calibrating offset/scale
-	const matrix::Vector3f val_calibrated{(((raw_f.emult(_sensitivity) * report.scaling) - _calibration_offset).emult(_calibration_scale))};
+	// Apply range scale
+	const matrix::Vector3f val{raw_f.emult(_sensitivity) *report.scaling};
 
 	// Raw values (ADC units 0 - 65535)
 	report.x_raw = x;
 	report.y_raw = y;
 	report.z_raw = z;
 
-	report.x = val_calibrated(0);
-	report.y = val_calibrated(1);
-	report.z = val_calibrated(2);
+	report.x = val(0);
+	report.y = val(1);
+	report.z = val(2);
 
 	_sensor_mag_pub.update();
 }
 
 void PX4Magnetometer::print_status()
 {
-	PX4_INFO(MAG_BASE_DEVICE_PATH " device instance: %d", _class_device_instance);
-
-	PX4_INFO("calibration scale: %.5f %.5f %.5f", (double)_calibration_scale(0), (double)_calibration_scale(1),
-		 (double)_calibration_scale(2));
-	PX4_INFO("calibration offset: %.5f %.5f %.5f", (double)_calibration_offset(0), (double)_calibration_offset(1),
-		 (double)_calibration_offset(2));
+	char device_id_buffer[80] {};
+	device::Device::device_id_print_buffer(device_id_buffer, sizeof(device_id_buffer), _sensor_mag_pub.get().device_id);
+	PX4_INFO("device id: %d (%s)", _sensor_mag_pub.get().device_id, device_id_buffer);
+	PX4_INFO("rotation: %d", _rotation);
 }

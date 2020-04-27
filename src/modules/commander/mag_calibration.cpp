@@ -52,12 +52,12 @@
 #include <math.h>
 #include <fcntl.h>
 #include <drivers/drv_hrt.h>
-#include <drivers/drv_mag.h>
 #include <drivers/drv_tone_alarm.h>
 #include <matrix/math.hpp>
 #include <lib/systemlib/mavlink_log.h>
 #include <lib/parameters/param.h>
 #include <uORB/SubscriptionBlocking.hpp>
+#include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 
 static constexpr char sensor_name[] {"mag"};
@@ -91,6 +91,16 @@ struct mag_worker_data_t {
 	float		*x[MAX_MAGS] {nullptr};
 	float		*y[MAX_MAGS] {nullptr};
 	float		*z[MAX_MAGS] {nullptr};
+};
+
+/** mag scaling factors; Vout = (Vin * Vscale) + Voffset */
+struct mag_calibration_s {
+	float	x_offset;
+	float	x_scale;
+	float	y_offset;
+	float	y_scale;
+	float	z_offset;
+	float	z_scale;
 };
 
 int do_mag_calibration(orb_advert_t *mavlink_log_pub)

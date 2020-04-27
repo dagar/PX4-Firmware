@@ -130,7 +130,7 @@ void VehicleIMU::Run()
 
 void VehicleIMU::PrintStatus()
 {
-	PX4_INFO("selected IMU: accel: %d gyro: %d", _accel_corrections.get_device_id(), _gyro_corrections.get_device_id());
+	PX4_INFO("selected IMU: accel: %d gyro: %d", _accel_corrections.device_id(), _gyro_corrections.device_id());
 	_accel_corrections.PrintStatus();
 	_gyro_corrections.PrintStatus();
 }
