@@ -77,7 +77,7 @@
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/input_rc.h>
 #include <uORB/topics/manual_control_setpoint.h>
-#include <uORB/topics/mavlink_log.h>
+#include <uORB/topics/log_message.h>
 #include <uORB/topics/mount_orientation.h>
 #include <uORB/topics/obstacle_distance.h>
 #include <uORB/topics/optical_flow.h>
@@ -408,7 +408,7 @@ protected:
 	{
 		if (!_mavlink->get_logbuffer()->empty() && _mavlink->is_connected()) {
 
-			mavlink_log_s mavlink_log{};
+			log_message_s mavlink_log{};
 
 			if (_mavlink->get_logbuffer()->get(&mavlink_log)) {
 

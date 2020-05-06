@@ -2322,7 +2322,7 @@ Mavlink::task_main(int argc, char *argv[])
 			}
 		}
 
-		mavlink_log_s mavlink_log;
+		log_message_s mavlink_log;
 
 		if (mavlink_log_sub.update(&mavlink_log)) {
 			_logbuffer.put(&mavlink_log);

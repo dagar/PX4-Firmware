@@ -45,7 +45,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include <uORB/topics/mavlink_log.h>
+#include <uORB/topics/log_message.h>
+
 #include "mavlink_log.h"
 
 __EXPORT void mavlink_vasprintf(int severity, orb_advert_t *mavlink_log_pub, const char *fmt, ...)
@@ -60,7 +61,7 @@ __EXPORT void mavlink_vasprintf(int severity, orb_advert_t *mavlink_log_pub, con
 		return;
 	}
 
-	mavlink_log_s log_msg;
+	log_message_s log_msg;
 	log_msg.severity = severity;
 	log_msg.timestamp = hrt_absolute_time();
 
@@ -73,6 +74,6 @@ __EXPORT void mavlink_vasprintf(int severity, orb_advert_t *mavlink_log_pub, con
 		orb_publish(ORB_ID(mavlink_log), *mavlink_log_pub, &log_msg);
 
 	} else {
-		*mavlink_log_pub = orb_advertise_queue(ORB_ID(mavlink_log), &log_msg, mavlink_log_s::ORB_QUEUE_LENGTH);
+		*mavlink_log_pub = orb_advertise_queue(ORB_ID(mavlink_log), &log_msg, log_message_s::ORB_QUEUE_LENGTH);
 	}
 }

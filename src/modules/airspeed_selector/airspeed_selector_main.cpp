@@ -47,7 +47,6 @@
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/airspeed_validated.h>
 #include <uORB/topics/estimator_status.h>
-#include <uORB/topics/mavlink_log.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationMulti.hpp>

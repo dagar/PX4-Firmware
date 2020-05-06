@@ -53,7 +53,6 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/collision_constraints.h>
 #include <uORB/topics/distance_sensor.h>
-#include <uORB/topics/mavlink_log.h>
 #include <uORB/topics/obstacle_distance.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_command.h>

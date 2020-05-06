@@ -72,7 +72,7 @@
 #include <systemlib/mavlink_log.h>
 #include <systemlib/uthash/utlist.h>
 #include <uORB/Publication.hpp>
-#include <uORB/topics/mavlink_log.h>
+#include <uORB/topics/log_message.h>
 #include <uORB/topics/mission_result.h>
 #include <uORB/topics/radio_status.h>
 #include <uORB/topics/telemetry_status.h>
@@ -562,7 +562,7 @@ private:
 
 	mavlink_channel_t	_channel{MAVLINK_COMM_0};
 
-	ringbuffer::RingBuffer	_logbuffer{5, sizeof(mavlink_log_s)};
+	ringbuffer::RingBuffer	_logbuffer{log_message_s::ORB_QUEUE_LENGTH, sizeof(log_message_s)};
 
 	pthread_t		_receive_thread {};
 
