@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,11 +31,16 @@
 #
 ############################################################################
 
-add_subdirectory(bmp280)
-add_subdirectory(bmp388)
-add_subdirectory(dps310)
-add_subdirectory(lps22hb)
-#add_subdirectory(lps25h) # not ready for general inclusion
-#add_subdirectory(mpl3115a2) # not ready for general inclusion
-add_subdirectory(ms5607)
-add_subdirectory(ms5611)
+px4_add_module(
+	MODULE drivers__barometer__ms5607
+	MAIN ms5607
+	COMPILE_FLAGS
+	SRCS
+		ms5607_main.cpp
+		MS5607.cpp
+		MS5607.hpp
+		TE_MS5607_registers.hpp
+	DEPENDS
+		drivers_barometer
+		px4_work_queue
+	)

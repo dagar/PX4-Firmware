@@ -20,7 +20,7 @@ ist8310 -I -R 4 start
 ll40ls start -X
 
 # Internal SPI (auto detect ms5611 or ms5607)
-if ! ms5611 -T 5607 -s start
+if ! ms5607 -s start
 then
 	ms5611 -s start
 fi

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,13 +54,6 @@ namespace device __EXPORT
 class __EXPORT SPI : public CDev
 {
 public:
-	// no copy, assignment, move, move assignment
-	SPI(const SPI &) = delete;
-	SPI &operator=(const SPI &) = delete;
-	SPI(SPI &&) = delete;
-	SPI &operator=(SPI &&) = delete;
-
-protected:
 	/**
 	 * Constructor
 	 *
@@ -72,8 +65,15 @@ protected:
 	 * @param frequency	SPI clock frequency
 	 */
 	SPI(uint8_t device_type, const char *name, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency);
-	virtual ~SPI();
+	virtual ~SPI() = default;
 
+	// no copy, assignment, move, move assignment
+	SPI(const SPI &) = delete;
+	SPI &operator=(const SPI &) = delete;
+	SPI(SPI &&) = delete;
+	SPI &operator=(SPI &&) = delete;
+
+protected:
 	/**
 	 * Locking modes supported by the driver.
 	 */
@@ -83,12 +83,53 @@ protected:
 		LOCK_NONE		/**< perform no locking, only safe if the bus is entirely private */
 	};
 
-	virtual int	init() override;
+	virtual int init() override;
 
 	/**
 	 * Check for the presence of the device on the bus.
 	 */
-	virtual int	probe() { return PX4_OK; }
+	virtual int probe() { return PX4_OK; }
+
+	/**
+	 * Read directly from the device.
+	 *
+	 * The actual size of each unit quantity is device-specific.
+	 *
+	 * @param offset	The device address at which to start reading
+	 * @param data		The buffer into which the read values should be placed.
+	 * @param count		The number of items to read.
+	 * @return		The number of items read on success, negative errno otherwise.
+	 */
+	int read(unsigned address, void *data = nullptr, unsigned count = 0) override;
+
+	/**
+	 * Write directly to the device.
+	 *
+	 * The actual size of each unit quantity is device-specific.
+	 *
+	 * @param address	The device address at which to start writing.
+	 * @param data		The buffer from which values should be read.
+	 * @param count		The number of items to write.
+	 * @return		The number of items written on success, negative errno otherwise.
+	 */
+	int write(unsigned address, void *data = nullptr, unsigned count = 0) override;
+
+	/**
+	 * Read a register from the device.
+	 *
+	 * @param		The register to read.
+	 * @return		The value that was read.
+	 */
+	uint8_t RegisterRead(uint8_t reg) override;
+
+	/**
+	 * Write a register in the device.
+	 *
+	 * @param reg		The register to write.
+	 * @param value		The new value to write.
+	 * @return		OK on success, negative errno otherwise.
+	 */
+	int RegisterWrite(uint8_t reg, uint8_t value) override;
 
 	/**
 	 * Perform a SPI transfer.
@@ -109,7 +150,7 @@ protected:
 	 * @return		OK if the exchange was successful, -errno
 	 *			otherwise.
 	 */
-	int		transfer(uint8_t *send, uint8_t *recv, unsigned len);
+	int transfer(uint8_t *send, uint8_t *recv, unsigned len);
 
 	/**
 	 * Perform a SPI 16 bit transfer.
@@ -130,7 +171,7 @@ protected:
 	 * @return		OK if the exchange was successful, -errno
 	 *			otherwise.
 	 */
-	int		transferhword(uint16_t *send, uint16_t *recv, unsigned len);
+	int transferhword(uint16_t *send, uint16_t *recv, unsigned len);
 
 	/**
 	 * Set the SPI bus frequency
@@ -155,6 +196,7 @@ protected:
 	void		set_lockmode(enum LockMode mode) { _locking_mode = mode; }
 
 private:
+
 	uint32_t		_device;
 	enum spi_mode_e		_mode;
 	uint32_t		_frequency;
@@ -163,11 +205,9 @@ private:
 	LockMode		_locking_mode{LOCK_THREADS};	/**< selected locking mode */
 
 protected:
-	int	_transfer(uint8_t *send, uint8_t *recv, unsigned len);
-
-	int	_transferhword(uint16_t *send, uint16_t *recv, unsigned len);
-
-	bool	external() const override { return px4_spi_bus_external(get_device_bus()); }
+	int _transfer(uint8_t *send, uint8_t *recv, unsigned len);
+	int _transferhword(uint16_t *send, uint16_t *recv, unsigned len);
+	bool external() const override { return px4_spi_bus_external(get_device_bus()); }
 
 };
 

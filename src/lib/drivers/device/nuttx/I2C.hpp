@@ -57,8 +57,19 @@ namespace device __EXPORT
  */
 class __EXPORT I2C : public CDev
 {
-
 public:
+
+	/**
+	 * @ Constructor
+	 *
+	 * @param device_type	The device type (see drv_sensor.h)
+	 * @param name		Driver name
+	 * @param bus		I2C bus on which the device lives
+	 * @param address	I2C bus address, or zero if set_address will be used
+	 * @param frequency	I2C bus frequency for the device (currently not used)
+	 */
+	I2C(uint8_t device_type, const char *name, const int bus, const uint16_t address, const uint32_t frequency);
+	virtual ~I2C();
 
 	// no copy, assignment, move, move assignment
 	I2C(const I2C &) = delete;
@@ -75,24 +86,12 @@ protected:
 	 * The number of times a read or write operation will be retried on
 	 * error.
 	 */
-	uint8_t		_retries{0};
-
-	/**
-	 * @ Constructor
-	 *
-	 * @param device_type	The device type (see drv_sensor.h)
-	 * @param name		Driver name
-	 * @param bus		I2C bus on which the device lives
-	 * @param address	I2C bus address, or zero if set_address will be used
-	 * @param frequency	I2C bus frequency for the device (currently not used)
-	 */
-	I2C(uint8_t device_type, const char *name, const int bus, const uint16_t address, const uint32_t frequency);
-	virtual ~I2C();
+	uint8_t _retries{0};
 
 	/**
 	 * Check for the presence of the device on the bus.
 	 */
-	virtual int	probe() { return PX4_OK; }
+	virtual int probe() { return PX4_OK; }
 
 	/**
 	 * Perform an I2C transaction to the device.
@@ -106,9 +105,9 @@ protected:
 	 * @return		OK if the transfer was successful, -errno
 	 *			otherwise.
 	 */
-	int		transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len);
+	int transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len);
 
-	bool	external() const override { return px4_i2c_bus_external(_device_id.devid_s.bus); }
+	bool external() const override { return px4_i2c_bus_external(_device_id.devid_s.bus); }
 
 private:
 	static unsigned	int	_bus_clocks[PX4_NUMBER_I2C_BUSES];

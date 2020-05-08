@@ -72,8 +72,7 @@ I2C::~I2C()
 	}
 }
 
-int
-I2C::set_bus_clock(unsigned bus, unsigned clock_hz)
+int I2C::set_bus_clock(unsigned bus, unsigned clock_hz)
 {
 	int index = bus - 1;
 
@@ -90,8 +89,7 @@ I2C::set_bus_clock(unsigned bus, unsigned clock_hz)
 	return OK;
 }
 
-int
-I2C::init()
+int I2C::init()
 {
 	int ret = PX4_ERROR;
 	unsigned bus_index;

@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,13 +35,11 @@ px4_add_module(
 	MODULE drivers__barometer__ms5611
 	MAIN ms5611
 	COMPILE_FLAGS
-		-Wno-cast-align # TODO: fix and enable
 	SRCS
-		ms5611_spi.cpp
-		ms5611_i2c.cpp
-		ms5611.cpp
 		ms5611_main.cpp
+		MS5611.cpp
 		MS5611.hpp
+		TE_MS5611_registers.hpp
 	DEPENDS
 		drivers_barometer
 		px4_work_queue

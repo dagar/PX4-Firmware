@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "MS5611.hpp"
+#include "MS5607.hpp"
 
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
@@ -41,19 +41,19 @@
 #include <drivers/device/i2c.h>
 #include <drivers/device/spi.h>
 
-#define MS5611_ADDRESS_1 0x76 /* address select pins pulled high (PX4FMU series v1.6+) */
-#define MS5611_ADDRESS_2 0x77 /* address select pins pulled low (PX4FMU prototypes) */
+#define MS5607_ADDRESS_1 0x76 /* address select pins pulled high (PX4FMU series v1.6+) */
+#define MS5607_ADDRESS_2 0x77 /* address select pins pulled low (PX4FMU prototypes) */
 
-I2CSPIDriverBase *MS5611::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
+I2CSPIDriverBase *MS5607::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 				      int runtime_instance)
 {
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = new device::I2C(DRV_BARO_DEVTYPE_MS5611, MODULE_NAME, iterator.bus(), MS5611_ADDRESS_1, cli.bus_frequency);
+		interface = new device::I2C(DRV_BARO_DEVTYPE_MS5607, MODULE_NAME, iterator.bus(), MS5607_ADDRESS_1, cli.bus_frequency);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = new device::SPI(DRV_BARO_DEVTYPE_MS5611, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+		interface = new device::SPI(DRV_BARO_DEVTYPE_MS5607, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
 						    cli.bus_frequency);
 	}
 
@@ -67,7 +67,7 @@ I2CSPIDriverBase *MS5611::instantiate(const BusCLIArguments &cli, const BusInsta
 		return nullptr;
 	}
 
-	MS5611 *dev = new MS5611(interface, iterator.configuredBusOption(), iterator.bus());
+	MS5607 *dev = new MS5607(interface, iterator.configuredBusOption(), iterator.bus());
 
 	if (dev == nullptr) {
 		return nullptr;
@@ -82,19 +82,19 @@ I2CSPIDriverBase *MS5611::instantiate(const BusCLIArguments &cli, const BusInsta
 	return dev;
 }
 
-void MS5611::print_usage()
+void MS5607::print_usage()
 {
-	PRINT_MODULE_USAGE_NAME("ms5611", "driver");
+	PRINT_MODULE_USAGE_NAME("ms5607", "driver");
 	PRINT_MODULE_USAGE_SUBCATEGORY("baro");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, true);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
-extern "C" int ms5611_main(int argc, char *argv[])
+extern "C" int ms5607_main(int argc, char *argv[])
 {
 	int ch;
-	using ThisDriver = MS5611;
+	using ThisDriver = MS5607;
 	BusCLIArguments cli{true, true};
 	cli.default_i2c_frequency = I2C_SPEED;
 	cli.default_spi_frequency = SPI_SPEED;
@@ -114,7 +114,7 @@ extern "C" int ms5611_main(int argc, char *argv[])
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_BARO_DEVTYPE_MS5611);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_BARO_DEVTYPE_MS5607);
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);

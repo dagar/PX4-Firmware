@@ -32,8 +32,8 @@
  ****************************************************************************/
 
 /**
- * @file MS5611.hpp
- * Driver for the MS5611 barometric pressure sensor connected via I2C or SPI.
+ * @file MS5607.hpp
+ * Driver for the MS5607 barometric pressure sensor connected via I2C or SPI.
  */
 
 #pragma once
@@ -44,15 +44,15 @@
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/i2c_spi_buses.h>
 
-#include "TE_MS5611_registers.hpp"
+#include "TE_MS5607_registers.hpp"
 
-using namespace TE_MS5611;
+using namespace TE_MS5607;
 
-class MS5611 : public I2CSPIDriver<MS5611>
+class MS5607 : public I2CSPIDriver<MS5607>
 {
 public:
-	MS5611(device::Device *interface, I2CSPIBusOption bus_option, int bus);
-	~MS5611() override;
+	MS5607(device::Device *interface, I2CSPIBusOption bus_option, int bus);
+	~MS5607() override;
 
 	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 					     int runtime_instance);
@@ -66,7 +66,7 @@ private:
 	uint32_t ReadADC();
 	bool ReadProm();
 
-	// MS5611 crc4 cribbed from the datasheet
+	// MS5607 crc4 cribbed from the datasheet
 	bool crc4(uint16_t *n_prom);
 
 	device::Device *_interface;
@@ -84,9 +84,9 @@ private:
 	hrt_abstime _timestamp_sample{0};
 	hrt_abstime _last_temperature_update{0};
 
-	TE_MS5611::PROM _prom{};
+	TE_MS5607::PROM _prom{};
 
-	// intermediate temperature values per MS5611 datasheet
+	// intermediate temperature values per MS5607 datasheet
 	int64_t _OFF{0};
 	int64_t _SENS{0};
 
