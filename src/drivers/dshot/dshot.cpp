@@ -280,7 +280,7 @@ DShotOutput::init()
 	/* try to claim the generic PWM output device node as well - it's OK if we fail at this */
 	_class_instance = register_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH);
 
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
+	if (_class_instance == cdev::CLASS_DEVICE_PRIMARY) {
 		/* lets not be too verbose */
 	} else if (_class_instance < 0) {
 		PX4_ERR("FAILED registering class device");

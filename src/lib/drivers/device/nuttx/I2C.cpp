@@ -54,14 +54,9 @@ namespace device
 unsigned int I2C::_bus_clocks[PX4_NUMBER_I2C_BUSES] = PX4_I2C_BUS_CLOCK_INIT;
 
 I2C::I2C(uint8_t device_type, const char *name, const int bus, const uint16_t address, const uint32_t frequency) :
-	CDev(name, nullptr),
+	Device(device_type, name, DeviceBusType_I2C, bus, address),
 	_frequency(frequency)
 {
-	// fill in _device_id fields for a I2C device
-	_device_id.devid_s.devtype = device_type;
-	_device_id.devid_s.bus_type = DeviceBusType_I2C;
-	_device_id.devid_s.bus = bus;
-	_device_id.devid_s.address = address;
 }
 
 I2C::~I2C()
@@ -72,8 +67,7 @@ I2C::~I2C()
 	}
 }
 
-int
-I2C::set_bus_clock(unsigned bus, unsigned clock_hz)
+int I2C::set_bus_clock(unsigned bus, unsigned clock_hz)
 {
 	int index = bus - 1;
 
@@ -90,8 +84,7 @@ I2C::set_bus_clock(unsigned bus, unsigned clock_hz)
 	return OK;
 }
 
-int
-I2C::init()
+int I2C::init()
 {
 	int ret = PX4_ERROR;
 	unsigned bus_index;
@@ -144,14 +137,6 @@ I2C::init()
 		goto out;
 	}
 
-	// do base class init, which will create device node, etc
-	ret = CDev::init();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("cdev init failed");
-		goto out;
-	}
-
 	// tell the world where we are
 	DEVICE_DEBUG("on I2C bus %d at 0x%02x (bus: %u KHz, max: %u KHz)",
 		     get_device_bus(), get_device_address(), _bus_clocks[bus_index] / 1000, _frequency / 1000);
@@ -166,8 +151,7 @@ out:
 	return ret;
 }
 
-int
-I2C::transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len)
+int I2C::transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len)
 {
 	int ret = PX4_ERROR;
 	unsigned retry_count = 0;
@@ -225,6 +209,34 @@ I2C::transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const
 	} while (retry_count++ < _retries);
 
 	return ret;
+}
+
+int I2C::read(unsigned address, void *data, unsigned count)
+{
+	uint8_t cmd = address;
+	return transfer(&cmd, 1, (uint8_t *)data, count);
+}
+
+int I2C::write(unsigned address, void *data, unsigned count)
+{
+	uint8_t cmd = address;
+	return transfer(&cmd, 1, (uint8_t *)data, count);
+}
+
+uint8_t I2C::RegisterRead(uint8_t reg)
+{
+	uint8_t value;
+
+	if (transfer(&reg, 1, &value, 1) == PX4_OK) {
+		return value;
+	}
+
+	return 0;
+}
+
+int I2C::RegisterWrite(uint8_t reg, uint8_t value)
+{
+	return transfer(&reg, 1, &value, 1);
 }
 
 } // namespace device

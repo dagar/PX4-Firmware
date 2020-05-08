@@ -56,7 +56,7 @@ UavcanMagnetometerBridge::UavcanMagnetometerBridge(uavcan::INode &node) :
 int
 UavcanMagnetometerBridge::init()
 {
-	int res = device::CDev::init();
+	int res = cdev::CDev::init();
 
 	if (res < 0) {
 		return res;

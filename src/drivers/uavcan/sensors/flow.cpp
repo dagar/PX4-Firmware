@@ -46,7 +46,7 @@ UavcanFlowBridge::UavcanFlowBridge(uavcan::INode &node) :
 int
 UavcanFlowBridge::init()
 {
-	int res = device::CDev::init();
+	int res = cdev::CDev::init();
 
 	if (res < 0) {
 		return res;

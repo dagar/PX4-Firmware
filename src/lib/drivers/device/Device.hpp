@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -88,7 +88,7 @@ public:
 	 *
 	 * @return	OK if the driver initialized OK, negative errno otherwise;
 	 */
-	virtual int	init() { return PX4_OK; }
+	virtual int init() { return PX4_OK; }
 
 	/**
 	 * Read directly from the device.
@@ -100,7 +100,7 @@ public:
 	 * @param count		The number of items to read.
 	 * @return		The number of items read on success, negative errno otherwise.
 	 */
-	virtual int	read(unsigned address, void *data, unsigned count) { return -ENODEV; }
+	virtual int read(unsigned address, void *data = nullptr, unsigned count = 0) { return -ENODEV; }
 
 	/**
 	 * Write directly to the device.
@@ -112,7 +112,7 @@ public:
 	 * @param count		The number of items to write.
 	 * @return		The number of items written on success, negative errno otherwise.
 	 */
-	virtual int	write(unsigned address, void *data, unsigned count) { return -ENODEV; }
+	virtual int write(unsigned address, void *data = nullptr, unsigned count = 0) { return -ENODEV; }
 
 	/**
 	 * Read a register from the device.
@@ -120,7 +120,7 @@ public:
 	 * @param		The register to read.
 	 * @return		The value that was read.
 	 */
-	virtual uint8_t read_reg(unsigned reg) { return -ENODEV; }
+	virtual uint8_t RegisterRead(uint8_t reg) { return 0; }
 
 	/**
 	 * Write a register in the device.
@@ -129,24 +129,24 @@ public:
 	 * @param value		The new value to write.
 	 * @return		OK on success, negative errno otherwise.
 	 */
-	virtual int write_reg(unsigned reg, uint8_t value) { return -ENODEV; }
+	virtual int RegisterWrite(uint8_t reg, uint8_t value) { return -ENODEV; }
 
-	/**
-	 * Perform a device-specific operation.
-	 *
-	 * @param operation	The operation to perform.
-	 * @param arg		An argument to the operation.
-	 * @return		Negative errno on error, OK or positive value on success.
-	 */
-	virtual int	ioctl(unsigned operation, unsigned &arg)
+	int RegisterClearAndSetBits(uint8_t reg, uint8_t clearbits, uint8_t setbits)
 	{
-		switch (operation) {
-		case DEVIOCGDEVICEID:
-			return (int)_device_id.devid;
+		const uint8_t orig_val = RegisterRead(reg);
+		uint8_t val = (orig_val & ~clearbits) | setbits;
+
+		if (orig_val != val) {
+			return RegisterWrite(reg, val);
 		}
 
-		return -ENODEV;
+		return PX4_OK;
 	}
+
+	// temporary for transition
+	void RegisterSetBits(uint8_t reg, uint8_t setbits) { RegisterClearAndSetBits(reg, 0, setbits); }
+	void RegisterClearBits(uint8_t reg, uint8_t clearbits) { RegisterClearAndSetBits(reg, clearbits, 0); }
+	int RegisterSetAndClearBits(uint8_t reg, uint8_t clearbits, uint8_t setbits) { return RegisterClearAndSetBits(reg, clearbits, setbits); }
 
 	/** Device bus types for DEVID */
 	enum DeviceBusType {
@@ -182,7 +182,7 @@ public:
 	 *
 	 * @return The bus type
 	 */
-	DeviceBusType	get_device_bus_type() const { return _device_id.devid_s.bus_type; }
+	DeviceBusType get_device_bus_type() const { return _device_id.devid_s.bus_type; }
 
 	static const char *get_device_bus_string(DeviceBusType bus)
 	{

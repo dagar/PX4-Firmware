@@ -40,7 +40,7 @@
 #ifndef _DEVICE_I2C_H
 #define _DEVICE_I2C_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
 
 namespace device __EXPORT
 {
@@ -48,7 +48,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on I2C
  */
-class __EXPORT I2C : public CDev
+class __EXPORT I2C : public Device
 {
 
 public:

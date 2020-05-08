@@ -48,14 +48,9 @@ namespace device
 {
 
 I2C::I2C(uint8_t device_type, const char *name, const int bus, const uint16_t address, const uint32_t frequency) :
-	CDev(name, nullptr),
+	Device(device_type, name, DeviceBusType_I2C, bus, address),
 	_frequency(frequency)
 {
-	// fill in _device_id fields for a I2C device
-	_device_id.devid_s.devtype = device_type;
-	_device_id.devid_s.bus_type = DeviceBusType_I2C;
-	_device_id.devid_s.bus = bus;
-	_device_id.devid_s.address = address;
 }
 
 I2C::~I2C()
@@ -87,14 +82,6 @@ I2C::init()
 
 	if (ret != OK) {
 		DEVICE_DEBUG("probe failed");
-		goto out;
-	}
-
-	// do base class init, which will create device node, etc
-	ret = CDev::init();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("cdev init failed");
 		goto out;
 	}
 

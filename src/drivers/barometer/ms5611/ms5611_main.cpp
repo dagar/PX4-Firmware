@@ -31,26 +31,30 @@
  *
  ****************************************************************************/
 
+#include "MS5611.hpp"
+
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/i2c_spi_buses.h>
 #include <px4_platform_common/module.h>
 
+#include <drivers/device/i2c.h>
+#include <drivers/device/spi.h>
 
-#include "MS5611.hpp"
-#include "ms5611.h"
+#define MS5611_ADDRESS_1		0x76	/* address select pins pulled high (PX4FMU series v1.6+) */
+#define MS5611_ADDRESS_2		0x77    /* address select pins pulled low (PX4FMU prototypes) */
 
 I2CSPIDriverBase *MS5611::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 				      int runtime_instance)
 {
-	ms5611::prom_u prom_buf;
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = MS5611_i2c_interface(prom_buf, iterator.devid(), iterator.bus(), cli.bus_frequency);
+		interface = new device::I2C(DRV_BARO_DEVTYPE_MS5611, MODULE_NAME, iterator.bus(), MS5611_ADDRESS_1, cli.bus_frequency);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = MS5611_spi_interface(prom_buf, iterator.devid(), iterator.bus(), cli.bus_frequency, cli.spi_mode);
+		interface = new device::SPI(DRV_BARO_DEVTYPE_MS5611, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						    cli.bus_frequency);
 	}
 
 	if (interface == nullptr) {
@@ -64,8 +68,7 @@ I2CSPIDriverBase *MS5611::instantiate(const BusCLIArguments &cli, const BusInsta
 		return nullptr;
 	}
 
-	MS5611 *dev = new MS5611(interface, prom_buf, (MS56XX_DEVICE_TYPES)cli.type, iterator.configuredBusOption(),
-				 iterator.bus());
+	MS5611 *dev = new MS5611(interface, (MS56XX_DEVICE_TYPES)cli.type, iterator.configuredBusOption(), iterator.bus());
 
 	if (dev == nullptr) {
 		delete interface;

@@ -87,7 +87,7 @@ PWMSim::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS], unsigne
 }
 
 int
-PWMSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+PWMSim::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	int ret = OK;
 

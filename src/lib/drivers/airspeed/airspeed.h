@@ -37,13 +37,14 @@
 #include <drivers/device/i2c.h>
 #include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
+#include <lib/cdev/CDev.hpp>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/defines.h>
 #include <perf/perf_counter.h>
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/PublicationMulti.hpp>
 
-class __EXPORT Airspeed : public device::I2C
+class __EXPORT Airspeed : public cdev::CDev, public device::I2C
 {
 public:
 	Airspeed(int bus, int bus_frequency, int address, unsigned conversion_interval);
@@ -51,7 +52,7 @@ public:
 
 	int	init() override;
 
-	int	ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	int	ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 private:
 	Airspeed(const Airspeed &) = delete;

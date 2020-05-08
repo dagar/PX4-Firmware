@@ -37,16 +37,18 @@
  */
 
 #include "MS5611.hpp"
-#include "ms5611.h"
 
-#include <cdev/CDev.hpp>
+static constexpr int16_t combine(uint8_t msb, uint8_t lsb)
+{
+	return (msb << 8u) | lsb;
+}
 
-MS5611::MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type,
-	       I2CSPIBusOption bus_option, int bus) :
+static bool crc4(uint16_t *n_prom);
+
+MS5611::MS5611(device::Device *interface, enum MS56XX_DEVICE_TYPES device_type, I2CSPIBusOption bus_option, int bus) :
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id()), bus_option, bus, 0, device_type),
 	_px4_barometer(interface->get_device_id()),
 	_interface(interface),
-	_prom(prom_buf.s),
 	_device_type(device_type),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
 	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
@@ -64,8 +66,7 @@ MS5611::~MS5611()
 	delete _interface;
 }
 
-int
-MS5611::init()
+int MS5611::init()
 {
 	int ret;
 
@@ -142,8 +143,27 @@ MS5611::init()
 	return ret;
 }
 
-void
-MS5611::start()
+bool MS5611::ReadProm()
+{
+	uint8_t buffer[16] {};
+
+	for (int i = 0; i < 16; i = i + 2) {
+		_interface->read(ADDR_PROM_SETUP + i, &buffer[i], 2);
+	}
+
+	_prom.factory_setup = combine(buffer[0], buffer[1]);
+	_prom.c1_pressure_sens = combine(buffer[2], buffer[3]);
+	_prom.c2_pressure_offset = combine(buffer[4], buffer[5]);
+	_prom.c3_temp_coeff_pres_sens = combine(buffer[6], buffer[7]);
+	_prom.c4_temp_coeff_pres_offset = combine(buffer[8], buffer[9]);
+	_prom.c5_reference_temp = combine(buffer[10], buffer[11]);
+	_prom.c6_temp_coeff_temp = combine(buffer[12], buffer[13]);
+	_prom.serial_and_crc = combine(buffer[14], buffer[15]);
+
+	return crc4((uint16_t *)&_prom);
+}
+
+void MS5611::start()
 {
 	/* reset the report ring and state machine */
 	_collect_phase = false;
@@ -157,7 +177,6 @@ void
 MS5611::RunImpl()
 {
 	int ret;
-	unsigned dummy;
 
 	/* collection phase? */
 	if (_collect_phase) {
@@ -177,7 +196,8 @@ MS5611::RunImpl()
 			}
 
 			/* issue a reset command to the sensor */
-			_interface->ioctl(IOCTL_RESET, dummy);
+			_interface->write(ADDR_RESET_CMD);
+
 			/* reset the collection state machine and try again - we need
 			 * to wait 2.8 ms after issuing the sensor reset command
 			 * according to the MS5611 datasheet
@@ -195,7 +215,8 @@ MS5611::RunImpl()
 
 	if (ret != OK) {
 		/* issue a reset command to the sensor */
-		_interface->ioctl(IOCTL_RESET, dummy);
+		_interface->write(ADDR_RESET_CMD);
+
 		/* reset the collection state machine and try again */
 		start();
 		return;
@@ -221,7 +242,7 @@ MS5611::measure()
 	/*
 	 * Send the command to begin measuring.
 	 */
-	int ret = _interface->ioctl(IOCTL_MEASURE, addr);
+	int ret = _interface->write(addr);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -234,8 +255,7 @@ MS5611::measure()
 	return ret;
 }
 
-int
-MS5611::collect()
+int MS5611::collect()
 {
 	uint32_t raw;
 
@@ -344,14 +364,10 @@ void MS5611::print_status()
 	_px4_barometer.print_status();
 }
 
-namespace ms5611
-{
-
 /**
  * MS5611 crc4 cribbed from the datasheet
  */
-bool
-crc4(uint16_t *n_prom)
+static bool crc4(uint16_t *n_prom)
 {
 	int16_t cnt;
 	uint16_t n_rem;
@@ -392,5 +408,3 @@ crc4(uint16_t *n_prom)
 	/* return true if CRCs match */
 	return (0x000F & crc_read) == (n_rem ^ 0x00);
 }
-
-} // namespace ms5611

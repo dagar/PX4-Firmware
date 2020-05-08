@@ -169,9 +169,6 @@ public:
 	// We need to override the read_reg function from the BMI088 base class, because the accelerometer requires a dummy byte read before each read operation
 	uint8_t   read_reg(unsigned reg) override;
 
-	// We need to override the read_reg16 function from the BMI088 base class, because the accelerometer requires a dummy byte read before each read operation
-	uint16_t read_reg16(unsigned reg) override;
-
 	void            print_status() override;
 
 	void            print_registers();

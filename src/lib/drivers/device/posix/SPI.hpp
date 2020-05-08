@@ -40,7 +40,7 @@
 #ifndef _DEVICE_SPI_H
 #define _DEVICE_SPI_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
 #include <px4_platform_common/spi.h>
 
 #ifdef __PX4_LINUX
@@ -64,7 +64,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on SPI
  */
-class __EXPORT SPI : public CDev
+class __EXPORT SPI : public Device
 {
 public:
 	// no copy, assignment, move, move assignment

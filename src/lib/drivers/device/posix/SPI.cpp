@@ -54,16 +54,11 @@ namespace device
 {
 
 SPI::SPI(uint8_t device_type, const char *name, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency) :
-	CDev(name, nullptr),
+	Device(device_type, name, DeviceBusType_SPI, bus, (uint8_t)(device >> 8)),
 	_device(device),
 	_mode(mode),
 	_frequency(frequency)
 {
-	_device_id.devid_s.devtype = device_type;
-	// fill in _device_id fields for a SPI device
-	_device_id.devid_s.bus_type = DeviceBusType_SPI;
-	_device_id.devid_s.bus = bus;
-	_device_id.devid_s.address = (uint8_t)device;
 }
 
 SPI::~SPI()
@@ -93,14 +88,6 @@ SPI::init()
 
 	if (ret != OK) {
 		DEVICE_DEBUG("probe failed");
-		return ret;
-	}
-
-	/* do base class init, which will create the device node, etc. */
-	ret = CDev::init();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("cdev init failed");
 		return ret;
 	}
 

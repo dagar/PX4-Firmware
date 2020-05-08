@@ -97,6 +97,7 @@
 #include <string.h>
 #include <strings.h>
 
+#include <lib/cdev/CDev.hpp>
 #include <drivers/device/i2c.h>
 #include <drivers/drv_blinkm.h>
 #include <px4_platform_common/i2c_spi_buses.h>
@@ -114,7 +115,7 @@ static const int LED_OFFTIME = 120;
 static const int LED_BLINK = 1;
 static const int LED_NOBLINK = 0;
 
-class BlinkM : public device::I2C, public I2CSPIDriver<BlinkM>
+class BlinkM : public cdev::CDev, public device::I2C, public I2CSPIDriver<BlinkM>
 {
 public:
 	BlinkM(I2CSPIBusOption bus_option, const int bus, int bus_frequency, const int address);
@@ -129,7 +130,7 @@ public:
 	virtual int		init();
 	virtual int		probe();
 	virtual int		setMode(int mode);
-	virtual int		ioctl(device::file_t *filp, int cmd, unsigned long arg);
+	virtual int		ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
 
 	static const char	*const script_names[];
 
@@ -254,6 +255,7 @@ const char *const BlinkM::script_names[] = {
 extern "C" __EXPORT int blinkm_main(int argc, char *argv[]);
 
 BlinkM::BlinkM(I2CSPIBusOption bus_option, const int bus, int bus_frequency, const int address) :
+	CDev(BLINKM0_DEVICE_PATH),
 	I2C(DRV_LED_DEVTYPE_BLINKM, MODULE_NAME, bus, address, bus_frequency),
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus, address),
 	led_color_1(LED_OFF),
@@ -335,7 +337,7 @@ BlinkM::probe()
 }
 
 int
-BlinkM::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+BlinkM::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	int ret = ENOTTY;
 

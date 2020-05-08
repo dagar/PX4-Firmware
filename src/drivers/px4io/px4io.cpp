@@ -3317,23 +3317,6 @@ monitor(void)
 }
 
 void
-if_test(unsigned mode)
-{
-	device::Device *interface = get_interface();
-	int result;
-
-	if (interface) {
-		result = interface->ioctl(1, mode); /* XXX magic numbers */
-		delete interface;
-
-	} else {
-		errx(1, "interface not loaded, exiting");
-	}
-
-	errx(0, "test returned %d", result);
-}
-
-void
 lockdown(int argc, char *argv[])
 {
 	if (g_dev != nullptr) {
@@ -3465,14 +3448,6 @@ px4io_main(int argc, char *argv[])
 		}
 
 		return ret;
-	}
-
-	if (!strcmp(argv[1], "iftest")) {
-		if (g_dev != nullptr) {
-			errx(1, "can't iftest when started");
-		}
-
-		if_test((argc > 2) ? strtol(argv[2], NULL, 0) : 0);
 	}
 
 	if (!strcmp(argv[1], "forceupdate")) {

@@ -120,16 +120,6 @@ BMI088::read_reg(unsigned reg)
 	return cmd[1];
 }
 
-uint16_t
-BMI088::read_reg16(unsigned reg)
-{
-	uint8_t cmd[3] = { (uint8_t)(reg | DIR_READ), 0, 0 };
-
-	transfer(cmd, cmd, sizeof(cmd));
-
-	return (uint16_t)(cmd[1] << 8) | cmd[2];
-}
-
 int
 BMI088::write_reg(unsigned reg, uint8_t value)
 {

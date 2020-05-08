@@ -112,13 +112,13 @@ int LSM303AGR::reset()
 {
 	// Single mode
 	// Output data rate configuration: 100Hz
-	write_reg(CFG_REG_A_M, CFG_REG_A_M_MD0 | CFG_REG_A_M_ODR1 | CFG_REG_A_M_ODR0);
+	RegisterWrite(CFG_REG_A_M, CFG_REG_A_M_MD0 | CFG_REG_A_M_ODR1 | CFG_REG_A_M_ODR0);
 
 	// Enable low pass filter
-	write_reg(CFG_REG_B_M, CFG_REG_B_M_OFF_CANC | CFG_REG_B_M_OFF_LPF);
+	RegisterWrite(CFG_REG_B_M, CFG_REG_B_M_OFF_CANC | CFG_REG_B_M_OFF_LPF);
 
 	// Disable I2C
-	write_reg(CFG_REG_C_M, CFG_REG_C_M_I2C_DIS);
+	RegisterWrite(CFG_REG_C_M, CFG_REG_C_M_I2C_DIS);
 
 	return PX4_OK;
 }
@@ -128,9 +128,9 @@ bool LSM303AGR::self_test()
 	// Magnetometer self-test procedure (LSM303AGR DocID027765 Rev 5 page 25/68)
 	uint8_t status_m = 0;
 
-	write_reg(CFG_REG_A_M, 0x0C);
-	write_reg(CFG_REG_B_M, 0x02);
-	write_reg(CFG_REG_C_M, 0x10);
+	RegisterWrite(CFG_REG_A_M, 0x0C);
+	RegisterWrite(CFG_REG_B_M, 0x02);
+	RegisterWrite(CFG_REG_C_M, 0x10);
 
 	// sleep 20ms
 	usleep(20000);
@@ -143,29 +143,29 @@ bool LSM303AGR::self_test()
 	// average x, y, z
 	for (int i = 0; i < 50; i++) {
 
-		status_m = read_reg(STATUS_REG_M);
+		status_m = RegisterRead(STATUS_REG_M);
 
-		OUTX_NOST += read_reg(OUTX_L_REG_M) + (read_reg(OUTX_H_REG_M) << 8);
-		OUTY_NOST += read_reg(OUTY_L_REG_M) + (read_reg(OUTY_H_REG_M) << 8);
-		OUTZ_NOST += read_reg(OUTZ_L_REG_M) + (read_reg(OUTZ_H_REG_M) << 8);
+		OUTX_NOST += RegisterRead(OUTX_L_REG_M) + (RegisterRead(OUTX_H_REG_M) << 8);
+		OUTY_NOST += RegisterRead(OUTY_L_REG_M) + (RegisterRead(OUTY_H_REG_M) << 8);
+		OUTZ_NOST += RegisterRead(OUTZ_L_REG_M) + (RegisterRead(OUTZ_H_REG_M) << 8);
 	}
 
 	// enable self-test
-	write_reg(CFG_REG_C_M, 0x12);
+	RegisterWrite(CFG_REG_C_M, 0x12);
 
 	// wait for 60ms
 	usleep(60000);
 
 	// Check Zyxda
-	status_m = read_reg(STATUS_REG_M);
+	status_m = RegisterRead(STATUS_REG_M);
 
 	// Read mag x, y, z to clear Zyxda bit
-	read_reg(OUTX_L_REG_M);
-	read_reg(OUTX_H_REG_M);
-	read_reg(OUTY_L_REG_M);
-	read_reg(OUTY_H_REG_M);
-	read_reg(OUTZ_L_REG_M);
-	read_reg(OUTZ_H_REG_M);
+	RegisterRead(OUTX_L_REG_M);
+	RegisterRead(OUTX_H_REG_M);
+	RegisterRead(OUTY_L_REG_M);
+	RegisterRead(OUTY_H_REG_M);
+	RegisterRead(OUTZ_L_REG_M);
+	RegisterRead(OUTZ_H_REG_M);
 
 	uint16_t OUTX_ST = 0;
 	uint16_t OUTY_ST = 0;
@@ -175,11 +175,11 @@ bool LSM303AGR::self_test()
 	// average x, y, z
 	for (int i = 0; i < 50; i++) {
 
-		status_m = read_reg(STATUS_REG_M);
+		status_m = RegisterRead(STATUS_REG_M);
 
-		OUTX_NOST += read_reg(OUTX_L_REG_M) + (read_reg(OUTX_H_REG_M) << 8);
-		OUTY_NOST += read_reg(OUTY_L_REG_M) + (read_reg(OUTY_H_REG_M) << 8);
-		OUTZ_NOST += read_reg(OUTZ_L_REG_M) + (read_reg(OUTZ_H_REG_M) << 8);
+		OUTX_NOST += RegisterRead(OUTX_L_REG_M) + (RegisterRead(OUTX_H_REG_M) << 8);
+		OUTY_NOST += RegisterRead(OUTY_L_REG_M) + (RegisterRead(OUTY_H_REG_M) << 8);
+		OUTZ_NOST += RegisterRead(OUTZ_L_REG_M) + (RegisterRead(OUTZ_H_REG_M) << 8);
 	}
 
 	const uint16_t abs_x = abs(OUTX_ST - OUTX_NOST);
@@ -202,10 +202,10 @@ bool LSM303AGR::self_test()
 	}
 
 	// disable self test
-	write_reg(CFG_REG_C_M, 0x10);
+	RegisterWrite(CFG_REG_C_M, 0x10);
 
 	// Idle mode
-	write_reg(CFG_REG_A_M, 0x03);
+	RegisterWrite(CFG_REG_A_M, 0x03);
 
 	return true;
 }
@@ -213,33 +213,13 @@ bool LSM303AGR::self_test()
 int LSM303AGR::probe()
 {
 	/* verify that the device is attached and functioning */
-	bool success = (read_reg(WHO_AM_I_M) == LSM303AGR_WHO_AM_I_M);
+	bool success = (RegisterRead(WHO_AM_I_M) == LSM303AGR_WHO_AM_I_M);
 
 	if (success) {
 		return OK;
 	}
 
 	return -EIO;
-}
-
-uint8_t LSM303AGR::read_reg(unsigned reg)
-{
-	uint8_t cmd[2];
-	cmd[0] = reg | DIR_READ;
-	cmd[1] = 0;
-
-	transfer(cmd, cmd, sizeof(cmd));
-
-	return cmd[1];
-}
-
-int LSM303AGR::write_reg(unsigned reg, uint8_t value)
-{
-	uint8_t	cmd[2];
-	cmd[0] = reg | DIR_WRITE;
-	cmd[1] = value;
-
-	return transfer(cmd, nullptr, sizeof(cmd));
 }
 
 void LSM303AGR::start()
@@ -298,12 +278,12 @@ void LSM303AGR::RunImpl()
 void LSM303AGR::measure()
 {
 	// Send the command to begin a measurement.
-	write_reg(CFG_REG_A_M, CFG_REG_A_M_MD0 | CFG_REG_A_M_ODR1 | CFG_REG_A_M_ODR0);
+	RegisterWrite(CFG_REG_A_M, CFG_REG_A_M_MD0 | CFG_REG_A_M_ODR1 | CFG_REG_A_M_ODR0);
 }
 
 int LSM303AGR::collect()
 {
-	const uint8_t status = read_reg(STATUS_REG_M);
+	const uint8_t status = RegisterRead(STATUS_REG_M);
 
 	_px4_mag.set_error_count(perf_event_count(_bad_registers) + perf_event_count(_bad_values));
 
@@ -315,9 +295,9 @@ int LSM303AGR::collect()
 		const hrt_abstime timestamp_sample = hrt_absolute_time();
 
 		// switch to right hand coordinate system in place
-		float x_raw = read_reg(OUTX_L_REG_M) + (read_reg(OUTX_H_REG_M) << 8);
-		float y_raw = read_reg(OUTY_L_REG_M) + (read_reg(OUTY_H_REG_M) << 8);
-		float z_raw = -(read_reg(OUTZ_L_REG_M) + (read_reg(OUTZ_H_REG_M) << 8));
+		float x_raw = RegisterRead(OUTX_L_REG_M) + (RegisterRead(OUTX_H_REG_M) << 8);
+		float y_raw = RegisterRead(OUTY_L_REG_M) + (RegisterRead(OUTY_H_REG_M) << 8);
+		float z_raw = -(RegisterRead(OUTZ_L_REG_M) + (RegisterRead(OUTZ_H_REG_M) << 8));
 
 		_px4_mag.update(timestamp_sample, x_raw, y_raw, z_raw);
 

@@ -61,7 +61,7 @@ public:
 	/** @see ModuleBase::print_status() */
 	int print_status() override;
 
-	int ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
+	int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
 
 	bool updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 			   unsigned num_outputs, unsigned num_control_groups_updated) override;

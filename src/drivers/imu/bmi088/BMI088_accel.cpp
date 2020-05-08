@@ -102,17 +102,6 @@ BMI088_accel::read_reg(unsigned reg)
 	return cmd[2]; // Skip dummy byte in cmd[1] and read out actual data
 }
 
-uint16_t
-BMI088_accel::read_reg16(unsigned reg)
-{
-	// For the BMI088, you need to read out the dummy byte before you can read out the normal data (see section "SPI interface of accelerometer part" of the BMI088 datasheet)
-	uint8_t cmd[4] = { (uint8_t)(reg | DIR_READ), 0, 0, 0 };
-
-	transfer(cmd, cmd, sizeof(cmd));
-
-	return (uint16_t)(cmd[2] << 8) | cmd[3]; // Skip dummy byte in cmd[1]
-}
-
 int BMI088_accel::reset()
 {
 	write_reg(BMI088_ACC_SOFTRESET, BMI088_SOFT_RESET); // Soft-reset

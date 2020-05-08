@@ -39,7 +39,7 @@
 
 #pragma once
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
 
 #include "dev_fs_lib_spi.h"
 
@@ -56,7 +56,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on SPI
  */
-class __EXPORT SPI : public CDev
+class __EXPORT SPI : public Device
 {
 protected:
 	/**

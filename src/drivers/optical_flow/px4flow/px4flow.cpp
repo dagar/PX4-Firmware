@@ -93,28 +93,26 @@ public:
 	 * Perform a poll cycle; collect from the previous measurement
 	 * and start a new one.
 	 */
-	void				RunImpl();
-protected:
-	int			probe() override;
-
+	void RunImpl();
 private:
+	int probe() override;
 
 	uint8_t _sonar_rotation;
-	bool				_sensor_ok{false};
-	bool				_collect_phase{false};
-	int			_class_instance{-1};
-	int			_orb_class_instance{-1};
+	bool _sensor_ok{false};
+	bool _collect_phase{false};
 
-	uORB::PublicationMulti<optical_flow_s>		_px4flow_topic{ORB_ID(optical_flow)};
-	uORB::PublicationMulti<distance_sensor_s>	_distance_sensor_topic{ORB_ID(distance_sensor)};
+	int _orb_class_instance{-1};
 
-	perf_counter_t		_sample_perf;
-	perf_counter_t		_comms_errors;
+	uORB::PublicationMulti<optical_flow_s> _px4flow_topic{ORB_ID(optical_flow)};
+	uORB::PublicationMulti<distance_sensor_s> _distance_sensor_topic{ORB_ID(distance_sensor)};
 
-	enum Rotation       _sensor_rotation;
-	float 				_sensor_min_range{0.0f};
-	float 				_sensor_max_range{0.0f};
-	float 				_sensor_max_flow_rate{0.0f};
+	perf_counter_t _sample_perf;
+	perf_counter_t _comms_errors;
+
+	enum Rotation _sensor_rotation;
+	float _sensor_min_range{0.0f};
+	float _sensor_max_range{0.0f};
+	float _sensor_max_flow_rate{0.0f};
 
 	i2c_frame _frame;
 	i2c_integral_frame _frame_integral;
@@ -126,7 +124,7 @@ private:
 	 * @param address	The I2C bus address to probe.
 	 * @return		True if the device is present.
 	 */
-	int					probe_address(uint8_t address);
+	int probe_address(uint8_t address);
 
 	/**
 	 * Initialise the automatic measurement state machine and start it.
@@ -134,10 +132,10 @@ private:
 	 * @note This function is called at open and error time.  It might make sense
 	 *       to make it more aggressive about resetting the bus in case of errors.
 	 */
-	void				start();
+	void start();
 
-	int					measure();
-	int					collect();
+	int measure();
+	int collect();
 
 };
 
@@ -169,8 +167,6 @@ PX4FLOW::init()
 	if (I2C::init() != OK) {
 		return ret;
 	}
-
-	_class_instance = register_class_devname(RANGE_FINDER_BASE_DEVICE_PATH);
 
 	ret = OK;
 	/* sensor is ok, but we don't really know if it is within range */
@@ -317,7 +313,7 @@ PX4FLOW::collect()
 	_px4flow_topic.publish(report);
 
 	/* publish to the distance_sensor topic as well */
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
+	if (_orb_class_instance == 0) {
 		distance_sensor_s distance_report{};
 		distance_report.timestamp = report.timestamp;
 		distance_report.min_distance = PX4FLOW_MIN_DISTANCE;

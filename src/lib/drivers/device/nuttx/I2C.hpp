@@ -40,7 +40,7 @@
 #ifndef _DEVICE_I2C_H
 #define _DEVICE_I2C_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
 #include <px4_platform_common/i2c.h>
 
 #include <nuttx/i2c/i2c_master.h>
@@ -55,28 +55,9 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on I2C
  */
-class __EXPORT I2C : public CDev
+class __EXPORT I2C : public Device
 {
-
 public:
-
-	// no copy, assignment, move, move assignment
-	I2C(const I2C &) = delete;
-	I2C &operator=(const I2C &) = delete;
-	I2C(I2C &&) = delete;
-	I2C &operator=(I2C &&) = delete;
-
-	virtual int	init() override;
-
-	static int	set_bus_clock(unsigned bus, unsigned clock_hz);
-
-protected:
-	/**
-	 * The number of times a read or write operation will be retried on
-	 * error.
-	 */
-	uint8_t		_retries{0};
-
 	/**
 	 * @ Constructor
 	 *
@@ -89,10 +70,69 @@ protected:
 	I2C(uint8_t device_type, const char *name, const int bus, const uint16_t address, const uint32_t frequency);
 	virtual ~I2C();
 
+	// no copy, assignment, move, move assignment
+	I2C(const I2C &) = delete;
+	I2C &operator=(const I2C &) = delete;
+	I2C(I2C &&) = delete;
+	I2C &operator=(I2C &&) = delete;
+
+	virtual int	init() override;
+
+	static int	set_bus_clock(unsigned bus, unsigned clock_hz);
+
+protected:
+
+	/**
+	 * Read directly from the device.
+	 *
+	 * The actual size of each unit quantity is device-specific.
+	 *
+	 * @param offset	The device address at which to start reading
+	 * @param data		The buffer into which the read values should be placed.
+	 * @param count		The number of items to read.
+	 * @return		The number of items read on success, negative errno otherwise.
+	 */
+	int read(unsigned address, void *data = nullptr, unsigned count = 0) override;
+
+	/**
+	 * Write directly to the device.
+	 *
+	 * The actual size of each unit quantity is device-specific.
+	 *
+	 * @param address	The device address at which to start writing.
+	 * @param data		The buffer from which values should be read.
+	 * @param count		The number of items to write.
+	 * @return		The number of items written on success, negative errno otherwise.
+	 */
+	int write(unsigned address, void *data = nullptr, unsigned count = 0) override;
+
+	/**
+	 * Read a register from the device.
+	 *
+	 * @param		The register to read.
+	 * @return		The value that was read.
+	 */
+	uint8_t RegisterRead(uint8_t reg) override;
+
+	/**
+	 * Write a register in the device.
+	 *
+	 * @param reg		The register to write.
+	 * @param value		The new value to write.
+	 * @return		OK on success, negative errno otherwise.
+	 */
+	int RegisterWrite(uint8_t reg, uint8_t value) override;
+
+	/**
+	 * The number of times a read or write operation will be retried on
+	 * error.
+	 */
+	uint8_t _retries{0};
+
 	/**
 	 * Check for the presence of the device on the bus.
 	 */
-	virtual int	probe() { return PX4_OK; }
+	virtual int probe() { return PX4_OK; }
 
 	/**
 	 * Perform an I2C transaction to the device.
@@ -106,9 +146,9 @@ protected:
 	 * @return		OK if the transfer was successful, -errno
 	 *			otherwise.
 	 */
-	int		transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len);
+	int transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, const unsigned recv_len);
 
-	bool	external() const override { return px4_i2c_bus_external(_device_id.devid_s.bus); }
+	bool external() const override { return px4_i2c_bus_external(_device_id.devid_s.bus); }
 
 private:
 	static unsigned	int	_bus_clocks[PX4_NUMBER_I2C_BUSES];

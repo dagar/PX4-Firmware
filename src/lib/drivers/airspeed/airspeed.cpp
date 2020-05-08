@@ -57,6 +57,7 @@
 #include <drivers/airspeed/airspeed.h>
 
 Airspeed::Airspeed(int bus, int bus_frequency, int address, unsigned conversion_interval) :
+	CDev(nullptr),
 	I2C(0, "Airspeed", bus, address, bus_frequency),
 	_sensor_ok(false),
 	_measure_interval(conversion_interval),
@@ -113,8 +114,7 @@ Airspeed::probe()
 	return ret;
 }
 
-int
-Airspeed::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+int Airspeed::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case AIRSPEEDIOCSSCALE: {
@@ -125,7 +125,7 @@ Airspeed::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 
 	default:
 		/* give it to the superclass */
-		return I2C::ioctl(filp, cmd, arg);
+		return CDev::ioctl(filp, cmd, arg);
 	}
 }
 

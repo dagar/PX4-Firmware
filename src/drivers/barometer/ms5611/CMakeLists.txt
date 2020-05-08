@@ -37,8 +37,6 @@ px4_add_module(
 	COMPILE_FLAGS
 		-Wno-cast-align # TODO: fix and enable
 	SRCS
-		ms5611_spi.cpp
-		ms5611_i2c.cpp
 		ms5611.cpp
 		ms5611_main.cpp
 		MS5611.hpp

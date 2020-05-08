@@ -54,7 +54,6 @@ elseif(UNIX AND NOT APPLE AND NOT (${PX4_PLATFORM} MATCHES "qurt")) #TODO: add l
 endif()
 
 px4_add_library(drivers__device
-	CDev.cpp
 	ringbuffer.cpp
 	${SRCS_PLATFORM}
 	)
@@ -63,4 +62,3 @@ if (${PX4_PLATFORM} STREQUAL "nuttx")
 	target_link_libraries(drivers__device PRIVATE nuttx_arch)
 endif()
 
-target_link_libraries(drivers__device PRIVATE cdev)

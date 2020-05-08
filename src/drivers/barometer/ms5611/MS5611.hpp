@@ -40,12 +40,50 @@
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <systemlib/err.h>
 
-#include "ms5611.h"
+#include <string.h>
+
+#include <drivers/device/i2c.h>
+#include <drivers/device/device.h>
+#include <drivers/device/spi.h>
+#include <lib/cdev/CDev.hpp>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#include <systemlib/err.h>
+#include <uORB/uORB.h>
+
+#include "board_config.h"
 
 enum MS56XX_DEVICE_TYPES {
 	MS5611_DEVICE	= 5611,
 	MS5607_DEVICE	= 5607,
 };
+
+static constexpr uint8_t ADDR_RESET_CMD  = 0x1E; /* write to this address to reset chip */
+static constexpr uint8_t ADDR_PROM_SETUP = 0xA0; /* address of 8x 2 bytes factory and calibration data */
+
+/**
+ * Calibration PROM as reported by the device.
+ */
+#pragma pack(push,1)
+struct prom_s {
+	uint16_t factory_setup;
+	uint16_t c1_pressure_sens;
+	uint16_t c2_pressure_offset;
+	uint16_t c3_temp_coeff_pres_sens;
+	uint16_t c4_temp_coeff_pres_offset;
+	uint16_t c5_reference_temp;
+	uint16_t c6_temp_coeff_temp;
+	uint16_t serial_and_crc;
+};
+
+/**
+ * Grody hack for crc4()
+ */
+union prom_u {
+	uint16_t c[8];
+	prom_s s;
+};
+#pragma pack(pop)
+
 
 /* helper macro for handling report buffer indices */
 #define INCREMENT(_x, _lim)	do { __typeof__(_x) _tmp = _x+1; if (_tmp >= _lim) _tmp = 0; _x = _tmp; } while(0)
@@ -87,8 +125,7 @@ enum MS56XX_DEVICE_TYPES {
 class MS5611 : public I2CSPIDriver<MS5611>
 {
 public:
-	MS5611(device::Device *interface, ms5611::prom_u &prom_buf, enum MS56XX_DEVICE_TYPES device_type,
-	       I2CSPIBusOption bus_option, int bus);
+	MS5611(device::Device *interface, enum MS56XX_DEVICE_TYPES device_type, I2CSPIBusOption bus_option, int bus);
 	~MS5611() override;
 
 	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
@@ -112,14 +149,16 @@ public:
 	 */
 	void			RunImpl();
 
-protected:
+private:
+	bool ReadProm();
+
 	void print_status() override;
 
 	PX4Barometer		_px4_barometer;
 
 	device::Device		*_interface;
 
-	ms5611::prom_s		_prom;
+	prom_s		_prom;
 
 	enum MS56XX_DEVICE_TYPES _device_type;
 	bool			_collect_phase{false};

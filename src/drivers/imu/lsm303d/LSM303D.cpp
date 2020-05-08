@@ -99,14 +99,14 @@ LSM303D::init()
 void
 LSM303D::disable_i2c(void)
 {
-	uint8_t a = read_reg(0x02);
-	write_reg(0x02, (0x10 | a));
-	a = read_reg(0x02);
-	write_reg(0x02, (0xF7 & a));
-	a = read_reg(0x15);
-	write_reg(0x15, (0x80 | a));
-	a = read_reg(0x02);
-	write_reg(0x02, (0xE7 & a));
+	uint8_t a = RegisterRead(0x02);
+	RegisterWrite(0x02, (0x10 | a));
+	a = RegisterRead(0x02);
+	RegisterWrite(0x02, (0xF7 & a));
+	a = RegisterRead(0x15);
+	RegisterWrite(0x15, (0x80 | a));
+	a = RegisterRead(0x02);
+	RegisterWrite(0x02, (0xE7 & a));
 }
 
 void
@@ -142,10 +142,10 @@ int
 LSM303D::probe()
 {
 	// read dummy value to void to clear SPI statemachine on sensor
-	read_reg(ADDR_WHO_AM_I);
+	RegisterRead(ADDR_WHO_AM_I);
 
 	// verify that the device is attached and functioning
-	if (read_reg(ADDR_WHO_AM_I) == WHO_I_AM) {
+	if (RegisterRead(ADDR_WHO_AM_I) == WHO_I_AM) {
 		_checked_values[0] = WHO_I_AM;
 		return OK;
 	}
@@ -153,32 +153,10 @@ LSM303D::probe()
 	return -EIO;
 }
 
-uint8_t
-LSM303D::read_reg(unsigned reg)
-{
-	uint8_t cmd[2] {};
-	cmd[0] = reg | DIR_READ;
-
-	transfer(cmd, cmd, sizeof(cmd));
-
-	return cmd[1];
-}
-
-int
-LSM303D::write_reg(unsigned reg, uint8_t value)
-{
-	uint8_t	cmd[2] {};
-
-	cmd[0] = reg | DIR_WRITE;
-	cmd[1] = value;
-
-	return transfer(cmd, nullptr, sizeof(cmd));
-}
-
 void
 LSM303D::write_checked_reg(unsigned reg, uint8_t value)
 {
-	write_reg(reg, value);
+	RegisterWrite(reg, value);
 
 	for (uint8_t i = 0; i < LSM303D_NUM_CHECKED_REGISTERS; i++) {
 		if (reg == _checked_registers[i]) {
@@ -190,7 +168,7 @@ LSM303D::write_checked_reg(unsigned reg, uint8_t value)
 void
 LSM303D::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
-	uint8_t	val = read_reg(reg);
+	uint8_t	val = RegisterRead(reg);
 	val &= ~clearbits;
 	val |= setbits;
 	write_checked_reg(reg, val);
@@ -423,7 +401,7 @@ LSM303D::check_registers(void)
 {
 	uint8_t v = 0;
 
-	if ((v = read_reg(_checked_registers[_checked_next])) != _checked_values[_checked_next]) {
+	if ((v = RegisterRead(_checked_registers[_checked_next])) != _checked_values[_checked_next]) {
 		/*
 		  if we get the wrong value then we know the SPI bus
 		  or sensor is very sick. We set _register_wait to 20
@@ -439,7 +417,7 @@ LSM303D::check_registers(void)
 		  is not writeable
 		 */
 		if (_checked_next != 0) {
-			write_reg(_checked_registers[_checked_next], _checked_values[_checked_next]);
+			RegisterWrite(_checked_registers[_checked_next], _checked_values[_checked_next]);
 		}
 
 		_register_wait = 20;
@@ -580,7 +558,7 @@ LSM303D::print_status()
 	::printf("checked_next: %u\n", _checked_next);
 
 	for (uint8_t i = 0; i < LSM303D_NUM_CHECKED_REGISTERS; i++) {
-		uint8_t v = read_reg(_checked_registers[i]);
+		uint8_t v = RegisterRead(_checked_registers[i]);
 
 		if (v != _checked_values[i]) {
 			::printf("reg %02x:%02x should be %02x\n",

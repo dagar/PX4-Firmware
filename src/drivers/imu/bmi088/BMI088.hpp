@@ -84,8 +84,7 @@ protected:
 	* @param       The register to read.
 	* @return      The value that was read.
 	*/
-	uint8_t         read_reg(unsigned reg) override;
-	virtual uint16_t        read_reg16(unsigned reg);
+	virtual uint8_t         read_reg(unsigned reg);
 
 	/**
 	* Write a register in the BMI088
@@ -94,5 +93,5 @@ protected:
 	* @param value     The new value to write.
 	* @return	   OK on success, negative errno otherwise.
 	*/
-	int            write_reg(unsigned reg, uint8_t value) override;
+	int            write_reg(unsigned reg, uint8_t value);
 };

@@ -40,7 +40,7 @@
 #ifndef _DEVICE_I2C_H
 #define _DEVICE_I2C_H
 
-#include "../CDev.hpp"
+#include "../Device.hpp"
 #include <px4_platform_common/i2c.h>
 
 namespace device __EXPORT
@@ -49,7 +49,7 @@ namespace device __EXPORT
 /**
  * Abstract class for character device on I2C
  */
-class __EXPORT I2C : public CDev
+class __EXPORT I2C : public Device
 {
 
 public:
@@ -60,7 +60,7 @@ public:
 	I2C(I2C &&) = delete;
 	I2C &operator=(I2C &&) = delete;
 
-	virtual int	init() override;
+	virtual int init() override;
 
 protected:
 	/**

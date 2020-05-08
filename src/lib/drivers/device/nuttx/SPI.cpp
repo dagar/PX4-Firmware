@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file spi.cpp
+ * @file SPI.cpp
  *
  * Base class for devices connected via SPI.
  *
@@ -58,31 +58,16 @@ namespace device
 {
 
 SPI::SPI(uint8_t device_type, const char *name, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency) :
-	CDev(name, nullptr),
-	_device(device),
+	Device(device_type, name, DeviceBusType_SPI, bus, (uint8_t)(device >> 8)),
 	_mode(mode),
 	_frequency(frequency)
 {
-	_device_id.devid_s.devtype = device_type;
-	// fill in _device_id fields for a SPI device
-	_device_id.devid_s.bus_type = DeviceBusType_SPI;
-	_device_id.devid_s.bus = bus;
-	// Use the 2. LSB byte as SPI address. This is currently 0, but will allow to extend
-	// for multiple instances of the same device on a bus, should that ever be required.
-	_device_id.devid_s.address = (uint8_t)(device >> 8);
-
 	if (!px4_spi_bus_requires_locking(bus)) {
 		_locking_mode = LOCK_NONE;
 	}
 }
 
-SPI::~SPI()
-{
-	// XXX no way to let go of the bus...
-}
-
-int
-SPI::init()
+int SPI::init()
 {
 	/* attach to the spi bus */
 	if (_dev == nullptr) {
@@ -111,22 +96,13 @@ SPI::init()
 		return ret;
 	}
 
-	/* do base class init, which will create the device node, etc. */
-	ret = CDev::init();
-
-	if (ret != OK) {
-		DEVICE_DEBUG("cdev init failed");
-		return ret;
-	}
-
 	/* tell the world where we are */
 	DEVICE_DEBUG("on SPI bus %d at %d (%u KHz)", get_device_bus(), PX4_SPI_DEV_ID(_device), _frequency / 1000);
 
 	return PX4_OK;
 }
 
-int
-SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
+int SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 {
 	int result;
 
@@ -160,8 +136,7 @@ SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 	return result;
 }
 
-int
-SPI::_transfer(uint8_t *send, uint8_t *recv, unsigned len)
+int SPI::_transfer(uint8_t *send, uint8_t *recv, unsigned len)
 {
 	SPI_SETFREQUENCY(_dev, _frequency);
 	SPI_SETMODE(_dev, _mode);
@@ -177,8 +152,7 @@ SPI::_transfer(uint8_t *send, uint8_t *recv, unsigned len)
 	return PX4_OK;
 }
 
-int
-SPI::transferhword(uint16_t *send, uint16_t *recv, unsigned len)
+int SPI::transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 {
 	int result;
 
@@ -212,8 +186,7 @@ SPI::transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 	return result;
 }
 
-int
-SPI::_transferhword(uint16_t *send, uint16_t *recv, unsigned len)
+int SPI::_transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 {
 	SPI_SETFREQUENCY(_dev, _frequency);
 	SPI_SETMODE(_dev, _mode);
@@ -227,6 +200,57 @@ SPI::_transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 	SPI_SELECT(_dev, _device, false);
 
 	return PX4_OK;
+}
+
+int SPI::read(unsigned address, void *data, unsigned count)
+{
+	//static constexpr uint8_t DIR_READ = 0x80;
+	uint8_t cmd[1 + count] {};
+	cmd[0] = address | _read_direction_bit; // DIR_READ;
+
+	if (transfer(cmd, cmd, sizeof(cmd)) == PX4_OK) {
+		memcpy(data, &cmd[1], count);
+		return PX4_OK;
+	}
+
+	return PX4_ERROR;
+}
+
+int SPI::write(unsigned address, void *data, unsigned count)
+{
+	if (count == 0) {
+		uint8_t cmd = address;
+		return transfer(&cmd, nullptr, 1);
+
+	} else {
+		uint8_t cmd[1 + count] {};
+		cmd[0] = address | _write_direction_bit; // DIR_WRITE
+
+		if (data) {
+			memcpy(&cmd[1], data, count);
+		}
+
+		return transfer(cmd, cmd, sizeof(cmd));
+	}
+
+	return PX4_ERROR;
+
+}
+
+uint8_t SPI::RegisterRead(uint8_t reg)
+{
+	uint8_t cmd[2] {};
+	cmd[0] = reg | _read_direction_bit;
+	transfer(cmd, cmd, sizeof(cmd));
+	return cmd[1];
+}
+
+int SPI::RegisterWrite(uint8_t reg, uint8_t value)
+{
+	uint8_t cmd[2];
+	cmd[0] = reg | _write_direction_bit;
+	cmd[1] = value;
+	return transfer(cmd, cmd, sizeof(cmd));
 }
 
 } // namespace device

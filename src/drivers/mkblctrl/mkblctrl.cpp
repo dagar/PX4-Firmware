@@ -43,6 +43,7 @@
 
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/tasks.h>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/device/i2c.h>
 #include <parameters/param.h>
 
@@ -115,10 +116,7 @@ struct MotorData_t {
 	unsigned int RoundCount;
 };
 
-
-
-
-class MK : public device::I2C
+class MK : public cdev::CDev, public device::I2C
 {
 public:
 	enum MappingMode {
@@ -218,6 +216,7 @@ MK	*g_mk;
 } // namespace
 
 MK::MK(int bus, const char *_device_path) :
+	CDev("/dev/mkblctrl"),
 	I2C(0, "mkblctrl", bus, 0, I2C_BUS_SPEED),
 	_update_rate(UPDATE_RATE),
 	_task(-1),

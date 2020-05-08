@@ -74,22 +74,22 @@ int
 L3GD20::probe()
 {
 	/* read dummy value to void to clear SPI statemachine on sensor */
-	read_reg(ADDR_WHO_AM_I);
+	RegisterRead(ADDR_WHO_AM_I);
 
 	bool success = false;
 	uint8_t v = 0;
 
 	/* verify that the device is attached and functioning, accept
 	 * L3GD20, L3GD20H and L3G4200D */
-	if ((v = read_reg(ADDR_WHO_AM_I)) == WHO_I_AM) {
+	if ((v = RegisterRead(ADDR_WHO_AM_I)) == WHO_I_AM) {
 		_orientation = SENSOR_BOARD_ROTATION_DEFAULT;
 		success = true;
 
-	} else if ((v = read_reg(ADDR_WHO_AM_I)) == WHO_I_AM_H) {
+	} else if ((v = RegisterRead(ADDR_WHO_AM_I)) == WHO_I_AM_H) {
 		_orientation = SENSOR_BOARD_ROTATION_180_DEG;
 		success = true;
 
-	} else if ((v = read_reg(ADDR_WHO_AM_I)) == WHO_I_AM_L3G4200D) {
+	} else if ((v = RegisterRead(ADDR_WHO_AM_I)) == WHO_I_AM_L3G4200D) {
 		/* Detect the L3G4200D used on AeroCore */
 		_is_l3g4200d = true;
 		_orientation = SENSOR_BOARD_ROTATION_DEFAULT;
@@ -104,34 +104,10 @@ L3GD20::probe()
 	return -EIO;
 }
 
-uint8_t
-L3GD20::read_reg(unsigned reg)
-{
-	uint8_t cmd[2] {};
-
-	cmd[0] = reg | DIR_READ;
-	cmd[1] = 0;
-
-	transfer(cmd, cmd, sizeof(cmd));
-
-	return cmd[1];
-}
-
-int
-L3GD20::write_reg(unsigned reg, uint8_t value)
-{
-	uint8_t	cmd[2] {};
-
-	cmd[0] = reg | DIR_WRITE;
-	cmd[1] = value;
-
-	return transfer(cmd, nullptr, sizeof(cmd));
-}
-
 void
 L3GD20::write_checked_reg(unsigned reg, uint8_t value)
 {
-	write_reg(reg, value);
+	RegisterWrite(reg, value);
 
 	for (uint8_t i = 0; i < L3GD20_NUM_CHECKED_REGISTERS; i++) {
 		if (reg == _checked_registers[i]) {
@@ -143,7 +119,7 @@ L3GD20::write_checked_reg(unsigned reg, uint8_t value)
 void
 L3GD20::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
-	uint8_t	val = read_reg(reg);
+	uint8_t	val = RegisterRead(reg);
 	val &= ~clearbits;
 	val |= setbits;
 	write_checked_reg(reg, val);
@@ -234,10 +210,10 @@ L3GD20::disable_i2c()
 
 	while (retries--) {
 		// add retries
-		uint8_t a = read_reg(0x05);
-		write_reg(0x05, (0x20 | a));
+		uint8_t a = RegisterRead(0x05);
+		RegisterWrite(0x05, (0x20 | a));
 
-		if (read_reg(0x05) == (a | 0x20)) {
+		if (RegisterRead(0x05) == (a | 0x20)) {
 			// this sets the I2C_DIS bit on the
 			// L3GD20H. The l3gd20 datasheet doesn't
 			// mention this register, but it does seem to
@@ -280,7 +256,7 @@ L3GD20::check_registers()
 {
 	uint8_t v;
 
-	if ((v = read_reg(_checked_registers[_checked_next])) != _checked_values[_checked_next]) {
+	if ((v = RegisterRead(_checked_registers[_checked_next])) != _checked_values[_checked_next]) {
 		/*
 		  if we get the wrong value then we know the SPI bus
 		  or sensor is very sick. We set _register_wait to 20
@@ -296,7 +272,7 @@ L3GD20::check_registers()
 		  is not writeable
 		 */
 		if (_checked_next != 0) {
-			write_reg(_checked_registers[_checked_next], _checked_values[_checked_next]);
+			RegisterWrite(_checked_registers[_checked_next], _checked_values[_checked_next]);
 		}
 
 		_register_wait = 20;
@@ -404,7 +380,7 @@ L3GD20::print_status()
 	::printf("checked_next: %u\n", _checked_next);
 
 	for (uint8_t i = 0; i < L3GD20_NUM_CHECKED_REGISTERS; i++) {
-		uint8_t v = read_reg(_checked_registers[i]);
+		uint8_t v = RegisterRead(_checked_registers[i]);
 
 		if (v != _checked_values[i]) {
 			::printf("reg %02x:%02x should be %02x\n",
@@ -423,7 +399,7 @@ L3GD20::print_registers()
 	printf("L3GD20 registers\n");
 
 	for (uint8_t reg = 0; reg <= 0x40; reg++) {
-		uint8_t v = read_reg(reg);
+		uint8_t v = RegisterRead(reg);
 		printf("%02x:%02x ", (unsigned)reg, (unsigned)v);
 
 		if ((reg + 1) % 16 == 0) {
@@ -438,5 +414,5 @@ void
 L3GD20::test_error()
 {
 	// trigger a deliberate error
-	write_reg(ADDR_CTRL_REG3, 0);
+	RegisterWrite(ADDR_CTRL_REG3, 0);
 }

@@ -70,7 +70,7 @@ int PWMOut::init()
 	/* try to claim the generic PWM output device node as well - it's OK if we fail at this */
 	_class_instance = register_class_devname(PWM_OUTPUT_BASE_DEVICE_PATH);
 
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
+	if (_class_instance == cdev::CLASS_DEVICE_PRIMARY) {
 		/* lets not be too verbose */
 	} else if (_class_instance < 0) {
 		PX4_ERR("FAILED registering class device");
@@ -420,10 +420,10 @@ void PWMOut::update_pwm_rev_mask()
 
 	const char *pname_format;
 
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
+	if (_class_instance == cdev::CLASS_DEVICE_PRIMARY) {
 		pname_format = "PWM_MAIN_REV%d";
 
-	} else if (_class_instance == CLASS_DEVICE_SECONDARY) {
+	} else if (_class_instance == cdev::CLASS_DEVICE_SECONDARY) {
 		pname_format = "PWM_AUX_REV%d";
 
 	} else {
@@ -458,10 +458,10 @@ void PWMOut::update_pwm_trims()
 
 	const char *pname_format;
 
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
+	if (_class_instance == cdev::CLASS_DEVICE_PRIMARY) {
 		pname_format = "PWM_MAIN_TRIM%d";
 
-	} else if (_class_instance == CLASS_DEVICE_SECONDARY) {
+	} else if (_class_instance == cdev::CLASS_DEVICE_SECONDARY) {
 		pname_format = "PWM_AUX_TRIM%d";
 
 	} else {

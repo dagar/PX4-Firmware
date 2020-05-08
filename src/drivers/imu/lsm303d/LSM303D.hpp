@@ -183,23 +183,6 @@ private:
 	void			measureMagnetometer();
 
 	/**
-	 * Read a register from the LSM303D
-	 *
-	 * @param		The register to read.
-	 * @return		The value that was read.
-	 */
-	uint8_t			read_reg(unsigned reg) override;
-
-	/**
-	 * Write a register in the LSM303D
-	 *
-	 * @param reg		The register to write.
-	 * @param value		The new value to write.
-	 * @return		OK on success, negative errno otherwise.
-	 */
-	int			write_reg(unsigned reg, uint8_t value) override;
-
-	/**
 	 * Modify a register in the LSM303D
 	 *
 	 * Bits are cleared before bits are set.
