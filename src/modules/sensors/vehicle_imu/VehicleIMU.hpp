@@ -35,8 +35,10 @@
 
 #include <sensor_corrections/SensorCorrections.hpp>
 
+#include <lib/drivers/device/integrator.h>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
+#include <lib/perf/perf_counter.h>
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_config.h>
@@ -45,8 +47,8 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_accel_integrated.h>
-#include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/vehicle_imu.h>
 
 namespace sensors
@@ -69,13 +71,40 @@ private:
 	void ParametersUpdate(bool force = false);
 	void Run() override;
 
+	struct IntervalAverage {
+		hrt_abstime timestamp_sample_last{0};
+		float interval_sum{0.f};
+		float interval_count{0.f};
+		float update_interval{0.f};
+	};
+
+	bool UpdateIntervalAverage(IntervalAverage &intavg, const hrt_abstime &timestamp_sample);
+	void UpdateIntergratorConfiguration();
+
 	uORB::PublicationMulti<vehicle_imu_s> _vehicle_imu_pub{ORB_ID(vehicle_imu)};
 	uORB::Subscription _params_sub{ORB_ID(parameter_update)};
-	uORB::SubscriptionCallbackWorkItem _sensor_accel_integrated_sub;
-	uORB::SubscriptionCallbackWorkItem _sensor_gyro_integrated_sub;
+	uORB::SubscriptionCallbackWorkItem _sensor_accel_sub;
+	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub;
 
 	SensorCorrections _accel_corrections;
 	SensorCorrections _gyro_corrections;
+
+	Integrator _accel_integrator{5000, false}; // 200 Hz default
+	Integrator _gyro_integrator{5000, true};   // 200 Hz default, coning compensation enabled
+
+	hrt_abstime _last_timestamp_sample_accel{0};
+	hrt_abstime _last_timestamp_sample_gyro{0};
+
+	IntervalAverage _accel_interval{};
+	IntervalAverage _gyro_interval{};
+
+	perf_counter_t _publish_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": publish interval")};
+	perf_counter_t _accel_update_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": accel update interval")};
+	perf_counter_t _gyro_update_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": gyro update interval")};
+
+	DEFINE_PARAMETERS(
+		(ParamInt<px4::params::IMU_INTEG_RATE>) _param_imu_integ_rate
+	)
 };
 
 } // namespace sensors

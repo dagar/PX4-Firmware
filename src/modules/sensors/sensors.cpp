@@ -417,12 +417,12 @@ void Sensors::InitializeVehicleIMU()
 	for (uint8_t i = 0; i < MAX_SENSOR_COUNT; i++) {
 		if (_vehicle_imu_list[i] == nullptr) {
 
-			uORB::Subscription accel_sub{ORB_ID(sensor_accel_integrated), i};
-			sensor_accel_integrated_s accel{};
+			uORB::Subscription accel_sub{ORB_ID(sensor_accel), i};
+			sensor_accel_s accel{};
 			accel_sub.copy(&accel);
 
-			uORB::Subscription gyro_sub{ORB_ID(sensor_gyro_integrated), i};
-			sensor_gyro_integrated_s gyro{};
+			uORB::Subscription gyro_sub{ORB_ID(sensor_gyro), i};
+			sensor_gyro_s gyro{};
 			gyro_sub.copy(&gyro);
 
 			if (accel.device_id > 0 && gyro.device_id > 0) {
