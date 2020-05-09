@@ -100,10 +100,13 @@ public:
 
 	virtual void call() = 0;
 
+	void set_required_updates(uint8_t required_updates) { _required_updates = required_updates; }
+
 protected:
 
 	bool _registered{false};
 
+	uint8_t _required_updates{0};
 };
 
 // Subscription with callback that schedules a WorkItem
@@ -128,7 +131,14 @@ public:
 	void call() override
 	{
 		// schedule immediately if no interval, otherwise check time elapsed
-		if ((_interval_us == 0) || (hrt_elapsed_time_atomic(&_last_update) >= _interval_us)) {
+		if (_required_updates > 0) {
+			if (_subscription.get_node()->published_message_count() >= (_subscription.get_last_generation() + _required_updates)) {
+				if (updated()) {
+					_work_item->ScheduleNow();
+				}
+			}
+
+		} else if (updated()) {
 			_work_item->ScheduleNow();
 		}
 	}

@@ -42,15 +42,6 @@
 #define FXAS21002C_DEFAULT_ONCHIP_FILTER_FREQ 	64 // ODR dependant
 
 /*
-  we set the timer interrupt to run a bit faster than the desired
-  sample rate and then throw away duplicates using the data ready bit.
-  This time reduction is enough to cope with worst case timing jitter
-  due to other timers
-  Typical reductions for the MPU6000 is 20% so 20% of 1/800 is 250 us
- */
-#define FXAS21002C_TIMER_REDUCTION				250
-
-/*
   list of registers that will be checked in check_registers(). Note
   that ADDR_WHO_AM_I must be first in the list.
  */
@@ -310,15 +301,13 @@ FXAS21002C::set_onchip_lowpass_filter(int frequency_hz)
 	set_standby(_current_rate, false);
 }
 
-void
-FXAS21002C::start()
+void FXAS21002C::start()
 {
 	/* start polling at the specified rate */
-	ScheduleOnInterval((1_s / FXAS21002C_DEFAULT_RATE) - FXAS21002C_TIMER_REDUCTION, 10000);
+	ScheduleOnInterval((1_s / FXAS21002C_DEFAULT_RATE) / 2);
 }
 
-void
-FXAS21002C::check_registers(void)
+void FXAS21002C::check_registers()
 {
 	uint8_t v;
 
