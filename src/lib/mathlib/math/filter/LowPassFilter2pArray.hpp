@@ -56,30 +56,22 @@ public:
 	 *
 	 * @return retrieve the filtered result
 	 */
-	inline float apply(const int16_t samples[], uint8_t num_samples)
+	inline void apply(T samples[], const uint8_t N)
 	{
-		float output = 0.0f;
+		for (int n = 0; n < N; n++) {
+			// Direct Form II implementation
+			T delay_element_0{samples[n] - _delay_element_1 *_a1 - _delay_element_2 * _a2};
 
-		for (int n = 0; n < num_samples; n++) {
-			// do the filtering
-			float delay_element_0 = samples[n] - _delay_element_1 * _a1 - _delay_element_2 * _a2;
-
-			if (n == num_samples - 1) {
-				output = delay_element_0 * _b0 + _delay_element_1 * _b1 + _delay_element_2 * _b2;
+			// don't allow bad values to propagate via the filter
+			if (!PX4_ISFINITE(output)) {
+				output = samples[n];
 			}
+
+			samples[n] = delay_element_0 * _b0 + _delay_element_1 * _b1 + _delay_element_2 * _b2;
 
 			_delay_element_2 = _delay_element_1;
 			_delay_element_1 = delay_element_0;
 		}
-
-		// don't allow bad values to propagate via the filter
-		if (!PX4_ISFINITE(output)) {
-			reset(samples[num_samples - 1]);
-			output = samples[num_samples - 1];
-		}
-
-		// return the value. Should be no need to check limits
-		return output;
 	}
 
 };

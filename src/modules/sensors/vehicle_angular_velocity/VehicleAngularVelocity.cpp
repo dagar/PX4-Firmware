@@ -49,6 +49,10 @@ VehicleAngularVelocity::VehicleAngularVelocity() :
 	_notch_filter_velocity.setParameters(kInitialRateHz, _param_imu_gyro_nf_freq.get(), _param_imu_gyro_nf_bw.get());
 
 	_lp_filter_acceleration.set_cutoff_frequency(kInitialRateHz, _param_imu_dgyro_cutoff.get());
+
+	_notchFilterArrayX.setParameters(kInitialRateHz, _param_imu_gyro_nf_freq.get(), _param_imu_gyro_nf_bw.get());
+	_notchFilterArrayY.setParameters(kInitialRateHz, _param_imu_gyro_nf_freq.get(), _param_imu_gyro_nf_bw.get());
+	_notchFilterArrayZ.setParameters(kInitialRateHz, _param_imu_gyro_nf_freq.get(), _param_imu_gyro_nf_bw.get());
 }
 
 VehicleAngularVelocity::~VehicleAngularVelocity()
@@ -75,6 +79,10 @@ void VehicleAngularVelocity::Stop()
 {
 	// clear all registered callbacks
 	for (auto &sub : _sensor_sub) {
+		sub.unregisterCallback();
+	}
+
+	for (auto &sub : _sensor_fifo_sub) {
 		sub.unregisterCallback();
 	}
 
@@ -167,6 +175,39 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(bool force)
 				sub.unregisterCallback();
 			}
 
+			for (auto &sub : _sensor_fifo_sub) {
+				sub.unregisterCallback();
+			}
+
+			// use sensor_gyro_fifo if available
+			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+				sensor_gyro_fifo_s fifo_data{};
+				_sensor_fifo_sub[i].copy(&fifo_data);
+
+				if ((fifo_data.device_id != 0) && (fifo_data.device_id == sensor_selection.gyro_device_id)) {
+					if (_sensor_fifo_sub[i].registerCallback()) {
+						PX4_DEBUG("selected sensor changed %d -> %d", _selected_sensor_sub_index, i);
+
+						// record selected sensor (array index)
+						_selected_sensor_sub_index = i;
+						_selected_sensor_device_id = sensor_selection.gyro_device_id;
+
+						// clear bias and corrections
+						_bias.zero();
+
+						_calibration.set_device_id(report.device_id);
+
+						// reset sample interval accumulator on sensor change
+						_timestamp_sample_last = 0;
+
+						_fifo_available = true;
+
+						return true;
+					}
+				}
+			}
+
+			// otherwise fallback to regular sensor_gyro
 			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
 				sensor_gyro_s report{};
 				_sensor_sub[i].copy(&report);
@@ -186,6 +227,8 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(bool force)
 
 						// reset sample interval accumulator on sensor change
 						_timestamp_sample_last = 0;
+
+						_fifo_available = false;
 
 						return true;
 					}
@@ -224,88 +267,144 @@ void VehicleAngularVelocity::Run()
 	SensorBiasUpdate(selection_updated);
 	ParametersUpdate();
 
-	bool sensor_updated = _sensor_sub[_selected_sensor_sub_index].updated();
+	bool sensor_updated = false;
+
+	if (_fifo_available) {
+		sensor_updated = _sensor_fifo_sub[_selected_sensor_sub_index].updated();
+
+	} else {
+		sensor_updated = _sensor_sub[_selected_sensor_sub_index].updated();
+	}
 
 	// process all outstanding messages
 	while (sensor_updated || selection_updated) {
 		selection_updated = false;
 
-		sensor_gyro_s sensor_data;
+		if (_fifo_available) {
 
-		if (_sensor_sub[_selected_sensor_sub_index].copy(&sensor_data)) {
+			sensor_gyro_fifo_s sensor_fifo_data;
 
-			if (sensor_updated) {
-				// collect sample interval average for filters
-				if ((_timestamp_sample_last > 0) && (sensor_data.timestamp_sample > _timestamp_sample_last)) {
-					_interval_sum += (sensor_data.timestamp_sample - _timestamp_sample_last);
-					_interval_count++;
+			if (_sensor_fifo_sub[_selected_sensor_sub_index].copy(&sensor_fifo_data)) {
 
-				} else {
-					_interval_sum = 0.f;
-					_interval_count = 0.f;
+
+				if (sensor_fifo_updated) {
+					// collect sample interval average for filters
+					if ((_timestamp_sample_last > 0) && (sensor_fifo_data.timestamp_sample > _timestamp_sample_last)) {
+						_interval_sum += (sensor_fifo_data.timestamp_sample - _timestamp_sample_last);
+						_interval_count++;
+
+					} else {
+						_interval_sum = 0.f;
+						_interval_count = 0.f;
+					}
+
+					_timestamp_sample_last = sensor_fifo_data.timestamp_sample;
 				}
 
-				_timestamp_sample_last = sensor_data.timestamp_sample;
+				// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
+				const float dt = math::constrain(((sensor_fifo_data.timestamp_sample - _timestamp_sample_prev) / 1e6f), 0.0002f, 0.02f);
+				_timestamp_sample_prev = sensor_fifo_data.timestamp_sample;
+
+
+				const auto &data[] {sensor_fifo_data.x, sensor_fifo_data.y, sensor_fifo_data.z};
+				float samples[3][sizeof(sensor_gyro_fifo_s::x) / sizeof(sensor_gyro_fifo_s::x[0])];
+
+				for (int i = 0; i < 3; i++) {
+					for (uint8_t n = 0; n < sensor_fifo_data.samples; n++) {
+						samples[i][n] = (float)data[n];
+					}
+
+					_notchFilterArray[i].apply(samples[i], sensor_fifo_data.samples);
+					_filterArray[i].apply(samples[i], sensor_fifo_data.samples);
+				}
+
+				// angular acceleration
+				for (int n = 0; n < sensor_fifo_data.samples; n++) {
+
+					angular_acceleration_raw = (sample_notched[1][i] - _angular_velocity_prev) / sensor_fifo_data.dt;
+					_angular_velocity_prev = sample_notched[1][i];
+
+					_angular_acceleration_prev = angular_acceleration_raw;
+				}
+
+				// get the sensor data and correct for thermal errors (apply offsets and scale)
+				Vector3f angular_velocity = _calibration.Correct(Vector3f{x_filtered, y_filtered, z_filtered}) - _bias;
 			}
 
-			// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
-			const float dt = math::constrain(((sensor_data.timestamp_sample - _timestamp_sample_prev) / 1e6f), 0.0002f, 0.02f);
-			_timestamp_sample_prev = sensor_data.timestamp_sample;
+		} else {
 
-			// get the sensor data and correct for thermal errors (apply offsets and scale)
-			const Vector3f val{sensor_data.x, sensor_data.y, sensor_data.z};
+			sensor_gyro_s sensor_data;
 
-			// correct for in-run bias errors
-			Vector3f angular_velocity_raw = _calibration.Correct(val) - _bias;
+			if (_sensor_sub[_selected_sensor_sub_index].copy(&sensor_data)) {
 
-			// correct for in-run bias errors
-			angular_velocity_raw -= _bias;
+				if (sensor_updated) {
+					// collect sample interval average for filters
+					if ((_timestamp_sample_last > 0) && (sensor_data.timestamp_sample > _timestamp_sample_last)) {
+						_interval_sum += (sensor_data.timestamp_sample - _timestamp_sample_last);
+						_interval_count++;
 
-			// Differentiate angular velocity (after notch filter)
-			const Vector3f angular_velocity_notched{_notch_filter_velocity.apply(angular_velocity_raw)};
-			const Vector3f angular_acceleration_raw = (angular_velocity_notched - _angular_velocity_prev) / dt;
-
-			_angular_velocity_prev = angular_velocity_notched;
-			_angular_acceleration_prev = angular_acceleration_raw;
-
-			CheckFilters();
-
-			// Filter: apply low-pass
-			const Vector3f angular_acceleration{_lp_filter_acceleration.apply(angular_acceleration_raw)};
-			const Vector3f angular_velocity{_lp_filter_velocity.apply(angular_velocity_notched)};
-
-			// publish once all new samples are processed
-			sensor_updated = _sensor_sub[_selected_sensor_sub_index].updated();
-
-			if (!sensor_updated) {
-				bool publish = true;
-
-				if (_param_imu_gyro_rate_max.get() > 0) {
-					const uint64_t interval = 1e6f / _param_imu_gyro_rate_max.get();
-
-					if (hrt_elapsed_time(&_last_publish) < interval) {
-						publish = false;
+					} else {
+						_interval_sum = 0.f;
+						_interval_count = 0.f;
 					}
+
+					_timestamp_sample_last = sensor_data.timestamp_sample;
 				}
 
-				if (publish) {
-					// Publish vehicle_angular_acceleration
-					vehicle_angular_acceleration_s v_angular_acceleration;
-					v_angular_acceleration.timestamp_sample = sensor_data.timestamp_sample;
-					angular_acceleration.copyTo(v_angular_acceleration.xyz);
-					v_angular_acceleration.timestamp = hrt_absolute_time();
-					_vehicle_angular_acceleration_pub.publish(v_angular_acceleration);
+				// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
+				const float dt = math::constrain(((sensor_data.timestamp_sample - _timestamp_sample_prev) / 1e6f), 0.0002f, 0.02f);
+				_timestamp_sample_prev = sensor_data.timestamp_sample;
 
-					// Publish vehicle_angular_velocity
-					vehicle_angular_velocity_s v_angular_velocity;
-					v_angular_velocity.timestamp_sample = sensor_data.timestamp_sample;
-					angular_velocity.copyTo(v_angular_velocity.xyz);
-					v_angular_velocity.timestamp = hrt_absolute_time();
-					_vehicle_angular_velocity_pub.publish(v_angular_velocity);
+				// get the sensor data and correct for thermal errors (apply offsets and scale)
+				Vector3f angular_velocity_raw = _calibration.Correct(Vector3f{sensor_data.x, sensor_data.y, sensor_data.z}) - _bias;
 
-					_last_publish = v_angular_velocity.timestamp_sample;
-					return;
+				// Differentiate angular velocity (after notch filter)
+				const Vector3f angular_velocity_notched{_notch_filter_velocity.apply(angular_velocity_raw)};
+				const Vector3f angular_acceleration_raw = (angular_velocity_notched - _angular_velocity_prev) / dt;
+
+				_angular_velocity_prev = angular_velocity_notched;
+				_angular_acceleration_prev = angular_acceleration_raw;
+
+			}
+		}
+
+		CheckFilters();
+
+		// Filter: apply low-pass
+		const Vector3f angular_acceleration{_lp_filter_acceleration.apply(angular_acceleration_raw)};
+		const Vector3f angular_velocity{_lp_filter_velocity.apply(angular_velocity_notched)};
+
+		// publish once all new samples are processed
+		sensor_updated = _sensor_sub[_selected_sensor_sub_index].updated();
+
+		if (!sensor_updated) {
+			bool publish = true;
+
+			if (_param_imu_gyro_rate_max.get() > 0) {
+				const uint64_t interval = 1e6f / _param_imu_gyro_rate_max.get();
+
+				if (hrt_elapsed_time(&_last_publish) < interval) {
+					publish = false;
 				}
+			}
+
+			if (publish) {
+				// Publish vehicle_angular_acceleration
+				vehicle_angular_acceleration_s v_angular_acceleration;
+				v_angular_acceleration.timestamp_sample = sensor_data.timestamp_sample;
+				angular_acceleration.copyTo(v_angular_acceleration.xyz);
+				v_angular_acceleration.timestamp = hrt_absolute_time();
+				_vehicle_angular_acceleration_pub.publish(v_angular_acceleration);
+
+				// Publish vehicle_angular_velocity
+				vehicle_angular_velocity_s v_angular_velocity;
+				v_angular_velocity.timestamp_sample = sensor_data.timestamp_sample;
+				angular_velocity.copyTo(v_angular_velocity.xyz);
+				v_angular_velocity.timestamp = hrt_absolute_time();
+				_vehicle_angular_velocity_pub.publish(v_angular_velocity);
+
+				_last_publish = v_angular_velocity.timestamp_sample;
+				return;
 			}
 		}
 	}

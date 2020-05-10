@@ -37,6 +37,7 @@
 
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/math/filter/LowPassFilter2pArray.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
 #include <lib/mathlib/math/filter/NotchFilter.hpp>
 #include <px4_platform_common/log.h>
@@ -49,6 +50,7 @@
 #include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_gyro_fifo.h>
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_angular_acceleration.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
@@ -63,11 +65,9 @@ public:
 	VehicleAngularVelocity();
 	~VehicleAngularVelocity() override;
 
+	void PrintStatus();
 	bool Start();
 	void Stop();
-
-	void PrintStatus();
-
 private:
 	void Run() override;
 
@@ -90,6 +90,11 @@ private:
 		{this, ORB_ID(sensor_gyro), 1},
 		{this, ORB_ID(sensor_gyro), 2}
 	};
+	uORB::SubscriptionCallbackWorkItem _sensor_fifo_sub[MAX_SENSOR_COUNT] {
+		{this, ORB_ID(sensor_gyro_fifo), 0},
+		{this, ORB_ID(sensor_gyro_fifo), 1},
+		{this, ORB_ID(sensor_gyro_fifo), 2}
+	};
 
 	SensorCalibration _calibration{SensorCalibration::SensorType::Gyroscope};
 
@@ -103,12 +108,17 @@ private:
 	static constexpr const float kInitialRateHz{1000.0f}; /**< sensor update rate used for initialization */
 	float _update_rate_hz{kInitialRateHz}; /**< current rate-controller loop update rate in [Hz] */
 
+	bool _fifo_available{false};
+
 	// angular velocity filters
-	math::LowPassFilter2pVector3f _lp_filter_velocity{kInitialRateHz, 30.0f};
+	math::LowPassFilter2pArray _filterArray[3] {{8000, 30.f}, {8000, 30.f}, {8000, 30.f}};
+	math::NotchFilterArray<float> _notchFilterArray[3] {};
+
+	math::LowPassFilter2pVector3f _lp_filter_velocity{kInitialRateHz, 30.f};
 	math::NotchFilter<matrix::Vector3f> _notch_filter_velocity{};
 
 	// angular acceleration filter
-	math::LowPassFilter2pVector3f _lp_filter_acceleration{kInitialRateHz, 30.0f};
+	math::LowPassFilter2pVector3f _lp_filter_acceleration{kInitialRateHz, 30.f};
 
 	float _filter_sample_rate{kInitialRateHz};
 

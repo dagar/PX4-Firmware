@@ -66,6 +66,10 @@ public:
 	// apply offsets and scale
 	// rotate corrected measurements from sensor to body frame
 	matrix::Vector3f Correct(const matrix::Vector3f &data);
+	matrix::Vector3f Rotate(const matrix::Vector3f &data) const { return _rotation * data; }
+
+	float getScale(uint8_t) const { return _scale(axis); }
+
 
 	void ParametersUpdate();
 	void SensorCorrectionsUpdate(bool force = false);
