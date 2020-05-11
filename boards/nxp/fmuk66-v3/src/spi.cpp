@@ -60,18 +60,16 @@ constexpr px4_spi_bus_t px4_spi_buses[SPI_BUS_MAX_BUS_ITEMS] = {
 		initSPIDevice(SPIDEV_FLASH(0), SPI::CS{GPIO::PortC, GPIO::Pin2})
 	}),
 	initSPIBus(SPI::Bus::SPI1, {
-		initSPIDevice(DRV_ACC_DEVTYPE_FXOS8701C, SPI::CS{GPIO::PortB, GPIO::Pin10}),
-		initSPIDevice(DRV_GYR_DEVTYPE_FXAS2100C, SPI::CS{GPIO::PortB, GPIO::Pin9}),
+		initSPIDevice(DRV_ACC_DEVTYPE_FXOS8701C, SPI::CS{GPIO::PortB, GPIO::Pin10}, SPI::DRDY{GPIO::PortE, GPIO::Pin9}), // ACCEL_MAG_INT1: E9, ACCEL_MAG_INT2: E10
+		initSPIDevice(DRV_GYR_DEVTYPE_FXAS2100C, SPI::CS{GPIO::PortB, GPIO::Pin9}, SPI::DRDY{GPIO::PortE, GPIO::Pin7}), // GYRO_INT1: E7, GYRO_INT2: E6
 		initSPIDevice(DRV_DEVTYPE_UNUSED, SPI::CS{GPIO::PortA, GPIO::Pin19}),
 	}, {GPIO::PortB, GPIO::Pin8}),
 	initSPIBusExternal(SPI::Bus::SPI2, {
-		initSPIConfigExternal(SPI::CS{GPIO::PortB, GPIO::Pin20}),
-		initSPIConfigExternal(SPI::CS{GPIO::PortD, GPIO::Pin15}),
+		initSPIConfigExternal(SPI::CS{GPIO::PortB, GPIO::Pin20}, SPI::DRDY{GPIO::PortD, GPIO::Pin11}), // BARO_INT1: D11
+		initSPIConfigExternal(SPI::CS{GPIO::PortD, GPIO::Pin15}, SPI::DRDY{GPIO::PortD, GPIO::Pin7}), // BARO_INT2: D7
 	}),
 };
-
 static constexpr bool unused = validateSPIConfig(px4_spi_buses);
-
 
 #define PX4_MK_GPIO(pin_ftmx, io)    ((((uint32_t)(pin_ftmx)) & ~(_PIN_MODE_MASK | _PIN_OPTIONS_MASK)) |(io))
 

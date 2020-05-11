@@ -133,7 +133,6 @@ struct RawAccelMagReport {
 extern device::Device *FXOS8701CQ_SPI_interface(int bus, uint32_t chip_select, int bus_frequency, spi_mode_e spi_mode);
 extern device::Device *FXOS8701CQ_I2C_interface(int bus, int bus_frequency, int i2c_address);
 
-
 /*
   we set the timer interrupt to run a bit faster than the desired
   sample rate and then throw away duplicates using the data ready bit.
@@ -145,7 +144,7 @@ extern device::Device *FXOS8701CQ_I2C_interface(int bus, int bus_frequency, int 
 class FXOS8701CQ : public I2CSPIDriver<FXOS8701CQ>
 {
 public:
-	FXOS8701CQ(device::Device *interface, I2CSPIBusOption bus_option, int bus, enum Rotation rotation, int i2c_address);
+	FXOS8701CQ(device::Device *interface, I2CSPIBusOption bus_option, int bus, enum Rotation rotation, int i2c_address, spi_drdy_gpio_t drdy_gpio);
 	virtual ~FXOS8701CQ();
 
 	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
@@ -154,21 +153,25 @@ public:
 
 	int		init();
 
-	void			print_status() override;
+	void		print_status() override;
 
-	void			RunImpl();
+	void		RunImpl();
 
-	void			print_registers();
-	void			test_error();
-protected:
-	int		probe();
+	void		print_registers();
+	void		test_error();
+private:
+	int probe();
 	void custom_method(const BusCLIArguments &cli) override;
 
-private:
 	device::Device *_interface;
 
-	void			start();
-	void			reset();
+	void		start();
+	void		reset();
+
+	static int DataReadyInterruptCallback(int irq, void *context, void *arg);
+	void DataReady();
+	bool DataReadyInterruptConfigure();
+	bool DataReadyInterruptDisable();
 
 	/**
 	 * check key registers for correct values
@@ -181,10 +184,7 @@ private:
 	 * @param		The register to read.
 	 * @return		The value that was read.
 	 */
-	inline uint8_t read_reg(unsigned reg)
-	{
-		return _interface->read_reg(reg);
-	}
+	inline uint8_t read_reg(unsigned reg) { return _interface->read_reg(reg); }
 
 	/**
 	 * Write a register in the FXOS8701C
@@ -193,10 +193,7 @@ private:
 	 * @param value		The new value to write.
 	 * @return		OK on success, negative errno otherwise.
 	 */
-	inline int write_reg(unsigned reg, uint8_t value)
-	{
-		return _interface->write_reg(reg, value);
-	}
+	inline int write_reg(unsigned reg, uint8_t value) { return _interface->write_reg(reg, value); }
 
 	/**
 	 * Modify a register in the FXOS8701C
@@ -245,7 +242,6 @@ private:
 	 */
 	int			accel_set_samplerate(unsigned frequency);
 
-
 	PX4Accelerometer	_px4_accel;
 
 #if !defined(BOARD_HAS_NOISY_FXOS8700_MAG)
@@ -254,11 +250,19 @@ private:
 	perf_counter_t		_mag_sample_perf;
 #endif
 
+	hrt_abstime _interrupt_timestamp{0};
+
+	bool _data_ready_interrupt_enabled{false};
+
+	const spi_drdy_gpio_t _drdy_gpio;
+
 	unsigned		_accel_samplerate{FXOS8701C_ACCEL_DEFAULT_RATE};
 
 	perf_counter_t		_accel_sample_perf;
 	perf_counter_t		_bad_registers;
 	perf_counter_t		_accel_duplicates;
+	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval")};
+
 
 	uint8_t			_register_wait{0};
 

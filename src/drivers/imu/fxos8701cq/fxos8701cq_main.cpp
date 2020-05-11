@@ -73,8 +73,7 @@ I2CSPIDriverBase *FXOS8701CQ::instantiate(const BusCLIArguments &cli, const BusI
 		return nullptr;
 	}
 
-	FXOS8701CQ *dev = new FXOS8701CQ(interface, iterator.configuredBusOption(), iterator.bus(), cli.rotation,
-					 cli.i2c_address);
+	FXOS8701CQ *dev = new FXOS8701CQ(interface, iterator.configuredBusOption(), iterator.bus(), cli.rotation, cli.i2c_address, iterator.DRDYGPIO());
 
 	if (dev == nullptr) {
 		delete interface;

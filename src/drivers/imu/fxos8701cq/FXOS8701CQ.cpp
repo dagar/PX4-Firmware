@@ -39,6 +39,8 @@
 
 #include "FXOS8701CQ.hpp"
 
+#include <px4_platform_common/micro_hal.h>
+
 using namespace time_literals;
 
 /*
@@ -53,8 +55,7 @@ const uint8_t FXOS8701CQ::_checked_registers[FXOS8701C_NUM_CHECKED_REGISTERS] = 
 	FXOS8701CQ_M_CTRL_REG2,
 };
 
-FXOS8701CQ::FXOS8701CQ(device::Device *interface, I2CSPIBusOption bus_option, int bus, enum Rotation rotation,
-		       int i2c_address) :
+FXOS8701CQ::FXOS8701CQ(device::Device *interface, I2CSPIBusOption bus_option, int bus, enum Rotation rotation, int i2c_address, spi_drdy_gpio_t drdy_gpio) :
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id()), bus_option, bus, i2c_address),
 	_interface(interface),
 	_px4_accel(interface->get_device_id(), ORB_PRIO_LOW, rotation),
@@ -62,6 +63,7 @@ FXOS8701CQ::FXOS8701CQ(device::Device *interface, I2CSPIBusOption bus_option, in
 	_px4_mag(interface->get_device_id(), ORB_PRIO_LOW, rotation),
 	_mag_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": mag read")),
 #endif
+	_drdy_gpio(drdy_gpio),
 	_accel_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": acc read")),
 	_bad_registers(perf_alloc(PC_COUNT, MODULE_NAME": bad reg")),
 	_accel_duplicates(perf_alloc(PC_COUNT, MODULE_NAME": acc dupe"))
@@ -83,10 +85,10 @@ FXOS8701CQ::~FXOS8701CQ()
 	perf_free(_accel_sample_perf);
 	perf_free(_bad_registers);
 	perf_free(_accel_duplicates);
+	perf_free(_drdy_interval_perf);
 }
 
-int
-FXOS8701CQ::init()
+int FXOS8701CQ::init()
 {
 	// do SPI/I2C init (and probe) first
 	int ret = _interface->init();
@@ -112,8 +114,7 @@ FXOS8701CQ::init()
 	return PX4_OK;
 }
 
-void
-FXOS8701CQ::reset()
+void FXOS8701CQ::reset()
 {
 	// enable accel set it To Standby
 	write_checked_reg(FXOS8701CQ_CTRL_REG1, 0);
@@ -132,8 +133,7 @@ FXOS8701CQ::reset()
 	write_checked_reg(FXOS8701CQ_CTRL_REG1, CTRL_REG1_DR(0) | CTRL_REG1_ACTIVE);
 }
 
-int
-FXOS8701CQ::probe()
+int FXOS8701CQ::probe()
 {
 	// verify that the device is attached and functioning
 	uint8_t whoami = read_reg(FXOS8701CQ_WHOAMI);
@@ -147,8 +147,39 @@ FXOS8701CQ::probe()
 	return -EIO;
 }
 
-void
-FXOS8701CQ::write_checked_reg(unsigned reg, uint8_t value)
+int FXOS8701CQ::DataReadyInterruptCallback(int irq, void *context, void *arg)
+{
+	static_cast<FXOS8701CQ *>(arg)->DataReady();
+	return 0;
+}
+
+void FXOS8701CQ::DataReady()
+{
+	perf_count(_drdy_interval_perf);
+	_interrupt_timestamp = hrt_absolute_time();
+	ScheduleNow();
+}
+
+bool FXOS8701CQ::DataReadyInterruptConfigure()
+{
+	if (_drdy_gpio == 0) {
+		return false;
+	}
+
+	// Setup data ready on falling edge
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &FXOS8701CQ::DataReadyInterruptCallback, this) == 0;
+}
+
+bool FXOS8701CQ::DataReadyInterruptDisable()
+{
+	if (_drdy_gpio == 0) {
+		return false;
+	}
+
+	return px4_arch_gpiosetevent(_drdy_gpio, false, false, false, nullptr, nullptr) == 0;
+}
+
+void FXOS8701CQ::write_checked_reg(unsigned reg, uint8_t value)
 {
 	write_reg(reg, value);
 
@@ -159,8 +190,7 @@ FXOS8701CQ::write_checked_reg(unsigned reg, uint8_t value)
 	}
 }
 
-void
-FXOS8701CQ::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
+void FXOS8701CQ::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
 	uint8_t	val = read_reg(reg);
 	val &= ~clearbits;
@@ -168,8 +198,7 @@ FXOS8701CQ::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 	write_checked_reg(reg, val);
 }
 
-int
-FXOS8701CQ::accel_set_range(unsigned max_g)
+int FXOS8701CQ::accel_set_range(unsigned max_g)
 {
 	uint8_t setbits = 0;
 	float lsb_per_g;
@@ -204,8 +233,7 @@ FXOS8701CQ::accel_set_range(unsigned max_g)
 }
 
 #if !defined(BOARD_HAS_NOISY_FXOS8700_MAG)
-int
-FXOS8701CQ::mag_set_range(unsigned max_ga)
+int FXOS8701CQ::mag_set_range(unsigned max_ga)
 {
 	// mag_range_ga = 12;
 	float mag_range_scale = 0.001f;
@@ -216,8 +244,7 @@ FXOS8701CQ::mag_set_range(unsigned max_ga)
 }
 #endif
 
-int
-FXOS8701CQ::accel_set_samplerate(unsigned frequency)
+int FXOS8701CQ::accel_set_samplerate(unsigned frequency)
 {
 	uint8_t setbits = 0;
 
@@ -259,11 +286,18 @@ FXOS8701CQ::accel_set_samplerate(unsigned frequency)
 	return OK;
 }
 
-void
-FXOS8701CQ::start()
+void FXOS8701CQ::start()
 {
-	// start polling at the specified rate
-	ScheduleOnInterval(1000000 / (FXOS8701C_ACCEL_DEFAULT_RATE) - FXOS8701C_TIMER_REDUCTION, 10000);
+	if (DataReadyInterruptConfigure()) {
+		_data_ready_interrupt_enabled = true;
+
+		// backup schedule as a watchdog timeout
+		ScheduleDelayed(10_ms);
+
+	} else {
+		_data_ready_interrupt_enabled = false;
+		ScheduleOnInterval(1_s / FXOS8701C_ACCEL_DEFAULT_RATE - FXOS8701C_TIMER_REDUCTION, 10000);
+	}
 }
 
 void
@@ -302,6 +336,19 @@ FXOS8701CQ::RunImpl()
 	// start the performance counter
 	perf_begin(_accel_sample_perf);
 
+	/* fetch data from the sensor */
+	hrt_abstime timestamp_sample = hrt_absolute_time();
+
+	if (_data_ready_interrupt_enabled) {
+		// re-schedule as watchdog timeout
+		ScheduleDelayed(10_ms);
+
+		// timestamp set in data ready interrupt
+		if (hrt_elapsed_time(&_interrupt_timestamp) < 200_us) {
+			timestamp_sample = _interrupt_timestamp;
+		}
+	}
+
 	// status register and data as read back from the device
 	RawAccelMagReport raw_accel_mag_report{};
 
@@ -314,9 +361,6 @@ FXOS8701CQ::RunImpl()
 		perf_end(_accel_sample_perf);
 		return;
 	}
-
-	/* fetch data from the sensor */
-	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
 	_interface->read(FXOS8701CQ_DR_STATUS, (uint8_t *)&raw_accel_mag_report, sizeof(raw_accel_mag_report));
 
@@ -374,6 +418,7 @@ FXOS8701CQ::print_status()
 #endif
 	perf_print_counter(_bad_registers);
 	perf_print_counter(_accel_duplicates);
+	perf_print_counter(_drdy_interval_perf);
 
 	::printf("checked_next: %u\n", _checked_next);
 

@@ -107,7 +107,7 @@ __BEGIN_DECLS
 
 /* kinetis_gpiosetevent is not implemented and will need to be added */
 
-#define px4_arch_gpiosetevent(pinset,r,f,e,fp,a)  kinetis_gpiosetevent(pinset,r,f,e,fp,a)
+#define px4_arch_gpiosetevent(pinset,r,f,e,fp,a)  kinetis_pinirqattach(pinset,fp,a)
 
 #define _PX4_MAKE_GPIO(pin_ftmx, io)    ((((uint32_t)(pin_ftmx)) & ~(_PIN_MODE_MASK | _PIN_OPTIONS_MASK)) |(io))
 #define PX4_MAKE_GPIO_INPUT(gpio) _PX4_MAKE_GPIO(gpio, GPIO_PULLUP)
