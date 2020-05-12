@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,9 +60,9 @@ void RateControl::setSaturationStatus(const MultirotorMixer::saturation_status &
 Vector3f RateControl::update(const Vector3f &rate, const Vector3f &rate_sp, const Vector3f &angular_accel,
 			     const float dt, const bool landed)
 {
-	_setpoint_filter[0].setParameters(dt, 0.01f);
-	_setpoint_filter[1].setParameters(dt, 0.01f);
-	_setpoint_filter[2].setParameters(dt, 0.01f);
+	_setpoint_filter[0].setParameters(dt, _filter_time_constant);
+	_setpoint_filter[1].setParameters(dt, _filter_time_constant);
+	_setpoint_filter[2].setParameters(dt, _filter_time_constant);
 
 	_setpoint_filter[0].update(rate_sp(0));
 	_setpoint_filter[1].update(rate_sp(1));

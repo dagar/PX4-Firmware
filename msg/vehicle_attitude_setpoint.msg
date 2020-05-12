@@ -4,8 +4,6 @@ float32 roll_body		# body angle in NED frame (can be NaN for FW)
 float32 pitch_body		# body angle in NED frame (can be NaN for FW)
 float32 yaw_body		# body angle in NED frame (can be NaN for FW)
 
-float32 yaw_sp_move_rate	# rad/s (commanded by user)
-
 # For quaternion-based attitude control
 float32[4] q_d			# Desired quaternion for quaternion control
 
@@ -17,7 +15,12 @@ bool roll_reset_integral	# Reset roll integral part (navigation logic change)
 bool pitch_reset_integral	# Reset pitch integral part (navigation logic change)
 bool yaw_reset_integral	# Reset yaw integral part (navigation logic change)
 
-bool fw_control_yaw		# control heading with rudder (used for auto takeoff on runway)
+uint8 yaw_mode
+uint8 YAW_MODE_HEADING     = 1  # control heading with rudder (used for auto takeoff on runway)
+uint8 YAW_MODE_COORDINATED = 2  # yaw controlled to maintain coordinated turn
+uint8 YAW_MODE_DISABLED    = 3  # yaw control disabled
+
+float32 yaw_sp_move_rate	# rad/s (commanded by user)
 
 uint8 apply_flaps       	# flap config specifier
 uint8 FLAPS_OFF = 0     	# no flaps

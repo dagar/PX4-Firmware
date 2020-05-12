@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ public:
 	 * Set the mximum absolute value of the integrator for all axes
 	 * @param integrator_limit limit value for all axes x, y, z
 	 */
-	void setIntegratorLimit(const matrix::Vector3f &integrator_limit) { _lim_int = integrator_limit; };
+	void setIntegratorLimit(const matrix::Vector3f &integrator_limit) { _lim_int = integrator_limit; }
 
 	/**
 	 * Set direct rate to torque feed forward gain
@@ -71,6 +71,8 @@ public:
 	 * @param FF 3D vector of feed forward gains for body x,y,z axis
 	 */
 	void setFeedForwardGain(const matrix::Vector3f &FF) { _gain_ff = FF; };
+
+	void setFilterTimeConstant(float time_constant) { _filter_time_constant = time_constant; }
 
 	/**
 	 * Set saturation status
@@ -115,6 +117,8 @@ private:
 
 	// setpoint filter
 	AlphaFilter<float> _setpoint_filter[3];
+
+	float _filter_time_constant{0.f};
 
 	bool _mixer_saturation_positive[3] {};
 	bool _mixer_saturation_negative[3] {};

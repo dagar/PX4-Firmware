@@ -66,7 +66,6 @@ TEST(PositionControlTest, EmptySetpoint)
 	EXPECT_EQ(attitude.roll_reset_integral, false);
 	EXPECT_EQ(attitude.pitch_reset_integral, false);
 	EXPECT_EQ(attitude.yaw_reset_integral, false);
-	EXPECT_EQ(attitude.fw_control_yaw, false);
 	EXPECT_FLOAT_EQ(attitude.apply_flaps, 0.f);//vehicle_attitude_setpoint_s::FLAPS_OFF); // TODO why no reference?
 }
 

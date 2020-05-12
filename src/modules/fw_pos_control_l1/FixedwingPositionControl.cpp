@@ -557,7 +557,7 @@ FixedwingPositionControl::control_position(const Vector2f &curr_pos, const Vecto
 
 	bool setpoint = true;
 
-	_att_sp.fw_control_yaw = false;		// by default we don't want yaw to be contoller directly with rudder
+	_att_sp.yaw_mode = vehicle_attitude_setpoint_s::YAW_MODE_COORDINATED; // by default we don't want yaw to be contoller directly with rudder
 	_att_sp.apply_flaps = vehicle_attitude_setpoint_s::FLAPS_OFF;		// by default we don't use flaps
 
 	Vector2f nav_speed_2d{ground_speed};
@@ -1085,7 +1085,14 @@ FixedwingPositionControl::control_takeoff(const Vector2f &curr_pos, const Vector
 		// assign values
 		_att_sp.roll_body = _runway_takeoff.getRoll(_l1_control.get_roll_setpoint());
 		_att_sp.yaw_body = _runway_takeoff.getYaw(_l1_control.nav_bearing());
-		_att_sp.fw_control_yaw = _runway_takeoff.controlYaw();
+
+		if (_runway_takeoff.controlYaw()) {
+			_att_sp.yaw_mode = vehicle_attitude_setpoint_s::YAW_MODE_HEADING;
+
+		} else {
+			_att_sp.yaw_mode = vehicle_attitude_setpoint_s::YAW_MODE_COORDINATED;
+		}
+
 		_att_sp.pitch_body = _runway_takeoff.getPitch(get_tecs_pitch());
 
 		// reset integrals except yaw (which also counts for the wheel controller)
@@ -1346,7 +1353,7 @@ FixedwingPositionControl::control_landing(const Vector2f &curr_pos, const Vector
 		/* enable direct yaw control using rudder/wheel */
 		if (_land_noreturn_horizontal) {
 			_att_sp.yaw_body = _target_bearing;
-			_att_sp.fw_control_yaw = true;
+			_att_sp.yaw_mode = vehicle_attitude_setpoint_s::YAW_MODE_HEADING;
 		}
 
 		if (((_current_altitude < terrain_alt + _landingslope.motor_lim_relative_alt()) &&
