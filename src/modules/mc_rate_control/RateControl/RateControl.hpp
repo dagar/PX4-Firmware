@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,8 +40,8 @@
 #pragma once
 
 #include <matrix/matrix/math.hpp>
-#include <mathlib/math/filter/LowPassFilter2pVector3f.hpp>
-
+#include <lib/ecl/EKF/AlphaFilter.hpp>
+#include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
 #include <lib/mixer/MultirotorMixer/MultirotorMixer.hpp>
 #include <uORB/topics/rate_ctrl_status.h>
 
@@ -63,7 +63,7 @@ public:
 	 * Set the mximum absolute value of the integrator for all axes
 	 * @param integrator_limit limit value for all axes x, y, z
 	 */
-	void setIntegratorLimit(const matrix::Vector3f &integrator_limit) { _lim_int = integrator_limit; };
+	void setIntegratorLimit(const matrix::Vector3f &integrator_limit) { _lim_int = integrator_limit; }
 
 	/**
 	 * Set direct rate to torque feed forward gain
@@ -71,6 +71,12 @@ public:
 	 * @param FF 3D vector of feed forward gains for body x,y,z axis
 	 */
 	void setFeedForwardGain(const matrix::Vector3f &FF) { _gain_ff = FF; };
+
+	void setFilterTimeConstant(float time_constant) { _filter_time_constant = time_constant; }
+
+	void setRollErrorFilterTimeConstant(float time_constant) { _roll_error_filter_time_constant = time_constant; }
+	void setPitchErrorFilterTimeConstant(float time_constant) { _pitch_error_filter_time_constant = time_constant; }
+	void setYawErrorFilterTimeConstant(float time_constant) { _yaw_error_filter_time_constant = time_constant; }
 
 	/**
 	 * Set saturation status
@@ -112,6 +118,16 @@ private:
 
 	// States
 	matrix::Vector3f _rate_int; ///< integral term of the rate controller
+
+	// setpoint filter
+	AlphaFilter<float> _setpoint_filter[3];
+	AlphaFilter<float> _error_filter[3];
+
+	float _filter_time_constant{0.f};
+
+	float _roll_error_filter_time_constant{0.f};
+	float _pitch_error_filter_time_constant{0.f};
+	float _yaw_error_filter_time_constant{0.f};
 
 	bool _mixer_saturation_positive[3] {};
 	bool _mixer_saturation_negative[3] {};

@@ -44,8 +44,8 @@ using namespace px4::logger;
 
 void LoggedTopics::add_default_topics()
 {
-	add_topic("actuator_controls_0", 100);
-	add_topic("actuator_controls_1", 100);
+	add_topic("actuator_controls_0");
+	add_topic("actuator_controls_1");
 	add_topic("airspeed", 1000);
 	add_topic("airspeed_validated", 1000);
 	add_topic("camera_capture");
@@ -70,7 +70,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("position_controller_status", 500);
 	add_topic("position_setpoint_triplet", 200);
 	add_topic("radio_status");
-	add_topic("rate_ctrl_status", 200);
+	add_topic("rate_ctrl_status");
 	add_topic("rpm", 500);
 	add_topic("safety", 1000);
 	add_topic("sensor_combined", 100);
@@ -81,16 +81,16 @@ void LoggedTopics::add_default_topics()
 	add_topic("tecs_status", 200);
 	add_topic("trajectory_setpoint", 200);
 	add_topic("vehicle_air_data", 200);
-	add_topic("vehicle_angular_velocity", 20);
-	add_topic("vehicle_attitude", 50);
-	add_topic("vehicle_attitude_setpoint", 100);
+	add_topic("vehicle_angular_velocity");
+	add_topic("vehicle_attitude");
+	add_topic("vehicle_attitude_setpoint");
 	add_topic("vehicle_command");
 	add_topic("vehicle_global_position", 200);
 	add_topic("vehicle_land_detected");
 	add_topic("vehicle_local_position", 100);
 	add_topic("vehicle_local_position_setpoint", 100);
 	add_topic("vehicle_magnetometer", 200);
-	add_topic("vehicle_rates_setpoint", 20);
+	add_topic("vehicle_rates_setpoint");
 	add_topic("vehicle_roi", 1000);
 	add_topic("vehicle_status", 200);
 	add_topic("vehicle_status_flags");
@@ -98,9 +98,9 @@ void LoggedTopics::add_default_topics()
 	add_topic("yaw_estimator_status", 200);
 
 	// multi topics
-	add_topic_multi("actuator_outputs", 100);
+	add_topic_multi("actuator_outputs");
 	add_topic_multi("logger_status");
-	add_topic_multi("multirotor_motor_limits", 1000);
+	add_topic_multi("multirotor_motor_limits");
 	add_topic_multi("telemetry_status", 1000);
 	add_topic_multi("wind_estimate", 1000);
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -280,6 +280,54 @@ PARAM_DEFINE_FLOAT(MC_YAWRATE_FF, 0.0f);
  * @group Multicopter Rate Control
  */
 PARAM_DEFINE_FLOAT(MC_YAWRATE_K, 1.0f);
+
+/**
+ * Setpoint filter time constant
+ * Setting this parameter to 0 disables the filter
+ *
+ * @unit s
+ * @min 0.0
+ * @max 2.0
+ * @decimal 2
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_RATE_SP_TAU, 0.01f);
+
+/**
+ * Roll rate error filter time constant
+ * Setting this parameter to 0 disables the filter
+ *
+ * @unit s
+ * @min 0.0
+ * @max 2.0
+ * @decimal 2
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_RATE_R_ERR_TC, 0.01f);
+
+/**
+ * Pitch rate error filter time constant
+ * Setting this parameter to 0 disables the filter
+ *
+ * @unit s
+ * @min 0.0
+ * @max 2.0
+ * @decimal 2
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_RATE_P_ERR_TC, 0.01f);
+
+/**
+ * Yaw rate error filter time constant
+ * Setting this parameter to 0 disables the filter
+ *
+ * @unit s
+ * @min 0.0
+ * @max 2.0
+ * @decimal 2
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_RATE_Y_ERR_TC, 0.05f);
 
 /**
  * Max acro roll rate

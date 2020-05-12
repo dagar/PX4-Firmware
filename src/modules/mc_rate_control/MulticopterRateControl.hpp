@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -132,6 +132,8 @@ private:
 
 	hrt_abstime _last_run{0};
 
+	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */
+
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,
 		(ParamFloat<px4::params::MC_ROLLRATE_I>) _param_mc_rollrate_i,
@@ -164,13 +166,16 @@ private:
 		(ParamFloat<px4::params::MC_ACRO_SUPEXPO>) _param_mc_acro_supexpo,			/**< superexpo stick curve shape (roll & pitch) */
 		(ParamFloat<px4::params::MC_ACRO_SUPEXPOY>) _param_mc_acro_supexpoy,			/**< superexpo stick curve shape (yaw) */
 
+		(ParamFloat<px4::params::MC_RATE_SP_TAU>) _param_mc_rate_sp_tau,
+
+		(ParamFloat<px4::params::MC_RATE_R_ERR_TC>) _param_mc_rate_r_err_tc,
+		(ParamFloat<px4::params::MC_RATE_P_ERR_TC>) _param_mc_rate_p_err_tc,
+		(ParamFloat<px4::params::MC_RATE_Y_ERR_TC>) _param_mc_rate_y_err_tc,
+
 		(ParamFloat<px4::params::MC_RATT_TH>) _param_mc_ratt_th,
 
 		(ParamBool<px4::params::MC_BAT_SCALE_EN>) _param_mc_bat_scale_en,
 
 		(ParamInt<px4::params::CBRK_RATE_CTRL>) _param_cbrk_rate_ctrl
 	)
-
-	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */
-
 };

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,8 +60,35 @@ void RateControl::setSaturationStatus(const MultirotorMixer::saturation_status &
 Vector3f RateControl::update(const Vector3f &rate, const Vector3f &rate_sp, const Vector3f &angular_accel,
 			     const float dt, const bool landed)
 {
+	_setpoint_filter[0].setParameters(dt, _filter_time_constant);
+	_setpoint_filter[1].setParameters(dt, _filter_time_constant);
+	_setpoint_filter[2].setParameters(dt, _filter_time_constant);
+
+	_setpoint_filter[0].update(rate_sp(0));
+	_setpoint_filter[1].update(rate_sp(1));
+	_setpoint_filter[2].update(rate_sp(2));
+
+	const Vector3f filtered_setpoint {
+		_setpoint_filter[0].getState(),
+		_setpoint_filter[1].getState(),
+		_setpoint_filter[2].getState(),
+	};
+
 	// angular rates error
-	Vector3f rate_error = rate_sp - rate;
+	Vector3f rate_error = filtered_setpoint - rate;
+
+	// apply yaw error filter
+	_error_filter[0].setParameters(dt, _roll_error_filter_time_constant);
+	_error_filter[1].setParameters(dt, _pitch_error_filter_time_constant);
+	_error_filter[2].setParameters(dt, _yaw_error_filter_time_constant);
+
+	_error_filter[0].update(rate_error(0));
+	_error_filter[1].update(rate_error(1));
+	_error_filter[2].update(rate_error(2));
+
+	rate_error(0) = _error_filter[0].getState();
+	rate_error(1) = _error_filter[1].getState();
+	rate_error(2) = _error_filter[2].getState();
 
 	// PID control with feed forward
 	const Vector3f torque = _gain_p.emult(rate_error) + _rate_int - _gain_d.emult(angular_accel) + _gain_ff.emult(rate_sp);
@@ -108,6 +135,14 @@ void RateControl::updateIntegral(Vector3f &rate_error, const float dt)
 
 void RateControl::getRateControlStatus(rate_ctrl_status_s &rate_ctrl_status)
 {
+	rate_ctrl_status.rollspeed_error = _error_filter[0].getState();
+	rate_ctrl_status.pitchspeed_error = _error_filter[1].getState();
+	rate_ctrl_status.yawspeed_error = _error_filter[2].getState();
+
+	rate_ctrl_status.rollspeed_setpoint = _setpoint_filter[0].getState();
+	rate_ctrl_status.pitchspeed_setpoint = _setpoint_filter[1].getState();
+	rate_ctrl_status.yawspeed_setpoint = _setpoint_filter[2].getState();
+
 	rate_ctrl_status.rollspeed_integ = _rate_int(0);
 	rate_ctrl_status.pitchspeed_integ = _rate_int(1);
 	rate_ctrl_status.yawspeed_integ = _rate_int(2);

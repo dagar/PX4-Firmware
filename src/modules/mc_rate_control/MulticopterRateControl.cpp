@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -88,6 +88,11 @@ MulticopterRateControl::parameters_updated()
 	_rate_control.setFeedForwardGain(
 		Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
 
+	_rate_control.setFilterTimeConstant(_param_mc_rate_sp_tau.get());
+
+	_rate_control.setRollErrorFilterTimeConstant(_param_mc_rate_r_err_tc.get());
+	_rate_control.setPitchErrorFilterTimeConstant(_param_mc_rate_p_err_tc.get());
+	_rate_control.setYawErrorFilterTimeConstant(_param_mc_rate_y_err_tc.get());
 
 	// manual rate control acro mode rate limits
 	_acro_rate_max = Vector3f(radians(_param_mc_acro_r_max.get()), radians(_param_mc_acro_p_max.get()),
