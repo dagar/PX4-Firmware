@@ -132,6 +132,8 @@ private:
 
 	hrt_abstime _last_run{0};
 
+	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */
+
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,
 		(ParamFloat<px4::params::MC_ROLLRATE_I>) _param_mc_rollrate_i,
@@ -170,7 +172,4 @@ private:
 
 		(ParamInt<px4::params::CBRK_RATE_CTRL>) _param_cbrk_rate_ctrl
 	)
-
-	matrix::Vector3f _acro_rate_max;	/**< max attitude rates in acro mode */
-
 };

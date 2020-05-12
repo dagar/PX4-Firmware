@@ -70,7 +70,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("position_controller_status", 500);
 	add_topic("position_setpoint_triplet", 200);
 	add_topic("radio_status");
-	add_topic("rate_ctrl_status", 200);
+	add_topic("rate_ctrl_status", 10);
 	add_topic("rpm", 500);
 	add_topic("safety", 1000);
 	add_topic("sensor_combined", 100);
