@@ -164,30 +164,40 @@ void WorkQueue::Run()
 	PX4_DEBUG("%s: exiting", _config.name);
 }
 
-void WorkQueue::print_status(bool last)
+void WorkQueue::print_run_status(callback?, bool last)
 {
 	const size_t num_items = _work_items.size();
-	PX4_INFO_RAW("%-16s\n", get_name());
+	snprintf(buffer, len, "%-16s\n", get_name());
+
+	// callback print line
+	print_callback(data);
+
 	unsigned i = 0;
 
 	for (WorkItem *item : _work_items) {
 		i++;
 
+		// TODO: new buffer per WorkItem
+		char line_buffer[80]{};
+
 		if (last) {
-			PX4_INFO_RAW("    ");
+			snprintf(line_buffer, 4, "    ");
 
 		} else {
-			PX4_INFO_RAW("|   ");
+			snprintf(line_buffer, 4, "|   ");
 		}
 
 		if (i < num_items) {
-			PX4_INFO_RAW("|__%2d) ", i);
+			snprintf(line_buffer, 8, "|__%2d) ", i);
 
 		} else {
-			PX4_INFO_RAW("\\__%2d) ", i);
+			snprintf(line_buffer, 8, "\\__%2d) ", i);
 		}
 
-		item->print_run_status();
+		item->print_run_status(buffer);
+
+		// callback print
+		print_callback(data);
 	}
 }
 

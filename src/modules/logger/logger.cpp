@@ -1220,6 +1220,7 @@ void Logger::start_log_file(LogType type)
 	if (type == LogType::Full) {
 		write_parameters(type);
 		write_perf_data(true);
+		write_wq_status();
 		write_console_output();
 	}
 
@@ -1248,6 +1249,7 @@ void Logger::stop_log_file(LogType type)
 	if (type == LogType::Full) {
 		_writer.set_need_reliable_transfer(true);
 		write_perf_data(false);
+		write_wq_status();
 		_writer.set_need_reliable_transfer(false);
 	}
 
@@ -1270,6 +1272,7 @@ void Logger::start_log_mavlink()
 	write_formats(LogType::Full);
 	write_parameters(LogType::Full);
 	write_perf_data(true);
+	write_wq_status();
 	write_console_output();
 	write_all_add_logged_msg(LogType::Full);
 	_writer.set_need_reliable_transfer(false);
@@ -1391,6 +1394,25 @@ void Logger::write_load_output()
 	_writer.set_need_reliable_transfer(false);
 }
 
+void Logger::write_wq_status()
+{
+	if (_print_load_reason == PrintLoadReason::Watchdog) {
+		PX4_ERR("Writing watchdog data"); // this is just that we see it easily in the log
+	}
+
+	perf_callback_data_t callback_data = {};
+	char buffer[140];
+	callback_data.logger = this;
+	callback_data.counter = 0;
+	callback_data.buffer = buffer;
+	hrt_abstime curr_time = hrt_absolute_time();
+	_writer.set_need_reliable_transfer(true);
+	// TODO: maybe we should restrict the output to a selected backend (eg. when file logging is running
+	// and mavlink log is started, this will be added to the file as well)
+	print_load_buffer(curr_time, buffer, sizeof(buffer), print_load_callback, &callback_data, &_load);
+	_writer.set_need_reliable_transfer(false);
+}
+
 void Logger::write_console_output()
 {
 	const int buffer_length = 220;
@@ -1410,7 +1432,6 @@ void Logger::write_console_output()
 		size -= read_size;
 		first = false;
 	}
-
 }
 
 void Logger::write_format(LogType type, const orb_metadata &meta, WrittenFormats &written_formats,

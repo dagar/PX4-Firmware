@@ -70,7 +70,7 @@ public:
 
 	void request_stop() { _should_exit.store(true); }
 
-	void print_status(bool last = false);
+	void print_run_status(int fd, bool last = false);
 
 private:
 

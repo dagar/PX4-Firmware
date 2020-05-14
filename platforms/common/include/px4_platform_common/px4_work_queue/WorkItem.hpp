@@ -73,7 +73,7 @@ public:
 		}
 	}
 
-	virtual void print_run_status() const;
+	virtual void print_run_status(int fd) const;
 
 	/**
 	 * Switch to a different WorkQueue.

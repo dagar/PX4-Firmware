@@ -64,14 +64,14 @@ void ScheduledWorkItem::ScheduleClear()
 	WorkItem::ScheduleClear();
 }
 
-void ScheduledWorkItem::print_run_status() const
+void ScheduledWorkItem::print_run_status(int fd) const
 {
 	if (_call.period > 0) {
-		PX4_INFO_RAW("%-26s %8.1f Hz %12.0f us (%" PRId64 " us)\n", _item_name, (double)average_rate(),
-			     (double)average_interval(), _call.period);
+		dprintf(fd, "%-26s %8.1f Hz %12.0f us (%" PRId64 " us)\n", _item_name, (double)average_rate(),
+			(double)average_interval(), _call.period);
 
 	} else {
-		WorkItem::print_run_status();
+		WorkItem::print_run_status(fd);
 	}
 }
 

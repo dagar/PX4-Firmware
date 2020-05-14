@@ -303,6 +303,11 @@ private:
 	void write_load_output();
 
 	/**
+	 * write the work queue status
+	 */
+	void write_wq_status();
+
+	/**
 	 * Regularly print the buffer fill state (only if DBGPRINT is set)
 	 * @param total_bytes total written bytes (to the full file), will be reset on each print
 	 * @param timer_start time since last print

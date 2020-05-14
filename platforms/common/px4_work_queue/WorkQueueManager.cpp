@@ -384,30 +384,68 @@ WorkQueueManagerStop()
 	return PX4_OK;
 }
 
-int
-WorkQueueManagerStatus()
+struct print_load_callback_data_s {
+	int fd;
+	char buffer[140];
+};
+
+static void print_status_callback(void *user)
+{
+	char *clear_line = "";
+	struct print_status_callback_data_s *data = (struct print_status_callback_data_s *)user;
+
+	if (data->fd == 1) {
+		clear_line = CL;
+	}
+
+	dprintf(data->fd, "%s%s\n", clear_line, data->buffer);
+}
+
+typedef void (*perf_callback)(perf_counter_t handle, void *user);
+void PrintWorkQueueStatusBuffer(perf_callback cb, void *user)
+{
+
+typedef void (*print_load_callback_f)(void *user);
+
+/**
+ * Print load to a buffer, and call cb after each written line (buffer will not include '\n')
+ */
+void PrintWorkQueueStatusBuffer(uint64_t t, char *buffer, int buffer_length, print_load_callback_f cb, void *user, struct print_load_s *print_state)
+{
+
+}
+
+
+int WorkQueueManagerStatus()
 {
 	if (!_wq_manager_should_exit.load() && (_wq_manager_wqs_list != nullptr)) {
 
 		const size_t num_wqs = _wq_manager_wqs_list->size();
-		PX4_INFO_RAW("\nWork Queue: %-1zu threads                        RATE        INTERVAL\n", num_wqs);
-
 		LockGuard lg{_wq_manager_wqs_list->mutex()};
+
+		struct print_load_callback_data_s data;
+		data.fd = STDOUT_FILENO;
+
+		int print_len = snprintf(data.buffer, "\nWork Queue: %-1zu threads                        RATE        INTERVAL\n", num_wqs);
+		print_status_callback(&data);
+
 		size_t i = 0;
 
 		for (WorkQueue *wq : *_wq_manager_wqs_list) {
 			i++;
 
+			// new line buffer
+
 			const bool last_wq = (i >= num_wqs);
 
 			if (!last_wq) {
-				PX4_INFO_RAW("|__ %zu) ", i);
+				snprintf(buffer, "|__ %zu) ", i);
 
 			} else {
-				PX4_INFO_RAW("\\__ %zu) ", i);
+				snprintf(buffer, "\\__ %zu) ", i);
 			}
 
-			wq->print_status(last_wq);
+			wq->print_run_status(buffer, last_wq);
 		}
 
 	} else {

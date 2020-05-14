@@ -132,9 +132,9 @@ float WorkItem::average_interval() const
 	return 0.f;
 }
 
-void WorkItem::print_run_status() const
+void WorkItem::print_run_status(int fd) const
 {
-	PX4_INFO_RAW("%-26s %8.1f Hz %12.0f us\n", _item_name, (double)average_rate(), (double)average_interval());
+	dprintf(fd, "%-26s %8.1f Hz %12.0f us\n", _item_name, (double)average_rate(), (double)average_interval());
 }
 
 } // namespace px4
