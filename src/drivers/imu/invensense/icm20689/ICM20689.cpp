@@ -60,6 +60,7 @@ ICM20689::~ICM20689()
 	perf_free(_fifo_overflow_perf);
 	perf_free(_fifo_reset_perf);
 	perf_free(_drdy_interval_perf);
+	perf_free(_drdy_run_latency_perf);
 }
 
 int ICM20689::init()
@@ -101,6 +102,7 @@ void ICM20689::print_status()
 	perf_print_counter(_fifo_overflow_perf);
 	perf_print_counter(_fifo_reset_perf);
 	perf_print_counter(_drdy_interval_perf);
+	perf_print_counter(_drdy_run_latency_perf);
 
 	_px4_accel.print_status();
 	_px4_gyro.print_status();
@@ -199,6 +201,8 @@ void ICM20689::RunImpl()
 				}
 
 				timestamp_sample = _fifo_watermark_interrupt_timestamp;
+
+				perf_set_elapsed(_drdy_run_latency_perf, hrt_elapsed_time(&timestamp_sample));
 			}
 
 			bool failure = false;
