@@ -138,14 +138,15 @@ private:
 	perf_counter_t _fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO overflow")};
 	perf_counter_t _fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO reset")};
 	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval")};
+	perf_counter_t _drdy_sync_error_perf{perf_alloc(PC_COUNT, MODULE_NAME": DRDY sync error")};
 
 	hrt_abstime _reset_timestamp{0};
 	hrt_abstime _last_config_check_timestamp{0};
-	hrt_abstime _fifo_watermark_interrupt_timestamp{0};
 	hrt_abstime _temperature_update_timestamp{0};
 
+	hrt_abstime _drdy_interrupt_timestamp{0};
+	px4::atomic<uint8_t> _drdy_fifo_read_samples{0};
 	px4::atomic<uint8_t> _data_ready_count{0};
-	px4::atomic<uint8_t> _fifo_read_samples{0};
 	bool _data_ready_interrupt_enabled{false};
 	bool _force_fifo_count_check{true};
 

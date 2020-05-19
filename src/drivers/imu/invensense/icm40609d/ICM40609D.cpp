@@ -187,6 +187,7 @@ void ICM40609D::RunImpl()
 				// timestamp set in data ready interrupt
 				samples = _fifo_read_samples.load();
 				timestamp_sample = _fifo_watermark_interrupt_timestamp;
+				perf_count_interval(_drdy_interval_perf, _fifo_watermark_interrupt_timestamp);
 			}
 
 			bool failure = false;
@@ -369,7 +370,6 @@ int ICM40609D::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM40609D::DataReady()
 {
-	perf_count(_drdy_interval_perf);
 	_fifo_watermark_interrupt_timestamp = hrt_absolute_time();
 	_fifo_read_samples.store(_fifo_gyro_samples);
 	ScheduleNow();

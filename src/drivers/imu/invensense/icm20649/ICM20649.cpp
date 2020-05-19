@@ -198,6 +198,7 @@ void ICM20649::RunImpl()
 				}
 
 				timestamp_sample = _fifo_watermark_interrupt_timestamp;
+				perf_count_interval(_drdy_interval_perf, _fifo_watermark_interrupt_timestamp);
 			}
 
 			bool failure = false;
@@ -378,8 +379,6 @@ int ICM20649::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM20649::DataReady()
 {
-	perf_count(_drdy_interval_perf);
-
 	if (_data_ready_count.fetch_add(1) >= (_fifo_gyro_samples - 1)) {
 		_data_ready_count.store(0);
 		_fifo_watermark_interrupt_timestamp = hrt_absolute_time();

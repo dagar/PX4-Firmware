@@ -60,6 +60,7 @@ ICM20689::~ICM20689()
 	perf_free(_fifo_overflow_perf);
 	perf_free(_fifo_reset_perf);
 	perf_free(_drdy_interval_perf);
+	perf_free(_drdy_sync_error_perf);
 }
 
 int ICM20689::init()
@@ -101,6 +102,7 @@ void ICM20689::print_status()
 	perf_print_counter(_fifo_overflow_perf);
 	perf_print_counter(_fifo_reset_perf);
 	perf_print_counter(_drdy_interval_perf);
+	perf_print_counter(_drdy_sync_error_perf);
 
 	_px4_accel.print_status();
 	_px4_gyro.print_status();
@@ -182,36 +184,38 @@ void ICM20689::RunImpl()
 		break;
 
 	case STATE::FIFO_READ: {
-			hrt_abstime timestamp_sample = 0;
 			uint8_t samples = 0;
+			hrt_abstime timestamp_sample = 0;
 
 			if (_data_ready_interrupt_enabled) {
-				// re-schedule as watchdog timeout
-				ScheduleDelayed(10_ms);
+				samples = _drdy_fifo_read_samples.fetch_and(0);
+				timestamp_sample = _drdy_interrupt_timestamp;
 
-				// timestamp set in data ready interrupt
-				if (!_force_fifo_count_check) {
-					samples = _fifo_read_samples.load();
+				if ((samples == 0) || (hrt_elapsed_time(&timestamp_sample) < (_fifo_empty_interval_us / 2))) {
+					// manually check FIFO count if no samples from DRDY or timestamp looks bogus
+					_force_fifo_count_check = true;
 
 				} else {
-					const uint16_t fifo_count = FIFOReadCount();
-					samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) * SAMPLES_PER_TRANSFER; // round down to nearest
+					// timestamp set in data ready interrupt
+					perf_count_interval(_drdy_interval_perf, timestamp_sample);
 				}
 
-				timestamp_sample = _fifo_watermark_interrupt_timestamp;
+				if (_force_fifo_count_check) {
+					perf_count(_drdy_sync_error_perf);
+				}
+
+				// re-schedule as watchdog timeout
+				ScheduleDelayed(10_ms);
 			}
 
-			bool failure = false;
-
-			// manually check FIFO count if no samples from DRDY or timestamp looks bogus
-			if (!_data_ready_interrupt_enabled || (samples == 0)
-			    || (hrt_elapsed_time(&timestamp_sample) > (_fifo_empty_interval_us / 2))) {
-
+			if (!_data_ready_interrupt_enabled || _force_fifo_count_check) {
 				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
 				timestamp_sample = hrt_absolute_time();
 				const uint16_t fifo_count = FIFOReadCount();
 				samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) * SAMPLES_PER_TRANSFER; // round down to nearest
 			}
+
+			bool failure = false;
 
 			if (samples > FIFO_MAX_SAMPLES) {
 				// not technically an overflow, but more samples than we expected or can publish
@@ -357,12 +361,16 @@ int ICM20689::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM20689::DataReady()
 {
-	perf_count(_drdy_interval_perf);
+	const hrt_abstime now = hrt_absolute_time();
+	const uint8_t data_ready_count = _data_ready_count.fetch_add(1) + 1;
 
-	if (_data_ready_count.fetch_add(1) >= (_fifo_gyro_samples - 1)) {
+	// required number of samples in the FIFO & even (only 1 accel per 2 samples)
+	if ((_drdy_fifo_read_samples.load() == 0) && (data_ready_count >= _fifo_gyro_samples)
+	    && (data_ready_count % SAMPLES_PER_TRANSFER == 0)) {
+
 		_data_ready_count.store(0);
-		_fifo_watermark_interrupt_timestamp = hrt_absolute_time();
-		_fifo_read_samples.store(_fifo_gyro_samples);
+		_drdy_interrupt_timestamp = now;
+		_drdy_fifo_read_samples.store(data_ready_count);
 		ScheduleNow();
 	}
 }
@@ -528,8 +536,8 @@ void ICM20689::FIFOReset()
 
 	// reset while FIFO is disabled
 	_data_ready_count.store(0);
-	_fifo_watermark_interrupt_timestamp = 0;
-	_fifo_read_samples.store(0);
+	_drdy_interrupt_timestamp = 0;
+	_drdy_fifo_read_samples.store(0);
 
 	// FIFO_EN: enable both gyro and accel
 	// USER_CTRL: re-enable FIFO

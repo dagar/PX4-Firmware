@@ -196,6 +196,7 @@ void MPU6000::RunImpl()
 			if (_data_ready_interrupt_enabled && (hrt_elapsed_time(&timestamp_sample) < (_fifo_empty_interval_us / 2))) {
 				// use timestamp from data ready interrupt if enabled and seems valid
 				timestamp_sample = _fifo_watermark_interrupt_timestamp;
+				perf_count_interval(_drdy_interval_perf, _fifo_watermark_interrupt_timestamp);
 
 			} else {
 				// use the time now roughly corresponding with the last sample we'll pull from the FIFO
@@ -352,8 +353,6 @@ int MPU6000::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void MPU6000::DataReady()
 {
-	perf_count(_drdy_interval_perf);
-
 	if (_data_ready_count.fetch_add(1) >= (_fifo_gyro_samples - 1)) {
 		_data_ready_count.store(0);
 		_fifo_watermark_interrupt_timestamp = hrt_absolute_time();

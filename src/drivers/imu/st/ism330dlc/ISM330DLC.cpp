@@ -194,9 +194,6 @@ void ISM330DLC::DataReady()
 {
 	_time_data_ready = hrt_absolute_time();
 
-	perf_count(_drdy_count_perf);
-	perf_count(_drdy_interval_perf);
-
 	// make another measurement
 	ScheduleNow();
 }
