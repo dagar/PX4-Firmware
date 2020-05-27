@@ -154,6 +154,7 @@ private:
 	enum class STATE : uint8_t {
 		RESET,
 		WAIT_FOR_RESET,
+		SELF_TEST,
 		CONFIGURE,
 		FIFO_READ,
 	};

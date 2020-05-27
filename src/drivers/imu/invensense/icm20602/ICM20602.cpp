@@ -146,7 +146,7 @@ void ICM20602::RunImpl()
 		    && (RegisterRead(Register::CONFIG) == 0x80)) {
 
 			// if reset succeeded then configure
-			_state = STATE::CONFIGURE;
+			_state = STATE::SELF_TEST;
 			ScheduleDelayed(10_ms);
 
 		} else {
@@ -160,6 +160,76 @@ void ICM20602::RunImpl()
 				PX4_DEBUG("Reset not complete, check again in 10 ms");
 				ScheduleDelayed(10_ms);
 			}
+		}
+
+		break;
+
+	case STATE::SELF_TEST: {
+
+			// SELF - TEST RESPONSE = SENSOR OUTPUT WITH SELF - TEST ENABLED – SENSOR OUTPUT WITH SELF - TEST DISABLED
+
+
+			// ACCEL
+			// The equation to convert self-test codes in OTP to factory self-test measurement is:
+			//  ST_OTP = (2620 / 2^FS) * 1.01^(ST_code-1) (lsb)
+			// - ST_OTP is the value that is stored in OTP of the device
+			// - FS is the Full Scale value,
+			// - ST_code is based on the Self-Test value (ST_FAC) determined in InvenSense’s factory final test and calculated based on the following equation:
+			//       ST_code = round(log(ST_FAC/(2620 / 2^FS)) / log(1.01)) + 1
+
+			//uint8_t XA_ST_DATA = ReadRegister(Register::SELF_TEST_X_ACCEL);
+			//uint8_t YA_ST_DATA = ReadRegister(Register::SELF_TEST_Y_ACCEL);
+			//uint8_t ZA_ST_DATA = ReadRegister(Register::SELF_TEST_Z_ACCEL);
+
+
+			// 1. get baseline values without self-test enabled
+
+			struct {
+				uint8_t cmd;
+				uint8_t ACCEL_XOUT_H;
+				uint8_t ACCEL_XOUT_L;
+				uint8_t ACCEL_YOUT_H;
+				uint8_t ACCEL_YOUT_L;
+				uint8_t ACCEL_ZOUT_H;
+				uint8_t ACCEL_ZOUT_L;
+				uint8_t TEMP_OUT_H;
+				uint8_t TEMP_OUT_L;
+				uint8_t GYRO_XOUT_H;
+				uint8_t GYRO_XOUT_L;
+				uint8_t GYRO_YOUT_H;
+				uint8_t GYRO_YOUT_L;
+				uint8_t GYRO_ZOUT_H;
+				uint8_t GYRO_ZOUT_L;
+			} transfer{};
+
+
+			// 2. enable self test
+			write_reg(MPUREG_GYRO_CONFIG, BITS_FS_250DPS | BITS_GYRO_ST_X | BITS_GYRO_ST_Y | BITS_GYRO_ST_Z);
+
+
+
+
+			// 3. get values with self-test enabled
+
+
+
+			// 4. extract factory trim values
+
+
+
+			// GYRO
+			// ST_OTP = (2620 / 2^FS) * 1.01^(ST_code-1) (lsb)
+			//  - ST_OTP is the value that is stored in OTP of the device
+			//  - FS is the Full Scale value
+			//  - ST_code is based on the Self-Test value (ST_ FAC) determined in InvenSense’s factory final test and calculated based on the following equation:
+			//       ST_code = round(log(ST_FAC/(2620 / 2^FS)) / log(1.01)) + 1
+
+
+			PX4_INFO("self test passed");
+
+			// if self test succeeded then configure
+			_state = STATE::CONFIGURE;
+			ScheduleDelayed(10_ms);
 		}
 
 		break;

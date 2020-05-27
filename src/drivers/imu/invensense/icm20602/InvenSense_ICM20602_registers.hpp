@@ -63,6 +63,10 @@ static constexpr float TEMPERATURE_SENSITIVITY = 326.8f; // LSB/C
 static constexpr float TEMPERATURE_OFFSET = 25.f; // C
 
 enum class Register : uint8_t {
+	SELF_TEST_X_ACCEL = 0x0D,
+	SELF_TEST_Y_ACCEL = 0x0E,
+	SELF_TEST_Z_ACCEL = 0x0F,
+
 	CONFIG        = 0x1A,
 	GYRO_CONFIG   = 0x1B,
 	ACCEL_CONFIG  = 0x1C,
@@ -75,6 +79,10 @@ enum class Register : uint8_t {
 
 	TEMP_OUT_H    = 0x41,
 	TEMP_OUT_L    = 0x42,
+
+	SELF_TEST_X_GYRO = 0x50,
+	SELF_TEST_Y_GYRO = 0x51,
+	SELF_TEST_Z_GYRO = 0x52,
 
 	FIFO_WM_TH1   = 0x60,
 	FIFO_WM_TH2   = 0x61,
