@@ -90,7 +90,6 @@ px4_add_board(
 	SYSTEMCMDS
 		bl_update
 		dumpfile
-		esc_calib
 		hardfault_log
 		i2cdetect
 		led_control

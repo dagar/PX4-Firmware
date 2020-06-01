@@ -55,7 +55,6 @@ px4_add_board(
 		#config
 		#dumpfile
 		dyn
-		esc_calib
 		led_control
 		mixer
 		motor_ramp

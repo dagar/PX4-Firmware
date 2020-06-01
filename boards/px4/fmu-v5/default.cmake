@@ -94,7 +94,6 @@ px4_add_board(
 		bl_update
 		dmesg
 		dumpfile
-		esc_calib
 		gpio
 		hardfault_log
 		i2cdetect

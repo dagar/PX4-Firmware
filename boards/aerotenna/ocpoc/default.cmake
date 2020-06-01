@@ -67,7 +67,6 @@ px4_add_board(
 		vmount
 		vtol_att_control
 	SYSTEMCMDS
-		esc_calib
 		led_control
 		mixer
 		motor_ramp
