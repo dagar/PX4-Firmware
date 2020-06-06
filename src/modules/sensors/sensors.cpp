@@ -41,6 +41,9 @@
  * @author Beat Küng <beat-kueng@gmx.net>
  */
 
+
+#include "DataValidator/DataValidator.hpp"
+
 #include <drivers/drv_adc.h>
 #include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>

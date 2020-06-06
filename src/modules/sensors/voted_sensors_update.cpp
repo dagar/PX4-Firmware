@@ -43,7 +43,6 @@
 
 #include <uORB/Subscription.hpp>
 #include <conversion/rotation.h>
-#include <ecl/geo/geo.h>
 
 #define MAG_ROT_VAL_INTERNAL		-1
 #define CAL_ERROR_APPLY_CAL_MSG "FAILED APPLYING %s CAL #%u"

@@ -49,8 +49,9 @@
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
 
-#include <lib/ecl/validation/data_validator.h>
-#include <lib/ecl/validation/data_validator_group.h>
+#include "DataValidator/DataValidator.hpp"
+#include "DataValidator/DataValidatorGroup.hpp"
+
 #include <lib/mag_compensation/MagCompensation.hpp>
 
 #include <uORB/Publication.hpp>
