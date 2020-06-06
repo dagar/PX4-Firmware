@@ -14,4 +14,4 @@ int16 x_raw
 int16 y_raw
 int16 z_raw
 
-bool  is_external	# if true the mag is external (i.e. not built into the board)
+bool is_external	# if true the mag is external (i.e. not built into the board)
