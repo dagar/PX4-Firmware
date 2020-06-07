@@ -34,7 +34,7 @@
 /**
  * @file AKM_AK8963_registers.hpp
  *
- * AKM AK8963 registers.
+ * Asahi Kasei Microdevices (AKM) AK8963 registers.
  *
  */
 
@@ -107,5 +107,4 @@ enum CNTL2_BIT : uint8_t {
 	SRST = Bit0, // Reset
 };
 
-
-} // namespace InvenSense_MPU9250
+} // namespace AKM_AK8963

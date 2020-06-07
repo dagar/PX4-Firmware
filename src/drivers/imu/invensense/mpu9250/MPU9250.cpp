@@ -629,10 +629,6 @@ void MPU9250::UpdateTemperature()
 	if (PX4_ISFINITE(TEMP_degC)) {
 		_px4_accel.set_temperature(TEMP_degC);
 		_px4_gyro.set_temperature(TEMP_degC);
-
-		if (_slave_ak8963_magnetometer) {
-			_slave_ak8963_magnetometer->set_temperature(TEMP_degC);
-		}
 	}
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,9 +32,9 @@
  ****************************************************************************/
 
 /**
- * @file AKM_AK8963_registers.hpp
+ * @file AKM_AK09916_registers.hpp
  *
- * AKM AK8963 registers.
+ * Asahi Kasei Microdevices (AKM) AK09916 registers.
  *
  */
 
@@ -42,7 +42,7 @@
 
 #include <cstdint>
 
-namespace AKM_AK8963
+namespace AKM_AK09916
 {
 
 // TODO: move to a central header
@@ -56,32 +56,33 @@ static constexpr uint8_t Bit6 = (1 << 6);
 static constexpr uint8_t Bit7 = (1 << 7);
 
 static constexpr uint32_t I2C_SPEED = 400 * 1000; // 400 kHz I2C serial interface
-static constexpr uint8_t I2C_ADDRESS_DEFAULT = 0x0C;
+static constexpr uint8_t I2C_ADDRESS_DEFAULT = 0b0001100;
 
-static constexpr uint8_t WHOAMI = 0x48;
+static constexpr uint8_t Company_ID = 0x48;
+static constexpr uint8_t Device_ID = 0x09;
 
 enum class Register : uint8_t {
-	WIA   = 0x00, // Device ID
+	WIA1  = 0x01, // Company ID of AKM
+	WIA2  = 0x01, // Device ID of AK09916
 
-	ST1   = 0x02, // Status 1
-	HXL   = 0x03,
-	HXH   = 0x04,
-	HYL   = 0x05,
-	HYH   = 0x06,
-	HZL   = 0x07,
-	HZH   = 0x08,
-	ST2   = 0x09, // Status 2
-	CNTL1 = 0x0A, // Control 1
-	CNTL2 = 0x0B, // Control 2
+	ST1   = 0x10, // Status 1
+	HXL   = 0x11,
+	HXH   = 0x12,
+	HYL   = 0x13,
+	HYH   = 0x14,
+	HZL   = 0x15,
+	HZH   = 0x16,
 
-	ASAX  = 0x10, // X-axis sensitivity adjustment value
-	ASAY  = 0x11, // Y-axis sensitivity adjustment value
-	ASAZ  = 0x12, // Z-axis sensitivity adjustment value
+	ST2   = 0x18, // Status 2
+
+	CNTL2 = 0x31, // Control 2
+	CNTL3 = 0x32, // Control 3
 };
 
 // ST1
 enum ST1_BIT : uint8_t {
-	DRDY = Bit0,
+	DOR  = Bit1, // Data overrun
+	DRDY = Bit0, // Data is ready
 };
 
 // ST2
@@ -90,22 +91,25 @@ enum ST2_BIT : uint8_t {
 	HOFL = Bit3, // Magnetic sensor overflow
 };
 
-// CNTL1
-enum CNTL1_BIT : uint8_t {
-	BIT_16 = Bit4, // Output bit setting (16-bit output)
-
-	// MODE[3:0]: Operation mode setting
-	POWER_DOWN_MODE         = 0,
-	SINGLE_MEASUREMENT_MODE = Bit0,
-	CONTINUOUS_MODE_1       = Bit1,        //   8 Hz
-	CONTINUOUS_MODE_2       = Bit2 | Bit1, // 100 Hz
-	FUSE_ROM_ACCESS_MODE    = Bit3 | Bit2 | Bit1 | Bit0, // MODE[3:0]=“1111”
-};
-
 // CNTL2
 enum CNTL2_BIT : uint8_t {
-	SRST = Bit0, // Reset
+	// MODE[4:0] bits
+
+	// “00000”: Power-down mode
+	// “00010”: Continuous measurement mode 1
+	// “00100”: Continuous measurement mode 2
+	// “00110”: Continuous measurement mode 3
+	// “01000”: Continuous measurement mode 4
+	// “10000”: Self-test mode
+	MODE1 = Bit1,        // Continuous measurement mode 1 (10Hz)
+	MODE2 = Bit2,        // Continuous measurement mode 2 (20Hz)
+	MODE3 = Bit2 | Bit1, // Continuous measurement mode 3 (50Hz)
+	MODE4 = Bit3,        // Continuous measurement mode 4 (100Hz)
 };
 
+// CNTL3
+enum CNTL3_BIT : uint8_t {
+	SRST = Bit0,
+};
 
-} // namespace InvenSense_MPU9250
+} // namespace AKM_AK09916

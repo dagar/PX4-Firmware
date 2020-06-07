@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,16 +30,17 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+
 px4_add_module(
-	MODULE drivers__icm20948
-	MAIN icm20948
+	MODULE drivers__magnetometer__ak8963
+	MAIN ak8963
 	COMPILE_FLAGS
 	SRCS
-		icm20948.cpp
-		icm20948_i2c.cpp
-		icm20948_spi.cpp
-		icm20948_main.cpp
-		ICM20948_mag.cpp
-		mag_i2c.cpp
+		AKM_AK8963_registers.hpp
+		AK8963.cpp
+		AK8963.hpp
+		ak8963_main.cpp
 	DEPENDS
+		drivers_magnetometer
+		px4_work_queue
 	)
