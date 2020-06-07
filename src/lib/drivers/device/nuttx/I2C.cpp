@@ -211,13 +211,13 @@ int I2C::transfer(const uint8_t *send, const unsigned send_len, uint8_t *recv, c
 	return ret;
 }
 
-int I2C::read(unsigned address, void *data, unsigned count)
+int I2C::Read(uint8_t address, uint8_t *data, uint8_t length)
 {
 	uint8_t cmd = address;
-	return transfer(&cmd, 1, (uint8_t *)data, count);
+	return transfer(&cmd, 1, (uint8_t *)data, length);
 }
 
-int I2C::write(unsigned address, void *data, unsigned count)
+int I2C::Write(uint8_t address, uint8_t *data, uint8_t count)
 {
 	uint8_t cmd = address;
 	return transfer(&cmd, 1, (uint8_t *)data, count);

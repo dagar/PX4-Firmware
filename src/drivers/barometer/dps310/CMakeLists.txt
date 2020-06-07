@@ -36,8 +36,6 @@ px4_add_module(
 	SRCS
 		DPS310.cpp
 		DPS310.hpp
-		DPS310_I2C.cpp
-		DPS310_SPI.cpp
 		dps310_main.cpp
 	DEPENDS
 		drivers_barometer

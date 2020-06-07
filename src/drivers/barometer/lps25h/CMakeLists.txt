@@ -37,8 +37,6 @@ px4_add_module(
 		LPS25H.cpp
 		LPS25H.hpp
 		lps25h_main.cpp
-		lps25h_i2c.cpp
-		lps25h_spi.cpp
 	DEPENDS
 		drivers_barometer
 		px4_work_queue

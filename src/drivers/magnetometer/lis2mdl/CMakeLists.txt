@@ -31,11 +31,12 @@
 #
 ############################################################################
 px4_add_module(
-	MODULE drivers__lis2mdl
+	MODULE drivers__magnetometer__lis2mdl
 	MAIN lis2mdl
 	SRCS
-		lis2mdl_i2c.cpp
-		lis2mdl_spi.cpp
 		lis2mdl_main.cpp
 		lis2mdl.cpp
+		DEPENDS
+		drivers_magnetometer
+		px4_work_queue
 	)

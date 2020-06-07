@@ -39,7 +39,10 @@
 
 #pragma once
 
-#include "lps25h.h"
+#include <string.h>
+
+#include <drivers/device/Device.hpp>
+#include <systemlib/err.h>
 
 #include <drivers/device/Device.hpp>
 #include <lib/perf/perf_counter.h>
@@ -53,6 +56,10 @@
 
 /* Max measurement rate is 25Hz */
 #define LPS25H_CONVERSION_INTERVAL	(1000000 / 25)	/* microseconds */
+
+#define ADDR_WHO_AM_I		0x0F
+
+#define ID_WHO_AM_I		0xBD
 
 #define ADDR_REF_P_XL		0x08
 #define ADDR_REF_P_L		0x09
@@ -170,9 +177,6 @@ private:
 
 	void			start();
 	int			reset();
-
-	int			write_reg(uint8_t reg, uint8_t val);
-	int			read_reg(uint8_t reg, uint8_t &val);
 
 	int			measure();
 	int			collect();

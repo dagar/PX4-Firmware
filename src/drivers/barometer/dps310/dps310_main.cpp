@@ -33,14 +33,11 @@
 
 #include "DPS310.hpp"
 
-namespace dps310
-{
-extern device::Device *DPS310_SPI_interface(uint8_t bus, uint32_t device, int bus_frequency, spi_mode_e spi_mode);
-extern device::Device *DPS310_I2C_interface(uint8_t bus, uint32_t device, int bus_frequency);
-}
-
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
+
+#include <drivers/device/i2c.h>
+#include <drivers/device/spi.h>
 
 using namespace dps310;
 
@@ -61,10 +58,11 @@ I2CSPIDriverBase *DPS310::instantiate(const BusCLIArguments &cli, const BusInsta
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = DPS310_I2C_interface(iterator.bus(), cli.i2c_address, cli.bus_frequency);
+		interface = new device::I2C(DRV_BARO_DEVTYPE_DPS310, MODULE_NAME, iterator.bus(), cli.i2c_address, cli.bus_frequency);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = DPS310_SPI_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
+		interface = new device::SPI(DRV_BARO_DEVTYPE_DPS310, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						    cli.bus_frequency);
 	}
 
 	if (interface == nullptr) {

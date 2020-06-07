@@ -132,9 +132,6 @@ struct RawAccelMagReport {
 };
 #pragma pack(pop)
 
-extern device::Device *FXOS8701CQ_SPI_interface(int bus, uint32_t chip_select, int bus_frequency, spi_mode_e spi_mode);
-extern device::Device *FXOS8701CQ_I2C_interface(int bus, int bus_frequency, int i2c_address);
-
 class FXOS8701CQ : public I2CSPIDriver<FXOS8701CQ>
 {
 public:
@@ -167,23 +164,6 @@ private:
 	 * check key registers for correct values
 	 */
 	void			check_registers();
-
-	/**
-	 * Read a register from the FXOS8701C
-	 *
-	 * @param		The register to read.
-	 * @return		The value that was read.
-	 */
-	inline uint8_t read_reg(unsigned reg) { return _interface->read_reg(reg); }
-
-	/**
-	 * Write a register in the FXOS8701C
-	 *
-	 * @param reg		The register to write.
-	 * @param value		The new value to write.
-	 * @return		OK on success, negative errno otherwise.
-	 */
-	inline int write_reg(unsigned reg, uint8_t value) { return _interface->write_reg(reg, value); }
 
 	/**
 	 * Modify a register in the FXOS8701C

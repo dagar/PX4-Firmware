@@ -75,8 +75,8 @@ VOXLPM::init()
 		return ret;
 	}
 
-	write_reg(DEFAULT_CTRLA_REG_VAL, VOXLPM_LTC2946_CTRLA_REG);
-	write_reg(DEFAULT_CTRLB_REG_VAL, VOXLPM_LTC2946_CTRLB_REG);
+	RegisterWrite(DEFAULT_CTRLA_REG_VAL, VOXLPM_LTC2946_CTRLA_REG);
+	RegisterWrite(DEFAULT_CTRLB_REG_VAL, VOXLPM_LTC2946_CTRLB_REG);
 
 	_battery.reset();
 
@@ -135,8 +135,8 @@ VOXLPM::measure()
 
 	hrt_abstime tnow = hrt_absolute_time();
 
-	int curr_read_ret = read_reg_buf(VOXLPM_LTC2946_DELTA_SENSE_MSB_REG, iraw, sizeof(iraw)); // 0x14
-	int volt_read_ret = read_reg_buf(VOXLPM_LTC2946_VIN_MSB_REG, vraw, sizeof(vraw));         // 0x1E
+	int curr_read_ret = Read(VOXLPM_LTC2946_DELTA_SENSE_MSB_REG, iraw, sizeof(iraw)); // 0x14
+	int volt_read_ret = Read(VOXLPM_LTC2946_VIN_MSB_REG, vraw, sizeof(vraw));         // 0x1E
 
 	if ((volt_read_ret == 0) && (curr_read_ret == 0)) {
 		uint16_t volt16 = (((uint16_t)vraw[0]) << 8) | vraw[1];   // MSB first
@@ -184,27 +184,4 @@ VOXLPM::measure()
 	perf_end(_sample_perf);
 
 	return OK;
-}
-
-uint8_t
-VOXLPM::read_reg(uint8_t addr)
-{
-	uint8_t cmd[2] = { (uint8_t)(addr), 0};
-	transfer(&cmd[0], 1, &cmd[1], 1);
-
-	return cmd[1];
-}
-
-int
-VOXLPM::read_reg_buf(uint8_t addr, uint8_t *buf, uint8_t len)
-{
-	const uint8_t cmd = (uint8_t)(addr);
-	return transfer(&cmd, sizeof(cmd), buf, len);
-}
-
-int
-VOXLPM::write_reg(uint8_t value, uint8_t addr)
-{
-	uint8_t cmd[2] = { (uint8_t)(addr), value};
-	return transfer(cmd, sizeof(cmd), nullptr, 0);
 }

@@ -80,11 +80,6 @@
 
 #define CFG_REG_C_BDU                   (1 << 4) /* avoids reading of incorrect data due to async reads */
 
-/* interface factories */
-extern device::Device *LIS2MDL_SPI_interface(int bus, uint32_t devid, int bus_frequency, spi_mode_e spi_mode);
-extern device::Device *LIS2MDL_I2C_interface(int bus, int bus_frequency);
-
-
 class LIS2MDL : public I2CSPIDriver<LIS2MDL>
 {
 public:
@@ -132,23 +127,4 @@ private:
 	 *       to make it more aggressive about resetting the bus in case of errors.
 	 */
 	void start();
-
-	/**
-	 * @brief Reads a register.
-	 *
-	 * @param reg           The register to read.
-	 * @param val           The value read.
-	 * @return              OK on read success.
-	 */
-	int read_reg(uint8_t reg, uint8_t &val);
-
-	/**
-	 * @brief  Writes a register.
-	 *
-	 * @param reg           The register to write.
-	 * @param val           The value to write.
-	 * @return              OK on write success.
-	 */
-	int write_reg(uint8_t reg, uint8_t val);
-
 };

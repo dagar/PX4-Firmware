@@ -78,7 +78,7 @@ ICM20948_mag::measure()
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
 	uint8_t st1 = 0;
-	int ret = _interface->read(AK09916REG_ST1, &st1, sizeof(st1));
+	int ret = _interface->Read(AK09916REG_ST1, &st1, sizeof(st1));
 
 	if (ret != OK) {
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
@@ -100,7 +100,7 @@ ICM20948_mag::measure()
 	}
 
 	ak09916_regs data{};
-	ret = _interface->read(AK09916REG_ST1, &data, sizeof(data));
+	ret = _interface->Read(AK09916REG_ST1, &data, sizeof(data));
 
 	if (ret != OK) {
 		_px4_mag.set_error_count(perf_event_count(_mag_errors));
@@ -165,7 +165,7 @@ ICM20948_mag::set_passthrough(uint8_t reg, uint8_t size, uint8_t *out)
 void
 ICM20948_mag::read_block(uint8_t reg, uint8_t *val, uint8_t count)
 {
-	_parent->_interface->read(reg, val, count);
+	_parent->_interface->Read(reg, val, count);
 }
 
 void
@@ -186,7 +186,7 @@ ICM20948_mag::read_reg(unsigned int reg)
 		passthrough_read(reg, &buf, 0x01);
 
 	} else {
-		_interface->read(reg, &buf, 1);
+		_interface->Read(reg, &buf, 1);
 	}
 
 	return buf;
@@ -219,7 +219,7 @@ ICM20948_mag::write_reg(unsigned reg, uint8_t value)
 		passthrough_write(reg, value);
 
 	} else {
-		_interface->write(ICM20948_LOW_SPEED_OP(reg), &value, 1);
+		_interface->Write(ICM20948_LOW_SPEED_OP(reg), &value, 1);
 	}
 }
 
@@ -250,7 +250,7 @@ ICM20948_mag::ak09916_read_adjustments()
 	px4_usleep(50);
 
 	if (_interface != nullptr) {
-		_interface->read(AK09916REG_ASAX, response, 3);
+		_interface->Read(AK09916REG_ASAX, response, 3);
 
 	} else {
 		passthrough_read(AK09916REG_ASAX, response, 3);

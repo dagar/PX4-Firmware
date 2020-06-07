@@ -55,8 +55,8 @@ public:
 	virtual ~PX4IO_serial();
 
 	virtual int	init() = 0;
-	virtual int	read(unsigned offset, void *data, unsigned count = 1);
-	virtual int	write(unsigned address, void *data, unsigned count = 1);
+	virtual int	Read(uint8_t offset, uint8_t *data, uint8_t count = 1);
+	virtual int	Write(uint8_t address, uint8_t *data, uint8_t count = 1);
 
 protected:
 	/**

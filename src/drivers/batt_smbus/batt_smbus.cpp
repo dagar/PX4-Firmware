@@ -459,7 +459,7 @@ int BATT_SMBUS::manufacturer_write(const uint16_t cmd_code, void *data, const un
 int BATT_SMBUS::unseal()
 {
 	// See bq40z50 technical reference.
-	uint16_t keys[2] = {0x0414, 0x3672};
+	uint16_t keys[2] {0x0414, 0x3672};
 
 	int ret = _interface->write_word(BATT_SMBUS_MANUFACTURER_ACCESS, keys[0]);
 

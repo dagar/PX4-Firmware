@@ -41,7 +41,6 @@
 #include <px4_platform_common/module.h>
 
 #include "QMC5883.hpp"
-#include "qmc5883.h"
 
 extern "C" __EXPORT int qmc5883_main(int argc, char *argv[]);
 
@@ -51,7 +50,7 @@ I2CSPIDriverBase *QMC5883::instantiate(const BusCLIArguments &cli, const BusInst
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = QMC5883_I2C_interface(iterator.bus(), cli.bus_frequency, cli.i2c_address);
+		interface = new device::I2C(DRV_MAG_DEVTYPE_QMC5883, MODULE_NAME, iterator.bus(), cli.bus_frequency, cli.i2c_address);
 	}
 
 	if (interface == nullptr) {

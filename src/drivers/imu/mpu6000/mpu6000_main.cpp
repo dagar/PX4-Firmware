@@ -83,8 +83,9 @@ I2CSPIDriverBase *MPU6000::instantiate(const BusCLIArguments &cli, const BusInst
 	int device_type = cli.type;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = MPU6000_I2C_interface(iterator.bus(), iterator.devid(), device_type, iterator.external(),
-							  cli.bus_frequency);
+		interface = new device::I2C(DRV_IMU_DEVTYPE_MPU6000, MOiterator.bus(), iterator.devid(), device_type,
+						    iterator.external(),
+						    cli.bus_frequency);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
 		interface = MPU6000_SPI_interface(iterator.bus(), iterator.devid(), device_type, iterator.external(),

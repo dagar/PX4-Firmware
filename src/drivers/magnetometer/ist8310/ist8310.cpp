@@ -218,44 +218,6 @@ private:
 	void            check_conf();
 
 	/**
-	 * Write a register.
-	 *
-	 * @param reg       The register to write.
-	 * @param val       The value to write.
-	 * @return      OK on write success.
-	 */
-	int         write_reg(uint8_t reg, uint8_t val);
-
-	/**
-	 * Write to a register block.
-	 *
-	 * @param address   The register address to write to.
-	 * @param data      The buffer to write from.
-	 * @param count     The number of bytes to write.
-	 * @return      OK on write success.
-	 */
-	int     write(unsigned address, void *data, unsigned count);
-
-	/**
-	 * Read a register.
-	 *
-	 * @param reg       The register to read.
-	 * @param val       The value read.
-	 * @return      OK on read success.
-	 */
-	int         read_reg(uint8_t reg, uint8_t &val);
-
-	/**
-	 * read register block.
-	 *
-	 * @param address   The register address to read from.
-	 * @param data      The buffer to read into.
-	 * @param count     The number of bytes to read.
-	 * @return      OK on write success.
-	 */
-	int read(unsigned address, void *data, unsigned count);
-
-	/**
 	 * Issue a measurement command.
 	 *
 	 * @return      OK if the measurement command was successful.
@@ -309,26 +271,6 @@ out:
 	return ret;
 }
 
-int IST8310::write(unsigned address, void *data, unsigned count)
-{
-	uint8_t buf[32];
-
-	if (sizeof(buf) < (count + 1)) {
-		return -EIO;
-	}
-
-	buf[0] = address;
-	memcpy(&buf[1], data, count);
-
-	return transfer(&buf[0], count + 1, nullptr, 0);
-}
-
-int IST8310::read(unsigned address, void *data, unsigned count)
-{
-	uint8_t cmd = address;
-	return transfer(&cmd, 1, (uint8_t *)data, count);
-}
-
 /**
    check that the configuration register has the right value. This is
    done periodically to cope with I2C bus noise causing the
@@ -336,35 +278,24 @@ int IST8310::read(unsigned address, void *data, unsigned count)
  */
 void IST8310::check_conf()
 {
-	int ret;
+	int ret = OK;
 
-	uint8_t ctrl_reg_in = 0;
-	ret = read_reg(ADDR_CTRL3, ctrl_reg_in);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		return;
-	}
+	uint8_t ctrl_reg_in = RegisterRead(ADDR_CTRL3);
 
 	if (ctrl_reg_in != _ctl3_reg) {
 		perf_count(_conf_errors);
-		ret = write_reg(ADDR_CTRL3, _ctl3_reg);
+		ret = RegisterWrite(ADDR_CTRL3, _ctl3_reg);
 
 		if (OK != ret) {
 			perf_count(_comms_errors);
 		}
 	}
 
-	ret = read_reg(ADDR_CTRL4, ctrl_reg_in);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		return;
-	}
+	ctrl_reg_in = RegisterRead(ADDR_CTRL4);
 
 	if (ctrl_reg_in != _ctl4_reg) {
 		perf_count(_conf_errors);
-		ret = write_reg(ADDR_CTRL4, _ctl4_reg);
+		ret = RegisterWrite(ADDR_CTRL4, _ctl4_reg);
 
 		if (OK != ret) {
 			perf_count(_comms_errors);
@@ -384,15 +315,15 @@ void IST8310::start()
 int IST8310::reset()
 {
 	/* software reset */
-	write_reg(ADDR_CTRL2, CTRL2_SRST);
+	RegisterWrite(ADDR_CTRL2, CTRL2_SRST);
 
 	/* configure control register 3 */
 	_ctl3_reg = CTRL3_SAMPLEAVG_16;
-	write_reg(ADDR_CTRL3, _ctl3_reg);
+	RegisterWrite(ADDR_CTRL3, _ctl3_reg);
 
 	/* configure control register 4 */
 	_ctl4_reg = CTRL4_SRPD;
-	write_reg(ADDR_CTRL4, _ctl4_reg);
+	RegisterWrite(ADDR_CTRL4, _ctl4_reg);
 
 	return OK;
 }
@@ -463,7 +394,7 @@ int IST8310::measure()
 	/*
 	 * Send the command to begin a measurement.
 	 */
-	int ret = write_reg(ADDR_CTRL1, CTRL1_MODE_SINGLE);
+	int ret = RegisterWrite(ADDR_CTRL1, CTRL1_MODE_SINGLE);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -504,7 +435,7 @@ int IST8310::collect()
 
 	/* get measurements from the device */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	ret = read(ADDR_DATA_OUT_X_LSB, (uint8_t *)&report_buffer, sizeof(report_buffer));
+	ret = Read(ADDR_DATA_OUT_X_LSB, (uint8_t *)&report_buffer, sizeof(report_buffer));
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
@@ -561,26 +492,11 @@ out:
 	return ret;
 }
 
-int IST8310::write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf = val;
-	return write(reg, &buf, 1);
-}
-
-int IST8310::read_reg(uint8_t reg, uint8_t &val)
-{
-	uint8_t buf = 0;
-	int ret = read(reg, &buf, 1);
-	val = buf;
-	return ret;
-}
-
 void IST8310::print_status()
 {
 	I2CSPIDriverBase::print_status();
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	printf("poll interval:  %u interval\n", _measure_interval);
 	_px4_mag.print_status();
 }
 

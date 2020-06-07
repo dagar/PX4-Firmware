@@ -354,7 +354,7 @@ void FXAS21002C::RunImpl()
 	RawGyroReport raw_gyro_report{};
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	_interface->read(FXAS21002C_STATUS, (uint8_t *)&raw_gyro_report, sizeof(raw_gyro_report));
+	_interface->Read(FXAS21002C_STATUS, (uint8_t *)&raw_gyro_report, sizeof(raw_gyro_report));
 
 	if (!(raw_gyro_report.status & DR_STATUS_ZYXDR)) {
 		perf_end(_sample_perf);

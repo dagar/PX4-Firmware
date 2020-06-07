@@ -62,10 +62,11 @@ I2CSPIDriverBase *FXOS8701CQ::instantiate(const BusCLIArguments &cli, const BusI
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = FXOS8701CQ_I2C_interface(iterator.bus(), cli.bus_frequency, cli.i2c_address);
+		interface = new device::I2C(DRV_ACC_DEVTYPE_FXOS8701C, MODULE_NAME, iterator.bus(), cli.bus_frequency, cli.i2c_address);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = FXOS8701CQ_SPI_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
+		interface = new device::SPI(DRV_ACC_DEVTYPE_FXOS8701C, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						    cli.bus_frequency);
 	}
 
 	if (interface == nullptr) {

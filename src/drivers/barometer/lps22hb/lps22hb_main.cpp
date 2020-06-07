@@ -34,6 +34,9 @@
 #include "LPS22HB.hpp"
 #include <px4_platform_common/module.h>
 
+#include <drivers/device/i2c.h>
+#include <drivers/device/spi.h>
+
 void LPS22HB::print_usage()
 {
 	PRINT_MODULE_USAGE_NAME("lps22hb", "driver");
@@ -49,10 +52,11 @@ I2CSPIDriverBase *LPS22HB::instantiate(const BusCLIArguments &cli, const BusInst
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = LPS22HB_I2C_interface(iterator.bus(), cli.bus_frequency);
+		interface = new device::I2C(DRV_BARO_DEVTYPE_LPS22HB, MODULE_NAME, iterator.bus(), 0x23, cli.bus_frequency);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = LPS22HB_SPI_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
+		interface = new device::SPI(DRV_BARO_DEVTYPE_LPS22HB, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						    cli.bus_frequency);
 	}
 
 	if (interface == nullptr) {

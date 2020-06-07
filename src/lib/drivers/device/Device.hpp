@@ -100,7 +100,7 @@ public:
 	 * @param count		The number of items to read.
 	 * @return		The number of items read on success, negative errno otherwise.
 	 */
-	virtual int read(unsigned address, void *data = nullptr, unsigned count = 0) { return -ENODEV; }
+	virtual int Read(uint8_t address, uint8_t *data = nullptr, uint8_t length = 0) { return -ENODEV; }
 
 	/**
 	 * Write directly to the device.
@@ -112,7 +112,7 @@ public:
 	 * @param count		The number of items to write.
 	 * @return		The number of items written on success, negative errno otherwise.
 	 */
-	virtual int write(unsigned address, void *data = nullptr, unsigned count = 0) { return -ENODEV; }
+	virtual int Write(uint8_t address, uint8_t *data = nullptr, uint8_t length = 0) { return -ENODEV; }
 
 	/**
 	 * Read a register from the device.

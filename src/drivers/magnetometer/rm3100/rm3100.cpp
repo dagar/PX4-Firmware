@@ -80,7 +80,7 @@ int RM3100::self_test()
 
 	/* Configure mag into self test mode */
 	cmd = BIST_SELFTEST;
-	ret = _interface->write(ADDR_BIST, &cmd, 1);
+	ret = _interface->Write(ADDR_BIST, &cmd, 1);
 
 	if (ret != PX4_OK) {
 		return ret;
@@ -88,7 +88,7 @@ int RM3100::self_test()
 
 	/* Now we need to write to POLL to launch self test */
 	cmd = POLL_XYZ;
-	ret = _interface->write(ADDR_POLL, &cmd, 1);
+	ret = _interface->Write(ADDR_POLL, &cmd, 1);
 
 	if (ret != PX4_OK) {
 		return ret;
@@ -102,7 +102,7 @@ int RM3100::self_test()
 	}
 
 	/* Now check BIST register to see whether self test is ok or not*/
-	ret = _interface->read(ADDR_BIST, &cmd, 1);
+	ret = _interface->Read(ADDR_BIST, &cmd, 1);
 
 	if (ret != PX4_OK) {
 		return ret;
@@ -116,7 +116,7 @@ int RM3100::self_test()
 int RM3100::check_measurement()
 {
 	uint8_t status = 0;
-	int ret = _interface->read(ADDR_STATUS, &status, 1);
+	int ret = _interface->Read(ADDR_STATUS, &status, 1);
 
 	if (ret != 0) {
 		return ret;
@@ -144,7 +144,7 @@ int RM3100::collect()
 	perf_begin(_sample_perf);
 
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	int ret = _interface->read(ADDR_MX, (uint8_t *)&rm_report, sizeof(rm_report));
+	int ret = _interface->Read(ADDR_MX, (uint8_t *)&rm_report, sizeof(rm_report));
 
 	if (ret != OK) {
 		perf_end(_sample_perf);
@@ -231,14 +231,14 @@ int RM3100::measure()
 	/* Send the command to begin a measurement. */
 	if ((_mode == CONTINUOUS) && !_continuous_mode_set) {
 		cmd = (CMM_DEFAULT | CONTINUOUS_MODE);
-		ret = _interface->write(ADDR_CMM, &cmd, 1);
+		ret = _interface->Write(ADDR_CMM, &cmd, 1);
 		_continuous_mode_set = true;
 
 	} else if (_mode == SINGLE) {
 		if (_continuous_mode_set) {
 			/* This is needed for polling mode */
 			cmd = (CMM_DEFAULT | POLLING_MODE);
-			ret = _interface->write(ADDR_CMM, &cmd, 1);
+			ret = _interface->Write(ADDR_CMM, &cmd, 1);
 
 			if (ret != OK) {
 				perf_count(_comms_errors);
@@ -249,7 +249,7 @@ int RM3100::measure()
 		}
 
 		cmd = POLL_XYZ;
-		ret = _interface->write(ADDR_POLL, &cmd, 1);
+		ret = _interface->Write(ADDR_POLL, &cmd, 1);
 	}
 
 
@@ -286,24 +286,24 @@ int RM3100::set_default_register_values()
 
 	cmd[0] = CCX_DEFAULT_MSB;
 	cmd[1] = CCX_DEFAULT_LSB;
-	_interface->write(ADDR_CCX, cmd, 2);
+	_interface->Write(ADDR_CCX, cmd, 2);
 
 	cmd[0] = CCY_DEFAULT_MSB;
 	cmd[1] = CCY_DEFAULT_LSB;
-	_interface->write(ADDR_CCY, cmd, 2);
+	_interface->Write(ADDR_CCY, cmd, 2);
 
 	cmd[0] = CCZ_DEFAULT_MSB;
 	cmd[1] = CCZ_DEFAULT_LSB;
-	_interface->write(ADDR_CCZ, cmd, 2);
+	_interface->Write(ADDR_CCZ, cmd, 2);
 
 	cmd[0] = CMM_DEFAULT;
-	_interface->write(ADDR_CMM, cmd, 1);
+	_interface->Write(ADDR_CMM, cmd, 1);
 
 	cmd[0] = TMRC_DEFAULT;
-	_interface->write(ADDR_TMRC, cmd, 1);
+	_interface->Write(ADDR_TMRC, cmd, 1);
 
 	cmd[0] = BIST_DEFAULT;
-	_interface->write(ADDR_BIST, cmd, 1);
+	_interface->Write(ADDR_BIST, cmd, 1);
 
 	return PX4_OK;
 }

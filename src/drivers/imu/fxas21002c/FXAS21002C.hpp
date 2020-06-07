@@ -173,9 +173,6 @@
 #  define CTRL_REG3_EXTCTRLEN            (1 << 2)
 #  define CTRL_REG3_FS_DOUBLE            (1 << 0)
 
-device::Device *FXAS21002C_SPI_interface(int bus, uint32_t chip_select, int bus_frequency, spi_mode_e spi_mode);
-device::Device *FXAS21002C_I2C_interface(int bus, int bus_frequency, int i2c_address);
-
 /* status register and data as read back from the device */
 #pragma pack(push, 1)
 struct RawGyroReport {
@@ -186,7 +183,6 @@ struct RawGyroReport {
 	int16_t		z;
 };
 #pragma pack(pop)
-
 
 class FXAS21002C : public I2CSPIDriver<FXAS21002C>
 {
@@ -206,11 +202,10 @@ public:
 
 	void			print_registers();
 	void			test_error();
-protected:
+private:
 	void custom_method(const BusCLIArguments &cli);
 	int probe();
 
-private:
 	device::Device *_interface;
 	PX4Gyroscope _px4_gyro;
 
@@ -257,28 +252,6 @@ private:
 	 * check key registers for correct values
 	 */
 	void check_registers(void);
-
-	/**
-	 * Read a register from the FXAS21002C
-	 *
-	 * @param		The register to read.
-	 * @return		The value that was read.
-	 */
-	inline uint8_t read_reg(unsigned reg)
-	{
-		return _interface->read_reg(reg);
-	}
-
-	/**
-	 * Write a register in the FXAS21002C
-	 *
-	 * @param reg		The register to write.
-	 * @param value		The new value to write.
-	 */
-	inline int write_reg(unsigned reg, uint8_t value)
-	{
-		return _interface->write_reg(reg, value);
-	}
 
 	/**
 	 * Modify a register in the FXAS21002C

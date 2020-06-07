@@ -403,7 +403,7 @@ MPU6000::factory_self_test()
 	// get baseline values without self-test enabled
 	for (uint8_t i = 0; i < repeats; i++) {
 		up_udelay(1000);
-		_interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
+		_interface->Read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
 				 sizeof(mpu_report));
 
 		accel_baseline[0] += int16_t_from_bytes(mpu_report.accel_x);
@@ -430,7 +430,7 @@ MPU6000::factory_self_test()
 	// get values with self-test enabled
 	for (uint8_t i = 0; i < repeats; i++) {
 		up_udelay(1000);
-		_interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
+		_interface->Read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED), (uint8_t *)&mpu_report,
 				 sizeof(mpu_report));
 
 		accel[0] += int16_t_from_bytes(mpu_report.accel_x);
@@ -529,7 +529,7 @@ MPU6000::test_error()
 	// deliberately trigger an error. This was noticed during
 	// development as a handy way to test the reset logic
 	uint8_t data[sizeof(MPUReport)] {};
-	_interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_LOW_BUS_SPEED), data, sizeof(data));
+	_interface->Read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_LOW_BUS_SPEED), data, sizeof(data));
 	PX4_WARN("error triggered");
 	print_registers();
 	_in_factory_test = false;
@@ -539,7 +539,7 @@ uint8_t
 MPU6000::read_reg(unsigned reg, uint32_t speed)
 {
 	uint8_t buf{};
-	_interface->read(MPU6000_SET_SPEED(reg, speed), &buf, 1);
+	_interface->Read(MPU6000_SET_SPEED(reg, speed), &buf, 1);
 	return buf;
 }
 
@@ -549,7 +549,7 @@ MPU6000::read_reg16(unsigned reg)
 	uint8_t buf[2] {};
 
 	// general register transfer at low clock speed
-	_interface->read(MPU6000_LOW_SPEED_OP(reg), &buf, arraySize(buf));
+	_interface->Read(MPU6000_LOW_SPEED_OP(reg), &buf, arraySize(buf));
 	return (uint16_t)(buf[0] << 8) | buf[1];
 }
 
@@ -745,7 +745,7 @@ void MPU6000::RunImpl()
 
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	if (sizeof(mpu_report) != _interface->read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED),
+	if (sizeof(mpu_report) != _interface->Read(MPU6000_SET_SPEED(MPUREG_INT_STATUS, MPU6000_HIGH_BUS_SPEED),
 			(uint8_t *)&mpu_report, sizeof(mpu_report))) {
 
 		perf_end(_sample_perf);

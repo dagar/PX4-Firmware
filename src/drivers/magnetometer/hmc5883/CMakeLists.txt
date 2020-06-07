@@ -37,8 +37,6 @@ px4_add_module(
 	SRCS
 		HMC5883.cpp
 		HMC5883.hpp
-		hmc5883_i2c.cpp
-		hmc5883_spi.cpp
 		hmc5883_main.cpp
 	DEPENDS
 		drivers_magnetometer

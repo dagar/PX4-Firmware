@@ -178,8 +178,4 @@ private:
 	float			_rsense{0.0f};
 
 	Battery 		_battery;
-
-	uint8_t 		read_reg(uint8_t addr);
-	int 			read_reg_buf(uint8_t addr, uint8_t *buf, uint8_t len);
-	int 			write_reg(uint8_t value, uint8_t addr);
 };

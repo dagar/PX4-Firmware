@@ -56,11 +56,12 @@ I2CSPIDriverBase *FXAS21002C::instantiate(const BusCLIArguments &cli, const BusI
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = FXAS21002C_I2C_interface(iterator.bus(), cli.bus_frequency, cli.i2c_address);
+		interface = new device::I2C(DRV_GYR_DEVTYPE_FXAS2100C, MODULE_NAME, iterator.bus(), cli.bus_frequency, cli.i2c_address);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = FXAS21002C_SPI_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
-	}
+		interface = new device::SPI((DRV_GYR_DEVTYPE_FXAS2100C, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						     cli.bus_frequency);
+		}
 
 	if (interface == nullptr) {
 		PX4_ERR("alloc failed");

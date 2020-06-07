@@ -43,7 +43,15 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_device.h>
 #include <lib/drivers/magnetometer/PX4Magnetometer.hpp>
-#include "hmc5883.h"
+#include <drivers/device/Device.hpp>
+
+#define ADDR_ID_A			0x0a
+#define ADDR_ID_B			0x0b
+#define ADDR_ID_C			0x0c
+
+#define ID_A_WHO_AM_I			'H'
+#define ID_B_WHO_AM_I			'4'
+#define ID_C_WHO_AM_I			'3'
 
 /*
  * HMC5883 internal constants and data structures.
@@ -161,24 +169,6 @@ private:
 	 * change
 	 */
 	void 			check_conf();
-
-	/**
-	 * Write a register.
-	 *
-	 * @param reg		The register to write.
-	 * @param val		The value to write.
-	 * @return		OK on write success.
-	 */
-	int			write_reg(uint8_t reg, uint8_t val);
-
-	/**
-	 * Read a register.
-	 *
-	 * @param reg		The register to read.
-	 * @param val		The value read.
-	 * @return		OK on read success.
-	 */
-	int			read_reg(uint8_t reg, uint8_t &val);
 
 	/**
 	 * Issue a measurement command.

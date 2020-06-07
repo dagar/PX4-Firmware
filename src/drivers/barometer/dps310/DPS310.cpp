@@ -108,7 +108,7 @@ DPS310::reset()
 	//   Note: The coefficients read from the coefficient register are 2's complement numbers.
 	uint8_t coef[18] {};
 
-	if (_interface->read((uint8_t)Register::COEF, coef, 18)) {
+	if (_interface->Read((uint8_t)Register::COEF, coef, 18)) {
 		return PX4_ERROR;
 	}
 
@@ -199,7 +199,7 @@ DPS310::RunImpl()
 	uint8_t buf[6] {};
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	if (_interface->read((uint8_t)Register::PSR_B2, buf, 6) != PX4_OK) {
+	if (_interface->Read((uint8_t)Register::PSR_B2, buf, 6) != PX4_OK) {
 		perf_count(_comms_errors);
 		perf_end(_sample_perf);
 		return;
@@ -241,19 +241,17 @@ DPS310::RunImpl()
 	perf_end(_sample_perf);
 }
 
-uint8_t
-DPS310::RegisterRead(Register reg)
+uint8_t DPS310::RegisterRead(Register reg)
 {
 	uint8_t buf{};
-	_interface->read((uint8_t)reg, &buf, 1);
+	_interface->Read((uint8_t)reg, &buf, 1);
 
 	return buf;
 }
 
-void
-DPS310::RegisterWrite(Register reg, uint8_t value)
+void DPS310::RegisterWrite(Register reg, uint8_t value)
 {
-	_interface->write((uint8_t)reg, &value, 1);
+	_interface->Write((uint8_t)reg, &value, 1);
 }
 
 void

@@ -311,7 +311,7 @@ void FXOS8701CQ::RunImpl()
 	RawAccelMagReport raw_accel_mag_report{};
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	_interface->read(FXOS8701CQ_DR_STATUS, (uint8_t *)&raw_accel_mag_report, sizeof(raw_accel_mag_report));
+	_interface->Read(FXOS8701CQ_DR_STATUS, (uint8_t *)&raw_accel_mag_report, sizeof(raw_accel_mag_report));
 
 	if (!(raw_accel_mag_report.status & DR_STATUS_ZYXDR)) {
 		perf_end(_accel_sample_perf);

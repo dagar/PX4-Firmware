@@ -130,22 +130,6 @@ private:
 	void			measure();
 
 	/**
-	 * Read a register from the BMA180
-	 *
-	 * @param		The register to read.
-	 * @return		The value that was read.
-	 */
-	uint8_t			read_reg(uint8_t reg);
-
-	/**
-	 * Write a register in the BMA180
-	 *
-	 * @param reg		The register to write.
-	 * @param value		The new value to write.
-	 */
-	void			write_reg(uint8_t reg, uint8_t value);
-
-	/**
 	 * Modify a register in the BMA180
 	 *
 	 * Bits are cleared before bits are set.
@@ -154,7 +138,7 @@ private:
 	 * @param clearbits	Bits in the register to clear.
 	 * @param setbits	Bits in the register to set.
 	 */
-	void			modify_reg(uint8_t reg, uint8_t clearbits, uint8_t setbits);
+	void			RegisterClearAndSetBits(uint8_t reg, uint8_t clearbits, uint8_t setbits);
 
 	/**
 	 * Set the BMA180 measurement range.
@@ -200,28 +184,28 @@ int BMA180::init()
 	}
 
 	/* perform soft reset (p48) */
-	write_reg(ADDR_RESET, SOFT_RESET);
+	RegisterWrite(ADDR_RESET, SOFT_RESET);
 
 	/* wait 10 ms (datasheet incorrectly lists 10 us on page 49) */
 	usleep(10000);
 
 	/* enable writing to chip config */
-	modify_reg(ADDR_CTRL_REG0, 0, REG0_WRITE_ENABLE);
+	RegisterClearAndSetBits(ADDR_CTRL_REG0, 0, REG0_WRITE_ENABLE);
 
 	/* disable I2C interface */
-	modify_reg(ADDR_HIGH_DUR, HIGH_DUR_DIS_I2C, 0);
+	RegisterClearAndSetBits(ADDR_HIGH_DUR, HIGH_DUR_DIS_I2C, 0);
 
 	/* switch to low-noise mode */
-	modify_reg(ADDR_TCO_Z, TCO_Z_MODE_MASK, 0);
+	RegisterClearAndSetBits(ADDR_TCO_Z, TCO_Z_MODE_MASK, 0);
 
 	/* disable 12-bit mode */
-	modify_reg(ADDR_OFFSET_T, OFFSET_T_READOUT_12BIT, 0);
+	RegisterClearAndSetBits(ADDR_OFFSET_T, OFFSET_T_READOUT_12BIT, 0);
 
 	/* disable shadow-disable mode */
-	modify_reg(ADDR_GAIN_Y, GAIN_Y_SHADOW_DIS, 0);
+	RegisterClearAndSetBits(ADDR_GAIN_Y, GAIN_Y_SHADOW_DIS, 0);
 
 	/* disable writing to chip config */
-	modify_reg(ADDR_CTRL_REG0, REG0_WRITE_ENABLE, 0);
+	RegisterClearAndSetBits(ADDR_CTRL_REG0, REG0_WRITE_ENABLE, 0);
 
 	if (set_range(4)) {
 		PX4_ERR("Failed setting range");
@@ -231,7 +215,7 @@ int BMA180::init()
 		PX4_ERR("Failed setting lowpass");
 	}
 
-	if (read_reg(ADDR_CHIP_ID) == CHIP_ID) {
+	if (RegisterRead(ADDR_CHIP_ID) == CHIP_ID) {
 		ret = OK;
 
 	} else {
@@ -250,35 +234,13 @@ out:
 int BMA180::probe()
 {
 	/* dummy read to ensure SPI state machine is sane */
-	read_reg(ADDR_CHIP_ID);
+	RegisterRead(ADDR_CHIP_ID);
 
-	if (read_reg(ADDR_CHIP_ID) == CHIP_ID) {
+	if (RegisterRead(ADDR_CHIP_ID) == CHIP_ID) {
 		return OK;
 	}
 
 	return -EIO;
-}
-
-uint8_t BMA180::read_reg(uint8_t reg)
-{
-	uint8_t cmd[2] {};
-	cmd[0] = reg | DIR_READ;
-	transfer(cmd, cmd, sizeof(cmd));
-	return cmd[1];
-}
-
-void BMA180::write_reg(uint8_t reg, uint8_t value)
-{
-	uint8_t	cmd[2] {reg, value};
-	transfer(cmd, nullptr, sizeof(cmd));
-}
-
-void BMA180::modify_reg(uint8_t reg, uint8_t clearbits, uint8_t setbits)
-{
-	uint8_t	val = read_reg(reg);
-	val &= ~clearbits;
-	val |= setbits;
-	write_reg(reg, val);
 }
 
 int BMA180::set_range(unsigned max_g)
@@ -322,16 +284,16 @@ int BMA180::set_range(unsigned max_g)
 	_px4_accel.set_scale(accel_range_m_s2 / 8192.f);
 
 	/* enable writing to chip config */
-	modify_reg(ADDR_CTRL_REG0, 0, REG0_WRITE_ENABLE);
+	RegisterClearAndSetBits(ADDR_CTRL_REG0, 0, REG0_WRITE_ENABLE);
 
 	/* adjust sensor configuration */
-	modify_reg(ADDR_OFFSET_LSB1, OFFSET_LSB1_RANGE_MASK, rangebits);
+	RegisterClearAndSetBits(ADDR_OFFSET_LSB1, OFFSET_LSB1_RANGE_MASK, rangebits);
 
 	/* block writing to chip config */
-	modify_reg(ADDR_CTRL_REG0, REG0_WRITE_ENABLE, 0);
+	RegisterClearAndSetBits(ADDR_CTRL_REG0, REG0_WRITE_ENABLE, 0);
 
 	/* check if wanted value is now in register */
-	return !((read_reg(ADDR_OFFSET_LSB1) & OFFSET_LSB1_RANGE_MASK) ==
+	return !((RegisterRead(ADDR_OFFSET_LSB1) & OFFSET_LSB1_RANGE_MASK) ==
 		 (OFFSET_LSB1_RANGE_MASK & rangebits));
 }
 
@@ -368,16 +330,16 @@ int BMA180::set_lowpass(unsigned frequency)
 	}
 
 	/* enable writing to chip config */
-	modify_reg(ADDR_CTRL_REG0, 0, REG0_WRITE_ENABLE);
+	RegisterClearAndSetBits(ADDR_CTRL_REG0, 0, REG0_WRITE_ENABLE);
 
 	/* adjust sensor configuration */
-	modify_reg(ADDR_BW_TCS, BW_TCS_BW_MASK, bwbits);
+	RegisterClearAndSetBits(ADDR_BW_TCS, BW_TCS_BW_MASK, bwbits);
 
 	/* block writing to chip config */
-	modify_reg(ADDR_CTRL_REG0, REG0_WRITE_ENABLE, 0);
+	RegisterClearAndSetBits(ADDR_CTRL_REG0, REG0_WRITE_ENABLE, 0);
 
 	/* check if wanted value is now in register */
-	return !((read_reg(ADDR_BW_TCS) & BW_TCS_BW_MASK) == (BW_TCS_BW_MASK & bwbits));
+	return !((RegisterRead(ADDR_BW_TCS) & BW_TCS_BW_MASK) == (BW_TCS_BW_MASK & bwbits));
 }
 
 void BMA180::start()
@@ -404,14 +366,14 @@ void BMA180::measure()
 	 * perform only the axis assignment here.
 	 * Two non-value bits are discarded directly
 	 */
-	int16_t y_raw  = read_reg(ADDR_ACC_X_LSB + 0);
-	y_raw |= read_reg(ADDR_ACC_X_LSB + 1) << 8;
+	int16_t y_raw  = RegisterRead(ADDR_ACC_X_LSB + 0);
+	y_raw |= RegisterRead(ADDR_ACC_X_LSB + 1) << 8;
 
-	int16_t x_raw  = read_reg(ADDR_ACC_X_LSB + 2);
-	x_raw |= read_reg(ADDR_ACC_X_LSB + 3) << 8;
+	int16_t x_raw  = RegisterRead(ADDR_ACC_X_LSB + 2);
+	x_raw |= RegisterRead(ADDR_ACC_X_LSB + 3) << 8;
 
-	int16_t z_raw  = read_reg(ADDR_ACC_X_LSB + 4);
-	z_raw |= read_reg(ADDR_ACC_X_LSB + 5) << 8;
+	int16_t z_raw  = RegisterRead(ADDR_ACC_X_LSB + 4);
+	z_raw |= RegisterRead(ADDR_ACC_X_LSB + 5) << 8;
 
 	/* discard two non-value bits in the 16 bit measurement */
 	x_raw = (x_raw / 4);

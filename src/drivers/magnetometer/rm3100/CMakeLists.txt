@@ -35,8 +35,6 @@ px4_add_module(
 	MAIN rm3100
 	COMPILE_FLAGS
 	SRCS
-		rm3100_i2c.cpp
-		rm3100_spi.cpp
 		rm3100_main.cpp
 		rm3100.cpp
 	DEPENDS

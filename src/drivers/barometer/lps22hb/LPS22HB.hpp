@@ -70,10 +70,6 @@ static constexpr uint8_t PRESS_OUT_H = 0x2A;
 static constexpr uint8_t TEMP_OUT_L = 0x2B;
 static constexpr uint8_t TEMP_OUT_H = 0x2C;
 
-/* interface factories */
-extern device::Device *LPS22HB_SPI_interface(int bus, uint32_t devid, int bus_frequency, spi_mode_e spi_mode);
-extern device::Device *LPS22HB_I2C_interface(int bus, int bus_frequency);
-
 class LPS22HB : public I2CSPIDriver<LPS22HB>
 {
 public:
@@ -111,24 +107,6 @@ private:
 	 * Reset the device
 	 */
 	int			reset();
-
-	/**
-	 * Write a register.
-	 *
-	 * @param reg		The register to write.
-	 * @param val		The value to write.
-	 * @return		OK on write success.
-	 */
-	int			write_reg(uint8_t reg, uint8_t val);
-
-	/**
-	 * Read a register.
-	 *
-	 * @param reg		The register to read.
-	 * @param val		The value read.
-	 * @return		OK on read success.
-	 */
-	int			read_reg(uint8_t reg, uint8_t &val);
 
 	/**
 	 * Issue a measurement command.

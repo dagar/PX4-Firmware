@@ -1985,7 +1985,7 @@ PX4IO::io_reg_set(uint8_t page, uint8_t offset, const uint16_t *values, unsigned
 		return -EINVAL;
 	}
 
-	int ret =  _interface->write((page << 8) | offset, (void *)values, num_values);
+	int ret = _interface->Write((page << 8) | offset, (uint8_t *)values, num_values);
 
 	if (ret != (int)num_values) {
 		PX4_DEBUG("io_reg_set(%hhu,%hhu,%u): error %d", page, offset, num_values, ret);
@@ -2010,7 +2010,7 @@ PX4IO::io_reg_get(uint8_t page, uint8_t offset, uint16_t *values, unsigned num_v
 		return -EINVAL;
 	}
 
-	int ret = _interface->read((page << 8) | offset, reinterpret_cast<void *>(values), num_values);
+	int ret = _interface->Read((page << 8) | offset, reinterpret_cast<uint8_t *>(values), num_values);
 
 	if (ret != (int)num_values) {
 		PX4_DEBUG("io_reg_get(%hhu,%hhu,%u): data error %d", page, offset, num_values, ret);
@@ -2914,8 +2914,7 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 	return ret;
 }
 
-ssize_t
-PX4IO::write(file * /*filp*/, const char *buffer, size_t len)
+ssize_t PX4IO::write(file * /*filp*/, const char *buffer, size_t len)
 /* Make it obvious that file * isn't used here */
 {
 	unsigned count = len / 2;
@@ -3101,7 +3100,7 @@ checkcrc(int argc, char *argv[])
 
 	while (true) {
 		uint8_t buf[16];
-		int n = read(fd, buf, sizeof(buf));
+		int n = ::read(fd, buf, sizeof(buf));
 
 		if (n <= 0) { break; }
 
@@ -3260,11 +3259,10 @@ test(void)
 
 		/* Check if user wants to quit */
 		char c;
-		ret = poll(&fds, 1, 0);
+		ret = ::poll(&fds, 1, 0);
 
 		if (ret > 0) {
-
-			read(0, &c, 1);
+			::read(0, &c, 1);
 
 			if (c == 0x03 || c == 0x63 || c == 'q') {
 				warnx("User abort\n");
@@ -3295,7 +3293,7 @@ monitor(void)
 		if (fds[0].revents == POLLIN) {
 			/* control logic is to cancel with any key */
 			char c;
-			(void)read(0, &c, 1);
+			::read(0, &c, 1);
 
 			if (cancels-- == 0) {
 				printf("\033[2J\033[H"); /* move cursor home and clear screen */
@@ -3341,7 +3339,7 @@ lockdown(int argc, char *argv[])
 
 				if (ret > 0) {
 
-					if (read(0, &c, 1) > 0) {
+					if (::read(0, &c, 1) > 0) {
 
 						if (c != 'y') {
 							exit(0);

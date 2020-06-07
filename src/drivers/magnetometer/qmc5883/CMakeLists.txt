@@ -35,7 +35,6 @@ px4_add_module(
 	MAIN qmc5883
 	COMPILE_FLAGS
 	SRCS
-		QMC5883_I2C.cpp
 		QMC5883.cpp
 		QMC5883.hpp
 		qmc5883_main.cpp

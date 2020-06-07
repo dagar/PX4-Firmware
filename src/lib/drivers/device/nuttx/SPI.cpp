@@ -202,21 +202,21 @@ int SPI::_transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 	return PX4_OK;
 }
 
-int SPI::read(unsigned address, void *data, unsigned count)
+int SPI::Read(uint8_t address, uint8_t *data, uint8_t length)
 {
 	//static constexpr uint8_t DIR_READ = 0x80;
-	uint8_t cmd[1 + count] {};
+	uint8_t cmd[1 + length] {};
 	cmd[0] = address | _read_direction_bit; // DIR_READ;
 
 	if (transfer(cmd, cmd, sizeof(cmd)) == PX4_OK) {
-		memcpy(data, &cmd[1], count);
+		memcpy(data, &cmd[1], length);
 		return PX4_OK;
 	}
 
 	return PX4_ERROR;
 }
 
-int SPI::write(unsigned address, void *data, unsigned count)
+int SPI::Write(uint8_t address, uint8_t *data, uint8_t count)
 {
 	if (count == 0) {
 		uint8_t cmd = address;

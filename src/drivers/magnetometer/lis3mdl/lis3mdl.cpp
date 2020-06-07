@@ -99,14 +99,14 @@ int LIS3MDL::collect()
 	perf_begin(_sample_perf);
 
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	_interface->read(ADDR_OUT_X_L, (uint8_t *)&lis_report, sizeof(lis_report));
+	_interface->Read(ADDR_OUT_X_L, (uint8_t *)&lis_report, sizeof(lis_report));
 
 	/**
 	 * Silicon Bug: the X axis will be read instead of the temperature registers if you do a sequential read through XYZ.
 	 * The temperature registers must be addressed directly.
 	 */
 
-	int ret = _interface->read(ADDR_OUT_T_L, (uint8_t *)&buf_rx, sizeof(buf_rx));
+	int ret = _interface->Read(ADDR_OUT_T_L, (uint8_t *)&buf_rx, sizeof(buf_rx));
 
 	if (ret != OK) {
 		perf_end(_sample_perf);
@@ -173,11 +173,11 @@ int LIS3MDL::measure()
 
 	/* Send the command to begin a measurement. */
 	if ((_mode == CONTINUOUS) && !_continuous_mode_set) {
-		ret = write_reg(ADDR_CTRL_REG3, MODE_REG_CONTINOUS_MODE);
+		ret = _interface->RegisterWrite(ADDR_CTRL_REG3, MODE_REG_CONTINOUS_MODE);
 		_continuous_mode_set = true;
 
 	} else if (_mode == SINGLE) {
-		ret = write_reg(ADDR_CTRL_REG3, MODE_REG_SINGLE_MODE);
+		ret = _interface->RegisterWrite(ADDR_CTRL_REG3, MODE_REG_SINGLE_MODE);
 		_continuous_mode_set = false;
 	}
 
@@ -217,11 +217,11 @@ int LIS3MDL::reset()
 int
 LIS3MDL::set_default_register_values()
 {
-	write_reg(ADDR_CTRL_REG1, CNTL_REG1_DEFAULT);
-	write_reg(ADDR_CTRL_REG2, CNTL_REG2_DEFAULT);
-	write_reg(ADDR_CTRL_REG3, CNTL_REG3_DEFAULT);
-	write_reg(ADDR_CTRL_REG4, CNTL_REG4_DEFAULT);
-	write_reg(ADDR_CTRL_REG5, CNTL_REG5_DEFAULT);
+	_interface->RegisterWrite(ADDR_CTRL_REG1, CNTL_REG1_DEFAULT);
+	_interface->RegisterWrite(ADDR_CTRL_REG2, CNTL_REG2_DEFAULT);
+	_interface->RegisterWrite(ADDR_CTRL_REG3, CNTL_REG3_DEFAULT);
+	_interface->RegisterWrite(ADDR_CTRL_REG4, CNTL_REG4_DEFAULT);
+	_interface->RegisterWrite(ADDR_CTRL_REG5, CNTL_REG5_DEFAULT);
 
 	return PX4_OK;
 }
@@ -252,18 +252,13 @@ int LIS3MDL::set_range(unsigned range)
 	/*
 	 * Send the command to set the range
 	 */
-	int ret = write_reg(ADDR_CTRL_REG2, (_range_bits << 5));
+	int ret = _interface->RegisterWrite(ADDR_CTRL_REG2, (_range_bits << 5));
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
 	}
 
-	uint8_t range_bits_in = 0;
-	ret = read_reg(ADDR_CTRL_REG2, range_bits_in);
-
-	if (ret != OK) {
-		perf_count(_comms_errors);
-	}
+	uint8_t range_bits_in = _interface->RegisterRead(ADDR_CTRL_REG2);
 
 	if (range_bits_in == (_range_bits << 5)) {
 		return PX4_OK;
@@ -279,18 +274,4 @@ void LIS3MDL::start()
 
 	/* schedule a cycle to start things */
 	ScheduleNow();
-}
-
-int LIS3MDL::read_reg(uint8_t reg, uint8_t &val)
-{
-	uint8_t buf = val;
-	int ret = _interface->read(reg, &buf, 1);
-	val = buf;
-	return ret;
-}
-
-int LIS3MDL::write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf = val;
-	return _interface->write(reg, &buf, 1);
 }

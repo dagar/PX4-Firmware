@@ -136,7 +136,6 @@ ArchPX4IOSerial::init()
 	(void)rSR;
 	(void)rDR;
 
-
 	/* configure line speed */
 	uint32_t usartdiv32 = PX4IO_SERIAL_CLOCK / (PX4IO_SERIAL_BITRATE / 2);
 	uint32_t mantissa = usartdiv32 >> 5;

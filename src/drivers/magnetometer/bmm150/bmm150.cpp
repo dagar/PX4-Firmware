@@ -79,12 +79,12 @@ int BMM150::init()
 	}
 
 	/* Bring the device to sleep mode */
-	modify_reg(BMM150_POWER_CTRL_REG, 1, 1);
+	RegisterClearAndSetBits(BMM150_POWER_CTRL_REG, 1, 1);
 
 	px4_usleep(10000);
 
 	/* check id*/
-	if (read_reg(BMM150_CHIP_ID_REG) != BMM150_CHIP_ID) {
+	if (RegisterRead(BMM150_CHIP_ID_REG) != BMM150_CHIP_ID) {
 		DEVICE_DEBUG("id of magnetometer is not: 0x%02x", BMM150_CHIP_ID);
 		return -EIO;
 	}
@@ -110,18 +110,6 @@ int BMM150::init()
 
 out:
 	return ret;
-}
-
-int BMM150::probe()
-{
-	/* During I2C Initialization, sensor is in suspend mode
-	 * and chip Id will return 0x00, hence returning OK. After
-	 * I2C initialization, sensor is brought to sleep mode
-	 * and Chip Id is verified. In sleep mode, we can read
-	 * chip id. */
-
-	/* @Note: Please read BMM150 Datasheet for more details */
-	return OK;
 }
 
 void BMM150::start()
@@ -194,7 +182,7 @@ int BMM150::collect()
 	/* Read Magnetometer data*/
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
-	if (OK != get_data(BMM150_DATA_X_LSB_REG, mag_data, sizeof(mag_data))) {
+	if (OK != Read(BMM150_DATA_X_LSB_REG, mag_data, sizeof(mag_data))) {
 		return -EIO;
 	}
 
@@ -326,7 +314,7 @@ int BMM150::reset()
 	int ret = OK;
 
 	/* Soft-reset */
-	modify_reg(BMM150_POWER_CTRL_REG, BMM150_SOFT_RESET_MASK, BMM150_SOFT_RESET_VALUE);
+	RegisterClearAndSetBits(BMM150_POWER_CTRL_REG, BMM150_SOFT_RESET_MASK, BMM150_SOFT_RESET_VALUE);
 
 	px4_usleep(5000);
 
@@ -342,34 +330,6 @@ int BMM150::reset()
 	ret += set_presetmode(BMM150_PRESETMODE_REGULAR);
 
 	return OK;
-}
-
-uint8_t BMM150::read_reg(uint8_t reg)
-{
-	const uint8_t cmd = reg;
-	uint8_t ret{0};
-	transfer(&cmd, 1, &ret, 1);
-	return ret;
-}
-
-int BMM150::write_reg(uint8_t reg, uint8_t value)
-{
-	const uint8_t cmd[2] = { reg, value};
-	return transfer(cmd, 2, nullptr, 0);
-}
-
-int BMM150::get_data(uint8_t reg, uint8_t *data, unsigned len)
-{
-	const uint8_t cmd = reg;
-	return transfer(&cmd, 1, data, len);
-}
-
-void BMM150::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
-{
-	uint8_t val = read_reg(reg);
-	val &= ~clearbits;
-	val |= setbits;
-	write_reg(reg, val);
 }
 
 int BMM150::set_power_mode(uint8_t power_mode)
@@ -395,7 +355,7 @@ int BMM150::set_power_mode(uint8_t power_mode)
 	}
 
 	setbits |= power_mode;
-	modify_reg(BMM150_CTRL_REG, clearbits, setbits);
+	RegisterClearAndSetBits(BMM150_CTRL_REG, clearbits, setbits);
 
 	return OK;
 }
@@ -443,7 +403,7 @@ int BMM150::set_data_rate(uint8_t data_rate)
 	}
 
 	setbits |= data_rate;
-	modify_reg(BMM150_CTRL_REG, clearbits, setbits);
+	RegisterClearAndSetBits(BMM150_CTRL_REG, clearbits, setbits);
 
 	return OK;
 }
@@ -454,38 +414,38 @@ int BMM150::init_trim_registers()
 	uint8_t data[2] = {0};
 	uint16_t msb, lsb, msblsb;
 
-	_dig_x1 = read_reg(BMM150_DIG_X1);
-	_dig_y1 = read_reg(BMM150_DIG_Y1);
-	_dig_x2 = read_reg(BMM150_DIG_X2);
-	_dig_y2 = read_reg(BMM150_DIG_Y2);
-	_dig_xy1 = read_reg(BMM150_DIG_XY1);
-	_dig_xy2 = read_reg(BMM150_DIG_XY2);
+	_dig_x1 = RegisterRead(BMM150_DIG_X1);
+	_dig_y1 = RegisterRead(BMM150_DIG_Y1);
+	_dig_x2 = RegisterRead(BMM150_DIG_X2);
+	_dig_y2 = RegisterRead(BMM150_DIG_Y2);
+	_dig_xy1 = RegisterRead(BMM150_DIG_XY1);
+	_dig_xy2 = RegisterRead(BMM150_DIG_XY2);
 
-	ret += get_data(BMM150_DIG_Z1_LSB, data, 2);
+	ret += Read(BMM150_DIG_Z1_LSB, data, 2);
 	lsb = data[0];
 	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
 	_dig_z1 = (uint16_t)msblsb;
 
-	ret += get_data(BMM150_DIG_Z2_LSB, data, 2);
+	ret += Read(BMM150_DIG_Z2_LSB, data, 2);
 	lsb = data[0];
 	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
 	_dig_z2 = (int16_t)msblsb;
 
-	ret += get_data(BMM150_DIG_Z3_LSB, data, 2);
+	ret += Read(BMM150_DIG_Z3_LSB, data, 2);
 	lsb = data[0];
 	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
 	_dig_z3 = (int16_t)msblsb;
 
-	ret += get_data(BMM150_DIG_Z4_LSB, data, 2);
+	ret += Read(BMM150_DIG_Z4_LSB, data, 2);
 	lsb = data[0];
 	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
 	_dig_z4 = (int16_t)msblsb;
 
-	ret += get_data(BMM150_DIG_XYZ1_LSB, data, 2);
+	ret += Read(BMM150_DIG_XYZ1_LSB, data, 2);
 	lsb = data[0];
 	msb = ((uint16_t)(data[1] & 0x7F) << 8);
 	msblsb = (msb | lsb);
@@ -557,12 +517,12 @@ int BMM150::self_test()
 	/* normal self-test */
 	set_power_mode(BMM150_SLEEP_MODE);
 
-	modify_reg(BMM150_CTRL_REG, 0, 1);
+	RegisterClearAndSetBits(BMM150_CTRL_REG, 0, 1);
 	int i;
 
 	for (i = 0; i < 100; ++i) {
 		px4_usleep(1000);
-		uint8_t ctrl_reg = read_reg(BMM150_CTRL_REG);
+		uint8_t ctrl_reg = RegisterRead(BMM150_CTRL_REG);
 
 		if ((ctrl_reg & 1) == 0) {
 			break;
@@ -575,9 +535,9 @@ int BMM150::self_test()
 	}
 
 	uint8_t results[3];
-	results[0] = read_reg(BMM150_DATA_X_LSB_REG);
-	results[1] = read_reg(BMM150_DATA_Y_LSB_REG);
-	results[2] = read_reg(BMM150_DATA_Z_LSB_REG);
+	results[0] = RegisterRead(BMM150_DATA_X_LSB_REG);
+	results[1] = RegisterRead(BMM150_DATA_Y_LSB_REG);
+	results[2] = RegisterRead(BMM150_DATA_Z_LSB_REG);
 	bool failed = false;
 
 	for (i = 0; i < 3; ++i) {
@@ -595,29 +555,6 @@ int BMM150::self_test()
 	return reset();
 }
 
-void BMM150::print_registers()
-{
-	printf("BMM150 registers\n");
-
-	uint8_t reg = BMM150_CHIP_ID_REG;
-	uint8_t v = read_reg(reg);
-	printf("Chip Id: %02x:%02x\n", (unsigned)reg, (unsigned)v);
-
-	reg = BMM150_INT_SETT_CTRL_REG;
-	v = read_reg(reg);
-	printf("Int sett Ctrl reg: %02x:%02x\n", (unsigned)reg, (unsigned)v);
-
-	reg = BMM150_AXES_EN_CTRL_REG;
-	v = read_reg(reg);
-	printf("Axes En Ctrl reg: %02x:%02x\n", (unsigned)reg, (unsigned)v);
-
-	printf("Trim data: %i %i, %i %i, %i %i %i %i, %i %i, %i\n",
-	       _dig_x1, _dig_y1, _dig_x2, _dig_y2, _dig_z1, _dig_z2, _dig_z3, _dig_z4, _dig_xy1, _dig_xy2, _dig_xyz1);
-
-	printf("Latest raw data: x=%i y=%i z=%i resistance=%i\n",
-	       _last_raw_x, _last_raw_y, _last_raw_z, _last_resistance);
-}
-
 void BMM150::print_usage()
 {
 	PRINT_MODULE_USAGE_NAME("bmm150", "driver");
@@ -625,8 +562,6 @@ void BMM150::print_usage()
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, false);
 	PRINT_MODULE_USAGE_PARAM_INT('R', 0, 0, 35, "Rotation", true);
-	PRINT_MODULE_USAGE_COMMAND("reset");
-	PRINT_MODULE_USAGE_COMMAND("regdump");
 	PRINT_MODULE_USAGE_COMMAND("selftest");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
@@ -634,13 +569,7 @@ void BMM150::print_usage()
 void BMM150::custom_method(const BusCLIArguments &cli)
 {
 	switch (cli.custom1) {
-	case 0: reset();
-		break;
-
-	case 1: print_registers();
-		break;
-
-	case 2: self_test();
+	case 0: self_test();
 		break;
 	}
 }
@@ -700,18 +629,8 @@ extern "C" __EXPORT int bmm150_main(int argc, char *argv[])
 		return ThisDriver::module_status(iterator);
 	}
 
-	if (!strcmp(verb, "reset")) {
-		cli.custom1 = 0;
-		return ThisDriver::module_custom_method(cli, iterator);
-	}
-
-	if (!strcmp(verb, "regdump")) {
-		cli.custom1 = 1;
-		return ThisDriver::module_custom_method(cli, iterator);
-	}
-
 	if (!strcmp(verb, "selftest")) {
-		cli.custom1 = 2;
+		cli.custom1 = 0;
 		return ThisDriver::module_custom_method(cli, iterator);
 	}
 

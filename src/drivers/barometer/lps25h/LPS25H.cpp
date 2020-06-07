@@ -73,15 +73,15 @@ void LPS25H::start()
 int LPS25H::reset()
 {
 	// Power on
-	int ret = write_reg(ADDR_CTRL_REG1, CTRL_REG1_PD);
+	int ret = _interface->RegisterWrite(ADDR_CTRL_REG1, CTRL_REG1_PD);
 	usleep(1000);
 
 	// Reset
-	ret = write_reg(ADDR_CTRL_REG2, CTRL_REG2_BOOT | CTRL_REG2_SWRESET);
+	ret = _interface->RegisterWrite(ADDR_CTRL_REG2, CTRL_REG2_BOOT | CTRL_REG2_SWRESET);
 	usleep(5000);
 
 	// Power on
-	ret = write_reg(ADDR_CTRL_REG1, CTRL_REG1_PD);
+	ret = _interface->RegisterWrite(ADDR_CTRL_REG1, CTRL_REG1_PD);
 	usleep(1000);
 
 	return ret;
@@ -131,7 +131,7 @@ int LPS25H::measure()
 	/*
 	 * Send the command to begin a 16-bit measurement.
 	 */
-	int ret = write_reg(ADDR_CTRL_REG2, CTRL_REG2_ONE_SHOT);
+	int ret = _interface->RegisterWrite(ADDR_CTRL_REG2, CTRL_REG2_ONE_SHOT);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -154,7 +154,7 @@ int LPS25H::collect()
 
 	/* get measurements from the device : MSB enables register address auto-increment */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	int ret = _interface->read(ADDR_STATUS_REG | (1 << 7), (uint8_t *)&report, sizeof(report));
+	int ret = _interface->Read(ADDR_STATUS_REG | (1 << 7), (uint8_t *)&report, sizeof(report));
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
@@ -178,20 +178,6 @@ int LPS25H::collect()
 
 	perf_end(_sample_perf);
 	return PX4_OK;
-}
-
-int LPS25H::write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf = val;
-	return _interface->write(reg, &buf, 1);
-}
-
-int LPS25H::read_reg(uint8_t reg, uint8_t &val)
-{
-	uint8_t buf = val;
-	int ret = _interface->read(reg, &buf, 1);
-	val = buf;
-	return ret;
 }
 
 void LPS25H::print_status()

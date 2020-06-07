@@ -416,7 +416,7 @@ static int read_with_retry(int fd, void *buf, size_t n)
 	uint8_t retries = 0;
 
 	do {
-		ret = read(fd, buf, n);
+		ret = ::read(fd, buf, n);
 	} while (ret == -1 && retries++ < 100);
 
 	if (retries != 0) {

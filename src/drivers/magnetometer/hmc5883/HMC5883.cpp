@@ -117,18 +117,13 @@ int HMC5883::set_range(unsigned range)
 	/*
 	 * Send the command to set the range
 	 */
-	int ret = write_reg(ADDR_CONF_B, (_range_bits << 5));
+	int ret = _interface->RegisterWrite(ADDR_CONF_B, (_range_bits << 5));
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
 	}
 
-	uint8_t range_bits_in = 0;
-	ret = read_reg(ADDR_CONF_B, range_bits_in);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-	}
+	uint8_t range_bits_in = _interface->RegisterRead(ADDR_CONF_B);
 
 	return !(range_bits_in == (_range_bits << 5));
 }
@@ -140,19 +135,11 @@ int HMC5883::set_range(unsigned range)
  */
 void HMC5883::check_range()
 {
-	int ret;
-
-	uint8_t range_bits_in = 0;
-	ret = read_reg(ADDR_CONF_B, range_bits_in);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		return;
-	}
+	uint8_t range_bits_in = _interface->RegisterRead(ADDR_CONF_B);
 
 	if (range_bits_in != (_range_bits << 5)) {
 		perf_count(_range_errors);
-		ret = write_reg(ADDR_CONF_B, (_range_bits << 5));
+		int ret = _interface->RegisterWrite(ADDR_CONF_B, (_range_bits << 5));
 
 		if (OK != ret) {
 			perf_count(_comms_errors);
@@ -167,19 +154,11 @@ void HMC5883::check_range()
  */
 void HMC5883::check_conf()
 {
-	int ret;
-
-	uint8_t conf_reg_in = 0;
-	ret = read_reg(ADDR_CONF_A, conf_reg_in);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		return;
-	}
+	uint8_t conf_reg_in = _interface->RegisterRead(ADDR_CONF_A);
 
 	if (conf_reg_in != _conf_reg) {
 		perf_count(_conf_errors);
-		ret = write_reg(ADDR_CONF_A, _conf_reg);
+		int ret = _interface->RegisterWrite(ADDR_CONF_A, _conf_reg);
 
 		if (OK != ret) {
 			perf_count(_comms_errors);
@@ -187,8 +166,7 @@ void HMC5883::check_conf()
 	}
 }
 
-void
-HMC5883::start()
+void HMC5883::start()
 {
 	/* reset the report ring and state machine */
 	_collect_phase = false;
@@ -256,7 +234,7 @@ int HMC5883::measure()
 	/*
 	 * Send the command to begin a measurement.
 	 */
-	int ret = write_reg(ADDR_MODE, MODE_REG_SINGLE_MODE);
+	int ret = _interface->RegisterWrite(ADDR_MODE, MODE_REG_SINGLE_MODE);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -296,7 +274,7 @@ int HMC5883::collect()
 
 	/* get measurements from the device */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	int ret = _interface->read(ADDR_DATA_OUT_X_MSB, (uint8_t *)&hmc_report, sizeof(hmc_report));
+	int ret = _interface->Read(ADDR_DATA_OUT_X_MSB, (uint8_t *)&hmc_report, sizeof(hmc_report));
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
@@ -333,8 +311,7 @@ int HMC5883::collect()
 
 			_temperature_counter = 0;
 
-			ret = _interface->read(ADDR_TEMP_OUT_MSB,
-					       raw_temperature, sizeof(raw_temperature));
+			ret = _interface->Read(ADDR_TEMP_OUT_MSB, raw_temperature, sizeof(raw_temperature));
 
 			if (ret == OK) {
 				int16_t temp16 = (((int16_t)raw_temperature[0]) << 8) +
@@ -427,14 +404,8 @@ out:
  */
 int HMC5883::set_temperature_compensation(unsigned enable)
 {
-	int ret;
 	/* get current config */
-	ret = read_reg(ADDR_CONF_A, _conf_reg);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		return -EIO;
-	}
+	_conf_reg = _interface->RegisterRead(ADDR_CONF_A);
 
 	if (enable != 0) {
 		_conf_reg |= HMC5983_TEMP_SENSOR_ENABLE;
@@ -443,35 +414,16 @@ int HMC5883::set_temperature_compensation(unsigned enable)
 		_conf_reg &= ~HMC5983_TEMP_SENSOR_ENABLE;
 	}
 
-	ret = write_reg(ADDR_CONF_A, _conf_reg);
+	int ret = _interface->RegisterWrite(ADDR_CONF_A, _conf_reg);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
 		return -EIO;
 	}
 
-	uint8_t conf_reg_ret = 0;
-
-	if (read_reg(ADDR_CONF_A, conf_reg_ret) != OK) {
-		perf_count(_comms_errors);
-		return -EIO;
-	}
+	uint8_t conf_reg_ret = _interface->RegisterRead(ADDR_CONF_A);
 
 	return conf_reg_ret == _conf_reg;
-}
-
-int HMC5883::write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf = val;
-	return _interface->write(reg, &buf, 1);
-}
-
-int HMC5883::read_reg(uint8_t reg, uint8_t &val)
-{
-	uint8_t buf = val;
-	int ret = _interface->read(reg, &buf, 1);
-	val = buf;
-	return ret;
 }
 
 void HMC5883::print_status()

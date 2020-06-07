@@ -77,17 +77,11 @@ int QMC5883::init()
  */
 void QMC5883::check_conf()
 {
-	uint8_t conf_reg_in = 0;
-	int ret = read_reg(QMC5883_ADDR_CONTROL_1, conf_reg_in);
-
-	if (OK != ret) {
-		perf_count(_comms_errors);
-		return;
-	}
+	uint8_t conf_reg_in = _interface->RegisterRead(QMC5883_ADDR_CONTROL_1);
 
 	if (conf_reg_in != _conf_reg) {
 		perf_count(_conf_errors);
-		ret = write_reg(QMC5883_ADDR_CONTROL_1, _conf_reg);
+		int ret = _interface->RegisterWrite(QMC5883_ADDR_CONTROL_1, _conf_reg);
 
 		if (OK != ret) {
 			perf_count(_comms_errors);
@@ -107,14 +101,13 @@ void QMC5883::start()
 int QMC5883::reset()
 {
 	/* read 0x00 once */
-	uint8_t data_bits_in = 0;
-	read_reg(QMC5883_ADDR_DATA_OUT_X_LSB, data_bits_in);
+	_interface->RegisterRead(QMC5883_ADDR_DATA_OUT_X_LSB);
 
 	/* software reset */
-	write_reg(QMC5883_ADDR_CONTROL_2, QMC5883_SOFT_RESET);
+	_interface->RegisterWrite(QMC5883_ADDR_CONTROL_2, QMC5883_SOFT_RESET);
 
 	/* set reset period to 0x01 */
-	write_reg(QMC5883_ADDR_SET_RESET, QMC5883_SET_DEFAULT);
+	_interface->RegisterWrite(QMC5883_ADDR_SET_RESET, QMC5883_SET_DEFAULT);
 
 	// use fixed range of 2G
 	_px4_mag.set_scale(1.f / 12000.f); // 12000 LSB/Gauss at +/- 2G range
@@ -124,7 +117,8 @@ int QMC5883::reset()
 		    QMC5883_OUTPUT_DATA_RATE_200 |
 		    QMC5883_OVERSAMPLE_512 |
 		    QMC5883_OUTPUT_RANGE_2G;
-	write_reg(QMC5883_ADDR_CONTROL_1, _conf_reg);
+
+	_interface->RegisterWrite(QMC5883_ADDR_CONTROL_1, _conf_reg);
 
 	return OK;
 }
@@ -201,7 +195,7 @@ int QMC5883::collect()
 
 	/* get measurements from the device */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	ret = _interface->read(QMC5883_ADDR_DATA_OUT_X_LSB, (uint8_t *)&qmc_report, sizeof(qmc_report));
+	ret = _interface->Read(QMC5883_ADDR_DATA_OUT_X_LSB, (uint8_t *)&qmc_report, sizeof(qmc_report));
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
@@ -231,8 +225,7 @@ int QMC5883::collect()
 
 		_temperature_counter = 0;
 
-		ret = _interface->read(QMC5883_ADDR_TEMP_OUT_LSB,
-				       raw_temperature, sizeof(raw_temperature));
+		ret = _interface->Read(QMC5883_ADDR_TEMP_OUT_LSB, raw_temperature, sizeof(raw_temperature));
 
 		if (ret == OK) {
 			int16_t temp16 = (((int16_t)raw_temperature[1]) << 8) +
@@ -283,20 +276,6 @@ int QMC5883::collect()
 
 out:
 	perf_end(_sample_perf);
-	return ret;
-}
-
-int QMC5883::write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf = val;
-	return _interface->write(reg, &buf, 1);
-}
-
-int QMC5883::read_reg(uint8_t reg, uint8_t &val)
-{
-	uint8_t buf = val;
-	int ret = _interface->read(reg, &buf, 1);
-	val = buf;
 	return ret;
 }
 

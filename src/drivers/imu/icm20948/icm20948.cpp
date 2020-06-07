@@ -255,7 +255,7 @@ ICM20948::reset_mpu()
 
 		for (uint8_t i = 0; i < _num_checked_registers; i++) {
 			if ((reg = read_reg(_checked_registers[i])) != _checked_values[i]) {
-				_interface->read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &bankcheck, 1);
+				_interface->Read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &bankcheck, 1);
 
 				write_reg(_checked_registers[i], _checked_values[i]);
 				PX4_ERR("Reg %d is:%d s/b:%d Tries:%d - bank s/b %d, is %d", _checked_registers[i], reg, _checked_values[i], retries,
@@ -447,7 +447,7 @@ ICM20948::select_register_bank(uint8_t bank)
 	 * Making sure the right register bank is selected (even if it should be). Observed some
 	 * unexpected changes to this, don't risk writing to the wrong register bank.
 	 */
-	_interface->read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &buf, 1);
+	_interface->Read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &buf, 1);
 
 	while (bank != buf && retries > 0) {
 		//PX4_WARN("user bank: expected %d got %d",bank,buf);
@@ -460,7 +460,7 @@ ICM20948::select_register_bank(uint8_t bank)
 		retries--;
 		//PX4_WARN("BANK retries: %d", 4-retries);
 
-		_interface->read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &buf, 1);
+		_interface->Read(ICM20948_LOW_SPEED_OP(ICMREG_20948_BANK_SEL), &buf, 1);
 	}
 
 
@@ -481,7 +481,7 @@ ICM20948::read_reg(unsigned reg, uint32_t speed)
 	uint8_t buf{};
 
 	select_register_bank(REG_BANK(reg));
-	_interface->read(ICM20948_SET_SPEED(REG_ADDRESS(reg), speed), &buf, 1);
+	_interface->Read(ICM20948_SET_SPEED(REG_ADDRESS(reg), speed), &buf, 1);
 
 	return buf;
 }
@@ -494,7 +494,7 @@ ICM20948::read_reg_range(unsigned start_reg, uint32_t speed, uint8_t *buf, uint1
 	}
 
 	select_register_bank(REG_BANK(start_reg));
-	return _interface->read(ICM20948_SET_SPEED(REG_ADDRESS(start_reg), speed), buf, count);
+	return _interface->Read(ICM20948_SET_SPEED(REG_ADDRESS(start_reg), speed), buf, count);
 }
 
 uint16_t
@@ -504,7 +504,7 @@ ICM20948::read_reg16(unsigned reg)
 
 	// general register transfer at low clock speed
 	select_register_bank(REG_BANK(reg));
-	_interface->read(ICM20948_LOW_SPEED_OP(REG_ADDRESS(reg)), &buf, arraySize(buf));
+	_interface->Read(ICM20948_LOW_SPEED_OP(REG_ADDRESS(reg)), &buf, arraySize(buf));
 
 	return (uint16_t)(buf[0] << 8) | buf[1];
 }

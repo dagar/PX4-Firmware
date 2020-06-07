@@ -148,7 +148,7 @@ bool MS5611::ReadProm()
 	uint8_t buffer[16] {};
 
 	for (int i = 0; i < 16; i = i + 2) {
-		_interface->read(ADDR_PROM_SETUP + i, &buffer[i], 2);
+		_interface->Read(ADDR_PROM_SETUP + i, &buffer[i], 2);
 	}
 
 	_prom.factory_setup = combine(buffer[0], buffer[1]);
@@ -196,7 +196,7 @@ MS5611::RunImpl()
 			}
 
 			/* issue a reset command to the sensor */
-			_interface->write(ADDR_RESET_CMD);
+			_interface->Write(ADDR_RESET_CMD);
 
 			/* reset the collection state machine and try again - we need
 			 * to wait 2.8 ms after issuing the sensor reset command
@@ -215,7 +215,7 @@ MS5611::RunImpl()
 
 	if (ret != OK) {
 		/* issue a reset command to the sensor */
-		_interface->write(ADDR_RESET_CMD);
+		_interface->Write(ADDR_RESET_CMD);
 
 		/* reset the collection state machine and try again */
 		start();
@@ -242,7 +242,7 @@ MS5611::measure()
 	/*
 	 * Send the command to begin measuring.
 	 */
-	int ret = _interface->write(addr);
+	int ret = _interface->Write(addr);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -263,7 +263,7 @@ int MS5611::collect()
 
 	/* read the most recent measurement - read offset/size are hardcoded in the interface */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	int ret = _interface->read(0, (void *)&raw, 0);
+	int ret = _interface->Read(0, (uint8_t *)&raw, 3);
 
 	if (ret < 0) {
 		perf_count(_comms_errors);

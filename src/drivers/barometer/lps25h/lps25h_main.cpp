@@ -35,6 +35,9 @@
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 
+#include <drivers/device/i2c.h>
+#include <drivers/device/spi.h>
+
 #include "LPS25H.hpp"
 
 void
@@ -53,10 +56,11 @@ I2CSPIDriverBase *LPS25H::instantiate(const BusCLIArguments &cli, const BusInsta
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = LPS25H_I2C_interface(iterator.bus(), cli.bus_frequency);
+		interface = new device::I2C(DRV_BARO_DEVTYPE_LPS25H, MODULE_NAME, iterator.bus(), cli.bus_frequency, cli.i2c_address);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = LPS25H_SPI_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
+		interface = new device::SPI(DRV_BARO_DEVTYPE_LPS25H, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						    cli.bus_frequency);
 	}
 
 	if (interface == nullptr) {

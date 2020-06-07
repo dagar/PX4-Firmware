@@ -89,13 +89,13 @@ LIS2MDL::measure()
 	perf_begin(_sample_perf);
 
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	int ret = _interface->read(ADDR_STATUS_REG, (uint8_t *)&lis_report, sizeof(lis_report));
+	int ret = _interface->Read(ADDR_STATUS_REG, (uint8_t *)&lis_report, sizeof(lis_report));
 
 	/**
 	 * Silicon Bug: the X axis will be read instead of the temperature registers if you do a sequential read through XYZ.
 	 * The temperature registers must be addressed directly.
 	 */
-	ret = _interface->read(ADDR_OUT_T_L, (uint8_t *)&buf_rx, sizeof(buf_rx));
+	ret = _interface->Read(ADDR_OUT_T_L, (uint8_t *)&buf_rx, sizeof(buf_rx));
 
 	if (ret != OK) {
 		perf_end(_sample_perf);
@@ -141,13 +141,11 @@ LIS2MDL::RunImpl()
 	ScheduleDelayed(LIS2MDL_CONVERSION_INTERVAL);
 }
 
-int
-LIS2MDL::init()
+int LIS2MDL::init()
 {
-
-	int ret = write_reg(ADDR_CFG_REG_A, CFG_REG_A_ODR | CFG_REG_A_MD | CFG_REG_A_TEMP_COMP_EN);
-	ret = write_reg(ADDR_CFG_REG_B, 0);
-	ret = write_reg(ADDR_CFG_REG_C, CFG_REG_C_BDU);
+	int ret = _interface->RegisterWrite(ADDR_CFG_REG_A, CFG_REG_A_ODR | CFG_REG_A_MD | CFG_REG_A_TEMP_COMP_EN);
+	ret = _interface->RegisterWrite(ADDR_CFG_REG_B, 0);
+	ret = _interface->RegisterWrite(ADDR_CFG_REG_C, CFG_REG_C_BDU);
 
 	_measure_interval = LIS2MDL_CONVERSION_INTERVAL;
 	start();
@@ -155,8 +153,7 @@ LIS2MDL::init()
 	return ret;
 }
 
-void
-LIS2MDL::print_status()
+void LIS2MDL::print_status()
 {
 	I2CSPIDriverBase::print_status();
 	perf_print_counter(_sample_perf);
@@ -165,25 +162,8 @@ LIS2MDL::print_status()
 	_px4_mag.print_status();
 }
 
-void
-LIS2MDL::start()
+void LIS2MDL::start()
 {
 	/* schedule a cycle to start things */
 	ScheduleNow();
-}
-
-int
-LIS2MDL::read_reg(uint8_t reg, uint8_t &val)
-{
-	uint8_t buf = val;
-	int ret = _interface->read(reg, &buf, 1);
-	val = buf;
-	return ret;
-}
-
-int
-LIS2MDL::write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf = val;
-	return _interface->write(reg, &buf, 1);
 }

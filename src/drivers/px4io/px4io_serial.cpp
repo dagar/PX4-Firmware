@@ -104,8 +104,7 @@ PX4IO_serial::init(IOPacket *io_buffer)
 	return 0;
 }
 
-int
-PX4IO_serial::write(unsigned address, void *data, unsigned count)
+int PX4IO_serial::Write(uint8_t address, uint8_t *data, uint8_t count)
 {
 	uint8_t page = address >> 8;
 	uint8_t offset = address & 0xff;
@@ -161,8 +160,7 @@ PX4IO_serial::write(unsigned address, void *data, unsigned count)
 	return result;
 }
 
-int
-PX4IO_serial::read(unsigned address, void *data, unsigned count)
+int PX4IO_serial::Read(uint8_t address, uint8_t *data, uint8_t count)
 {
 	uint8_t page = address >> 8;
 	uint8_t offset = address & 0xff;

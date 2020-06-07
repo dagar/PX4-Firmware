@@ -92,7 +92,7 @@ protected:
 	 * @param count		The number of items to read.
 	 * @return		The number of items read on success, negative errno otherwise.
 	 */
-	int read(unsigned address, void *data = nullptr, unsigned count = 0) override;
+	int Read(uint8_t address, uint8_t *data = nullptr, uint8_t length = 0) override;
 
 	/**
 	 * Write directly to the device.
@@ -104,7 +104,7 @@ protected:
 	 * @param count		The number of items to write.
 	 * @return		The number of items written on success, negative errno otherwise.
 	 */
-	int write(unsigned address, void *data = nullptr, unsigned count = 0) override;
+	int Write(uint8_t address, uint8_t *data = nullptr, uint8_t count = 0) override;
 
 	/**
 	 * Read a register from the device.

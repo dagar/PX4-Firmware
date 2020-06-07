@@ -82,7 +82,7 @@ void LPS22HB::start()
 
 int LPS22HB::reset()
 {
-	return write_reg(CTRL_REG2, BOOT | SWRESET);
+	return _interface->RegisterWrite(CTRL_REG2, BOOT | SWRESET);
 }
 
 void LPS22HB::RunImpl()
@@ -117,7 +117,7 @@ void LPS22HB::RunImpl()
 int LPS22HB::measure()
 {
 	// Send the command to begin a 16-bit measurement.
-	int ret = write_reg(CTRL_REG2, IF_ADD_INC | ONE_SHOT);
+	int ret = _interface->RegisterWrite(CTRL_REG2, IF_ADD_INC | ONE_SHOT);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -142,7 +142,7 @@ int LPS22HB::collect()
 
 	/* this should be fairly close to the end of the measurement, so the best approximation of the time */
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	int ret = _interface->read(STATUS, (uint8_t *)&report, sizeof(report));
+	int ret = _interface->Read(STATUS, (uint8_t *)&report, sizeof(report));
 
 	if (ret != OK) {
 		perf_count(_comms_errors);
@@ -163,20 +163,6 @@ int LPS22HB::collect()
 
 	perf_end(_sample_perf);
 	return PX4_OK;
-}
-
-int LPS22HB::write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf = val;
-	return _interface->write(reg, &buf, 1);
-}
-
-int LPS22HB::read_reg(uint8_t reg, uint8_t &val)
-{
-	uint8_t buf = val;
-	int ret = _interface->read(reg, &buf, 1);
-	val = buf;
-	return ret;
 }
 
 void LPS22HB::print_status()

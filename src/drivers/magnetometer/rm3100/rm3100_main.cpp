@@ -47,10 +47,11 @@ I2CSPIDriverBase *RM3100::instantiate(const BusCLIArguments &cli, const BusInsta
 	device::Device *interface = nullptr;
 
 	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = RM3100_I2C_interface(iterator.bus(), cli.bus_frequency);
+		interface = new device::I2C(DRV_MAG_DEVTYPE_RM3100, MODULE_NAME, iterator.bus(), cli.bus_frequency, cli.i2c_address);
 
 	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = RM3100_SPI_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
+		interface = new device::SPI(DRV_MAG_DEVTYPE_RM3100, MODULE_NAME, iterator.bus(), iterator.devid(), cli.spi_mode,
+						    cli.bus_frequency);
 	}
 
 	if (interface == nullptr) {

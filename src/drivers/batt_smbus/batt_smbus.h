@@ -220,7 +220,7 @@ private:
 
 	SMBus *_interface;
 
-	perf_counter_t _cycle{perf_alloc(PC_ELAPSED, "batt_smbus_cycle")};
+	perf_counter_t _cycle{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
 	float _cell_voltages[4] {};
 

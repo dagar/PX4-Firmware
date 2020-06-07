@@ -199,19 +199,15 @@ public:
 					     int runtime_instance);
 	static void print_usage();
 
-	int             init() override;
+	int init() override;
 
-	void            print_status() override;
+	void print_status() override;
 
-	void        print_registers();
-
-	void	RunImpl();
+	void RunImpl();
 
 	void custom_method(const BusCLIArguments &cli) override;
 
 private:
-	int       probe() override;
-
 	PX4Magnetometer _px4_mag;
 
 	/* altitude conversion calibration */
@@ -261,16 +257,6 @@ private:
 	int     collect(); //get results and publish
 
 	/**
-	 * Read the specified number of bytes from BMM150.
-	 *
-	 * @param reg       The register to read.
-	 * @param data      Pointer to buffer for bytes read.
-	 * @param len       Number of bytes to read
-	 * @return          OK if the transfer was successful, -errno otherwise.
-	 */
-	int             get_data(uint8_t reg, uint8_t *data, unsigned len);
-
-	/**
 	 * Resets the chip.
 	 */
 	int             reset();
@@ -281,34 +267,6 @@ private:
 	 * @return 0 on success, 1 on failure
 	 */
 	int             self_test();
-
-	/**
-	 * Read a register from the BMM150
-	 *
-	 * @param reg     The register to read.
-	 * @return        The value that was read.
-	 */
-	uint8_t         read_reg(uint8_t reg);
-
-	/**
-	 * Write a register in the BMM150
-	 *
-	 * @param reg       The register to write.
-	 * @param value     The new value to write.
-	 * @return          OK if the transfer was successful, -errno otherwise.
-	 */
-	int             write_reg(uint8_t reg, uint8_t value);
-
-	/**
-	 * Modify a register in the BMM150
-	 *
-	 * Bits are cleared before bits are set.
-	 *
-	 * @param reg       The register to modify.
-	 * @param clearbits Bits in the register to clear.
-	 * @param setbits   Bits in the register to set.
-	 */
-	void            modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits);
 
 	/*
 	  set the power mode of BMM150.
