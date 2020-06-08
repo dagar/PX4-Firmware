@@ -117,6 +117,8 @@ void LoggedTopics::add_default_topics()
 	add_topic_multi("vehicle_imu", 500);
 	add_topic_multi("vehicle_imu_status", 1000);
 
+	add_topic_multi("estimator_mag_cal");
+
 #ifdef CONFIG_ARCH_BOARD_PX4_SITL
 	add_topic("actuator_controls_virtual_fw");
 	add_topic("actuator_controls_virtual_mc");
