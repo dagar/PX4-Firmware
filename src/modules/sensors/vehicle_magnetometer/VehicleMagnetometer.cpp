@@ -37,6 +37,14 @@
 #include <lib/ecl/geo/geo.h>
 #include <drivers/drv_mag.h>
 
+#if !defined(CONSTRAINED_FLASH)
+// status debugging
+#include <lib/ecl/geo_lookup/geo_mag_declination.h>
+#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_gps_position.h>
+#endif // !CONSTRAINED_FLASH
+
 using namespace matrix;
 using namespace time_literals;
 using math::radians;
@@ -436,4 +444,90 @@ void VehicleMagnetometer::PrintStatus()
 	}
 
 	_voter.print();
+
+
+
+#if !defined(CONSTRAINED_FLASH)
+	uORB::Subscription vehicle_gps_position_sub {ORB_ID(vehicle_gps_position)};
+
+	if (vehicle_gps_position_sub.advertised()) {
+		vehicle_gps_position_s gps;
+
+		if (vehicle_gps_position_sub.copy(&gps)) {
+			if ((hrt_elapsed_time(&gps.timestamp) < 1_s) && (gps.eph < 1000)) {
+				const double lat = gps.lat / 1.e7;
+				const double lon = gps.lon / 1.e7;
+
+				// set the magnetic field data returned by the geo library using the current GPS position
+				const float mag_declination_gps = math::radians(get_mag_declination(lat, lon));
+				const float mag_inclination_gps = math::radians(get_mag_inclination(lat, lon));
+
+				const float mag_strength_gps = 0.01f * get_mag_strength(lat, lon);
+
+				const Vector3f mag_earth_pred = Dcmf(Eulerf(0, -mag_inclination_gps, mag_declination_gps)) * Vector3f(mag_strength_gps,
+								0, 0);
+
+
+				uORB::Subscription sensor_combined_sub{ORB_ID(sensor_combined)};
+				sensor_combined_s imu{};
+				sensor_combined_sub.copy(&imu);
+				const Vector3f accel{imu.accelerometer_m_s2};
+
+				uORB::Subscription vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
+				vehicle_attitude_s attitude{};
+				vehicle_attitude_sub.copy(&attitude);
+
+				if (attitude.timestamp > 0) {
+					Vector3f expected_field = Dcmf{Quatf{attitude.q}} .transpose() * mag_earth_pred;
+
+					PX4_INFO(" X    Y    Z");
+					PX4_INFO("[%.3f, %.3f, %.3f] Expected WMM ", (double)expected_field(0), (double)expected_field(1),
+						 (double)expected_field(2));
+
+					for (int mag_instance = 0; mag_instance < MAX_SENSOR_COUNT; mag_instance++) {
+						sensor_mag_s mag{};
+
+						if (_sensor_sub[mag_instance].advertised() && _sensor_sub[mag_instance].copy(&mag)) {
+							//PX4_INFO("[%.3f, %.3f, %.3f] Magnetometer %d", (double)mag.x, (double)mag.y, (double)mag.z, mag_instance);
+
+							const Vector3f m{mag.x, mag.y, mag.z};
+
+							// Rotation matrix can be easily constructed from acceleration and mag field vectors
+							// 'k' is Earth Z axis (Down) unit vector in body frame
+							Vector3f k = -accel;
+							k.normalize();
+
+							// 'i' is Earth X axis (North) unit vector in body frame, orthogonal with 'k'
+							Vector3f i = (m - k * (m * k));
+							i.normalize();
+
+							// 'j' is Earth Y axis (East) unit vector in body frame, orthogonal with 'k' and 'i'
+							Vector3f j = k % i;
+
+							// Fill rotation matrix
+							Dcmf R;
+							R.row(0) = i;
+							R.row(1) = j;
+							R.row(2) = k;
+
+							// Convert to quaternion
+							Quatf q = R;
+
+							// Compensate for magnetic declination
+							Quatf decl_rotation = Eulerf(0.0f, 0.0f, mag_declination_gps);
+							q = q * decl_rotation;
+
+							q.normalize();
+
+							const Eulerf euler{q};
+							PX4_INFO("Roll: %3.1fº, Pitch: %3.1fº, Yaw: %3.1fº] Attitude %d", (double)math::degrees(euler(0)),
+								 (double)math::degrees(euler(1)), (double)math::degrees(euler(2)), mag_instance);
+						}
+					}
+				}
+			}
+		}
+	}
+
+#endif // !CONSTRAINED_FLASH
 }
