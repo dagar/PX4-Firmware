@@ -34,8 +34,10 @@
 px4_add_module(
 	MODULE drivers__tone_alarm
 	MAIN tone_alarm
+	COMPILE_OPTIONS
 	SRCS
 		ToneAlarm.cpp
+		ToneAlarm.h
 	DEPENDS
 		circuit_breaker
 		arch_tone_alarm

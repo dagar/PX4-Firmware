@@ -299,7 +299,7 @@ void init()
 	rCR1 = GTIM_CR1_CEN;	// Ensure the timer is running.
 }
 
-void start_note(unsigned frequency)
+hrt_abstime start_note(unsigned frequency)
 {
 	// Calculate the signal switching period.
 	// (Signal switching period is one half of the frequency period).
@@ -315,13 +315,20 @@ void start_note(unsigned frequency)
 	// Calculate the period for the selected prescaler value.
 	unsigned int period = (divisor / (prescale + 1)) - 1;
 
+	auto flags = enter_critical_section();
+
 	rPSC = prescale;	// Load new prescaler.
 	rARR = period;		// Load new toggle period.
 	rEGR = GTIM_EGR_UG;	// Force a reload of the period.
 	rCCER |= TONE_CCER; 	// Enable the output.
 
 	// Configure the GPIO to enable timer output.
+	hrt_abstime time_started = hrt_absolute_time();
 	px4_arch_configgpio(GPIO_TONE_ALARM);
+
+	leave_critical_section(flags);
+
+	return time_started;
 }
 
 void stop_note()

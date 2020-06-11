@@ -82,7 +82,7 @@
 
 #define BLINK_MSG_TIME	700000	// 3 fast blinks (in us)
 
-bool is_multirotor(const struct vehicle_status_s *current_status)
+bool is_multirotor(const vehicle_status_s *current_status)
 {
 	return ((current_status->system_type == VEHICLE_TYPE_QUADROTOR) ||
 		(current_status->system_type == VEHICLE_TYPE_HEXAROTOR) ||
@@ -90,13 +90,13 @@ bool is_multirotor(const struct vehicle_status_s *current_status)
 		(current_status->system_type == VEHICLE_TYPE_TRICOPTER));
 }
 
-bool is_rotary_wing(const struct vehicle_status_s *current_status)
+bool is_rotary_wing(const vehicle_status_s *current_status)
 {
 	return is_multirotor(current_status) || (current_status->system_type == VEHICLE_TYPE_HELICOPTER)
 	       || (current_status->system_type == VEHICLE_TYPE_COAXIAL);
 }
 
-bool is_vtol(const struct vehicle_status_s *current_status)
+bool is_vtol(const vehicle_status_s *current_status)
 {
 	return (current_status->system_type == VEHICLE_TYPE_VTOL_DUOROTOR ||
 		current_status->system_type == VEHICLE_TYPE_VTOL_QUADROTOR ||
@@ -125,8 +125,8 @@ bool is_ground_rover(const struct vehicle_status_s *current_status)
 
 static hrt_abstime blink_msg_end = 0; // end time for currently blinking LED message, 0 if no blink message
 static hrt_abstime tune_end = 0; // end time of currently played tune, 0 for repeating tunes or silence
-static int tune_current = TONE_STOP_TUNE; // currently playing tune, can be interrupted after tune_end
-static unsigned int tune_durations[TONE_NUMBER_OF_TUNES] {};
+static uint8_t tune_current = tune_control_s::TUNE_ID_STOP; // currently playing tune, can be interrupted after tune_end
+static unsigned int tune_durations[tune_control_s::NUMBER_OF_TUNES] {};
 
 static int fd_leds{-1};
 
@@ -137,15 +137,18 @@ static orb_advert_t tune_control_pub = nullptr;
 
 int buzzer_init()
 {
-	tune_durations[TONE_NOTIFY_POSITIVE_TUNE] = 800000;
-	tune_durations[TONE_NOTIFY_NEGATIVE_TUNE] = 900000;
-	tune_durations[TONE_NOTIFY_NEUTRAL_TUNE] = 500000;
-	tune_durations[TONE_ARMING_WARNING_TUNE] = 3000000;
-	tune_durations[TONE_HOME_SET] = 800000;
-	tune_durations[TONE_BATTERY_WARNING_FAST_TUNE] = 800000;
-	tune_durations[TONE_BATTERY_WARNING_SLOW_TUNE] = 800000;
-	tune_durations[TONE_SINGLE_BEEP_TUNE] = 300000;
+	tune_durations[tune_control_s::TUNE_ID_NOTIFY_POSITIVE] = 800000;
+	tune_durations[tune_control_s::TUNE_ID_NOTIFY_NEGATIVE] = 900000;
+	tune_durations[tune_control_s::TUNE_ID_NOTIFY_NEUTRAL] = 500000;
+	tune_durations[tune_control_s::TUNE_ID_ARMING_WARNING] = 3000000;
+	tune_durations[tune_control_s::TUNE_ID_HOME_SET] = 800000;
+	tune_durations[tune_control_s::TUNE_ID_BATTERY_WARNING_FAST] = 800000;
+	tune_durations[tune_control_s::TUNE_ID_BATTERY_WARNING_SLOW] = 800000;
+	tune_durations[tune_control_s::TUNE_ID_SINGLE_BEEP] = 300000;
+
+	//tune_control.timestamp = hrt_absolute_time();
 	tune_control_pub = orb_advertise_queue(ORB_ID(tune_control), &tune_control, tune_control_s::ORB_QUEUE_LENGTH);
+
 	return PX4_OK;
 }
 
@@ -158,7 +161,7 @@ void set_tune_override(int tune)
 {
 	tune_control.tune_id = tune;
 	tune_control.volume = tune_control_s::VOLUME_LEVEL_DEFAULT;
-	tune_control.tune_override = 1;
+	tune_control.tune_override = true;
 	tune_control.timestamp = hrt_absolute_time();
 	orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
 }
@@ -173,7 +176,7 @@ void set_tune(int tune)
 		if (tune != tune_current || new_tune_duration != 0) {
 			tune_control.tune_id = tune;
 			tune_control.volume = tune_control_s::VOLUME_LEVEL_DEFAULT;
-			tune_control.tune_override = 0;
+			tune_control.tune_override = false;
 			tune_control.timestamp = hrt_absolute_time();
 			orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
 		}
@@ -195,7 +198,7 @@ void tune_home_set(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_GREEN, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		set_tune(TONE_HOME_SET);
+		set_tune(tune_control_s::TUNE_ID_HOME_SET);
 	}
 }
 
@@ -205,7 +208,7 @@ void tune_mission_ok(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_GREEN, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		set_tune(TONE_NOTIFY_NEUTRAL_TUNE);
+		set_tune(tune_control_s::TUNE_ID_NOTIFY_NEUTRAL);
 	}
 }
 
@@ -215,7 +218,7 @@ void tune_mission_fail(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_GREEN, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		set_tune(TONE_NOTIFY_NEGATIVE_TUNE);
+		set_tune(tune_control_s::TUNE_ID_NOTIFY_NEGATIVE);
 	}
 }
 
@@ -228,7 +231,7 @@ void tune_positive(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_GREEN, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		set_tune(TONE_NOTIFY_POSITIVE_TUNE);
+		set_tune(tune_control_s::TUNE_ID_NOTIFY_POSITIVE);
 	}
 }
 
@@ -241,7 +244,7 @@ void tune_neutral(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_WHITE, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		set_tune(TONE_NOTIFY_NEUTRAL_TUNE);
+		set_tune(tune_control_s::TUNE_ID_NOTIFY_NEUTRAL);
 	}
 }
 
@@ -254,7 +257,7 @@ void tune_negative(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_RED, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		set_tune(TONE_NOTIFY_NEGATIVE_TUNE);
+		set_tune(tune_control_s::TUNE_ID_NOTIFY_NEGATIVE);
 	}
 }
 
@@ -264,7 +267,7 @@ void tune_failsafe(bool use_buzzer)
 	rgbled_set_color_and_mode(led_control_s::COLOR_PURPLE, led_control_s::MODE_BLINK_FAST);
 
 	if (use_buzzer) {
-		set_tune(TONE_BATTERY_WARNING_FAST_TUNE);
+		set_tune(tune_control_s::TUNE_ID_BATTERY_WARNING_FAST);
 	}
 }
 
