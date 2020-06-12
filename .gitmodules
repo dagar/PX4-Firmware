@@ -48,3 +48,6 @@
 [submodule "Tools/flightgear_bridge"]
 	path = Tools/flightgear_bridge
 	url = https://github.com/PX4/PX4-FlightGear-Bridge.git
+[submodule "src/modules/gyro_fft/CMSIS_5"]
+	path = src/modules/gyro_fft/CMSIS_5
+	url = git@github.com:ARM-software/CMSIS_5.git

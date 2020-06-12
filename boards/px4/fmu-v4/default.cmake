@@ -25,14 +25,14 @@ px4_add_board(
 		gps
 		heater
 		#imu # all available imu drivers
-		imu/adis16448
-		imu/adis16477
-		imu/adis16497
-		imu/invensense/icm20602
-		imu/invensense/icm20608g
-		imu/invensense/icm40609d
-		imu/invensense/mpu6500
-		imu/invensense/mpu9250
+		#imu/adis16448
+		#imu/adis16477
+		#imu/adis16497
+		#imu/invensense/icm20602
+		#imu/invensense/icm20608g
+		#imu/invensense/icm40609d
+		#imu/invensense/mpu6500
+		#imu/invensense/mpu9250
 		irlock
 		lights/blinkm
 		lights/rgbled
@@ -66,6 +66,7 @@ px4_add_board(
 		events
 		fw_att_control
 		fw_pos_control_l1
+		gyro_fft
 		land_detector
 		landing_target_estimator
 		load_mon
@@ -114,6 +115,7 @@ px4_add_board(
 		ver
 		work_queue
 	EXAMPLES
+		fake_gyro
 		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		hello
 		hwtest # Hardware test

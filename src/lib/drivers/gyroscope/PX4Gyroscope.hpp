@@ -84,7 +84,7 @@ public:
 
 private:
 	uORB::PublicationQueuedMulti<sensor_gyro_s>      _sensor_pub;
-	uORB::PublicationMulti<sensor_gyro_fifo_s>       _sensor_fifo_pub;
+	uORB::PublicationQueuedMulti<sensor_gyro_fifo_s> _sensor_fifo_pub;
 
 	matrix::Vector3f	_calibration_offset{0.f, 0.f, 0.f};
 

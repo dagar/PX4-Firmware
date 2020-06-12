@@ -8,8 +8,9 @@ float32 scale
 
 uint8 samples             # number of valid samples
 
-int16[32] x               # angular velocity in the NED X board axis in rad/s
-int16[32] y               # angular velocity in the NED Y board axis in rad/s
-int16[32] z               # angular velocity in the NED Z board axis in rad/s
+int16[128] x               # angular velocity in the NED X board axis in rad/s
+int16[128] y               # angular velocity in the NED Y board axis in rad/s
+int16[128] z               # angular velocity in the NED Z board axis in rad/s
 
-uint8 ORB_QUEUE_LENGTH = 2
+
+uint8[3] max_index
