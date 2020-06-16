@@ -35,7 +35,6 @@
 
 #include <px4_platform_common/log.h>
 #include <lib/ecl/geo/geo.h>
-#include <drivers/drv_mag.h>
 
 #if !defined(CONSTRAINED_FLASH)
 // status debugging
@@ -113,43 +112,39 @@ void VehicleMagnetometer::ParametersUpdate(bool force)
 			int32_t device_id = 0;
 			param_get(param_find(str), &device_id);
 
+			// TODO: WRONG WRONG WONG
+			int32_t driver_device_id = 0; // TODO: WRONG WRONG WONG
+			// TODO: WRONG WRONG WONG
+
 			// apply calibration
 			for (int dev_index = 0; dev_index < MAX_SENSOR_COUNT; dev_index++) {
 
-				sprintf(str, "%s%u", MAG_BASE_DEVICE_PATH, dev_index);
-
-				int fd = px4_open(str, O_RDWR);
-
-				const uint32_t driver_device_id = (uint32_t)px4_ioctl(fd, DEVIOCGDEVICEID, 0);
-
-				if ((device_id > 0) && ((uint32_t)device_id == driver_device_id)) {
-					mag_calibration_s mscale{};
+				if ((device_id > 0) && (device_id == driver_device_id)) {
 
 					sprintf(str, "CAL_MAG%u_XOFF", dev_index);
-					param_get(param_find(str), &mscale.x_offset);
+					float x_offset = 0.f;
+					param_get(param_find(str), &x_offset);
 
 					sprintf(str, "CAL_MAG%u_YOFF", dev_index);
-					param_get(param_find(str), &mscale.y_offset);
+					float y_offset = 0.f;
+					param_get(param_find(str), &y_offset);
 
 					sprintf(str, "CAL_MAG%u_ZOFF", dev_index);
-					param_get(param_find(str), &mscale.z_offset);
+					float z_offset = 0.f;
+					param_get(param_find(str), &z_offset);
 
 					sprintf(str, "CAL_MAG%u_XSCALE", dev_index);
-					param_get(param_find(str), &mscale.x_scale);
+					float x_scale = 0.f;
+					param_get(param_find(str), &x_scale);
 
 					sprintf(str, "CAL_MAG%u_YSCALE", dev_index);
-					param_get(param_find(str), &mscale.y_scale);
+					float y_scale = 0.f;
+					param_get(param_find(str), &y_scale);
 
 					sprintf(str, "CAL_MAG%u_ZSCALE", dev_index);
-					param_get(param_find(str), &mscale.z_scale);
-
-					// apply scaling and offsets
-					if (px4_ioctl(fd, MAGIOCSSCALE, (long unsigned int)&mscale) != PX4_OK) {
-						PX4_ERR("FAILED APPLYING mag CAL %u", dev_index);
-					}
+					float z_scale = 0.f;
+					param_get(param_find(str), &z_scale);
 				}
-
-				px4_close(fd);
 			}
 
 			// find corresponding enabled and rotation parameters
