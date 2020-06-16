@@ -3316,7 +3316,7 @@ protected:
 				uint8_t mavlink_state;
 				uint8_t mavlink_base_mode;
 				uint32_t mavlink_custom_mode;
-				mavlink_hil_actuator_controls_t msg = {};
+				mavlink_hil_actuator_controls_t msg{};
 
 				get_mavlink_mode_state(&status, &mavlink_state, &mavlink_base_mode, &mavlink_custom_mode);
 
@@ -3403,6 +3403,9 @@ protected:
 				msg.time_usec = hrt_absolute_time();
 				msg.mode = mavlink_base_mode;
 				msg.flags = 0;
+#if defined(ENABLE_LOCKSTEP_SCHEDULER)
+				msg.flags |= 1;
+#endif // ENABLE_LOCKSTEP_SCHEDULER
 
 				mavlink_msg_hil_actuator_controls_send_struct(_mavlink->get_channel(), &msg);
 

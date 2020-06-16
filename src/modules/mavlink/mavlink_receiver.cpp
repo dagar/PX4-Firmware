@@ -2123,6 +2123,28 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 	mavlink_hil_sensor_t imu;
 	mavlink_msg_hil_sensor_decode(msg, &imu);
 
+
+
+#if defined(ENABLE_LOCKSTEP_SCHEDULER)
+	struct timespec ts {};
+	abstime_to_ts(&ts, imu.time_usec);
+	px4_clock_settime(CLOCK_MONOTONIC, &ts);
+
+#if 0
+	hrt_abstime now_us = hrt_absolute_time();
+	// This is just for to debug missing HIL_SENSOR messages.
+	static hrt_abstime last_time = 0;
+	hrt_abstime diff = now_us - last_time;
+	float step = diff / 4000.0f;
+
+	if (step > 1.1f || step < 0.9f) {
+		PX4_INFO("HIL_SENSOR: imu time_usec: %lu, time_usec: %lu, diff: %lu, step: %.2f", imu.time_usec, now_us, diff, step);
+	}
+
+	last_time = now_us;
+#endif
+#endif // ENABLE_LOCKSTEP_SCHEDULER
+
 	const uint64_t timestamp = hrt_absolute_time();
 
 	/* airspeed */
@@ -2814,6 +2836,17 @@ MavlinkReceiver::Run()
 					usleep(100000);
 				}
 			}
+
+#if defined(MAVLINK_TCP)
+
+			else if (_mavlink->get_protocol() == Protocol::TCP) {
+				if (fds[0].revents & POLLIN) {
+					nread = recvfrom(_mavlink->get_socket_fd(), buf, sizeof(buf), 0, (struct sockaddr *)&srcaddr, &addrlen);
+				}
+			}
+
+#endif // MAVLINK_TCP
+
 
 #if defined(MAVLINK_UDP)
 
