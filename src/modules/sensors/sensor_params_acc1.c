@@ -95,3 +95,11 @@ PARAM_DEFINE_FLOAT(CAL_ACC1_YSCALE, 1.0f);
  * @group Sensor Calibration
  */
 PARAM_DEFINE_FLOAT(CAL_ACC1_ZSCALE, 1.0f);
+
+/**
+ * Accelerometer calibration temperature
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_FLOAT(CAL_ACC1_TEMPC, NAN);

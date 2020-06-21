@@ -71,3 +71,11 @@ PARAM_DEFINE_FLOAT(CAL_GYRO2_YOFF, 0.0f);
  * @group Sensor Calibration
  */
 PARAM_DEFINE_FLOAT(CAL_GYRO2_ZOFF, 0.0f);
+
+/**
+ * Gyro calibration temperature
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_FLOAT(CAL_GYRO2_TEMPC, NAN);

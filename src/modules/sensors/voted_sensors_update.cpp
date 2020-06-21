@@ -243,6 +243,9 @@ void VotedSensorsUpdate::parametersUpdate()
 				(void)sprintf(str, "CAL_MAG%u_ZSCALE", i);
 				failed = failed || (PX4_OK != param_get(param_find(str), &mscale.z_scale));
 
+				(void)sprintf(str, "CAL_MAG%u_TEMPC", i);
+				param_find(str); // mark active, but not actively used
+
 				(void)sprintf(str, "CAL_MAG%u_ROT", i);
 				int32_t mag_rot = 0;
 				param_get(param_find(str), &mag_rot);

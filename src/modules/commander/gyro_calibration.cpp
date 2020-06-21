@@ -67,6 +67,7 @@ struct gyro_worker_data_t {
 	orb_advert_t *mavlink_log_pub{nullptr};
 	int32_t device_id[MAX_GYROS] {};
 	Vector3f offset[MAX_GYROS] {};
+	float temperature[MAX_GYROS] {NAN, NAN, NAN};
 
 	static constexpr int last_num_samples = 9; ///< number of samples for the motion detection median filter
 	float last_sample_0_x[last_num_samples];
@@ -148,6 +149,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, gyro_worker_data
 					}
 
 					worker_data.offset[gyro_index] += Vector3f{gyro_report.x, gyro_report.y, gyro_report.z} - offset;
+					worker_data.temperature[gyro_index] += gyro_report.temperature;
 					calibration_counter[gyro_index]++;
 
 					if (gyro_index == 0) {
@@ -190,6 +192,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, gyro_worker_data
 		}
 
 		worker_data.offset[s] /= calibration_counter[s];
+		worker_data.temperature[s] /= calibration_counter[s];
 	}
 
 	return calibrate_return_ok;
@@ -314,6 +317,10 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 				sprintf(str, "CAL_GYRO%u_ZOFF", uorb_index);
 				failed |= (PX4_OK != param_set_no_notification(param_find(str), &z_offset));
 
+				float temperature = worker_data.temperature[uorb_index];
+				sprintf(str, "CAL_GYRO%u_TEMPC", uorb_index);
+				failed |= (PX4_OK != param_set_no_notification(param_find(str), &temperature));
+
 				int32_t device_id = worker_data.device_id[uorb_index];
 				sprintf(str, "CAL_GYRO%u_ID", uorb_index);
 				failed |= (PX4_OK != param_set_no_notification(param_find(str), &device_id));
@@ -325,6 +332,9 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 				sprintf(str, "CAL_GYRO%u_YOFF", uorb_index);
 				param_reset(param_find(str));
 				sprintf(str, "CAL_GYRO%u_ZOFF", uorb_index);
+				param_reset(param_find(str));
+
+				sprintf(str, "CAL_GYRO%u_TEMPC", uorb_index);
 				param_reset(param_find(str));
 
 				// reset unused calibration device ID

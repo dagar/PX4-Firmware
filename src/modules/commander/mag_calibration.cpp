@@ -90,6 +90,7 @@ typedef struct  {
 	float		*x[max_mags];
 	float		*y[max_mags];
 	float		*z[max_mags];
+	float           temperature[max_mags] {NAN, NAN, NAN, NAN};
 } mag_worker_data_t;
 
 
@@ -472,6 +473,7 @@ static calibrate_return mag_calibration_worker(detect_orientation_return orienta
 					worker_data->x[cur_mag][worker_data->calibration_counter_total[cur_mag]] = mag.x;
 					worker_data->y[cur_mag][worker_data->calibration_counter_total[cur_mag]] = mag.y;
 					worker_data->z[cur_mag][worker_data->calibration_counter_total[cur_mag]] = mag.z;
+					worker_data->temperature[cur_mag] += mag.temperature;
 					worker_data->calibration_counter_total[cur_mag]++;
 				}
 			}
@@ -878,6 +880,11 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 					failed |= (PX4_OK != param_set_no_notification(param_find(str), &(mscale.y_scale)));
 					(void)sprintf(str, "CAL_MAG%u_ZSCALE", cur_mag);
 					failed |= (PX4_OK != param_set_no_notification(param_find(str), &(mscale.z_scale)));
+
+					float temperature = worker_data.temperature[cur_mag];
+					(void)sprintf(str, "CAL_MAG%u_TEMPC", cur_mag);
+					failed |= (PX4_OK != param_set_no_notification(param_find(str), &temperature));
+
 
 					if (failed) {
 						calibration_log_critical(mavlink_log_pub, CAL_ERROR_SET_PARAMS_MSG);

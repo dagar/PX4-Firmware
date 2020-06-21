@@ -88,6 +88,9 @@ int SensorCalibration::FindCalibrationIndex(uint32_t device_id) const
 		}
 
 		if ((uint32_t)device_id_val == device_id) {
+			// mark temperature active if ID found, but otherwise not used
+			sprintf(str, "CAL_%s%u_TEMPC", SensorString(), i);
+			param_find(str);
 			return i;
 		}
 	}

@@ -174,3 +174,11 @@ PARAM_DEFINE_FLOAT(CAL_MAG3_YCOMP, 0.0f);
 * @group Sensor Calibration
 */
 PARAM_DEFINE_FLOAT(CAL_MAG3_ZCOMP, 0.0f);
+
+/**
+ * Magnetometer calibration temperature
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_FLOAT(CAL_MAG3_TEMPC, NAN);
