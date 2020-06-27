@@ -240,67 +240,30 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 			const Vector3f accel_offs_rotated = board_rotation_t *accel_offs[uorb_index];
 			const Matrix3f accel_T_rotated = board_rotation_t *accel_T[uorb_index] * board_rotation;
 
-			PX4_INFO("found offset %d: x: %.6f, y: %.6f, z: %.6f", uorb_index,
-				 (double)accel_offs_rotated(0), (double)accel_offs_rotated(1), (double)accel_offs_rotated(2));
+			Vector3f offset{accel_offs_rotated};
+			Vector3f scale{accel_T_rotated.diag()};
 
-			PX4_INFO("found scale %d: x: %.6f, y: %.6f, z: %.6f", uorb_index,
-				 (double)accel_T_rotated(0, 0), (double)accel_T_rotated(1, 1), (double)accel_T_rotated(2, 2));
+			char str[20] {};
 
-			char str[30] {};
-
-			// calibration offsets
-			float x_offset = accel_offs_rotated(0);
-			sprintf(str, "CAL_ACC%u_XOFF", uorb_index);
-			param_set_no_notification(param_find(str), &x_offset);
-
-			float y_offset = accel_offs_rotated(1);
-			sprintf(str, "CAL_ACC%u_YOFF", uorb_index);
-			param_set_no_notification(param_find(str), &y_offset);
-
-			float z_offset = accel_offs_rotated(2);
-			sprintf(str, "CAL_ACC%u_ZOFF", uorb_index);
-			param_set_no_notification(param_find(str), &z_offset);
-
-
-			// calibration scale
-			float x_scale = accel_T_rotated(0, 0);
-			sprintf(str, "CAL_ACC%u_XSCALE", uorb_index);
-			param_set_no_notification(param_find(str), &x_scale);
-
-			float y_scale = accel_T_rotated(1, 1);
-			sprintf(str, "CAL_ACC%u_YSCALE", uorb_index);
-			param_set_no_notification(param_find(str), &y_scale);
-
-			float z_scale = accel_T_rotated(2, 2);
-			sprintf(str, "CAL_ACC%u_ZSCALE", uorb_index);
-			param_set_no_notification(param_find(str), &z_scale);
-
-			// calibration device ID
-			sprintf(str, "CAL_ACC%u_ID", uorb_index);
+			sprintf(str, "CAL_%s%u_ID", "ACC", uorb_index);
 			param_set_no_notification(param_find(str), &device_id[uorb_index]);
 
-		} else {
-			char str[30] {};
+			for (int axis = 0; axis < 3; axis++) {
+				char axis_char = 'X' + axis;
 
-			// reset calibration offsets
-			sprintf(str, "CAL_ACC%u_XOFF", uorb_index);
-			param_reset(param_find(str));
-			sprintf(str, "CAL_ACC%u_YOFF", uorb_index);
-			param_reset(param_find(str));
-			sprintf(str, "CAL_ACC%u_ZOFF", uorb_index);
-			param_reset(param_find(str));
+				// offsets
+				sprintf(str, "CAL_%s%u_%cOFF", "ACC", uorb_index, axis_char);
+				param_set_no_notification(param_find(str), &offset(axis));
 
-			// reset calibration scale
-			sprintf(str, "CAL_ACC%u_XSCALE", uorb_index);
-			param_reset(param_find(str));
-			sprintf(str, "CAL_ACC%u_YSCALE", uorb_index);
-			param_reset(param_find(str));
-			sprintf(str, "CAL_ACC%u_ZSCALE", uorb_index);
-			param_reset(param_find(str));
+				// scale
+				sprintf(str, "CAL_%s%u_%cSCALE", "ACC", uorb_index, axis_char);
+				param_get(param_find(str), &scale(axis));
+			}
 
-			// reset calibration device ID
-			sprintf(str, "CAL_ACC%u_ID", uorb_index);
-			param_reset(param_find(str));
+			PX4_INFO("[cal] %s #%u off: x:%.2f y:%.2f z:%.2f", "ACC", uorb_index, (double)offset(0), (double)offset(1),
+				 (double)offset(2));
+			PX4_INFO("[cal] %s #%u scale: x:%.2f y:%.2f z:%.2f", "ACC", uorb_index, (double)scale(0), (double)scale(1),
+				 (double)scale(2));
 		}
 	}
 
@@ -322,7 +285,7 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 	return res;
 }
 
-static calibrate_return accel_calibration_worker(detect_orientation_return orientation, int cancel_sub, void *data)
+static calibrate_return accel_calibration_worker(detect_orientation_return orientation, void *data)
 {
 	const unsigned samples_num = 750;
 	accel_worker_data_t *worker_data = (accel_worker_data_t *)(data);
@@ -355,11 +318,7 @@ static calibrate_return do_accel_calibration_measurements(orb_advert_t *mavlink_
 	bool data_collected[detect_orientation_side_count] {};
 
 	if (result == calibrate_return_ok) {
-		int cancel_sub = calibrate_cancel_subscribe();
-		result = calibrate_from_orientation(mavlink_log_pub, cancel_sub, data_collected, accel_calibration_worker, &worker_data,
-						    false);
-
-		calibrate_cancel_unsubscribe(cancel_sub);
+		result = calibrate_from_orientation(mavlink_log_pub, data_collected, accel_calibration_worker, &worker_data, false);
 	}
 
 	if (result == calibrate_return_ok) {

@@ -44,6 +44,9 @@
 #include <uORB/topics/vehicle_gps_position.h>
 #endif // !CONSTRAINED_FLASH
 
+namespace sensors
+{
+
 using namespace matrix;
 using namespace time_literals;
 using math::radians;
@@ -65,14 +68,12 @@ VehicleMagnetometer::VehicleMagnetometer() :
 VehicleMagnetometer::~VehicleMagnetometer()
 {
 	Stop();
-
 	perf_free(_cycle_perf);
 }
 
 bool VehicleMagnetometer::Start()
 {
 	ScheduleNow();
-
 	return true;
 }
 
@@ -96,112 +97,8 @@ void VehicleMagnetometer::ParametersUpdate(bool force)
 
 		updateParams();
 
-		// fine tune the rotation
-		const Dcmf board_rotation_offset{Eulerf{
-				radians(_param_sens_board_x_off.get()),
-				radians(_param_sens_board_y_off.get()),
-				radians(_param_sens_board_z_off.get())}};
-
-		// get transformation matrix from sensor/board to body frame
-		const Dcmf board_rotation = board_rotation_offset * get_rot_matrix((enum Rotation)_param_sens_board_rot.get());
-
-		for (int cal_index = 0; cal_index < MAX_SENSOR_COUNT; cal_index++) {
-			char str[30] {};
-			// ID
-			(void)sprintf(str, "CAL_MAG%u_ID", cal_index);
-			int32_t device_id = 0;
-			param_get(param_find(str), &device_id);
-
-			// TODO: WRONG WRONG WONG
-			int32_t driver_device_id = 0; // TODO: WRONG WRONG WONG
-			// TODO: WRONG WRONG WONG
-
-			// apply calibration
-			for (int dev_index = 0; dev_index < MAX_SENSOR_COUNT; dev_index++) {
-
-				if ((device_id > 0) && (device_id == driver_device_id)) {
-
-					sprintf(str, "CAL_MAG%u_XOFF", dev_index);
-					float x_offset = 0.f;
-					param_get(param_find(str), &x_offset);
-
-					sprintf(str, "CAL_MAG%u_YOFF", dev_index);
-					float y_offset = 0.f;
-					param_get(param_find(str), &y_offset);
-
-					sprintf(str, "CAL_MAG%u_ZOFF", dev_index);
-					float z_offset = 0.f;
-					param_get(param_find(str), &z_offset);
-
-					sprintf(str, "CAL_MAG%u_XSCALE", dev_index);
-					float x_scale = 0.f;
-					param_get(param_find(str), &x_scale);
-
-					sprintf(str, "CAL_MAG%u_YSCALE", dev_index);
-					float y_scale = 0.f;
-					param_get(param_find(str), &y_scale);
-
-					sprintf(str, "CAL_MAG%u_ZSCALE", dev_index);
-					float z_scale = 0.f;
-					param_get(param_find(str), &z_scale);
-				}
-			}
-
-			// find corresponding enabled and rotation parameters
-			for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
-
-				uORB::SubscriptionData<sensor_mag_s> mag_report{ORB_ID(sensor_mag)};
-
-				if ((device_id > 0) && ((uint32_t)device_id == mag_report.get().device_id)) {
-
-					// Enabled? CAL_MAGx_EN
-					sprintf(str, "CAL_MAG%u_EN", cal_index);
-					int32_t device_enabled = 1;
-					param_get(param_find(str), &device_enabled);
-					_enabled[uorb_index] = (device_enabled == 1);
-
-					// Rotation
-					sprintf(str, "CAL_MAG%u_ROT", cal_index);
-					int32_t mag_rot = 0;
-					param_get(param_find(str), &mag_rot);
-
-					if (mag_report.get().is_external) {
-						// check if this mag is still set as internal, otherwise leave untouched
-						if (mag_rot < 0) {
-							// it was marked as internal, change to external with no rotation
-							mag_rot = 0;
-							param_set_no_notification(param_find(str), &mag_rot);
-						}
-
-					} else {
-						// mag is internal - reset param to -1 to indicate internal mag
-						if (mag_rot != MAG_ROT_VAL_INTERNAL) {
-							mag_rot = MAG_ROT_VAL_INTERNAL;
-							param_set_no_notification(param_find(str), &mag_rot);
-						}
-					}
-
-					// now get the mag rotation
-					if (mag_rot >= 0) {
-						// Set external magnetometers to use the parameter value
-						_mag_rotation[uorb_index] = get_rot_matrix((enum Rotation)mag_rot);
-
-					} else {
-						// Set internal magnetometers to use the board rotation
-						_mag_rotation[uorb_index] = board_rotation;
-					}
-
-					// CAL_MAGx_{X,Y,Z}COMP
-					sprintf(str, "CAL_MAG%u_XCOMP", cal_index);
-					param_get(param_find(str), &_power_compensation[uorb_index](0));
-
-					sprintf(str, "CAL_MAG%u_YCOMP", cal_index);
-					param_get(param_find(str), &_power_compensation[uorb_index](1));
-
-					sprintf(str, "CAL_MAG%u_ZCOMP", cal_index);
-					param_get(param_find(str), &_power_compensation[uorb_index](2));
-				}
-			}
+		for (auto &cal : _calibration) {
+			cal.ParametersUpdate();
 		}
 	}
 }
@@ -214,7 +111,7 @@ void VehicleMagnetometer::Run()
 
 	for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
 
-		if (!_enabled[uorb_index]) {
+		if (!_calibration[uorb_index].enabled()) {
 			continue;
 		}
 
@@ -246,14 +143,9 @@ void VehicleMagnetometer::Run()
 					_priority[uorb_index] = _sensor_sub[uorb_index].get_priority();
 				}
 
-				Vector3f vect(report.x, report.y, report.z);
+				_calibration[uorb_index].set_device_id(report.device_id);
 
-				// throttle-/current-based mag compensation when armed
-				if (_mag_comp_type != MagCompensationType::Disabled && _armed) {
-					vect = vect + _power * _power_compensation[uorb_index];
-				}
-
-				vect = _mag_rotation[uorb_index] * vect;
+				Vector3f vect = _calibration[uorb_index].Correct(Vector3f{report.x, report.y, report.z});
 
 				_last_data[uorb_index].timestamp = report.timestamp;
 				_last_data[uorb_index].x = vect(0);
@@ -340,41 +232,8 @@ void VehicleMagnetometer::Run()
 			_armed = vcontrol_mode.flag_armed;
 		}
 
-		//check mag power compensation type (change battery current subscription instance if necessary)
-		if ((MagCompensationType)_param_mag_comp_typ.get() == MagCompensationType::Current_inst0
-		    && _mag_comp_type != MagCompensationType::Current_inst0) {
 
-			_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 0};
-		}
-
-		if ((MagCompensationType)_param_mag_comp_typ.get() == MagCompensationType::Current_inst1
-		    && _mag_comp_type != MagCompensationType::Current_inst1) {
-
-			_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 1};
-		}
-
-		_mag_comp_type = (MagCompensationType)_param_mag_comp_typ.get();
-
-		//update power signal for mag compensation
-		if (_mag_comp_type == MagCompensationType::Throttle) {
-			actuator_controls_s controls;
-
-			if (_actuator_ctrl_0_sub.update(&controls)) {
-				_power = controls.control[actuator_controls_s::INDEX_THROTTLE];
-			}
-
-		} else if (_mag_comp_type == MagCompensationType::Current_inst0
-			   || _mag_comp_type == MagCompensationType::Current_inst1) {
-
-			battery_status_s bat_stat;
-
-			if (_battery_status_sub.update(&bat_stat)) {
-				_power = bat_stat.current_a * 0.001f; //current in [kA]
-			}
-		}
 	}
-
-
 
 	if (!_armed) {
 		calcMagInconsistency();
@@ -400,7 +259,7 @@ void VehicleMagnetometer::calcMagInconsistency()
 	// Check each sensor against the primary
 	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
 		// check that the sensor we are checking against is not the same as the primary
-		if (_enabled[i] && (_priority[i] > 0) && (i != _selected_sensor_sub_index)) {
+		if ((_priority[i] > 0) && (i != _selected_sensor_sub_index)) {
 			// calculate angle to 3D magnetic field vector of the primary sensor
 			const sensor_mag_s &current_mag_report = _last_data[i];
 			Vector3f current_mag{current_mag_report.x, current_mag_report.y, current_mag_report.z};
@@ -440,7 +299,11 @@ void VehicleMagnetometer::PrintStatus()
 
 	_voter.print();
 
-
+	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+		if (_advertised[i]) {
+			_calibration[i].PrintStatus();
+		}
+	}
 
 #if !defined(CONSTRAINED_FLASH)
 	uORB::Subscription vehicle_gps_position_sub {ORB_ID(vehicle_gps_position)};
@@ -526,3 +389,5 @@ void VehicleMagnetometer::PrintStatus()
 
 #endif // !CONSTRAINED_FLASH
 }
+
+}; // namespace sensors

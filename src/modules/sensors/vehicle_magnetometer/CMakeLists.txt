@@ -32,6 +32,8 @@
 ############################################################################
 
 px4_add_library(vehicle_magnetometer
+	MagnetometerCalibration.cpp
+	MagnetometerCalibration.hpp
 	VehicleMagnetometer.cpp
 	VehicleMagnetometer.hpp
 )

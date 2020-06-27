@@ -39,6 +39,8 @@
 
 #include "parameters.h"
 
+#include <stdio.h>
+
 namespace sensors
 {
 
@@ -58,8 +60,6 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 	parameter_handles.board_offset[1] = param_find("SENS_BOARD_Y_OFF");
 	parameter_handles.board_offset[2] = param_find("SENS_BOARD_Z_OFF");
 
-
-
 	parameter_handles.air_cmodel = param_find("CAL_AIR_CMODEL");
 	parameter_handles.air_tube_length = param_find("CAL_AIR_TUBELEN");
 	parameter_handles.air_tube_diameter_mm = param_find("CAL_AIR_TUBED_MM");
@@ -70,14 +70,18 @@ void initialize_parameter_handles(ParameterHandles &parameter_handles)
 	(void)param_find("CAL_ACC0_ID");
 	(void)param_find("CAL_GYRO0_ID");
 
-	(void)param_find("CAL_MAG0_ID");
-	(void)param_find("CAL_MAG1_ID");
-	(void)param_find("CAL_MAG2_ID");
-	(void)param_find("CAL_MAG3_ID");
-	(void)param_find("CAL_MAG0_ROT");
-	(void)param_find("CAL_MAG1_ROT");
-	(void)param_find("CAL_MAG2_ROT");
-	(void)param_find("CAL_MAG3_ROT");
+	char str[20] {};
+
+	for (int mag_index = 0; mag_index < 4; mag_index++) {
+		// CAL_MAGx_ID
+		sprintf(str, "CAL_%s%u_ID", "MAG", mag_index);
+		param_find(str);
+
+		// CAL_MAGx_ROT
+		sprintf(str, "CAL_%s%u_ROT", "MAG", mag_index);
+		param_find(str);
+	}
+
 	(void)param_find("CAL_MAG_SIDES");
 	(void)param_find("CAL_MAG_ROT_AUTO");
 

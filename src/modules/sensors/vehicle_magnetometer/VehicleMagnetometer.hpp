@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include "MagnetometerCalibration.hpp"
+
 #include "data_validator/DataValidatorGroup.hpp"
 
 #include <lib/conversion/rotation.h>
@@ -55,6 +57,8 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 
+namespace sensors
+{
 class VehicleMagnetometer : public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
@@ -94,18 +98,7 @@ private:
 		{this, ORB_ID(sensor_mag), 3}
 	};
 
-	matrix::Dcmf _mag_rotation[MAX_SENSOR_COUNT] {}; /**< rotation matrix for the orientation that the external mag0 is mounted */
-
-	/* Magnetometer interference compensation */
-	enum class MagCompensationType {
-		Disabled = 0,
-		Throttle,
-		Current_inst0,
-		Current_inst1
-	};
-	MagCompensationType _mag_comp_type{MagCompensationType::Disabled};
-	matrix::Vector3f _power_compensation[MAX_SENSOR_COUNT] {};
-	float _power{0.f};
+	MagnetometerCalibration _calibration[MAX_SENSOR_COUNT];
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
@@ -117,7 +110,6 @@ private:
 
 	sensor_mag_s _last_data[MAX_SENSOR_COUNT] {};
 	bool _advertised[MAX_SENSOR_COUNT] {};
-	bool _enabled[MAX_SENSOR_COUNT] {true, true, true, true};
 
 	float _mag_angle_diff[2] {};			/**< filtered mag angle differences between sensor instances (Ga) */
 
@@ -138,3 +130,4 @@ private:
 
 	)
 };
+}; // namespace sensors

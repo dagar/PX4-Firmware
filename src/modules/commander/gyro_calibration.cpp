@@ -84,7 +84,7 @@ static int float_cmp(const void *elem1, const void *elem2)
 	return *(const float *)elem1 > *(const float *)elem2;
 }
 
-static calibrate_return gyro_calibration_worker(int cancel_sub, gyro_worker_data_t &worker_data)
+static calibrate_return gyro_calibration_worker(gyro_worker_data_t &worker_data)
 {
 	unsigned calibration_counter[MAX_GYROS] {};
 	static constexpr unsigned CALIBRATION_COUNT = 250;
@@ -108,7 +108,7 @@ static calibrate_return gyro_calibration_worker(int cancel_sub, gyro_worker_data
 	unsigned slow_count = 0;
 
 	while (slow_count < CALIBRATION_COUNT) {
-		if (calibrate_cancel_check(worker_data.mavlink_log_pub, cancel_sub)) {
+		if (calibrate_cancel_check(worker_data.mavlink_log_pub)) {
 			return calibrate_return_cancelled;
 		}
 
@@ -237,15 +237,13 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 		}
 	}
 
-	int cancel_sub = calibrate_cancel_subscribe();
-
 	unsigned try_count = 0;
 	unsigned max_tries = 20;
 	res = PX4_ERROR;
 
 	do {
 		// Calibrate gyro and ensure user didn't move
-		calibrate_return cal_return = gyro_calibration_worker(cancel_sub, worker_data);
+		calibrate_return cal_return = gyro_calibration_worker(worker_data);
 
 		if (cal_return == calibrate_return_cancelled) {
 			// Cancel message already sent, we are done here
@@ -290,46 +288,31 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 		res = PX4_ERROR;
 	}
 
-	calibrate_cancel_unsubscribe(cancel_sub);
-
 	if (res == PX4_OK) {
 
 		/* set offset parameters to new values */
 		bool failed = (PX4_OK != param_set_no_notification(param_find("CAL_GYRO_PRIME"), &device_id_primary));
 
 		for (unsigned uorb_index = 0; uorb_index < MAX_GYROS; uorb_index++) {
-
-			char str[30] {};
-
 			if (uorb_index < orb_gyro_count) {
-				float x_offset = worker_data.offset[uorb_index](0);
-				sprintf(str, "CAL_GYRO%u_XOFF", uorb_index);
-				failed |= (PX4_OK != param_set_no_notification(param_find(str), &x_offset));
+				Vector3f offset{worker_data.offset[uorb_index]};
 
-				float y_offset = worker_data.offset[uorb_index](1);
-				sprintf(str, "CAL_GYRO%u_YOFF", uorb_index);
-				failed |= (PX4_OK != param_set_no_notification(param_find(str), &y_offset));
-
-				float z_offset = worker_data.offset[uorb_index](2);
-				sprintf(str, "CAL_GYRO%u_ZOFF", uorb_index);
-				failed |= (PX4_OK != param_set_no_notification(param_find(str), &z_offset));
+				char str[20] {};
 
 				int32_t device_id = worker_data.device_id[uorb_index];
-				sprintf(str, "CAL_GYRO%u_ID", uorb_index);
-				failed |= (PX4_OK != param_set_no_notification(param_find(str), &device_id));
+				sprintf(str, "CAL_%s%u_ID", "GYRO", uorb_index);
+				param_set_no_notification(param_find(str), &device_id);
 
-			} else {
-				// reset unused calibration offsets
-				sprintf(str, "CAL_GYRO%u_XOFF", uorb_index);
-				param_reset(param_find(str));
-				sprintf(str, "CAL_GYRO%u_YOFF", uorb_index);
-				param_reset(param_find(str));
-				sprintf(str, "CAL_GYRO%u_ZOFF", uorb_index);
-				param_reset(param_find(str));
+				for (int axis = 0; axis < 3; axis++) {
+					char axis_char = 'X' + axis;
 
-				// reset unused calibration device ID
-				sprintf(str, "CAL_GYRO%u_ID", uorb_index);
-				param_reset(param_find(str));
+					// offsets
+					sprintf(str, "CAL_%s%u_%cOFF", "GYRO", uorb_index, axis_char);
+					param_set_no_notification(param_find(str), &offset(axis));
+				}
+
+				PX4_INFO("[cal] %s #%u off: x:%.2f y:%.2f z:%.2f", "GYRO", uorb_index, (double)offset(0), (double)offset(1),
+					 (double)offset(2));
 			}
 		}
 

@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "SensorCalibration.hpp"
+#include "MagnetometerCalibration.hpp"
 
 #include <lib/parameters/param.h>
 
@@ -42,35 +42,64 @@ using math::radians;
 namespace sensors
 {
 
-void SensorCalibration::set_device_id(uint32_t device_id)
+void MagnetometerCalibration::set_device_id(uint32_t device_id)
 {
 	if (_device_id != device_id) {
 		_device_id = device_id;
-		SensorCorrectionsUpdate(true);
 		ParametersUpdate();
 	}
 }
 
-matrix::Vector3f SensorCalibration::Correct(const matrix::Vector3f &data)
+matrix::Vector3f MagnetometerCalibration::Correct(const matrix::Vector3f &data)
 {
-	SensorCorrectionsUpdate();
-	return _rotation * matrix::Vector3f{(data - _thermal_offset - _offset).emult(_scale)};
+	// CAL_MAG_COMP_TYP
+
+	// //check mag power compensation type (change battery current subscription instance if necessary)
+	// if ((MagCompensationType)_param_mag_comp_typ.get() == MagCompensationType::Current_inst0
+	//     && _mag_comp_type != MagCompensationType::Current_inst0) {
+
+	// 	_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 0};
+	// }
+
+	// if ((MagCompensationType)_param_mag_comp_typ.get() == MagCompensationType::Current_inst1
+	//     && _mag_comp_type != MagCompensationType::Current_inst1) {
+
+	// 	_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 1};
+	// }
+
+	// _mag_comp_type = (MagCompensationType)_param_mag_comp_typ.get();
+
+	// //update power signal for mag compensation
+	// if (_mag_comp_type == MagCompensationType::Throttle) {
+	// 	actuator_controls_s controls;
+
+	// 	if (_actuator_ctrl_0_sub.update(&controls)) {
+	// 		_power = controls.control[actuator_controls_s::INDEX_THROTTLE];
+	// 	}
+
+	// } else if (_mag_comp_type == MagCompensationType::Current_inst0
+	// 	   || _mag_comp_type == MagCompensationType::Current_inst1) {
+
+	// 	battery_status_s bat_stat;
+
+	// 	if (_battery_status_sub.update(&bat_stat)) {
+	// 		_power = bat_stat.current_a * 0.001f; //current in [kA]
+	// 	}
+	// }
+
+
+
+	// throttle-/current-based mag compensation
+	// if (_mag_comp_type != MagCompensationType::Disabled) {
+	// 	vect = vect + _power * _power_compensation;
+	// }
+
+	// TODO: off diagonal
+
+	return _rotation * matrix::Vector3f{(data - _offset).emult(_scale)};
 }
 
-const char *SensorCalibration::SensorString() const
-{
-	switch (_type) {
-	case SensorType::Accelerometer:
-		return "ACC";
-
-	case SensorType::Gyroscope:
-		return "GYRO";
-	}
-
-	return nullptr;
-}
-
-int SensorCalibration::FindCalibrationIndex(uint32_t device_id) const
+int MagnetometerCalibration::FindCalibrationIndex(uint32_t device_id) const
 {
 	if (device_id == 0) {
 		return -1;
@@ -95,56 +124,7 @@ int SensorCalibration::FindCalibrationIndex(uint32_t device_id) const
 	return -1;
 }
 
-void SensorCalibration::SensorCorrectionsUpdate(bool force)
-{
-	// check if the selected sensor has updated
-	if (_sensor_correction_sub.updated() || force) {
-
-		// valid device id required
-		if (_device_id == 0) {
-			return;
-		}
-
-		sensor_correction_s corrections;
-
-		if (_sensor_correction_sub.copy(&corrections)) {
-			// find sensor_corrections index
-			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
-				if ((_type == SensorType::Accelerometer) && (corrections.accel_device_ids[i] == _device_id)) {
-					switch (i) {
-					case 0:
-						_thermal_offset = Vector3f{corrections.accel_offset_0};
-						return;
-					case 1:
-						_thermal_offset = Vector3f{corrections.accel_offset_1};
-						return;
-					case 2:
-						_thermal_offset = Vector3f{corrections.accel_offset_2};
-						return;
-					}
-
-				} else if ((_type == SensorType::Gyroscope) && (corrections.gyro_device_ids[i] == _device_id)) {
-					switch (i) {
-					case 0:
-						_thermal_offset = Vector3f{corrections.gyro_offset_0};
-						return;
-					case 1:
-						_thermal_offset = Vector3f{corrections.gyro_offset_1};
-						return;
-					case 2:
-						_thermal_offset = Vector3f{corrections.gyro_offset_2};
-						return;
-					}
-				}
-			}
-		}
-
-		// zero thermal offset if not found
-		_thermal_offset.zero();
-	}
-}
-
-void SensorCalibration::ParametersUpdate()
+void MagnetometerCalibration::ParametersUpdate()
 {
 	if (!_external) {
 		// fine tune the rotation
@@ -188,35 +168,31 @@ void SensorCalibration::ParametersUpdate()
 			param_get(param_find(str), &_offset(axis));
 
 			// scale
-			// gyroscope doesn't have a scale factor calibration
-			if (_type != SensorType::Gyroscope) {
-				sprintf(str, "CAL_%s%u_%cSCALE", SensorString(), calibration_index, axis_char);
-				param_get(param_find(str), &_scale(axis));
-			}
+			sprintf(str, "CAL_%s%u_%cSCALE", SensorString(), calibration_index, axis_char);
+			param_get(param_find(str), &_scale(axis));
+
+			// off diagonal factors
+			sprintf(str, "CAL_%s%u_%cODIAG", SensorString(), calibration_index, axis_char);
+			param_get(param_find(str), &_offdiagonal(axis));
+
+			// power compensation
+			sprintf(str, "CAL_%s%u_%cCOMP", SensorString(), calibration_index, axis_char);
+			param_get(param_find(str), &_power_compensation(axis));
 		}
 
 	} else {
 		_enabled = true;
 		_offset.zero();
 		_scale = Vector3f{1.f, 1.f, 1.f};
+		_offdiagonal.zero();
+		_power_compensation.zero();
 	}
 }
 
-void SensorCalibration::PrintStatus()
+void MagnetometerCalibration::PrintStatus()
 {
-	if (_type != SensorType::Gyroscope) {
-		PX4_INFO("%s %d EN: %d, offset: [%.4f %.4f %.4f] scale: [%.4f %.4f %.4f]", SensorString(), _device_id, _enabled,
-			 (double)_offset(0), (double)_offset(1), (double)_offset(2), (double)_scale(0), (double)_scale(1), (double)_scale(2));
-
-	} else {
-		PX4_INFO("%s %d EN: %d, offset: [%.4f %.4f %.4f]", SensorString(), _device_id, _enabled,
-			 (double)_offset(0), (double)_offset(1), (double)_offset(2));
-	}
-
-	if (_thermal_offset.norm() > 0.f) {
-		PX4_INFO("%s %d temperature offset: [%.4f %.4f %.4f]", SensorString(), _device_id,
-			 (double)_thermal_offset(0), (double)_thermal_offset(1), (double)_thermal_offset(2));
-	}
+	PX4_INFO("%s %d EN: %d, offset: [%.4f %.4f %.4f] scale: [%.4f %.4f %.4f]", SensorString(), _device_id, _enabled,
+		 (double)_offset(0), (double)_offset(1), (double)_offset(2), (double)_scale(0), (double)_scale(1), (double)_scale(2));
 }
 
 } // namespace sensors
