@@ -86,6 +86,7 @@ static int float_cmp(const void *elem1, const void *elem2)
 
 static calibrate_return gyro_calibration_worker(gyro_worker_data_t &worker_data)
 {
+	const hrt_abstime calibration_started = hrt_absolute_time();
 	unsigned calibration_counter[MAX_GYROS] {};
 	static constexpr unsigned CALIBRATION_COUNT = 250;
 	unsigned poll_errcount = 0;
@@ -108,7 +109,7 @@ static calibrate_return gyro_calibration_worker(gyro_worker_data_t &worker_data)
 	unsigned slow_count = 0;
 
 	while (slow_count < CALIBRATION_COUNT) {
-		if (calibrate_cancel_check(worker_data.mavlink_log_pub)) {
+		if (calibrate_cancel_check(worker_data.mavlink_log_pub, calibration_started)) {
 			return calibrate_return_cancelled;
 		}
 

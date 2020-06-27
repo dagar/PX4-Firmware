@@ -146,6 +146,10 @@ void SensorCalibration::SensorCorrectionsUpdate(bool force)
 
 void SensorCalibration::ParametersUpdate()
 {
+	if (_device_id == 0) {
+		return;
+	}
+
 	if (!_external) {
 		// fine tune the rotation
 		float x_offset = 0.f;

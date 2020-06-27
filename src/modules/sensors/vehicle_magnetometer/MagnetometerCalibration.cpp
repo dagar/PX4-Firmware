@@ -50,53 +50,9 @@ void MagnetometerCalibration::set_device_id(uint32_t device_id)
 	}
 }
 
-matrix::Vector3f MagnetometerCalibration::Correct(const matrix::Vector3f &data)
+Vector3f MagnetometerCalibration::Correct(Vector3f data)
 {
-	// CAL_MAG_COMP_TYP
-
-	// //check mag power compensation type (change battery current subscription instance if necessary)
-	// if ((MagCompensationType)_param_mag_comp_typ.get() == MagCompensationType::Current_inst0
-	//     && _mag_comp_type != MagCompensationType::Current_inst0) {
-
-	// 	_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 0};
-	// }
-
-	// if ((MagCompensationType)_param_mag_comp_typ.get() == MagCompensationType::Current_inst1
-	//     && _mag_comp_type != MagCompensationType::Current_inst1) {
-
-	// 	_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 1};
-	// }
-
-	// _mag_comp_type = (MagCompensationType)_param_mag_comp_typ.get();
-
-	// //update power signal for mag compensation
-	// if (_mag_comp_type == MagCompensationType::Throttle) {
-	// 	actuator_controls_s controls;
-
-	// 	if (_actuator_ctrl_0_sub.update(&controls)) {
-	// 		_power = controls.control[actuator_controls_s::INDEX_THROTTLE];
-	// 	}
-
-	// } else if (_mag_comp_type == MagCompensationType::Current_inst0
-	// 	   || _mag_comp_type == MagCompensationType::Current_inst1) {
-
-	// 	battery_status_s bat_stat;
-
-	// 	if (_battery_status_sub.update(&bat_stat)) {
-	// 		_power = bat_stat.current_a * 0.001f; //current in [kA]
-	// 	}
-	// }
-
-
-
-	// throttle-/current-based mag compensation
-	// if (_mag_comp_type != MagCompensationType::Disabled) {
-	// 	vect = vect + _power * _power_compensation;
-	// }
-
-	// TODO: off diagonal
-
-	return _rotation * matrix::Vector3f{(data - _offset).emult(_scale)};
+	return _rotation * (_scale * ((data + _power * _power_compensation) - _offset));
 }
 
 int MagnetometerCalibration::FindCalibrationIndex(uint32_t device_id) const
@@ -126,39 +82,47 @@ int MagnetometerCalibration::FindCalibrationIndex(uint32_t device_id) const
 
 void MagnetometerCalibration::ParametersUpdate()
 {
-	if (!_external) {
-		// fine tune the rotation
-		float x_offset = 0.f;
-		float y_offset = 0.f;
-		float z_offset = 0.f;
-		param_get(param_find("SENS_BOARD_X_OFF"), &x_offset);
-		param_get(param_find("SENS_BOARD_Y_OFF"), &y_offset);
-		param_get(param_find("SENS_BOARD_Z_OFF"), &z_offset);
-
-		const Dcmf board_rotation_offset(Eulerf(radians(x_offset), radians(y_offset), radians(z_offset)));
-
-		// get transformation matrix from sensor/board to body frame
-		int32_t board_rot = 0;
-		param_get(param_find("SENS_BOARD_ROT"), &board_rot);
-		_rotation = board_rotation_offset * get_rot_matrix((enum Rotation)board_rot);
-
-	} else {
-		// TODO: per sensor external rotation
-		_rotation.setIdentity();
+	if (_device_id == 0) {
+		return;
 	}
 
-
-	int calibration_index = FindCalibrationIndex(_device_id);
+	const int calibration_index = FindCalibrationIndex(_device_id);
 
 	if (calibration_index >= 0) {
 
 		char str[20] {};
+
+		if (!_external) {
+			// fine tune the rotation
+			float x_offset = 0.f;
+			float y_offset = 0.f;
+			float z_offset = 0.f;
+			param_get(param_find("SENS_BOARD_X_OFF"), &x_offset);
+			param_get(param_find("SENS_BOARD_Y_OFF"), &y_offset);
+			param_get(param_find("SENS_BOARD_Z_OFF"), &z_offset);
+
+			const Dcmf board_rotation_offset(Eulerf(radians(x_offset), radians(y_offset), radians(z_offset)));
+
+			// get transformation matrix from sensor/board to body frame
+			int32_t board_rot = 0;
+			param_get(param_find("SENS_BOARD_ROT"), &board_rot);
+			_rotation = board_rotation_offset * get_rot_matrix((enum Rotation)board_rot);
+
+		} else {
+			sprintf(str, "CAL_%s%u_ROT", SensorString(), calibration_index);
+			int32_t rotation = 0;
+			param_get(param_find(str), &rotation);
+
+			_rotation = get_rot_matrix((enum Rotation)rotation);
+		}
 
 		sprintf(str, "CAL_%s%u_EN", SensorString(), calibration_index);
 		int32_t enabled_val = 0;
 		param_get(param_find(str), &enabled_val);
 
 		_enabled = (enabled_val == 1);
+
+		Vector3f offdiagonal{};
 
 		for (int axis = 0; axis < 3; axis++) {
 			char axis_char = 'X' + axis;
@@ -169,30 +133,46 @@ void MagnetometerCalibration::ParametersUpdate()
 
 			// scale
 			sprintf(str, "CAL_%s%u_%cSCALE", SensorString(), calibration_index, axis_char);
-			param_get(param_find(str), &_scale(axis));
+			param_get(param_find(str), &_scale(axis, axis));
 
 			// off diagonal factors
 			sprintf(str, "CAL_%s%u_%cODIAG", SensorString(), calibration_index, axis_char);
-			param_get(param_find(str), &_offdiagonal(axis));
+			param_get(param_find(str), &offdiagonal(axis));
 
 			// power compensation
 			sprintf(str, "CAL_%s%u_%cCOMP", SensorString(), calibration_index, axis_char);
 			param_get(param_find(str), &_power_compensation(axis));
 		}
 
+		// off diagonal X
+		_scale(0, 1) = offdiagonal(0);
+		_scale(1, 0) = offdiagonal(0);
+
+		// off diagonal Y
+		_scale(0, 2) = offdiagonal(1);
+		_scale(2, 0) = offdiagonal(1);
+
+		// off diagonal Z
+		_scale(2, 3) = offdiagonal(2);
+		_scale(3, 2) = offdiagonal(2);
+
 	} else {
 		_enabled = true;
 		_offset.zero();
-		_scale = Vector3f{1.f, 1.f, 1.f};
-		_offdiagonal.zero();
+		_scale.setIdentity();
 		_power_compensation.zero();
+
+		_rotation.setIdentity();
 	}
 }
 
 void MagnetometerCalibration::PrintStatus()
 {
 	PX4_INFO("%s %d EN: %d, offset: [%.4f %.4f %.4f] scale: [%.4f %.4f %.4f]", SensorString(), _device_id, _enabled,
-		 (double)_offset(0), (double)_offset(1), (double)_offset(2), (double)_scale(0), (double)_scale(1), (double)_scale(2));
+		 (double)_offset(0), (double)_offset(1), (double)_offset(2), (double)_scale(0, 0), (double)_scale(1, 1),
+		 (double)_scale(2, 2));
+
+	_scale.print();
 }
 
 } // namespace sensors

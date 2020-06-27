@@ -139,6 +139,7 @@ static unsigned progress_percentage(mag_worker_data_t *worker_data)
 
 static calibrate_return mag_calibration_worker(detect_orientation_return orientation, void *data)
 {
+	const hrt_abstime calibration_started = hrt_absolute_time();
 	orb_advert_t mavlink_log_pub = nullptr;
 	calibrate_return result = calibrate_return_ok;
 
@@ -174,7 +175,7 @@ static calibrate_return mag_calibration_worker(detect_orientation_return orienta
 	       fabsf(gyro_z_integral) < gyro_int_thresh_rad) {
 
 		/* abort on request */
-		if (calibrate_cancel_check(&mavlink_log_pub)) {
+		if (calibrate_cancel_check(&mavlink_log_pub, calibration_started)) {
 			result = calibrate_return_cancelled;
 			return result;
 		}
@@ -223,7 +224,7 @@ static calibrate_return mag_calibration_worker(detect_orientation_return orienta
 	while (hrt_absolute_time() < calibration_deadline &&
 	       calibration_counter_side < worker_data->calibration_points_perside) {
 
-		if (calibrate_cancel_check(&mavlink_log_pub)) {
+		if (calibrate_cancel_check(&mavlink_log_pub, calibration_started)) {
 			result = calibrate_return_cancelled;
 			break;
 		}
@@ -241,7 +242,7 @@ static calibrate_return mag_calibration_worker(detect_orientation_return orienta
 					bool reject = reject_sample(matrix::Vector3f{mag.x, mag.y, mag.z},
 								    worker_data->x[cur_mag], worker_data->y[cur_mag], worker_data->z[cur_mag],
 								    worker_data->calibration_counter_total[cur_mag],
-								    calibration_sides * worker_data->calibration_points_perside);
+								    worker_data->calibration_points_perside * calibration_sides);
 
 					if (reject) {
 						rejected = true;
@@ -345,6 +346,7 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 	matrix::Vector3f power_compensation[MAX_MAGS] {};
 	bool internal[MAX_MAGS] {true, true, true, true};
 
+	ORB_PRIO device_prio_max = ORB_PRIO_UNINITIALIZED;
 	int32_t device_id_primary = 0;
 
 	for (uint8_t cur_mag = 0; cur_mag < MAX_MAGS; cur_mag++) {
@@ -366,6 +368,14 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 		offset_existing[cur_mag].zero();
 
 		if (device_ids[cur_mag] != 0) {
+
+			// Get priority
+			ORB_PRIO prio = mag_sub.get_priority();
+
+			if (prio > device_prio_max) {
+				device_prio_max = prio;
+				device_id_primary = device_ids[cur_mag];
+			}
 
 			// preserve any existing power compensation or configured rotation (external only)
 			for (uint8_t mag_cal_index = 0; mag_cal_index < MAX_MAGS; mag_cal_index++) {
@@ -497,7 +507,7 @@ calibrate_return mag_calibrate_all(orb_advert_t *mavlink_log_pub, int32_t cal_ma
 					}
 				}
 
-				if (result != calibrate_return_error) {
+				if (result == calibrate_return_ok) {
 					// Notify if a parameter which should be positive is non-positive
 					const float should_be_positive[] = {sphere_radius[cur_mag], diag_x[cur_mag], diag_y[cur_mag], diag_z[cur_mag]};
 

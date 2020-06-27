@@ -97,6 +97,27 @@ void VehicleMagnetometer::ParametersUpdate(bool force)
 
 		updateParams();
 
+		// Mag compensation type
+		MagCompensationType mag_comp_typ = static_cast<MagCompensationType>(_param_mag_comp_typ.get());
+
+		if (mag_comp_typ != _mag_comp_type) {
+			// check mag power compensation type (change battery current subscription instance if necessary)
+			if (mag_comp_typ == MagCompensationType::Current_inst0 && _mag_comp_type != MagCompensationType::Current_inst0) {
+				_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 0};
+			}
+
+			if (mag_comp_typ == MagCompensationType::Current_inst1 && _mag_comp_type != MagCompensationType::Current_inst1) {
+				_battery_status_sub = uORB::Subscription{ORB_ID(battery_status), 1};
+			}
+
+			if (mag_comp_typ == MagCompensationType::Throttle) {
+				_actuator_controls_0_sub = uORB::Subscription{ORB_ID(actuator_controls_0)};
+			}
+		}
+
+		_mag_comp_type = mag_comp_typ;
+
+
 		for (auto &cal : _calibration) {
 			cal.ParametersUpdate();
 		}
@@ -106,6 +127,50 @@ void VehicleMagnetometer::ParametersUpdate(bool force)
 void VehicleMagnetometer::Run()
 {
 	perf_begin(_cycle_perf);
+
+	ParametersUpdate();
+
+	// check vehicle status for changes to armed state
+	if (_vcontrol_mode_sub.updated()) {
+		vehicle_control_mode_s vcontrol_mode;
+
+		if (_vcontrol_mode_sub.copy(&vcontrol_mode)) {
+			_armed = vcontrol_mode.flag_armed;
+		}
+	}
+
+	if (_mag_comp_type != MagCompensationType::Disabled) {
+		// update power signal for mag compensation
+		if (_armed) {
+			if (_mag_comp_type == MagCompensationType::Throttle) {
+				actuator_controls_s controls;
+
+				if (_actuator_controls_0_sub.update(&controls)) {
+					for (auto &cal : _calibration) {
+						cal.UpdatePower(controls.control[actuator_controls_s::INDEX_THROTTLE]);
+					}
+				}
+
+			} else if (_mag_comp_type == MagCompensationType::Current_inst0
+				   || _mag_comp_type == MagCompensationType::Current_inst1) {
+
+				battery_status_s bat_stat;
+
+				if (_battery_status_sub.update(&bat_stat)) {
+					float power = bat_stat.current_a * 0.001f; //current in [kA]
+
+					for (auto &cal : _calibration) {
+						cal.UpdatePower(power);
+					}
+				}
+			}
+
+		} else {
+			for (auto &cal : _calibration) {
+				cal.UpdatePower(0.f);
+			}
+		}
+	}
 
 	bool updated[MAX_SENSOR_COUNT] {};
 
@@ -176,8 +241,6 @@ void VehicleMagnetometer::Run()
 	}
 
 	if ((_selected_sensor_sub_index >= 0) && updated[_selected_sensor_sub_index]) {
-		ParametersUpdate();
-
 		const sensor_mag_s &mag = _last_data[_selected_sensor_sub_index];
 
 		// populate vehicle_magnetometer with primary mag and publish
@@ -222,17 +285,6 @@ void VehicleMagnetometer::Run()
 				_priority[failover_index] = ORB_PRIO_MIN;
 			}
 		}
-	}
-
-	// check vehicle status for changes to publication state
-	if (_vcontrol_mode_sub.updated()) {
-		vehicle_control_mode_s vcontrol_mode;
-
-		if (_vcontrol_mode_sub.copy(&vcontrol_mode)) {
-			_armed = vcontrol_mode.flag_armed;
-		}
-
-
 	}
 
 	if (!_armed) {

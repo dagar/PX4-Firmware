@@ -2,8 +2,8 @@
 px4_add_board(
 	PLATFORM nuttx
 	VENDOR px4
-	MODEL fmu-v5
-	LABEL default
+	MODEL fmu-v5x
+	LABEL p2_base_phy_LAN8742Ai
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
@@ -12,9 +12,10 @@ px4_add_board(
 	UAVCAN_INTERFACES 2
 	SERIAL_PORTS
 		GPS1:/dev/ttyS0
-		TEL1:/dev/ttyS1
-		TEL2:/dev/ttyS2
-		TEL4:/dev/ttyS3
+		TEL1:/dev/ttyS6
+		TEL2:/dev/ttyS4
+		TEL3:/dev/ttyS1
+		GPS2:/dev/ttyS7
 	DRIVERS
 		adc
 		barometer # all available barometer drivers
@@ -30,15 +31,13 @@ px4_add_board(
 		imu/adis16448
 		imu/adis16477
 		imu/adis16497
-		imu/bosch/bmi055
+		imu/bmi088
 		imu/invensense/icm20602
-		imu/invensense/icm20689
-		#imu/mpu6000 # legacy icm20602/icm20689 driver
+		imu/st/ism330dlc
 		irlock
 		lights/blinkm
 		lights/rgbled
 		lights/rgbled_ncp5623c
-		lights/rgbled_pwm
 		magnetometer # all available magnetometer drivers
 		mkblctrl
 		optical_flow # all available optical flow drivers
@@ -58,16 +57,14 @@ px4_add_board(
 		telemetry # all available telemetry drivers
 		test_ppm
 		tone_alarm
-		#uavcan # TODO: uavcan mag fix and verify
+		uavcan
 	MODULES
 		airspeed_selector
 		attitude_estimator_q
-		battery_status
 		camera_feedback
 		commander
 		dataman
 		ekf2
-		esc_battery
 		events
 		fw_att_control
 		fw_pos_control_l1
@@ -76,7 +73,6 @@ px4_add_board(
 		load_mon
 		local_position_estimator
 		logger
-		mag_calibrator
 		mavlink
 		mc_att_control
 		mc_hover_thrust_estimator
@@ -96,7 +92,6 @@ px4_add_board(
 		dmesg
 		dumpfile
 		esc_calib
-		gpio
 		hardfault_log
 		i2cdetect
 		led_control
@@ -118,8 +113,8 @@ px4_add_board(
 		usb_connected
 		ver
 		work_queue
+		serial_test
 	EXAMPLES
-		fake_magnetometer
 		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		hello
 		hwtest # Hardware test

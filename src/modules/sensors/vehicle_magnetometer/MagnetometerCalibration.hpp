@@ -33,10 +33,13 @@
 
 #pragma once
 
-#include <lib/conversion/rotation.h>
-#include <lib/matrix/matrix/math.hpp>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/log.h>
+#include <lib/conversion/rotation.h>
+#include <lib/matrix/matrix/math.hpp>
+#include <uORB/Subscription.hpp>
+#include <uORB/topics/actuator_controls.h>
+#include <uORB/topics/battery_status.h>
 
 namespace sensors
 {
@@ -58,12 +61,12 @@ public:
 
 	// apply offsets and scale
 	// rotate corrected measurements from sensor to body frame
-	matrix::Vector3f Correct(const matrix::Vector3f &data);
+	matrix::Vector3f Correct(matrix::Vector3f data);
 
 	void ParametersUpdate();
 	void SensorCorrectionsUpdate(bool force = false);
 
-	const matrix::Dcmf &getBoardRotation() const { return _rotation; }
+	void UpdatePower(float power) { _power = power; }
 
 private:
 
@@ -75,21 +78,10 @@ private:
 
 	matrix::Dcmf _rotation;
 
-	matrix::Vector3f _offset{0.f, 0.f, 0.f};
-	matrix::Vector3f _scale{1.f, 1.f, 1.f};
-	matrix::Vector3f _offdiagonal{0.f, 0.f, 0.f};
-
-	// Magnetometer interference compensation
-	enum class MagCompensationType {
-		Disabled = 0,
-		Throttle,
-		Current_inst0,
-		Current_inst1
-	};
-	MagCompensationType _mag_comp_type{MagCompensationType::Disabled};
-	matrix::Vector3f _power_compensation{0.f, 0.f, 0.f};
+	matrix::Vector3f _offset;
+	matrix::Matrix3f _scale;
+	matrix::Vector3f _power_compensation;
 	float _power{0.f};
-
 
 	uint32_t _device_id{0};
 

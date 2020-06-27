@@ -36,6 +36,8 @@
 
 #pragma once
 
+#include <drivers/drv_hrt.h>
+
 /**
  * Least-squares fit of a sphere to a set of points.
  *
@@ -105,7 +107,7 @@ calibrate_return calibrate_from_orientation(orb_advert_t *mavlink_log_pub,	///< 
 		bool lenient_still_detection);					///< true: Use more lenient still position detection
 
 /// Used to periodically check for a cancel command
-bool calibrate_cancel_check(orb_advert_t *mavlink_log_pub);	///< uORB handle to write output to
+bool calibrate_cancel_check(orb_advert_t *mavlink_log_pub, const hrt_abstime &calibration_started);
 
 
 // TODO FIXME: below are workarounds for QGC. The issue is that sometimes

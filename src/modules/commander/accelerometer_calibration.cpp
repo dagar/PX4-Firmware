@@ -176,7 +176,7 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 	int res = PX4_OK;
 
 	int32_t device_id[MAX_ACCEL_SENS] {};
-	int device_prio_max = 0;
+	enum ORB_PRIO device_prio_max = ORB_PRIO_UNINITIALIZED;
 	int32_t device_id_primary = 0;
 	unsigned active_sensors = 0;
 
@@ -195,7 +195,7 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 
 		if (device_id[cur_accel] != 0) {
 			// Get priority
-			int32_t prio = accel_sub.get_priority();
+			ORB_PRIO prio = accel_sub.get_priority();
 
 			if (prio > device_prio_max) {
 				device_prio_max = prio;

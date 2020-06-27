@@ -31,11 +31,26 @@
 #
 ############################################################################
 
-px4_add_library(vehicle_magnetometer
-	MagnetometerCalibration.cpp
-	MagnetometerCalibration.hpp
-	VehicleMagnetometer.cpp
-	VehicleMagnetometer.hpp
-)
-target_compile_options(vehicle_magnetometer PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
-target_link_libraries(vehicle_magnetometer PRIVATE px4_work_queue)
+px4_add_module(
+	MODULE modules__mag_calibrator
+	MAIN mag_calibrator
+	COMPILE_FLAGS
+		${MAX_CUSTOM_OPT_LEVEL}
+		#-O0
+		#-DDEBUG_BUILD
+	SRCS
+		MagCalibrator.cpp
+		MagCalibrator.hpp
+
+		# TRICAL
+		3dmath.h
+		filter.c
+		filter.h
+		TRICAL.c
+		TRICAL.h
+	DEPENDS
+		ecl_geo_lookup
+		mathlib
+		px4_work_queue
+	#UNITY_BUILD
+	)

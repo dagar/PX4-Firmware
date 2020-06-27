@@ -348,7 +348,7 @@ int run_lm_sphere_fit(const float x[], const float y[], const float z[], float &
 				(z[k] + fit1_params[3]));
 		float B = (offdiag_x * (x[k] - fit1_params[1])) + (diag_y    * (y[k] - fit1_params[2])) + (offdiag_z *
 				(z[k] + fit1_params[3]));
-		float C = (offdiag_y * (x[k] - fit1_params[1])) + (offdiag_z * (y[k] - fit1_params[2])) + (diag_z *
+		float C = (offdiag_y * (x[k] - fit1_params[1])) + (offdiag_z * (y[k] - fit1_params[2])) + (diag_z    *
 				(z[k] - fit1_params[3]));
 		float length = sqrtf(A * A + B * B + C * C);
 		residual = fit1_params[0] - length;
@@ -415,7 +415,7 @@ int run_lm_ellipsoid_fit(const float x[], const float y[], const float z[], floa
 	// Gauss Newton Part common for all kind of extensions including LM
 	for (uint16_t k = 0; k < _samples_collected; k++) {
 
-		//Calculate Jacobian
+		// Calculate Jacobian
 		float A = (diag_x    * (x[k] - offset_x)) + (offdiag_x * (y[k] - offset_y)) + (offdiag_y * (z[k] - offset_z));
 		float B = (offdiag_x * (x[k] - offset_x)) + (diag_y    * (y[k] - offset_y)) + (offdiag_z * (z[k] - offset_z));
 		float C = (offdiag_y * (x[k] - offset_x)) + (offdiag_z * (y[k] - offset_y)) + (diag_z    * (z[k] - offset_z));
@@ -423,17 +423,17 @@ int run_lm_ellipsoid_fit(const float x[], const float y[], const float z[], floa
 		residual = sphere_radius - length;
 		fit1 += residual * residual;
 		// 0-2: partial derivative (offset wrt fitness fn) fn operated on sample
-		ellipsoid_jacob[0] = 1.0f * (((diag_x    * A) + (offdiag_x * B) + (offdiag_y * C)) / length);
-		ellipsoid_jacob[1] = 1.0f * (((offdiag_x * A) + (diag_y    * B) + (offdiag_z * C)) / length);
-		ellipsoid_jacob[2] = 1.0f * (((offdiag_y * A) + (offdiag_z * B) + (diag_z    * C)) / length);
+		ellipsoid_jacob[0] = 1.f * (((diag_x    * A) + (offdiag_x * B) + (offdiag_y * C)) / length);
+		ellipsoid_jacob[1] = 1.f * (((offdiag_x * A) + (diag_y    * B) + (offdiag_z * C)) / length);
+		ellipsoid_jacob[2] = 1.f * (((offdiag_y * A) + (offdiag_z * B) + (diag_z    * C)) / length);
 		// 3-5: partial derivative (diag offset wrt fitness fn) fn operated on sample
-		ellipsoid_jacob[3] = -1.0f * ((x[k] - offset_x) * A) / length;
-		ellipsoid_jacob[4] = -1.0f * ((y[k] - offset_y) * B) / length;
-		ellipsoid_jacob[5] = -1.0f * ((z[k] - offset_z) * C) / length;
+		ellipsoid_jacob[3] = -1.f * ((x[k] - offset_x) * A) / length;
+		ellipsoid_jacob[4] = -1.f * ((y[k] - offset_y) * B) / length;
+		ellipsoid_jacob[5] = -1.f * ((z[k] - offset_z) * C) / length;
 		// 6-8: partial derivative (off-diag offset wrt fitness fn) fn operated on sample
-		ellipsoid_jacob[6] = -1.0f * (((y[k] - offset_y) * A) + ((x[k] - offset_x) * B)) / length;
-		ellipsoid_jacob[7] = -1.0f * (((z[k] - offset_z) * A) + ((x[k] - offset_x) * C)) / length;
-		ellipsoid_jacob[8] = -1.0f * (((z[k] - offset_z) * B) + ((y[k] - offset_y) * C)) / length;
+		ellipsoid_jacob[6] = -1.f * (((y[k] - offset_y) * A) + ((x[k] - offset_x) * B)) / length;
+		ellipsoid_jacob[7] = -1.f * (((z[k] - offset_z) * A) + ((x[k] - offset_x) * C)) / length;
+		ellipsoid_jacob[8] = -1.f * (((z[k] - offset_z) * B) + ((y[k] - offset_y) * C)) / length;
 
 		for (uint8_t i = 0; i < 9; i++) {
 			// compute JTJ
@@ -448,7 +448,7 @@ int run_lm_ellipsoid_fit(const float x[], const float y[], const float z[], floa
 
 
 	//------------------------Levenberg-Marquardt-part-starts-here---------------------------------//
-	//refer: http://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm#Choice_of_damping_parameter
+	// refer: http://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm#Choice_of_damping_parameter
 	float fit1_params[9] = {offset_x, offset_y, offset_z, diag_x, diag_y, diag_z, offdiag_x, offdiag_y, offdiag_z};
 	float fit2_params[9];
 	memcpy(fit2_params, fit1_params, sizeof(fit1_params));
@@ -689,13 +689,14 @@ calibrate_return calibrate_from_orientation(orb_advert_t *mavlink_log_pub,
 		bool side_data_collected[detect_orientation_side_count], calibration_from_orientation_worker_t calibration_worker,
 		void *worker_data, bool lenient_still_position)
 {
+	const hrt_abstime calibration_started = hrt_absolute_time();
 	calibrate_return result = calibrate_return_ok;
 
 	unsigned orientation_failures = 0;
 
 	// Rotate through all requested orientation
 	while (true) {
-		if (calibrate_cancel_check(mavlink_log_pub)) {
+		if (calibrate_cancel_check(mavlink_log_pub, calibration_started)) {
 			result = calibrate_return_cancelled;
 			break;
 		}
@@ -802,7 +803,7 @@ static void calibrate_answer_command(orb_advert_t *mavlink_log_pub, struct vehic
 	}
 }
 
-bool calibrate_cancel_check(orb_advert_t *mavlink_log_pub)
+bool calibrate_cancel_check(orb_advert_t *mavlink_log_pub, const hrt_abstime &calibration_started)
 {
 	uORB::Subscription vehicle_command_sub{ORB_ID(vehicle_command)};
 
@@ -811,7 +812,7 @@ bool calibrate_cancel_check(orb_advert_t *mavlink_log_pub)
 	while (vehicle_command_sub.update(&cmd)) {
 		if (cmd.command == vehicle_command_s::VEHICLE_CMD_PREFLIGHT_CALIBRATION) {
 			// ignore commands that are old or internal
-			if ((hrt_elapsed_time(&cmd.timestamp) < 1_s) && cmd.from_external) {
+			if ((cmd.timestamp > calibration_started) && cmd.from_external) {
 				if ((int)cmd.param1 == 0 &&
 				    (int)cmd.param2 == 0 &&
 				    (int)cmd.param3 == 0 &&

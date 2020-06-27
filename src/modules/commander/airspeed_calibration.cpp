@@ -65,6 +65,8 @@ static void feedback_calibration_failed(orb_advert_t *mavlink_log_pub)
 
 int do_airspeed_calibration(orb_advert_t *mavlink_log_pub)
 {
+	const hrt_abstime calibration_started = hrt_absolute_time();
+
 	int result = PX4_OK;
 	unsigned calibration_counter = 0;
 	const unsigned maxcount = 2400;
@@ -122,7 +124,7 @@ int do_airspeed_calibration(orb_advert_t *mavlink_log_pub)
 
 	while (calibration_counter < calibration_count) {
 
-		if (calibrate_cancel_check(mavlink_log_pub)) {
+		if (calibrate_cancel_check(mavlink_log_pub, calibration_started)) {
 			goto error_return;
 		}
 
@@ -204,7 +206,7 @@ int do_airspeed_calibration(orb_advert_t *mavlink_log_pub)
 	/* just take a few samples and make sure pitot tubes are not reversed, timeout after ~30 seconds */
 	while (calibration_counter < maxcount) {
 
-		if (calibrate_cancel_check(mavlink_log_pub)) {
+		if (calibrate_cancel_check(mavlink_log_pub, calibration_started)) {
 			goto error_return;
 		}
 

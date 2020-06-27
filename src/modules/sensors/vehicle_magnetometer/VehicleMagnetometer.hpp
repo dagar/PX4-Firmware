@@ -86,7 +86,7 @@ private:
 	uORB::Publication<sensor_preflight_mag_s> _sensor_preflight_mag_pub{ORB_ID(sensor_preflight_mag)};
 	uORB::Publication<vehicle_magnetometer_s> _vehicle_magnetometer_pub{ORB_ID(vehicle_magnetometer)};
 
-	uORB::Subscription _actuator_ctrl_0_sub{ORB_ID(actuator_controls_0)};
+	uORB::Subscription _actuator_controls_0_sub{ORB_ID(actuator_controls_0)};
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status), 0};
 	uORB::Subscription _params_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _vcontrol_mode_sub{ORB_ID(vehicle_control_mode)};
@@ -99,6 +99,15 @@ private:
 	};
 
 	MagnetometerCalibration _calibration[MAX_SENSOR_COUNT];
+
+	// Magnetometer interference compensation
+	enum class MagCompensationType {
+		Disabled = 0,
+		Throttle,
+		Current_inst0,
+		Current_inst1
+	};
+	MagCompensationType _mag_comp_type{MagCompensationType::Disabled};
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
@@ -120,14 +129,7 @@ private:
 	bool _armed{false};				/**< arming status of the vehicle */
 
 	DEFINE_PARAMETERS(
-		(ParamInt<px4::params::SENS_BOARD_ROT>) _param_sens_board_rot,
-
-		(ParamFloat<px4::params::SENS_BOARD_X_OFF>) _param_sens_board_x_off,
-		(ParamFloat<px4::params::SENS_BOARD_Y_OFF>) _param_sens_board_y_off,
-		(ParamFloat<px4::params::SENS_BOARD_Z_OFF>) _param_sens_board_z_off,
-
 		(ParamInt<px4::params::CAL_MAG_COMP_TYP>) _param_mag_comp_typ
-
 	)
 };
 }; // namespace sensors
