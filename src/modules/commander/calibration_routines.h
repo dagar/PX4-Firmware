@@ -38,6 +38,8 @@
 
 #include <drivers/drv_hrt.h>
 
+#include <matrix/math.hpp>
+
 /**
  * Least-squares fit of a sphere to a set of points.
  *
@@ -112,6 +114,14 @@ calibrate_return calibrate_from_orientation(orb_advert_t *mavlink_log_pub,	///< 
 /// Used to periodically check for a cancel command
 bool calibrate_cancel_check(orb_advert_t *mavlink_log_pub, const hrt_abstime &calibration_started);
 
+int32_t GetCalibrationParam(const char *sensor_type, const char *cal_type, uint8_t instance);
+void SetCalibrationParam(const char *sensor_type, const char *cal_type, uint8_t instance, int32_t value);
+
+matrix::Vector3f GetCalibrationParamsVector3f(const char *sensor_type, const char *cal_type, uint8_t instance);
+void SetCalibrationParamsVector3f(const char *sensor_type, const char *cal_type, uint8_t instance,
+				  matrix::Vector3f values);
+
+matrix::Dcmf GetBoardRotation();
 
 // TODO FIXME: below are workarounds for QGC. The issue is that sometimes
 // a mavlink log message is overwritten by the following one. A workaround

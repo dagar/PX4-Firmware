@@ -189,20 +189,15 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 
 			// preserve existing CAL_ACCx_PRIO parameter
 			for (uint8_t cal_index = 0; cal_index < MAX_ACCEL_SENS; cal_index++) {
-				char str[20] {};
-				sprintf(str, "CAL_%s%u_ID", "ACC", cal_index);
-				int32_t cal_device_id = 0;
+				int32_t cal_device_id = GetCalibrationParam("ACC", "ID", cal_index);
 
-				if (param_get(param_find(str), &cal_device_id) == PX4_OK) {
-					if ((cal_device_id != 0) && (cal_device_id == device_id[cur_accel])) {
-						// CAL_ACCx_PRIO
-						sprintf(str, "CAL_%s%u_PRIO", "ACC", cal_index);
-						param_get(param_find(str), &priority[cur_accel]);
+				if ((cal_device_id != 0) && (cal_device_id == device_id[cur_accel])) {
+					// CAL_ACCx_PRIO
+					priority[cur_accel] = GetCalibrationParam("ACC", "PRIO", cal_index);
 
-						// check configured priority and reset if necessary
-						if (priority[cur_accel] < 0 || priority[cur_accel] > 100) {
-							priority[cur_accel] = ACCEL_DEFAULT_PRIORITY;
-						}
+					// check configured priority and reset if necessary
+					if (priority[cur_accel] < 0 || priority[cur_accel] > 100) {
+						priority[cur_accel] = ACCEL_DEFAULT_PRIORITY;
 					}
 				}
 			}
@@ -256,24 +251,11 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 			priority[uorb_index] = ACCEL_DEFAULT_PRIORITY;
 		}
 
-		char str[20] {};
-
-		sprintf(str, "CAL_%s%u_ID", "ACC", uorb_index);
-		param_set_no_notification(param_find(str), &device_id[uorb_index]);
-		sprintf(str, "CAL_%s%u_PRIO", "ACC", uorb_index);
-		param_set_no_notification(param_find(str), &priority[uorb_index]);
-
-		for (int axis = 0; axis < 3; axis++) {
-			char axis_char = 'X' + axis;
-
-			// offsets
-			sprintf(str, "CAL_%s%u_%cOFF", "ACC", uorb_index, axis_char);
-			param_set_no_notification(param_find(str), &offset(axis));
-
-			// scale
-			sprintf(str, "CAL_%s%u_%cSCALE", "ACC", uorb_index, axis_char);
-			param_set_no_notification(param_find(str), &scale(axis));
-		}
+		// save calibration
+		SetCalibrationParam("ACC", "ID", uorb_index, device_id[uorb_index]);
+		SetCalibrationParam("ACC", "PRIO", uorb_index, priority[uorb_index]);
+		SetCalibrationParamsVector3f("ACC", "OFF", uorb_index, offset);
+		SetCalibrationParamsVector3f("ACC", "SCALE", uorb_index, scale);
 	}
 
 	param_notify_changes();
@@ -304,11 +286,11 @@ static calibrate_return accel_calibration_worker(detect_orientation_return orien
 
 	read_accelerometer_avg(worker_data->accel_ref, orientation, samples_num);
 
-	calibration_log_info(worker_data->mavlink_log_pub, "[cal] %s side result: [%8.4f %8.4f %8.4f]",
-			     detect_orientation_str(orientation),
-			     (double)worker_data->accel_ref[0][orientation][0],
-			     (double)worker_data->accel_ref[0][orientation][1],
-			     (double)worker_data->accel_ref[0][orientation][2]);
+	PX4_DEBUG("[cal] %s side result: [%8.4f %8.4f %8.4f]",
+		  detect_orientation_str(orientation),
+		  (double)worker_data->accel_ref[0][orientation][0],
+		  (double)worker_data->accel_ref[0][orientation][1],
+		  (double)worker_data->accel_ref[0][orientation][2]);
 
 	worker_data->done_count++;
 	calibration_log_info(worker_data->mavlink_log_pub, CAL_QGC_PROGRESS_MSG, 17 * worker_data->done_count);
@@ -351,18 +333,7 @@ static calibrate_return do_accel_calibration_measurements(orb_advert_t *mavlink_
 static calibrate_return read_accelerometer_avg(float (&accel_avg)[MAX_ACCEL_SENS][detect_orientation_side_count][3],
 		unsigned orient, unsigned samples_num)
 {
-	/* get total sensor board rotation matrix */
-	float board_offset[3] {};
-	param_get(param_find("SENS_BOARD_X_OFF"), &board_offset[0]);
-	param_get(param_find("SENS_BOARD_Y_OFF"), &board_offset[1]);
-	param_get(param_find("SENS_BOARD_Z_OFF"), &board_offset[2]);
-
-	const Dcmf board_rotation_offset{Eulerf{math::radians(board_offset[0]), math::radians(board_offset[1]), math::radians(board_offset[2])}};
-
-	int32_t board_rotation_int = 0;
-	param_get(param_find("SENS_BOARD_ROT"), &board_rotation_int);
-
-	const Dcmf board_rotation = board_rotation_offset * get_rot_matrix((enum Rotation)board_rotation_int);
+	const Dcmf board_rotation = GetBoardRotation();
 
 	Vector3f accel_sum[MAX_ACCEL_SENS] {};
 	unsigned counts[MAX_ACCEL_SENS] {};

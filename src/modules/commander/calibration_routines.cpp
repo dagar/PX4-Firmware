@@ -45,8 +45,10 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_tone_alarm.h>
 
+#include <lib/conversion/rotation.h>
 #include <lib/ecl/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
+#include <lib/parameters/param.h>
 #include <lib/systemlib/mavlink_log.h>
 #include <matrix/math.hpp>
 
@@ -867,4 +869,90 @@ bool calibrate_cancel_check(orb_advert_t *mavlink_log_pub, const hrt_abstime &ca
 	}
 
 	return ret;
+}
+
+int32_t GetCalibrationParam(const char *sensor_type, const char *cal_type, uint8_t instance)
+{
+	int32_t value = 0;
+	char str[20] {};
+
+	// eg CAL_MAGn_ID/CAL_MAGn_ROT
+	sprintf(str, "CAL_%s%u_%s", sensor_type, instance, cal_type);
+
+	if (param_get(param_find(str), &value) != PX4_OK) {
+		PX4_ERR("[cal] failed to get %s", str);
+	}
+
+	return value;
+}
+
+void SetCalibrationParam(const char *sensor_type, const char *cal_type, uint8_t instance, int32_t value)
+{
+	char str[20] {};
+
+	// eg CAL_MAGn_ID/CAL_MAGn_ROT
+	sprintf(str, "CAL_%s%u_%s", sensor_type, instance, cal_type);
+
+	if (param_set_no_notification(param_find(str), &value) != PX4_OK) {
+		PX4_ERR("[cal] failed to set %s = %d", str, value);
+	}
+}
+
+matrix::Vector3f GetCalibrationParamsVector3f(const char *sensor_type, const char *cal_type, uint8_t instance)
+{
+	matrix::Vector3f values{0.f, 0.f, 0.f};
+
+	char str[20] {};
+
+	for (int axis = 0; axis < 3; axis++) {
+		char axis_char = 'X' + axis;
+
+		// eg CAL_MAGn_{X,Y,Z}OFF
+		sprintf(str, "CAL_%s%u_%c%s", sensor_type, instance, axis_char, cal_type);
+
+		if (param_get(param_find(str), &values(axis)) != PX4_OK) {
+			PX4_ERR("[cal] failed to get %s", str);
+		}
+	}
+
+	return values;
+}
+
+void SetCalibrationParamsVector3f(const char *sensor_type, const char *cal_type, uint8_t instance,
+				  matrix::Vector3f values)
+{
+	char str[20] {};
+
+	for (int axis = 0; axis < 3; axis++) {
+		char axis_char = 'X' + axis;
+
+		// eg CAL_MAGn_{X,Y,Z}OFF
+		sprintf(str, "CAL_%s%u_%c%s", sensor_type, instance, axis_char, cal_type);
+
+		if (param_set_no_notification(param_find(str), &values(axis)) != PX4_OK) {
+			PX4_ERR("[cal] failed to set %s = %.4f", str, (double)values(axis));
+		}
+	}
+}
+
+using math::radians;
+using matrix::Eulerf;
+using matrix::Dcmf;
+
+matrix::Dcmf GetBoardRotation()
+{
+	float x_offset = 0.f;
+	float y_offset = 0.f;
+	float z_offset = 0.f;
+	param_get(param_find("SENS_BOARD_X_OFF"), &x_offset);
+	param_get(param_find("SENS_BOARD_Y_OFF"), &y_offset);
+	param_get(param_find("SENS_BOARD_Z_OFF"), &z_offset);
+
+	const Dcmf board_rotation_offset(Eulerf(radians(x_offset), radians(y_offset), radians(z_offset)));
+
+	// get transformation matrix from sensor/board to body frame
+	int32_t board_rot = 0;
+	param_get(param_find("SENS_BOARD_ROT"), &board_rot);
+
+	return board_rotation_offset * get_rot_matrix((enum Rotation)board_rot);
 }

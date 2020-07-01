@@ -222,20 +222,15 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 			// preserve existing CAL_GYROx_PRIO parameter
 			for (uint8_t cal_index = 0; cal_index < MAX_GYROS; cal_index++) {
-				char str[20] {};
-				sprintf(str, "CAL_%s%u_ID", "GYRO", cal_index);
-				int32_t cal_device_id = 0;
+				int32_t cal_device_id = GetCalibrationParam("GYRO", "ID", cal_index);
 
-				if (param_get(param_find(str), &cal_device_id) == PX4_OK) {
-					if ((cal_device_id != 0) && (cal_device_id == worker_data.device_id[cur_gyro])) {
-						// CAL_GYROx_PRIO
-						sprintf(str, "CAL_%s%u_PRIO", "GYRO", cal_index);
-						param_get(param_find(str), &priority[cur_gyro]);
+				if ((cal_device_id != 0) && (cal_device_id == worker_data.device_id[cur_gyro])) {
+					// CAL_GYROx_PRIO
+					priority[cur_gyro] = GetCalibrationParam("GYRO", "PRIO", cal_index);
 
-						// check configured priority and reset if necessary
-						if (priority[cur_gyro] < 0 || priority[cur_gyro] > 100) {
-							priority[cur_gyro] = GYRO_DEFAULT_PRIORITY;
-						}
+					// check configured priority and reset if necessary
+					if (priority[cur_gyro] < 0 || priority[cur_gyro] > 100) {
+						priority[cur_gyro] = GYRO_DEFAULT_PRIORITY;
 					}
 				}
 			}
@@ -320,20 +315,10 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 				offset.zero();
 			}
 
-			char str[20] {};
-
-			sprintf(str, "CAL_%s%u_ID", "GYRO", uorb_index);
-			param_set_no_notification(param_find(str), &device_id);
-			sprintf(str, "CAL_%s%u_PRIO", "GYRO", uorb_index);
-			param_set_no_notification(param_find(str), &priority[uorb_index]);
-
-			for (int axis = 0; axis < 3; axis++) {
-				char axis_char = 'X' + axis;
-
-				// offsets
-				sprintf(str, "CAL_%s%u_%cOFF", "GYRO", uorb_index, axis_char);
-				param_set_no_notification(param_find(str), &offset(axis));
-			}
+			// save calibration
+			SetCalibrationParam("GYRO", "ID", uorb_index, device_id);
+			SetCalibrationParam("GYRO", "PRIO", uorb_index, priority[uorb_index]);
+			SetCalibrationParamsVector3f("GYRO", "OFF", uorb_index, offset);
 		}
 
 		if (failed) {
