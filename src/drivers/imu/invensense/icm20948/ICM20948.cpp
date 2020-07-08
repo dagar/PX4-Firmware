@@ -51,7 +51,7 @@ ICM20948::ICM20948(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Ro
 	_px4_gyro(get_device_id(), ORB_PRIO_DEFAULT, rotation)
 {
 	if (drdy_gpio != 0) {
-		_drdy_interval_perf = perf_alloc(PC_INTERVAL, MODULE_NAME": DRDY interval");
+		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME": DRDY missed");
 	}
 
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
@@ -82,7 +82,6 @@ ICM20948::~ICM20948()
 	perf_free(_fifo_empty_perf);
 	perf_free(_fifo_overflow_perf);
 	perf_free(_fifo_reset_perf);
-	perf_free(_drdy_interval_perf);
 
 	delete _slave_ak09916_magnetometer;
 }
@@ -125,7 +124,7 @@ void ICM20948::print_status()
 	perf_print_counter(_fifo_empty_perf);
 	perf_print_counter(_fifo_overflow_perf);
 	perf_print_counter(_fifo_reset_perf);
-	perf_print_counter(_drdy_interval_perf);
+	perf_print_counter(_drdy_missed_perf);
 
 
 	if (_slave_ak09916_magnetometer) {
@@ -231,8 +230,8 @@ void ICM20948::RunImpl()
 	case STATE::FIFO_READ: {
 			if (_data_ready_interrupt_enabled) {
 				// scheduled from interrupt if _drdy_fifo_read_samples was set
-				if (_drdy_fifo_read_samples.fetch_and(0) == _fifo_gyro_samples) {
-					perf_count_interval(_drdy_interval_perf, now);
+				if (_drdy_fifo_read_samples.fetch_and(0) != _fifo_gyro_samples) {
+					perf_count(_drdy_missed_perf);
 				}
 
 				// push backup schedule back
@@ -442,12 +441,12 @@ int ICM20948::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM20948::DataReady()
 {
-	const uint8_t count = _drdy_count.fetch_add(1) + 1;
-
 	uint8_t expected = 0;
 
 	// at least the required number of samples in the FIFO
-	if ((count >= _fifo_gyro_samples) && _drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
+	if (((_drdy_count.fetch_add(1) + 1) >= _fifo_gyro_samples)
+	    && _drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
+
 		_drdy_count.store(0);
 		ScheduleNow();
 	}

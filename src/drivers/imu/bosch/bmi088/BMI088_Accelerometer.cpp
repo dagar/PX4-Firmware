@@ -46,7 +46,7 @@ BMI088_Accelerometer::BMI088_Accelerometer(I2CSPIBusOption bus_option, int bus, 
 	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation)
 {
 	if (drdy_gpio != 0) {
-		_drdy_interval_perf = perf_alloc(PC_INTERVAL, MODULE_NAME"_accel: DRDY interval");
+		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME"_accel: DRDY missed");
 	}
 
 	ConfigureSampleRate(_px4_accel.get_max_rate_hz());
@@ -59,7 +59,7 @@ BMI088_Accelerometer::~BMI088_Accelerometer()
 	perf_free(_fifo_empty_perf);
 	perf_free(_fifo_overflow_perf);
 	perf_free(_fifo_reset_perf);
-	perf_free(_drdy_interval_perf);
+	perf_free(_drdy_missed_perf);
 }
 
 void BMI088_Accelerometer::exit_and_cleanup()
@@ -79,7 +79,7 @@ void BMI088_Accelerometer::print_status()
 	perf_print_counter(_fifo_empty_perf);
 	perf_print_counter(_fifo_overflow_perf);
 	perf_print_counter(_fifo_reset_perf);
-	perf_print_counter(_drdy_interval_perf);
+	perf_print_counter(_drdy_missed_perf);
 }
 
 int BMI088_Accelerometer::probe()
@@ -186,7 +186,9 @@ void BMI088_Accelerometer::RunImpl()
 				// scheduled from interrupt if _drdy_fifo_read_samples was set
 				if (_drdy_fifo_read_samples.fetch_and(0) == _fifo_accel_samples) {
 					samples = _fifo_accel_samples;
-					perf_count_interval(_drdy_interval_perf, now);
+
+				} else {
+					perf_count(_drdy_missed_perf);
 				}
 
 				// push backup schedule back

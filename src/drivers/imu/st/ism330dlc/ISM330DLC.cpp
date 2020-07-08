@@ -57,7 +57,6 @@ ISM330DLC::~ISM330DLC()
 	perf_free(_fifo_overflow_perf);
 	perf_free(_fifo_reset_perf);
 	perf_free(_drdy_count_perf);
-	perf_free(_drdy_interval_perf);
 }
 
 void ISM330DLC::exit_and_cleanup()
@@ -337,6 +336,5 @@ void ISM330DLC::print_status()
 	perf_print_counter(_fifo_overflow_perf);
 	perf_print_counter(_fifo_reset_perf);
 	perf_print_counter(_drdy_count_perf);
-	perf_print_counter(_drdy_interval_perf);
 
 }
