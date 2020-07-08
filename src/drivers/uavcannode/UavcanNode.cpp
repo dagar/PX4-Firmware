@@ -223,7 +223,7 @@ void UavcanNode::busevent_signal_trampoline()
 
 static void cb_reboot(const uavcan::TimerEvent &)
 {
-	px4_systemreset(false);
+	board_reset(0);
 }
 
 void UavcanNode::cb_beginfirmware_update(const uavcan::ReceivedDataStructure<UavcanNode::BeginFirmwareUpdate::Request>
@@ -276,7 +276,7 @@ class RestartRequestHandler: public uavcan::IRestartRequestHandler
 	{
 		PX4_INFO("UAVCAN: Restarting by request from %i\n", int(request_source.get()));
 		usleep(20 * 1000 * 1000);
-		px4_systemreset(false);
+		board_reset(0);
 		return true; // Will never be executed BTW
 	}
 } restart_request_handler;
@@ -389,7 +389,26 @@ void UavcanNode::Run()
 			range_sensor.sensor_id = i;
 			range_sensor.range = dist.current_distance;
 			range_sensor.field_of_view = dist.h_fov;
-			range_sensor.sensor_type = uavcan::equipment::range_sensor::Measurement::SENSOR_TYPE_UNDEFINED;
+
+			// sensor type
+			switch (dist.type) {
+			case distance_sensor_s::MAV_DISTANCE_SENSOR_LASER:
+				range_sensor.sensor_type = uavcan::equipment::range_sensor::Measurement::SENSOR_TYPE_LIDAR;
+				break;
+
+			case distance_sensor_s::MAV_DISTANCE_SENSOR_ULTRASOUND:
+				range_sensor.sensor_type = uavcan::equipment::range_sensor::Measurement::SENSOR_TYPE_SONAR;
+				break;
+
+			case distance_sensor_s::MAV_DISTANCE_SENSOR_RADAR:
+				range_sensor.sensor_type = uavcan::equipment::range_sensor::Measurement::SENSOR_TYPE_RADAR;
+				break;
+
+			case distance_sensor_s::MAV_DISTANCE_SENSOR_INFRARED:
+			default:
+				range_sensor.sensor_type = uavcan::equipment::range_sensor::Measurement::SENSOR_TYPE_UNDEFINED;
+				break;
+			}
 
 			// reading_type
 			if (dist.current_distance >= dist.max_distance) {
