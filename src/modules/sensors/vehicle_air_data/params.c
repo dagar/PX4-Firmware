@@ -43,3 +43,17 @@
  *
  */
 PARAM_DEFINE_FLOAT(SENS_BARO_QNH, 1013.25f);
+
+
+/**
+ * Barometer max output rate
+ *
+ * @min 5
+ * @max 100
+ * @group Sensors
+ * @unit Hz
+ *
+ * @reboot_required true
+ *
+ */
+PARAM_DEFINE_FLOAT(SENS_BARO_RATE, 20.0f);
