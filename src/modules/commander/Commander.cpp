@@ -1438,7 +1438,7 @@ Commander::run()
 
 			if (hrt_elapsed_time(&system_power.timestamp) < 1_s) {
 				if (system_power.servo_valid &&
-				    !system_power.brick_valid &&
+				    !system_power.brick_valid_flags &&
 				    !system_power.usb_connected) {
 					/* flying only on servo rail, this is unsafe */
 					status_flags.condition_power_input_valid = false;
@@ -2167,8 +2167,8 @@ Commander::run()
 
 			const uint8_t failure_status = _failure_detector.getStatus();
 
-			if (failure_status != status.failure_detector_status) {
-				status.failure_detector_status = failure_status;
+			if (failure_status != status.failure_detector_status_flags) {
+				status.failure_detector_status_flags = failure_status;
 				_status_changed = true;
 			}
 		}
@@ -2183,7 +2183,7 @@ Commander::run()
 				if (hrt_elapsed_time(&time_at_arm) < 500_ms) {
 					// 500ms is the PWM spoolup time. Within this timeframe controllers are not affecting actuator_outputs
 
-					if (status.failure_detector_status & vehicle_status_s::FAILURE_ARM_ESC) {
+					if (status.failure_detector_status_flags & vehicle_status_s::FAILURE_ARM_ESC) {
 						arm_disarm(false, true, &mavlink_log_pub, "Failure detector");
 						_status_changed = true;
 						mavlink_log_critical(&mavlink_log_pub, "ESCs did not respond to arm request");

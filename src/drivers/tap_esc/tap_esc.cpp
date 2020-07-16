@@ -456,7 +456,7 @@ void TAP_ESC::cycle()
 
 			/* publish mixer status */
 			multirotor_motor_limits_s multirotor_motor_limits = {};
-			multirotor_motor_limits.saturation_status = _mixers->get_saturation_status();
+			multirotor_motor_limits.saturation_status_flags = _mixers->get_saturation_status();
 
 			orb_publish(ORB_ID(multirotor_motor_limits), _to_mixer_status, &multirotor_motor_limits);
 

@@ -196,10 +196,10 @@ void ADC::update_system_power(hrt_abstime now)
 #if defined(BOARD_BRICK_VALID_LIST)
 	/* The valid signals (HW dependent) are associated with each brick */
 	bool  valid_chan[BOARD_NUMBER_BRICKS] = BOARD_BRICK_VALID_LIST;
-	system_power.brick_valid = 0;
+	system_power.brick_valid_flags = 0;
 
 	for (int b = 0; b < BOARD_NUMBER_BRICKS; b++) {
-		system_power.brick_valid |=  valid_chan[b] ? 1 << b : 0;
+		system_power.brick_valid_flags |= valid_chan[b] ? 1 << b : 0;
 	}
 
 #endif

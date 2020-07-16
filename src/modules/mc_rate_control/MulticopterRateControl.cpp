@@ -258,7 +258,7 @@ MulticopterRateControl::Run()
 
 				if (_motor_limits_sub.copy(&motor_limits)) {
 					MultirotorMixer::saturation_status saturation_status;
-					saturation_status.value = motor_limits.saturation_status;
+					saturation_status.value = motor_limits.saturation_status_flags;
 
 					_rate_control.setSaturationStatus(saturation_status);
 				}

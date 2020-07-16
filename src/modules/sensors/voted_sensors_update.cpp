@@ -333,7 +333,7 @@ void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 			_last_sensor_data[uorb_index].accelerometer_m_s2[1] = accel_data(1);
 			_last_sensor_data[uorb_index].accelerometer_m_s2[2] = accel_data(2);
 			_last_sensor_data[uorb_index].accelerometer_integral_dt = imu_report.delta_velocity_dt;
-			_last_sensor_data[uorb_index].accelerometer_clipping = imu_report.delta_velocity_clipping;
+			_last_sensor_data[uorb_index].accelerometer_clipping_flags = imu_report.delta_velocity_clipping_flags;
 			_last_sensor_data[uorb_index].gyro_rad[0] = gyro_rate(0);
 			_last_sensor_data[uorb_index].gyro_rad[1] = gyro_rate(1);
 			_last_sensor_data[uorb_index].gyro_rad[2] = gyro_rate(2);
@@ -367,7 +367,7 @@ void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 		memcpy(&raw.gyro_rad, &_last_sensor_data[gyro_best_index].gyro_rad, sizeof(raw.gyro_rad));
 		raw.accelerometer_integral_dt = _last_sensor_data[accel_best_index].accelerometer_integral_dt;
 		raw.gyro_integral_dt = _last_sensor_data[gyro_best_index].gyro_integral_dt;
-		raw.accelerometer_clipping = _last_sensor_data[accel_best_index].accelerometer_clipping;
+		raw.accelerometer_clipping_flags = _last_sensor_data[accel_best_index].accelerometer_clipping_flags;
 
 		if ((accel_best_index != _accel.last_best_vote) || (_selection.accel_device_id != _accel_device_id[accel_best_index])) {
 			_accel.last_best_vote = (uint8_t)accel_best_index;

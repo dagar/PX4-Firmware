@@ -2316,7 +2316,7 @@ MavlinkReceiver::handle_message_cellular_status(mavlink_message_t *msg)
 	cellular_status_s cellular_status{};
 
 	cellular_status.timestamp = hrt_absolute_time();
-	cellular_status.status = status.status;
+	cellular_status.status_flags = status.status;
 	cellular_status.failure_reason = status.failure_reason;
 	cellular_status.type = status.type;
 	cellular_status.quality = status.quality;

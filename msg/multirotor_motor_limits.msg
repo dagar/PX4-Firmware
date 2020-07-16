@@ -1,5 +1,5 @@
 uint64 timestamp		# time since system start (microseconds)
-uint16 saturation_status	# Integer bit mask indicating which axes in the control mixer are saturated
+uint16 saturation_status_flags	# Bits indicating which axes in the control mixer are saturated
 
 # 0 - True if the saturation status is valid
 # 1 - True if any motor is saturated at the upper limit

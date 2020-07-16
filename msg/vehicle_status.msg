@@ -88,9 +88,9 @@ bool high_latency_data_link_lost 			# Set to true if the high latency data link 
 bool engine_failure				# Set to true if an engine failure is detected
 bool mission_failure				# Set to true if mission could not continue/finish
 
-uint8 failure_detector_status			# Bitmask containing FailureDetector status [0, 0, 0, 0, 0, FAILURE_ALT, FAILURE_PITCH, FAILURE_ROLL]
+uint8 failure_detector_status_flags		# Bits indicating FailureDetector status [0, 0, 0, 0, 0, FAILURE_ALT, FAILURE_PITCH, FAILURE_ROLL]
 
 # see SYS_STATUS mavlink message for the following
-uint32 onboard_control_sensors_present
-uint32 onboard_control_sensors_enabled
-uint32 onboard_control_sensors_health
+uint32 onboard_control_sensors_present_flags
+uint32 onboard_control_sensors_enabled_flags
+uint32 onboard_control_sensors_health_flags

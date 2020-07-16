@@ -1979,7 +1979,7 @@ PX4IO::io_publish_pwm_outputs()
 	if (saturation_status.flags.valid) {
 		multirotor_motor_limits_s motor_limits{};
 		motor_limits.timestamp = hrt_absolute_time();
-		motor_limits.saturation_status = saturation_status.value;
+		motor_limits.saturation_status_flags = saturation_status.value;
 
 		_to_mixer_status.publish(motor_limits);
 	}

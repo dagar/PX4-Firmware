@@ -43,17 +43,17 @@ bool PreFlightCheck::failureDetectorCheck(orb_advert_t *mavlink_log_pub, const v
 		return true;
 	}
 
-	if (status.failure_detector_status != vehicle_status_s::FAILURE_NONE) {
+	if (status.failure_detector_status_flags != vehicle_status_s::FAILURE_NONE) {
 		if (report_fail) {
-			if (status.failure_detector_status & vehicle_status_s::FAILURE_ROLL) {
+			if (status.failure_detector_status_flags & vehicle_status_s::FAILURE_ROLL) {
 				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Roll failure detected");
 			}
 
-			if (status.failure_detector_status & vehicle_status_s::FAILURE_PITCH) {
+			if (status.failure_detector_status_flags & vehicle_status_s::FAILURE_PITCH) {
 				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Pitch failure detected");
 			}
 
-			if (status.failure_detector_status & vehicle_status_s::FAILURE_ALT) {
+			if (status.failure_detector_status_flags & vehicle_status_s::FAILURE_ALT) {
 				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Altitude failure detected");
 			}
 		}

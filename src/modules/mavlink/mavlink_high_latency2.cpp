@@ -350,34 +350,34 @@ bool MavlinkStreamHighLatency2::write_vehicle_status(mavlink_high_latency2_t *ms
 	vehicle_status_s status;
 
 	if (_status_sub.update(&status)) {
-		if ((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE)
-		    && !(status.onboard_control_sensors_health & MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE)) {
+		if ((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE)
+		    && !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE)) {
 			msg->failure_flags |= HL_FAILURE_FLAG_ABSOLUTE_PRESSURE;
 		}
 
-		if (((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_ACCEL)
-		     && !(status.onboard_control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_ACCEL)) ||
-		    ((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_ACCEL2) &&
-		     !(status.onboard_control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_ACCEL2))) {
+		if (((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_SENSOR_3D_ACCEL)
+		     && !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_SENSOR_3D_ACCEL)) ||
+		    ((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_SENSOR_3D_ACCEL2) &&
+		     !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_SENSOR_3D_ACCEL2))) {
 			msg->failure_flags |= HL_FAILURE_FLAG_3D_ACCEL;
 		}
 
-		if (((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_GYRO)
-		     && !(status.onboard_control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_GYRO)) ||
-		    ((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_GYRO2) &&
-		     !(status.onboard_control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_GYRO2))) {
+		if (((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_SENSOR_3D_GYRO)
+		     && !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_SENSOR_3D_GYRO)) ||
+		    ((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_SENSOR_3D_GYRO2) &&
+		     !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_SENSOR_3D_GYRO2))) {
 			msg->failure_flags |= HL_FAILURE_FLAG_3D_GYRO;
 		}
 
-		if (((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_MAG)
-		     && !(status.onboard_control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_MAG)) ||
-		    ((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_SENSOR_3D_MAG2) &&
-		     !(status.onboard_control_sensors_health & MAV_SYS_STATUS_SENSOR_3D_MAG2))) {
+		if (((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_SENSOR_3D_MAG)
+		     && !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_SENSOR_3D_MAG)) ||
+		    ((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_SENSOR_3D_MAG2) &&
+		     !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_SENSOR_3D_MAG2))) {
 			msg->failure_flags |= HL_FAILURE_FLAG_3D_MAG;
 		}
 
-		if ((status.onboard_control_sensors_enabled & MAV_SYS_STATUS_TERRAIN)
-		    && !(status.onboard_control_sensors_health & MAV_SYS_STATUS_TERRAIN)) {
+		if ((status.onboard_control_sensors_enabled_flags & MAV_SYS_STATUS_TERRAIN)
+		    && !(status.onboard_control_sensors_health_flags & MAV_SYS_STATUS_TERRAIN)) {
 			msg->failure_flags |= HL_FAILURE_FLAG_TERRAIN;
 		}
 

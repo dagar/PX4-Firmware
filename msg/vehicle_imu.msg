@@ -14,4 +14,4 @@ uint16 delta_velocity_dt        # integration period in us
 uint8 CLIPPING_X = 1
 uint8 CLIPPING_Y = 2
 uint8 CLIPPING_Z = 4
-uint8 delta_velocity_clipping   # bitfield indicating if there was any accelerometer clipping (per axis) during the integration time frame
+uint8 delta_velocity_clipping_flags # bits indicating if there was any accelerometer clipping (per axis) during the integration time frame

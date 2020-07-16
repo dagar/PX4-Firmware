@@ -606,9 +606,9 @@ protected:
 
 			mavlink_sys_status_t msg{};
 
-			msg.onboard_control_sensors_present = status.onboard_control_sensors_present;
-			msg.onboard_control_sensors_enabled = status.onboard_control_sensors_enabled;
-			msg.onboard_control_sensors_health = status.onboard_control_sensors_health;
+			msg.onboard_control_sensors_present = status.onboard_control_sensors_present_flags;
+			msg.onboard_control_sensors_enabled = status.onboard_control_sensors_enabled_flags;
+			msg.onboard_control_sensors_health = status.onboard_control_sensors_health_flags;
 
 			msg.load = cpuload.load * 1000.0f;
 

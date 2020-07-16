@@ -257,6 +257,7 @@ add_custom_command(OUTPUT ${uorb_sources}
 		templates/uorb/msg.cpp.em
 		templates/uorb/uORBTopics.cpp.em
 		tools/px_generate_uorb_topic_files.py
+		tools/px_generate_uorb_topic_helper.py
 	COMMENT "Generating uORB topic sources"
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	VERBATIM

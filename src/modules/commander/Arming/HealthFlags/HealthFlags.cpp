@@ -48,46 +48,47 @@ void set_health_flags(uint64_t subsystem_type, bool present, bool enabled, bool 
 		  enabled, ok);
 
 	if (present) {
-		status.onboard_control_sensors_present |= (uint32_t)subsystem_type;
+		status.onboard_control_sensors_present_flags |= (uint32_t)subsystem_type;
 
 	} else {
-		status.onboard_control_sensors_present &= ~(uint32_t)subsystem_type;
+		status.onboard_control_sensors_present_flags &= ~(uint32_t)subsystem_type;
 	}
 
 	if (enabled) {
-		status.onboard_control_sensors_enabled |= (uint32_t)subsystem_type;
+		status.onboard_control_sensors_enabled_flags |= (uint32_t)subsystem_type;
 
 	} else {
-		status.onboard_control_sensors_enabled &= ~(uint32_t)subsystem_type;
+		status.onboard_control_sensors_enabled_flags &= ~(uint32_t)subsystem_type;
 	}
 
 	if (ok) {
-		status.onboard_control_sensors_health |= (uint32_t)subsystem_type;
+		status.onboard_control_sensors_health_flags |= (uint32_t)subsystem_type;
 
 	} else {
-		status.onboard_control_sensors_health &= ~(uint32_t)subsystem_type;
+		status.onboard_control_sensors_health_flags &= ~(uint32_t)subsystem_type;
 	}
 }
 
 void set_health_flags_present_healthy(uint64_t subsystem_type, bool present, bool healthy, vehicle_status_s &status)
 {
-	set_health_flags(subsystem_type, present, status.onboard_control_sensors_enabled & (uint32_t)subsystem_type, healthy,
+	set_health_flags(subsystem_type, present, status.onboard_control_sensors_enabled_flags & (uint32_t)subsystem_type,
+			 healthy,
 			 status);
 }
 
 void set_health_flags_healthy(uint64_t subsystem_type, bool healthy, vehicle_status_s &status)
 {
-	set_health_flags(subsystem_type, status.onboard_control_sensors_present & (uint32_t)subsystem_type,
-			 status.onboard_control_sensors_enabled & (uint32_t)subsystem_type, healthy, status);
+	set_health_flags(subsystem_type, status.onboard_control_sensors_present_flags & (uint32_t)subsystem_type,
+			 status.onboard_control_sensors_enabled_flags & (uint32_t)subsystem_type, healthy, status);
 }
 
 void _print_sub(const char *name, const vehicle_status_s &status, uint32_t bit)
 {
 	PX4_INFO("%s:\t\t%s\t%s", name,
-		 (status.onboard_control_sensors_enabled & bit) ? "EN" : " ",
-		 (status.onboard_control_sensors_present & bit) ?
-		 ((status.onboard_control_sensors_health & bit) ? "OK" : "ERR") :
-		 (status.onboard_control_sensors_enabled & bit) ? "OFF" : "");
+		 (status.onboard_control_sensors_enabled_flags & bit) ? "EN" : " ",
+		 (status.onboard_control_sensors_present_flags & bit) ?
+		 ((status.onboard_control_sensors_health_flags & bit) ? "OK" : "ERR") :
+		 (status.onboard_control_sensors_enabled_flags & bit) ? "OFF" : "");
 }
 
 void print_health_flags(const vehicle_status_s &status)

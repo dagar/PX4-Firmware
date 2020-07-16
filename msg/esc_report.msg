@@ -8,7 +8,7 @@ uint8 esc_address					# Address of current ESC (in most cases 1-8 / must be set 
 
 uint8 esc_state					# State of ESC - depend on Vendor
 
-uint8 failures					# Bitmask to indicate the internal ESC faults
+uint8 failure_flags					# Bitmask to indicate the internal ESC faults
 
 uint8 FAILURE_NONE = 0
 uint8 FAILURE_OVER_CURRENT_MASK = 1 		# (1 << 0)

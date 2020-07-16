@@ -356,7 +356,7 @@ void VehicleIMU::Run()
 			delta_velocity_corrected.copyTo(imu.delta_velocity);
 			imu.delta_angle_dt = gyro_integral_dt;
 			imu.delta_velocity_dt = accel_integral_dt;
-			imu.delta_velocity_clipping = _delta_velocity_clipping;
+			imu.delta_velocity_clipping_flags = _delta_velocity_clipping;
 			imu.timestamp = hrt_absolute_time();
 			_vehicle_imu_pub.publish(imu);
 

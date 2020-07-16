@@ -426,7 +426,7 @@ MixingOutput::publishMixerStatus(const actuator_outputs_s &actuator_outputs)
 	if (saturation_status.flags.valid) {
 		multirotor_motor_limits_s motor_limits;
 		motor_limits.timestamp = actuator_outputs.timestamp;
-		motor_limits.saturation_status = saturation_status.value;
+		motor_limits.saturation_status_flags = saturation_status.value;
 
 		_to_mixer_status.publish(motor_limits);
 	}
