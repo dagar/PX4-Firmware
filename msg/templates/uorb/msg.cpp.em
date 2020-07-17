@@ -78,8 +78,10 @@ topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in so
 @# This is used for the logger
 constexpr char __orb_@(topic_name)_fields[] = "@( ";".join(topic_fields) );";
 
+// write __orb_@(topic_name)_fields to output file
+
 @[for multi_topic in topics]@
-ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), __orb_@(topic_name)_fields, static_cast<uint8_t>(ORB_ID::@multi_topic));
+ORB_DEFINE(@multi_topic, struct @uorb_struct, @(struct_size-padding_end_size), static_cast<uint8_t>(ORB_ID::@multi_topic));
 @[end for]
 
 void print_message(const @uorb_struct &message)

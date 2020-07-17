@@ -81,9 +81,9 @@ __license__ = "BSD"
 __email__ = "thomasgubler@gmail.com"
 
 
-TEMPLATE_FILE = ['msg.h.em', 'msg.cpp.em']
-TOPICS_LIST_TEMPLATE_FILE = ['uORBTopics.hpp.em', 'uORBTopics.cpp.em']
-OUTPUT_FILE_EXT = ['.h', '.cpp']
+TEMPLATE_FILE = ['msg.h.em', 'msg.cpp.em', 'msg_fields.txt.em']
+TOPICS_LIST_TEMPLATE_FILE = ['uORBTopics.hpp.em', 'uORBTopics.cpp.em', 'uORBTopics.txt.em']
+OUTPUT_FILE_EXT = ['.h', '.cpp', '.txt']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
 TOPICS_TOKEN = '# TOPICS '
@@ -487,6 +487,8 @@ if __name__ == "__main__":
                         action='store_true')
     parser.add_argument('--sources', help='Generate source files',
                         action='store_true')
+    parser.add_argument('--text', help='Generate text files',
+                        action='store_true')
     parser.add_argument('-d', dest='dir', help='directory with msg files')
     parser.add_argument('-f', dest='file',
                         help="files to convert (use only without -d)",
@@ -521,8 +523,10 @@ if __name__ == "__main__":
         generate_idx = 0
     elif args.sources:
         generate_idx = 1
+    elif args.text:
+        generate_idx = 2
     else:
-        print('Error: either --headers or --sources must be specified')
+        print('Error: either --headers, --sources, or --text must be specified')
         exit(-1)
     if args.file is not None:
         for f in args.file:

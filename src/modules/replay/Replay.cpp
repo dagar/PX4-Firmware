@@ -355,6 +355,8 @@ Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 	// FIXME: this should check recursively, all used nested types
 	string file_format = _file_formats[topic_name];
 
+	// TODO: read file
+
 	if (file_format != orb_meta->o_fields) {
 		// check if we have a compatibility conversion available
 		if (topic_name == "sensor_combined") {

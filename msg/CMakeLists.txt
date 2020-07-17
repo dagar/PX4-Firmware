@@ -206,6 +206,7 @@ endif()
 # headers
 set(msg_out_path ${PX4_BINARY_DIR}/uORB/topics)
 set(msg_source_out_path	${CMAKE_CURRENT_BINARY_DIR}/topics_sources)
+set(msg_fields_out_path	${PX4_BINARY_DIR}/romfs_extras/topics_fields)
 
 set(uorb_headers ${msg_out_path}/uORBTopics.hpp)
 set(uorb_sources ${msg_source_out_path}/uORBTopics.cpp)
@@ -213,6 +214,7 @@ foreach(msg_file ${msg_files})
 	get_filename_component(msg ${msg_file} NAME_WE)
 	list(APPEND uorb_headers ${msg_out_path}/${msg}.h)
 	list(APPEND uorb_sources ${msg_source_out_path}/${msg}.cpp)
+	list(APPEND uorb_text ${msg_fields_out_path}/${msg}.txt)
 endforeach()
 
 if (px4_constrained_flash_build)
@@ -261,6 +263,27 @@ add_custom_command(OUTPUT ${uorb_sources}
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	VERBATIM
 	)
-
 add_library(uorb_msgs ${uorb_sources})
+
+# Generate uORB text
+add_custom_command(OUTPUT ${uorb_text}
+	COMMAND ${PYTHON_EXECUTABLE} tools/px_generate_uorb_topic_files.py
+		--text
+		-f ${msg_files}
+		-i ${CMAKE_CURRENT_SOURCE_DIR}
+		-o ${msg_fields_out_path}
+		-e templates/uorb
+		-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/text
+		#-q
+		${added_arguments}
+	DEPENDS
+		${msg_files}
+		templates/uorb/msg_fields.txt.em
+		tools/px_generate_uorb_topic_files.py
+	COMMENT "Generating uORB text"
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	VERBATIM
+)
+add_custom_target(uorb_text DEPENDS ${uorb_text})
+
 add_dependencies(uorb_msgs prebuild_targets uorb_headers)

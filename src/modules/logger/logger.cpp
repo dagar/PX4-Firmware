@@ -1457,7 +1457,8 @@ void Logger::write_format(LogType type, const orb_metadata &meta, WrittenFormats
 	PX4_DEBUG("writing format for %s", meta.o_name);
 
 	// Write the current format (we don't need to check if we already added it to written_formats)
-	int format_len = snprintf(msg.format, sizeof(msg.format), "%s:%s", meta.o_name, meta.o_fields);
+	//int format_len = snprintf(msg.format, sizeof(msg.format), "%s:%s", meta.o_name, meta.o_fields);
+	int format_len = snprintf(msg.format, sizeof(msg.format), "%s:%s", meta.o_name, "uint64 timestamp");
 	size_t msg_size = sizeof(msg) - sizeof(msg.format) + format_len;
 	msg.msg_size = msg_size - ULOG_MSG_HEADER_LEN;
 
@@ -1469,7 +1470,10 @@ void Logger::write_format(LogType type, const orb_metadata &meta, WrittenFormats
 
 	// Now go through the fields and check for nested type usages.
 	// o_fields looks like this for example: "uint64_t timestamp;uint8_t[5] array;"
-	const char *fmt = meta.o_fields;
+
+	// TODO: read file /obj/fields/topic.txt
+	//const char *fmt = meta.o_fields;
+	const char *fmt = "uint64 timestamp";
 
 	while (fmt && *fmt) {
 		// extract the type name
