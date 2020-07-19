@@ -51,8 +51,6 @@
 
 namespace px4_daemon
 {
-
-
 class Pxh
 {
 public:
@@ -88,11 +86,7 @@ private:
 	History _history;
 	struct termios _orig_term {};
 
-	static apps_map_type _apps;
 	static Pxh *_instance;
 };
 
-
-
 } // namespace px4_daemon
-

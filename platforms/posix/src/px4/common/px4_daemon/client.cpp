@@ -57,7 +57,6 @@ namespace px4_daemon
 {
 
 Client::Client(int instance_id) :
-	_fd(-1),
 	_instance_id(instance_id)
 {}
 

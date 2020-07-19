@@ -38,7 +38,6 @@
 # 	OS Specific Functions
 #
 #		* px4_qurt_add_firmware
-#		* px4_qurt_generate_builtin_commands
 #		* px4_qurt_add_export
 #		* px4_qurt_generate_romfs
 #
@@ -48,54 +47,6 @@
 # 		* px4_os_determine_build_chip
 #		* px4_os_prebuild_targets
 #
-
-#=============================================================================
-#
-#	px4_qurt_generate_builtin_commands
-#
-#	This function generates the builtin_commands.c src for qurt
-#
-#	Usage:
-#		px4_qurt_generate_builtin_commands(
-#			MODULE_LIST <in-list>
-#			OUT <file>)
-#
-#	Input:
-#		MODULE_LIST	: list of modules
-#
-#	Output:
-#		OUT	: stem of generated apps.cpp/apps.h ("apps").
-#
-#	Example:
-#		px4_qurt_generate_builtin_commands(
-#			OUT <generated-src> MODULE_LIST px4_simple_app)
-#
-function(px4_qurt_generate_builtin_commands)
-	px4_parse_function_args(
-		NAME px4_qurt_generate_builtin_commands
-		ONE_VALUE OUT
-		MULTI_VALUE MODULE_LIST
-		REQUIRED MODULE_LIST OUT
-		ARGN ${ARGN})
-
-	set(builtin_apps_string)
-	set(builtin_apps_decl_string)
-	set(command_count 0)
-	foreach(module ${MODULE_LIST})
-		foreach(property MAIN STACK_MAIN PRIORITY)
-			get_target_property(${property} ${module} ${property})
-		endforeach()
-		if (MAIN)
-			set(builtin_apps_string
-				"${builtin_apps_string}\tapps[\"${MAIN}\"] = ${MAIN}_main;\n")
-			set(builtin_apps_decl_string
-				"${builtin_apps_decl_string}int ${MAIN}_main(int argc, char *argv[]);\n")
-			math(EXPR command_count "${command_count}+1")
-		endif()
-	endforeach()
-	configure_file(${PX4_SOURCE_DIR}/platforms/common/apps.cpp.in ${OUT}.cpp)
-	configure_file(${PX4_SOURCE_DIR}/platforms/common/apps.h.in ${OUT}.h)
-endfunction()
 
 #=============================================================================
 #

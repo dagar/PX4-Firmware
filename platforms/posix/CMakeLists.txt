@@ -13,9 +13,10 @@ set(PX4_SHELL_COMMAND_PREFIX "px4-")
 
 add_definitions("-DPX4_SHELL_COMMAND_PREFIX=\"${PX4_SHELL_COMMAND_PREFIX}\"")
 
-px4_posix_generate_builtin_commands(
+px4_generate_builtin_commands(
 	OUT apps
-	MODULE_LIST ${module_libraries})
+	MODULE_LIST ${module_libraries}
+)
 
 px4_posix_generate_alias(
 	OUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/px4-alias.sh

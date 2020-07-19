@@ -6,8 +6,6 @@
 #include "apps.h"
 
 #include <cstdio>
-#include <map>
-#include <string>
 
 #include <cstdlib>
 
@@ -15,17 +13,19 @@
 
 extern "C" {
 
-${builtin_apps_decl_string}
-int shutdown_main(int argc, char *argv[]);
-int list_tasks_main(int argc, char *argv[]);
-int list_files_main(int argc, char *argv[]);
-int sleep_main(int argc, char *argv[]);
+	int cdev_test_main(int argc, char *argv[]);
+
+	int shutdown_main(int argc, char *argv[]);
+	int list_tasks_main(int argc, char *argv[]);
+	int list_files_main(int argc, char *argv[]);
+	int sleep_main(int argc, char *argv[]);
 
 }
 
 void init_app_map(apps_map_type &apps)
 {
-	${builtin_apps_string}
+	apps["cdev_test"] = cdev_test_main;
+
 	apps["shutdown"] = shutdown_main;
 	apps["list_tasks"] = list_tasks_main;
 	apps["list_files"] = list_files_main;
@@ -35,6 +35,7 @@ void init_app_map(apps_map_type &apps)
 void list_builtins(apps_map_type &apps)
 {
 	printf("Builtin Commands:\n");
+
 	for (apps_map_type::iterator it = apps.begin(); it != apps.end(); ++it) {
 		printf("  %s\n", it->first.c_str());
 	}
@@ -60,13 +61,13 @@ int list_files_main(int argc, char *argv[])
 
 int sleep_main(int argc, char *argv[])
 {
-        if (argc != 2) {
-           PX4_WARN( "Usage: sleep <seconds>" );
-           return 1;
-        }
+	if (argc != 2) {
+		PX4_WARN("Usage: sleep <seconds>");
+		return 1;
+	}
 
-        unsigned long usecs = 1000000UL * atol(argv[1]);
-        printf("Sleeping for %s s; (%lu us).\n", argv[1], usecs);
-        px4_usleep(usecs);
-        return 0;
+	unsigned long usecs = 1000000UL * atol(argv[1]);
+	printf("Sleeping for %s s; (%lu us).\n", argv[1], usecs);
+	px4_usleep(usecs);
+	return 0;
 }

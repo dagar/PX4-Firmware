@@ -78,7 +78,6 @@ public:
 	 */
 	void try_to_save_current_line(const std::string &line);
 
-
 	/**
 	 * Set the previous (earlier) command from the history.
 	 *

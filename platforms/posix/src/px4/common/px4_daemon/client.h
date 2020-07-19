@@ -80,7 +80,7 @@ private:
 	int _send_cmds(const int argc, const char **argv);
 	int _listen();
 
-	int _fd;
+	int _fd{-1};
 	int _instance_id; ///< instance ID for running multiple instances of the px4 server
 };
 

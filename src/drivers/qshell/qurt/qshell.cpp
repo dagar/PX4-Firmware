@@ -63,11 +63,6 @@
 
 px4::AppState QShell::appState;
 
-QShell::QShell()
-{
-	init_app_map(m_apps);
-}
-
 int QShell::main()
 {
 	appState.setRunning(true);
@@ -78,7 +73,7 @@ int QShell::main()
 		return -1;
 	}
 
-	px4_pollfd_struct_t fds[1] = {};
+	px4_pollfd_struct_t fds[1] {};
 	fds[0].fd = sub_qshell_req;
 	fds[0].events = POLLIN;
 
@@ -143,7 +138,7 @@ int QShell::run_cmd(const std::vector<std::string> &appargs)
 	std::string command = appargs[0];
 
 	if (command.compare("help") == 0) {
-		list_builtins(m_apps);
+		list_builtins();
 		return 0;
 	}
 

@@ -52,8 +52,8 @@
 class QShell
 {
 public:
-	QShell();
-	~QShell() {}
+	QShell() = default;
+	~QShell() = default;
 
 	int main();
 	int run_cmd(const std::vector<std::string> &appargs);
@@ -61,10 +61,7 @@ public:
 	static px4::AppState appState; /* track requests to terminate app */
 
 private:
-
 	uORB::Publication<qshell_retval_s>	_qshell_retval_pub{ORB_ID(qshell_retval)};
 
 	qshell_req_s m_qshell_req{};
-
-	apps_map_type m_apps;
 };
