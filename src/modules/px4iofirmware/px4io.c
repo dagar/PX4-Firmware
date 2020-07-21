@@ -58,8 +58,6 @@
 # include <lib/perf/perf_counter.h>
 #endif
 
-#include <output_limit/output_limit.h>
-
 #include <stm32_uart.h>
 
 #define DEBUG
@@ -71,8 +69,6 @@ struct sys_state_s 	system_state;
 
 static struct hrt_call serial_dma_call;
 
-output_limit_t pwm_limit;
-
 float dt;
 
 /*
@@ -83,12 +79,7 @@ static volatile uint32_t msg_counter;
 static volatile uint32_t last_msg_counter;
 static volatile uint8_t msg_next_out, msg_next_in;
 
-/*
- * WARNING: too large buffers here consume the memory required
- * for mixer handling. Do not allocate more than 80 bytes for
- * output.
- */
-#define NUM_MSG 1
+#define NUM_MSG 5
 static char msg[NUM_MSG][CONFIG_USART1_TXBUFSIZE];
 
 static void heartbeat_blink(void);
@@ -363,9 +354,6 @@ user_start(int argc, char *argv[])
 	r_page_status[PX4IO_P_STATUS_FREEMEM] = minfo.mxordblk;
 	syslog(LOG_INFO, "MEM: free %u, largest %u\n", minfo.mxordblk, minfo.fordblks);
 
-	/* initialize PWM limit lib */
-	output_limit_init(&pwm_limit);
-
 	/*
 	 *    P O L I C E    L I G H T S
 	 *
@@ -459,10 +447,6 @@ user_start(int argc, char *argv[])
 			  pre-flight testing the override system
 			 */
 			uint32_t heartbeat_period_us = 250 * 1000UL;
-
-			if (r_status_flags & PX4IO_P_STATUS_FLAGS_OVERRIDE) {
-				heartbeat_period_us /= 4;
-			}
 
 			if ((hrt_absolute_time() - last_heartbeat_time) > heartbeat_period_us) {
 				last_heartbeat_time = hrt_absolute_time();

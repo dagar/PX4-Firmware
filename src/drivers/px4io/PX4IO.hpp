@@ -44,7 +44,6 @@
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/posix.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <px4_platform_common/sem.hpp>
 
 #include <crc32.h>
@@ -57,8 +56,7 @@
 #include <drivers/drv_sbus.h>
 #include <lib/circuit_breaker/circuit_breaker.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/mixer/MixerGroup.hpp>
-#include <lib/mixer/MultirotorMixer/MultirotorMixer.hpp>
+#include <lib/mixer_module/mixer_module.hpp>
 #include <lib/parameters/param.h>
 #include <lib/perf/perf_counter.h>
 #include <lib/rc/dsm.h>
@@ -68,16 +66,11 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_armed.h>
-#include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
-#include <uORB/topics/multirotor_motor_limits.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/px4io_status.h>
-#include <uORB/topics/rc_channels.h>
 #include <uORB/topics/safety.h>
-#include <uORB/topics/test_motor.h>
 #include <uORB/topics/vehicle_command.h>
-#include <uORB/topics/vehicle_control_mode.h>
 
 #include <debug.h>
 
@@ -101,29 +94,27 @@ using namespace time_literals;
  *
  * Encapsulates PX4FMU to PX4IO communications modeled as file operations.
  */
-class PX4IO : public cdev::CDev, public px4::ScheduledWorkItem
+class PX4IO : public cdev::CDev, public ModuleBase<PX4IO>, public OutputModuleInterface
 {
 public:
-	/**
-	 * Constructor.
-	 *
-	 * Initialize all class variables.
-	 */
-	PX4IO() = delete;
-	explicit PX4IO(device::Device *interface);
 
-	/**
-	 * Destructor.
-	 *
-	 * Wait for worker thread to terminate.
-	 */
+	PX4IO() = delete;
+	PX4IO(device::Device *interface);
+
 	~PX4IO() override;
 
-	/**
-	 * Initialize the PX4IO class.
-	 *
-	 * Retrieve relevant initial system parameters. Initialize PX4IO registers.
-	 */
+	/** @see ModuleBase */
+	static int task_spawn(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static int custom_command(int argc, char *argv[]) { return 0; }
+
+	/** @see ModuleBase */
+	static int print_usage(const char *reason = nullptr);
+
+	/** @see ModuleBase::print_status() */
+	int print_status() override;
+
 	int		init() override;
 
 	/**
@@ -135,6 +126,13 @@ public:
 	 * @param hitl_mode set to suppress publication of actuator_outputs - instead defer to pwm_out_sim
 	 */
 	int			init(bool disable_rc_handling, bool hitl_mode);
+
+
+
+	bool updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS], unsigned num_outputs,
+			   unsigned num_control_groups_updated) override { return true; }
+
+
 
 	/**
 	 * Detect if a PX4IO is connected.
@@ -187,12 +185,13 @@ private:
 
 	device::Device		*_interface{nullptr};
 
+
+	MixingOutput _mixing_output{8, *this, MixingOutput::SchedulingPolicy::Auto, true};
+
+
 	unsigned		_hardware{0};		///< Hardware revision
-	unsigned		_max_actuators{0};		///< Maximum # of actuators supported by PX4IO
-	unsigned		_max_controls{0};		///< Maximum # of controls supported by PX4IO
-	unsigned		_max_rc_input{0};		///< Maximum receiver channels supported by PX4IO
-	unsigned		_max_relays{0};		///< Maximum relays supported by PX4IO
-	unsigned		_max_transfer{16};		///< Maximum number of I2C transfers supported by PX4IO
+	unsigned		_max_actuators{8};	///< Maximum # of actuators supported by PX4IO
+	unsigned		_max_rc_input{0};	///< Maximum receiver channels supported by PX4IO
 
 	bool			_rc_handling_disabled{false};	///< If set, IO does not evaluate, but only forward the RC values
 	unsigned		_rc_chan_count{0};		///< Internal copy of the last seen number of RC channels
@@ -217,14 +216,7 @@ private:
 	uint16_t		_last_written_arming_s{0};	///< the last written arming state reg
 	uint16_t		_last_written_arming_c{0};	///< the last written arming state reg
 
-	/* subscribed topics */
-	uORB::SubscriptionCallbackWorkItem _t_actuator_controls_0{this, ORB_ID(actuator_controls_0)};
-
-	uORB::Subscription	_t_actuator_controls_1{ORB_ID(actuator_controls_1)};	///< actuator controls group 1 topic
-	uORB::Subscription	_t_actuator_controls_2{ORB_ID(actuator_controls_2)};;	///< actuator controls group 2 topic
-	uORB::Subscription	_t_actuator_controls_3{ORB_ID(actuator_controls_3)};;	///< actuator controls group 3 topic
 	uORB::Subscription	_t_actuator_armed{ORB_ID(actuator_armed)};		///< system armed control topic
-	uORB::Subscription 	_t_vehicle_control_mode{ORB_ID(vehicle_control_mode)};	///< vehicle control mode topic
 	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};	///< parameter update topic
 	uORB::Subscription	_t_vehicle_command{ORB_ID(vehicle_command)};		///< vehicle command topic
 
@@ -234,8 +226,6 @@ private:
 
 	/* advertised topics */
 	uORB::PublicationMulti<input_rc_s>			_to_input_rc{ORB_ID(input_rc)};
-	uORB::PublicationMulti<actuator_outputs_s>		_to_outputs{ORB_ID(actuator_outputs)};
-	uORB::PublicationMulti<multirotor_motor_limits_s>	_to_mixer_status{ORB_ID(multirotor_motor_limits)};
 	uORB::Publication<px4io_status_s>			_px4io_status_pub{ORB_ID(px4io_status)};
 	uORB::Publication<safety_s>				_to_safety{ORB_ID(safety)};
 
@@ -244,7 +234,6 @@ private:
 	bool			_primary_pwm_device{false};	///< true if we are the default PWM output
 	bool			_lockdown_override{false};	///< allow to override the safety lockdown
 	bool			_armed{false};			///< wether the system is armed
-	bool			_override_available{false};	///< true if manual reversion mode is enabled
 
 	bool			_cb_flighttermination{true};	///< true if the flight termination circuit breaker is enabled
 	bool 			_in_esc_calibration_mode{false};	///< do not send control outputs to IO (used for esc calibration)
@@ -258,33 +247,12 @@ private:
 
 	bool			_test_fmu_fail{false}; ///< To test what happens if IO loses FMU
 
-	struct MotorTest {
-		uORB::Subscription test_motor_sub{ORB_ID(test_motor)};
-		bool in_test_mode{false};
-		hrt_abstime timeout{0};
-	};
-	MotorTest _motor_test;
 	bool                    _hitl_mode{false};     ///< Hardware-in-the-loop simulation mode - don't publish actuator_outputs
-
-	/**
-	 * Send controls for one group to IO
-	 */
-	int			io_set_control_state(unsigned group);
-
-	/**
-	 * Send all controls to IO
-	 */
-	int			io_set_control_groups();
 
 	/**
 	 * Update IO's arming-related state
 	 */
 	int			io_set_arming_state();
-
-	/**
-	 * Push RC channel configuration to IO.
-	 */
-	int			io_set_rc_config();
 
 	/**
 	 * Fetch status and alarms from IO
@@ -312,11 +280,6 @@ private:
 	int			io_publish_raw_rc();
 
 	/**
-	 * Fetch and publish the PWM servo outputs.
-	 */
-	int			io_publish_pwm_outputs();
-
-	/**
 	 * write register(s)
 	 *
 	 * @param page		Register page to write to.
@@ -335,7 +298,7 @@ private:
 	 * @param value		Value to write.
 	 * @return		OK if the value was written successfully.
 	 */
-	int			io_reg_set(uint8_t page, uint8_t offset, const uint16_t value);
+	int			io_reg_set(uint8_t page, uint8_t offset, const uint16_t value) { return io_reg_set(page, offset, &value, 1); }
 
 	/**
 	 * read register(s)
@@ -356,7 +319,7 @@ private:
 	 * @return		Register value that was read, or _io_reg_get_error on error.
 	 */
 	uint32_t		io_reg_get(uint8_t page, uint8_t offset);
-	static const uint32_t	_io_reg_get_error = 0x80000000;
+	static constexpr uint32_t	_io_reg_get_error = 0x80000000;
 
 	/**
 	 * modify a register
@@ -367,11 +330,6 @@ private:
 	 * @param setbits	Bits to set in the register.
 	 */
 	int			io_reg_modify(uint8_t page, uint8_t offset, uint16_t clearbits, uint16_t setbits);
-
-	/**
-	 * Send mixer definition text to IO
-	 */
-	int			mixer_send(const char *buf, unsigned buflen, unsigned retries = 3);
 
 	/**
 	 * Handle a status update from IO.
@@ -407,9 +365,4 @@ private:
 	 * @param vrssi 	vrssi register
 	 */
 	void			io_handle_vservo(uint16_t vservo, uint16_t vrssi);
-
-	/**
-	 * check and handle test_motor topic updates
-	 */
-	void handle_motor_test();
 };

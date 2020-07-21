@@ -50,8 +50,6 @@
 
 #include "protocol.h"
 
-#include <output_limit/output_limit.h>
-
 /*
  * Constants and limits.
  */
@@ -60,7 +58,6 @@
 #define PX4IO_CONTROL_CHANNELS		8
 #define PX4IO_CONTROL_GROUPS		4
 #define PX4IO_RC_INPUT_CHANNELS		18
-#define PX4IO_RC_MAPPED_CONTROL_CHANNELS		8 /**< This is the maximum number of channels mapped/used */
 
 /*
  * Debug logging
@@ -77,20 +74,12 @@
  * Registers.
  */
 extern volatile uint16_t	r_page_status[];	/* PX4IO_PAGE_STATUS */
-extern uint16_t			r_page_actuators[];	/* PX4IO_PAGE_ACTUATORS */
 extern uint16_t			r_page_servos[];	/* PX4IO_PAGE_SERVOS */
 extern uint16_t			r_page_direct_pwm[];	/* PX4IO_PAGE_DIRECT_PWM */
 extern uint16_t			r_page_raw_rc_input[];	/* PX4IO_PAGE_RAW_RC_INPUT */
-extern uint16_t			r_page_rc_input[];	/* PX4IO_PAGE_RC_INPUT */
-extern uint16_t			r_page_adc[];		/* PX4IO_PAGE_RAW_ADC_INPUT */
 
 extern volatile uint16_t	r_page_setup[];		/* PX4IO_PAGE_SETUP */
-extern uint16_t			r_page_controls[];	/* PX4IO_PAGE_CONTROLS */
-extern uint16_t			r_page_rc_input_config[]; /* PX4IO_PAGE_RC_INPUT_CONFIG */
 extern uint16_t			r_page_servo_failsafe[]; /* PX4IO_PAGE_FAILSAFE_PWM */
-extern uint16_t			r_page_servo_control_min[]; /* PX4IO_PAGE_CONTROL_MIN_PWM */
-extern uint16_t			r_page_servo_control_max[]; /* PX4IO_PAGE_CONTROL_MAX_PWM */
-extern int16_t			r_page_servo_control_trim[]; /* PX4IO_PAGE_CONTROL_TRIM_PWM */
 extern uint16_t			r_page_servo_disarmed[];	/* PX4IO_PAGE_DISARMED_PWM */
 
 /*
@@ -104,32 +93,16 @@ extern uint16_t			r_page_servo_disarmed[];	/* PX4IO_PAGE_DISARMED_PWM */
 #define r_raw_rc_count		r_page_raw_rc_input[PX4IO_P_RAW_RC_COUNT]
 #define r_raw_rc_values		(&r_page_raw_rc_input[PX4IO_P_RAW_RC_BASE])
 #define r_raw_rc_flags		r_page_raw_rc_input[PX4IO_P_RAW_RC_FLAGS]
-#define r_rc_valid			r_page_rc_input[PX4IO_P_RC_VALID]
-#define r_rc_values			(&r_page_rc_input[PX4IO_P_RC_BASE])
-#define r_mixer_limits 		r_page_status[PX4IO_P_STATUS_MIXER]
 
 #define r_setup_features	r_page_setup[PX4IO_P_SETUP_FEATURES]
 #define r_setup_arming		r_page_setup[PX4IO_P_SETUP_ARMING]
 #define r_setup_pwm_rates	r_page_setup[PX4IO_P_SETUP_PWM_RATES]
 #define r_setup_pwm_defaultrate	r_page_setup[PX4IO_P_SETUP_PWM_DEFAULTRATE]
 #define r_setup_pwm_altrate	r_page_setup[PX4IO_P_SETUP_PWM_ALTRATE]
-#define r_setup_rc_thr_failsafe	r_page_setup[PX4IO_P_SETUP_RC_THR_FAILSAFE_US]
 
 #define r_setup_pwm_reverse	r_page_setup[PX4IO_P_SETUP_PWM_REVERSE]
 
-#define r_setup_trim_roll	r_page_setup[PX4IO_P_SETUP_TRIM_ROLL]
-#define r_setup_trim_pitch	r_page_setup[PX4IO_P_SETUP_TRIM_PITCH]
-#define r_setup_trim_yaw	r_page_setup[PX4IO_P_SETUP_TRIM_YAW]
-#define r_setup_scale_roll 	r_page_setup[PX4IO_P_SETUP_SCALE_ROLL]
-#define r_setup_scale_pitch	r_page_setup[PX4IO_P_SETUP_SCALE_PITCH]
-#define r_setup_scale_yaw	r_page_setup[PX4IO_P_SETUP_SCALE_YAW]
-#define r_setup_sbus_rate	r_page_setup[PX4IO_P_SETUP_SBUS_RATE]
-#define r_setup_thr_fac		r_page_setup[PX4IO_P_SETUP_THR_MDL_FAC]
-#define r_setup_slew_max	r_page_setup[PX4IO_P_SETUP_MOTOR_SLEW_MAX]
-#define r_setup_airmode		r_page_setup[PX4IO_P_SETUP_AIRMODE]
 #define r_setup_flighttermination	r_page_setup[PX4IO_P_SETUP_ENABLE_FLIGHTTERMINATION]
-
-#define r_control_values	(&r_page_controls[0])
 
 /*
  * System state structure.
@@ -137,24 +110,14 @@ extern uint16_t			r_page_servo_disarmed[];	/* PX4IO_PAGE_DISARMED_PWM */
 struct sys_state_s {
 
 	volatile uint64_t	rc_channels_timestamp_received;
-	volatile uint64_t	rc_channels_timestamp_valid;
 
 	/**
 	 * Last FMU receive time, in microseconds since system boot
 	 */
 	volatile uint64_t	fmu_data_received_time;
-
 };
 
 extern struct sys_state_s system_state;
-extern float dt;
-extern bool update_mc_thrust_param;
-extern bool update_trims;
-
-/*
- * PWM limit structure
- */
-extern output_limit_t pwm_limit;
 
 /*
  * GPIO handling.
@@ -164,8 +127,6 @@ extern output_limit_t pwm_limit;
 #define LED_SAFETY(_s)			px4_arch_gpiowrite(GPIO_LED3, !(_s))
 #define LED_RING(_s)			px4_arch_gpiowrite(GPIO_LED4, (_s))
 
-
-# define PX4IO_RELAY_CHANNELS		0
 # define ENABLE_SBUS_OUT(_s)		px4_arch_gpiowrite(GPIO_SBUS_OENABLE, !(_s))
 
 # define VDD_SERVO_FAULT		(!px4_arch_gpioread(GPIO_SERVO_FAULT_DETECT))
@@ -188,8 +149,7 @@ void atomic_modify_and(volatile uint16_t *target, uint16_t modification);
  * Mixer
  */
 extern void	mixer_tick(void);
-extern int	mixer_handle_text_create_mixer(void);
-extern int	mixer_handle_text(const void *buffer, size_t length);
+
 /* Set the failsafe values of all mixed channels (based on zero throttle, controls centered) */
 extern void	mixer_set_failsafe(void);
 
