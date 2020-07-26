@@ -52,7 +52,6 @@ using namespace time_literals;
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
-
 typedef enum {
 	BAT_DISCHARGING = 0,
 	BAT_CHARGING = 1,
@@ -153,71 +152,4 @@ private:
 	static int task_main_trampoline(int argc, char *argv[]);
 
 	void task_main();
-
-};
-
-
-class SyslinkBridge : public cdev::CDev
-{
-
-public:
-	SyslinkBridge(Syslink *link);
-	virtual ~SyslinkBridge() = default;
-
-	virtual int	init();
-
-	virtual ssize_t	read(struct file *filp, char *buffer, size_t buflen);
-	virtual ssize_t	write(struct file *filp, const char *buffer, size_t buflen);
-	virtual int	ioctl(struct file *filp, int cmd, unsigned long arg);
-
-	// Makes the message available for reading to processes reading from the bridge
-	void pipe_message(crtp_message_t *msg);
-
-protected:
-
-	virtual pollevent_t poll_state(struct file *filp);
-
-private:
-
-	Syslink *_link;
-
-	// Stores data that was received from syslink but not yet read by another driver
-	ringbuffer::RingBuffer _readbuffer;
-
-	crtp_message_t _msg_to_send;
-	int _msg_to_send_size_remaining;
-
-};
-
-
-class SyslinkMemory : public cdev::CDev
-{
-
-public:
-	SyslinkMemory(Syslink *link);
-	virtual ~SyslinkMemory() = default;
-
-	virtual int	init();
-
-	virtual ssize_t	read(struct file *filp, char *buffer, size_t buflen);
-	virtual ssize_t	write(struct file *filp, const char *buffer, size_t buflen);
-	virtual int	ioctl(struct file *filp, int cmd, unsigned long arg);
-
-private:
-	friend class Syslink;
-
-	Syslink *_link;
-
-	int _activeI;
-
-	syslink_message_t msgbuf;
-
-	uint8_t scan();
-	void getinfo(int i);
-
-	int read(int i, uint16_t addr, char *buf, int length);
-	int write(int i, uint16_t addr, const char *buf, int length);
-
-	void sendAndWait();
-
 };

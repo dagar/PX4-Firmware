@@ -44,7 +44,7 @@
 
 #include <drivers/drv_hrt.h>
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
-#include <lib/drivers/device/spi.h>
+#include <lib/drivers/device/i2c.h>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/ecl/geo/geo.h>
 #include <lib/perf/perf_counter.h>
@@ -55,7 +55,7 @@
 
 using namespace InvenSense_MPU9250;
 
-class MPU9250 : public device::SPI, public I2CSPIDriver<MPU9250>
+class MPU9250 : public device::I2C, public I2CSPIDriver<MPU9250>
 {
 public:
 	MPU9250(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
@@ -85,11 +85,10 @@ private:
 
 	// Transfer data
 	struct FIFOTransferBuffer {
-		uint8_t cmd{static_cast<uint8_t>(Register::FIFO_R_W) | DIR_READ};
 		FIFO::DATA f[FIFO_MAX_SAMPLES] {};
 	};
 	// ensure no struct padding
-	static_assert(sizeof(FIFOTransferBuffer) == (1 + FIFO_MAX_SAMPLES *sizeof(FIFO::DATA)));
+	static_assert(sizeof(FIFOTransferBuffer) == FIFO_MAX_SAMPLES *sizeof(FIFO::DATA));
 
 	struct register_config_t {
 		Register reg;

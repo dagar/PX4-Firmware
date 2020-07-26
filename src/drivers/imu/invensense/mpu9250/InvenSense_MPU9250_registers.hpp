@@ -54,6 +54,9 @@ static constexpr uint8_t Bit5 = (1 << 5);
 static constexpr uint8_t Bit6 = (1 << 6);
 static constexpr uint8_t Bit7 = (1 << 7);
 
+static constexpr uint32_t I2C_ADDRESS =
+	0b1101000; // or 0b1101001 (last bit determined determined by the logic level on pin AD0)
+static constexpr uint32_t I2C_SPEED = 400 * 1000;
 
 static constexpr uint32_t SPI_SPEED = 1 * 1000 * 1000;
 static constexpr uint32_t SPI_SPEED_SENSOR = 10 * 1000 * 1000; // 20MHz for reading sensor and interrupt registers

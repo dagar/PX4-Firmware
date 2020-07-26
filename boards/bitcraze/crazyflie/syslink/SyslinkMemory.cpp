@@ -31,13 +31,12 @@
  *
  ****************************************************************************/
 
-
-#include "syslink_main.h"
+#include "Syslink.hpp"
+#include "SyslinkMemory.hpp"
 
 #include "drv_deck.h"
 
 #include <cstring>
-
 
 SyslinkMemory::SyslinkMemory(Syslink *link) :
 	CDev(DECK_DEVICE_PATH),
@@ -46,9 +45,7 @@ SyslinkMemory::SyslinkMemory(Syslink *link) :
 {
 }
 
-
-int
-SyslinkMemory::init()
+int SyslinkMemory::init()
 {
 	int ret = CDev::init();
 
@@ -58,26 +55,22 @@ SyslinkMemory::init()
 		return ret;
 	}
 
-
 	return ret;
 }
 
-ssize_t
-SyslinkMemory::read(struct file *filp, char *buffer, size_t buflen)
+ssize_t SyslinkMemory::read(struct file *filp, char *buffer, size_t buflen)
 {
 	return read(_activeI, 0, buffer, buflen);
 }
 
-ssize_t
-SyslinkMemory::write(struct file *filp, const char *buffer, size_t buflen)
+ssize_t SyslinkMemory::write(struct file *filp, const char *buffer, size_t buflen)
 {
 	// For now, unsupported
 	return -1;
 //	return buflen;
 }
 
-int
-SyslinkMemory::ioctl(struct file *filp, int cmd, unsigned long arg)
+int SyslinkMemory::ioctl(struct file *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case DECKIOGNUM:
@@ -101,9 +94,7 @@ SyslinkMemory::ioctl(struct file *filp, int cmd, unsigned long arg)
 	}
 }
 
-
-uint8_t
-SyslinkMemory::scan()
+uint8_t SyslinkMemory::scan()
 {
 	syslink_ow_scan_t *data = (syslink_ow_scan_t *) &msgbuf.data;
 	msgbuf.type = SYSLINK_OW_SCAN;
@@ -113,8 +104,7 @@ SyslinkMemory::scan()
 	return data->nmems;
 }
 
-void
-SyslinkMemory::getinfo(int i)
+void SyslinkMemory::getinfo(int i)
 {
 	syslink_ow_getinfo_t *data = (syslink_ow_getinfo_t *) &msgbuf.data;
 	msgbuf.type = SYSLINK_OW_GETINFO;
@@ -123,8 +113,7 @@ SyslinkMemory::getinfo(int i)
 	sendAndWait();
 }
 
-int
-SyslinkMemory::read(int i, uint16_t addr, char *buf, int length)
+int SyslinkMemory::read(int i, uint16_t addr, char *buf, int length)
 {
 	syslink_ow_read_t *data = (syslink_ow_read_t *) &msgbuf.data;
 	msgbuf.type = SYSLINK_OW_READ;
@@ -154,15 +143,13 @@ SyslinkMemory::read(int i, uint16_t addr, char *buf, int length)
 	return nread;
 }
 
-int
-SyslinkMemory::write(int i, uint16_t addr, const char *buf, int length)
+int SyslinkMemory::write(int i, uint16_t addr, const char *buf, int length)
 {
 	// TODO: Unimplemented
 	return -1;
 }
 
-void
-SyslinkMemory::sendAndWait()
+void SyslinkMemory::sendAndWait()
 {
 	// TODO: Force the syslink thread to wake up
 	_link->_queue.force(&msgbuf, sizeof(msgbuf));

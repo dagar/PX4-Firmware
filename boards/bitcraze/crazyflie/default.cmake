@@ -10,8 +10,10 @@ px4_add_board(
 	DRIVERS
 		barometer/lps25h
 		distance_sensor/vl53l0x
+		distance_sensor/vl53l1xMulti
 		gps
-		imu/mpu9250
+		#imu/mpu9250
+		imu/invensense/mpu9250
 		optical_flow/pmw3901
 		pwm_out
 	MODULES
@@ -46,7 +48,7 @@ px4_add_board(
 		mixer
 		motor_ramp
 		motor_test
-		mtd
+		#mtd
 		nshterm
 		param
 		perf

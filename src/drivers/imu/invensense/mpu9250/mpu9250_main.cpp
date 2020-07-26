@@ -73,6 +73,8 @@ extern "C" int mpu9250_main(int argc, char *argv[])
 	using ThisDriver = MPU9250;
 	BusCLIArguments cli{false, true};
 	cli.default_spi_frequency = SPI_SPEED;
+	//cli.default_i2c_address = I2C_DEFAULT_ADDRESS;
+	cli.default_i2c_frequency = I2C_SPEED;
 
 	while ((ch = cli.getopt(argc, argv, "MR:")) != EOF) {
 		switch (ch) {

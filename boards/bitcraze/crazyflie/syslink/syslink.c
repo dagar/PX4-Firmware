@@ -39,7 +39,6 @@
  * @author Dennis Shtatnov <densht@gmail.com>
  */
 
-
 #include <px4_platform_common/defines.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -48,9 +47,7 @@
 #include <poll.h>
 #include <termios.h>
 
-
 #include "syslink.h"
-
 
 const char *syslink_magic = "\xbc\xcf";
 
@@ -60,10 +57,8 @@ void syslink_parse_init(syslink_parse_state *state)
 	state->index = 0;
 }
 
-
 int syslink_parse_char(syslink_parse_state *state, char c, syslink_message_t *msg)
 {
-
 	switch (state->state) {
 	case SYSLINK_STATE_START:
 		if (c == syslink_magic[state->index]) {
@@ -129,7 +124,6 @@ int syslink_parse_char(syslink_parse_state *state, char c, syslink_message_t *ms
 	}
 
 	return 0;
-
 }
 
 /*

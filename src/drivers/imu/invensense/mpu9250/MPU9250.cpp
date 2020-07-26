@@ -44,7 +44,7 @@ static constexpr int16_t combine(uint8_t msb, uint8_t lsb)
 
 MPU9250::MPU9250(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
 		 spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio, bool enable_magnetometer) :
-	SPI(DRV_IMU_DEVTYPE_MPU9250, MODULE_NAME, bus, device, spi_mode, bus_frequency),
+	I2C(DRV_IMU_DEVTYPE_MPU9250, MODULE_NAME, bus, 0b1101000, 400000),
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
 	_drdy_gpio(drdy_gpio),
 	_px4_accel(get_device_id(), ORB_PRIO_HIGH, rotation),
@@ -73,6 +73,14 @@ MPU9250::MPU9250(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rota
 			}
 		}
 	}
+
+	// if i2c
+
+	// DLPF_CFG 1
+	// FCHOICE 1 1
+
+	// or reduce data with SMPLRT_DIV? <- reduce data until I2C can keep up
+	//  Fchoice = 2’b11 (fchoice_b register bits are 2’b00), and (0 < dlpf_cfg < 7),
 }
 
 MPU9250::~MPU9250()
@@ -89,10 +97,10 @@ MPU9250::~MPU9250()
 
 int MPU9250::init()
 {
-	int ret = SPI::init();
+	int ret = I2C::init();
 
 	if (ret != PX4_OK) {
-		DEVICE_DEBUG("SPI::init failed (%i)", ret);
+		DEVICE_DEBUG("I2C::init failed (%i)", ret);
 		return ret;
 	}
 
@@ -170,8 +178,10 @@ void MPU9250::RunImpl()
 			RegisterWrite(Register::PWR_MGMT_1, 0);
 			RegisterWrite(Register::SIGNAL_PATH_RESET,
 				      SIGNAL_PATH_RESET_BIT::GYRO_RESET | SIGNAL_PATH_RESET_BIT::ACCEL_RESET | SIGNAL_PATH_RESET_BIT::TEMP_RESET);
-			RegisterWrite(Register::USER_CTRL, USER_CTRL_BIT::I2C_MST_EN | USER_CTRL_BIT::I2C_IF_DIS | USER_CTRL_BIT::I2C_MST_RST |
+			RegisterWrite(Register::USER_CTRL, USER_CTRL_BIT::I2C_MST_EN | USER_CTRL_BIT::I2C_MST_RST |
 				      USER_CTRL_BIT::SIG_COND_RST);
+
+			// I2C_IF_DIS
 
 			// if reset succeeded then configure
 			_state = STATE::CONFIGURE;
@@ -457,18 +467,18 @@ bool MPU9250::RegisterCheck(const register_config_t &reg_cfg)
 
 uint8_t MPU9250::RegisterRead(Register reg)
 {
-	uint8_t cmd[2] {};
-	cmd[0] = static_cast<uint8_t>(reg) | DIR_READ;
-	set_frequency(SPI_SPEED); // low speed for regular registers
-	transfer(cmd, cmd, sizeof(cmd));
-	return cmd[1];
+	//set_frequency(SPI_SPEED); // low speed for regular registers
+	uint8_t cmd = static_cast<uint8_t>(reg);
+	uint8_t value{};
+	transfer(&cmd, 1, &value, 1);
+	return value;
 }
 
 void MPU9250::RegisterWrite(Register reg, uint8_t value)
 {
-	uint8_t cmd[2] { (uint8_t)reg, value };
-	set_frequency(SPI_SPEED); // low speed for regular registers
-	transfer(cmd, cmd, sizeof(cmd));
+	uint8_t cmd = static_cast<uint8_t>(reg);
+	//set_frequency(SPI_SPEED); // low speed for regular registers
+	transfer(&cmd, 1, &value, 1);
 }
 
 void MPU9250::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t clearbits)
@@ -485,25 +495,27 @@ void MPU9250::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t cle
 uint16_t MPU9250::FIFOReadCount()
 {
 	// read FIFO count
-	uint8_t fifo_count_buf[3] {};
-	fifo_count_buf[0] = static_cast<uint8_t>(Register::FIFO_COUNTH) | DIR_READ;
-	set_frequency(SPI_SPEED_SENSOR);
+	uint8_t cmd = static_cast<uint8_t>(Register::FIFO_COUNTH);
+	uint8_t fifo_count_buf[2] {};
+	//set_frequency(SPI_SPEED_SENSOR);
 
-	if (transfer(fifo_count_buf, fifo_count_buf, sizeof(fifo_count_buf)) != PX4_OK) {
+	if (transfer(&cmd, 1, fifo_count_buf, sizeof(fifo_count_buf)) != PX4_OK) {
 		perf_count(_bad_transfer_perf);
 		return 0;
 	}
 
-	return combine(fifo_count_buf[1], fifo_count_buf[2]);
+	return combine(fifo_count_buf[0], fifo_count_buf[1]);
 }
 
 bool MPU9250::FIFORead(const hrt_abstime &timestamp_sample, uint8_t samples)
 {
 	FIFOTransferBuffer buffer{};
-	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 1, FIFO::SIZE);
-	set_frequency(SPI_SPEED_SENSOR);
+	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA), FIFO::SIZE);
+	//set_frequency(SPI_SPEED_SENSOR);
 
-	if (transfer((uint8_t *)&buffer, (uint8_t *)&buffer, transfer_size) != PX4_OK) {
+	uint8_t cmd = static_cast<uint8_t>(Register::FIFO_R_W);
+
+	if (transfer(&cmd, 1, (uint8_t *)&buffer, transfer_size) != PX4_OK) {
 		perf_count(_bad_transfer_perf);
 		return false;
 	}
@@ -622,16 +634,16 @@ void MPU9250::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA 
 void MPU9250::UpdateTemperature()
 {
 	// read current temperature
-	uint8_t temperature_buf[3] {};
-	temperature_buf[0] = static_cast<uint8_t>(Register::TEMP_OUT_H) | DIR_READ;
-	set_frequency(SPI_SPEED_SENSOR);
+	uint8_t cmd = static_cast<uint8_t>(Register::TEMP_OUT_H);
+	uint8_t temperature_buf[2] {};
+	//set_frequency(SPI_SPEED_SENSOR);
 
-	if (transfer(temperature_buf, temperature_buf, sizeof(temperature_buf)) != PX4_OK) {
+	if (transfer(&cmd, 1, temperature_buf, sizeof(temperature_buf)) != PX4_OK) {
 		perf_count(_bad_transfer_perf);
 		return;
 	}
 
-	const int16_t TEMP_OUT = combine(temperature_buf[1], temperature_buf[2]);
+	const int16_t TEMP_OUT = combine(temperature_buf[0], temperature_buf[1]);
 	const float TEMP_degC = (TEMP_OUT / TEMPERATURE_SENSITIVITY) + TEMPERATURE_OFFSET;
 
 	if (PX4_ISFINITE(TEMP_degC)) {
@@ -659,12 +671,13 @@ bool MPU9250::I2CSlaveExternalSensorDataRead(uint8_t *buffer, uint8_t length)
 	bool ret = false;
 
 	if (buffer != nullptr && length <= 24) {
+		uint8_t cmd = static_cast<uint8_t>(Register::EXT_SENS_DATA_00);
 		// max EXT_SENS_DATA 24 bytes
-		uint8_t transfer_buffer[24 + 1] {};
-		transfer_buffer[0] = static_cast<uint8_t>(Register::EXT_SENS_DATA_00) | DIR_READ;
-		set_frequency(SPI_SPEED_SENSOR);
+		uint8_t transfer_buffer[24] {};
 
-		if (transfer(transfer_buffer, transfer_buffer, length + 1) == PX4_OK) {
+		//set_frequency(SPI_SPEED_SENSOR);
+
+		if (transfer(&cmd, 1, transfer_buffer, length) == PX4_OK) {
 			ret = true;
 		}
 

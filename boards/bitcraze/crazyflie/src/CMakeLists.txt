@@ -37,7 +37,6 @@ add_library(drivers_board
 	led.c
 	spi.cpp
 	timer_config.cpp
-	usb.c
 )
 target_link_libraries(drivers_board
 	PRIVATE

@@ -68,7 +68,6 @@ typedef struct {
 	uint8_t data[CRTP_MAX_DATA_SIZE];
 } __attribute__((packed)) crtp_message_t;
 
-
 typedef struct {
 	float roll; // -20 to 20
 	float pitch;

@@ -38,8 +38,10 @@ px4_add_module(
 		-Wno-cast-align # TODO: fix and enable
 	SRCS
 		syslink_main.cpp
-		syslink_bridge.cpp
-		syslink_memory.cpp
+		SyslinkBridge.cpp
+		SyslinkBridge.hpp
+		SyslinkMemory.cpp
+		SyslinkMemory.hpp
 		syslink.c
 	DEPENDS
 		battery

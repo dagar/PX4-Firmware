@@ -8,8 +8,10 @@ adc start
 # Onboard I2C
 mpu9250 -I -R 12 start
 
-# I2C bypass of mpu
+# I2C
 lps25h -I start
 
 # Optical flow deck
-vl53l0x start -X
+#vl53l0x start -X
+
+# pmw3901

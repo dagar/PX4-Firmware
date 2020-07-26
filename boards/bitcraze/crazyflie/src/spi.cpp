@@ -42,7 +42,6 @@
 #include <nuttx/spi/spi.h>
 #include <arch/board/board.h>
 #include <systemlib/px4_macros.h>
-#include <nuttx/mmcsd.h>
 
 #include <up_arch.h>
 #include <chip.h>
@@ -62,37 +61,3 @@ constexpr px4_spi_bus_t px4_spi_buses[SPI_BUS_MAX_BUS_ITEMS] = {
 };
 
 static constexpr bool unused = validateSPIConfig(px4_spi_buses);
-
-/************************************************************************************
- * Name: stm32_spi_bus_initialize
- *
- * Description:
- *   Called to configure SPI buses on PX4FMU board.
- *
- ************************************************************************************/
-static struct spi_dev_s *spi_expansion;
-
-__EXPORT int stm32_spi_bus_initialize(void)
-{
-	/* Configure SPI-based devices */
-
-	/* Get the external SPI port */
-	spi_expansion = stm32_spibus_initialize(1);
-
-	if (!spi_expansion) {
-		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 1);
-		return -ENODEV;
-	}
-
-#ifdef CONFIG_MMCSD
-	int ret = mmcsd_spislotinitialize(CONFIG_NSH_MMCSDMINOR, CONFIG_NSH_MMCSDSLOTNO, spi_expansion);
-
-	if (ret != OK) {
-		syslog(LOG_ERR, "[boot] FAILED to bind SPI port 1 to the MMCSD driver\n");
-		return -ENODEV;
-	}
-
-#endif
-
-	return OK;
-}

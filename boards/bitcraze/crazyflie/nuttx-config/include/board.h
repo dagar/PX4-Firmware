@@ -34,12 +34,7 @@
  *
  ************************************************************************************/
 
-#ifndef __CONFIG_CRAZYFLIE_INCLUDE_BOARD_H
-#define __CONFIG_CRAZYFLIE_INCLUDE_BOARD_H
-
-/************************************************************************************
- * Included Files
- ************************************************************************************/
+#pragma once
 
 #include <nuttx/config.h>
 
@@ -48,10 +43,6 @@
 #endif
 
 #include "stm32.h"
-
-/************************************************************************************
- * Definitions
- ************************************************************************************/
 
 /* Clocking *************************************************************************/
 /* The Crazyflie 2.0 uses a 8MHz crystal connected to the HSE.
@@ -111,18 +102,15 @@
 #define STM32_SYSCLK_FREQUENCY  168000000ul
 
 /* AHB clock (HCLK) is SYSCLK (168MHz) */
-
 #define STM32_RCC_CFGR_HPRE     RCC_CFGR_HPRE_SYSCLK  /* HCLK  = SYSCLK / 1 */
 #define STM32_HCLK_FREQUENCY    STM32_SYSCLK_FREQUENCY
 #define STM32_BOARD_HCLK        STM32_HCLK_FREQUENCY  /* same as above, to satisfy compiler */
 
 /* APB1 clock (PCLK1) is HCLK/4 (42MHz) */
-
 #define STM32_RCC_CFGR_PPRE1    RCC_CFGR_PPRE1_HCLKd4     /* PCLK1 = HCLK / 4 */
 #define STM32_PCLK1_FREQUENCY   (STM32_HCLK_FREQUENCY/4)
 
 /* Timers driven from APB1 will be twice PCLK1 */
-
 #define STM32_APB1_TIM2_CLKIN   (2*STM32_PCLK1_FREQUENCY)
 #define STM32_APB1_TIM3_CLKIN   (2*STM32_PCLK1_FREQUENCY)
 #define STM32_APB1_TIM4_CLKIN   (2*STM32_PCLK1_FREQUENCY)
@@ -134,12 +122,10 @@
 #define STM32_APB1_TIM14_CLKIN  (2*STM32_PCLK1_FREQUENCY)
 
 /* APB2 clock (PCLK2) is HCLK/2 (84MHz) */
-
 #define STM32_RCC_CFGR_PPRE2    RCC_CFGR_PPRE2_HCLKd2     /* PCLK2 = HCLK / 2 */
 #define STM32_PCLK2_FREQUENCY   (STM32_HCLK_FREQUENCY/2)
 
 /* Timers driven from APB2 will be twice PCLK2 */
-
 #define STM32_APB2_TIM1_CLKIN   (2*STM32_PCLK2_FREQUENCY)
 #define STM32_APB2_TIM8_CLKIN   (2*STM32_PCLK2_FREQUENCY)
 #define STM32_APB2_TIM9_CLKIN   (2*STM32_PCLK2_FREQUENCY)
@@ -150,7 +136,6 @@
  * otherwise frequency is 2xAPBx.
  * Note: TIM1,8-11 are on APB2, others on APB1
  */
-
 #define BOARD_TIM1_FREQUENCY    STM32_APB2_TIM1_CLKIN
 #define BOARD_TIM2_FREQUENCY    STM32_APB1_TIM2_CLKIN
 #define BOARD_TIM3_FREQUENCY    STM32_APB1_TIM3_CLKIN
@@ -168,10 +153,7 @@
 
 /* Alternate function pin selections ************************************************/
 
-/*
- * UARTs.
- *
- */
+// UARTs.
 /* E_TX2 / E_RX2 */
 #define GPIO_USART2_RX	GPIO_USART2_RX_1
 #define GPIO_USART2_TX	GPIO_USART2_TX_1
@@ -196,22 +178,18 @@
  */
 #define GPIO_I2C1_SCL		GPIO_I2C1_SCL_1
 #define GPIO_I2C1_SDA		GPIO_I2C1_SDA_1
-#define GPIO_I2C1_SCL_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN6)
-#define GPIO_I2C1_SDA_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN7)
 
 #define GPIO_I2C3_SCL		GPIO_I2C3_SCL_1
 #define GPIO_I2C3_SDA		GPIO_I2C3_SDA_1
-#define GPIO_I2C3_SCL_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTA|GPIO_PIN8)
-#define GPIO_I2C3_SDA_GPIO	(GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTC|GPIO_PIN9)
 
 /*
  * SPI
  *
  * E_MISO, E_MOSI, E_SCK exposed on headers
  */
-#define GPIO_SPI1_MISO	(GPIO_SPI1_MISO_1|GPIO_SPEED_50MHz)
-#define GPIO_SPI1_MOSI	(GPIO_SPI1_MOSI_1|GPIO_SPEED_50MHz)
-#define GPIO_SPI1_SCK	(GPIO_SPI1_SCK_1|GPIO_SPEED_50MHz)
+#define GPIO_SPI1_MISO	GPIO_SPI1_MISO_1
+#define GPIO_SPI1_MOSI	GPIO_SPI1_MOSI_1
+#define GPIO_SPI1_SCK	GPIO_SPI1_SCK_1
 
 /* XXX since we allocate the HP work stack from CCM RAM on normal system startup,
    SPI1 will never run in DMA mode - so we can just give it a random config here.
@@ -219,5 +197,3 @@
    disable it for SPI1. */
 #define DMACHAN_SPI1_RX DMAMAP_SPI1_RX_1
 #define DMACHAN_SPI1_TX DMAMAP_SPI1_TX_2
-
-#endif  /* __CONFIG_CRAZYFLIE_INCLUDE_BOARD_H */

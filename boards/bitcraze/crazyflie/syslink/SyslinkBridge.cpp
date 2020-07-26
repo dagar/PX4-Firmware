@@ -38,10 +38,9 @@
  * Character device for talking to the radio as a plain serial port
  */
 
-#include "syslink_main.h"
+#include "Syslink.hpp"
+#include "SyslinkBridge.hpp"
 #include <cstring>
-
-
 
 SyslinkBridge::SyslinkBridge(Syslink *link) :
 	CDev("/dev/bridge0"),
@@ -55,8 +54,7 @@ SyslinkBridge::SyslinkBridge(Syslink *link) :
 	//ideally _msg_to_send.data size should be CRTP_MAX_DATA_SIZE but cfbridge does not receive 31 bytes of data due to a bug somewhere
 }
 
-int
-SyslinkBridge::init()
+int SyslinkBridge::init()
 {
 	int ret = CDev::init();
 
@@ -70,8 +68,7 @@ SyslinkBridge::init()
 	return ret;
 }
 
-pollevent_t
-SyslinkBridge::poll_state(struct file *filp)
+pollevent_t SyslinkBridge::poll_state(struct file *filp)
 {
 	pollevent_t state = 0;
 
@@ -86,8 +83,7 @@ SyslinkBridge::poll_state(struct file *filp)
 	return state;
 }
 
-ssize_t
-SyslinkBridge::read(struct file *filp, char *buffer, size_t buflen)
+ssize_t SyslinkBridge::read(struct file *filp, char *buffer, size_t buflen)
 {
 	int nread = 0;
 	crtp_message_t msg;
@@ -105,8 +101,7 @@ SyslinkBridge::read(struct file *filp, char *buffer, size_t buflen)
 	return nread;
 }
 
-ssize_t
-SyslinkBridge::write(struct file *filp, const char *buffer, size_t buflen)
+ssize_t SyslinkBridge::write(struct file *filp, const char *buffer, size_t buflen)
 {
 	int buflen_rem = buflen;
 
@@ -135,8 +130,7 @@ SyslinkBridge::write(struct file *filp, const char *buffer, size_t buflen)
 	return buflen;
 }
 
-int
-SyslinkBridge::ioctl(struct file *filp, int cmd, unsigned long arg)
+int SyslinkBridge::ioctl(struct file *filp, int cmd, unsigned long arg)
 {
 	// All termios commands should be silently ignored as they are handled
 
@@ -153,9 +147,7 @@ SyslinkBridge::ioctl(struct file *filp, int cmd, unsigned long arg)
 	}
 }
 
-
-void
-SyslinkBridge::pipe_message(crtp_message_t *msg)
+void SyslinkBridge::pipe_message(crtp_message_t *msg)
 {
 	_readbuffer.force(msg, sizeof(msg->size) + msg->size);
 	poll_notify(POLLIN);

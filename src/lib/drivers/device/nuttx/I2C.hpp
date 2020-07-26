@@ -110,12 +110,11 @@ protected:
 
 	bool	external() const override { return px4_i2c_bus_external(_device_id.devid_s.bus); }
 
-private:
-	static unsigned	int	_bus_clocks[PX4_NUMBER_I2C_BUSES];
-
 	const uint32_t		_frequency;
 	i2c_master_s		*_dev{nullptr};
 
+private:
+	static unsigned	int	_bus_clocks[PX4_NUMBER_I2C_BUSES];
 };
 
 } // namespace device

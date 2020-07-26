@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2016-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,18 +32,14 @@
  ****************************************************************************/
 
 /**
- * @file crazyflie_init.c
+ * @file init.c
  *
- * Crazyflie specific early startup code.  This file implements the
+ * Board specific early startup code.  This file implements the
  * board_app_initialize() function that is called early by nsh during startup.
  *
  * Code here is run before the rcS script is invoked; it should start required
  * subsystems and perform board-specific initialization.
  */
-
-/****************************************************************************
- * Included Files
- ****************************************************************************/
 
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/tasks.h>
@@ -56,6 +52,7 @@
 
 #include <nuttx/board.h>
 #include <nuttx/analog/adc.h>
+#include <nuttx/mmcsd.h>
 #include <nuttx/spi/spi.h>
 
 #include "board_config.h"
@@ -68,10 +65,6 @@
 
 #include <systemlib/px4_macros.h>
 #include <px4_platform_common/init.h>
-
-/****************************************************************************
- * Pre-Processor Definitions
- ****************************************************************************/
 
 /*
  * Ideally we'd be able to get these from up_internal.h,
@@ -104,18 +97,20 @@ __END_DECLS
  *
  ************************************************************************************/
 
-__EXPORT void
-stm32_boardinitialize(void)
+__EXPORT void stm32_boardinitialize(void)
 {
 	/* configure LEDs */
-
 	board_autoled_initialize();
 
 	/* configure SPI interfaces */
-
 	stm32_spiinitialize();
 
-	stm32_usbinitialize();
+	stm32_configgpio(GPIO_OTGFS_VBUS);
+}
+
+void stm32_usbsuspend(FAR struct usbdev_s *dev, bool resume)
+{
+
 }
 
 /****************************************************************************
@@ -130,22 +125,23 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	px4_platform_init();
 
-	/* set up the serial DMA polling */
-	static struct hrt_call serial_dma_call;
-	struct timespec ts;
 
-	/*
-	 * Poll at 1ms intervals for received bytes that have not triggered
-	 * a DMA event.
-	 */
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000000;
+	// /* set up the serial DMA polling */
+	// static struct hrt_call serial_dma_call;
+	// struct timespec ts;
 
-	hrt_call_every(&serial_dma_call,
-		       ts_to_abstime(&ts),
-		       ts_to_abstime(&ts),
-		       (hrt_callout)stm32_serial_dma_poll,
-		       NULL);
+	// /*
+	//  * Poll at 1ms intervals for received bytes that have not triggered
+	//  * a DMA event.
+	//  */
+	// ts.tv_sec = 0;
+	// ts.tv_nsec = 1000000;
+
+	// hrt_call_every(&serial_dma_call,
+	// 	       ts_to_abstime(&ts),
+	// 	       ts_to_abstime(&ts),
+	// 	       (hrt_callout)stm32_serial_dma_poll,
+	// 	       NULL);
 
 
 	/* initial LED state */
@@ -160,14 +156,20 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_RED);
 	}
 
-#ifdef CONFIG_SPI
-	int ret = stm32_spi_bus_initialize();
+#if defined(CONFIG_SPI) && defined(CONFIG_MMCSD)
+	struct spi_dev_s *spi_expansion = stm32_spibus_initialize(1);
 
-	if (ret != OK) {
-		return ret;
+	if (!spi_expansion) {
+		syslog(LOG_ERR, "[boot] FAILED to initialize SPI port %d\n", 1);
 	}
 
-#endif
+	int ret = mmcsd_spislotinitialize(CONFIG_NSH_MMCSDMINOR, CONFIG_NSH_MMCSDSLOTNO, spi_expansion);
+
+	if (ret != OK) {
+		syslog(LOG_ERR, "[boot] FAILED to bind SPI port 1 to the MMCSD driver\n");
+	}
+
+#endif // CONFIG_SPI && CONFIG_MMCSD
 
 	return OK;
 }

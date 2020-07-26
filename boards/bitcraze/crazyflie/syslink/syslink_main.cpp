@@ -61,9 +61,11 @@
 #include <board_config.h>
 
 #include "crtp.h"
-#include "syslink_main.h"
+#include "Syslink.hpp"
 #include "drv_deck.h"
 
+#include "SyslinkBridge.hpp"
+#include "SyslinkMemory.hpp"
 
 
 __BEGIN_DECLS
@@ -74,7 +76,6 @@ extern void led_toggle(int led);
 __END_DECLS
 
 extern "C" { __EXPORT int syslink_main(int argc, char *argv[]); }
-
 
 Syslink *g_syslink = nullptr;
 
@@ -104,9 +105,7 @@ Syslink::Syslink() :
 	px4_sem_setprotocol(&memory_sem, SEM_PRIO_NONE);
 }
 
-
-int
-Syslink::start()
+int Syslink::start()
 {
 	_task_running = true;
 	_syslink_task = px4_task_spawn_cmd(
@@ -121,9 +120,7 @@ Syslink::start()
 	return 0;
 }
 
-
-int
-Syslink::set_datarate(uint8_t datarate)
+int Syslink::set_datarate(uint8_t datarate)
 {
 	syslink_message_t msg;
 	msg.type = SYSLINK_RADIO_DATARATE;
@@ -132,8 +129,7 @@ Syslink::set_datarate(uint8_t datarate)
 	return send_message(&msg);
 }
 
-int
-Syslink::set_channel(uint8_t channel)
+int Syslink::set_channel(uint8_t channel)
 {
 	syslink_message_t msg;
 	msg.type = SYSLINK_RADIO_CHANNEL;
@@ -142,8 +138,7 @@ Syslink::set_channel(uint8_t channel)
 	return send_message(&msg);
 }
 
-int
-Syslink::set_address(uint64_t addr)
+int Syslink::set_address(uint64_t addr)
 {
 	syslink_message_t msg;
 	msg.type = SYSLINK_RADIO_ADDRESS;
@@ -152,8 +147,7 @@ Syslink::set_address(uint64_t addr)
 	return send_message(&msg);
 }
 
-int
-Syslink::send_queued_raw_message()
+int Syslink::send_queued_raw_message()
 {
 	if (_writebuffer.empty()) {
 		return 0;
@@ -171,9 +165,7 @@ Syslink::send_queued_raw_message()
 	return send_message(&msg);
 }
 
-
-void
-Syslink::update_params(bool force_set)
+void Syslink::update_params(bool force_set)
 {
 	param_t _param_radio_channel = param_find("SLNK_RADIO_CHAN");
 	param_t _param_radio_rate = param_find("SLNK_RADIO_RATE");
@@ -198,7 +190,6 @@ Syslink::update_params(bool force_set)
 	hrt_abstime t = hrt_absolute_time();
 
 	// request updates if needed
-
 	if (channel != this->_channel || force_set) {
 		this->_channel = channel;
 		set_channel(channel);
@@ -219,13 +210,10 @@ Syslink::update_params(bool force_set)
 		this->_params_update[2] = t;
 		this->_params_ack[2] = 0;
 	}
-
-
 }
 
 // 1M 8N1 serial connection to NRF51
-int
-Syslink::open_serial(const char *dev)
+int Syslink::open_serial(const char *dev)
 {
 #ifndef B1000000
 #define B1000000 1000000
@@ -234,7 +222,7 @@ Syslink::open_serial(const char *dev)
 	int rate = B1000000;
 
 	// open uart
-	int fd = px4_open(dev, O_RDWR | O_NOCTTY);
+	int fd = open(dev, O_RDWR | O_NOCTTY);
 	int termios_state = -1;
 
 	if (fd < 0) {
@@ -270,17 +258,13 @@ Syslink::open_serial(const char *dev)
 	return fd;
 }
 
-
-
-int
-Syslink::task_main_trampoline(int argc, char *argv[])
+int Syslink::task_main_trampoline(int argc, char *argv[])
 {
 	g_syslink->task_main();
 	return 0;
 }
 
-void
-Syslink::task_main()
+void Syslink::task_main()
 {
 	_bridge = new SyslinkBridge(this);
 	_bridge->init();
@@ -289,7 +273,6 @@ Syslink::task_main()
 	_memory->init();
 
 	_battery.reset();
-
 
 	//	int ret;
 
@@ -302,13 +285,11 @@ Syslink::task_main()
 		return;
 	}
 
-
 	/* Set non-blocking */
 	/*
 	int flags = fcntl(_fd, F_GETFL, 0);
 	fcntl(_fd, F_SETFL, flags | O_NONBLOCK);
 	*/
-
 	px4_arch_configgpio(GPIO_NRF_TXEN);
 
 	px4_pollfd_struct_t fds[2];
@@ -372,11 +353,9 @@ Syslink::task_main()
 	}
 
 	close(_fd);
-
 }
 
-void
-Syslink::handle_message(syslink_message_t *msg)
+void Syslink::handle_message(syslink_message_t *msg)
 {
 	hrt_abstime t = hrt_absolute_time();
 
@@ -497,11 +476,9 @@ Syslink::handle_message(syslink_message_t *msg)
 	} else if (_params_ack[2] == 0 && t - _params_update[2] > 10000) {
 		set_address(_addr);
 	}
-
 }
 
-void
-Syslink::handle_radio(syslink_message_t *sys)
+void Syslink::handle_radio(syslink_message_t *sys)
 {
 	hrt_abstime t = hrt_absolute_time();
 
@@ -515,11 +492,9 @@ Syslink::handle_radio(syslink_message_t *sys)
 	} else if (sys->type == SYSLINK_RADIO_ADDRESS) {
 		_params_ack[2] = t;
 	}
-
 }
 
-void
-Syslink::handle_raw(syslink_message_t *sys)
+void Syslink::handle_raw(syslink_message_t *sys)
 {
 	crtp_message_t *c = (crtp_message_t *) &sys->length;
 
@@ -577,8 +552,7 @@ Syslink::handle_raw(syslink_message_t *sys)
 	send_queued_raw_message();
 }
 
-void
-Syslink::handle_bootloader(syslink_message_t *sys)
+void Syslink::handle_bootloader(syslink_message_t *sys)
 {
 	// Minimal bootloader emulation for being detectable
 	// To the bitcraze utilities, the STM32 will appear to have no flashable pages
@@ -602,11 +576,9 @@ Syslink::handle_bootloader(syslink_message_t *sys)
 		c->data[22] = 0x10; // Protocol version
 		send_message(sys);
 	}
-
 }
 
-void
-Syslink::handle_raw_other(syslink_message_t *sys)
+void Syslink::handle_raw_other(syslink_message_t *sys)
 {
 	// This function doesn't actually do anything
 	// It is just here to return null responses to most standard messages
@@ -683,8 +655,7 @@ Syslink::handle_raw_other(syslink_message_t *sys)
 	}
 }
 
-int
-Syslink::send_bytes(const void *data, size_t len)
+int Syslink::send_bytes(const void *data, size_t len)
 {
 	// TODO: This could be way more efficient
 	//       Using interrupts/DMA/polling would be much better
@@ -698,8 +669,7 @@ Syslink::send_bytes(const void *data, size_t len)
 	return 0;
 }
 
-int
-Syslink::send_message(syslink_message_t *msg)
+int Syslink::send_message(syslink_message_t *msg)
 {
 	syslink_compute_cksum(msg);
 	send_bytes(syslink_magic, 2);
@@ -709,7 +679,6 @@ Syslink::send_message(syslink_message_t *msg)
 	send_bytes(&msg->cksum, sizeof(msg->cksum));
 	return 0;
 }
-
 
 namespace syslink
 {
@@ -738,10 +707,8 @@ void start()
 	// Wait for task and bridge to start
 	usleep(5000);
 
-
 	warnx("Started syslink on /dev/ttyS2\n");
 	exit(0);
-
 }
 
 void status()
@@ -827,20 +794,13 @@ void attached(int pid)
 	exit(found ? 1 : 0);
 }
 
-
-
 void test()
 {
 	// TODO: Ensure battery messages are recent
 	// TODO: Read and write from memory to ensure it is working
 }
 
-
-
-
 }
-
-
 
 int syslink_main(int argc, char *argv[])
 {
@@ -848,7 +808,6 @@ int syslink_main(int argc, char *argv[])
 		syslink::usage();
 		exit(1);
 	}
-
 
 	const char *verb = argv[1];
 
@@ -872,9 +831,6 @@ int syslink_main(int argc, char *argv[])
 	if (!strcmp(verb, "test")) {
 		syslink::test();
 	}
-
-
-
 
 	syslink::usage();
 	exit(1);

@@ -69,7 +69,6 @@ static uint32_t g_ledmap[] = {
 	GPIO_LED_GREEN_L  // Indexed by LED_RX
 };
 
-
 __EXPORT void led_init()
 {
 	/* Configure LED1 GPIO for output */
@@ -83,7 +82,7 @@ __EXPORT void led_init()
 __EXPORT void led_on(int led)
 {
 	/* Pull down to switch on */
-	px4_arch_gpiowrite(g_ledmap[led], g_ledmap[led] & GPIO_OUTPUT_SET ? true : false);
+	stm32_gpiowrite(g_ledmap[led], g_ledmap[led] & GPIO_OUTPUT_SET ? true : false);
 }
 
 __EXPORT void led_off(int led)
