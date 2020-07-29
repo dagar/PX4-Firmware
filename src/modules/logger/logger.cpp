@@ -414,43 +414,6 @@ bool Logger::request_stop_static()
 	return true;
 }
 
-bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
-{
-	LoggerSubscription &sub = _subscriptions[sub_idx];
-
-	bool updated = false;
-
-	if (sub.valid()) {
-		if (sub.get_interval_us() == 0) {
-			// record gaps in full rate (no interval) messages
-			const unsigned last_generation = sub.get_last_generation();
-			updated = sub.update(buffer);
-
-			if (updated && (sub.get_last_generation() != last_generation + 1)) {
-				// error, missed a message
-				_message_gaps++;
-			}
-
-		} else {
-			updated = sub.update(buffer);
-		}
-
-	} else if (try_to_subscribe) {
-		if (sub.subscribe()) {
-			write_add_logged_msg(LogType::Full, sub);
-
-			if (sub_idx < _num_mission_subs) {
-				write_add_logged_msg(LogType::Mission, sub);
-			}
-
-			// copy first data
-			updated = sub.copy(buffer);
-		}
-	}
-
-	return updated;
-}
-
 const char *Logger::configured_backend_mode() const
 {
 	switch (_writer.backend()) {
@@ -708,47 +671,104 @@ void Logger::run()
 			/* wait for lock on log buffer */
 			_writer.lock();
 
-			for (int sub_idx = 0; sub_idx < _num_subscriptions; ++sub_idx) {
-				LoggerSubscription &sub = _subscriptions[sub_idx];
-				/* if this topic has been updated, copy the new data into the message buffer
-				 * and write a message to the log
-				 */
-				const bool try_to_subscribe = (sub_idx == next_subscribe_topic_index);
+			const ssize_t buffer_size = _writer.get_buffer_size_file(LogType::Full);
 
-				if (copy_if_updated(sub_idx, _msg_buffer + sizeof(ulog_message_data_header_s), try_to_subscribe)) {
-					// each message consists of a header followed by an orb data object
-					const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
-					const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
-					const uint16_t write_msg_id = sub.msg_id;
+			// only check buffer if using file backend and not mavlink
+			const bool check_buffer_fill = (_writer.backend() & LogWriter::BackendFile) && (buffer_size > 0)
+						       && !(_writer.backend() & LogWriter::BackendMavlink);
 
-					//write one byte after another (necessary because of alignment)
-					_msg_buffer[0] = (uint8_t)write_msg_size;
-					_msg_buffer[1] = (uint8_t)(write_msg_size >> 8);
-					_msg_buffer[2] = static_cast<uint8_t>(ULogMessageType::DATA);
-					_msg_buffer[3] = (uint8_t)write_msg_id;
-					_msg_buffer[4] = (uint8_t)(write_msg_id >> 8);
+			bool buffer_full = false;
+			bool updates_available = true;
 
-					// PX4_INFO("topic: %s, size = %zu, out_size = %zu", sub.get_topic()->o_name, sub.get_topic()->o_size, msg_size);
+			while (!buffer_full && updates_available) {
 
-					// full log
-					if (write_message(LogType::Full, _msg_buffer, msg_size)) {
+				updates_available = false;
 
-#ifdef DBGPRINT
-						total_bytes += msg_size;
-#endif /* DBGPRINT */
+				for (int sub_idx = 0; sub_idx < _num_subscriptions; ++sub_idx) {
+					LoggerSubscription &sub = _subscriptions[sub_idx];
+					/* if this topic has been updated, copy the new data into the message buffer
+					 * and write a message to the log
+					 */
+					bool msg_copied = false;
+					void *buffer = _msg_buffer + sizeof(ulog_message_data_header_s);
+
+					if (sub.valid()) {
+						updates_available = sub.updated();
+
+						if (check_buffer_fill) {
+							// skip copying message until there's space available in the buffer
+							const ssize_t available = buffer_size - _writer.get_buffer_fill_count_file(LogType::Full);
+							const ssize_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+
+							buffer_full = msg_size > available;
+
+							if (buffer_full) {
+								continue;
+							}
+						}
+
+						if (sub.get_interval_us() == 0) {
+							// record gaps in full rate (no interval) messages
+							const unsigned last_generation = sub.get_last_generation();
+							msg_copied = sub.update(buffer);
+
+							if (msg_copied && (sub.get_last_generation() != last_generation + 1)) {
+								// error, missed a message
+								_message_gaps++;
+							}
+
+						} else {
+							msg_copied = sub.update(buffer);
+						}
+
+					} else if (sub_idx == next_subscribe_topic_index) {
+						if (sub.subscribe()) {
+							write_add_logged_msg(LogType::Full, sub);
+
+							if (sub_idx < _num_mission_subs) {
+								write_add_logged_msg(LogType::Mission, sub);
+							}
+
+							// copy first data
+							msg_copied = sub.copy(buffer);
+						}
 					}
 
-					// mission log
-					if (sub_idx < _num_mission_subs) {
-						if (_writer.is_started(LogType::Mission)) {
-							if (_mission_subscriptions[sub_idx].next_write_time < (loop_time / 100000)) {
-								unsigned delta_time = _mission_subscriptions[sub_idx].min_delta_ms;
+					if (msg_copied) {
+						// each message consists of a header followed by an orb data object
+						const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+						const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
+						const uint16_t write_msg_id = sub.msg_id;
 
-								if (delta_time > 0) {
-									_mission_subscriptions[sub_idx].next_write_time = (loop_time / 100000) + delta_time / 100;
+						//write one byte after another (necessary because of alignment)
+						_msg_buffer[0] = (uint8_t)write_msg_size;
+						_msg_buffer[1] = (uint8_t)(write_msg_size >> 8);
+						_msg_buffer[2] = static_cast<uint8_t>(ULogMessageType::DATA);
+						_msg_buffer[3] = (uint8_t)write_msg_id;
+						_msg_buffer[4] = (uint8_t)(write_msg_id >> 8);
+
+						// PX4_INFO("topic: %s, size = %zu, out_size = %zu", sub.get_topic()->o_name, sub.get_topic()->o_size, msg_size);
+
+						// full log
+						if (write_message(LogType::Full, _msg_buffer, msg_size)) {
+
+#ifdef DBGPRINT
+							total_bytes += msg_size;
+#endif /* DBGPRINT */
+						}
+
+						// mission log
+						if (sub_idx < _num_mission_subs) {
+							if (_writer.is_started(LogType::Mission)) {
+								if (_mission_subscriptions[sub_idx].next_write_time < (loop_time / 100000)) {
+									unsigned delta_time = _mission_subscriptions[sub_idx].min_delta_ms;
+
+									if (delta_time > 0) {
+										_mission_subscriptions[sub_idx].next_write_time = (loop_time / 100000) + delta_time / 100;
+									}
+
+									write_message(LogType::Mission, _msg_buffer, msg_size);
 								}
-
-								write_message(LogType::Mission, _msg_buffer, msg_size);
 							}
 						}
 					}
