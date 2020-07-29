@@ -261,7 +261,8 @@ private:
 
 	void write_changed_parameters(LogType type);
 
-	inline bool copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe);
+	inline bool copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe, ssize_t file_buffer_available,
+				    bool check_file_buffer);
 
 	/**
 	 * Write exactly one ulog message to the logger and handle dropouts.

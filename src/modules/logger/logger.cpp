@@ -414,13 +414,23 @@ bool Logger::request_stop_static()
 	return true;
 }
 
-bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
+bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe, ssize_t file_buffer_available,
+			     bool check_file_buffer)
 {
 	LoggerSubscription &sub = _subscriptions[sub_idx];
 
 	bool updated = false;
 
 	if (sub.valid()) {
+		if (check_file_buffer && sub.updated()) {
+			// skip copying message until there's space available in the buffer
+			const ssize_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+
+			if (msg_size > file_buffer_available) {
+				return false;
+			}
+		}
+
 		if (sub.get_interval_us() == 0) {
 			// record gaps in full rate (no interval) messages
 			const unsigned last_generation = sub.get_last_generation();
@@ -708,6 +718,12 @@ void Logger::run()
 			/* wait for lock on log buffer */
 			_writer.lock();
 
+			const ssize_t file_buffer_size = _writer.get_buffer_size_file(LogType::Full);
+			const ssize_t file_buffer_available = file_buffer_size - _writer.get_buffer_fill_count_file(LogType::Full);
+
+			// only check buffer if not using mavlink backend
+			const bool check_file_buffer = (file_buffer_size > 0) && !_writer.is_started(LogType::Full, LogWriter::BackendMavlink);
+
 			for (int sub_idx = 0; sub_idx < _num_subscriptions; ++sub_idx) {
 				LoggerSubscription &sub = _subscriptions[sub_idx];
 				/* if this topic has been updated, copy the new data into the message buffer
@@ -715,7 +731,9 @@ void Logger::run()
 				 */
 				const bool try_to_subscribe = (sub_idx == next_subscribe_topic_index);
 
-				if (copy_if_updated(sub_idx, _msg_buffer + sizeof(ulog_message_data_header_s), try_to_subscribe)) {
+				if (copy_if_updated(sub_idx, _msg_buffer + sizeof(ulog_message_data_header_s), try_to_subscribe,
+						    file_buffer_available, check_file_buffer)) {
+
 					// each message consists of a header followed by an orb data object
 					const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
 					const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
