@@ -1,0 +1,6 @@
+VL53L1X Ultra Lite Driver / Linux user space porting
+
+This delivery is based on VL53L1X_ULD_API_V3.3.0 release (tag uld_3.3.0) modified as following:
+- Modified VL53L1X_SetInterMeasurementInMs() function's parameter from 16bits to 32bits value
+
+See README.txt file about build details
