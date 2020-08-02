@@ -179,6 +179,9 @@ private:
 	gps_dump_s			*_dump_from_device{nullptr};
 	bool				_should_dump_communication{false};			///< if true, dump communication
 
+	param_t				_gps_x_mode_param{PARAM_INVALID};
+	param_t				_gps_x_baudrate_param{PARAM_INVALID};
+
 	static volatile bool _is_gps_main_advertised; ///< for the second gps we want to make sure that it gets instance 1
 	/// and thus we wait until the first one publishes at least one message.
 
@@ -251,7 +254,6 @@ volatile GPS *GPS::_secondary_instance = nullptr;
  */
 extern "C" __EXPORT int gps_main(int argc, char *argv[]);
 
-
 GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interface, bool fake_gps,
 	 bool enable_sat_info, Instance instance, unsigned configured_baudrate) :
 	_configured_baudrate(configured_baudrate),
@@ -262,6 +264,7 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 {
 	/* store port name */
 	strncpy(_port, path, sizeof(_port) - 1);
+
 	/* enforce null termination */
 	_port[sizeof(_port) - 1] = '\0';
 
@@ -275,7 +278,7 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 		memset(_p_report_sat_info, 0, sizeof(*_p_report_sat_info));
 	}
 
-	_mode_auto = mode == GPS_DRIVER_MODE_NONE;
+	_mode_auto = (mode == GPS_DRIVER_MODE_NONE);
 }
 
 GPS::~GPS()
@@ -305,7 +308,6 @@ GPS::~GPS()
 	if (_dump_from_device) {
 		delete (_dump_from_device);
 	}
-
 }
 
 int GPS::callback(GPSCallbackType type, void *data1, int data2, void *user)
@@ -691,7 +693,7 @@ GPS::run()
 		} else {
 
 			if (_helper != nullptr) {
-				delete (_helper);
+				delete _helper;
 				_helper = nullptr;
 			}
 
@@ -791,6 +793,16 @@ GPS::run()
 //
 //						PX4_WARN("module found: %s", mode_str);
 						_healthy = true;
+
+						// save GPS_1_MODE and baud rate
+						if (_mode_auto) {
+							if (_instance == Instance::Main) {
+								// check _mode
+								// check _configured_baudrate
+								int32_t mode = 0;
+								param_set_no_notification(param_find("GPS_1_MODE"), &mode);
+							}
+						}
 					}
 				}
 
@@ -1110,7 +1122,7 @@ GPS *GPS::instantiate(int argc, char *argv[])
 
 GPS *GPS::instantiate(int argc, char *argv[], Instance instance)
 {
-	const char *device_name = "/dev/ttyS3";
+	const char *device_name = nullptr;
 	const char *device_name_secondary = nullptr;
 	int baudrate_main = 0;
 	int baudrate_secondary = 0;
@@ -1130,12 +1142,16 @@ GPS *GPS::instantiate(int argc, char *argv[], Instance instance)
 			if (px4_get_parameter_value(myoptarg, baudrate_main) != 0) {
 				PX4_ERR("baudrate parsing failed");
 				error_flag = true;
+			} else {
+				// store GPS1 baudrate handle?
 			}
 			break;
 		case 'g':
 			if (px4_get_parameter_value(myoptarg, baudrate_secondary) != 0) {
 				PX4_ERR("baudrate parsing failed");
 				error_flag = true;
+			} else {
+				// store GPS2 baudrate handle
 			}
 			break;
 

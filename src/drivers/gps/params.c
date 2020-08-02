@@ -64,7 +64,6 @@ PARAM_DEFINE_INT32(GPS_DUMP_COMM, 0);
  */
 PARAM_DEFINE_INT32(GPS_UBX_DYNMODEL, 7);
 
-
 /**
  * Heading/Yaw offset for dual antenna GPS
  *
@@ -86,3 +85,30 @@ PARAM_DEFINE_INT32(GPS_UBX_DYNMODEL, 7);
  */
 PARAM_DEFINE_FLOAT(GPS_YAW_OFFSET, 0.f);
 
+/**
+ * GPS 1 mode
+ *
+ *
+ * @min 0
+ * @max 4
+ * @value 0 Auto
+ * @value 1 UBlox
+ * @value 2 MTK
+ * @value 3 Ashtech
+ * @value 4 Emlid Reach
+ *
+ * @group GPS
+ */
+PARAM_DEFINE_INT32(GPS_1_MODE, 0);
+
+/**
+ * GPS 1 mode
+ *
+ *
+ * @min 0
+ * @max 9
+ * @value 0 Auto
+ *
+ * @group GPS
+ */
+PARAM_DEFINE_INT32(GPS_1_BAUDRATE, 0);
