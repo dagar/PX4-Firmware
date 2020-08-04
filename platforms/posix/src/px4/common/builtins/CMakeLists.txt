@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,48 +31,12 @@
 #
 ############################################################################
 
-add_subdirectory(builtins)
-add_subdirectory(px4_daemon)
-add_subdirectory(lockstep_scheduler)
+px4_add_library(px4_builtins
+	builtins.cpp
+	builtins.h
 
-set(EXTRA_DEPENDS)
-if("${CONFIG_SHMEM}" STREQUAL "1")
-	list(APPEND CMAKE_MODULE_PATH "${PX4_SOURCE_DIR}/boards/atlflight/cmake_hexagon")
-	include(hexagon_sdk)
-	include_directories(${HEXAGON_SDK_INCLUDES})
-	include_directories(${PX4_BINARY_DIR}/platforms/posix)
-	list(APPEND SHMEM_SRCS
-		shmem_posix.cpp
-	)
-	add_definitions(-DCONFIG_SHMEM=1)
-	set(EXTRA_DEPENDS generate_px4muorb_stubs)
-endif()
+	builtin_list.c
 
-add_library(px4_layer
-	px4_posix_impl.cpp
-	tasks.cpp
-	px4_sem.cpp
-	px4_init.cpp
-	lib_crc32.c
-	drv_hrt.cpp
-	${SHMEM_SRCS}
+	${PX4_BINARY_DIR}/builtin_list.h  # generated - { "work_queue", SCHED_PRIORITY_DEFAULT, 2048, work_queue_main },
+	${PX4_BINARY_DIR}/builtin_proto.h # generated - int work_queue_main(int argc, char *argv[]);
 )
-target_compile_definitions(px4_layer PRIVATE MODULE_NAME="px4")
-target_compile_options(px4_layer PRIVATE -Wno-cast-align) # TODO: fix and enable
-target_link_libraries(px4_layer PRIVATE work_queue px4_work_queue)
-target_link_libraries(px4_layer PRIVATE px4_daemon drivers_board)
-
-if(ENABLE_LOCKSTEP_SCHEDULER)
-	target_link_libraries(px4_layer PRIVATE lockstep_scheduler)
-endif()
-
-
-if(EXTRA_DEPENDS)
-	add_dependencies(px4_layer ${EXTRA_DEPENDS})
-endif()
-
-
-if(BUILD_TESTING)
-	add_subdirectory(test_stubs)
-	add_subdirectory(gtest_runner)
-endif()

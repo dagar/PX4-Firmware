@@ -59,7 +59,7 @@ function(px4_generate_builtin_commands)
 		endif()
 	endforeach()
 
-	configure_file(${PX4_SOURCE_DIR}/cmake/builtins/px4.bdat.in ${OUT}/px4.bdat)
-	configure_file(${PX4_SOURCE_DIR}/cmake/builtins/px4.pdat.in ${OUT}/px4.pdat)
+	configure_file(${PX4_SOURCE_DIR}/cmake/builtins/builtin_list.h.in ${OUT}/builtin_list.h) # { "bmp280", SCHED_PRIORITY_DEFAULT, 2048, bmp280_main },
+	configure_file(${PX4_SOURCE_DIR}/cmake/builtins/builtin_proto.h.in ${OUT}/builtin_proto.h) # int sercon_main(int argc, char *argv[]);
 
 endfunction()
