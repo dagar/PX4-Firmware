@@ -63,7 +63,7 @@ CDev::~CDev()
 {
 	PX4_DEBUG("CDev::~CDev");
 
-	if (_registered) {
+	if (_devname != nullptr) {
 		unregister_driver(_devname);
 	}
 
@@ -125,10 +125,6 @@ CDev::init()
 	// now register the driver
 	if (_devname != nullptr) {
 		ret = register_driver(_devname, &fops, 0666, (void *)this);
-
-		if (ret == PX4_OK) {
-			_registered = true;
-		}
 	}
 
 	return ret;
@@ -378,15 +374,8 @@ int CDev::unregister_driver_and_memory()
 {
 	int retval = PX4_OK;
 
-	if (_registered) {
-		unregister_driver(_devname);
-		_registered = false;
-
-	} else {
-		retval = -ENODEV;
-	}
-
 	if (_devname != nullptr) {
+		unregister_driver(_devname);
 		free((void *)_devname);
 		_devname = nullptr;
 

@@ -253,6 +253,16 @@ protected:
 	int unregister_class_devname(const char *class_devname, unsigned class_instance);
 
 	/**
+	* First, unregisters the driver. Next, free the memory for the devname,
+	* in case it was expected to have ownership. Sets devname to nullptr.
+	*
+	* This is only needed if the ownership of the devname was passed to the CDev, otherwise ~CDev handles it.
+	*
+	* @return  PX4_OK on success, -ENODEV if the devname is already nullptr
+	*/
+	int unregister_driver_and_memory();
+
+	/**
 	 * Take the driver lock.
 	 *
 	 * Each driver instance has its own lock/semaphore.
@@ -270,26 +280,14 @@ protected:
 
 	px4_sem_t	_lock; /**< lock to protect access to all class members (also for derived classes) */
 
-
-	/**
-	* First, unregisters the driver. Next, free the memory for the devname,
-	* in case it was expected to have ownership. Sets devname to nullptr.
-	*
-	* This is only needed if the ownership of the devname was passed to the CDev, otherwise ~CDev handles it.
-	*
-	* @return  PX4_OK on success, -ENODEV if the devname is already nullptr
-	*/
-	int unregister_driver_and_memory();
+	uint8_t		_open_count{0};			/**< number of successful opens */
 
 private:
 	const char	*_devname{nullptr};		/**< device node name */
 
 	px4_pollfd_struct_t	**_pollset{nullptr};
 
-	bool		_registered{false};		/**< true if device name was registered */
-
 	uint8_t		_max_pollwaiters{0};		/**< size of the _pollset array */
-	uint16_t	_open_count{0};			/**< number of successful opens */
 
 	/**
 	 * Store a pollwaiter in a slot where we can find it later.

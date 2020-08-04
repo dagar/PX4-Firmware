@@ -184,7 +184,7 @@ public:
 
 	uint8_t get_queue_size() const { return _queue_size; }
 
-	int8_t subscriber_count() const { return _subscriber_count; }
+	uint8_t subscriber_count() const { return _open_count; }
 
 	unsigned published_message_count() const { return _generation.load(); }
 
@@ -261,7 +261,6 @@ private:
 	const uint8_t _instance; /**< orb multi instance identifier */
 	bool _advertised{false};  /**< has ever been advertised (not necessarily published data yet) */
 	uint8_t _queue_size; /**< maximum number of elements in the queue */
-	int8_t _subscriber_count{0};
 
 	/**
 	 * Check whether a topic appears updated to a subscriber.

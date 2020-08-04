@@ -70,7 +70,7 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 		unlock();
 
 		/* now complete the open */
-		return CDev::open(filp);
+		return PX4_OK;
 	}
 
 	/* is this a new subscriber? */
@@ -89,20 +89,13 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 
 		filp->f_priv = (void *)sd;
 
-		int ret = CDev::open(filp);
-
 		add_internal_subscriber();
 
-		if (ret != PX4_OK) {
-			PX4_ERR("CDev::open failed");
-			delete sd;
-		}
-
-		return ret;
+		return PX4_OK;
 	}
 
 	if (filp->f_oflags == 0) {
-		return CDev::open(filp);
+		return PX4_OK;
 	}
 
 	/* can only be pub or sub, not both */
@@ -123,7 +116,7 @@ uORB::DeviceNode::close(cdev::file_t *filp)
 		}
 	}
 
-	return CDev::close(filp);
+	return PX4_OK;
 }
 
 bool
@@ -498,7 +491,7 @@ uORB::DeviceNode::print_statistics(int max_topic_length)
 
 	const uint8_t instance = get_instance();
 	const uint8_t priority = get_priority();
-	const int8_t sub_count = subscriber_count();
+	const uint8_t sub_count = subscriber_count();
 	const uint8_t queue_size = get_queue_size();
 
 	unlock();
@@ -512,12 +505,12 @@ uORB::DeviceNode::print_statistics(int max_topic_length)
 void uORB::DeviceNode::add_internal_subscriber()
 {
 	lock();
-	_subscriber_count++;
+	_open_count++;
 
 #ifdef ORB_COMMUNICATOR
 	uORBCommunicator::IChannel *ch = uORB::Manager::get_instance()->get_uorb_communicator();
 
-	if (ch != nullptr && _subscriber_count > 0) {
+	if (ch != nullptr && _open_count > 0) {
 		unlock(); //make sure we cannot deadlock if add_subscription calls back into DeviceNode
 		ch->add_subscription(_meta->o_name, 1);
 
@@ -532,12 +525,12 @@ void uORB::DeviceNode::add_internal_subscriber()
 void uORB::DeviceNode::remove_internal_subscriber()
 {
 	lock();
-	_subscriber_count--;
+	_open_count--;
 
 #ifdef ORB_COMMUNICATOR
 	uORBCommunicator::IChannel *ch = uORB::Manager::get_instance()->get_uorb_communicator();
 
-	if (ch != nullptr && _subscriber_count == 0) {
+	if (ch != nullptr && _open_count == 0) {
 		unlock(); //make sure we cannot deadlock if remove_subscription calls back into DeviceNode
 		ch->remove_subscription(_meta->o_name);
 
