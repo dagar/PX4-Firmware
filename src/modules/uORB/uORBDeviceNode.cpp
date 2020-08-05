@@ -42,25 +42,61 @@
 #include "uORBCommunicator.hpp"
 #endif /* ORB_COMMUNICATOR */
 
+#ifdef __PX4_NUTTX
+static int orb_open(cdev::file_t *filp) { return static_cast<uORB::DeviceNode *>(filp->f_inode->i_private)->open(filp); }
+static int orb_close(cdev::file_t *filp) { return static_cast<uORB::DeviceNode *>(filp->f_inode->i_private)->close(filp); }
+static ssize_t orb_read(cdev::file_t *filp, char *buffer, size_t buflen) { return static_cast<uORB::DeviceNode *>(filp->f_inode->i_private)->read(filp, buffer, buflen); }
+static ssize_t orb_write(cdev::file_t *filp, const char *buffer, size_t buflen) { return static_cast<uORB::DeviceNode *>(filp->f_inode->i_private)->write(filp, buffer, buflen); }
+static int orb_ioctl(cdev::file_t *filp, int cmd, unsigned long arg) { return static_cast<uORB::DeviceNode *>(filp->f_inode->i_private)->ioctl(filp, cmd, arg); }
+static int orb_poll(cdev::file_t *filp, px4_pollfd_struct_t *fds, bool setup) { return static_cast<uORB::DeviceNode *>(filp->f_inode->i_private)->poll(filp, fds, setup); }
+
+const struct file_operations fops = {
+open	: orb_open,
+close	: orb_close,
+read	: orb_read,
+write	: orb_write,
+seek	: nullptr,
+ioctl	: orb_ioctl,
+poll	: orb_poll,
+#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+unlink	: nullptr
+#endif
+};
+
+#endif // PX4_NUTTX
+
+
 uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path,
 			     ORB_PRIO priority, uint8_t queue_size) :
-	CDev(path),
+	_devname(path),
 	_meta(meta),
 	_priority(priority),
 	_instance(instance),
 	_queue_size(queue_size)
 {
+	px4_sem_init(&_lock, 0, 1);
 }
 
 uORB::DeviceNode::~DeviceNode()
 {
-	delete[] _data;
+	unregister_driver(_devname);
 
-	CDev::unregister_driver_and_memory();
+	delete[] _data;
+	delete[] _pollset;
+
+	px4_sem_destroy(&_lock);
 }
 
-int
-uORB::DeviceNode::open(cdev::file_t *filp)
+int uORB::DeviceNode::init()
+{
+	// uORB::Utils::node_mkpath(nodepath, meta, instance);
+
+	int ret = register_driver(_devname, &fops, 0666, (void *)this);
+
+	return ret;
+}
+
+int uORB::DeviceNode::open(cdev::file_t *filp)
 {
 	/* is this a publisher? */
 	if (filp->f_oflags == PX4_F_WRONLY) {
@@ -70,7 +106,7 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 		unlock();
 
 		/* now complete the open */
-		return CDev::open(filp);
+		return PX4_OK;
 	}
 
 	/* is this a new subscriber? */
@@ -89,28 +125,20 @@ uORB::DeviceNode::open(cdev::file_t *filp)
 
 		filp->f_priv = (void *)sd;
 
-		int ret = CDev::open(filp);
-
 		add_internal_subscriber();
 
-		if (ret != PX4_OK) {
-			PX4_ERR("CDev::open failed");
-			delete sd;
-		}
-
-		return ret;
+		return PX4_OK;
 	}
 
 	if (filp->f_oflags == 0) {
-		return CDev::open(filp);
+		return PX4_OK;
 	}
 
 	/* can only be pub or sub, not both */
 	return -EINVAL;
 }
 
-int
-uORB::DeviceNode::close(cdev::file_t *filp)
+int uORB::DeviceNode::close(cdev::file_t *filp)
 {
 	if (filp->f_oflags == PX4_F_RDONLY) { /* subscriber */
 		SubscriberData *sd = static_cast<SubscriberData *>(filp->f_priv);
@@ -123,7 +151,7 @@ uORB::DeviceNode::close(cdev::file_t *filp)
 		}
 	}
 
-	return CDev::close(filp);
+	return PX4_OK;
 }
 
 bool
@@ -170,8 +198,7 @@ uORB::DeviceNode::copy(void *dst, unsigned &generation)
 	return updated;
 }
 
-ssize_t
-uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
+ssize_t uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 	/* if the object has not been written yet, return zero */
 	if (_data == nullptr) {
@@ -202,8 +229,7 @@ uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 	return _meta->o_size;
 }
 
-ssize_t
-uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
+ssize_t uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 {
 	/*
 	 * Writes are legal from interrupt context as long as the
@@ -258,16 +284,159 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 		item->call();
 	}
 
-	ATOMIC_LEAVE;
+	for (unsigned i = 0; i < _max_pollwaiters; i++) {
+		if (nullptr != _pollset[i]) {
+			// If the topic looks updated to the subscriber, go ahead and notify them.
+			if (appears_updated((cdev::file_t *)_pollset[i]->priv)) {
+				_pollset[i]->revents |= _pollset[i]->events & POLLIN;
+				px4_sem_post(_pollset[i]->sem);
+			}
+		}
+	}
 
-	/* notify any poll waiters */
-	poll_notify(POLLIN);
+	ATOMIC_LEAVE;
 
 	return _meta->o_size;
 }
 
-int
-uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
+int uORB::DeviceNode::store_poll_waiter(px4_pollfd_struct_t *fds)
+{
+	// Look for a free slot.
+	for (unsigned i = 0; i < _max_pollwaiters; i++) {
+		if (nullptr == _pollset[i]) {
+
+			/* save the pollfd */
+			_pollset[i] = fds;
+
+			return PX4_OK;
+		}
+	}
+
+	return -ENFILE;
+}
+
+int uORB::DeviceNode::poll(cdev::file_t *filep, px4_pollfd_struct_t *fds, bool setup)
+{
+	int ret = PX4_OK;
+
+	if (setup) {
+		/*
+		 * Save the file pointer in the pollfd for the subclass'
+		 * benefit.
+		 */
+		fds->priv = (void *)filep;
+
+		/*
+		 * Lock against poll_notify() and possibly other callers (protect _pollset).
+		 */
+		ATOMIC_ENTER;
+
+		/*
+		 * Try to store the fds for later use and handle array resizing.
+		 */
+		while ((ret = store_poll_waiter(fds)) == -ENFILE) {
+
+			// No free slot found. Resize the pollset. This is expensive, but it's only needed initially.
+
+			if (_max_pollwaiters >= 256 / 2) { //_max_pollwaiters is uint8_t
+				ret = -ENOMEM;
+				break;
+			}
+
+			const uint8_t new_count = _max_pollwaiters > 0 ? _max_pollwaiters * 2 : 1;
+			px4_pollfd_struct_t **prev_pollset = _pollset;
+
+#ifdef __PX4_NUTTX
+			// malloc uses a semaphore, we need to call it enabled IRQ's
+			px4_leave_critical_section(flags);
+#endif
+			px4_pollfd_struct_t **new_pollset = new px4_pollfd_struct_t *[new_count];
+
+#ifdef __PX4_NUTTX
+			flags = px4_enter_critical_section();
+#endif
+
+			if (prev_pollset == _pollset) {
+				// no one else updated the _pollset meanwhile, so we're good to go
+				if (!new_pollset) {
+					ret = -ENOMEM;
+					break;
+				}
+
+				if (_max_pollwaiters > 0) {
+					memset(new_pollset + _max_pollwaiters, 0, sizeof(px4_pollfd_struct_t *) * (new_count - _max_pollwaiters));
+					memcpy(new_pollset, _pollset, sizeof(px4_pollfd_struct_t *) * _max_pollwaiters);
+				}
+
+				_pollset = new_pollset;
+				_pollset[_max_pollwaiters] = fds;
+				_max_pollwaiters = new_count;
+
+				// free the previous _pollset (we need to unlock here which is fine because we don't access _pollset anymore)
+#ifdef __PX4_NUTTX
+				px4_leave_critical_section(flags);
+#endif
+
+				if (prev_pollset) {
+					delete[](prev_pollset);
+				}
+
+#ifdef __PX4_NUTTX
+				flags = px4_enter_critical_section();
+#endif
+
+				// Success
+				ret = PX4_OK;
+				break;
+			}
+
+#ifdef __PX4_NUTTX
+			px4_leave_critical_section(flags);
+#endif
+			// We have to retry
+			delete[] new_pollset;
+#ifdef __PX4_NUTTX
+			flags = px4_enter_critical_section();
+#endif
+		}
+
+		if (ret == PX4_OK) {
+			/*
+			 * Check to see whether we should send a poll notification
+			 * immediately.
+			 */
+			if (appears_updated(filep)) {
+				fds->revents |= fds->events & POLLIN;
+			}
+
+			/* yes? post the notification */
+			if (fds->revents != 0) {
+				px4_sem_post(fds->sem);
+			}
+		}
+
+		ATOMIC_LEAVE;
+
+	} else {
+		ATOMIC_ENTER;
+
+		/*
+		 * Handle a teardown request.
+		 */
+		for (unsigned i = 0; i < _max_pollwaiters; i++) {
+			if (fds == _pollset[i]) {
+				_pollset[i] = nullptr;
+				break;
+			}
+		}
+
+		ATOMIC_LEAVE;
+	}
+
+	return ret;
+}
+
+int uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 	case ORBIOCUPDATED: {
@@ -343,8 +512,7 @@ uORB::DeviceNode::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 		return OK;
 
 	default:
-		/* give it to the superclass */
-		return CDev::ioctl(filp, cmd, arg);
+		return -ENOTTY;
 	}
 }
 
@@ -445,26 +613,6 @@ int16_t uORB::DeviceNode::topic_unadvertised(const orb_metadata *meta, ORB_PRIO 
 }
 */
 #endif /* ORB_COMMUNICATOR */
-
-px4_pollevent_t
-uORB::DeviceNode::poll_state(cdev::file_t *filp)
-{
-	// If the topic appears updated to the subscriber, say so.
-	if (appears_updated(filp)) {
-		return POLLIN;
-	}
-
-	return 0;
-}
-
-void
-uORB::DeviceNode::poll_notify_one(px4_pollfd_struct_t *fds, px4_pollevent_t events)
-{
-	// If the topic looks updated to the subscriber, go ahead and notify them.
-	if (appears_updated((cdev::file_t *)fds->priv)) {
-		CDev::poll_notify_one(fds, events);
-	}
-}
 
 bool
 uORB::DeviceNode::appears_updated(cdev::file_t *filp)

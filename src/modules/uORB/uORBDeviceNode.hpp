@@ -36,7 +36,14 @@
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
-#include <lib/cdev/CDev.hpp>
+#include <px4_platform_common/px4_config.h>
+#include <px4_platform_common/posix.h>
+
+#ifdef __PX4_NUTTX
+#include <lib/cdev/nuttx/cdev_platform.hpp>
+#else
+#include <lib/cdev/posix/cdev_platform.hpp>
+#endif
 
 #include <containers/IntrusiveSortedList.hpp>
 #include <containers/List.hpp>
@@ -53,12 +60,13 @@ class SubscriptionCallback;
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public cdev::CDev, public IntrusiveSortedListNode<uORB::DeviceNode *>
+class uORB::DeviceNode : public IntrusiveSortedListNode<uORB::DeviceNode *>
 {
 public:
 	DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path, ORB_PRIO priority,
 		   uint8_t queue_size = 1);
-	virtual ~DeviceNode();
+
+	~DeviceNode();
 
 	// no copy, assignment, move, move assignment
 	DeviceNode(const DeviceNode &) = delete;
@@ -68,16 +76,18 @@ public:
 
 	bool operator<=(const DeviceNode &rhs) const { return (strcmp(get_devname(), rhs.get_devname()) <= 0); }
 
+	int init();
+
 	/**
 	 * Method to create a subscriber instance and return the struct
 	 * pointing to the subscriber as a file pointer.
 	 */
-	int open(cdev::file_t *filp) override;
+	int open(cdev::file_t *filp);
 
 	/**
 	 * Method to close a subscriber for this topic.
 	 */
-	int close(cdev::file_t *filp) override;
+	int close(cdev::file_t *filp);
 
 	/**
 	 * reads data from a subscriber node to the buffer provided.
@@ -90,7 +100,7 @@ public:
 	 * @return
 	 *   ssize_t the number of bytes read.
 	 */
-	ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) override;
+	ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen);
 
 	/**
 	 * writes the published data to the internal buffer to be read by
@@ -104,12 +114,23 @@ public:
 	 * @return ssize_t
 	 *   The number of bytes that are written
 	 */
-	ssize_t write(cdev::file_t *filp, const char *buffer, size_t buflen) override;
+	ssize_t write(cdev::file_t *filp, const char *buffer, size_t buflen);
 
 	/**
 	 * IOCTL control for the subscriber.
 	 */
-	int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
+	int ioctl(cdev::file_t *filp, int cmd, unsigned long arg);
+
+	/**
+	 * Perform a poll setup/teardown operation.
+	 *
+	 * @param filep		Pointer to the internal file structure.
+	 * @param fds		Poll descriptor being waited on.
+	 * @param setup		True if this is establishing a request, false if
+	 *			it is being torn down.
+	 * @return		OK on success, or -errno otherwise.
+	 */
+	int	poll(cdev::file_t *filep, px4_pollfd_struct_t *fds, bool setup);
 
 	/**
 	 * Method to publish a data to this node.
@@ -221,13 +242,41 @@ public:
 	// remove item from list of work items
 	void unregister_callback(SubscriptionCallback *callback_sub);
 
-protected:
+	/**
+	 * Take the driver lock.
+	 *
+	 * Each driver instance has its own lock/semaphore.
+	 *
+	 * Note that we must loop as the wait may be interrupted by a signal.
+	 *
+	 * Careful: lock() calls cannot be nested!
+	 */
+	void		lock() { do {} while (px4_sem_wait(&_lock) != 0); }
 
-	px4_pollevent_t poll_state(cdev::file_t *filp) override;
+	/**
+	 * Release the driver lock.
+	 */
+	void		unlock() { px4_sem_post(&_lock); }
 
-	void poll_notify_one(px4_pollfd_struct_t *fds, px4_pollevent_t events) override;
+	px4_sem_t	_lock; /**< lock to protect access to all class members (also for derived classes) */
+
+	/**
+	 * Get the device name.
+	 *
+	 * @return the file system string of the device handle
+	 */
+	const char	*get_devname() const { return _devname; }
 
 private:
+
+	/**
+	 * Store a pollwaiter in a slot where we can find it later.
+	 *
+	 * Expands the pollset as required.  Must be called with the driver locked.
+	 *
+	 * @return		OK, or -errno on error.
+	 */
+	inline int	store_poll_waiter(px4_pollfd_struct_t *fds);
 
 	/**
 	 * Copies data and the corresponding generation
@@ -253,6 +302,12 @@ private:
 		unsigned generation{0}; /**< last generation the subscriber has seen */
 		UpdateIntervalData *update_interval{nullptr}; /**< if null, no update interval */
 	};
+
+	const char	*_devname{nullptr};		/**< device node name */
+
+	px4_pollfd_struct_t	**_pollset{nullptr};
+
+	uint8_t		_max_pollwaiters{0};		/**< size of the _pollset array */
 
 	const orb_metadata *_meta; /**< object metadata information */
 
