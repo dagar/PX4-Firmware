@@ -100,6 +100,7 @@ px4_add_board(
 		motor_test
 		mtd
 		nshterm
+		orbtopic
 		param
 		perf
 		pwm
