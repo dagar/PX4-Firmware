@@ -135,7 +135,7 @@ MulticopterRateControl::Run()
 	if (_parameter_update_sub.updated()) {
 		// clear update
 		parameter_update_s param_update;
-		_parameter_update_sub.copy(&param_update);
+		_parameter_update_sub.copy(param_update);
 
 		updateParams();
 		parameters_updated();
@@ -148,7 +148,7 @@ MulticopterRateControl::Run()
 
 		// grab corresponding vehicle_angular_acceleration immediately after vehicle_angular_velocity copy
 		vehicle_angular_acceleration_s v_angular_acceleration{};
-		_vehicle_angular_acceleration_sub.copy(&v_angular_acceleration);
+		_vehicle_angular_acceleration_sub.copy(v_angular_acceleration);
 
 		const hrt_abstime now = hrt_absolute_time();
 
@@ -160,20 +160,20 @@ MulticopterRateControl::Run()
 		const Vector3f rates{angular_velocity.xyz};
 
 		/* check for updates in other topics */
-		_v_control_mode_sub.update(&_v_control_mode);
+		_v_control_mode_sub.update(_v_control_mode);
 
 		if (_vehicle_land_detected_sub.updated()) {
 			vehicle_land_detected_s vehicle_land_detected;
 
-			if (_vehicle_land_detected_sub.copy(&vehicle_land_detected)) {
+			if (_vehicle_land_detected_sub.copy(vehicle_land_detected)) {
 				_landed = vehicle_land_detected.landed;
 				_maybe_landed = vehicle_land_detected.maybe_landed;
 			}
 		}
 
-		_vehicle_status_sub.update(&_vehicle_status);
+		_vehicle_status_sub.update(_vehicle_status);
 
-		const bool manual_control_updated = _manual_control_setpoint_sub.update(&_manual_control_setpoint);
+		const bool manual_control_updated = _manual_control_setpoint_sub.update(_manual_control_setpoint);
 
 		// generate the rate setpoint from sticks?
 		bool manual_rate_sp = false;
@@ -204,7 +204,7 @@ MulticopterRateControl::Run()
 			}
 
 		} else {
-			_landing_gear_sub.update(&_landing_gear);
+			_landing_gear_sub.update(_landing_gear);
 		}
 
 		if (manual_rate_sp) {
@@ -236,7 +236,7 @@ MulticopterRateControl::Run()
 			// use rates setpoint topic
 			vehicle_rates_setpoint_s v_rates_sp;
 
-			if (_v_rates_sp_sub.update(&v_rates_sp)) {
+			if (_v_rates_sp_sub.update(v_rates_sp)) {
 				_rates_sp(0) = v_rates_sp.roll;
 				_rates_sp(1) = v_rates_sp.pitch;
 				_rates_sp(2) = v_rates_sp.yaw;
@@ -256,7 +256,7 @@ MulticopterRateControl::Run()
 			if (_motor_limits_sub.updated()) {
 				multirotor_motor_limits_s motor_limits;
 
-				if (_motor_limits_sub.copy(&motor_limits)) {
+				if (_motor_limits_sub.copy(motor_limits)) {
 					MultirotorMixer::saturation_status saturation_status;
 					saturation_status.value = motor_limits.saturation_status;
 
@@ -285,11 +285,8 @@ MulticopterRateControl::Run()
 			// scale effort by battery status if enabled
 			if (_param_mc_bat_scale_en.get()) {
 				if (_battery_status_sub.updated()) {
-					battery_status_s battery_status;
-
-					if (_battery_status_sub.copy(&battery_status)) {
-						_battery_status_scale = battery_status.scale;
-					}
+					battery_status_s battery_status = _battery_status_sub.get();
+					_battery_status_scale = battery_status.scale;
 				}
 
 				if (_battery_status_scale > 0.0f) {

@@ -45,6 +45,7 @@
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
+#include <uORB/Subscription2.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
@@ -93,16 +94,17 @@ private:
 
 	RateControl _rate_control; ///< class for rate control calculations
 
-	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
-	uORB::Subscription _landing_gear_sub{ORB_ID(landing_gear)};
-	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
-	uORB::Subscription _motor_limits_sub{ORB_ID(multirotor_motor_limits)};
-	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
-	uORB::Subscription _v_control_mode_sub{ORB_ID(vehicle_control_mode)};
-	uORB::Subscription _v_rates_sp_sub{ORB_ID(vehicle_rates_setpoint)};
-	uORB::Subscription _vehicle_angular_acceleration_sub{ORB_ID(vehicle_angular_acceleration)};
-	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
-	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription2<ORB_ID::battery_status, battery_status_s> _battery_status_sub;
+	uORB::Subscription2<ORB_ID::landing_gear, landing_gear_s> _landing_gear_sub;
+	uORB::Subscription2<ORB_ID::manual_control_setpoint, manual_control_setpoint_s> _manual_control_setpoint_sub;
+	uORB::Subscription2<ORB_ID::multirotor_motor_limits, multirotor_motor_limits_s> _motor_limits_sub;
+	uORB::Subscription2<ORB_ID::parameter_update, parameter_update_s> _parameter_update_sub;
+	uORB::Subscription2<ORB_ID::vehicle_control_mode, vehicle_control_mode_s> _v_control_mode_sub;
+	uORB::Subscription2<ORB_ID::vehicle_rates_setpoint, vehicle_rates_setpoint_s> _v_rates_sp_sub;
+	uORB::Subscription2<ORB_ID::vehicle_angular_acceleration, vehicle_angular_acceleration_s>
+	_vehicle_angular_acceleration_sub;
+	uORB::Subscription2<ORB_ID::vehicle_land_detected, vehicle_land_detected_s> _vehicle_land_detected_sub;
+	uORB::Subscription2<ORB_ID::vehicle_status, vehicle_status_s> _vehicle_status_sub;
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
 
