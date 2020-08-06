@@ -145,6 +145,8 @@ private:
 
 	unsigned handle_command_motor_test(const vehicle_command_s &cmd);
 
+	void manual_control_check();
+
 	void mission_init();
 
 	void offboard_control_update();
@@ -304,9 +306,6 @@ private:
 	bool		_nav_test_passed{false};	/**< true if the post takeoff navigation test has passed */
 	bool		_nav_test_failed{false};	/**< true if the post takeoff navigation test has failed */
 
-	bool		_geofence_loiter_on{false};
-	bool		_geofence_rtl_on{false};
-	bool		_geofence_land_on{false};
 	bool		_geofence_warning_action_on{false};
 	bool		_geofence_violated_prev{false};
 
@@ -354,10 +353,8 @@ private:
 	uint32_t	_stick_off_counter{0};
 	uint32_t	_stick_on_counter{0};
 
-	manual_control_switches_s _manual_control_switches{};		///< the current manual control switches
-	manual_control_switches_s _manual_control_switches_prev{};
 	int32_t		_flight_mode_slots[manual_control_switches_s::MODE_SLOT_NUM] {};
-	uint8_t		_last_manual_control_setpoint_arm_switch{0};
+	uint8_t		_arm_switch{manual_control_switches_s::SWITCH_POS_NONE};
 
 	hrt_abstime	_boot_timestamp{0};
 	hrt_abstime	_last_disarmed_timestamp{0};
