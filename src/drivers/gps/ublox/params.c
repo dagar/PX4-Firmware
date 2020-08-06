@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,7 +64,6 @@ PARAM_DEFINE_INT32(GPS_DUMP_COMM, 0);
  */
 PARAM_DEFINE_INT32(GPS_UBX_DYNMODEL, 7);
 
-
 /**
  * Heading/Yaw offset for dual antenna GPS
  *
@@ -85,4 +84,3 @@ PARAM_DEFINE_INT32(GPS_UBX_DYNMODEL, 7);
  * @group GPS
  */
 PARAM_DEFINE_FLOAT(GPS_YAW_OFFSET, 0.f);
-

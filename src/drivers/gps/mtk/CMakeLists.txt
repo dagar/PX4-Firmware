@@ -31,33 +31,16 @@
 #
 ############################################################################
 
-px4_add_git_submodule(TARGET git_gps_devices PATH "devices")
-
-px4_add_library(gps_devices
-	devices/src/ashtech.cpp
-	devices/src/ashtech.h
-	devices/src/base_station.h
-	devices/src/emlid_reach.cpp
-	devices/src/emlid_reach.h
-	devices/src/gps_helper.cpp
-	devices/src/gps_helper.h
-	devices/src/mtk.cpp
-	devices/src/mtk.h
-	devices/src/rtcm.cpp
-	devices/src/rtcm.h
-	devices/src/sbf.cpp
-	devices/src/sbf.h
-	devices/src/ubx.cpp
-	devices/src/ubx.h
-)
-target_compile_options(gps_devices PRIVATE -Wno-cast-align -Wno-error=double-promotion)
-
-add_dependencies(gps_devices git_gps_devices)
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
-add_subdirectory(ashtech)
-add_subdirectory(emlid_reach)
-add_subdirectory(mtk)
-add_subdirectory(sbf)
-add_subdirectory(ublox)
+px4_add_module(
+	MODULE drivers__gps__mtk
+	MAIN mtk
+	COMPILE_FLAGS
+		-Wno-cast-align # TODO: fix and enable
+		#-Wno-stringop-overflow # due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91707
+	SRCS
+		MTK.cpp
+		MTK.hpp
+	DEPENDS
+		gps_devices
+		px4_work_queue
+	)

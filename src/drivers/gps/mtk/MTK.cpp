@@ -1,0 +1,548 @@
+/****************************************************************************
+ *
+ *   Copyright (c) 2013-2020 PX4 Development Team. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name PX4 nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ ****************************************************************************/
+
+#include "MTK.hpp"
+
+MTK::MTK(const char *path, unsigned configured_baudrate) :
+	_configured_baudrate(configured_baudrate)
+{
+	/* store port name */
+	strncpy(_port, path, sizeof(_port) - 1);
+	/* enforce null termination */
+	_port[sizeof(_port) - 1] = '\0';
+
+	_report_gps_pos.heading = NAN;
+	_report_gps_pos.heading_offset = NAN;
+}
+
+MTK::~MTK()
+{
+	if (_dump_to_device) {
+		delete (_dump_to_device);
+	}
+
+	if (_dump_from_device) {
+		delete (_dump_from_device);
+	}
+}
+
+int MTK::callback(GPSCallbackType type, void *data1, int data2, void *user)
+{
+	MTK *gps = (MTK *)user;
+
+	switch (type) {
+	case GPSCallbackType::readDeviceData: {
+			int num_read = gps->pollOrRead((uint8_t *)data1, data2, *((int *)data1));
+
+			if (num_read > 0) {
+				gps->dumpGpsData((uint8_t *)data1, (size_t)num_read, false);
+			}
+
+			return num_read;
+		}
+
+	case GPSCallbackType::writeDeviceData:
+		gps->dumpGpsData((uint8_t *)data1, (size_t)data2, true);
+
+		return write(gps->_serial_fd, data1, (size_t)data2);
+
+	case GPSCallbackType::setBaudrate:
+		return gps->setBaudrate(data2);
+
+	case GPSCallbackType::gotRTCMMessage:
+		/* not used */
+		break;
+
+	case GPSCallbackType::surveyInStatus:
+		/* not used */
+		break;
+
+	case GPSCallbackType::setClock:
+		px4_clock_settime(CLOCK_REALTIME, (timespec *)data1);
+		break;
+	}
+
+	return 0;
+}
+
+int MTK::pollOrRead(uint8_t *buf, size_t buf_length, int timeout)
+{
+#if !defined(__PX4_QURT)
+
+	/* For non QURT, use the usual polling. */
+
+	//Poll only for the serial data. In the same thread we also need to handle orb messages,
+	//so ideally we would poll on both, the serial fd and orb subscription. Unfortunately the
+	//two pollings use different underlying mechanisms (at least under posix), which makes this
+	//impossible. Instead we limit the maximum polling interval and regularly check for new orb
+	//messages.
+	//FIXME: add a unified poll() API
+	const int max_timeout = 50;
+
+	pollfd fds[1];
+	fds[0].fd = _serial_fd;
+	fds[0].events = POLLIN;
+
+	int ret = poll(fds, sizeof(fds) / sizeof(fds[0]), math::min(max_timeout, timeout));
+
+	if (ret > 0) {
+		/* if we have new data from GPS, go handle it */
+		if (fds[0].revents & POLLIN) {
+			/*
+			 * We are here because poll says there is some data, so this
+			 * won't block even on a blocking device. But don't read immediately
+			 * by 1-2 bytes, wait for some more data to save expensive read() calls.
+			 * If we have all requested data available, read it without waiting.
+			 * If more bytes are available, we'll go back to poll() again.
+			 */
+			const unsigned character_count = 32; // minimum bytes that we want to read
+			unsigned baudrate = _baudrate == 0 ? 115200 : _baudrate;
+			const unsigned sleeptime = character_count * 1000000 / (baudrate / 10);
+
+#ifdef __PX4_NUTTX
+			int err = 0;
+			int bytes_available = 0;
+			err = ioctl(_serial_fd, FIONREAD, (unsigned long)&bytes_available);
+
+			if (err != 0 || bytes_available < (int)character_count) {
+				px4_usleep(sleeptime);
+			}
+
+#else
+			px4_usleep(sleeptime);
+#endif
+
+			ret = ::read(_serial_fd, buf, buf_length);
+
+		} else {
+			ret = -1;
+		}
+	}
+
+	return ret;
+
+#else
+	/* For QURT, just use read for now, since this doesn't block, we need to slow it down
+	 * just a bit. */
+	px4_usleep(10000);
+	return ::read(_serial_fd, buf, buf_length);
+#endif
+}
+
+int MTK::setBaudrate(unsigned baud)
+{
+	/* process baud rate */
+	int speed;
+
+	switch (baud) {
+	case 9600:   speed = B9600;   break;
+
+	case 19200:  speed = B19200;  break;
+
+	case 38400:  speed = B38400;  break;
+
+	case 57600:  speed = B57600;  break;
+
+	case 115200: speed = B115200; break;
+
+	case 230400: speed = B230400; break;
+
+	default:
+		PX4_ERR("unknown baudrate: %d", baud);
+		return -EINVAL;
+	}
+
+	struct termios uart_config;
+
+	int termios_state;
+
+	/* fill the struct for the new configuration */
+	tcgetattr(_serial_fd, &uart_config);
+
+	/* properly configure the terminal (see also https://en.wikibooks.org/wiki/Serial_Programming/termios ) */
+
+	//
+	// Input flags - Turn off input processing
+	//
+	// convert break to null byte, no CR to NL translation,
+	// no NL to CR translation, don't mark parity errors or breaks
+	// no input parity check, don't strip high bit off,
+	// no XON/XOFF software flow control
+	//
+	uart_config.c_iflag &= ~(IGNBRK | BRKINT | ICRNL |
+				 INLCR | PARMRK | INPCK | ISTRIP | IXON);
+	//
+	// Output flags - Turn off output processing
+	//
+	// no CR to NL translation, no NL to CR-NL translation,
+	// no NL to CR translation, no column 0 CR suppression,
+	// no Ctrl-D suppression, no fill characters, no case mapping,
+	// no local output processing
+	//
+	// config.c_oflag &= ~(OCRNL | ONLCR | ONLRET |
+	//                     ONOCR | ONOEOT| OFILL | OLCUC | OPOST);
+	uart_config.c_oflag = 0;
+
+	//
+	// No line processing
+	//
+	// echo off, echo newline off, canonical mode off,
+	// extended input processing off, signal chars off
+	//
+	uart_config.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
+
+	/* no parity, one stop bit, disable flow control */
+	uart_config.c_cflag &= ~(CSTOPB | PARENB | CRTSCTS);
+
+	/* set baud rate */
+	if ((termios_state = cfsetispeed(&uart_config, speed)) < 0) {
+		GPS_ERR("ERR: %d (cfsetispeed)", termios_state);
+		return -1;
+	}
+
+	if ((termios_state = cfsetospeed(&uart_config, speed)) < 0) {
+		GPS_ERR("ERR: %d (cfsetospeed)", termios_state);
+		return -1;
+	}
+
+	if ((termios_state = tcsetattr(_serial_fd, TCSANOW, &uart_config)) < 0) {
+		GPS_ERR("ERR: %d (tcsetattr)", termios_state);
+		return -1;
+	}
+
+	return 0;
+}
+
+void MTK::initializeCommunicationDump()
+{
+	param_t gps_dump_comm_ph = param_find("GPS_DUMP_COMM");
+	int32_t param_dump_comm;
+
+	if (gps_dump_comm_ph == PARAM_INVALID || param_get(gps_dump_comm_ph, &param_dump_comm) != 0) {
+		return;
+	}
+
+	if (param_dump_comm != 1) {
+		return; //dumping disabled
+	}
+
+	_dump_from_device = new gps_dump_s();
+	_dump_to_device = new gps_dump_s();
+
+	if (!_dump_from_device || !_dump_to_device) {
+		PX4_ERR("failed to allocated dump data");
+		return;
+	}
+
+	memset(_dump_to_device, 0, sizeof(gps_dump_s));
+	memset(_dump_from_device, 0, sizeof(gps_dump_s));
+
+	//make sure to use a large enough queue size, so that we don't lose messages. You may also want
+	//to increase the logger rate for that.
+	_dump_communication_pub.publish(*_dump_from_device);
+
+	_should_dump_communication = true;
+}
+
+void MTK::dumpGpsData(uint8_t *data, size_t len, bool msg_to_gps_device)
+{
+	if (!_should_dump_communication) {
+		return;
+	}
+
+	gps_dump_s *dump_data = msg_to_gps_device ? _dump_to_device : _dump_from_device;
+
+	while (len > 0) {
+		size_t write_len = len;
+
+		if (write_len > sizeof(dump_data->data) - dump_data->len) {
+			write_len = sizeof(dump_data->data) - dump_data->len;
+		}
+
+		memcpy(dump_data->data + dump_data->len, data, write_len);
+		data += write_len;
+		dump_data->len += write_len;
+		len -= write_len;
+
+		if (dump_data->len >= sizeof(dump_data->data)) {
+			if (msg_to_gps_device) {
+				dump_data->len |= 1 << 7;
+			}
+
+			dump_data->timestamp = hrt_absolute_time();
+			_dump_communication_pub.publish(*dump_data);
+			dump_data->len = 0;
+		}
+	}
+}
+
+void MTK::run()
+{
+	/* open the serial port */
+	_serial_fd = ::open(_port, O_RDWR | O_NOCTTY);
+
+	if (_serial_fd < 0) {
+		PX4_ERR("failed to open serial port: %s err: %d", _port, errno);
+		return;
+	}
+
+	initializeCommunicationDump();
+
+	uint64_t last_rate_measurement = hrt_absolute_time();
+	unsigned last_rate_count = 0;
+
+	/* loop handling received serial bytes and also configuring in between */
+	while (!should_exit()) {
+		if (_helper != nullptr) {
+			delete (_helper);
+			_helper = nullptr;
+		}
+
+		_helper = new GPSDriverMTK(&MTK::callback, this, &_report_gps_pos);
+
+		_baudrate = _configured_baudrate;
+
+		if (_helper && _helper->configure(_baudrate, GPSHelper::OutputMode::GPS) == 0) {
+
+			/* reset report */
+			memset(&_report_gps_pos, 0, sizeof(_report_gps_pos));
+
+			int helper_ret;
+
+			while ((helper_ret = _helper->receive(TIMEOUT_5HZ)) > 0 && !should_exit()) {
+
+				if (helper_ret & 1) {
+					_report_gps_pos_pub.publish(_report_gps_pos);
+					last_rate_count++;
+				}
+
+				reset_if_scheduled();
+
+				/* measure update rate every 5 seconds */
+				if (hrt_absolute_time() - last_rate_measurement > RATE_MEASUREMENT_PERIOD) {
+					float dt = (float)((hrt_absolute_time() - last_rate_measurement)) / 1000000.0f;
+					_rate = last_rate_count / dt;
+					last_rate_measurement = hrt_absolute_time();
+					last_rate_count = 0;
+					_helper->storeUpdateRates();
+					_helper->resetUpdateRates();
+				}
+
+				if (!_healthy) {
+					_healthy = true;
+				}
+			}
+
+			if (_healthy) {
+				_healthy = false;
+				_rate = 0.0f;
+			}
+		}
+	}
+
+	PX4_INFO("exiting");
+
+	if (_serial_fd >= 0) {
+		::close(_serial_fd);
+		_serial_fd = -1;
+	}
+}
+
+int
+MTK::print_status()
+{
+	PX4_INFO("status: %s, port: %s, baudrate: %d", _healthy ? "OK" : "NOT OK", _port, _baudrate);
+
+	if (_report_gps_pos.timestamp != 0) {
+		if (_helper) {
+			PX4_INFO("rate position: \t\t%6.2f Hz", (double)_helper->getPositionUpdateRate());
+			PX4_INFO("rate velocity: \t\t%6.2f Hz", (double)_helper->getVelocityUpdateRate());
+		}
+
+		PX4_INFO("rate publication:\t\t%6.2f Hz", (double)_rate);
+
+		print_message(_report_gps_pos);
+	}
+
+	return 0;
+}
+
+void
+MTK::reset_if_scheduled()
+{
+	GPSRestartType restart_type = _scheduled_reset;
+
+	if (restart_type != GPSRestartType::None) {
+		_scheduled_reset = GPSRestartType::None;
+		int res = _helper->reset(restart_type);
+
+		if (res == -1) {
+			PX4_INFO("Reset is not supported on this device.");
+
+		} else if (res < 0) {
+			PX4_INFO("Reset failed.");
+
+		} else {
+			PX4_INFO("Reset succeeded.");
+		}
+	}
+}
+
+int
+MTK::custom_command(int argc, char *argv[])
+{
+	// Check if the driver is running.
+	if (!is_running()) {
+		PX4_INFO("not running");
+		return PX4_ERROR;
+	}
+
+	MTK *_instance = get_instance();
+
+	bool res = false;
+
+	if (argc == 2 && !strcmp(argv[0], "reset")) {
+
+		if (!strcmp(argv[1], "hot")) {
+			res = true;
+			_instance->schedule_reset(GPSRestartType::Hot);
+
+		} else if (!strcmp(argv[1], "cold")) {
+			res = true;
+			_instance->schedule_reset(GPSRestartType::Cold);
+
+		} else if (!strcmp(argv[1], "warm")) {
+			res = true;
+			_instance->schedule_reset(GPSRestartType::Warm);
+		}
+	}
+
+	if (res) {
+		PX4_INFO("Resetting GPS - %s", argv[1]);
+		return 0;
+	}
+
+	return (res) ? 0 : print_usage("unknown command");
+}
+
+int MTK::print_usage(const char *reason)
+{
+	if (reason) {
+		PX4_WARN("%s\n", reason);
+	}
+
+	PRINT_MODULE_DESCRIPTION(
+		R"DESCR_STR(
+### Description
+GPS driver module that handles the communication with the device and publishes the position via uORB.
+It supports multiple protocols (device vendors) and by default automatically selects the correct one.
+
+### Implementation
+There is a thread for each device polling for data. The GPS protocol classes are implemented with callbacks
+so that they can be used in other projects as well (eg. QGroundControl uses them too).
+
+Initiate warm restart of GPS device
+$ mtk reset warm
+)DESCR_STR");
+
+	PRINT_MODULE_USAGE_NAME("mtk", "driver");
+	PRINT_MODULE_USAGE_COMMAND("start");
+	PRINT_MODULE_USAGE_PARAM_STRING('d', "/dev/ttyS3", "<file:dev>", "GPS device", true);
+	PRINT_MODULE_USAGE_PARAM_INT('b', 0, 0, 3000000, "Baudrate (can also be p:<param_name>)", true);
+	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
+	PRINT_MODULE_USAGE_COMMAND_DESCR("reset", "Reset GPS device");
+	PRINT_MODULE_USAGE_ARG("cold|warm|hot", "Specify reset type", false);
+
+	return 0;
+}
+
+int MTK::task_spawn(int argc, char *argv[])
+{
+	int task_id = px4_task_spawn_cmd("mtk", SCHED_DEFAULT,
+				   SCHED_PRIORITY_SLOW_DRIVER, TASK_STACK_SIZE,
+				   (px4_main_t)&run_trampoline, (char *const *)argv);
+
+	if (task_id < 0) {
+		task_id = -1;
+		return -errno;
+	}
+
+	_task_id = task_id;
+
+	return 0;
+}
+
+MTK *MTK::instantiate(int argc, char *argv[])
+{
+	const char *device_name = "/dev/ttyS3";
+	int baudrate_main = 0;
+	bool error_flag = false;
+	int myoptind = 1;
+	int ch;
+	const char *myoptarg = nullptr;
+
+	while ((ch = px4_getopt(argc, argv, "b:d:", &myoptind, &myoptarg)) != EOF) {
+		switch (ch) {
+		case 'b':
+			if (px4_get_parameter_value(myoptarg, baudrate_main) != 0) {
+				PX4_ERR("baudrate parsing failed");
+				error_flag = true;
+			}
+			break;
+
+		case 'd':
+			device_name = myoptarg;
+			break;
+
+		case '?':
+			error_flag = true;
+			break;
+
+		default:
+			PX4_WARN("unrecognized flag");
+			error_flag = true;
+			break;
+		}
+	}
+
+	if (error_flag) {
+		return nullptr;
+	}
+
+	return new MTK(device_name, baudrate_main);
+}
+
+extern "C" __EXPORT int mtk_main(int argc, char *argv[])
+{
+	return MTK::main(argc, argv);
+}
