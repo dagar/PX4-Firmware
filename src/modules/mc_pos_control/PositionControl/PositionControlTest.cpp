@@ -55,8 +55,7 @@ TEST(PositionControlTest, EmptySetpoint)
 	EXPECT_EQ(Vector3f(output_setpoint.jerk), Vector3f(0.f, 0.f, 0.f));
 	EXPECT_EQ(Vector3f(output_setpoint.thrust), Vector3f(0, 0, 0));
 
-	vehicle_attitude_setpoint_s attitude{};
-	position_control.getAttitudeSetpoint(attitude);
+	vehicle_attitude_setpoint_s attitude{position_control.getAttitudeSetpoint()};
 	EXPECT_FLOAT_EQ(attitude.roll_body, 0.f);
 	EXPECT_FLOAT_EQ(attitude.pitch_body, 0.f);
 	EXPECT_FLOAT_EQ(attitude.yaw_body, 0.f);
@@ -110,7 +109,7 @@ public:
 		_position_control.setInputSetpoint(_input_setpoint);
 		const bool ret = _position_control.update(.1f);
 		_position_control.getLocalPositionSetpoint(_output_setpoint);
-		_position_control.getAttitudeSetpoint(_attitude);
+		_attitude = _position_control.getAttitudeSetpoint();
 		return ret;
 	}
 

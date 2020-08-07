@@ -695,18 +695,17 @@ MulticopterPositionControl::Run()
 			_flight_tasks.updateVelocityControllerIO(Vector3f(local_pos_sp.vx, local_pos_sp.vy, local_pos_sp.vz),
 					Vector3f(local_pos_sp.acceleration));
 
-			vehicle_attitude_setpoint_s attitude_setpoint{};
-			attitude_setpoint.timestamp = time_stamp_now;
-			_control.getAttitudeSetpoint(attitude_setpoint);
-
 			// publish attitude setpoint
 			// It's important to publish also when disarmed otheriwse the attitude setpoint stays uninitialized.
 			// Not publishing when not running a flight task
 			// in stabilized mode attitude setpoints get ignored
 			// in offboard with attitude setpoints they come from MAVLink directly
+			const vehicle_attitude_setpoint_s attitude_setpoint{_control.getAttitudeSetpoint()};
 			_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
 
-			_wv_dcm_z_sp_prev = Quatf(attitude_setpoint.q_d).dcm_z();
+			if (_wv_controller != nullptr) {
+				_wv_dcm_z_sp_prev = Quatf(attitude_setpoint.q_d).dcm_z();
+			}
 
 			// if there's any change in landing gear setpoint publish it
 			if (gear.landing_gear != _old_landing_gear_position

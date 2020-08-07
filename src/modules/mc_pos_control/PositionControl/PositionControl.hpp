@@ -177,7 +177,7 @@ public:
 	 * It needs to be executed by the attitude controller to achieve velocity and position tracking.
 	 * @param attitude_setpoint reference to struct to fill up
 	 */
-	void getAttitudeSetpoint(vehicle_attitude_setpoint_s &attitude_setpoint) const;
+	vehicle_attitude_setpoint_s getAttitudeSetpoint() const;
 
 private:
 	bool _updateSuccessful();
