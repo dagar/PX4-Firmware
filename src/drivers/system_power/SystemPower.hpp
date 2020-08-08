@@ -32,39 +32,31 @@
  ****************************************************************************/
 
 /**
- * @file adc.cpp
+ * @file SystemPower.hpp
  *
  * Driver for an ADC.
  *
  */
 #include <stdint.h>
 
-#include <drivers/drv_adc.h>
 #include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
 #include <lib/perf/perf_counter.h>
-#include <px4_arch/adc.h>
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/adc_report.h>
+#include <uORB/topics/system_power.h>
 
 using namespace time_literals;
 
-#ifndef ADC_CHANNELS
-#error "board needs to define ADC_CHANNELS to use this driver"
-#endif
-
-#define ADC_TOTAL_CHANNELS 		32
-
-class ADC : public ModuleBase<ADC>, public px4::ScheduledWorkItem
+class SystemPower : public ModuleBase<SystemPower>, public px4::ScheduledWorkItem
 {
 public:
-	ADC(uint32_t base_address = SYSTEM_ADC_BASE, uint32_t channels = ADC_CHANNELS);
-
-	~ADC() override;
+	SystemPower();
+	~SystemPower() override;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -77,22 +69,29 @@ public:
 
 	int init();
 
-	int test();
-
 private:
+	void Run() override;
 
-	void		Run() override;
+	void OpenGpioDevices();
+	void CloseGpioDevices();
+	uint8_t ReadGpioValue(int fd);
 
-	static const hrt_abstime	kINTERVAL{10_ms};	/**< 100Hz base rate */
+	static int DataReadyInterruptCallback(int irq, void *context, void *arg);
+	void DataReady();
+	bool DataReadyInterruptConfigure();
+	bool DataReadyInterruptDisable();
 
-	perf_counter_t			_cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
+	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
-	const uint32_t			_base_address;
-	uint8_t				_channel_count{0};
+	uORB::Publication<system_power_s> _system_power_pub{ORB_ID(system_power)};
+	uORB::Subscription _adc_report_sub{ORB_ID(adc_report)};
 
-	uint8_t                          _am_channel[PX4_MAX_ADC_CHANNELS] {};
+#if defined(BOARD_GPIO_VDD_5V_COMP_VALID)
+	int _5v_comp_valid_fd {-1};
+#endif // BOARD_GPIO_VDD_5V_COMP_VALID
+#if defined(BOARD_GPIO_VDD_5V_CAN1_GPS1_VALID)
+	int _5v_can1_gps1_valid_fd {-1};
+#endif // BOARD_GPIO_VDD_5V_CAN1_GPS1_VALID
 
-	uORB::Publication<adc_report_s> _adc_report_pub{ORB_ID(adc_report)};
-
-	adc_report_s _adc_report{};
+	bool _first_run{true};
 };
