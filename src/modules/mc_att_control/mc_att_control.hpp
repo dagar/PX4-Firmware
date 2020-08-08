@@ -89,19 +89,13 @@ private:
 	 */
 	void		parameters_updated();
 
-	void		publish_rates_setpoint();
-
 	float		throttle_curve(float throttle_stick_input);
 
 	/**
 	 * Generate & publish an attitude setpoint from stick inputs
 	 */
-	void		generate_attitude_setpoint(float dt, bool reset_yaw_sp);
+	vehicle_attitude_setpoint_s generate_attitude_setpoint(float dt, float yaw);
 
-	/**
-	 * Attitude controller.
-	 */
-	void		control_attitude();
 
 	AttitudeControl _attitude_control; ///< class for attitude control calculations
 
@@ -118,26 +112,27 @@ private:
 	uORB::Publication<vehicle_rates_setpoint_s>	_v_rates_sp_pub{ORB_ID(vehicle_rates_setpoint)};			/**< rate setpoint publication */
 	uORB::Publication<vehicle_attitude_setpoint_s>	_vehicle_attitude_setpoint_pub;
 
-	struct vehicle_attitude_s		_v_att {};		/**< vehicle attitude */
-	struct vehicle_rates_setpoint_s		_v_rates_sp {};		/**< vehicle rates setpoint */
-	struct manual_control_setpoint_s	_manual_control_setpoint {};	/**< manual control setpoint */
-	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
-	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
-	struct vehicle_land_detected_s		_vehicle_land_detected {};
+	vehicle_control_mode_s _v_control_mode {};	/**< vehicle control mode */
 
-	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
+	perf_counter_t _loop_perf;			/**< loop duration performance counter */
 
 	matrix::Vector3f _thrust_setpoint_body; ///< body frame 3D thrust vector
-	matrix::Vector3f _rates_sp; ///< angular rates setpoint
 
 	float _man_yaw_sp{0.f};				/**< current yaw setpoint in manual mode */
-	float _man_tilt_max;			/**< maximum tilt allowed for manual flight [rad] */
+	float _man_tilt_max{0.f};			/**< maximum tilt allowed for manual flight [rad] */
 	AlphaFilter<float> _man_x_input_filter;
 	AlphaFilter<float> _man_y_input_filter;
 
 	hrt_abstime _last_run{0};
 
-	bool _reset_yaw_sp{true};
+	uint8_t _quat_reset_counter{0};
+
+	bool _landed{true};
+
+	bool _vehicle_type_rotary_wing{true};
+	bool _vtol{false};
+	bool _vtol_in_transition_mode{false};
+	bool _vtol_tailsitter{false};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLL_P>) _param_mc_roll_p,
@@ -149,22 +144,20 @@ private:
 		(ParamFloat<px4::params::MC_PITCHRATE_MAX>) _param_mc_pitchrate_max,
 		(ParamFloat<px4::params::MC_YAWRATE_MAX>) _param_mc_yawrate_max,
 
-		(ParamFloat<px4::params::MPC_MAN_Y_MAX>) _param_mpc_man_y_max,			/**< scaling factor from stick to yaw rate */
+		(ParamFloat<px4::params::MPC_MAN_Y_MAX>) _param_mpc_man_y_max,		/**< scaling factor from stick to yaw rate */
 
 		(ParamFloat<px4::params::MC_RATT_TH>) _param_mc_ratt_th,
 
 		/* Stabilized mode params */
-		(ParamFloat<px4::params::MPC_MAN_TILT_MAX>) _param_mpc_man_tilt_max,			/**< maximum tilt allowed for manual flight */
-		(ParamFloat<px4::params::MPC_MANTHR_MIN>) _param_mpc_manthr_min,			/**< minimum throttle for stabilized */
-		(ParamFloat<px4::params::MPC_THR_MAX>) _param_mpc_thr_max,				/**< maximum throttle for stabilized */
+		(ParamFloat<px4::params::MPC_MAN_TILT_MAX>) _param_mpc_man_tilt_max,	/**< maximum tilt allowed for manual flight */
+		(ParamFloat<px4::params::MPC_MANTHR_MIN>) _param_mpc_manthr_min,	/**< minimum throttle for stabilized */
+		(ParamFloat<px4::params::MPC_THR_MAX>) _param_mpc_thr_max,		/**< maximum throttle for stabilized */
 		(ParamFloat<px4::params::MPC_THR_HOVER>)
-		_param_mpc_thr_hover,			/**< throttle at which vehicle is at hover equilibrium */
-		(ParamInt<px4::params::MPC_THR_CURVE>) _param_mpc_thr_curve,				/**< throttle curve behavior */
+		_param_mpc_thr_hover,		/**< throttle at which vehicle is at hover equilibrium */
+		(ParamInt<px4::params::MPC_THR_CURVE>) _param_mpc_thr_curve,		/**< throttle curve behavior */
 
 		(ParamInt<px4::params::MC_AIRMODE>) _param_mc_airmode,
 		(ParamFloat<px4::params::MC_MAN_TILT_TAU>) _param_mc_man_tilt_tau
 	)
-
-	bool _is_tailsitter{false};
 };
 

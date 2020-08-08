@@ -420,7 +420,6 @@ MulticopterPositionControl::poll_subscriptions()
 {
 	_vehicle_status_sub.update(&_vehicle_status);
 	_vehicle_land_detected_sub.update(&_vehicle_land_detected);
-	_control_mode_sub.update(&_control_mode);
 	_home_pos_sub.update(&_home_pos);
 
 	if (_att_sub.updated()) {
@@ -540,6 +539,12 @@ MulticopterPositionControl::Run()
 		return;
 	}
 
+	_control_mode_sub.update(&_control_mode);
+
+	if (!_control_mode.flag_control_climb_rate_enabled || !_control_mode.flag_control_position_enabled) {
+		return;
+	}
+
 	perf_begin(_cycle_perf);
 
 	if (_local_pos_sub.update(&_local_pos)) {
@@ -548,7 +553,7 @@ MulticopterPositionControl::Run()
 		parameters_update(false);
 
 		// set _dt in controllib Block - the time difference since the last loop iteration in seconds
-		const hrt_abstime time_stamp_now = hrt_absolute_time();
+		const hrt_abstime time_stamp_now = _local_pos.timestamp;
 		setDt((time_stamp_now - _time_stamp_last_loop) / 1e6f);
 		_time_stamp_last_loop = time_stamp_now;
 
@@ -602,6 +607,7 @@ MulticopterPositionControl::Run()
 			}
 
 			// publish trajectory setpoint
+			setpoint.timestamp = hrt_absolute_time();
 			_traj_sp_pub.publish(setpoint);
 
 			landing_gear_s gear = _flight_tasks.getGear();
@@ -683,7 +689,7 @@ MulticopterPositionControl::Run()
 			// will remain NAN. Given that the PositionController cannot generate a position-setpoint, this type of setpoint is always equal to the input to the
 			// PositionController.
 			vehicle_local_position_setpoint_s local_pos_sp{};
-			local_pos_sp.timestamp = time_stamp_now;
+			local_pos_sp.timestamp = hrt_absolute_time();
 			_control.getLocalPositionSetpoint(local_pos_sp);
 
 			// Publish local position setpoint
@@ -695,15 +701,14 @@ MulticopterPositionControl::Run()
 			_flight_tasks.updateVelocityControllerIO(Vector3f(local_pos_sp.vx, local_pos_sp.vy, local_pos_sp.vz),
 					Vector3f(local_pos_sp.acceleration));
 
-			vehicle_attitude_setpoint_s attitude_setpoint{};
-			attitude_setpoint.timestamp = time_stamp_now;
-			_control.getAttitudeSetpoint(attitude_setpoint);
-
 			// publish attitude setpoint
 			// It's important to publish also when disarmed otheriwse the attitude setpoint stays uninitialized.
 			// Not publishing when not running a flight task
 			// in stabilized mode attitude setpoints get ignored
 			// in offboard with attitude setpoints they come from MAVLink directly
+			vehicle_attitude_setpoint_s attitude_setpoint;
+			_control.getAttitudeSetpoint(attitude_setpoint);
+			attitude_setpoint.timestamp = hrt_absolute_time();
 			_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
 
 			_wv_dcm_z_sp_prev = Quatf(attitude_setpoint.q_d).dcm_z();
@@ -711,6 +716,7 @@ MulticopterPositionControl::Run()
 			// if there's any change in landing gear setpoint publish it
 			if (gear.landing_gear != _old_landing_gear_position
 			    && gear.landing_gear != landing_gear_s::GEAR_KEEP) {
+
 				_landing_gear.timestamp = time_stamp_now;
 				_landing_gear.landing_gear = gear.landing_gear;
 				_landing_gear_pub.publish(_landing_gear);
