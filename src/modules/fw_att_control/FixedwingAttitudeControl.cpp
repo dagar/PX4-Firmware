@@ -301,9 +301,9 @@ void FixedwingAttitudeControl::Run()
 		}
 
 		/* only run controller if attitude changed */
-		static uint64_t last_run = 0;
-		float deltaT = constrain((hrt_elapsed_time(&last_run) / 1e6f), 0.01f, 0.1f);
-		last_run = hrt_absolute_time();
+		const hrt_abstime now = _att.timestamp;
+		float deltaT = constrain((now - _last_run) * 1e-6f), 0.01f, 0.1f);
+		_last_run = _att.timestamp;
 
 		/* get current rotation matrix and euler angles from control state quaternions */
 		matrix::Dcmf R = matrix::Quatf(_att.q);
@@ -424,7 +424,7 @@ void FixedwingAttitudeControl::Run()
 			}
 
 			/* Prepare data for attitude controllers */
-			struct ECL_ControlData control_input = {};
+			struct ECL_ControlData control_input;
 			control_input.roll = euler_angles.phi();
 			control_input.pitch = euler_angles.theta();
 			control_input.yaw = euler_angles.psi();
@@ -502,16 +502,16 @@ void FixedwingAttitudeControl::Run()
 			/* Run attitude controllers */
 			if (_vcontrol_mode.flag_control_attitude_enabled) {
 				if (PX4_ISFINITE(_att_sp.roll_body) && PX4_ISFINITE(_att_sp.pitch_body)) {
-					_roll_ctrl.control_attitude(control_input);
-					_pitch_ctrl.control_attitude(control_input);
+					_roll_ctrl.control_attitude(control_input, dt);
+					_pitch_ctrl.control_attitude(control_input, dt);
 
 					if (wheel_control) {
-						_wheel_ctrl.control_attitude(control_input);
+						_wheel_ctrl.control_attitude(control_input, dt);
 						_yaw_ctrl.reset_integrator();
 
 					} else {
 						// runs last, because is depending on output of roll and pitch attitude
-						_yaw_ctrl.control_attitude(control_input);
+						_yaw_ctrl.control_attitude(control_input, dt);
 						_wheel_ctrl.reset_integrator();
 					}
 

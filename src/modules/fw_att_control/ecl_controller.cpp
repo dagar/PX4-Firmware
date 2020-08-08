@@ -52,7 +52,6 @@
 #include <mathlib/mathlib.h>
 
 ECL_Controller::ECL_Controller() :
-	_last_run(0),
 	_tc(0.1f),
 	_k_p(0.0f),
 	_k_i(0.0f),

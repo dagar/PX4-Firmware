@@ -124,6 +124,8 @@ private:
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
+	hrt_abstime _last_run{0};
+
 	float _flaps_applied{0.0f};
 	float _flaperons_applied{0.0f};
 

@@ -326,39 +326,38 @@ MulticopterAttitudeControl::Run()
 				_man_y_input_filter.reset(0.f);
 			}
 		}
-	}
 
-	if (_v_control_mode.flag_control_attitude_enable) {
+		if (_v_control_mode.flag_control_attitude_enable) {
 
-		Vector3f rates_sp = _attitude_control.update(q);
+			Vector3f rates_sp = _attitude_control.update(q);
 
-		if (_v_control_mode.flag_control_yawrate_override_enabled) {
-			/* Yaw rate override enabled, overwrite the yaw setpoint */
-			vehicle_rates_setpoint_s v_rates_sp{};
+			if (_v_control_mode.flag_control_yawrate_override_enabled) {
+				/* Yaw rate override enabled, overwrite the yaw setpoint */
+				vehicle_rates_setpoint_s v_rates_sp{};
 
-			if (_v_rates_sp_sub.copy(&v_rates_sp)) {
-				rates_sp(2) = v_rates_sp.yaw;
+				if (_v_rates_sp_sub.copy(&v_rates_sp)) {
+					rates_sp(2) = v_rates_sp.yaw;
+				}
 			}
+
+			vehicle_rates_setpoint_s v_rates_sp;
+			v_rates_sp.roll = rates_sp(0);
+			v_rates_sp.pitch = rates_sp(1);
+			v_rates_sp.yaw = rates_sp(2);
+			_thrust_setpoint_body.copyTo(v_rates_sp.thrust_body);
+			v_rates_sp.timestamp = hrt_absolute_time();
+
+			_v_rates_sp_pub.publish(v_rates_sp);
 		}
 
-		vehicle_rates_setpoint_s v_rates_sp;
-		v_rates_sp.roll = rates_sp(0);
-		v_rates_sp.pitch = rates_sp(1);
-		v_rates_sp.yaw = rates_sp(2);
-		_thrust_setpoint_body.copyTo(v_rates_sp.thrust_body);
-		v_rates_sp.timestamp = hrt_absolute_time();
 
-		_v_rates_sp_pub.publish(v_rates_sp);
+		if (_landed || _vtol_in_transition_mode) {
+			_man_yaw_sp = q.psi();
+		}
 	}
 
-
-	if (_landed || _vtol_in_transition_mode) {
-		_man_yaw_sp = yaw;
+	perf_end(_loop_perf);
 	}
-}
-
-perf_end(_loop_perf);
-}
 
 int MulticopterAttitudeControl::task_spawn(int argc, char *argv[])
 {

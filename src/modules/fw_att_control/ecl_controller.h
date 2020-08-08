@@ -52,6 +52,7 @@
 #include <px4_log.h>
 
 struct ECL_ControlData {
+	uint64_t timestamp;
 	float roll;
 	float pitch;
 	float yaw;
@@ -101,7 +102,6 @@ public:
 	void reset_integrator();
 
 protected:
-	uint64_t _last_run;
 	float _tc;
 	float _k_p;
 	float _k_i;

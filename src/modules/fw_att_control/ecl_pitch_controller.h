@@ -60,7 +60,7 @@ public:
 	ECL_PitchController() = default;
 	~ECL_PitchController() = default;
 
-	float control_attitude(const struct ECL_ControlData &ctl_data) override;
+	float control_attitude(const struct ECL_ControlData &ctl_data, const float dt) override;
 	float control_euler_rate(const struct ECL_ControlData &ctl_data) override;
 	float control_bodyrate(const struct ECL_ControlData &ctl_data) override;
 

@@ -141,6 +141,13 @@ MulticopterRateControl::Run()
 		parameters_updated();
 	}
 
+	/* check for updates in other topics */
+	_v_control_mode_sub.update(&_v_control_mode);
+
+	if (!_v_control_mode.flag_control_rates_enabled || _actuators_0_circuit_breaker_enabled) {
+		return;
+	}
+
 	/* run controller on gyro changes */
 	vehicle_angular_velocity_s angular_velocity;
 
@@ -150,7 +157,7 @@ MulticopterRateControl::Run()
 		vehicle_angular_acceleration_s v_angular_acceleration{};
 		_vehicle_angular_acceleration_sub.copy(&v_angular_acceleration);
 
-		const hrt_abstime now = hrt_absolute_time();
+		const hrt_abstime now = v_angular_acceleration.timestamp_sample;
 
 		// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
 		const float dt = math::constrain(((now - _last_run) / 1e6f), 0.0002f, 0.02f);
@@ -158,9 +165,6 @@ MulticopterRateControl::Run()
 
 		const Vector3f angular_accel{v_angular_acceleration.xyz};
 		const Vector3f rates{angular_velocity.xyz};
-
-		/* check for updates in other topics */
-		_v_control_mode_sub.update(&_v_control_mode);
 
 		if (_vehicle_land_detected_sub.updated()) {
 			vehicle_land_detected_s vehicle_land_detected;
@@ -245,7 +249,7 @@ MulticopterRateControl::Run()
 		}
 
 		// run the rate controller
-		if (_v_control_mode.flag_control_rates_enabled && !_actuators_0_circuit_breaker_enabled) {
+		if (!_v_control_mode.flag_control_termination_enabled) {
 
 			// reset integral if disarmed
 			if (!_v_control_mode.flag_armed || _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
@@ -302,7 +306,7 @@ MulticopterRateControl::Run()
 			actuators.timestamp = hrt_absolute_time();
 			_actuators_0_pub.publish(actuators);
 
-		} else if (_v_control_mode.flag_control_termination_enabled) {
+		} else {
 			if (!_vehicle_status.is_vtol) {
 				// publish actuator controls
 				actuator_controls_s actuators{};

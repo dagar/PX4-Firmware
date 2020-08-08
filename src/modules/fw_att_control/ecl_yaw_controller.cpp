@@ -95,7 +95,7 @@ float ECL_YawController::control_attitude(const struct ECL_ControlData &ctl_data
 	return _rate_setpoint;
 }
 
-float ECL_YawController::control_bodyrate(const struct ECL_ControlData &ctl_data)
+float ECL_YawController::control_bodyrate(const struct ECL_ControlData &ctl_data, const float dt)
 {
 	/* Do not calculate control signal with bad inputs */
 	if (!(PX4_ISFINITE(ctl_data.roll) &&
@@ -109,11 +109,6 @@ float ECL_YawController::control_bodyrate(const struct ECL_ControlData &ctl_data
 
 		return math::constrain(_last_output, -1.0f, 1.0f);
 	}
-
-	/* get the usual dt estimate */
-	uint64_t dt_micros = hrt_elapsed_time(&_last_run);
-	_last_run = hrt_absolute_time();
-	float dt = (float)dt_micros * 1e-6f;
 
 	/* lock integral for long intervals */
 	bool lock_integrator = ctl_data.lock_integrator;

@@ -352,7 +352,7 @@ AttitudeEstimatorQ::Run()
 		}
 
 		/* time from previous iteration */
-		hrt_abstime now = hrt_absolute_time();
+		hrt_abstime now = sensors.timestamp;
 		const float dt = math::constrain((now - _last_time) / 1e6f, _dt_min, _dt_max);
 		_last_time = now;
 
