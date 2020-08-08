@@ -73,6 +73,7 @@
 #include <uORB/topics/battery_status.h>
 
 #include "parameters.h"
+#include "auto_calibration/AutoCalibration.hpp"
 #include "voted_sensors_update.h"
 #include "vehicle_acceleration/VehicleAcceleration.hpp"
 #include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
@@ -170,6 +171,8 @@ private:
 	VehicleAngularVelocity	_vehicle_angular_velocity;
 	VehicleAirData          *_vehicle_air_data{nullptr};
 
+	AutoCalibration *_auto_calibration{nullptr};
+
 	static constexpr int MAX_SENSOR_COUNT = 3;
 	VehicleIMU      *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
 
@@ -202,6 +205,7 @@ private:
 
 	void		InitializeVehicleAirData();
 	void		InitializeVehicleIMU();
+	void		UpdateAutoCalibration();
 
 	DEFINE_PARAMETERS(
 		(ParamBool<px4::params::SYS_HAS_BARO>) _param_sys_has_baro
@@ -474,6 +478,23 @@ void Sensors::InitializeVehicleIMU()
 	}
 }
 
+void Sensors::UpdateAutoCalibration()
+{
+	if (!_armed && (_auto_calibration == nullptr)) {
+		AutoCalibration *auto_cal = new AutoCalibration();
+
+		if (auto_cal) {
+			auto_cal->Start();
+			_auto_calibration = auto_cal;
+		}
+
+	} else if (_armed && (_auto_calibration != nullptr)) {
+		_auto_calibration->Stop();
+		delete _auto_calibration;
+		_auto_calibration = nullptr;
+	}
+}
+
 void Sensors::Run()
 {
 	if (should_exit()) {
@@ -585,6 +606,8 @@ void Sensors::Run()
 		// check parameters for updates
 		parameter_update_poll();
 	}
+
+	UpdateAutoCalibration();
 
 	perf_end(_loop_perf);
 }
