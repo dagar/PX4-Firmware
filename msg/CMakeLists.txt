@@ -121,6 +121,7 @@ set(msg_files
 	sensor_mag.msg
 	sensor_preflight.msg
 	sensor_selection.msg
+	smart_battery_status.msg
 	subsystem_info.msg
 	system_power.msg
 	task_stack_info.msg

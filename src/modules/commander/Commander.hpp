@@ -72,6 +72,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/power_button_state.h>
 #include <uORB/topics/safety.h>
+#include <uORB/topics/smart_battery_status.h>
 #include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/system_power.h>
 #include <uORB/topics/telemetry_status.h>
@@ -381,22 +382,16 @@ private:
 	vtol_vehicle_status_s	_vtol_status{};
 
 	// Subscriptions
+
+	uORB::Subscription _battery_subs[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(battery_status), 0}, {ORB_ID(battery_status), 1}, {ORB_ID(battery_status), 2}, {ORB_ID(battery_status), 3}};
+	uORB::Subscription _smart_battery_subs[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(smart_battery_status), 0}, {ORB_ID(smart_battery_status), 1}, {ORB_ID(smart_battery_status), 2}, {ORB_ID(smart_battery_status), 3}};
+
+	uORB::Subscription _sub_distance_sensor[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(distance_sensor), 0}, {ORB_ID(distance_sensor), 1}, {ORB_ID(distance_sensor), 2}, {ORB_ID(distance_sensor), 3}};
+	uORB::Subscription _telemetry_status_sub[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(telemetry_status), 0}, {ORB_ID(telemetry_status), 1}, {ORB_ID(telemetry_status), 2}, {ORB_ID(telemetry_status), 3}};
+
 	uORB::Subscription					_actuator_controls_sub{ORB_ID_VEHICLE_ATTITUDE_CONTROLS};
-#if BOARD_NUMBER_BRICKS > 1
-	uORB::Subscription					_battery_subs[ORB_MULTI_MAX_INSTANCES] {
-		uORB::Subscription(ORB_ID(battery_status), 0),
-		uORB::Subscription(ORB_ID(battery_status), 1),
-		uORB::Subscription(ORB_ID(battery_status), 2),
-		uORB::Subscription(ORB_ID(battery_status), 3),
-	};
-#else
-	uORB::Subscription					_battery_subs[1] {
-		uORB::Subscription(ORB_ID(battery_status), 0)
-	};
-#endif
 	uORB::Subscription					_cmd_sub {ORB_ID(vehicle_command)};
 	uORB::Subscription					_cpuload_sub{ORB_ID(cpuload)};
-	uORB::Subscription					_sub_distance_sensor[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(distance_sensor), 0}, {ORB_ID(distance_sensor), 1}, {ORB_ID(distance_sensor), 2}, {ORB_ID(distance_sensor), 3}}; /**< distance data received from onboard rangefinders */
 	uORB::Subscription					_esc_status_sub{ORB_ID(esc_status)};
 	uORB::Subscription					_geofence_result_sub{ORB_ID(geofence_result)};
 	uORB::Subscription					_iridiumsbd_status_sub{ORB_ID(iridiumsbd_status)};
@@ -406,7 +401,6 @@ private:
 	uORB::Subscription					_manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription					_subsys_sub{ORB_ID(subsystem_info)};
 	uORB::Subscription					_system_power_sub{ORB_ID(system_power)};
-	uORB::Subscription					_telemetry_status_sub[ORB_MULTI_MAX_INSTANCES] {{ORB_ID(telemetry_status), 0}, {ORB_ID(telemetry_status), 1}, {ORB_ID(telemetry_status), 2}, {ORB_ID(telemetry_status), 3}};
 	uORB::Subscription					_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 	uORB::Subscription					_vtol_vehicle_status_sub{ORB_ID(vtol_vehicle_status)};
 

@@ -3947,6 +3947,23 @@ void Commander::battery_status_check()
 		}
 	}
 
+
+	for (auto &smart_battery : _smart_battery_subs) {
+		// We need to update the status flag if ANY battery is updated, because the system source might have
+		// changed, or might be nothing (if there is no battery connected)
+		battery_sub_updated |= smart_battery.updated();
+
+		smart_battery_status_s battery;
+
+		if (smart_battery.copy(&battery)) {
+			if (battery.connected) {
+				// TODO: copy to batteries[x]?
+				// what if we have smart and non-smart batteries?
+				num_connected_batteries++;
+			}
+		}
+	}
+
 	if (!battery_sub_updated) {
 		// Nothing has changed since the last time this function was called, so nothing needs to be done now.
 		return;

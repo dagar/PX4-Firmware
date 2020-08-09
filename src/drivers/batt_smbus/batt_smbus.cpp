@@ -51,8 +51,8 @@ BATT_SMBUS::BATT_SMBUS(I2CSPIBusOption bus_option, const int bus, SMBus *interfa
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id()), bus_option, bus),
 	_interface(interface)
 {
-	battery_status_s new_report = {};
-	_batt_topic = orb_advertise(ORB_ID(battery_status), &new_report);
+	smart_battery_status_s new_report = {};
+	_batt_topic = orb_advertise(ORB_ID(smart_battery_status), &new_report);
 
 	int battsource = 1;
 	param_set(param_find("BAT_SOURCE"), &battsource);
@@ -87,7 +87,7 @@ void BATT_SMBUS::RunImpl()
 	uint64_t now = hrt_absolute_time();
 
 	// Read data from sensor.
-	battery_status_s new_report = {};
+	smart_battery_status_s new_report = {};
 
 	// TODO(hyonlim): this driver should support multiple SMBUS going forward.
 	new_report.id = 1;
@@ -156,19 +156,19 @@ void BATT_SMBUS::RunImpl()
 
 	// Check if max lifetime voltage delta is greater than allowed.
 	if (_lifetime_max_delta_cell_voltage > BATT_CELL_VOLTAGE_THRESHOLD_FAILED) {
-		new_report.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+		new_report.warning = smart_battery_status_s::BATTERY_WARNING_CRITICAL;
 
 	} else if (new_report.remaining > _low_thr) {
-		new_report.warning = battery_status_s::BATTERY_WARNING_NONE;
+		new_report.warning = smart_battery_status_s::BATTERY_WARNING_NONE;
 
 	} else if (new_report.remaining > _crit_thr) {
-		new_report.warning = battery_status_s::BATTERY_WARNING_LOW;
+		new_report.warning = smart_battery_status_s::BATTERY_WARNING_LOW;
 
 	} else if (new_report.remaining > _emergency_thr) {
-		new_report.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+		new_report.warning = smart_battery_status_s::BATTERY_WARNING_CRITICAL;
 
 	} else {
-		new_report.warning = battery_status_s::BATTERY_WARNING_EMERGENCY;
+		new_report.warning = smart_battery_status_s::BATTERY_WARNING_EMERGENCY;
 	}
 
 	// Read battery temperature and covert to Celsius.
@@ -187,7 +187,7 @@ void BATT_SMBUS::RunImpl()
 
 	// Only publish if no errors.
 	if (!ret) {
-		orb_publish(ORB_ID(battery_status), _batt_topic, &new_report);
+		orb_publish(ORB_ID(smart_battery_status), _batt_topic, &new_report);
 
 		_last_report = new_report;
 	}

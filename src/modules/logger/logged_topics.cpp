@@ -118,6 +118,7 @@ void LoggedTopics::add_default_topics()
 	add_topic_multi("sensor_baro", 1000);
 	add_topic_multi("sensor_gyro", 1000);
 	add_topic_multi("sensor_mag", 1000);
+	add_topic_multi("smart_battery_status", 300);
 	add_topic_multi("vehicle_gps_position", 1000);
 	add_topic_multi("vehicle_imu", 500);
 	add_topic_multi("vehicle_imu_status", 1000);

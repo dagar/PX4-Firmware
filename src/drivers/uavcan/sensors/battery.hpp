@@ -38,7 +38,7 @@
 #pragma once
 
 #include "sensor_bridge.hpp"
-#include <uORB/topics/battery_status.h>
+#include <uORB/topics/smart_battery_status.h>
 #include <uavcan/equipment/power/BatteryInfo.hpp>
 #include <drivers/drv_hrt.h>
 #include <px4_platform_common/module_params.h>

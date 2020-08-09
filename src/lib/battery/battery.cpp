@@ -122,7 +122,6 @@ Battery::reset()
 	_battery_status.warning = battery_status_s::BATTERY_WARNING_NONE;
 	_battery_status.connected = false;
 	_battery_status.capacity = _params.capacity;
-	_battery_status.temperature = NAN;
 	_battery_status.id = (uint8_t) _index;
 }
 
@@ -164,14 +163,6 @@ Battery::updateBatteryStatus(hrt_abstime timestamp, float voltage_v, float curre
 		_battery_status.connected = connected;
 		_battery_status.source = source;
 		_battery_status.priority = priority;
-
-		static constexpr int uorb_max_cells = sizeof(_battery_status.voltage_cell_v) / sizeof(
-				_battery_status.voltage_cell_v[0]);
-
-		// Fill cell voltages with average values to work around BATTERY_STATUS message not allowing to report just total voltage
-		for (int i = 0; (i < _battery_status.cell_count) && (i < uorb_max_cells); i++) {
-			_battery_status.voltage_cell_v[i] = _battery_status.voltage_filtered_v / _battery_status.cell_count;
-		}
 	}
 
 	_battery_status.timestamp = timestamp;
