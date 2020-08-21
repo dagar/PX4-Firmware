@@ -46,6 +46,6 @@
 #include <uORB/uORB.h>
 
 int do_accel_calibration(orb_advert_t *mavlink_log_pub);
-int do_accel_calibration_quick(orb_advert_t *mavlink_log_pub);
+int do_accel_calibration_quick(orb_advert_t *mavlink_log_pub, bool board_is_level = false);
 
 #endif /* ACCELEROMETER_CALIBRATION_H_ */

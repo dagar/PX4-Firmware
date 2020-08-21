@@ -70,6 +70,8 @@ public:
 	bool external() const { return _external; }
 	const int32_t &priority() const { return _priority; }
 	const matrix::Dcmf &rotation() const { return _rotation; }
+	const matrix::Vector3f &scale() const { return _scale; }
+	bool uncalibrated() const { return _calibration_index < 0; }
 
 	// apply offsets and scale
 	// rotate corrected measurements from sensor to body frame

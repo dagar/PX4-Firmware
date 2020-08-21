@@ -53,6 +53,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/sensor_preflight_mag.h>
+#include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 
@@ -84,6 +85,8 @@ private:
 
 	uORB::Publication<sensor_preflight_mag_s> _sensor_preflight_mag_pub{ORB_ID(sensor_preflight_mag)};
 	uORB::Publication<vehicle_magnetometer_s> _vehicle_magnetometer_pub{ORB_ID(vehicle_magnetometer)};
+
+	uORB::PublicationQueued<subsystem_info_s> _subsystem_info_pub{ORB_ID(subsystem_info)};
 
 	uORB::Subscription _actuator_controls_0_sub{ORB_ID(actuator_controls_0)};
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status), 0};

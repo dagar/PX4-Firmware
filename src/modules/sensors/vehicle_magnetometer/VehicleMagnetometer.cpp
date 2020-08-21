@@ -332,6 +332,14 @@ void VehicleMagnetometer::Run()
 		calcMagInconsistency();
 	}
 
+	subsystem_info_s subsystem_info{};
+	subsystem_info.present = true;
+	subsystem_info.enabled = true;
+	subsystem_info.ok = true;
+	subsystem_info.subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_MAG;
+	subsystem_info.timestamp = hrt_absolute_time();
+	_subsystem_info_pub.publish(subsystem_info);
+
 	// reschedule timeout
 	ScheduleDelayed(100_ms);
 

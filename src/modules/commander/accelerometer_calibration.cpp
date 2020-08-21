@@ -246,6 +246,62 @@ static calibrate_return accel_calibration_worker(detect_orientation_return orien
 
 	read_accelerometer_avg(worker_data->accel_ref, orientation, samples_num);
 
+	// check accel
+	for (unsigned accel_index = 0; accel_index < MAX_ACCEL_SENS; accel_index++) {
+		switch (orientation) {
+		case ORIENTATION_TAIL_DOWN:    // [ g, 0, 0 ]
+			if (worker_data->accel_ref[accel_index][ORIENTATION_TAIL_DOWN][0] < 0.f) {
+				calibration_log_emergency(worker_data->mavlink_log_pub, "[cal] accel %d invalid X-axis, check rotation", accel_index);
+				return calibrate_return_error;
+			}
+
+			break;
+
+		case ORIENTATION_NOSE_DOWN:    // [ -g, 0, 0 ]
+			if (worker_data->accel_ref[accel_index][ORIENTATION_NOSE_DOWN][0] > 0.f) {
+				calibration_log_emergency(worker_data->mavlink_log_pub, "[cal] accel %d invalid X-axis, check rotation", accel_index);
+				return calibrate_return_error;
+			}
+
+			break;
+
+		case ORIENTATION_LEFT:         // [ 0, g, 0 ]
+			if (worker_data->accel_ref[accel_index][ORIENTATION_LEFT][1] < 0.f) {
+				calibration_log_emergency(worker_data->mavlink_log_pub, "[cal] accel %d invalid Y-axis, check rotation", accel_index);
+				return calibrate_return_error;
+			}
+
+			break;
+
+		case ORIENTATION_RIGHT:        // [ 0, -g, 0 ]
+			if (worker_data->accel_ref[accel_index][ORIENTATION_RIGHT][1] > 0.f) {
+				calibration_log_emergency(worker_data->mavlink_log_pub, "[cal] accel %d invalid Y-axis, check rotation", accel_index);
+				return calibrate_return_error;
+			}
+
+			break;
+
+		case ORIENTATION_UPSIDE_DOWN:  // [ 0, 0, g ]
+			if (worker_data->accel_ref[accel_index][ORIENTATION_UPSIDE_DOWN][2] < 0.f) {
+				calibration_log_emergency(worker_data->mavlink_log_pub, "[cal] accel %d invalid Z-axis, check rotation", accel_index);
+				return calibrate_return_error;
+			}
+
+			break;
+
+		case ORIENTATION_RIGHTSIDE_UP: // [ 0, 0, -g ]
+			if (worker_data->accel_ref[accel_index][ORIENTATION_RIGHTSIDE_UP][2] > 0.f) {
+				calibration_log_emergency(worker_data->mavlink_log_pub, "[cal] accel %d invalid Z-axis, check rotation", accel_index);
+				return calibrate_return_error;
+			}
+
+			break;
+
+		default:
+			break;
+		}
+	}
+
 	calibration_log_info(worker_data->mavlink_log_pub, "[cal] %s side result: [%.3f %.3f %.3f]",
 			     detect_orientation_str(orientation),
 			     (double)worker_data->accel_ref[0][orientation][0],
@@ -369,9 +425,8 @@ int do_accel_calibration(orb_advert_t *mavlink_log_pub)
 	return PX4_ERROR;
 }
 
-int do_accel_calibration_quick(orb_advert_t *mavlink_log_pub)
+int do_accel_calibration_quick(orb_advert_t *mavlink_log_pub, bool board_is_level)
 {
-#if !defined(CONSTRAINED_FLASH)
 	PX4_INFO("Accelerometer quick calibration");
 
 	bool success = false;
@@ -435,37 +490,46 @@ int do_accel_calibration_quick(orb_advert_t *mavlink_log_pub)
 
 		if ((count > 0) && (arp.device_id != 0)) {
 
+			const Vector3f gravity{0.f, 0.f, -CONSTANTS_ONE_G};
+
 			bool calibrated = false;
 			const Vector3f accel_avg = accel_sum / count;
 
 			Vector3f offset{0.f, 0.f, 0.f};
 
-			uORB::SubscriptionData<vehicle_attitude_s> attitude_sub{ORB_ID(vehicle_attitude)};
-			attitude_sub.update();
+			if (board_is_level) {
+				offset = accel_avg - gravity;
+				calibrated = true;
 
-			if (attitude_sub.advertised() && attitude_sub.get().timestamp != 0) {
-				// use vehicle_attitude if available
-				const vehicle_attitude_s &att = attitude_sub.get();
-				const matrix::Quatf q{att.q};
-				const Vector3f accel_ref = q.conjugate_inversed(Vector3f{0.f, 0.f, -CONSTANTS_ONE_G});
+			} else {
 
-				// sanity check angle between acceleration vectors
-				const float angle = AxisAnglef(Quatf(accel_avg, accel_ref)).angle();
+				uORB::SubscriptionData<vehicle_attitude_s> attitude_sub{ORB_ID(vehicle_attitude)};
+				attitude_sub.update();
 
-				if (angle <= math::radians(10.f)) {
-					offset = accel_avg - accel_ref;
+				if (attitude_sub.advertised() && (hrt_elapsed_time(&attitude_sub.get().timestamp) < 1_s)) {
+					// use vehicle_attitude if available
+					const vehicle_attitude_s &att = attitude_sub.get();
+					const Quatf q{att.q};
+					const Vector3f accel_ref = q.conjugate_inversed(gravity);
+
+					// sanity check angle between acceleration vectors
+					const float angle = AxisAnglef(Quatf(accel_avg, accel_ref)).angle();
+
+					if (angle <= math::radians(10.f)) {
+						offset = accel_avg - accel_ref;
+						calibrated = true;
+					}
+				}
+
+				if (!calibrated) {
+					// otherwise simply normalize to gravity and remove offset
+					Vector3f accel{accel_avg};
+					accel.normalize();
+					accel = accel * CONSTANTS_ONE_G;
+
+					offset = accel_avg - accel;
 					calibrated = true;
 				}
-			}
-
-			if (!calibrated) {
-				// otherwise simply normalize to gravity and remove offset
-				Vector3f accel{accel_avg};
-				accel.normalize();
-				accel = accel * CONSTANTS_ONE_G;
-
-				offset = accel_avg - accel;
-				calibrated = true;
 			}
 
 			calibration::Accelerometer calibration{arp.device_id};
@@ -481,13 +545,16 @@ int do_accel_calibration_quick(orb_advert_t *mavlink_log_pub)
 				PX4_ERR("accel %d quick calibrate failed", accel_index);
 
 			} else {
+				// use existing scale (if available)
+				offset.edivide(calibration.scale());
+
 				calibration.set_offset(offset);
+
+				calibration.ParametersSave();
+				calibration.PrintStatus();
 
 				success = true;
 			}
-
-			calibration.ParametersSave();
-			calibration.PrintStatus();
 		}
 	}
 
@@ -495,8 +562,6 @@ int do_accel_calibration_quick(orb_advert_t *mavlink_log_pub)
 		param_notify_changes();
 		return PX4_OK;
 	}
-
-#endif // !CONSTRAINED_FLASH
 
 	return PX4_ERROR;
 }

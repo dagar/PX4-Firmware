@@ -49,6 +49,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_correction.h>
+#include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/vehicle_air_data.h>
 
 namespace sensors
@@ -74,6 +75,8 @@ private:
 	static constexpr int MAX_SENSOR_COUNT = 3;
 
 	uORB::Publication<vehicle_air_data_s> _vehicle_air_data_pub{ORB_ID(vehicle_air_data)};
+
+	uORB::PublicationQueued<subsystem_info_s> _subsystem_info_pub{ORB_ID(subsystem_info)};
 
 	uORB::Subscription _params_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _sensor_correction_sub{ORB_ID(sensor_correction)};

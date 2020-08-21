@@ -31,6 +31,7 @@
  *
  ****************************************************************************/
 
+#include "accelerometer_calibration.h"
 #include "level_calibration.h"
 #include "calibration_messages.h"
 #include "calibration_routines.h"
@@ -83,6 +84,16 @@ int do_level_calibration(orb_advert_t *mavlink_log_pub)
 	int num_retries = 0;
 
 	uORB::SubscriptionBlocking<vehicle_attitude_s> att_sub{ORB_ID(vehicle_attitude)};
+
+	// check if valid
+	{
+		vehicle_attitude_s att{};
+		att_sub.copy(&att);
+
+		if (true || (hrt_elapsed_time(&att.timestamp) < 1_s)) {
+			do_accel_calibration_quick(mavlink_log_pub, true);
+		}
+	}
 
 	while (had_motion && num_retries++ < 50) {
 		Vector2f min_angles{100.f, 100.f};
