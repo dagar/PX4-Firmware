@@ -1500,29 +1500,6 @@ void Ekf2::Run()
 				}
 			}
 
-			{
-				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
-				bias.timestamp = now;
-
-				// take device ids from sensor_selection_s if not using specific vehicle_imu_s
-				if (_imu_sub_index < 0) {
-					bias.gyro_device_id = _sensor_selection.gyro_device_id;
-					bias.accel_device_id = _sensor_selection.accel_device_id;
-				}
-
-				bias.mag_device_id = _sensor_selection.mag_device_id;
-
-				// In-run bias estimates
-				_ekf.getGyroBias().copyTo(bias.gyro_bias);
-				_ekf.getAccelBias().copyTo(bias.accel_bias);
-
-				bias.mag_bias[0] = _last_valid_mag_cal[0];
-				bias.mag_bias[1] = _last_valid_mag_cal[1];
-				bias.mag_bias[2] = _last_valid_mag_cal[2];
-
-				_estimator_sensor_bias_pub.publish(bias);
-			}
-
 			// publish estimator status
 			estimator_status_s status;
 			status.timestamp = now;
@@ -1555,6 +1532,36 @@ void Ekf2::Run()
 			status.pre_flt_fail_mag_field_disturbed = control_status.flags.mag_field_disturbed;
 
 			_estimator_status_pub.publish(status);
+
+			{
+				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
+				bias.timestamp = now;
+
+				// take device ids from sensor_selection_s if not using specific vehicle_imu_s
+				if (_imu_sub_index < 0) {
+					bias.gyro_device_id = _sensor_selection.gyro_device_id;
+					bias.accel_device_id = _sensor_selection.accel_device_id;
+				}
+
+				bias.mag_device_id = _sensor_selection.mag_device_id;
+
+				// In-run bias estimates
+				_ekf.getGyroBias().copyTo(bias.gyro_bias);
+				_ekf.getAccelBias().copyTo(bias.accel_bias);
+
+				bias.gyro_bias_variance[0] = status.covariances[10];
+				bias.gyro_bias_variance[1] = status.covariances[11];
+				bias.gyro_bias_variance[2] = status.covariances[12];
+				bias.accel_bias_variance[0] = status.covariances[13];
+				bias.accel_bias_variance[1] = status.covariances[14];
+				bias.accel_bias_variance[2] = status.covariances[15];
+
+				bias.mag_bias[0] = _last_valid_mag_cal[0];
+				bias.mag_bias[1] = _last_valid_mag_cal[1];
+				bias.mag_bias[2] = _last_valid_mag_cal[2];
+
+				_estimator_sensor_bias_pub.publish(bias);
+			}
 
 			// publish GPS drift data only when updated to minimise overhead
 			float gps_drift[3];

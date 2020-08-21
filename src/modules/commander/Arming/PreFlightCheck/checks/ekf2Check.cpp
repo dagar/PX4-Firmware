@@ -38,8 +38,11 @@
 #include <lib/parameters/param.h>
 #include <systemlib/mavlink_log.h>
 #include <uORB/Subscription.hpp>
+#include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/subsystem_info.h>
+
+using namespace time_literals;
 
 bool PreFlightCheck::ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_status, const bool optional,
 			       const bool report_fail, const bool enforce_gps_required)
@@ -145,38 +148,53 @@ bool PreFlightCheck::ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 		goto out;
 	}
 
-	// check accelerometer delta velocity bias estimates
-	param_get(param_find("COM_ARM_EKF_AB"), &test_limit);
+	{
+		uORB::Subscription estimator_sensor_bias_sub{ORB_ID(estimator_sensor_bias)};
+		estimator_sensor_bias_s estimator_sensor_bias{};
+		estimator_sensor_bias_sub.copy(&estimator_sensor_bias);
 
-	for (uint8_t index = 13; index < 16; index++) {
-		// allow for higher uncertainty in estimates for axes that are less observable to prevent false positives
-		// adjust test threshold by 3-sigma
-		float test_uncertainty = 3.0f * sqrtf(fmaxf(status.covariances[index], 0.0f));
+		if (hrt_elapsed_time(&estimator_sensor_bias.timestamp) < 1_s) {
 
-		if (fabsf(status.states[index]) > test_limit + test_uncertainty) {
+			if (estimator_sensor_bias.accel_bias_id != 0) {
+				// check accelerometer delta velocity bias estimates
+				float accel_bias_test_limit = 0.f;
+				param_get(param_find("COM_ARM_EKF_AB"), &accel_bias_test_limit);
 
-			if (report_fail) {
-				PX4_ERR("state %d: |%.8f| > %.8f + %.8f", index, (double)status.states[index], (double)test_limit,
-					(double)test_uncertainty);
-				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: High Accelerometer Bias");
+				for (int i = 0; i < 3; i++) {
+					// allow for higher uncertainty in estimates for axes that are less observable to prevent false positives
+					// adjust test threshold by 3-sigma
+					const float test_uncertainty = 3.0f * sqrtf(fmaxf(estimator_sensor_bias.accel_bias_variance[i], 0.f));
+
+					if (fabsf(estimator_sensor_bias.accel_bias[i]) > accel_bias_test_limit + test_uncertainty) {
+						if (report_fail) {
+							PX4_ERR("accel bias %d: |%.8f| > %.8f + %.8f", i, (double)estimator_sensor_bias.accel_bias[i],
+								(double)accel_bias_test_limit, (double)test_uncertainty);
+							mavlink_log_critical(mavlink_log_pub, "Preflight Fail: High Accelerometer Bias");
+						}
+
+						success = false;
+						goto out;
+					}
+				}
 			}
 
-			success = false;
-			goto out;
+			if (estimator_sensor_bias.gyro_bias_id != 0) {
+				// check gyro delta angle bias estimates
+				float gyro_bias_test_limit = 0.f;
+				param_get(param_find("COM_ARM_EKF_GB"), &gyro_bias_test_limit);
+
+				for (int i = 0; i < 3; i++) {
+					if (fabsf(estimator_sensor_bias.gyro_bias[i]) > gyro_bias_test_limit) {
+						if (report_fail) {
+							mavlink_log_critical(mavlink_log_pub, "Preflight Fail: High Gyro Bias");
+						}
+
+						success = false;
+						goto out;
+					}
+				}
+			}
 		}
-	}
-
-	// check gyro delta angle bias estimates
-	param_get(param_find("COM_ARM_EKF_GB"), &test_limit);
-
-	if (fabsf(status.states[10]) > test_limit || fabsf(status.states[11]) > test_limit
-	    || fabsf(status.states[12]) > test_limit) {
-		if (report_fail) {
-			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: High Gyro Bias");
-		}
-
-		success = false;
-		goto out;
 	}
 
 	// If GPS aiding is required, declare fault condition if the required GPS quality checks are failing
