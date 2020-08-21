@@ -155,13 +155,15 @@ typedef struct  {
 	orb_advert_t	*mavlink_log_pub{nullptr};
 	unsigned	done_count{0};
 	float		accel_ref[MAX_ACCEL_SENS][detect_orientation_side_count][3] {};
+	float           temperature[MAX_ACCEL_SENS] {};
 } accel_worker_data_t;
 
 // Read specified number of accelerometer samples, calculate average and dispersion.
 static calibrate_return read_accelerometer_avg(float (&accel_avg)[MAX_ACCEL_SENS][detect_orientation_side_count][3],
-		unsigned orient, unsigned samples_num)
+		float (& temperature_avg)[MAX_ACCEL_SENS], unsigned orient, unsigned samples_num)
 {
 	Vector3f accel_sum[MAX_ACCEL_SENS] {};
+	float temperature_sum[MAX_ACCEL_SENS] {};
 	unsigned counts[MAX_ACCEL_SENS] {};
 
 	unsigned errcount = 0;
@@ -207,6 +209,7 @@ static calibrate_return read_accelerometer_avg(float (&accel_avg)[MAX_ACCEL_SENS
 					}
 
 					accel_sum[accel_index] += Vector3f{arp.x, arp.y, arp.z} - offset;
+					temperature_sum[accel_index] += arp.temperature;
 					counts[accel_index]++;
 				}
 			}
@@ -231,6 +234,8 @@ static calibrate_return read_accelerometer_avg(float (&accel_avg)[MAX_ACCEL_SENS
 	for (unsigned s = 0; s < MAX_ACCEL_SENS; s++) {
 		const Vector3f avg{accel_sum[s] / counts[s]};
 		avg.copyTo(accel_avg[s][orient]);
+
+		temperature_avg[s] = temperature_sum[s] / counts[s];
 	}
 
 	return calibrate_return_ok;
@@ -244,7 +249,7 @@ static calibrate_return accel_calibration_worker(detect_orientation_return orien
 	calibration_log_info(worker_data->mavlink_log_pub, "[cal] Hold still, measuring %s side",
 			     detect_orientation_str(orientation));
 
-	read_accelerometer_avg(worker_data->accel_ref, orientation, samples_num);
+	read_accelerometer_avg(worker_data->accel_ref, worker_data->temperature, orientation, samples_num);
 
 	// check accel
 	for (unsigned accel_index = 0; accel_index < MAX_ACCEL_SENS; accel_index++) {
