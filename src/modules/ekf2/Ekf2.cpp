@@ -728,16 +728,7 @@ void Ekf2::Run()
 			if (control_status.flags.tilt_align) {
 				// generate vehicle local position data
 				vehicle_local_position_s &lpos = _vehicle_local_position_pub.get();
-
-				// generate vehicle odometry data
-				vehicle_odometry_s odom{};
-
 				lpos.timestamp = now;
-
-				odom.timestamp = hrt_absolute_time();
-				odom.timestamp_sample = now;
-
-				odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
 				// Position of body origin in local NED frame
 				Vector3f position = _ekf.getPosition();
@@ -747,22 +738,11 @@ void Ekf2::Run()
 				lpos.y = (_ekf.local_position_is_valid()) ? position(1) : 0.0f;
 				lpos.z = position(2);
 
-				// Vehicle odometry position
-				odom.x = lpos.x;
-				odom.y = lpos.y;
-				odom.z = lpos.z;
-
 				// Velocity of body origin in local NED frame (m/s)
 				const Vector3f velocity = _ekf.getVelocity();
 				lpos.vx = velocity(0);
 				lpos.vy = velocity(1);
 				lpos.vz = velocity(2);
-
-				// Vehicle odometry linear velocity
-				odom.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
-				odom.vx = lpos.vx;
-				odom.vy = lpos.vy;
-				odom.vz = lpos.vz;
 
 				// vertical position time derivative (m/s)
 				lpos.z_deriv = _ekf.getVerticalPositionDerivative();
@@ -802,16 +782,6 @@ void Ekf2::Run()
 
 				lpos.heading = matrix::Eulerf(q).psi();
 				lpos.delta_heading = matrix::Eulerf(delta_q_reset).psi();
-
-				// Vehicle odometry quaternion
-				q.copyTo(odom.q);
-
-				// Vehicle odometry angular rates
-				const Vector3f gyro_bias = _ekf.getGyroBias();
-				const Vector3f rates(imu_sample_new.delta_ang * imu_sample_new.delta_ang_dt);
-				odom.rollspeed = rates(0) - gyro_bias(0);
-				odom.pitchspeed = rates(1) - gyro_bias(1);
-				odom.yawspeed = rates(2) - gyro_bias(2);
 
 				lpos.dist_bottom_valid = _ekf.get_terrain_valid();
 
@@ -875,42 +845,12 @@ void Ekf2::Run()
 					lpos.hagl_max = INFINITY;
 				}
 
-				// Get covariances to vehicle odometry
-				float covariances[24];
-				_ekf.covariances_diagonal().copyTo(covariances);
-
-				// get the covariance matrix size
-				const size_t POS_URT_SIZE = sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0]);
-				const size_t VEL_URT_SIZE = sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0]);
-
-				// initially set pose covariances to 0
-				for (size_t i = 0; i < POS_URT_SIZE; i++) {
-					odom.pose_covariance[i] = 0.0;
-				}
-
-				// set the position variances
-				odom.pose_covariance[odom.COVARIANCE_MATRIX_X_VARIANCE] = covariances[7];
-				odom.pose_covariance[odom.COVARIANCE_MATRIX_Y_VARIANCE] = covariances[8];
-				odom.pose_covariance[odom.COVARIANCE_MATRIX_Z_VARIANCE] = covariances[9];
-
-				// TODO: implement propagation from quaternion covariance to Euler angle covariance
-				// by employing the covariance law
-
-				// initially set velocity covariances to 0
-				for (size_t i = 0; i < VEL_URT_SIZE; i++) {
-					odom.velocity_covariance[i] = 0.0;
-				}
-
-				// set the linear velocity variances
-				odom.velocity_covariance[odom.COVARIANCE_MATRIX_VX_VARIANCE] = covariances[4];
-				odom.velocity_covariance[odom.COVARIANCE_MATRIX_VY_VARIANCE] = covariances[5];
-				odom.velocity_covariance[odom.COVARIANCE_MATRIX_VZ_VARIANCE] = covariances[6];
-
 				// publish vehicle local position data
 				_vehicle_local_position_pub.update();
 
-				// publish vehicle odometry data
-				_vehicle_odometry_pub.publish(odom);
+				if (_param_ekf2_odom_pub.get()) {
+					publish_odometry(imu_sample_new, lpos);
+				}
 
 				// publish external visual odometry after fixed frame alignment if new odometry is received
 				if (new_ev_data_received) {
@@ -1316,6 +1256,71 @@ void Ekf2::publish_attitude(const hrt_abstime &timestamp)
 		vehicle_attitude_s att{};
 		_att_pub.publish(att);
 	}
+}
+
+void Ekf2::publish_odometry(const imuSample& imu, const vehicle_local_position_s &lpos)
+{
+	// generate vehicle odometry data
+	vehicle_odometry_s odom{};
+	odom.timestamp_sample = lpos.timestamp;
+
+	odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
+
+	// Vehicle odometry position
+	odom.x = lpos.x;
+	odom.y = lpos.y;
+	odom.z = lpos.z;
+
+	// Vehicle odometry linear velocity
+	odom.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
+	odom.vx = lpos.vx;
+	odom.vy = lpos.vy;
+	odom.vz = lpos.vz;
+
+	// Vehicle odometry quaternion
+	_ekf.getQuaternion().copyTo(odom.q);
+
+	// Vehicle odometry angular rates
+	const Vector3f gyro_bias = _ekf.getGyroBias();
+	const Vector3f rates(imu.delta_ang * imu.delta_ang_dt);
+	odom.rollspeed = rates(0) - gyro_bias(0);
+	odom.pitchspeed = rates(1) - gyro_bias(1);
+	odom.yawspeed = rates(2) - gyro_bias(2);
+
+	// Get covariances to vehicle odometry
+	float covariances[24];
+	_ekf.covariances_diagonal().copyTo(covariances);
+
+	// get the covariance matrix size
+	static constexpr size_t POS_URT_SIZE = sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0]);
+	static constexpr size_t VEL_URT_SIZE = sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0]);
+
+	// initially set pose covariances to 0
+	for (size_t i = 0; i < POS_URT_SIZE; i++) {
+		odom.pose_covariance[i] = 0.0;
+	}
+
+	// set the position variances
+	odom.pose_covariance[odom.COVARIANCE_MATRIX_X_VARIANCE] = covariances[7];
+	odom.pose_covariance[odom.COVARIANCE_MATRIX_Y_VARIANCE] = covariances[8];
+	odom.pose_covariance[odom.COVARIANCE_MATRIX_Z_VARIANCE] = covariances[9];
+
+	// TODO: implement propagation from quaternion covariance to Euler angle covariance
+	// by employing the covariance law
+
+	// initially set velocity covariances to 0
+	for (size_t i = 0; i < VEL_URT_SIZE; i++) {
+		odom.velocity_covariance[i] = 0.0;
+	}
+
+	// set the linear velocity variances
+	odom.velocity_covariance[odom.COVARIANCE_MATRIX_VX_VARIANCE] = covariances[4];
+	odom.velocity_covariance[odom.COVARIANCE_MATRIX_VY_VARIANCE] = covariances[5];
+	odom.velocity_covariance[odom.COVARIANCE_MATRIX_VZ_VARIANCE] = covariances[6];
+
+	// publish vehicle odometry data
+	odom.timestamp = hrt_absolute_time();
+	_vehicle_odometry_pub.publish(odom);
 }
 
 void Ekf2::publish_yaw_estimator_status(const hrt_abstime &timestamp)

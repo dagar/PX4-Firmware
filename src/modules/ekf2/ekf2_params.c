@@ -1457,3 +1457,11 @@ PARAM_DEFINE_INT32(EKF2_MAG_CHECK, 0);
  * @decimal 1
  */
 PARAM_DEFINE_FLOAT(EKF2_GSF_TAS, 15.0f);
+
+/**
+ * Publish Odometry
+ *
+ * @group EKF2
+ * @boolean
+ */
+PARAM_DEFINE_INT32(EKF2_ODOM_PUB, 0);

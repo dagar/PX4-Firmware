@@ -133,6 +133,7 @@ private:
 	bool update_mag_decl(Param &mag_decl_param);
 
 	void publish_attitude(const hrt_abstime &timestamp);
+	void publish_odometry(const imuSample& imu, const vehicle_local_position_s &local_position);
 	void publish_wind_estimate(const hrt_abstime &timestamp);
 	void publish_yaw_estimator_status(const hrt_abstime &timestamp);
 
@@ -536,7 +537,9 @@ private:
 
 		// Used by EKF-GSF experimental yaw estimator
 		(ParamExtFloat<px4::params::EKF2_GSF_TAS>)
-		_param_ekf2_gsf_tas_default	///< default value of true airspeed assumed during fixed wing operation
+		_param_ekf2_gsf_tas_default,	///< default value of true airspeed assumed during fixed wing operation
+
+		(ParamBool<px4::params::EKF2_ODOM_PUB>) _param_ekf2_odom_pub
 
 	)
 };
