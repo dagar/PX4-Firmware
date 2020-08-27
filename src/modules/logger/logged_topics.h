@@ -74,7 +74,7 @@ inline bool operator&(SDLogProfileMask a, SDLogProfileMask b)
 class LoggedTopics
 {
 public:
-	static constexpr int 		MAX_TOPICS_NUM = 200; /**< Maximum number of logged topics */
+	static constexpr int 		MAX_TOPICS_NUM = 256; /**< Maximum number of logged topics */
 
 	struct RequestedSubscription {
 		uint16_t interval_ms;
@@ -98,7 +98,8 @@ public:
 	bool initialize_logged_topics(SDLogProfileMask profile);
 
 	const RequestedSubscriptionArray &subscriptions() const { return _subscriptions; }
-	int numMissionSubscriptions() const { return _num_mission_subs; }
+	const RequestedSubscriptionArray &interval_subscriptions() const { return _interval_subscriptions; }
+	const RequestedSubscriptionArray &mission_subscriptions() const { return _mission_subscriptions; }
 
 private:
 
@@ -151,7 +152,8 @@ private:
 	bool add_topic(const orb_metadata *topic, uint16_t interval_ms = 0, uint8_t instance = 0);
 
 	RequestedSubscriptionArray _subscriptions;
-	int _num_mission_subs{0};
+	RequestedSubscriptionArray _interval_subscriptions;
+	RequestedSubscriptionArray _mission_subscriptions;
 };
 
 } //namespace logger

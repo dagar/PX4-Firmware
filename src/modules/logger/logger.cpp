@@ -179,6 +179,9 @@ int Logger::print_status()
 	PX4_INFO("Number of subscriptions: %i (%i bytes)", _num_subscriptions,
 		 (int)(_num_subscriptions * sizeof(LoggerSubscription)));
 
+	PX4_INFO("Number of interval subscriptions: %i (%i bytes)", _num_interval_subscriptions,
+		 (int)(_num_interval_subscriptions * sizeof(LoggerSubscriptionInterval)));
+
 	bool is_logging = false;
 
 	if (_writer.is_started(LogType::Full, LogWriter::BackendFile)) {
@@ -414,34 +417,42 @@ bool Logger::request_stop_static()
 	return true;
 }
 
-bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
+bool Logger::copy_if_updated(LoggerSubscription &sub, int sub_idx, void *buffer, bool try_to_subscribe)
 {
-	LoggerSubscription &sub = _subscriptions[sub_idx];
-
 	bool updated = false;
 
 	if (sub.valid()) {
-		if (sub.get_interval_us() == 0) {
-			// record gaps in full rate (no interval) messages
-			const unsigned last_generation = sub.get_last_generation();
-			updated = sub.update(buffer);
+		// record gaps in messages
+		const unsigned last_generation = sub.get_last_generation();
+		updated = sub.update(buffer);
 
-			if (updated && (sub.get_last_generation() != last_generation + 1)) {
-				// error, missed a message
-				_message_gaps++;
-			}
-
-		} else {
-			updated = sub.update(buffer);
+		if (updated && (sub.get_last_generation() != last_generation + 1)) {
+			// error, missed a message
+			_message_gaps++;
 		}
 
 	} else if (try_to_subscribe) {
 		if (sub.subscribe()) {
-			write_add_logged_msg(LogType::Full, sub);
+			write_add_logged_msg(LogType::Full, sub.get_topic(), sub.get_instance(), sub.msg_id);
 
-			if (sub_idx < _num_mission_subs) {
-				write_add_logged_msg(LogType::Mission, sub);
-			}
+			// copy first data
+			updated = sub.copy(buffer);
+		}
+	}
+
+	return updated;
+}
+
+bool Logger::copy_if_updated(LoggerSubscriptionInterval &sub, int sub_idx, void *buffer, bool try_to_subscribe)
+{
+	bool updated = false;
+
+	if (sub.valid()) {
+		updated = sub.update(buffer);
+
+	} else if (try_to_subscribe) {
+		if (sub.subscribe()) {
+			write_add_logged_msg(LogType::Full, sub.get_topic(), sub.get_instance(), sub.msg_id);
 
 			// copy first data
 			updated = sub.copy(buffer);
@@ -478,7 +489,7 @@ bool Logger::initialize_topics()
 
 	// initialize mission topics
 	logged_topics.initialize_mission_topics((MissionLogType)_param_sdlog_mission.get());
-	_num_mission_subs = logged_topics.numMissionSubscriptions();
+	_num_mission_subs = logged_topics.mission_subscriptions().count;
 
 	if (_num_mission_subs > 0) {
 		if (_num_mission_subs >= MAX_MISSION_TOPICS_NUM) {
@@ -486,15 +497,23 @@ bool Logger::initialize_topics()
 			_num_mission_subs = MAX_MISSION_TOPICS_NUM;
 		}
 
-		for (int i = 0; i < _num_mission_subs; ++i) {
-			_mission_subscriptions[i].min_delta_ms = logged_topics.subscriptions().sub[i].interval_ms;
-			_mission_subscriptions[i].next_write_time = 0;
-		}
-
 		int mkdir_ret = mkdir(LOG_ROOT[(int)LogType::Mission], S_IRWXU | S_IRWXG | S_IRWXO);
 
 		if (mkdir_ret != 0 && errno != EEXIST) {
 			PX4_ERR("failed creating log root dir: %s (%i)", LOG_ROOT[(int)LogType::Mission], errno);
+		}
+
+		_mission_subscriptions = new LoggerSubscriptionInterval[_num_mission_subs];
+
+		if (!_mission_subscriptions) {
+			PX4_ERR("alloc failed");
+			return false;
+		}
+
+		for (int i = 0; i < _num_mission_subs; ++i) {
+			const LoggedTopics::RequestedSubscription &sub = logged_topics.mission_subscriptions().sub[i];
+			_mission_subscriptions[i] = LoggerSubscriptionInterval(sub.id, sub.interval_ms, sub.instance);
+			_mission_subscriptions[i].subscribe();
 		}
 	}
 
@@ -517,23 +536,46 @@ bool Logger::initialize_topics()
 
 	delete[](_subscriptions);
 	_subscriptions = nullptr;
+	_num_subscriptions = logged_topics.subscriptions().count;
 
-	if (logged_topics.subscriptions().count > 0) {
-		_subscriptions = new LoggerSubscription[logged_topics.subscriptions().count];
+	if (_num_subscriptions > 0) {
+		_subscriptions = new LoggerSubscription[_num_subscriptions];
 
 		if (!_subscriptions) {
 			PX4_ERR("alloc failed");
 			return false;
 		}
 
-		for (int i = 0; i < logged_topics.subscriptions().count; ++i) {
+		for (int i = 0; i < _num_subscriptions; ++i) {
 			const LoggedTopics::RequestedSubscription &sub = logged_topics.subscriptions().sub[i];
-			_subscriptions[i] = LoggerSubscription(sub.id, sub.interval_ms, sub.instance);
+			_subscriptions[i] = LoggerSubscription(sub.id, sub.instance);
 			_subscriptions[i].subscribe();
 		}
 	}
 
-	_num_subscriptions = logged_topics.subscriptions().count;
+	// interval subscriptions
+	delete[](_interval_subscriptions);
+	_interval_subscriptions = nullptr;
+	_num_interval_subscriptions = logged_topics.interval_subscriptions().count;
+
+	if (_num_interval_subscriptions > 0) {
+		_interval_subscriptions = new LoggerSubscriptionInterval[_num_interval_subscriptions];
+
+		if (!_interval_subscriptions) {
+			PX4_ERR("alloc failed");
+			return false;
+		}
+
+		for (int i = 0; i < _num_interval_subscriptions; ++i) {
+			const LoggedTopics::RequestedSubscription &sub = logged_topics.interval_subscriptions().sub[i];
+			_interval_subscriptions[i] = LoggerSubscriptionInterval(sub.id, sub.interval_ms, sub.instance);
+			_interval_subscriptions[i].subscribe();
+		}
+	}
+
+
+
+
 	return true;
 }
 
@@ -574,6 +616,13 @@ void Logger::run()
 		//use o_size, because that's what orb_copy will use
 		if (_subscriptions[sub].get_topic()->o_size > max_msg_size) {
 			max_msg_size = _subscriptions[sub].get_topic()->o_size;
+		}
+	}
+
+	for (int sub = 0; sub < _num_interval_subscriptions; ++sub) {
+		//use o_size, because that's what orb_copy will use
+		if (_interval_subscriptions[sub].get_topic()->o_size > max_msg_size) {
+			max_msg_size = _interval_subscriptions[sub].get_topic()->o_size;
 		}
 	}
 
@@ -653,6 +702,7 @@ void Logger::run()
 	// check for new subscription data
 	hrt_abstime next_subscribe_check = 0;
 	int next_subscribe_topic_index = -1; // this is used to distribute the checks over time
+	int next_interval_subscribe_topic_index = -1; // this is used to distribute the checks over time
 
 	if (polling_topic_sub >= 0) {
 		_lockstep_component = px4_lockstep_register_component();
@@ -715,11 +765,36 @@ void Logger::run()
 				 */
 				const bool try_to_subscribe = (sub_idx == next_subscribe_topic_index);
 
-				if (copy_if_updated(sub_idx, _msg_buffer + sizeof(ulog_message_data_header_s), try_to_subscribe)) {
+				if (copy_if_updated(sub, sub_idx, _msg_buffer + sizeof(ulog_message_data_header_s), try_to_subscribe)) {
 					// each message consists of a header followed by an orb data object
 					const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
 					const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
-					const uint16_t write_msg_id = sub.msg_id;
+					const uint16_t write_msg_id = sub_idx;
+
+					// write one byte after another (necessary because of alignment)
+					_msg_buffer[0] = (uint8_t)write_msg_size;
+					_msg_buffer[1] = (uint8_t)(write_msg_size >> 8);
+					_msg_buffer[2] = static_cast<uint8_t>(ULogMessageType::DATA);
+					_msg_buffer[3] = (uint8_t)write_msg_id;
+					_msg_buffer[4] = (uint8_t)(write_msg_id >> 8);
+
+					// full log
+					write_message(LogType::Full, _msg_buffer, msg_size);
+				}
+			}
+
+			for (int sub_idx = 0; sub_idx < _num_interval_subscriptions; ++sub_idx) {
+				LoggerSubscriptionInterval &sub = _interval_subscriptions[sub_idx];
+				/* if this topic has been updated, copy the new data into the message buffer
+				 * and write a message to the log
+				 */
+				const bool try_to_subscribe = (sub_idx == next_interval_subscribe_topic_index);
+
+				if (copy_if_updated(sub, sub_idx, _msg_buffer + sizeof(ulog_message_data_header_s), try_to_subscribe)) {
+					// each message consists of a header followed by an orb data object
+					const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+					const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
+					const uint16_t write_msg_id = sub_idx;
 
 					//write one byte after another (necessary because of alignment)
 					_msg_buffer[0] = (uint8_t)write_msg_size;
@@ -728,30 +803,47 @@ void Logger::run()
 					_msg_buffer[3] = (uint8_t)write_msg_id;
 					_msg_buffer[4] = (uint8_t)(write_msg_id >> 8);
 
-					// PX4_INFO("topic: %s, size = %zu, out_size = %zu", sub.get_topic()->o_name, sub.get_topic()->o_size, msg_size);
-
 					// full log
-					if (write_message(LogType::Full, _msg_buffer, msg_size)) {
+					write_message(LogType::Full, _msg_buffer, msg_size);
+				}
+			}
 
-#ifdef DBGPRINT
-						total_bytes += msg_size;
-#endif /* DBGPRINT */
-					}
+			// mission log
+			if (_writer.is_started(LogType::Mission)) {
+				for (int sub_idx = 0; sub_idx < _num_mission_subs; ++sub_idx) {
+					LoggerSubscriptionInterval &sub = _mission_subscriptions[sub_idx];
+					bool updated = false;
 
-					// mission log
-					if (sub_idx < _num_mission_subs) {
-						if (_writer.is_started(LogType::Mission)) {
-							if (_mission_subscriptions[sub_idx].next_write_time < (loop_time / 100000)) {
-								unsigned delta_time = _mission_subscriptions[sub_idx].min_delta_ms;
+					if (sub.valid()) {
+						updated = sub.updated();
 
-								if (delta_time > 0) {
-									_mission_subscriptions[sub_idx].next_write_time = (loop_time / 100000) + delta_time / 100;
-								}
+					} else {
+						if (sub.subscribe()) {
+							write_add_logged_msg(LogType::Mission, sub.get_topic(), sub.get_instance(), sub.msg_id);
 
-								write_message(LogType::Mission, _msg_buffer, msg_size);
-							}
+							// force copy first data
+							updated = true;
 						}
 					}
+
+					if (updated) {
+						// each message consists of a header followed by an orb data object
+						const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+						const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
+
+						// write one byte after another (necessary because of alignment)
+						_msg_buffer[0] = (uint8_t)write_msg_size;
+						_msg_buffer[1] = (uint8_t)(write_msg_size >> 8);
+						_msg_buffer[2] = static_cast<uint8_t>(ULogMessageType::DATA);
+						_msg_buffer[3] = sub_idx;
+						_msg_buffer[4] = 0;
+
+						sub.copy(&_msg_buffer[5]);
+
+						// full log
+						write_message(LogType::Mission, _msg_buffer, msg_size);
+					}
+
 				}
 			}
 
@@ -823,6 +915,17 @@ void Logger::run()
 				next_subscribe_topic_index = 0;
 			}
 
+			if (next_interval_subscribe_topic_index != -1) {
+				if (++next_interval_subscribe_topic_index >= _num_interval_subscriptions) {
+					next_interval_subscribe_topic_index = -1;
+					next_subscribe_check = loop_time + TRY_SUBSCRIBE_INTERVAL;
+				}
+
+			} else if (loop_time > next_subscribe_check) {
+				next_interval_subscribe_topic_index = 0;
+			}
+
+
 			debug_print_buffer(total_bytes, timer_start);
 
 		} else { // not logging
@@ -842,6 +945,20 @@ void Logger::run()
 
 			} else if (loop_time > next_subscribe_check) {
 				next_subscribe_topic_index = 0;
+			}
+
+			if (next_interval_subscribe_topic_index != -1) {
+				if (!_interval_subscriptions[next_interval_subscribe_topic_index].valid()) {
+					_interval_subscriptions[next_interval_subscribe_topic_index].subscribe();
+				}
+
+				if (++next_interval_subscribe_topic_index >= _num_interval_subscriptions) {
+					next_interval_subscribe_topic_index = -1;
+					next_subscribe_check = loop_time + TRY_SUBSCRIBE_INTERVAL;
+				}
+
+			} else if (loop_time > next_subscribe_check) {
+				next_interval_subscribe_topic_index = 0;
 			}
 		}
 
@@ -1570,7 +1687,12 @@ void Logger::write_formats(LogType type)
 	}
 
 	for (int i = 0; i < sub_count; ++i) {
-		const LoggerSubscription &sub = _subscriptions[i];
+		const uORB::Subscription &sub = _subscriptions[i];
+		write_format(type, *sub.get_topic(), written_formats, msg, i);
+	}
+
+	for (int i = 0; i < _num_interval_subscriptions; ++i) {
+		const uORB::SubscriptionInterval &sub = _interval_subscriptions[i];
 		write_format(type, *sub.get_topic(), written_formats, msg, i);
 	}
 
@@ -1593,7 +1715,16 @@ void Logger::write_all_add_logged_msg(LogType type)
 		LoggerSubscription &sub = _subscriptions[i];
 
 		if (sub.valid()) {
-			write_add_logged_msg(type, sub);
+			write_add_logged_msg(type, sub.get_topic(), sub.get_instance(), sub.msg_id);
+			added_subscriptions = true;
+		}
+	}
+
+	for (int i = 0; i < _num_interval_subscriptions; ++i) {
+		LoggerSubscriptionInterval &sub = _interval_subscriptions[i];
+
+		if (sub.valid()) {
+			write_add_logged_msg(type, sub.get_topic(), sub.get_instance(), sub.msg_id);
 			added_subscriptions = true;
 		}
 	}
@@ -1605,26 +1736,26 @@ void Logger::write_all_add_logged_msg(LogType type)
 	}
 }
 
-void Logger::write_add_logged_msg(LogType type, LoggerSubscription &subscription)
+void Logger::write_add_logged_msg(LogType type, const orb_metadata *meta, uint8_t instance, uint8_t &msg_id)
 {
 	ulog_message_add_logged_s msg;
 
-	if (subscription.msg_id == MSG_ID_INVALID) {
+	if (msg_id == MSG_ID_INVALID) {
 		if (_next_topic_id == MSG_ID_INVALID) {
 			// if we land here an uint8 is too small -> switch to uint16
 			PX4_ERR("limit for _next_topic_id reached");
 			return;
 		}
 
-		subscription.msg_id = _next_topic_id++;
+		msg_id = _next_topic_id++;
 	}
 
-	msg.msg_id = subscription.msg_id;
-	msg.multi_id = subscription.get_instance();
+	msg.msg_id = msg_id;
+	msg.multi_id = instance;
 
-	int message_name_len = strlen(subscription.get_topic()->o_name);
+	int message_name_len = strlen(meta->o_name);
 
-	memcpy(msg.message_name, subscription.get_topic()->o_name, message_name_len);
+	memcpy(msg.message_name, meta->o_name, message_name_len);
 
 	size_t msg_size = sizeof(msg) - sizeof(msg.message_name) + message_name_len;
 	msg.msg_size = msg_size - ULOG_MSG_HEADER_LEN;

@@ -58,6 +58,8 @@ class Subscription
 {
 public:
 
+	Subscription() : _orb_id(ORB_ID::INVALID) {}
+
 	/**
 	 * Constructor
 	 *

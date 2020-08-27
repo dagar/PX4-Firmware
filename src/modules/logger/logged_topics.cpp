@@ -295,8 +295,15 @@ void LoggedTopics::initialize_mission_topics(MissionLogType mission_log_type)
 
 void LoggedTopics::add_mission_topic(const char *name, uint16_t interval_ms)
 {
-	if (add_topic(name, interval_ms)) {
-		++_num_mission_subs;
+	const orb_metadata *const *topics = orb_get_topics();
+
+	for (size_t i = 0; i < orb_topics_count(); i++) {
+		if (strcmp(name, topics[i]->o_name) == 0) {
+			RequestedSubscription &sub = _mission_subscriptions.sub[_mission_subscriptions.count++];
+			sub.interval_ms = interval_ms;
+			sub.instance = 0;
+			sub.id = static_cast<ORB_ID>(topics[i]->o_id);
+		}
 	}
 }
 
@@ -316,10 +323,18 @@ bool LoggedTopics::add_topic(const orb_metadata *topic, uint16_t interval_ms, ui
 		return false;
 	}
 
-	RequestedSubscription &sub = _subscriptions.sub[_subscriptions.count++];
-	sub.interval_ms = interval_ms;
-	sub.instance = instance;
-	sub.id = static_cast<ORB_ID>(topic->o_id);
+	if (interval_ms == 0) {
+		RequestedSubscription &sub = _subscriptions.sub[_subscriptions.count++];
+		sub.instance = instance;
+		sub.id = static_cast<ORB_ID>(topic->o_id);
+
+	} else {
+		RequestedSubscription &sub = _interval_subscriptions.sub[_interval_subscriptions.count++];
+		sub.interval_ms = interval_ms;
+		sub.instance = instance;
+		sub.id = static_cast<ORB_ID>(topic->o_id);
+	}
+
 	return true;
 }
 
