@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,38 +31,87 @@
  *
  ****************************************************************************/
 
+/**
+ * @file Publication2.hpp
+ *
+ */
+
 #pragma once
 
-#include <drivers/drv_baro.h>
-#include <drivers/drv_hrt.h>
-#include <lib/cdev/CDev.hpp>
-#include <lib/conversion/rotation.h>
-#include <uORB/uORB.h>
-#include <uORB/PublicationMulti.hpp>
-#include <uORB/topics/sensor_baro.h>
+#include <px4_platform_common/defines.h>
+#include <systemlib/err.h>
 
-class PX4Barometer : public cdev::CDev
+#include <uORB/uORB.h>
+#include "uORBDeviceNode.hpp"
+#include <uORB/topics/uORBTopics.hpp>
+
+namespace uORB
 {
 
+class Publication2Base
+{
 public:
-	PX4Barometer(uint32_t device_id);
-	~PX4Barometer() override;
 
-	const sensor_baro_s &get() { return _sensor_baro_pub.get(); }
+	bool advertised() const { return _handle != nullptr; }
 
-	void set_device_type(uint8_t devtype);
-	void set_error_count(uint64_t error_count) { _sensor_baro_pub.get().error_count = error_count; }
+	bool unadvertise() { return (DeviceNode::unadvertise(_handle) == PX4_OK); }
 
-	void set_temperature(float temperature) { _sensor_baro_pub.get().temperature = temperature; }
+protected:
 
-	void update(const hrt_abstime &timestamp_sample, float pressure);
+	Publication2Base() = default;
 
-	int get_class_instance() { return _class_device_instance; };
+	~Publication2Base()
+	{
+		if (_handle != nullptr) {
+			// don't automatically unadvertise queued publications (eg vehicle_command)
+			if (static_cast<DeviceNode *>(_handle)->get_queue_size() == 1) {
+				unadvertise();
+			}
+		}
+	}
 
-private:
-
-	uORB::PublicationMultiData<ORB_ID::sensor_baro>	_sensor_baro_pub{};
-
-	int			_class_device_instance{-1};
-
+	orb_advert_t _handle{nullptr};
 };
+
+/**
+ * uORB publication wrapper class
+ */
+template<ORB_ID T, uint8_t ORB_QSIZE = 1>
+class Publication2 : public Publication2Base
+{
+public:
+
+	/**
+	 * Constructor
+	 *
+	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
+	 */
+	Publication2() = default;
+
+	bool advertise()
+	{
+		if (!advertised()) {
+			_handle = orb_advertise_queue(get_orb_meta(T), nullptr, ORB_QSIZE);
+		}
+
+		return advertised();
+	}
+
+	using S = typename ORBTypeMap<T>::type;
+
+	/**
+	 * Publish the struct
+	 * @param data The uORB message struct we are updating.
+	 */
+	bool publish(const S &data)
+	{
+		if (!advertised()) {
+			advertise();
+		}
+
+		return (DeviceNode::publish(get_orb_meta(T), _handle, &data) == PX4_OK);
+	}
+};
+
+
+} // namespace uORB

@@ -142,7 +142,7 @@ private:
 
 	uORB::Subscription	_adc_report_sub{ORB_ID(adc_report)};		/**< adc_report sub */
 	differential_pressure_s	_diff_pres {};
-	uORB::PublicationMulti<differential_pressure_s>	_diff_pres_pub{ORB_ID(differential_pressure)};		/**< differential_pressure */
+	uORB::PublicationMulti<ORB_ID::differential_pressure>	_diff_pres_pub{};		/**< differential_pressure */
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
 
 

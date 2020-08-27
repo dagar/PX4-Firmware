@@ -132,7 +132,7 @@ protected:
 	 */
 	void reset_filter();
 
-	uORB::PublicationMulti<timesync_status_s>  _timesync_status_pub{ORB_ID(timesync_status)};
+	uORB::PublicationMulti<ORB_ID::timesync_status>  _timesync_status_pub{};
 
 	uint32_t _sequence{0};
 

@@ -121,7 +121,7 @@ private:
 	float		_analog_rc_rssi_volt{-1.0f};
 	bool		_analog_rc_rssi_stable{false};
 
-	uORB::PublicationMulti<input_rc_s>	_to_input_rc{ORB_ID(input_rc)};
+	uORB::PublicationMulti<ORB_ID::input_rc>	_to_input_rc{};
 
 	int		_rcs_fd{-1};
 	char		_device[20] {};					///< device / serial port path

@@ -533,7 +533,7 @@ private:
 
 	orb_advert_t		_mavlink_log_pub{nullptr};
 
-	uORB::PublicationMulti<telemetry_status_s> _telem_status_pub{ORB_ID(telemetry_status)};
+	uORB::PublicationMulti<ORB_ID::telemetry_status> _telem_status_pub{};
 
 	bool			_task_running{true};
 	static bool		_boot_complete;

@@ -87,7 +87,7 @@ private:
 
 	bool _should_exit = false;
 	bool _is_running = false;
-	uORB::PublicationMulti<input_rc_s>	_rcinput_pub{ORB_ID(input_rc)};
+	uORB::PublicationMulti<ORB_ID::input_rc>	_rcinput_pub{};
 	int _channels = 8; //D8R-II plus
 	input_rc_s _data{};
 

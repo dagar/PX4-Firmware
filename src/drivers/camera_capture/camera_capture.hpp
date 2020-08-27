@@ -50,6 +50,7 @@
 #include <px4_platform_common/workqueue.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/Publication2.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/camera_trigger.h>
 #include <uORB/topics/vehicle_command.h>
@@ -102,7 +103,7 @@ private:
 
 	// Publishers
 	uORB::PublicationQueued<vehicle_command_ack_s>	_command_ack_pub{ORB_ID(vehicle_command_ack)};
-	uORB::Publication<camera_trigger_s>		_trigger_pub{ORB_ID(camera_trigger)};
+	uORB::Publication2<ORB_ID::camera_trigger>		_trigger_pub{};
 
 	// Subscribers
 	uORB::Subscription				_command_sub{ORB_ID(vehicle_command)};

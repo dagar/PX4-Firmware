@@ -71,7 +71,7 @@ private:
 
 	bool _isRunning{false};
 
-	uORB::PublicationMulti<input_rc_s> _input_rc_pub{ORB_ID(input_rc)};
+	uORB::PublicationMulti<ORB_ID::input_rc> _input_rc_pub{};
 
 	static constexpr int CHANNELS{14};
 	int _channel_fd[CHANNELS] {};

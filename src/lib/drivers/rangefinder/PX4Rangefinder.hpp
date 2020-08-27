@@ -65,6 +65,6 @@ public:
 
 private:
 
-	uORB::PublicationMultiData<distance_sensor_s> _distance_sensor_pub;
+	uORB::PublicationMultiData<ORB_ID::distance_sensor> _distance_sensor_pub{};
 
 };

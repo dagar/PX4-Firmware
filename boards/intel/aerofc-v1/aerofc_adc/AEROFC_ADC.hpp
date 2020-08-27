@@ -43,7 +43,7 @@
 #include <drivers/device/i2c.h>
 #include <drivers/drv_adc.h>
 #include <px4_platform_common/i2c_spi_buses.h>
-#include <uORB/Publication.hpp>
+#include <uORB/Publication2.hpp>
 #include <uORB/topics/adc_report.h>
 
 #define SLAVE_ADDR 0x50
@@ -65,9 +65,9 @@ public:
 
 	void RunImpl();
 private:
-	int probe() override;;
+	int probe() override;
 
-	uORB::Publication<adc_report_s>		_to_adc_report{ORB_ID(adc_report)};
+	uORB::Publication2<ORB_ID::adc_report>		_to_adc_report{};
 
 	perf_counter_t _sample_perf;
 };

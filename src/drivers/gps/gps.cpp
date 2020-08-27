@@ -162,8 +162,8 @@ private:
 	vehicle_gps_position_s		_report_gps_pos{};				///< uORB topic for gps position
 	satellite_info_s		*_p_report_sat_info{nullptr};			///< pointer to uORB topic for satellite info
 
-	uORB::PublicationMulti<vehicle_gps_position_s>	_report_gps_pos_pub{ORB_ID(vehicle_gps_position)};	///< uORB pub for gps position
-	uORB::PublicationMulti<satellite_info_s>	_report_sat_info_pub{ORB_ID(satellite_info)};		///< uORB pub for satellite info
+	uORB::PublicationMulti<ORB_ID::vehicle_gps_position>	_report_gps_pos_pub{};	///< uORB pub for gps position
+	uORB::PublicationMulti<ORB_ID::satellite_info>	_report_sat_info_pub{};		///< uORB pub for satellite info
 
 	float				_rate{0.0f};					///< position update rate
 	float				_rate_rtcm_injection{0.0f};			///< RTCM message injection rate

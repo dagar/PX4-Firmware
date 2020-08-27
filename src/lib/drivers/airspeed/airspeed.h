@@ -72,7 +72,7 @@ protected:
 	bool			_collect_phase;
 	float			_diff_pres_offset;
 
-	uORB::PublicationMulti<differential_pressure_s>	_airspeed_pub{ORB_ID(differential_pressure)};
+	uORB::PublicationMulti<ORB_ID::differential_pressure>	_airspeed_pub{};
 
 	int			_airspeed_orb_class_instance;
 

@@ -111,7 +111,7 @@ private:
 	uORB::Publication<actuator_controls_s>		_actuators_0_pub;
 	uORB::Publication<vehicle_attitude_setpoint_s>	_attitude_sp_pub;
 	uORB::Publication<vehicle_rates_setpoint_s>	_rate_sp_pub{ORB_ID(vehicle_rates_setpoint)};
-	uORB::PublicationMulti<rate_ctrl_status_s>	_rate_ctrl_status_pub{ORB_ID(rate_ctrl_status)};
+	uORB::PublicationMulti<ORB_ID::rate_ctrl_status>	_rate_ctrl_status_pub{};
 
 	actuator_controls_s			_actuators {};		/**< actuator control inputs */
 	manual_control_setpoint_s		_manual_control_setpoint {};		/**< r/c channel data */

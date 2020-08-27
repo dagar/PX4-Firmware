@@ -105,8 +105,8 @@ private:
 	int			_class_instance{-1};
 	int			_orb_class_instance{-1};
 
-	uORB::PublicationMulti<optical_flow_s>		_px4flow_topic{ORB_ID(optical_flow)};
-	uORB::PublicationMulti<distance_sensor_s>	_distance_sensor_topic{ORB_ID(distance_sensor)};
+	uORB::PublicationMulti<ORB_ID::optical_flow>		_px4flow_topic{};
+	uORB::PublicationMulti<ORB_ID::distance_sensor>	_distance_sensor_topic{};
 
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_comms_errors;

@@ -46,7 +46,7 @@
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/i2c_spi_buses.h>
-#include <uORB/Publication.hpp>
+#include <uORB/Publication2.hpp>
 #include <uORB/topics/irlock_report.h>
 
 /** Configuration Constants **/
@@ -116,7 +116,7 @@ private:
 	/** internal variables **/
 	uint32_t _read_failures{0};
 
-	uORB::Publication<irlock_report_s> _irlock_report_topic{ORB_ID(irlock_report)};
+	uORB::Publication2<ORB_ID::irlock_report> _irlock_report_topic{};
 };
 
 IRLOCK::IRLOCK(I2CSPIBusOption bus_option, const int bus, int bus_frequency, const int address) :

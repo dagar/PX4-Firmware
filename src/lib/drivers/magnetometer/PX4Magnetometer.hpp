@@ -61,7 +61,7 @@ public:
 	int get_class_instance() { return _class_device_instance; };
 
 private:
-	uORB::PublicationQueuedMulti<sensor_mag_s> _sensor_pub;
+	uORB::PublicationQueuedMulti<ORB_ID::sensor_mag> _sensor_pub{};
 
 	uint32_t		_device_id{0};
 	const enum Rotation	_rotation;

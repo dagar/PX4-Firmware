@@ -164,12 +164,12 @@ private:
 
 	// uORB publisher handlers
 	uORB::Publication<differential_pressure_s>	_differential_pressure_pub{ORB_ID(differential_pressure)};
-	uORB::PublicationMulti<optical_flow_s>		_flow_pub{ORB_ID(optical_flow)};
+	uORB::PublicationMulti<ORB_ID::optical_flow>		_flow_pub{};
 	uORB::Publication<irlock_report_s>		_irlock_report_pub{ORB_ID(irlock_report)};
 	uORB::Publication<vehicle_odometry_s>		_visual_odometry_pub{ORB_ID(vehicle_visual_odometry)};
 	uORB::Publication<vehicle_odometry_s>		_mocap_odometry_pub{ORB_ID(vehicle_mocap_odometry)};
 
-	uORB::PublicationMulti<distance_sensor_s>	*_dist_pubs[RANGE_FINDER_MAX_SENSORS] {};
+	uORB::PublicationMulti<ORB_ID::distance_sensor>	*_dist_pubs[RANGE_FINDER_MAX_SENSORS] {};
 	uint8_t _dist_sensor_ids[RANGE_FINDER_MAX_SENSORS] {};
 
 	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
@@ -218,7 +218,7 @@ private:
 	uORB::Publication<input_rc_s>			_input_rc_pub{ORB_ID(input_rc)};
 
 	// HIL GPS
-	uORB::PublicationMulti<vehicle_gps_position_s>	*_vehicle_gps_position_pubs[ORB_MULTI_MAX_INSTANCES] {};
+	uORB::PublicationMulti<ORB_ID::vehicle_gps_position>	*_vehicle_gps_position_pubs[ORB_MULTI_MAX_INSTANCES] {};
 	uint8_t _gps_ids[ORB_MULTI_MAX_INSTANCES] {};
 	std::default_random_engine _gen{};
 

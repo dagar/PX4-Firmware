@@ -339,7 +339,7 @@ void Simulator::handle_message_hil_gps(const mavlink_message_t *msg)
 			}
 
 			if (_vehicle_gps_position_pubs[i] == nullptr) {
-				_vehicle_gps_position_pubs[i] = new uORB::PublicationMulti<vehicle_gps_position_s> {ORB_ID(vehicle_gps_position)};
+				_vehicle_gps_position_pubs[i] = new uORB::PublicationMulti<ORB_ID::vehicle_gps_position> {};
 				_gps_ids[i] = hil_gps.id;
 				_vehicle_gps_position_pubs[i]->publish(gps);
 				break;
@@ -1131,7 +1131,7 @@ int Simulator::publish_distance_topic(const mavlink_distance_sensor_t *dist_mavl
 		}
 
 		if (_dist_pubs[i] == nullptr) {
-			_dist_pubs[i] = new uORB::PublicationMulti<distance_sensor_s> {ORB_ID(distance_sensor)};
+			_dist_pubs[i] = new uORB::PublicationMulti<ORB_ID::distance_sensor> {};
 			_dist_sensor_ids[i] = dist.id;
 			_dist_pubs[i]->publish(dist);
 			break;

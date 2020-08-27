@@ -42,7 +42,7 @@
 #include <systemlib/err.h>
 #include <uORB/uORB.h>
 
-#include "Publication.hpp"
+#include "Publication2.hpp"
 
 namespace uORB
 {
@@ -50,8 +50,8 @@ namespace uORB
 /**
  * Base publication multi wrapper class
  */
-template<typename T, uint8_t QSIZE = 1>
-class PublicationMulti : public PublicationBase
+template<ORB_ID T, uint8_t QSIZE = 1>
+class PublicationMulti : public Publication2Base
 {
 public:
 
@@ -60,42 +60,38 @@ public:
 	 *
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
 	 */
-	PublicationMulti(ORB_ID id) :
-		PublicationBase(id)
-	{}
-
-	PublicationMulti(const orb_metadata *meta) :
-		PublicationBase(static_cast<ORB_ID>(meta->o_id))
-	{}
+	PublicationMulti() = default;
 
 	bool advertise()
 	{
 		if (!advertised()) {
 			int instance = 0;
-			_handle = orb_advertise_multi_queue(get_topic(), nullptr, &instance, QSIZE);
+			_handle = orb_advertise_multi_queue(get_orb_meta(T), nullptr, &instance, QSIZE);
 		}
 
 		return advertised();
 	}
 
+	using S = typename ORBTypeMap<T>::type;
+
 	/**
 	 * Publish the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool publish(const T &data)
+	bool publish(const S &data)
 	{
 		if (!advertised()) {
 			advertise();
 		}
 
-		return (orb_publish(get_topic(), _handle, &data) == PX4_OK);
+		return (orb_publish(get_orb_meta(T), _handle, &data) == PX4_OK);
 	}
 };
 
 /**
  * The publication multi class with data embedded.
  */
-template<typename T>
+template<ORB_ID T>
 class PublicationMultiData : public PublicationMulti<T>
 {
 public:
@@ -104,26 +100,27 @@ public:
 	 *
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
 	 */
-	PublicationMultiData(ORB_ID id) : PublicationMulti<T>(id) {}
-	PublicationMultiData(const orb_metadata *meta) : PublicationMulti<T>(meta) {}
+	PublicationMultiData() = default;
 
-	T	&get() { return _data; }
-	void	set(const T &data) { _data = data; }
+	using S = typename ORBTypeMap<T>::type;
+
+	S	&get() { return _data; }
+	void	set(const S &data) { _data = data; }
 
 	// Publishes the embedded struct.
 	bool	update() { return PublicationMulti<T>::publish(_data); }
-	bool	update(const T &data)
+	bool	update(const S &data)
 	{
 		_data = data;
 		return PublicationMulti<T>::publish(_data);
 	}
 
 private:
-	T _data{};
+	S _data{};
 };
 
 
-template<class T>
-using PublicationQueuedMulti = PublicationMulti<T, T::ORB_QUEUE_LENGTH>;
+template<ORB_ID T>
+using PublicationQueuedMulti = PublicationMulti<T, ORBTypeMap<T>::type::ORB_QUEUE_LENGTH>;
 
 } // namespace uORB

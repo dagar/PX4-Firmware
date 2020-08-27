@@ -101,7 +101,7 @@ private:
 
 	bool changeMode(Mode newMode);
 
-	uORB::PublicationMulti<optical_flow_s> _optical_flow_pub{ORB_ID(optical_flow)};
+	uORB::PublicationMulti<ORB_ID::optical_flow> _optical_flow_pub{};
 
 	perf_counter_t	_sample_perf;
 	perf_counter_t	_comms_errors;

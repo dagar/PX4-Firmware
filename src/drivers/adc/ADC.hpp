@@ -48,7 +48,7 @@
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
-#include <uORB/Publication.hpp>
+#include <uORB/Publication2.hpp>
 #include <uORB/topics/adc_report.h>
 #include <uORB/topics/system_power.h>
 
@@ -103,6 +103,6 @@ private:
 	const uint32_t			_base_address;
 	px4_adc_msg_t			*_samples{nullptr};	/**< sample buffer */
 
-	uORB::Publication<adc_report_s>		_to_adc_report{ORB_ID(adc_report)};
-	uORB::Publication<system_power_s>	_to_system_power{ORB_ID(system_power)};
+	uORB::Publication2<ORB_ID::adc_report>		_to_adc_report{};
+	uORB::Publication2<ORB_ID::system_power>	_to_system_power{};
 };

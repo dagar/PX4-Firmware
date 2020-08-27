@@ -205,7 +205,7 @@ private:
 	int _paramSub{-1};
 	parameter_update_s _paramUpdate;
 
-	uORB::PublicationMulti<wheel_encoders_s> _wheelEncodersAdv[2] { ORB_ID(wheel_encoders), ORB_ID(wheel_encoders)};
+	uORB::PublicationMulti<ORB_ID::wheel_encoders> _wheelEncodersAdv[2] {};
 	wheel_encoders_s _wheelEncoderMsg[2];
 
 	uint32_t _lastEncoderCount[2] {0, 0};

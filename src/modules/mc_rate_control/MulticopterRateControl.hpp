@@ -43,6 +43,7 @@
 #include <px4_platform_common/posix.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/Publication2.hpp>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
@@ -107,9 +108,10 @@ private:
 	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
 
 	uORB::Publication<actuator_controls_s>		_actuators_0_pub;
-	uORB::PublicationMulti<rate_ctrl_status_s>	_controller_status_pub{ORB_ID(rate_ctrl_status)};	/**< controller status publication */
-	uORB::Publication<landing_gear_s>		_landing_gear_pub{ORB_ID(landing_gear)};
-	uORB::Publication<vehicle_rates_setpoint_s>	_v_rates_sp_pub{ORB_ID(vehicle_rates_setpoint)};			/**< rate setpoint publication */
+	uORB::PublicationMulti<ORB_ID::rate_ctrl_status>	_controller_status_pub{};	/**< controller status publication */
+	uORB::Publication2<ORB_ID::landing_gear>	_landing_gear_pub{};
+	uORB::Publication2<ORB_ID::vehicle_rates_setpoint>	_v_rates_sp_pub{};			/**< rate setpoint publication */
+
 
 	landing_gear_s 			_landing_gear{};
 	manual_control_setpoint_s	_manual_control_setpoint{};

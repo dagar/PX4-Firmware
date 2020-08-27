@@ -102,7 +102,7 @@ private:
 
 	esc_status_s	_esc_status{};
 
-	uORB::PublicationMulti<esc_status_s> _esc_status_pub{ORB_ID(esc_status)};
+	uORB::PublicationMulti<ORB_ID::esc_status> _esc_status_pub{};
 
 	uint8_t		_rotor_count{0};
 

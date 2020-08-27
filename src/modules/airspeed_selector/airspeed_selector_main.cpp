@@ -101,7 +101,7 @@ private:
 	};
 
 	uORB::Publication<airspeed_validated_s> _airspeed_validated_pub {ORB_ID(airspeed_validated)};			/**< airspeed validated topic*/
-	uORB::PublicationMulti<wind_estimate_s> _wind_est_pub[MAX_NUM_AIRSPEED_SENSORS + 1] {{ORB_ID(wind_estimate)}, {ORB_ID(wind_estimate)}, {ORB_ID(wind_estimate)}, {ORB_ID(wind_estimate)}}; /**< wind estimate topic (for each airspeed validator + purely sideslip fusion) */
+	uORB::PublicationMulti<ORB_ID::wind_estimate> _wind_est_pub[MAX_NUM_AIRSPEED_SENSORS + 1] {}; /**< wind estimate topic (for each airspeed validator + purely sideslip fusion) */
 	orb_advert_t 	_mavlink_log_pub {nullptr}; 						/**< mavlink log topic*/
 
 	uORB::Subscription _estimator_status_sub{ORB_ID(estimator_status)};

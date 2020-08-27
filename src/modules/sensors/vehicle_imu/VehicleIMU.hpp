@@ -85,8 +85,8 @@ private:
 	void UpdateGyroVibrationMetrics(const matrix::Vector3f &delta_angle);
 	void UpdateAccelVibrationMetrics(const matrix::Vector3f &delta_velocity);
 
-	uORB::PublicationMulti<vehicle_imu_s> _vehicle_imu_pub{ORB_ID(vehicle_imu)};
-	uORB::PublicationMulti<vehicle_imu_status_s> _vehicle_imu_status_pub{ORB_ID(vehicle_imu_status)};
+	uORB::PublicationMulti<ORB_ID::vehicle_imu> _vehicle_imu_pub{};
+	uORB::PublicationMulti<ORB_ID::vehicle_imu_status> _vehicle_imu_status_pub{};
 	uORB::Subscription _params_sub{ORB_ID(parameter_update)};
 	uORB::SubscriptionCallbackWorkItem _sensor_accel_sub;
 	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub;

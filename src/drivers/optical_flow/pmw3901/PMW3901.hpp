@@ -87,7 +87,7 @@ private:
 
 	const uint64_t _collect_time{15000}; // usecs, ensures flow data is published every second iteration of Run() (100Hz -> 50Hz)
 
-	uORB::PublicationMulti<optical_flow_s> _optical_flow_pub{ORB_ID(optical_flow)};
+	uORB::PublicationMulti<ORB_ID::optical_flow> _optical_flow_pub{};
 
 	perf_counter_t _sample_perf;
 	perf_counter_t _comms_errors;

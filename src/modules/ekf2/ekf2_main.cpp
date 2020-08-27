@@ -281,7 +281,7 @@ private:
 	uORB::PublicationData<vehicle_global_position_s>	_vehicle_global_position_pub{ORB_ID(vehicle_global_position)};
 	uORB::PublicationData<vehicle_local_position_s>		_vehicle_local_position_pub{ORB_ID(vehicle_local_position)};
 	uORB::PublicationData<vehicle_odometry_s>		_vehicle_visual_odometry_aligned_pub{ORB_ID(vehicle_visual_odometry_aligned)};
-	uORB::PublicationMulti<wind_estimate_s>			_wind_pub{ORB_ID(wind_estimate)};
+	uORB::PublicationMulti<ORB_ID::wind_estimate>		_wind_pub{};
 
 	Ekf _ekf;
 
