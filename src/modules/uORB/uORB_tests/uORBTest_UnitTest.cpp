@@ -38,7 +38,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <math.h>
-#include <lib/cdev/CDev.hpp>
 
 uORBTest::UnitTest &uORBTest::UnitTest::instance()
 {

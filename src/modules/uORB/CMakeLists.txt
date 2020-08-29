@@ -63,7 +63,6 @@ if(NOT PX4_BOARD MATCHES "px4_io") # TODO: fix this hack (move uORB to platform 
 			uORBUtils.cpp
 			uORBUtils.hpp
 		DEPENDS
-			cdev
 			uorb_msgs
 		)
 

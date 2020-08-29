@@ -439,7 +439,7 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const char *nodepath)
 	lock();
 
 	for (uORB::DeviceNode *node : _node_list) {
-		if (strcmp(node->get_devname(), nodepath) == 0) {
+		if (strcmp(node->get_path(), nodepath) == 0) {
 			unlock();
 			return node;
 		}

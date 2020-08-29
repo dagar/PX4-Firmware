@@ -36,8 +36,6 @@
 #include "uORBCommon.hpp"
 #include "uORBDeviceMaster.hpp"
 
-#include <lib/cdev/CDev.hpp>
-
 #include <containers/IntrusiveSortedList.hpp>
 #include <containers/List.hpp>
 #include <px4_platform_common/atomic.h>
@@ -48,16 +46,22 @@ class DeviceNode;
 class DeviceMaster;
 class Manager;
 class SubscriptionCallback;
-}
+
+#if defined(__PX4_NUTTX)
+using px4_file_operations_t = struct file_operations;
+using file_t = struct file;
+#endif // PX4_NUTTX
+} // namespace uORB
+
 
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public cdev::CDev, public IntrusiveSortedListNode<uORB::DeviceNode *>
+class uORB::DeviceNode : public IntrusiveSortedListNode<uORB::DeviceNode *>
 {
 public:
 	DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path, uint8_t queue_size = 1);
-	virtual ~DeviceNode();
+	~DeviceNode();
 
 	// no copy, assignment, move, move assignment
 	DeviceNode(const DeviceNode &) = delete;
@@ -65,18 +69,20 @@ public:
 	DeviceNode(DeviceNode &&) = delete;
 	DeviceNode &operator=(DeviceNode &&) = delete;
 
-	bool operator<=(const DeviceNode &rhs) const { return (strcmp(get_devname(), rhs.get_devname()) <= 0); }
+	bool operator<=(const DeviceNode &rhs) const { return (strcmp(get_path(), rhs.get_path()) <= 0); }
+
+	int init();
 
 	/**
 	 * Method to create a subscriber instance and return the struct
 	 * pointing to the subscriber as a file pointer.
 	 */
-	int open(cdev::file_t *filp) override;
+	int open(file_t *filp);
 
 	/**
 	 * Method to close a subscriber for this topic.
 	 */
-	int close(cdev::file_t *filp) override;
+	int close(file_t *filp);
 
 	/**
 	 * reads data from a subscriber node to the buffer provided.
@@ -89,7 +95,7 @@ public:
 	 * @return
 	 *   ssize_t the number of bytes read.
 	 */
-	ssize_t read(cdev::file_t *filp, char *buffer, size_t buflen) override;
+	ssize_t read(file_t *filp, char *buffer, size_t buflen);
 
 	/**
 	 * writes the published data to the internal buffer to be read by
@@ -103,12 +109,29 @@ public:
 	 * @return ssize_t
 	 *   The number of bytes that are written
 	 */
-	ssize_t write(cdev::file_t *filp, const char *buffer, size_t buflen) override;
+	ssize_t write(file_t *filp, const char *buffer, size_t buflen);
 
 	/**
 	 * IOCTL control for the subscriber.
 	 */
-	int ioctl(cdev::file_t *filp, int cmd, unsigned long arg) override;
+	int ioctl(file_t *filp, int cmd, unsigned long arg);
+
+	/**
+	 * Perform a poll setup/teardown operation.
+	 *
+	 * This is handled internally and should not normally be overridden.
+	 *
+	 * @param filep		Pointer to the internal file structure.
+	 * @param fds		Poll descriptor being waited on.
+	 * @param setup		True if this is establishing a request, false if
+	 *			it is being torn down.
+	 * @return		OK on success, or -errno otherwise.
+	 */
+	int	poll(file_t *filep, px4_pollfd_struct_t *fds, bool setup);
+
+	px4_sem_t _lock;
+	void lock() { do {} while (px4_sem_wait(&_lock) != 0); }
+	void unlock() { px4_sem_post(&_lock); }
 
 	/**
 	 * Method to publish a data to this node.
@@ -195,6 +218,7 @@ public:
 	ORB_ID id() const { return static_cast<ORB_ID>(_meta->o_id); }
 
 	const char *get_name() const { return _meta->o_name; }
+	const char *get_path() const { return _path; }
 
 	uint8_t get_instance() const { return _instance; }
 
@@ -217,12 +241,6 @@ public:
 	// remove item from list of work items
 	void unregister_callback(SubscriptionCallback *callback_sub);
 
-protected:
-
-	px4_pollevent_t poll_state(cdev::file_t *filp) override;
-
-	void poll_notify_one(px4_pollfd_struct_t *fds, px4_pollevent_t events) override;
-
 private:
 
 	const orb_metadata *_meta; /**< object metadata information */
@@ -235,4 +253,24 @@ private:
 	bool _advertised{false};  /**< has ever been advertised (not necessarily published data yet) */
 	uint8_t _queue_size; /**< maximum number of elements in the queue */
 	int8_t _subscriber_count{0};
+
+	const char	*_path{nullptr};		/**< device node name */
+	px4_pollfd_struct_t	**_pollset{nullptr};
+	uint8_t		_max_pollwaiters{0};		/**< size of the _pollset array */
+
+	/**
+	 * Store a pollwaiter in a slot where we can find it later.
+	 *
+	 * Expands the pollset as required.  Must be called with the driver locked.
+	 *
+	 * @return		OK, or -errno on error.
+	 */
+	inline int	store_poll_waiter(px4_pollfd_struct_t *fds);
+
+	/**
+	 * Remove a poll waiter.
+	 *
+	 * @return		OK, or -errno on error.
+	 */
+	inline int	remove_poll_waiter(px4_pollfd_struct_t *fds);
 };
