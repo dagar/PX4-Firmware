@@ -229,9 +229,27 @@ stm32_boardinitialize(void)
  *
  ****************************************************************************/
 
+//static struct stm32_tim_dev_s *tim;
+
+#define EXTCOMIN_FREQ    24
+#define TIMER_FREQ       32000
+
+#define GPIO_TIM5_CH1OUT_1    (GPIO_ALT|GPIO_AF2|GPIO_SPEED_50MHz|GPIO_PUSHPULL|GPIO_PORTA|GPIO_PIN0)
+
+// STM32_TIM_SETCHANNEL
+
 
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
+	// IMU_2_FSYNC PA0/TIM5_CH1
+	//if (tim == NULL) {
+	//	tim = stm32_tim_init(5);
+	//	DEBUGASSERT(tim);
+	//	STM32_TIM_SETPERIOD(tim, TIMER_FREQ / EXTCOMIN_FREQ);
+	//	STM32_TIM_SETCLOCK(tim, TIMER_FREQ);
+	//	STM32_TIM_SETMODE(tim, STM32_TIM_MODE_UP);
+	//}
+
 	/* Power on Interfaces */
 
 	VDD_3V3_SD_CARD_EN(true);
