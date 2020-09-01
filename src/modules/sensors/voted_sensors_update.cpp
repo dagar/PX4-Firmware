@@ -137,7 +137,7 @@ void VotedSensorsUpdate::parametersUpdate()
 
 void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 {
-	for (int uorb_index = 0; uorb_index < 3; uorb_index++) {
+	for (int uorb_index = 0; uorb_index < SENSOR_COUNT_MAX; uorb_index++) {
 		vehicle_imu_s imu_report;
 
 		if ((_accel.priority[uorb_index] > 0) && (_gyro.priority[uorb_index] > 0)
@@ -182,13 +182,31 @@ void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 	}
 
 	// find the best sensor
-	int accel_best_index;
-	int gyro_best_index;
-	_accel.voter.get_best(hrt_absolute_time(), &accel_best_index);
-	_gyro.voter.get_best(hrt_absolute_time(), &gyro_best_index);
+	int accel_best_index = -1;
+	int gyro_best_index = -1;
 
-	checkFailover(_accel, "Accel", subsystem_info_s::SUBSYSTEM_TYPE_ACC);
-	checkFailover(_gyro, "Gyro", subsystem_info_s::SUBSYSTEM_TYPE_GYRO);
+	if (_param_sens_imu_mode.get() == 1) {
+		_accel.voter.get_best(hrt_absolute_time(), &accel_best_index);
+		_gyro.voter.get_best(hrt_absolute_time(), &gyro_best_index);
+
+		checkFailover(_accel, "Accel", subsystem_info_s::SUBSYSTEM_TYPE_ACC);
+		checkFailover(_gyro, "Gyro", subsystem_info_s::SUBSYSTEM_TYPE_GYRO);
+
+	} else if (_param_sens_imu_mode.get() == 0) {
+
+		// use sensor_selection to find best
+		_sensor_selection_sub.update(&_selection);
+
+		for (int i = 0; i < SENSOR_COUNT_MAX; i++) {
+			if ((_accel_device_id[i] != 0) && (_accel_device_id[i] == _selection.accel_device_id)) {
+				accel_best_index = i;
+			}
+
+			if ((_gyro_device_id[i] != 0) && (_gyro_device_id[i] == _selection.gyro_device_id)) {
+				gyro_best_index = i;
+			}
+		}
+	}
 
 	// write data for the best sensor to output variables
 	if ((accel_best_index >= 0) && (gyro_best_index >= 0)) {
@@ -351,12 +369,14 @@ void VotedSensorsUpdate::sensorsPoll(sensor_combined_s &raw)
 	imuPoll(raw);
 
 	// publish sensor selection if changed
-	if (_selection_changed) {
-		// don't publish until selected IDs are valid
-		if (_selection.accel_device_id > 0 && _selection.gyro_device_id > 0) {
-			_selection.timestamp = hrt_absolute_time();
-			_sensor_selection_pub.publish(_selection);
-			_selection_changed = false;
+	if (_param_sens_imu_mode.get() == 1) {
+		if (_selection_changed) {
+			// don't publish until selected IDs are valid
+			if (_selection.accel_device_id > 0 && _selection.gyro_device_id > 0) {
+				_selection.timestamp = hrt_absolute_time();
+				_sensor_selection_pub.publish(_selection);
+				_selection_changed = false;
+			}
 		}
 	}
 }
