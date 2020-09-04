@@ -38,7 +38,7 @@
 #include <lib/parameters/param.h>
 #include <systemlib/mavlink_log.h>
 #include <uORB/Subscription.hpp>
-#include <uORB/topics/sensor_preflight_imu.h>
+#include <uORB/topics/sensor_diff_imu.h>
 #include <uORB/topics/subsystem_info.h>
 
 bool PreFlightCheck::imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status,
@@ -47,15 +47,29 @@ bool PreFlightCheck::imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_
 	float test_limit = 1.0f; // pass limit re-used for each test
 
 	// Get sensor_preflight data if available and exit with a fail recorded if not
-	uORB::SubscriptionData<sensor_preflight_imu_s> sensors_sub{ORB_ID(sensor_preflight_imu)};
+	uORB::SubscriptionData<sensor_diff_imu_s> sensors_sub{ORB_ID(sensor_diff_imu)};
 	sensors_sub.update();
-	const sensor_preflight_imu_s &sensors = sensors_sub.get();
+	const sensor_diff_imu_s &sensors = sensors_sub.get();
+
+	// get worst case values
+	float max_accel_diff = 0.0f;
+	float max_gyro_diff = 0.0f;
+
+	for (uint8_t index = 0; index < sensor_diff_imu_s::MAX_SENSORS; index++) {
+		if (sensors.accel_inconsistency_m_s_s[index] > max_accel_diff) {
+			max_accel_diff = sensors.accel_inconsistency_m_s_s[index];
+		}
+
+		if (sensors.gyro_inconsistency_rad_s[index] > max_gyro_diff) {
+			max_gyro_diff = sensors.gyro_inconsistency_rad_s[index];
+		}
+	}
 
 	// Use the difference between IMU's to detect a bad calibration.
 	// If a single IMU is fitted, the value being checked will be zero so this check will always pass.
 	param_get(param_find("COM_ARM_IMU_ACC"), &test_limit);
 
-	if (sensors.accel_inconsistency_m_s_s > test_limit) {
+	if (max_accel_diff > test_limit) {
 		if (report_status) {
 			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accels inconsistent - Check Cal");
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_ACC, false, status);
@@ -64,7 +78,7 @@ bool PreFlightCheck::imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_
 
 		return false;
 
-	} else if (sensors.accel_inconsistency_m_s_s > test_limit * 0.8f) {
+	} else if (max_accel_diff > test_limit * 0.8f) {
 		if (report_status) {
 			mavlink_log_info(mavlink_log_pub, "Preflight Advice: Accels inconsistent - Check Cal");
 		}
@@ -73,7 +87,8 @@ bool PreFlightCheck::imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_
 	// Fail if gyro difference greater than 5 deg/sec and notify if greater than 2.5 deg/sec
 	param_get(param_find("COM_ARM_IMU_GYR"), &test_limit);
 
-	if (sensors.gyro_inconsistency_rad_s > test_limit) {
+
+	if (max_gyro_diff > test_limit) {
 		if (report_status) {
 			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Gyros inconsistent - Check Cal");
 			set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_GYRO, false, status);
@@ -82,7 +97,7 @@ bool PreFlightCheck::imuConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_
 
 		return false;
 
-	} else if (sensors.gyro_inconsistency_rad_s > test_limit * 0.5f) {
+	} else if (max_gyro_diff > test_limit * 0.5f) {
 		if (report_status) {
 			mavlink_log_info(mavlink_log_pub, "Preflight Advice: Gyros inconsistent - Check Cal");
 		}
