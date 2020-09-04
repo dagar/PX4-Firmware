@@ -389,9 +389,8 @@ void VotedSensorsUpdate::setRelativeTimestamps(sensor_combined_s &raw)
 	}
 }
 
-void VotedSensorsUpdate::calcAccelInconsistency(sensor_preflight_imu_s &preflt)
+void VotedSensorsUpdate::calcAccelInconsistency(sensor_diff_imu_s &preflt)
 {
-	float accel_diff_sum_max_sq = 0.0f; // the maximum sum of axis differences squared
 	unsigned check_index = 0; // the number of sensors the primary has been checked against
 
 	// Check each sensor against the primary
@@ -411,15 +410,17 @@ void VotedSensorsUpdate::calcAccelInconsistency(sensor_preflight_imu_s &preflt)
 
 			}
 
-			// capture the largest sum value
-			if (accel_diff_sum_sq > accel_diff_sum_max_sq) {
-				accel_diff_sum_max_sq = accel_diff_sum_sq;
-
-			}
+			preflt.accel_inconsistency_m_s_s[sensor_index] = sqrtf(accel_diff_sum_sq);
 
 			// increment the check index
 			check_index++;
+
+		} else {
+			preflt.accel_inconsistency_m_s_s[sensor_index] = 0.0f;
+
 		}
+
+		preflt.accel_device_ids[sensor_index] = _accel_device_id[sensor_index];
 
 		// check to see if the maximum number of checks has been reached and break
 		if (check_index >= 2) {
@@ -427,20 +428,10 @@ void VotedSensorsUpdate::calcAccelInconsistency(sensor_preflight_imu_s &preflt)
 
 		}
 	}
-
-	// skip check if less than 2 sensors
-	if (check_index < 1) {
-		preflt.accel_inconsistency_m_s_s = 0.0f;
-
-	} else {
-		// get the vector length of the largest difference and write to the combined sensor struct
-		preflt.accel_inconsistency_m_s_s = sqrtf(accel_diff_sum_max_sq);
-	}
 }
 
-void VotedSensorsUpdate::calcGyroInconsistency(sensor_preflight_imu_s &preflt)
+void VotedSensorsUpdate::calcGyroInconsistency(sensor_diff_imu_s &preflt)
 {
-	float gyro_diff_sum_max_sq = 0.0f; // the maximum sum of axis differences squared
 	unsigned check_index = 0; // the number of sensors the primary has been checked against
 
 	// Check each sensor against the primary
@@ -460,29 +451,22 @@ void VotedSensorsUpdate::calcGyroInconsistency(sensor_preflight_imu_s &preflt)
 
 			}
 
-			// capture the largest sum value
-			if (gyro_diff_sum_sq > gyro_diff_sum_max_sq) {
-				gyro_diff_sum_max_sq = gyro_diff_sum_sq;
-
-			}
+			preflt.gyro_inconsistency_rad_s[sensor_index] = sqrtf(gyro_diff_sum_sq);
 
 			// increment the check index
 			check_index++;
+
+		} else {
+			preflt.gyro_inconsistency_rad_s[sensor_index] = 0.0f;
+
 		}
+
+		preflt.gyro_device_ids[sensor_index] = _gyro_device_id[sensor_index];
 
 		// check to see if the maximum number of checks has been reached and break
 		if (check_index >= 2) {
 			break;
 
 		}
-	}
-
-	// skip check if less than 2 sensors
-	if (check_index < 1) {
-		preflt.gyro_inconsistency_rad_s = 0.0f;
-
-	} else {
-		// get the vector length of the largest difference and write to the combined sensor struct
-		preflt.gyro_inconsistency_rad_s = sqrtf(gyro_diff_sum_max_sq);
 	}
 }

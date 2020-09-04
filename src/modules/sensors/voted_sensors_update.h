@@ -52,7 +52,7 @@
 #include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/sensor_preflight_imu.h>
+#include <uORB/topics/sensor_diff_imu.h>
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_imu.h>
 #include <uORB/topics/vehicle_imu_status.h>
@@ -113,12 +113,12 @@ public:
 	/**
 	 * Calculates the magnitude in m/s/s of the largest difference between the primary and any other accel sensor
 	 */
-	void calcAccelInconsistency(sensor_preflight_imu_s &preflt);
+	void calcAccelInconsistency(sensor_diff_imu_s &preflt);
 
 	/**
 	 * Calculates the magnitude in rad/s of the largest difference between the primary and any other gyro sensor
 	 */
-	void calcGyroInconsistency(sensor_preflight_imu_s &preflt);
+	void calcGyroInconsistency(sensor_diff_imu_s &preflt);
 
 private:
 
@@ -183,7 +183,7 @@ private:
 	bool _selection_changed{true};			/**< true when a sensor selection has changed and not been published */
 
 	float _accel_diff[3][2] {};			/**< filtered accel differences between IMU units (m/s/s) */
-	float _gyro_diff[3][2] {};			/**< filtered gyro differences between IMU uinits (rad/s) */
+	float _gyro_diff[3][2] {};			/**< filtered gyro differences between IMU units (rad/s) */
 
 	uint32_t _accel_device_id[SENSOR_COUNT_MAX] {};	/**< accel driver device id for each uorb instance */
 	uint32_t _gyro_device_id[SENSOR_COUNT_MAX] {};	/**< gyro driver device id for each uorb instance */
