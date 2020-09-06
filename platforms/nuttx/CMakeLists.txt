@@ -37,8 +37,8 @@ endif()
 
 include(cygwin_cygpath)
 
-set(NUTTX_DIR ${PX4_BINARY_DIR}/NuttX/nuttx)
-set(NUTTX_APPS_DIR ${PX4_BINARY_DIR}/NuttX/apps)
+set(NUTTX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/NuttX/nuttx)
+set(APPS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/NuttX/apps)
 
 add_executable(px4 ${PX4_SOURCE_DIR}/platforms/common/empty.c)
 set(FW_NAME ${PX4_BOARD_VENDOR}_${PX4_BOARD_MODEL}_${PX4_BOARD_LABEL}.elf)
@@ -99,7 +99,7 @@ file(RELATIVE_PATH PX4_BINARY_DIR_REL ${CMAKE_CURRENT_BINARY_DIR} ${PX4_BINARY_D
 
 # only in the cygwin environment: convert absolute linker script path to mixed windows (C:/...)
 # because even relative linker script paths are different for linux, mac and windows
-CYGPATH(PX4_BINARY_DIR PX4_BINARY_DIR_CYG)
+CYGPATH(PX4_BOARD_DIR PX4_BOARD_DIR_CYG)
 
 target_link_libraries(nuttx_arch
 	INTERFACE
@@ -120,7 +120,7 @@ target_link_libraries(px4 PRIVATE
 	-fno-exceptions
 	-fno-rtti
 
-	-Wl,--script=${PX4_BINARY_DIR_CYG}/NuttX/nuttx-config/scripts/${SCRIPT_PREFIX}script.ld
+	-Wl,--script=${PX4_BOARD_DIR_CYG}/nuttx-config/scripts/${SCRIPT_PREFIX}script.ld
 	-Wl,-Map=${PX4_CONFIG}.map
 	-Wl,--warn-common
 	-Wl,--gc-sections
