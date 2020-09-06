@@ -266,7 +266,7 @@ void VehicleMagnetometer::Run()
 		}
 	}
 
-	if (_data_sum_count[_selected_sensor_sub_index] > 0) {
+	if (!_armed && _data_sum_count[_selected_sensor_sub_index] > 0) {
 		calculateInconsistency();
 	}
 
@@ -364,13 +364,10 @@ void VehicleMagnetometer::Publish(uint8_t instance, bool multi)
 
 void VehicleMagnetometer::calculateInconsistency()
 {
-	sensor_preflight_mag_s preflt{};
+	sensors_status_mag_s sensors_status_mag{};
 
-	const Vector3f primary_mag(_data_sum[_selected_sensor_sub_index] /
-				   _data_sum_count[_selected_sensor_sub_index]); // primary mag field vector
-
-	float mag_angle_diff_max = 0.0f; // the maximum angle difference
-	unsigned check_index = 0; // the number of sensors the primary has been checked against
+	// primary mag field vector
+	const Vector3f primary_mag(_data_sum[_selected_sensor_sub_index] / _data_sum_count[_selected_sensor_sub_index]);
 
 	// Check each sensor against the primary
 	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
@@ -382,27 +379,21 @@ void VehicleMagnetometer::calculateInconsistency()
 			float angle_error = AxisAnglef(Quatf(current_mag, primary_mag)).angle();
 
 			// complementary filter to not fail/pass on single outliers
-			_mag_angle_diff[check_index] *= 0.95f;
-			_mag_angle_diff[check_index] += 0.05f * angle_error;
-
-			mag_angle_diff_max = math::max(mag_angle_diff_max, _mag_angle_diff[check_index]);
-
-			// increment the check index
-			check_index++;
+			_mag_angle_diff[i] *= 0.95f;
+			_mag_angle_diff[i] += 0.05f * angle_error;
 		}
 
-		// check to see if the maximum number of checks has been reached and break
-		if (check_index >= 2) {
-			break;
-		}
+		sensors_status_mag.device_id[i] = _calibration.device_id();
+		sensors_status_mag.inconsistency[i] = _mag_angle_diff[i];
+		sensors_status_mag.healthy[i] = _voter(i).get_state() != ERROR_STATE::NO_ERROR;
 	}
 
 	// get the vector length of the largest difference and write to the combined sensor struct
 	// will be zero if there is only one magnetometer and hence nothing to compare
-	preflt.mag_inconsistency_angle = mag_angle_diff_max;
+
 
 	preflt.timestamp = hrt_absolute_time();
-	_sensor_preflight_mag_pub.publish(preflt);
+	_sensors_status_mag_pub.publish(preflt);
 }
 
 void VehicleMagnetometer::PrintStatus()
