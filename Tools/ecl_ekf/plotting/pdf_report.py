@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from pyulog import ULog
 
-from analysis.post_processing import magnetic_field_estimates_from_status, get_estimator_check_flags
+from analysis.post_processing import magnetic_field_estimates_from_states, get_estimator_check_flags
 from plotting.data_plots import TimeSeriesPlot, InnovationPlot, ControlModeSummaryPlot, \
     CheckFlagsPlot
 from analysis.detectors import PreconditionError
@@ -292,8 +292,8 @@ def create_pdf_report(ulog: ULog, output_plot_filename: str) -> None:
         data_plot.close()
 
         # Plot the earth frame magnetic field estimates
-        declination, field_strength, inclination = magnetic_field_estimates_from_status(
-            estimator_status)
+        declination, field_strength, inclination = magnetic_field_estimates_from_states(
+            estimator_states)
         data_plot = CheckFlagsPlot(
             1e-6 * estimator_status['timestamp'],
             {'strength': field_strength, 'declination': declination, 'inclination': inclination},
