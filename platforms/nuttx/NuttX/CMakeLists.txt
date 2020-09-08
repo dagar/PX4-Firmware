@@ -228,6 +228,21 @@ if(CONFIG_NSH_LIBRARY)
 		get_target_property(STACK_MAIN ${module} STACK_MAIN)
 		get_target_property(PRIORITY ${module} PRIORITY)
 
+
+		# bdat
+		#   { "adis16448", SCHED_PRIORITY_DEFAULT, 2048, adis16448_main },
+
+		# pdat
+		#    int adis16448_main(int argc, char *argv[]);
+
+
+		set(builtin_apps_string "${builtin_apps_string}\tapps[\"${MAIN}\"] = ${MAIN}_main;\n")
+		set(builtin_apps_decl_string "${builtin_apps_decl_string}int ${MAIN}_main(int argc, char *argv[]);\n")
+		math(EXPR command_count "${command_count}+1")
+
+
+
+
 		if(MAIN)
 			add_custom_command(OUTPUT ${APPS_DIR}/builtin/registry/px4_${MAIN}_main.bdat
 				COMMAND echo "{ \"${MAIN}\", ${PRIORITY}, ${STACK_MAIN}, ${MAIN}_main }," > ${APPS_DIR}/builtin/registry/px4_${MAIN}_main.bdat

@@ -52,9 +52,6 @@ namespace px4_daemon
 
 Pxh *Pxh::_instance = nullptr;
 
-apps_map_type Pxh::_apps = {};
-
-
 Pxh::Pxh()
 {
 	_instance = this;
@@ -69,10 +66,6 @@ int Pxh::process_line(const std::string &line, bool silently_fail)
 {
 	if (line.empty()) {
 		return 0;
-	}
-
-	if (_apps.empty()) {
-		init_app_map(_apps);
 	}
 
 	std::stringstream line_stream(line);
