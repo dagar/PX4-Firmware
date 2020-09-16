@@ -76,6 +76,7 @@ px4_add_board(
 		#top
 		topic_listener
 		tune_control
+		vcmd
 		ver
 		work_queue
 	EXAMPLES
@@ -94,4 +95,3 @@ px4_add_board(
 
 message(STATUS "Building without lockstep")
 set(ENABLE_LOCKSTEP_SCHEDULER no)
-
