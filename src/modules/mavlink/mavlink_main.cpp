@@ -1257,15 +1257,15 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 		interval = -1;
 	}
 
-	for (const auto &stream : _streams) {
-		if (strcmp(stream_name, stream->get_name()) == 0) {
+	for (auto &stream : _streams) {
+		if (strcmp(stream_name, stream.get_name()) == 0) {
 			if (interval != 0) {
 				/* set new interval */
-				stream->set_interval(interval);
+				stream.set_interval(interval);
 
 			} else {
 				/* delete stream */
-				_streams.deleteNode(stream);
+				_streams.deleteNode(&stream);
 				return OK; // must finish with loop after node is deleted
 			}
 
@@ -1474,12 +1474,12 @@ Mavlink::update_rate_mult()
 	float rate = 0.0f;
 
 	/* scale down rates if their theoretical bandwidth is exceeding the link bandwidth */
-	for (const auto &stream : _streams) {
-		if (stream->const_rate()) {
-			const_rate += (stream->get_interval() > 0) ? stream->get_size_avg() * 1000000.0f / stream->get_interval() : 0;
+	for (auto &stream : _streams) {
+		if (stream.const_rate()) {
+			const_rate += (stream.get_interval() > 0) ? stream.get_size_avg() * 1000000.0f / stream.get_interval() : 0;
 
 		} else {
-			rate += (stream->get_interval() > 0) ? stream->get_size_avg() * 1000000.0f / stream->get_interval() : 0;
+			rate += (stream.get_interval() > 0) ? stream.get_size_avg() * 1000000.0f / stream.get_interval() : 0;
 		}
 	}
 
@@ -2379,18 +2379,18 @@ Mavlink::task_main(int argc, char *argv[])
 		check_requested_subscriptions();
 
 		/* update streams */
-		for (const auto &stream : _streams) {
-			stream->update(t);
+		for (auto &stream : _streams) {
+			stream.update(t);
 
 			if (!_first_heartbeat_sent) {
 				if (_mode == MAVLINK_MODE_IRIDIUM) {
-					if (stream->get_id() == MAVLINK_MSG_ID_HIGH_LATENCY2) {
-						_first_heartbeat_sent = stream->first_message_sent();
+					if (stream.get_id() == MAVLINK_MSG_ID_HIGH_LATENCY2) {
+						_first_heartbeat_sent = stream.first_message_sent();
 					}
 
 				} else {
-					if (stream->get_id() == MAVLINK_MSG_ID_HEARTBEAT) {
-						_first_heartbeat_sent = stream->first_message_sent();
+					if (stream.get_id() == MAVLINK_MSG_ID_HEARTBEAT) {
+						_first_heartbeat_sent = stream.first_message_sent();
 					}
 				}
 			}
@@ -2852,9 +2852,9 @@ Mavlink::display_status_streams()
 
 	const float rate_mult = _rate_mult;
 
-	for (const auto &stream : _streams) {
-		const int interval = stream->get_interval();
-		const unsigned size = stream->get_size();
+	for (auto &stream : _streams) {
+		const int interval = stream.get_interval();
+		const unsigned size = stream.get_size();
 		char rate_str[20];
 
 		if (interval < 0) {
@@ -2864,11 +2864,11 @@ Mavlink::display_status_streams()
 			float rate = 1000000.0f / (float)interval;
 			// Note that the actual current rate can be lower if the associated uORB topic updates at a
 			// lower rate.
-			float rate_current = stream->const_rate() ? rate : rate * rate_mult;
+			float rate_current = stream.const_rate() ? rate : rate * rate_mult;
 			snprintf(rate_str, sizeof(rate_str), "%6.2f (%.3f)", (double)rate, (double)rate_current);
 		}
 
-		printf("\t%-30s%-16s", stream->get_name(), rate_str);
+		printf("\t%-30s%-16s", stream.get_name(), rate_str);
 
 		if (size > 0) {
 			printf(" %3i\n", size);

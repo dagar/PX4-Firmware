@@ -56,13 +56,13 @@ public:
 		pthread_cond_destroy(&_cv);
 	}
 
-	void add(T newNode)
+	void add(T* newNode)
 	{
 		LockGuard lg{_mutex};
 		IntrusiveSortedList<T>::add(newNode);
 	}
 
-	bool remove(T removeNode)
+	bool remove(T* removeNode)
 	{
 		LockGuard lg{_mutex};
 		return IntrusiveSortedList<T>::remove(removeNode);

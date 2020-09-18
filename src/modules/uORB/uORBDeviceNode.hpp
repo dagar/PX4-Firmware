@@ -229,7 +229,7 @@ private:
 
 	uint8_t     *_data{nullptr};   /**< allocated object buffer */
 	px4::atomic<unsigned>  _generation{0};  /**< object generation count */
-	List<uORB::SubscriptionCallback *>	_callbacks;
+	List<uORB::SubscriptionCallback>	_callbacks;
 
 	const uint8_t _instance; /**< orb multi instance identifier */
 	bool _advertised{false};  /**< has ever been advertised (not necessarily published data yet) */

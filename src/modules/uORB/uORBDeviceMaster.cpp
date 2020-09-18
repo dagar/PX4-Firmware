@@ -219,14 +219,14 @@ int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node,
 		}
 	}
 
-	for (const auto &node : _node_list) {
+	for (auto &node : _node_list) {
 
 		++num_topics;
 
 		//check if already added
 		cur_node = *first_node;
 
-		while (cur_node && cur_node->node != node) {
+		while (cur_node && cur_node->node != &node) {
 			cur_node = cur_node->next;
 		}
 
@@ -238,7 +238,7 @@ int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node,
 			bool matched = false;
 
 			for (int i = 0; i < num_filters; ++i) {
-				if (strstr(node->get_meta()->o_name, topic_filter[i])) {
+				if (strstr(node.get_meta()->o_name, topic_filter[i])) {
 					matched = true;
 				}
 			}
@@ -260,7 +260,7 @@ int uORB::DeviceMaster::addNewDeviceNodes(DeviceNodeStatisticsData **first_node,
 			return -ENOMEM;
 		}
 
-		last_node->node = node;
+		last_node->node = &node;
 
 		size_t name_length = strlen(last_node->node->get_meta()->o_name);
 
@@ -438,10 +438,10 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const char *nodepath)
 {
 	lock();
 
-	for (uORB::DeviceNode *node : _node_list) {
-		if (strcmp(node->get_devname(), nodepath) == 0) {
+	for (auto& node : _node_list) {
+		if (strcmp(node.get_devname(), nodepath) == 0) {
 			unlock();
-			return node;
+			return &node;
 		}
 	}
 
@@ -480,9 +480,9 @@ uORB::DeviceNode *uORB::DeviceMaster::getDeviceNode(const struct orb_metadata *m
 
 uORB::DeviceNode *uORB::DeviceMaster::getDeviceNodeLocked(const struct orb_metadata *meta, const uint8_t instance)
 {
-	for (uORB::DeviceNode *node : _node_list) {
-		if ((strcmp(node->get_name(), meta->o_name) == 0) && (node->get_instance() == instance)) {
-			return node;
+	for (auto& node : _node_list) {
+		if ((strcmp(node.get_name(), meta->o_name) == 0) && (node.get_instance() == instance)) {
+			return &node;
 		}
 	}
 

@@ -54,8 +54,8 @@ MixerGroup::mix(float *outputs, unsigned space)
 {
 	unsigned index = 0;
 
-	for (auto mixer : _mixers) {
-		index += mixer->mix(outputs + index, space - index);
+	for (auto& mixer : _mixers) {
+		index += mixer.mix(outputs + index, space - index);
 
 		if (index >= space) {
 			break;
@@ -76,13 +76,13 @@ MixerGroup::set_trims(int16_t *values, unsigned n)
 {
 	unsigned index = 0;
 
-	for (auto mixer : _mixers) {
+	for (auto& mixer : _mixers) {
 		// convert from integer to float
 		// to be safe, clamp offset to range of [-500, 500] usec
 		float offset = math::constrain((float)values[index] / 10000, -1.0f, 1.0f);
 
 		debug("set trim: %d, offset: %5.3f", values[index], (double)offset);
-		index += mixer->set_trim(offset);
+		index += mixer.set_trim(offset);
 
 		if (index >= n) {
 			break;
@@ -104,9 +104,9 @@ MixerGroup::get_trims(int16_t *values)
 	unsigned index_mixer = 0;
 	unsigned index = 0;
 
-	for (auto mixer : _mixers) {
+	for (auto& mixer : _mixers) {
 		float trim = 0;
-		index_mixer += mixer->get_trim(&trim);
+		index_mixer += mixer.get_trim(&trim);
 
 		// MultirotorMixer returns the number of motors so we
 		// loop through index_mixer and set the same trim value for all motors
@@ -122,24 +122,24 @@ MixerGroup::get_trims(int16_t *values)
 void
 MixerGroup::set_thrust_factor(float val)
 {
-	for (auto mixer : _mixers) {
-		mixer->set_thrust_factor(val);
+	for (auto& mixer : _mixers) {
+		mixer.set_thrust_factor(val);
 	}
 }
 
 void
 MixerGroup::set_airmode(Mixer::Airmode airmode)
 {
-	for (auto mixer : _mixers) {
-		mixer->set_airmode(airmode);
+	for (auto& mixer : _mixers) {
+		mixer.set_airmode(airmode);
 	}
 }
 
 unsigned
 MixerGroup::get_multirotor_count()
 {
-	for (auto mixer : _mixers) {
-		unsigned rotor_count = mixer->get_multirotor_count();
+	for (auto& mixer : _mixers) {
+		unsigned rotor_count = mixer.get_multirotor_count();
 
 		if (rotor_count > 0) {
 			return rotor_count;
@@ -154,8 +154,8 @@ MixerGroup::get_saturation_status()
 {
 	uint16_t sat = 0;
 
-	for (auto mixer : _mixers) {
-		sat |= mixer->get_saturation_status();
+	for (auto& mixer : _mixers) {
+		sat |= mixer.get_saturation_status();
 	}
 
 	return sat;
@@ -164,8 +164,8 @@ MixerGroup::get_saturation_status()
 void
 MixerGroup::groups_required(uint32_t &groups)
 {
-	for (auto mixer : _mixers) {
-		mixer->groups_required(groups);
+	for (auto& mixer : _mixers) {
+		mixer.groups_required(groups);
 	}
 }
 
@@ -239,7 +239,7 @@ MixerGroup::load_from_buf(Mixer::ControlCallback control_cb, uintptr_t cb_handle
 
 void MixerGroup::set_max_delta_out_once(float delta_out_max)
 {
-	for (auto mixer : _mixers) {
-		mixer->set_max_delta_out_once(delta_out_max);
+	for (auto& mixer : _mixers) {
+		mixer.set_max_delta_out_once(delta_out_max);
 	}
 }

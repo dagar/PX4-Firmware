@@ -54,7 +54,7 @@ namespace px4
 {
 
 // list of current work queues
-static BlockingList<WorkQueue *> *_wq_manager_wqs_list{nullptr};
+static BlockingList<WorkQueue> *_wq_manager_wqs_list{nullptr};
 
 // queue of WorkQueues to be created (as threads in the wq manager task)
 static BlockingQueue<const wq_config_t *, 1> *_wq_manager_create_queue{nullptr};
@@ -73,9 +73,9 @@ FindWorkQueueByName(const char *name)
 	LockGuard lg{_wq_manager_wqs_list->mutex()};
 
 	// search list
-	for (WorkQueue *wq : *_wq_manager_wqs_list) {
-		if (strcmp(wq->get_name(), name) == 0) {
-			return wq;
+	for (WorkQueue& wq : *_wq_manager_wqs_list) {
+		if (strcmp(wq.get_name(), name) == 0) {
+			return &wq;
 		}
 	}
 
@@ -221,7 +221,7 @@ WorkQueueRunner(void *context)
 static int
 WorkQueueManagerRun(int, char **)
 {
-	_wq_manager_wqs_list = new BlockingList<WorkQueue *>();
+	_wq_manager_wqs_list = new BlockingList<WorkQueue>();
 	_wq_manager_create_queue = new BlockingQueue<const wq_config_t *, 1>();
 
 	while (!_wq_manager_should_exit.load()) {
@@ -352,8 +352,8 @@ WorkQueueManagerStop()
 
 				// ask all work queues (threads) to stop
 				// NOTE: not currently safe without all WorkItems stopping first
-				for (WorkQueue *wq : *_wq_manager_wqs_list) {
-					wq->request_stop();
+				for (auto& wq : *_wq_manager_wqs_list) {
+					wq.request_stop();
 				}
 			}
 
@@ -395,7 +395,7 @@ WorkQueueManagerStatus()
 		LockGuard lg{_wq_manager_wqs_list->mutex()};
 		size_t i = 0;
 
-		for (WorkQueue *wq : *_wq_manager_wqs_list) {
+		for (auto& wq : *_wq_manager_wqs_list) {
 			i++;
 
 			const bool last_wq = (i >= num_wqs);
@@ -407,7 +407,7 @@ WorkQueueManagerStatus()
 				PX4_INFO_RAW("\\__ %zu) ", i);
 			}
 
-			wq->print_status(last_wq);
+			wq.print_status(last_wq);
 		}
 
 	} else {

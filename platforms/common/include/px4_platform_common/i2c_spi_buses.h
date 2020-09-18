@@ -167,7 +167,7 @@ private:
 	const uint8_t _i2c_address;
 	SPIBusIterator _spi_bus_iterator;
 	I2CBusIterator _i2c_bus_iterator;
-	List<I2CSPIInstance *>::Iterator _current_instance;
+	List<I2CSPIInstance>::Iterator _current_instance;
 };
 
 /**

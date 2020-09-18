@@ -56,7 +56,7 @@ class IntrusiveSortedList
 {
 public:
 
-	void add(T newNode)
+	void add(T* newNode)
 	{
 		if (_head == nullptr) {
 			// list is empty, add as head
@@ -71,7 +71,7 @@ public:
 			}
 
 			// find last node and add to end
-			T node = _head;
+			T* node = _head;
 
 			while (node != nullptr && node->getSortedSibling() != nullptr) {
 
@@ -90,7 +90,7 @@ public:
 		}
 	}
 
-	bool remove(T removeNode)
+	bool remove(T* removeNode)
 	{
 		if (removeNode == nullptr) {
 			return false;
@@ -107,7 +107,7 @@ public:
 			return true;
 		}
 
-		for (T node = _head; node != nullptr; node = node->getSortedSibling()) {
+		for (T* node = _head; node != nullptr; node = node->getSortedSibling()) {
 			// is sibling the node to remove?
 			if (node->getSortedSibling() == removeNode) {
 				// replace sibling
@@ -128,12 +128,16 @@ public:
 	}
 
 	struct Iterator {
-		T node;
-		explicit Iterator(T v) : node(v) {}
+		T* node;
+		explicit Iterator(T* v) : node(v) {}
 
-		operator T() const { return node; }
-		operator T &() { return node; }
-		T operator* () const { return node; }
+		//operator T() const { return node; }
+		operator T &() { return *node; }
+		T& operator* () { return *node; }
+
+		bool operator==(const Iterator & other) const { return node == other.node; }
+		bool operator!=(const Iterator & other) const { return node != other.node; }
+
 		Iterator &operator++ ()
 		{
 			if (node) {
@@ -153,14 +157,14 @@ public:
 	{
 		size_t sz = 0;
 
-		for (T node = _head; node != nullptr; node = node->getSortedSibling()) {
+		for (T* node = _head; node != nullptr; node = node->getSortedSibling()) {
 			sz++;
 		}
 
 		return sz;
 	}
 
-	void deleteNode(T node)
+	void deleteNode(T* node)
 	{
 		if (remove(node)) {
 			// only delete if node was successfully removed
@@ -170,10 +174,10 @@ public:
 
 	void clear()
 	{
-		T node = _head;
+		T* node = _head;
 
 		while (node != nullptr) {
-			T next = node->getSortedSibling();
+			T* next = node->getSortedSibling();
 			delete node;
 			node = next;
 		}
@@ -183,5 +187,5 @@ public:
 
 protected:
 
-	T _head{nullptr};
+	T* _head{nullptr};
 };

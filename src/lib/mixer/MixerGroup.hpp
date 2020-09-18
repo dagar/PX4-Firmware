@@ -166,5 +166,5 @@ public:
 	unsigned			get_multirotor_count();
 
 private:
-	List<Mixer *>			_mixers;	/**< linked list of mixers */
+	List<Mixer>			_mixers;	/**< linked list of mixers */
 };

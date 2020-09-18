@@ -74,7 +74,7 @@ bool IntrusiveSortedListTest::run_tests()
 
 bool IntrusiveSortedListTest::test_add()
 {
-	IntrusiveSortedList<testContainer *> list1;
+	IntrusiveSortedList<testContainer> list1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", list1.size(), 0);
@@ -95,9 +95,9 @@ bool IntrusiveSortedListTest::test_add()
 
 	int i = 0;
 
-	for (auto t : list1) {
+	for (auto& t : list1) {
 		// verify all elements were inserted in order
-		ut_compare("stored i", i, t->i);
+		ut_compare("stored i", i, t.i);
 		i++;
 	}
 
@@ -113,7 +113,7 @@ bool IntrusiveSortedListTest::test_add()
 
 bool IntrusiveSortedListTest::test_remove()
 {
-	IntrusiveSortedList<testContainer *> list1;
+	IntrusiveSortedList<testContainer> list1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", list1.size(), 0);
@@ -138,18 +138,18 @@ bool IntrusiveSortedListTest::test_remove()
 		// find node with i == remove_i
 		testContainer *removed = nullptr;
 
-		for (auto t : list1) {
-			if (t->i == remove_i) {
-				ut_assert_true(list1.remove(t));
-				removed = t;
+		for (auto& t : list1) {
+			if (t.i == remove_i) {
+				ut_assert_true(list1.remove(&t));
+				removed = &t;
 			}
 		}
 
 		delete removed;
 
 		// iterate list again to verify removal
-		for (auto t : list1) {
-			ut_assert_true(t->i != remove_i);
+		for (auto& t : list1) {
+			ut_assert_true(t.i != remove_i);
 		}
 
 		ut_assert_true(list1.size() == 100 - remove_i - 1);
@@ -171,7 +171,7 @@ bool IntrusiveSortedListTest::test_remove()
 
 bool IntrusiveSortedListTest::test_range_based_for()
 {
-	IntrusiveSortedList<testContainer *> list1;
+	IntrusiveSortedList<testContainer> list1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", list1.size(), 0);
@@ -190,8 +190,8 @@ bool IntrusiveSortedListTest::test_range_based_for()
 	// verify all elements are in order
 	int i = 0;
 
-	for (auto t1 : list1) {
-		ut_compare("check count", i, t1->i);
+	for (auto& t1 : list1) {
+		ut_compare("check count", i, t1.i);
 		i++;
 	}
 
@@ -210,7 +210,7 @@ bool IntrusiveSortedListTest::test_range_based_for()
 
 bool IntrusiveSortedListTest::test_reinsert()
 {
-	IntrusiveSortedList<testContainer *> l1;
+	IntrusiveSortedList<testContainer> l1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", l1.size(), 0);
@@ -238,10 +238,10 @@ bool IntrusiveSortedListTest::test_reinsert()
 		// find node with i == remove_i
 		testContainer *removed = nullptr;
 
-		for (auto t : l1) {
-			if (t->i == remove_i) {
-				ut_assert_true(l1.remove(t));
-				removed = t;
+		for (auto& t : l1) {
+			if (t.i == remove_i) {
+				ut_assert_true(l1.remove(&t));
+				removed = &t;
 			}
 		}
 
@@ -249,8 +249,8 @@ bool IntrusiveSortedListTest::test_reinsert()
 		ut_assert_false(l1.empty());
 
 		// iterate list again to verify removal
-		for (auto t : l1) {
-			ut_assert_true(t->i != remove_i);
+		for (auto& t : l1) {
+			ut_assert_true(t.i != remove_i);
 		}
 
 		// size temporarily reduced by 1

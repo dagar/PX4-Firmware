@@ -82,13 +82,13 @@ protected:
 	virtual void updateParamsSubclass() {}
 
 	SuperBlock *getParent() { return _parent; }
-	List<BlockParamBase *> &getParams() { return _params; }
+	List<BlockParamBase> &getParams() { return _params; }
 
 	const char *_name;
 	SuperBlock *_parent;
 	float _dt{0.0f};
 
-	List<BlockParamBase *> _params;
+	List<BlockParamBase> _params;
 };
 
 class __EXPORT SuperBlock :
@@ -116,10 +116,10 @@ public:
 	}
 
 protected:
-	List<Block *> &getChildren() { return _children; }
+	List<Block> &getChildren() { return _children; }
 	void updateChildParams();
 
-	List<Block *> _children;
+	List<Block> _children;
 };
 
 

@@ -136,4 +136,4 @@ void SuperBlock::updateChildParams()
 
 } // namespace control
 
-template class List<control::BlockParamBase *>;
+template class List<control::BlockParamBase>;

@@ -624,15 +624,15 @@ UavcanNode::init(uavcan::NodeID node_id, UAVCAN_DRIVER::BusEvent &bus_events)
 	// Sensor bridges
 	IUavcanSensorBridge::make_all(_node, _sensor_bridges);
 
-	for (const auto &br : _sensor_bridges) {
-		ret = br->init();
+	for (auto &br : _sensor_bridges) {
+		ret = br.init();
 
 		if (ret < 0) {
-			PX4_ERR("cannot init sensor bridge '%s' (%d)", br->get_name(), ret);
+			PX4_ERR("cannot init sensor bridge '%s' (%d)", br.get_name(), ret);
 			return ret;
 		}
 
-		PX4_INFO("sensor bridge '%s' init ok", br->get_name());
+		PX4_INFO("sensor bridge '%s' init ok", br.get_name());
 	}
 
 	_mixing_interface.mixingOutput().setAllDisarmedValues(UavcanEscController::DISARMED_OUTPUT_VALUE);
@@ -956,8 +956,8 @@ UavcanNode::print_info()
 
 	// Sensor bridges
 	for (const auto &br : _sensor_bridges) {
-		printf("Sensor '%s':\n", br->get_name());
-		br->print_status();
+		printf("Sensor '%s':\n", br.get_name());
+		br.print_status();
 		printf("\n");
 	}
 

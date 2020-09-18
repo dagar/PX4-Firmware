@@ -79,7 +79,7 @@ public:
 	 * Sensor bridge factory.
 	 * Creates all known sensor bridges and puts them in the linked list.
 	 */
-	static void make_all(uavcan::INode &node, List<IUavcanSensorBridge *> &list);
+	static void make_all(uavcan::INode &node, List<IUavcanSensorBridge> &list);
 };
 
 namespace uavcan_bridge

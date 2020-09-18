@@ -170,7 +170,7 @@ void WorkQueue::print_status(bool last)
 	PX4_INFO_RAW("%-16s\n", get_name());
 	unsigned i = 0;
 
-	for (WorkItem *item : _work_items) {
+	for (auto& item : _work_items) {
 		i++;
 
 		if (last) {
@@ -187,7 +187,7 @@ void WorkQueue::print_status(bool last)
 			PX4_INFO_RAW("\\__%2d) ", i);
 		}
 
-		item->print_run_status();
+		item.print_run_status();
 	}
 }
 

@@ -71,7 +71,7 @@ bool ListTest::run_tests()
 
 bool ListTest::test_add()
 {
-	List<testContainer *> list1;
+	List<testContainer> list1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", list1.size(), 0);
@@ -92,9 +92,9 @@ bool ListTest::test_add()
 
 	int i = 0;
 
-	for (auto t : list1) {
+	for (auto& t : list1) {
 		// verify all elements were inserted in order
-		ut_compare("stored i", i, t->i);
+		ut_compare("stored i", i, t.i);
 		i++;
 	}
 
@@ -110,7 +110,7 @@ bool ListTest::test_add()
 
 bool ListTest::test_remove()
 {
-	List<testContainer *> list1;
+	List<testContainer> list1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", list1.size(), 0);
@@ -135,18 +135,18 @@ bool ListTest::test_remove()
 		// find node with i == remove_i
 		testContainer *removed = nullptr;
 
-		for (auto t : list1) {
-			if (t->i == remove_i) {
-				ut_assert_true(list1.remove(t));
-				removed = t;
+		for (auto& t : list1) {
+			if (t.i == remove_i) {
+				ut_assert_true(list1.remove(&t));
+				removed = &t;
 			}
 		}
 
 		delete removed;
 
 		// iterate list again to verify removal
-		for (auto t : list1) {
-			ut_assert_true(t->i != remove_i);
+		for (auto& t : list1) {
+			ut_assert_true(t.i != remove_i);
 		}
 
 		ut_assert_true(list1.size() == 100 - remove_i - 1);
@@ -168,7 +168,7 @@ bool ListTest::test_remove()
 
 bool ListTest::test_range_based_for()
 {
-	List<testContainer *> list1;
+	List<testContainer> list1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", list1.size(), 0);
@@ -202,8 +202,8 @@ bool ListTest::test_range_based_for()
 
 	i = 99;
 
-	for (auto t2 : list1) {
-		ut_compare("range based for i", i, t2->i);
+	for (auto& t2 : list1) {
+		ut_compare("range based for i", i, t2.i);
 		i--;
 	}
 
@@ -222,7 +222,7 @@ bool ListTest::test_range_based_for()
 
 bool ListTest::test_reinsert()
 {
-	List<testContainer *> l1;
+	List<testContainer> l1;
 
 	// size should be 0 initially
 	ut_compare("size initially 0", l1.size(), 0);
@@ -250,10 +250,10 @@ bool ListTest::test_reinsert()
 		// find node with i == remove_i
 		testContainer *removed = nullptr;
 
-		for (auto t : l1) {
-			if (t->i == remove_i) {
-				ut_assert_true(l1.remove(t));
-				removed = t;
+		for (auto& t : l1) {
+			if (t.i == remove_i) {
+				ut_assert_true(l1.remove(&t));
+				removed = &t;
 			}
 		}
 
@@ -261,8 +261,8 @@ bool ListTest::test_reinsert()
 		ut_assert_false(l1.empty());
 
 		// iterate list again to verify removal
-		for (auto t : l1) {
-			ut_assert_true(t->i != remove_i);
+		for (const auto& t : l1) {
+			ut_assert_true(t.i != remove_i);
 		}
 
 		// size temporarily reduced by 1

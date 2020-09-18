@@ -219,8 +219,8 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 	memcpy(_data + (_meta->o_size * (generation % _queue_size)), buffer, _meta->o_size);
 
 	// callbacks
-	for (auto item : _callbacks) {
-		item->call();
+	for (auto& item : _callbacks) {
+		item.call();
 	}
 
 	ATOMIC_LEAVE;
@@ -513,8 +513,8 @@ uORB::DeviceNode::register_callback(uORB::SubscriptionCallback *callback_sub)
 		ATOMIC_ENTER;
 
 		// prevent duplicate registrations
-		for (auto existing_callbacks : _callbacks) {
-			if (callback_sub == existing_callbacks) {
+		for (auto& existing_callbacks : _callbacks) {
+			if (callback_sub == &existing_callbacks) {
 				ATOMIC_LEAVE;
 				return true;
 			}

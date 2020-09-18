@@ -51,6 +51,10 @@ public:
 
 protected:
 
+	~ListNode() {
+
+	}
+
 	T _list_node_sibling{nullptr};
 
 };
@@ -60,7 +64,7 @@ class List
 {
 public:
 
-	void add(T newNode)
+	void add(T* newNode)
 	{
 		if (_head == nullptr) {
 			// list is empty, add as head
@@ -69,7 +73,7 @@ public:
 
 		} else {
 			// find last node and add to end
-			T node = _head;
+			T* node = _head;
 
 			while (node != nullptr) {
 				if (node->getSibling() == nullptr) {
@@ -83,7 +87,7 @@ public:
 		}
 	}
 
-	bool remove(T removeNode)
+	bool remove(T* removeNode)
 	{
 		if (removeNode == nullptr) {
 			return false;
@@ -100,7 +104,7 @@ public:
 			return true;
 		}
 
-		for (T node = getHead(); node != nullptr; node = node->getSibling()) {
+		for (T* node = _head; node != nullptr; node = node->getSibling()) {
 			// is sibling the node to remove?
 			if (node->getSibling() == removeNode) {
 				// replace sibling
@@ -121,12 +125,20 @@ public:
 	}
 
 	struct Iterator {
-		T node;
-		explicit Iterator(T v) : node(v) {}
+		T* node;
+		explicit Iterator(T* v) : node(v) {}
 
-		operator T() const { return node; }
-		operator T &() { return node; }
-		T operator* () const { return node; }
+		//operator T *() const { return node; }
+		operator T &() const { return *node; }
+
+		T& operator* () { return *node; }
+		//T* operator* () { return node; }
+
+		bool operator==(Iterator & other) { return node == other.node; }
+		bool operator==(const Iterator & other) const { return node == other.node; }
+		bool operator!=(const Iterator & other) const { return node != other.node; }
+
+
 		Iterator &operator++ ()
 		{
 			if (node) {
@@ -137,25 +149,25 @@ public:
 		}
 	};
 
-	Iterator begin() { return Iterator(getHead()); }
+	Iterator begin() { return Iterator(_head); }
 	Iterator end() { return Iterator(nullptr); }
 
-	const T getHead() const { return _head; }
+	T* getHead() const { return _head; }
 
-	bool empty() const { return getHead() == nullptr; }
+	bool empty() const { return _head == nullptr; }
 
 	size_t size() const
 	{
 		size_t sz = 0;
 
-		for (auto node = getHead(); node != nullptr; node = node->getSibling()) {
+		for (T* node = _head; node != nullptr; node = node->getSibling()) {
 			sz++;
 		}
 
 		return sz;
 	}
 
-	void deleteNode(T node)
+	void deleteNode(T* node)
 	{
 		if (remove(node)) {
 			// only delete if node was successfully removed
@@ -165,10 +177,10 @@ public:
 
 	void clear()
 	{
-		auto node = getHead();
+		T* node = _head;
 
 		while (node != nullptr) {
-			auto next = node->getSibling();
+			T* next = node->getSibling();
 			delete node;
 			node = next;
 		}
@@ -178,5 +190,5 @@ public:
 
 protected:
 
-	T _head{nullptr};
+	T* _head{nullptr};
 };

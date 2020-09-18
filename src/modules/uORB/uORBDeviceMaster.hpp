@@ -114,7 +114,7 @@ private:
 	 */
 	uORB::DeviceNode *getDeviceNodeLocked(const struct orb_metadata *meta, const uint8_t instance);
 
-	IntrusiveSortedList<uORB::DeviceNode *> _node_list;
+	IntrusiveSortedList<uORB::DeviceNode> _node_list;
 	AtomicBitset<ORB_TOPICS_COUNT> _node_exists[ORB_MULTI_MAX_INSTANCES];
 
 	px4_sem_t	_lock; /**< lock to protect access to all class members (also for derived classes) */

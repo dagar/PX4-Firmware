@@ -78,8 +78,8 @@ protected:
 	 */
 	virtual void updateParams()
 	{
-		for (const auto &child : _children) {
-			child->updateParams();
+		for (auto &child : _children) {
+			child.updateParams();
 		}
 
 		updateParamsImpl();
@@ -92,5 +92,5 @@ protected:
 
 private:
 	/** @list _children The module parameter list of inheriting classes. */
-	List<ModuleParams *> _children;
+	List<ModuleParams> _children;
 };

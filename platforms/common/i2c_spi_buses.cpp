@@ -46,7 +46,7 @@
 
 #include <pthread.h>
 
-static List<I2CSPIInstance *> i2c_spi_module_instances; ///< list of currently running instances
+static List<I2CSPIInstance> i2c_spi_module_instances; ///< list of currently running instances
 static pthread_mutex_t i2c_spi_module_instances_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 const char *BusCLIArguments::parseDefaultArguments(int argc, char *argv[])
@@ -243,8 +243,8 @@ bool BusInstanceIterator::next()
 		}
 
 		while (_current_instance != i2c_spi_module_instances.end()) {
-			if (strcmp((*_current_instance)->_module_name, _module_name) == 0 &&
-			    _type == (*_current_instance)->_type) {
+			if (strcmp(_current_instance.node->_module_name, _module_name) == 0 &&
+			    _type == _current_instance.node->_type) {
 				return true;
 			}
 
@@ -270,13 +270,13 @@ bool BusInstanceIterator::next()
 
 		for (_current_instance = i2c_spi_module_instances.begin(); _current_instance != i2c_spi_module_instances.end();
 		     ++_current_instance) {
-			if (strcmp((*_current_instance)->_module_name, _module_name) != 0) {
+			if (strcmp(_current_instance.node->_module_name, _module_name) != 0) {
 				continue;
 			}
 
-			if (_bus_option == (*_current_instance)->_bus_option && bus == (*_current_instance)->_bus &&
-			    _type == (*_current_instance)->_type &&
-			    (!is_i2c || _i2c_address == (*_current_instance)->_i2c_address)) {
+			if (_bus_option == _current_instance.node->_bus_option && bus == _current_instance.node->_bus &&
+			    _type == _current_instance.node->_type &&
+			    (!is_i2c || _i2c_address == _current_instance.node->_i2c_address)) {
 				break;
 			}
 		}
@@ -292,7 +292,7 @@ int BusInstanceIterator::runningInstancesCount() const
 	int num_instances = 0;
 
 	for (const auto &modules : i2c_spi_module_instances) {
-		if (strcmp(modules->_module_name, _module_name) == 0) {
+		if (strcmp(modules._module_name, _module_name) == 0) {
 			++num_instances;
 		}
 	}
@@ -306,19 +306,19 @@ I2CSPIInstance *BusInstanceIterator::instance() const
 		return nullptr;
 	}
 
-	return *_current_instance;
+	return _current_instance.node;
 }
 
 void BusInstanceIterator::removeInstance()
 {
 	// find previous node
-	List<I2CSPIInstance *>::Iterator previous = i2c_spi_module_instances.begin();
+	List<I2CSPIInstance>::Iterator previous = i2c_spi_module_instances.begin();
 
-	while (previous != i2c_spi_module_instances.end() && (*previous)->getSibling() != *_current_instance) {
+	while (previous != i2c_spi_module_instances.end() && previous.node->getSibling() != _current_instance.node) {
 		++previous;
 	}
 
-	i2c_spi_module_instances.remove(*_current_instance);
+	i2c_spi_module_instances.remove(_current_instance.node);
 	_current_instance = previous; // previous can be i2c_spi_module_instances.end(), which means we removed the first item
 }
 
