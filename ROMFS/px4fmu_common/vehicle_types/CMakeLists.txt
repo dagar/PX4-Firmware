@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,11 +31,21 @@
 #
 ############################################################################
 
+add_subdirectory(airship)
+#add_subdirectory(boat)
+add_subdirectory(fixedwing)
+#add_subdirectory(helicopter)
+add_subdirectory(multicopter)
+add_subdirectory(rover)
+add_subdirectory(uuv)
+add_subdirectory(vtol)
+
 px4_add_romfs_files(
-	rc.interface
-	rc.io
-	rc.logging
-	rcS
-	rc.sensors
-	rc.thermal_cal
+	# [0-999] Reserved (historical)"
+
+	# [1000, 1999] Simulation setups"
+	#1000_rc_fw_easystar.hil
+	#1001_rc_quad_x.hil
+	#1002_standard_vtol.hil
+	#1100_rc_quad_x_sih.hil
 )

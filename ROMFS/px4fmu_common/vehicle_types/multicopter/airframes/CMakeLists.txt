@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,10 +32,71 @@
 ############################################################################
 
 px4_add_romfs_files(
-	rc.interface
-	rc.io
-	rc.logging
-	rcS
-	rc.sensors
-	rc.thermal_cal
+	# [4000, 4999] Quadrotor x"
+	4001_quad_x
+	4003_qavr5
+	4009_qav250
+	4010_dji_f330
+	4011_dji_f450
+	4014_s500
+	4015_holybro_s500
+	4016_holybro_px4vision
+	4020_hk_micro_pcb
+	4030_3dr_solo
+	4031_3dr_quad
+	4040_reaper
+	4041_beta75x
+	4050_generic_250
+	4051_s250aq
+	4052_holybro_qav250
+	4053_holybro_kopis2
+	4060_dji_matrice_100
+	4070_aerofc
+	4071_ifo
+	4072_draco
+	4073_ifo-s
+	4080_zmr250
+	4090_nanomind
+	4100_tiltquadrotor
+	4250_teal
+	4500_clover4
+	4900_crazyflie
+
+	# [5000, 5999] Quadrotor +"
+	5001_quad_+
+
+	# [6000, 6999] Hexarotor x"
+	6001_hexa_x
+	6002_draco_r
+
+	# [7000, 7999] Hexarotor +"
+	7001_hexa_+
+
+	# [8000, 8999] Octorotor +"
+	8001_octo_x
+
+	# [9000, 9999] Octorotor +"
+	9001_octo_+
+
+	# [10000, 10999] Quadrotor Wide arm / H frame"
+	10015_tbs_discovery
+	10016_3dr_iris
+	10017_steadidrone_qu4d
+	10018_tbs_endurance
+
+	# [11000, 11999] Hexa Cox
+	11001_hexa_cox
+
+	# [12000, 12999] Octo Cox
+	12001_octo_cox
+	12002_steadidrone_mavrik
+
+	# [13000, 13999] VTOL
+
+	# [14000, 14999] Tri Y
+	14001_tri_y_yaw+
+	14002_tri_y_yaw-
+
+
+	24001_dodeca_cox
 )

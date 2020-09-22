@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2018-2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,10 +32,21 @@
 ############################################################################
 
 px4_add_romfs_files(
-	rc.interface
-	rc.io
-	rc.logging
-	rcS
-	rc.sensors
-	rc.thermal_cal
+	# [2000, 2999] Standard planes"
+	2100_standard_plane
+	2105_maja
+	2106_albatross
+	2200_mini_talon
+
+	# [3000, 3999] Flying wing"
+	3000_generic_wing
+	3030_io_camflyer
+	3031_phantom
+	3032_skywalker_x5
+	3033_wingwing
+	3034_fx79
+	3035_viper
+	3036_pigeon
+	3037_parrot_disco_mod
+	3100_tbs_caipirinha
 )

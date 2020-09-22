@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Vehicle configuration setup script.
+#
+# NOTE: Script variables are declared/initialized/unset in the rcS script.
+#
+
+source ${VEHICLE_TYPE}
+
+#
+# Generic setup (autostart ID not found).
+#
+if [ $VEHICLE_TYPE = none ]
+then
+	echo "No autostart ID found"
+	ekf2 start
+fi

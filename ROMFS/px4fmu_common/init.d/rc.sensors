@@ -95,6 +95,12 @@ then
 	paw3902 -S start
 fi
 
+# Check for flow sensor
+if param compare SENS_EN_PX4FLOW 1
+then
+	px4flow start -X
+fi
+
 # probe for optional external I2C devices
 if param compare SENS_EXT_I2C_PRB 1
 then

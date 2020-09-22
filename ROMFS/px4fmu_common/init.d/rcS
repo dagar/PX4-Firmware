@@ -480,7 +480,7 @@ else
 	# Note: rc.vehicle_setup is the entry point for rc.interface,
 	#       rc.fw_apps, rc.mc_apps, rc.rover_apps, and rc.vtol_apps.
 	#
-	. /etc/init.d/rc.vehicle_setup
+	. /etc/init.d/vehicle_types/rc.vehicle_setup
 
 	# Camera capture driver
 	if param greater -s CAM_CAP_FBACK 0
@@ -507,12 +507,6 @@ else
 	if ! param compare MNT_MODE_IN -1
 	then
 		vmount start
-	fi
-
-	# Check for flow sensor
-	if param compare SENS_EN_PX4FLOW 1
-	then
-		px4flow start -X
 	fi
 
 	# Blacksheep telemetry

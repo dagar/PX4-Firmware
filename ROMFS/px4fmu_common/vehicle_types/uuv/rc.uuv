@@ -1,0 +1,23 @@
+#!/bin/sh
+
+#
+# UUV setup
+#
+if [ $VEHICLE_TYPE = uuv ]
+then
+	if [ $MIXER = none ]
+	then
+		echo "UUV mixer undefined"
+	fi
+
+	# Load mixer and configure outputs.
+	source /etc/init.d/rc.interface
+
+	ekf2 start
+
+	# Start UUV Attitude Controller.
+	uuv_att_control start
+
+	# Start UUV Land Detector.
+	land_detector start rover
+fi

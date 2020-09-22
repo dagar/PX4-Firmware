@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# Airship setup.
+#
+if [ $VEHICLE_TYPE = airship ]
+then
+	if [ $MIXER = none ]
+	then
+		echo "VTOL mixer undefined"
+	fi
+
+	if [ $MAV_TYPE = none ]
+	then
+		# Set a default MAV_TYPE = 19 if not defined.
+		set MAV_TYPE 19
+
+		# Use mixer to detect vehicle type.
+		if [ $MIXER = firefly6 ]
+		then
+			set MAV_TYPE 21
+		fi
+		if [ $MIXER = quad_x_pusher_vtol ]
+		then
+			set MAV_TYPE 22
+		fi
+	fi
+
+	# Set the mav type parameter.
+	param set MAV_TYPE ${MAV_TYPE}
+
+	# Load mixer and configure outputs.
+	source /etc/init.d/rc.interface
+
+	ekf2 start
+
+	#
+	# Start Airship Attitude Controller.
+	#
+	airship_att_control start
+
+	#
+	# Start Land Detector.
+	#
+	land_detector start airship
+fi

@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Rover setup.
+#
+if [ $VEHICLE_TYPE = rover ]
+then
+	if [ $MIXER = none ]
+	then
+		# Set default mixer for UGV if not defined.
+		set MIXER rover_generic
+	fi
+
+	if [ $MAV_TYPE = none ]
+	then
+		# Set a default MAV_TYPE = 10 if not defined.
+		set MAV_TYPE 10
+	fi
+
+	# Set the mav type parameter.
+	param set MAV_TYPE ${MAV_TYPE}
+
+	# Load mixer and configure outputs.
+	source /etc/init.d/rc.interface
+
+	# Start standard UGV apps.
+	source /etc/init.d/rc.rover_apps
+fi

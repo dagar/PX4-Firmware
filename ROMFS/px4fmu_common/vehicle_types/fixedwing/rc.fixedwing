@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Fixed wing setup.
+#
+if [ $VEHICLE_TYPE = fw ]
+then
+	if [ $MIXER = none ]
+	then
+		# Set default mixer for fixed wing if not defined.
+		set MIXER AERT
+	fi
+
+	if [ $MAV_TYPE = none ]
+	then
+		# Set a default MAV_TYPE = 1 if not defined.
+		set MAV_TYPE 1
+	fi
+
+	# Set the mav type parameter.
+	param set MAV_TYPE ${MAV_TYPE}
+
+	# Load mixer and configure outputs.
+	source /etc/init.d/rc.interface
+
+	# Start the attitude and position estimator.
+	ekf2 start
+
+	# Start controllers
+	land_detector start fixedwing
+	fw_att_control start
+	fw_pos_control_l1 start
+	airspeed_selector start
+fi
