@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2017-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -62,27 +62,19 @@
 #include <uORB/topics/position_controller_status.h>
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/sensor_combined.h>
-#include <uORB/topics/vehicle_acceleration.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_velocity.h>
 #include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/ekf2_timestamps.h>
-#include <uORB/uORB.h>
-
-using matrix::Dcmf;
-
-using uORB::SubscriptionData;
 
 class RoverPositionControl : public ModuleBase<RoverPositionControl>, public ModuleParams
 {
 public:
 	RoverPositionControl();
 	~RoverPositionControl();
-	RoverPositionControl(const RoverPositionControl &) = delete;
-	RoverPositionControl operator=(const RoverPositionControl &other) = delete;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -96,23 +88,18 @@ public:
 	static int print_usage(const char *reason = nullptr);
 
 	/** @see ModuleBase::run() */
-	void run() override;
+	void Run() override;
 
 private:
 
-	uORB::Publication<position_controller_status_s>	_pos_ctrl_status_pub{ORB_ID(position_controller_status)};  /**< navigation capabilities publication */
-	uORB::Publication<actuator_controls_s>		_actuator_controls_pub{ORB_ID(actuator_controls_0)};  /**< actuator controls publication */
+	void parameters_update(bool force = false);
 
-	int		_control_mode_sub{-1};		/**< control mode subscription */
-	int		_global_pos_sub{-1};
-	int		_local_pos_sub{-1};
-	int		_manual_control_setpoint_sub{-1};		/**< notification of manual control updates */
-	int		_pos_sp_triplet_sub{-1};
-	int		_att_sp_sub{-1};
-	int		_vehicle_attitude_sub{-1};
-	int		_sensor_combined_sub{-1};
+	bool control_position(const matrix::Vector2f &global_pos, const matrix::Vector3f &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet);
+	void control_velocity(const matrix::Vector3f &current_velocity, const position_setpoint_triplet_s &pos_sp_triplet);
+	void control_attitude(const vehicle_attitude_s &att, const vehicle_attitude_setpoint_s &att_sp);
 
-	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
+	uORB::Publication<actuator_controls_s> _actuator_controls_pub{ORB_ID(actuator_controls_0)};
+	uORB::Publication<position_controller_status_s>	_pos_ctrl_status_pub{ORB_ID(position_controller_status)};
 
 	manual_control_setpoint_s		_manual_control_setpoint{};			    /**< r/c channel data */
 	position_setpoint_triplet_s		_pos_sp_triplet{};		/**< triplet of mission items */
@@ -120,11 +107,17 @@ private:
 	vehicle_control_mode_s			_control_mode{};		/**< control mode */
 	vehicle_global_position_s		_global_pos{};			/**< global vehicle position */
 	vehicle_local_position_s		_local_pos{};			/**< global vehicle position */
-	actuator_controls_s				_act_controls{};		/**< direct control of actuators */
-	vehicle_attitude_s				_vehicle_att{};
-	sensor_combined_s				_sensor_combined{};
+	actuator_controls_s			_act_controls{};		/**< direct control of actuators */
 
-	SubscriptionData<vehicle_acceleration_s>		_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
+	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
+	uORB::Subscription _position_setpoint_triplet_sub{ORB_ID(position_setpoint_triplet)};
+	uORB::Subscription _vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
+	uORB::Subscription _vehicle_attitude_setpoint_sub{ORB_ID(vehicle_attitude_setpoint)};
+	uORB::Subscription _vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
+	uORB::Subscription _vehicle_global_position_sub{ORB_ID(vehicle_global_position)};
+	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
+
+	uORB::SubscriptionData<vehicle_velocity_s> _vehicle_velocity_sub{ORB_ID(vehicle_velocity)};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
 
@@ -135,20 +128,19 @@ private:
 	PID_t _speed_ctrl{};
 
 	// estimator reset counters
-	uint8_t _pos_reset_counter{0};		// captures the number of times the estimator has reset the horizontal position
+	uint8_t _pos_reset_counter{0}; // captures the number of times the estimator has reset the horizontal position
 
-	ECL_L1_Pos_Controller				_gnd_control;
+	ECL_L1_Pos_Controller _gnd_control;
 
 	enum UGV_POSCTRL_MODE {
 		UGV_POSCTRL_MODE_AUTO,
 		UGV_POSCTRL_MODE_OTHER
-	} _control_mode_current{UGV_POSCTRL_MODE_OTHER};			///< used to check the mode in the last control loop iteration. Use to check if the last iteration was in the same mode.
-
+	} _control_mode_current{UGV_POSCTRL_MODE_OTHER}; ///< used to check the mode in the last control loop iteration. Use to check if the last iteration was in the same mode.
 
 	enum POS_CTRLSTATES {
 		GOTO_WAYPOINT,
 		STOPPING
-	} _pos_ctrl_state {STOPPING};			/// Position control state machine
+	} _pos_ctrl_state{STOPPING}; /// Position control state machine
 
 	/* previous waypoint */
 	matrix::Vector2f _prev_wp{0.0f, 0.0f};
@@ -176,24 +168,4 @@ private:
 		(ParamFloat<px4::params::GND_MAX_ANG>) _param_max_turn_angle,
 		(ParamFloat<px4::params::NAV_LOITER_RAD>) _param_nav_loiter_rad	/**< loiter radius for Rover */
 	)
-
-	/**
-	 * Update our local parameter cache.
-	 */
-	void parameters_update(bool force = false);
-
-	void		manual_control_setpoint_poll();
-	void		position_setpoint_triplet_poll();
-	void		attitude_setpoint_poll();
-	void		vehicle_control_mode_poll();
-	void 		vehicle_attitude_poll();
-
-	/**
-	 * Control position.
-	 */
-	bool		control_position(const matrix::Vector2f &global_pos, const matrix::Vector3f &ground_speed,
-					 const position_setpoint_triplet_s &_pos_sp_triplet);
-	void		control_velocity(const matrix::Vector3f &current_velocity, const position_setpoint_triplet_s &pos_sp_triplet);
-	void		control_attitude(const vehicle_attitude_s &att, const vehicle_attitude_setpoint_s &att_sp);
-
 };

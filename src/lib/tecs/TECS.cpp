@@ -55,9 +55,7 @@ static constexpr float DT_MAX = 1.0f;	///< max value of _dt allowed before a fil
  * inertial nav data is not available. It also calculates a true airspeed derivative
  * which is used by the airspeed complimentary filter.
  */
-void TECS::update_vehicle_state_estimates(float airspeed, const matrix::Dcmf &rotMat,
-		const matrix::Vector3f &accel_body, bool altitude_lock, bool in_air,
-		float altitude, float vz)
+void TECS::update_vehicle_state_estimates(float airspeed, float accel_body_x, bool in_air, float altitude, float vz)
 {
 	// calculate the time lapsed since the last update
 	uint64_t now = hrt_absolute_time();
@@ -70,7 +68,7 @@ void TECS::update_vehicle_state_estimates(float airspeed, const matrix::Dcmf &ro
 		reset_altitude = true;
 	}
 
-	if (!altitude_lock || !in_air) {
+	if (!in_air) {
 		reset_altitude = true;
 	}
 
@@ -91,10 +89,8 @@ void TECS::update_vehicle_state_estimates(float airspeed, const matrix::Dcmf &ro
 	if (PX4_ISFINITE(airspeed) && airspeed_sensor_enabled()) {
 		// Assuming the vehicle is flying X axis forward, use the X axis measured acceleration
 		// compensated for gravity to estimate the rate of change of speed
-		float speed_deriv_raw = rotMat(2, 0) * CONSTANTS_ONE_G + accel_body(0);
-
 		// Apply some noise filtering
-		_speed_derivative = 0.95f * _speed_derivative + 0.05f * speed_deriv_raw;
+		_speed_derivative = 0.95f * _speed_derivative + 0.05f * accel_body_x;
 
 	} else {
 		_speed_derivative = 0.0f;
@@ -103,7 +99,6 @@ void TECS::update_vehicle_state_estimates(float airspeed, const matrix::Dcmf &ro
 	if (!_in_air) {
 		_states_initialized = false;
 	}
-
 }
 
 void TECS::_update_speed_states(float airspeed_setpoint, float indicated_airspeed, float EAS2TAS)
@@ -176,7 +171,6 @@ void TECS::_update_speed_setpoint()
 	// calculate the demanded rate of change of speed proportional to speed error
 	// and apply performance limits
 	_TAS_rate_setpoint = constrain((_TAS_setpoint_adj - _tas_state) * _speed_error_gain, velRateMin, velRateMax);
-
 }
 
 void TECS::_update_height_setpoint(float desired, float state)
