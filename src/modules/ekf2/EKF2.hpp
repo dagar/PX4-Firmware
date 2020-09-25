@@ -126,6 +126,8 @@ private:
 	void publish_wind_estimate(const hrt_abstime &timestamp);
 	void publish_yaw_estimator_status(const hrt_abstime &timestamp);
 
+	void update_visual_odometry(ekf2_timestamps_s &ekf2_timestamps);
+
 	/*
 	 * Calculate filtered WGS84 height from estimated AMSL height
 	 */
@@ -164,10 +166,6 @@ private:
 	float   _wgs84_hgt_offset = 0;  ///< height offset between AMSL and WGS84
 
 	bool _imu_bias_reset_request{false};
-
-	// republished aligned external visual odometry
-	bool new_ev_data_received = false;
-	vehicle_odometry_s _ev_odom{};
 
 	uORB::Subscription _airdata_sub{ORB_ID(vehicle_air_data)};
 	uORB::Subscription _airspeed_sub{ORB_ID(airspeed)};
