@@ -119,6 +119,32 @@ void VehicleAirData::ParametersUpdate()
 	}
 }
 
+static float calculateAltitude(float pressure_pa, float qnh_pa = 101.325f)
+{
+	// calculate altitude using the hypsometric equation
+	const constexpr float T1 = 15.f - CONSTANTS_ABSOLUTE_NULL_CELSIUS; // temperature at base height in Kelvin
+	const constexpr float a = -6.5f / 1000.f; // temperature gradient in degrees per metre
+
+	// current pressure at MSL in kPa (QNH in Pa)
+	const float p1 = qnh_pa;
+
+	// measured pressure in kPa
+	const float p = pressure_pa * 0.001f;
+
+	/*
+	* Solve:
+	*
+	*     /        -(aR / g)     \
+	*    | (p / p1)          . T1 | - T1
+	*     \                      /
+	* h = -------------------------------  + h1
+	*                   a
+	*/
+	float baro_alt_meter = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
+
+	return baro_alt_meter;
+}
+
 void VehicleAirData::Run()
 {
 	perf_begin(_cycle_perf);
@@ -219,32 +245,15 @@ void VehicleAirData::Run()
 			// Convert from millibar to Pa and apply temperature compensation
 			out.baro_pressure_pa = 100.0f * pressure - _thermal_offset[_selected_sensor_sub_index];
 
-			// calculate altitude using the hypsometric equation
-			static constexpr float T1 = 15.0f - CONSTANTS_ABSOLUTE_NULL_CELSIUS; // temperature at base height in Kelvin
-			static constexpr float a = -6.5f / 1000.0f; // temperature gradient in degrees per metre
-
 			// current pressure at MSL in kPa (QNH in hPa)
-			const float p1 = _param_sens_baro_qnh.get() * 0.1f;
+			const float qnh = _param_sens_baro_qnh.get() * 0.1f;
 
-			// measured pressure in kPa
-			const float p = out.baro_pressure_pa * 0.001f;
-
-			/*
-			 * Solve:
-			 *
-			 *     /        -(aR / g)     \
-			 *    | (p / p1)          . T1 | - T1
-			 *     \                      /
-			 * h = -------------------------------  + h1
-			 *                   a
-			 */
-			out.baro_alt_meter = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
+			out.baro_alt_meter = calculateAltitude(out.baro_pressure_pa, qnh);
 
 			// calculate air density
 			// estimate air density assuming typical 20degC ambient temperature
 			// TODO: use air temperature if available (differential pressure sensors)
-			static constexpr float pressure_to_density = 1.0f / (CONSTANTS_AIR_GAS_CONST * (20.0f -
-					CONSTANTS_ABSOLUTE_NULL_CELSIUS));
+			static constexpr float pressure_to_density = 1.f / (CONSTANTS_AIR_GAS_CONST * (20.f - CONSTANTS_ABSOLUTE_NULL_CELSIUS));
 
 			out.rho = pressure_to_density * out.baro_pressure_pa;
 
@@ -284,10 +293,64 @@ void VehicleAirData::Run()
 		_last_failover_count = _voter.failover_count();
 	}
 
+	if (_vehicle_status_sub.updated()) {
+		vehicle_status_s vehicle_status;
+
+		if (_vehicle_status_sub.copy(&vehicle_status)) {
+			if (vehicle_status.arming_state != vehicle_status_s::ARMING_STATE_ARMED) {
+				UpdateBarometerOffsetsFromGPS();
+			}
+		}
+	}
+
 	// reschedule timeout
 	ScheduleDelayed(100_ms);
 
 	perf_end(_cycle_perf);
+}
+
+void VehicleAirData::UpdateBarometerOffsetsFromGPS()
+{
+	// find best GPS
+	bool gps_alt_found = false;
+	float min_epv = INFINITY;
+	float best_gps_altitude = 0.f;
+
+	for (auto &vehicle_gps_position_sub : _vehicle_gps_position_subs) {
+		vehicle_gps_position_s vehicle_gps_position;
+
+		if (vehicle_gps_position_sub.update(&vehicle_gps_position)) {
+			if ((vehicle_gps_position.fix_type >= 2) && (vehicle_gps_position.epv < 10)) {
+				if (vehicle_gps_position.epv < min_epv) {
+					min_epv = vehicle_gps_position.epv;
+					best_gps_altitude = vehicle_gps_position.alt;
+
+					gps_alt_found = true;
+				}
+			}
+		}
+	}
+
+	if (gps_alt_found) {
+		// bisection to find QNH such that (pressure - offset) ~= GPS altitude
+
+		static constexpr float TOLERANCE = 10; // 10 meter tolerance
+
+
+
+
+
+		_gps_pressure_offset[0] = 0;
+	}
+
+	// TODO:
+	//  - low pass pressure
+	//  - when pressure AND GPS altitude are reasonably stable => bisection to find offset
+	//  - store
+	//      - offsets per barometer to sync altitude with GPS
+	//      - baseline pressure per sensor
+	//      - GPS altitude and eph used to find offset
+	//      - repeated updates if baro pressure changes (while disarmed)
 }
 
 void VehicleAirData::PrintStatus()

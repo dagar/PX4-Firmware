@@ -46,10 +46,13 @@
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
+#include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_correction.h>
 #include <uORB/topics/vehicle_air_data.h>
+#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/vehicle_status.h>
 
 namespace sensors
 {
@@ -70,6 +73,7 @@ private:
 
 	void ParametersUpdate();
 	void SensorCorrectionsUpdate(bool force = false);
+	void UpdateBarometerOffsetsFromGPS();
 
 	static constexpr int MAX_SENSOR_COUNT = 3;
 
@@ -77,6 +81,9 @@ private:
 
 	uORB::Subscription _params_sub{ORB_ID(parameter_update)};
 	uORB::Subscription _sensor_correction_sub{ORB_ID(sensor_correction)};
+	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+
+	uORB::SubscriptionMultiArray<vehicle_gps_position_s, 3> _vehicle_gps_position_subs{ORB_ID::vehicle_gps_position};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_sub[MAX_SENSOR_COUNT] {
 		{this, ORB_ID(sensor_baro), 0},
@@ -101,6 +108,8 @@ private:
 	bool _advertised[MAX_SENSOR_COUNT] {};
 
 	float _thermal_offset[MAX_SENSOR_COUNT] {0.f, 0.f, 0.f};
+
+	float _gps_pressure_offset[MAX_SENSOR_COUNT] {};
 
 	uint8_t _priority[MAX_SENSOR_COUNT] {};
 
