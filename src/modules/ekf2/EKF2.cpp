@@ -194,22 +194,18 @@ EKF2::EKF2(int instance, const px4::wq_config_t &config, int imu, int mag, bool 
 
 EKF2::~EKF2()
 {
-	px4_lockstep_unregister_component(_lockstep_component);
+	if (!_multi_mode) {
+		px4_lockstep_unregister_component(_lockstep_component);
+	}
+
 	perf_free(_ekf_update_perf);
 }
 
 int EKF2::print_status()
 {
-	if (_multi_mode) {
-		PX4_INFO_RAW("\nEKF2 Instance: %d\n", _instance);
-	}
-
-	PX4_INFO("attitude:        %s", (_ekf.attitude_valid()) ? "valid" : "invalid");
-	PX4_INFO("local position:  %s", (_ekf.local_position_is_valid()) ? "valid" : "invalid");
-	PX4_INFO("global position: %s", (_ekf.global_position_is_valid()) ? "valid" : "invalid");
-
+	PX4_INFO_RAW("ekf2:%d attitude: %d, local position: %d, global position: %d\n", _instance, _ekf.attitude_valid(),
+		     _ekf.local_position_is_valid(), _ekf.global_position_is_valid());
 	perf_print_counter(_ekf_update_perf);
-
 	return 0;
 }
 
@@ -1206,13 +1202,13 @@ void EKF2::Run()
 		if (!_multi_mode) {
 			// publish ekf2_timestamps
 			_ekf2_timestamps_pub.publish(ekf2_timestamps);
-		}
 
-		if (_lockstep_component == -1) {
-			_lockstep_component = px4_lockstep_register_component();
-		}
+			if (_lockstep_component == -1) {
+				_lockstep_component = px4_lockstep_register_component();
+			}
 
-		px4_lockstep_progress(_lockstep_component);
+			px4_lockstep_progress(_lockstep_component);
+		}
 	}
 }
 
@@ -1423,20 +1419,6 @@ int EKF2::task_spawn(int argc, char *argv[])
 		const int multi_instances = math::min(imu_instances * mag_instances, (int)EKF2_MAX_INSTANCES);
 		int multi_instances_allocated = 0;
 
-		// Start EKF2Selector if it's not already running
-		if (_ekf2_selector.load() == nullptr) {
-			EKF2Selector *inst = new EKF2Selector();
-
-			if (inst) {
-				_ekf2_selector.store(inst);
-				inst->Start();
-
-			} else {
-				PX4_ERR("Failed to start EKF2 selector");
-				return PX4_ERROR;
-			}
-		}
-
 		// allocate EKF2 instances until all found or arming
 		uORB::SubscriptionData<vehicle_status_s> vehicle_status_sub{ORB_ID(vehicle_status)};
 
@@ -1463,7 +1445,7 @@ int EKF2::task_spawn(int argc, char *argv[])
 							EKF2 *ekf2_inst = new EKF2(instance, px4::ins_instance_to_wq(imu), imu, mag, false);
 
 							if (ekf2_inst) {
-								PX4_INFO("starting instance %d, IMU:%d (%d), MAG: %d (%d)", instance,
+								PX4_INFO("starting instance %d, IMU:%d (%d), MAG:%d (%d)", instance,
 									 imu, vehicle_imu_sub.get().accel_device_id,
 									 mag, vehicle_mag_sub.get().device_id);
 
@@ -1482,6 +1464,21 @@ int EKF2::task_spawn(int argc, char *argv[])
 					} else {
 						px4_usleep(50000); // give the sensors extra time to start
 						continue;
+					}
+				}
+			}
+
+			if (multi_instances_allocated >= 1) {
+				// Start EKF2Selector if it's not already running
+				if (_ekf2_selector.load() == nullptr) {
+					EKF2Selector *inst = new EKF2Selector();
+
+					if (inst) {
+						_ekf2_selector.store(inst);
+						inst->Start();
+
+					} else {
+						PX4_ERR("Failed to start EKF2 selector");
 					}
 				}
 			}
@@ -1508,6 +1505,8 @@ int EKF2::task_spawn(int argc, char *argv[])
 			success = true;
 		}
 	}
+
+	PX4_INFO("startup finished");
 
 	return success ? PX4_OK : PX4_ERROR;
 }
@@ -1567,6 +1566,7 @@ extern "C" __EXPORT int ekf2_main(int argc, char *argv[])
 
 			for (int i = 0; i < EKF2_MAX_INSTANCES; i++) {
 				if (_objects[i].load()) {
+					PX4_INFO_RAW("\n");
 					_objects[i].load()->print_status();
 				}
 			}
