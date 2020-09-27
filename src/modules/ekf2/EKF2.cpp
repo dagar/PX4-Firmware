@@ -696,11 +696,11 @@ void EKF2::Run()
 				odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
 				// Position of body origin in local NED frame
-				Vector3f position = _ekf.getPosition();
+				const Vector3f position = _ekf.getPosition();
 				const float lpos_x_prev = lpos.x;
 				const float lpos_y_prev = lpos.y;
-				lpos.x = (_ekf.local_position_is_valid()) ? position(0) : 0.0f;
-				lpos.y = (_ekf.local_position_is_valid()) ? position(1) : 0.0f;
+				lpos.x = position(0);
+				lpos.y = position(1);
 				lpos.z = position(2);
 
 				// Vehicle odometry position
