@@ -145,7 +145,7 @@ void MulticopterHoverThrustEstimator::Run()
 	const float dt = (local_pos.timestamp - _timestamp_last) * 1e-6f;
 	_timestamp_last = local_pos.timestamp;
 
-	if (_armed && !_landed && (dt > 0.001f) && (dt < 1.f) && PX4_ISFINITE(local_pos.az)) {
+	if (_armed && !_landed && (dt > 0.001f) && (dt < 1.f) && PX4_ISFINITE(local_pos.acceleration[2])) {
 
 		_hover_thrust_ekf.predict(dt);
 
@@ -156,7 +156,7 @@ void MulticopterHoverThrustEstimator::Run()
 				// Inform the hover thrust estimator about the measured vertical
 				// acceleration (positive acceleration is up) and the current thrust (positive thrust is up)
 				ZeroOrderHoverThrustEkf::status status;
-				_hover_thrust_ekf.fuseAccZ(-local_pos.az, -local_pos_sp.thrust[2], status);
+				_hover_thrust_ekf.fuseAccZ(-local_pos.acceleration[2], -local_pos_sp.thrust[2], status);
 
 				const bool valid = _in_air && (status.hover_thrust_var < 0.001f) && (status.innov_test_ratio < 1.f);
 				_valid_hysteresis.set_state_and_update(valid, local_pos.timestamp);

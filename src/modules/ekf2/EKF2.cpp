@@ -717,10 +717,7 @@ void EKF2::Run()
 				lpos.z_deriv = _ekf.getVerticalPositionDerivative();
 
 				// Acceleration of body origin in local frame
-				Vector3f vel_deriv = _ekf.getVelocityDerivative();
-				lpos.ax = vel_deriv(0);
-				lpos.ay = vel_deriv(1);
-				lpos.az = vel_deriv(2);
+				_ekf.getVelocityDerivative().copyTo(lpos.acceleration);
 
 				// TODO: better status reporting
 				lpos.xy_valid = _ekf.local_position_is_valid() && !_preflt_checker.hasHorizFailed();

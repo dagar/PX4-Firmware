@@ -608,9 +608,9 @@ void BlockLocalPositionEstimator::publishLocalPos()
 		// this estimator does not provide a separate vertical position time derivative estimate, so use the vertical velocity
 		_pub_lpos.get().z_deriv = xLP(X_vz);
 
-		_pub_lpos.get().ax = _u(U_ax);		// north
-		_pub_lpos.get().ay = _u(U_ay);		// east
-		_pub_lpos.get().az = _u(U_az);		// down
+		_pub_lpos.get().acceleration[0] = _u(U_ax);		// north
+		_pub_lpos.get().acceleration[1] = _u(U_ay);		// east
+		_pub_lpos.get().acceleration[2] = _u(U_az);		// down
 
 		_pub_lpos.get().xy_global = _estimatorInitialized & EST_XY;
 		_pub_lpos.get().z_global = !(_sensorTimeout & SENSOR_BARO) && _altOriginGlobal;

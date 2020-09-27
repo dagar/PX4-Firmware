@@ -195,7 +195,7 @@ float VtolType::update_and_get_backtransition_pitch_sp()
 	const Eulerf euler(Quatf(_v_att->q));
 
 	const float track = atan2f(_local_pos->velocity[1], _local_pos->velocity[0]);
-	const float accel_body_forward = cosf(track) * _local_pos->ax + sinf(track) * _local_pos->ay;
+	const float accel_body_forward = cosf(track) * _local_pos->acceleration[0] + sinf(track) * _local_pos->acceleration[1];
 
 	// get accel error, positive means decelerating too slow, need to pitch up (must reverse dec_max, as it is a positive number)
 	const float accel_error_forward = _params->back_trans_dec_sp + accel_body_forward;

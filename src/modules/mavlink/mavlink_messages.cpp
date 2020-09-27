@@ -5125,9 +5125,9 @@ protected:
 			msg.vz = lpos.velocity[2] * 1e2f;
 			msg.ind_airspeed = 0;
 			msg.true_airspeed = 0;
-			msg.xacc = lpos.ax;
-			msg.yacc = lpos.ay;
-			msg.zacc = lpos.az;
+			msg.xacc = lpos.acceleration[0];
+			msg.yacc = lpos.acceleration[1];
+			msg.zacc = lpos.acceleration[2];
 
 			mavlink_msg_hil_state_quaternion_send_struct(_mavlink->get_channel(), &msg);
 
