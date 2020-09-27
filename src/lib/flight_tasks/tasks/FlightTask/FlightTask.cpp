@@ -133,12 +133,12 @@ void FlightTask::_evaluateVehicleLocalPosition()
 
 		// velocity
 		if (_sub_vehicle_local_position.get().v_xy_valid) {
-			_velocity(0) = _sub_vehicle_local_position.get().vx;
-			_velocity(1) = _sub_vehicle_local_position.get().vy;
+			_velocity(0) = _sub_vehicle_local_position.get().velocity[0];
+			_velocity(1) = _sub_vehicle_local_position.get().velocity[1];
 		}
 
 		if (_sub_vehicle_local_position.get().v_z_valid) {
-			_velocity(2) = _sub_vehicle_local_position.get().vz;
+			_velocity(2) = _sub_vehicle_local_position.get().velocity[2];
 		}
 
 		// distance to bottom

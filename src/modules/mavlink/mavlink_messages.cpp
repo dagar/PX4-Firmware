@@ -1708,7 +1708,7 @@ protected:
 
 			mavlink_vfr_hud_t msg{};
 			msg.airspeed = airspeed_validated.equivalent_airspeed_m_s;
-			msg.groundspeed = sqrtf(lpos.vx * lpos.vx + lpos.vy * lpos.vy);
+			msg.groundspeed = matrix::Vector2f(lpos.velocity).norm();
 			msg.heading = math::degrees(wrap_2pi(lpos.heading));
 
 			if (armed.armed) {
@@ -1745,7 +1745,7 @@ protected:
 			}
 
 			if (lpos.v_z_valid) {
-				msg.climb = -lpos.vz;
+				msg.climb = -lpos.velocity[2];
 			}
 
 			mavlink_msg_vfr_hud_send_struct(_mavlink->get_channel(), &msg);
@@ -2221,14 +2221,14 @@ protected:
 				float evv = 0.0f;
 
 				if (local_pos.v_xy_valid) {
-					msg.vx = local_pos.vx * 100.0f;
-					msg.vy = local_pos.vy * 100.0f;
+					msg.vx = local_pos.velocity[0] * 100.0f;
+					msg.vy = local_pos.velocity[1] * 100.0f;
 					evh = local_pos.evh;
 					msg.flags |= UTM_DATA_AVAIL_FLAGS_HORIZONTAL_VELO_AVAILABLE;
 				}
 
 				if (local_pos.v_z_valid) {
-					msg.vz = local_pos.vz * 100.0f;
+					msg.vz = local_pos.velocity[2] * 100.0f;
 					evv = local_pos.evv;
 					msg.flags |= UTM_DATA_AVAIL_FLAGS_VERTICAL_VELO_AVAILABLE;
 				}
@@ -2640,9 +2640,9 @@ protected:
 			msg.lat = gpos.lat * 1e7;
 			msg.lon = gpos.lon * 1e7;
 
-			msg.vx = lpos.vx * 100.0f;
-			msg.vy = lpos.vy * 100.0f;
-			msg.vz = lpos.vz * 100.0f;
+			msg.vx = lpos.velocity[0] * 100.0f;
+			msg.vy = lpos.velocity[1] * 100.0f;
+			msg.vz = lpos.velocity[2] * 100.0f;
 
 			msg.hdg = math::degrees(wrap_2pi(lpos.heading)) * 100.0f;
 
@@ -2866,9 +2866,9 @@ protected:
 			msg.x = lpos.x;
 			msg.y = lpos.y;
 			msg.z = lpos.z;
-			msg.vx = lpos.vx;
-			msg.vy = lpos.vy;
-			msg.vz = lpos.vz;
+			msg.vx = lpos.velocity[0];
+			msg.vy = lpos.velocity[1];
+			msg.vz = lpos.velocity[2];
 
 			mavlink_msg_local_position_ned_send_struct(_mavlink->get_channel(), &msg);
 
@@ -5120,9 +5120,9 @@ protected:
 			msg.lat = gpos.lat * 1e7;
 			msg.lon = gpos.lon * 1e7;
 			msg.alt = gpos.alt * 1e3f;
-			msg.vx = lpos.vx * 1e2f;
-			msg.vy = lpos.vy * 1e2f;
-			msg.vz = lpos.vz * 1e2f;
+			msg.vx = lpos.velocity[0] * 1e2f;
+			msg.vy = lpos.velocity[1] * 1e2f;
+			msg.vz = lpos.velocity[2] * 1e2f;
 			msg.ind_airspeed = 0;
 			msg.true_airspeed = 0;
 			msg.xacc = lpos.ax;

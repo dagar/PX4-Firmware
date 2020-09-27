@@ -1422,7 +1422,7 @@ FixedwingPositionControl::control_landing(const hrt_abstime &now, const Vector2f
 			_land_noreturn_vertical = true;
 
 		} else {
-			if (_local_pos.vz > 0.1f) {
+			if (_local_pos.velocity[2] > 0.1f) {
 				_flare_pitch_sp = radians(_param_fw_lnd_fl_pmin.get()) *
 						  constrain((_flare_height - (_current_altitude - terrain_alt)) / _flare_height, 0.0f, 1.0f);
 			}
@@ -1586,7 +1586,7 @@ FixedwingPositionControl::Run()
 		_vehicle_rates_sub.update();
 
 		Vector2f curr_pos((float)_current_latitude, (float)_current_longitude);
-		Vector2f ground_speed(_local_pos.vx, _local_pos.vy);
+		Vector2f ground_speed{_local_pos.velocity};
 
 		//Convert Local setpoints to global setpoints
 		if (_control_mode.flag_control_offboard_enabled) {
@@ -1778,7 +1778,7 @@ FixedwingPositionControl::tecs_update_pitch_throttle(const hrt_abstime &now, flo
 	/* update TECS vehicle state estimates */
 	_tecs.update_vehicle_state_estimates(_airspeed, _R_nb,
 					     accel_body, (_local_pos.timestamp > 0), in_air_alt_control,
-					     _current_altitude, _local_pos.vz);
+					     _current_altitude, _local_pos.velocity[2]);
 
 	/* scale throttle cruise by baro pressure */
 	if (_param_fw_thr_alt_scl.get() > FLT_EPSILON) {

@@ -194,7 +194,7 @@ float VtolType::update_and_get_backtransition_pitch_sp()
 	const float pitch_lim = 0.3f;
 	const Eulerf euler(Quatf(_v_att->q));
 
-	const float track = atan2f(_local_pos->vy, _local_pos->vx);
+	const float track = atan2f(_local_pos->velocity[1], _local_pos->velocity[0]);
 	const float accel_body_forward = cosf(track) * _local_pos->ax + sinf(track) * _local_pos->ay;
 
 	// get accel error, positive means decelerating too slow, need to pitch up (must reverse dec_max, as it is a positive number)
@@ -259,7 +259,8 @@ void VtolType::check_quadchute_condition()
 
 			} else {
 				const bool height_error = _local_pos->z_valid && ((-_local_pos_sp->z - -_local_pos->z) > _params->fw_alt_err);
-				const bool height_rate_error = _local_pos->v_z_valid && (_local_pos->vz > 1.0f) && (_local_pos->z_deriv > 1.0f);
+				const bool height_rate_error = _local_pos->v_z_valid && (_local_pos->velocity[2] > 1.0f)
+							       && (_local_pos->z_deriv > 1.0f);
 
 				if (height_error && height_rate_error) {
 					_attc->abort_front_transition("QuadChute: large altitude error");

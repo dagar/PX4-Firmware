@@ -705,16 +705,13 @@ void EKF2::Run()
 				odom.z = lpos.z;
 
 				// Velocity of body origin in local NED frame (m/s)
-				const Vector3f velocity = _ekf.getVelocity();
-				lpos.vx = velocity(0);
-				lpos.vy = velocity(1);
-				lpos.vz = velocity(2);
+				_ekf.getVelocity().copyTo(lpos.velocity);
 
 				// Vehicle odometry linear velocity
 				odom.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
-				odom.vx = lpos.vx;
-				odom.vy = lpos.vy;
-				odom.vz = lpos.vz;
+				odom.vx = lpos.velocity[0];
+				odom.vy = lpos.velocity[1];
+				odom.vz = lpos.velocity[2];
 
 				// vertical position time derivative (m/s)
 				lpos.z_deriv = _ekf.getVerticalPositionDerivative();

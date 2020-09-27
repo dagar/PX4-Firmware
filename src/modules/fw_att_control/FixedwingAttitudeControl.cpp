@@ -448,7 +448,7 @@ void FixedwingAttitudeControl::Run()
 				/* Use min airspeed to calculate ground speed scaling region.
 				* Don't scale below gspd_scaling_trim
 				*/
-				float groundspeed = sqrtf(_local_pos.vx * _local_pos.vx + _local_pos.vy * _local_pos.vy);
+				float groundspeed = matrix::Vector2f(_local_pos.velocity).norm();
 				float gspd_scaling_trim = (_param_fw_airspd_min.get() * 0.6f);
 				float groundspeed_scaler = gspd_scaling_trim / ((groundspeed < gspd_scaling_trim) ? gspd_scaling_trim : groundspeed);
 

@@ -174,13 +174,13 @@ bool MulticopterLandDetector::_get_ground_contact_state()
 			max_climb_rate = _param_lndmc_z_vel_max.get() * 2.5f;
 		}
 
-		vertical_movement = (fabsf(_vehicle_local_position.vz) > max_climb_rate);
+		vertical_movement = (fabsf(_vehicle_local_position.velocity[2]) > max_climb_rate);
 	}
 
 
 	// Check if we are moving horizontally.
 	if (lpos_available && _vehicle_local_position.v_xy_valid) {
-		const Vector2f v_xy{_vehicle_local_position.vx, _vehicle_local_position.vy};
+		const Vector2f v_xy{_vehicle_local_position.velocity};
 		_horizontal_movement = v_xy.longerThan(_param_lndmc_xy_vel_max.get());
 
 	} else {

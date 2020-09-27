@@ -20,10 +20,7 @@ uint8 xy_reset_counter
 float32 delta_z
 uint8 z_reset_counter
 
-# Velocity in NED frame
-float32 vx 				# North velocity in NED earth-fixed frame, (metres/sec)
-float32 vy				# East velocity in NED earth-fixed frame, (metres/sec)
-float32 vz				# Down velocity in NED earth-fixed frame, (metres/sec)
+float32[3] velocity                     # Velocity in NED earth-fixed frame, (metres/sec)
 float32 z_deriv				# Down position time derivative in NED earth-fixed frame, (metres/sec)
 
 # Velocity reset delta

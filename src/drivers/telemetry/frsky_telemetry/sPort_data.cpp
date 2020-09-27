@@ -207,7 +207,7 @@ void sPort_send_SPD(int uart)
 	const vehicle_local_position_s &local_pos = s_port_subscription_data->vehicle_local_position_sub.get();
 
 	/* send data for A2 */
-	float speed = sqrtf(local_pos.vx * local_pos.vx + local_pos.vy * local_pos.vy);
+	float speed = matrix::Vector2f(local_pos.velocity).norm();
 	uint32_t ispeed = (int)(10 * speed);
 	sPort_send_data(uart, SMARTPORT_ID_GPS_SPD, ispeed);
 }
@@ -300,7 +300,7 @@ void sPort_send_GPS_SPD(int uart)
 	const vehicle_local_position_s &local_pos = s_port_subscription_data->vehicle_local_position_sub.get();
 
 	/* send 100 * knots */
-	float speed = sqrtf(local_pos.vx * local_pos.vx + local_pos.vy * local_pos.vy);
+	float speed = matrix::Vector2f(local_pos.velocity).norm();
 	uint32_t ispeed = (int)(1944 * speed);
 	sPort_send_data(uart, SMARTPORT_ID_GPS_SPD, ispeed);
 }

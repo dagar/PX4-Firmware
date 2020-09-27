@@ -306,9 +306,9 @@ AirspeedModule::Run()
 		/* Prepare data for airspeed_validator */
 		struct airspeed_validator_update_data input_data = {};
 		input_data.timestamp = _time_now_usec;
-		input_data.lpos_vx = _vehicle_local_position.vx;
-		input_data.lpos_vy = _vehicle_local_position.vy;
-		input_data.lpos_vz = _vehicle_local_position.vz;
+		input_data.lpos_vx = _vehicle_local_position.velocity[0];
+		input_data.lpos_vy = _vehicle_local_position.velocity[1];
+		input_data.lpos_vz = _vehicle_local_position.velocity[2];
 		input_data.lpos_valid = _vehicle_local_position_valid;
 		input_data.lpos_evh = _vehicle_local_position.evh;
 		input_data.lpos_evv = _vehicle_local_position.evv;
@@ -451,11 +451,8 @@ void AirspeedModule::update_wind_estimator_sideslip()
 	_wind_estimator_sideslip.update(_time_now_usec);
 
 	if (_vehicle_local_position_valid && att_valid) {
-		Vector3f vI(_vehicle_local_position.vx, _vehicle_local_position.vy, _vehicle_local_position.vz);
-		Quatf q(_vehicle_attitude.q);
-
-		/* sideslip fusion */
-		_wind_estimator_sideslip.fuse_beta(_time_now_usec, vI, q);
+		// sideslip fusion
+		_wind_estimator_sideslip.fuse_beta(_time_now_usec, Vector3f{_vehicle_local_position.velocity}, Quatf{_vehicle_attitude.q});
 	}
 
 	/* fill message for publishing later */
@@ -478,9 +475,9 @@ void AirspeedModule::update_wind_estimator_sideslip()
 void AirspeedModule::update_ground_minus_wind_airspeed()
 {
 	/* calculate airspeed estimate based on groundspeed-windspeed to use as fallback */
-	float TAS_north = _vehicle_local_position.vx - _wind_estimate_sideslip.windspeed_north;
-	float TAS_east = _vehicle_local_position.vy - _wind_estimate_sideslip.windspeed_east;
-	float TAS_down = _vehicle_local_position.vz; // no wind estimate in z
+	float TAS_north = _vehicle_local_position.velocity[0] - _wind_estimate_sideslip.windspeed_north;
+	float TAS_east = _vehicle_local_position.velocity[1] - _wind_estimate_sideslip.windspeed_east;
+	float TAS_down = _vehicle_local_position.velocity[2]; // no wind estimate in z
 	_ground_minus_wind_TAS = sqrtf(TAS_north * TAS_north + TAS_east * TAS_east + TAS_down * TAS_down);
 	_ground_minus_wind_EAS = calc_EAS_from_TAS(_ground_minus_wind_TAS, _vehicle_air_data.baro_pressure_pa,
 				 _vehicle_air_data.baro_temp_celcius);

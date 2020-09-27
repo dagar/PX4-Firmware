@@ -557,8 +557,8 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 		// set a best guess for previous setpoints for smooth transition
 		map_projection_project(&_map_ref, _navigator->get_position_setpoint_triplet()->current.lat,
 				       _navigator->get_position_setpoint_triplet()->current.lon, &_sp_pev(0), &_sp_pev(1));
-		_sp_pev_prev(0) = _sp_pev(0) - _navigator->get_local_position()->vx * dt;
-		_sp_pev_prev(1) = _sp_pev(1) - _navigator->get_local_position()->vy * dt;
+		_sp_pev_prev(0) = _sp_pev(0) - _navigator->get_local_position()->velocity[0] * dt;
+		_sp_pev_prev(1) = _sp_pev(1) - _navigator->get_local_position()->velocity[1] * dt;
 	}
 
 	_last_slewrate_time = now;

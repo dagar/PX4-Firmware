@@ -145,7 +145,7 @@ void Standard::update_vtol_state()
 			// transition to MC mode if transition time has passed or forward velocity drops below MPC cruise speed
 
 			const Dcmf R_to_body(Quatf(_v_att->q).inversed());
-			const Vector3f vel = R_to_body * Vector3f(_local_pos->vx, _local_pos->vy, _local_pos->vz);
+			const Vector3f vel = R_to_body * Vector3f{_local_pos->velocity};
 
 			float x_vel = vel(0);
 

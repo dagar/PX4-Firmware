@@ -222,7 +222,7 @@ void frsky_send_frame2(int uart)
 		lat_ns = (gpos.lat < 0) ? 'S' : 'N';
 		lon    = frsky_format_gps(fabsf(gpos.lon));
 		lon_ew = (gpos.lon < 0) ? 'W' : 'E';
-		speed  = sqrtf(lpos.vx * lpos.vx + lpos.vy * lpos.vy) * 25.0f / 46.0f;
+		speed  = matrix::Vector2f(lpos.velocity).norm() * 25.0f / 46.0f;
 		alt    = gpos.alt;
 	}
 

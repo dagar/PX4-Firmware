@@ -457,9 +457,9 @@ MulticopterPositionControl::set_vehicle_states(const float &vel_sp_z)
 		_states.position(2) = NAN;
 	}
 
-	if (PX4_ISFINITE(_local_pos.vx) && PX4_ISFINITE(_local_pos.vy) && _local_pos.v_xy_valid) {
-		_states.velocity(0) = _local_pos.vx;
-		_states.velocity(1) = _local_pos.vy;
+	if (PX4_ISFINITE(_local_pos.velocity[0]) && PX4_ISFINITE(_local_pos.velocity[1]) && _local_pos.v_xy_valid) {
+		_states.velocity(0) = _local_pos.velocity[0];
+		_states.velocity(1) = _local_pos.velocity[1];
 		_states.acceleration(0) = _vel_x_deriv.update(_states.velocity(0));
 		_states.acceleration(1) = _vel_y_deriv.update(_states.velocity(1));
 
@@ -471,14 +471,14 @@ MulticopterPositionControl::set_vehicle_states(const float &vel_sp_z)
 		_vel_y_deriv.reset();
 	}
 
-	if (PX4_ISFINITE(_local_pos.vz) && _local_pos.v_z_valid) {
-		_states.velocity(2) = _local_pos.vz;
+	if (PX4_ISFINITE(_local_pos.velocity[2]) && _local_pos.v_z_valid) {
+		_states.velocity(2) = _local_pos.velocity[2];
 
 		if (PX4_ISFINITE(vel_sp_z) && fabsf(vel_sp_z) > FLT_EPSILON && PX4_ISFINITE(_local_pos.z_deriv)) {
 			// A change in velocity is demanded. Set velocity to the derivative of position
 			// because it has less bias but blend it in across the landing speed range
 			float weighting = fminf(fabsf(vel_sp_z) / _param_mpc_land_speed.get(), 1.0f);
-			_states.velocity(2) = _local_pos.z_deriv * weighting + _local_pos.vz * (1.0f - weighting);
+			_states.velocity(2) = _local_pos.z_deriv * weighting + _local_pos.velocity[2] * (1.0f - weighting);
 		}
 
 		_states.acceleration(2) = _vel_z_deriv.update(-_states.velocity(2));

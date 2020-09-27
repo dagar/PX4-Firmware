@@ -4142,7 +4142,7 @@ void Commander::estimator_check(const vehicle_status_flags_s &vstatus_flags)
 			} else {
 				// if nav status is unconfirmed, confirm yaw angle as passed after 30 seconds or achieving 5 m/s of speed
 				const bool sufficient_time = (hrt_elapsed_time(&_time_at_takeoff) > 30_s);
-				const bool sufficient_speed = (lpos.vx * lpos.vx + lpos.vy * lpos.vy > 25.0f);
+				const bool sufficient_speed = (matrix::Vector2f(lpos.velocity).norm_squared() > 25.0f);
 
 				bool innovation_pass = estimator_status.vel_test_ratio < 1.0f && estimator_status.pos_test_ratio < 1.0f;
 

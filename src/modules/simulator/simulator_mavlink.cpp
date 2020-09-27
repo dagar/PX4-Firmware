@@ -480,9 +480,9 @@ void Simulator::handle_message_hil_state_quaternion(const mavlink_message_t *msg
 		hil_lpos.x = x;
 		hil_lpos.y = y;
 		hil_lpos.z = _hil_ref_alt - hil_state.alt / 1000.0f;
-		hil_lpos.vx = hil_state.vx / 100.0f;
-		hil_lpos.vy = hil_state.vy / 100.0f;
-		hil_lpos.vz = hil_state.vz / 100.0f;
+		hil_lpos.velocity[0] = hil_state.vx / 100.0f;
+		hil_lpos.velocity[1] = hil_state.vy / 100.0f;
+		hil_lpos.velocity[2] = hil_state.vz / 100.0f;
 		matrix::Eulerf euler = matrix::Quatf(hil_attitude.q);
 		hil_lpos.heading = euler.psi();
 		hil_lpos.xy_global = true;

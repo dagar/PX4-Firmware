@@ -63,15 +63,14 @@ bool FixedwingLandDetector::_get_landed_state()
 	if (hrt_elapsed_time(&_vehicle_local_position.timestamp) < 1_s) {
 
 		// Horizontal velocity complimentary filter.
-		float val = 0.97f * _velocity_xy_filtered + 0.03f * sqrtf(_vehicle_local_position.vx * _vehicle_local_position.vx +
-				_vehicle_local_position.vy * _vehicle_local_position.vy);
+		float val = 0.97f * _velocity_xy_filtered + 0.03f * matrix::Vector2f(_vehicle_local_position.velocity).norm();
 
 		if (PX4_ISFINITE(val)) {
 			_velocity_xy_filtered = val;
 		}
 
 		// Vertical velocity complimentary filter.
-		val = 0.99f * _velocity_z_filtered + 0.01f * fabsf(_vehicle_local_position.vz);
+		val = 0.99f * _velocity_z_filtered + 0.01f * fabsf(_vehicle_local_position.velocity[2]);
 
 		if (PX4_ISFINITE(val)) {
 			_velocity_z_filtered = val;

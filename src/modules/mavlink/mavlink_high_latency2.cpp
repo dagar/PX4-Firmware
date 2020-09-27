@@ -500,8 +500,8 @@ void MavlinkStreamHighLatency2::update_local_position()
 	vehicle_local_position_s local_pos;
 
 	if (_local_pos_sub.update(&local_pos)) {
-		_climb_rate.add_value(fabsf(local_pos.vz), _update_rate_filtered);
-		_groundspeed.add_value(sqrtf(local_pos.vx * local_pos.vx + local_pos.vy * local_pos.vy), _update_rate_filtered);
+		_climb_rate.add_value(fabsf(local_pos.velocity[2]), _update_rate_filtered);
+		_groundspeed.add_value(matrix::Vector2f(local_pos.velocity).norm(), _update_rate_filtered);
 	}
 }
 

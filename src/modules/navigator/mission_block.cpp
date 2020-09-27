@@ -339,8 +339,7 @@ MissionBlock::is_mission_item_reached()
 			if (_mission_item.vtol_back_transition
 			    && _navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING) {
 
-				float velocity = sqrtf(_navigator->get_local_position()->vx * _navigator->get_local_position()->vx +
-						       _navigator->get_local_position()->vy * _navigator->get_local_position()->vy);
+				const float velocity = matrix::Vector2f(_navigator->get_local_position()->velocity).norm();
 
 				const float back_trans_dec = _navigator->get_vtol_back_trans_deceleration();
 				const float reverse_delay = _navigator->get_vtol_reverse_delay();
@@ -373,13 +372,18 @@ MissionBlock::is_mission_item_reached()
 		    || ((_mission_item.nav_cmd == NAV_CMD_LOITER_TO_ALT) && _mission_item.force_heading
 			&& PX4_ISFINITE(_mission_item.yaw))) {
 
-			/* check course if defined only for rotary wing except takeoff */
-			float cog = (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) ?
-				    _navigator->get_local_position()->heading :
-				    atan2f(
-					    _navigator->get_local_position()->vy,
-					    _navigator->get_local_position()->vx
-				    );
+			// check course if defined only for rotary wing except takeoff
+			float cog = 0.f;
+
+			if (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
+				cog = _navigator->get_local_position()->heading;
+
+			} else {
+				cog = atan2f(
+					      _navigator->get_local_position()->velocity[1],
+					      _navigator->get_local_position()->velocity[0]
+				      );
+			}
 
 			float yaw_err = wrap_pi(_mission_item.yaw - cog);
 

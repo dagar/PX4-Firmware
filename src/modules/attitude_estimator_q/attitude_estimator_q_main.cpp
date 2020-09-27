@@ -330,7 +330,7 @@ AttitudeEstimatorQ::Run()
 				    && lpos.v_xy_valid && lpos.v_z_valid && (lpos.eph < 5.0f) && _inited) {
 
 					/* position data is actual */
-					const Vector3f vel(lpos.vx, lpos.vy, lpos.vz);
+					const Vector3f vel{lpos.velocity};
 
 					/* velocity updated */
 					if (_vel_prev_t != 0 && lpos.timestamp != _vel_prev_t) {

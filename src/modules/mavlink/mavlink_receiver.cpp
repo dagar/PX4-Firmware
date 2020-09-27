@@ -2616,9 +2616,9 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		hil_local_pos.x = x;
 		hil_local_pos.y = y;
 		hil_local_pos.z = _hil_local_alt0 - hil_state.alt / 1000.0f;
-		hil_local_pos.vx = hil_state.vx / 100.0f;
-		hil_local_pos.vy = hil_state.vy / 100.0f;
-		hil_local_pos.vz = hil_state.vz / 100.0f;
+		hil_local_pos.velocity[0] = hil_state.vx / 100.0f;
+		hil_local_pos.velocity[1] = hil_state.vy / 100.0f;
+		hil_local_pos.velocity[2] = hil_state.vz / 100.0f;
 
 		matrix::Eulerf euler{matrix::Quatf(hil_state.attitude_quaternion)};
 		hil_local_pos.heading = euler.psi();

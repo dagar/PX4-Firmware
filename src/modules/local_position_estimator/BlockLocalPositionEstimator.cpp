@@ -601,9 +601,9 @@ void BlockLocalPositionEstimator::publishLocalPos()
 
 		_pub_lpos.get().heading = matrix::Eulerf(matrix::Quatf(_sub_att.get().q)).psi();
 
-		_pub_lpos.get().vx = xLP(X_vx);		// north
-		_pub_lpos.get().vy = xLP(X_vy);		// east
-		_pub_lpos.get().vz = xLP(X_vz);		// down
+		_pub_lpos.get().velocity[0] = xLP(X_vx);		// north
+		_pub_lpos.get().velocity[1] = xLP(X_vy);		// east
+		_pub_lpos.get().velocity[2] = xLP(X_vz);		// down
 
 		// this estimator does not provide a separate vertical position time derivative estimate, so use the vertical velocity
 		_pub_lpos.get().z_deriv = xLP(X_vz);
