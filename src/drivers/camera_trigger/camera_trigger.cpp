@@ -375,7 +375,7 @@ CameraTrigger::update_distance()
 	if (local.xy_valid) {
 
 		// Initialize position if not done yet
-		matrix::Vector2f current_position(local.x, local.y);
+		const matrix::Vector2f current_position(local.position);
 
 		if (!_valid_position) {
 			// First time valid position, take first shot

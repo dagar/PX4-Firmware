@@ -2613,9 +2613,9 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 		hil_local_pos.z_valid = true;
 		hil_local_pos.v_xy_valid = true;
 		hil_local_pos.v_z_valid = true;
-		hil_local_pos.x = x;
-		hil_local_pos.y = y;
-		hil_local_pos.z = _hil_local_alt0 - hil_state.alt / 1000.0f;
+		hil_local_pos.position[0] = x;
+		hil_local_pos.position[1] = y;
+		hil_local_pos.position[2] = _hil_local_alt0 - hil_state.alt / 1000.0f;
 		hil_local_pos.velocity[0] = hil_state.vx / 100.0f;
 		hil_local_pos.velocity[1] = hil_state.vy / 100.0f;
 		hil_local_pos.velocity[2] = hil_state.vz / 100.0f;

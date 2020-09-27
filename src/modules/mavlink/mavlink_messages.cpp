@@ -1732,7 +1732,7 @@ protected:
 
 			if (lpos.z_valid && lpos.z_global) {
 				/* use local position estimate */
-				msg.alt = -lpos.z + lpos.ref_alt;
+				msg.alt = -lpos.position[2] + lpos.ref_alt;
 
 			} else {
 				vehicle_air_data_s air_data{};
@@ -2607,7 +2607,7 @@ protected:
 			mavlink_global_position_int_t msg{};
 
 			if (lpos.z_valid && lpos.z_global) {
-				msg.alt = (-lpos.z + lpos.ref_alt) * 1000.0f;
+				msg.alt = (-lpos.position[2] + lpos.ref_alt) * 1000.0f;
 
 			} else {
 				// fall back to baro altitude
@@ -2624,7 +2624,7 @@ protected:
 
 			if ((home.timestamp > 0) && home.valid_alt) {
 				if (lpos.z_valid) {
-					msg.relative_alt = -(lpos.z - home.z) * 1000.0f;
+					msg.relative_alt = -(lpos.position[2] - home.z) * 1000.0f;
 
 				} else {
 					msg.relative_alt = msg.alt - (home.alt * 1000.0f);
@@ -2632,7 +2632,7 @@ protected:
 
 			} else {
 				if (lpos.z_valid) {
-					msg.relative_alt = -lpos.z * 1000.0f;
+					msg.relative_alt = -lpos.position[2] * 1000.0f;
 				}
 			}
 
@@ -2863,9 +2863,9 @@ protected:
 			mavlink_local_position_ned_t msg{};
 
 			msg.time_boot_ms = lpos.timestamp / 1000;
-			msg.x = lpos.x;
-			msg.y = lpos.y;
-			msg.z = lpos.z;
+			msg.x = lpos.position[0];
+			msg.y = lpos.position[1];
+			msg.z = lpos.position[2];
 			msg.vx = lpos.velocity[0];
 			msg.vy = lpos.velocity[1];
 			msg.vz = lpos.velocity[2];
@@ -4853,26 +4853,26 @@ protected:
 
 			if (local_pos.z_valid) {
 				if (local_pos.z_global) {
-					msg.altitude_amsl = -local_pos.z + local_pos.ref_alt;
+					msg.altitude_amsl = -local_pos.position[2] + local_pos.ref_alt;
 
 				} else {
 					msg.altitude_amsl = msg.altitude_monotonic;
 				}
 
-				msg.altitude_local = -local_pos.z;
+				msg.altitude_local = -local_pos.position[2];
 
 				home_position_s home{};
 				_home_sub.copy(&home);
 
 				if (home.valid_alt) {
-					msg.altitude_relative = -(local_pos.z - home.z);
+					msg.altitude_relative = -(local_pos.position[2] - home.z);
 
 				} else {
-					msg.altitude_relative = -local_pos.z;
+					msg.altitude_relative = -local_pos.position[2];
 				}
 
 				if (local_pos.dist_bottom_valid) {
-					msg.altitude_terrain = -local_pos.z - local_pos.dist_bottom;
+					msg.altitude_terrain = -local_pos.position[2] - local_pos.dist_bottom;
 					msg.bottom_clearance = local_pos.dist_bottom;
 				}
 			}
@@ -4958,7 +4958,7 @@ protected:
 
 			vehicle_local_position_s lpos{};
 			_local_pos_sub.copy(&lpos);
-			msg.wind_alt = (lpos.z_valid && lpos.z_global) ? (-lpos.z + lpos.ref_alt) : NAN;
+			msg.wind_alt = (lpos.z_valid && lpos.z_global) ? (-lpos.position[2] + lpos.ref_alt) : NAN;
 
 			msg.horiz_accuracy = 0.0f;
 			msg.vert_accuracy = 0.0f;

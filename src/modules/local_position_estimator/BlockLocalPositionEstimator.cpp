@@ -589,14 +589,14 @@ void BlockLocalPositionEstimator::publishLocalPos()
 		_pub_lpos.get().v_xy_valid = _estimatorInitialized & EST_XY;
 		_pub_lpos.get().v_z_valid = _estimatorInitialized & EST_Z;
 
-		_pub_lpos.get().x = xLP(X_x);	// north
-		_pub_lpos.get().y = xLP(X_y);	// east
+		_pub_lpos.get().position[0] = xLP(X_x);	// north
+		_pub_lpos.get().position[1] = xLP(X_y);	// east
 
 		if (_param_lpe_fusion.get() & FUSE_PUB_AGL_Z) {
-			_pub_lpos.get().z = -_aglLowPass.getState();	// agl
+			_pub_lpos.get().position[2] = -_aglLowPass.getState();	// agl
 
 		} else {
-			_pub_lpos.get().z = xLP(X_z);	// down
+			_pub_lpos.get().position[2] = xLP(X_z);	// down
 		}
 
 		_pub_lpos.get().heading = matrix::Eulerf(matrix::Quatf(_sub_att.get().q)).psi();

@@ -485,8 +485,8 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 
 		// if we're already in this state, only want to make it invalid if we reached the target but can't see it anymore
 		if (_state == PrecLandState::HorizontalApproach) {
-			if (fabsf(_target_pose.x_abs - vehicle_local_position->x) < _param_pld_hacc_rad.get()
-			    && fabsf(_target_pose.y_abs - vehicle_local_position->y) < _param_pld_hacc_rad.get()) {
+			if (fabsf(_target_pose.x_abs - vehicle_local_position->position[0]) < _param_pld_hacc_rad.get()
+			    && fabsf(_target_pose.y_abs - vehicle_local_position->position[1]) < _param_pld_hacc_rad.get()) {
 				// we've reached the position where we last saw the target. If we don't see it now, we need to do something
 				return _target_pose_valid && _target_pose.abs_pos_valid;
 
@@ -515,13 +515,13 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		} else {
 			// if not already in this state, need to be above target to enter it
 			return _target_pose_updated && _target_pose.abs_pos_valid
-			       && fabsf(_target_pose.x_abs - vehicle_local_position->x) < _param_pld_hacc_rad.get()
-			       && fabsf(_target_pose.y_abs - vehicle_local_position->y) < _param_pld_hacc_rad.get();
+			       && fabsf(_target_pose.x_abs - vehicle_local_position->position[0]) < _param_pld_hacc_rad.get()
+			       && fabsf(_target_pose.y_abs - vehicle_local_position->position[1]) < _param_pld_hacc_rad.get();
 		}
 
 	case PrecLandState::FinalApproach:
 		return _target_pose_valid && _target_pose.abs_pos_valid
-		       && (_target_pose.z_abs - vehicle_local_position->z) < _param_pld_fappr_alt.get();
+		       && (_target_pose.z_abs - vehicle_local_position->position[2]) < _param_pld_fappr_alt.get();
 
 	case PrecLandState::Search:
 		return true;

@@ -436,7 +436,7 @@ FixedwingPositionControl::get_waypoint_heading_distance(float heading, position_
 float
 FixedwingPositionControl::get_terrain_altitude_takeoff(float takeoff_alt)
 {
-	float terrain_alt = _local_pos.ref_alt - (_local_pos.dist_bottom + _local_pos.z);
+	float terrain_alt = _local_pos.ref_alt - (_local_pos.dist_bottom + _local_pos.position[2]);
 
 	if (PX4_ISFINITE(terrain_alt) && _local_pos.dist_bottom_valid) {
 		return terrain_alt;
@@ -1327,7 +1327,7 @@ FixedwingPositionControl::control_landing(const hrt_abstime &now, const Vector2f
 	if (_param_fw_lnd_useter.get() == 1) {
 		if (_local_pos.dist_bottom_valid) {
 			// all good, have valid terrain altitude
-			float terrain_vpos = _local_pos.dist_bottom + _local_pos.z;
+			float terrain_vpos = _local_pos.dist_bottom + _local_pos.position[2];
 			terrain_alt = (_local_pos.ref_alt - terrain_vpos);
 			_t_alt_prev_valid = terrain_alt;
 			_time_last_t_alt = now;
@@ -1551,7 +1551,7 @@ FixedwingPositionControl::Run()
 			_current_longitude = gpos.lon;
 		}
 
-		_current_altitude = -_local_pos.z + _local_pos.ref_alt; // Altitude AMSL in meters
+		_current_altitude = -_local_pos.position[2] + _local_pos.ref_alt; // Altitude AMSL in meters
 
 		// handle estimator reset events. we only adjust setpoins for manual modes
 		if (_control_mode.flag_control_manual_enabled) {

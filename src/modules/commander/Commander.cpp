@@ -1210,9 +1210,9 @@ Commander::set_home_position()
 			home.alt = gpos.alt;
 			home.valid_alt = true;
 
-			home.x = lpos.x;
-			home.y = lpos.y;
-			home.z = lpos.z;
+			home.x = lpos.position[0];
+			home.y = lpos.position[1];
+			home.z = lpos.position[2];
 
 			home.yaw = lpos.heading;
 			_heading_reset_counter = lpos.heading_reset_counter;
@@ -2291,7 +2291,7 @@ Commander::run()
 						float home_dist_xy = -1.0f;
 						float home_dist_z = -1.0f;
 						mavlink_wpm_distance_to_point_local(_home_pub.get().x, _home_pub.get().y, _home_pub.get().z,
-										    local_position.x, local_position.y, local_position.z,
+										    local_position.position[0], local_position.position[1], local_position.position[2],
 										    &home_dist_xy, &home_dist_z);
 
 						if ((home_dist_xy > local_position.eph * 2.0f) || (home_dist_z > local_position.epv * 2.0f)) {

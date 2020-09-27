@@ -123,12 +123,12 @@ void FlightTask::_evaluateVehicleLocalPosition()
 
 		// position
 		if (_sub_vehicle_local_position.get().xy_valid) {
-			_position(0) = _sub_vehicle_local_position.get().x;
-			_position(1) = _sub_vehicle_local_position.get().y;
+			_position(0) = _sub_vehicle_local_position.get().position[0];
+			_position(1) = _sub_vehicle_local_position.get().position[1];
 		}
 
 		if (_sub_vehicle_local_position.get().z_valid) {
-			_position(2) = _sub_vehicle_local_position.get().z;
+			_position(2) = _sub_vehicle_local_position.get().position[2];
 		}
 
 		// velocity

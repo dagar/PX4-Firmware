@@ -692,17 +692,14 @@ void EKF2::Run()
 				odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
 				// Position of body origin in local NED frame
-				Vector3f position = _ekf.getPosition();
-				const float lpos_x_prev = lpos.x;
-				const float lpos_y_prev = lpos.y;
-				lpos.x = (_ekf.local_position_is_valid()) ? position(0) : 0.0f;
-				lpos.y = (_ekf.local_position_is_valid()) ? position(1) : 0.0f;
-				lpos.z = position(2);
+				const float lpos_x_prev = lpos.position[0];
+				const float lpos_y_prev = lpos.position[1];
+				_ekf.getPosition().copyTo(lpos.position);
 
 				// Vehicle odometry position
-				odom.x = lpos.x;
-				odom.y = lpos.y;
-				odom.z = lpos.z;
+				odom.x = lpos.position[0];
+				odom.y = lpos.position[1];
+				odom.z = lpos.position[2];
 
 				// Velocity of body origin in local NED frame (m/s)
 				_ekf.getVelocity().copyTo(lpos.velocity);
@@ -762,7 +759,7 @@ void EKF2::Run()
 				lpos.dist_bottom_valid = _ekf.get_terrain_valid();
 
 				float terrain_vpos = _ekf.getTerrainVertPos();
-				lpos.dist_bottom = terrain_vpos - lpos.z; // Distance to bottom surface (ground) in meters
+				lpos.dist_bottom = terrain_vpos - lpos.position[2]; // Distance to bottom surface (ground) in meters
 
 				// constrain the distance to ground to _rng_gnd_clearance
 				if (lpos.dist_bottom < _param_ekf2_min_rng.get()) {
@@ -910,13 +907,13 @@ void EKF2::Run()
 					vehicle_global_position_s &global_pos = _vehicle_global_position_pub.get();
 					global_pos.timestamp_sample = imu_sample_new.time_us;
 
-					if (fabsf(lpos_x_prev - lpos.x) > FLT_EPSILON || fabsf(lpos_y_prev - lpos.y) > FLT_EPSILON) {
-						map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
+					if (fabsf(lpos_x_prev - lpos.position[0]) > FLT_EPSILON || fabsf(lpos_y_prev - lpos.position[1]) > FLT_EPSILON) {
+						map_projection_reproject(&ekf_origin, lpos.position[0], lpos.position[1], &global_pos.lat, &global_pos.lon);
 					}
 
 					global_pos.lat_lon_reset_counter = lpos.xy_reset_counter;
 
-					global_pos.alt = -lpos.z + lpos.ref_alt; // Altitude AMSL in meters
+					global_pos.alt = -lpos.position[2] + lpos.ref_alt; // Altitude AMSL in meters
 					global_pos.alt_ellipsoid = filter_altitude_ellipsoid(global_pos.alt);
 
 					// global altitude has opposite sign of local down position

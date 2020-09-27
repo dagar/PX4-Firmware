@@ -442,16 +442,16 @@ MulticopterPositionControl::set_vehicle_states(const float &vel_sp_z)
 	}
 
 	// only set position states if valid and finite
-	if (PX4_ISFINITE(_local_pos.x) && PX4_ISFINITE(_local_pos.y) && _local_pos.xy_valid) {
-		_states.position(0) = _local_pos.x;
-		_states.position(1) = _local_pos.y;
+	if (PX4_ISFINITE(_local_pos.position[0]) && PX4_ISFINITE(_local_pos.position[1]) && _local_pos.xy_valid) {
+		_states.position(0) = _local_pos.position[0];
+		_states.position(1) = _local_pos.position[1];
 
 	} else {
 		_states.position(0) = _states.position(1) = NAN;
 	}
 
-	if (PX4_ISFINITE(_local_pos.z) && _local_pos.z_valid) {
-		_states.position(2) = _local_pos.z;
+	if (PX4_ISFINITE(_local_pos.position[2]) && _local_pos.z_valid) {
+		_states.position(2) = _local_pos.position[2];
 
 	} else {
 		_states.position(2) = NAN;

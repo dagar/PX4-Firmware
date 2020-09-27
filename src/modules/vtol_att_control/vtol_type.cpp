@@ -235,7 +235,7 @@ void VtolType::check_quadchute_condition()
 		// fixed-wing minimum altitude
 		if (_params->fw_min_alt > FLT_EPSILON) {
 
-			if (-(_local_pos->z) < _params->fw_min_alt) {
+			if (-(_local_pos->position[2]) < _params->fw_min_alt) {
 				_attc->abort_front_transition("QuadChute: Minimum altitude breached");
 			}
 		}
@@ -258,7 +258,7 @@ void VtolType::check_quadchute_condition()
 				}
 
 			} else {
-				const bool height_error = _local_pos->z_valid && ((-_local_pos_sp->z - -_local_pos->z) > _params->fw_alt_err);
+				const bool height_error = _local_pos->z_valid && ((-_local_pos_sp->z - -_local_pos->position[2]) > _params->fw_alt_err);
 				const bool height_rate_error = _local_pos->v_z_valid && (_local_pos->velocity[2] > 1.0f)
 							       && (_local_pos->z_deriv > 1.0f);
 
@@ -431,7 +431,7 @@ bool VtolType::is_channel_set(const int channel, const int target)
 float VtolType::pusher_assist()
 {
 	// Altitude above ground is distance sensor altitude if available, otherwise local z-position
-	float dist_to_ground = -_local_pos->z;
+	float dist_to_ground = -_local_pos->position[2];
 
 	if (_local_pos->dist_bottom_valid) {
 		dist_to_ground = _local_pos->dist_bottom;
