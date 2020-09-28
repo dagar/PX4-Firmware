@@ -174,10 +174,11 @@ EKF2::EKF2(int instance, const px4::wq_config_t &config, int imu, int mag, bool 
 	_visual_odometry_aligned_pub.advertise();
 
 	_ekf_gps_drift_pub.advertise();
+	_estimator_bias_imu_pub.advertise();
+	_estimator_bias_magnetometer_pub.advertise();
 	_estimator_innovation_test_ratios_pub.advertise();
 	_estimator_innovation_variances_pub.advertise();
 	_estimator_innovations_pub.advertise();
-	_estimator_sensor_bias_pub.advertise();
 	_estimator_states_pub.advertise();
 	_estimator_status_pub.advertise();
 	_wind_pub.advertise();
@@ -391,6 +392,9 @@ void EKF2::Run()
 		// publish attitude immediately (uses quaternion from output predictor)
 		publish_attitude(now);
 
+		bool mag_updated = false;
+		hrt_abstime mag_timestamp_sample = 0;
+
 		// read mag data
 		if (_magnetometer_sub.updated()) {
 			vehicle_magnetometer_s magnetometer;
@@ -438,11 +442,14 @@ void EKF2::Run()
 				mag_sample.mag(0) = magnetometer.magnetometer_ga[0] - _param_ekf2_magbias_x.get();
 				mag_sample.mag(1) = magnetometer.magnetometer_ga[1] - _param_ekf2_magbias_y.get();
 				mag_sample.mag(2) = magnetometer.magnetometer_ga[2] - _param_ekf2_magbias_z.get();
-				mag_sample.time_us = magnetometer.timestamp;
+				mag_sample.time_us = magnetometer.timestamp_sample;
 
 				_ekf.setMagData(mag_sample);
 				ekf2_timestamps.vehicle_magnetometer_timestamp_rel = (int16_t)((int64_t)magnetometer.timestamp / 100 -
 						(int64_t)ekf2_timestamps.timestamp / 100);
+
+				mag_updated = true;
+				mag_timestamp_sample = magnetometer.timestamp_sample;
 			}
 		}
 
@@ -986,35 +993,59 @@ void EKF2::Run()
 			status.timestamp = _replay_mode ? now : hrt_absolute_time();
 			_estimator_status_pub.update();
 
-			{
-				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
-				estimator_sensor_bias_s bias;
-				bias.timestamp_sample = imu_sample_new.time_us;
+			// IMU bias
+			if (((_param_ekf2_aid_mask.get() & MASK_INHIBIT_ACC_BIAS) == 0) && !status.filter_fault_flags) {
 
-				// take device ids from sensor_selection_s if not using specific vehicle_imu_s
-				bias.gyro_device_id = _estimator_status_pub.get().gyro_device_id;
-				bias.accel_device_id = _estimator_status_pub.get().accel_device_id;
-				bias.mag_device_id = _estimator_status_pub.get().mag_device_id;
+				const auto accel_bias{_ekf.getAccelBias()};
+				const auto gyro_bias{_ekf.getGyroBias()};
 
-				_ekf.getGyroBias().copyTo(bias.gyro_bias);
-				_ekf.getAccelBias().copyTo(bias.accel_bias);
+				bool accel_bias_updated = ((accel_bias - _accel_bias_last).norm_squared() > sq(0.001f));
+				bool gyro_bias_updated = ((gyro_bias - _gyro_bias_last).norm_squared() > sq(0.001f));
 
-				bias.mag_bias[0] = _last_valid_mag_cal[0];
-				bias.mag_bias[1] = _last_valid_mag_cal[1];
-				bias.mag_bias[2] = _last_valid_mag_cal[2];
+				if (accel_bias_updated || gyro_bias_updated) {
+					// publish all corrected IMU readings and bias estimates
+					estimator_bias_imu_s bias_imu;
+					bias_imu.timestamp_sample = imu_sample_new.time_us;
 
-				bias.gyro_bias_variance[0] = states.covariances[10];
-				bias.gyro_bias_variance[1] = states.covariances[11];
-				bias.gyro_bias_variance[2] = states.covariances[12];
-				bias.accel_bias_variance[0] = states.covariances[13];
-				bias.accel_bias_variance[1] = states.covariances[14];
-				bias.accel_bias_variance[2] = states.covariances[15];
-				bias.mag_bias_variance[0] = states.covariances[19];
-				bias.mag_bias_variance[1] = states.covariances[20];
-				bias.mag_bias_variance[2] = states.covariances[21];
+					// take device ids from sensor_selection_s if not using specific vehicle_imu_s
+					bias_imu.accel_device_id = _estimator_status_pub.get().accel_device_id;
+					bias_imu.gyro_device_id = _estimator_status_pub.get().gyro_device_id;
 
-				bias.timestamp = _replay_mode ? now : hrt_absolute_time();
-				_estimator_sensor_bias_pub.publish(bias);
+					accel_bias.copyTo(bias_imu.accel_bias);
+					gyro_bias.copyTo(bias_imu.gyro_bias);
+
+					bias_imu.gyro_bias_sigma[0] = sqrt(fmaxf(0.f, states.covariances[10] / EstimatorInterface::FILTER_UPDATE_PERIOD_S));
+					bias_imu.gyro_bias_sigma[1] = sqrt(fmaxf(0.f, states.covariances[11] / EstimatorInterface::FILTER_UPDATE_PERIOD_S));
+					bias_imu.gyro_bias_sigma[2] = sqrt(fmaxf(0.f, states.covariances[12] / EstimatorInterface::FILTER_UPDATE_PERIOD_S));
+					bias_imu.accel_bias_sigma[0] = sqrt(fmaxf(0.f, states.covariances[13] / EstimatorInterface::FILTER_UPDATE_PERIOD_S));
+					bias_imu.accel_bias_sigma[1] = sqrt(fmaxf(0.f, states.covariances[14] / EstimatorInterface::FILTER_UPDATE_PERIOD_S));
+					bias_imu.accel_bias_sigma[2] = sqrt(fmaxf(0.f, states.covariances[15] / EstimatorInterface::FILTER_UPDATE_PERIOD_S));
+
+					bias_imu.timestamp = _replay_mode ? now : hrt_absolute_time();
+					_estimator_bias_imu_pub.publish(bias_imu);
+
+					_accel_bias_last = accel_bias;
+					_gyro_bias_last = gyro_bias;
+				}
+			}
+
+			// magnetometer bias
+			if (mag_updated && control_status.flags.mag_3D && !status.filter_fault_flags) {
+				// publish bias estimates after mag calibration is updated above
+				estimator_bias_magnetometer_s bias_magnetometer{};
+				bias_magnetometer.timestamp_sample = mag_timestamp_sample;
+				bias_magnetometer.mag_device_id = _estimator_status_pub.get().mag_device_id;
+
+				bias_magnetometer.mag_bias[0] = _last_valid_mag_cal[0];
+				bias_magnetometer.mag_bias[1] = _last_valid_mag_cal[1];
+				bias_magnetometer.mag_bias[2] = _last_valid_mag_cal[2];
+
+				bias_magnetometer.mag_bias_variance[0] = states.covariances[19];
+				bias_magnetometer.mag_bias_variance[1] = states.covariances[20];
+				bias_magnetometer.mag_bias_variance[2] = states.covariances[20];
+
+				bias_magnetometer.timestamp = _replay_mode ? now : hrt_absolute_time();
+				_estimator_bias_magnetometer_pub.publish(bias_magnetometer);
 			}
 
 			// publish GPS drift data only when updated to minimise overhead
@@ -1199,10 +1230,10 @@ void EKF2::Run()
 			}
 		}
 
-		if (!_multi_mode) {
-			// publish ekf2_timestamps
-			_ekf2_timestamps_pub.publish(ekf2_timestamps);
+		// publish ekf2_timestamps
+		_ekf2_timestamps_pub.publish(ekf2_timestamps);
 
+		if (!_multi_mode) {
 			if (_lockstep_component == -1) {
 				_lockstep_component = px4_lockstep_register_component();
 			}
@@ -1415,6 +1446,19 @@ int EKF2::task_spawn(int argc, char *argv[])
 	}
 
 	if (multi_mode) {
+		// Start EKF2Selector if it's not already running
+		if (_ekf2_selector.load() == nullptr) {
+			EKF2Selector *inst = new EKF2Selector();
+
+			if (inst) {
+				_ekf2_selector.store(inst);
+				inst->Start();
+
+			} else {
+				PX4_ERR("Failed to start EKF2 selector");
+			}
+		}
+
 		const hrt_abstime time_started = hrt_absolute_time();
 		const int multi_instances = math::min(imu_instances * mag_instances, (int)EKF2_MAX_INSTANCES);
 		int multi_instances_allocated = 0;
@@ -1434,6 +1478,7 @@ int EKF2::task_spawn(int argc, char *argv[])
 				for (uint8_t imu = 0; imu < imu_instances; imu++) {
 
 					uORB::SubscriptionData<vehicle_imu_s> vehicle_imu_sub{ORB_ID(vehicle_imu), imu};
+					vehicle_mag_sub.update();
 
 					// Mag & IMU data must be valid, first mag can be ignored initially
 					if ((vehicle_mag_sub.get().device_id != 0 || mag == 0) && (vehicle_imu_sub.get().accel_device_id != 0)
@@ -1464,21 +1509,6 @@ int EKF2::task_spawn(int argc, char *argv[])
 					} else {
 						px4_usleep(50000); // give the sensors extra time to start
 						continue;
-					}
-				}
-			}
-
-			if (multi_instances_allocated >= 1) {
-				// Start EKF2Selector if it's not already running
-				if (_ekf2_selector.load() == nullptr) {
-					EKF2Selector *inst = new EKF2Selector();
-
-					if (inst) {
-						_ekf2_selector.store(inst);
-						inst->Start();
-
-					} else {
-						PX4_ERR("Failed to start EKF2 selector");
 					}
 				}
 			}

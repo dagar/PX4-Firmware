@@ -55,7 +55,9 @@ EKF2Selector::~EKF2Selector()
 
 bool EKF2Selector::Start()
 {
-	ScheduleNow();
+	_selected_instance = 0;
+	_instance[0].estimator_status_sub.registerCallback();
+	_instance[0].estimator_attitude_sub.registerCallback();
 	return true;
 }
 

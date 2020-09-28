@@ -64,8 +64,9 @@
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/topics/ekf_gps_drift.h>
+#include <uORB/topics/estimator_bias_imu.h>
+#include <uORB/topics/estimator_bias_magnetometer.h>
 #include <uORB/topics/estimator_innovations.h>
-#include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_states.h>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/landing_target_pose.h>
@@ -181,6 +182,9 @@ private:
 
 	bool _imu_bias_reset_request{false};
 
+	matrix::Vector3f _accel_bias_last{};
+	matrix::Vector3f _gyro_bias_last{};
+
 	// republished aligned external visual odometry
 	bool new_ev_data_received = false;
 	vehicle_odometry_s _ev_odom{};
@@ -213,10 +217,11 @@ private:
 
 	uORB::PublicationMulti<ekf2_timestamps_s>		_ekf2_timestamps_pub{ORB_ID(ekf2_timestamps)};
 	uORB::PublicationMulti<ekf_gps_drift_s>			_ekf_gps_drift_pub{ORB_ID(ekf_gps_drift)};
+	uORB::PublicationMulti<estimator_bias_imu_s>		_estimator_bias_imu_pub{ORB_ID(estimator_bias_imu)};
+	uORB::PublicationMulti<estimator_bias_magnetometer_s>	_estimator_bias_magnetometer_pub{ORB_ID(estimator_bias_magnetometer)};
 	uORB::PublicationMulti<estimator_innovations_s>		_estimator_innovation_test_ratios_pub{ORB_ID(estimator_innovation_test_ratios)};
 	uORB::PublicationMulti<estimator_innovations_s>		_estimator_innovation_variances_pub{ORB_ID(estimator_innovation_variances)};
 	uORB::PublicationMulti<estimator_innovations_s>		_estimator_innovations_pub{ORB_ID(estimator_innovations)};
-	uORB::PublicationMulti<estimator_sensor_bias_s>		_estimator_sensor_bias_pub{ORB_ID(estimator_sensor_bias)};
 	uORB::PublicationMulti<estimator_states_s>		_estimator_states_pub{ORB_ID(estimator_states)};
 	uORB::PublicationMultiData<estimator_status_s>		_estimator_status_pub{ORB_ID(estimator_status)};
 	uORB::PublicationMulti<yaw_estimator_status_s>		_yaw_est_pub{ORB_ID(yaw_estimator_status)};

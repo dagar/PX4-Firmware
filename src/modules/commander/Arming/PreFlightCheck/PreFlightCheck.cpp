@@ -233,7 +233,7 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 			failed = true;
 		}
 
-		if (!ekf2CheckStates(mavlink_log_pub, reportFailures && report_ekf_fail)) {
+		if (!ekf2CheckSensorBias(mavlink_log_pub, reportFailures)) {
 			failed = true;
 		}
 	}

@@ -111,12 +111,12 @@ void LoggedTopics::add_default_topics()
 	add_topic("estimator_selector_status", 200);
 	add_topic_multi("ekf_gps_drift", 1000, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_attitude", 500, MAX_ESTIMATOR_INSTANCES);
+	add_topic_multi("estimator_bias_imu", 1000, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_global_position", 1000, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_innovation_test_ratios", 500, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_innovation_variances", 500, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_innovations", 500, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_local_position", 500, MAX_ESTIMATOR_INSTANCES);
-	add_topic_multi("estimator_sensor_bias", 1000, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_states", 1000, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("estimator_status", 500, MAX_ESTIMATOR_INSTANCES);
 	add_topic_multi("yaw_estimator_status", 1000, MAX_ESTIMATOR_INSTANCES);

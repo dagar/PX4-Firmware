@@ -78,8 +78,9 @@
 #include <uORB/topics/differential_pressure.h>
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/esc_status.h>
+#include <uORB/topics/estimator_bias_imu.h>
+#include <uORB/topics/estimator_bias_magnetometer.h>
 #include <uORB/topics/estimator_selector_status.h>
-#include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/geofence_result.h>
 #include <uORB/topics/home_position.h>
@@ -962,7 +963,8 @@ public:
 
 private:
 	uORB::SubscriptionMultiArray<vehicle_imu_s, 3> _vehicle_imu_subs{ORB_ID::vehicle_imu};
-	uORB::Subscription _estimator_sensor_bias_sub{ORB_ID(estimator_sensor_bias)};
+	uORB::Subscription _estimator_bias_imu_sub{ORB_ID(estimator_bias_imu)};
+	uORB::Subscription _estimator_bias_magnetometer_sub{ORB_ID(estimator_bias_magnetometer)};
 	uORB::Subscription _estimator_selector_status_sub{ORB_ID(estimator_selector_status)};
 	uORB::Subscription _sensor_selection_sub{ORB_ID(sensor_selection)};
 	uORB::Subscription _differential_pressure_sub{ORB_ID(differential_pressure)};
@@ -1016,7 +1018,8 @@ protected:
 				estimator_selector_status_s estimator_selector_status;
 
 				if (_estimator_selector_status_sub.copy(&estimator_selector_status)) {
-					_estimator_sensor_bias_sub.ChangeInstance(estimator_selector_status.primary_instance);
+					_estimator_bias_imu_sub.ChangeInstance(estimator_selector_status.primary_instance);
+					_estimator_bias_magnetometer_sub.ChangeInstance(estimator_selector_status.primary_instance);
 				}
 			}
 
@@ -1025,19 +1028,23 @@ protected:
 			Vector3f mag_bias{0.f, 0.f, 0.f};
 
 			{
-				estimator_sensor_bias_s bias;
+				estimator_bias_imu_s bias_imu;
 
-				if (_estimator_sensor_bias_sub.copy(&bias)) {
-					if ((bias.accel_device_id != 0) && (bias.accel_device_id == imu.accel_device_id)) {
-						accel_bias = Vector3f{bias.accel_bias};
+				if (_estimator_bias_imu_sub.copy(&bias_imu)) {
+					if ((bias_imu.accel_device_id != 0) && (bias_imu.accel_device_id == imu.accel_device_id)) {
+						accel_bias = Vector3f{bias_imu.accel_bias};
 					}
 
-					if ((bias.gyro_device_id != 0) && (bias.gyro_device_id == imu.gyro_device_id)) {
-						gyro_bias = Vector3f{bias.gyro_bias};
+					if ((bias_imu.gyro_device_id != 0) && (bias_imu.gyro_device_id == imu.gyro_device_id)) {
+						gyro_bias = Vector3f{bias_imu.gyro_bias};
 					}
+				}
 
-					if ((bias.mag_device_id != 0) && (bias.mag_device_id == magnetometer.device_id)) {
-						mag_bias = Vector3f{bias.mag_bias};
+				estimator_bias_magnetometer_s bias_mag;
+
+				if (_estimator_bias_magnetometer_sub.copy(&bias_mag)) {
+					if ((bias_mag.mag_device_id != 0) && (bias_mag.mag_device_id == magnetometer.device_id)) {
+						mag_bias = Vector3f{bias_mag.mag_bias};
 
 					} else {
 						// find primary mag
@@ -1045,12 +1052,11 @@ protected:
 
 						for (int i = 0; i < mag_subs.size(); i++) {
 							if (mag_subs[i].advertised() && mag_subs[i].copy(&magnetometer)) {
-								if (magnetometer.device_id == bias.mag_device_id) {
+								if (magnetometer.device_id == bias_mag.mag_device_id) {
 									_magnetometer_sub.ChangeInstance(i);
 									break;
 								}
 							}
-
 						}
 					}
 				}

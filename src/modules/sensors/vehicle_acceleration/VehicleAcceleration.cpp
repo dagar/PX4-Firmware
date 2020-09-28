@@ -142,14 +142,14 @@ void VehicleAcceleration::SensorBiasUpdate(bool force)
 		estimator_selector_status_s estimator_selector_status;
 
 		if (_estimator_selector_status_sub.copy(&estimator_selector_status)) {
-			_estimator_sensor_bias_sub.ChangeInstance(estimator_selector_status.primary_instance);
+			_estimator_bias_imu_sub.ChangeInstance(estimator_selector_status.primary_instance);
 		}
 	}
 
-	if (_estimator_sensor_bias_sub.updated() || force) {
-		estimator_sensor_bias_s bias;
+	if (_estimator_bias_imu_sub.updated() || force) {
+		estimator_bias_imu_s bias;
 
-		if (_estimator_sensor_bias_sub.copy(&bias)) {
+		if (_estimator_bias_imu_sub.copy(&bias)) {
 			if (bias.accel_device_id == _selected_sensor_device_id) {
 				_bias = Vector3f{bias.accel_bias};
 				return;

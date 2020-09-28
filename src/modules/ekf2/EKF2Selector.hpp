@@ -44,7 +44,6 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/topics/estimator_selector_status.h>
-#include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_selection.h>
