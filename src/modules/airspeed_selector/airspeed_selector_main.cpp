@@ -44,7 +44,7 @@
 #include <systemlib/mavlink_log.h>
 
 #include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionMultiArray.hpp>
+#include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/airspeed_validated.h>
 #include <uORB/topics/estimator_selector_status.h>
@@ -63,8 +63,6 @@
 #include <uORB/topics/wind_estimate.h>
 
 using namespace time_literals;
-
-static constexpr uint32_t SCHEDULE_INTERVAL{100_ms};	/**< The schedule interval in usec (10 Hz) */
 
 using matrix::Dcmf;
 using matrix::Quatf;
@@ -117,7 +115,12 @@ private:
 	uORB::Subscription _vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::Subscription _vtol_vehicle_status_sub{ORB_ID(vtol_vehicle_status)};
-	uORB::SubscriptionMultiArray<airspeed_s, MAX_NUM_AIRSPEED_SENSORS> _airspeed_subs{ORB_ID::airspeed};
+
+	uORB::SubscriptionCallbackWorkItem _airspeed_subs[MAX_NUM_AIRSPEED_SENSORS] {
+		{this, ORB_ID(airspeed), 0},
+		{this, ORB_ID(airspeed), 1},
+		{this, ORB_ID(airspeed), 2},
+	};
 
 	estimator_status_s _estimator_status {};
 	vehicle_acceleration_s _accel {};
@@ -208,11 +211,11 @@ AirspeedModule::task_spawn(int argc, char *argv[])
 
 	_object.store(dev);
 
-	dev->ScheduleOnInterval(SCHEDULE_INTERVAL, 10000);
 	_task_id = task_id_is_work_queue;
+	dev->ScheduleNow();
 	return PX4_OK;
-
 }
+
 void
 AirspeedModule::init()
 {
@@ -233,8 +236,8 @@ AirspeedModule::init()
 		}
 
 	} else {
-		_valid_airspeed_index =
-			_param_airspeed_primary_index.get(); // set index to the one provided in the parameter ASPD_PRIMARY
+		// set index to the one provided in the parameter ASPD_PRIMARY
+		_valid_airspeed_index = _param_airspeed_primary_index.get();
 	}
 
 	_prev_airspeed_index = _valid_airspeed_index; // needed to detect a switching
@@ -248,7 +251,7 @@ AirspeedModule::check_for_connected_airspeed_sensors()
 
 	if (_param_airspeed_primary_index.get() > 0) {
 
-		for (int i = 0; i < _airspeed_subs.size(); i++) {
+		for (int i = 0; i < MAX_NUM_AIRSPEED_SENSORS; i++) {
 			if (!_airspeed_subs[i].advertised()) {
 				break;
 			}
@@ -257,17 +260,19 @@ AirspeedModule::check_for_connected_airspeed_sensors()
 		}
 
 	} else {
-		detected_airspeed_sensors = 0; //user has selected groundspeed-windspeed as primary source, or disabled airspeed
+		detected_airspeed_sensors = 0; // user has selected groundspeed-windspeed as primary source, or disabled airspeed
 	}
 
 	_number_of_airspeed_sensors = detected_airspeed_sensors;
 }
 
-
 void
 AirspeedModule::Run()
 {
-	_time_now_usec = hrt_absolute_time(); //hrt time of the current cycle
+	// reschedule timeout
+	ScheduleDelayed(500_ms);
+
+	_time_now_usec = hrt_absolute_time(); // hrt time of the current cycle
 
 	/* do not run the airspeed selector until 2s after system boot, as data from airspeed sensor
 	and estimator may not be valid yet*/
@@ -288,9 +293,7 @@ AirspeedModule::Run()
 		update_params();
 	}
 
-
-
-	bool armed = (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
+	const bool armed = (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
 
 	/* Check for new connected airspeed sensors as long as we're disarmed */
 	if (!armed) {
@@ -306,9 +309,9 @@ AirspeedModule::Run()
 		bool fixed_wing = !_vtol_vehicle_status.vtol_in_rw_mode;
 		bool in_air = !_vehicle_land_detected.landed;
 
-		/* Prepare data for airspeed_validator */
-		struct airspeed_validator_update_data input_data = {};
-		input_data.timestamp = _time_now_usec;
+		// Prepare data for airspeed_validator
+		airspeed_validator_update_data input_data{};
+		input_data.timestamp = _vehicle_local_position.timestamp_sample;
 		input_data.lpos_vx = _vehicle_local_position.vx;
 		input_data.lpos_vy = _vehicle_local_position.vy;
 		input_data.lpos_vz = _vehicle_local_position.vz;
@@ -334,7 +337,7 @@ AirspeedModule::Run()
 
 				input_data.airspeed_indicated_raw = airspeed_raw.indicated_airspeed_m_s;
 				input_data.airspeed_true_raw = airspeed_raw.true_airspeed_m_s;
-				input_data.airspeed_timestamp = airspeed_raw.timestamp;
+				input_data.airspeed_timestamp = airspeed_raw.timestamp_sample;
 				input_data.air_temperature_celsius = airspeed_raw.air_temperature_celsius;
 
 				/* update in_fixed_wing_flight for the current airspeed sensor validator */
@@ -540,12 +543,22 @@ void AirspeedModule::select_airspeed_and_publish()
 		}
 	}
 
-	/* publish critical message (and log) in index has changed */
-	/* Suppress log message if still on the ground and no airspeed sensor connected */
-	if (_valid_airspeed_index != _prev_airspeed_index && (_number_of_airspeed_sensors > 0
-			|| !_vehicle_land_detected.landed)) {
-		mavlink_log_critical(&_mavlink_log_pub, "Airspeed: switched from sensor %i to %i", _prev_airspeed_index,
-				     _valid_airspeed_index);
+	if (_valid_airspeed_index != _prev_airspeed_index) {
+		/* publish critical message (and log) in index has changed */
+		/* Suppress log message if still on the ground and no airspeed sensor connected */
+		if ((_number_of_airspeed_sensors > 0) || !_vehicle_land_detected.landed) {
+			mavlink_log_critical(&_mavlink_log_pub, "Airspeed: switched from sensor %i to %i", _prev_airspeed_index,
+					     _valid_airspeed_index);
+		}
+
+		if (_valid_airspeed_index >= 0 && _valid_airspeed_index <= MAX_NUM_AIRSPEED_SENSORS) {
+
+			for (auto &sub : _airspeed_subs) {
+				sub.unregisterCallback();
+			}
+
+			_airspeed_subs[_valid_airspeed_index].registerCallback();
+		}
 	}
 
 	_prev_airspeed_index = _valid_airspeed_index;
@@ -608,7 +621,6 @@ void AirspeedModule::select_airspeed_and_publish()
 
 		_wind_est_pub[i + 1].publish(wind_est);
 	}
-
 }
 
 int AirspeedModule::custom_command(int argc, char *argv[])
