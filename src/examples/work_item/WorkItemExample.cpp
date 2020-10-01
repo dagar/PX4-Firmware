@@ -81,11 +81,8 @@ void WorkItemExample::Run()
 	// Example
 	// publish some data
 	orb_test_s data{};
-	data.timestamp = hrt_absolute_time();
 	data.val = accel.device_id;
 	_orb_test_pub.publish(data);
-
-
 
 
 	perf_end(_loop_perf);

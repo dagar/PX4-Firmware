@@ -95,7 +95,6 @@ void PX4Gyroscope::updateFIFO(sensor_gyro_fifo_s &sample)
 	sample.scale = _scale;
 	sample.rotation = _rotation;
 
-	sample.timestamp = hrt_absolute_time();
 	_sensor_fifo_pub.publish(sample);
 
 	{
@@ -134,7 +133,6 @@ void PX4Gyroscope::Publish(const hrt_abstime &timestamp_sample, float x, float y
 	report.x = x * _scale;
 	report.y = y * _scale;
 	report.z = z * _scale;
-	report.timestamp = hrt_absolute_time();
 
 	_sensor_pub.publish(report);
 }

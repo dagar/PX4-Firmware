@@ -47,12 +47,11 @@
 #include <drivers/device/device.h>
 #include <drivers/drv_hrt.h>
 
-#include <uORB/topics/distance_sensor.h>
+#include <lib/drivers/rangefinder/PX4Rangefinder.hpp>
 
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/tasks.h>
-
 
 #define PGA460_DEFAULT_PORT "/dev/ttyS6"
 #define MAX_DETECTABLE_DISTANCE          3.0f
@@ -210,10 +209,8 @@
 class PGA460 : public ModuleBase<PGA460>
 {
 public:
-
 	PGA460(const char *port = PGA460_DEFAULT_PORT);
-
-	virtual ~PGA460();
+	~PGA460() override = default;
 
 	/**
 	 * @see ModuleBase::custom_command().
@@ -380,7 +377,7 @@ private:
 	void uORB_publish_results(const float dist);
 
 	/** @orb_advert_t orb_advert_t uORB advertisement topic. */
-	orb_advert_t _distance_sensor_topic{nullptr};
+	PX4Rangefinder _px4_rangefinder;
 
 	/** @param _fd Returns the file descriptor from open(). */
 	int _fd{-1};

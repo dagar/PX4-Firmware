@@ -40,7 +40,9 @@
 
 #include <px4_platform_common/defines.h>
 #include <systemlib/err.h>
+
 #include <uORB/uORB.h>
+#include "uORBDeviceNode.hpp"
 
 #include "Publication.hpp"
 
@@ -50,7 +52,7 @@ namespace uORB
 /**
  * Base publication multi wrapper class
  */
-template<typename T, uint8_t QSIZE = 1>
+template<typename T, uint8_t ORB_QSIZE = 1>
 class PublicationMulti : public PublicationBase
 {
 public:
@@ -60,19 +62,14 @@ public:
 	 *
 	 * @param meta The uORB metadata (usually from the ORB_ID() macro) for the topic.
 	 */
-	PublicationMulti(ORB_ID id) :
-		PublicationBase(id)
-	{}
-
-	PublicationMulti(const orb_metadata *meta) :
-		PublicationBase(static_cast<ORB_ID>(meta->o_id))
-	{}
+	PublicationMulti(ORB_ID id) : PublicationBase(id) {}
+	PublicationMulti(const orb_metadata *meta) : PublicationBase(static_cast<ORB_ID>(meta->o_id)) {}
 
 	bool advertise()
 	{
 		if (!advertised()) {
 			int instance = 0;
-			_handle = orb_advertise_multi_queue(get_topic(), nullptr, &instance, QSIZE);
+			_handle = orb_advertise_multi_queue(get_topic(), nullptr, &instance, ORB_QSIZE);
 		}
 
 		return advertised();
@@ -82,13 +79,14 @@ public:
 	 * Publish the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool publish(const T &data)
+	bool publish(T &data)
 	{
 		if (!advertised()) {
 			advertise();
 		}
 
-		return (orb_publish(get_topic(), _handle, &data) == PX4_OK);
+		data.timestamp = hrt_absolute_time();
+		return (DeviceNode::publish(get_topic(), _handle, &data) == PX4_OK);
 	}
 };
 

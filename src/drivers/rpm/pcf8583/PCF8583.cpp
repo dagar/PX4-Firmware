@@ -134,7 +134,6 @@ void PCF8583::RunImpl()
 	rpm_s msg{};
 	msg.indicated_frequency_rpm = indicated_rpm;
 	msg.estimated_accurancy_rpm = estimated_accurancy;
-	msg.timestamp = hrt_absolute_time();
 	_rpm_pub.publish(msg);
 }
 

@@ -291,7 +291,6 @@ PX4FLOW::collect()
 
 	optical_flow_s report{};
 
-	report.timestamp = hrt_absolute_time();
 	report.pixel_flow_x_integral = static_cast<float>(_frame_integral.pixel_flow_x_integral) / 10000.0f;//convert to radians
 	report.pixel_flow_y_integral = static_cast<float>(_frame_integral.pixel_flow_y_integral) / 10000.0f;//convert to radians
 	report.frame_count_since_last_readout = _frame_integral.frame_count_since_last_readout;
@@ -319,7 +318,6 @@ PX4FLOW::collect()
 	/* publish to the distance_sensor topic as well */
 	if (_class_instance == CLASS_DEVICE_PRIMARY) {
 		distance_sensor_s distance_report{};
-		distance_report.timestamp = report.timestamp;
 		distance_report.min_distance = PX4FLOW_MIN_DISTANCE;
 		distance_report.max_distance = PX4FLOW_MAX_DISTANCE;
 		distance_report.current_distance = report.ground_distance_m;

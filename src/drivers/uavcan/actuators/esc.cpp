@@ -158,7 +158,6 @@ UavcanEscController::esc_status_sub_cb(const uavcan::ReceivedDataStructure<uavca
 void
 UavcanEscController::orb_pub_timer_cb(const uavcan::TimerEvent &)
 {
-	_esc_status.timestamp = hrt_absolute_time();
 	_esc_status.esc_count = _rotor_count;
 	_esc_status.counter += 1;
 	_esc_status.esc_connectiontype = esc_status_s::ESC_CONNECTION_TYPE_CAN;

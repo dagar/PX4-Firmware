@@ -105,12 +105,23 @@ public:
 	 * Publish the struct
 	 * @param data The uORB message struct we are updating.
 	 */
-	bool publish(const T &data)
+	bool publish(T &data)
 	{
 		if (!advertised()) {
 			advertise();
 		}
 
+		data.timestamp = hrt_absolute_time();
+		return (DeviceNode::publish(get_topic(), _handle, &data) == PX4_OK);
+	}
+
+	bool publish(const hrt_abstime& timestamp, T &data)
+	{
+		if (!advertised()) {
+			advertise();
+		}
+
+		data.timestamp = timestamp;
 		return (DeviceNode::publish(get_topic(), _handle, &data) == PX4_OK);
 	}
 };
@@ -148,7 +159,5 @@ private:
 
 template<class T>
 using PublicationQueued = Publication<T, T::ORB_QUEUE_LENGTH>;
-
-
 
 } // namespace uORB

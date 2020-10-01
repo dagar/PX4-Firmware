@@ -146,7 +146,6 @@ PWMIN::publish(uint16_t status, uint32_t period, uint32_t pulse_width)
 		return;
 	}
 
-	_pwm.timestamp = hrt_absolute_time();
 	_pwm.error_count = _error_count;
 	_pwm.period = period;
 	_pwm.pulse_width = pulse_width;

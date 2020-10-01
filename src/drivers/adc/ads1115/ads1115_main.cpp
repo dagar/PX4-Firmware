@@ -93,8 +93,6 @@ void ADS1115::RunImpl()
 
 	perf_begin(_cycle_perf);
 
-	_adc_report.timestamp = hrt_absolute_time();
-
 	if (isSampleReady()) { // whether ADS1115 is ready to be read or not
 		int16_t buf;
 		ADS1115::ChannelSelection ch = cycleMeasure(&buf);

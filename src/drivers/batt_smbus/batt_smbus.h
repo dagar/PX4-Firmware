@@ -53,6 +53,7 @@
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/i2c_spi_buses.h>
 #include <uORB/topics/battery_status.h>
+#include <uORB/PublicationMulti.hpp>
 
 #include <board_config.h>
 
@@ -244,7 +245,7 @@ private:
 	battery_status_s _last_report{};
 
 	/** @param _batt_topic uORB battery topic. */
-	orb_advert_t _batt_topic{nullptr};
+	uORB::PublicationMulti<battery_status_s> _battery_status_pub{ORB_ID(battery_status)};
 
 	/** @param _cell_count Number of series cell. */
 	uint8_t _cell_count{0};

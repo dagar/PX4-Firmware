@@ -51,15 +51,11 @@ BATT_SMBUS::BATT_SMBUS(I2CSPIBusOption bus_option, const int bus, SMBus *interfa
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(interface->get_device_id()), bus_option, bus),
 	_interface(interface)
 {
-	battery_status_s new_report = {};
-	_batt_topic = orb_advertise(ORB_ID(battery_status), &new_report);
-
 	int battsource = 1;
 	int batt_device_type = (int)SMBUS_DEVICE_TYPE::UNDEFINED;
 
 	param_set(param_find("BAT_SOURCE"), &battsource);
 	param_get(param_find("BAT_SMBUS_MODEL"), &batt_device_type);
-
 
 	//TODO: probe the device and autodetect its type
 	if ((SMBUS_DEVICE_TYPE)batt_device_type == SMBUS_DEVICE_TYPE::BQ40Z80) {
@@ -79,7 +75,6 @@ BATT_SMBUS::BATT_SMBUS(I2CSPIBusOption bus_option, const int bus, SMBus *interfa
 
 BATT_SMBUS::~BATT_SMBUS()
 {
-	orb_unadvertise(_batt_topic);
 	perf_free(_cycle);
 
 	if (_interface != nullptr) {
@@ -98,13 +93,10 @@ void BATT_SMBUS::RunImpl()
 	uint16_t result;
 
 	// Read data from sensor.
-	battery_status_s new_report = {};
+	battery_status_s new_report{};
 
 	// TODO(hyonlim): this driver should support multiple SMBUS going forward.
 	new_report.id = 1;
-
-	// Set time of reading.
-	new_report.timestamp = hrt_absolute_time();
 
 	new_report.connected = true;
 
@@ -192,7 +184,7 @@ void BATT_SMBUS::RunImpl()
 		}
 
 		new_report.interface_error = perf_event_count(_interface->_interface_errors);
-		orb_publish(ORB_ID(battery_status), _batt_topic, &new_report);
+		_battery_status_pub.publish(new_report);
 
 		_last_report = new_report;
 	}

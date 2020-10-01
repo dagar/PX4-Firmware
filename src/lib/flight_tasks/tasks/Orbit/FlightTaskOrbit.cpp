@@ -105,7 +105,6 @@ bool FlightTaskOrbit::applyCommandParameters(const vehicle_command_s &command)
 bool FlightTaskOrbit::sendTelemetry()
 {
 	orbit_status_s orbit_status{};
-	orbit_status.timestamp = hrt_absolute_time();
 	orbit_status.radius = math::signNoZero(_v) * _r;
 	orbit_status.frame = 0; // MAV_FRAME::MAV_FRAME_GLOBAL
 	orbit_status.yaw_behaviour = _yaw_behaviour;

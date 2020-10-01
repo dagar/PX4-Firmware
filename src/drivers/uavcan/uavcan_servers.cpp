@@ -552,7 +552,6 @@ UavcanServers::run(pthread_addr_t)
 
 			// Acknowledge the received command
 			vehicle_command_ack_s ack{};
-			ack.timestamp = hrt_absolute_time();
 			ack.command = cmd.command;
 			ack.result = cmd_ack_result;
 			ack.target_system = cmd.source_system;

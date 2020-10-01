@@ -84,7 +84,6 @@ struct irlock_target_s {
 
 /** irlock_s structure returned from read calls **/
 struct irlock_s {
-	hrt_abstime timestamp; /** microseconds since system start **/
 	uint8_t num_targets;
 	irlock_target_s targets[IRLOCK_OBJECTS_MAX];
 };
@@ -198,7 +197,6 @@ int IRLOCK::read_device()
 	}
 
 	irlock_s report{};
-	report.timestamp = hrt_absolute_time();
 	report.num_targets = 0;
 
 	while (report.num_targets < IRLOCK_OBJECTS_MAX) {
@@ -211,8 +209,6 @@ int IRLOCK::read_device()
 
 	// publish over uORB
 	if (report.num_targets > 0) {
-		irlock_report_s orb_report{};
-		orb_report.timestamp = report.timestamp;
 		orb_report.signature = report.targets[0].signature;
 		orb_report.pos_x     = report.targets[0].pos_x;
 		orb_report.pos_y     = report.targets[0].pos_y;

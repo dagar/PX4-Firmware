@@ -127,7 +127,6 @@ ETSAirspeed::collect()
 	float diff_pres_pa_raw = (float)(val[1] << 8 | val[0]);
 
 	differential_pressure_s report{};
-	report.timestamp = hrt_absolute_time();
 
 	if (diff_pres_pa_raw < FLT_EPSILON) {
 		// a zero value indicates no measurement

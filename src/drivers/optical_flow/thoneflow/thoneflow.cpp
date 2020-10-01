@@ -52,8 +52,8 @@
 #include <lib/parameters/param.h>
 #include <perf/perf_counter.h>
 #include <systemlib/err.h>
+#include <uORB/PublicationMulti.h>
 #include <uORB/topics/optical_flow.h>
-#include <uORB/uORB.h>
 
 #include "thoneflow_parser.h"
 
@@ -81,8 +81,7 @@ private:
 
 	hrt_abstime              _last_read;
 
-	optical_flow_s           _report;
-	orb_advert_t             _optical_flow_pub;
+	uORB::PublicationMulti<optical_flow_s> _optical_flow_pub{ORB_ID(optical_flow)};
 
 	perf_counter_t           _sample_perf;
 	perf_counter_t           _comms_errors;
@@ -119,7 +118,6 @@ Thoneflow::Thoneflow(const char *port) :
 	_linebuf_index(0),
 	_parse_state(THONEFLOW_PARSE_STATE0_UNSYNC),
 	_last_read(0),
-	_report(),
 	_optical_flow_pub(nullptr),
 	_sample_perf(perf_alloc(PC_ELAPSED, "thoneflow_read")),
 	_comms_errors(perf_alloc(PC_COUNT, "thoneflow_com_err"))
@@ -217,30 +215,6 @@ Thoneflow::init()
 			_rotation = Rotation(val);
 		}
 
-		/* Initialise report structure */
-		/* No gyro on this board */
-		_report.gyro_x_rate_integral = NAN;
-		_report.gyro_y_rate_integral = NAN;
-		_report.gyro_z_rate_integral = NAN;
-
-		/* Conservative specs according to datasheet */
-		_report.max_flow_rate = 5.0f;           // Datasheet: 7.4 rad/s
-		_report.min_ground_distance = 0.1f;     // Datasheet: 80mm
-		_report.max_ground_distance = 30.0f;    // Datasheet: infinity
-
-		/* Integrated flow is sent at 66fps */
-		_report.frame_count_since_last_readout = 1;
-		_report.integration_timespan = 15151;	// microseconds
-
-		/* Get a publish handle on the optical flow topic */
-		_optical_flow_pub = orb_advertise(ORB_ID(optical_flow), &_report);
-
-		if (_optical_flow_pub == nullptr) {
-			PX4_ERR("Failed to create optical_flow object");
-			ret = PX4_ERROR;
-			break;
-		}
-
 	} while (0);
 
 	/* Close the fd */
@@ -299,20 +273,34 @@ Thoneflow::collect()
 
 		_last_read = hrt_absolute_time();
 
+		optical_flow_s report{};
+
 		/* Parse each byte of read buffer */
 		for (int i = 0; i < ret; i++) {
-			valid |= thoneflow_parse(readbuf[i], _linebuf, &_linebuf_index, &_parse_state, &_report);
+			valid |= thoneflow_parse(readbuf[i], _linebuf, &_linebuf_index, &_parse_state, &report);
 		}
 
 		/* Publish most recent valid measurement */
 		if (valid) {
-			_report.timestamp = hrt_absolute_time();
-
 			/* Rotate measurements from sensor frame to body frame */
 			float zeroval = 0.0f;
-			rotate_3f(_rotation, _report.pixel_flow_x_integral, _report.pixel_flow_y_integral, zeroval);
+			rotate_3f(_rotation, report.pixel_flow_x_integral, report.pixel_flow_y_integral, zeroval);
 
-			orb_publish(ORB_ID(optical_flow), _optical_flow_pub, &_report);
+			// No gyro on this board
+			report.gyro_x_rate_integral = NAN;
+			report.gyro_y_rate_integral = NAN;
+			report.gyro_z_rate_integral = NAN;
+
+			// Conservative specs according to datasheet
+			report.max_flow_rate = 5.0f;           // Datasheet: 7.4 rad/s
+			report.min_ground_distance = 0.1f;     // Datasheet: 80mm
+			report.max_ground_distance = 30.0f;    // Datasheet: infinity
+
+			// Integrated flow is sent at 66fps
+			report.frame_count_since_last_readout = 1;
+			report.integration_timespan = 15151;	// microseconds
+
+			_optical_flow_pub.publish(report);
 		}
 
 		/* Bytes left to parse */

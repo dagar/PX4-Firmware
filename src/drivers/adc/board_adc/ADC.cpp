@@ -217,7 +217,6 @@ void ADC::update_system_power(hrt_abstime now)
 	system_power.hipower_5v_oc = BOARD_ADC_HIPOWER_5V_OC;
 #endif
 
-	system_power.timestamp = hrt_absolute_time();
 	_to_system_power.publish(system_power);
 
 #endif // BOARD_ADC_USB_CONNECTED

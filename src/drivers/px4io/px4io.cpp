@@ -708,7 +708,6 @@ PX4IO::init()
 		if (reg & PX4IO_P_SETUP_ARMING_FORCE_FAILSAFE) {
 			mavlink_log_emergency(&_mavlink_log_pub, "IO is in failsafe, force failsafe");
 			/* send command to terminate flight via command API */
-			vcmd.timestamp = hrt_absolute_time();
 			vcmd.param1 = 1.0f; /* request flight termination */
 			vcmd.command = vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION;
 
@@ -740,7 +739,6 @@ PX4IO::init()
 		}
 
 		/* send command to arm system via command API */
-		vcmd.timestamp = hrt_absolute_time();
 		vcmd.param1 = 1.0f; /* request arming */
 		vcmd.param3 = 1234.f; /* mark the command coming from IO (for in-air restoring) */
 		vcmd.command = vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM;
@@ -1649,7 +1647,6 @@ PX4IO::io_handle_status(uint16_t status)
 		_safety.safety_off = safety_off;
 		_safety.override_available = _override_available;
 		_safety.override_enabled = override_enabled;
-		_safety.timestamp = hrt_absolute_time();
 
 		_to_safety.publish(_safety);
 	}
@@ -1776,7 +1773,6 @@ PX4IO::io_get_status()
 			status.raw_inputs[i] = io_reg_get(PX4IO_PAGE_RAW_RC_INPUT, PX4IO_P_RAW_RC_BASE + i);
 		}
 
-		status.timestamp = hrt_absolute_time();
 		_px4io_status_pub.publish(status);
 
 		_last_status_publish = status.timestamp;
@@ -1823,8 +1819,6 @@ PX4IO::io_get_raw_rc_input(input_rc_s &input_rc)
 	}
 
 	_rc_chan_count = channel_count;
-
-	input_rc.timestamp = hrt_absolute_time();
 
 	input_rc.rc_ppm_frame_length = regs[PX4IO_P_RAW_RC_DATA];
 
@@ -1950,8 +1944,7 @@ PX4IO::io_publish_pwm_outputs()
 		return ret;
 	}
 
-	actuator_outputs_s outputs = {};
-	outputs.timestamp = hrt_absolute_time();
+	actuator_outputs_s outputs{};
 	outputs.noutputs = _max_actuators;
 
 	/* convert from register format to float */
@@ -1972,7 +1965,6 @@ PX4IO::io_publish_pwm_outputs()
 	/* publish mixer status */
 	if (saturation_status.flags.valid) {
 		multirotor_motor_limits_s motor_limits{};
-		motor_limits.timestamp = hrt_absolute_time();
 		motor_limits.saturation_status = saturation_status.value;
 
 		_to_mixer_status.publish(motor_limits);

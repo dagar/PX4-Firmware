@@ -112,7 +112,6 @@ void AEROFC_ADC::RunImpl()
 
 	adc_report_s adc_report{};
 	adc_report.device_id = get_device_id();
-	adc_report.timestamp = hrt_absolute_time();
 	adc_report.v_ref = 3.0f;
 	adc_report.resolution = 1 << 12;
 

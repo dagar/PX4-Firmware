@@ -40,18 +40,16 @@
 
 #include "pga460.h"
 
-
-PGA460::PGA460(const char *port)
+PGA460::PGA460(const char *port) :
+	_px4_rangefinder(0)
 {
 	// Store port name.
 	strncpy(_port, port, sizeof(_port) - 1);
 	// Enforce null termination.
 	_port[sizeof(_port) - 1] = '\0';
-}
 
-PGA460::~PGA460()
-{
-	orb_unadvertise(_distance_sensor_topic);
+	_px4_rangefinder.set_min_distance(MIN_DETECTABLE_TEMPERATURE);
+	_px4_rangefinder.set_max_distance(MAX_DETECTABLE_TEMPERATURE);
 }
 
 uint8_t PGA460::calc_checksum(uint8_t *data, const uint8_t size)
@@ -681,14 +679,6 @@ void PGA460::run()
 		return;
 	}
 
-	struct distance_sensor_s report = {};
-	_distance_sensor_topic = orb_advertise(ORB_ID(distance_sensor), &report);
-
-	if (_distance_sensor_topic == nullptr) {
-		PX4_WARN("Advertise failed.");
-		return;
-	}
-
 	_start_loop = hrt_absolute_time();
 
 	while (!should_exit()) {
@@ -761,54 +751,30 @@ int PGA460::task_spawn(int argc, char *argv[])
 
 void PGA460::uORB_publish_results(const float object_distance)
 {
-	struct distance_sensor_s report = {};
-	report.timestamp = hrt_absolute_time();
-	report.type = distance_sensor_s::MAV_DISTANCE_SENSOR_ULTRASOUND;
-	report.orientation = distance_sensor_s::ROTATION_DOWNWARD_FACING;
-	report.current_distance = object_distance;
-	report.min_distance = MIN_DETECTABLE_DISTANCE;
-	report.max_distance = MAX_DETECTABLE_DISTANCE;
-	report.signal_quality = 0;
-
-	bool data_is_valid = false;
 	static uint8_t good_data_counter = 0;
 
-	// If we are within our MIN and MAX thresholds, continue.
-	if (object_distance > MIN_DETECTABLE_DISTANCE && object_distance < MAX_DETECTABLE_DISTANCE) {
+	// Height cannot change by more than MAX_SAMPLE_DEVIATION between measurements.
+	bool sample_deviation_valid = (object_distance < _previous_valid_report_distance + MAX_SAMPLE_DEVIATION)
+					&& (object_distance > _previous_valid_report_distance - MAX_SAMPLE_DEVIATION);
 
-		// Height cannot change by more than MAX_SAMPLE_DEVIATION between measurements.
-		bool sample_deviation_valid = (report.current_distance < _previous_valid_report_distance + MAX_SAMPLE_DEVIATION)
-					      && (report.current_distance > _previous_valid_report_distance - MAX_SAMPLE_DEVIATION);
+	// Must have NUM_SAMPLES_CONSISTENT valid samples to be publishing.
+	if (sample_deviation_valid) {
+		good_data_counter++;
 
-		// Must have NUM_SAMPLES_CONSISTENT valid samples to be publishing.
-		if (sample_deviation_valid) {
-			good_data_counter++;
-
-			if (good_data_counter > NUM_SAMPLES_CONSISTENT - 1) {
-				good_data_counter = NUM_SAMPLES_CONSISTENT;
-				data_is_valid = true;
-
-			} else {
-				// Have not gotten NUM_SAMPLES_CONSISTENT consistently valid samples.
-				data_is_valid = false;
-			}
-
-		} else if (good_data_counter > 0) {
-			good_data_counter--;
-
-		} else {
-			// Reset our quality of data estimate after NUM_SAMPLES_CONSISTENT invalid samples.
-			_previous_valid_report_distance = _previous_report_distance;
+		if (good_data_counter > NUM_SAMPLES_CONSISTENT - 1) {
+			good_data_counter = NUM_SAMPLES_CONSISTENT;
+			_px4_rangefinder.update(hrt_absolute_time(), object_distance);
 		}
 
-		_previous_report_distance = report.current_distance;
+	} else if (good_data_counter > 0) {
+		good_data_counter--;
+
+	} else {
+		// Reset our quality of data estimate after NUM_SAMPLES_CONSISTENT invalid samples.
+		_previous_valid_report_distance = _previous_report_distance;
 	}
 
-	if (data_is_valid) {
-		report.signal_quality = 1;
-		_previous_valid_report_distance = report.current_distance;
-		orb_publish(ORB_ID(distance_sensor), _distance_sensor_topic, &report);
-	}
+	_previous_report_distance = object_distance;
 }
 
 int PGA460::unlock_eeprom()

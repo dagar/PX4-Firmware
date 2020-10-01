@@ -359,8 +359,6 @@ MavlinkReceiver::handle_message_command_long(mavlink_message_t *msg)
 
 	vehicle_command_s vcmd{};
 
-	vcmd.timestamp = hrt_absolute_time();
-
 	/* Copy the content of mavlink_command_long_t cmd_mavlink into command_t cmd */
 	vcmd.param1 = cmd_mavlink.param1;
 	vcmd.param2 = cmd_mavlink.param2;
@@ -388,7 +386,6 @@ MavlinkReceiver::handle_message_command_int(mavlink_message_t *msg)
 	mavlink_msg_command_int_decode(msg, &cmd_mavlink);
 
 	vehicle_command_s vcmd{};
-	vcmd.timestamp = hrt_absolute_time();
 
 	/* Copy the content of mavlink_command_int_t cmd_mavlink into command_t cmd */
 	vcmd.param1 = cmd_mavlink.param1;
@@ -410,8 +407,7 @@ MavlinkReceiver::handle_message_command_int(mavlink_message_t *msg)
 }
 
 template <class T>
-void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const T &cmd_mavlink,
-		const vehicle_command_s &vehicle_command)
+void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const T &cmd_mavlink, vehicle_command_s &vehicle_command)
 {
 	bool target_ok = evaluate_target_ok(cmd_mavlink.command, cmd_mavlink.target_system, cmd_mavlink.target_component);
 	bool send_ack = true;

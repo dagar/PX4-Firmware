@@ -114,7 +114,6 @@ void PX4Accelerometer::updateFIFO(sensor_accel_fifo_s &sample)
 	sample.scale = _scale;
 	sample.rotation = _rotation;
 
-	sample.timestamp = hrt_absolute_time();
 	_sensor_fifo_pub.publish(sample);
 
 	{
@@ -168,7 +167,6 @@ void PX4Accelerometer::Publish(const hrt_abstime &timestamp_sample, float x, flo
 	report.clip_counter[0] = fabsf(roundf(clipping_x));
 	report.clip_counter[1] = fabsf(roundf(clipping_y));
 	report.clip_counter[2] = fabsf(roundf(clipping_z));
-	report.timestamp = hrt_absolute_time();
 
 	_sensor_pub.publish(report);
 }
