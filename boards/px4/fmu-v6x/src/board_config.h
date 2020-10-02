@@ -54,7 +54,7 @@
  * Definitions
  ****************************************************************************************************/
 
-#undef TRACE_PINS
+#define TRACE_PINS
 
 /* PX4IO connection configuration */
 
