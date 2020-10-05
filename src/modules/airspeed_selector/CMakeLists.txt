@@ -34,7 +34,8 @@ px4_add_module(
 	MODULE modules__airspeed_selector
 	MAIN airspeed_selector
 	SRCS
-		airspeed_selector_main.cpp
+		AirspeedSelector.cpp
+		AirspeedSelector.hpp
 	DEPENDS
 		git_ecl
 		ecl_airdata

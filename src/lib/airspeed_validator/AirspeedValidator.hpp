@@ -78,13 +78,14 @@ public:
 
 	void update_airspeed_validator(const airspeed_validator_update_data &input_data);
 
-	float get_IAS() { return _IAS; }
-	float get_CAS() { return _CAS; }
-	float get_TAS() { return _TAS; }
-	bool get_airspeed_valid() { return _airspeed_valid; }
-	float get_CAS_scale() {return _CAS_scale;}
+	float get_IAS() const { return _IAS; }
+	float get_CAS() const { return _CAS; }
+	float get_TAS() const { return _TAS; }
+	bool get_airspeed_valid() const { return _airspeed_valid; }
+	float get_CAS_scale() const { return _CAS_scale;}
 
-	wind_estimate_s get_wind_estimator_states(uint64_t timestamp);
+	// returns the current states of the wind estimator to be published in the airspeed module
+	wind_estimate_s get_wind_estimator_states();
 
 	// setters wind estimator parameters
 	void set_wind_estimator_wind_p_noise(float wind_sigma) { _wind_estimator.set_wind_p_noise(wind_sigma); }
@@ -111,6 +112,17 @@ public:
 	void set_airspeed_stall(float airspeed_stall) { _airspeed_stall = airspeed_stall; }
 
 private:
+	void update_in_fixed_wing_flight(bool in_fixed_wing_flight) { _in_fixed_wing_flight = in_fixed_wing_flight; }
+
+	void update_wind_estimator(const uint64_t timestamp, float airspeed_true_raw, bool lpos_valid,
+				   float lpos_vx, float lpos_vy, float lpos_vz,
+				   float lpos_evh, float lpos_evv, const float att_q[4]);
+	void update_CAS_scale();
+	void update_CAS_TAS(float air_pressure_pa, float air_temperature_celsius);
+	void check_airspeed_innovation(uint64_t timestamp, float estimator_status_vel_test_ratio,
+				       float estimator_status_mag_test_ratio);
+	void check_load_factor(float accel_z);
+	void update_airspeed_valid_status(const uint64_t timestamp);
 
 	WindEstimator _wind_estimator{}; ///< wind estimator instance running in this particular airspeedValidator
 
@@ -125,7 +137,7 @@ private:
 	float _TAS{0.0f}; ///< true airspeed in m/s
 	float _CAS_scale{1.0f}; ///< scale factor from IAS to CAS
 
-	uint64_t	_time_last_airspeed{0};		///< time last airspeed measurement was received (uSec)
+	uint64_t _time_last_airspeed{0};		///< time last airspeed measurement was received (uSec)
 
 	// states of data stopped check
 	bool _data_stopped_failed{false}; ///< data_stopp check has detected failure
@@ -136,37 +148,23 @@ private:
 	bool _innovations_check_failed{false};  ///< true when airspeed innovations have failed consistency checks
 	float _tas_innov_threshold{1.0}; ///< innovation error threshold for triggering innovation check failure
 	float _tas_innov_integ_threshold{-1.0}; ///< integrator innovation error threshold for triggering innovation check failure
-	uint64_t	_time_last_aspd_innov_check{0};	///< time airspeed innovation was last checked (uSec)
-	uint64_t	_time_last_tas_pass{0};		///< last time innovation checks passed
-	uint64_t	_time_last_tas_fail{0};		///< last time innovation checks failed
-	float		_apsd_innov_integ_state{0.0f};	///< inegral of excess normalised airspeed innovation (sec)
+	uint64_t _time_last_aspd_innov_check{0};	///< time airspeed innovation was last checked (uSec)
+	uint64_t _time_last_tas_pass{0};		///< last time innovation checks passed
+	uint64_t _time_last_tas_fail{0};		///< last time innovation checks failed
+	float _apsd_innov_integ_state{0.0f};	///< inegral of excess normalised airspeed innovation (sec)
 	static constexpr uint64_t TAS_INNOV_FAIL_DELAY{1_s};	///< time required for innovation levels to pass or fail (usec)
-	uint64_t	_time_wind_estimator_initialized{0};		///< time last time wind estimator was initialized (uSec)
+	uint64_t _time_wind_estimator_initialized{0};		///< time last time wind estimator was initialized (uSec)
 
 	// states of load factor check
 	bool _load_factor_check_failed{false}; ///< load_factor check has detected failure
 	float _airspeed_stall{8.0f}; ///< stall speed of aircraft used for load factor check
-	float	_load_factor_ratio{0.5f};	///< ratio of maximum load factor predicted by stall speed to measured load factor
+	float _load_factor_ratio{0.5f};	///< ratio of maximum load factor predicted by stall speed to measured load factor
 
 	// states of airspeed valid declaration
 	bool _airspeed_valid{false}; ///< airspeed valid (pitot or groundspeed-windspeed)
 	int _checks_fail_delay{3}; ///< delay for airspeed invalid declaration after single check failure (Sec)
 	int _checks_clear_delay{3}; ///< delay for airspeed valid declaration after all checks passed again (Sec)
-	bool		_airspeed_failing{false};	///< airspeed sensor checks have detected failure, but not yet declared failed
-	uint64_t	_time_checks_passed{0};	///< time the checks have last passed (uSec)
-	uint64_t	_time_checks_failed{0};	///< time the checks have last not passed (uSec)
-
-	void update_in_fixed_wing_flight(bool in_fixed_wing_flight) { _in_fixed_wing_flight = in_fixed_wing_flight; }
-
-	void update_wind_estimator(const uint64_t timestamp, float airspeed_true_raw, bool lpos_valid, float lpos_vx,
-				   float lpos_vy,
-				   float lpos_vz,
-				   float lpos_evh, float lpos_evv, const float att_q[4]);
-	void update_CAS_scale();
-	void update_CAS_TAS(float air_pressure_pa, float air_temperature_celsius);
-	void check_airspeed_innovation(uint64_t timestamp, float estimator_status_vel_test_ratio,
-				       float estimator_status_mag_test_ratio);
-	void check_load_factor(float accel_z);
-	void update_airspeed_valid_status(const uint64_t timestamp);
-
+	bool _airspeed_failing{false};	///< airspeed sensor checks have detected failure, but not yet declared failed
+	uint64_t _time_checks_passed{0};	///< time the checks have last passed (uSec)
+	uint64_t _time_checks_failed{0};	///< time the checks have last not passed (uSec)
 };
