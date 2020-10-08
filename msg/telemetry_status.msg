@@ -23,7 +23,7 @@ float32 data_rate
 
 float32 rate_multiplier
 
-float32 rate_rx
+uint32 rate_rx              # bytes/s
 
-float32 rate_tx
-float32 rate_txerr
+uint32 rate_tx              # bytes/s
+uint32 rate_txerr           # bytes/s

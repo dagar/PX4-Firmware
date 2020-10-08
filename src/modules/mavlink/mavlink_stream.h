@@ -76,9 +76,9 @@ public:
 	int get_interval() { return _interval; }
 
 	/**
-	 * @return 0 if updated / sent, -1 if unchanged
+	 * @return 0 if updated / sent, -1 on error
 	 */
-	int update(const hrt_abstime &t);
+	int update();
 	virtual const char *get_name() const = 0;
 	virtual uint16_t get_id() = 0;
 
@@ -122,12 +122,6 @@ public:
 	 */
 	void reset_last_sent() { _last_sent = 0; }
 
-protected:
-	Mavlink      *const _mavlink;
-	int _interval{1000000};		///< if set to negative value = unlimited rate
-
-	virtual bool send(const hrt_abstime t) = 0;
-
 	/**
 	 * Function to collect/update data for the streams at a high rate independant of
 	 * actual stream rate.
@@ -135,6 +129,12 @@ protected:
 	 * This function is called at every iteration of the mavlink module.
 	 */
 	virtual void update_data() { }
+
+protected:
+	Mavlink      *const _mavlink;
+	int _interval{1000000};		///< if set to negative value = unlimited rate
+
+	virtual bool send(const hrt_abstime t) = 0;
 
 private:
 	hrt_abstime _last_sent{0};

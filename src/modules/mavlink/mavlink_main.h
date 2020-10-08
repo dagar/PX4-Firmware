@@ -474,7 +474,7 @@ public:
 	int			get_data_rate()		{ return _datarate; }
 	void			set_data_rate(int rate) { if (rate > 0) { _datarate = rate; } }
 
-	unsigned		get_main_loop_delay() const { return _main_loop_delay; }
+	int		get_main_loop_delay() const { return _main_loop_delay; }
 
 	/** get the Mavlink shell. Create a new one if there isn't one. It is *always* created via MavlinkReceiver thread.
 	 *  Returns nullptr if shell cannot be created */

@@ -1501,7 +1501,9 @@ Mavlink::update_rate_mult()
 
 	/* scale down if we have a TX err rate suggesting link congestion */
 	if (_tstatus.rate_txerr > 0.0f && !_radio_status_critical) {
-		hardware_mult = (_tstatus.rate_tx) / (_tstatus.rate_tx + _tstatus.rate_txerr);
+		const float rate_tx = _tstatus.rate_tx;
+		const float rate_total = _tstatus.rate_tx + _tstatus.rate_txerr;
+		hardware_mult = rate_tx / rate_total;
 
 	} else if (_radio_status_available) {
 
@@ -1523,8 +1525,8 @@ Mavlink::update_rate_mult()
 	/* pick the minimum from bandwidth mult and hardware mult as limit */
 	_rate_mult = fminf(bandwidth_mult, hardware_mult);
 
-	/* ensure the rate multiplier never drops below 5% so that something is always sent */
-	_rate_mult = math::constrain(_rate_mult, 0.05f, 1.0f);
+	/* ensure the rate multiplier never drops below 1% so that something is always sent */
+	_rate_mult = math::constrain(_rate_mult, 0.01f, 1.0f);
 }
 
 void
@@ -2232,7 +2234,17 @@ Mavlink::task_main(int argc, char *argv[])
 
 	while (!_task_should_exit) {
 		/* main loop */
-		px4_usleep(_main_loop_delay);
+		int min_interval = MAVLINK_MAX_INTERVAL;
+
+		for (const auto &stream : _streams) {
+			int interval = stream->get_interval();
+
+			if (interval > 0 && interval < min_interval) {
+				min_interval = interval;
+			}
+		}
+
+		px4_usleep(math::constrain(min_interval / 2, 1000, 20000));
 
 		if (!should_transmit()) {
 			check_requested_subscriptions();
@@ -2376,26 +2388,6 @@ Mavlink::task_main(int argc, char *argv[])
 			}
 		}
 
-		check_requested_subscriptions();
-
-		/* update streams */
-		for (const auto &stream : _streams) {
-			stream->update(t);
-
-			if (!_first_heartbeat_sent) {
-				if (_mode == MAVLINK_MODE_IRIDIUM) {
-					if (stream->get_id() == MAVLINK_MSG_ID_HIGH_LATENCY2) {
-						_first_heartbeat_sent = stream->first_message_sent();
-					}
-
-				} else {
-					if (stream->get_id() == MAVLINK_MSG_ID_HEARTBEAT) {
-						_first_heartbeat_sent = stream->first_message_sent();
-					}
-				}
-			}
-		}
-
 		/* check for ulog streaming messages */
 		if (_mavlink_ulog) {
 			if (_mavlink_ulog_stop_requested) {
@@ -2469,10 +2461,51 @@ Mavlink::task_main(int argc, char *argv[])
 			}
 		}
 
-		/* update TX/RX rates*/
-		if (t > _bytes_timestamp + 500000) {
+		check_requested_subscriptions();
+
+		// update streams
+		unsigned tx_buf_free = get_free_tx_buf();
+
+		if (tx_buf_free > MAVLINK_NUM_NON_PAYLOAD_BYTES) {
+			for (const auto &stream : _streams) {
+				stream->update_data();
+
+				// check if there is space in the buffer before trying to send
+				if (stream->get_size_avg() <= tx_buf_free) {
+					if (stream->update() == 0) {
+						tx_buf_free = get_free_tx_buf();
+					}
+
+				} else {
+					break;
+				}
+
+				if (!_first_heartbeat_sent) {
+					if (_mode == MAVLINK_MODE_IRIDIUM) {
+						if (stream->get_id() == MAVLINK_MSG_ID_HIGH_LATENCY2) {
+							_first_heartbeat_sent = stream->first_message_sent();
+						}
+
+					} else {
+						if (stream->get_id() == MAVLINK_MSG_ID_HEARTBEAT) {
+							_first_heartbeat_sent = stream->first_message_sent();
+						}
+					}
+				}
+			}
+		}
+
+		// update RX/TX rates
+		bool update_rxtx_rates = (t > _bytes_timestamp + 1_s);
+
+		// force RX/TX rate update immediately if there's no longer a transmit error
+		if ((_bytes_txerr == 0) && (_bytes_tx > 0) && (_tstatus.rate_txerr > 0)) {
+			update_rxtx_rates = true;
+		}
+
+		if (update_rxtx_rates) {
 			if (_bytes_timestamp != 0) {
-				const float dt = (t - _bytes_timestamp) / 1000.0f;
+				const float dt = (t - _bytes_timestamp) * 1e-6f;
 
 				_tstatus.rate_tx = _bytes_tx / dt;
 				_tstatus.rate_txerr = _bytes_txerr / dt;
@@ -2481,6 +2514,8 @@ Mavlink::task_main(int argc, char *argv[])
 				_bytes_tx = 0;
 				_bytes_txerr = 0;
 				_bytes_rx = 0;
+
+				_tstatus_updated = true;
 			}
 
 			_bytes_timestamp = t;
@@ -2796,11 +2831,11 @@ Mavlink::display_status()
 
 	printf("\tflow control: %s\n", _flow_control_mode ? "ON" : "OFF");
 	printf("\trates:\n");
-	printf("\t  tx: %.3f kB/s\n", (double)_tstatus.rate_tx);
-	printf("\t  txerr: %.3f kB/s\n", (double)_tstatus.rate_txerr);
+	printf("\t  tx: %d B/s\n", _tstatus.rate_tx);
+	printf("\t  txerr: %d B/s\n", _tstatus.rate_txerr);
 	printf("\t  tx rate mult: %.3f\n", (double)_rate_mult);
-	printf("\t  tx rate max: %i B/s\n", _datarate);
-	printf("\t  rx: %.3f kB/s\n", (double)_tstatus.rate_rx);
+	printf("\t  tx rate max: %d B/s\n", _datarate);
+	printf("\t  rx: %d B/s\n", _tstatus.rate_rx);
 
 	if (_mavlink_ulog) {
 		printf("\tULog rate: %.1f%% of max %.1f%%\n", (double)_mavlink_ulog->current_data_rate() * 100.,
