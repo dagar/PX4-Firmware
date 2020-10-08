@@ -2470,7 +2470,7 @@ Mavlink::task_main(int argc, char *argv[])
 		}
 
 		/* update TX/RX rates*/
-		if (t > _bytes_timestamp + 1000000) {
+		if (t > _bytes_timestamp + 500000) {
 			if (_bytes_timestamp != 0) {
 				const float dt = (t - _bytes_timestamp) / 1000.0f;
 
