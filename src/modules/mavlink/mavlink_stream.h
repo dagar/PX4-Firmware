@@ -43,15 +43,13 @@
 
 #include <drivers/drv_hrt.h>
 #include <px4_platform_common/module_params.h>
-#include <containers/List.hpp>
+#include <containers/IntrusiveSortedList.hpp>
 
 class Mavlink;
 
-class MavlinkStream : public ListNode<MavlinkStream *>
+class MavlinkStream : public IntrusiveSortedListNode<MavlinkStream *>
 {
-
 public:
-
 	MavlinkStream(Mavlink *mavlink);
 	virtual ~MavlinkStream() = default;
 
@@ -60,6 +58,16 @@ public:
 	MavlinkStream &operator=(const MavlinkStream &) = delete;
 	MavlinkStream(MavlinkStream &&) = delete;
 	MavlinkStream &operator=(MavlinkStream &&) = delete;
+
+	bool operator<=(const MavlinkStream &rhs)
+	{
+		if (const_rate()) {
+			// sort with unlimited
+			return -1;
+		}
+
+		return get_interval() <= rhs.get_interval();
+	}
 
 	/**
 	 * Get the interval
@@ -73,7 +81,7 @@ public:
 	 *
 	 * @return the inveral in microseconds (us) between messages
 	 */
-	int get_interval() { return _interval; }
+	int get_interval() const { return _interval; }
 
 	/**
 	 * @return 0 if updated / sent, -1 if unchanged

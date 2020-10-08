@@ -394,7 +394,7 @@ public:
 	 */
 	void			send_protocol_version();
 
-	List<MavlinkStream *> &get_streams() { return _streams; }
+	IntrusiveSortedList<MavlinkStream *> &get_streams() { return _streams; }
 
 	float			get_rate_mult() const { return _rate_mult; }
 
@@ -556,7 +556,7 @@ private:
 
 	unsigned		_main_loop_delay{1000};	/**< mainloop delay, depends on data rate */
 
-	List<MavlinkStream *>		_streams;
+	IntrusiveSortedList<MavlinkStream *>		_streams;
 
 	MavlinkShell		*_mavlink_shell{nullptr};
 	MavlinkULog		*_mavlink_ulog{nullptr};
