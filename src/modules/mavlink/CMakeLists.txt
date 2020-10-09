@@ -41,6 +41,7 @@ px4_add_module(
 		-Wno-address-of-packed-member # TODO: fix in c_library_v2
 		-Wno-enum-compare # ROTATION <-> MAV_SENSOR_ROTATION
 		#-DDEBUG_BUILD
+		${MAX_CUSTOM_OPT_LEVEL}
 	INCLUDES
 		${PX4_SOURCE_DIR}/mavlink/include/mavlink
 	SRCS
