@@ -109,6 +109,8 @@ void LoggedTopics::add_default_topics()
 	add_topic("vtol_vehicle_status", 200);
 	add_topic("yaw_estimator_status", 200);
 
+	add_topic("sensor_gyro_fifo");
+
 	// multi topics
 	add_topic_multi("actuator_outputs", 100, 2);
 	add_topic_multi("logger_status", 0, 2);
