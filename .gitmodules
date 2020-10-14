@@ -54,3 +54,6 @@
 [submodule "src/examples/gyro_fft/CMSIS_5"]
 	path = src/examples/gyro_fft/CMSIS_5
 	url = https://github.com/ARM-software/CMSIS_5.git
+[submodule "external/eMQTT5"]
+	path = external/eMQTT5
+	url = git@github.com:X-Ryl669/eMQTT5.git
