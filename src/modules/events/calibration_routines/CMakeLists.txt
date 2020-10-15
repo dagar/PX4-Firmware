@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,32 +31,24 @@
 #
 ############################################################################
 
-add_subdirectory(failure_detector)
-add_subdirectory(Arming)
-
-px4_add_module(
-	MODULE modules__commander
-	MAIN commander
-	COMPILE_FLAGS
-	SRCS
-		Commander.cpp
-		Commander.hpp
-		commander_helper.cpp
-		commander_helper.h
-		state_machine_helper.cpp
-		state_machine_helper.h
-	DEPENDS
-		circuit_breaker
-		failure_detector
-		git_ecl
-		ecl_geo
-		hysteresis
-		PreFlightCheck
-		ArmAuthorization
-		HealthFlags
-		sensor_calibration
-	)
-
-if(PX4_TESTING)
-	add_subdirectory(commander_tests)
-endif()
+px4_add_library(calibration_routines
+	accelerometer_calibration.cpp
+	accelerometer_calibration.h
+	airspeed_calibration.cpp
+	airspeed_calibration.h
+	calibration_messages.h
+	calibration_routines.cpp
+	calibration_routines.h
+	esc_calibration.cpp
+	esc_calibration.h
+	factory_calibration_storage.cpp
+	factory_calibration_storage.h
+	gyro_calibration.cpp
+	gyro_calibration.h
+	level_calibration.cpp
+	level_calibration.h
+	mag_calibration.cpp
+	mag_calibration.h
+	rc_calibration.cpp
+	rc_calibration.h
+)

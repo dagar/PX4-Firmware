@@ -31,6 +31,8 @@
 #
 ############################################################################
 
+add_subdirectory(calibration_routines)
+
 px4_add_module(
 	MODULE modules__events
 	MAIN send_event
@@ -41,5 +43,5 @@ px4_add_module(
 		set_leds.cpp
 		status_display.cpp
 	DEPENDS
-		modules__uORB
+		calibration_routines
 	)
