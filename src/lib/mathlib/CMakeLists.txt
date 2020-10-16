@@ -40,3 +40,4 @@ px4_add_library(mathlib
 
 px4_add_unit_gtest(SRC math/filter/NotchFilterTest.cpp)
 px4_add_unit_gtest(SRC math/FunctionsTest.cpp)
+px4_add_unit_gtest(SRC math/FloatTest.cpp)
