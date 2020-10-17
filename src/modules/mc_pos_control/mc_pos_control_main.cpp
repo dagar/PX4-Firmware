@@ -59,7 +59,6 @@
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/landing_gear.h>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
@@ -107,7 +106,6 @@ private:
 
 	Takeoff _takeoff; /**< state machine and ramp to bring the vehicle off the ground without jumps */
 
-	uORB::Publication<vehicle_attitude_setpoint_s>	_vehicle_attitude_setpoint_pub;
 	uORB::PublicationQueued<vehicle_command_s> _pub_vehicle_command{ORB_ID(vehicle_command)};	 /**< vehicle command publication */
 	orb_advert_t _mavlink_log_pub{nullptr};
 
@@ -235,13 +233,6 @@ private:
 	void limit_altitude(vehicle_local_position_setpoint_s &setpoint);
 
 	/**
-	 * Adjust the setpoint during landing.
-	 * Thrust is adjusted to support the land-detector during detection.
-	 * @param setpoint gets adjusted based on land-detector state
-	 */
-	void limit_thrust_during_landing(vehicle_attitude_setpoint_s &setpoint);
-
-	/**
 	 * Start flightasks based on navigation state.
 	 * This methods activates a task based on the navigation state.
 	 */
@@ -277,7 +268,6 @@ MulticopterPositionControl::MulticopterPositionControl(bool vtol) :
 	SuperBlock(nullptr, "MPC"),
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
-	_vehicle_attitude_setpoint_pub(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
 	_vel_x_deriv(this, "VELD"),
 	_vel_y_deriv(this, "VELD"),
 	_vel_z_deriv(this, "VELD"),
@@ -679,18 +669,7 @@ MulticopterPositionControl::Run()
 			_flight_tasks.updateVelocityControllerIO(Vector3f(local_pos_sp.vx, local_pos_sp.vy, local_pos_sp.vz),
 					Vector3f(local_pos_sp.acceleration));
 
-			vehicle_attitude_setpoint_s attitude_setpoint{};
-			attitude_setpoint.timestamp = time_stamp_now;
-			_control.getAttitudeSetpoint(attitude_setpoint);
-
-			// publish attitude setpoint
-			// It's important to publish also when disarmed otheriwse the attitude setpoint stays uninitialized.
-			// Not publishing when not running a flight task
-			// in stabilized mode attitude setpoints get ignored
-			// in offboard with attitude setpoints they come from MAVLink directly
-			_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
-
-			_wv_dcm_z_sp_prev = Quatf(attitude_setpoint.q_d).dcm_z();
+			//_wv_dcm_z_sp_prev = Quatf(attitude_setpoint.q_d).dcm_z(); // TODO: fix
 
 			// if there's any change in landing gear setpoint publish it
 			if (gear.landing_gear != _old_landing_gear_position

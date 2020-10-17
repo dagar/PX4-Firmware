@@ -53,6 +53,7 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_land_detected.h>
+#include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <vtol_att_control/vtol_type.h>
 #include <lib/ecl/AlphaFilter/AlphaFilter.hpp>
 
@@ -94,7 +95,16 @@ private:
 	/**
 	 * Generate & publish an attitude setpoint from stick inputs
 	 */
-	void		generate_attitude_setpoint(const matrix::Quatf &q, float dt, bool reset_yaw_sp);
+	void		generate_attitude_setpoint(const float yaw, float dt, bool reset_yaw_sp);
+
+	/**
+	 * Converts a body z vector and yaw set-point to a desired attitude.
+	 * @param body_z a world frame 3D vector in direction of the desired body z axis
+	 * @param yaw_sp the desired yaw setpoint
+	 *
+	 * @return Quaternion etpoint to fill
+	 */
+	matrix::Quatf bodyzToAttitude(matrix::Vector3f body_z, const float yaw_sp);
 
 	AttitudeControl _attitude_control; ///< class for attitude control calculations
 
@@ -105,6 +115,7 @@ private:
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};	/**< manual control setpoint subscription */
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};			/**< vehicle status subscription */
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};	/**< vehicle land detected subscription */
+	uORB::Subscription _vehicle_local_position_setpoint_sub{ORB_ID(vehicle_local_position_setpoint)};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_attitude_sub{this, ORB_ID(vehicle_attitude)};
 

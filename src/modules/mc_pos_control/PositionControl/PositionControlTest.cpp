@@ -54,20 +54,6 @@ TEST(PositionControlTest, EmptySetpoint)
 	EXPECT_EQ(Vector3f(output_setpoint.acceleration), Vector3f(0.f, 0.f, 0.f));
 	EXPECT_EQ(Vector3f(output_setpoint.jerk), Vector3f(0.f, 0.f, 0.f));
 	EXPECT_EQ(Vector3f(output_setpoint.thrust), Vector3f(0, 0, 0));
-
-	vehicle_attitude_setpoint_s attitude{};
-	position_control.getAttitudeSetpoint(attitude);
-	EXPECT_FLOAT_EQ(attitude.roll_body, 0.f);
-	EXPECT_FLOAT_EQ(attitude.pitch_body, 0.f);
-	EXPECT_FLOAT_EQ(attitude.yaw_body, 0.f);
-	EXPECT_FLOAT_EQ(attitude.yaw_sp_move_rate, 0.f);
-	EXPECT_EQ(Quatf(attitude.q_d), Quatf(1.f, 0.f, 0.f, 0.f));
-	EXPECT_EQ(Vector3f(attitude.thrust_body), Vector3f(0.f, 0.f, 0.f));
-	EXPECT_EQ(attitude.roll_reset_integral, false);
-	EXPECT_EQ(attitude.pitch_reset_integral, false);
-	EXPECT_EQ(attitude.yaw_reset_integral, false);
-	EXPECT_EQ(attitude.fw_control_yaw, false);
-	EXPECT_FLOAT_EQ(attitude.apply_flaps, 0.f);//vehicle_attitude_setpoint_s::FLAPS_OFF); // TODO why no reference?
 }
 
 class PositionControlBasicTest : public ::testing::Test
@@ -110,7 +96,6 @@ public:
 		_position_control.setInputSetpoint(_input_setpoint);
 		const bool ret = _position_control.update(.1f);
 		_position_control.getLocalPositionSetpoint(_output_setpoint);
-		_position_control.getAttitudeSetpoint(_attitude);
 		return ret;
 	}
 
@@ -118,7 +103,6 @@ public:
 	vehicle_constraints_s _contraints{};
 	vehicle_local_position_setpoint_s _input_setpoint{};
 	vehicle_local_position_setpoint_s _output_setpoint{};
-	vehicle_attitude_setpoint_s _attitude{};
 };
 
 class PositionControlBasicDirectionTest : public PositionControlBasicTest
@@ -130,11 +114,6 @@ public:
 		EXPECT_GT(thrust(0), 0.f);
 		EXPECT_GT(thrust(1), 0.f);
 		EXPECT_LT(thrust(2), 0.f);
-
-		Vector3f body_z = Quatf(_attitude.q_d).dcm_z();
-		EXPECT_LT(body_z(0), 0.f);
-		EXPECT_LT(body_z(1), 0.f);
-		EXPECT_GT(body_z(2), 0.f);
 	}
 };
 
@@ -163,17 +142,9 @@ TEST_F(PositionControlBasicTest, TiltLimit)
 	_input_setpoint.z = -0.f;
 
 	EXPECT_TRUE(runController());
-	Vector3f body_z = Quatf(_attitude.q_d).dcm_z();
-	float angle = acosf(body_z.dot(Vector3f(0.f, 0.f, 1.f)));
-	EXPECT_GT(angle, 0.f);
-	EXPECT_LE(angle, 1.f);
 
 	_contraints.tilt = .5f;
 	EXPECT_TRUE(runController());
-	body_z = Quatf(_attitude.q_d).dcm_z();
-	angle = acosf(body_z.dot(Vector3f(0.f, 0.f, 1.f)));
-	EXPECT_GT(angle, 0.f);
-	EXPECT_LE(angle, .50001f);
 }
 
 TEST_F(PositionControlBasicTest, VelocityLimit)
@@ -199,13 +170,6 @@ TEST_F(PositionControlBasicTest, PositionControlMaxThrustLimit)
 	EXPECT_FLOAT_EQ(thrust(0), 0.f);
 	EXPECT_FLOAT_EQ(thrust(1), 0.f);
 	EXPECT_FLOAT_EQ(thrust(2), -0.9f);
-
-	EXPECT_EQ(_attitude.thrust_body[0], 0.f);
-	EXPECT_EQ(_attitude.thrust_body[1], 0.f);
-	EXPECT_FLOAT_EQ(_attitude.thrust_body[2], -0.9f);
-
-	EXPECT_FLOAT_EQ(_attitude.roll_body, 0.f);
-	EXPECT_FLOAT_EQ(_attitude.pitch_body, 0.f);
 }
 
 TEST_F(PositionControlBasicTest, PositionControlMinThrustLimit)
@@ -217,11 +181,6 @@ TEST_F(PositionControlBasicTest, PositionControlMinThrustLimit)
 	runController();
 	Vector3f thrust(_output_setpoint.thrust);
 	EXPECT_FLOAT_EQ(thrust.length(), 0.1f);
-
-	EXPECT_FLOAT_EQ(_attitude.thrust_body[2], -0.1f);
-
-	EXPECT_FLOAT_EQ(_attitude.roll_body, 0.f);
-	EXPECT_FLOAT_EQ(_attitude.pitch_body, -1.f);
 }
 
 TEST_F(PositionControlBasicTest, FailsafeInput)
@@ -231,12 +190,6 @@ TEST_F(PositionControlBasicTest, FailsafeInput)
 	_input_setpoint.acceleration[0] = _input_setpoint.acceleration[1] = 0.f;
 
 	EXPECT_TRUE(runController());
-	EXPECT_FLOAT_EQ(_attitude.thrust_body[0], 0.f);
-	EXPECT_FLOAT_EQ(_attitude.thrust_body[1], 0.f);
-	EXPECT_LT(_output_setpoint.thrust[2], -.1f);
-	EXPECT_GT(_output_setpoint.thrust[2], -.5f);
-	EXPECT_GT(_attitude.thrust_body[2], -.5f);
-	EXPECT_LE(_attitude.thrust_body[2], -.1f);
 }
 
 TEST_F(PositionControlBasicTest, IdleThrustInput)
