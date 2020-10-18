@@ -94,13 +94,15 @@ private:
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 	perf_counter_t _cycle_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": cycle interval")};
 	perf_counter_t _fft_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": FFT")};
+
+	//perf_counter_t _accel_fifo_generation_gap_perf{perf_alloc(PC_COUNT, MODULE_NAME": accel FIFO data gap")};
 	perf_counter_t _gyro_fifo_generation_gap_perf{perf_alloc(PC_COUNT, MODULE_NAME": gyro FIFO data gap")};
 
 	uint32_t _selected_sensor_device_id{0};
 
-	arm_rfft_instance_q15 _rfft_q15[3];
+	arm_rfft_instance_q15 _rfft_q15;
 
-	q15_t _data_buffer[3][FFT_LENGTH] {};
+	q15_t _gyro_data_buffer[3][FFT_LENGTH] {};
 	q15_t _hanning_window[FFT_LENGTH] {};
 	q15_t _fft_input_buffer[FFT_LENGTH] {};
 	q15_t _fft_outupt_buffer[FFT_LENGTH * 2] {};

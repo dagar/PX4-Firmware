@@ -45,9 +45,7 @@ GyroFFT::GyroFFT() :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::lp_default)
 {
-	for (int axis = 0; axis < 3; axis++) {
-		arm_rfft_init_q15(&_rfft_q15[axis], FFT_LENGTH, 0, 1);
-	}
+	arm_rfft_init_q15(&_rfft_q15, FFT_LENGTH, 0, 1);
 
 	// init Hanning window
 	for (int n = 0; n < FFT_LENGTH; n++) {
@@ -67,8 +65,8 @@ GyroFFT::~GyroFFT()
 bool GyroFFT::init()
 {
 	if (!SensorSelectionUpdate(true)) {
-		PX4_ERR("sensor_gyro_fifo callback registration failed!");
-		return false;
+		PX4_WARN("sensor_gyro_fifo callback registration failed!");
+		ScheduleDelayed(500_ms);
 	}
 
 	return true;
@@ -76,7 +74,7 @@ bool GyroFFT::init()
 
 bool GyroFFT::SensorSelectionUpdate(bool force)
 {
-	if (_sensor_selection_sub.updated() || force) {
+	if (_sensor_selection_sub.updated() || (_selected_sensor_device_id == 0) || force) {
 		sensor_selection_s sensor_selection{};
 		_sensor_selection_sub.copy(&sensor_selection);
 
@@ -157,7 +155,7 @@ float GyroFFT::EstimatePeakFrequency(q15_t fft[FFT_LENGTH * 2], uint8_t peak_ind
 	float d = (dp + dm) / 2 + tau(dp * dp) - tau(dm * dm);
 
 	float adjustedBinLocation = peak_index + d;
-	float peakFreqAdjusted = (_gyro_sample_rate_hz * adjustedBinLocation / (FFT_LENGTH * 2));
+	float peakFreqAdjusted = (_gyro_sample_rate_hz * adjustedBinLocation / (FFT_LENGTH * 2.f));
 
 	return peakFreqAdjusted;
 }
@@ -199,6 +197,7 @@ void GyroFFT::Run()
 	const float resolution_hz = _gyro_sample_rate_hz / FFT_LENGTH;
 
 	bool publish = false;
+	bool fft_updated = false;
 
 	// run on sensor gyro fifo updates
 	sensor_gyro_fifo_s sensor_gyro_fifo;
@@ -235,33 +234,34 @@ void GyroFFT::Run()
 				break;
 			}
 
-			// TODO: stagger updates per axis to minimize latency
+			int &buffer_index = _fft_buffer_index[axis];
+
 			for (int n = 0; n < N; n++) {
-				int &buffer_index = _fft_buffer_index[axis];
+				if (buffer_index < FFT_LENGTH) {
+					// convert int16_t -> q15_t (scaling isn't relevant)
+					_gyro_data_buffer[axis][buffer_index] = input[n] / 2;
+					buffer_index++;
+				}
 
-				// convert int16_t -> q15_t (scaling isn't relevant)
-				_data_buffer[axis][buffer_index] = input[n] / 2;
+				// if we have enough samples begin processing, but only one FFT per cycle
+				if ((buffer_index >= FFT_LENGTH) && !fft_updated) {
 
-				buffer_index++;
-
-				// if we have enough samples, begin processing
-				if (buffer_index >= FFT_LENGTH) {
-
-					arm_mult_q15(_data_buffer[axis], _hanning_window, _fft_input_buffer, FFT_LENGTH);
+					arm_mult_q15(_gyro_data_buffer[axis], _hanning_window, _fft_input_buffer, FFT_LENGTH);
 
 					perf_begin(_fft_perf);
-					arm_rfft_q15(&_rfft_q15[axis], _fft_input_buffer, _fft_outupt_buffer);
+					arm_rfft_q15(&_rfft_q15, _fft_input_buffer, _fft_outupt_buffer);
 					perf_end(_fft_perf);
+					fft_updated = true;
 
 					static constexpr uint16_t MIN_SNR = 10; // TODO:
 
-					static constexpr int MAX_NUM_PEAKS = 6;
+					static constexpr int MAX_NUM_PEAKS = 2;
 					uint32_t peaks_magnitude[MAX_NUM_PEAKS] {};
 					uint8_t peak_index[MAX_NUM_PEAKS] {};
 
 					// start at 2 to skip DC
 					// output is ordered [real[0], imag[0], real[1], imag[1], real[2], imag[2] ... real[(N/2)-1], imag[(N/2)-1]
-					for (uint8_t bucket_index = 2; bucket_index < FFT_LENGTH; bucket_index = bucket_index + 2) {
+					for (uint8_t bucket_index = 2; bucket_index < (FFT_LENGTH / 2); bucket_index = bucket_index + 2) {
 						const float freq_hz = (bucket_index / 2) * resolution_hz;
 
 						if (freq_hz > _param_imu_gyro_fft_max.get()) {
@@ -337,10 +337,10 @@ void GyroFFT::Run()
 					}
 
 					// reset
-					buffer_index = FFT_LENGTH / 2;
-
-					// copy 2nd half of buffer to 1st half (50% overlap)
-					memcpy(&_data_buffer[axis][0], &_data_buffer[axis][FFT_LENGTH / 2], sizeof(q15_t) * FFT_LENGTH / 2);
+					// shift buffer (75% overlap)
+					int overlap_start = FFT_LENGTH / 4;
+					memmove(&_gyro_data_buffer[axis][0], &_gyro_data_buffer[axis][overlap_start], sizeof(q15_t) * overlap_start * 3);
+					buffer_index = overlap_start * 3;
 				}
 			}
 		}
