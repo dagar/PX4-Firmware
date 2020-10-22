@@ -47,7 +47,7 @@
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_selection.h>
-#include <uORB/topics/sensors_status_imu.h>
+#include <uORB/topics/sensors_status.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_global_position.h>
@@ -123,8 +123,8 @@ private:
 		{this, 8},
 	};
 
-	static constexpr uint8_t IMU_STATUS_SIZE = (sizeof(sensors_status_imu_s::gyro_inconsistency_rad_s) / sizeof(
-				sensors_status_imu_s::gyro_inconsistency_rad_s[0]));
+	static constexpr uint8_t IMU_STATUS_SIZE = (sizeof(sensors_status_s::inconsistency) / sizeof(
+				sensors_status_s::inconsistency[0]));
 	static_assert(IMU_STATUS_SIZE == sizeof(estimator_selector_status_s::accumulated_gyro_error) / sizeof(
 			      estimator_selector_status_s::accumulated_gyro_error[0]),
 		      "increase estimator_selector_status_s::accumulated_gyro_error size");
@@ -137,7 +137,8 @@ private:
 
 	float _accumulated_gyro_error[IMU_STATUS_SIZE] {};
 	float _accumulated_accel_error[IMU_STATUS_SIZE] {};
-	hrt_abstime _last_update_us{0};
+	hrt_abstime _last_accel_status_update_us{0};
+	hrt_abstime _last_gyro_status_update_us{0};
 	bool _gyro_fault_detected{false};
 	bool _accel_fault_detected{false};
 
@@ -176,7 +177,8 @@ private:
 	int _lockstep_component{-1};
 
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
-	uORB::Subscription _sensors_status_imu{ORB_ID(sensors_status_imu)};
+	uORB::Subscription _sensors_status_accel{ORB_ID(sensors_status_accel)};
+	uORB::Subscription _sensors_status_gyro{ORB_ID(sensors_status_gyro)};
 
 	// Publications
 	uORB::Publication<estimator_selector_status_s> _estimator_selector_status_pub{ORB_ID(estimator_selector_status)};

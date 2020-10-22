@@ -130,34 +130,26 @@ bool EKF2Selector::UpdateErrorScores()
 	// first check imu inconsistencies
 	_gyro_fault_detected = false;
 	uint32_t faulty_gyro_id = 0;
-	_accel_fault_detected = false;
-	uint32_t faulty_accel_id = 0;
 
-	if (_sensors_status_imu.updated()) {
-		sensors_status_imu_s sensors_status_imu;
+	if (_sensors_status_gyro.updated()) {
+		sensors_status_s sensors_status_gyro;
 
-		if (_sensors_status_imu.copy(&sensors_status_imu)) {
+		if (_sensors_status_gyro.copy(&sensors_status_gyro)) {
 			const float angle_rate_threshold = radians(_param_ekf2_sel_imu_angle_rate.get());
 			const float angle_threshold = radians(_param_ekf2_sel_imu_angle.get());
-			const float accel_threshold = _param_ekf2_sel_imu_accel.get();
-			const float velocity_threshold = _param_ekf2_sel_imu_velocity.get();
-			const float time_step_s = constrain((sensors_status_imu.timestamp - _last_update_us) * 1e-6f, 0.f, 0.02f);
-			_last_update_us = sensors_status_imu.timestamp;
+			const float time_step_s = constrain((sensors_status_gyro.timestamp - _last_gyro_status_update_us) * 1e-6f, 0.f, 0.02f);
+			_last_gyro_status_update_us = sensors_status_gyro.timestamp;
 
 			uint8_t n_gyros = 0;
-			uint8_t n_accels = 0;
 			uint8_t n_gyro_exceedances = 0;
-			uint8_t n_accel_exceedances = 0;
 			float largest_accumulated_gyro_error = 0.0f;
-			float largest_accumulated_accel_error = 0.0f;
 			uint8_t largest_gyro_error_index = 0;
-			uint8_t largest_accel_error_index = 0;
 
 			for (unsigned i = 0; i < IMU_STATUS_SIZE; i++) {
 				// check for gyros with excessive difference to mean using accumulated error
-				if (sensors_status_imu.gyro_device_ids[i] != 0) {
+				if (sensors_status_gyro.device_ids[i] != 0) {
 					n_gyros++;
-					_accumulated_gyro_error[i] += (sensors_status_imu.gyro_inconsistency_rad_s[i] - angle_rate_threshold) * time_step_s;
+					_accumulated_gyro_error[i] += (sensors_status_gyro.inconsistency[i] - angle_rate_threshold) * time_step_s;
 					_accumulated_gyro_error[i] = fmaxf(_accumulated_gyro_error[i], 0.f);
 
 					if (_accumulated_gyro_error[i] > angle_threshold) {
@@ -173,11 +165,46 @@ bool EKF2Selector::UpdateErrorScores()
 					// no sensor
 					_accumulated_gyro_error[i] = 0.f;
 				}
+			}
 
+			if (n_gyro_exceedances > 0) {
+				if (n_gyros >= 3) {
+					// If there are 3 or more sensors, the one with the largest accumulated error is faulty
+					_gyro_fault_detected = true;
+					faulty_gyro_id = _instance[largest_gyro_error_index].estimator_status.gyro_device_id;
+
+				} else if (n_gyros == 2) {
+					// A fault is present, but the faulty sensor identity cannot be determined
+					_gyro_fault_detected = true;
+				}
+			}
+		}
+	}
+
+
+	_accel_fault_detected = false;
+	uint32_t faulty_accel_id = 0;
+
+	if (_sensors_status_accel.updated()) {
+		sensors_status_s sensors_status_accel;
+
+		if (_sensors_status_accel.copy(&sensors_status_accel)) {
+			const float accel_threshold = _param_ekf2_sel_imu_accel.get();
+			const float velocity_threshold = _param_ekf2_sel_imu_velocity.get();
+			const float time_step_s = constrain((sensors_status_accel.timestamp - _last_accel_status_update_us) * 1e-6f, 0.f,
+							    0.02f);
+			_last_accel_status_update_us = sensors_status_accel.timestamp;
+
+			uint8_t n_accels = 0;
+			uint8_t n_accel_exceedances = 0;
+			float largest_accumulated_accel_error = 0.0f;
+			uint8_t largest_accel_error_index = 0;
+
+			for (unsigned i = 0; i < IMU_STATUS_SIZE; i++) {
 				// check for accelerometers with excessive difference to mean using accumulated error
-				if (sensors_status_imu.accel_device_ids[i] != 0) {
+				if (sensors_status_accel.device_ids[i] != 0) {
 					n_accels++;
-					_accumulated_accel_error[i] += (sensors_status_imu.accel_inconsistency_m_s_s[i] - accel_threshold) * time_step_s;
+					_accumulated_accel_error[i] += (sensors_status_accel.inconsistency[i] - accel_threshold) * time_step_s;
 					_accumulated_accel_error[i] = fmaxf(_accumulated_accel_error[i], 0.f);
 
 					if (_accumulated_accel_error[i] > velocity_threshold) {
@@ -192,18 +219,6 @@ bool EKF2Selector::UpdateErrorScores()
 				} else {
 					// no sensor
 					_accumulated_accel_error[i] = 0.f;
-				}
-			}
-
-			if (n_gyro_exceedances > 0) {
-				if (n_gyros >= 3) {
-					// If there are 3 or more sensors, the one with the largest accumulated error is faulty
-					_gyro_fault_detected = true;
-					faulty_gyro_id = _instance[largest_gyro_error_index].estimator_status.gyro_device_id;
-
-				} else if (n_gyros == 2) {
-					// A fault is present, but the faulty sensor identity cannot be determined
-					_gyro_fault_detected = true;
 				}
 			}
 
@@ -259,12 +274,13 @@ bool EKF2Selector::UpdateErrorScores()
 		}
 
 		// if the gyro used by the EKF is faulty, declare the EKF unhealthy without delay
-		if (_gyro_fault_detected && _instance[i].estimator_status.gyro_device_id == faulty_gyro_id) {
+		if (_gyro_fault_detected && (faulty_gyro_id != 0) && (_instance[i].estimator_status.gyro_device_id == faulty_gyro_id)) {
 			_instance[i].healthy = false;
 		}
 
 		// if the accelerometer used by the EKF is faulty, declare the EKF unhealthy without delay
-		if (_accel_fault_detected && _instance[i].estimator_status.accel_device_id == faulty_accel_id) {
+		if (_accel_fault_detected && (faulty_accel_id != 0)
+		    && (_instance[i].estimator_status.accel_device_id == faulty_accel_id)) {
 			_instance[i].healthy = false;
 		}
 

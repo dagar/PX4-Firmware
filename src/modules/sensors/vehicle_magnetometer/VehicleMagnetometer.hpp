@@ -53,7 +53,7 @@
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_mag.h>
-#include <uORB/topics/sensor_preflight_mag.h>
+#include <uORB/topics/sensors_status.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 
@@ -85,7 +85,7 @@ private:
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
-	uORB::Publication<sensor_preflight_mag_s> _sensor_preflight_mag_pub{ORB_ID(sensor_preflight_mag)};
+	uORB::Publication<sensors_status_s> _sensors_status_mag_pub{ORB_ID(sensors_status_mag)};
 
 	uORB::Publication<vehicle_magnetometer_s> _vehicle_magnetometer_pub{ORB_ID(vehicle_magnetometer)};
 	uORB::PublicationMulti<vehicle_magnetometer_s> _vehicle_magnetometer_multi_pub[MAX_SENSOR_COUNT] {

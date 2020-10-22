@@ -379,7 +379,7 @@ void VehicleMagnetometer::Publish(uint8_t instance, bool multi)
 
 void VehicleMagnetometer::calcMagInconsistency()
 {
-	sensor_preflight_mag_s preflt{};
+	sensors_status_s sensors_status_mag{};
 
 	const sensor_mag_s &primary_mag_report = _last_data[_selected_sensor_sub_index];
 	const Vector3f primary_mag(primary_mag_report.x, primary_mag_report.y,
@@ -416,10 +416,10 @@ void VehicleMagnetometer::calcMagInconsistency()
 
 	// get the vector length of the largest difference and write to the combined sensor struct
 	// will be zero if there is only one magnetometer and hence nothing to compare
-	preflt.mag_inconsistency_angle = mag_angle_diff_max;
+	//preflt.mag_inconsistency_angle = mag_angle_diff_max;
 
-	preflt.timestamp = hrt_absolute_time();
-	_sensor_preflight_mag_pub.publish(preflt);
+	sensors_status_mag.timestamp = hrt_absolute_time();
+	_sensors_status_mag_pub.publish(sensors_status_mag);
 }
 
 void VehicleMagnetometer::PrintStatus()

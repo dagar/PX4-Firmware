@@ -39,7 +39,7 @@
 #include <mathlib/mathlib.h>
 #include <systemlib/mavlink_log.h>
 #include <uORB/Subscription.hpp>
-#include <uORB/topics/sensor_preflight_mag.h>
+#include <uORB/topics/sensors_status.h>
 
 // return false if the magnetomer measurements are inconsistent
 bool PreFlightCheck::magConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status,
@@ -48,11 +48,10 @@ bool PreFlightCheck::magConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_
 	bool pass = false; // flag for result of checks
 
 	// get the sensor preflight data
-	uORB::SubscriptionData<sensor_preflight_mag_s> sensors_sub{ORB_ID(sensor_preflight_mag)};
-	sensors_sub.update();
-	const sensor_preflight_mag_s &sensors = sensors_sub.get();
+	uORB::SubscriptionData<sensors_status_s> sensors_sub{ORB_ID(sensors_status_mag)};
+	const sensors_status_s &sensors_status_mag = sensors_sub.get();
 
-	if (sensors.timestamp == 0) {
+	if (sensors_status_mag.timestamp == 0) {
 		// can happen if not advertised (yet)
 		pass = true;
 	}
@@ -62,12 +61,11 @@ bool PreFlightCheck::magConsistencyCheck(orb_advert_t *mavlink_log_pub, vehicle_
 	int32_t angle_difference_limit_deg = 90;
 	param_get(param_find("COM_ARM_MAG_ANG"), &angle_difference_limit_deg);
 
-	pass = pass || angle_difference_limit_deg < 0; // disabled, pass check
-	pass = pass || sensors.mag_inconsistency_angle < math::radians<float>(angle_difference_limit_deg);
+	pass = pass || (angle_difference_limit_deg < 0); // disabled, pass check
+	//pass = pass || (sensors_status_mag.inconsistency < math::radians<float>(angle_difference_limit_deg));
 
 	if (!pass && report_status) {
-		mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Compasses %d° inconsistent",
-				     static_cast<int>(math::degrees<float>(sensors.mag_inconsistency_angle)));
+		//mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Compasses %d° inconsistent", static_cast<int>(math::degrees<float>(sensors_status_mag.inconsistency)));
 		mavlink_log_critical(mavlink_log_pub, "Please check orientations and recalibrate");
 		set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, status);
 		set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false, status);

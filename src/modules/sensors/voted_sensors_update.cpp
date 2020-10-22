@@ -370,32 +370,33 @@ void VotedSensorsUpdate::sensorsPoll(sensor_combined_s &raw)
 	calcAccelInconsistency();
 	calcGyroInconsistency();
 
-	sensors_status_imu_s status{};
-	status.accel_device_id_primary = _selection.accel_device_id;
-	status.gyro_device_id_primary = _selection.gyro_device_id;
+	sensors_status_s status_accel{};
+	sensors_status_s status_gyro{};
+	status_accel.device_id_primary = _selection.accel_device_id;
+	status_gyro.device_id_primary = _selection.gyro_device_id;
 
-	static_assert(MAX_SENSOR_COUNT == (sizeof(sensors_status_imu_s::accel_inconsistency_m_s_s) / sizeof(
-			sensors_status_imu_s::accel_inconsistency_m_s_s[0])), "check sensors_status_imu accel_inconsistency_m_s_s size");
-	static_assert(MAX_SENSOR_COUNT == (sizeof(sensors_status_imu_s::gyro_inconsistency_rad_s) / sizeof(
-			sensors_status_imu_s::gyro_inconsistency_rad_s[0])), "check sensors_status_imu accel_inconsistency_m_s_s size");
+	static_assert(MAX_SENSOR_COUNT == (sizeof(sensors_status_s::inconsistency) / sizeof(
+			sensors_status_s::inconsistency[0])), "check sensors_status inconsistency size");
 
 	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
 		if ((_accel_device_id[i] != 0) && (_accel.priority[i] > 0)) {
-			status.accel_device_ids[i] = _accel_device_id[i];
-			status.accel_inconsistency_m_s_s[i] = _accel_diff[i].norm();
-			status.accel_healthy[i] = (_accel.voter.get_sensor_state(i) == DataValidator::ERROR_FLAG_NO_ERROR);
+			status_accel.device_ids[i] = _accel_device_id[i];
+			status_accel.inconsistency[i] = _accel_diff[i].norm();
+			status_accel.healthy[i] = (_accel.voter.get_sensor_state(i) == DataValidator::ERROR_FLAG_NO_ERROR);
 		}
 
 		if ((_gyro_device_id[i] != 0) && (_gyro.priority[i] > 0)) {
-			status.gyro_device_ids[i] = _gyro_device_id[i];
-			status.gyro_inconsistency_rad_s[i] = _gyro_diff[i].norm();
-			status.gyro_healthy[i] = (_gyro.voter.get_sensor_state(i) == DataValidator::ERROR_FLAG_NO_ERROR);
+			status_gyro.device_ids[i] = _gyro_device_id[i];
+			status_gyro.inconsistency[i] = _gyro_diff[i].norm();
+			status_gyro.healthy[i] = (_gyro.voter.get_sensor_state(i) == DataValidator::ERROR_FLAG_NO_ERROR);
 		}
 	}
 
+	status_accel.timestamp = hrt_absolute_time();
+	_sensors_status_accel_pub.publish(status_accel);
 
-	status.timestamp = hrt_absolute_time();
-	_sensors_status_imu_pub.publish(status);
+	status_gyro.timestamp = hrt_absolute_time();
+	_sensors_status_gyro_pub.publish(status_gyro);
 }
 
 void VotedSensorsUpdate::setRelativeTimestamps(sensor_combined_s &raw)
