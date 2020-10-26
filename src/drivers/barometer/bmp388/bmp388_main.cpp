@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,77 +31,63 @@
  *
  ****************************************************************************/
 
-#include <px4_platform_common/px4_config.h>
+#include "BMP388.hpp"
+
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 
-#include "bmp388.h"
-
-void
-BMP388::print_usage()
-{
-	PRINT_MODULE_USAGE_NAME("bmp388", "driver");
-	PRINT_MODULE_USAGE_SUBCATEGORY("baro");
-	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, true);
-	PRINT_MODULE_USAGE_PARAMS_I2C_ADDRESS(0x76);
-	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
-}
-
 I2CSPIDriverBase *BMP388::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
-				      int runtime_instance)
+				       int runtime_instance)
 {
-	IBMP388 *interface = nullptr;
+	BMP388 *instance = new BMP388(iterator.configuredBusOption(), iterator.bus(), cli.bus_frequency, cli.rotation);
 
-	if (iterator.busType() == BOARD_I2C_BUS) {
-		interface = bmp388_i2c_interface(iterator.bus(), cli.i2c_address, cli.bus_frequency);
-
-	} else if (iterator.busType() == BOARD_SPI_BUS) {
-		interface = bmp388_spi_interface(iterator.bus(), iterator.devid(), cli.bus_frequency, cli.spi_mode);
-	}
-
-	if (interface == nullptr) {
-		PX4_ERR("failed creating interface for bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
+	if (!instance) {
+		PX4_ERR("alloc failed");
 		return nullptr;
 	}
 
-	if (interface->init() != OK) {
-		delete interface;
+	if (instance->init() != PX4_OK) {
+		delete instance;
 		PX4_DEBUG("no device on bus %i (devid 0x%x)", iterator.bus(), iterator.devid());
 		return nullptr;
 	}
 
-	BMP388 *dev = new BMP388(iterator.configuredBusOption(), iterator.bus(), interface);
+	return instance;
+}
 
-	if (dev == nullptr) {
-		delete interface;
-		return nullptr;
-	}
-
-	if (OK != dev->init()) {
-		delete dev;
-		return nullptr;
-	}
-
-	return dev;
+void BMP388::print_usage()
+{
+	PRINT_MODULE_USAGE_NAME("bmp388", "driver");
+	PRINT_MODULE_USAGE_SUBCATEGORY("magnetometer");
+	PRINT_MODULE_USAGE_COMMAND("start");
+	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(true, false);
+	PRINT_MODULE_USAGE_PARAM_INT('R', 0, 0, 35, "Rotation", true);
+	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
 extern "C" int bmp388_main(int argc, char *argv[])
 {
+	int ch;
 	using ThisDriver = BMP388;
-	BusCLIArguments cli{true, true};
-	cli.i2c_address = 0x76;
-	cli.default_i2c_frequency = 100 * 1000;
-	cli.default_spi_frequency = 10 * 1000 * 1000;
+	BusCLIArguments cli{true, false};
+	cli.default_i2c_frequency = I2C_SPEED;
 
-	const char *verb = cli.parseDefaultArguments(argc, argv);
+	while ((ch = cli.getopt(argc, argv, "R:")) != EOF) {
+		switch (ch) {
+		case 'R':
+			cli.rotation = (enum Rotation)atoi(cli.optarg());
+			break;
+		}
+	}
+
+	const char *verb = cli.optarg();
 
 	if (!verb) {
 		ThisDriver::print_usage();
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_BARO_DEVTYPE_BMP388);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_MAG_DEVTYPE_BMP388);
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);

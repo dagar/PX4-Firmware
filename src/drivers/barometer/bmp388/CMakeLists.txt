@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,14 +32,15 @@
 ############################################################################
 
 px4_add_module(
-	MODULE drivers__barometer__bmp388
+	MODULE drivers__magnetometer__bosch__bmp388
 	MAIN bmp388
+	COMPILE_FLAGS
 	SRCS
-		bmp388_spi.cpp
-		bmp388_i2c.cpp
-		bmp388.cpp
+		BMP388.cpp
+		BMP388.hpp
 		bmp388_main.cpp
+		Bosch_BMP388_registers.hpp
 	DEPENDS
-		drivers_barometer
+		drivers_magnetometer
 		px4_work_queue
 	)
