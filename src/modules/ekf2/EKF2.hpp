@@ -61,6 +61,7 @@
 #include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/topics/ekf_gps_drift.h>
 #include <uORB/topics/estimator_innovations.h>
+#include <uORB/topics/estimator_optical_flow_vel.h>
 #include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_states.h>
 #include <uORB/topics/estimator_status.h>
@@ -81,7 +82,6 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/wind_estimate.h>
 #include <uORB/topics/yaw_estimator_status.h>
-#include <uORB/topics/optical_flow_vel.h>
 
 #include "Utility/PreFlightChecker.hpp"
 
@@ -126,7 +126,7 @@ private:
 	void publish_odometry(const hrt_abstime &timestamp, const imuSample &imu, const vehicle_local_position_s &lpos);
 	void publish_wind_estimate(const hrt_abstime &timestamp);
 	void publish_yaw_estimator_status(const hrt_abstime &timestamp);
-	void publish_optical_flow_vel(const hrt_abstime &timestamp);
+	void publish_optical_flow_vel(const hrt_abstime &timestamp, const flowSample &flow_sample);
 
 	/*
 	 * Calculate filtered WGS84 height from estimated AMSL height
@@ -203,6 +203,7 @@ private:
 	uORB::Publication<estimator_innovations_s>		_estimator_innovation_test_ratios_pub{ORB_ID(estimator_innovation_test_ratios)};
 	uORB::Publication<estimator_innovations_s>		_estimator_innovation_variances_pub{ORB_ID(estimator_innovation_variances)};
 	uORB::Publication<estimator_innovations_s>		_estimator_innovations_pub{ORB_ID(estimator_innovations)};
+	uORB::Publication<estimator_optical_flow_vel_s>		_estimator_optical_flow_vel_pub{ORB_ID(estimator_optical_flow_vel)};
 	uORB::Publication<estimator_sensor_bias_s>		_estimator_sensor_bias_pub{ORB_ID(estimator_sensor_bias)};
 	uORB::Publication<estimator_states_s>			_estimator_states_pub{ORB_ID(estimator_states)};
 	uORB::PublicationData<estimator_status_s>		_estimator_status_pub{ORB_ID(estimator_status)};
@@ -213,7 +214,6 @@ private:
 	uORB::PublicationData<vehicle_local_position_s>		_vehicle_local_position_pub{ORB_ID(vehicle_local_position)};
 	uORB::PublicationData<vehicle_odometry_s>		_vehicle_visual_odometry_aligned_pub{ORB_ID(vehicle_visual_odometry_aligned)};
 	uORB::PublicationMulti<wind_estimate_s>			_wind_pub{ORB_ID(wind_estimate)};
-	uORB::Publication<optical_flow_vel_s>			_optical_flow_vel_pub{ORB_ID(optical_flow_vel)};
 
 	Ekf _ekf;
 

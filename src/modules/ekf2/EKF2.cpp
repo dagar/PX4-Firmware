@@ -159,6 +159,7 @@ EKF2::EKF2(bool replay_mode):
 	_estimator_innovation_test_ratios_pub.advertise();
 	_estimator_innovation_variances_pub.advertise();
 	_estimator_innovations_pub.advertise();
+	_estimator_optical_flow_vel_pub.advertise();
 	_estimator_sensor_bias_pub.advertise();
 	_estimator_states_pub.advertise();
 	_estimator_status_pub.advertise();
@@ -168,7 +169,6 @@ EKF2::EKF2(bool replay_mode):
 	_vehicle_visual_odometry_aligned_pub.advertise();
 	_wind_pub.advertise();
 	_yaw_est_pub.advertise();
-	_optical_flow_vel_pub.advertise();
 }
 
 EKF2::~EKF2()
@@ -489,11 +489,13 @@ void EKF2::Run()
 			}
 		}
 
+		bool optical_flow_updated = false;
+		flowSample flow;
+
 		if (_optical_flow_sub.updated()) {
 			optical_flow_s optical_flow;
 
 			if (_optical_flow_sub.copy(&optical_flow)) {
-				flowSample flow {};
 				// NOTE: the EKF uses the reverse sign convention to the flow sensor. EKF assumes positive LOS rate
 				// is produced by a RH rotation of the image about the sensor axis.
 				flow.flow_xy_rad(0) = -optical_flow.pixel_flow_x_integral;
@@ -510,6 +512,8 @@ void EKF2::Run()
 				    flow.dt < 1) {
 
 					_ekf.setOpticalFlowData(flow);
+
+					optical_flow_updated = true;
 				}
 
 				// Save sensor limits reported by the optical flow sensor
@@ -1043,8 +1047,6 @@ void EKF2::Run()
 
 			publish_yaw_estimator_status(now);
 
-			publish_optical_flow_vel(now);
-
 			if (!_mag_decl_saved && (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY)) {
 				_mag_decl_saved = update_mag_decl(_param_ekf2_mag_decl);
 			}
@@ -1134,6 +1136,11 @@ void EKF2::Run()
 				test_ratios.timestamp = _replay_mode ? now : hrt_absolute_time();
 				_estimator_innovation_test_ratios_pub.publish(test_ratios);
 			}
+		}
+
+
+		if (optical_flow_updated) {
+			publish_optical_flow_vel(now, flow);
 		}
 
 		// publish ekf2_timestamps
@@ -1336,19 +1343,19 @@ void EKF2::publish_wind_estimate(const hrt_abstime &timestamp)
 	}
 }
 
-void EKF2::publish_optical_flow_vel(const hrt_abstime &timestamp)
+void EKF2::publish_optical_flow_vel(const hrt_abstime &timestamp, const flowSample &flow_sample)
 {
-	optical_flow_vel_s flow_vel{};
-	flow_vel.timestamp_sample = timestamp;
+	estimator_optical_flow_vel_s flow_vel{};
+	flow_vel.timestamp_sample = flow_sample.time_us;
 
 	_ekf.getFlowVelBody().copyTo(flow_vel.vel_body);
 	_ekf.getFlowVelNE().copyTo(flow_vel.vel_ne);
-	_ekf.getFlowCompensated().copyTo(flow_vel.flow_rate_compensated);
-	_ekf.getFlowUncompensated().copyTo(flow_vel.flow_rate_uncompensated);
-	_ekf.getFlowGyro().copyTo(flow_vel.gyro);
+	_ekf.getFlowCompensated().copyTo(flow_vel.flow_integral_compensated);
+	_ekf.getFlowUncompensated().copyTo(flow_vel.flow_integral_uncompensated);
+	_ekf.getFlowGyro().copyTo(flow_vel.gyro_rate_integral);
 	flow_vel.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 
-	_optical_flow_vel_pub.publish(flow_vel);
+	_estimator_optical_flow_vel_pub.publish(flow_vel);
 }
 
 float EKF2::filter_altitude_ellipsoid(float amsl_hgt)
