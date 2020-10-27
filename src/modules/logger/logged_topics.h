@@ -77,12 +77,21 @@ public:
 	static constexpr int MAX_TOPICS_NUM = 255; /**< Maximum number of logged topics */
 
 	struct RequestedSubscription {
-		uint16_t interval_ms;
-		uint8_t instance;
+		uint8_t instance{0};
 		ORB_ID id{ORB_ID::INVALID};
 	};
 	struct RequestedSubscriptionArray {
-		RequestedSubscription sub[MAX_TOPICS_NUM];
+		RequestedSubscription subs[MAX_TOPICS_NUM];
+		int count{0};
+	};
+
+	struct RequestedSubscriptionInterval {
+		uint16_t interval_ms{0};
+		uint8_t instance{0};
+		ORB_ID id{ORB_ID::INVALID};
+	};
+	struct RequestedSubscriptionIntervalArray {
+		RequestedSubscriptionInterval subs[MAX_TOPICS_NUM];
 		int count{0};
 	};
 
@@ -98,6 +107,8 @@ public:
 	bool initialize_logged_topics(SDLogProfileMask profile);
 
 	const RequestedSubscriptionArray &subscriptions() const { return _subscriptions; }
+	const RequestedSubscriptionIntervalArray &subscriptions_interval() const { return _subscriptions_interval; }
+
 	int numMissionSubscriptions() const { return _num_mission_subs; }
 
 private:
@@ -160,6 +171,7 @@ private:
 	bool add_topic(const orb_metadata *topic, uint16_t interval_ms = 0, uint8_t instance = 0);
 
 	RequestedSubscriptionArray _subscriptions;
+	RequestedSubscriptionIntervalArray _subscriptions_interval;
 	int _num_mission_subs{0};
 };
 

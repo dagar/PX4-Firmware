@@ -324,15 +324,21 @@ bool LoggedTopics::add_topic(const orb_metadata *topic, uint16_t interval_ms, ui
 		return false;
 	}
 
-	if (_subscriptions.count >= MAX_TOPICS_NUM) {
+	if ((_subscriptions.count + _subscriptions_interval.count) >= MAX_TOPICS_NUM) {
 		PX4_WARN("Too many subscriptions, failed to add: %s %d", topic->o_name, instance);
 		return false;
 	}
 
-	RequestedSubscription &sub = _subscriptions.sub[_subscriptions.count++];
-	sub.interval_ms = interval_ms;
-	sub.instance = instance;
-	sub.id = static_cast<ORB_ID>(topic->o_id);
+	if (interval_ms == 0) {
+		RequestedSubscription &sub = _subscriptions.sub[_subscriptions.count++];
+		sub.instance = instance;
+		sub.id = static_cast<ORB_ID>(topic->o_id);
+	} else {
+		RequestedSubscriptionInterval &sub = _subscriptions_interval.sub[_subscriptions_interval.count++];
+		sub.interval_ms = interval_ms;
+		sub.instance = instance;
+		sub.id = static_cast<ORB_ID>(topic->o_id);
+	}
 	return true;
 }
 
@@ -346,17 +352,37 @@ bool LoggedTopics::add_topic(const char *name, uint16_t interval_ms, uint8_t ins
 			bool already_added = false;
 
 			// check if already added: if so, only update the interval
-			for (int j = 0; j < _subscriptions.count; ++j) {
-				if (_subscriptions.sub[j].id == static_cast<ORB_ID>(topics[i]->o_id) &&
-				    _subscriptions.sub[j].instance == instance) {
+			if (interval_ms != 0) {
+				bool new_interval = false;
+				for (int j = 0; j < _subscriptions.count; ++j) {
+					if (_subscriptions.sub[j].id == static_cast<ORB_ID>(topics[i]->o_id) &&
+					_subscriptions.sub[j].instance == instance) {
 
-					PX4_DEBUG("logging topic %s(%d), interval: %i, already added, only setting interval",
-						  topics[i]->o_name, instance, interval_ms);
+						PX4_DEBUG("logging topic %s(%d), interval: %i, already added, only setting interval",
+							topics[i]->o_name, instance, interval_ms);
 
-					_subscriptions.sub[j].interval_ms = interval_ms;
-					success = true;
-					already_added = true;
-					break;
+						// interval no longer zero, remove
+						_subscriptions.sub[j].id = ORB_ID::INVALID;
+						_subscriptions.sub[j].instance = 0;
+
+						new_interval = true;
+
+						break;
+					}
+				}
+
+				for (int j = 0; j < _subscriptions_interval.count; ++j) {
+					if (_subscriptions_interval.sub[j].id == static_cast<ORB_ID>(topics[i]->o_id) &&
+					_subscriptions_interval.sub[j].instance == instance) {
+
+						PX4_DEBUG("logging topic %s(%d), interval: %i, already added, only setting interval",
+							topics[i]->o_name, instance, interval_ms);
+
+						_subscriptions_interval.sub[j].interval_ms = interval_ms;
+						success = true;
+						already_added = true;
+						break;
+					}
 				}
 			}
 
@@ -392,7 +418,7 @@ bool LoggedTopics::initialize_logged_topics(SDLogProfileMask profile)
 		initialize_configured_topics(profile);
 	}
 
-	return _subscriptions.count > 0;
+	return (_subscriptions.count > 0) || (_subscriptions_interval.count > 0);
 }
 
 void LoggedTopics::initialize_configured_topics(SDLogProfileMask profile)

@@ -67,16 +67,6 @@ namespace px4
 namespace logger
 {
 
-static constexpr uint8_t MSG_ID_INVALID = UINT8_MAX;
-
-struct LoggerSubscription : public uORB::SubscriptionInterval {
-	LoggerSubscription() = default;
-
-	LoggerSubscription(ORB_ID id, uint32_t interval_ms = 0, uint8_t instance = 0) :
-		uORB::SubscriptionInterval(id, interval_ms * 1000, instance)
-	{}
-};
-
 class Logger : public ModuleBase<Logger>, public ModuleParams
 {
 public:
@@ -324,8 +314,12 @@ private:
 	LogMode						_log_mode;
 	const bool					_log_name_timestamp;
 
-	LoggerSubscription	 			*_subscriptions{nullptr}; ///< all subscriptions for full & mission log (in front)
+	uORB::Subscription	 			*_subscriptions{nullptr}; ///< all subscriptions for full & mission log (in front)
+	uORB::SubscriptionInterval	 		*_subscriptions_interval{nullptr};
+
 	int						_num_subscriptions{0};
+	int						_num_subscriptions_interval{0};
+
 	MissionSubscription 				_mission_subscriptions[MAX_MISSION_TOPICS_NUM] {}; ///< additional data for mission subscriptions
 	int						_num_mission_subs{0};
 

@@ -178,7 +178,7 @@ int Logger::print_status()
 {
 	PX4_INFO("Running in mode: %s", configured_backend_mode());
 	PX4_INFO("Number of subscriptions: %i (%i bytes)", _num_subscriptions,
-		 (int)(_num_subscriptions * sizeof(LoggerSubscription)));
+		 (int)(_num_subscriptions * sizeof(uORB::SubscriptionInterval)));
 
 	bool is_logging = false;
 
@@ -417,7 +417,7 @@ bool Logger::request_stop_static()
 
 bool Logger::copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe)
 {
-	LoggerSubscription &sub = _subscriptions[sub_idx];
+	auto &sub = _subscriptions[sub_idx];
 
 	bool updated = false;
 
@@ -520,7 +520,7 @@ bool Logger::initialize_topics()
 	_subscriptions = nullptr;
 
 	if (logged_topics.subscriptions().count > 0) {
-		_subscriptions = new LoggerSubscription[logged_topics.subscriptions().count];
+		_subscriptions = new uORB::Subscription[logged_topics.subscriptions().count];
 
 		if (!_subscriptions) {
 			PX4_ERR("alloc failed");
@@ -529,7 +529,7 @@ bool Logger::initialize_topics()
 
 		for (int i = 0; i < logged_topics.subscriptions().count; ++i) {
 			const LoggedTopics::RequestedSubscription &sub = logged_topics.subscriptions().sub[i];
-			_subscriptions[i] = LoggerSubscription(sub.id, sub.interval_ms, sub.instance);
+			_subscriptions[i] = uORB::SubscriptionInterval(sub.id, sub.interval_ms * 1000, sub.instance);
 			_subscriptions[i].subscribe();
 		}
 	}
