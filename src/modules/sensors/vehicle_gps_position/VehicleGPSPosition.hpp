@@ -45,6 +45,7 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_gps.h>
+#include <uORB/topics/sensors_status.h>
 #include <uORB/topics/vehicle_gps_position.h>
 
 using namespace time_literals;
@@ -54,18 +55,14 @@ namespace sensors
 class VehicleGPSPosition : public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
-
 	VehicleGPSPosition();
 	~VehicleGPSPosition() override;
 
+	void PrintStatus();
 	bool Start();
 	void Stop();
-
-	void PrintStatus();
-
 private:
 	void Run() override;
-
 	void ParametersUpdate(bool force = false);
 	void Publish(const sensor_gps_s &gps);
 
@@ -101,6 +98,8 @@ private:
 	*/
 	void calc_gps_blend_output();
 
+	void calculateGPSDriftMetrics();
+
 	// defines used to specify the mask position for use of different accuracy metrics in the GPS blending algorithm
 	static constexpr uint8_t BLEND_MASK_USE_SPD_ACC  = 1;
 	static constexpr uint8_t BLEND_MASK_USE_HPOS_ACC = 2;
@@ -114,6 +113,7 @@ private:
 	static constexpr hrt_abstime GPS_TIMEOUT_US = 2_s;
 	static constexpr float GPS_TIMEOUT_S = (GPS_TIMEOUT_US / 1e6f);
 
+	uORB::Publication<sensors_status_s> _sensors_status_gps_pub{ORB_ID(sensors_status_gps_s)};
 	uORB::Publication<vehicle_gps_position_s> _vehicle_gps_position_pub{ORB_ID(vehicle_gps_position)};
 
 	uORB::Subscription _params_sub{ORB_ID(parameter_update)}; /**< parameter updates subscription */
@@ -142,6 +142,23 @@ private:
 	uint8_t _gps_slowest_index{0};			///< index of the physical receiver with the slowest update rate
 	float _gps_dt[GPS_MAX_RECEIVERS] {};		///< average time step in seconds.
 	bool  _gps_new_output_data{false};		///< true if there is new output data for the EKF
+
+
+	// variables used for the GPS quality checks
+	Vector3f _gps_pos_deriv_filt;	///< GPS NED position derivative (m/sec)
+	Vector2f _gps_velNE_filt;	///< filtered GPS North and East velocity (m/sec)
+	float _gps_velD_diff_filt{0.0f};	///< GPS filtered Down velocity (m/sec)
+	uint64_t _last_gps_fail_us{0};		///< last system time in usec that the GPS failed it's checks
+	uint64_t _last_gps_pass_us{0};		///< last system time in usec that the GPS passed it's checks
+	float _gps_error_norm{1.0f};		///< normalised gps error
+	uint32_t _min_gps_health_time_us{10000000}; ///< GPS is marked as healthy only after this amount of time
+	struct map_projection_reference_s _gps_pos_prev {};   // Contains WGS-84 position latitude and longitude (radians) of the previous GPS message
+	float _gps_alt_prev{0.0f};	// height from the previous GPS message (m)
+	float _gps_drift_metrics[3] {};	// Array containing GPS drift metrics
+					// [0] Horizontal position drift rate (m/s)
+					// [1] Vertical position drift rate (m/s)
+					// [2] Filtered horizontal velocity (m/s)
+
 
 	DEFINE_PARAMETERS(
 		// GPS blending

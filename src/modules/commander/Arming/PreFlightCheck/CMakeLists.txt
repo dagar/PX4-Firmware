@@ -35,7 +35,6 @@ px4_add_library(PreFlightCheck
 	PreFlightCheck.cpp
 	checks/preArmCheck.cpp
 	checks/magnetometerCheck.cpp
-	checks/magConsistencyCheck.cpp
 	checks/accelerometerCheck.cpp
 	checks/gyroCheck.cpp
 	checks/baroCheck.cpp

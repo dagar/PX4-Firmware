@@ -62,33 +62,25 @@ namespace sensors
 class VehicleMagnetometer : public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
-
 	VehicleMagnetometer();
 	~VehicleMagnetometer() override;
 
+	void PrintStatus();
 	bool Start();
 	void Stop();
-
-	void PrintStatus();
-
 private:
 	void Run() override;
-
 	void ParametersUpdate(bool force = false);
-
 	void Publish(uint8_t instance, bool multi = false);
 
-	/**
-	 * Calculates the magnitude in Gauss of the largest difference between the primary and any other magnetometers
-	 */
-	void calcMagInconsistency();
+	// Calculates the magnitude in Gauss of the largest difference between the primary and any other magnetometers
+	void calculateInconsistency();
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
 	uORB::Publication<sensors_status_s> _sensors_status_mag_pub{ORB_ID(sensors_status_mag)};
 
-	uORB::Publication<vehicle_magnetometer_s> _vehicle_magnetometer_pub{ORB_ID(vehicle_magnetometer)};
-	uORB::PublicationMulti<vehicle_magnetometer_s> _vehicle_magnetometer_multi_pub[MAX_SENSOR_COUNT] {
+	uORB::PublicationMulti<vehicle_magnetometer_s> _vehicle_magnetometer_pub[MAX_SENSOR_COUNT] {
 		{ORB_ID(vehicle_magnetometer)},
 		{ORB_ID(vehicle_magnetometer)},
 		{ORB_ID(vehicle_magnetometer)},
@@ -127,24 +119,24 @@ private:
 	unsigned _last_failover_count{0};
 
 	uint64_t _timestamp_sample_sum[MAX_SENSOR_COUNT] {0};
-	matrix::Vector3f _mag_sum[MAX_SENSOR_COUNT] {};
-	int _mag_sum_count[MAX_SENSOR_COUNT] {};
+	matrix::Vector3f _data_sum[MAX_SENSOR_COUNT] {};
+	float _temperature_sum[MAX_SENSOR_COUNT] {};
+	int _data_sum_count[MAX_SENSOR_COUNT] {};
 	hrt_abstime _last_publication_timestamp[MAX_SENSOR_COUNT] {};
 
-	sensor_mag_s _last_data[MAX_SENSOR_COUNT] {};
 	bool _advertised[MAX_SENSOR_COUNT] {};
 
-	float _mag_angle_diff[2] {};			/**< filtered mag angle differences between sensor instances (Ga) */
+	float _mag_angle_diff[2] {}; /**< filtered mag angle differences between sensor instances (Ga) */
 
 	uint8_t _priority[MAX_SENSOR_COUNT] {};
 
 	int8_t _selected_sensor_sub_index{-1};
 
-	bool _armed{false};				/**< arming status of the vehicle */
+	bool _armed{false};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::CAL_MAG_COMP_TYP>) _param_mag_comp_typ,
-		(ParamBool<px4::params::SENS_MAG_MODE>) _param_sens_mag_mode,
+		(ParamInt<px4::params::SENS_MAG_MODE>) _param_sens_mag_mode,
 		(ParamFloat<px4::params::SENS_MAG_RATE>) _param_sens_mag_rate
 	)
 };

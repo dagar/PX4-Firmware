@@ -44,56 +44,66 @@
 
 using namespace time_literals;
 
-bool PreFlightCheck::accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, const uint8_t instance,
-					const bool optional, int32_t &device_id, const bool report_fail)
-{
-	const bool exists = (orb_exists(ORB_ID(sensor_accel), instance) == PX4_OK);
-	bool calibration_valid = false;
-	bool valid = true;
+static constexpr unsigned max_mandatory_accel_count = 1;
+static constexpr unsigned max_optional_accel_count = 4;
 
-	if (exists) {
+bool PreFlightCheck::accelerometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, const bool report_fail)
+{
+	/* check all sensors individually, but fail only for mandatory ones */
+	for (unsigned i = 0; i < max_optional_accel_count; i++) {
+		const bool required = (i < max_mandatory_accel_count);
+		const bool report_fail = (reportFailures);
+
+		int32_t device_id = -1;
+
+		const bool exists = (orb_exists(ORB_ID(sensor_accel), instance) == PX4_OK);
+		bool calibration_valid = false;
+		bool valid = true;
 
 		uORB::SubscriptionData<sensor_accel_s> accel{ORB_ID(sensor_accel), instance};
 
-		valid = (accel.get().device_id != 0) && (accel.get().timestamp != 0);
+		if (exists) {
+			valid = (accel.get().device_id != 0) && (accel.get().timestamp != 0);
 
-		if (!valid) {
-			if (report_fail) {
-				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: no valid data from Accel #%u", instance);
+			if (!valid) {
+				if (report_fail) {
+					mavlink_log_critical(mavlink_log_pub, "Preflight Fail: no valid data from Accel #%u", instance);
+				}
 			}
-		}
 
-		device_id = accel.get().device_id;
+			device_id = accel.get().device_id;
 
-		calibration_valid = (calibration::FindCalibrationIndex("ACC", device_id) >= 0);
+			calibration_valid = (calibration::FindCalibrationIndex("ACC", device_id) >= 0);
 
-		if (!calibration_valid) {
-			if (report_fail) {
-				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel #%u uncalibrated", instance);
+			if (!calibration_valid) {
+				if (report_fail) {
+					mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel #%u uncalibrated", instance);
+				}
+
+			} else {
+				const float accel_magnitude = sqrtf(accel.get().x * accel.get().x
+								    + accel.get().y * accel.get().y
+								    + accel.get().z * accel.get().z);
+
+				if (accel_magnitude < 4.0f || accel_magnitude > 15.0f /* m/s^2 */) {
+					if (report_fail) {
+						mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel Range, hold still on arming");
+					}
+
+					// this is fatal
+					valid = false;
+				}
 			}
 
 		} else {
-			const float accel_magnitude = sqrtf(accel.get().x * accel.get().x
-							    + accel.get().y * accel.get().y
-							    + accel.get().z * accel.get().z);
-
-			if (accel_magnitude < 4.0f || accel_magnitude > 15.0f /* m/s^2 */) {
-				if (report_fail) {
-					mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel Range, hold still on arming");
-				}
-
-				// this is fatal
-				valid = false;
+			if (!optional && report_fail) {
+				mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel Sensor #%u missing", instance);
 			}
 		}
 
-	} else {
-		if (!optional && report_fail) {
-			mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Accel Sensor #%u missing", instance);
-		}
-	}
+		const bool success = calibration_valid && valid;
 
-	const bool success = calibration_valid && valid;
+	}
 
 	return success;
 }

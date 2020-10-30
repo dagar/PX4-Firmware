@@ -43,8 +43,10 @@
 
 using namespace time_literals;
 
-bool PreFlightCheck::gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, const uint8_t instance,
-			       const bool optional, int32_t &device_id, const bool report_fail)
+static constexpr unsigned max_mandatory_gyro_count = 1;
+static constexpr unsigned max_optional_gyro_count = 4;
+
+bool PreFlightCheck::gyroCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, const bool report_fail)
 {
 	const bool exists = (orb_exists(ORB_ID(sensor_gyro), instance) == PX4_OK);
 	bool calibration_valid = false;

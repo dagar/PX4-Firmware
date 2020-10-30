@@ -45,15 +45,6 @@
 
 using namespace time_literals;
 
-static constexpr unsigned max_mandatory_gyro_count = 1;
-static constexpr unsigned max_optional_gyro_count = 4;
-static constexpr unsigned max_mandatory_accel_count = 1;
-static constexpr unsigned max_optional_accel_count = 4;
-static constexpr unsigned max_mandatory_mag_count = 1;
-static constexpr unsigned max_optional_mag_count = 4;
-static constexpr unsigned max_mandatory_baro_count = 1;
-static constexpr unsigned max_optional_baro_count = 4;
-
 bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status,
 				    vehicle_status_flags_s &status_flags, const bool checkGNSS, bool reportFailures, const bool prearm,
 				    const hrt_abstime &time_since_boot)
@@ -64,113 +55,27 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 	bool failed = false;
 
 	failed = failed || !airframeCheck(mavlink_log_pub, status);
-
-	/* ---- MAG ---- */
-	{
-		int32_t sys_has_mag = 1;
-		param_get(param_find("SYS_HAS_MAG"), &sys_has_mag);
-
-		if (sys_has_mag == 1) {
-
-			/* check all sensors individually, but fail only for mandatory ones */
-			for (unsigned i = 0; i < max_optional_mag_count; i++) {
-				const bool required = (i < max_mandatory_mag_count) && (sys_has_mag == 1);
-				const bool report_fail = (reportFailures);
-
-				int32_t device_id = -1;
-
-				if (!magnetometerCheck(mavlink_log_pub, status, i, !required, device_id, report_fail)) {
-					if (required) {
-						failed = true;
-					}
-				}
-			}
-
-			// TODO: highest priority mag
-
-			/* mag consistency checks (need to be performed after the individual checks) */
-			if (!magConsistencyCheck(mavlink_log_pub, status, (reportFailures))) {
-				failed = true;
-			}
-		}
-	}
-
-	/* ---- ACCEL ---- */
-	{
-		/* check all sensors individually, but fail only for mandatory ones */
-		for (unsigned i = 0; i < max_optional_accel_count; i++) {
-			const bool required = (i < max_mandatory_accel_count);
-			const bool report_fail = (reportFailures);
-
-			int32_t device_id = -1;
-
-			if (!accelerometerCheck(mavlink_log_pub, status, i, !required, device_id, report_fail)) {
-				if (required) {
-					failed = true;
-				}
-			}
-		}
-
-		// TODO: highest priority (from params)
-	}
-
-	/* ---- GYRO ---- */
-	{
-		/* check all sensors individually, but fail only for mandatory ones */
-		for (unsigned i = 0; i < max_optional_gyro_count; i++) {
-			const bool required = (i < max_mandatory_gyro_count);
-			int32_t device_id = -1;
-
-			if (!gyroCheck(mavlink_log_pub, status, i, !required, device_id, reportFailures)) {
-				if (required) {
-					failed = true;
-				}
-			}
-		}
-
-		// TODO: highest priority (from params)
-	}
-
-	/* ---- BARO ---- */
-	{
-		int32_t sys_has_baro = 1;
-		param_get(param_find("SYS_HAS_BARO"), &sys_has_baro);
-
-		bool baro_fail_reported = false;
-
-		/* check all sensors, but fail only for mandatory ones */
-		for (unsigned i = 0; i < max_optional_baro_count; i++) {
-			const bool required = (i < max_mandatory_baro_count) && (sys_has_baro == 1);
-			const bool report_fail = (reportFailures && !baro_fail_reported);
-
-			int32_t device_id = -1;
-
-			if (!baroCheck(mavlink_log_pub, status, i, !required, device_id, report_fail)) {
-				if (required) {
-					baro_fail_reported = true;
-				}
-			}
-		}
-	}
-
-	/* ---- IMU CONSISTENCY ---- */
-	// To be performed after the individual sensor checks have completed
-	{
-		if (!imuConsistencyCheck(mavlink_log_pub, status, reportFailures)) {
-			failed = true;
-		}
-	}
+	failed = failed || !magnetometerCheck(mavlink_log_pub, status, reportFailures);
+	failed = failed || !accelerometerCheck(mavlink_log_pub, status, reportFailures);
+	failed = failed || !gyroCheck(mavlink_log_pub, status, reportFailures);
+	failed = failed || !baroCheck(mavlink_log_pub, status, reportFailures);
+	failed = failed || !imuConsistencyCheck(mavlink_log_pub, status, reportFailures);
+	failed = failed || !failureDetectorCheck(mavlink_log_pub, status, reportFailures, prearm);
+	failed = failed || !manualControlCheck(mavlink_log_pub, reportFailures);
+	failed = failed || !cpuResourceCheck(mavlink_log_pub, reportFailures);
 
 	/* ---- AIRSPEED ---- */
 	/* Perform airspeed check only if circuit breaker is not engaged and it's not a rotary wing */
 	if (!status_flags.circuit_breaker_engaged_airspd_check &&
-	    (status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING || status.is_vtol)) {
+	    ((status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING) || status.is_vtol)) {
 
-		int32_t optional = 0;
-		param_get(param_find("FW_ARSP_MODE"), &optional);
+		int32_t fw_airspeed_mode = 0;
+		param_get(param_find("FW_ARSP_MODE"), &fw_airspeed_mode);
 
-		if (!airspeedCheck(mavlink_log_pub, status, (bool)optional, reportFailures, prearm) && !(bool)optional) {
-			failed = true;
+		if (fw_airspeed_mode == 0) {
+			if (!airspeedCheck(mavlink_log_pub, status, optional, reportFailures, prearm)) {
+				failed = true;
+			}
 		}
 	}
 
@@ -225,14 +130,6 @@ bool PreFlightCheck::preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_statu
 			failed = true;
 		}
 	}
-
-	/* ---- Failure Detector ---- */
-	if (!failureDetectorCheck(mavlink_log_pub, status, reportFailures, prearm)) {
-		failed = true;
-	}
-
-	failed = failed || !manualControlCheck(mavlink_log_pub, reportFailures);
-	failed = failed || !cpuResourceCheck(mavlink_log_pub, reportFailures);
 
 	/* Report status */
 	return !failed;

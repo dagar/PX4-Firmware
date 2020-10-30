@@ -43,9 +43,26 @@
 
 using namespace time_literals;
 
-bool PreFlightCheck::magnetometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, const uint8_t instance,
-				       const bool optional, int32_t &device_id, const bool report_fail)
+static constexpr unsigned max_mandatory_mag_count = 1;
+static constexpr unsigned max_optional_mag_count = 4;
+
+bool PreFlightCheck::magnetometerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, const bool report_fail)
 {
+	int32_t sys_has_mag = 1;
+	param_get(param_find("SYS_HAS_MAG"), &sys_has_mag);
+
+	if (sys_has_mag == 1) {
+
+		/* check all sensors individually, but fail only for mandatory ones */
+		for (unsigned i = 0; i < max_optional_mag_count; i++) {
+			const bool required = (i < max_mandatory_mag_count) && (sys_has_mag == 1);
+			const bool report_fail = (reportFailures);
+
+			int32_t device_id = -1;
+
+		}
+	}
+
 	const bool exists = (orb_exists(ORB_ID(sensor_mag), instance) == PX4_OK);
 	bool calibration_valid = false;
 	bool valid = false;
@@ -86,6 +103,37 @@ bool PreFlightCheck::magnetometerCheck(orb_advert_t *mavlink_log_pub, vehicle_st
 	} else if (instance == 1) {
 		set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, exists, !optional, success, status);
 	}
+
+
+	bool pass = false; // flag for result of checks
+
+	// get the sensor preflight data
+	uORB::SubscriptionData<sensors_status_s> sensors_sub{ORB_ID(sensors_status_mag)};
+	const sensors_status_s &sensors_status_mag = sensors_sub.get();
+
+	if (sensors_status_mag.timestamp == 0) {
+		// can happen if not advertised (yet)
+		pass = true;
+	}
+
+	// Use the difference between sensors to detect a bad calibration, orientation or magnetic interference.
+	// If a single sensor is fitted, the value being checked will be zero so this check will always pass.
+	int32_t angle_difference_limit_deg = 90;
+	param_get(param_find("COM_ARM_MAG_ANG"), &angle_difference_limit_deg);
+
+	pass = pass || (angle_difference_limit_deg < 0); // disabled, pass check
+	//pass = pass || (sensors_status_mag.inconsistency < math::radians<float>(angle_difference_limit_deg));
+
+	if (!pass && report_status) {
+		//mavlink_log_critical(mavlink_log_pub, "Preflight Fail: Compasses %d° inconsistent", static_cast<int>(math::degrees<float>(sensors_status_mag.inconsistency)));
+		mavlink_log_critical(mavlink_log_pub, "Please check orientations and recalibrate");
+		set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG, false, status);
+		set_health_flags_healthy(subsystem_info_s::SUBSYSTEM_TYPE_MAG2, false, status);
+	}
+
+	return pass;
+
+
 
 	return success;
 }

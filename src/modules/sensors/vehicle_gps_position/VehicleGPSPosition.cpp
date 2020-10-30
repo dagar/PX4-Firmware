@@ -732,6 +732,84 @@ void VehicleGPSPosition::Publish(const sensor_gps_s &gps)
 	_vehicle_gps_position_pub.publish(gps_output);
 }
 
+void VehicleGPSPosition::calculateGPSDriftMetrics()
+{
+	// Calculate time lapsed since last update, limit to prevent numerical errors and calculate a lowpass filter coefficient
+	constexpr float filt_time_const = 10.0f;
+	const float dt = math::constrain(float(int64_t(_time_last_imu) - int64_t(_gps_pos_prev.timestamp)) * 1e-6f, 0.001f, filt_time_const);
+	const float filter_coef = dt / filt_time_const;
+
+	// The following checks are only valid when the vehicle is at rest
+	const double lat = gps.lat * 1.0e-7;
+	const double lon = gps.lon * 1.0e-7;
+
+	// Calculate position movement since last measurement
+	float delta_pos_n = 0.0f;
+	float delta_pos_e = 0.0f;
+
+	// calculate position movement since last GPS fix
+	if (_gps_pos_prev.timestamp > 0) {
+		map_projection_project(&_gps_pos_prev, lat, lon, &delta_pos_n, &delta_pos_e);
+
+	} else {
+		// no previous position has been set
+		map_projection_init_timestamped(&_gps_pos_prev, lat, lon, _time_last_imu);
+		_gps_alt_prev = 1e-3f * (float)gps.alt;
+	}
+
+	float req_hdrift = 0.f;
+	float req_vdrift = 0.f;
+
+	// Calculate the horizontal and vertical drift velocity components and limit to 10x the threshold
+	const Vector3f vel_limit(req_hdrift, req_hdrift, req_vdrift);
+	Vector3f pos_derived(delta_pos_n, delta_pos_e, (_gps_alt_prev - 1e-3f * (float)gps.alt));
+	pos_derived = matrix::constrain(pos_derived / dt, -10.0f * vel_limit, 10.0f * vel_limit);
+
+	// Apply a low pass filter
+	_gps_pos_deriv_filt = pos_derived * filter_coef + _gps_pos_deriv_filt * (1.0f - filter_coef);
+
+	// Calculate the horizontal drift speed and fail if too high
+	_gps_drift_metrics[0] = Vector2f(_gps_pos_deriv_filt.xy()).norm();
+	_gps_check_fail_status.flags.hdrift = (_gps_drift_metrics[0] > _params.req_hdrift);
+
+	// Fail if the vertical drift speed is too high
+	_gps_drift_metrics[1] = fabsf(_gps_pos_deriv_filt(2));
+	_gps_check_fail_status.flags.vdrift = (_gps_drift_metrics[1] > _params.req_vdrift);
+
+	// Check the magnitude of the filtered horizontal GPS velocity
+	const Vector2f gps_velNE = matrix::constrain(Vector2f(gps.vel_ned.xy()), -10.f * req_hdrift, 10.f * req_hdrift);
+	_gps_velNE_filt = gps_velNE * filter_coef + _gps_velNE_filt * (1.0f - filter_coef);
+	_gps_drift_metrics[2] = _gps_velNE_filt.norm();
+	_gps_check_fail_status.flags.hspeed = (_gps_drift_metrics[2] > _params.req_hdrift);
+
+
+	// fill
+
+	// float32 hpos_drift_rate	# Horizontal position rate magnitude checked using EKF2_REQ_HDRIFT (m/s)
+	// float32 vpos_drift_rate	# Vertical position rate magnitude checked using EKF2_REQ_VDRIFT (m/s)
+	// float32 hspd			# Filtered horizontal velocity magnitude checked using EKF2_REQ_HDRIFT (m/s)
+	// bool blocked			# true when drift calculation is blocked due to IMU movement check controlled by EKF2_MOVE_TEST
+
+
+	// Check the fix type
+	_gps_check_fail_status.flags.fix = (gps.fix_type < 3);
+
+	// Check the number of satellites
+	_gps_check_fail_status.flags.nsats = (gps.nsats < _params.req_nsats);
+
+	// Check the position dilution of precision
+	_gps_check_fail_status.flags.pdop = (gps.pdop > _params.req_pdop);
+
+	// Check the reported horizontal and vertical position accuracy
+	_gps_check_fail_status.flags.hacc = (gps.eph > _params.req_hacc);
+	_gps_check_fail_status.flags.vacc = (gps.epv > _params.req_vacc);
+
+	// Check the reported speed accuracy
+	_gps_check_fail_status.flags.sacc = (gps.sacc > _params.req_sacc);
+
+
+}
+
 void VehicleGPSPosition::PrintStatus()
 {
 	PX4_INFO("selected GPS: %d", _gps_select_index);

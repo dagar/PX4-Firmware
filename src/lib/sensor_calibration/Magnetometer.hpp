@@ -68,6 +68,7 @@ public:
 	void set_offdiagonal(const matrix::Vector3f &offdiagonal);
 	void set_rotation(Rotation rotation);
 
+	bool calibrated() const { return _calibration_index >= 0; }
 	uint8_t calibration_count() const { return _calibration_count; }
 	uint32_t device_id() const { return _device_id; }
 	bool enabled() const { return (_priority > 0); }
