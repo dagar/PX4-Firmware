@@ -135,8 +135,17 @@ private:
 	bool update_mag_decl(Param &mag_decl_param);
 
 	void PublishAttitude(const hrt_abstime &timestamp);
-	void PublishOpticalFlowVel(const hrt_abstime &timestamp, const optical_flow_s &optical_flow);
+	void PublishEkfDriftMetrics(const hrt_abstime &timestamp);
+	void PublishGlobalPosition(const hrt_abstime &timestamp);
+	void PublishInnovations(const hrt_abstime &timestamp, const imuSample &imu);
+	void PublishInnovationTestRatios(const hrt_abstime &timestamp);
+	void PublishInnovationVariances(const hrt_abstime &timestamp);
+	void PublishLocalPosition(const hrt_abstime &timestamp);
 	void PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu);
+	void PublishOpticalFlowVel(const hrt_abstime &timestamp, const optical_flow_s &flow_sample);
+	void PublishSensorBias(const hrt_abstime &timestamp);
+	void PublishStates(const hrt_abstime &timestamp);
+	void PublishStatus(const hrt_abstime &timestamp);
 	void PublishWindEstimate(const hrt_abstime &timestamp);
 	void PublishYawEstimatorStatus(const hrt_abstime &timestamp);
 
@@ -189,6 +198,10 @@ private:
 	uint32_t _device_id_mag{0};
 
 	Vector3f _last_local_position_for_gpos{};
+
+	Vector3f _last_accel_bias{};
+	Vector3f _last_gyro_bias{};
+	Vector3f _last_mag_bias{};
 
 	uORB::Subscription _airdata_sub{ORB_ID(vehicle_air_data)};
 	uORB::Subscription _airspeed_sub{ORB_ID(airspeed)};
