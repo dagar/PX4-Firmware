@@ -681,269 +681,18 @@ void EKF2::Run()
 
 		if (ekf_updated) {
 
-			vehicle_local_position_s lpos{};
-			_ekf.get_ekf_lpos_accuracy(&lpos.eph, &lpos.epv);
-
 			filter_control_status_u control_status;
 			_ekf.get_control_mode(&control_status.value);
 
-			// only publish position after successful alignment
-			if (control_status.flags.tilt_align) {
-				// generate vehicle local position data
-				lpos.timestamp_sample = imu_sample_new.time_us;
-
-				// Position of body origin in local NED frame
-				const Vector3f position = _ekf.getPosition();
-				lpos.x = position(0);
-				lpos.y = position(1);
-				lpos.z = position(2);
-
-				// Velocity of body origin in local NED frame (m/s)
-				const Vector3f velocity = _ekf.getVelocity();
-				lpos.vx = velocity(0);
-				lpos.vy = velocity(1);
-				lpos.vz = velocity(2);
-
-				// vertical position time derivative (m/s)
-				lpos.z_deriv = _ekf.getVerticalPositionDerivative();
-
-				// Acceleration of body origin in local frame
-				Vector3f vel_deriv = _ekf.getVelocityDerivative();
-				lpos.ax = vel_deriv(0);
-				lpos.ay = vel_deriv(1);
-				lpos.az = vel_deriv(2);
-
-				// TODO: better status reporting
-				lpos.xy_valid = _ekf.local_position_is_valid() && !_preflt_checker.hasHorizFailed();
-				lpos.z_valid = !_preflt_checker.hasVertFailed();
-				lpos.v_xy_valid = _ekf.local_position_is_valid() && !_preflt_checker.hasHorizFailed();
-				lpos.v_z_valid = !_preflt_checker.hasVertFailed();
-
-				// Position of local NED origin in GPS / WGS84 frame
-				map_projection_reference_s ekf_origin;
-				uint64_t origin_time;
-
-				// true if position (x,y,z) has a valid WGS-84 global reference (ref_lat, ref_lon, alt)
-				const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin, &lpos.ref_alt);
-				lpos.xy_global = ekf_origin_valid;
-				lpos.z_global = ekf_origin_valid;
-
-				if (ekf_origin_valid && (origin_time > lpos.ref_timestamp)) {
-					lpos.ref_timestamp = origin_time;
-					lpos.ref_lat = ekf_origin.lat_rad * 180.0 / M_PI; // Reference point latitude in degrees
-					lpos.ref_lon = ekf_origin.lon_rad * 180.0 / M_PI; // Reference point longitude in degrees
-				}
-
-				// The rotation of the tangent plane vs. geographical north
-				const Quatf q = _ekf.getQuaternion();
-
-				Quatf delta_q_reset;
-				_ekf.get_quat_reset(&delta_q_reset(0), &lpos.heading_reset_counter);
-
-				lpos.heading = Eulerf(q).psi();
-				lpos.delta_heading = Eulerf(delta_q_reset).psi();
-
-				lpos.dist_bottom_valid = _ekf.isTerrainEstimateValid();
-
-				float terrain_vpos = _ekf.getTerrainVertPos();
-				lpos.dist_bottom = terrain_vpos - lpos.z; // Distance to bottom surface (ground) in meters
-
-				// constrain the distance to ground to _rng_gnd_clearance
-				if (lpos.dist_bottom < _param_ekf2_min_rng.get()) {
-					lpos.dist_bottom = _param_ekf2_min_rng.get();
-				}
-
-				if (!_had_valid_terrain) {
-					_had_valid_terrain = lpos.dist_bottom_valid;
-				}
-
-				// only consider ground effect if compensation is configured and the vehicle is armed (props spinning)
-				if ((_param_ekf2_gnd_eff_dz.get() > 0.0f) && _armed) {
-					// set ground effect flag if vehicle is closer than a specified distance to the ground
-					if (lpos.dist_bottom_valid) {
-						_ekf.set_gnd_effect_flag(lpos.dist_bottom < _param_ekf2_gnd_max_hgt.get());
-
-						// if we have no valid terrain estimate and never had one then use ground effect flag from land detector
-						// _had_valid_terrain is used to make sure that we don't fall back to using this option
-						// if we temporarily lose terrain data due to the distance sensor getting out of range
-
-					} else if (!_had_valid_terrain) {
-						// update ground effect flag based on land detector state
-						_ekf.set_gnd_effect_flag(_in_ground_effect);
-					}
-
-				} else {
-					_ekf.set_gnd_effect_flag(false);
-				}
-
-				_ekf.get_ekf_vel_accuracy(&lpos.evh, &lpos.evv);
-
-				// get state reset information of position and velocity
-				_ekf.get_posD_reset(&lpos.delta_z, &lpos.z_reset_counter);
-				_ekf.get_velD_reset(&lpos.delta_vz, &lpos.vz_reset_counter);
-				_ekf.get_posNE_reset(&lpos.delta_xy[0], &lpos.xy_reset_counter);
-				_ekf.get_velNE_reset(&lpos.delta_vxy[0], &lpos.vxy_reset_counter);
-
-				// get control limit information
-				_ekf.get_ekf_ctrl_limits(&lpos.vxy_max, &lpos.vz_max, &lpos.hagl_min, &lpos.hagl_max);
-
-				// convert NaN to INFINITY
-				if (!PX4_ISFINITE(lpos.vxy_max)) {
-					lpos.vxy_max = INFINITY;
-				}
-
-				if (!PX4_ISFINITE(lpos.vz_max)) {
-					lpos.vz_max = INFINITY;
-				}
-
-				if (!PX4_ISFINITE(lpos.hagl_min)) {
-					lpos.hagl_min = INFINITY;
-				}
-
-				if (!PX4_ISFINITE(lpos.hagl_max)) {
-					lpos.hagl_max = INFINITY;
-				}
-
-				// publish vehicle local position data
-				lpos.timestamp = _replay_mode ? now : hrt_absolute_time();
-				_local_position_pub.publish(lpos);
-
-				// publish vehicle_odometry
-				PublishOdometry(now, imu_sample_new);
-
-				// publish vehicle_global_position if valid
-				if (_ekf.global_position_is_valid() && !_preflt_checker.hasFailed()) {
-					// only publish if position has changed by at least 1 mm (map_projection_reproject is relatively expensive)
-					if ((_last_local_position_for_gpos - position).longerThan(0.001f)) {
-
-						// generate and publish global position data
-						vehicle_global_position_s global_pos{};
-						global_pos.timestamp_sample = imu_sample_new.time_us;
-
-						map_projection_reproject(&ekf_origin, lpos.x, lpos.y, &global_pos.lat, &global_pos.lon);
-
-						global_pos.lat_lon_reset_counter = lpos.xy_reset_counter;
-
-						global_pos.alt = -lpos.z + lpos.ref_alt; // Altitude AMSL in meters
-						global_pos.alt_ellipsoid = filter_altitude_ellipsoid(global_pos.alt);
-
-						// global altitude has opposite sign of local down position
-						global_pos.delta_alt = -lpos.delta_z;
-
-						_ekf.get_ekf_gpos_accuracy(&global_pos.eph, &global_pos.epv);
-
-						global_pos.terrain_alt_valid = lpos.dist_bottom_valid;
-
-						if (global_pos.terrain_alt_valid) {
-							global_pos.terrain_alt = lpos.ref_alt - terrain_vpos; // Terrain altitude in m, WGS84
-
-						} else {
-							global_pos.terrain_alt = 0.0f; // Terrain altitude in m, WGS84
-						}
-
-						global_pos.dead_reckoning = _ekf.inertial_dead_reckoning(); // True if this position is estimated through dead-reckoning
-						global_pos.timestamp = _replay_mode ? now : hrt_absolute_time();
-						_global_position_pub.publish(global_pos);
-
-						_last_local_position_for_gpos = position;
-					}
-				}
-			}
-
-			// publish estimator states
-			estimator_states_s states;
-			states.timestamp_sample = imu_sample_new.time_us;
-			states.n_states = 24;
-			_ekf.getStateAtFusionHorizonAsVector().copyTo(states.states);
-			_ekf.covariances_diagonal().copyTo(states.covariances);
-			states.timestamp = _replay_mode ? now : hrt_absolute_time();
-			_estimator_states_pub.publish(states);
-
-			// publish estimator status
-			estimator_status_s status{};
-			status.timestamp_sample = imu_sample_new.time_us;
-			_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
-			_ekf.get_gps_check_status(&status.gps_check_fail_flags);
-			// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
-			// the GPS Fix bit, which is always checked)
-			status.gps_check_fail_flags &= ((uint16_t)_params->gps_check_mask << 1) | 1;
-			status.control_mode_flags = control_status.value;
-			_ekf.get_filter_fault_status(&status.filter_fault_flags);
-			_ekf.get_innovation_test_status(status.innovation_check_flags, status.mag_test_ratio,
-							status.vel_test_ratio, status.pos_test_ratio,
-							status.hgt_test_ratio, status.tas_test_ratio,
-							status.hagl_test_ratio, status.beta_test_ratio);
-
-			status.pos_horiz_accuracy = lpos.eph;
-			status.pos_vert_accuracy = lpos.epv;
-			_ekf.get_ekf_soln_status(&status.solution_status_flags);
-			_ekf.getImuVibrationMetrics().copyTo(status.vibe);
-			status.time_slip = _last_time_slip_us * 1e-6f;
-			status.pre_flt_fail_innov_heading = _preflt_checker.hasHeadingFailed();
-			status.pre_flt_fail_innov_vel_horiz = _preflt_checker.hasHorizVelFailed();
-			status.pre_flt_fail_innov_vel_vert = _preflt_checker.hasVertVelFailed();
-			status.pre_flt_fail_innov_height = _preflt_checker.hasHeightFailed();
-			status.pre_flt_fail_mag_field_disturbed = control_status.flags.mag_field_disturbed;
-			status.accel_device_id = _device_id_accel;
-			status.baro_device_id = _device_id_baro;
-			status.gyro_device_id = _device_id_gyro;
-			status.mag_device_id = _device_id_mag;
-			status.timestamp = _replay_mode ? now : hrt_absolute_time();
-			_estimator_status_pub.publish(status);
-
-			// estimator_sensor_bias
-			if (status.filter_fault_flags == 0) {
-				// publish all corrected sensor readings and bias estimates after mag calibration is updated above
-				estimator_sensor_bias_s bias;
-				bias.timestamp_sample = imu_sample_new.time_us;
-
-				// take device ids from sensor_selection_s if not using specific vehicle_imu_s
-				bias.gyro_device_id = _device_id_gyro;
-				bias.accel_device_id = _device_id_accel;
-				bias.mag_device_id = _device_id_mag;
-
-				_ekf.getGyroBias().copyTo(bias.gyro_bias);
-				_ekf.getAccelBias().copyTo(bias.accel_bias);
-
-				bias.mag_bias[0] = _last_valid_mag_cal[0];
-				bias.mag_bias[1] = _last_valid_mag_cal[1];
-				bias.mag_bias[2] = _last_valid_mag_cal[2];
-
-				bias.gyro_bias_variance[0] = states.covariances[10];
-				bias.gyro_bias_variance[1] = states.covariances[11];
-				bias.gyro_bias_variance[2] = states.covariances[12];
-				bias.accel_bias_variance[0] = states.covariances[13];
-				bias.accel_bias_variance[1] = states.covariances[14];
-				bias.accel_bias_variance[2] = states.covariances[15];
-				bias.mag_bias_variance[0] = states.covariances[19];
-				bias.mag_bias_variance[1] = states.covariances[20];
-				bias.mag_bias_variance[2] = states.covariances[21];
-
-				bias.timestamp = _replay_mode ? now : hrt_absolute_time();
-				_estimator_sensor_bias_pub.publish(bias);
-			}
-
-			// publish GPS drift data only when updated to minimise overhead
-			float gps_drift[3];
-			bool blocked;
-
-			if (_ekf.get_gps_drift_metrics(gps_drift, &blocked)) {
-				ekf_gps_drift_s drift_data;
-				drift_data.hpos_drift_rate = gps_drift[0];
-				drift_data.vpos_drift_rate = gps_drift[1];
-				drift_data.hspd = gps_drift[2];
-				drift_data.blocked = blocked;
-				drift_data.timestamp = _replay_mode ? now : hrt_absolute_time();
-
-				_ekf_gps_drift_pub.publish(drift_data);
-			}
+			uint16_t filter_fault_flags;
+			_ekf.get_filter_fault_status(&filter_fault_flags);
 
 			{
 				/* Check and save learned magnetometer bias estimates */
 
 				// Check if conditions are OK for learning of magnetometer bias values
 				if (!_landed && _armed &&
-				    !status.filter_fault_flags && // there are no filter faults
+				    !filter_fault_flags && // there are no filter faults
 				    control_status.flags.mag_3D) { // the EKF is operating in the correct mode
 
 					if (_last_magcal_us == 0) {
@@ -954,7 +703,7 @@ void EKF2::Run()
 						_last_magcal_us = now;
 					}
 
-				} else if (status.filter_fault_flags != 0) {
+				} else if (filter_fault_flags != 0) {
 					// if a filter fault has occurred, assume previous learning was invalid and do not
 					// count it towards total learning time.
 					_total_cal_time_us = 0;
@@ -979,9 +728,15 @@ void EKF2::Run()
 					// Declare all bias estimates invalid if any variances are out of range
 					bool all_estimates_invalid = false;
 
+					float states[24];
+					_ekf.getStateAtFusionHorizonAsVector().copyTo(states);
+
+					float covariances[24];
+					_ekf.covariances_diagonal().copyTo(covariances);
+
 					for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
-						if (states.covariances[axis_index + 19] < min_var_allowed
-						    || states.covariances[axis_index + 19] > max_var_allowed) {
+						if (covariances[axis_index + 19] < min_var_allowed
+						    || covariances[axis_index + 19] > max_var_allowed) {
 							all_estimates_invalid = true;
 						}
 					}
@@ -989,15 +744,15 @@ void EKF2::Run()
 					// Store valid estimates and their associated variances
 					if (!all_estimates_invalid) {
 						for (uint8_t axis_index = 0; axis_index <= 2; axis_index++) {
-							_last_valid_mag_cal[axis_index] = states.states[axis_index + 19];
+							_last_valid_mag_cal[axis_index] = states[axis_index + 19];
 							_valid_cal_available[axis_index] = true;
-							_last_valid_variance[axis_index] = states.covariances[axis_index + 19];
+							_last_valid_variance[axis_index] = covariances[axis_index + 19];
 						}
 					}
 				}
 
 				// Check and save the last valid calibration when we are disarmed
-				if (!_armed && _standby && (status.filter_fault_flags == 0)) {
+				if (!_armed && _standby && (filter_fault_flags == 0)) {
 					update_mag_bias(_param_ekf2_magbias_x, 0);
 					update_mag_bias(_param_ekf2_magbias_y, 1);
 					update_mag_bias(_param_ekf2_magbias_z, 2);
@@ -1007,97 +762,23 @@ void EKF2::Run()
 				}
 			}
 
+			PublishLocalPosition(now);
+			PublishOdometry(now, imu_sample_new);
+			PublishGlobalPosition(now);
+			PublishSensorBias(now);
 			PublishWindEstimate(now);
+
+			// publish status/logging messages
+			PublishStates(now);
+			PublishStatus(now);
+			PublishEkfDriftMetrics(now);
 			PublishYawEstimatorStatus(now);
+			PublishInnovations(now, imu_sample_new);
+			PublishInnovationTestRatios(now);
+			PublishInnovationVariances(now);
 
 			if (!_mag_decl_saved && _standby) {
 				_mag_decl_saved = update_mag_decl(_param_ekf2_mag_decl);
-			}
-
-			{
-				// publish estimator innovation data
-				estimator_innovations_s innovations;
-				innovations.timestamp_sample = imu_sample_new.time_us;
-				_ekf.getGpsVelPosInnov(&innovations.gps_hvel[0], innovations.gps_vvel, &innovations.gps_hpos[0],
-						       innovations.gps_vpos);
-				_ekf.getEvVelPosInnov(&innovations.ev_hvel[0], innovations.ev_vvel, &innovations.ev_hpos[0], innovations.ev_vpos);
-				_ekf.getBaroHgtInnov(innovations.baro_vpos);
-				_ekf.getRngHgtInnov(innovations.rng_vpos);
-				_ekf.getAuxVelInnov(&innovations.aux_hvel[0]);
-				_ekf.getFlowInnov(&innovations.flow[0]);
-				_ekf.getHeadingInnov(innovations.heading);
-				_ekf.getMagInnov(innovations.mag_field);
-				_ekf.getDragInnov(&innovations.drag[0]);
-				_ekf.getAirspeedInnov(innovations.airspeed);
-				_ekf.getBetaInnov(innovations.beta);
-				_ekf.getHaglInnov(innovations.hagl);
-				// Not yet supported
-				innovations.aux_vvel = NAN;
-				innovations.fake_hpos[0] = innovations.fake_hpos[1] = innovations.fake_vpos = NAN;
-				innovations.fake_hvel[0] = innovations.fake_hvel[1] = innovations.fake_vvel = NAN;
-
-				// publish estimator innovation variance data
-				estimator_innovations_s innovation_var;
-				innovation_var.timestamp_sample = imu_sample_new.time_us;
-				_ekf.getGpsVelPosInnovVar(&innovation_var.gps_hvel[0], innovation_var.gps_vvel, &innovation_var.gps_hpos[0],
-							  innovation_var.gps_vpos);
-				_ekf.getEvVelPosInnovVar(&innovation_var.ev_hvel[0], innovation_var.ev_vvel, &innovation_var.ev_hpos[0],
-							 innovation_var.ev_vpos);
-				_ekf.getBaroHgtInnovVar(innovation_var.baro_vpos);
-				_ekf.getRngHgtInnovVar(innovation_var.rng_vpos);
-				_ekf.getAuxVelInnovVar(&innovation_var.aux_hvel[0]);
-				_ekf.getFlowInnovVar(&innovation_var.flow[0]);
-				_ekf.getHeadingInnovVar(innovation_var.heading);
-				_ekf.getMagInnovVar(&innovation_var.mag_field[0]);
-				_ekf.getDragInnovVar(&innovation_var.drag[0]);
-				_ekf.getAirspeedInnovVar(innovation_var.airspeed);
-				_ekf.getBetaInnovVar(innovation_var.beta);
-				_ekf.getHaglInnovVar(innovation_var.hagl);
-				// Not yet supported
-				innovation_var.aux_vvel = NAN;
-				innovation_var.fake_hpos[0] = innovation_var.fake_hpos[1] = innovation_var.fake_vpos = NAN;
-				innovation_var.fake_hvel[0] = innovation_var.fake_hvel[1] = innovation_var.fake_vvel = NAN;
-
-
-				// publish estimator innovation test ratio data
-				estimator_innovations_s test_ratios;
-				test_ratios.timestamp_sample = imu_sample_new.time_us;
-				_ekf.getGpsVelPosInnovRatio(test_ratios.gps_hvel[0], test_ratios.gps_vvel, test_ratios.gps_hpos[0],
-							    test_ratios.gps_vpos);
-				_ekf.getEvVelPosInnovRatio(test_ratios.ev_hvel[0], test_ratios.ev_vvel, test_ratios.ev_hpos[0],
-							   test_ratios.ev_vpos);
-				_ekf.getBaroHgtInnovRatio(test_ratios.baro_vpos);
-				_ekf.getRngHgtInnovRatio(test_ratios.rng_vpos);
-				_ekf.getAuxVelInnovRatio(test_ratios.aux_hvel[0]);
-				_ekf.getFlowInnovRatio(test_ratios.flow[0]);
-				_ekf.getHeadingInnovRatio(test_ratios.heading);
-				_ekf.getMagInnovRatio(test_ratios.mag_field[0]);
-				_ekf.getDragInnovRatio(&test_ratios.drag[0]);
-				_ekf.getAirspeedInnovRatio(test_ratios.airspeed);
-				_ekf.getBetaInnovRatio(test_ratios.beta);
-				_ekf.getHaglInnovRatio(test_ratios.hagl);
-				// Not yet supported
-				test_ratios.aux_vvel = NAN;
-				test_ratios.fake_hpos[0] = test_ratios.fake_hpos[1] = test_ratios.fake_vpos = NAN;
-				test_ratios.fake_hvel[0] = test_ratios.fake_hvel[1] = test_ratios.fake_vvel = NAN;
-
-				// calculate noise filtered velocity innovations which are used for pre-flight checking
-				if (_standby) {
-					float dt_seconds = imu_sample_new.delta_ang_dt;
-					runPreFlightChecks(dt_seconds, control_status, innovations, _can_observe_heading_in_flight);
-
-				} else {
-					resetPreFlightChecks();
-				}
-
-				innovations.timestamp = _replay_mode ? now : hrt_absolute_time();
-				_estimator_innovations_pub.publish(innovations);
-
-				innovation_var.timestamp = _replay_mode ? now : hrt_absolute_time();
-				_estimator_innovation_variances_pub.publish(innovation_var);
-
-				test_ratios.timestamp = _replay_mode ? now : hrt_absolute_time();
-				_estimator_innovation_test_ratios_pub.publish(test_ratios);
 			}
 		}
 
@@ -1239,10 +920,291 @@ void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 	}
 }
 
+void EKF2::PublishEkfDriftMetrics(const hrt_abstime &timestamp)
+{
+	// publish GPS drift data only when updated to minimise overhead
+	float gps_drift[3];
+	bool blocked;
+
+	if (_ekf.get_gps_drift_metrics(gps_drift, &blocked)) {
+		ekf_gps_drift_s drift_data;
+		drift_data.hpos_drift_rate = gps_drift[0];
+		drift_data.vpos_drift_rate = gps_drift[1];
+		drift_data.hspd = gps_drift[2];
+		drift_data.blocked = blocked;
+		drift_data.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+
+		_ekf_gps_drift_pub.publish(drift_data);
+	}
+}
+
+void EKF2::PublishGlobalPosition(const hrt_abstime &timestamp)
+{
+	if (_ekf.global_position_is_valid() && !_preflt_checker.hasFailed()) {
+		// only publish if position has changed by at least 1 mm (map_projection_reproject is relatively expensive)
+		const Vector3f position = _ekf.getPosition();
+
+		if ((_last_local_position_for_gpos - position).longerThan(0.001f)) {
+
+			// generate and publish global position data
+			vehicle_global_position_s global_pos;
+			global_pos.timestamp_sample = timestamp;
+
+			// Position of local NED origin in GPS / WGS84 frame
+			uint64_t origin_time;
+			map_projection_reference_s ekf_origin;
+			float ref_alt;
+			// true if position (x,y,z) has a valid WGS-84 global reference (ref_lat, ref_lon, alt)
+			const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin, &ref_alt);
+
+			if (ekf_origin_valid) {
+
+				map_projection_reproject(&ekf_origin, position(0), position(1), &global_pos.lat, &global_pos.lon);
+
+				float delta_xy[2];
+				_ekf.get_posNE_reset(delta_xy, &global_pos.lat_lon_reset_counter);
+
+				global_pos.alt = -position(2) + ref_alt; // Altitude AMSL in meters
+				global_pos.alt_ellipsoid = filter_altitude_ellipsoid(global_pos.alt);
+
+				// global altitude has opposite sign of local down position
+				float delta_z;
+				uint8_t z_reset_counter;
+				_ekf.get_posD_reset(&delta_z, &z_reset_counter);
+				global_pos.delta_alt = -delta_z;
+
+				_ekf.get_ekf_gpos_accuracy(&global_pos.eph, &global_pos.epv);
+
+				global_pos.terrain_alt_valid = _ekf.isTerrainEstimateValid();
+
+				if (global_pos.terrain_alt_valid) {
+					global_pos.terrain_alt = ref_alt -  _ekf.getTerrainVertPos(); // Terrain altitude in m, WGS84
+
+				} else {
+					global_pos.terrain_alt = 0.0f; // Terrain altitude in m, WGS84
+				}
+
+				global_pos.dead_reckoning = _ekf.inertial_dead_reckoning(); // True if this position is estimated through dead-reckoning
+				global_pos.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+				_global_position_pub.publish(global_pos);
+
+				_last_local_position_for_gpos = position;
+			}
+		}
+	}
+}
+
+void EKF2::PublishInnovations(const hrt_abstime &timestamp, const imuSample &imu)
+{
+	// publish estimator innovation data
+	estimator_innovations_s innovations;
+	innovations.timestamp_sample = timestamp;
+	_ekf.getGpsVelPosInnov(innovations.gps_hvel, innovations.gps_vvel, innovations.gps_hpos, innovations.gps_vpos);
+	_ekf.getEvVelPosInnov(innovations.ev_hvel, innovations.ev_vvel, innovations.ev_hpos, innovations.ev_vpos);
+	_ekf.getBaroHgtInnov(innovations.baro_vpos);
+	_ekf.getRngHgtInnov(innovations.rng_vpos);
+	_ekf.getAuxVelInnov(innovations.aux_hvel);
+	_ekf.getFlowInnov(innovations.flow);
+	_ekf.getHeadingInnov(innovations.heading);
+	_ekf.getMagInnov(innovations.mag_field);
+	_ekf.getDragInnov(innovations.drag);
+	_ekf.getAirspeedInnov(innovations.airspeed);
+	_ekf.getBetaInnov(innovations.beta);
+	_ekf.getHaglInnov(innovations.hagl);
+	// Not yet supported
+	innovations.aux_vvel = NAN;
+	innovations.fake_hpos[0] = innovations.fake_hpos[1] = innovations.fake_vpos = NAN;
+	innovations.fake_hvel[0] = innovations.fake_hvel[1] = innovations.fake_vvel = NAN;
+	innovations.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_estimator_innovations_pub.publish(innovations);
+
+	// calculate noise filtered velocity innovations which are used for pre-flight checking
+	if (_standby) {
+
+		filter_control_status_u control_status;
+		_ekf.get_control_mode(&control_status.value);
+
+		float dt_seconds = imu.delta_ang_dt;
+		runPreFlightChecks(dt_seconds, control_status, innovations, _can_observe_heading_in_flight);
+
+	} else {
+		resetPreFlightChecks();
+	}
+}
+
+void EKF2::PublishInnovationTestRatios(const hrt_abstime &timestamp)
+{
+	// publish estimator innovation test ratio data
+	estimator_innovations_s test_ratios{};
+	test_ratios.timestamp_sample = timestamp;
+	_ekf.getGpsVelPosInnovRatio(test_ratios.gps_hvel[0], test_ratios.gps_vvel, test_ratios.gps_hpos[0],
+				    test_ratios.gps_vpos);
+	_ekf.getEvVelPosInnovRatio(test_ratios.ev_hvel[0], test_ratios.ev_vvel, test_ratios.ev_hpos[0], test_ratios.ev_vpos);
+	_ekf.getBaroHgtInnovRatio(test_ratios.baro_vpos);
+	_ekf.getRngHgtInnovRatio(test_ratios.rng_vpos);
+	_ekf.getAuxVelInnovRatio(test_ratios.aux_hvel[0]);
+	_ekf.getFlowInnovRatio(test_ratios.flow[0]);
+	_ekf.getHeadingInnovRatio(test_ratios.heading);
+	_ekf.getMagInnovRatio(test_ratios.mag_field[0]);
+	_ekf.getDragInnovRatio(&test_ratios.drag[0]);
+	_ekf.getAirspeedInnovRatio(test_ratios.airspeed);
+	_ekf.getBetaInnovRatio(test_ratios.beta);
+	_ekf.getHaglInnovRatio(test_ratios.hagl);
+	// Not yet supported
+	test_ratios.aux_vvel = NAN;
+	test_ratios.fake_hpos[0] = test_ratios.fake_hpos[1] = test_ratios.fake_vpos = NAN;
+	test_ratios.fake_hvel[0] = test_ratios.fake_hvel[1] = test_ratios.fake_vvel = NAN;
+
+	test_ratios.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_estimator_innovation_test_ratios_pub.publish(test_ratios);
+}
+
+void EKF2::PublishInnovationVariances(const hrt_abstime &timestamp)
+{
+	// publish estimator innovation variance data
+	estimator_innovations_s variances;
+	variances.timestamp_sample = timestamp;
+	_ekf.getGpsVelPosInnovVar(variances.gps_hvel, variances.gps_vvel, variances.gps_hpos, variances.gps_vpos);
+	_ekf.getEvVelPosInnovVar(variances.ev_hvel, variances.ev_vvel, variances.ev_hpos, variances.ev_vpos);
+	_ekf.getBaroHgtInnovVar(variances.baro_vpos);
+	_ekf.getRngHgtInnovVar(variances.rng_vpos);
+	_ekf.getAuxVelInnovVar(variances.aux_hvel);
+	_ekf.getFlowInnovVar(variances.flow);
+	_ekf.getHeadingInnovVar(variances.heading);
+	_ekf.getMagInnovVar(variances.mag_field);
+	_ekf.getDragInnovVar(variances.drag);
+	_ekf.getAirspeedInnovVar(variances.airspeed);
+	_ekf.getBetaInnovVar(variances.beta);
+	_ekf.getHaglInnovVar(variances.hagl);
+	// Not yet supported
+	variances.aux_vvel = NAN;
+	variances.fake_hpos[0] = variances.fake_hpos[1] = variances.fake_vpos = NAN;
+	variances.fake_hvel[0] = variances.fake_hvel[1] = variances.fake_vvel = NAN;
+
+	variances.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_estimator_innovation_variances_pub.publish(variances);
+}
+
+void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
+{
+	vehicle_local_position_s lpos;
+	// generate vehicle local position data
+	lpos.timestamp_sample = timestamp;
+
+	// Position of body origin in local NED frame
+	const Vector3f position = _ekf.getPosition();
+	lpos.x = position(0);
+	lpos.y = position(1);
+	lpos.z = position(2);
+
+	// Velocity of body origin in local NED frame (m/s)
+	const Vector3f velocity = _ekf.getVelocity();
+	lpos.vx = velocity(0);
+	lpos.vy = velocity(1);
+	lpos.vz = velocity(2);
+
+	// vertical position time derivative (m/s)
+	lpos.z_deriv = _ekf.getVerticalPositionDerivative();
+
+	// Acceleration of body origin in local frame
+	Vector3f vel_deriv = _ekf.getVelocityDerivative();
+	lpos.ax = vel_deriv(0);
+	lpos.ay = vel_deriv(1);
+	lpos.az = vel_deriv(2);
+
+	// TODO: better status reporting
+	lpos.xy_valid = _ekf.local_position_is_valid() && !_preflt_checker.hasHorizFailed();
+	lpos.z_valid = !_preflt_checker.hasVertFailed();
+	lpos.v_xy_valid = _ekf.local_position_is_valid() && !_preflt_checker.hasHorizFailed();
+	lpos.v_z_valid = !_preflt_checker.hasVertFailed();
+
+	// Position of local NED origin in GPS / WGS84 frame
+	uint64_t origin_time;
+	map_projection_reference_s ekf_origin_pos;
+	const bool ekf_origin_valid = _ekf.get_ekf_origin(&origin_time, &ekf_origin_pos, &lpos.ref_alt);
+	lpos.ref_timestamp = origin_time;
+	lpos.ref_lat = math::degrees(ekf_origin_pos.lat_rad); // Reference point latitude in degrees
+	lpos.ref_lon = math::degrees(ekf_origin_pos.lon_rad); // Reference point longitude in degrees
+
+	lpos.xy_global = ekf_origin_valid;
+	lpos.z_global = ekf_origin_valid;
+
+	Quatf delta_q_reset;
+	_ekf.get_quat_reset(&delta_q_reset(0), &lpos.heading_reset_counter);
+
+	lpos.heading = Eulerf(_ekf.getQuaternion()).psi();
+	lpos.delta_heading = Eulerf(delta_q_reset).psi();
+
+	lpos.dist_bottom_valid = _ekf.isTerrainEstimateValid();
+
+	float terrain_vpos = _ekf.getTerrainVertPos();
+
+	// Distance to bottom surface (ground) in meters
+	//  constrain the distance to ground to _rng_gnd_clearance
+	lpos.dist_bottom = math::min(terrain_vpos - lpos.z, _param_ekf2_min_rng.get());
+
+	if (!_had_valid_terrain) {
+		_had_valid_terrain = lpos.dist_bottom_valid;
+	}
+
+	// only consider ground effect if compensation is configured and the vehicle is armed (props spinning)
+	if ((_param_ekf2_gnd_eff_dz.get() > 0.0f) && _armed) {
+		// set ground effect flag if vehicle is closer than a specified distance to the ground
+		if (lpos.dist_bottom_valid) {
+			_ekf.set_gnd_effect_flag(lpos.dist_bottom < _param_ekf2_gnd_max_hgt.get());
+
+			// if we have no valid terrain estimate and never had one then use ground effect flag from land detector
+			// _had_valid_terrain is used to make sure that we don't fall back to using this option
+			// if we temporarily lose terrain data due to the distance sensor getting out of range
+
+		} else if (!_had_valid_terrain) {
+			// update ground effect flag based on land detector state
+			_ekf.set_gnd_effect_flag(_in_ground_effect);
+		}
+
+	} else {
+		_ekf.set_gnd_effect_flag(false);
+	}
+
+	_ekf.get_ekf_lpos_accuracy(&lpos.eph, &lpos.epv);
+	_ekf.get_ekf_vel_accuracy(&lpos.evh, &lpos.evv);
+
+	// get state reset information of position and velocity
+	_ekf.get_posD_reset(&lpos.delta_z, &lpos.z_reset_counter);
+	_ekf.get_velD_reset(&lpos.delta_vz, &lpos.vz_reset_counter);
+	_ekf.get_posNE_reset(&lpos.delta_xy[0], &lpos.xy_reset_counter);
+	_ekf.get_velNE_reset(&lpos.delta_vxy[0], &lpos.vxy_reset_counter);
+
+	// get control limit information
+	_ekf.get_ekf_ctrl_limits(&lpos.vxy_max, &lpos.vz_max, &lpos.hagl_min, &lpos.hagl_max);
+
+	// convert NaN to INFINITY
+	if (!PX4_ISFINITE(lpos.vxy_max)) {
+		lpos.vxy_max = INFINITY;
+	}
+
+	if (!PX4_ISFINITE(lpos.vz_max)) {
+		lpos.vz_max = INFINITY;
+	}
+
+	if (!PX4_ISFINITE(lpos.hagl_min)) {
+		lpos.hagl_min = INFINITY;
+	}
+
+	if (!PX4_ISFINITE(lpos.hagl_max)) {
+		lpos.hagl_max = INFINITY;
+	}
+
+	// publish vehicle local position data
+	lpos.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_local_position_pub.publish(lpos);
+
+}
+
 void EKF2::PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu)
 {
 	// generate vehicle odometry data
-	vehicle_odometry_s odom;
+	vehicle_odometry_s odom{};
 	odom.timestamp_sample = imu.time_us;
 
 	odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
@@ -1270,40 +1232,149 @@ void EKF2::PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu)
 	odom.pitchspeed = rates(1) - gyro_bias(1);
 	odom.yawspeed = rates(2) - gyro_bias(2);
 
-	// get the covariance matrix size
-	const size_t POS_URT_SIZE = sizeof(odom.pose_covariance) / sizeof(odom.pose_covariance[0]);
-	const size_t VEL_URT_SIZE = sizeof(odom.velocity_covariance) / sizeof(odom.velocity_covariance[0]);
-
 	// Get covariances to vehicle odometry
 	float covariances[24];
 	_ekf.covariances_diagonal().copyTo(covariances);
 
-	// initially set pose covariances to 0
-	for (size_t i = 0; i < POS_URT_SIZE; i++) {
-		odom.pose_covariance[i] = 0.0;
-	}
-
-	// set the position variances
-	odom.pose_covariance[odom.COVARIANCE_MATRIX_X_VARIANCE] = covariances[7];
-	odom.pose_covariance[odom.COVARIANCE_MATRIX_Y_VARIANCE] = covariances[8];
-	odom.pose_covariance[odom.COVARIANCE_MATRIX_Z_VARIANCE] = covariances[9];
-
 	// TODO: implement propagation from quaternion covariance to Euler angle covariance
 	// by employing the covariance law
-
-	// initially set velocity covariances to 0
-	for (size_t i = 0; i < VEL_URT_SIZE; i++) {
-		odom.velocity_covariance[i] = 0.0;
-	}
 
 	// set the linear velocity variances
 	odom.velocity_covariance[odom.COVARIANCE_MATRIX_VX_VARIANCE] = covariances[4];
 	odom.velocity_covariance[odom.COVARIANCE_MATRIX_VY_VARIANCE] = covariances[5];
 	odom.velocity_covariance[odom.COVARIANCE_MATRIX_VZ_VARIANCE] = covariances[6];
 
+	// set the position variances
+	odom.pose_covariance[odom.COVARIANCE_MATRIX_X_VARIANCE] = covariances[7];
+	odom.pose_covariance[odom.COVARIANCE_MATRIX_Y_VARIANCE] = covariances[8];
+	odom.pose_covariance[odom.COVARIANCE_MATRIX_Z_VARIANCE] = covariances[9];
+
 	// publish vehicle odometry data
 	odom.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 	_odometry_pub.publish(odom);
+}
+
+void EKF2::PublishSensorBias(const hrt_abstime &timestamp)
+{
+	// estimator_sensor_bias
+	estimator_sensor_bias_s bias{};
+	bias.timestamp_sample = timestamp;
+
+	const Vector3f gyro_bias{_ekf.getGyroBias()};
+	const Vector3f accel_bias{_ekf.getAccelBias()};
+
+	float states[24];
+	_ekf.getStateAtFusionHorizonAsVector().copyTo(states);
+	const Vector3f mag_bias {
+		states[19] + _param_ekf2_magbias_x.get(),
+		states[20] + _param_ekf2_magbias_y.get(),
+		states[21] + _param_ekf2_magbias_z.get(),
+	};
+
+	// only publish on change
+	if ((gyro_bias - _last_gyro_bias).longerThan(0.001f)
+	    || (accel_bias - _last_accel_bias).longerThan(0.001f)
+	    || (mag_bias - _last_mag_bias).longerThan(0.001f)) {
+
+		float covariances[24];
+		_ekf.covariances_diagonal().copyTo(covariances);
+
+		// take device ids from sensor_selection_s if not using specific vehicle_imu_s
+		if (_device_id_gyro != 0) {
+			bias.gyro_device_id = _device_id_gyro;
+
+			gyro_bias.copyTo(bias.gyro_bias);
+
+			bias.gyro_bias_variance[0] = covariances[10];
+			bias.gyro_bias_variance[1] = covariances[11];
+			bias.gyro_bias_variance[2] = covariances[12];
+
+			_last_gyro_bias = gyro_bias;
+		}
+
+		if ((_device_id_accel != 0) && !(_param_ekf2_aid_mask.get() & MASK_INHIBIT_ACC_BIAS)) {
+			bias.accel_device_id = _device_id_accel;
+
+			accel_bias.copyTo(bias.accel_bias);
+
+			bias.accel_bias_variance[0] = covariances[13];
+			bias.accel_bias_variance[1] = covariances[14];
+			bias.accel_bias_variance[2] = covariances[15];
+
+			_last_accel_bias = accel_bias;
+		}
+
+		if (_device_id_mag != 0) {
+			bias.mag_device_id = _device_id_mag;
+
+			mag_bias.copyTo(bias.mag_bias);
+
+			bias.mag_bias_variance[0] = covariances[19];
+			bias.mag_bias_variance[1] = covariances[20];
+			bias.mag_bias_variance[2] = covariances[21];
+
+			_last_mag_bias = mag_bias;
+		}
+
+		bias.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+		_estimator_sensor_bias_pub.publish(bias);
+	}
+}
+
+void EKF2::PublishStates(const hrt_abstime &timestamp)
+{
+	// publish estimator states
+	estimator_states_s states;
+	states.timestamp_sample = timestamp;
+	states.n_states = 24;
+	_ekf.getStateAtFusionHorizonAsVector().copyTo(states.states);
+	_ekf.covariances_diagonal().copyTo(states.covariances);
+	states.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_estimator_states_pub.publish(states);
+}
+
+void EKF2::PublishStatus(const hrt_abstime &timestamp)
+{
+	estimator_status_s status{};
+	status.timestamp_sample = timestamp;
+
+	_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
+
+	_ekf.get_gps_check_status(&status.gps_check_fail_flags);
+
+	// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
+	// the GPS Fix bit, which is always checked)
+	status.gps_check_fail_flags &= ((uint16_t)_params->gps_check_mask << 1) | 1;
+
+	filter_control_status_u control_status;
+	_ekf.get_control_mode(&control_status.value);
+	status.control_mode_flags = control_status.value;
+
+	_ekf.get_filter_fault_status(&status.filter_fault_flags);
+	_ekf.get_innovation_test_status(status.innovation_check_flags, status.mag_test_ratio,
+					status.vel_test_ratio, status.pos_test_ratio,
+					status.hgt_test_ratio, status.tas_test_ratio,
+					status.hagl_test_ratio, status.beta_test_ratio);
+
+	_ekf.get_ekf_lpos_accuracy(&status.pos_horiz_accuracy, &status.pos_vert_accuracy);
+	_ekf.get_ekf_soln_status(&status.solution_status_flags);
+	_ekf.getImuVibrationMetrics().copyTo(status.vibe);
+
+	status.time_slip = _last_time_slip_us * 1e-6f;
+
+	status.pre_flt_fail_innov_heading = _preflt_checker.hasHeadingFailed();
+	status.pre_flt_fail_innov_vel_horiz = _preflt_checker.hasHorizVelFailed();
+	status.pre_flt_fail_innov_vel_vert = _preflt_checker.hasVertVelFailed();
+	status.pre_flt_fail_innov_height = _preflt_checker.hasHeightFailed();
+	status.pre_flt_fail_mag_field_disturbed = control_status.flags.mag_field_disturbed;
+
+	status.accel_device_id = _device_id_accel;
+	status.baro_device_id = _device_id_baro;
+	status.gyro_device_id = _device_id_gyro;
+	status.mag_device_id = _device_id_mag;
+
+	status.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_estimator_status_pub.publish(status);
 }
 
 void EKF2::PublishYawEstimatorStatus(const hrt_abstime &timestamp)
