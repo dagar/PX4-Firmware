@@ -588,13 +588,10 @@ void EKF2::PublishInnovations(const hrt_abstime &timestamp, const imuSample &imu
 	// calculate noise filtered velocity innovations which are used for pre-flight checking
 	if (_standby) {
 		// TODO: move to run before publications
-		filter_control_status_u control_status;
-		_ekf.get_control_mode(&control_status.value);
-
-		_preflt_checker.setUsingGpsAiding(control_status.flags.gps);
-		_preflt_checker.setUsingFlowAiding(control_status.flags.opt_flow);
-		_preflt_checker.setUsingEvPosAiding(control_status.flags.ev_pos);
-		_preflt_checker.setUsingEvVelAiding(control_status.flags.ev_vel);
+		_preflt_checker.setUsingGpsAiding(_ekf.control_status_flags().gps);
+		_preflt_checker.setUsingFlowAiding(_ekf.control_status_flags().opt_flow);
+		_preflt_checker.setUsingEvPosAiding(_ekf.control_status_flags().ev_pos);
+		_preflt_checker.setUsingEvVelAiding(_ekf.control_status_flags().ev_vel);
 
 		_preflt_checker.update(imu.delta_ang_dt, innovations);
 	}
@@ -944,9 +941,7 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 	// the GPS Fix bit, which is always checked)
 	status.gps_check_fail_flags &= ((uint16_t)_params->gps_check_mask << 1) | 1;
 
-	filter_control_status_u control_status;
-	_ekf.get_control_mode(&control_status.value);
-	status.control_mode_flags = control_status.value;
+	_ekf.get_control_mode(&status.control_mode_flags);
 
 	_ekf.get_filter_fault_status(&status.filter_fault_flags);
 	_ekf.get_innovation_test_status(status.innovation_check_flags, status.mag_test_ratio,
@@ -964,7 +959,7 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 	status.pre_flt_fail_innov_vel_horiz = _preflt_checker.hasHorizVelFailed();
 	status.pre_flt_fail_innov_vel_vert = _preflt_checker.hasVertVelFailed();
 	status.pre_flt_fail_innov_height = _preflt_checker.hasHeightFailed();
-	status.pre_flt_fail_mag_field_disturbed = control_status.flags.mag_field_disturbed;
+	status.pre_flt_fail_mag_field_disturbed = _ekf.control_status_flags().mag_field_disturbed;
 
 	status.accel_device_id = _device_id_accel;
 	status.baro_device_id = _device_id_baro;
@@ -1387,16 +1382,11 @@ void EKF2::UpdateRangeSample(ekf2_timestamps_s &ekf2_timestamps)
 void EKF2::UpdateMagCalibration(const hrt_abstime &timestamp)
 {
 	/* Check and save learned magnetometer bias estimates */
-	filter_control_status_u control_status;
-	_ekf.get_control_mode(&control_status.value);
-
 	fault_status_u fault_status;
 	_ekf.get_filter_fault_status(&fault_status.value);
 
 	// Check if conditions are OK for learning of magnetometer bias values
-	if (control_status.flags.in_air && _armed &&
-	    !fault_status.value && // there are no filter faults
-	    control_status.flags.mag_3D) { // the EKF is operating in the correct mode
+	if (_ekf.control_status_flags().in_air && _ekf.control_status_flags().mag_3D && _armed && (fault_status.value == 0)) {
 
 		if (_last_magcal_us == 0) {
 			_last_magcal_us = timestamp;
