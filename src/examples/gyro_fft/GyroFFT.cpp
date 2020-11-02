@@ -160,15 +160,6 @@ float GyroFFT::EstimatePeakFrequency(q15_t fft[FFT_LENGTH * 2], uint8_t peak_ind
 	return peak_freq_adjusted;
 }
 
-static int float_cmp(const void *elem1, const void *elem2)
-{
-	if (*(const float *)elem1 < * (const float *)elem2) {
-		return -1;
-	}
-
-	return *(const float *)elem1 > *(const float *)elem2;
-}
-
 void GyroFFT::Run()
 {
 	if (should_exit()) {
@@ -253,7 +244,7 @@ void GyroFFT::Run()
 					perf_end(_fft_perf);
 					fft_updated = true;
 
-					static constexpr uint16_t MIN_SNR = 10; // TODO:
+					static constexpr uint16_t MIN_SNR = 15; // TODO:
 
 					uint32_t max_peak_magnitude = 0;
 					uint8_t max_peak_index = 0;
@@ -302,43 +293,36 @@ void GyroFFT::Run()
 					}
 
 					if (publish) {
-						float *peak_frequencies;
+						float *fft_peak_frequencies;
+						uint32_t *fft_peaks_magnitude;
 
 						switch (axis) {
 						case 0:
-							peak_frequencies = _sensor_gyro_fft.peak_frequencies_x;
+							fft_peak_frequencies = _sensor_gyro_fft.peak_frequencies_x;
+							fft_peaks_magnitude = _sensor_gyro_fft.peak_magnitudes_x;
 							break;
 
 						case 1:
-							peak_frequencies = _sensor_gyro_fft.peak_frequencies_y;
+							fft_peak_frequencies = _sensor_gyro_fft.peak_frequencies_y;
+							fft_peaks_magnitude = _sensor_gyro_fft.peak_magnitudes_y;
 							break;
 
 						case 2:
-							peak_frequencies = _sensor_gyro_fft.peak_frequencies_z;
+							fft_peak_frequencies = _sensor_gyro_fft.peak_frequencies_z;
+							fft_peaks_magnitude = _sensor_gyro_fft.peak_magnitudes_z;
 							break;
 						}
 
-						int peaks_found = 0;
-
 						for (int i = 0; i < MAX_NUM_PEAKS; i++) {
 							if ((peak_index[i] > 0) && (peak_index[i] < FFT_LENGTH) && (peaks_magnitude[i] > 0)) {
-								const float freq = EstimatePeakFrequency(_fft_outupt_buffer, peak_index[i]);
 
-								if (freq >= _param_imu_gyro_fft_min.get() && freq <= _param_imu_gyro_fft_max.get()) {
-									peak_frequencies[peaks_found] = freq;
-									peaks_found++;
-								}
+								fft_peak_frequencies[i] = EstimatePeakFrequency(_fft_outupt_buffer, peak_index[i]);
+								fft_peaks_magnitude[i] = peaks_magnitude[i];
+
+							} else {
+								fft_peak_frequencies[i] = NAN;
+								fft_peaks_magnitude[i] = 0;
 							}
-						}
-
-						// mark remaining slots empty
-						for (int i = peaks_found; i < MAX_NUM_PEAKS; i++) {
-							peak_frequencies[i] = NAN;
-						}
-
-						// publish in sorted order for convenience
-						if (peaks_found > 0) {
-							qsort(peak_frequencies, peaks_found, sizeof(float), float_cmp);
 						}
 					}
 

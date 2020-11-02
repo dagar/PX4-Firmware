@@ -75,7 +75,7 @@ public:
 	bool init();
 
 private:
-	static constexpr uint16_t FFT_LENGTH = 2048;
+	static constexpr uint16_t FFT_LENGTH = 1024;
 
 	float EstimatePeakFrequency(q15_t fft[FFT_LENGTH * 2], uint8_t peak_index);
 	void Run() override;

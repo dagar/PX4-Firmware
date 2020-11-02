@@ -12,3 +12,7 @@ float32[3] peak_frequency # peak frequency per axis
 float32[4] peak_frequencies_x # x axis peak frequencies
 float32[4] peak_frequencies_y # y axis peak frequencies
 float32[4] peak_frequencies_z # z axis peak frequencies
+
+uint32[4] peak_magnitudes_x  # x axis peak magnitudes
+uint32[4] peak_magnitudes_y  # x axis peak magnitudes
+uint32[4] peak_magnitudes_z  # x axis peak magnitudes

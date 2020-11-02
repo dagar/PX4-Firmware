@@ -33,7 +33,7 @@ px4_add_board(
 		imu/invensense/icm20608g
 		imu/invensense/icm40609d
 		imu/invensense/mpu6500
-		imu/invensense/mpu9250
+		#imu/invensense/mpu9250
 		irlock
 		lights/blinkm
 		lights/rgbled
@@ -50,11 +50,11 @@ px4_add_board(
 		pwm_out
 		rc_input
 		roboclaw
-		safety_button
+		#safety_button
 		tap_esc
 		telemetry # all available telemetry drivers
 		test_ppm
-		tone_alarm
+		#tone_alarm
 		uavcan
 	MODULES
 		airspeed_selector
@@ -75,7 +75,7 @@ px4_add_board(
 		logger
 		mavlink
 		mc_att_control
-		mc_hover_thrust_estimator
+		#mc_hover_thrust_estimator
 		mc_pos_control
 		mc_rate_control
 		#micrortps_bridge
