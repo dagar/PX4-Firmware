@@ -223,6 +223,7 @@ tone_alarm start
 rc_update start
 manual_control start
 sensors start
+output_predictor start
 commander start
 navigator start
 

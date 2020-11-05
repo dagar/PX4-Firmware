@@ -34,7 +34,6 @@
 #include <gtest/gtest.h>
 #include <math.h>
 #include "EKF/ekf.h"
-#include "EKF/imu_down_sampler.hpp"
 
 class EkfImuSamplingTest : public ::testing::TestWithParam<std::tuple<float, float, Vector3f, Vector3f>>
 {
@@ -48,7 +47,6 @@ public:
 	void SetUp() override
 	{
 		_ekf.init(0);
-
 	}
 
 	void TearDown() override
@@ -119,101 +117,3 @@ INSTANTIATE_TEST_SUITE_P(imuSamplingAtMultipleRates,
 				 std::make_tuple<float, float, Vector3f, Vector3f>(1.6f,  1.6f, Vector3f{0.0f, 0.0f, 1.0f}, Vector3f{0.0f, 0.0f, 0.0f}),
 				 std::make_tuple<float, float, Vector3f, Vector3f>(0.333f, 1.0f, Vector3f{0.0f, 0.0f, 1.0f}, Vector3f{0.0f, 0.0f, 0.0f})
 			 ));
-
-TEST_F(EkfImuSamplingTest, accelDownSampling)
-{
-	int32_t target_dt_us = 8000;
-	ImuDownSampler sampler(target_dt_us);
-
-	Vector3f ang_vel{0.0f, 0.0f, 0.0f};
-	Vector3f accel{-0.46f, 0.87f, 0.0f};
-	imuSample input_sample;
-	input_sample.delta_ang_dt = 0.004f;
-	input_sample.delta_ang = ang_vel * input_sample.delta_ang_dt;
-	input_sample.delta_vel_dt = 0.004f;
-	input_sample.delta_vel = accel * input_sample.delta_vel_dt;
-	input_sample.time_us = 0;
-
-	// WHEN: adding samples at the double rate as the target rate
-	EXPECT_FALSE(sampler.update(input_sample));
-	input_sample.time_us = 4000;
-
-	// THEN: after two samples a first downsampled sample is ready
-	EXPECT_TRUE(sampler.update(input_sample));
-
-	// THEN: downsampled sample should fit to input data
-	imuSample output_sample = sampler.getDownSampledImuAndTriggerReset();
-	EXPECT_FLOAT_EQ(output_sample.delta_ang_dt, 0.008f);
-	EXPECT_FLOAT_EQ(output_sample.delta_vel_dt, 0.008f);
-	EXPECT_TRUE(matrix::isEqual(ang_vel * 0.008f, output_sample.delta_ang, 1e-10f));
-	EXPECT_TRUE(matrix::isEqual(accel * 0.008f, output_sample.delta_vel, 1e-10f));
-}
-
-TEST_F(EkfImuSamplingTest, gyroDownSampling)
-{
-	int32_t target_dt_us = 8000;
-	ImuDownSampler sampler(target_dt_us);
-
-	Vector3f ang_vel{0.0f, 0.0f, 1.0f};
-	Vector3f accel{0.0f, 0.0f, 0.0f};
-	imuSample input_sample;
-
-	input_sample.delta_ang_dt = 0.004f;
-	input_sample.delta_ang = ang_vel * input_sample.delta_ang_dt;
-	input_sample.delta_vel_dt = 0.004f;
-	input_sample.delta_vel = accel * input_sample.delta_vel_dt;
-	input_sample.time_us = 0;
-
-	// WHEN: adding samples at the double rate as the target rate
-	EXPECT_FALSE(sampler.update(input_sample));
-	input_sample.time_us += 4000;
-
-	// THEN: after two samples a first downsampled sample is ready
-	EXPECT_TRUE(sampler.update(input_sample));
-	input_sample.time_us += 4000;
-
-	// THEN: downsampled sample should fit to input data
-	imuSample output_sample = sampler.getDownSampledImuAndTriggerReset();
-	EXPECT_FLOAT_EQ(output_sample.delta_ang_dt, 0.008f);
-	EXPECT_FLOAT_EQ(output_sample.delta_vel_dt, 0.008f);
-	EXPECT_TRUE(matrix::isEqual(ang_vel * 0.008f, output_sample.delta_ang, 1e-10f));
-	EXPECT_TRUE(matrix::isEqual(accel * 0.008f, output_sample.delta_vel, 1e-10f));
-
-	ang_vel = Vector3f{0.0f, 1.0f, 0.0f};
-	input_sample.delta_ang = ang_vel * input_sample.delta_ang_dt;
-	input_sample.delta_vel = accel * input_sample.delta_vel_dt;
-
-	// WHEN: adding samples at the double rate as the target rate
-	EXPECT_FALSE(sampler.update(input_sample));
-	input_sample.time_us += 4000;
-
-	// THEN: after two more samples a second downsampled sample is ready
-	EXPECT_TRUE(sampler.update(input_sample));
-	input_sample.time_us += 4000;
-
-	// THEN: downsampled sample should fit the adapted input data
-	output_sample = sampler.getDownSampledImuAndTriggerReset();
-	EXPECT_FLOAT_EQ(output_sample.delta_ang_dt, 0.008f);
-	EXPECT_FLOAT_EQ(output_sample.delta_vel_dt, 0.008f);
-	EXPECT_TRUE(matrix::isEqual(ang_vel * 0.008f, output_sample.delta_ang, 1e-10f));
-	EXPECT_TRUE(matrix::isEqual(accel * 0.008f, output_sample.delta_vel, 1e-10f));
-
-	ang_vel = Vector3f{1.0f, 0.0f, 0.0f};
-	input_sample.delta_ang = ang_vel * input_sample.delta_ang_dt;
-	input_sample.delta_vel = accel * input_sample.delta_vel_dt;
-
-	// WHEN: adding samples at the double rate as the target rate
-	EXPECT_FALSE(sampler.update(input_sample));
-	input_sample.time_us += 4000;
-
-	// THEN: after two more samples a second downsampled sample is ready
-	EXPECT_TRUE(sampler.update(input_sample));
-	input_sample.time_us += 4000;
-
-	// THEN: downsampled sample should fit the adapted input data
-	output_sample = sampler.getDownSampledImuAndTriggerReset();
-	EXPECT_FLOAT_EQ(output_sample.delta_ang_dt, 0.008f);
-	EXPECT_FLOAT_EQ(output_sample.delta_vel_dt, 0.008f);
-	EXPECT_TRUE(matrix::isEqual(ang_vel * 0.008f, output_sample.delta_ang, 1e-10f));
-	EXPECT_TRUE(matrix::isEqual(accel * 0.008f, output_sample.delta_vel, 1e-10f));
-}

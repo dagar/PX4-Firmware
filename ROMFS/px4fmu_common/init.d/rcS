@@ -409,6 +409,8 @@ else
 		commander start
 	fi
 
+	output_predictor start
+
 	# Pre-takeoff continuous magnetometer calibration
 	if param compare -s MBE_ENABLE 1
 	then

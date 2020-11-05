@@ -486,12 +486,6 @@ private:
 		(ParamInt<px4::params::EKF2_FUSE_BETA>)
 		_param_ekf2_fuse_beta,		///< Controls synthetic sideslip fusion, 0 disables, 1 enables
 
-		// output predictor filter time constants
-		(ParamExtFloat<px4::params::EKF2_TAU_VEL>)
-		_param_ekf2_tau_vel,		///< time constant used by the output velocity complementary filter (sec)
-		(ParamExtFloat<px4::params::EKF2_TAU_POS>)
-		_param_ekf2_tau_pos,		///< time constant used by the output position complementary filter (sec)
-
 		// IMU switch on bias parameters
 		(ParamExtFloat<px4::params::EKF2_GBIAS_INIT>)
 		_param_ekf2_gbias_init,	///< 1-sigma gyro bias uncertainty at switch on (rad/sec)

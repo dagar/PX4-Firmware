@@ -128,12 +128,6 @@ void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
 	const Vector2f delta_horz_vel = new_horz_vel - Vector2f(_state.vel);
 	_state.vel.xy() = new_horz_vel;
 
-	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-		_output_buffer[index].vel.xy() += delta_horz_vel;
-	}
-
-	_output_new.vel.xy() += delta_horz_vel;
-
 	_state_reset_status.velNE_change = delta_horz_vel;
 	_state_reset_status.velNE_counter++;
 }
@@ -142,14 +136,6 @@ void Ekf::resetVerticalVelocityTo(float new_vert_vel)
 {
 	const float delta_vert_vel = new_vert_vel - _state.vel(2);
 	_state.vel(2) = new_vert_vel;
-
-	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-		_output_buffer[index].vel(2) += delta_vert_vel;
-		_output_vert_buffer[index].vert_vel += delta_vert_vel;
-	}
-
-	_output_new.vel(2) += delta_vert_vel;
-	_output_vert_new.vert_vel += delta_vert_vel;
 
 	_state_reset_status.velD_change = delta_vert_vel;
 	_state_reset_status.velD_counter++;
@@ -219,12 +205,6 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
 	const Vector2f delta_horz_pos{new_horz_pos - Vector2f{_state.pos}};
 	_state.pos.xy() = new_horz_pos;
 
-	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-		_output_buffer[index].pos.xy() += delta_horz_pos;
-	}
-
-	_output_new.pos.xy() += delta_horz_pos;
-
 	_state_reset_status.posNE_change = delta_horz_pos;
 	_state_reset_status.posNE_counter++;
 }
@@ -237,19 +217,6 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos)
 	// store the reset amount and time to be published
 	_state_reset_status.posD_change = new_vert_pos - old_vert_pos;
 	_state_reset_status.posD_counter++;
-
-	// apply the change in height / height rate to our newest height / height rate estimate
-	// which have already been taken out from the output buffer
-	_output_new.pos(2) += _state_reset_status.posD_change;
-
-	// add the reset amount to the output observer buffered data
-	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].pos(2) += _state_reset_status.posD_change;
-		_output_vert_buffer[i].vert_vel_integ += _state_reset_status.posD_change;
-	}
-
-	// add the reset amount to the output observer vertical position state
-	_output_vert_new.vert_vel_integ = _state.pos(2);
 }
 
 // Reset height state using the last height measurement
@@ -348,30 +315,6 @@ void Ekf::resetHeight()
 
 	// Reset the timout timer
 	_time_last_hgt_fuse = _time_last_imu;
-}
-
-// align output filter states to match EKF states at the fusion time horizon
-void Ekf::alignOutputFilter()
-{
-	const outputSample &output_delayed = _output_buffer.get_oldest();
-
-	// calculate the quaternion rotation delta from the EKF to output observer states at the EKF fusion time horizon
-	Quatf q_delta{_state.quat_nominal * output_delayed.quat_nominal.inversed()};
-	q_delta.normalize();
-
-	// calculate the velocity and position deltas between the output and EKF at the EKF fusion time horizon
-	const Vector3f vel_delta = _state.vel - output_delayed.vel;
-	const Vector3f pos_delta = _state.pos - output_delayed.pos;
-
-	// loop through the output filter state history and add the deltas
-	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].quat_nominal = q_delta * _output_buffer[i].quat_nominal;
-		_output_buffer[i].quat_nominal.normalize();
-		_output_buffer[i].vel += vel_delta;
-		_output_buffer[i].pos += pos_delta;
-	}
-
-	_output_new = _output_buffer.get_newest();
 }
 
 // Do a forced re-alignment of the yaw angle to align with the horizontal velocity vector from the GPS.
@@ -594,10 +537,10 @@ float Ekf::compensateBaroForDynamicPressure(const float baro_alt_uncompensated) 
 	// calculate static pressure error = Pmeas - Ptruth
 	// model position error sensitivity as a body fixed ellipse with a different scale in the positive and
 	// negative X and Y directions. Used to correct baro data for positional errors
-	const matrix::Dcmf R_to_body(_output_new.quat_nominal.inversed());
+	const matrix::Dcmf R_to_body{_state.quat_nominal.inversed()}; // TODO
 
 	// Calculate airspeed in body frame
-	const Vector3f velocity_earth = _output_new.vel - _vel_imu_rel_body_ned;
+	const Vector3f velocity_earth{_state.vel}; // TODO
 
 	const Vector3f wind_velocity_earth(_state.wind_vel(0), _state.wind_vel(1), 0.0f);
 
@@ -1711,18 +1654,6 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance, bool update_buffer)
 	// update the yaw angle variance
 	if (yaw_variance > FLT_EPSILON) {
 		increaseQuatYawErrVariance(yaw_variance);
-	}
-
-	// add the reset amount to the output observer buffered data
-	if (update_buffer) {
-		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-			_output_buffer[i].quat_nominal = _state_reset_status.quat_change * _output_buffer[i].quat_nominal;
-		}
-
-		// apply the change in attitude quaternion to our newest quaternion estimate
-		// which was already taken out from the output buffer
-		_output_new.quat_nominal = _state_reset_status.quat_change * _output_new.quat_nominal;
-
 	}
 
 	// capture the reset event

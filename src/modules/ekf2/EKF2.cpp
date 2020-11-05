@@ -51,11 +51,11 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 	_replay_mode(replay_mode && !multi_mode),
 	_multi_mode(multi_mode),
 	_instance(multi_mode ? -1 : 0),
-	_attitude_pub(multi_mode ? ORB_ID(estimator_attitude) : ORB_ID(vehicle_attitude)),
-	_local_position_pub(multi_mode ? ORB_ID(estimator_local_position) : ORB_ID(vehicle_local_position)),
-	_global_position_pub(multi_mode ? ORB_ID(estimator_global_position) : ORB_ID(vehicle_global_position)),
-	_odometry_pub(multi_mode ? ORB_ID(estimator_odometry) : ORB_ID(vehicle_odometry)),
-	_wind_pub(multi_mode ? ORB_ID(estimator_wind) : ORB_ID(wind)),
+	_attitude_pub(ORB_ID(estimator_attitude)),
+	_local_position_pub(ORB_ID(estimator_local_position)),
+	_global_position_pub(ORB_ID(estimator_global_position)),
+	_odometry_pub(ORB_ID(estimator_odometry)),
+	_wind_pub(ORB_ID(estimator_wind)),
 	_params(_ekf.getParamHandle()),
 	_param_ekf2_predict_us(_params->filter_update_interval_us),
 	_param_ekf2_mag_delay(_params->mag_delay_ms),
@@ -141,8 +141,6 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 	_param_ekf2_ev_pos_y(_params->ev_pos_body(1)),
 	_param_ekf2_ev_pos_z(_params->ev_pos_body(2)),
 	_param_ekf2_arsp_thr(_params->arsp_thr),
-	_param_ekf2_tau_vel(_params->vel_Tau),
-	_param_ekf2_tau_pos(_params->pos_Tau),
 	_param_ekf2_gbias_init(_params->switch_on_gyro_bias),
 	_param_ekf2_abias_init(_params->switch_on_accel_bias),
 	_param_ekf2_angerr_init(_params->initial_tilt_err),
@@ -228,8 +226,8 @@ bool EKF2::multi_init(int imu, int mag)
 
 int EKF2::print_status()
 {
-	PX4_INFO_RAW("ekf2:%d EKF dt: %.4fs, IMU dt: %.4fs, attitude: %d, local position: %d, global position: %d\n",
-		     _instance, (double)_ekf.get_dt_ekf_avg(), (double)_ekf.get_dt_imu_avg(), _ekf.attitude_valid(),
+	PX4_INFO_RAW("ekf2:%d EKF dt: %.4fs, attitude: %d, local position: %d, global position: %d\n",
+		     _instance, (double)_ekf.get_dt_ekf_avg(), _ekf.attitude_valid(),
 		     _ekf.local_position_is_valid(), _ekf.global_position_is_valid());
 
 	perf_print_counter(_ecl_ekf_update_perf);
@@ -469,7 +467,6 @@ void EKF2::Run()
 
 		// push imu data into estimator
 		_ekf.setIMUData(imu_sample_new);
-		PublishAttitude(now); // publish attitude immediately (uses quaternion from output predictor)
 
 		// integrate time to monitor time slippage
 		if (_start_time_us > 0) {
@@ -569,6 +566,7 @@ void EKF2::Run()
 		if (_ekf.update()) {
 			perf_set_elapsed(_ecl_ekf_update_full_perf, hrt_elapsed_time(&ekf_update_start));
 
+			PublishAttitude(now);
 			PublishLocalPosition(now);
 			PublishOdometry(now, imu_sample_new);
 			PublishGlobalPosition(now);
@@ -612,23 +610,15 @@ void EKF2::Run()
 
 void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 {
-	if (_ekf.attitude_valid()) {
-		// generate vehicle attitude quaternion data
-		vehicle_attitude_s att;
-		att.timestamp_sample = timestamp;
-		const Quatf q{_ekf.calculate_quaternion()};
-		q.copyTo(att.q);
+	// generate vehicle attitude quaternion data
+	vehicle_attitude_s att;
+	att.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
+	const Quatf q{_ekf.getQuaternion()};
+	q.copyTo(att.q);
 
-		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
-		att.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
-		_attitude_pub.publish(att);
-
-	}  else if (_replay_mode) {
-		// in replay mode we have to tell the replay module not to wait for an update
-		// we do this by publishing an attitude with zero timestamp
-		vehicle_attitude_s att{};
-		_attitude_pub.publish(att);
-	}
+	_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
+	att.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_attitude_pub.publish(att);
 }
 
 void EKF2::PublishBaroBias(const hrt_abstime &timestamp)
@@ -1098,7 +1088,7 @@ void EKF2::PublishSensorBias(const hrt_abstime &timestamp)
 	    || (timestamp >= _last_sensor_bias_published + 1_s)) {
 
 		estimator_sensor_bias_s bias{};
-		bias.timestamp_sample = timestamp;
+		bias.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
 
 		// take device ids from sensor_selection_s if not using specific vehicle_imu_s
 		if (_device_id_gyro != 0) {
@@ -1154,8 +1144,6 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 {
 	estimator_status_s status{};
 	status.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
-
-	_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
 
 	_ekf.get_gps_check_status(&status.gps_check_fail_flags);
 
@@ -1318,7 +1306,7 @@ void EKF2::PublishYawEstimatorStatus(const hrt_abstime &timestamp)
 			       yaw_est_test_data.innov_vn, yaw_est_test_data.innov_ve,
 			       yaw_est_test_data.weight)) {
 
-		yaw_est_test_data.timestamp_sample = timestamp;
+		yaw_est_test_data.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
 		yaw_est_test_data.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 
 		_yaw_est_pub.publish(yaw_est_test_data);

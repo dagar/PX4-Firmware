@@ -65,32 +65,18 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 		_initialised = init(imu_sample.time_us);
 	}
 
-	const float dt = math::constrain((imu_sample.time_us - _time_last_imu) / 1e6f, 1.0e-4f, 0.02f);
-
 	_time_last_imu = imu_sample.time_us;
 
-	if (_time_last_imu > 0) {
-		_dt_imu_avg = 0.8f * _dt_imu_avg + 0.2f * dt;
-	}
+	_imu_buffer.push(imu_sample);
 
-	_newest_high_rate_imu_sample = imu_sample;
+	// get the oldest data from the buffer
+	_imu_sample_delayed = _imu_buffer.get_oldest();
 
-	_imu_updated = _imu_down_sampler.update(imu_sample);
+	// calculate the minimum interval between observations required to guarantee no loss of data
+	// this will occur if data is overwritten before its time stamp falls behind the fusion time horizon
+	_min_obs_interval_us = (imu_sample.time_us - _imu_sample_delayed.time_us) / (_obs_buffer_length - 1);
 
-	// accumulate and down-sample imu data and push to the buffer when new downsampled data becomes available
-	if (_imu_updated) {
-
-		_imu_buffer.push(_imu_down_sampler.getDownSampledImuAndTriggerReset());
-
-		// get the oldest data from the buffer
-		_imu_sample_delayed = _imu_buffer.get_oldest();
-
-		// calculate the minimum interval between observations required to guarantee no loss of data
-		// this will occur if data is overwritten before its time stamp falls behind the fusion time horizon
-		_min_obs_interval_us = (imu_sample.time_us - _imu_sample_delayed.time_us) / (_obs_buffer_length - 1);
-
-		setDragData(imu_sample);
-	}
+	setDragData(imu_sample);
 }
 
 void EstimatorInterface::setMagData(const magSample &mag_sample)
@@ -484,8 +470,7 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 
 	ECL_DEBUG("EKF max time delay %.1f ms, OBS length %d\n", (double)ekf_delay_ms, _obs_buffer_length);
 
-	if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_buffer.allocate(_imu_buffer_length)
-	    || !_output_vert_buffer.allocate(_imu_buffer_length)) {
+	if (!_imu_buffer.allocate(_imu_buffer_length)) {
 
 		printBufferAllocationFailed("IMU and output");
 		return false;
@@ -537,7 +522,6 @@ void EstimatorInterface::printBufferAllocationFailed(const char *buffer_name)
 
 void EstimatorInterface::print_status()
 {
-	printf("IMU average dt: %.6f seconds\n", (double)_dt_imu_avg);
 	printf("EKF average dt: %.6f seconds\n", (double)_dt_ekf_avg);
 
 	printf("IMU buffer: %d (%d Bytes)\n", _imu_buffer.get_length(), _imu_buffer.get_total_size());
@@ -575,7 +559,4 @@ void EstimatorInterface::print_status()
 	if (_drag_buffer) {
 		printf("drag buffer: %d/%d (%d Bytes)\n", _drag_buffer->entries(), _drag_buffer->get_length(), _drag_buffer->get_total_size());
 	}
-
-	printf("output buffer: %d/%d (%d Bytes)\n", _output_buffer.entries(), _output_buffer.get_length(), _output_buffer.get_total_size());
-	printf("output vert buffer: %d/%d (%d Bytes)\n", _output_vert_buffer.entries(), _output_vert_buffer.get_length(), _output_vert_buffer.get_total_size());
 }

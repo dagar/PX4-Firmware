@@ -72,8 +72,6 @@
 #include <uORB/topics/vehicle_imu.h>
 
 #include "voted_sensors_update.h"
-#include "vehicle_acceleration/VehicleAcceleration.hpp"
-#include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
 #include "vehicle_air_data/VehicleAirData.hpp"
 #include "vehicle_gps_position/VehicleGPSPosition.hpp"
 #include "vehicle_imu/VehicleIMU.hpp"
@@ -173,8 +171,6 @@ private:
 
 	VotedSensorsUpdate _voted_sensors_update;
 
-	VehicleAcceleration	_vehicle_acceleration;
-	VehicleAngularVelocity	_vehicle_angular_velocity;
 	VehicleAirData          *_vehicle_air_data{nullptr};
 	VehicleMagnetometer     *_vehicle_magnetometer{nullptr};
 	VehicleGPSPosition	*_vehicle_gps_position{nullptr};
@@ -252,9 +248,6 @@ Sensors::Sensors(bool hil_enabled) :
 
 	_airspeed_validator.set_timeout(300000);
 	_airspeed_validator.set_equal_value_threshold(100);
-
-	_vehicle_acceleration.Start();
-	_vehicle_angular_velocity.Start();
 }
 
 Sensors::~Sensors()
@@ -262,14 +255,6 @@ Sensors::~Sensors()
 	// clear all registered callbacks
 	for (auto &sub : _vehicle_imu_sub) {
 		sub.unregisterCallback();
-	}
-
-	_vehicle_acceleration.Stop();
-	_vehicle_angular_velocity.Stop();
-
-	if (_vehicle_air_data) {
-		_vehicle_air_data->Stop();
-		delete _vehicle_air_data;
 	}
 
 	if (_vehicle_gps_position) {
@@ -771,12 +756,6 @@ int Sensors::print_status()
 	PX4_INFO_RAW("\n");
 	PX4_INFO_RAW("Airspeed status:\n");
 	_airspeed_validator.print();
-
-	PX4_INFO_RAW("\n");
-	_vehicle_acceleration.PrintStatus();
-
-	PX4_INFO_RAW("\n");
-	_vehicle_angular_velocity.PrintStatus();
 
 	if (_vehicle_gps_position) {
 		PX4_INFO_RAW("\n");

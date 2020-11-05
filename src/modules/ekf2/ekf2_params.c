@@ -976,28 +976,6 @@ PARAM_DEFINE_FLOAT(EKF2_ARSP_THR, 0.0f);
 PARAM_DEFINE_INT32(EKF2_FUSE_BETA, 0);
 
 /**
-
- * Time constant of the velocity output prediction and smoothing filter
- *
- * @group EKF2
- * @max 1.0
- * @unit s
- * @decimal 2
- */
-PARAM_DEFINE_FLOAT(EKF2_TAU_VEL, 0.25f);
-
-/**
- * Time constant of the position output prediction and smoothing filter. Controls how tightly the output track the EKF states.
- *
- * @group EKF2
- * @min 0.1
- * @max 1.0
- * @unit s
- * @decimal 2
- */
-PARAM_DEFINE_FLOAT(EKF2_TAU_POS, 0.25f);
-
-/**
  * 1-sigma IMU gyro switch-on bias
  *
  * @group EKF2

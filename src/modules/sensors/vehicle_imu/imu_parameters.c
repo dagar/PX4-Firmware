@@ -47,7 +47,7 @@
 * @reboot_required true
 * @group Sensors
 */
-PARAM_DEFINE_INT32(IMU_INTEG_RATE, 200);
+PARAM_DEFINE_INT32(IMU_INTEG_RATE, 100);
 
 /**
  * IMU auto calibration

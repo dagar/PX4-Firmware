@@ -1,0 +1,5 @@
+menuconfig MODULES_OUTPUT_PREDICTOR
+	bool "output_predictor"
+	default n
+	---help---
+		Enable support for output_predictor

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019, 2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -59,6 +59,7 @@ void LoggedTopics::add_default_topics()
 	add_optional_topic("camera_trigger");
 	add_topic("cellular_status", 200);
 	add_topic("commander_state");
+	add_topic("control_state", 10);
 	add_topic("cpuload");
 	add_optional_topic("esc_status", 250);
 	add_topic("failure_detector_status", 100);
@@ -78,6 +79,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("npfg_status", 100);
 	add_topic("offboard_control_mode", 100);
 	add_topic("onboard_computer_status", 10);
+	add_topic("output_predictor_status", 200);
 	add_topic("parameter_update");
 	add_topic("position_controller_status", 500);
 	add_topic("position_setpoint_triplet", 200);

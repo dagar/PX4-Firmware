@@ -60,6 +60,7 @@ set(msg_files
 	collision_report.msg
 	commander_state.msg
 	control_allocator_status.msg
+	control_state.msg
 	cpuload.msg
 	differential_pressure.msg
 	distance_sensor.msg
@@ -119,6 +120,7 @@ set(msg_files
 	onboard_computer_status.msg
 	optical_flow.msg
 	orbit_status.msg
+	output_predictor_status.msg
 	parameter_update.msg
 	ping.msg
 	pps_capture.msg

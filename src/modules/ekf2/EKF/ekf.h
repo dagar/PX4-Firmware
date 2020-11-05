@@ -127,6 +127,20 @@ public:
 	// get the state vector at the delayed time horizon
 	matrix::Vector<float, 24> getStateAtFusionHorizonAsVector() const;
 
+	const matrix::Quatf getQuaternion() const { return _state.quat_nominal; } // TODO
+
+	// get the velocity of the body frame origin in local NED earth frame
+	Vector3f getVelocity() const { return _state.vel; } // TODO
+
+	// get the velocity derivative in earth frame
+	const Vector3f getVelocityDerivative() const { return {}; } // TODO
+
+	// get the derivative of the vertical position of the body frame origin in local NED earth frame
+	float getVerticalPositionDerivative() const { return _state.vel(2); } // TODO
+
+	// get the position of the body frame origin in local earth frame
+	Vector3f getPosition() const { return _state.pos; } // TODO
+
 	// get the wind velocity in m/s
 	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
 
@@ -187,10 +201,6 @@ public:
 
 	Vector3f getPositionVariance() const { return P.slice<3, 3>(7, 7).diag(); }
 
-	// return an array containing the output predictor angular, velocity and position tracking
-	// error magnitudes (rad), (m/sec), (m)
-	const Vector3f &getOutputTrackingError() const { return _output_tracking_error; }
-
 	// First argument returns GPS drift  metrics in the following array locations
 	// 0 : Horizontal position drift rate (m/s)
 	// 1 : Vertical position drift rate (m/s)
@@ -198,6 +208,9 @@ public:
 	// Second argument returns true when IMU movement is blocking the drift calculation
 	// Function returns true if the metrics have been updated and not returned previously by this function
 	bool get_gps_drift_metrics(float drift[3], bool *blocked);
+
+	// return true if the attitude is usable
+	bool attitude_valid() const { return PX4_ISFINITE(_state.quat_nominal(0)) && _control_status.flags.tilt_align; }
 
 	// return true if the global position estimate is valid
 	// return true if the origin is set we are not doing unconstrained free inertial navigation
@@ -304,9 +317,6 @@ public:
 
 	// return the quaternion defining the rotation from the External Vision to the EKF reference frame
 	matrix::Quatf getVisionAlignmentQuaternion() const { return Quatf(_R_ev_to_ekf); };
-
-	// use the latest IMU data at the current time horizon.
-	Quatf calculate_quaternion() const;
 
 	// set minimum continuous period without GPS fail required to mark a healthy GPS status
 	void set_min_required_gps_health_time(uint32_t time_us) { _min_gps_health_time_us = time_us; }
@@ -479,12 +489,6 @@ private:
 	bool _inhibit_flow_use{false};	///< true when use of optical flow and range finder is being inhibited
 	Vector2f _flow_compensated_XY_rad{};	///< measured delta angle of the image about the X and Y body axes after removal of body rotation (rad), RH rotation is positive
 
-	// output predictor states
-	Vector3f _delta_angle_corr{};	///< delta angle correction vector (rad)
-	Vector3f _vel_err_integ{};	///< integral of velocity tracking error (m)
-	Vector3f _pos_err_integ{};	///< integral of position tracking error (m.s)
-	Vector3f _output_tracking_error{}; ///< contains the magnitude of the angle, velocity and position track errors (rad, m/s, m)
-
 	// variables used for the GPS quality checks
 	Vector3f _gps_pos_deriv_filt{};	///< GPS NED position derivative (m/sec)
 	Vector2f _gps_velNE_filt{};	///< filtered GPS North and East velocity (m/sec)
@@ -552,12 +556,6 @@ private:
 	bool _is_range_aid_suitable{false};	///< true when range finder can be used in flight as the height reference instead of the primary height sensor
 
 	float _height_rate_lpf{0.0f};
-
-	// update the real time complementary filter states. This includes the prediction
-	// and the correction step
-	void calculateOutputStates(const imuSample &imu);
-	void applyCorrectionToVerticalOutputBuffer(float vert_vel_correction);
-	void applyCorrectionToOutputBuffer(const Vector3f &vel_correction, const Vector3f &pos_correction);
 
 	// initialise filter states of both the delayed ekf and the real time complementary filter
 	bool initialiseFilter(void);
@@ -716,9 +714,6 @@ private:
 
 	// Return the magnetic declination in radians to be used by the alignment and fusion processing
 	float getMagDeclination();
-
-	// modify output filter to match the the EKF state at the fusion time horizon
-	void alignOutputFilter();
 
 	// update the rotation matrix which transforms EV navigation frame measurements into NED
 	void calcExtVisRotMat();

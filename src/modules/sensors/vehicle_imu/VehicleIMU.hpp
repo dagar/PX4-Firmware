@@ -110,7 +110,7 @@ private:
 	Integrator       _accel_integrator{};
 	IntegratorConing _gyro_integrator{};
 
-	uint32_t _imu_integration_interval_us{5000};
+	uint32_t _imu_integration_interval_us{10000};
 
 	hrt_abstime _accel_timestamp_sample_last{0};
 	hrt_abstime _gyro_timestamp_sample_last{0};
