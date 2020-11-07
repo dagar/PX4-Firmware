@@ -44,18 +44,15 @@
 
 #include <drivers/drv_hrt.h>
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
-#include <lib/drivers/device/spi.h>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/ecl/geo/geo.h>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/atomic.h>
 #include <px4_platform_common/i2c_spi_buses.h>
 
-#include "MPU9250_AK8963.hpp"
-
 using namespace InvenSense_MPU9250;
 
-class MPU9250 : public device::SPI, public I2CSPIDriver<MPU9250>
+class MPU9250 : public I2CSPIDriver<MPU9250>
 {
 public:
 	MPU9250(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
@@ -71,7 +68,7 @@ public:
 	int init() override;
 	void print_status() override;
 
-private:
+protected:
 	void exit_and_cleanup() override;
 
 	// Sensor Configuration
@@ -126,16 +123,6 @@ private:
 	bool ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
 	void ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
 	void UpdateTemperature();
-
-	const spi_drdy_gpio_t _drdy_gpio;
-
-	// I2C AUX interface (slave 1 - 4)
-	AKM_AK8963::MPU9250_AK8963 *_slave_ak8963_magnetometer{nullptr};
-	friend class AKM_AK8963::MPU9250_AK8963;
-
-	void I2CSlaveRegisterWrite(uint8_t slave_i2c_addr, uint8_t reg, uint8_t val);
-	void I2CSlaveExternalSensorDataEnable(uint8_t slave_i2c_addr, uint8_t reg, uint8_t size);
-	bool I2CSlaveExternalSensorDataRead(uint8_t *buffer, uint8_t length);
 
 	PX4Accelerometer _px4_accel;
 	PX4Gyroscope _px4_gyro;
