@@ -168,6 +168,7 @@ public:
 	 */
 	inline bool compare_exchange(T *expected, T desired)
 	{
+		(void)expected;
 		return __atomic_compare_exchange(&_value, expected, &desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 	}
 
