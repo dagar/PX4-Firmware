@@ -304,7 +304,7 @@ bool LSM9DS1::RegisterCheck(const register_config_t &reg_cfg)
 uint8_t LSM9DS1::RegisterRead(Register reg)
 {
 	uint8_t cmd[2] {};
-	cmd[0] = static_cast<uint8_t>(reg) | READ_BIT;
+	cmd[0] = static_cast<uint8_t>(reg) | DIR_READ;
 	transfer(cmd, cmd, sizeof(cmd));
 	return cmd[1];
 }
@@ -328,21 +328,83 @@ void LSM9DS1::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t cle
 
 bool LSM9DS1::FIFORead(const hrt_abstime &timestamp_sample, uint8_t samples)
 {
-	FIFOTransferBuffer buffer{};
-	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 1, FIFO::SIZE);
+	sensor_gyro_fifo_s gyro{};
+	gyro.timestamp_sample = timestamp_sample;
+	gyro.samples = 0;
+	gyro.dt = FIFO_SAMPLE_DT;
 
-	if (transfer((uint8_t *)&buffer, (uint8_t *)&buffer, transfer_size) != PX4_OK) {
-		perf_count(_bad_transfer_perf);
-		return false;
+	sensor_accel_fifo_s accel{};
+	accel.timestamp_sample = timestamp_sample;
+	accel.samples = 0;
+	accel.dt = FIFO_SAMPLE_DT;
+
+	for (int i = 0; i < samples; i++) {
+		{
+			struct GyroTransferBuffer {
+				uint8_t cmd{static_cast<uint8_t>(Register::OUT_X_L_G) | DIR_READ};
+				uint8_t OUT_X_L_G{0};
+				uint8_t OUT_X_H_G{0};
+				uint8_t OUT_Y_L_G{0};
+				uint8_t OUT_Y_H_G{0};
+				uint8_t OUT_Z_L_G{0};
+				uint8_t OUT_Z_H_G{0};
+			} buffer{};
+
+			if (transfer((uint8_t *)&buffer, (uint8_t *)&buffer, sizeof(buffer)) == PX4_OK) {
+				const int16_t gyro_x = combine(buffer.OUT_X_H_G, buffer.OUT_X_L_G);
+				const int16_t gyro_y = combine(buffer.OUT_Y_H_G, buffer.OUT_Y_L_G);
+				const int16_t gyro_z = combine(buffer.OUT_Z_H_G, buffer.OUT_Z_L_G);
+
+				// sensor's frame is +x forward, +y left, +z up
+				//  flip y & z to publish right handed with z down (x forward, y right, z down)
+				gyro.x[gyro.samples] = gyro_x;
+				gyro.y[gyro.samples] = gyro_y;
+				gyro.z[gyro.samples] = (gyro_z == INT16_MIN) ? INT16_MAX : -gyro_z;
+				gyro.samples++;
+			} else {
+				perf_count(_bad_transfer_perf);
+			}
+		}
+
+		{
+			struct AccelTransferBuffer {
+				uint8_t cmd{static_cast<uint8_t>(Register::OUT_X_L_XL) | DIR_READ};
+				uint8_t OUT_X_L_XL{0};
+				uint8_t OUT_X_H_XL{0};
+				uint8_t OUT_Y_L_XL{0};
+				uint8_t OUT_Y_H_XL{0};
+				uint8_t OUT_Z_L_XL{0};
+				uint8_t OUT_Z_H_XL{0};
+			} buffer{};
+
+			if (transfer((uint8_t *)&buffer, (uint8_t *)&buffer, sizeof(buffer)) == PX4_OK) {
+				const int16_t accel_x = combine(buffer.OUT_X_H_XL, buffer.OUT_X_L_XL);
+				const int16_t accel_y = combine(buffer.OUT_Y_H_XL, buffer.OUT_Y_L_XL);
+				const int16_t accel_z = combine(buffer.OUT_Z_H_XL, buffer.OUT_Z_L_XL);
+
+				// sensor's frame is +x forward, +y left, +z up
+				//  flip y & z to publish right handed with z down (x forward, y right, z down)
+				accel.x[accel.samples] = accel_x;
+				accel.y[accel.samples] = accel_y;
+				accel.z[accel.samples] = (accel_z == INT16_MIN) ? INT16_MAX : -accel_z;
+				accel.samples++;
+			} else {
+				perf_count(_bad_transfer_perf);
+			}
+		}
 	}
 
-	if (samples > 0) {
-		ProcessGyro(timestamp_sample, buffer.f, samples);
-		ProcessAccel(timestamp_sample, buffer.f, samples);
-		return true;
+	if (gyro.samples > 0) {
+		_px4_gyro.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) + perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
+		_px4_gyro.updateFIFO(gyro);
 	}
 
-	return false;
+	if (accel.samples > 0) {
+		_px4_accel.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) + perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
+		_px4_accel.updateFIFO(accel);
+	}
+
+	return (accel.samples > 0) && (gyro.samples > 0);
 }
 
 void LSM9DS1::FIFOReset()
@@ -360,69 +422,22 @@ void LSM9DS1::FIFOReset()
 	}
 }
 
-void LSM9DS1::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples)
-{
-	sensor_accel_fifo_s accel{};
-	accel.timestamp_sample = timestamp_sample;
-	accel.samples = samples;
-	accel.dt = FIFO_SAMPLE_DT;
-
-	for (int i = 0; i < samples; i++) {
-		const int16_t accel_x = combine(fifo[i].OUT_X_H_XL, fifo[i].OUT_X_L_XL);
-		const int16_t accel_y = combine(fifo[i].OUT_Y_H_XL, fifo[i].OUT_Y_L_XL);
-		const int16_t accel_z = combine(fifo[i].OUT_Z_H_XL, fifo[i].OUT_Z_L_XL);
-
-		// sensor's frame is +x forward, +y left, +z up
-		//  flip y & z to publish right handed with z down (x forward, y right, z down)
-		accel.x[i] = accel_x;
-		accel.y[i] = accel_y;
-		accel.z[i] = (accel_z == INT16_MIN) ? INT16_MAX : -accel_z;
-	}
-
-	_px4_accel.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
-				   perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
-
-	_px4_accel.updateFIFO(accel);
-}
-
-void LSM9DS1::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples)
-{
-	sensor_gyro_fifo_s gyro{};
-	gyro.timestamp_sample = timestamp_sample;
-	gyro.samples = samples;
-	gyro.dt = FIFO_SAMPLE_DT;
-
-	for (int i = 0; i < samples; i++) {
-		const int16_t gyro_x = combine(fifo[i].OUT_X_H_G, fifo[i].OUT_X_L_G);
-		const int16_t gyro_y = combine(fifo[i].OUT_Y_H_G, fifo[i].OUT_Y_L_G);
-		const int16_t gyro_z = combine(fifo[i].OUT_Z_H_G, fifo[i].OUT_Z_L_G);
-
-		// sensor's frame is +x forward, +y left, +z up
-		//  flip y & z to publish right handed with z down (x forward, y right, z down)
-		gyro.x[i] = gyro_x;
-		gyro.y[i] = gyro_y;
-		gyro.z[i] = (gyro_z == INT16_MIN) ? INT16_MAX : -gyro_z;
-	}
-
-	_px4_gyro.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
-				  perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
-
-	_px4_gyro.updateFIFO(gyro);
-}
-
 void LSM9DS1::UpdateTemperature()
 {
 	// read current temperature
-	uint8_t temperature_buf[3] {};
-	temperature_buf[0] = static_cast<uint8_t>(Register::OUT_TEMP_L) | READ_BIT | MS_BIT;
+	struct TransferBuffer {
+		uint8_t cmd{static_cast<uint8_t>(Register::OUT_TEMP_L) | DIR_READ};
+		uint8_t OUT_TEMP_L{0};
+		uint8_t OUT_TEMP_H{0};
+	} buffer{};
 
-	if (transfer(temperature_buf, temperature_buf, sizeof(temperature_buf)) != PX4_OK) {
+	if (transfer((uint8_t*)&buffer, (uint8_t*)&buffer, sizeof(buffer)) != PX4_OK) {
 		perf_count(_bad_transfer_perf);
 		return;
 	}
 
 	// 16 bits in two’s complement format with a sensitivity of 256 LSB/°C. The output zero level corresponds to 25 °C.
-	const int16_t OUT_TEMP = combine(temperature_buf[1], temperature_buf[2] & 0x0F);
+	const int16_t OUT_TEMP = combine(buffer.OUT_TEMP_H & 0x0F, buffer.OUT_TEMP_L);
 	const float temperature = (OUT_TEMP / 256.0f) + 25.0f;
 
 	if (PX4_ISFINITE(temperature)) {

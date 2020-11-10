@@ -35,6 +35,8 @@ px4_add_module(
 	MODULE drivers__imu__st__lsm9ds1
 	MAIN lsm9ds1
 	COMPILE_FLAGS
+		-O0
+		-DDEBUG_BUILD
 	SRCS
 		LSM9DS1.cpp
 		LSM9DS1.hpp

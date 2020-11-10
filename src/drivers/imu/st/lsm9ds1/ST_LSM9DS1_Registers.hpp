@@ -56,8 +56,7 @@ namespace ST_LSM9DS1
 {
 static constexpr uint32_t SPI_SPEED = 10 * 1000 * 1000; // 10 MHz SPI clock frequency
 
-static constexpr uint8_t READ_BIT = Bit7;
-static constexpr uint8_t MS_BIT   = Bit6; // When 1, the address is auto-incremented in multiple read/write commands.
+static constexpr uint8_t DIR_READ = 0x80;
 
 static constexpr uint8_t WHO_AM_I_ID = 0b01101000; // Who I am ID
 
@@ -81,7 +80,7 @@ enum class Register : uint8_t {
 	OUT_Z_H_G       = 0x1D,
 
 	CTRL_REG6_XL    = 0x20, // Linear acceleration sensor Control Register 6.
-
+	CTRL_REG7_XL    = 0x21, // Linear acceleration sensor Control Register 7.
 	CTRL_REG8       = 0x22, // Control register 8.
 	CTRL_REG9       = 0x23, // Control register 9.
 
@@ -99,13 +98,9 @@ enum class Register : uint8_t {
 // CTRL_REG1_G
 enum CTRL_REG1_G_BIT : uint8_t {
 	// ODR_G [2:0]
-	ODR_G_952HZ  = Bit7 | Bit6,
-
+	ODR_G_952HZ  = Bit7 | Bit6, // 952 Hz ODR
 	// FS_G [1:0]
 	FS_G_2000DPS = Bit4 | Bit3,
-
-	// This bit must be set to ‘0’ for the correct operation of the device.
-
 	// BW_G [1:0]
 	BW_G_100Hz   = Bit1 | Bit0, // BW_G 100 Hz
 };
@@ -121,9 +116,14 @@ enum STATUS_REG_BIT : uint8_t {
 enum CTRL_REG6_XL_BIT : uint8_t {
 	// ODR_XL [2:0]
 	ODR_XL_952HZ = Bit7 | Bit6, // 952 Hz ODR
-
 	// FS_XL [1:0]
 	FS_XL_16     = Bit3,        // FS_XL 01: ±16 g
+};
+
+// CTRL_REG7_XL
+enum CTRL_REG7_XL_BIT : uint8_t {
+	HR  = Bit7, // High resolution mode for accelerometer enable.
+	FDS = Bit2, // Filtered data selection. 0: internal filter bypassed
 };
 
 // CTRL_REG8
@@ -144,7 +144,7 @@ enum CTRL_REG9_BIT : uint8_t {
 // FIFO_CTRL
 enum FIFO_CTRL_BIT : uint8_t {
 	// FMODE [2:0]
-	FIFO_MODE = Bit5, // FIFO mode. Stops collecting data when FIFO is full.
+	FMODE_CONTINUOUS = Bit7|Bit6, // Continuous mode. If the FIFO is full, the new sample over- writes the older sample.
 };
 
 // FIFO_SRC
@@ -156,24 +156,7 @@ enum FIFO_SRC_BIT : uint8_t {
 
 namespace FIFO
 {
-static constexpr size_t SIZE = 32 * 6; // 32 samples max
-
-// When both accelerometer and gyroscope sensors are activated at the same ODR
-struct DATA {
-	uint8_t OUT_X_L_G;
-	uint8_t OUT_X_H_G;
-	uint8_t OUT_Y_L_G;
-	uint8_t OUT_Y_H_G;
-	uint8_t OUT_Z_L_G;
-	uint8_t OUT_Z_H_G;
-	uint8_t OUT_X_L_XL;
-	uint8_t OUT_X_H_XL;
-	uint8_t OUT_Y_L_XL;
-	uint8_t OUT_Y_H_XL;
-	uint8_t OUT_Z_L_XL;
-	uint8_t OUT_Z_H_XL;
-};
-
+static constexpr size_t SIZE = 32 * 12; // 32 samples max
 }
 
 } // namespace ST_LSM9DS1

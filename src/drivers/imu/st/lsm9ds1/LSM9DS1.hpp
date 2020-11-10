@@ -78,15 +78,7 @@ private:
 	static constexpr float ACCEL_RATE{ST_LSM9DS1::LA_ODR}; // 952 Hz accel
 
 	// maximum FIFO samples per transfer is limited to the size of sensor_accel_fifo/sensor_gyro_fifo
-	static constexpr uint32_t FIFO_MAX_SAMPLES{math::min(math::min(FIFO::SIZE / sizeof(FIFO::DATA), sizeof(sensor_gyro_fifo_s::x) / sizeof(sensor_gyro_fifo_s::x[0])), sizeof(sensor_accel_fifo_s::x) / sizeof(sensor_accel_fifo_s::x[0]) * (int)(GYRO_RATE / ACCEL_RATE))};
-
-	// Transfer data
-	struct FIFOTransferBuffer {
-		uint8_t cmd{static_cast<uint8_t>(Register::OUT_X_L_G) | READ_BIT | MS_BIT};
-		FIFO::DATA f[FIFO_MAX_SAMPLES] {};
-	};
-	// ensure no struct padding
-	static_assert(sizeof(FIFOTransferBuffer) == (1 + FIFO_MAX_SAMPLES *sizeof(FIFO::DATA)));
+	static constexpr uint32_t FIFO_MAX_SAMPLES{math::min(math::min(FIFO::SIZE / 12, sizeof(sensor_gyro_fifo_s::x) / sizeof(sensor_gyro_fifo_s::x[0])), sizeof(sensor_accel_fifo_s::x) / sizeof(sensor_accel_fifo_s::x[0]) * (int)(GYRO_RATE / ACCEL_RATE))};
 
 	struct register_config_t {
 		Register reg;
@@ -111,8 +103,6 @@ private:
 	bool FIFORead(const hrt_abstime &timestamp_sample, uint8_t samples);
 	void FIFOReset();
 
-	void ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
-	void ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
 	void UpdateTemperature();
 
 	PX4Accelerometer _px4_accel;
@@ -141,13 +131,14 @@ private:
 	uint32_t _fifo_gyro_samples{static_cast<uint32_t>(_fifo_empty_interval_us / (1000000 / GYRO_RATE))};
 
 	uint8_t _checked_register{0};
-	static constexpr uint8_t size_register_cfg{5};
+	static constexpr uint8_t size_register_cfg{6};
 	register_config_t _register_cfg[size_register_cfg] {
 		// Register               | Set bits, Clear bits
 		{ Register::CTRL_REG1_G,  CTRL_REG1_G_BIT::ODR_G_952HZ | CTRL_REG1_G_BIT::FS_G_2000DPS | CTRL_REG1_G_BIT::BW_G_100Hz, 0 },
 		{ Register::CTRL_REG6_XL, CTRL_REG6_XL_BIT::ODR_XL_952HZ | CTRL_REG6_XL_BIT::FS_XL_16, 0 },
+		{ Register::CTRL_REG7_XL, CTRL_REG7_XL_BIT::HR, CTRL_REG7_XL_BIT::FDS },
 		{ Register::CTRL_REG8,    CTRL_REG8_BIT::BDU | CTRL_REG8_BIT::IF_ADD_INC, CTRL_REG8_BIT::SW_RESET },
 		{ Register::CTRL_REG9,    CTRL_REG9_BIT::FIFO_EN | CTRL_REG9_BIT::I2C_DISABLE, 0 },
-		{ Register::FIFO_CTRL,    FIFO_CTRL_BIT::FIFO_MODE, 0 },
+		{ Register::FIFO_CTRL,    FIFO_CTRL_BIT::FMODE_CONTINUOUS, 0 },
 	};
 };
