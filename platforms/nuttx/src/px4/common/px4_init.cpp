@@ -42,7 +42,62 @@
 
 #include <fcntl.h>
 
-int px4_platform_console_init(void)
+#if defined(GPIO_OTGFS_VBUS) && defined(CONFIG_SYSTEM_CDCACM)
+__BEGIN_DECLS
+#include <nuttx/wqueue.h>
+#include <builtin/builtin.h>
+
+static struct work_s usb_work;
+
+static void mavlink_usb_start(void *arg)
+{
+	sched_lock();
+	exec_builtin("sercon", NULL, NULL, 0);
+	sched_unlock();
+
+	sched_lock();
+	static const char *mavlink_start_argv[5] = {"mavlink", "start", "-d", "/dev/ttyACM0", NULL};
+	exec_builtin("mavlink", (char *const *)mavlink_start_argv, NULL, 0);
+	sched_unlock();
+}
+
+static void usb_serial_discconect(void *arg)
+{
+	sched_lock();
+	exec_builtin("serdis", NULL, NULL, 0);
+	sched_unlock();
+}
+
+static void mavlink_usb_stop(void *arg)
+{
+	sched_lock();
+	static const char *mavlink_stop_argv[5] = {"mavlink", "stop", "-d", "/dev/ttyACM0", NULL};
+	exec_builtin("mavlink", (char *const *)mavlink_stop_argv, NULL, 0);
+	sched_unlock();
+
+	// USB serial disconnect
+	work_queue(HPWORK, &usb_work, usb_serial_discconect, NULL, USEC2TICK(100000));
+}
+
+static int usb_otgfs_vbus_event(int irq, void *context, void *arg)
+{
+	int value = stm32_gpioread(GPIO_OTGFS_VBUS);
+
+	if (value == 1) {
+		// USB connected
+		work_queue(HPWORK, &usb_work, mavlink_usb_start, NULL, USEC2TICK(10000));
+
+	} else if (value == 0) {
+		// USB disconnected
+		work_queue(HPWORK, &usb_work, mavlink_usb_stop, NULL, USEC2TICK(10000));
+	}
+
+	return 0;
+}
+__END_DECLS
+#endif // GPIO_OTGFS_VBUS && CONFIG_SYSTEM_CDCACM
+
+int px4_platform_console_init()
 {
 #if !defined(CONFIG_DEV_CONSOLE) && defined(CONFIG_DEV_NULL)
 
@@ -82,9 +137,8 @@ int px4_platform_console_init(void)
 	return OK;
 }
 
-int px4_platform_init(void)
+int px4_platform_init()
 {
-
 	int ret = px4_platform_console_init();
 
 	if (ret < 0) {
@@ -116,6 +170,17 @@ int px4_platform_init(void)
 #endif
 
 	px4::WorkQueueManagerStart();
+
+
+#if defined(GPIO_OTGFS_VBUS) && defined(CONFIG_SYSTEM_CDCACM)
+	stm32_gpiosetevent(GPIO_OTGFS_VBUS, true, true, true, usb_otgfs_vbus_event, NULL);
+
+	// manually start if already connected
+	if (stm32_gpioread(GPIO_OTGFS_VBUS) == 1) {
+		work_queue(HPWORK, &usb_work, mavlink_usb_start, NULL, USEC2TICK(100000));
+	}
+
+#endif // GPIO_OTGFS_VBUS && CONFIG_SYSTEM_CDCACM
 
 	return PX4_OK;
 }

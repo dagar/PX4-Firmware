@@ -3,9 +3,6 @@
 # PX4 FMUv4 specific board MAVLink startup script.
 #------------------------------------------------------------------------------
 
-# Start MAVLink on the USB port
-mavlink start -d /dev/ttyACM0
-
 # Pixracer: start MAVLink on Wifi (ESP8266 port). Except for the TealOne airframe.
 if ! param compare SYS_AUTOSTART 4250
 then
