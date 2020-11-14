@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -82,8 +82,7 @@ $ uorb top
 	PRINT_MODULE_USAGE_ARG("<filter1> [<filter2>]", "topic(s) to match (implies -a)", true);
 }
 
-int
-uorb_main(int argc, char *argv[])
+int uorb_main(int argc, char *argv[])
 {
 	if (argc < 2) {
 		usage();

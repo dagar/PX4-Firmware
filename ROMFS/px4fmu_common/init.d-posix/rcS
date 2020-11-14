@@ -57,8 +57,6 @@ fi
 [ -f $LOG_FILE ] && rm $LOG_FILE
 
 
-uorb start
-
 # Load parameters
 set PARAM_FILE eeprom/parameters_"$REQUESTED_AUTOSTART"
 param select $PARAM_FILE

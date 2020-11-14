@@ -110,6 +110,10 @@ typedef const struct orb_metadata *orb_id_t;
 
 __BEGIN_DECLS
 
+int uorb_start(void);
+int uorb_status(void);
+int uorb_top(void);
+
 /**
  * ORB topic advertiser handle.
  *
