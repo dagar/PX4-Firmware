@@ -2151,8 +2151,6 @@ Mavlink::task_main(int argc, char *argv[])
 	/* command ack */
 	uORB::Publication<vehicle_command_ack_s> command_ack_pub{ORB_ID(vehicle_command_ack)};
 
-	uORB::Subscription mavlink_log_sub{ORB_ID(mavlink_log)};
-
 	vehicle_status_s status{};
 	status_sub.copy(&status);
 
@@ -2360,12 +2358,6 @@ Mavlink::task_main(int argc, char *argv[])
 				mavlink_msg_command_ack_send_struct(get_channel(), &msg);
 				//_transmitting_enabled = _transmitting_enabled_temp;
 			}
-		}
-
-		mavlink_log_s mavlink_log;
-
-		if (mavlink_log_sub.update(&mavlink_log)) {
-			_logbuffer.put(&mavlink_log);
 		}
 
 		/* check for shell output */

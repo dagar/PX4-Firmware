@@ -51,12 +51,20 @@
 
 static orb_advert_t orb_log_message_pub = nullptr;
 
+#define PX4_ANSI_COLOR_RED     "\x1b[31m"
+#define PX4_ANSI_COLOR_GREEN   "\x1b[32m"
+#define PX4_ANSI_COLOR_YELLOW  "\x1b[33m"
+#define PX4_ANSI_COLOR_BLUE    "\x1b[34m"
+#define PX4_ANSI_COLOR_MAGENTA "\x1b[35m"
+#define PX4_ANSI_COLOR_CYAN    "\x1b[36m"
+#define PX4_ANSI_COLOR_GRAY    "\x1B[37m"
+#define PX4_ANSI_COLOR_RESET   "\x1b[0m"
+
 __EXPORT const char *__px4_log_level_str[_PX4_LOG_LEVEL_PANIC + 1] = { "DEBUG", "INFO", "WARN", "ERROR", "PANIC" };
-__EXPORT const char *__px4_log_level_color[_PX4_LOG_LEVEL_PANIC + 1] =
-{ PX4_ANSI_COLOR_GREEN, PX4_ANSI_COLOR_RESET, PX4_ANSI_COLOR_YELLOW, PX4_ANSI_COLOR_RED, PX4_ANSI_COLOR_RED };
 
+static constexpr char *px4_log_level_color[_PX4_LOG_LEVEL_PANIC + 1] = { PX4_ANSI_COLOR_GREEN, PX4_ANSI_COLOR_RESET, PX4_ANSI_COLOR_YELLOW, PX4_ANSI_COLOR_RED, PX4_ANSI_COLOR_RED };
 
-void px4_log_initialize(void)
+void px4_log_initialize()
 {
 	assert(orb_log_message_pub == nullptr);
 
@@ -66,15 +74,14 @@ void px4_log_initialize(void)
 	log_message.severity = 6; //info
 	strcpy((char *)log_message.text, "initialized uORB logging");
 
-	orb_log_message_pub = orb_advertise_queue(ORB_ID(log_message), &log_message, 2);
+	orb_log_message_pub = orb_advertise_queue(ORB_ID(log_message), &log_message, log_message_s::ORB_QUEUE_LENGTH);
 
 	if (!orb_log_message_pub) {
 		PX4_ERR("failed to advertise log_message");
 	}
 }
 
-
-__EXPORT void px4_log_modulename(int level, const char *moduleName, const char *fmt, ...)
+__EXPORT void px4_log_modulename(int level, const char *module_name, const char *fmt, ...)
 {
 	FILE *out = stdout;
 	bool use_color = true;
@@ -88,15 +95,15 @@ __EXPORT void px4_log_modulename(int level, const char *moduleName, const char *
 #endif
 
 	if (level >= _PX4_LOG_LEVEL_INFO) {
-		if (use_color) { fputs(__px4_log_level_color[level], out); }
+		if (use_color) { fputs(px4_log_level_color[level], out); }
 
 		fprintf(out, __px4__log_level_fmt __px4__log_level_arg(level));
 
 		if (use_color) { fputs(PX4_ANSI_COLOR_GRAY, out); }
 
-		fprintf(out, __px4__log_modulename_pfmt, moduleName);
+		fprintf(out, __px4__log_modulename_pfmt, module_name);
 
-		if (use_color) { fputs(__px4_log_level_color[level], out); }
+		if (use_color) { fputs(px4_log_level_color[level], out); }
 
 		va_list argptr;
 		va_start(argptr, fmt);
@@ -111,9 +118,8 @@ __EXPORT void px4_log_modulename(int level, const char *moduleName, const char *
 	/* publish an orb log message */
 	if (level >= _PX4_LOG_LEVEL_INFO && orb_log_message_pub) { //publish all messages
 
-		struct log_message_s log_message;
+		log_message_s log_message;
 		const unsigned max_length_pub = sizeof(log_message.text);
-		log_message.timestamp = hrt_absolute_time();
 
 		const uint8_t log_level_table[] = {
 			7, /* _PX4_LOG_LEVEL_DEBUG */
@@ -128,12 +134,13 @@ __EXPORT void px4_log_modulename(int level, const char *moduleName, const char *
 
 		va_list argptr;
 
-		pos += snprintf((char *)log_message.text + pos, max_length_pub - pos, __px4__log_modulename_pfmt, moduleName);
+		pos += snprintf((char *)log_message.text + pos, max_length_pub - pos, __px4__log_modulename_pfmt, module_name);
 		va_start(argptr, fmt);
 		pos += vsnprintf((char *)log_message.text + pos, max_length_pub - pos, fmt, argptr);
 		va_end(argptr);
 		log_message.text[max_length_pub - 1] = 0; //ensure 0-termination
 
+		log_message.timestamp = hrt_absolute_time();
 		orb_publish(ORB_ID(log_message), orb_log_message_pub, &log_message);
 	}
 
@@ -158,7 +165,7 @@ __EXPORT void px4_log_raw(int level, const char *fmt, ...)
 #endif
 
 	if (level >= _PX4_LOG_LEVEL_INFO) {
-		if (use_color) { fputs(__px4_log_level_color[level], out); }
+		if (use_color) { fputs(px4_log_level_color[level], out); }
 
 		va_list argptr;
 		va_start(argptr, fmt);

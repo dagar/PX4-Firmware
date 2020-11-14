@@ -73,16 +73,7 @@ __END_DECLS
 #define PX4_INFO(FMT, ...) 	qurt_log(_PX4_LOG_LEVEL_INFO, __FILE__, __LINE__, FMT, ##__VA_ARGS__)
 #define PX4_INFO_RAW(FMT, ...) 	__px4_log_omit(_PX4_LOG_LEVEL_INFO, FMT, ##__VA_ARGS__)
 
-#if defined(TRACE_BUILD)
-/****************************************************************************
- * Extremely Verbose settings for a Trace build
- ****************************************************************************/
-#define PX4_PANIC(FMT, ...)	qurt_log(_PX4_LOG_LEVEL_PANIC, __FILE__, __LINE__, FMT, ##__VA_ARGS__)
-#define PX4_ERR(FMT, ...)	qurt_log(_PX4_LOG_LEVEL_ERROR, __FILE__, __LINE__, FMT, ##__VA_ARGS__)
-#define PX4_WARN(FMT, ...) 	qurt_log(_PX4_LOG_LEVEL_WARN,  __FILE__, __LINE__, FMT, ##__VA_ARGS__)
-#define PX4_DEBUG(FMT, ...) 	qurt_log(_PX4_LOG_LEVEL_DEBUG, __FILE__, __LINE__, FMT, ##__VA_ARGS__)
-
-#elif defined(DEBUG_BUILD)
+#if defined(DEBUG_BUILD)
 /****************************************************************************
  * Verbose settings for a Debug build
  ****************************************************************************/
@@ -127,11 +118,8 @@ __END_DECLS
 __BEGIN_DECLS
 
 __EXPORT extern const char *__px4_log_level_str[_PX4_LOG_LEVEL_PANIC + 1];
-__EXPORT extern const char *__px4_log_level_color[_PX4_LOG_LEVEL_PANIC + 1];
-__EXPORT void px4_log_modulename(int level, const char *moduleName, const char *fmt, ...)
-__attribute__((format(printf, 3, 4)));
-__EXPORT void px4_log_raw(int level, const char *fmt, ...)
-__attribute__((format(printf, 2, 3)));
+__EXPORT void px4_log_modulename(int level, const char *moduleName, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+__EXPORT void px4_log_raw(int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
 #if __GNUC__
 // Allow empty format strings.
@@ -167,15 +155,6 @@ __END_DECLS
 #define __px4__log_file_and_line_fmt 	" (file %s line %u)"
 #define __px4__log_file_and_line_arg 	, __FILE__, __LINE__
 #define __px4__log_end_fmt 		"\n"
-
-#define PX4_ANSI_COLOR_RED     "\x1b[31m"
-#define PX4_ANSI_COLOR_GREEN   "\x1b[32m"
-#define PX4_ANSI_COLOR_YELLOW  "\x1b[33m"
-#define PX4_ANSI_COLOR_BLUE    "\x1b[34m"
-#define PX4_ANSI_COLOR_MAGENTA "\x1b[35m"
-#define PX4_ANSI_COLOR_CYAN    "\x1b[36m"
-#define PX4_ANSI_COLOR_GRAY    "\x1B[37m"
-#define PX4_ANSI_COLOR_RESET   "\x1b[0m"
 
 #ifdef __PX4_POSIX
 #define PX4_LOG_COLORIZED_OUTPUT //if defined and output is a tty, colorize the output according to the log level
@@ -394,16 +373,7 @@ __END_DECLS
 #define PX4_INFO_RAW(FMT, ...) 	__px4_log_raw(_PX4_LOG_LEVEL_INFO, FMT, ##__VA_ARGS__)
 #endif
 
-#if defined(TRACE_BUILD)
-/****************************************************************************
- * Extremely Verbose settings for a Trace build
- ****************************************************************************/
-#define PX4_PANIC(FMT, ...)	__px4_log_timestamp_thread_file_and_line(_PX4_LOG_LEVEL_PANIC, FMT, ##__VA_ARGS__)
-#define PX4_ERR(FMT, ...)	__px4_log_timestamp_thread_file_and_line(_PX4_LOG_LEVEL_ERROR, FMT, ##__VA_ARGS__)
-#define PX4_WARN(FMT, ...) 	__px4_log_timestamp_thread_file_and_line(_PX4_LOG_LEVEL_WARN,  FMT, ##__VA_ARGS__)
-#define PX4_DEBUG(FMT, ...) 	__px4_log_timestamp_thread(_PX4_LOG_LEVEL_DEBUG, FMT, ##__VA_ARGS__)
-
-#elif defined(DEBUG_BUILD)
+#if defined(DEBUG_BUILD)
 /****************************************************************************
  * Verbose settings for a Debug build
  ****************************************************************************/
@@ -431,6 +401,8 @@ __END_DECLS
 #define PX4_DEBUG(FMT, ...) 	__px4_log_omit(_PX4_LOG_LEVEL_DEBUG, FMT, ##__VA_ARGS__)
 
 #endif
+
 #define PX4_LOG_NAMED(name, FMT, ...) 	__px4_log_named_cond(name, true, FMT, ##__VA_ARGS__)
 #define PX4_LOG_NAMED_COND(name, cond, FMT, ...) __px4_log_named_cond(name, cond, FMT, ##__VA_ARGS__)
+
 #endif
