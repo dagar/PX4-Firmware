@@ -39,7 +39,7 @@
 class MavlinkStreamFlightInformation : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamFlightInformation(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamFlightInformation(); }
 
 	static constexpr const char *get_name_static() { return "FLIGHT_INFORMATION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_FLIGHT_INFORMATION; }
@@ -53,7 +53,7 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamFlightInformation(Mavlink *mavlink) : MavlinkStream(mavlink)
+	MavlinkStreamFlightInformation()
 	{
 		_param_com_flight_uuid = param_find("COM_FLIGHT_UUID");
 	}
@@ -61,7 +61,7 @@ private:
 	uORB::Subscription _armed_sub{ORB_ID(actuator_armed)};
 	param_t _param_com_flight_uuid;
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		actuator_armed_s actuator_armed{};
 		bool ret = _armed_sub.copy(&actuator_armed);
@@ -74,7 +74,7 @@ private:
 			flight_info.flight_uuid = static_cast<uint64_t>(flight_uuid);
 			flight_info.arming_time_utc = flight_info.takeoff_time_utc = actuator_armed.armed_time_ms;
 			flight_info.time_boot_ms = hrt_absolute_time() / 1000;
-			mavlink_msg_flight_information_send_struct(_mavlink->get_channel(), &flight_info);
+			mavlink_msg_flight_information_send_struct(mavlink->get_channel(), &flight_info);
 		}
 
 		return ret;

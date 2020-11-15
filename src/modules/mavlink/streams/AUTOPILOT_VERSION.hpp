@@ -37,7 +37,7 @@
 class MavlinkStreamAutopilotVersion : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAutopilotVersion(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamAutopilotVersion(); }
 
 	static constexpr const char *get_name_static() { return "AUTOPILOT_VERSION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_AUTOPILOT_VERSION; }
@@ -51,11 +51,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAutopilotVersion(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamAutopilotVersion() = default;
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
-		return _mavlink->send_autopilot_capabilities();
+		return mavlink->send_autopilot_capabilities();
 	}
 };
 

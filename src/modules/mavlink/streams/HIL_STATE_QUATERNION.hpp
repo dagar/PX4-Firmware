@@ -37,7 +37,7 @@
 class MavlinkStreamHILStateQuaternion : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamHILStateQuaternion(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamHILStateQuaternion(); }
 
 	static constexpr const char *get_name_static() { return "HIL_STATE_QUATERNION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_HIL_STATE_QUATERNION; }
@@ -55,14 +55,14 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamHILStateQuaternion(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamHILStateQuaternion() = default;
 
 	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity_groundtruth)};
 	uORB::Subscription _att_sub{ORB_ID(vehicle_attitude_groundtruth)};
 	uORB::Subscription _gpos_sub{ORB_ID(vehicle_global_position_groundtruth)};
 	uORB::Subscription _lpos_sub{ORB_ID(vehicle_local_position_groundtruth)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		if (_angular_velocity_sub.updated() || _att_sub.updated() || _gpos_sub.updated() || _lpos_sub.updated()) {
 			vehicle_attitude_s att{};
@@ -102,7 +102,7 @@ private:
 			msg.yacc = lpos.ay;
 			msg.zacc = lpos.az;
 
-			mavlink_msg_hil_state_quaternion_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_hil_state_quaternion_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

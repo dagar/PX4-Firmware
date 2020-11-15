@@ -37,7 +37,7 @@
 class MavlinkStreamExtendedSysState : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamExtendedSysState(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamExtendedSysState(); }
 
 	static constexpr const char *get_name_static() { return "EXTENDED_SYS_STATE"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_EXTENDED_SYS_STATE; }
@@ -51,7 +51,7 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamExtendedSysState(Mavlink *mavlink) : MavlinkStream(mavlink)
+	MavlinkStreamExtendedSysState()
 	{
 		_msg.vtol_state = MAV_VTOL_STATE_UNDEFINED;
 		_msg.landed_state = MAV_LANDED_STATE_ON_GROUND;
@@ -63,7 +63,7 @@ private:
 	uORB::Subscription _control_mode_sub{ORB_ID(vehicle_control_mode)};
 	mavlink_extended_sys_state_t _msg{};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		bool updated = false;
 
@@ -116,7 +116,7 @@ private:
 		}
 
 		if (updated) {
-			mavlink_msg_extended_sys_state_send_struct(_mavlink->get_channel(), &_msg);
+			mavlink_msg_extended_sys_state_send_struct(mavlink->get_channel(), &_msg);
 		}
 
 		return updated;

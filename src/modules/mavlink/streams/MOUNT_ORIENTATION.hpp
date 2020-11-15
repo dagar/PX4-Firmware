@@ -40,7 +40,7 @@
 class MavlinkStreamMountOrientation : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamMountOrientation(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamMountOrientation(); }
 
 	static constexpr const char *get_name_static() { return "MOUNT_ORIENTATION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_MOUNT_ORIENTATION; }
@@ -54,12 +54,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamMountOrientation(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamMountOrientation() = default;
 
 	uORB::Subscription _mount_orientation_sub{ORB_ID(mount_orientation)};
 	uORB::Subscription _lpos_sub{ORB_ID(vehicle_local_position)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		mount_orientation_s mount_orientation;
 
@@ -74,7 +74,7 @@ private:
 			_lpos_sub.copy(&lpos);
 			msg.yaw_absolute = math::degrees(matrix::wrap_2pi(lpos.heading + mount_orientation.attitude_euler_angle[2]));
 
-			mavlink_msg_mount_orientation_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_mount_orientation_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

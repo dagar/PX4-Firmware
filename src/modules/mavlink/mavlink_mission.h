@@ -77,7 +77,7 @@ class Mavlink;
 class MavlinkMissionManager
 {
 public:
-	explicit MavlinkMissionManager(Mavlink *mavlink);
+	MavlinkMissionManager(Mavlink *mavlink);
 
 	~MavlinkMissionManager() = default;
 

@@ -39,7 +39,7 @@
 class MavlinkStreamObstacleDistance : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamObstacleDistance(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamObstacleDistance(); }
 
 	static constexpr const char *get_name_static() { return "OBSTACLE_DISTANCE"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_OBSTACLE_DISTANCE; }
@@ -54,11 +54,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamObstacleDistance(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamObstacleDistance() = default;
 
 	uORB::Subscription _obstacle_distance_fused_sub{ORB_ID(obstacle_distance_fused)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		obstacle_distance_s obstacle_distance;
 
@@ -75,7 +75,7 @@ private:
 			msg.increment_f = obstacle_distance.increment;
 			msg.frame = obstacle_distance.frame;
 
-			mavlink_msg_obstacle_distance_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_obstacle_distance_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

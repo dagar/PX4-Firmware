@@ -59,7 +59,7 @@
 class MavlinkStreamHighLatency2 : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamHighLatency2(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamHighLatency2(); }
 
 	static constexpr const char *get_name_static() { return "HIGH_LATENCY2"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_HIGH_LATENCY2; }
@@ -75,8 +75,7 @@ public:
 	bool const_rate() override { return true; }
 
 private:
-	explicit MavlinkStreamHighLatency2(Mavlink *mavlink) :
-		MavlinkStream(mavlink),
+	MavlinkStreamHighLatency2() :
 		_airspeed(SimpleAnalyzer::AVERAGE),
 		_airspeed_sp(SimpleAnalyzer::AVERAGE),
 		_climb_rate(SimpleAnalyzer::MAX),
@@ -98,13 +97,13 @@ private:
 		bool connected{false};
 	};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		const hrt_abstime t = hrt_absolute_time();
 
 		// only send the struct if transmitting is allowed
 		// this assures that the stream timer is only reset when actually a message is transmitted
-		if (_mavlink->should_transmit()) {
+		if (mavlink->should_transmit()) {
 			mavlink_high_latency2_t msg{};
 			set_default_values(msg);
 
@@ -138,7 +137,7 @@ private:
 			if (updated) {
 				msg.timestamp = t / 1000;
 
-				msg.type = _mavlink->get_system_type();
+				msg.type = mavlink->get_system_type();
 				msg.autopilot = MAV_AUTOPILOT_PX4;
 
 				if (_airspeed.valid()) {
@@ -200,7 +199,7 @@ private:
 
 				reset_analysers(t);
 
-				mavlink_msg_high_latency2_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_high_latency2_send_struct(mavlink->get_channel(), &msg);
 			}
 
 			return updated;

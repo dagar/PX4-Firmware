@@ -39,7 +39,7 @@
 class MavlinkStreamDebug : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamDebug(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamDebug(); }
 
 	static constexpr const char *get_name_static() { return "DEBUG"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_DEBUG; }
@@ -53,11 +53,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamDebug(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamDebug() = default;
 
 	uORB::Subscription _debug_value_sub{ORB_ID(debug_value)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		debug_value_s debug;
 
@@ -67,7 +67,7 @@ private:
 			msg.ind = debug.ind;
 			msg.value = debug.value;
 
-			mavlink_msg_debug_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_debug_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

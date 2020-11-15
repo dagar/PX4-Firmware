@@ -37,7 +37,7 @@
 class MavlinkStreamPing : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamPing(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamPing(); }
 
 	static constexpr const char *get_name_static() { return "PING"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_PING; }
@@ -53,11 +53,11 @@ public:
 	bool const_rate() override { return true; }
 
 private:
-	explicit MavlinkStreamPing(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamPing() = default;
 
 	uint32_t _sequence{0};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		mavlink_ping_t msg{};
 
@@ -66,7 +66,7 @@ private:
 		msg.target_system = 0; // All systems
 		msg.target_component = 0; // All components
 
-		mavlink_msg_ping_send_struct(_mavlink->get_channel(), &msg);
+		mavlink_msg_ping_send_struct(mavlink->get_channel(), &msg);
 
 		return true;
 	}

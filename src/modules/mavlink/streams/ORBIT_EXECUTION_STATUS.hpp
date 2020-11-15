@@ -39,7 +39,7 @@
 class MavlinkStreamOrbitStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamOrbitStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamOrbitStatus(); }
 
 	static constexpr const char *get_name_static() { return "ORBIT_EXECUTION_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ORBIT_EXECUTION_STATUS; }
@@ -53,11 +53,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamOrbitStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamOrbitStatus() = default;
 
 	uORB::Subscription _orbit_status_sub{ORB_ID(orbit_status)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		orbit_status_s orbit_status;
 
@@ -71,7 +71,7 @@ private:
 			msg.y = orbit_status.y * 1e7;
 			msg.z = orbit_status.z;
 
-			mavlink_msg_orbit_execution_status_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_orbit_execution_status_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

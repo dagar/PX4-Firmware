@@ -39,7 +39,7 @@
 class MavlinkStreamStatustext : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamStatustext(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamStatustext(); }
 
 	static constexpr const char *get_name_static() { return "STATUSTEXT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_STATUSTEXT; }
@@ -53,14 +53,14 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamStatustext(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamStatustext() = default;
 
 	uORB::Subscription _mavlink_log_sub{ORB_ID(mavlink_log)};
 	uint16_t _id{0};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
-		if (_mavlink->is_connected() && (_mavlink->get_free_tx_buf() >= get_size())) {
+		if (mavlink->is_connected() && (mavlink->get_free_tx_buf() >= get_size())) {
 
 			mavlink_log_s mavlink_log;
 
@@ -86,7 +86,7 @@ private:
 						memcpy(&msg.text[0], &text[0], chunk_size);
 					}
 
-					mavlink_msg_statustext_send_struct(_mavlink->get_channel(), &msg);
+					mavlink_msg_statustext_send_struct(mavlink->get_channel(), &msg);
 
 					if (text_size <= max_chunk_size) {
 						break;

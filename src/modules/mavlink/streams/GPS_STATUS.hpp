@@ -47,7 +47,7 @@ public:
 
 	uint16_t get_id() override { return get_id_static(); }
 
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGPSStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGPSStatus(); }
 
 	unsigned get_size() override
 	{
@@ -62,10 +62,9 @@ private:
 	MavlinkStreamGPSStatus &operator = (const MavlinkStreamGPSStatus &) = delete;
 
 protected:
-	explicit MavlinkStreamGPSStatus(Mavlink *mavlink) : MavlinkStream(mavlink)
-	{}
+	MavlinkStreamGPSStatus() = default;
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		satellite_info_s sat {};
 
@@ -85,7 +84,7 @@ protected:
 				msg.satellite_prn[i]       = sat.prn[i];
 			}
 
-			mavlink_msg_gps_status_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_gps_status_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

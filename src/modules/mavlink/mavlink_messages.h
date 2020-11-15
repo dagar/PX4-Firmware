@@ -47,11 +47,11 @@ class StreamListItem
 {
 
 public:
-	MavlinkStream *(*new_instance)(Mavlink *mavlink);
+	MavlinkStream *(*new_instance)();
 	const char *name;
 	uint16_t id;
 
-	StreamListItem(MavlinkStream * (*inst)(Mavlink *mavlink), const char *_name, uint16_t _id) :
+	StreamListItem(MavlinkStream * (*inst)(), const char *_name, uint16_t _id) :
 		new_instance(inst),
 		name(_name),
 		id(_id) {}
@@ -68,9 +68,9 @@ static StreamListItem create_stream_list_item()
 
 const char *get_stream_name(const uint16_t msg_id);
 
-MavlinkStream *create_mavlink_stream(const char *stream_name, Mavlink *mavlink);
+MavlinkStream *create_mavlink_stream(const char *stream_name);
 
-MavlinkStream *create_mavlink_stream(const uint16_t msg_id, Mavlink *mavlink);
+MavlinkStream *create_mavlink_stream(const uint16_t msg_id);
 
 void get_mavlink_navigation_mode(const struct vehicle_status_s *const status, uint8_t *mavlink_base_mode,
 				 union px4_custom_mode *custom_mode);

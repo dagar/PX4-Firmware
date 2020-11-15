@@ -1264,7 +1264,7 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 
 	// search for stream with specified name in supported streams list
 	// create new instance if found
-	MavlinkStream *stream = create_mavlink_stream(stream_name, this);
+	MavlinkStream *stream = create_mavlink_stream(stream_name);
 
 	if (stream != nullptr) {
 		stream->set_interval(interval);
@@ -2378,7 +2378,7 @@ Mavlink::task_main(int argc, char *argv[])
 
 		/* update streams */
 		for (const auto &stream : _streams) {
-			stream->update(t);
+			stream->update(this, t);
 
 			if (!_first_heartbeat_sent) {
 				if (_mode == MAVLINK_MODE_IRIDIUM) {

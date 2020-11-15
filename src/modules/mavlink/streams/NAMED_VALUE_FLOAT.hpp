@@ -39,7 +39,7 @@
 class MavlinkStreamNamedValueFloat : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamNamedValueFloat(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamNamedValueFloat(); }
 
 	static constexpr const char *get_name_static() { return "NAMED_VALUE_FLOAT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_NAMED_VALUE_FLOAT; }
@@ -53,11 +53,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamNamedValueFloat(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamNamedValueFloat() = default;
 
 	uORB::Subscription _debug_key_value_sub{ORB_ID(debug_key_value)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		debug_key_value_s debug;
 
@@ -69,7 +69,7 @@ private:
 			msg.name[sizeof(msg.name) - 1] = '\0'; // enforce null termination
 			msg.value = debug.value;
 
-			mavlink_msg_named_value_float_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_named_value_float_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

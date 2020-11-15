@@ -40,7 +40,7 @@
 class MavlinkStreamAltitude : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAltitude(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamAltitude(); }
 
 	static constexpr const char *get_name_static() { return "ALTITUDE"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ALTITUDE; }
@@ -54,13 +54,13 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAltitude(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamAltitude() = default;
 
 	uORB::Subscription _local_pos_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _home_sub{ORB_ID(home_position)};
 	uORB::Subscription _air_data_sub{ORB_ID(vehicle_air_data)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		mavlink_altitude_t msg{};
 
@@ -123,7 +123,7 @@ private:
 
 		if (lpos_updated || (air_data_updated && lpos_timeout)) {
 			msg.time_usec = hrt_absolute_time();
-			mavlink_msg_altitude_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_altitude_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

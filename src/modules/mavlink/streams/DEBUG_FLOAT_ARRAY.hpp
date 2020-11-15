@@ -39,7 +39,7 @@
 class MavlinkStreamDebugFloatArray : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamDebugFloatArray(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamDebugFloatArray(); }
 
 	static constexpr const char *get_name_static() { return "DEBUG_FLOAT_ARRAY"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY; }
@@ -53,11 +53,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamDebugFloatArray(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamDebugFloatArray() = default;
 
 	uORB::Subscription _debug_array_sub{ORB_ID(debug_array)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		debug_array_s debug;
 
@@ -73,7 +73,7 @@ private:
 				msg.data[i] = debug.data[i];
 			}
 
-			mavlink_msg_debug_float_array_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_debug_float_array_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

@@ -40,7 +40,7 @@
 class MavlinkStreamWindCov : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamWindCov(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamWindCov(); }
 
 	static constexpr const char *get_name_static() { return "WIND_COV"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_WIND_COV; }
@@ -54,12 +54,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamWindCov(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamWindCov() = default;
 
 	uORB::Subscription _wind_estimate_sub{ORB_ID(wind_estimate)};
 	uORB::Subscription _local_pos_sub{ORB_ID(vehicle_local_position)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		wind_estimate_s wind_estimate;
 
@@ -82,7 +82,7 @@ private:
 			msg.horiz_accuracy = 0.0f;
 			msg.vert_accuracy = 0.0f;
 
-			mavlink_msg_wind_cov_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_wind_cov_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

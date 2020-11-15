@@ -40,7 +40,7 @@
 class MavlinkStreamDistanceSensor : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamDistanceSensor(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamDistanceSensor(); }
 
 	static constexpr const char *get_name_static() { return "DISTANCE_SENSOR"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_DISTANCE_SENSOR; }
@@ -54,11 +54,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamDistanceSensor(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamDistanceSensor() = default;
 
 	uORB::SubscriptionMultiArray<distance_sensor_s> _distance_sensor_subs{ORB_ID::distance_sensor};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		bool updated = false;
 
@@ -95,7 +95,7 @@ private:
 				msg.orientation      = dist_sensor.orientation;
 				msg.covariance       = dist_sensor.variance * 1e4f;         // m^2 to cm^2
 
-				mavlink_msg_distance_sensor_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_distance_sensor_send_struct(mavlink->get_channel(), &msg);
 
 				updated = true;
 			}

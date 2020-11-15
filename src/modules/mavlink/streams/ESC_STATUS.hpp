@@ -39,7 +39,7 @@
 class MavlinkStreamESCStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamESCStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamESCStatus(); }
 
 	static constexpr const char *get_name_static() { return "ESC_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ESC_STATUS; }
@@ -54,12 +54,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamESCStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamESCStatus() = default;
 
 	uORB::Subscription _esc_status_sub{ORB_ID(esc_status)};
 	uint8_t _number_of_batches{0};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		static constexpr uint8_t batch_size = MAVLINK_MSG_ESC_STATUS_FIELD_RPM_LEN;
 		esc_status_s esc_status;
@@ -81,7 +81,7 @@ private:
 					msg.current[esc_index] = esc_status.esc[esc_index].esc_current;
 				}
 
-				mavlink_msg_esc_status_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_esc_status_send_struct(mavlink->get_channel(), &msg);
 			}
 
 			return true;

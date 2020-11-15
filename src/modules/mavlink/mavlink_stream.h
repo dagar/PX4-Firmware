@@ -52,7 +52,7 @@ class MavlinkStream : public ListNode<MavlinkStream *>
 
 public:
 
-	MavlinkStream(Mavlink *mavlink);
+	MavlinkStream() = default;
 	virtual ~MavlinkStream() = default;
 
 	// no copy, assignment, move, move assignment
@@ -78,7 +78,8 @@ public:
 	/**
 	 * @return 0 if updated / sent, -1 if unchanged
 	 */
-	int update(const hrt_abstime &t);
+	int update(Mavlink *mavlink, const hrt_abstime &t);
+
 	virtual const char *get_name() const = 0;
 	virtual uint16_t get_id() = 0;
 
@@ -95,10 +96,10 @@ public:
 	/**
 	 * This function is called in response to a MAV_CMD_REQUEST_MESSAGE command.
 	 */
-	virtual bool request_message(float param2 = 0.0, float param3 = 0.0, float param4 = 0.0,
+	virtual bool request_message(Mavlink *mavlink, float param2 = 0.0, float param3 = 0.0, float param4 = 0.0,
 				     float param5 = 0.0, float param6 = 0.0, float param7 = 0.0)
 	{
-		return send();
+		return send(mavlink);
 	}
 
 	/**
@@ -123,10 +124,9 @@ public:
 	void reset_last_sent() { _last_sent = 0; }
 
 protected:
-	Mavlink      *const _mavlink;
 	int _interval{1000000};		///< if set to negative value = unlimited rate
 
-	virtual bool send() = 0;
+	virtual bool send(Mavlink *mavlink) = 0;
 
 	/**
 	 * Function to collect/update data for the streams at a high rate independant of
@@ -137,7 +137,7 @@ protected:
 	virtual void update_data() { }
 
 private:
-	hrt_abstime _last_sent{0};
+	hrt_abstime _last_sent{hrt_absolute_time()};
 	bool _first_message_sent{false};
 };
 

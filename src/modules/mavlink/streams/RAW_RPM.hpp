@@ -39,7 +39,7 @@
 class MavlinkStreamRawRpm : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamRawRpm(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamRawRpm(); }
 
 	static constexpr const char *get_name_static() { return "RAW_RPM"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_RAW_RPM; }
@@ -53,11 +53,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamRawRpm(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamRawRpm() = default;
 
 	uORB::Subscription _rpm_sub{ORB_ID(rpm)};
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
 		rpm_s rpm;
 
@@ -66,7 +66,7 @@ private:
 
 			msg.frequency = rpm.indicated_frequency_rpm;
 
-			mavlink_msg_raw_rpm_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_raw_rpm_send_struct(mavlink->get_channel(), &msg);
 
 			return true;
 		}

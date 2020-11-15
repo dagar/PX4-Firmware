@@ -37,7 +37,7 @@
 class MavlinkStreamProtocolVersion : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamProtocolVersion(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamProtocolVersion(); }
 
 	static constexpr const char *get_name_static() { return "PROTOCOL_VERSION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_PROTOCOL_VERSION; }
@@ -51,11 +51,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamProtocolVersion(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamProtocolVersion() = default;
 
-	bool send() override
+	bool send(Mavlink *mavlink) override
 	{
-		_mavlink->send_protocol_version();
+		mavlink->send_protocol_version();
 		return true;
 	}
 };
