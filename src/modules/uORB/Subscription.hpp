@@ -64,6 +64,7 @@ public:
 	 * @param id The uORB ORB_ID enum for the topic.
 	 * @param instance The instance for multi sub.
 	 */
+	Subscription() = default;
 	Subscription(ORB_ID id, uint8_t instance = 0) :
 		_orb_id(id),
 		_instance(instance)

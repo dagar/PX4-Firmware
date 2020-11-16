@@ -77,28 +77,33 @@ public:
 	static constexpr int MAX_TOPICS_NUM = 255; /**< Maximum number of logged topics */
 
 	struct RequestedSubscription {
-		uint16_t interval_ms;
-		uint8_t instance;
+		uint8_t instance{0};
 		ORB_ID id{ORB_ID::INVALID};
 	};
+
+	struct RequestedSubscriptionInterval {
+		uint16_t interval_ms{0};
+		uint8_t instance{0};
+		ORB_ID id{ORB_ID::INVALID};
+	};
+
 	struct RequestedSubscriptionArray {
 		RequestedSubscription sub[MAX_TOPICS_NUM];
-		int count{0};
+		uint8_t count{0};
+	};
+
+	struct RequestedSubscriptionIntervalArray {
+		RequestedSubscriptionInterval sub[MAX_TOPICS_NUM];
+		uint8_t count{0};
 	};
 
 	LoggedTopics() = default;
 	~LoggedTopics() = default;
 
-	/**
-	 * Add topic subscriptions based on the configured mission log type.
-	 * Must be initialized first
-	 */
-	void initialize_mission_topics(MissionLogType mission_log_type);
-
 	bool initialize_logged_topics(SDLogProfileMask profile);
 
 	const RequestedSubscriptionArray &subscriptions() const { return _subscriptions; }
-	int numMissionSubscriptions() const { return _num_mission_subs; }
+	const RequestedSubscriptionIntervalArray &subscriptions_interval() const { return _subscriptions_interval; }
 
 private:
 
@@ -129,15 +134,6 @@ private:
 	int add_topics_from_file(const char *fname);
 
 	/**
-	 * Add a topic to be logged for the mission log (it's also added to the full log).
-	 * The interval is expected to be 0 or large (in the order of 0.1 seconds or higher).
-	 * Must be called before all other topics are added.
-	 * @param name topic name
-	 * @param interval limit rate if >0 [ms], otherwise log as fast as the topic is updated.
-	 */
-	void add_mission_topic(const char *name, uint16_t interval_ms = 0);
-
-	/**
 	 * Add topic subscriptions based on the profile configuration
 	 */
 	void initialize_configured_topics(SDLogProfileMask profile);
@@ -160,7 +156,7 @@ private:
 	bool add_topic(const orb_metadata *topic, uint16_t interval_ms = 0, uint8_t instance = 0);
 
 	RequestedSubscriptionArray _subscriptions;
-	int _num_mission_subs{0};
+	RequestedSubscriptionIntervalArray _subscriptions_interval;
 };
 
 } //namespace logger

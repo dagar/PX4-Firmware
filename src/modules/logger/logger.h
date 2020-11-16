@@ -67,16 +67,6 @@ namespace px4
 namespace logger
 {
 
-static constexpr uint8_t MSG_ID_INVALID = UINT8_MAX;
-
-struct LoggerSubscription : public uORB::SubscriptionInterval {
-	LoggerSubscription() = default;
-
-	LoggerSubscription(ORB_ID id, uint32_t interval_ms = 0, uint8_t instance = 0) :
-		uORB::SubscriptionInterval(id, interval_ms * 1000, instance)
-	{}
-};
-
 class Logger : public ModuleBase<Logger>, public ModuleParams
 {
 public:
@@ -157,11 +147,6 @@ private:
 		size_t high_water{0};					///< maximum used write buffer
 	};
 
-	struct MissionSubscription {
-		unsigned min_delta_ms{0};        ///< minimum time between 2 topic writes [ms]
-		unsigned next_write_time{0};     ///< next time to write in 0.1 seconds
-	};
-
 	/**
 	 * @brief Updates and checks for updated uORB parameters.
 	 */
@@ -176,7 +161,7 @@ private:
 	 * Write an ADD_LOGGED_MSG to the log for a given subscription and instance.
 	 * _writer.lock() must be held when calling this.
 	 */
-	void write_add_logged_msg(LogType type, LoggerSubscription &subscription);
+	void write_add_logged_msg(LogType type, const orb_metadata *orb_meta, uint16_t msg_id, uint8_t multi_id);
 
 	/**
 	 * Create logging directory
@@ -220,7 +205,7 @@ private:
 	using WrittenFormats = Array < const orb_metadata *, 20 >;
 
 	void write_format(LogType type, const orb_metadata &meta, WrittenFormats &written_formats, ulog_message_format_s &msg,
-			  int subscription_index, int level = 1);
+			  int level = 1);
 	void write_formats(LogType type);
 
 	/**
@@ -258,8 +243,6 @@ private:
 	void write_parameters(LogType type);
 
 	void write_changed_parameters(LogType type);
-
-	inline bool copy_if_updated(int sub_idx, void *buffer, bool try_to_subscribe);
 
 	/**
 	 * Write exactly one ulog message to the logger and handle dropouts.
@@ -324,10 +307,13 @@ private:
 	LogMode						_log_mode;
 	const bool					_log_name_timestamp;
 
-	LoggerSubscription	 			*_subscriptions{nullptr}; ///< all subscriptions for full & mission log (in front)
+	uORB::Subscription	 			*_subscriptions{nullptr}; ///< all subscriptions with no interval
+	uORB::SubscriptionInterval 			*_subscriptions_interval{nullptr}; ///< all subscriptions with configured intervals
+	uORB::SubscriptionInterval 			*_subscriptions_mission{nullptr}; ///< all subscriptions with configured intervals
+
 	int						_num_subscriptions{0};
-	MissionSubscription 				_mission_subscriptions[MAX_MISSION_TOPICS_NUM] {}; ///< additional data for mission subscriptions
-	int						_num_mission_subs{0};
+	int						_num_subscriptions_interval{0};
+	int						_num_subscriptions_mission{0};
 
 	LogWriter					_writer;
 	uint32_t					_log_interval{0};

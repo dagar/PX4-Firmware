@@ -293,26 +293,6 @@ int LoggedTopics::add_topics_from_file(const char *fname)
 	return ntopics;
 }
 
-void LoggedTopics::initialize_mission_topics(MissionLogType mission_log_type)
-{
-	if (mission_log_type == MissionLogType::Complete) {
-		add_mission_topic("camera_capture");
-		add_mission_topic("mission_result");
-		add_mission_topic("vehicle_global_position", 1000);
-		add_mission_topic("vehicle_status", 1000);
-
-	} else if (mission_log_type == MissionLogType::Geotagging) {
-		add_mission_topic("camera_capture");
-	}
-}
-
-void LoggedTopics::add_mission_topic(const char *name, uint16_t interval_ms)
-{
-	if (add_topic(name, interval_ms)) {
-		++_num_mission_subs;
-	}
-}
-
 bool LoggedTopics::add_topic(const orb_metadata *topic, uint16_t interval_ms, uint8_t instance)
 {
 	size_t fields_len = strlen(topic->o_fields) + strlen(topic->o_name) + 1; //1 for ':'
@@ -329,10 +309,18 @@ bool LoggedTopics::add_topic(const orb_metadata *topic, uint16_t interval_ms, ui
 		return false;
 	}
 
-	RequestedSubscription &sub = _subscriptions.sub[_subscriptions.count++];
-	sub.interval_ms = interval_ms;
-	sub.instance = instance;
-	sub.id = static_cast<ORB_ID>(topic->o_id);
+	if (interval_ms == 0) {
+		RequestedSubscription &sub = _subscriptions.sub[_subscriptions.count++];
+		sub.instance = instance;
+		sub.id = static_cast<ORB_ID>(topic->o_id);
+
+	} else {
+		RequestedSubscriptionInterval &sub = _subscriptions_interval.sub[_subscriptions_interval.count++];
+		sub.interval_ms = interval_ms;
+		sub.instance = instance;
+		sub.id = static_cast<ORB_ID>(topic->o_id);
+	}
+
 	return true;
 }
 
@@ -344,19 +332,38 @@ bool LoggedTopics::add_topic(const char *name, uint16_t interval_ms, uint8_t ins
 	for (size_t i = 0; i < orb_topics_count(); i++) {
 		if (strcmp(name, topics[i]->o_name) == 0) {
 			bool already_added = false;
+			bool already_added_interval = false;
 
-			// check if already added: if so, only update the interval
+			// check if already added
 			for (int j = 0; j < _subscriptions.count; ++j) {
-				if (_subscriptions.sub[j].id == static_cast<ORB_ID>(topics[i]->o_id) &&
-				    _subscriptions.sub[j].instance == instance) {
+				if (_subscriptions.sub[j].id == static_cast<ORB_ID>(topics[i]->o_id) && _subscriptions.sub[j].instance == instance) {
 
-					PX4_DEBUG("logging topic %s(%d), interval: %i, already added, only setting interval",
-						  topics[i]->o_name, instance, interval_ms);
-
-					_subscriptions.sub[j].interval_ms = interval_ms;
-					success = true;
 					already_added = true;
 					break;
+				}
+			}
+
+			for (int j = 0; j < _subscriptions_interval.count; ++j) {
+				if (_subscriptions_interval.sub[j].id == static_cast<ORB_ID>(topics[i]->o_id)
+				    && _subscriptions_interval.sub[j].instance == instance) {
+
+					already_added_interval = true;
+					break;
+				}
+			}
+
+
+			if (interval_ms == 0) {
+				//
+
+				if (already_added) {
+					// do nothing
+				}
+
+				if (already_added_interval) {
+					// remove from _subscriptions_interval and add to subscriptions
+
+					// TODO: dagar
 				}
 			}
 
