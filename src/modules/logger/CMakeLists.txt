@@ -36,7 +36,9 @@ px4_add_module(
 	MAIN logger
 	PRIORITY "SCHED_PRIORITY_MAX-30"
 	COMPILE_FLAGS
+		-O0
 		-Wno-cast-align # TODO: fix and enable
+		-DDEBUG_BUILD
 	SRCS
 		logged_topics.cpp
 		logger.cpp

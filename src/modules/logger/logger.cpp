@@ -162,7 +162,7 @@ int Logger::task_spawn(int argc, char *argv[])
 	_task_id = px4_task_spawn_cmd("logger",
 				      SCHED_DEFAULT,
 				      SCHED_PRIORITY_LOG_CAPTURE,
-				      3700,
+				      5700,
 				      (px4_main_t)&run_trampoline,
 				      (char *const *)argv);
 
@@ -180,6 +180,7 @@ int Logger::print_status()
 
 	PX4_INFO("Number of subscriptions (unlimited interval): %i (%i bytes)", _num_subscriptions,
 		 (int)(_num_subscriptions * sizeof(uORB::Subscription)));
+
 	PX4_INFO("Number of subscriptions (interval): %i (%i bytes)", _num_subscriptions_interval,
 		 (int)(_num_subscriptions_interval * sizeof(uORB::SubscriptionInterval)));
 
@@ -439,10 +440,10 @@ bool Logger::initialize_topics()
 
 	if (mission_log_type == MissionLogType::Complete) {
 		_subscriptions_mission = new uORB::SubscriptionInterval[4] {
-			{uORB::SubscriptionInterval{ORB_ID::camera_capture, 0, 0}},
-			{uORB::SubscriptionInterval{ORB_ID::mission_result, 0, 0}},
-			{uORB::SubscriptionInterval{ORB_ID::vehicle_global_position, 1000000, 0}},
-			{uORB::SubscriptionInterval{ORB_ID::vehicle_status, 0, 0}},
+			{uORB::SubscriptionInterval{ORB_ID::camera_capture, 0}},
+			{uORB::SubscriptionInterval{ORB_ID::mission_result, 0}},
+			{uORB::SubscriptionInterval{ORB_ID::vehicle_global_position, 1000000}},
+			{uORB::SubscriptionInterval{ORB_ID::vehicle_status, 0}},
 		};
 
 		if (!_subscriptions_mission) {
@@ -453,7 +454,7 @@ bool Logger::initialize_topics()
 		_num_subscriptions_mission = 4;
 
 	} else if (mission_log_type == MissionLogType::Geotagging) {
-		_subscriptions_mission = new uORB::SubscriptionInterval{ORB_ID::camera_capture, 0, 0};
+		_subscriptions_mission = new uORB::SubscriptionInterval{ORB_ID::camera_capture};
 
 		if (!_subscriptions_mission) {
 			PX4_ERR("alloc failed");
@@ -505,20 +506,24 @@ bool Logger::initialize_topics()
 	_num_subscriptions = 0;
 
 	if (logged_topics.subscriptions().count > 0) {
-		_subscriptions = new uORB::Subscription[logged_topics.subscriptions().count];
+		_num_subscriptions = logged_topics.subscriptions().count;
+		_subscriptions = new uORB::Subscription[_num_subscriptions];
 
 		if (!_subscriptions) {
 			PX4_ERR("alloc failed");
 			return false;
 		}
 
-		for (int i = 0; i < logged_topics.subscriptions().count; ++i) {
+		for (int i = 0; i < _num_subscriptions; ++i) {
 			const auto &sub = logged_topics.subscriptions().sub[i];
-			_subscriptions[i] = uORB::Subscription(sub.id, sub.instance);
-			_subscriptions[i].subscribe();
-		}
 
-		_num_subscriptions = logged_topics.subscriptions().count;
+			if (sub.id != ORB_ID::INVALID) {
+				_subscriptions[i] = uORB::Subscription(sub.id, sub.instance);
+
+			} else {
+				PX4_ERR("sub.id == ORB_ID::INVALID");
+			}
+		}
 	}
 
 
@@ -528,22 +533,25 @@ bool Logger::initialize_topics()
 	_num_subscriptions_interval = 0;
 
 	if (logged_topics.subscriptions_interval().count > 0) {
-		_subscriptions_interval = new uORB::SubscriptionInterval[logged_topics.subscriptions_interval().count];
+		_num_subscriptions_interval = logged_topics.subscriptions_interval().count;
+		_subscriptions_interval = new uORB::SubscriptionInterval[_num_subscriptions_interval];
 
 		if (!_subscriptions_interval) {
 			PX4_ERR("alloc failed");
 			return false;
 		}
 
-		for (int i = 0; i < logged_topics.subscriptions_interval().count; ++i) {
+		for (int i = 0; i < _num_subscriptions_interval; ++i) {
 			const auto &sub = logged_topics.subscriptions_interval().sub[i];
-			_subscriptions_interval[i] = uORB::SubscriptionInterval(sub.id, sub.interval_ms * 1000, sub.instance);
-			_subscriptions_interval[i].subscribe();
+
+			if (sub.id != ORB_ID::INVALID) {
+				_subscriptions_interval[i] = uORB::SubscriptionInterval(sub.id, sub.interval_ms * 1000, sub.instance);
+
+			} else {
+				PX4_ERR("sub.id == ORB_ID::INVALID");
+			}
 		}
-
-		_num_subscriptions_interval = logged_topics.subscriptions_interval().count;
 	}
-
 
 	return true;
 }
@@ -723,140 +731,111 @@ void Logger::run()
 
 			// subscriptions (unlimited interval)
 			for (int sub_idx = 0; sub_idx < _num_subscriptions; ++sub_idx) {
-
-				bool msg_copied = false;
 				uORB::Subscription &sub = _subscriptions[sub_idx];
 
-				if (sub.valid()) {
-					if (sub.updated()) {
-						if (check_file_buffer) {
-							// skip copying message until there's space available in the buffer
-							const ssize_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
-
-							if (msg_size > file_buffer_available) {
-								break;
-							}
-						}
-
-						// record gaps in full rate (no interval) messages
-						const unsigned last_generation = sub.get_last_generation();
-						msg_copied = sub.copy(_msg_buffer + sizeof(ulog_message_data_header_s));
-
-						if (msg_copied && (sub.get_last_generation() != last_generation + 1)) {
-							// error, missed a message
-							_message_gaps++;
-						}
-					}
-
-				} else {
-					if (sub.subscribe()) {
-						write_add_logged_msg(LogType::Full, sub.get_topic(), (uint16_t)sub.get_orb_id(), sub.get_instance());
-
-						// copy first data
-						msg_copied = sub.copy(_msg_buffer + sizeof(ulog_message_data_header_s));
-					}
+				if (!sub.valid() && sub.subscribe()) {
+					write_add_logged_msg(LogType::Full, sub.get_topic(), (uint16_t)sub.get_orb_id(), sub.get_instance());
 				}
 
-				if (msg_copied) {
+				if (sub.valid() && sub.updated()) {
+					const ssize_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+
+					// skip copying message until there's space available in the buffer
+					if (check_file_buffer && (msg_size > file_buffer_available)) {
+						break;
+					}
+
 					// each message consists of a header followed by an orb data object
-					const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
 					const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
 					const uint16_t write_msg_id = static_cast<uint16_t>(sub.get_orb_id());
 
-					//write one byte after another (necessary because of alignment)
+					// write one byte after another (necessary because of alignment)
 					_msg_buffer[0] = (uint8_t)write_msg_size;
 					_msg_buffer[1] = (uint8_t)(write_msg_size >> 8);
 					_msg_buffer[2] = static_cast<uint8_t>(ULogMessageType::DATA);
 					_msg_buffer[3] = (uint8_t)write_msg_id;
 					_msg_buffer[4] = (uint8_t)(write_msg_id >> 8);
 
-					if (write_message(LogType::Full, _msg_buffer, msg_size)) {
+					const unsigned last_generation = sub.get_last_generation();
 
+					if (sub.copy(&_msg_buffer[5])) {
+						// record gaps in full rate (no interval) messages
+						if (sub.get_last_generation() != last_generation + 1) {
+							_message_gaps++;
+						}
+
+						if (write_message(LogType::Full, _msg_buffer, msg_size)) {
 #ifdef DBGPRINT
-						total_bytes += msg_size;
+							total_bytes += msg_size;
 #endif /* DBGPRINT */
+						}
 					}
 				}
 			}
-
 
 			// subscriptions interval
 			for (int sub_idx = 0; sub_idx < _num_subscriptions_interval; ++sub_idx) {
 				uORB::SubscriptionInterval &sub = _subscriptions_interval[sub_idx];
-				bool msg_copied = false;
 
-				if (sub.valid()) {
-					if (sub.updated()) {
-						if (check_file_buffer) {
-							// skip copying message until there's space available in the buffer
-							const ssize_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
-
-							if (msg_size > file_buffer_available) {
-								break;
-							}
-						}
-
-						void *buffer = _msg_buffer + sizeof(ulog_message_data_header_s);
-						msg_copied = sub.copy(buffer);
-					}
-
-				} else {
-					if (sub.subscribe()) {
-						write_add_logged_msg(LogType::Full, sub.get_topic(), (uint16_t)sub.get_orb_id(), sub.get_instance());
-
-						// copy first data
-						void *buffer = _msg_buffer + sizeof(ulog_message_data_header_s);
-						msg_copied = sub.copy(buffer);
-					}
+				if (!sub.valid() && sub.subscribe()) {
+					write_add_logged_msg(LogType::Full, sub.get_topic(), (uint16_t)sub.get_orb_id(), sub.get_instance());
 				}
 
-				if (msg_copied) {
+				if (sub.valid() && sub.updated()) {
+					const ssize_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+
+					// skip copying message until there's space available in the buffer
+					if (check_file_buffer && (msg_size > file_buffer_available)) {
+						break;
+					}
+
 					// each message consists of a header followed by an orb data object
-					const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
 					const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
 					const uint16_t write_msg_id = static_cast<uint16_t>(sub.get_orb_id());
 
-					//write one byte after another (necessary because of alignment)
+					// write one byte after another (necessary because of alignment)
 					_msg_buffer[0] = (uint8_t)write_msg_size;
 					_msg_buffer[1] = (uint8_t)(write_msg_size >> 8);
 					_msg_buffer[2] = static_cast<uint8_t>(ULogMessageType::DATA);
 					_msg_buffer[3] = (uint8_t)write_msg_id;
 					_msg_buffer[4] = (uint8_t)(write_msg_id >> 8);
 
-					// PX4_INFO("topic: %s, size = %zu, out_size = %zu", sub.get_topic()->o_name, sub.get_topic()->o_size, msg_size);
-
-					// full log
-					if (write_message(LogType::Full, _msg_buffer, msg_size)) {
+					if (sub.copy(&_msg_buffer[5])) {
+						if (write_message(LogType::Full, _msg_buffer, msg_size)) {
 #ifdef DBGPRINT
-						total_bytes += msg_size;
+							total_bytes += msg_size;
 #endif /* DBGPRINT */
+						}
 					}
 				}
 			}
 
+			// mission subscriptions
+			for (int sub_idx = 0; sub_idx < _num_subscriptions_mission; ++sub_idx) {
+				uORB::SubscriptionInterval &sub = _subscriptions_mission[sub_idx];
 
-			// mission
-			// // mission log
-			// if (sub_idx < _num_mission_subs) {
-			// 	if (_writer.is_started(LogType::Mission)) {
-			// 		if (_mission_subscriptions[sub_idx].next_write_time < (loop_time / 100000)) {
-			// 			unsigned delta_time = _mission_subscriptions[sub_idx].min_delta_ms;
+				if (!sub.valid() && sub.subscribe()) {
+					write_add_logged_msg(LogType::Full, sub.get_topic(), (uint16_t)sub.get_orb_id(), sub.get_instance());
+				}
 
-			// 			if (delta_time > 0) {
-			// 				_mission_subscriptions[sub_idx].next_write_time = (loop_time / 100000) + delta_time / 100;
-			// 			}
+				if (sub.valid() && sub.updated()) {
+					// each message consists of a header followed by an orb data object
+					const size_t msg_size = sizeof(ulog_message_data_header_s) + sub.get_topic()->o_size_no_padding;
+					const uint16_t write_msg_size = static_cast<uint16_t>(msg_size - ULOG_MSG_HEADER_LEN);
+					const uint16_t write_msg_id = static_cast<uint16_t>(sub.get_orb_id());
 
-			// 			write_message(LogType::Mission, _msg_buffer, msg_size);
-			// 		}
-			// 	}
-			// }
+					// write one byte after another (necessary because of alignment)
+					_msg_buffer[0] = (uint8_t)write_msg_size;
+					_msg_buffer[1] = (uint8_t)(write_msg_size >> 8);
+					_msg_buffer[2] = static_cast<uint8_t>(ULogMessageType::DATA);
+					_msg_buffer[3] = (uint8_t)write_msg_id;
+					_msg_buffer[4] = (uint8_t)(write_msg_id >> 8);
 
-
-
-
-
-
-
+					if (sub.copy(&_msg_buffer[5])) {
+						write_message(LogType::Mission, _msg_buffer, msg_size);
+					}
+				}
+			}
 
 			// check for new logging message(s)
 			log_message_s log_message;
@@ -1632,14 +1611,18 @@ void Logger::write_formats(LogType type)
 	}
 
 	for (int i = 0; i < _num_subscriptions; ++i) {
+		PX4_DEBUG("writing subscription[%d] format", i);
 		const auto &sub = _subscriptions[i];
 		write_format(type, *sub.get_topic(), written_formats, msg);
 	}
 
 	for (int i = 0; i < _num_subscriptions_interval; ++i) {
+		PX4_DEBUG("writing _subscriptions_interval[%d] format", i);
 		const auto &sub = _subscriptions_interval[i];
 		write_format(type, *sub.get_topic(), written_formats, msg);
 	}
+
+	PX4_DEBUG("Done!");
 
 	_writer.unlock();
 }
@@ -1654,7 +1637,7 @@ void Logger::write_all_add_logged_msg(LogType type)
 	for (int i = 0; i < _num_subscriptions; ++i) {
 		uORB::Subscription &sub = _subscriptions[i];
 
-		if (sub.valid()) {
+		if (sub.subscribe()) {
 			write_add_logged_msg(type, sub.get_topic(), (uint16_t)sub.get_orb_id(), sub.get_instance());
 			added_subscriptions = true;
 		}
@@ -1664,7 +1647,7 @@ void Logger::write_all_add_logged_msg(LogType type)
 	for (int i = 0; i < _num_subscriptions_interval; ++i) {
 		uORB::SubscriptionInterval &sub = _subscriptions_interval[i];
 
-		if (sub.valid()) {
+		if (sub.subscribe()) {
 			write_add_logged_msg(type, sub.get_topic(), (uint16_t)sub.get_orb_id(), sub.get_instance());
 			added_subscriptions = true;
 		}
@@ -1764,7 +1747,6 @@ void Logger::write_info(LogType type, const char *name, uint32_t value)
 {
 	write_info_template<uint32_t>(type, name, value, "uint32_t");
 }
-
 
 template<typename T>
 void Logger::write_info_template(LogType type, const char *name, T value, const char *type_str)
