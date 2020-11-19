@@ -36,6 +36,7 @@
 #include <lib/sensor_calibration/Gyroscope.hpp>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/math/filter/FOAWDifferentiator.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2pArray.hpp>
 #include <lib/mathlib/math/filter/NotchFilterArray.hpp>
@@ -162,6 +163,8 @@ private:
 
 	// angular acceleration filter
 	math::LowPassFilter2p _lp_filter_acceleration[3] {{kInitialRateHz, 30.f}, {kInitialRateHz, 30.f}, {kInitialRateHz, 30.f}};
+
+	math::FOAWDifferentiator _foaw[3] {{0.001f, 0.025f}, {0.001f, 0.025f}, {0.001f, 0.025f}};
 
 	uint32_t _selected_sensor_device_id{0};
 

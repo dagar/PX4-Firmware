@@ -175,8 +175,9 @@ void LoggedTopics::add_default_topics()
 	add_topic("fw_virtual_attitude_setpoint");
 	add_topic("mc_virtual_attitude_setpoint");
 	add_topic("time_offset");
-	add_topic("vehicle_angular_acceleration", 10);
-	add_topic("vehicle_angular_velocity", 10);
+	add_topic("sensor_gyro", 0, 3);
+	add_topic("vehicle_angular_acceleration");
+	add_topic("vehicle_angular_velocity");
 	add_topic("vehicle_attitude_groundtruth", 10);
 	add_topic("vehicle_global_position_groundtruth", 100);
 	add_topic("vehicle_local_position_groundtruth", 100);

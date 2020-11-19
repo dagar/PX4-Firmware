@@ -631,6 +631,9 @@ void VehicleAngularVelocity::Run()
 					// save last filtered sample
 					angular_velocity_unscaled(axis) = FilterAngularVelocity(axis, data, N);
 					angular_acceleration_unscaled(axis) = FilterAngularAcceleration(axis, data, N, dt_s);
+
+					_foaw[axis].set_sample_time(dt_s);
+					_foaw[axis].apply(angular_velocity_unscaled(axis));
 				}
 
 				// Publish
@@ -676,6 +679,9 @@ void VehicleAngularVelocity::Run()
 				// save last filtered sample
 				angular_velocity_unscaled(axis) = FilterAngularVelocity(axis, data, 1);
 				angular_acceleration_unscaled(axis) = FilterAngularAcceleration(axis, data, 1, dt_s);
+
+				_foaw[axis].set_sample_time(dt_s);
+				_foaw[axis].apply(angular_velocity_unscaled(axis));
 			}
 
 			// Publish
@@ -701,6 +707,12 @@ void VehicleAngularVelocity::CalibrateAndPublish(const hrt_abstime &timestamp_sa
 		vehicle_angular_acceleration_s v_angular_acceleration;
 		v_angular_acceleration.timestamp_sample = timestamp_sample;
 		_angular_acceleration.copyTo(v_angular_acceleration.xyz);
+
+		for (int i = 0; i < 3; i++) {
+			v_angular_acceleration.foaw_xyz[i] = _foaw[i].get_last_derivative();
+			v_angular_acceleration.foaw_window_size[i] = _foaw[i].get_last_window_size();
+		}
+
 		v_angular_acceleration.timestamp = hrt_absolute_time();
 		_vehicle_angular_acceleration_pub.publish(v_angular_acceleration);
 
