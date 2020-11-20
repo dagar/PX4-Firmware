@@ -40,7 +40,7 @@
 
 namespace math
 {
-class __EXPORT LowPassFilter2p
+class LowPassFilter2p
 {
 public:
 
