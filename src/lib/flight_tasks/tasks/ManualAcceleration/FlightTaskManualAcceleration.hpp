@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,37 +32,33 @@
  ****************************************************************************/
 
 /**
- * @file FlightManualPositionSmooth.cpp
+ * @file FlightTaskManualPosition.hpp
+ *
+ * Flight task for manual position controlled mode.
+ *
  */
 
-#include "FlightTaskManualPositionSmooth.hpp"
+#pragma once
 
-using namespace matrix;
+#include "FlightTaskManualAltitudeSmoothVel.hpp"
+#include "StickAccelerationXY.hpp"
+#include "StickYaw.hpp"
 
-FlightTaskManualPositionSmooth::FlightTaskManualPositionSmooth() :
-	_smoothingXY(this, Vector2f(_velocity)),
-	_smoothingZ(this, _velocity(2), _sticks.getPosition()(2))
-{}
-
-void FlightTaskManualPositionSmooth::_updateSetpoints()
+class FlightTaskManualAcceleration : public FlightTaskManualAltitudeSmoothVel
 {
-	/* Get yaw setpont, un-smoothed position setpoints.*/
-	FlightTaskManualPosition::_updateSetpoints();
+public:
+	FlightTaskManualAcceleration();
+	virtual ~FlightTaskManualAcceleration() = default;
+	bool activate(const vehicle_local_position_setpoint_s &last_setpoint) override;
+	bool update() override;
 
-	/* Smooth velocity setpoint in xy.*/
-	Vector2f vel(_velocity);
-	Vector2f vel_sp_xy(_velocity_setpoint);
-	_smoothingXY.updateMaxVelocity(_constraints.speed_xy);
-	_smoothingXY.smoothVelocity(vel_sp_xy, vel, _yaw, _yawspeed_setpoint, _deltatime);
-	_velocity_setpoint(0) = vel_sp_xy(0);
-	_velocity_setpoint(1) = vel_sp_xy(1);
+private:
+	StickAccelerationXY _stick_acceleration_xy;
+	StickYaw _stick_yaw;
 
-	/* Check for xy position lock.*/
-	_updateXYlock();
-
-	/* Smooth velocity in z.*/
-	_smoothingZ.smoothVelFromSticks(_velocity_setpoint(2), _deltatime);
-
-	/* Check for altitude lock*/
-	_updateAltitudeLock();
-}
+	void _ekfResetHandlerPositionXY() override;
+	void _ekfResetHandlerVelocityXY() override;
+	void _ekfResetHandlerPositionZ() override;
+	void _ekfResetHandlerVelocityZ() override;
+	void _ekfResetHandlerHeading(float delta_psi) override;
+};

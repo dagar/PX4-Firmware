@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,29 +32,35 @@
  ****************************************************************************/
 
 /**
- * @file FlightManualPositionSmooth.hpp
- *
- * Flight task for smooth manual controlled position.
+ * @file StickYaw.cpp
  */
 
-#pragma once
+#include "StickYaw.hpp"
 
-#include "FlightTaskManualPosition.hpp"
-#include "ManualSmoothingXY.hpp"
-#include "ManualSmoothingZ.hpp"
+#include <px4_platform_common/defines.h>
 
-class FlightTaskManualPositionSmooth : public FlightTaskManualPosition
+void StickYaw::generateYawSetpoint(float &yawspeed_setpoint, float &yaw_setpoint, const float desired_yawspeed,
+				   const float yaw, const float deltatime)
 {
-public:
-	FlightTaskManualPositionSmooth();
+	_yawspeed_slew_rate.setSlewRate(2.f * M_PI_F);
+	yawspeed_setpoint = _yawspeed_slew_rate.update(desired_yawspeed, deltatime);
+	yaw_setpoint = updateYawLock(yaw, yawspeed_setpoint, yaw_setpoint);
+}
 
-	virtual ~FlightTaskManualPositionSmooth() = default;
+float StickYaw::updateYawLock(const float yaw, const float yawspeed_setpoint, const float yaw_setpoint)
+{
+	// Yaw-lock depends on desired yawspeed input. If not locked, yaw_sp is set to NAN.
+	if (fabsf(yawspeed_setpoint) > FLT_EPSILON) {
+		// no fixed heading when rotating around yaw by stick
+		return NAN;
 
-protected:
+	} else {
+		// break down and hold the current heading when no more rotation commanded
+		if (!PX4_ISFINITE(yaw_setpoint)) {
+			return yaw;
 
-	virtual void _updateSetpoints() override;
-
-private:
-	ManualSmoothingXY _smoothingXY; /**< smoothing for velocity setpoints in xy */
-	ManualSmoothingZ _smoothingZ; /**< smoothing for velocity in z */
-};
+		} else {
+			return yaw_setpoint;
+		}
+	}
+}

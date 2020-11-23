@@ -56,6 +56,10 @@
 #include <regulated/drone/sensor/BMSStatus_1_0.hpp>
 #include <uavcan/node/Heartbeat_1_0.hpp>
 
+// reg.drone.phy.electricity.SourceTs  // energy source state
+// reg.drone.srv.battery.Status        // battery status
+// reg.drone.srv.battery.Parameters    // battery parameters
+
 #include "CanardInterface.hpp"
 
 class UavcanNode : public ModuleParams, public px4::ScheduledWorkItem

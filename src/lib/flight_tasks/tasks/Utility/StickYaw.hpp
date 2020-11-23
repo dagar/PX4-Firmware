@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,25 +32,37 @@
  ****************************************************************************/
 
 /**
- * @file FlightManualAltitude.cpp
+ * @file StickYaw.hpp
+ * @brief Generate yaw and angular yawspeed setpoints from stick input
+ * @author Matthias Grob <maetugr@gmail.com>
  */
 
-#include "FlightTaskManualAltitudeSmooth.hpp"
+#pragma once
 
-using namespace matrix;
+#include "SlewRate.hpp"
 
-FlightTaskManualAltitudeSmooth::FlightTaskManualAltitudeSmooth() :
-	_smoothing(this, _velocity(2), _sticks.getPosition()(2))
-{}
-
-void FlightTaskManualAltitudeSmooth::_updateSetpoints()
+class StickYaw
 {
-	/* Get yaw, thrust */
-	FlightTaskManualAltitude::_updateSetpoints();
+public:
+	StickYaw() = default;
+	~StickYaw() = default;
 
-	/* Smooth velocity in z*/
-	_smoothing.smoothVelFromSticks(_velocity_setpoint(2), _deltatime);
+	void generateYawSetpoint(float &yawspeed_setpoint, float &yaw_setpoint, const float desired_yawspeed, const float yaw,
+				 const float deltatime);
 
-	/* Check for altitude lock*/
-	_updateAltitudeLock();
-}
+private:
+	SlewRate<float> _yawspeed_slew_rate;
+
+	/**
+	 * Lock yaw when not currently turning
+	 * When applying a yawspeed the vehicle is turning, when the speed is
+	 * set to zero the vehicle needs to slow down and then lock at the yaw
+	 * it stops at to not drift over time.
+	 * @param yawspeed current yaw rotational rate state
+	 * @param yaw current yaw rotational rate state
+	 * @param yawspeed_setpoint rotation rate at which to turn around yaw axis
+	 * @param yaw current yaw setpoint which then will be overwritten by the return value
+	 * @return yaw setpoint to execute to have a yaw lock at the correct moment in time
+	 */
+	static float updateYawLock(const float yaw, const float yawspeed_setpoint, const float yaw_setpoint);
+};

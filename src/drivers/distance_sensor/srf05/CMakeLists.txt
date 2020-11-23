@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,10 +30,12 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
-
-px4_add_library(FlightTaskManualPositionSmooth
-	FlightTaskManualPositionSmooth.cpp
-)
-
-target_link_libraries(FlightTaskManualPositionSmooth PUBLIC FlightTaskManualPosition FlightTaskUtility)
-target_include_directories(FlightTaskManualPositionSmooth PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+px4_add_module(
+	MODULE drivers__srf05
+	MAIN srf05
+	COMPILE_FLAGS
+	SRCS
+		SRF05.cpp
+	DEPENDS
+		drivers_rangefinder
+	)
