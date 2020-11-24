@@ -373,12 +373,13 @@ private:
 
 	main_state_t	_main_state_pre_offboard{commander_state_s::MAIN_STATE_MANUAL};
 
-	commander_state_s	_internal_state{};
-	cpuload_s		_cpuload{};
-	geofence_result_s	_geofence_result{};
-	vehicle_land_detected_s	_land_detector{};
-	safety_s		_safety{};
-	vtol_vehicle_status_s	_vtol_status{};
+	commander_state_s       _internal_state{};
+	cpuload_s               _cpuload{};
+	geofence_result_s	 _geofence_result{};
+	vehicle_land_detected_s _land_detector{};
+	safety_s                _safety{};
+	vehicle_control_mode_s  _vehicle_control_mode{};
+	vtol_vehicle_status_s   _vtol_status{};
 
 	// Subscriptions
 	uORB::Subscription					_actuator_controls_sub{ORB_ID_VEHICLE_ATTITUDE_CONTROLS};
@@ -407,7 +408,7 @@ private:
 	uORB::SubscriptionData<airspeed_s>			_airspeed_sub{ORB_ID(airspeed)};
 	uORB::SubscriptionData<estimator_status_s>		_estimator_status_sub{ORB_ID(estimator_status)};
 	uORB::SubscriptionData<mission_result_s>		_mission_result_sub{ORB_ID(mission_result)};
-	uORB::SubscriptionData<offboard_control_mode_s>		_offboard_control_mode_sub{ORB_ID(offboard_control_mode)};
+	uORB::SubscriptionData<offboard_control_mode_s>	_offboard_control_mode_sub{ORB_ID(offboard_control_mode)};
 	uORB::SubscriptionData<vehicle_global_position_s>	_global_position_sub{ORB_ID(vehicle_global_position)};
 	uORB::SubscriptionData<vehicle_local_position_s>	_local_position_sub{ORB_ID(vehicle_local_position)};
 
