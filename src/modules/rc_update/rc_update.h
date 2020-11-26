@@ -47,7 +47,7 @@
 #include <px4_platform_common/px4_work_queue/WorkItem.hpp>
 #include <drivers/drv_hrt.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
+#include <lib/mathlib/math/filter/MedianFilter.hpp>
 #include <lib/perf/perf_counter.h>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationMulti.hpp>
@@ -100,7 +100,8 @@ private:
 	 */
 	void		update_rc_functions();
 
-	void		UpdateSwitches();
+	void		UpdateManualSwitches();
+	void		UpdateManualSetpoint(const hrt_abstime &timestamp_sample);
 
 	/**
 	 * Update our local parameter cache.
@@ -110,7 +111,7 @@ private:
 	/**
 	 * Get and limit value for specified RC function. Returns NAN if not mapped.
 	 */
-	float		get_rc_value(uint8_t func, float min_value, float max_value);
+	float		get_rc_value(uint8_t func, float min_value, float max_value) const;
 
 	/**
 	 * Get switch position for specified function.
@@ -126,17 +127,18 @@ private:
 	 */
 	void		set_params_from_rc();
 
-	static constexpr unsigned RC_MAX_CHAN_COUNT{input_rc_s::RC_INPUT_MAX_CHANNELS}; /**< maximum number of r/c channels we handle */
+	static constexpr uint8_t RC_MAX_CHAN_COUNT{input_rc_s::RC_INPUT_MAX_CHANNELS}; /**< maximum number of r/c channels we handle */
 
-	struct Parameters {
-		uint16_t min[RC_MAX_CHAN_COUNT];
-		uint16_t trim[RC_MAX_CHAN_COUNT];
-		uint16_t max[RC_MAX_CHAN_COUNT];
-		uint16_t dz[RC_MAX_CHAN_COUNT];
-		bool rev[RC_MAX_CHAN_COUNT];
+	int32_t _rc_map_param[rc_parameter_map_s::RC_PARAM_MAP_NCHAN];
 
-		int32_t rc_map_param[rc_parameter_map_s::RC_PARAM_MAP_NCHAN];
-	} _parameters{};
+	struct RCChannel {
+		math::MedianFilter<uint16_t, 3> filter;
+		uint16_t min{1000};
+		uint16_t trim{1500};
+		uint16_t max{2000};
+		uint8_t dz{0};
+		bool reverse{false};
+	} _channels[RC_MAX_CHAN_COUNT] {};
 
 	struct ParameterHandles {
 		param_t min[RC_MAX_CHAN_COUNT];
@@ -173,6 +175,7 @@ private:
 	hrt_abstime _last_rc_to_param_map_time = 0;
 
 	uint8_t _channel_count_previous{0};
+	uint8_t _input_source_previous{0};
 
 	perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME)};			/**< loop performance counter */
 
