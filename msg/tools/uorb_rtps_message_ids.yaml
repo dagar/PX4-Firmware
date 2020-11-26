@@ -120,8 +120,6 @@ rtps:
     id: 56
   - msg: rate_ctrl_status
     id: 57
-  - msg: rc_channels
-    id: 58
   - msg: rc_parameter_map
     id: 59
   - msg: safety

@@ -178,7 +178,7 @@ PARAM_DEFINE_FLOAT(COM_EF_TIME, 10.0f);
  *
  * @group Commander
  * @unit s
- * @min 0
+ * @min 0.4
  * @max 35
  * @decimal 1
  * @increment 0.1

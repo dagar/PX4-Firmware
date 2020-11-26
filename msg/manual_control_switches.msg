@@ -31,3 +31,5 @@ uint8 acro_switch		 # acro 2 position switch (optional): _MANUAL_, ACRO
 uint8 rattitude_switch           # rattitude control 2 position switch (optional): _MANUAL, RATTITUDE
 uint8 stab_switch 		 # stabilize switch (only relevant for fixed wings, optional): _MANUAL, STABILIZED
 uint8 posctl_switch		 # position control 2 position switch (optional): _ALTCTL_, POSCTL
+
+uint32 switch_changes            # number of switch changes

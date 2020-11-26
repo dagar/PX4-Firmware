@@ -33,12 +33,6 @@
 
 #pragma once
 
-/**
- * @file rc_update.h
- *
- * @author Beat Kueng <beat-kueng@gmx.net>
- */
-
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
@@ -47,7 +41,7 @@
 #include <px4_platform_common/px4_work_queue/WorkItem.hpp>
 #include <drivers/drv_hrt.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
+#include <lib/mathlib/math/filter/MedianFilter.hpp>
 #include <lib/perf/perf_counter.h>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationMulti.hpp>
@@ -57,7 +51,6 @@
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/manual_control_switches.h>
 #include <uORB/topics/input_rc.h>
-#include <uORB/topics/rc_channels.h>
 #include <uORB/topics/rc_parameter_map.h>
 #include <uORB/topics/parameter_update.h>
 
@@ -86,19 +79,23 @@ public:
 
 	bool init();
 
+	int print_status() override;
+
 private:
 
+	static constexpr uint8_t RC_MAX_CHAN_COUNT{input_rc_s::RC_INPUT_MAX_CHANNELS}; /**< maximum number of r/c channels we handle */
+
+	static constexpr uint16_t RC_PWM_MIN_US =  500; //  500 us
+	static constexpr uint16_t RC_PWM_MAX_US = 2500; // 2500 us
+
 	void Run() override;
+
+	float calibratedChannelValue(uint8_t channel, uint16_t value) const;
 
 	/**
 	 * Check for changes in rc_parameter_map
 	 */
 	void		rc_parameter_map_poll(bool forced = false);
-
-	/**
-	 * update the RC functions. Call this when the parameters change.
-	 */
-	void		update_rc_functions();
 
 	void		UpdateSwitches();
 
@@ -110,13 +107,13 @@ private:
 	/**
 	 * Get and limit value for specified RC function. Returns NAN if not mapped.
 	 */
-	float		get_rc_value(uint8_t func, float min_value, float max_value);
+	float		get_rc_value(int8_t channel, float min_value, float max_value) const;
 
 	/**
 	 * Get switch position for specified function.
 	 */
-	switch_pos_t get_rc_sw3pos_position(uint8_t func, float on_th, float mid_th) const;
-	switch_pos_t get_rc_sw2pos_position(uint8_t func, float on_th) const;
+	switch_pos_t get_rc_sw3pos_position(int8_t channel, float on_th, float mid_th) const;
+	switch_pos_t get_rc_sw2pos_position(int8_t channel, float on_th) const;
 
 	/**
 	 * Update parameters from RC channels if the functionality is activated and the
@@ -126,16 +123,23 @@ private:
 	 */
 	void		set_params_from_rc();
 
-	static constexpr unsigned RC_MAX_CHAN_COUNT{input_rc_s::RC_INPUT_MAX_CHANNELS}; /**< maximum number of r/c channels we handle */
+	enum RC_FUNCTION : int8_t {
+		INVALID    = -1,
+		PARAM_1    = 0,
+		PARAM_2    = 1,
+		PARAM_3    = 2,
+	};
+
+	int8_t _rc_function[3] {RC_FUNCTION::INVALID, RC_FUNCTION::INVALID, RC_FUNCTION::INVALID};
+
+	math::MedianFilter<uint16_t, 3> _rc_filters[RC_MAX_CHAN_COUNT];
 
 	struct Parameters {
 		uint16_t min[RC_MAX_CHAN_COUNT];
 		uint16_t trim[RC_MAX_CHAN_COUNT];
 		uint16_t max[RC_MAX_CHAN_COUNT];
-		uint16_t dz[RC_MAX_CHAN_COUNT];
+		uint8_t dz[RC_MAX_CHAN_COUNT];
 		bool rev[RC_MAX_CHAN_COUNT];
-
-		int32_t rc_map_param[rc_parameter_map_s::RC_PARAM_MAP_NCHAN];
 	} _parameters{};
 
 	struct ParameterHandles {
@@ -159,22 +163,28 @@ private:
 
 	uORB::Publication<actuator_controls_s>       _actuator_group_3_pub{ORB_ID(actuator_controls_3)};
 	uORB::Publication<manual_control_switches_s> _manual_control_switches_pub{ORB_ID(manual_control_switches)};
-	uORB::Publication<rc_channels_s>             _rc_channels_pub{ORB_ID(rc_channels)};
 
 	uORB::PublicationMulti<manual_control_setpoint_s> _manual_control_setpoint_pub{ORB_ID(manual_control_setpoint)};	/**< manual control signal topic */
 
-	rc_channels_s _rc {};			/**< r/c channel data */
 	manual_control_switches_s _manual_switches_previous{};
 	manual_control_switches_s _manual_switches_last_publish{};
 
 	rc_parameter_map_s _rc_parameter_map {};
 	float _param_rc_values[rc_parameter_map_s::RC_PARAM_MAP_NCHAN] {};	/**< parameter values for RC control */
 
-	hrt_abstime _last_rc_to_param_map_time = 0;
+	hrt_abstime _last_manual_control_setpoint_publish{0};
+	hrt_abstime _last_rc_to_param_map_time{0};
+	hrt_abstime _last_timestamp_signal{0};
+
+	uint16_t _rc_values_previous[RC_MAX_CHAN_COUNT] {};
 
 	uint8_t _channel_count_previous{0};
 
-	perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME)};			/**< loop performance counter */
+	uint8_t _channel_count_max{0};
+
+	perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
+	perf_counter_t _loop_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": cycle interval")};
+	perf_counter_t _valid_data_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": valid data interval")};
 
 	DEFINE_PARAMETERS(
 
@@ -209,6 +219,10 @@ private:
 		(ParamInt<px4::params::RC_MAP_AUX5>) _param_rc_map_aux5,
 		(ParamInt<px4::params::RC_MAP_AUX6>) _param_rc_map_aux6,
 
+		(ParamInt<px4::params::RC_MAP_PARAM1>) _param_rc_map_param1,
+		(ParamInt<px4::params::RC_MAP_PARAM2>) _param_rc_map_param2,
+		(ParamInt<px4::params::RC_MAP_PARAM3>) _param_rc_map_param3,
+
 		(ParamInt<px4::params::RC_FAILS_THR>) _param_rc_fails_thr,
 
 		(ParamFloat<px4::params::RC_ASSIST_TH>) _param_rc_assist_th,
@@ -226,11 +240,9 @@ private:
 		(ParamFloat<px4::params::RC_MAN_TH>) _param_rc_man_th,
 		(ParamFloat<px4::params::RC_RETURN_TH>) _param_rc_return_th,
 
-		(ParamInt<px4::params::RC_CHAN_CNT>) _param_rc_chan_cnt
+		(ParamInt<px4::params::RC_CHAN_CNT>) _param_rc_chan_cnt,
+
+		(ParamBool<px4::params::RC_MEDIAN_FILTER>) _param_rc_median_filter
 	)
-
 };
-
-
-
 } /* namespace RCUpdate */

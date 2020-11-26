@@ -46,7 +46,6 @@
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/actuator_armed.h>
-#include <uORB/topics/rc_channels.h>
 #include <uORB/topics/parameter_update.h>
 
 #include <drivers/drv_hrt.h>
@@ -262,8 +261,6 @@ void task_main(int argc, char *argv[])
 	update_params(airmode);
 	uORB::Subscription parameter_update_sub{ORB_ID(parameter_update)};
 
-	int rc_channels_sub = -1;
-
 	// Start disarmed
 	_armed.armed = false;
 	_armed.prearmed = false;
@@ -312,24 +309,10 @@ void task_main(int argc, char *argv[])
 		}
 
 		if (_armed.in_esc_calibration_mode) {
-			if (rc_channels_sub == -1) {
-				// only subscribe when really needed: esc calibration is not something we use regularily
-				rc_channels_sub = orb_subscribe(ORB_ID(rc_channels));
-			}
-
-			rc_channels_s rc_channels;
-			int ret = orb_copy(ORB_ID(rc_channels), rc_channels_sub, &rc_channels);
 			_controls[0].control[0] = 0.f;
 			_controls[0].control[1] = 0.f;
 			_controls[0].control[2] = 0.f;
-			int channel = rc_channels.function[rc_channels_s::FUNCTION_THROTTLE];
-
-			if (ret == 0 && channel >= 0 && channel < (int)(sizeof(rc_channels.channels) / sizeof(rc_channels.channels[0]))) {
-				_controls[0].control[3] = rc_channels.channels[channel];
-
-			} else {
-				_controls[0].control[3] = 1.f;
-			}
+			_controls[0].control[3] = 1.f;
 
 			/* Switch off the PWM limit ramp for the calibration. */
 			_pwm_limit.state = OUTPUT_LIMIT_STATE_ON;
@@ -440,10 +423,6 @@ void task_main(int argc, char *argv[])
 	if (_armed_sub != -1) {
 		orb_unsubscribe(_armed_sub);
 		_armed_sub = -1;
-	}
-
-	if (rc_channels_sub != -1) {
-		orb_unsubscribe(rc_channels_sub);
 	}
 
 	perf_free(_perf_control_latency);

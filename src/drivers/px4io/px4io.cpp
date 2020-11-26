@@ -88,7 +88,6 @@
 #include <uORB/topics/safety.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_command.h>
-#include <uORB/topics/rc_channels.h>
 #include <uORB/topics/px4io_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/multirotor_motor_limits.h>

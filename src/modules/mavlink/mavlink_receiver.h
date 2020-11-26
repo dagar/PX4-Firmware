@@ -80,7 +80,6 @@
 #include <uORB/topics/ping.h>
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/radio_status.h>
-#include <uORB/topics/rc_channels.h>
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/telemetry_status.h>
 #include <uORB/topics/transponder_report.h>

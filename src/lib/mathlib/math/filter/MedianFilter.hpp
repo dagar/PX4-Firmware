@@ -62,7 +62,7 @@ public:
 		_buffer[_head] = sample;
 	}
 
-	T median()
+	T median() const
 	{
 		T sorted[WINDOW];
 		memcpy(sorted, _buffer, sizeof(_buffer));
@@ -76,6 +76,9 @@ public:
 		insert(sample);
 		return median();
 	}
+
+	// get latest sample
+	T latest() const { return _buffer[_head]; }
 
 private:
 
