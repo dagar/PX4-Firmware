@@ -2681,27 +2681,6 @@ Commander::control_status_leds(vehicle_status_s *status_local, const actuator_ar
 transition_result_t
 Commander::set_main_state(const vehicle_status_s &status_local, bool *changed)
 {
-	if (_safety.override_available && _safety.override_enabled) {
-		return set_main_state_override_on(status_local, changed);
-
-	} else {
-		return set_main_state_rc(status_local, changed);
-	}
-}
-
-transition_result_t
-Commander::set_main_state_override_on(const vehicle_status_s &status_local, bool *changed)
-{
-	const transition_result_t res = main_state_transition(status_local, commander_state_s::MAIN_STATE_MANUAL, status_flags,
-					&_internal_state);
-	*changed = (res == TRANSITION_CHANGED);
-
-	return res;
-}
-
-transition_result_t
-Commander::set_main_state_rc(const vehicle_status_s &status_local, bool *changed)
-{
 	if ((_manual_control_setpoint.timestamp == 0)
 	    || (_manual_control_setpoint.timestamp == _last_manual_control_setpoint.timestamp)) {
 
@@ -3196,8 +3175,6 @@ Commander::update_control_mode()
 
 	/* set vehicle_control_mode according to set_navigation_state */
 	control_mode.flag_armed = armed.armed;
-	control_mode.flag_external_manual_override_ok = (status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING
-			&& !status.is_vtol);
 
 	switch (status.nav_state) {
 	case vehicle_status_s::NAVIGATION_STATE_MANUAL:
@@ -3238,10 +3215,6 @@ Commander::update_control_mode()
 		break;
 
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_RTL:
-		/* override is not ok for the RTL and recovery mode */
-		control_mode.flag_external_manual_override_ok = false;
-
-	/* fallthrough */
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET:
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_LAND:
 	case vehicle_status_s::NAVIGATION_STATE_AUTO_LANDENGFAIL:

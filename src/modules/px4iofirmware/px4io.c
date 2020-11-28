@@ -71,10 +71,6 @@ struct sys_state_s 	system_state;
 
 static struct hrt_call serial_dma_call;
 
-output_limit_t pwm_limit;
-
-float dt;
-
 /*
  * a set of debug buffers to allow us to send debug information from ISRs
  */
@@ -349,9 +345,6 @@ user_start(int argc, char *argv[])
 	r_page_status[PX4IO_P_STATUS_FREEMEM] = minfo.mxordblk;
 	syslog(LOG_INFO, "MEM: free %u, largest %u\n", minfo.mxordblk, minfo.fordblks);
 
-	/* initialize PWM limit lib */
-	output_limit_init(&pwm_limit);
-
 	/*
 	 *    P O L I C E    L I G H T S
 	 *
@@ -396,19 +389,8 @@ user_start(int argc, char *argv[])
 
 	uint64_t last_debug_time = 0;
 	uint64_t last_heartbeat_time = 0;
-	uint64_t last_loop_time = 0;
 
 	for (;;) {
-		dt = (hrt_absolute_time() - last_loop_time) / 1000000.0f;
-		last_loop_time = hrt_absolute_time();
-
-		if (dt < 0.0001f) {
-			dt = 0.0001f;
-
-		} else if (dt > 0.02f) {
-			dt = 0.02f;
-		}
-
 #if defined(PX4IO_PERF)
 		/* track the rate at which the loop is running */
 		perf_count(loop_perf);
@@ -445,10 +427,6 @@ user_start(int argc, char *argv[])
 			  pre-flight testing the override system
 			 */
 			uint32_t heartbeat_period_us = 250 * 1000UL;
-
-			if (r_status_flags & PX4IO_P_STATUS_FLAGS_OVERRIDE) {
-				heartbeat_period_us /= 4;
-			}
 
 			if ((hrt_absolute_time() - last_heartbeat_time) > heartbeat_period_us) {
 				last_heartbeat_time = hrt_absolute_time();
