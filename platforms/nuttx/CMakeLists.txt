@@ -181,6 +181,25 @@ if (TARGET parameters_xml AND TARGET airframes_xml)
 
 endif()
 
+
+if(${CONFIG_CDCACM_VENDORID} AND ${CONFIG_CDCACM_PRODUCTID})
+
+endif()
+
+add_custom_command(
+	OUTPUT ${PX4_SOURCE_DIR/build/artifacts/manifest.json
+	COMMAND
+		${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/Tools/firmware_manifest.py
+			--prototype ${PX4_SOURCE_DIR}/boards/${PX4_BOARD_VENDOR}/${PX4_BOARD_MODEL}/firmware.prototype
+			--git_identity ${PX4_SOURCE_DIR}
+	DEPENDS
+		px4
+	COMMENT "Updating manifest.json"
+	WORKING_DIRECTORY ${PX4_BINARY_DIR}
+)
+add_custom_target(px4_manifest_update ALL DEPENDS ${PX4_SOURCE_DIR/build/artifacts/manifest.json)
+
+
 # print weak symbols
 add_custom_target(weak_symbols
 	COMMAND ${CMAKE_NM} $<TARGET_FILE:px4> | ${GREP} " w " | cat

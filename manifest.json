@@ -1,0 +1,29 @@
+{
+    "firmware": [
+        {
+            "mav_autopilot": 12,
+            "mav_type": "Generic",
+            "mav-firmware-version-type": "BETA",
+            "mav-firmware-version": "1.11.2",
+            "git-sha": "abcdefg",
+            "format": "px4",
+            "platform": "BOARD_VENDOR_BOARD_MODEL",
+            "USBID": "0x1234/0x5678",
+            "url": "TODO",
+            "latest": 0
+        },
+        {
+            "mav_autopilot": 12,
+            "mav_type": "Generic",
+            "mav-firmware-version-type": "BETA",
+            "mav-firmware-version": "1.11.2",
+            "git-sha": "abcdefg",
+            "format": "px4",
+            "platform": "BOARD_VENDOR_BOARD_MODEL",
+            "USBID": "0x1234/0x5678",
+            "url": "TODO",
+            "latest": 0
+        }
+    ],
+    "format-version": "1.0.0"
+}
