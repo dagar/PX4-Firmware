@@ -96,6 +96,9 @@ static struct work_s autosave_work {};
 static px4::atomic<bool> autosave_scheduled{false};
 static bool autosave_disabled = false;
 
+static struct work_s notify_work {};
+static px4::atomic<bool> notify_scheduled{false};
+
 static constexpr uint16_t param_info_count = sizeof(px4::parameters) / sizeof(param_info_s);
 static px4::AtomicBitset<param_info_count> params_active;  // params found
 static px4::AtomicBitset<param_info_count> params_changed; // params non-default
@@ -252,9 +255,10 @@ param_find_changed(param_t param)
 	return nullptr;
 }
 
-void
-param_notify_changes()
+static void param_notify_worker(void *arg)
 {
+	notify_scheduled.store(false);
+
 	parameter_update_s pup{};
 	pup.instance = param_instance++;
 	pup.get_count = perf_event_count(param_get_perf);
@@ -271,6 +275,16 @@ param_notify_changes()
 
 	} else {
 		orb_publish(ORB_ID(parameter_update), param_topic, &pup);
+	}
+}
+
+void param_notify_changes()
+{
+	// schedule deferred param notification unless already scheduled
+	bool expected = false;
+
+	if (notify_scheduled.compare_exchange(&expected, true)) {
+		work_queue(LPWORK, &notify_work, &param_notify_worker, nullptr, USEC2TICK(10_ms));
 	}
 }
 
