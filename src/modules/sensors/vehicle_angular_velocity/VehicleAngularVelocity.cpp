@@ -100,19 +100,7 @@ void VehicleAngularVelocity::Stop()
 
 void VehicleAngularVelocity::CheckFilters()
 {
-	// calculate sensor update rate
-	const float sample_interval_avg = _interval_sum / _interval_count;
-
-	if (PX4_ISFINITE(sample_interval_avg) && (sample_interval_avg > 0.0f)) {
-
-		_update_rate_hz = 1.e6f / sample_interval_avg;
-
-		if (_fifo_available) {
-			_sensor_fifo_sample_rate[_selected_sensor_sub_index] = _update_rate_hz;
-
-		} else {
-			_sensor_sample_rate[_selected_sensor_sub_index] = _update_rate_hz;
-		}
+	if (PX4_ISFINITE(_sensor_sample_rate) && (_sensor_sample_rate > 0.0f)) {
 
 		// check if sample rate error is greater than 1%
 		if ((fabsf(_update_rate_hz - _filter_sample_rate) / _filter_sample_rate) > 0.01f) {
@@ -227,7 +215,6 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(bool force)
 						_calibration.set_device_id(sensor_gyro_fifo_sub.get().device_id);
 
 						// reset sample interval accumulator on sensor change
-						IntervalAverageReset();
 						_sample_rate_determined = false;
 						_required_sample_updates = 0;
 						_reset_filters = true;
@@ -259,7 +246,6 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(bool force)
 						_calibration.set_device_id(sensor_gyro_sub.get().device_id);
 
 						// reset sample interval accumulator on sensor change
-						IntervalAverageReset();
 						_sample_rate_determined = false;
 						_required_sample_updates = 0;
 						_reset_filters = true;
@@ -318,34 +304,6 @@ void VehicleAngularVelocity::ParametersUpdate(bool force)
 			}
 		}
 	}
-}
-
-void VehicleAngularVelocity::IntervalAverageReset()
-{
-	_timestamp_interval_last = 0;
-	_interval_sum = 0.f;
-	_interval_count = 0.f;
-}
-
-void VehicleAngularVelocity::IntervalAverageUpdate(const hrt_abstime &timestamp, int count)
-{
-	// collect sample interval average for filters
-	if ((_timestamp_interval_last != 0) && (timestamp > _timestamp_interval_last)) {
-		_interval_sum += (timestamp - _timestamp_interval_last);
-		_interval_count += count;
-
-		if (!_sample_rate_determined && (_interval_sum > 500_ms)) {
-			CheckFilters();
-
-		} else if (_interval_sum > 10_s) {
-			IntervalAverageReset();
-		}
-
-	} else {
-		IntervalAverageReset();
-	}
-
-	_timestamp_interval_last = timestamp;
 }
 
 float VehicleAngularVelocity::GetSampleRateForGyro(uint32_t device_id)
@@ -425,17 +383,6 @@ void VehicleAngularVelocity::Run()
 		sensor_gyro_fifo_s sensor_fifo_data;
 
 		while (_sensor_fifo_sub.update(&sensor_fifo_data)) {
-
-			if (_sensor_fifo_sub.get_last_generation() == _sensor_last_generation + 1) {
-				// update interval average if there's no gap in data
-				IntervalAverageUpdate(sensor_fifo_data.timestamp_sample, sensor_fifo_data.samples);
-
-			} else {
-				// gap in sensor data, reset
-				IntervalAverageReset();
-			}
-
-			_sensor_last_generation = _sensor_fifo_sub.get_last_generation();
 
 			if (sensor_fifo_data.samples > 0 && sensor_fifo_data.samples <= 32) {
 				const int N = sensor_fifo_data.samples;
@@ -551,16 +498,6 @@ void VehicleAngularVelocity::Run()
 		sensor_gyro_s sensor_data;
 
 		while (_sensor_sub.update(&sensor_data)) {
-			if (_sensor_sub.get_last_generation() == _sensor_last_generation + 1) {
-				// update interval average if there's no gap in data
-				IntervalAverageUpdate(sensor_data.timestamp_sample);
-
-			} else {
-				// gap in sensor data, reset
-				IntervalAverageReset();
-			}
-
-			_sensor_last_generation = _sensor_sub.get_last_generation();
 
 			// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
 			const float dt = math::constrain(((sensor_data.timestamp_sample - _timestamp_sample_last) / 1e6f), 0.0002f, 0.02f);
@@ -573,10 +510,7 @@ void VehicleAngularVelocity::Run()
 			if (_reset_filters) {
 				if (!_sample_rate_determined) {
 					// if sample rate was previously determined use it
-					if (PX4_ISFINITE(_sensor_sample_rate[_selected_sensor_sub_index])) {
-						_filter_sample_rate = _sensor_sample_rate[_selected_sensor_sub_index];
-
-					} else {
+					if (!PX4_ISFINITE(_sensor_sample_rate)) {
 						// sample rate hasn't been calculated internally yet, try to get it from vehicle_imu_status
 						const float gyro_rate_hz = GetSampleRateForGyro(sensor_data.device_id);
 

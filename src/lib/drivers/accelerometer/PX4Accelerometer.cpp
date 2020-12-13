@@ -142,11 +142,11 @@ void PX4Accelerometer::updateFIFO(sensor_accel_fifo_s &sample)
 		const float z = integral(2) / (float)N;
 
 		// publish
-		Publish(sample.timestamp_sample, x, y, z, clip_count);
+		Publish(sample.timestamp_sample, x, y, z, clip_count, sample.samples);
 	}
 }
 
-void PX4Accelerometer::Publish(const hrt_abstime &timestamp_sample, float x, float y, float z, uint8_t clip_count[3])
+void PX4Accelerometer::Publish(const hrt_abstime &timestamp_sample, float x, float y, float z, uint8_t clip_count[3], uint8_t samples)
 {
 	// Apply rotation (before scaling)
 	rotate_3f(_rotation, x, y, z);
@@ -168,6 +168,7 @@ void PX4Accelerometer::Publish(const hrt_abstime &timestamp_sample, float x, flo
 	report.clip_counter[0] = fabsf(roundf(clipping_x));
 	report.clip_counter[1] = fabsf(roundf(clipping_y));
 	report.clip_counter[2] = fabsf(roundf(clipping_z));
+	report.samples = samples;
 	report.timestamp = hrt_absolute_time();
 
 	_sensor_pub.publish(report);

@@ -11,4 +11,6 @@ float32 temperature       # temperature in degrees celsius
 
 uint32 error_count
 
+uint8 samples
+
 uint8 ORB_QUEUE_LENGTH = 8

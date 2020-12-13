@@ -78,9 +78,6 @@ private:
 
 	float GetSampleRateForGyro(uint32_t device_id);
 
-	void IntervalAverageReset();
-	void IntervalAverageUpdate(const hrt_abstime &timestamp, int count = 1);
-
 	void ParametersUpdate(bool force = false);
 	void SensorBiasUpdate(bool force = false);
 	bool SensorSelectionUpdate(bool force = false);
@@ -128,8 +125,7 @@ private:
 
 	float _filter_sample_rate{kInitialRateHz};
 
-	float _sensor_sample_rate[MAX_SENSOR_COUNT] {NAN, NAN, NAN, NAN};
-	float _sensor_fifo_sample_rate[MAX_SENSOR_COUNT] {NAN, NAN, NAN, NAN};
+	float _sensor_sample_rate{NAN};
 
 	uint32_t _selected_sensor_device_id{0};
 	uint8_t _selected_sensor_sub_index{0};
@@ -137,8 +133,6 @@ private:
 	hrt_abstime _timestamp_interval_last{0};
 	float _interval_sum{0.f};
 	float _interval_count{0.f};
-
-	unsigned _sensor_last_generation{0};
 
 	bool _sample_rate_determined{false};
 	bool _reset_filters{false};
