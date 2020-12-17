@@ -85,6 +85,23 @@ public:
 		return _rotation * (_scale * ((data + _power * _power_compensation) - _offset));
 	}
 
+	matrix::Vector3f BiasCorrectedSensorOffset(const matrix::Vector3f &bias) const
+	{
+		return _offset + _rotation.I() * _scale.I() * bias;
+	}
+
+	void ApplyBias(const matrix::Vector3f &bias)
+	{
+		PX4_INFO("apply bias: [%.5f, %.5f, %.5f]", (double)bias(0), (double)bias(1), (double)bias(2));
+
+		const auto old_offset = _offset;
+		_offset += _rotation.I() * _scale.I() * bias;
+
+		PX4_INFO("offset update [%.5f, %.5f, %.5f] -> [%.5f, %.5f, %.5f]",
+			 (double)old_offset(0), (double)old_offset(1), (double)old_offset(2),
+			 (double)_offset(0), (double)_offset(1), (double)_offset(2));
+	}
+
 	bool ParametersSave();
 	void ParametersUpdate();
 
