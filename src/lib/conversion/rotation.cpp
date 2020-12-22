@@ -41,8 +41,7 @@
 #include "math.h"
 #include "rotation.h"
 
-__EXPORT matrix::Dcmf
-get_rot_matrix(enum Rotation rot)
+matrix::Dcmf get_rot_matrix(enum Rotation rot)
 {
 	return matrix::Dcmf{matrix::Eulerf{
 			math::radians((float)rot_lookup[rot].roll),
@@ -50,8 +49,7 @@ get_rot_matrix(enum Rotation rot)
 			math::radians((float)rot_lookup[rot].yaw)}};
 }
 
-__EXPORT matrix::Quatf
-get_rot_quaternion(enum Rotation rot)
+matrix::Quatf get_rot_quaternion(enum Rotation rot)
 {
 	return matrix::Quatf{matrix::Eulerf{
 			math::radians((float)rot_lookup[rot].roll),
@@ -60,292 +58,336 @@ get_rot_quaternion(enum Rotation rot)
 }
 
 __EXPORT void
-rotate_3f(enum Rotation rot, float &x, float &y, float &z)
+rotate_3fold(enum Rotation rot, float &x, float &y, float &z)
 {
-	float tmp;
-
 	switch (rot) {
-	case ROTATION_NONE:
-	case ROTATION_MAX:
-		return;
-
-	case ROTATION_YAW_45: {
-			tmp = M_SQRT1_2_F * (x - y);
-			y   = M_SQRT1_2_F * (x + y);
-			x = tmp;
-			return;
-		}
-
 	case ROTATION_YAW_90: {
-			tmp = x; x = -y; y = tmp;
-			return;
+			float tmp = x;
+			x = -y;
+			y = tmp;
 		}
+		break;
 
-	case ROTATION_YAW_135: {
-			tmp = -M_SQRT1_2_F * (x + y);
-			y   =  M_SQRT1_2_F * (x - y);
-			x = tmp;
-			return;
+	case ROTATION_YAW_180: {
+			x = -x;
+			y = -y;
 		}
-
-	case ROTATION_YAW_180:
-		x = -x; y = -y;
-		return;
-
-	case ROTATION_YAW_225: {
-			tmp = M_SQRT1_2_F * (y - x);
-			y   = -M_SQRT1_2_F * (x + y);
-			x = tmp;
-			return;
-		}
+		break;
 
 	case ROTATION_YAW_270: {
-			tmp = x; x = y; y = -tmp;
-			return;
+			float tmp = x;
+			x = y;
+			y = -tmp;
 		}
-
-	case ROTATION_YAW_315: {
-			tmp = M_SQRT1_2_F * (x + y);
-			y   = M_SQRT1_2_F * (y - x);
-			x = tmp;
-			return;
-		}
+		break;
 
 	case ROTATION_ROLL_180: {
-			y = -y; z = -z;
-			return;
+			y = -y;
+			z = -z;
 		}
-
-	case ROTATION_ROLL_180_YAW_45: {
-			tmp = M_SQRT1_2_F * (x + y);
-			y   = M_SQRT1_2_F * (x - y);
-			x = tmp; z = -z;
-			return;
-		}
+		break;
 
 	case ROTATION_ROLL_180_YAW_90:
 
 	// FALLTHROUGH
 	case ROTATION_PITCH_180_YAW_270: {
-			tmp = x;
+			float tmp = x;
 			x = y;
 			y = tmp;
 			z = -z;
-			return;
 		}
-
-	case ROTATION_ROLL_180_YAW_135: {
-			tmp = M_SQRT1_2_F * (y - x);
-			y   = M_SQRT1_2_F * (y + x);
-			x = tmp; z = -z;
-			return;
-		}
+		break;
 
 	case ROTATION_PITCH_180: {
-			x = -x; z = -z;
-			return;
+			x = -x;
+			z = -z;
 		}
-
-	case ROTATION_ROLL_180_YAW_225: {
-			tmp = -M_SQRT1_2_F * (x + y);
-			y   =  M_SQRT1_2_F * (y - x);
-			x = tmp; z = -z;
-			return;
-		}
+		break;
 
 	case ROTATION_ROLL_180_YAW_270:
 
 	// FALLTHROUGH
 	case ROTATION_PITCH_180_YAW_90: {
-			tmp = x;
+			float tmp = x;
 			x = -y;
 			y = -tmp;
 			z = -z;
-			return;
 		}
-
-	case ROTATION_ROLL_180_YAW_315: {
-			tmp =  M_SQRT1_2_F * (x - y);
-			y   = -M_SQRT1_2_F * (x + y);
-			x = tmp; z = -z;
-			return;
-		}
+		break;
 
 	case ROTATION_ROLL_90: {
-			tmp = z; z = y; y = -tmp;
-			return;
+			float tmp = z;
+			z = y;
+			y = -tmp;
 		}
-
-	case ROTATION_ROLL_90_YAW_45: {
-			tmp = z; z = y; y = -tmp;
-			tmp = M_SQRT1_2_F * (x - y);
-			y   = M_SQRT1_2_F * (x + y);
-			x = tmp;
-			return;
-		}
+		break;
 
 	case ROTATION_ROLL_90_YAW_90: {
-			tmp = x;
+			float tmp = x;
 			x = z;
 			z = y;
 			y = tmp;
-			return;
 		}
-
-	case ROTATION_ROLL_90_YAW_135: {
-			tmp = z; z = y; y = -tmp;
-			tmp = -M_SQRT1_2_F * (x + y);
-			y   =  M_SQRT1_2_F * (x - y);
-			x = tmp;
-			return;
-		}
+		break;
 
 	case ROTATION_ROLL_270: {
-			tmp = z; z = -y; y = tmp;
-			return;
+			float tmp = z;
+			z = -y;
+			y = tmp;
 		}
-
-	case ROTATION_ROLL_270_YAW_45: {
-			tmp = z; z = -y; y = tmp;
-			tmp = M_SQRT1_2_F * (x - y);
-			y   = M_SQRT1_2_F * (x + y);
-			x = tmp;
-			return;
-		}
+		break;
 
 	case ROTATION_ROLL_270_YAW_90: {
-			tmp = x;
+			float tmp = x;
 			x = -z;
 			z = -y;
 			y = tmp;
-			return;
 		}
-
-	case ROTATION_ROLL_270_YAW_135: {
-			tmp = z; z = -y; y = tmp;
-			tmp = -M_SQRT1_2_F * (x + y);
-			y   =  M_SQRT1_2_F * (x - y);
-			x = tmp;
-			return;
-		}
+		break;
 
 	case ROTATION_PITCH_90: {
-			tmp = z; z = -x; x = tmp;
-			return;
+			float tmp = z;
+			z = -x;
+			x = tmp;
 		}
+		break;
 
 	case ROTATION_PITCH_270: {
-			tmp = z; z = x; x = -tmp;
-			return;
+			float tmp = z;
+			z = x;
+			x = -tmp;
 		}
+		break;
 
 	case ROTATION_ROLL_180_PITCH_270: {
-			tmp = z; z = x; x = tmp;
-			y = -y;
-			return;
-		}
-
-	case ROTATION_PITCH_315: {
-			tmp = M_SQRT1_2_F * x - M_SQRT1_2_F * z;
-			z = M_SQRT1_2_F * z + M_SQRT1_2_F * x;
+			float tmp = z;
+			z = x;
 			x = tmp;
-			return;
+			y = -y;
 		}
+		break;
 
 	case ROTATION_ROLL_90_YAW_270: {
-			tmp = x;
+			float tmp = x;
 			x = -z;
 			z = y;
 			y = -tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_90_PITCH_90: {
-			tmp = x;
+			float tmp = x;
 			x = y;
 			y = -z;
 			z = -tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_180_PITCH_90: {
-			tmp = x;
+			float tmp = x;
 			x = -z;
 			y = -y;
 			z = -tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_270_PITCH_90: {
-			tmp = x;
+			float tmp = x;
 			x = -y;
 			y = z;
 			z = -tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_90_PITCH_180:
 
 	// FALLTHROUGH
 	case ROTATION_ROLL_270_YAW_180: {
-			tmp = y;
+			float tmp = y;
 			x = -x;
 			y = -z;
 			z = -tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_270_PITCH_180: {
-			tmp = y;
+			float tmp = y;
 			x = -x;
 			y = z;
 			z = tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_90_PITCH_270: {
-			tmp = x;
+			float tmp = x;
 			x = -y;
 			y = -z;
 			z = tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_270_PITCH_270: {
-			tmp = x;
+			float tmp = x;
 			x = y;
 			y = z;
 			z = tmp;
-			return;
 		}
+		break;
 
 	case ROTATION_ROLL_90_PITCH_180_YAW_90: {
-			tmp = x;
+			float tmp = x;
 			x = z;
 			z = -y;
 			y = -tmp;
-			return;
 		}
+		break;
 
-	case ROTATION_ROLL_90_PITCH_68_YAW_293: {
-			const float tmpx = x;
-			const float tmpy = y;
-			const float tmpz = z;
-			x = 0.146371f * tmpx + 0.362280f * tmpy - 0.920505f * tmpz;
-			y = -0.344827f * tmpx - 0.853477f * tmpy - 0.390731f * tmpz;
-			z = -0.927184f * tmpx + 0.374607f * tmpy;
-			return;
-		}
+	case ROTATION_YAW_45:
 
+	// FALLTHROUGH
+	case ROTATION_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_YAW_225:
+
+	// FALLTHROUGH
+	case ROTATION_YAW_315:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_45:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_225:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_315:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_90_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_270_YAW_45:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_270_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_90_YAW_45:
+
+	// FALLTHROUGH
+	case ROTATION_PITCH_315:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_90_PITCH_68_YAW_293:
+
+	// FALLTHROUGH
 	case ROTATION_ROLL_90_PITCH_315: {
-			const float tmpx = x;
-			const float tmpy = y;
-			const float tmpz = z;
-			x = 0.707107f * tmpx - 0.707107f * tmpy;
-			y = -tmpz;
-			z = 0.707107f * tmpx + 0.707107f * tmpy;
-			return;
+			const matrix::Vector3f r{get_rot_matrix(rot) *matrix::Vector3f{x, y, z}};
+			x = r(0);
+			y = r(1);
+			z = r(2);
 		}
+		break;
 
+	case ROTATION_NONE:
+		return;
+
+	default:
+		PX4_DEBUG("invalid rotation: %d", rot);
 	}
+}
+
+using matrix::Vector3f;
+
+__EXPORT matrix::Vector3f rotated_3f(enum Rotation rot, const matrix::Vector3f &v)
+{
+	const auto &x = v(0);
+	const auto &y = v(1);
+	const auto &z = v(2);
+
+	switch (rot) {
+	case ROTATION_YAW_90:                   return Vector3f{-y, x, z};
+	case ROTATION_YAW_180:                  return Vector3f{-x, -y, z};
+	case ROTATION_YAW_270:                  return Vector3f{y, -x, z};
+	case ROTATION_ROLL_180:                 return Vector3f{x, -y, -z};
+	case ROTATION_ROLL_180_YAW_90:
+
+	// FALLTHROUGH
+	case ROTATION_PITCH_180_YAW_270:        return Vector3f{y, x, -z};
+	case ROTATION_PITCH_180:                return Vector3f{-x, y, -z};
+	case ROTATION_ROLL_180_YAW_270:
+
+	// FALLTHROUGH
+	case ROTATION_PITCH_180_YAW_90:         return Vector3f{-x, y, -z};
+	case ROTATION_ROLL_90:                  return Vector3f{x, -z, y};
+	case ROTATION_ROLL_90_YAW_90:           return Vector3f{z, x, y};
+	case ROTATION_ROLL_270:                 return Vector3f{x, z, -y};
+	case ROTATION_ROLL_270_YAW_90:          return Vector3f{-z, x, -y};
+	case ROTATION_PITCH_90:                 return Vector3f{z, y, -x};
+	case ROTATION_PITCH_270:                return Vector3f{-z, y, x};
+	case ROTATION_ROLL_180_PITCH_270:       return Vector3f{z, -y, x};
+	case ROTATION_ROLL_90_YAW_270:          return Vector3f{-z, -x, y};
+	case ROTATION_ROLL_90_PITCH_90:         return Vector3f{y, -z, -x};
+	case ROTATION_ROLL_180_PITCH_90:        return Vector3f{-z, -y, -x};
+	case ROTATION_ROLL_270_PITCH_90:        return Vector3f{-y, z, -x};
+	case ROTATION_ROLL_90_PITCH_180:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_270_YAW_180:         return Vector3f{-x, -z, -y};
+	case ROTATION_ROLL_270_PITCH_180:       return Vector3f{-x, z, y};
+	case ROTATION_ROLL_90_PITCH_270:        return Vector3f{-y, -z, x};
+	case ROTATION_ROLL_270_PITCH_270:       return Vector3f{y, z, x};
+	case ROTATION_ROLL_90_PITCH_180_YAW_90: return Vector3f{z, -x, -y};
+	case ROTATION_YAW_45:
+
+	// FALLTHROUGH
+	case ROTATION_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_YAW_225:
+
+	// FALLTHROUGH
+	case ROTATION_YAW_315:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_45:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_225:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_180_YAW_315:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_90_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_270_YAW_45:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_270_YAW_135:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_90_YAW_45:
+
+	// FALLTHROUGH
+	case ROTATION_PITCH_315:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_90_PITCH_68_YAW_293:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_90_PITCH_315: return get_rot_matrix(rot) * Vector3f(x, y, z);
+
+	default:
+		break;
+	}
+
+	return Vector3f(x, y, z);
 }

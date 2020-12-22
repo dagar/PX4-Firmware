@@ -40,7 +40,9 @@
 #ifndef ROTATION_H_
 #define ROTATION_H_
 
+#include <stdint.h>
 #include <unistd.h>
+
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
 
@@ -86,11 +88,11 @@ enum Rotation {
 	ROTATION_ROLL_180_PITCH_270  = 34,
 	ROTATION_ROLL_270_PITCH_270  = 35,
 	ROTATION_ROLL_90_PITCH_180_YAW_90 = 36,
-	ROTATION_ROLL_90_YAW_270     = 37,
+	ROTATION_ROLL_90_YAW_270          = 37,
 	ROTATION_ROLL_90_PITCH_68_YAW_293 = 38,
-	ROTATION_PITCH_315           = 39,
-	ROTATION_ROLL_90_PITCH_315   = 40,
-	ROTATION_ROLL_270_YAW_180    = 41,
+	ROTATION_PITCH_315                = 39,
+	ROTATION_ROLL_90_PITCH_315        = 40,
+	ROTATION_ROLL_270_YAW_180         = 41,
 
 	ROTATION_MAX
 };
@@ -101,7 +103,7 @@ typedef struct {
 	uint16_t yaw;
 } rot_lookup_t;
 
-const rot_lookup_t rot_lookup[] = {
+static constexpr rot_lookup_t rot_lookup[] = {
 	{  0,   0,   0 },
 	{  0,   0,  45 },
 	{  0,   0,  90 },
@@ -149,20 +151,228 @@ const rot_lookup_t rot_lookup[] = {
 /**
  * Get the rotation matrix
  */
-__EXPORT matrix::Dcmf
-get_rot_matrix(enum Rotation rot);
+matrix::Dcmf get_rot_matrix(enum Rotation rot);
 
 /**
  * Get the rotation quaternion
  */
-__EXPORT matrix::Quatf
-get_rot_quaternion(enum Rotation rot);
+matrix::Quatf get_rot_quaternion(enum Rotation rot);
+
+template<typename T>
+static constexpr bool rotate_swap(enum Rotation rot, T &x, T &y, T &z)
+{
+	switch (rot) {
+	case ROTATION_YAW_90: {
+			T tmp = x;
+			x = -y;
+			y = tmp;
+			return true;
+		}
+
+	case ROTATION_YAW_180:
+		x = -x;
+		y = -y;
+		return true;
+
+	case ROTATION_YAW_270: {
+			T tmp = x;
+			x = y;
+			y = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_180:
+		y = -y;
+		z = -z;
+		return true;
+
+	case ROTATION_ROLL_180_YAW_90:
+
+	// FALLTHROUGH
+	case ROTATION_PITCH_180_YAW_270: {
+			T tmp = x;
+			x = y;
+			y = tmp;
+			z = -z;
+			return true;
+		}
+
+	case ROTATION_PITCH_180:
+		x = -x;
+		z = -z;
+		return true;
+
+	case ROTATION_ROLL_180_YAW_270:
+
+	// FALLTHROUGH
+	case ROTATION_PITCH_180_YAW_90: {
+			T tmp = x;
+			x = -y;
+			y = -tmp;
+			z = -z;
+			return true;
+		}
+
+	case ROTATION_ROLL_90: {
+			T tmp = z;
+			z = y;
+			y = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_90_YAW_90: {
+			T tmp = x;
+			x = z;
+			z = y;
+			y = tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_270: {
+			T tmp = z;
+			z = -y;
+			y = tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_270_YAW_90: {
+			T tmp = x;
+			x = -z;
+			z = -y;
+			y = tmp;
+			return true;
+		}
+
+	case ROTATION_PITCH_90: {
+			T tmp = z;
+			z = -x;
+			x = tmp;
+			return true;
+		}
+
+	case ROTATION_PITCH_270: {
+			T tmp = z;
+			z = x;
+			x = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_180_PITCH_270: {
+			T tmp = z;
+			z = x;
+			x = tmp;
+			y = -y;
+			return true;
+		}
+
+	case ROTATION_ROLL_90_YAW_270: {
+			T tmp = x;
+			x = -z;
+			z = y;
+			y = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_90_PITCH_90: {
+			T tmp = x;
+			x = y;
+			y = -z;
+			z = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_180_PITCH_90: {
+			T tmp = x;
+			x = -z;
+			y = -y;
+			z = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_270_PITCH_90: {
+			T tmp = x;
+			x = -y;
+			y = z;
+			z = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_90_PITCH_180:
+
+	// FALLTHROUGH
+	case ROTATION_ROLL_270_YAW_180: {
+			T tmp = y;
+			x = -x;
+			y = -z;
+			z = -tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_270_PITCH_180: {
+			T tmp = y;
+			x = -x;
+			y = z;
+			z = tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_90_PITCH_270: {
+			T tmp = x;
+			x = -y;
+			y = -z;
+			z = tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_270_PITCH_270: {
+			T tmp = x;
+			x = y;
+			y = z;
+			z = tmp;
+			return true;
+		}
+
+	case ROTATION_ROLL_90_PITCH_180_YAW_90: {
+			T tmp = x;
+			x = z;
+			z = -y;
+			y = -tmp;
+			return true;
+		}
+
+	default:
+		break;
+	}
+
+	return false;
+}
+
+static constexpr void rotate_3i(enum Rotation rot, int16_t &x, int16_t &y, int16_t &z)
+{
+	if (!rotate_swap(rot, x, y, z)) {
+		// otherwise use rotation matrix
+		const matrix::Vector3f r{get_rot_matrix(rot) *matrix::Vector3f{(float)x, (float)y, (float)z}};
+		x = roundf(r(0));
+		y = roundf(r(1));
+		z = roundf(r(2));
+	}
+}
 
 /**
  * rotate a 3 element float vector in-place
  */
-__EXPORT void
-rotate_3f(enum Rotation rot, float &x, float &y, float &z);
+static constexpr void rotate_3f(enum Rotation rot, float &x, float &y, float &z)
+{
+	if (!rotate_swap(rot, x, y, z)) {
+		// otherwise use rotation matrix
+		const matrix::Vector3f r{get_rot_matrix(rot) *matrix::Vector3f{(float)x, (float)y, (float)z}};
+		x = r(0);
+		y = r(1);
+		z = r(2);
+	}
+}
 
+
+matrix::Vector3f rotated_3f(enum Rotation rot, const matrix::Vector3f &v);
 
 #endif /* ROTATION_H_ */
