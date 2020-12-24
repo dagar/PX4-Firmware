@@ -58,12 +58,23 @@ __BEGIN_DECLS
 typedef   uint8_t dsm_frame_t[DSM_BUFFER_SIZE]; /**< DSM dsm frame receive buffer */
 typedef   uint8_t dsm_buf_t[DSM_FRAME_SIZE * 2]; // Define working buffer
 
-typedef  struct dsm_decode_t {
+typedef struct dsm_decode_t {
 	dsm_frame_t frame;
 	dsm_buf_t buf;
 } dsm_decode_t;
 
 #pragma pack(pop)
+
+enum DSM_BIND_PULSE {
+	INTERNAL_DSM2_22MS = 3,
+	EXTERNAL_DSM2_22MS = 4,
+	INTERNAL_DSM2_11MS = 5,
+	EXTERNAL_DSM2_11MS = 6,
+	INTERNAL_DSMX_22MS = 7,
+	EXTERNAL_DSMX_22MS = 8,
+	INTERNAL_DSMX_11MS = 9,
+	EXTERNAL_DSMX_11MS = 10,
+};
 
 __EXPORT int	dsm_init(const char *device);
 __EXPORT void	dsm_deinit(void);
@@ -76,7 +87,7 @@ __EXPORT bool	dsm_parse(const uint64_t now, const uint8_t *frame, const unsigned
 			  uint16_t *num_values, bool *dsm_11_bit, unsigned *frame_drops, int8_t *rssi_percent, uint16_t max_channels);
 
 #ifdef SPEKTRUM_POWER
-__EXPORT void	dsm_bind(uint16_t cmd, int pulses);
+__EXPORT bool	dsm_bind(enum DSM_BIND_PULSE bind_pulses);
 #endif
 
 enum DSM_CMD {							/* DSM bind states */
@@ -86,9 +97,5 @@ enum DSM_CMD {							/* DSM bind states */
 	DSM_CMD_BIND_SEND_PULSES,
 	DSM_CMD_BIND_REINIT_UART
 };
-
-#define DSM2_BIND_PULSES 3	/* DSM_BIND_START parameter, pulses required to start pairing DSM2 22ms */
-#define DSMX_BIND_PULSES 7	/* DSM_BIND_START parameter, pulses required to start pairing DSMx 22ms */
-#define DSMX8_BIND_PULSES 9     /* DSM_BIND_START parameter, pulses required to start pairing DSMx 11ms */
 
 __END_DECLS

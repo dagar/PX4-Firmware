@@ -666,7 +666,7 @@ registers_set_one(uint8_t page, uint8_t offset, uint16_t value)
 			break;
 
 		case PX4IO_P_SETUP_DSM:
-			dsm_bind(value & 0x0f, (value >> 4) & 0xF);
+			dsm_bind(value & 0x0F);
 			break;
 
 		case PX4IO_P_SETUP_FORCE_SAFETY_ON:

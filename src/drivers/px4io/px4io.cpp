@@ -412,7 +412,7 @@ private:
 	 *
 	 * @param dsmMode	0:dsm2, 1:dsmx
 	 */
-	void			dsm_bind_ioctl(int dsmMode);
+	bool			dsm_bind_ioctl(int dsmMode = 0);
 
 	/**
 	 * check and handle test_motor topic updates
@@ -960,6 +960,8 @@ PX4IO::task_main()
 				// Check for a DSM pairing command
 				if (((unsigned int)cmd.command == vehicle_command_s::VEHICLE_CMD_START_RX_PAIR) && ((int)cmd.param1 == 0)) {
 					dsm_bind_ioctl((int)cmd.param2);
+
+					// TODO: command ack
 				}
 			}
 
@@ -1657,21 +1659,27 @@ PX4IO::io_handle_status(uint16_t status)
 	return ret;
 }
 
-void
-PX4IO::dsm_bind_ioctl(int dsmMode)
+bool PX4IO::dsm_bind_ioctl(int dsm_mode)
 {
-	if (!(_status & PX4IO_P_STATUS_FLAGS_SAFETY_OFF)) {
-		mavlink_log_info(&_mavlink_log_pub, "[IO] binding DSM%s RX", (dsmMode == 0) ? "2" : ((dsmMode == 1) ? "-X" : "-X8"));
-		int ret = ioctl(nullptr, DSM_BIND_START,
-				(dsmMode == 0) ? DSM2_BIND_PULSES : ((dsmMode == 1) ? DSMX_BIND_PULSES : DSMX8_BIND_PULSES));
+	if (!_rc_handling_disabled || (_status & PX4IO_P_STATUS_FLAGS_SAFETY_OFF) != 0) {
+		//mavlink_log_info(&_mavlink_log_pub, "[IO] binding DSM%s RX", (dsmMode == 0) ? "2" : ((dsmMode == 1) ? "-X" : "-X8"));
 
-		if (ret) {
-			mavlink_log_critical(&_mavlink_log_pub, "binding failed.");
-		}
+		mavlink_log_info(&_mavlink_log_pub, "[IO] binding DSMX 11 ms");
+
+		io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_DSM, INTERNAL_DSMX_11MS);
+
+		//if (ret == PX4_OK) {
+			//return true;
+
+		//} else {
+			//mavlink_log_critical(&_mavlink_log_pub, "[IO] binding failed");
+		//}
 
 	} else {
-		mavlink_log_info(&_mavlink_log_pub, "[IO] safety off, bind request rejected");
+		mavlink_log_info(&_mavlink_log_pub, "[IO] bind request rejected");
 	}
+
+	return false;
 }
 
 int
@@ -2655,30 +2663,13 @@ PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 		break;
 
 	case DSM_BIND_START:
-
-		/* only allow DSM2, DSM-X and DSM-X with more than 7 channels */
-		if (arg == DSM2_BIND_PULSES ||
-		    arg == DSMX_BIND_PULSES ||
-		    arg == DSMX8_BIND_PULSES) {
-			io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_DSM, dsm_bind_power_down);
-			px4_usleep(500000);
-			io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_DSM, dsm_bind_set_rx_out);
-			io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_DSM, dsm_bind_power_up);
-			px4_usleep(72000);
-			io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_DSM, dsm_bind_send_pulses | (arg << 4));
-			px4_usleep(50000);
-			io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_DSM, dsm_bind_reinit_uart);
-
+		if (dsm_bind_ioctl(arg)) {
 			ret = OK;
 
 		} else {
 			ret = -EINVAL;
 		}
 
-		break;
-
-	case DSM_BIND_POWER_UP:
-		io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_DSM, dsm_bind_power_up);
 		break;
 
 	case PWM_SERVO_SET(0) ... PWM_SERVO_SET(PWM_OUTPUT_MAX_CHANNELS - 1): {
@@ -3038,47 +3029,6 @@ checkcrc(int argc, char *argv[])
 }
 
 void
-bind(int argc, char *argv[])
-{
-	int pulses;
-
-	if (g_dev == nullptr) {
-		errx(1, "px4io must be started first");
-	}
-
-	if (argc < 3) {
-		errx(0, "needs argument, use dsm2, dsmx or dsmx8");
-	}
-
-	if (!strcmp(argv[2], "dsm2")) {
-		pulses = DSM2_BIND_PULSES;
-
-	} else if (!strcmp(argv[2], "dsmx")) {
-		pulses = DSMX_BIND_PULSES;
-
-	} else if (!strcmp(argv[2], "dsmx8")) {
-		pulses = DSMX8_BIND_PULSES;
-
-	} else {
-		errx(1, "unknown parameter %s, use dsm2, dsmx or dsmx8", argv[2]);
-	}
-
-	// Test for custom pulse parameter
-	if (argc > 3) {
-		pulses = atoi(argv[3]);
-	}
-
-	if (g_dev->system_status() & PX4IO_P_STATUS_FLAGS_SAFETY_OFF) {
-		errx(1, "system must not be armed");
-	}
-
-	g_dev->ioctl(nullptr, DSM_BIND_START, pulses);
-
-	exit(0);
-
-}
-
-void
 monitor(void)
 {
 	/* clear screen */
@@ -3396,7 +3346,10 @@ px4io_main(int argc, char *argv[])
 	}
 
 	if (!strcmp(argv[1], "bind")) {
-		bind(argc, argv);
+		// TODO: publish vehicle command
+		g_dev->ioctl(nullptr, DSM_BIND_START, INTERNAL_DSMX_11MS);
+
+		exit(0);
 	}
 
 	if (!strcmp(argv[1], "lockdown")) {

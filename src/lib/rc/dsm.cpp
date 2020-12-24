@@ -350,64 +350,57 @@ void dsm_deinit()
  * Handle DSM satellite receiver bind mode handler
  *
  * @param[in] cmd commands - dsm_bind_power_down, dsm_bind_power_up, dsm_bind_set_rx_out, dsm_bind_send_pulses, dsm_bind_reinit_uart
- * @param[in] pulses Number of pulses for dsm_bind_send_pulses command
  */
-void dsm_bind(uint16_t cmd, int pulses)
+bool dsm_bind(enum DSM_BIND_PULSE bind_pulse)
 {
 	if (dsm_fd < 0) {
-		return;
+		return false;
 	}
 
-	switch (cmd) {
-	case DSM_CMD_BIND_POWER_DOWN:
-		// power down DSM satellite
-#if defined(DSM_DEBUG)
-		printf("DSM: DSM_CMD_BIND_POWER_DOWN\n");
-#endif
-		SPEKTRUM_POWER(false);
-		break;
+	// To put a receiver into bind mode, within 200ms of power application the host device needs to issue a series of falling pulses.
 
-	case DSM_CMD_BIND_POWER_UP:
-		// power up DSM satellite
-#if defined(DSM_DEBUG)
-		printf("DSM: DSM_CMD_BIND_POWER_UP\n");
-#endif
-		SPEKTRUM_POWER(true);
-		dsm_guess_format(true);
-		break;
+	// power down DSM satellite
+	PX4_DEBUG("DSM: DSM_CMD_BIND_POWER_DOWN");
+	SPEKTRUM_POWER(false);
 
-	case DSM_CMD_BIND_SET_RX_OUT:
-		// Set UART RX pin to active output mode
-#if defined(DSM_DEBUG)
-		printf("DSM: DSM_CMD_BIND_SET_RX_OUT\n");
-#endif
-		SPEKTRUM_RX_AS_GPIO_OUTPUT();
-		break;
+	// Set UART RX pin to active output mode
+	PX4_DEBUG("DSM: DSM_CMD_BIND_SET_RX_OUT");
+	SPEKTRUM_RX_AS_GPIO_OUTPUT();
 
-	case DSM_CMD_BIND_SEND_PULSES:
-		// Pulse RX pin a number of times
-#if defined(DSM_DEBUG)
-		printf("DSM: DSM_CMD_BIND_SEND_PULSES\n");
-#endif
+	px4_usleep(500000);
 
-		for (int i = 0; i < pulses; i++) {
-			dsm_udelay(120);
-			SPEKTRUM_OUT(false);
-			dsm_udelay(120);
-			SPEKTRUM_OUT(true);
-		}
 
-		break;
+	// power up DSM satellite
+	PX4_DEBUG("DSM: DSM_CMD_BIND_POWER_UP");
+	SPEKTRUM_POWER(true);
+	dsm_guess_format(true);
 
-	case DSM_CMD_BIND_REINIT_UART:
-		// Restore USART RX pin to RS232 receive mode
-#if defined(DSM_DEBUG)
-		printf("DSM: DSM_CMD_BIND_REINIT_UART\n");
-#endif
-		SPEKTRUM_RX_AS_UART();
-		break;
+	px4_usleep(72000);
 
+
+	// Pulse RX pin a number of times
+	PX4_DEBUG("DSM: DSM_CMD_BIND_SEND_PULSES");
+
+	auto flags = px4_enter_critical_section();
+
+	for (int i = 0; i < 9; i++) {
+		//for (int i = 0; i < bind_pulse; i++) {
+		up_udelay(120);
+		SPEKTRUM_OUT(false);
+		up_udelay(120);
+		SPEKTRUM_OUT(true);
 	}
+
+	px4_leave_critical_section(flags);
+
+	px4_usleep(50000);
+
+
+	// Restore USART RX pin to RS232 receive mode
+	PX4_DEBUG("DSM: DSM_CMD_BIND_REINIT_UART");
+	SPEKTRUM_RX_AS_UART();
+
+	return true;
 }
 #endif
 

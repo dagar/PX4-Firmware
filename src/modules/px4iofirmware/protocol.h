@@ -200,13 +200,7 @@
 
 #define PX4IO_P_SETUP_VSERVO_SCALE		6	/* hardware rev [2] servo voltage correction factor (float) */
 #define PX4IO_P_SETUP_DSM			7	/* DSM bind state */
-enum {							/* DSM bind states */
-	dsm_bind_power_down = 0,
-	dsm_bind_power_up,
-	dsm_bind_set_rx_out,
-	dsm_bind_send_pulses,
-	dsm_bind_reinit_uart
-};
+
 /* 8 */
 #define PX4IO_P_SETUP_SET_DEBUG			9	/* debug level for IO board */
 

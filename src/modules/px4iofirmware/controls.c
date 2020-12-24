@@ -245,6 +245,10 @@ controls_tick()
 
 #endif
 
+	if (dsm_bind) {
+		dsm_bind();
+	}
+
 	/* zero RSSI if signal is lost */
 	if (!(r_raw_rc_flags & (PX4IO_P_RAW_RC_FLAGS_RC_OK))) {
 		_rssi = 0;

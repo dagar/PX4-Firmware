@@ -69,7 +69,7 @@ px4_add_board(
 		camera_feedback
 		commander
 		dataman
-		ekf2
+		#ekf2
 		esc_battery
 		events
 		fw_att_control

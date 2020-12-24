@@ -274,21 +274,16 @@ void RCInput::Run()
 				if (!_rc_scan_locked /* !_armed.armed */) { // TODO: add armed check?
 					if ((int)vcmd.param1 == 0) {
 						// DSM binding command
-						int dsm_bind_mode = (int)vcmd.param2;
+						//int dsm_bind_mode = (int)vcmd.param2;
 
-						int dsm_bind_pulses = 0;
+						/* specify 11ms DSMX. RX will automatically fall back to 22ms or DSM2 if necessary */
 
-						if (dsm_bind_mode == 0) {
-							dsm_bind_pulses = DSM2_BIND_PULSES;
+						/* only allow DSM2, DSM-X and DSM-X with more than 7 channels */
+						//PX4_INFO("DSM_BIND_START: DSM%s RX", (arg == 0) ? "2" : ((arg == 1) ? "-X" : "-X8"));
 
-						} else if (dsm_bind_mode == 1) {
-							dsm_bind_pulses = DSMX_BIND_PULSES;
-
-						} else {
-							dsm_bind_pulses = DSMX8_BIND_PULSES;
+						if (!dsm_bind(INTERNAL_DSMX_11MS)) {
+							PX4_ERR("spektrum bind failed");
 						}
-
-						bind_spektrum(dsm_bind_pulses);
 					}
 
 				} else {
@@ -600,47 +595,6 @@ void RCInput::Run()
 		}
 	}
 }
-
-#if defined(SPEKTRUM_POWER)
-bool RCInput::bind_spektrum(int arg) const
-{
-	int ret = PX4_ERROR;
-
-	/* specify 11ms DSMX. RX will automatically fall back to 22ms or DSM2 if necessary */
-
-	/* only allow DSM2, DSM-X and DSM-X with more than 7 channels */
-	PX4_INFO("DSM_BIND_START: DSM%s RX", (arg == 0) ? "2" : ((arg == 1) ? "-X" : "-X8"));
-
-	if (arg == DSM2_BIND_PULSES ||
-	    arg == DSMX_BIND_PULSES ||
-	    arg == DSMX8_BIND_PULSES) {
-
-		dsm_bind(DSM_CMD_BIND_POWER_DOWN, 0);
-
-		dsm_bind(DSM_CMD_BIND_SET_RX_OUT, 0);
-		usleep(500000);
-
-		dsm_bind(DSM_CMD_BIND_POWER_UP, 0);
-		usleep(72000);
-
-		irqstate_t flags = px4_enter_critical_section();
-		dsm_bind(DSM_CMD_BIND_SEND_PULSES, arg);
-		px4_leave_critical_section(flags);
-
-		usleep(50000);
-
-		dsm_bind(DSM_CMD_BIND_REINIT_UART, 0);
-
-		ret = OK;
-
-	} else {
-		PX4_ERR("DSM bind failed");
-		ret = -EINVAL;
-	}
-
-	return (ret == PX4_OK);
-}
-#endif /* SPEKTRUM_POWER */
 
 int RCInput::custom_command(int argc, char *argv[])
 {
