@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2013 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,42 +31,62 @@
  *
  ****************************************************************************/
 
-/**
- * @file drv_airspeed.h
- *
- * Airspeed driver interface.
- *
- * @author Simon Wilks
- */
+#pragma once
 
-#ifndef _DRV_AIRSPEED_H
-#define _DRV_AIRSPEED_H
+#include <lib/conversion/rotation.h>
+#include <lib/matrix/matrix/math.hpp>
+#include <px4_platform_common/px4_config.h>
+#include <px4_platform_common/log.h>
+#include <uORB/Subscription.hpp>
+#include <uORB/topics/sensor_correction.h>
 
-#include <stdint.h>
-#include <sys/ioctl.h>
+namespace calibration
+{
+class DifferentialPressure
+{
+public:
+	static constexpr int MAX_SENSOR_COUNT = 4;
 
-#include "drv_sensor.h"
-#include "drv_orb_dev.h"
+	static constexpr uint8_t DEFAULT_PRIORITY = 50;
 
-#define AIRSPEED_BASE_DEVICE_PATH "/dev/airspeed"
-#define AIRSPEED0_DEVICE_PATH	"/dev/airspeed0"
+	static constexpr const char *SensorString() { return "DPRES"; }
 
-/*
- * ioctl() definitions
- *
- * Airspeed drivers also implement the generic sensor driver
- * interfaces from drv_sensor.h
- */
+	DifferentialPressure();
+	explicit DifferentialPressure(uint32_t device_id);
 
-#define _AIRSPEEDIOCBASE		(0x7700)
-#define __AIRSPEEDIOC(_n)		(_PX4_IOC(_AIRSPEEDIOCBASE, _n))
+	~DifferentialPressure() = default;
 
-#define AIRSPEEDIOCSSCALE		__AIRSPEEDIOC(0)
+	void PrintStatus();
 
-/** airspeed scaling factors; out = (in * Vscale) + offset */
-struct airspeed_scale {
-	float	offset_pa;
-	float	scale;
+	void set_calibration_index(uint8_t calibration_index) { _calibration_index = calibration_index; }
+	void set_device_id(uint32_t device_id);
+	bool set_offset(const float &offset);
+
+	uint8_t calibration_count() const { return _calibration_count; }
+	uint32_t device_id() const { return _device_id; }
+	bool enabled() const { return (_priority > 0); }
+	const float &offset() const { return _offset; }
+	const int32_t &priority() const { return _priority; }
+
+	// apply offsets and scale
+	// rotate corrected measurements from sensor to body frame
+	inline float Correct(const float &data) const
+	{
+		return data - _offset;
+	}
+
+	bool ParametersSave();
+	void ParametersUpdate();
+
+	void Reset();
+
+private:
+	float _offset{0};
+
+	int8_t _calibration_index{-1};
+	uint32_t _device_id{0};
+	int32_t _priority{-1};
+
+	uint8_t _calibration_count{0};
 };
-
-#endif /* _DRV_AIRSPEED_H */
+} // namespace calibration

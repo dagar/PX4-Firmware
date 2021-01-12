@@ -75,10 +75,9 @@ private:
 
 	void Publish(uint8_t instance, bool multi = false);
 
-	static constexpr int MAX_SENSOR_COUNT = 4;
+	static constexpr int MAX_SENSOR_COUNT = 3;
 
 	uORB::PublicationMulti<airspeed_s> _airspeed_multi_pub[MAX_SENSOR_COUNT] {
-		{ORB_ID(airspeed)},
 		{ORB_ID(airspeed)},
 		{ORB_ID(airspeed)},
 		{ORB_ID(airspeed)},
@@ -91,7 +90,6 @@ private:
 		{this, ORB_ID(differential_pressure), 0},
 		{this, ORB_ID(differential_pressure), 1},
 		{this, ORB_ID(differential_pressure), 2},
-		{this, ORB_ID(differential_pressure), 3},
 	};
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
@@ -112,7 +110,7 @@ private:
 	differential_pressure_s _last_data[MAX_SENSOR_COUNT] {};
 	bool _advertised[MAX_SENSOR_COUNT] {};
 
-	uint8_t _priority[MAX_SENSOR_COUNT] {100, 100, 100, 100};
+	uint8_t _priority[MAX_SENSOR_COUNT] {100, 100, 100};
 
 	int8_t _selected_sensor_sub_index{-1};
 

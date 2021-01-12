@@ -38,6 +38,6 @@ px4_add_module(
 		SDP3X.cpp
 		SDP3X_main.cpp
 	DEPENDS
-		drivers__airspeed
 		mathlib
+		px4_work_queue
 	)

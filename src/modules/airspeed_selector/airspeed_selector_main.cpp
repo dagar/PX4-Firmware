@@ -565,7 +565,7 @@ void AirspeedModule::select_airspeed_and_publish()
 	_prev_number_of_airspeed_sensors = _number_of_airspeed_sensors;
 
 	/* fill out airspeed_validated message for publishing it */
-	airspeed_validated_s airspeed_validated = {};
+	airspeed_validated_s airspeed_validated{};
 	airspeed_validated.timestamp = _time_now_usec;
 	airspeed_validated.true_ground_minus_wind_m_s = NAN;
 	airspeed_validated.calibrated_ground_minus_wind_m_s = NAN;
@@ -600,6 +600,7 @@ void AirspeedModule::select_airspeed_and_publish()
 	}
 
 	/* publish airspeed validated topic */
+	airspeed_validated.timestamp = hrt_absolute_time();
 	_airspeed_validated_pub.publish(airspeed_validated);
 
 	/* publish sideslip-only-fusion wind topic */

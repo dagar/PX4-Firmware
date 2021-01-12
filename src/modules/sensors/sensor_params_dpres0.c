@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013, 2014 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,57 +31,42 @@
  *
  ****************************************************************************/
 
-#pragma once
+/**
+ * ID of the differential pressure that the calibration is for.
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_INT32(CAL_DPRES0_ID, 0);
 
-#include <string.h>
-#include <drivers/device/i2c.h>
-#include <drivers/drv_airspeed.h>
-#include <drivers/drv_hrt.h>
-#include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/defines.h>
-#include <perf/perf_counter.h>
-#include <uORB/topics/differential_pressure.h>
-#include <uORB/PublicationMulti.hpp>
+/**
+ * Differential pressure sensor 0 priority.
+ *
+ * @value -1  Uninitialized
+ * @value 0   Disabled
+ * @value 1   Min
+ * @value 25  Low
+ * @value 50  Medium (Default)
+ * @value 75  High
+ * @value 100 Max
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_INT32(CAL_DPRES0_PRIO, 50);
 
-class __EXPORT Airspeed : public device::I2C
-{
-public:
-	Airspeed(int bus, int bus_frequency, int address, unsigned conversion_interval);
-	virtual ~Airspeed();
+/**
+ * Differential pressure sensor offset
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_FLOAT(CAL_DPRES0_OFF, 0.0f);
 
-	int	init() override;
-
-	int	ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
-
-private:
-	Airspeed(const Airspeed &) = delete;
-	Airspeed &operator=(const Airspeed &) = delete;
-
-protected:
-	int	probe() override;
-
-	/**
-	* Perform a poll cycle; collect from the previous measurement
-	* and start a new one.
-	*/
-	virtual int	measure() = 0;
-	virtual int	collect() = 0;
-
-	bool			_sensor_ok;
-	int				_measure_interval;
-	bool			_collect_phase;
-	float			_diff_pres_offset;
-
-	uORB::PublicationMulti<differential_pressure_s>	_airspeed_pub{ORB_ID(differential_pressure)};
-
-	int			_airspeed_orb_class_instance;
-
-	int			_class_instance;
-
-	unsigned		_conversion_interval;
-
-	perf_counter_t		_sample_perf;
-	perf_counter_t		_comms_errors;
-};
-
-
+/**
+ * Differential pressure sensor scaling factor
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_FLOAT(CAL_DPRES0_SCALE, 1.0f);

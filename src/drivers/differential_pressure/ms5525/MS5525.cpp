@@ -171,6 +171,8 @@ MS5525::collect()
 {
 	perf_begin(_sample_perf);
 
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
+
 	// read ADC
 	uint8_t cmd = CMD_ADC_READ;
 	int ret = transfer(&cmd, 1, nullptr, 0);
@@ -181,7 +183,7 @@ MS5525::collect()
 	}
 
 	// read 24 bits from the sensor
-	uint8_t val[3];
+	uint8_t val[3] {};
 	ret = transfer(nullptr, 0, &val[0], 3);
 
 	if (ret != PX4_OK) {
@@ -248,28 +250,23 @@ MS5525::collect()
 	static constexpr float PSI_to_Pa = 6894.757f;
 	const float diff_press_pa_raw = diff_press_PSI * PSI_to_Pa;
 
-	const float temperature_c = TEMP * 0.01f;
+	const float temperature = TEMP * 0.01f;
 
-	differential_pressure_s diff_pressure = {
-		.timestamp = hrt_absolute_time(),
-		.error_count = perf_event_count(_comms_errors),
-		.differential_pressure_raw_pa = diff_press_pa_raw - _diff_pres_offset,
-		.differential_pressure_filtered_pa =  _filter.apply(diff_press_pa_raw) - _diff_pres_offset,
-		.temperature = temperature_c,
-		.device_id = _device_id.devid
-	};
-
-	_airspeed_pub.publish(diff_pressure);
-
-	ret = OK;
+	differential_pressure_s report{};
+	report.timestamp_sample = timestamp_sample;
+	report.device_id = get_device_id();
+	report.differential_pressure_raw_pa = diff_press_pa_raw;
+	report.temperature = temperature;
+	report.error_count = perf_event_count(_comms_errors);
+	report.timestamp = hrt_absolute_time();
+	_differential_pressure_pub.publish(report);
 
 	perf_end(_sample_perf);
 
-	return ret;
+	return PX4_OK;
 }
 
-void
-MS5525::RunImpl()
+void MS5525::RunImpl()
 {
 	int ret = PX4_ERROR;
 

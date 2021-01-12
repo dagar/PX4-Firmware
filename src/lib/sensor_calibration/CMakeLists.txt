@@ -34,6 +34,8 @@
 px4_add_library(sensor_calibration
 	Accelerometer.cpp
 	Accelerometer.hpp
+	DifferentialPressure.cpp
+	DifferentialPressure.hpp
 	Gyroscope.cpp
 	Gyroscope.hpp
 	Magnetometer.cpp

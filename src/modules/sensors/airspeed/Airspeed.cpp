@@ -34,10 +34,11 @@
 #include "Airspeed.hpp"
 
 #include <px4_platform_common/log.h>
-#include <drivers/drv_airspeed.h>
 #include <lib/ecl/geo/geo.h>
 
 #include <lib/airspeed/airspeed.h>
+
+#include <drivers/drv_sensor.h>
 
 namespace sensors
 {
@@ -94,23 +95,6 @@ void Airspeed::ParametersUpdate(bool force)
 		_parameter_update_sub.copy(&param_update);
 
 		updateParams();
-
-		/* update airspeed scale */
-		int fd = px4_open(AIRSPEED0_DEVICE_PATH, 0);
-
-		/* this sensor is optional, abort without error */
-		if (fd >= 0) {
-			struct airspeed_scale airscale = {
-				_param_sens_dpres_off.get(),
-				1.0f,
-			};
-
-			if (OK != px4_ioctl(fd, AIRSPEEDIOCSSCALE, (long unsigned int)&airscale)) {
-				PX4_ERR("failed to set offset for differential pressure sensor");
-			}
-
-			px4_close(fd);
-		}
 	}
 }
 
@@ -176,8 +160,10 @@ void Airspeed::Run()
 
 				_device_id[uorb_index] = diff_pres.device_id;
 
-				float vect[3] {diff_pres.differential_pressure_raw_pa, diff_pres.temperature, 0.f};
-				_voter.put(uorb_index, diff_pres.timestamp, vect, diff_pres.error_count, _priority[uorb_index]);
+				float differential_pressure_pa = diff_pres.differential_pressure_raw_pa - _param_sens_dpres_off.get();
+
+				float vect[3] {differential_pressure_pa, diff_pres.temperature, 0.f};
+				_voter.put(uorb_index, diff_pres.timestamp_sample, vect, diff_pres.error_count, _priority[uorb_index]);
 
 
 				float air_temperature_celsius = NAN;
@@ -195,8 +181,8 @@ void Airspeed::Run()
 				}
 
 				// average raw data for all instances
-				_timestamp_sample_sum[uorb_index] += diff_pres.timestamp;
-				_differential_pressure_sum[uorb_index] += diff_pres.differential_pressure_filtered_pa;
+				_timestamp_sample_sum[uorb_index] += diff_pres.timestamp_sample;
+				_differential_pressure_sum[uorb_index] += differential_pressure_pa;
 				_temperature_sum[uorb_index] += air_temperature_celsius;
 				_sum_count[uorb_index]++;
 			}

@@ -37,5 +37,5 @@ px4_add_module(
 	SRCS
 		ets_airspeed.cpp
 	DEPENDS
-		drivers__airspeed
+		px4_work_queue
 	)

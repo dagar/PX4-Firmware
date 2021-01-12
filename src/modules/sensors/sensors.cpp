@@ -42,7 +42,6 @@
  */
 
 #include <drivers/drv_adc.h>
-#include <drivers/drv_airspeed.h>
 #include <drivers/drv_hrt.h>
 #include <lib/mathlib/mathlib.h>
 #include <lib/parameters/param.h>
@@ -137,7 +136,6 @@ private:
 
 
 	struct Parameters {
-		float diff_pres_offset_pa;
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 		float diff_pres_analog_scale;
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
@@ -145,7 +143,6 @@ private:
 	} _parameters{}; /**< local copies of interesting parameters */
 
 	struct ParameterHandles {
-		param_t diff_pres_offset_pa;
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 		param_t diff_pres_analog_scale;
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
@@ -202,8 +199,6 @@ Sensors::Sensors(bool hil_enabled) :
 	_loop_perf(perf_alloc(PC_ELAPSED, "sensors")),
 	_voted_sensors_update(hil_enabled, _vehicle_imu_sub)
 {
-	/* Differential pressure offset */
-	_parameter_handles.diff_pres_offset_pa = param_find("SENS_DPRES_OFF");
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	_parameter_handles.diff_pres_analog_scale = param_find("SENS_DPRES_ANSC");
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
@@ -272,8 +267,6 @@ int Sensors::parameters_update()
 		return 0;
 	}
 
-	/* Airspeed offset */
-	param_get(_parameter_handles.diff_pres_offset_pa, &(_parameters.diff_pres_offset_pa));
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 	param_get(_parameter_handles.diff_pres_analog_scale, &(_parameters.diff_pres_analog_scale));
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
@@ -336,13 +329,8 @@ void Sensors::adc_poll()
 						 * vref. Those devices require no divider at all.
 						 */
 						if (voltage > 0.4f) {
-							const float diff_pres_pa_raw = voltage * _parameters.diff_pres_analog_scale - _parameters.diff_pres_offset_pa;
-
-							_diff_pres.differential_pressure_raw_pa = diff_pres_pa_raw;
-							_diff_pres.differential_pressure_filtered_pa = (_diff_pres.differential_pressure_filtered_pa * 0.9f) +
-									(diff_pres_pa_raw * 0.1f);
+							_diff_pres.differential_pressure_raw_pa = voltage * _parameters.diff_pres_analog_scale;
 							_diff_pres.temperature = NAN;
-
 							_diff_pres.timestamp = hrt_absolute_time();
 
 							_diff_pres_pub.publish(_diff_pres);
