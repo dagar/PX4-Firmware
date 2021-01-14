@@ -111,7 +111,7 @@ BlockLocalPositionEstimator::BlockLocalPositionEstimator() :
 	_ref_lon(0.0),
 	_ref_alt(0.0)
 {
-	_sensors_sub.set_interval_ms(10); // main prediction loop, 100 hz (lockstep requires to run at full rate)
+	_vehicle_imu_sub.set_interval_ms(10); // main prediction loop, 100 hz (lockstep requires to run at full rate)
 
 	// assign distance subs to array
 	_dist_subs[0] = &_sub_dist0;
@@ -144,7 +144,7 @@ BlockLocalPositionEstimator::BlockLocalPositionEstimator() :
 bool
 BlockLocalPositionEstimator::init()
 {
-	if (!_sensors_sub.registerCallback()) {
+	if (!_vehicle_imu_sub.registerCallback()) {
 		PX4_ERR("sensor combined callback registration failed!");
 		return false;
 	}
@@ -163,14 +163,14 @@ Vector<float, BlockLocalPositionEstimator::n_x> BlockLocalPositionEstimator::dyn
 void BlockLocalPositionEstimator::Run()
 {
 	if (should_exit()) {
-		_sensors_sub.unregisterCallback();
+		_vehicle_imu_sub.unregisterCallback();
 		exit_and_cleanup();
 		return;
 	}
 
-	sensor_combined_s imu;
+	vehicle_imu_s imu;
 
-	if (!_sensors_sub.update(&imu)) {
+	if (!_vehicle_imu_sub.update(&imu)) {
 		return;
 	}
 
@@ -898,11 +898,11 @@ void BlockLocalPositionEstimator::updateSSParams()
 	m_Q(X_tz, X_tz) = pn_t_noise_density * pn_t_noise_density;
 }
 
-void BlockLocalPositionEstimator::predict(const sensor_combined_s &imu)
+void BlockLocalPositionEstimator::predict(const vehicle_imu_s &imu)
 {
 	// get acceleration
 	_R_att = matrix::Dcm<float>(matrix::Quatf(_sub_att.get().q));
-	Vector3f a(imu.accelerometer_m_s2);
+	Vector3f a{Vector3f{imu.delta_velocity} *(1.e6f / (float)imu.delta_velocity_dt)};
 	// note, bias is removed in dynamics function
 	_u = _R_att * a;
 	_u(U_az) += CONSTANTS_ONE_G;	// add g

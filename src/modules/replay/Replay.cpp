@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -62,7 +62,6 @@
 #include <logger/messages.h>
 
 #include "Replay.hpp"
-#include "ReplayEkf2.hpp"
 
 #define PARAMS_OVERRIDE_FILE PX4_ROOTFSDIR "/replay_params.txt"
 
@@ -74,16 +73,6 @@ namespace px4
 
 char *Replay::_replay_file = nullptr;
 
-Replay::CompatSensorCombinedDtType::CompatSensorCombinedDtType(int gyro_integral_dt_offset_log,
-		int gyro_integral_dt_offset_intern, int accelerometer_integral_dt_offset_log,
-		int accelerometer_integral_dt_offset_intern)
-	: _gyro_integral_dt_offset_log(gyro_integral_dt_offset_log),
-	  _gyro_integral_dt_offset_intern(gyro_integral_dt_offset_intern),
-	  _accelerometer_integral_dt_offset_log(accelerometer_integral_dt_offset_log),
-	  _accelerometer_integral_dt_offset_intern(accelerometer_integral_dt_offset_intern)
-{
-}
-
 Replay::~Replay()
 {
 	for (size_t i = 0; i < _subscriptions.size(); ++i) {
@@ -91,27 +80,6 @@ Replay::~Replay()
 	}
 
 	_subscriptions.clear();
-}
-
-void *
-Replay::CompatSensorCombinedDtType::apply(void *data)
-{
-	// the types have the same size so we can do the conversion in-place
-	uint8_t *ptr = (uint8_t *)data;
-
-	float gyro_integral_dt;
-	memcpy(&gyro_integral_dt, ptr + _gyro_integral_dt_offset_log, sizeof(float));
-
-	float accel_integral_dt;
-	memcpy(&accel_integral_dt, ptr + _accelerometer_integral_dt_offset_log, sizeof(float));
-
-	uint32_t igyro_integral_dt = (uint32_t)(gyro_integral_dt * 1e6f);
-	memcpy(ptr + _gyro_integral_dt_offset_intern, &igyro_integral_dt, sizeof(float));
-
-	uint32_t iaccel_integral_dt = (uint32_t)(accel_integral_dt * 1e6f);
-	memcpy(ptr + _accelerometer_integral_dt_offset_intern, &iaccel_integral_dt, sizeof(float));
-
-	return data;
 }
 
 void
@@ -365,51 +333,13 @@ Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 		return true;
 	}
 
-	CompatBase *compat = nullptr;
-
 	// check the format: the field definitions must match
 	// FIXME: this should check recursively, all used nested types
 	string file_format = _file_formats[topic_name];
 
-	if (file_format != orb_meta->o_fields) {
-		// check if we have a compatibility conversion available
-		if (topic_name == "sensor_combined") {
-			if (string(orb_meta->o_fields) == "uint64_t timestamp;float[3] gyro_rad;uint32_t gyro_integral_dt;"
-			    "int32_t accelerometer_timestamp_relative;float[3] accelerometer_m_s2;"
-			    "uint32_t accelerometer_integral_dt" &&
-			    file_format == "uint64_t timestamp;float[3] gyro_rad;float gyro_integral_dt;"
-			    "int32_t accelerometer_timestamp_relative;float[3] accelerometer_m_s2;"
-			    "float accelerometer_integral_dt;") {
-
-				int gyro_integral_dt_offset_log;
-				int gyro_integral_dt_offset_intern;
-				int accelerometer_integral_dt_offset_log;
-				int accelerometer_integral_dt_offset_intern;
-				int unused;
-
-				if (findFieldOffset(file_format, "gyro_integral_dt", gyro_integral_dt_offset_log, unused) &&
-				    findFieldOffset(orb_meta->o_fields, "gyro_integral_dt", gyro_integral_dt_offset_intern, unused) &&
-				    findFieldOffset(file_format, "accelerometer_integral_dt", accelerometer_integral_dt_offset_log, unused) &&
-				    findFieldOffset(orb_meta->o_fields, "accelerometer_integral_dt", accelerometer_integral_dt_offset_intern, unused)) {
-
-					compat = new CompatSensorCombinedDtType(gyro_integral_dt_offset_log, gyro_integral_dt_offset_intern,
-										accelerometer_integral_dt_offset_log, accelerometer_integral_dt_offset_intern);
-				}
-			}
-		}
-
-		if (!compat) {
-			PX4_ERR("Formats for %s don't match. Will ignore it.", topic_name.c_str());
-			PX4_WARN(" Internal format: %s", orb_meta->o_fields);
-			PX4_WARN(" File format    : %s", file_format.c_str());
-			return true; // not a fatal error
-		}
-	}
-
 	Subscription *subscription = new Subscription();
 	subscription->orb_meta = orb_meta;
 	subscription->multi_id = multi_id;
-	subscription->compat = compat;
 
 	//find the timestamp offset
 	int field_size;
@@ -773,6 +703,17 @@ Replay::run()
 		_speed_factor = atof(speedup);
 	}
 
+
+	// read file and build index
+	msg_index m;
+	m.timkestamp = 0;
+	m.position = {};
+	_msg_index.emplace_back(m);
+
+
+
+
+
 	onEnterMainLoop();
 
 	_replay_start_time = hrt_absolute_time();
@@ -856,11 +797,6 @@ Replay::run()
 			continue;
 		}
 
-		if (subscription->compat) {
-			delete subscription->compat;
-			subscription->compat = nullptr;
-		}
-
 		if (subscription->orb_advert) {
 			orb_unadvertise(subscription->orb_advert);
 			subscription->orb_advert = nullptr;
@@ -938,10 +874,6 @@ bool
 Replay::publishTopic(Subscription &sub, void *data)
 {
 	bool published = false;
-
-	if (sub.compat) {
-		data = sub.compat->apply(data);
-	}
 
 	if (sub.orb_advert) {
 		orb_publish(sub.orb_meta, sub.orb_advert, data);
@@ -1061,17 +993,9 @@ Replay *
 Replay::instantiate(int argc, char *argv[])
 {
 	// check the replay mode
-	const char *replay_mode = getenv(replay::ENV_MODE);
+	//const char *replay_mode = getenv(replay::ENV_MODE);
 
-	Replay *instance = nullptr;
-
-	if (replay_mode && strcmp(replay_mode, "ekf2") == 0) {
-		PX4_INFO("Ekf2 replay mode");
-		instance = new ReplayEkf2();
-
-	} else {
-		instance = new Replay();
-	}
+	Replay *instance = new Replay();
 
 	return instance;
 }

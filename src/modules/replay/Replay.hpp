@@ -43,7 +43,6 @@
 
 #include <px4_platform_common/module.h>
 #include <uORB/topics/uORBTopics.hpp>
-#include <uORB/topics/ekf2_timestamps.h>
 
 namespace px4
 {
@@ -95,36 +94,6 @@ public:
 
 protected:
 
-	/**
-	 * @class Compatibility base class to convert topics to an updated format
-	 */
-	class CompatBase
-	{
-	public:
-		virtual ~CompatBase() = default;
-
-		/**
-		 * apply compatibility to a topic
-		 * @param data input topic (can be modified in place)
-		 * @return new topic data
-		 */
-		virtual void *apply(void *data) = 0;
-	};
-
-	class CompatSensorCombinedDtType : public CompatBase
-	{
-	public:
-		CompatSensorCombinedDtType(int gyro_integral_dt_offset_log, int gyro_integral_dt_offset_intern,
-					   int accelerometer_integral_dt_offset_log, int accelerometer_integral_dt_offset_intern);
-
-		void *apply(void *data) override;
-	private:
-		int _gyro_integral_dt_offset_log;
-		int _gyro_integral_dt_offset_intern;
-		int _accelerometer_integral_dt_offset_log;
-		int _accelerometer_integral_dt_offset_intern;
-	};
-
 	struct Subscription {
 
 		const orb_metadata *orb_meta = nullptr; ///< if nullptr, this subscription is invalid
@@ -136,8 +105,6 @@ protected:
 
 		std::streampos next_read_pos;
 		uint64_t next_timestamp; ///< timestamp of the file
-
-		CompatBase *compat = nullptr;
 
 		// statistics
 		int error_counter = 0;
@@ -219,6 +186,14 @@ protected:
 	float _speed_factor{1.f}; ///< from PX4_SIM_SPEED_FACTOR env variable (set to 0 to avoid usleep = unlimited rate)
 
 private:
+
+	struct msg_index {
+		hrt_abstime timestamp{0};
+		std::streampos position;
+	};
+
+	std::vector<msg_index> _msg_index;
+
 	std::set<std::string> _overridden_params;
 	std::map<std::string, std::string> _file_formats; ///< all formats we read from the file
 

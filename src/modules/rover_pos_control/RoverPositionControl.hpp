@@ -62,7 +62,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/position_controller_status.h>
 #include <uORB/topics/position_setpoint_triplet.h>
-#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_acceleration.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
@@ -109,7 +109,7 @@ private:
 	int		_pos_sp_triplet_sub{-1};
 	int		_att_sp_sub{-1};
 	int		_vehicle_attitude_sub{-1};
-	int		_sensor_combined_sub{-1};
+	int		_vehicle_angular_velocity_sub{-1};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
@@ -119,9 +119,9 @@ private:
 	vehicle_control_mode_s			_control_mode{};		/**< control mode */
 	vehicle_global_position_s		_global_pos{};			/**< global vehicle position */
 	vehicle_local_position_s		_local_pos{};			/**< global vehicle position */
-	actuator_controls_s				_act_controls{};		/**< direct control of actuators */
-	vehicle_attitude_s				_vehicle_att{};
-	sensor_combined_s				_sensor_combined{};
+	actuator_controls_s			_act_controls{};		/**< direct control of actuators */
+	vehicle_attitude_s			_vehicle_att{};
+	vehicle_angular_velocity_s		_vehicle_angular_velocity{};
 
 	uORB::SubscriptionData<vehicle_acceleration_s>		_vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 

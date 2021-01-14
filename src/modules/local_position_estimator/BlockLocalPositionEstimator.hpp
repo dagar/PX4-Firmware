@@ -20,7 +20,7 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/optical_flow.h>
-#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/vehicle_imu.h>
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/manual_control_setpoint.h>
@@ -183,7 +183,7 @@ private:
 	void updateSSParams();
 
 	// predict the next state
-	void predict(const sensor_combined_s &imu);
+	void predict(const vehicle_imu_s &imu);
 
 	// lidar
 	int  lidarMeasure(Vector<float, n_y_lidar> &y);
@@ -261,7 +261,7 @@ private:
 	// ----------------------------
 
 	// subscriptions
-	uORB::SubscriptionCallbackWorkItem _sensors_sub{this, ORB_ID(sensor_combined)};
+	uORB::SubscriptionCallbackWorkItem _vehicle_imu_sub{this, ORB_ID(vehicle_imu)};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 

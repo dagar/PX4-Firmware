@@ -52,7 +52,6 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_gyro.h>
-#include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensors_status_imu.h>
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_imu.h>
@@ -78,12 +77,6 @@ public:
 	VotedSensorsUpdate(bool hil_enabled, uORB::SubscriptionCallbackWorkItem(&vehicle_imu_sub)[MAX_SENSOR_COUNT]);
 
 	/**
-	 * initialize subscriptions etc.
-	 * @return 0 on success, <0 otherwise
-	 */
-	int init(sensor_combined_s &raw);
-
-	/**
 	 * This tries to find new sensor instances. This is called from init(), then it can be called periodically.
 	 */
 	void initializeSensors();
@@ -99,13 +92,7 @@ public:
 	/**
 	 * read new sensor data
 	 */
-	void sensorsPoll(sensor_combined_s &raw);
-
-	/**
-	 * set the relative timestamps of each sensor timestamp, based on the last sensorsPoll,
-	 * so that the data can be published.
-	 */
-	void setRelativeTimestamps(sensor_combined_s &raw);
+	void sensorsPoll();
 
 private:
 
@@ -127,13 +114,7 @@ private:
 
 	void initSensorClass(SensorData &sensor_data, uint8_t sensor_count_max);
 
-	/**
-	 * Poll IMU for updated data.
-	 *
-	 * @param raw	Combined sensor data structure into which
-	 *		data should be returned.
-	 */
-	void imuPoll(sensor_combined_s &raw);
+	void imuPoll();
 
 	/**
 	 * Check & handle failover of a sensor
@@ -165,7 +146,8 @@ private:
 
 	uORB::Subscription _sensor_selection_sub{ORB_ID(sensor_selection)};
 
-	sensor_combined_s _last_sensor_data[MAX_SENSOR_COUNT] {};	/**< latest sensor data from all sensors instances */
+	matrix::Vector3f _last_accel_data[MAX_SENSOR_COUNT] {};
+	matrix::Vector3f _last_gyro_data[MAX_SENSOR_COUNT] {};
 
 	const bool _hil_enabled{false};			/**< is hardware-in-the-loop mode enabled? */
 
@@ -176,8 +158,6 @@ private:
 
 	uint32_t _accel_device_id[MAX_SENSOR_COUNT] {};	/**< accel driver device id for each uorb instance */
 	uint32_t _gyro_device_id[MAX_SENSOR_COUNT] {};	/**< gyro driver device id for each uorb instance */
-
-	uint64_t _last_accel_timestamp[MAX_SENSOR_COUNT] {};	/**< latest full timestamp */
 
 	sensor_selection_s _selection {};		/**< struct containing the sensor selection to be published to the uORB */
 
