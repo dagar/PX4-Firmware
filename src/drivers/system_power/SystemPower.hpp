@@ -94,4 +94,38 @@ private:
 #endif // BOARD_GPIO_VDD_5V_CAN1_GPS1_VALID
 
 	bool _first_run{true};
+
+#if BOARD_NUMBER_BRICKS >= 1
+# if BOARD_NUMBER_BRICKS >= 1
+	Battery _battery1 {1, nullptr, 100};
+# endif // BOARD_NUMBER_BRICKS >= 1
+# if BOARD_NUMBER_BRICKS >= 2
+	Battery _battery2 {2, nullptr, 100};
+# endif // BOARD_NUMBER_BRICKS >= 2
+# if BOARD_NUMBER_BRICKS >= 3
+	Battery _battery3 {3, nullptr, 100};
+# endif // BOARD_NUMBER_BRICKS >= 3
+# if BOARD_NUMBER_BRICKS >= 4
+	Battery _battery4 {4, nullptr, 100};
+# endif // BOARD_NUMBER_BRICKS >= 4
+
+	DEFINE_PARAMETERS(
+# if BOARD_NUMBER_BRICKS >= 1
+		(ParamFloat<px4::params::BAT1_V_DIV>) _param_bat1_v_div,
+		(ParamFloat<px4::params::BAT1_A_PER_V>) _param_bat1_a_per_v,
+# endif // BOARD_NUMBER_BRICKS >= 1
+# if BOARD_NUMBER_BRICKS >= 2
+		(ParamFloat<px4::params::BAT2_V_DIV>) _param_bat2_v_div,
+		(ParamFloat<px4::params::BAT1_A_PER_V>) _param_bat2_a_per_v,
+# endif // BOARD_NUMBER_BRICKS >= 2
+# if BOARD_NUMBER_BRICKS >= 3
+		(ParamFloat<px4::params::BAT3_V_DIV>) _param_bat3_v_div,
+		(ParamFloat<px4::params::BAT1_A_PER_V>) _param_bat3_a_per_v,
+# endif // BOARD_NUMBER_BRICKS >= 3
+# if BOARD_NUMBER_BRICKS >= 4
+		(ParamFloat<px4::params::BAT4_V_DIV>) _param_bat4_v_div,
+		(ParamFloat<px4::params::BAT1_A_PER_V>) _param_bat4_a_per_v
+# endif // BOARD_NUMBER_BRICKS >= 4
+	)
+#endif // BOARD_NUMBER_BRICKS >= 1
 };
