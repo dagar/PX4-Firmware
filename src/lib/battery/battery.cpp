@@ -116,14 +116,18 @@ void Battery::reset()
 	_battery_status.warning = battery_status_s::BATTERY_WARNING_NONE;
 	_battery_status.connected = false;
 	_battery_status.capacity = _params.capacity > 0.0f ? (uint16_t)_params.capacity : 0;
-	_battery_status.temperature = NAN;
 	_battery_status.id = (uint8_t) _index;
 }
 
-void Battery::updateBatteryStatus(const hrt_abstime &timestamp, float voltage_v, float current_a, bool connected,
-				  int source, int priority, float throttle_normalized)
+void Battery::updateBatteryStatus(float voltage_v, float current_a, int source)
 {
+	const hrt_abstime timestamp = hrt_absolute_time();
 	reset();
+
+	float throttle_normalized = 0.f;
+
+	bool connected = true;
+
 
 	if (!_battery_initialized) {
 		_voltage_filter_v.reset(voltage_v);
@@ -154,15 +158,13 @@ void Battery::updateBatteryStatus(const hrt_abstime &timestamp, float voltage_v,
 		_battery_status.remaining = _remaining;
 		_battery_status.connected = connected;
 		_battery_status.source = source;
-		_battery_status.priority = priority;
 
-		static constexpr int uorb_max_cells = sizeof(_battery_status.voltage_cell_v) / sizeof(
-				_battery_status.voltage_cell_v[0]);
+		// static constexpr int uorb_max_cells = sizeof(_battery_status.voltage_cell_v) / sizeof(_battery_status.voltage_cell_v[0]);
 
-		// Fill cell voltages with average values to work around BATTERY_STATUS message not allowing to report just total voltage
-		for (int i = 0; (i < _battery_status.cell_count) && (i < uorb_max_cells); i++) {
-			_battery_status.voltage_cell_v[i] = _battery_status.voltage_filtered_v / _battery_status.cell_count;
-		}
+		// // Fill cell voltages with average values to work around BATTERY_STATUS message not allowing to report just total voltage
+		// for (int i = 0; (i < _battery_status.cell_count) && (i < uorb_max_cells); i++) {
+		// 	_battery_status.voltage_cell_v[i] = _battery_status.voltage_filtered_v / _battery_status.cell_count;
+		// }
 	}
 
 	if (source == _params.source) {

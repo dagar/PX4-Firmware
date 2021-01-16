@@ -39,10 +39,10 @@
 const char *const UavcanBatteryBridge::NAME = "battery";
 
 UavcanBatteryBridge::UavcanBatteryBridge(uavcan::INode &node) :
-	UavcanSensorBridgeBase("uavcan_battery", ORB_ID(battery_status)),
+	UavcanSensorBridgeBase("uavcan_battery", ORB_ID(smart_battery_status)),
 	ModuleParams(nullptr),
 	_sub_battery(node),
-	_warning(battery_status_s::BATTERY_WARNING_NONE),
+	_warning(smart_battery_status_s::BATTERY_WARNING_NONE),
 	_last_timestamp(0)
 {
 }
@@ -62,7 +62,7 @@ int UavcanBatteryBridge::init()
 void
 UavcanBatteryBridge::battery_sub_cb(const uavcan::ReceivedDataStructure<uavcan::equipment::power::BatteryInfo> &msg)
 {
-	battery_status_s battery{};
+	smart_battery_status_s battery{};
 
 	battery.timestamp = hrt_absolute_time();
 	battery.voltage_v = msg.voltage;
@@ -130,13 +130,13 @@ void
 UavcanBatteryBridge::determineWarning(float remaining)
 {
 	// propagate warning state only if the state is higher, otherwise remain in current warning state
-	if (remaining < _param_bat_emergen_thr.get() || (_warning == battery_status_s::BATTERY_WARNING_EMERGENCY)) {
-		_warning = battery_status_s::BATTERY_WARNING_EMERGENCY;
+	if (remaining < _param_bat_emergen_thr.get() || (_warning == smart_battery_status_s::BATTERY_WARNING_EMERGENCY)) {
+		_warning = smart_battery_status_s::BATTERY_WARNING_EMERGENCY;
 
-	} else if (remaining < _param_bat_crit_thr.get() || (_warning == battery_status_s::BATTERY_WARNING_CRITICAL)) {
-		_warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+	} else if (remaining < _param_bat_crit_thr.get() || (_warning == smart_battery_status_s::BATTERY_WARNING_CRITICAL)) {
+		_warning = smart_battery_status_s::BATTERY_WARNING_CRITICAL;
 
-	} else if (remaining < _param_bat_low_thr.get() || (_warning == battery_status_s::BATTERY_WARNING_LOW)) {
-		_warning = battery_status_s::BATTERY_WARNING_LOW;
+	} else if (remaining < _param_bat_low_thr.get() || (_warning == smart_battery_status_s::BATTERY_WARNING_LOW)) {
+		_warning = smart_battery_status_s::BATTERY_WARNING_LOW;
 	}
 }

@@ -75,6 +75,7 @@
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/sensor_selection.h>
+#include <uORB/topics/smart_battery_status.h>
 #include <uORB/topics/telemetry_status.h>
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/vehicle_air_data.h>
@@ -707,7 +708,7 @@ protected:
 				bat_msg.energy_consumed = -1;
 				bat_msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100 : -1;
 				bat_msg.battery_remaining = (battery_status.connected) ? ceilf(battery_status.remaining * 100.0f) : -1;
-				bat_msg.time_remaining = (battery_status.connected) ? battery_status.run_time_to_empty * 60 : 0;
+				//bat_msg.time_remaining = (battery_status.connected) ? battery_status.run_time_to_empty * 60 : 0;
 
 				switch (battery_status.warning) {
 				case (battery_status_s::BATTERY_WARNING_NONE):
@@ -736,25 +737,25 @@ protected:
 				}
 
 				// check if temperature valid
-				if (battery_status.connected && PX4_ISFINITE(battery_status.temperature)) {
-					bat_msg.temperature = battery_status.temperature * 100.0f;
+				// if (battery_status.connected && PX4_ISFINITE(battery_status.temperature)) {
+				// 	bat_msg.temperature = battery_status.temperature * 100.0f;
 
-				} else {
-					bat_msg.temperature = INT16_MAX;
-				}
+				// } else {
+				// 	bat_msg.temperature = INT16_MAX;
+				// }
 
-				static constexpr int mavlink_cells_max = (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0]));
-				static constexpr int uorb_cells_max =
-					(sizeof(battery_status.voltage_cell_v) / sizeof(battery_status.voltage_cell_v[0]));
+				// static constexpr int mavlink_cells_max = (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0]));
+				// static constexpr int uorb_cells_max =
+				// 	(sizeof(battery_status.voltage_cell_v) / sizeof(battery_status.voltage_cell_v[0]));
 
-				for (int cell = 0; cell < mavlink_cells_max; cell++) {
-					if (battery_status.connected && (cell < battery_status.cell_count) && (cell < uorb_cells_max)) {
-						bat_msg.voltages[cell] = battery_status.voltage_cell_v[cell] * 1000.0f;
+				// for (int cell = 0; cell < mavlink_cells_max; cell++) {
+				// 	if (battery_status.connected && (cell < battery_status.cell_count) && (cell < uorb_cells_max)) {
+				// 		bat_msg.voltages[cell] = battery_status.voltage_cell_v[cell] * 1000.0f;
 
-					} else {
-						bat_msg.voltages[cell] = UINT16_MAX;
-					}
-				}
+				// 	} else {
+				// 		bat_msg.voltages[cell] = UINT16_MAX;
+				// 	}
+				// }
 
 				mavlink_msg_battery_status_send_struct(_mavlink->get_channel(), &bat_msg);
 
@@ -802,13 +803,8 @@ public:
 	}
 
 private:
-	uORB::SubscriptionMultiArray<battery_status_s, battery_status_s::MAX_INSTANCES> _battery_status_subs{ORB_ID::battery_status};
+	uORB::SubscriptionMultiArray<smart_battery_status_s, smart_battery_status_s::MAX_INSTANCES> _battery_status_subs{ORB_ID::battery_status};
 
-	/* do not allow top copying this class */
-	MavlinkStreamSmartBatteryInfo(MavlinkStreamSysStatus &) = delete;
-	MavlinkStreamSmartBatteryInfo &operator = (const MavlinkStreamSysStatus &) = delete;
-
-protected:
 	explicit MavlinkStreamSmartBatteryInfo(Mavlink *mavlink) : MavlinkStream(mavlink)
 	{
 	}
@@ -818,13 +814,13 @@ protected:
 		bool updated = false;
 
 		for (auto &battery_sub : _battery_status_subs) {
-			battery_status_s battery_status;
+			smart_battery_status_s battery_status;
 
 			if (battery_sub.update(&battery_status)) {
-				if (battery_status.serial_number == 0) {
-					//This is not smart battery
-					continue;
-				}
+				// if (battery_status.serial_number == 0) {
+				// 	//This is not smart battery
+				// 	continue;
+				// }
 
 				mavlink_smart_battery_info_t msg = {};
 

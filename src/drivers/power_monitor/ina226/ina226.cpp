@@ -83,15 +83,7 @@ INA226::INA226(I2CSPIBusOption bus_option, const int bus, int bus_frequency, int
 	_power_lsb = 25 * _current_lsb;
 
 	// We need to publish immediately, to guarantee that the first instance of the driver publishes to uORB instance 0
-	_battery.updateBatteryStatus(
-		hrt_absolute_time(),
-		0.0,
-		0.0,
-		false,
-		battery_status_s::BATTERY_SOURCE_POWER_MODULE,
-		0,
-		0.0
-	);
+	_battery.updateBatteryStatus(0, 0, battery_status_s::BATTERY_SOURCE_POWER_MODULE);
 }
 
 INA226::~INA226()
@@ -231,17 +223,8 @@ INA226::collect()
 		_bus_voltage = _power = _current = _shunt = 0;
 	}
 
-	_actuators_sub.copy(&_actuator_controls);
-
-	_battery.updateBatteryStatus(
-		hrt_absolute_time(),
-		(float) _bus_voltage * INA226_VSCALE,
-		(float) _current * _current_lsb,
-		success,
-		battery_status_s::BATTERY_SOURCE_POWER_MODULE,
-		0,
-		_actuator_controls.control[actuator_controls_s::INDEX_THROTTLE]
-	);
+	_battery.updateBatteryStatus(_bus_voltage * INA226_VSCALE, _current * _current_lsb,
+				     battery_status_s::BATTERY_SOURCE_POWER_MODULE);
 
 	perf_end(_sample_perf);
 
@@ -304,15 +287,7 @@ INA226::RunImpl()
 		ScheduleDelayed(INA226_CONVERSION_INTERVAL);
 
 	} else {
-		_battery.updateBatteryStatus(
-			hrt_absolute_time(),
-			0.0f,
-			0.0f,
-			false,
-			battery_status_s::BATTERY_SOURCE_POWER_MODULE,
-			0,
-			0.0f
-		);
+		_battery.updateBatteryStatus(0, 0, battery_status_s::BATTERY_SOURCE_POWER_MODULE);
 
 		if (init() != PX4_OK) {
 			ScheduleDelayed(INA226_INIT_RETRY_INTERVAL_US);

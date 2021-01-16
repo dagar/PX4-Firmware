@@ -93,13 +93,9 @@ public:
 	 *
 	 * @param voltage_raw: Battery voltage, in Volts
 	 * @param current_raw: Battery current, in Amps
-	 * @param timestamp: Time at which the ADC was read (use hrt_absolute_time())
 	 * @param source: Source type in relation to BAT%d_SOURCE param.
-	 * @param priority: The brick number -1. The term priority refers to the Vn connection on the LTC4417
-	 * @param throttle_normalized: Throttle of the vehicle, between 0 and 1
 	 */
-	void updateBatteryStatus(const hrt_abstime &timestamp, float voltage_v, float current_a, bool connected,
-				 int source, int priority, float throttle_normalized);
+	void updateBatteryStatus(float voltage_v, float current_a, int source);
 
 protected:
 	struct {
