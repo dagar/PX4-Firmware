@@ -11,8 +11,8 @@ px4_add_board(
 	TESTING
 	UAVCAN_INTERFACES 2
 	SERIAL_PORTS
-		TEL1:/dev/ttyS0
-		TEL2:/dev/ttyS1
+		TEL1:/dev/ttyS1
+		#TEL2:/dev/ttyS1
 		GPS1:/dev/ttyS2
 		#RC:/dev/ttyS3
 		#CONSOLE:/dev/ttyS4
@@ -20,7 +20,7 @@ px4_add_board(
 	DRIVERS
 		adc/board_adc
 		#barometer # all available barometer drivers
-		barometer/dps310
+		#barometer/dps310
 		batt_smbus
 		camera_capture
 		camera_trigger
@@ -29,9 +29,9 @@ px4_add_board(
 		dshot
 		gps
 		#imu # all available imu drivers
-		imu/bosch/bmi088
-		imu/invensense/icm20602
-		imu/invensense/icm20948
+		#imu/bosch/bmi088
+		#imu/invensense/icm20602
+		#imu/invensense/icm20948
 		irlock
 		lights/blinkm
 		lights/rgbled
@@ -95,10 +95,11 @@ px4_add_board(
 		hardfault_log
 		i2cdetect
 		led_control
+		#mft
 		mixer
 		motor_ramp
 		motor_test
-		mtd
+		#mtd
 		nshterm
 		param
 		perf

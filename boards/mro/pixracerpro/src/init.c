@@ -175,6 +175,11 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 #ifdef CONFIG_MMCSD
+	// Ensure Power is off for > 10 mS
+	usleep(15 * 1000);
+	//VDD_3V3_SD_CARD_EN(true);
+	usleep(500 * 1000);
+
 	/* Mount the SDIO-based MMC/SD block driver */
 	/* First, get an instance of the SDIO interface */
 	struct sdio_dev_s *sdio_dev = sdio_initialize(0); // SDIO_SLOTNO 0 Only one slot
@@ -192,6 +197,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	/* Assume that the SD card is inserted.  What choice do we have? */
 	sdio_mediachange(sdio_dev, true);
 #endif /* CONFIG_MMCSD */
+
+	/* Configure the HW based on the manifest */
+
+	px4_platform_configure();
 
 	return OK;
 }

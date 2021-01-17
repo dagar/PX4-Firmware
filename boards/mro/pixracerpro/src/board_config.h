@@ -112,13 +112,17 @@
 
 /* High-resolution timer */
 #define HRT_TIMER               3  /* use timer3 for the HRT */
-#define HRT_TIMER_CHANNEL       2  /* use capture/compare channel 2 */
+#define HRT_TIMER_CHANNEL       1  /* use capture/compare channel 2 */
 
-#define HRT_PPM_CHANNEL         /* T3C3 */  3  /* use capture/compare channel 3 */
-#define GPIO_PPM_IN             /* PB0 T3C3 */ GPIO_TIM3_CH3IN_1
+#define HRT_PPM_CHANNEL         /* T3C2 */  2  /* use capture/compare channel 3 */
+#define GPIO_PPM_IN             /* PB0 T3C1 */ GPIO_TIM3_CH3IN_1
 
 /* RC Serial port */
-#define RC_SERIAL_PORT          "/dev/ttyS3"
+#define RC_SERIAL_PORT          "/dev/ttyS5"
+
+// #define GPIO_TIM3_CH3IN_1         (GPIO_ALT|GPIO_AF2|GPIO_SPEED_50MHz|GPIO_FLOAT|GPIO_PORTB|GPIO_PIN0)
+// #define GPIO_TIM3_CH2IN_3         (GPIO_ALT|GPIO_AF2|GPIO_SPEED_50MHz|GPIO_FLOAT|GPIO_PORTC|GPIO_PIN7)
+// #define GPIO_USART6_RX_1          (GPIO_ALT|GPIO_AF7|GPIO_SPEED_100MHz|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN7)
 
 #define GPIO_RSSI_IN            /* PC1  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN1)
 
