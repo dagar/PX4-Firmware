@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,42 +32,40 @@
  ****************************************************************************/
 
 /**
- * @file ControlAllocationPseudoInverse.hpp
+ * @file ActuatorEffectivenessPlane.hpp
  *
- * Simple Control Allocation Algorithm
+ * Actuator effectiveness for a plane.
  *
- * @author Julien Lecoeur <julien.lecoeur@gmail.com>
  */
 
-#include "ControlAllocationPseudoInverse.hpp"
+#pragma once
 
-void ControlAllocationPseudoInverse::setEffectivenessMatrix(
-	const matrix::Matrix<float, ControlAllocation::NUM_AXES, ControlAllocation::NUM_ACTUATORS> &effectiveness,
-	const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator_trim, int num_actuators)
-{
-	ControlAllocation::setEffectivenessMatrix(effectiveness, actuator_trim, num_actuators);
-	_mix_update_needed = true;
-}
+#include "ActuatorEffectiveness.hpp"
 
-void ControlAllocationPseudoInverse::updatePseudoInverse()
+class ActuatorEffectivenessPlane: public ActuatorEffectiveness
 {
-	if (_mix_update_needed) {
-		_mix = matrix::geninv(_effectiveness);
-		_mix_update_needed = false;
+public:
+	ActuatorEffectivenessPlane();
+	~ActuatorEffectivenessPlane() override = default;
+
+	/**
+	 * Set the current airspeed scaling
+	 *
+	 * @param Airspeed scaling
+	 */
+	void updateAirspeedScaling(const float airspeed_scaling) override;
+
+	bool getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix) override
+	{
+		matrix = _effectiveness;
+		return true;
 	}
-}
 
-void ControlAllocationPseudoInverse::allocate()
-{
-	//Compute new gains if needed
-	updatePseudoInverse();
+	int numActuators() const override { return NUM_ACTUATORS; };
 
-	// Allocate
-	_actuator_sp = _actuator_trim + _mix * (_control_sp - _control_trim);
+protected:
 
-	// Clip
-	clipActuatorSetpoint(_actuator_sp);
+	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> _effectiveness{};
 
-	// Compute achieved control
-	_control_allocated = _effectiveness * _actuator_sp;
-}
+	bool _updated{false};
+};

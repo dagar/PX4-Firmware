@@ -39,6 +39,8 @@ px4_add_library(ActuatorEffectiveness
 	ActuatorEffectivenessStandardVTOL.hpp
 	ActuatorEffectivenessTiltrotorVTOL.cpp
 	ActuatorEffectivenessTiltrotorVTOL.hpp
+	ActuatorEffectivenessPlane.cpp
+	ActuatorEffectivenessPlane.hpp
 )
 
 target_compile_options(ActuatorEffectiveness PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
@@ -49,4 +51,4 @@ target_link_libraries(ActuatorEffectiveness
 		ControlAllocation
 )
 
-# px4_add_unit_gtest(SRC ActuatorEffectivenessMultirotorTest.cpp LINKLIBS ActuatorEffectiveness)
+px4_add_unit_gtest(SRC ActuatorEffectivenessMultirotorTest.cpp LINKLIBS ActuatorEffectiveness)

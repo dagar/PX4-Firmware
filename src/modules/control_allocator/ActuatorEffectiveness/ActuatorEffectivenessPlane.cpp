@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,42 +32,33 @@
  ****************************************************************************/
 
 /**
- * @file ControlAllocationPseudoInverse.hpp
+ * @file ActuatorEffectivenessPlane.cpp
  *
- * Simple Control Allocation Algorithm
+ * Actuator effectiveness for a plane.
  *
- * @author Julien Lecoeur <julien.lecoeur@gmail.com>
  */
 
-#include "ControlAllocationPseudoInverse.hpp"
+#include "ActuatorEffectivenessPlane.hpp"
 
-void ControlAllocationPseudoInverse::setEffectivenessMatrix(
-	const matrix::Matrix<float, ControlAllocation::NUM_AXES, ControlAllocation::NUM_ACTUATORS> &effectiveness,
-	const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator_trim, int num_actuators)
+ActuatorEffectivenessPlane::ActuatorEffectivenessPlane()
 {
-	ControlAllocation::setEffectivenessMatrix(effectiveness, actuator_trim, num_actuators);
-	_mix_update_needed = true;
+	updateAirspeedScaling(1.f);
 }
 
-void ControlAllocationPseudoInverse::updatePseudoInverse()
+void ActuatorEffectivenessPlane::updateAirspeedScaling(const float airspeed_scaling)
 {
-	if (_mix_update_needed) {
-		_mix = matrix::geninv(_effectiveness);
-		_mix_update_needed = false;
-	}
-}
+	_updated = true;
 
-void ControlAllocationPseudoInverse::allocate()
-{
-	//Compute new gains if needed
-	updatePseudoInverse();
+	const float SC = 1.0f / (airspeed_scaling * airspeed_scaling);
 
-	// Allocate
-	_actuator_sp = _actuator_trim + _mix * (_control_sp - _control_trim);
+	const float B_plane[NUM_AXES][NUM_ACTUATORS] = {
+		{ 0.f, 0.f, 0.f,       0.f, 0.f, -0.5f * SC, 0.5f * SC, 0.f,       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.f, 0.f, 0.f,       0.f, 0.f,  0.f,       0.f,       0.5f * SC, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.f, 0.f, 0.5f * SC, 0.f, 0.f,  0.f,       0.f,       0.f,       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.f, 0.f, 0.f,       0.f, 1.f,  0.f,       0.f,       0.f,       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.f, 0.f, 0.f,       0.f, 0.f,  0.f,       0.f,       0.f,       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.f, 0.f, 0.f,       0.f, 0.f,  0.f,       0.f,       0.f,       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f}
+	};
 
-	// Clip
-	clipActuatorSetpoint(_actuator_sp);
-
-	// Compute achieved control
-	_control_allocated = _effectiveness * _actuator_sp;
+	_effectiveness = matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS>(B_plane);
 }

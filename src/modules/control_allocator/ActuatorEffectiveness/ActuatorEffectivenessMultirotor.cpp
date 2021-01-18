@@ -41,13 +41,7 @@
 
 #include "ActuatorEffectivenessMultirotor.hpp"
 
-ActuatorEffectivenessMultirotor::ActuatorEffectivenessMultirotor():
-	ModuleParams(nullptr)
-{
-}
-
-bool
-ActuatorEffectivenessMultirotor::getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix)
+bool ActuatorEffectivenessMultirotor::getEffectivenessMatrix(Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix)
 {
 	// Check if parameters have changed
 	if (_updated || _parameter_update_sub.updated()) {
@@ -55,82 +49,38 @@ ActuatorEffectivenessMultirotor::getEffectivenessMatrix(matrix::Matrix<float, NU
 		parameter_update_s param_update;
 		_parameter_update_sub.copy(&param_update);
 
-		updateParams();
 		_updated = false;
 
 		// Get multirotor geometry
-		MultirotorGeometry geometry = {};
-		geometry.rotors[0].position_x = _param_ca_mc_r0_px.get();
-		geometry.rotors[0].position_y = _param_ca_mc_r0_py.get();
-		geometry.rotors[0].position_z = _param_ca_mc_r0_pz.get();
-		geometry.rotors[0].axis_x = _param_ca_mc_r0_ax.get();
-		geometry.rotors[0].axis_y = _param_ca_mc_r0_ay.get();
-		geometry.rotors[0].axis_z = _param_ca_mc_r0_az.get();
-		geometry.rotors[0].thrust_coef = _param_ca_mc_r0_ct.get();
-		geometry.rotors[0].moment_ratio = _param_ca_mc_r0_km.get();
+		MultirotorGeometry geometry{};
 
-		geometry.rotors[1].position_x = _param_ca_mc_r1_px.get();
-		geometry.rotors[1].position_y = _param_ca_mc_r1_py.get();
-		geometry.rotors[1].position_z = _param_ca_mc_r1_pz.get();
-		geometry.rotors[1].axis_x = _param_ca_mc_r1_ax.get();
-		geometry.rotors[1].axis_y = _param_ca_mc_r1_ay.get();
-		geometry.rotors[1].axis_z = _param_ca_mc_r1_az.get();
-		geometry.rotors[1].thrust_coef = _param_ca_mc_r1_ct.get();
-		geometry.rotors[1].moment_ratio = _param_ca_mc_r1_km.get();
+		for (int n = 0; n < 16; n++) {
+			char position_str[3][16];
+			char axis_str[3][16];
 
-		geometry.rotors[2].position_x = _param_ca_mc_r2_px.get();
-		geometry.rotors[2].position_y = _param_ca_mc_r2_py.get();
-		geometry.rotors[2].position_z = _param_ca_mc_r2_pz.get();
-		geometry.rotors[2].axis_x = _param_ca_mc_r2_ax.get();
-		geometry.rotors[2].axis_y = _param_ca_mc_r2_ay.get();
-		geometry.rotors[2].axis_z = _param_ca_mc_r2_az.get();
-		geometry.rotors[2].thrust_coef = _param_ca_mc_r2_ct.get();
-		geometry.rotors[2].moment_ratio = _param_ca_mc_r2_km.get();
+			for (int axis = 0; axis < 3; axis++) {
+				char axis_char = 'X' + axis;
+				sprintf(position_str[axis], "CA_MC_R%u_P%c", n, axis_char); // CA_MC_Rn_P{X,Y,Z}
+				sprintf(axis_str[axis],     "CA_MC_R%u_A%c", n, axis_char); // CA_MC_Rn_A{X,Y,Z}
+			}
 
-		geometry.rotors[3].position_x = _param_ca_mc_r3_px.get();
-		geometry.rotors[3].position_y = _param_ca_mc_r3_py.get();
-		geometry.rotors[3].position_z = _param_ca_mc_r3_pz.get();
-		geometry.rotors[3].axis_x = _param_ca_mc_r3_ax.get();
-		geometry.rotors[3].axis_y = _param_ca_mc_r3_ay.get();
-		geometry.rotors[3].axis_z = _param_ca_mc_r3_az.get();
-		geometry.rotors[3].thrust_coef = _param_ca_mc_r3_ct.get();
-		geometry.rotors[3].moment_ratio = _param_ca_mc_r3_km.get();
+			param_get(param_find(position_str[0]), &geometry.rotors[n].position(0));
+			param_get(param_find(position_str[1]), &geometry.rotors[n].position(1));
+			param_get(param_find(position_str[2]), &geometry.rotors[n].position(2));
 
-		geometry.rotors[4].position_x = _param_ca_mc_r4_px.get();
-		geometry.rotors[4].position_y = _param_ca_mc_r4_py.get();
-		geometry.rotors[4].position_z = _param_ca_mc_r4_pz.get();
-		geometry.rotors[4].axis_x = _param_ca_mc_r4_ax.get();
-		geometry.rotors[4].axis_y = _param_ca_mc_r4_ay.get();
-		geometry.rotors[4].axis_z = _param_ca_mc_r4_az.get();
-		geometry.rotors[4].thrust_coef = _param_ca_mc_r4_ct.get();
-		geometry.rotors[4].moment_ratio = _param_ca_mc_r4_km.get();
+			param_get(param_find(axis_str[0]), &geometry.rotors[n].axis(0));
+			param_get(param_find(axis_str[1]), &geometry.rotors[n].axis(1));
+			param_get(param_find(axis_str[2]), &geometry.rotors[n].axis(2));
+			geometry.rotors[n].axis.normalize();
 
-		geometry.rotors[5].position_x = _param_ca_mc_r5_px.get();
-		geometry.rotors[5].position_y = _param_ca_mc_r5_py.get();
-		geometry.rotors[5].position_z = _param_ca_mc_r5_pz.get();
-		geometry.rotors[5].axis_x = _param_ca_mc_r5_ax.get();
-		geometry.rotors[5].axis_y = _param_ca_mc_r5_ay.get();
-		geometry.rotors[5].axis_z = _param_ca_mc_r5_az.get();
-		geometry.rotors[5].thrust_coef = _param_ca_mc_r5_ct.get();
-		geometry.rotors[5].moment_ratio = _param_ca_mc_r5_km.get();
+			char ct_str[16];
+			sprintf(ct_str, "CA_MC_R%u_CT", n); // CA_MC_Rn_CT
+			param_get(param_find(ct_str), &geometry.rotors[n].thrust_coef);
 
-		geometry.rotors[6].position_x = _param_ca_mc_r6_px.get();
-		geometry.rotors[6].position_y = _param_ca_mc_r6_py.get();
-		geometry.rotors[6].position_z = _param_ca_mc_r6_pz.get();
-		geometry.rotors[6].axis_x = _param_ca_mc_r6_ax.get();
-		geometry.rotors[6].axis_y = _param_ca_mc_r6_ay.get();
-		geometry.rotors[6].axis_z = _param_ca_mc_r6_az.get();
-		geometry.rotors[6].thrust_coef = _param_ca_mc_r6_ct.get();
-		geometry.rotors[6].moment_ratio = _param_ca_mc_r6_km.get();
-
-		geometry.rotors[7].position_x = _param_ca_mc_r7_px.get();
-		geometry.rotors[7].position_y = _param_ca_mc_r7_py.get();
-		geometry.rotors[7].position_z = _param_ca_mc_r7_pz.get();
-		geometry.rotors[7].axis_x = _param_ca_mc_r7_ax.get();
-		geometry.rotors[7].axis_y = _param_ca_mc_r7_ay.get();
-		geometry.rotors[7].axis_z = _param_ca_mc_r7_az.get();
-		geometry.rotors[7].thrust_coef = _param_ca_mc_r7_ct.get();
-		geometry.rotors[7].moment_ratio = _param_ca_mc_r7_km.get();
+			char km_str[16];
+			sprintf(km_str, "CA_MC_R%u_KM", n); // CA_MC_Rn_KM
+			param_get(param_find(km_str), &geometry.rotors[n].moment_ratio);
+		}
 
 		_num_actuators = computeEffectivenessMatrix(geometry, matrix);
 		return true;
@@ -139,53 +89,27 @@ ActuatorEffectivenessMultirotor::getEffectivenessMatrix(matrix::Matrix<float, NU
 	return false;
 }
 
-int
-ActuatorEffectivenessMultirotor::computeEffectivenessMatrix(const MultirotorGeometry &geometry,
-		matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &effectiveness)
+int ActuatorEffectivenessMultirotor::computeEffectivenessMatrix(const MultirotorGeometry &geometry,
+		Matrix<float, NUM_AXES, NUM_ACTUATORS> &effectiveness)
 {
 	int num_actuators = 0;
 
 	effectiveness.setZero();
 
 	for (size_t i = 0; i < NUM_ROTORS_MAX; i++) {
-		// Get rotor axis
-		matrix::Vector3f axis(
-			geometry.rotors[i].axis_x,
-			geometry.rotors[i].axis_y,
-			geometry.rotors[i].axis_z
-		);
-
-		// Normalize axis
-		float axis_norm = axis.norm();
-
-		if (axis_norm > FLT_EPSILON) {
-			axis /= axis_norm;
-
-		} else {
-			// Bad axis definition, ignore this rotor
-			continue;
-		}
-
-		// Get rotor position
-		matrix::Vector3f position(
-			geometry.rotors[i].position_x,
-			geometry.rotors[i].position_y,
-			geometry.rotors[i].position_z
-		);
-
 		// Get coefficients
-		float ct = geometry.rotors[i].thrust_coef;
-		float km = geometry.rotors[i].moment_ratio;
+		const float ct = geometry.rotors[i].thrust_coef;
+		const float km = geometry.rotors[i].moment_ratio;
 
 		if (fabsf(ct) < FLT_EPSILON) {
 			continue;
 		}
 
 		// Compute thrust generated by this rotor
-		matrix::Vector3f thrust = ct * axis;
+		Vector3f thrust{ct *geometry.rotors[i].axis};
 
 		// Compute moment generated by this rotor
-		matrix::Vector3f moment = ct * position.cross(axis) - ct * km * axis;
+		Vector3f moment{ct *geometry.rotors[i].position.cross(geometry.rotors[i].axis) - ct *km *geometry.rotors[i].axis};
 
 		// Fill corresponding items in effectiveness matrix
 		for (size_t j = 0; j < 3; j++) {

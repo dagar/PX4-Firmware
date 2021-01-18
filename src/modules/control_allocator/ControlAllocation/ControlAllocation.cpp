@@ -41,8 +41,7 @@
 
 #include "ControlAllocation.hpp"
 
-void
-ControlAllocation::setEffectivenessMatrix(
+void ControlAllocation::setEffectivenessMatrix(
 	const matrix::Matrix<float, ControlAllocation::NUM_AXES, ControlAllocation::NUM_ACTUATORS> &effectiveness,
 	const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator_trim, int num_actuators)
 {
@@ -58,9 +57,7 @@ ControlAllocation::setEffectivenessMatrix(
 	}
 }
 
-void
-ControlAllocation::setActuatorSetpoint(
-	const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator_sp)
+void ControlAllocation::setActuatorSetpoint(const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator_sp)
 {
 	// Set actuator setpoint
 	_actuator_sp = actuator_sp;
@@ -70,11 +67,9 @@ ControlAllocation::setActuatorSetpoint(
 
 	// Compute achieved control
 	_control_allocated = _effectiveness * _actuator_sp;
-
 }
 
-void
-ControlAllocation::clipActuatorSetpoint(matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator) const
+void ControlAllocation::clipActuatorSetpoint(matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator) const
 {
 	for (int i = 0; i < _num_actuators; i++) {
 		if (_actuator_max(i) < _actuator_min(i)) {
@@ -97,10 +92,10 @@ const
 
 	for (size_t i = 0; i < ControlAllocation::NUM_ACTUATORS; i++) {
 		if (_actuator_min(i) < _actuator_max(i)) {
-			actuator_normalized(i) = -1.0f + 2.0f * (actuator(i) - _actuator_min(i)) / (_actuator_max(i) - _actuator_min(i));
+			actuator_normalized(i) = -1.f + 2.f * (actuator(i) - _actuator_min(i)) / (_actuator_max(i) - _actuator_min(i));
 
 		} else {
-			actuator_normalized(i) = -1.0f + 2.0f * (_actuator_trim(i) - _actuator_min(i)) / (_actuator_max(i) - _actuator_min(i));
+			actuator_normalized(i) = -1.f + 2.f * (_actuator_trim(i) - _actuator_min(i)) / (_actuator_max(i) - _actuator_min(i));
 		}
 	}
 

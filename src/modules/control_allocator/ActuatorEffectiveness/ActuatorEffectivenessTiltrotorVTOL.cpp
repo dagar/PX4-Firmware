@@ -45,8 +45,8 @@ ActuatorEffectivenessTiltrotorVTOL::ActuatorEffectivenessTiltrotorVTOL()
 {
 	setFlightPhase(FlightPhase::HOVER_FLIGHT);
 }
-bool
-ActuatorEffectivenessTiltrotorVTOL::getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix)
+
+bool ActuatorEffectivenessTiltrotorVTOL::getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix)
 {
 	if (!_updated) {
 		return false;
@@ -56,7 +56,7 @@ ActuatorEffectivenessTiltrotorVTOL::getEffectivenessMatrix(matrix::Matrix<float,
 	float tilt = 0.0f;
 
 	switch (_flight_phase) {
-	case FlightPhase::HOVER_FLIGHT:  {
+	case FlightPhase::HOVER_FLIGHT: {
 			tilt = 0.0f;
 			break;
 		}
@@ -84,13 +84,13 @@ ActuatorEffectivenessTiltrotorVTOL::getEffectivenessMatrix(matrix::Matrix<float,
 	_trim(7) = tilt;
 
 	// Effectiveness
-	const float tiltrotor_vtol[NUM_AXES][NUM_ACTUATORS] = {
-		{-0.5f * cosf(_trim(4)),  0.5f * cosf(_trim(5)),  0.5f * cosf(_trim(6)), -0.5f * cosf(_trim(7)), 0.5f * _trim(0) *sinf(_trim(4)), -0.5f * _trim(1) *sinf(_trim(5)), -0.5f * _trim(2) *sinf(_trim(6)), 0.5f * _trim(3) *sinf(_trim(7)), -0.5f, 0.5f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
-		{ 0.5f * cosf(_trim(4)), -0.5f * cosf(_trim(5)),  0.5f * cosf(_trim(6)), -0.5f * cosf(_trim(7)), -0.5f * _trim(0) *sinf(_trim(4)),  0.5f * _trim(1) *sinf(_trim(5)), -0.5f * _trim(2) *sinf(_trim(6)), 0.5f * _trim(3) *sinf(_trim(7)), 0.f, 0.f, 0.5f, 0.f, 0.f, 0.f, 0.f, 0.f},
-		{-0.5f * sinf(_trim(4)),  0.5f * sinf(_trim(5)),  0.5f * sinf(_trim(6)), -0.5f * sinf(_trim(7)), -0.5f * _trim(0) *cosf(_trim(4)), 0.5f * _trim(1) *cosf(_trim(5)), 0.5f * _trim(2) *cosf(_trim(6)), -0.5f * _trim(3) *cosf(_trim(7)), 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
-		{ 0.25f * sinf(_trim(4)), 0.25f * sinf(_trim(5)), 0.25f * sinf(_trim(6)), 0.25f * sinf(_trim(7)), 0.25f * _trim(0) *cosf(_trim(4)), 0.25f * _trim(1) *cosf(_trim(5)), 0.25f * _trim(2) *cosf(_trim(6)), 0.25f * _trim(3) *cosf(_trim(7)), 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
-		{ 0.f,  0.f,  0.f,  0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
-		{-0.25f * cosf(_trim(4)), -0.25f * cosf(_trim(5)), -0.25f * cosf(_trim(6)), -0.25f * cosf(_trim(7)), 0.25f * _trim(0) *sinf(_trim(4)), 0.25f * _trim(1) *sinf(_trim(5)), 0.25f * _trim(2) *sinf(_trim(6)), 0.25f * _trim(3) *sinf(_trim(7)), 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f}
+	const float tiltrotor_vtol[NUM_AXES][NUM_ACTUATORS] {
+		{-0.5f  * cosf(_trim(4)),  0.5f  * cosf(_trim(5)),  0.5f  * cosf(_trim(6)), -0.5f  * cosf(_trim(7)),  0.5f  * _trim(0) *sinf(_trim(4)), -0.5f  * _trim(1) *sinf(_trim(5)), -0.5f  * _trim(2) *sinf(_trim(6)),  0.5f  * _trim(3) *sinf(_trim(7)), -0.5f, 0.5f, 0.f,  0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.5f  * cosf(_trim(4)), -0.5f  * cosf(_trim(5)),  0.5f  * cosf(_trim(6)), -0.5f  * cosf(_trim(7)), -0.5f  * _trim(0) *sinf(_trim(4)),  0.5f  * _trim(1) *sinf(_trim(5)), -0.5f  * _trim(2) *sinf(_trim(6)),  0.5f  * _trim(3) *sinf(_trim(7)),  0.f,  0.f,  0.5f, 0.f, 0.f, 0.f, 0.f, 0.f},
+		{-0.5f  * sinf(_trim(4)),  0.5f  * sinf(_trim(5)),  0.5f  * sinf(_trim(6)), -0.5f  * sinf(_trim(7)), -0.5f  * _trim(0) *cosf(_trim(4)),  0.5f  * _trim(1) *cosf(_trim(5)),  0.5f  * _trim(2) *cosf(_trim(6)), -0.5f  * _trim(3) *cosf(_trim(7)),  0.f,  0.f,  0.f,  0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.25f * sinf(_trim(4)),  0.25f * sinf(_trim(5)),  0.25f * sinf(_trim(6)),  0.25f * sinf(_trim(7)),  0.25f * _trim(0) *cosf(_trim(4)),  0.25f * _trim(1) *cosf(_trim(5)),  0.25f * _trim(2) *cosf(_trim(6)),  0.25f * _trim(3) *cosf(_trim(7)),  0.f,  0.f,  0.f,  0.f, 0.f, 0.f, 0.f, 0.f},
+		{ 0.f,                     0.f,                     0.f,                     0.f,                     0.f,                               0.f,                               0.f,                               0.f,                               0.f,  0.f,  0.f,  0.f, 0.f, 0.f, 0.f, 0.f},
+		{-0.25f * cosf(_trim(4)), -0.25f * cosf(_trim(5)), -0.25f * cosf(_trim(6)), -0.25f * cosf(_trim(7)),  0.25f * _trim(0) *sinf(_trim(4)),  0.25f * _trim(1) *sinf(_trim(5)),  0.25f * _trim(2) *sinf(_trim(6)),  0.25f * _trim(3) *sinf(_trim(7)),  0.f,  0.f,  0.f,  0.f, 0.f, 0.f, 0.f, 0.f}
 	};
 	matrix = matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS>(tiltrotor_vtol);
 
@@ -101,13 +101,11 @@ ActuatorEffectivenessTiltrotorVTOL::getEffectivenessMatrix(matrix::Matrix<float,
 		matrix(5, j) = 0.0f;
 	}
 
-
 	_updated = false;
 	return true;
 }
 
-void
-ActuatorEffectivenessTiltrotorVTOL::setFlightPhase(const FlightPhase &flight_phase)
+void ActuatorEffectivenessTiltrotorVTOL::setFlightPhase(const FlightPhase &flight_phase)
 {
 	ActuatorEffectiveness::setFlightPhase(flight_phase);
 

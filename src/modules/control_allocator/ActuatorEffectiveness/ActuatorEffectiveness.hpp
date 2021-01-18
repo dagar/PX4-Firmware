@@ -72,6 +72,8 @@ public:
 		_flight_phase = flight_phase;
 	}
 
+	virtual void updateAirspeedScaling(const float airspeed_scaling) {};
+
 	/**
 	 * Get the control effectiveness matrix if updated
 	 *
