@@ -47,7 +47,7 @@ class ActuatorEffectivenessTiltrotorVTOL: public ActuatorEffectiveness
 {
 public:
 	ActuatorEffectivenessTiltrotorVTOL();
-	virtual ~ActuatorEffectivenessTiltrotorVTOL() = default;
+	~ActuatorEffectivenessTiltrotorVTOL() override = default;
 
 	bool getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix) override;
 
@@ -59,6 +59,7 @@ public:
 	void setFlightPhase(const FlightPhase &flight_phase) override;
 
 	int numActuators() const override { return 10; }
+
 protected:
 	bool _updated{true};
 };

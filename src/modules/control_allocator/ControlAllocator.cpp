@@ -235,8 +235,7 @@ ControlAllocator::update_effectiveness_source()
 	}
 }
 
-void
-ControlAllocator::Run()
+void ControlAllocator::Run()
 {
 	if (should_exit()) {
 		_vehicle_torque_setpoint_sub.unregisterCallback();

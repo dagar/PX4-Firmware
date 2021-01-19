@@ -40,9 +40,7 @@
 
 #include "ControlAllocationSequentialDesaturation.hpp"
 
-
-void
-ControlAllocationSequentialDesaturation::allocate()
+void ControlAllocationSequentialDesaturation::allocate()
 {
 	//Compute new gains if needed
 	updatePseudoInverse();
@@ -70,9 +68,8 @@ ControlAllocationSequentialDesaturation::allocate()
 	_control_allocated = _effectiveness * _actuator_sp;
 }
 
-void ControlAllocationSequentialDesaturation::desaturateActuators(
-	ActuatorVector &actuator_sp,
-	const ActuatorVector &desaturation_vector, bool increase_only)
+void ControlAllocationSequentialDesaturation::desaturateActuators(ActuatorVector &actuator_sp,
+		const ActuatorVector &desaturation_vector, bool increase_only)
 {
 	float gain = computeDesaturationGain(desaturation_vector, actuator_sp);
 
@@ -124,8 +121,7 @@ float ControlAllocationSequentialDesaturation::computeDesaturationGain(const Act
 	return k_min + k_max;
 }
 
-void
-ControlAllocationSequentialDesaturation::mixAirmodeRP()
+void ControlAllocationSequentialDesaturation::mixAirmodeRP()
 {
 	// Airmode for roll and pitch, but not yaw
 
@@ -134,11 +130,12 @@ ControlAllocationSequentialDesaturation::mixAirmodeRP()
 
 	for (int i = 0; i < _num_actuators; i++) {
 		_actuator_sp(i) = _actuator_trim(i) +
-				  _mix(i, ControlAxis::ROLL) * (_control_sp(ControlAxis::ROLL) - _control_trim(ControlAxis::ROLL)) +
-				  _mix(i, ControlAxis::PITCH) * (_control_sp(ControlAxis::PITCH) - _control_trim(ControlAxis::PITCH)) +
+				  _mix(i, ControlAxis::ROLL)     * (_control_sp(ControlAxis::ROLL)     - _control_trim(ControlAxis::ROLL))     +
+				  _mix(i, ControlAxis::PITCH)    * (_control_sp(ControlAxis::PITCH)    - _control_trim(ControlAxis::PITCH))    +
 				  _mix(i, ControlAxis::THRUST_X) * (_control_sp(ControlAxis::THRUST_X) - _control_trim(ControlAxis::THRUST_X)) +
 				  _mix(i, ControlAxis::THRUST_Y) * (_control_sp(ControlAxis::THRUST_Y) - _control_trim(ControlAxis::THRUST_Y)) +
 				  _mix(i, ControlAxis::THRUST_Z) * (_control_sp(ControlAxis::THRUST_Z) - _control_trim(ControlAxis::THRUST_Z));
+
 		thrust_z(i) = _mix(i, ControlAxis::THRUST_Z);
 	}
 
@@ -148,8 +145,7 @@ ControlAllocationSequentialDesaturation::mixAirmodeRP()
 	mixYaw();
 }
 
-void
-ControlAllocationSequentialDesaturation::mixAirmodeRPY()
+void ControlAllocationSequentialDesaturation::mixAirmodeRPY()
 {
 	// Airmode for roll, pitch and yaw
 
@@ -159,14 +155,15 @@ ControlAllocationSequentialDesaturation::mixAirmodeRPY()
 
 	for (int i = 0; i < _num_actuators; i++) {
 		_actuator_sp(i) = _actuator_trim(i) +
-				  _mix(i, ControlAxis::ROLL) * (_control_sp(ControlAxis::ROLL) - _control_trim(ControlAxis::ROLL)) +
-				  _mix(i, ControlAxis::PITCH) * (_control_sp(ControlAxis::PITCH) - _control_trim(ControlAxis::PITCH)) +
-				  _mix(i, ControlAxis::YAW) * (_control_sp(ControlAxis::YAW) - _control_trim(ControlAxis::YAW)) +
+				  _mix(i, ControlAxis::ROLL)     * (_control_sp(ControlAxis::ROLL)     - _control_trim(ControlAxis::ROLL))     +
+				  _mix(i, ControlAxis::PITCH)    * (_control_sp(ControlAxis::PITCH)    - _control_trim(ControlAxis::PITCH))    +
+				  _mix(i, ControlAxis::YAW)      * (_control_sp(ControlAxis::YAW)      - _control_trim(ControlAxis::YAW))      +
 				  _mix(i, ControlAxis::THRUST_X) * (_control_sp(ControlAxis::THRUST_X) - _control_trim(ControlAxis::THRUST_X)) +
 				  _mix(i, ControlAxis::THRUST_Y) * (_control_sp(ControlAxis::THRUST_Y) - _control_trim(ControlAxis::THRUST_Y)) +
 				  _mix(i, ControlAxis::THRUST_Z) * (_control_sp(ControlAxis::THRUST_Z) - _control_trim(ControlAxis::THRUST_Z));
+
 		thrust_z(i) = _mix(i, ControlAxis::THRUST_Z);
-		yaw(i) = _mix(i, ControlAxis::YAW);
+		yaw(i)      = _mix(i, ControlAxis::YAW);
 	}
 
 	desaturateActuators(_actuator_sp, thrust_z);
@@ -176,8 +173,7 @@ ControlAllocationSequentialDesaturation::mixAirmodeRPY()
 	desaturateActuators(_actuator_sp, yaw);
 }
 
-void
-ControlAllocationSequentialDesaturation::mixAirmodeDisabled()
+void ControlAllocationSequentialDesaturation::mixAirmodeDisabled()
 {
 	// Airmode disabled: never allow to increase the thrust to unsaturate a motor
 
@@ -188,14 +184,15 @@ ControlAllocationSequentialDesaturation::mixAirmodeDisabled()
 
 	for (int i = 0; i < _num_actuators; i++) {
 		_actuator_sp(i) = _actuator_trim(i) +
-				  _mix(i, ControlAxis::ROLL) * (_control_sp(ControlAxis::ROLL) - _control_trim(ControlAxis::ROLL)) +
-				  _mix(i, ControlAxis::PITCH) * (_control_sp(ControlAxis::PITCH) - _control_trim(ControlAxis::PITCH)) +
+				  _mix(i, ControlAxis::ROLL)     * (_control_sp(ControlAxis::ROLL)     - _control_trim(ControlAxis::ROLL))     +
+				  _mix(i, ControlAxis::PITCH)    * (_control_sp(ControlAxis::PITCH)    - _control_trim(ControlAxis::PITCH))    +
 				  _mix(i, ControlAxis::THRUST_X) * (_control_sp(ControlAxis::THRUST_X) - _control_trim(ControlAxis::THRUST_X)) +
 				  _mix(i, ControlAxis::THRUST_Y) * (_control_sp(ControlAxis::THRUST_Y) - _control_trim(ControlAxis::THRUST_Y)) +
 				  _mix(i, ControlAxis::THRUST_Z) * (_control_sp(ControlAxis::THRUST_Z) - _control_trim(ControlAxis::THRUST_Z));
+
 		thrust_z(i) = _mix(i, ControlAxis::THRUST_Z);
-		roll(i) = _mix(i, ControlAxis::ROLL);
-		pitch(i) = _mix(i, ControlAxis::PITCH);
+		roll(i)     = _mix(i, ControlAxis::ROLL);
+		pitch(i)    = _mix(i, ControlAxis::PITCH);
 	}
 
 	// only reduce thrust
@@ -209,8 +206,7 @@ ControlAllocationSequentialDesaturation::mixAirmodeDisabled()
 	mixYaw();
 }
 
-void
-ControlAllocationSequentialDesaturation::mixYaw()
+void ControlAllocationSequentialDesaturation::mixYaw()
 {
 	// Add yaw to outputs
 	ActuatorVector yaw;
@@ -218,7 +214,8 @@ ControlAllocationSequentialDesaturation::mixYaw()
 
 	for (int i = 0; i < _num_actuators; i++) {
 		_actuator_sp(i) += _mix(i, ControlAxis::YAW) * (_control_sp(ControlAxis::YAW) - _control_trim(ControlAxis::YAW));
-		yaw(i) = _mix(i, ControlAxis::YAW);
+
+		yaw(i)      = _mix(i, ControlAxis::YAW);
 		thrust_z(i) = _mix(i, ControlAxis::THRUST_Z);
 	}
 
@@ -233,8 +230,7 @@ ControlAllocationSequentialDesaturation::mixYaw()
 	desaturateActuators(_actuator_sp, thrust_z, true);
 }
 
-void
-ControlAllocationSequentialDesaturation::updateParameters()
+void ControlAllocationSequentialDesaturation::updateParameters()
 {
 	updateParams();
 }
