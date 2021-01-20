@@ -51,8 +51,7 @@ using namespace time_literals;
 
 ControlAllocator::ControlAllocator() :
 	ModuleParams(nullptr),
-	WorkItem(MODULE_NAME, px4::wq_configurations::ctrl_alloc),
-	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
+	WorkItem(MODULE_NAME, px4::wq_configurations::ctrl_alloc)
 {
 	parameters_updated();
 }
@@ -65,8 +64,7 @@ ControlAllocator::~ControlAllocator()
 	perf_free(_loop_perf);
 }
 
-bool
-ControlAllocator::init()
+bool ControlAllocator::init()
 {
 	if (!_vehicle_torque_setpoint_sub.registerCallback()) {
 		PX4_ERR("vehicle_torque_setpoint callback registration failed!");
@@ -81,8 +79,7 @@ ControlAllocator::init()
 	return true;
 }
 
-void
-ControlAllocator::parameters_updated()
+void ControlAllocator::parameters_updated()
 {
 	// Allocation method & effectiveness source
 	// Do this first: in case a new method is loaded, it will be configured below
@@ -93,56 +90,31 @@ ControlAllocator::parameters_updated()
 		return;
 	}
 
-	// Minimum actuator values
-	matrix::Vector<float, NUM_ACTUATORS> actuator_min;
-	actuator_min(0) = _param_ca_act0_min.get();
-	actuator_min(1) = _param_ca_act1_min.get();
-	actuator_min(2) = _param_ca_act2_min.get();
-	actuator_min(3) = _param_ca_act3_min.get();
-	actuator_min(4) = _param_ca_act4_min.get();
-	actuator_min(5) = _param_ca_act5_min.get();
-	actuator_min(6) = _param_ca_act6_min.get();
-	actuator_min(7) = _param_ca_act7_min.get();
-	actuator_min(8) = _param_ca_act8_min.get();
-	actuator_min(9) = _param_ca_act9_min.get();
-	actuator_min(10) = _param_ca_act10_min.get();
-	actuator_min(11) = _param_ca_act11_min.get();
-	actuator_min(12) = _param_ca_act12_min.get();
-	actuator_min(13) = _param_ca_act13_min.get();
-	actuator_min(14) = _param_ca_act14_min.get();
-	actuator_min(15) = _param_ca_act15_min.get();
-	_control_allocation->setActuatorMin(actuator_min);
+	Vector<float, NUM_ACTUATORS> actuator_min; // Minimum actuator values
+	Vector<float, NUM_ACTUATORS> actuator_max; // Maximum actuator values
 
-	// Maximum actuator values
-	matrix::Vector<float, NUM_ACTUATORS> actuator_max;
-	actuator_max(0) = _param_ca_act0_max.get();
-	actuator_max(1) = _param_ca_act1_max.get();
-	actuator_max(2) = _param_ca_act2_max.get();
-	actuator_max(3) = _param_ca_act3_max.get();
-	actuator_max(4) = _param_ca_act4_max.get();
-	actuator_max(5) = _param_ca_act5_max.get();
-	actuator_max(6) = _param_ca_act6_max.get();
-	actuator_max(7) = _param_ca_act7_max.get();
-	actuator_max(8) = _param_ca_act8_max.get();
-	actuator_max(9) = _param_ca_act9_max.get();
-	actuator_max(10) = _param_ca_act10_max.get();
-	actuator_max(11) = _param_ca_act11_max.get();
-	actuator_max(12) = _param_ca_act12_max.get();
-	actuator_max(13) = _param_ca_act13_max.get();
-	actuator_max(14) = _param_ca_act14_max.get();
-	actuator_max(15) = _param_ca_act15_max.get();
+	for (int n = 0; n < 16; n++) {
+		char min_str[16];
+		sprintf(min_str, "CA_ACT%u_MIN", n);
+		param_get(param_find(min_str), &actuator_min(n));
+
+		char max_str[16];
+		sprintf(max_str, "CA_ACT%u_MAX", n);
+		param_get(param_find(max_str), &actuator_max(n));
+	}
+
+	_control_allocation->setActuatorMin(actuator_min);
 	_control_allocation->setActuatorMax(actuator_max);
 }
 
-void
-ControlAllocator::update_allocation_method()
+void ControlAllocator::update_allocation_method()
 {
 	AllocationMethod method = (AllocationMethod)_param_ca_method.get();
 
 	if (_allocation_method_id != method) {
 
 		// Save current state
-		matrix::Vector<float, NUM_ACTUATORS> actuator_sp;
+		Vector<float, NUM_ACTUATORS> actuator_sp;
 
 		if (_control_allocation != nullptr) {
 			actuator_sp = _control_allocation->getActuatorSetpoint();
@@ -185,8 +157,7 @@ ControlAllocator::update_allocation_method()
 	}
 }
 
-void
-ControlAllocator::update_effectiveness_source()
+void ControlAllocator::update_effectiveness_source()
 {
 	EffectivenessSource source = (EffectivenessSource)_param_ca_airframe.get();
 
@@ -308,22 +279,23 @@ void ControlAllocator::Run()
 	const float dt = math::constrain(((now - _last_run) / 1e6f), 0.0002f, 0.02f);
 
 	bool do_update = false;
-	vehicle_torque_setpoint_s vehicle_torque_setpoint;
-	vehicle_thrust_setpoint_s vehicle_thrust_setpoint;
 
 	// Run allocator on torque changes
+	vehicle_torque_setpoint_s vehicle_torque_setpoint;
+
 	if (_vehicle_torque_setpoint_sub.update(&vehicle_torque_setpoint)) {
-		_torque_sp = matrix::Vector3f(vehicle_torque_setpoint.xyz);
+		_torque_sp = Vector3f(vehicle_torque_setpoint.xyz);
 
 		do_update = true;
 		_timestamp_sample = vehicle_torque_setpoint.timestamp_sample;
-
 	}
 
 	// Also run allocator on thrust setpoint changes if the torque setpoint
 	// has not been updated for more than 5ms
+	vehicle_thrust_setpoint_s vehicle_thrust_setpoint;
+
 	if (_vehicle_thrust_setpoint_sub.update(&vehicle_thrust_setpoint)) {
-		_thrust_sp = matrix::Vector3f(vehicle_thrust_setpoint.xyz);
+		_thrust_sp = Vector3f(vehicle_thrust_setpoint.xyz);
 
 		if (dt > 5_ms) {
 			do_update = true;
@@ -337,7 +309,7 @@ void ControlAllocator::Run()
 		update_effectiveness_matrix_if_needed();
 
 		// Set control setpoint vector
-		matrix::Vector<float, NUM_AXES> c;
+		Vector<float, NUM_AXES> c;
 		c(0) = _torque_sp(0);
 		c(1) = _torque_sp(1);
 		c(2) = _torque_sp(2);
@@ -365,14 +337,14 @@ void ControlAllocator::Run()
 void
 ControlAllocator::update_effectiveness_matrix_if_needed()
 {
-	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> effectiveness;
+	Matrix<float, NUM_AXES, NUM_ACTUATORS> effectiveness;
 
 	if (_actuator_effectiveness->getEffectivenessMatrix(effectiveness)) {
-		const matrix::Vector<float, NUM_ACTUATORS> &trim = _actuator_effectiveness->getActuatorTrim();
+		const Vector<float, NUM_ACTUATORS> &trim = _actuator_effectiveness->getActuatorTrim();
 
 		// Set 0 effectiveness for actuators that are disabled (act_min >= act_max)
-		matrix::Vector<float, NUM_ACTUATORS> actuator_max = _control_allocation->getActuatorMax();
-		matrix::Vector<float, NUM_ACTUATORS> actuator_min = _control_allocation->getActuatorMin();
+		Vector<float, NUM_ACTUATORS> actuator_max = _control_allocation->getActuatorMax();
+		Vector<float, NUM_ACTUATORS> actuator_min = _control_allocation->getActuatorMin();
 
 		for (size_t j = 0; j < NUM_ACTUATORS; j++) {
 			if (actuator_min(j) >= actuator_max(j)) {
@@ -387,27 +359,23 @@ ControlAllocator::update_effectiveness_matrix_if_needed()
 	}
 }
 
-void
-ControlAllocator::publish_actuator_setpoint()
+void ControlAllocator::publish_actuator_setpoint()
 {
-	matrix::Vector<float, NUM_ACTUATORS> actuator_sp = _control_allocation->getActuatorSetpoint();
+	Vector<float, NUM_ACTUATORS> actuator_sp = _control_allocation->getActuatorSetpoint();
 
 	vehicle_actuator_setpoint_s vehicle_actuator_setpoint{};
-	vehicle_actuator_setpoint.timestamp = hrt_absolute_time();
 	vehicle_actuator_setpoint.timestamp_sample = _timestamp_sample;
 	actuator_sp.copyTo(vehicle_actuator_setpoint.actuator);
-
+	vehicle_actuator_setpoint.timestamp = hrt_absolute_time();
 	_vehicle_actuator_setpoint_pub.publish(vehicle_actuator_setpoint);
 }
 
-void
-ControlAllocator::publish_control_allocator_status()
+void ControlAllocator::publish_control_allocator_status()
 {
 	control_allocator_status_s control_allocator_status{};
-	control_allocator_status.timestamp = hrt_absolute_time();
 
 	// Allocated control
-	const matrix::Vector<float, NUM_AXES> &allocated_control = _control_allocation->getAllocatedControl();
+	const Vector<float, NUM_AXES> &allocated_control = _control_allocation->getAllocatedControl();
 	control_allocator_status.allocated_torque[0] = allocated_control(0);
 	control_allocator_status.allocated_torque[1] = allocated_control(1);
 	control_allocator_status.allocated_torque[2] = allocated_control(2);
@@ -416,7 +384,7 @@ ControlAllocator::publish_control_allocator_status()
 	control_allocator_status.allocated_thrust[2] = allocated_control(5);
 
 	// Unallocated control
-	matrix::Vector<float, NUM_AXES> unallocated_control = _control_allocation->getControlSetpoint() - allocated_control;
+	const Vector<float, NUM_AXES> unallocated_control = _control_allocation->getControlSetpoint() - allocated_control;
 	control_allocator_status.unallocated_torque[0] = unallocated_control(0);
 	control_allocator_status.unallocated_torque[1] = unallocated_control(1);
 	control_allocator_status.unallocated_torque[2] = unallocated_control(2);
@@ -425,15 +393,18 @@ ControlAllocator::publish_control_allocator_status()
 	control_allocator_status.unallocated_thrust[2] = unallocated_control(5);
 
 	// Allocation success flags
-	control_allocator_status.torque_setpoint_achieved = (Vector3f(unallocated_control(0), unallocated_control(1),
-			unallocated_control(2)).norm_squared() < 1e-6f);
-	control_allocator_status.thrust_setpoint_achieved = (Vector3f(unallocated_control(3), unallocated_control(4),
-			unallocated_control(5)).norm_squared() < 1e-6f);
+	if (Vector3f(unallocated_control(0), unallocated_control(1), unallocated_control(2)).norm_squared() < 1e-6f) {
+		control_allocator_status.torque_setpoint_achieved = true;
+	}
+
+	if (Vector3f(unallocated_control(3), unallocated_control(4), unallocated_control(5)).norm_squared() < 1e-6f) {
+		control_allocator_status.thrust_setpoint_achieved = true;
+	}
 
 	// Actuator saturation
-	const matrix::Vector<float, NUM_ACTUATORS> &actuator_sp = _control_allocation->getActuatorSetpoint();
-	const matrix::Vector<float, NUM_ACTUATORS> &actuator_min = _control_allocation->getActuatorMin();
-	const matrix::Vector<float, NUM_ACTUATORS> &actuator_max = _control_allocation->getActuatorMax();
+	const Vector<float, NUM_ACTUATORS> &actuator_sp = _control_allocation->getActuatorSetpoint();
+	const Vector<float, NUM_ACTUATORS> &actuator_min = _control_allocation->getActuatorMin();
+	const Vector<float, NUM_ACTUATORS> &actuator_max = _control_allocation->getActuatorMax();
 
 	for (size_t i = 0; i < NUM_ACTUATORS; i++) {
 		if (actuator_sp(i) > (actuator_max(i) - FLT_EPSILON)) {
@@ -444,6 +415,7 @@ ControlAllocator::publish_control_allocator_status()
 		}
 	}
 
+	control_allocator_status.timestamp = hrt_absolute_time();
 	_control_allocator_status_pub.publish(control_allocator_status);
 }
 
@@ -454,21 +426,21 @@ ControlAllocator::publish_legacy_actuator_controls()
 	// publish normalized version on actuator_controls_4/5
 	actuator_controls_s actuator_controls_4{};
 	actuator_controls_s actuator_controls_5{};
-	actuator_controls_4.timestamp = hrt_absolute_time();
-	actuator_controls_5.timestamp = hrt_absolute_time();
 	actuator_controls_4.timestamp_sample = _timestamp_sample;
 	actuator_controls_5.timestamp_sample = _timestamp_sample;
 
-	matrix::Vector<float, NUM_ACTUATORS> actuator_sp = _control_allocation->getActuatorSetpoint();
-	matrix::Vector<float, NUM_ACTUATORS> actuator_sp_normalized = _control_allocation->normalizeActuatorSetpoint(
-				actuator_sp);
+	Vector<float, NUM_ACTUATORS> actuator_sp = _control_allocation->getActuatorSetpoint();
+	Vector<float, NUM_ACTUATORS> actuator_sp_normalized = _control_allocation->normalizeActuatorSetpoint(actuator_sp);
 
 	for (size_t i = 0; i < 8; i++) {
 		actuator_controls_4.control[i] = (PX4_ISFINITE(actuator_sp_normalized(i))) ? actuator_sp_normalized(i) : 0.0f;
 		actuator_controls_5.control[i] = (PX4_ISFINITE(actuator_sp_normalized(i + 8))) ? actuator_sp_normalized(i + 8) : 0.0f;
 	}
 
+	actuator_controls_4.timestamp = hrt_absolute_time();
 	_actuator_controls_4_pub.publish(actuator_controls_4);
+
+	actuator_controls_5.timestamp = hrt_absolute_time();
 	_actuator_controls_5_pub.publish(actuator_controls_5);
 }
 
@@ -539,7 +511,7 @@ int ControlAllocator::print_status()
 
 	// Print current effectiveness matrix
 	if (_control_allocation != nullptr) {
-		const matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &effectiveness = _control_allocation->getEffectivenessMatrix();
+		const Matrix<float, NUM_AXES, NUM_ACTUATORS> &effectiveness = _control_allocation->getEffectivenessMatrix();
 		PX4_INFO("Effectiveness.T =");
 		effectiveness.T().print();
 		PX4_INFO("Configured actuators: %i", _control_allocation->numConfiguredActuators());
@@ -576,12 +548,7 @@ as inputs and outputs actuator setpoint messages.
 	return 0;
 }
 
-/**
- * Control Allocator app start / stop handling function
- */
-extern "C" __EXPORT int control_allocator_main(int argc, char *argv[]);
-
-int control_allocator_main(int argc, char *argv[])
+extern "C" __EXPORT int control_allocator_main(int argc, char *argv[])
 {
 	return ControlAllocator::main(argc, argv);
 }
