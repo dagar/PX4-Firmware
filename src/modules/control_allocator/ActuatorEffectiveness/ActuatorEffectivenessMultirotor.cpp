@@ -41,6 +41,8 @@
 
 #include "ActuatorEffectivenessMultirotor.hpp"
 
+#include <lib/parameters/param.h>
+
 bool ActuatorEffectivenessMultirotor::getEffectivenessMatrix(Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix)
 {
 	// Check if parameters have changed

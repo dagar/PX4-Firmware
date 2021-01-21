@@ -208,12 +208,15 @@ public:
 
 protected:
 	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> _effectiveness;  //< Effectiveness matrix
+
 	matrix::Vector<float, NUM_ACTUATORS> _actuator_trim; 	//< Neutral actuator values
 	matrix::Vector<float, NUM_ACTUATORS> _actuator_min; 	//< Minimum actuator values
 	matrix::Vector<float, NUM_ACTUATORS> _actuator_max; 	//< Maximum actuator values
 	matrix::Vector<float, NUM_ACTUATORS> _actuator_sp;  	//< Actuator setpoint
+
 	matrix::Vector<float, NUM_AXES> _control_sp;   		//< Control setpoint
 	matrix::Vector<float, NUM_AXES> _control_allocated;  	//< Allocated control
 	matrix::Vector<float, NUM_AXES> _control_trim;  	//< Control at trim actuator values
+
 	int _num_actuators{0};
 };

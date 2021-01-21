@@ -44,7 +44,14 @@
 #include <ControlAllocation/ControlAllocation.hpp>
 
 #include <matrix/matrix/math.hpp>
+#include <drivers/drv_hrt.h>
+#include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionInterval.hpp>
+#include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_actuator_setpoint.h>
+
+using namespace matrix;
+using namespace time_literals;
 
 class ActuatorEffectiveness
 {
@@ -55,23 +62,6 @@ public:
 	static constexpr uint8_t NUM_ACTUATORS = ControlAllocation::NUM_ACTUATORS;
 	static constexpr uint8_t NUM_AXES = ControlAllocation::NUM_AXES;
 
-	enum class FlightPhase {
-		HOVER_FLIGHT = 0,
-		FORWARD_FLIGHT = 1,
-		TRANSITION_HF_TO_FF = 2,
-		TRANSITION_FF_TO_HF = 3
-	};
-
-	/**
-	 * Set the current flight phase
-	 *
-	 * @param Flight phase
-	 */
-	virtual void setFlightPhase(const FlightPhase &flight_phase)
-	{
-		_flight_phase = flight_phase;
-	}
-
 	virtual void updateAirspeedScaling(const float airspeed_scaling) {};
 
 	/**
@@ -79,34 +69,31 @@ public:
 	 *
 	 * @return true if updated and matrix is set
 	 */
-	virtual bool getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix) = 0;
+	virtual bool getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix);
 
 	/**
 	 * Get the actuator trims
 	 *
 	 * @return Actuator trims
 	 */
-	const matrix::Vector<float, NUM_ACTUATORS> &getActuatorTrim() const
-	{
-		return _trim;
-	}
-
-	/**
-	 * Get the current flight phase
-	 *
-	 * @return Flight phase
-	 */
-	const FlightPhase &getFlightPhase() const
-	{
-		return _flight_phase;
-	}
+	const matrix::Vector<float, NUM_ACTUATORS> &getActuatorTrim() const { return _trim; }
 
 	/**
 	 * Get the number of actuators
 	 */
-	virtual int numActuators() const = 0;
+	virtual int numActuators() const { return NUM_ACTUATORS; }
 
 protected:
-	matrix::Vector<float, NUM_ACTUATORS> _trim;			///< Actuator trim
-	FlightPhase _flight_phase{FlightPhase::HOVER_FLIGHT};		///< Current flight phase
+	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> _effectiveness{};
+
+	matrix::Vector<float, NUM_ACTUATORS> _trim;		///< Actuator trim
+
+	bool _updated{true};
+
+	int _num_actuators{0};
+
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+
+private:
+
 };

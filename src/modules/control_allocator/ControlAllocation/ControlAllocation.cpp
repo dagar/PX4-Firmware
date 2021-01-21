@@ -41,9 +41,10 @@
 
 #include "ControlAllocation.hpp"
 
-void ControlAllocation::setEffectivenessMatrix(
-	const matrix::Matrix<float, ControlAllocation::NUM_AXES, ControlAllocation::NUM_ACTUATORS> &effectiveness,
-	const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator_trim, int num_actuators)
+using namespace matrix;
+
+void ControlAllocation::setEffectivenessMatrix(const Matrix<float, NUM_AXES, NUM_ACTUATORS> &effectiveness,
+		const Vector<float, NUM_ACTUATORS> &actuator_trim, int num_actuators)
 {
 	_effectiveness = effectiveness;
 	_actuator_trim = actuator_trim;
@@ -57,7 +58,7 @@ void ControlAllocation::setEffectivenessMatrix(
 	}
 }
 
-void ControlAllocation::setActuatorSetpoint(const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator_sp)
+void ControlAllocation::setActuatorSetpoint(const Vector<float, NUM_ACTUATORS> &actuator_sp)
 {
 	// Set actuator setpoint
 	_actuator_sp = actuator_sp;
@@ -69,7 +70,7 @@ void ControlAllocation::setActuatorSetpoint(const matrix::Vector<float, ControlA
 	_control_allocated = _effectiveness * _actuator_sp;
 }
 
-void ControlAllocation::clipActuatorSetpoint(matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator) const
+void ControlAllocation::clipActuatorSetpoint(Vector<float, NUM_ACTUATORS> &actuator) const
 {
 	for (int i = 0; i < _num_actuators; i++) {
 		if (_actuator_max(i) < _actuator_min(i)) {
@@ -84,13 +85,12 @@ void ControlAllocation::clipActuatorSetpoint(matrix::Vector<float, ControlAlloca
 	}
 }
 
-matrix::Vector<float, ControlAllocation::NUM_ACTUATORS>
-ControlAllocation::normalizeActuatorSetpoint(const matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> &actuator)
-const
+Vector<float, ControlAllocation::NUM_ACTUATORS>
+ControlAllocation::normalizeActuatorSetpoint(const Vector<float, NUM_ACTUATORS> &actuator) const
 {
-	matrix::Vector<float, ControlAllocation::NUM_ACTUATORS> actuator_normalized;
+	Vector<float, NUM_ACTUATORS> actuator_normalized;
 
-	for (size_t i = 0; i < ControlAllocation::NUM_ACTUATORS; i++) {
+	for (size_t i = 0; i < NUM_ACTUATORS; i++) {
 		if (_actuator_min(i) < _actuator_max(i)) {
 			actuator_normalized(i) = -1.f + 2.f * (actuator(i) - _actuator_min(i)) / (_actuator_max(i) - _actuator_min(i));
 

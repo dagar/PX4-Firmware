@@ -167,21 +167,12 @@ void ControlAllocator::update_effectiveness_source()
 		ActuatorEffectiveness *tmp = nullptr;
 
 		switch (source) {
-		case EffectivenessSource::NONE:
+		case EffectivenessSource::NORMAL:
+			tmp = new ActuatorEffectiveness();
+			break;
+
 		case EffectivenessSource::MULTIROTOR:
 			tmp = new ActuatorEffectivenessMultirotor();
-			break;
-
-		case EffectivenessSource::STANDARD_VTOL:
-			tmp = new ActuatorEffectivenessStandardVTOL();
-			break;
-
-		case EffectivenessSource::TILTROTOR_VTOL:
-			tmp = new ActuatorEffectivenessTiltrotorVTOL();
-			break;
-
-		case EffectivenessSource::PLANE:
-			tmp = new ActuatorEffectivenessPlane();
 			break;
 
 		default:
@@ -239,28 +230,28 @@ void ControlAllocator::Run()
 
 	if (_vehicle_status_sub.update(&vehicle_status)) {
 
-		ActuatorEffectiveness::FlightPhase flight_phase{ActuatorEffectiveness::FlightPhase::HOVER_FLIGHT};
+		// FlightPhase flight_phase{FlightPhase::HOVER_FLIGHT};
 
-		// Check if the current flight phase is HOVER or FIXED_WING
-		if (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
-			flight_phase = ActuatorEffectiveness::FlightPhase::HOVER_FLIGHT;
+		// // Check if the current flight phase is HOVER or FIXED_WING
+		// if (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
+		// 	flight_phase = FlightPhase::HOVER_FLIGHT;
 
-		} else {
-			flight_phase = ActuatorEffectiveness::FlightPhase::FORWARD_FLIGHT;
-		}
+		// } else {
+		// 	flight_phase = FlightPhase::FORWARD_FLIGHT;
+		// }
 
-		// Special cases for VTOL in transition
-		if (vehicle_status.is_vtol && vehicle_status.in_transition_mode) {
-			if (vehicle_status.in_transition_to_fw) {
-				flight_phase = ActuatorEffectiveness::FlightPhase::TRANSITION_HF_TO_FF;
+		// // Special cases for VTOL in transition
+		// if (vehicle_status.is_vtol && vehicle_status.in_transition_mode) {
+		// 	if (vehicle_status.in_transition_to_fw) {
+		// 		flight_phase = FlightPhase::TRANSITION_HF_TO_FF;
 
-			} else {
-				flight_phase = ActuatorEffectiveness::FlightPhase::TRANSITION_FF_TO_HF;
-			}
-		}
+		// 	} else {
+		// 		flight_phase = FlightPhase::TRANSITION_FF_TO_HF;
+		// 	}
+		// }
 
 		// Forward to effectiveness source
-		_actuator_effectiveness->setFlightPhase(flight_phase);
+		//_actuator_effectiveness->setFlightPhase(flight_phase);
 	}
 
 	if (_airspeed_sub.updated()) {
@@ -361,7 +352,7 @@ ControlAllocator::update_effectiveness_matrix_if_needed()
 
 void ControlAllocator::publish_actuator_setpoint()
 {
-	Vector<float, NUM_ACTUATORS> actuator_sp = _control_allocation->getActuatorSetpoint();
+	const Vector<float, NUM_ACTUATORS> &actuator_sp = _control_allocation->getActuatorSetpoint();
 
 	vehicle_actuator_setpoint_s vehicle_actuator_setpoint{};
 	vehicle_actuator_setpoint.timestamp_sample = _timestamp_sample;
@@ -379,6 +370,7 @@ void ControlAllocator::publish_control_allocator_status()
 	control_allocator_status.allocated_torque[0] = allocated_control(0);
 	control_allocator_status.allocated_torque[1] = allocated_control(1);
 	control_allocator_status.allocated_torque[2] = allocated_control(2);
+
 	control_allocator_status.allocated_thrust[0] = allocated_control(3);
 	control_allocator_status.allocated_thrust[1] = allocated_control(4);
 	control_allocator_status.allocated_thrust[2] = allocated_control(5);
@@ -388,6 +380,7 @@ void ControlAllocator::publish_control_allocator_status()
 	control_allocator_status.unallocated_torque[0] = unallocated_control(0);
 	control_allocator_status.unallocated_torque[1] = unallocated_control(1);
 	control_allocator_status.unallocated_torque[2] = unallocated_control(2);
+
 	control_allocator_status.unallocated_thrust[0] = unallocated_control(3);
 	control_allocator_status.unallocated_thrust[1] = unallocated_control(4);
 	control_allocator_status.unallocated_thrust[2] = unallocated_control(5);
@@ -488,24 +481,15 @@ int ControlAllocator::print_status()
 
 	// Print current airframe
 	switch ((EffectivenessSource)_param_ca_airframe.get()) {
-	case EffectivenessSource::NONE:
-		PX4_INFO("EffectivenessSource: None");
+	case EffectivenessSource::NORMAL:
+		PX4_INFO("EffectivenessSource: Normal");
 		break;
 
 	case EffectivenessSource::MULTIROTOR:
 		PX4_INFO("EffectivenessSource: MC parameters");
 		break;
 
-	case EffectivenessSource::STANDARD_VTOL:
-		PX4_INFO("EffectivenessSource: Standard VTOL");
-		break;
-
-	case EffectivenessSource::TILTROTOR_VTOL:
-		PX4_INFO("EffectivenessSource: Tiltrotor VTOL");
-		break;
-
-	case EffectivenessSource::PLANE:
-		PX4_INFO("EffectivenessSource: Plane");
+	default:
 		break;
 	}
 

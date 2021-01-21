@@ -43,9 +43,6 @@
 
 #include <ActuatorEffectiveness.hpp>
 #include <ActuatorEffectivenessMultirotor.hpp>
-#include <ActuatorEffectivenessStandardVTOL.hpp>
-#include <ActuatorEffectivenessTiltrotorVTOL.hpp>
-#include <ActuatorEffectivenessPlane.hpp>
 
 #include <ControlAllocation.hpp>
 #include <ControlAllocationPseudoInverse.hpp>
@@ -74,7 +71,6 @@ class ControlAllocator : public ModuleBase<ControlAllocator>, public ModuleParam
 {
 public:
 	ControlAllocator();
-
 	virtual ~ControlAllocator();
 
 	/** @see ModuleBase */
@@ -124,41 +120,39 @@ private:
 	ControlAllocation *_control_allocation{nullptr}; 	///< class for control allocation calculations
 
 	enum class EffectivenessSource {
-		NONE = -1,
-		MULTIROTOR = 0,
-		STANDARD_VTOL = 1,
-		TILTROTOR_VTOL = 2,
-		PLANE = 3
+		NONE       = -1,
+		NORMAL     =  0,
+		MULTIROTOR =  1,
 	};
 
 	EffectivenessSource _effectiveness_source_id{EffectivenessSource::NONE};
 	ActuatorEffectiveness *_actuator_effectiveness{nullptr}; 	///< class providing actuator effectiveness
 
 	// Inputs
-	uORB::SubscriptionCallbackWorkItem _vehicle_torque_setpoint_sub{this, ORB_ID(vehicle_torque_setpoint)};  /**< vehicle torque setpoint subscription */
-	uORB::SubscriptionCallbackWorkItem _vehicle_thrust_setpoint_sub{this, ORB_ID(vehicle_thrust_setpoint)};	 /**< vehicle thrust setpoint subscription */
+	uORB::SubscriptionCallbackWorkItem _vehicle_torque_setpoint_sub{this, ORB_ID(vehicle_torque_setpoint)};
+	uORB::SubscriptionCallbackWorkItem _vehicle_thrust_setpoint_sub{this, ORB_ID(vehicle_thrust_setpoint)};
 
 	// Outputs
-	uORB::Publication<vehicle_actuator_setpoint_s> _vehicle_actuator_setpoint_pub{ORB_ID(vehicle_actuator_setpoint)};	/**< actuator setpoint publication */
-	uORB::Publication<control_allocator_status_s>  _control_allocator_status_pub{ORB_ID(control_allocator_status)};	/**< actuator setpoint publication */
+	uORB::Publication<vehicle_actuator_setpoint_s> _vehicle_actuator_setpoint_pub{ORB_ID(vehicle_actuator_setpoint)};
+	uORB::Publication<control_allocator_status_s>  _control_allocator_status_pub{ORB_ID(control_allocator_status)};
 
 	// actuator_controls publication handles (temporary hack to plug actuator_setpoint into the mixer system)
-	uORB::Publication<actuator_controls_s>	_actuator_controls_4_pub{ORB_ID(actuator_controls_4)};
-	uORB::Publication<actuator_controls_s>	_actuator_controls_5_pub{ORB_ID(actuator_controls_5)};
+	uORB::Publication<actuator_controls_s> _actuator_controls_4_pub{ORB_ID(actuator_controls_4)};
+	uORB::Publication<actuator_controls_s> _actuator_controls_5_pub{ORB_ID(actuator_controls_5)};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
-	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
 	uORB::Subscription _airspeed_sub{ORB_ID(airspeed_validated)};
+	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 
-	matrix::Vector3f _torque_sp;
-	matrix::Vector3f _thrust_sp;
+	matrix::Vector3f _torque_sp{};
+	matrix::Vector3f _thrust_sp{};
 
 	// float _battery_scale_factor{1.0f};
 	// float _airspeed_scale_factor{1.0f};
 
-	perf_counter_t	_loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
+	perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
 	hrt_abstime _last_run{0};
 	hrt_abstime _timestamp_sample{0};

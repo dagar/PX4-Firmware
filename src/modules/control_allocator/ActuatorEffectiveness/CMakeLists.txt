@@ -32,15 +32,10 @@
 ############################################################################
 
 px4_add_library(ActuatorEffectiveness
+	ActuatorEffectiveness.cpp
 	ActuatorEffectiveness.hpp
 	ActuatorEffectivenessMultirotor.cpp
 	ActuatorEffectivenessMultirotor.hpp
-	ActuatorEffectivenessStandardVTOL.cpp
-	ActuatorEffectivenessStandardVTOL.hpp
-	ActuatorEffectivenessTiltrotorVTOL.cpp
-	ActuatorEffectivenessTiltrotorVTOL.hpp
-	ActuatorEffectivenessPlane.cpp
-	ActuatorEffectivenessPlane.hpp
 )
 
 target_compile_options(ActuatorEffectiveness PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
