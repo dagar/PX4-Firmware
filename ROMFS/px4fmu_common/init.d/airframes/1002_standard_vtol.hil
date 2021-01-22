@@ -71,5 +71,3 @@ param set SYS_HITL 1
 set MAV_TYPE 22
 
 set MIXER standard_vtol_hitl
-
-set PWM_OUT 1234

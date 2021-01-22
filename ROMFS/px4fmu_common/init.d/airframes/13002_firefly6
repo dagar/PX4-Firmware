@@ -59,5 +59,3 @@ set MAV_TYPE 21
 
 set MIXER firefly6
 set MIXER_AUX firefly6
-
-set PWM_OUT 12345678

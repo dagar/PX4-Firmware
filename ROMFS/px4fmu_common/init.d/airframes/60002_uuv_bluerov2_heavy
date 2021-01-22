@@ -45,7 +45,6 @@ then
 	param set BAT_V_OFFS_CURR 0.33
 fi
 
-set PWM_OUT 12345678
 # set MIXER IO_pass
 set MIXER vectored6dof
 

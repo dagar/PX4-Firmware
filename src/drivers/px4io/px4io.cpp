@@ -425,6 +425,8 @@ private:
 	 */
 	void			answer_command(const vehicle_command_s &cmd, uint8_t result);
 
+	void update_params();
+
 	/**
 	 * check and handle test_motor topic updates
 	 */
@@ -1096,30 +1098,6 @@ PX4IO::task_main()
 
 				(void)io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_PWM_REVERSE, pwm_invert_mask);
 
-				// update trim values
-				struct pwm_output_values pwm_values;
-
-//				memset(&pwm_values, 0, sizeof(pwm_values));
-//				ret = io_reg_get(PX4IO_PAGE_CONTROL_TRIM_PWM, 0, (uint16_t *)pwm_values.values, _max_actuators);
-
-				for (unsigned i = 0; i < _max_actuators; i++) {
-					char pname[16];
-					float pval;
-
-					/* fetch the trim values from parameters */
-					sprintf(pname, "PWM_MAIN_TRIM%u", i + 1);
-					param_t param_h = param_find(pname);
-
-					if (param_h != PARAM_INVALID) {
-
-						param_get(param_h, &pval);
-						pwm_values.values[i] = (int16_t)(10000 * pval);
-					}
-				}
-
-				/* copy values to registers in IO */
-				ret = io_reg_set(PX4IO_PAGE_CONTROL_TRIM_PWM, 0, pwm_values.values, _max_actuators);
-
 				float param_val;
 				param_t parm_handle;
 
@@ -1211,6 +1189,8 @@ PX4IO::task_main()
 					param_get(parm_handle, &param_val_int);
 					(void)io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_AIRMODE, SIGNED_TO_REG(param_val_int));
 				}
+
+				update_params();
 			}
 
 		}
@@ -1231,6 +1211,161 @@ out:
 	/* tell the dtor that we are exiting */
 	_task = -1;
 	_exit(0);
+}
+
+void PX4IO::update_params()
+{
+	int32_t pwm_min_default = PWM_DEFAULT_MIN;
+	int32_t pwm_max_default = PWM_DEFAULT_MAX;
+	int32_t pwm_disarmed_default = 0;
+	int32_t pwm_rate_default = 50;
+
+	const char *prefix = "PWM_MAIN";
+
+	param_set(param_find("PWM_MIN"), &pwm_min_default);
+	param_set(param_find("PWM_MAX"), &pwm_max_default);
+	param_set(param_find("PWM_DISARMED"), &pwm_disarmed_default);
+	param_set(param_find("PWM_RATE"), &pwm_rate_default);
+
+	char str[17];
+
+
+	// PWM_MAIN_MINx
+	{
+		pwm_output_values pwm{};
+		pwm.channel_count = _max_actuators;
+
+		for (unsigned i = 0; i < _max_actuators; i++) {
+			sprintf(str, "%s_MIN%u", prefix, i + 1);
+			int32_t pwm_min = -1;
+
+			if (param_get(param_find(str), &pwm_min) == PX4_OK) {
+				if (pwm_min >= 0) {
+					pwm.values[i] = math::constrain(pwm_min, PWM_LOWEST_MIN, PWM_HIGHEST_MIN);
+
+					if (pwm_min != pwm.values[i]) {
+						int32_t pwm_min_new = pwm.values[i];
+						param_set(param_find(str), &pwm_min_new);
+					}
+
+				} else {
+					pwm.values[i] = pwm_min_default;
+				}
+			}
+		}
+
+		io_reg_set(PX4IO_PAGE_CONTROL_MIN_PWM, 0, pwm.values, pwm.channel_count);
+	}
+
+	// PWM_MAIN_MAXx
+	{
+		pwm_output_values pwm{};
+		pwm.channel_count = _max_actuators;
+
+		for (unsigned i = 0; i < _max_actuators; i++) {
+			sprintf(str, "%s_MAX%u", prefix, i + 1);
+			int32_t pwm_max = -1;
+
+			if (param_get(param_find(str), &pwm_max) == PX4_OK) {
+				if (pwm_max >= 0) {
+					pwm.values[i] = math::constrain(pwm_max, PWM_LOWEST_MAX, PWM_HIGHEST_MAX);
+
+					if (pwm_max != pwm.values[i]) {
+						int32_t pwm_max_new = pwm.values[i];
+						param_set(param_find(str), &pwm_max_new);
+					}
+
+				} else {
+					pwm.values[i] = pwm_max_default;
+				}
+			}
+		}
+
+		io_reg_set(PX4IO_PAGE_CONTROL_MAX_PWM, 0, pwm.values, pwm.channel_count);
+	}
+
+	// PWM_MAIN_FAILx
+	{
+		pwm_output_values pwm{};
+		pwm.channel_count = _max_actuators;
+
+		for (unsigned i = 0; i < _max_actuators; i++) {
+			sprintf(str, "%s_FAIL%u", prefix, i + 1);
+			int32_t pwm_fail = -1;
+
+			if (param_get(param_find(str), &pwm_fail) == PX4_OK) {
+				if (pwm_fail >= 0) {
+					pwm.values[i] = math::constrain(pwm_fail, 0, PWM_HIGHEST_MAX);
+
+					if (pwm_fail != pwm.values[i]) {
+						int32_t pwm_fail_new = pwm.values[i];
+						param_set(param_find(str), &pwm_fail_new);
+					}
+				}
+			}
+		}
+
+		io_reg_set(PX4IO_PAGE_FAILSAFE_PWM, 0, pwm.values, pwm.channel_count);
+	}
+
+	// PWM_MAIN_DISx
+	{
+		pwm_output_values pwm{};
+		pwm.channel_count = _max_actuators;
+
+		for (unsigned i = 0; i < _max_actuators; i++) {
+			sprintf(str, "%s_DIS%u", prefix, i + 1);
+			int32_t pwm_dis = -1;
+
+			if (param_get(param_find(str), &pwm_dis) == PX4_OK) {
+				if (pwm_dis >= 0) {
+					pwm.values[i] = math::constrain(pwm_dis, 0, PWM_HIGHEST_MAX);
+
+					if (pwm_dis != pwm.values[i]) {
+						int32_t pwm_dis_new = pwm.values[i];
+						param_set(param_find(str), &pwm_dis_new);
+					}
+
+				} else {
+					pwm.values[i] = pwm_disarmed_default;
+				}
+			}
+		}
+
+		io_reg_set(PX4IO_PAGE_DISARMED_PWM, 0, pwm.values, pwm.channel_count);
+	}
+
+	// PWM_MAIN_REVx
+	{
+		//sprintf(str, "%s_REV%u", prefix, i + 1);
+		//int32_t pwm_rev = 0;
+
+		//if (param_get(param_find(str), &pwm_rev) == PX4_OK) {
+		// uint16_t &reverse_pwm_mask = _mixing_output.reverseOutputMask();
+
+		// if (pwm_rev >= 1) {
+		// 	reverse_pwm_mask = reverse_pwm_mask | (2 << i);
+
+		// } else {
+		// 	reverse_pwm_mask = reverse_pwm_mask & ~(2 << i);
+		// }
+		//}
+	}
+
+	// if (_mixing_output.mixers()) {
+	// 	int16_t values[8] {};
+
+	// 	for (unsigned i = 0; i < _max_actuators; i++) {
+	// 		sprintf(str, "%s_TRIM%u", prefix, i + 1);
+
+	// 		float pval = 0.0f;
+	// 		param_get(param_find(str), &pval);
+	// 		values[i] = roundf(10000 * pval);
+	// 	}
+
+	// 	// copy the trim values to the mixer offsets
+	// 	io_reg_set(PX4IO_PAGE_CONTROL_TRIM_PWM, 0, values, _max_actuators);
+	// }
 }
 
 int

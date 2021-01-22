@@ -48,6 +48,3 @@ then
 fi
 
 set MIXER fw_generic_wing
-
-# Provide ESC a constant 1000 us pulse while disarmed
-set PWM_OUT 4

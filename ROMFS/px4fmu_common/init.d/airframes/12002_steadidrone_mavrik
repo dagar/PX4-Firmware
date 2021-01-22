@@ -50,5 +50,3 @@ then
 fi
 
 set MIXER octo_cox_w
-
-set PWM_OUT 12345678

@@ -22,7 +22,6 @@
 
 set VEHICLE_TYPE mc
 set MIXER quad_x
-set PWM_OUT 1234
 
 if [ $AUTOCNF = yes ]
 then

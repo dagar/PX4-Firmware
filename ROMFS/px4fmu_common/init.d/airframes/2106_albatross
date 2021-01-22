@@ -47,6 +47,3 @@ then
 fi
 
 set MIXER AAVVTWFF
-
-# use PWM parameters for throttle channel
-set PWM_OUT 5

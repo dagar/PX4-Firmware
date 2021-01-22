@@ -86,5 +86,3 @@ fi
 set MAV_TYPE 21
 
 set MIXER vtol_convergence
-
-set PWM_OUT 1234

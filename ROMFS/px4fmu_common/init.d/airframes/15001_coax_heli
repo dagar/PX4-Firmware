@@ -52,7 +52,3 @@ fi
 
 # This is the gimbal pass mixer
 set MIXER_AUX pass
-
-# use PWM parameters for throttle channel
-set PWM_AUX_OUT 1234
-set PWM_OUT 34

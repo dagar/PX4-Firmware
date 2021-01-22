@@ -159,6 +159,3 @@ set MAV_TYPE 22
 
 set MIXER deltaquad
 set MIXER_AUX pass
-
-set PWM_OUT 1234
-set PWM_AUX_OUT 12345

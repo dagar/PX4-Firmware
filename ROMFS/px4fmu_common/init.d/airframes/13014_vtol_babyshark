@@ -114,5 +114,3 @@ set MAV_TYPE 22
 
 set MIXER babyshark
 set MIXER_AUX pass
-
-set PWM_OUT 5678

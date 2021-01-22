@@ -23,4 +23,3 @@ then
 fi
 
 set MIXER cloudship
-set PWM_OUT 1234

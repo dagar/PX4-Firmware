@@ -53,6 +53,3 @@ then
 fi
 
 set MIXER phantom
-
-# Provide ESC a constant 1000 us pulse
-set PWM_OUT 4

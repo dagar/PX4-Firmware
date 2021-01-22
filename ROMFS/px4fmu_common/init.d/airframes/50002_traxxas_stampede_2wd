@@ -66,4 +66,4 @@ set MAV_TYPE 10
 # Set mixer
 set MIXER stampede
 
-set PWM_MAIN_REV2 1
+param set PWM_MAIN_REV2 1

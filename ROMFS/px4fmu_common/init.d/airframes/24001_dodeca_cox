@@ -48,6 +48,3 @@ fi
 set MIXER dodeca_top_cox
 set MIXER_AUX dodeca_bottom_cox
 
-# Need to set all 8 channels
-set PWM_OUT 12345678
-set PWM_AUX_OUT 123456
