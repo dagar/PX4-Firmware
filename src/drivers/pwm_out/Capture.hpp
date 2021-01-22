@@ -38,6 +38,7 @@
 
 #include <board_config.h>
 #include <drivers/device/device.h>
+#include <drivers/device/i2c.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_input_capture.h>
 #include <drivers/drv_mixer.h>
@@ -63,12 +64,55 @@
 
 using namespace time_literals;
 
+/** Mode given via CLI */
+enum PortMode {
+	PORT_MODE_UNSET = 0,
+	PORT_FULL_GPIO,
+	PORT_FULL_PWM,
+	PORT_PWM8,
+	PORT_PWM6,
+	PORT_PWM5,
+	PORT_PWM4,
+	PORT_PWM3,
+	PORT_PWM2,
+	PORT_PWM1,
+	PORT_PWM3CAP1,
+	PORT_PWM4CAP1,
+	PORT_PWM4CAP2,
+	PORT_PWM5CAP1,
+	PORT_PWM2CAP2,
+	PORT_CAPTURE,
+};
+
+#if !defined(BOARD_HAS_PWM)
+#  error "board_config.h needs to define BOARD_HAS_PWM"
+#endif
+
 // TODO: keep in sync with drivers/camera_capture
 #define PX4FMU_DEVICE_PATH	"/dev/px4fmu"
 
 class PWMOut : public cdev::CDev, public ModuleBase<PWMOut>, public OutputModuleInterface
 {
 public:
+	enum Mode {
+		MODE_NONE,
+		MODE_1PWM,
+		MODE_2PWM,
+		MODE_2PWM2CAP,
+		MODE_3PWM,
+		MODE_3PWM1CAP,
+		MODE_4PWM,
+		MODE_4PWM1CAP,
+		MODE_4PWM2CAP,
+		MODE_5PWM,
+		MODE_5PWM1CAP,
+		MODE_6PWM,
+		MODE_8PWM,
+		MODE_14PWM,
+		MODE_4CAP,
+		MODE_5CAP,
+		MODE_6CAP,
+	};
 	PWMOut();
 	virtual ~PWMOut();
 
@@ -86,9 +130,23 @@ public:
 	/** @see ModuleBase::print_status() */
 	int print_status() override;
 
+	/** change the FMU mode of the running module */
+	static int fmu_new_mode(PortMode new_mode);
+
+	static int test();
+
 	virtual int	ioctl(file *filp, int cmd, unsigned long arg);
 
 	virtual int	init();
+
+	int		set_mode(Mode mode);
+	Mode		get_mode() { return _mode; }
+
+	static int	set_i2c_bus_clock(unsigned bus, unsigned clock_hz);
+
+	static void	capture_trampoline(void *context, uint32_t chan_index,
+					   hrt_abstime edge_time, uint32_t edge_state,
+					   uint32_t overflow);
 
 	void update_pwm_trims();
 
@@ -100,6 +158,8 @@ private:
 	static_assert(FMU_MAX_ACTUATORS <= MAX_ACTUATORS, "Increase MAX_ACTUATORS if this fails");
 
 	MixingOutput _mixing_output{FMU_MAX_ACTUATORS, *this, MixingOutput::SchedulingPolicy::Auto, true};
+
+	Mode		_mode{MODE_NONE};
 
 	uint32_t	_backup_schedule_interval_us{1_s};
 
@@ -124,11 +184,22 @@ private:
 	perf_counter_t	_cycle_perf;
 	perf_counter_t	_interval_perf;
 
+	void		capture_callback(uint32_t chan_index,
+					 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
 	void		update_current_rate();
-	int		set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
-
+	int			set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
+	int			pwm_ioctl(file *filp, int cmd, unsigned long arg);
 	void		update_pwm_rev_mask();
 	void		update_pwm_out_state(bool on);
 
 	void		update_params();
+
+	static void		sensor_reset(int ms);
+	static void		peripheral_reset(int ms);
+
+	int		capture_ioctl(file *filp, int cmd, unsigned long arg);
+
+	PWMOut(const PWMOut &) = delete;
+	PWMOut operator=(const PWMOut &) = delete;
+
 };

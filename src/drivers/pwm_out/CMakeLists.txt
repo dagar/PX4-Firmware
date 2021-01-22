@@ -34,6 +34,8 @@ px4_add_module(
 	MODULE drivers__pwm_out
 	MAIN pwm_out
 	COMPILE_FLAGS
+	MODULE_CONFIG
+		module.yaml
 	SRCS
 		PWMOut.cpp
 		PWMOut.hpp

@@ -213,15 +213,8 @@ struct pwm_output_rc_config {
 /** get the maximum PWM value the output will send */
 #define PWM_SERVO_GET_MAX_PWM	_PX4_IOC(_PWM_SERVO_BASE, 19)
 
-/** set the TRIM value the output will send */
-#define PWM_SERVO_SET_TRIM_PWM	_PX4_IOC(_PWM_SERVO_BASE, 20)
-
 /** get the TRIM value the output will send */
 #define PWM_SERVO_GET_TRIM_PWM	_PX4_IOC(_PWM_SERVO_BASE, 21)
-
-/** set the number of servos in (unsigned)arg - allows change of
- * split between servos and GPIO */
-#define PWM_SERVO_SET_COUNT	_PX4_IOC(_PWM_SERVO_BASE, 22)
 
 /** set the lockdown override flag to enable outputs in HIL */
 #define PWM_SERVO_SET_DISABLE_LOCKDOWN		_PX4_IOC(_PWM_SERVO_BASE, 23)
@@ -246,28 +239,6 @@ struct pwm_output_rc_config {
 
 /** set SBUS output frame rate in Hz */
 #define PWM_SERVO_SET_SBUS_RATE			_PX4_IOC(_PWM_SERVO_BASE, 33)
-
-/** set auxillary output mode. These correspond to enum Mode in px4fmu/fmu.cpp */
-#define PWM_SERVO_MODE_NONE         0
-#define PWM_SERVO_MODE_1PWM         1
-#define PWM_SERVO_MODE_2PWM         2
-#define PWM_SERVO_MODE_2PWM2CAP     3
-#define PWM_SERVO_MODE_3PWM         4
-#define PWM_SERVO_MODE_3PWM1CAP     5
-#define PWM_SERVO_MODE_4PWM         6
-#define PWM_SERVO_MODE_4PWM1CAP     7
-#define PWM_SERVO_MODE_4PWM2CAP     8
-#define PWM_SERVO_MODE_5PWM         9
-#define PWM_SERVO_MODE_5PWM1CAP    10
-#define PWM_SERVO_MODE_6PWM        11
-#define PWM_SERVO_MODE_8PWM        12
-#define PWM_SERVO_MODE_14PWM       13
-#define PWM_SERVO_MODE_4CAP        14
-#define PWM_SERVO_MODE_5CAP        15
-#define PWM_SERVO_MODE_6CAP        16
-#define PWM_SERVO_ENTER_TEST_MODE  17
-#define PWM_SERVO_EXIT_TEST_MODE   18
-#define PWM_SERVO_SET_MODE         _PX4_IOC(_PWM_SERVO_BASE, 34)
 
 /*
  *
