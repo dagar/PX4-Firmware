@@ -217,6 +217,71 @@ private:
 	};
 	Command _command; ///< incoming commands (from another thread)
 
+
+	enum class OutputFunction : int32_t {
+		DISABLED                 = 0,
+		MIXER_FILE               = 1,
+
+		LANDING_GEAR             = 10,
+		PARACHUTE                = 11,
+		FLAPS                    = 12,
+		SPOILER                  = 13,
+		AIRBRAKES                = 14,
+
+		FLIGHT_CONTROL_ROLL      = 100,
+		FLIGHT_CONTROL_PITCH     = 101,
+		FLIGHT_CONTROL_YAW       = 102,
+		FLIGHT_CONTROL_THROTTLE  = 103,
+		FLIGHT_CONTROL_FLAPS     = 104,
+		FLIGHT_CONTROL_SPOILER   = 105,
+		FLIGHT_CONTROL_AIRBRAKES = 106,
+		FLIGHT_CONTROL_LANDING_GEAR = 107,
+
+		FLIGHT_CONTROL_ALT_ROLL     = 200,
+		FLIGHT_CONTROL_ALT_PITCH    = 201,
+		FLIGHT_CONTROL_ALT_YAW      = 202,
+		FLIGHT_CONTROL_ALT_THROTTLE = 203,
+
+		GIMBAL_ROLL    = 300,
+		GIMBAL_PITCH   = 301,
+		GIMBAL_YAW     = 302,
+		GIMBAL_SHUTTER = 303,
+		CAMERA_ZOOM    = 304,
+
+		RC_ROLL     = 400,
+		RC_PITCH    = 401,
+		RC_YAW      = 402,
+		RC_THROTTLE = 403,
+		RC_AUX1     = 404,
+		RC_AUX2     = 405,
+		RC_AUX3     = 406,
+		RC_AUX4     = 407,
+		RC_AUX5     = 408,
+		RC_AUX6     = 409,
+
+
+
+		CONTROL_ALLOCATOR_0  = 1000,
+		CONTROL_ALLOCATOR_1  = 1001,
+		CONTROL_ALLOCATOR_2  = 1002,
+		CONTROL_ALLOCATOR_3  = 1003,
+		CONTROL_ALLOCATOR_4  = 1004,
+		CONTROL_ALLOCATOR_5  = 1005,
+		CONTROL_ALLOCATOR_6  = 1006,
+		CONTROL_ALLOCATOR_7  = 1007,
+		CONTROL_ALLOCATOR_8  = 1008,
+		CONTROL_ALLOCATOR_9  = 1009,
+		CONTROL_ALLOCATOR_10 = 1010,
+		CONTROL_ALLOCATOR_11 = 1011,
+		CONTROL_ALLOCATOR_12 = 1012,
+		CONTROL_ALLOCATOR_13 = 1013,
+		CONTROL_ALLOCATOR_14 = 1014,
+		CONTROL_ALLOCATOR_15 = 1015,
+
+
+
+	};
+
 	/**
 	 * Reorder outputs according to _param_mot_ordering
 	 * @param values values to reorder
@@ -227,6 +292,8 @@ private:
 	void unlock() { px4_sem_post(&_lock); }
 
 	px4_sem_t _lock; /**< lock to protect access to work queue changes (includes ScheduleNow calls from another thread) */
+
+	OutputFunction _function[MAX_ACTUATORS]{};
 
 	uint16_t _failsafe_value[MAX_ACTUATORS] {};
 	uint16_t _disarmed_value[MAX_ACTUATORS] {};

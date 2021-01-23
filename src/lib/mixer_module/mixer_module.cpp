@@ -263,7 +263,6 @@ void MixingOutput::updateOutputSlewrateSimplemixer()
 	_mixers->set_dt_once(dt);
 }
 
-
 unsigned MixingOutput::motorTest()
 {
 	test_motor_s test_motor;

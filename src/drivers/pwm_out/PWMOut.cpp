@@ -557,6 +557,11 @@ void PWMOut::update_params()
 {
 	updateParams();
 
+	// skip update when armed
+	if (_mixing_output.armed().armed) {
+		return;
+	}
+
 	int32_t pwm_min_default = PWM_DEFAULT_MIN;
 	int32_t pwm_max_default = PWM_DEFAULT_MAX;
 	int32_t pwm_disarmed_default = 0;
