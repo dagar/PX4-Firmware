@@ -50,6 +50,8 @@
 #include <errno.h>
 #include <math.h>
 
+using namespace time_literals;
+
 namespace vmount
 {
 
@@ -191,23 +193,12 @@ InputMavlinkCmdMount::InputMavlinkCmdMount(bool stabilize)
 	}
 }
 
-InputMavlinkCmdMount::~InputMavlinkCmdMount()
-{
-	if (_vehicle_command_sub >= 0) {
-		orb_unsubscribe(_vehicle_command_sub);
-	}
-}
-
 int InputMavlinkCmdMount::initialize()
 {
-	if ((_vehicle_command_sub = orb_subscribe(ORB_ID(vehicle_command))) < 0) {
-		return -errno;
-	}
-
 	// rate-limit inputs to 100Hz. If we don't do this and the output is configured to mavlink mode,
 	// it will publish vehicle_command's as well, causing the input poll() in here to return
 	// immediately, which in turn will cause an output update and thus a busy loop.
-	orb_set_interval(_vehicle_command_sub, 10);
+	_vehicle_command_sub.set_interval_us(10_ms);
 
 	return 0;
 }
@@ -218,139 +209,117 @@ int InputMavlinkCmdMount::update_impl(unsigned int timeout_ms, ControlData **con
 	// Default to notify that there was no change.
 	*control_data = nullptr;
 
-	const int num_poll = 1;
-	px4_pollfd_struct_t polls[num_poll];
-	polls[0].fd = 		_vehicle_command_sub;
-	polls[0].events = 	POLLIN;
-
-	int poll_timeout = (int)timeout_ms;
-
 	bool exit_loop = false;
 
-	while (!exit_loop && poll_timeout >= 0) {
-		hrt_abstime poll_start = hrt_absolute_time();
+	while (!exit_loop) {
+		vehicle_command_s vehicle_command;
 
-		int ret = px4_poll(polls, num_poll, poll_timeout);
+		if (_vehicle_command_sub.updateBlocking(vehicle_command, timeout_ms * 1000)) {
 
-		if (ret < 0) {
-			return -errno;
-		}
+			// if we get a command that we need to handle, we exit the loop, otherwise we poll until we reach the timeout
+			exit_loop = true;
 
-		poll_timeout -= (hrt_absolute_time() - poll_start) / 1000;
+			// Process only if the command is for us or for anyone (component id 0).
+			const bool sysid_correct = (vehicle_command.target_system == _mav_sys_id);
+			const bool compid_correct = ((vehicle_command.target_component == _mav_comp_id) ||
+						     (vehicle_command.target_component == 0));
 
-		// if we get a command that we need to handle, we exit the loop, otherwise we poll until we reach the timeout
-		exit_loop = true;
+			if (!sysid_correct || !compid_correct) {
+				exit_loop = false;
+				continue;
+			}
 
-		if (ret == 0) {
-			// Timeout control_data already null.
+			for (int i = 0; i < 3; ++i) {
+				_control_data.stabilize_axis[i] = _stabilize[i];
+			}
 
-		} else {
-			if (polls[0].revents & POLLIN) {
-				vehicle_command_s vehicle_command;
-				orb_copy(ORB_ID(vehicle_command), _vehicle_command_sub, &vehicle_command);
+			_control_data.gimbal_shutter_retract = false;
 
-				// Process only if the command is for us or for anyone (component id 0).
-				const bool sysid_correct = (vehicle_command.target_system == _mav_sys_id);
-				const bool compid_correct = ((vehicle_command.target_component == _mav_comp_id) ||
-							     (vehicle_command.target_component == 0));
+			if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_MOUNT_CONTROL) {
 
-				if (!sysid_correct || !compid_correct) {
-					exit_loop = false;
-					continue;
-				}
+				switch ((int)vehicle_command.param7) {
+				case vehicle_command_s::VEHICLE_MOUNT_MODE_RETRACT:
+					_control_data.gimbal_shutter_retract = true;
 
-				for (int i = 0; i < 3; ++i) {
-					_control_data.stabilize_axis[i] = _stabilize[i];
-				}
+				/* FALLTHROUGH */
 
-				_control_data.gimbal_shutter_retract = false;
-
-				if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_MOUNT_CONTROL) {
-
-					switch ((int)vehicle_command.param7) {
-					case vehicle_command_s::VEHICLE_MOUNT_MODE_RETRACT:
-						_control_data.gimbal_shutter_retract = true;
-
-					/* FALLTHROUGH */
-
-					case vehicle_command_s::VEHICLE_MOUNT_MODE_NEUTRAL:
-						_control_data.type = ControlData::Type::Neutral;
-
-						*control_data = &_control_data;
-						break;
-
-					case vehicle_command_s::VEHICLE_MOUNT_MODE_MAVLINK_TARGETING:
-						_control_data.type = ControlData::Type::Angle;
-						_control_data.type_data.angle.frames[0] = ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
-						_control_data.type_data.angle.frames[1] = ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
-						_control_data.type_data.angle.frames[2] = ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
-						// vmount spec has roll on channel 0, MAVLink spec has pitch on channel 0
-						_control_data.type_data.angle.angles[0] = vehicle_command.param2 * M_DEG_TO_RAD_F;
-						// vmount spec has pitch on channel 1, MAVLink spec has roll on channel 1
-						_control_data.type_data.angle.angles[1] = vehicle_command.param1 * M_DEG_TO_RAD_F;
-						// both specs have yaw on channel 2
-						_control_data.type_data.angle.angles[2] = vehicle_command.param3 * M_DEG_TO_RAD_F;
-
-						// We expect angle of [-pi..+pi]. If the input range is [0..2pi] we can fix that.
-						if (_control_data.type_data.angle.angles[2] > M_PI_F) {
-							_control_data.type_data.angle.angles[2] -= 2 * M_PI_F;
-						}
-
-						*control_data = &_control_data;
-						break;
-
-					case vehicle_command_s::VEHICLE_MOUNT_MODE_RC_TARGETING:
-						break;
-
-					case vehicle_command_s::VEHICLE_MOUNT_MODE_GPS_POINT:
-						control_data_set_lon_lat((double)vehicle_command.param6, (double)vehicle_command.param5, vehicle_command.param4);
-
-						*control_data = &_control_data;
-						break;
-					}
-
-					_ack_vehicle_command(&vehicle_command);
-
-				} else if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_MOUNT_CONFIGURE) {
-					_stabilize[0] = (int)(vehicle_command.param2 + 0.5f) == 1;
-					_stabilize[1] = (int)(vehicle_command.param3 + 0.5f) == 1;
-					_stabilize[2] = (int)(vehicle_command.param4 + 0.5f) == 1;
-
-					const int params[] = {
-						(int)((float)vehicle_command.param5 + 0.5f),
-						(int)((float)vehicle_command.param6 + 0.5f),
-						(int)(vehicle_command.param7 + 0.5f)
-					};
-
-					for (int i = 0; i < 3; ++i) {
-
-						if (params[i] == 0) {
-							_control_data.type_data.angle.frames[i] =
-								ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
-
-						} else if (params[i] == 1) {
-							_control_data.type_data.angle.frames[i] =
-								ControlData::TypeData::TypeAngle::Frame::AngularRate;
-
-						} else if (params[i] == 2) {
-							_control_data.type_data.angle.frames[i] =
-								ControlData::TypeData::TypeAngle::Frame::AngleAbsoluteFrame;
-
-						} else {
-							// Not supported, fallback to body angle.
-							_control_data.type_data.angle.frames[i] =
-								ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
-						}
-					}
-
-					_control_data.type = ControlData::Type::Neutral; //always switch to neutral position
+				case vehicle_command_s::VEHICLE_MOUNT_MODE_NEUTRAL:
+					_control_data.type = ControlData::Type::Neutral;
 
 					*control_data = &_control_data;
-					_ack_vehicle_command(&vehicle_command);
+					break;
 
-				} else {
-					exit_loop = false;
+				case vehicle_command_s::VEHICLE_MOUNT_MODE_MAVLINK_TARGETING:
+					_control_data.type = ControlData::Type::Angle;
+					_control_data.type_data.angle.frames[0] = ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
+					_control_data.type_data.angle.frames[1] = ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
+					_control_data.type_data.angle.frames[2] = ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
+					// vmount spec has roll on channel 0, MAVLink spec has pitch on channel 0
+					_control_data.type_data.angle.angles[0] = vehicle_command.param2 * M_DEG_TO_RAD_F;
+					// vmount spec has pitch on channel 1, MAVLink spec has roll on channel 1
+					_control_data.type_data.angle.angles[1] = vehicle_command.param1 * M_DEG_TO_RAD_F;
+					// both specs have yaw on channel 2
+					_control_data.type_data.angle.angles[2] = vehicle_command.param3 * M_DEG_TO_RAD_F;
+
+					// We expect angle of [-pi..+pi]. If the input range is [0..2pi] we can fix that.
+					if (_control_data.type_data.angle.angles[2] > M_PI_F) {
+						_control_data.type_data.angle.angles[2] -= 2 * M_PI_F;
+					}
+
+					*control_data = &_control_data;
+					break;
+
+				case vehicle_command_s::VEHICLE_MOUNT_MODE_RC_TARGETING:
+					break;
+
+				case vehicle_command_s::VEHICLE_MOUNT_MODE_GPS_POINT:
+					control_data_set_lon_lat((double)vehicle_command.param6, (double)vehicle_command.param5, vehicle_command.param4);
+
+					*control_data = &_control_data;
+					break;
 				}
+
+				_ack_vehicle_command(&vehicle_command);
+
+			} else if (vehicle_command.command == vehicle_command_s::VEHICLE_CMD_DO_MOUNT_CONFIGURE) {
+				_stabilize[0] = (int)(vehicle_command.param2 + 0.5f) == 1;
+				_stabilize[1] = (int)(vehicle_command.param3 + 0.5f) == 1;
+				_stabilize[2] = (int)(vehicle_command.param4 + 0.5f) == 1;
+
+				const int params[] = {
+					(int)((float)vehicle_command.param5 + 0.5f),
+					(int)((float)vehicle_command.param6 + 0.5f),
+					(int)(vehicle_command.param7 + 0.5f)
+				};
+
+				for (int i = 0; i < 3; ++i) {
+
+					if (params[i] == 0) {
+						_control_data.type_data.angle.frames[i] =
+							ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
+
+					} else if (params[i] == 1) {
+						_control_data.type_data.angle.frames[i] =
+							ControlData::TypeData::TypeAngle::Frame::AngularRate;
+
+					} else if (params[i] == 2) {
+						_control_data.type_data.angle.frames[i] =
+							ControlData::TypeData::TypeAngle::Frame::AngleAbsoluteFrame;
+
+					} else {
+						// Not supported, fallback to body angle.
+						_control_data.type_data.angle.frames[i] =
+							ControlData::TypeData::TypeAngle::Frame::AngleBodyFrame;
+					}
+				}
+
+				_control_data.type = ControlData::Type::Neutral; //always switch to neutral position
+
+				*control_data = &_control_data;
+				_ack_vehicle_command(&vehicle_command);
+
+			} else {
+				exit_loop = false;
 			}
 
 		}

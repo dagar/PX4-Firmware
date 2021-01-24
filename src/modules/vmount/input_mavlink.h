@@ -43,6 +43,7 @@
 #include "input_rc.h"
 #include <cstdint>
 
+#include <uORB/SubscriptionBlocking.hpp>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_roi.h>
 
@@ -81,19 +82,18 @@ class InputMavlinkCmdMount : public InputBase
 {
 public:
 	InputMavlinkCmdMount(bool stabilize);
-	virtual ~InputMavlinkCmdMount();
+	virtual ~InputMavlinkCmdMount() = default;
 
 	virtual void print_status();
 
-protected:
+private:
 	virtual int update_impl(unsigned int timeout_ms, ControlData **control_data, bool already_active);
 	virtual int initialize();
 
-private:
 	void _ack_vehicle_command(vehicle_command_s *cmd);
 
-	int _vehicle_command_sub = -1;
-	bool _stabilize[3] = { false, false, false };
+	uORB::SubscriptionBlocking<vehicle_command_s> _vehicle_command_sub{ORB_ID(vehicle_command)};
+	bool _stabilize[3] {};
 
 	int32_t _mav_sys_id{1}; ///< our mavlink system id
 	int32_t _mav_comp_id{1}; ///< our mavlink component id
