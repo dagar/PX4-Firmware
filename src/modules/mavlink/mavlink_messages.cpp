@@ -518,11 +518,10 @@ protected:
 
 	bool send() override
 	{
-		struct vehicle_command_s cmd;
 		bool sent = false;
+		vehicle_command_s cmd;
 
-		if (_cmd_sub.update(&cmd)) {
-
+		while ((_mavlink->get_free_tx_buf() >= get_size()) && _cmd_sub.update(&cmd)) {
 			if (!cmd.from_external) {
 				PX4_DEBUG("sending command %d to %d/%d", cmd.command, cmd.target_system, cmd.target_component);
 
