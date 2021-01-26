@@ -163,8 +163,7 @@ CameraCapture::capture_trampoline(void *context, uint32_t chan_index, hrt_abstim
 	camera_capture::g_camera_capture->capture_callback(chan_index, edge_time, edge_state, overflow);
 }
 
-void
-CameraCapture::Run()
+void CameraCapture::Run()
 {
 	// Command handling
 	vehicle_command_s cmd{};
@@ -180,31 +179,26 @@ CameraCapture::Run()
 
 			} else if (commandParamToInt(cmd.param1) == 0) {
 				set_capture_control(false);
-
 			}
 
 			// Reset capture sequence
 			if (commandParamToInt(cmd.param2) == 1) {
 				reset_statistics(true);
-
 			}
 
 			// Acknowledge the command
 			vehicle_command_ack_s command_ack{};
-
-			command_ack.timestamp = hrt_absolute_time();
 			command_ack.command = cmd.command;
 			command_ack.result = (uint8_t)vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
 			command_ack.target_system = cmd.source_system;
 			command_ack.target_component = cmd.source_component;
-
+			command_ack.timestamp = hrt_absolute_time();
 			_command_ack_pub.publish(command_ack);
 		}
 	}
 }
 
-void
-CameraCapture::set_capture_control(bool enabled)
+void CameraCapture::set_capture_control(bool enabled)
 {
 // a board can define BOARD_CAPTURE_GPIO to use a separate capture pin
 #if defined(BOARD_CAPTURE_GPIO)
@@ -216,14 +210,7 @@ CameraCapture::set_capture_control(bool enabled)
 
 #else
 
-	int fd = ::open(PX4FMU_DEVICE_PATH, O_RDWR);
-
-	if (fd < 0) {
-		PX4_ERR("open fail");
-		return;
-	}
-
-	input_capture_config_t conf;
+	input_capture_config_t conf{};
 	conf.channel = 5; // FMU chan 6
 	conf.filter = 0;
 
@@ -247,9 +234,7 @@ CameraCapture::set_capture_control(bool enabled)
 		if (::ioctl(fd, INPUT_CAP_GET_COUNT, (unsigned long)&capture_count) != 0) {
 			PX4_INFO("Not in a capture mode");
 
-			unsigned long mode = PWM_SERVO_MODE_4PWM2CAP;
-
-			if (::ioctl(fd, PWM_SERVO_SET_MODE, mode) == 0) {
+			if (up_input_capture_set(5, Rising, 0, NULL, NULL) == 0) {
 				PX4_INFO("Mode changed to 4PWM2CAP");
 
 			} else {
@@ -259,7 +244,8 @@ CameraCapture::set_capture_control(bool enabled)
 		}
 	}
 
-	if (::ioctl(fd, INPUT_CAP_SET_CALLBACK, (unsigned long)&conf) == 0) {
+	// FMU chan 6
+	if (up_input_capture_set_callback(5, &CameraCapture::capture_trampoline, this) == 0) {
 		_capture_enabled = enabled;
 		_gpio_capture = false;
 
@@ -276,8 +262,7 @@ err_out:
 #endif
 }
 
-void
-CameraCapture::reset_statistics(bool reset_seq)
+void CameraCapture::reset_statistics(bool reset_seq)
 {
 	if (reset_seq) {
 		_capture_seq = 0;
@@ -289,8 +274,7 @@ CameraCapture::reset_statistics(bool reset_seq)
 	_capture_overflows = 0;
 }
 
-int
-CameraCapture::start()
+int CameraCapture::start()
 {
 	// run every 100 ms (10 Hz)
 	ScheduleOnInterval(100000, 10000);
@@ -298,8 +282,7 @@ CameraCapture::start()
 	return PX4_OK;
 }
 
-void
-CameraCapture::stop()
+void CameraCapture::stop()
 {
 	ScheduleClear();
 
@@ -310,8 +293,7 @@ CameraCapture::stop()
 	}
 }
 
-void
-CameraCapture::status()
+int CameraCapture::print_status()
 {
 	PX4_INFO("Capture enabled : %s", _capture_enabled ? "YES" : "NO");
 	PX4_INFO("Frame sequence : %u", _capture_seq);
@@ -329,6 +311,48 @@ CameraCapture::status()
 	}
 
 	PX4_INFO("Number of overflows : %u", _capture_overflows);
+
+	return 0;
+}
+
+int CameraCapture::custom_command(int argc, char *argv[])
+{
+	PortMode new_mode = PORT_MODE_UNSET;
+	const char *verb = argv[0];
+
+	/* start the FMU if not running */
+	if (!is_running()) {
+		int ret = CameraCapture::task_spawn(argc, argv);
+
+		if (ret) {
+			return ret;
+		}
+	}
+
+	return print_usage("unknown command");
+}
+
+int CameraCapture::task_spawn(int argc, char *argv[])
+{
+	CameraCapture *instance = new CameraCapture();
+
+	if (instance) {
+		_object.store(instance);
+		_task_id = task_id_is_work_queue;
+
+		if (instance->init() == PX4_OK) {
+			return PX4_OK;
+		}
+
+	} else {
+		PX4_ERR("alloc failed");
+	}
+
+	delete instance;
+	_object.store(nullptr);
+	_task_id = -1;
+
+	return PX4_ERROR;
 }
 
 static int usage()
@@ -337,9 +361,7 @@ static int usage()
 	return 1;
 }
 
-extern "C" __EXPORT int camera_capture_main(int argc, char *argv[]);
-
-int camera_capture_main(int argc, char *argv[])
+extern "C" __EXPORT int camera_capture_main(int argc, char *argv[])
 {
 	if (argc < 2) {
 		return usage();
@@ -393,4 +415,54 @@ int camera_capture_main(int argc, char *argv[])
 	}
 
 	return 0;
+}
+
+int InputCapture::print_usage(const char *reason)
+{
+	if (reason) {
+		PX4_WARN("%s\n", reason);
+	}
+
+	PRINT_MODULE_DESCRIPTION(
+		R"DESCR_STR(
+### Description
+This module is responsible for driving the output and reading the input pins. For boards without a separate IO chip
+(eg. Pixracer), it uses the main channels. On boards with an IO chip (eg. Pixhawk), it uses the AUX channels, and the
+px4io driver is used for main ones.
+
+It listens on the actuator_controls topics, does the mixing and writes the PWM outputs.
+
+The module is configured via mode_* commands. This defines which of the first N pins the driver should occupy.
+By using mode_pwm4 for example, pins 5 and 6 can be used by the camera trigger driver or by a PWM rangefinder
+driver. Alternatively, pwm_out can be started in one of the capture modes, and then drivers can register a capture
+callback with ioctl calls.
+
+### Implementation
+By default the module runs on a work queue with a callback on the uORB actuator_controls topic.
+
+### Examples
+It is typically started with:
+$ pwm_out mode_pwm
+To drive all available pins.
+
+Capture input (rising and falling edges) and print on the console: start pwm_out in one of the capture modes:
+$ pwm_out mode_pwm3cap1
+This will enable capturing on the 4th pin. Then do:
+$ pwm_out test
+
+Use the `pwm` command for further configurations (PWM rate, levels, ...), and the `mixer` command to load
+mixer files.
+)DESCR_STR");
+
+	PRINT_MODULE_USAGE_NAME("input_capture", "driver");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("start", "Start the task (without any mode set, use any of the mode_* cmds)");
+
+	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
+
+	return 0;
+}
+
+extern "C" __EXPORT int pwm_out_main(int argc, char *argv[])
+{
+	return InputCapture::main(argc, argv);
 }

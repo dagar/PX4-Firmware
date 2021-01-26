@@ -57,43 +57,47 @@
 #define PX4FMU_DEVICE_PATH	"/dev/px4fmu"
 
 
-class CameraCapture : public px4::ScheduledWorkItem
+class CameraCapture : public ModuleBase<CameraCapture>, public px4::ScheduledWorkItem
 {
 public:
-	/**
-	 * Constructor
-	 */
 	CameraCapture();
-
-	/**
-	 * Destructor, also kills task.
-	 */
 	~CameraCapture();
+
+	/** @see ModuleBase */
+	static int task_spawn(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static int custom_command(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static int print_usage(const char *reason = nullptr);
+
+	/** @see ModuleBase::print_status() */
+	int print_status() override;
 
 	/**
 	 * Start the task.
 	 */
-	int			start();
+	int start();
 
 	/**
 	 * Stop the task.
 	 */
-	void			stop();
+	void stop();
 
-	void 			status();
+	void status();
 
 	// Low-rate command handling loop
-	void			Run() override;
+	void Run() override;
 
-	static void		capture_trampoline(void *context, uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state,
-			uint32_t overflow);
+	static void capture_trampoline(void *context, uint32_t chan_index, hrt_abstime edge_time, uint32_t edge_state,
+				       uint32_t overflow);
 
-	void 			set_capture_control(bool enabled);
+	void  set_capture_control(bool enabled);
 
-	void			reset_statistics(bool reset_seq);
+	void reset_statistics(bool reset_seq);
 
-	void			publish_trigger();
-
+	void publish_trigger();
 
 	static struct work_s	_work_publisher;
 

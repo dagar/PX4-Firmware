@@ -33,7 +33,6 @@
 #pragma once
 
 #include <drivers/device/device.h>
-#include <drivers/drv_input_capture.h>
 #include <drivers/drv_mixer.h>
 #include <lib/mixer_module/mixer_module.hpp>
 #include <px4_platform_common/getopt.h>
@@ -68,26 +67,17 @@ public:
 		MODE_NONE = 0,
 		MODE_1PWM,
 		MODE_2PWM,
-		MODE_2PWM2CAP,
 		MODE_3PWM,
-		MODE_3PWM1CAP,
 		MODE_4PWM,
-		MODE_4PWM1CAP,
-		MODE_4PWM2CAP,
 		MODE_5PWM,
-		MODE_5PWM1CAP,
 		MODE_6PWM,
 		MODE_8PWM,
 		MODE_14PWM,
-		MODE_4CAP,
-		MODE_5CAP,
-		MODE_6CAP,
 	};
 
 	/** Mode given via CLI */
 	enum PortMode {
 		PORT_MODE_UNSET = 0,
-		PORT_FULL_GPIO,
 		PORT_FULL_PWM,
 		PORT_PWM8,
 		PORT_PWM6,
@@ -96,25 +86,16 @@ public:
 		PORT_PWM3,
 		PORT_PWM2,
 		PORT_PWM1,
-		PORT_PWM3CAP1,
-		PORT_PWM4CAP1,
-		PORT_PWM4CAP2,
-		PORT_PWM5CAP1,
-		PORT_PWM2CAP2,
-		PORT_CAPTURE,
 	};
-
-	static void capture_trampoline(void *context, const uint32_t channel_index, const hrt_abstime edge_time,
-				       const uint32_t edge_state, const uint32_t overflow);
 
 	/** @see ModuleBase */
 	static int custom_command(int argc, char *argv[]);
 
 	Mode get_mode() { return _mode; }
 
-	virtual int init();
+	int init() override;
 
-	virtual int ioctl(file *filp, int cmd, unsigned long arg);
+	int ioctl(file *filp, int cmd, unsigned long arg) override;
 
 	/** change the mode of the running module */
 	static int module_new_mode(const PortMode new_mode);
@@ -175,11 +156,6 @@ private:
 		uORB::PublicationData<esc_status_s> esc_status_pub{ORB_ID(esc_status)};
 		int last_motor_index{-1};
 	};
-
-	void capture_callback(const uint32_t channel_index, const hrt_abstime edge_time,
-			      const uint32_t edge_state, const uint32_t overflow);
-
-	int capture_ioctl(file *filp, const int cmd, const unsigned long arg);
 
 	void enable_dshot_outputs(const bool enabled);
 

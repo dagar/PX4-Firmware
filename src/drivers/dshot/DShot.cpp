@@ -99,139 +99,34 @@ int DShot::set_mode(const Mode mode)
 	 */
 	switch (mode) {
 	case MODE_1PWM:
-		// default output rates
 		_output_mask = 0x1;
 		_outputs_initialized = false;
 		_num_outputs = 1;
 		break;
 
-#if defined(BOARD_HAS_CAPTURE)
-
-	case MODE_2PWM2CAP:	// v1 multi-port with flow control lines as PWM
-		up_input_capture_set(2, Rising, 0, NULL, NULL);
-		up_input_capture_set(3, Rising, 0, NULL, NULL);
-		PX4_DEBUG("MODE_2PWM2CAP");
-#endif
-
-	// FALLTHROUGH
-
-	case MODE_2PWM:	// v1 multi-port with flow control lines as PWM
-		PX4_DEBUG("MODE_2PWM");
-
-		// default output rates
+	case MODE_2PWM:
 		_output_mask = 0x3;
 		_outputs_initialized = false;
 		_num_outputs = 2;
-
 		break;
 
-#if defined(BOARD_HAS_CAPTURE)
-
-	case MODE_3PWM1CAP:	// v1 multi-port with flow control lines as PWM
-		PX4_DEBUG("MODE_3PWM1CAP");
-		up_input_capture_set(3, Rising, 0, NULL, NULL);
-#endif
-
-	// FALLTHROUGH
-
-	case MODE_3PWM:	// v1 multi-port with flow control lines as PWM
-		PX4_DEBUG("MODE_3PWM");
-
-		// default output rates
+	case MODE_3PWM:
 		_output_mask = 0x7;
 		_outputs_initialized = false;
 		_num_outputs = 3;
-
 		break;
 
-#if defined(BOARD_HAS_CAPTURE)
-
-	case MODE_4PWM1CAP:
-		PX4_DEBUG("MODE_4PWM1CAP");
-		up_input_capture_set(4, Rising, 0, NULL, NULL);
-#endif
-
-	// FALLTHROUGH
-
-	case MODE_4PWM: // v1 or v2 multi-port as 4 PWM outs
-		PX4_DEBUG("MODE_4PWM");
-
-		// default output rates
+	case MODE_4PWM:
 		_output_mask = 0xf;
 		_outputs_initialized = false;
 		_num_outputs = 4;
-
 		break;
 
-#if defined(BOARD_HAS_CAPTURE)
-
-	case MODE_4PWM2CAP:
-		PX4_DEBUG("MODE_4PWM2CAP");
-		up_input_capture_set(5, Rising, 0, NULL, NULL);
-
-		// default output rates
-		_output_mask = 0x0f;
-		_outputs_initialized = false;
-		_num_outputs = 4;
-
-		break;
-#endif
-
-#if defined(BOARD_HAS_CAPTURE)
-
-	case MODE_5PWM1CAP:
-		PX4_DEBUG("MODE_5PWM1CAP");
-		up_input_capture_set(5, Rising, 0, NULL, NULL);
-#endif
-
-	// FALLTHROUGH
-
-	case MODE_5PWM: // v1 or v2 multi-port as 5 PWM outs
-		PX4_DEBUG("MODE_5PWM");
-
-		// default output rates
+	case MODE_5PWM:
 		_output_mask = 0x1f;
 		_outputs_initialized = false;
 		_num_outputs = 5;
-
 		break;
-
-#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
-
-	case MODE_6PWM:
-		PX4_DEBUG("MODE_6PWM");
-
-		// default output rates
-		_output_mask = 0x3f;
-		_outputs_initialized = false;
-		_num_outputs = 6;
-
-		break;
-#endif
-
-#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
-
-	case MODE_8PWM: // AeroCore PWMs as 8 PWM outs
-		PX4_DEBUG("MODE_8PWM");
-		// default output rates
-		_output_mask = 0xff;
-		_outputs_initialized = false;
-		_num_outputs = 8;
-
-		break;
-#endif
-
-#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 14
-
-	case MODE_14PWM:
-		PX4_DEBUG("MODE_14PWM");
-		// default output rates
-		_output_mask = 0x3fff;
-		_outputs_initialized = false;
-		_num_outputs = 14;
-
-		break;
-#endif
 
 	case MODE_NONE:
 		PX4_DEBUG("MODE_NONE");
@@ -275,20 +170,6 @@ int DShot::task_spawn(int argc, char *argv[])
 	_task_id = -1;
 
 	return PX4_ERROR;
-}
-
-void DShot::capture_trampoline(void *context, const uint32_t channel_index, const hrt_abstime edge_time,
-			       const uint32_t edge_state, const uint32_t overflow)
-{
-	DShot *dev = static_cast<DShot *>(context);
-	dev->capture_callback(channel_index, edge_time, edge_state, overflow);
-}
-
-void DShot::capture_callback(const uint32_t channel_index, const hrt_abstime edge_time,
-			     const uint32_t edge_state, const uint32_t overflow)
-{
-	fprintf(stdout, "DShot: Capture chan:%d time:%lld state:%d overflow:%d\n", channel_index, edge_time, edge_state,
-		overflow);
 }
 
 void DShot::enable_dshot_outputs(const bool enabled)
@@ -613,55 +494,7 @@ void DShot::update_params()
 				       DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE));
 }
 
-int DShot::ioctl(file *filp, int cmd, unsigned long arg)
-{
-	int ret;
-
-	// try it as a Capture ioctl next
-	ret = capture_ioctl(filp, cmd, arg);
-
-	if (ret != -ENOTTY) {
-		return ret;
-	}
-
-	// if we are in valid PWM mode, try it as a PWM ioctl as well
-	switch (_mode) {
-	case MODE_1PWM:
-	case MODE_2PWM:
-	case MODE_3PWM:
-	case MODE_4PWM:
-	case MODE_5PWM:
-	case MODE_2PWM2CAP:
-	case MODE_3PWM1CAP:
-	case MODE_4PWM1CAP:
-	case MODE_4PWM2CAP:
-	case MODE_5PWM1CAP:
-#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
-	case MODE_6PWM:
-#endif
-#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
-	case MODE_8PWM:
-#endif
-#if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 14
-	case MODE_14PWM:
-#endif
-		ret = pwm_ioctl(filp, cmd, arg);
-		break;
-
-	default:
-		PX4_DEBUG("not in a PWM mode");
-		break;
-	}
-
-	// if nobody wants it, let CDev have it
-	if (ret == -ENOTTY) {
-		ret = CDev::ioctl(filp, cmd, arg);
-	}
-
-	return ret;
-}
-
-int DShot::pwm_ioctl(file *filp, const int cmd, const unsigned long arg)
+int DShot::ioctl(file *filp, const int cmd, const unsigned long arg)
 {
 	int ret = OK;
 
@@ -695,23 +528,18 @@ int DShot::pwm_ioctl(file *filp, const int cmd, const unsigned long arg)
 #endif
 
 		case MODE_5PWM:
-		case MODE_5PWM1CAP:
 			*(unsigned *)arg = 5;
 			break;
 
 		case MODE_4PWM:
-		case MODE_4PWM1CAP:
-		case MODE_4PWM2CAP:
 			*(unsigned *)arg = 4;
 			break;
 
 		case MODE_3PWM:
-		case MODE_3PWM1CAP:
 			*(unsigned *)arg = 3;
 			break;
 
 		case MODE_2PWM:
-		case MODE_2PWM2CAP:
 			*(unsigned *)arg = 2;
 			break;
 
@@ -740,36 +568,16 @@ int DShot::pwm_ioctl(file *filp, const int cmd, const unsigned long arg)
 				ret = set_mode(MODE_2PWM);
 				break;
 
-			case PWM_SERVO_MODE_2PWM2CAP:
-				ret = set_mode(MODE_2PWM2CAP);
-				break;
-
 			case PWM_SERVO_MODE_3PWM:
 				ret = set_mode(MODE_3PWM);
-				break;
-
-			case PWM_SERVO_MODE_3PWM1CAP:
-				ret = set_mode(MODE_3PWM1CAP);
 				break;
 
 			case PWM_SERVO_MODE_4PWM:
 				ret = set_mode(MODE_4PWM);
 				break;
 
-			case PWM_SERVO_MODE_4PWM1CAP:
-				ret = set_mode(MODE_4PWM1CAP);
-				break;
-
-			case PWM_SERVO_MODE_4PWM2CAP:
-				ret = set_mode(MODE_4PWM2CAP);
-				break;
-
 			case PWM_SERVO_MODE_5PWM:
 				ret = set_mode(MODE_5PWM);
-				break;
-
-			case PWM_SERVO_MODE_5PWM1CAP:
-				ret = set_mode(MODE_5PWM1CAP);
 				break;
 
 			case PWM_SERVO_MODE_6PWM:
@@ -778,18 +586,6 @@ int DShot::pwm_ioctl(file *filp, const int cmd, const unsigned long arg)
 
 			case PWM_SERVO_MODE_8PWM:
 				ret = set_mode(MODE_8PWM);
-				break;
-
-			case PWM_SERVO_MODE_4CAP:
-				ret = set_mode(MODE_4CAP);
-				break;
-
-			case PWM_SERVO_MODE_5CAP:
-				ret = set_mode(MODE_5CAP);
-				break;
-
-			case PWM_SERVO_MODE_6CAP:
-				ret = set_mode(MODE_6CAP);
 				break;
 
 			default:
@@ -822,157 +618,6 @@ int DShot::pwm_ioctl(file *filp, const int cmd, const unsigned long arg)
 	return ret;
 }
 
-int DShot::capture_ioctl(file *filp, const int cmd, const unsigned long arg)
-{
-	int ret = -EINVAL;
-
-#if defined(BOARD_HAS_CAPTURE)
-
-	lock();
-
-	input_capture_config_t *pconfig = 0;
-
-	input_capture_stats_t *stats = (input_capture_stats_t *)arg;
-
-	if (_mode == MODE_3PWM1CAP || _mode == MODE_2PWM2CAP ||
-	    _mode == MODE_4PWM1CAP || _mode == MODE_5PWM1CAP ||
-	    _mode == MODE_4PWM2CAP) {
-
-		pconfig = (input_capture_config_t *)arg;
-	}
-
-	switch (cmd) {
-
-	case INPUT_CAP_SET:
-		if (pconfig) {
-			ret =  up_input_capture_set(pconfig->channel, pconfig->edge, pconfig->filter,
-						    pconfig->callback, pconfig->context);
-		}
-
-		break;
-
-	case INPUT_CAP_SET_CALLBACK:
-		if (pconfig) {
-			ret =  up_input_capture_set_callback(pconfig->channel, pconfig->callback, pconfig->context);
-		}
-
-		break;
-
-	case INPUT_CAP_GET_CALLBACK:
-		if (pconfig) {
-			ret =  up_input_capture_get_callback(pconfig->channel, &pconfig->callback, &pconfig->context);
-		}
-
-		break;
-
-	case INPUT_CAP_GET_STATS:
-		if (arg) {
-			ret =  up_input_capture_get_stats(stats->chan_in_edges_out, stats, false);
-		}
-
-		break;
-
-	case INPUT_CAP_GET_CLR_STATS:
-		if (arg) {
-			ret =  up_input_capture_get_stats(stats->chan_in_edges_out, stats, true);
-		}
-
-		break;
-
-	case INPUT_CAP_SET_EDGE:
-		if (pconfig) {
-			ret =  up_input_capture_set_trigger(pconfig->channel, pconfig->edge);
-		}
-
-		break;
-
-	case INPUT_CAP_GET_EDGE:
-		if (pconfig) {
-			ret =  up_input_capture_get_trigger(pconfig->channel, &pconfig->edge);
-		}
-
-		break;
-
-	case INPUT_CAP_SET_FILTER:
-		if (pconfig) {
-			ret =  up_input_capture_set_filter(pconfig->channel, pconfig->filter);
-		}
-
-		break;
-
-	case INPUT_CAP_GET_FILTER:
-		if (pconfig) {
-			ret =  up_input_capture_get_filter(pconfig->channel, &pconfig->filter);
-		}
-
-		break;
-
-	case INPUT_CAP_GET_COUNT:
-		ret = OK;
-
-		switch (_mode) {
-		case MODE_5PWM1CAP:
-		case MODE_4PWM1CAP:
-		case MODE_3PWM1CAP:
-			*(unsigned *)arg = 1;
-			break;
-
-		case MODE_2PWM2CAP:
-		case MODE_4PWM2CAP:
-			*(unsigned *)arg = 2;
-			break;
-
-		default:
-			ret = -EINVAL;
-			break;
-		}
-
-		break;
-
-	case INPUT_CAP_SET_COUNT:
-		ret = OK;
-
-		switch (_mode) {
-		case MODE_3PWM1CAP:
-			set_mode(MODE_3PWM1CAP);
-			break;
-
-		case MODE_2PWM2CAP:
-			set_mode(MODE_2PWM2CAP);
-			break;
-
-		case MODE_4PWM1CAP:
-			set_mode(MODE_4PWM1CAP);
-			break;
-
-		case MODE_4PWM2CAP:
-			set_mode(MODE_4PWM2CAP);
-			break;
-
-		case MODE_5PWM1CAP:
-			set_mode(MODE_5PWM1CAP);
-			break;
-
-		default:
-			ret = -EINVAL;
-			break;
-		}
-
-		break;
-
-	default:
-		ret = -ENOTTY;
-		break;
-	}
-
-	unlock();
-
-#else
-	ret = -ENOTTY;
-#endif
-	return ret;
-}
-
 int DShot::module_new_mode(const PortMode new_mode)
 {
 	if (!is_running()) {
@@ -984,7 +629,6 @@ int DShot::module_new_mode(const PortMode new_mode)
 	mode = DShot::MODE_NONE;
 
 	switch (new_mode) {
-	case PORT_FULL_GPIO:
 	case PORT_MODE_UNSET:
 		break;
 
@@ -1035,15 +679,6 @@ int DShot::module_new_mode(const PortMode new_mode)
 		mode = DShot::MODE_5PWM;
 		break;
 
-
-#  if defined(BOARD_HAS_CAPTURE)
-
-	case PORT_PWM5CAP1:
-		// select 5-pin PWM mode 1 capture
-		mode = DShot::MODE_5PWM1CAP;
-		break;
-
-#  endif
 #endif
 
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 4
@@ -1053,47 +688,15 @@ int DShot::module_new_mode(const PortMode new_mode)
 		mode = DShot::MODE_4PWM;
 		break;
 
-
-#  if defined(BOARD_HAS_CAPTURE)
-
-	case PORT_PWM4CAP1:
-		// select 4-pin PWM mode 1 capture
-		mode = DShot::MODE_4PWM1CAP;
-		break;
-
-	case PORT_PWM4CAP2:
-		// select 4-pin PWM mode 2 capture
-		mode = DShot::MODE_4PWM2CAP;
-		break;
-
-#  endif
-
 	case PORT_PWM3:
 		// select 3-pin PWM mode
 		mode = DShot::MODE_3PWM;
 		break;
 
-#  if defined(BOARD_HAS_CAPTURE)
-
-	case PORT_PWM3CAP1:
-		// select 3-pin PWM mode 1 capture
-		mode = DShot::MODE_3PWM1CAP;
-		break;
-#  endif
-
 	case PORT_PWM2:
 		// select 2-pin PWM mode
 		mode = DShot::MODE_2PWM;
 		break;
-
-#  if defined(BOARD_HAS_CAPTURE)
-
-	case PORT_PWM2CAP2:
-		// select 2-pin PWM mode 2 capture
-		mode = DShot::MODE_2PWM2CAP;
-		break;
-
-#  endif
 #endif
 
 	default:
@@ -1204,13 +807,10 @@ int DShot::custom_command(int argc, char *argv[])
 	/*
 	 * Mode switches.
 	 */
-	if (!strcmp(verb, "mode_gpio")) {
-		new_mode = PORT_FULL_GPIO;
-
-	} else if (!strcmp(verb, "mode_pwm")) {
+	if (!strcmp(verb, "mode_pwm")) {
 		new_mode = PORT_FULL_PWM;
 
-		// mode: defines which outputs to drive (others may be used by other tasks such as camera capture)
+		// mode: defines which outputs to drive
 #if defined(BOARD_HAS_PWM)
 
 	} else if (!strcmp(verb, "mode_pwm1")) {
@@ -1228,41 +828,14 @@ int DShot::custom_command(int argc, char *argv[])
 	} else if (!strcmp(verb, "mode_pwm5")) {
 		new_mode = PORT_PWM5;
 
-#  if defined(BOARD_HAS_CAPTURE)
-
-	} else if (!strcmp(verb, "mode_pwm5cap1")) {
-		new_mode = PORT_PWM5CAP1;
-#  endif
-
 	} else if (!strcmp(verb, "mode_pwm4")) {
 		new_mode = PORT_PWM4;
-
-#  if defined(BOARD_HAS_CAPTURE)
-
-	} else if (!strcmp(verb, "mode_pwm4cap1")) {
-		new_mode = PORT_PWM4CAP1;
-
-	} else if (!strcmp(verb, "mode_pwm4cap2")) {
-		new_mode = PORT_PWM4CAP2;
-#  endif
 
 	} else if (!strcmp(verb, "mode_pwm3")) {
 		new_mode = PORT_PWM3;
 
-#  if defined(BOARD_HAS_CAPTURE)
-
-	} else if (!strcmp(verb, "mode_pwm3cap1")) {
-		new_mode = PORT_PWM3CAP1;
-#  endif
-
 	} else if (!strcmp(verb, "mode_pwm2")) {
 		new_mode = PORT_PWM2;
-
-#  if defined(BOARD_HAS_CAPTURE)
-
-	} else if (!strcmp(verb, "mode_pwm2cap2")) {
-		new_mode = PORT_PWM2CAP2;
-#  endif
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
 
@@ -1286,38 +859,21 @@ int DShot::print_status()
 	const char *mode_str = nullptr;
 
 	switch (_mode) {
-
 	case MODE_NONE: mode_str = "no outputs"; break;
 
 	case MODE_1PWM: mode_str = "outputs1"; break;
 
 	case MODE_2PWM: mode_str = "outputs2"; break;
 
-	case MODE_2PWM2CAP: mode_str = "outputs2cap2"; break;
-
 	case MODE_3PWM: mode_str = "outputs3"; break;
-
-	case MODE_3PWM1CAP: mode_str = "outputs3cap1"; break;
 
 	case MODE_4PWM: mode_str = "outputs4"; break;
 
-	case MODE_4PWM1CAP: mode_str = "outputs4cap1"; break;
-
-	case MODE_4PWM2CAP: mode_str = "outputs4cap2"; break;
-
 	case MODE_5PWM: mode_str = "outputs5"; break;
-
-	case MODE_5PWM1CAP: mode_str = "outputs5cap1"; break;
 
 	case MODE_6PWM: mode_str = "outputs6"; break;
 
 	case MODE_8PWM: mode_str = "outputs8"; break;
-
-	case MODE_4CAP: mode_str = "cap4"; break;
-
-	case MODE_5CAP: mode_str = "cap5"; break;
-
-	case MODE_6CAP: mode_str = "cap6"; break;
 
 	default:
 		break;
@@ -1372,22 +928,17 @@ After saving, the reversed direction will be regarded as the normal one. So to r
 	PRINT_MODULE_USAGE_COMMAND("mode_gpio");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("mode_pwm", "Select all available pins as PWM");
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 8
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm8");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm8");
 #endif
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm6");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm5");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm5cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm6");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm5");
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm4");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap1");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm4cap2");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm3");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm3cap1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm3");
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm2");
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm2cap2");
 #endif
 #if defined(BOARD_HAS_PWM)
-  PRINT_MODULE_USAGE_COMMAND("mode_pwm1");
+	PRINT_MODULE_USAGE_COMMAND("mode_pwm1");
 #endif
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("telemetry", "Enable Telemetry on a UART");
