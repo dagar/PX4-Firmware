@@ -32,6 +32,7 @@
  ****************************************************************************/
 
 #include "UavcanNode.hpp"
+#include "indication_controller.hpp"
 
 #include "boot_app_shared.h"
 
@@ -82,6 +83,8 @@ UavcanNode::UavcanNode(uavcan::ICanDriver &can_driver, uavcan::ISystemClock &sys
 	_raw_air_data_publisher(_node),
 	_range_sensor_measurement(_node),
 	_flow_measurement_publisher(_node),
+	_indication_button_publisher(_node),
+	_param_server(_node),
 	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle time")),
 	_interval_perf(perf_alloc(PC_INTERVAL, MODULE_NAME": cycle interval")),
 	_reset_timer(_node)
@@ -289,6 +292,9 @@ void UavcanNode::Run()
 	if (!_initialized) {
 
 		get_node().setRestartRequestHandler(&restart_request_handler);
+		_param_server.start(&_param_manager);
+
+		init_indication_controller(get_node());
 
 		// Set up the time synchronization
 		const int slave_init_res = _time_sync_slave.start();
@@ -310,6 +316,7 @@ void UavcanNode::Run()
 		_sensor_baro_sub.registerCallback();
 		_sensor_gps_sub.registerCallback();
 		_sensor_mag_sub.registerCallback();
+		_sensor_gps_sub.registerCallback();
 
 		_initialized = true;
 	}
@@ -512,6 +519,20 @@ void UavcanNode::Run()
 			measurement.quality = optical_flow.quality;
 
 			_flow_measurement_publisher.broadcast(measurement);
+		}
+	}
+
+	// safety -> standard::indication::button
+	if (_safety_sub.updated()) {
+		safety_s safety;
+
+		if (_safety_sub.copy(&safety)) {
+			if (safety.safety_switch_available) {
+				standard::indication::Button Button{};
+				Button.button = standard::indication::Button::BUTTON_SAFETY;
+				Button.press_time = safety.safety_off ? UINT8_MAX : 0;
+				_indication_button_publisher.broadcast(Button);
+			}
 		}
 	}
 
