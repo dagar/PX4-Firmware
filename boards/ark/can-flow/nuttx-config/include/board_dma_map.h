@@ -33,11 +33,13 @@
 
 #pragma once
 
-// N.B. Map not included as it is not correct for an F412
-
 // DMA1 Channel/Stream Selections
 //--------------------------------------------//---------------------------//----------------
 
 
 //  DMA2 Channel/Stream Selections
 //--------------------------------------------//---------------------------//----------------
+#define DMACHAN_SPI1_RX    DMAMAP_SPI1_RX_2   // DMA2, Stream 2, Channel 3
+#define DMACHAN_SPI2_RX    DMAMAP_SPI2_RX     // DMA2, Stream 3, Channel 0
+#define DMACHAN_SPI2_TX    DMAMAP_SPI2_TX     // DMA2, Stream 4, Channel 0
+#define DMACHAN_SPI1_TX    DMAMAP_SPI1_TX_1   // DMA2, Stream 5, Channel 3

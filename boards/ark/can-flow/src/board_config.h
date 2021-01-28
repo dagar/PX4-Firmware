@@ -53,17 +53,13 @@
  */
 #define GPIO_CAN1_SILENT_S0  /* PA9  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN9)
 
-/* CAN Termination
- *
- * CAN termination software control
- */
-#define GPIO_CAN1_TERMINATION  /* PB13  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN13)
+/* CAN termination software control */
+#define GPIO_CAN1_TERMINATION /* PB13 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTB|GPIO_PIN13)
 
 /* Boot config */
-#define GPIO_BOOT_CONFIG  /* PC15  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN15|GPIO_EXTI)
+#define GPIO_BOOT_CONFIG  /* PC15 */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN15|GPIO_EXTI)
 
 /* LEDs are driven with push open drain to support Anode to 5V or 3.3V */
-
 #define GPIO_LED_RED        /* PB3 */  (GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN3)
 #define GPIO_LED_BLUE       /* PA8 */  (GPIO_OUTPUT|GPIO_OPENDRAIN|GPIO_SPEED_50MHz|GPIO_OUTPUT_SET|GPIO_PORTA|GPIO_PIN8)
 
@@ -71,7 +67,7 @@
 #define BOARD_OVERLOAD_LED     LED_RED
 #define BOARD_ARMED_STATE_LED  LED_BLUE
 
-#define  FLASH_BASED_PARAMS
+#define FLASH_BASED_PARAMS
 
 /* High-resolution timer */
 #define HRT_TIMER                    3  /* use timer 3 for the HRT */
@@ -80,10 +76,6 @@
 __BEGIN_DECLS
 
 #ifndef __ASSEMBLY__
-
-/****************************************************************************************************
- * Public Functions
- ****************************************************************************************************/
 
 /****************************************************************************************************
  * Name: stm32_spiinitialize

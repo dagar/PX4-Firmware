@@ -33,11 +33,10 @@ px4_add_board(
 		optical_flow/paw3902
 		uavcannode
 	MODULES
-		# ekf2
-		# load_mon
-		sensors
+		#ekf2
+		load_mon
+		#sensors
 	SYSTEMCMDS
-		mtd
 		param
 		perf
 		reboot
@@ -45,15 +44,4 @@ px4_add_board(
 		topic_listener
 		ver
 		work_queue
-)
-
-include(px4_make_uavcan_bootloader)
-px4_make_uavcan_bootloadable(
-	BOARD ${PX4_BOARD}
-	BIN ${PX4_BINARY_DIR}/${PX4_BOARD}.bin
-	HWNAME ${uavcanblid_name}
-	HW_MAJOR ${uavcanblid_hw_version_major}
-	HW_MINOR ${uavcanblid_hw_version_minor}
-	SW_MAJOR ${uavcanblid_sw_version_major}
-	SW_MINOR ${uavcanblid_sw_version_minor}
 )
