@@ -66,6 +66,7 @@ enum MCU_REV {
 # define STM32F74xxx_75xxx  0x449
 # define STM32F76xxx_77xxx  0x451
 # define STM32F40x_41x      0x413
+# define STM32F412          0x441
 # define STM32F42x_43x      0x419
 # define STM32F103_LD       0x412
 # define STM32F103_MD       0x410
@@ -101,6 +102,10 @@ int board_mcu_version(char *rev, const char **revstr, const char **errata)
 		*revstr = "STM32F42x";
 		/* Set possible errata */
 		chip_errata = STM32_F4_ERRATA;
+		break;
+
+	case STM32F412:
+		*revstr = "STM32F412";
 		break;
 
 	case STM32F103_LD:

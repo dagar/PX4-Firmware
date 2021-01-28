@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,23 +31,25 @@
  *
  ****************************************************************************/
 
-#include "PAW3902.hpp"
+#include "AFBRS50.hpp"
+
+#include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 
-void PAW3902::print_usage()
+void AFBRS50::print_usage()
 {
-	PRINT_MODULE_USAGE_NAME("paw3902", "driver");
+	PRINT_MODULE_USAGE_NAME("afbrs50", "driver");
+	PRINT_MODULE_USAGE_SUBCATEGORY("range finder");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(false, true);
-	PRINT_MODULE_USAGE_PARAM_INT('Y', 0, 0, 359, "custom yaw rotation (degrees)", true);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
-I2CSPIDriverBase *PAW3902::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
+I2CSPIDriverBase *AFBRS50::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
 				       int runtime_instance)
 {
-	PAW3902 *instance = new PAW3902(iterator.configuredBusOption(), iterator.bus(), iterator.devid(), cli.bus_frequency,
-					cli.spi_mode, iterator.DRDYGPIO(), cli.custom1);
+	AFBRS50 *instance = new AFBRS50(iterator.configuredBusOption(), iterator.bus(), iterator.devid(), cli.rotation,
+					cli.bus_frequency, cli.spi_mode, iterator.DRDYGPIO());
 
 	if (!instance) {
 		PX4_ERR("alloc failed");
@@ -62,21 +64,11 @@ I2CSPIDriverBase *PAW3902::instantiate(const BusCLIArguments &cli, const BusInst
 	return instance;
 }
 
-extern "C" __EXPORT int paw3902_main(int argc, char *argv[])
+extern "C" int afbrs50_main(int argc, char *argv[])
 {
-	int ch = 0;
-	using ThisDriver = PAW3902;
+	using ThisDriver = AFBRS50;
 	BusCLIArguments cli{false, true};
-	cli.spi_mode = SPIDEV_MODE0;
 	cli.default_spi_frequency = SPI_SPEED;
-
-	while ((ch = cli.getopt(argc, argv, "Y:")) != EOF) {
-		switch (ch) {
-		case 'Y':
-			cli.custom1 = atoi(cli.optarg());
-			break;
-		}
-	}
 
 	const char *verb = cli.optarg();
 
@@ -85,17 +77,15 @@ extern "C" __EXPORT int paw3902_main(int argc, char *argv[])
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_FLOW_DEVTYPE_PAW3902);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_DIST_DEVTYPE_AFBRS50);
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);
-	}
 
-	if (!strcmp(verb, "stop")) {
+	} else if (!strcmp(verb, "stop")) {
 		return ThisDriver::module_stop(iterator);
-	}
 
-	if (!strcmp(verb, "status")) {
+	} else if (!strcmp(verb, "status")) {
 		return ThisDriver::module_status(iterator);
 	}
 

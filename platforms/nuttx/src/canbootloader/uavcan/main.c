@@ -918,8 +918,7 @@ static void application_run(size_t fw_image_size, bootloader_app_shared_t *commo
 	uint32_t fw_image[2] = {bootloader.fw_image[0], bootloader.fw_image[1]};
 
 	if (fw_image[0] != 0xffffffff
-	    && fw_image[1] > APPLICATION_LOAD_ADDRESS
-	    && fw_image[1] < (APPLICATION_LOAD_ADDRESS + fw_image_size)) {
+	    && fw_image[1] > APPLICATION_LOAD_ADDRESS) {
 
 		/* We want to disable interrupts regardless of whether NuttX
 		 * is configured for CONFIG_ARMV7M_USEBASEPRI
@@ -1143,6 +1142,8 @@ __EXPORT int main(int argc, char *argv[])
 		/* Preferred Node Address */
 
 		common.node_id = OPT_PREFERRED_NODE_ID;
+
+		goto boot;
 
 		if (CAN_OK != autobaud_and_get_dynamic_node_id(tboot, (can_speed_t *)&bootloader.bus_speed, &common.node_id)) {
 

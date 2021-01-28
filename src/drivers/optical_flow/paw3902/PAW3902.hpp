@@ -63,7 +63,7 @@ class PAW3902 : public device::SPI, public I2CSPIDriver<PAW3902>
 {
 public:
 	PAW3902(I2CSPIBusOption bus_option, int bus, int devid, int bus_frequency, spi_mode_e spi_mode,
-		float yaw_rotation_degrees = NAN);
+		spi_drdy_gpio_t drdy_gpio, float yaw_rotation_degrees = NAN);
 	virtual ~PAW3902();
 
 	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
@@ -77,7 +77,14 @@ public:
 	void RunImpl();
 
 private:
+	void exit_and_cleanup() override;
+
 	int probe() override;
+
+	static int DataReadyInterruptCallback(int irq, void *context, void *arg);
+	void DataReady();
+	bool DataReadyInterruptConfigure();
+	bool DataReadyInterruptDisable();
 
 	uint8_t	RegisterRead(uint8_t reg, int retries = 3);
 	void RegisterWrite(uint8_t reg, uint8_t data);
@@ -101,6 +108,8 @@ private:
 	perf_counter_t	_register_write_fail_perf{perf_alloc(PC_COUNT, MODULE_NAME": verified register write failed")};
 
 	static constexpr uint64_t COLLECT_TIME{15000}; // 15 milliseconds, optical flow data publish rate
+
+	const spi_drdy_gpio_t _drdy_gpio;
 
 	uint64_t _previous_collect_timestamp{0};
 	uint64_t _flow_dt_sum_usec{0};

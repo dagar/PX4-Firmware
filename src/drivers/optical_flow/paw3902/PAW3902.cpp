@@ -34,9 +34,11 @@
 #include "PAW3902.hpp"
 
 PAW3902::PAW3902(I2CSPIBusOption bus_option, int bus, int devid, int bus_frequency, spi_mode_e spi_mode,
+		 spi_drdy_gpio_t drdy_gpio,
 		 float yaw_rotation_degrees) :
 	SPI(DRV_FLOW_DEVTYPE_PAW3902, MODULE_NAME, bus, devid, spi_mode, bus_frequency),
-	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus)
+	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
+	_drdy_gpio(drdy_gpio)
 {
 	if (PX4_ISFINITE(yaw_rotation_degrees)) {
 		PX4_INFO("using yaw rotation %.3f degrees (%.3f radians)",
@@ -115,8 +117,40 @@ int PAW3902::probe()
 	return PX4_OK;
 }
 
+int PAW3902::DataReadyInterruptCallback(int irq, void *context, void *arg)
+{
+	static_cast<PAW3902 *>(arg)->DataReady();
+	return 0;
+}
+
+void PAW3902::DataReady()
+{
+	ScheduleNow();
+}
+
+bool PAW3902::DataReadyInterruptConfigure()
+{
+	if (_drdy_gpio == 0) {
+		return false;
+	}
+
+	// Setup data ready on falling edge
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
+}
+
+bool PAW3902::DataReadyInterruptDisable()
+{
+	if (_drdy_gpio == 0) {
+		return false;
+	}
+
+	return px4_arch_gpiosetevent(_drdy_gpio, false, false, false, nullptr, nullptr) == 0;
+}
+
 bool PAW3902::Reset()
 {
+	DataReadyInterruptDisable();
+
 	// Power on reset
 	RegisterWrite(Register::Power_Up_Reset, 0x5A);
 	usleep(1000);
@@ -131,6 +165,12 @@ bool PAW3902::Reset()
 	return true;
 }
 
+void PAW3902::exit_and_cleanup()
+{
+	DataReadyInterruptDisable();
+	I2CSPIDriverBase::exit_and_cleanup();
+}
+
 bool PAW3902::ChangeMode(Mode newMode)
 {
 	if (newMode != _mode) {
@@ -140,21 +180,31 @@ bool PAW3902::ChangeMode(Mode newMode)
 		// Issue a soft reset
 		RegisterWrite(Register::Power_Up_Reset, 0x5A);
 
+		uint32_t interval_us = 0;
+
 		switch (newMode) {
 		case Mode::Bright:
 			ModeBright();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_0);
+			interval_us = SAMPLE_INTERVAL_MODE_0;
 			break;
 
 		case Mode::LowLight:
 			ModeLowLight();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_1);
+			interval_us = SAMPLE_INTERVAL_MODE_1;
 			break;
 
 		case Mode::SuperLowLight:
 			ModeSuperLowLight();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_2);
+			interval_us = SAMPLE_INTERVAL_MODE_2;
 			break;
+		}
+
+		if (DataReadyInterruptConfigure()) {
+			// backup schedule as a watchdog timeout
+			ScheduleDelayed(500_ms);
+
+		} else {
+			ScheduleOnInterval(interval_us);
 		}
 
 		// Discard the first three motion data.

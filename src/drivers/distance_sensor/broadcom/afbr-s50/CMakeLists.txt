@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,21 +31,14 @@
 #
 ############################################################################
 
-px4_add_library(canbootloader
-	arch/stm32/board_identity.c
-	arch/stm32/drivers/can/driver.c
-	common/nuttx_stubs.c
-	fs/flash.c
-	protocol/uavcan.c
-	sched/timer.c
-	uavcan/main.c
-	util/random.c
-)
-
-include_directories(include)
-target_include_directories(canbootloader INTERFACE include)
-target_compile_options(canbootloader PRIVATE -Wno-error -O0)
-target_link_libraries(canbootloader
-	PRIVATE
-		drivers_bootloaders
-)
+px4_add_module(
+	MODULE drivers__distance_sensor__afbrs50
+	MAIN afbrs50
+	COMPILE_FLAGS
+	SRCS
+		AFBRS50.cpp
+		AFBRS50.hpp
+		afbrs50_main.cpp
+	DEPENDS
+		px4_work_queue
+	)
