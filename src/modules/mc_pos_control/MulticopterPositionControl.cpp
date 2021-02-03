@@ -138,6 +138,11 @@ int MulticopterPositionControl::parameters_update(bool force)
 		// initialize vectors from params and enforce constraints
 		_param_mpc_tko_speed.set(math::min(_param_mpc_tko_speed.get(), _param_mpc_z_vel_max_up.get()));
 		_param_mpc_land_speed.set(math::min(_param_mpc_land_speed.get(), _param_mpc_z_vel_max_dn.get()));
+
+		// set trigger time for takeoff delay
+		_takeoff.setSpoolupTime(_param_mpc_spoolup_time.get());
+		_takeoff.setTakeoffRampTime(_param_mpc_tko_ramp_t.get());
+		_takeoff.generateInitialRampValue(_param_mpc_z_vel_p_acc.get());
 	}
 
 	return OK;
@@ -238,6 +243,10 @@ void MulticopterPositionControl::Run()
 		const bool was_in_failsafe = _in_failsafe;
 		_in_failsafe = false;
 
+		// an update is necessary here because otherwise the takeoff state doesn't get skiped with non-altitude-controlled modes
+		_takeoff.updateTakeoffState(_control_mode.flag_armed, _vehicle_land_detected.landed, false, 10.f,
+					    !_control_mode.flag_control_climb_rate_enabled, time_stamp_now);
+
 		vehicle_local_position_setpoint_s setpoint;
 
 		// check if any task is active
@@ -250,13 +259,55 @@ void MulticopterPositionControl::Run()
 
 			vehicle_constraints_s constraints;
 
-			if (_vehicle_constraints_sub.update(&constraints)) {
-				_control.setConstraints(constraints);
-				_control.setThrustLimits(constraints.minimum_thrust, _param_mpc_thr_max.get());
+			if (_vehicle_constraints_sub.copy(&constraints)) {
+				// fix to prevent the takeoff ramp to ramp to a too high value or get stuck because of NAN
+				// TODO: this should get obsolete once the takeoff limiting moves into the flight tasks
+				if (!PX4_ISFINITE(constraints.speed_up) || (constraints.speed_up > _param_mpc_z_vel_max_up.get())) {
+					constraints.speed_up = _param_mpc_z_vel_max_up.get();
+				}
 
 				if (constraints.reset_integral) {
 					_control.resetIntegral();
 				}
+
+				// limit tilt during takeoff rampup
+				if (_takeoff.getTakeoffState() < TakeoffState::flight) {
+					constraints.tilt = math::radians(_param_mpc_tiltmax_lnd.get());
+					setpoint.acceleration[2] = NAN;
+				}
+			}
+
+			// handle smooth takeoff
+			_takeoff.updateTakeoffState(_control_mode.flag_armed, _vehicle_land_detected.landed, constraints.want_takeoff,
+						    constraints.speed_up, !_control_mode.flag_control_climb_rate_enabled, time_stamp_now);
+
+			constraints.speed_up = _takeoff.updateRamp(dt, constraints.speed_up);
+
+			_control.setConstraints(constraints);
+			_control.setThrustLimits(constraints.minimum_thrust, _param_mpc_thr_max.get());
+
+			const bool not_taken_off = _takeoff.getTakeoffState() < TakeoffState::rampup;
+			const bool flying = _takeoff.getTakeoffState() >= TakeoffState::flight;
+			const bool flying_but_ground_contact = flying && _vehicle_land_detected.ground_contact;
+
+			if (flying) {
+				_control.setThrustLimits(_param_mpc_thr_min.get(), _param_mpc_thr_max.get());
+
+			} else {
+				// allow zero thrust when taking off and landing
+				_control.setThrustLimits(0.f, _param_mpc_thr_max.get());
+			}
+
+			if (not_taken_off || flying_but_ground_contact) {
+				// we are not flying yet and need to avoid any corrections
+				reset_setpoint_to_nan(setpoint);
+				Vector3f(0.f, 0.f, 100.f).copyTo(setpoint.acceleration); // High downwards acceleration to make sure there's no thrust
+				// set yaw-sp to current yaw
+				// TODO: we need a clean way to disable yaw control
+				setpoint.yaw = _states.yaw;
+				setpoint.yawspeed = 0.f;
+				// prevent any integrator windup
+				_control.resetIntegral();
 			}
 
 			// Run position control
@@ -278,6 +329,16 @@ void MulticopterPositionControl::Run()
 				_control.setConstraints(constraints);
 
 				_control.update(dt);
+			}
+
+			// Publish takeoff status
+			takeoff_status_s takeoff_status;
+			takeoff_status.takeoff_state = static_cast<uint8_t>(_takeoff.getTakeoffState());
+
+			if (takeoff_status.takeoff_state != _old_takeoff_state) {
+				takeoff_status.timestamp = hrt_absolute_time();
+				_takeoff_status_pub.publish(takeoff_status);
+				_old_takeoff_state = takeoff_status.takeoff_state;
 			}
 
 			// Publish internal position control setpoints

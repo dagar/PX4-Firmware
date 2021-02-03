@@ -62,6 +62,7 @@
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 
 #include "PositionControl/PositionControl.hpp"
+#include "Takeoff/Takeoff.hpp"
 
 using namespace time_literals;
 
@@ -86,9 +87,12 @@ public:
 private:
 	void Run() override;
 
+	Takeoff _takeoff; /**< state machine and ramp to bring the vehicle off the ground without jumps */
+
 	uORB::Publication<vehicle_attitude_setpoint_s>	_vehicle_attitude_setpoint_pub;
 	orb_advert_t _mavlink_log_pub{nullptr};
 
+	uORB::Publication<takeoff_status_s> _takeoff_status_pub{ORB_ID(takeoff_status)};
 	uORB::Publication<vehicle_local_position_setpoint_s>	_local_pos_sp_pub{ORB_ID(vehicle_local_position_setpoint)};	/**< vehicle local position setpoint publication */
 
 	uORB::SubscriptionCallbackWorkItem _local_pos_sub{this, ORB_ID(vehicle_local_position)};	/**< vehicle local position */
@@ -150,6 +154,8 @@ private:
 	bool _in_failsafe = false; /**< true if failsafe was entered within current cycle */
 
 	bool _hover_thrust_initialized{false};
+
+	uint8_t _old_takeoff_state{0};
 
 	/** Timeout in us for trajectory data to get considered invalid */
 	static constexpr uint64_t TRAJECTORY_STREAM_TIMEOUT_US = 500_ms;

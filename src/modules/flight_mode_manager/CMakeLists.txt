@@ -107,8 +107,6 @@ add_compile_options(
 # add subdirectory containing all tasks
 add_subdirectory(tasks)
 
-add_subdirectory(Takeoff)
-
 px4_add_module(
 	MODULE modules__flight_mode_manager
 	MAIN flight_mode_manager
@@ -123,7 +121,6 @@ px4_add_module(
 		${CMAKE_CURRENT_BINARY_DIR}/FlightTasks_generated.hpp
 		${CMAKE_CURRENT_BINARY_DIR}/FlightTasks_generated.cpp
 	DEPENDS
-		Takeoff
 		px4_work_queue
 		WeatherVane
 )

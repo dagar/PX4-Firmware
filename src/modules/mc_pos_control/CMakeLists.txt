@@ -31,6 +31,7 @@
 #
 ############################################################################
 
+add_subdirectory(Takeoff)
 add_subdirectory(PositionControl)
 
 px4_add_module(
@@ -42,6 +43,7 @@ px4_add_module(
 		MulticopterPositionControl.hpp
 	DEPENDS
 		PositionControl
+		Takeoff
 		controllib
 		git_ecl
 		ecl_geo
