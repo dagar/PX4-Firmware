@@ -94,7 +94,7 @@ task_main(int argc, char *argv[])
 		unsigned hash = i ^ my_id;
 		unsigned len = (hash % (DM_MAX_DATA_SIZE / 2)) + 2;
 
-		int ret = dm_write(DM_KEY_WAYPOINTS_OFFBOARD_1, hash, DM_PERSIST_IN_FLIGHT_RESET, buffer, len);
+		int ret = dm_write(DM_KEY_WAYPOINTS_OFFBOARD_1, hash, buffer, len);
 		//PX4_INFO("ret: %d", ret);
 
 		if (ret != len) {

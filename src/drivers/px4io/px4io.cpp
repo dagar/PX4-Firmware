@@ -557,24 +557,8 @@ PX4IO::init(bool rc_handling_disabled, bool hitl_mode)
 int
 PX4IO::init()
 {
-	int ret;
-	param_t sys_restart_param;
-	int32_t sys_restart_val = DM_INIT_REASON_VOLATILE;
-
-	sys_restart_param = param_find("SYS_RESTART_TYPE");
-
-	if (sys_restart_param != PARAM_INVALID) {
-		/* Indicate restart type is unknown */
-		int32_t prev_val;
-		param_get(sys_restart_param, &prev_val);
-
-		if (prev_val != DM_INIT_REASON_POWER_ON) {
-			param_set_no_notification(sys_restart_param, &sys_restart_val);
-		}
-	}
-
 	/* do regular cdev init */
-	ret = CDev::init();
+	int ret = CDev::init();
 
 	if (ret != OK) {
 		return ret;

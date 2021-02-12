@@ -80,19 +80,6 @@ enum {
 	DM_KEY_COMPAT_MAX = 1
 };
 #endif
-/** Data persistence levels */
-typedef enum {
-	DM_PERSIST_POWER_ON_RESET = 0,	/* Data survives all resets */
-	DM_PERSIST_IN_FLIGHT_RESET,     /* Data survives in-flight resets only */
-	DM_PERSIST_VOLATILE             /* Data does not survive resets */
-} dm_persitence_t;
-
-/** The reason for the last reset */
-typedef enum {
-	DM_INIT_REASON_POWER_ON = 0,	/* Data survives resets */
-	DM_INIT_REASON_IN_FLIGHT,		/* Data survives in-flight resets only */
-	DM_INIT_REASON_VOLATILE			/* Data does not survive reset */
-} dm_reset_reason;
 
 struct dataman_compat_s {
 	uint64_t key;
@@ -120,7 +107,6 @@ __EXPORT ssize_t
 dm_write(
 	dm_item_t  item,		/* The item type to store */
 	unsigned index,			/* The index of the item */
-	dm_persitence_t persistence,	/* The persistence level of this item */
 	const void *buffer,		/* Pointer to caller data buffer */
 	size_t buflen			/* Length in bytes of data to retrieve */
 );
@@ -155,12 +141,6 @@ dm_unlock(
 __EXPORT int
 dm_clear(
 	dm_item_t item			/* The item type to clear */
-);
-
-/** Tell the data manager about the type of the last reset */
-__EXPORT int
-dm_restart(
-	dm_reset_reason restart_type	/* The last reset type */
 );
 
 #if defined(FLASH_BASED_DATAMAN)

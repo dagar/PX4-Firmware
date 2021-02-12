@@ -530,8 +530,7 @@ Geofence::loadFromFile(const char *filename)
 				}
 			}
 
-			if (dm_write(DM_KEY_FENCE_POINTS, pointCounter + 1, DM_PERSIST_POWER_ON_RESET, &vertex,
-				     sizeof(vertex)) != sizeof(vertex)) {
+			if (dm_write(DM_KEY_FENCE_POINTS, pointCounter + 1, &vertex, sizeof(vertex)) != sizeof(vertex)) {
 				goto error;
 			}
 
@@ -563,14 +562,14 @@ Geofence::loadFromFile(const char *filename)
 			if (dm_read(DM_KEY_FENCE_POINTS, seq, &mission_fence_point, sizeof(mission_fence_point_s)) ==
 			    sizeof(mission_fence_point_s)) {
 				mission_fence_point.vertex_count = pointCounter;
-				dm_write(DM_KEY_FENCE_POINTS, seq, DM_PERSIST_POWER_ON_RESET, &mission_fence_point,
+				dm_write(DM_KEY_FENCE_POINTS, seq, &mission_fence_point,
 					 sizeof(mission_fence_point_s));
 			}
 		}
 
 		mission_stats_entry_s stats;
 		stats.num_items = pointCounter;
-		rc = dm_write(DM_KEY_FENCE_POINTS, 0, DM_PERSIST_POWER_ON_RESET, &stats, sizeof(mission_stats_entry_s));
+		rc = dm_write(DM_KEY_FENCE_POINTS, 0, &stats, sizeof(mission_stats_entry_s));
 
 	} else {
 		PX4_ERR("Geofence: import error");

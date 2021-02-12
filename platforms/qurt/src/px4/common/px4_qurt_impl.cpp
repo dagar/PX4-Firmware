@@ -132,7 +132,6 @@ ssize_t
 dm_write(
 	dm_item_t  item,                /* The item type to store */
 	unsigned index,                 /* The index of the item */
-	dm_persitence_t persistence,    /* The persistence level of this item */
 	const void *buffer,             /* Pointer to caller data buffer */
 	size_t buflen                   /* Length in bytes of data to retrieve */
 )

@@ -1558,7 +1558,7 @@ Mission::read_mission_item(int offset, struct mission_item_s *mission_item)
 					(mission_item_tmp.do_jump_current_count)++;
 
 					/* save repeat count */
-					if (dm_write(dm_item, *mission_index_ptr, DM_PERSIST_POWER_ON_RESET, &mission_item_tmp, len) != len) {
+					if (dm_write(dm_item, *mission_index_ptr, &mission_item_tmp, len) != len) {
 						/* not supposed to happen unless the datamanager can't access the dataman */
 						mavlink_log_critical(_navigator->get_mavlink_log_pub(), "DO JUMP waypoint could not be written.");
 						return false;
@@ -1598,60 +1598,6 @@ Mission::read_mission_item(int offset, struct mission_item_s *mission_item)
 }
 
 void
-Mission::save_mission_state()
-{
-	mission_s mission_state = {};
-
-	/* lock MISSION_STATE item */
-	int dm_lock_ret = dm_lock(DM_KEY_MISSION_STATE);
-
-	if (dm_lock_ret != 0) {
-		PX4_ERR("DM_KEY_MISSION_STATE lock failed");
-	}
-
-	/* read current state */
-	int read_res = dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s));
-
-	if (read_res == sizeof(mission_s)) {
-		/* data read successfully, check dataman ID and items count */
-		if (mission_state.dataman_id == _mission.dataman_id && mission_state.count == _mission.count) {
-			/* navigator may modify only sequence, write modified state only if it changed */
-			if (mission_state.current_seq != _current_mission_index) {
-				mission_state.current_seq = _current_mission_index;
-				mission_state.timestamp = hrt_absolute_time();
-
-				if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
-					     sizeof(mission_s)) != sizeof(mission_s)) {
-
-					PX4_ERR("Can't save mission state");
-				}
-			}
-		}
-
-	} else {
-		/* invalid data, this must not happen and indicates error in mission publisher */
-		mission_state.timestamp = hrt_absolute_time();
-		mission_state.dataman_id = _mission.dataman_id;
-		mission_state.count = _mission.count;
-		mission_state.current_seq = _current_mission_index;
-
-		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Invalid mission state.");
-
-		/* write modified state only if changed */
-		if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
-			     sizeof(mission_s)) != sizeof(mission_s)) {
-
-			PX4_ERR("Can't save mission state");
-		}
-	}
-
-	/* unlock MISSION_STATE item */
-	if (dm_lock_ret == 0) {
-		dm_unlock(DM_KEY_MISSION_STATE);
-	}
-}
-
-void
 Mission::report_do_jump_mission_changed(int index, int do_jumps_remaining)
 {
 	/* inform about the change */
@@ -1683,8 +1629,6 @@ Mission::set_current_mission_item()
 	_navigator->get_mission_result()->seq_current = _current_mission_index;
 
 	_navigator->set_mission_result_updated();
-
-	save_mission_state();
 }
 
 void
@@ -1713,51 +1657,37 @@ Mission::check_mission_valid(bool force)
 void
 Mission::reset_mission(struct mission_s &mission)
 {
-	dm_lock(DM_KEY_MISSION_STATE);
+	dm_lock(mission.dataman_id);
 
-	if (dm_read(DM_KEY_MISSION_STATE, 0, &mission, sizeof(mission_s)) == sizeof(mission_s)) {
-		if (mission.dataman_id == DM_KEY_WAYPOINTS_OFFBOARD_0 || mission.dataman_id == DM_KEY_WAYPOINTS_OFFBOARD_1) {
-			/* set current item to 0 */
-			mission.current_seq = 0;
+	// reset jump counters
+	if (mission.count > 0) {
+		const dm_item_t dm_current = (dm_item_t)mission.dataman_id;
 
-			/* reset jump counters */
-			if (mission.count > 0) {
-				const dm_item_t dm_current = (dm_item_t)mission.dataman_id;
+		for (unsigned index = 0; index < mission.count; index++) {
+			mission_item_s item{};
+			const ssize_t len = sizeof(mission_item_s);
 
-				for (unsigned index = 0; index < mission.count; index++) {
-					struct mission_item_s item;
-					const ssize_t len = sizeof(struct mission_item_s);
-
-					if (dm_read(dm_current, index, &item, len) != len) {
-						PX4_WARN("could not read mission item during reset");
-						break;
-					}
-
-					if (item.nav_cmd == NAV_CMD_DO_JUMP) {
-						item.do_jump_current_count = 0;
-
-						if (dm_write(dm_current, index, DM_PERSIST_POWER_ON_RESET, &item, len) != len) {
-							PX4_WARN("could not save mission item during reset");
-							break;
-						}
-					}
-				}
+			if (dm_read(dm_current, index, &item, len) != len) {
+				PX4_WARN("could not read mission item during reset");
+				break;
 			}
 
-		} else {
-			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Could not read mission.");
+			if (item.nav_cmd == NAV_CMD_DO_JUMP) {
+				item.do_jump_current_count = 0;
 
-			/* initialize mission state in dataman */
-			mission.timestamp = hrt_absolute_time();
-			mission.dataman_id = DM_KEY_WAYPOINTS_OFFBOARD_0;
-			mission.count = 0;
-			mission.current_seq = 0;
+				if (dm_write(dm_current, index, &item, len) != len) {
+					PX4_WARN("could not save mission item during reset");
+					break;
+				}
+			}
 		}
-
-		dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
 	}
 
-	dm_unlock(DM_KEY_MISSION_STATE);
+	mission.count = 0;
+	mission.current_seq = 0;
+	mission.timestamp = hrt_absolute_time();
+
+	dm_unlock(mission.dataman_id);
 }
 
 bool
