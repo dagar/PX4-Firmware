@@ -105,17 +105,15 @@ Mission::on_inactive()
 
 	} else {
 
-		/* load missions from storage */
-		mission_s mission_state = {};
+		// check mission sub first, otherwise read from mission state
 
-		dm_lock(DM_KEY_MISSION_STATE);
+
+
+		/* load missions from storage */
+		mission_s mission_state{};
 
 		/* read current state */
-		int read_res = dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s));
-
-		dm_unlock(DM_KEY_MISSION_STATE);
-
-		if (read_res == sizeof(mission_s)) {
+		if (dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s)) == sizeof(mission_s)) {
 			_mission.dataman_id = mission_state.dataman_id;
 			_mission.count = mission_state.count;
 			_current_mission_index = mission_state.current_seq;
@@ -478,7 +476,6 @@ Mission::landing()
 void
 Mission::update_mission()
 {
-
 	bool failed = true;
 
 	/* Reset vehicle_roi
@@ -528,6 +525,7 @@ Mission::update_mission()
 		if (((_mission.count != old_mission.count) ||
 		     (_mission.dataman_id != old_mission.dataman_id)) &&
 		    !_navigator->get_land_detected()->landed) {
+
 			_mission_waypoints_changed = true;
 		}
 
@@ -552,7 +550,6 @@ Mission::update_mission()
 
 	set_current_mission_item();
 }
-
 
 void
 Mission::advance_mission()
@@ -1533,10 +1530,10 @@ Mission::read_mission_item(int offset, struct mission_item_s *mission_item)
 			return false;
 		}
 
-		const ssize_t len = sizeof(struct mission_item_s);
+		const ssize_t len = sizeof(mission_item_s);
 
 		/* read mission item to temp storage first to not overwrite current mission item if data damaged */
-		struct mission_item_s mission_item_tmp;
+		mission_item_s mission_item_tmp;
 
 		/* read mission item from datamanager */
 		if (dm_read(dm_item, *mission_index_ptr, &mission_item_tmp, len) != len) {
@@ -1600,54 +1597,21 @@ Mission::read_mission_item(int offset, struct mission_item_s *mission_item)
 void
 Mission::save_mission_state()
 {
-	mission_s mission_state = {};
+	// save any changes to dataman mission state
+	if ((_mission_state.timestamp == 0)
+	    || (_mission_state.dataman_id != _mission.dataman_id)
+	    || (_mission_state.count != _mission.count)
+	    || (_mission_state.current_seq != _current_mission_index)) {
 
-	/* lock MISSION_STATE item */
-	int dm_lock_ret = dm_lock(DM_KEY_MISSION_STATE);
+		_mission_state = _mission;
+		_mission_state.current_seq = _current_mission_index;
+		_mission_state.timestamp = hrt_absolute_time();
 
-	if (dm_lock_ret != 0) {
-		PX4_ERR("DM_KEY_MISSION_STATE lock failed");
-	}
-
-	/* read current state */
-	int read_res = dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s));
-
-	if (read_res == sizeof(mission_s)) {
-		/* data read successfully, check dataman ID and items count */
-		if (mission_state.dataman_id == _mission.dataman_id && mission_state.count == _mission.count) {
-			/* navigator may modify only sequence, write modified state only if it changed */
-			if (mission_state.current_seq != _current_mission_index) {
-				mission_state.current_seq = _current_mission_index;
-				mission_state.timestamp = hrt_absolute_time();
-
-				if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
-					     sizeof(mission_s)) != sizeof(mission_s)) {
-
-					PX4_ERR("Can't save mission state");
-				}
-			}
-		}
-
-	} else {
-		/* invalid data, this must not happen and indicates error in mission publisher */
-		mission_state.timestamp = hrt_absolute_time();
-		mission_state.dataman_id = _mission.dataman_id;
-		mission_state.count = _mission.count;
-		mission_state.current_seq = _current_mission_index;
-
-		mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Invalid mission state.");
-
-		/* write modified state only if changed */
-		if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission_state,
+		if (dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &_mission_state,
 			     sizeof(mission_s)) != sizeof(mission_s)) {
 
-			PX4_ERR("Can't save mission state");
+			PX4_ERR("failed to save mission state to dataman");
 		}
-	}
-
-	/* unlock MISSION_STATE item */
-	if (dm_lock_ret == 0) {
-		dm_unlock(DM_KEY_MISSION_STATE);
 	}
 }
 
@@ -1711,7 +1675,7 @@ Mission::check_mission_valid(bool force)
 }
 
 void
-Mission::reset_mission(struct mission_s &mission)
+Mission::reset_mission(mission_s &mission)
 {
 	dm_lock(DM_KEY_MISSION_STATE);
 

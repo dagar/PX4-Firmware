@@ -211,7 +211,7 @@ private:
 	/**
 	 * Reset mission
 	 */
-	void reset_mission(struct mission_s &mission);
+	void reset_mission(mission_s &mission);
 
 	/**
 	 * Returns true if we need to reset the mission (call this only when inactive)
@@ -221,7 +221,7 @@ private:
 	/**
 	 * Project current location with heading to far away location and fill setpoint.
 	 */
-	void generate_waypoint_from_heading(struct position_setpoint_s *setpoint, float yaw);
+	void generate_waypoint_from_heading(position_setpoint_s *setpoint, float yaw);
 
 	/**
 	 * Find and store the index of the landing sequence (DO_LAND_START)
@@ -247,6 +247,7 @@ private:
 
 	uORB::Subscription	_mission_sub{ORB_ID(mission)};		/**< mission subscription */
 	mission_s		_mission {};
+	mission_s               _mission_state{};
 
 	int32_t _current_mission_index{-1};
 

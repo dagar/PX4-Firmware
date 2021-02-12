@@ -55,8 +55,6 @@
 
 using matrix::wrap_2pi;
 
-dm_item_t MavlinkMissionManager::_dataman_id = DM_KEY_WAYPOINTS_OFFBOARD_0;
-bool MavlinkMissionManager::_dataman_init = false;
 uint16_t MavlinkMissionManager::_count[3] = { 0, 0, 0 };
 int32_t MavlinkMissionManager::_current_seq = 0;
 bool MavlinkMissionManager::_transfer_in_progress = false;
@@ -79,10 +77,9 @@ MavlinkMissionManager::MavlinkMissionManager(Mavlink *mavlink) :
 void
 MavlinkMissionManager::init_offboard_mission()
 {
-	if (!_dataman_init) {
-		_dataman_init = true;
+	if (!_dataman_init.load()) {
+		_dataman_init.store(true);
 
-		/* lock MISSION_STATE item */
 		int dm_lock_ret = dm_lock(DM_KEY_MISSION_STATE);
 
 		if (dm_lock_ret != 0) {
@@ -90,20 +87,14 @@ MavlinkMissionManager::init_offboard_mission()
 		}
 
 		mission_s mission_state;
-		int ret = dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s));
-
-		/* unlock MISSION_STATE item */
-		if (dm_lock_ret == 0) {
-			dm_unlock(DM_KEY_MISSION_STATE);
-		}
-
-		if (ret > 0) {
-			_dataman_id = (dm_item_t)mission_state.dataman_id;
+		if (dm_read(DM_KEY_MISSION_STATE, 0, &mission_state, sizeof(mission_s)) == sizeof(mission_s)) {
+			_dataman_id.store((dm_item_t)mission_state.dataman_id);
 			_count[MAV_MISSION_TYPE_MISSION] = mission_state.count;
 			_current_seq = mission_state.current_seq;
+		}
 
-		} else if (ret < 0) {
-			PX4_ERR("offboard mission init failed (%i)", ret);
+		if (dm_lock_ret == 0) {
+			dm_unlock(DM_KEY_MISSION_STATE);
 		}
 
 		load_geofence_stats();
@@ -111,7 +102,7 @@ MavlinkMissionManager::init_offboard_mission()
 		load_safepoint_stats();
 	}
 
-	_my_dataman_id = _dataman_id;
+	_my_dataman_id = _dataman_id.load();
 }
 
 int
@@ -149,23 +140,30 @@ MavlinkMissionManager::load_safepoint_stats()
 int
 MavlinkMissionManager::update_active_mission(dm_item_t dataman_id, uint16_t count, int32_t seq)
 {
-	// We want to make sure the whole struct is initialized including padding before getting written by dataman.
-	mission_s mission{};
-	mission.timestamp = hrt_absolute_time();
-	mission.dataman_id = dataman_id;
-	mission.count = count;
-	mission.current_seq = seq;
-
-	/* update mission state in dataman */
-
-	/* lock MISSION_STATE item */
+	// update mission state in dataman and publish mission
 	int dm_lock_ret = dm_lock(DM_KEY_MISSION_STATE);
 
 	if (dm_lock_ret != 0) {
 		PX4_ERR("DM_KEY_MISSION_STATE lock failed");
 	}
 
+	// We want to make sure the whole struct is initialized including padding before getting written by dataman.
+	mission_s mission{};
+	mission.dataman_id = dataman_id;
+	mission.count = count;
+	mission.current_seq = seq;
+	mission.timestamp = hrt_absolute_time();
+
 	int res = dm_write(DM_KEY_MISSION_STATE, 0, DM_PERSIST_POWER_ON_RESET, &mission, sizeof(mission_s));
+
+	/* mission state saved successfully, publish offboard_mission topic */
+	_offboard_mission_pub.publish(mission);
+
+	/* update active mission state */
+	_dataman_id.store(dataman_id);
+	_count[MAV_MISSION_TYPE_MISSION] = count;
+	_current_seq = seq;
+	_my_dataman_id = dataman_id;
 
 	/* unlock MISSION_STATE item */
 	if (dm_lock_ret == 0) {
@@ -173,15 +171,6 @@ MavlinkMissionManager::update_active_mission(dm_item_t dataman_id, uint16_t coun
 	}
 
 	if (res == sizeof(mission_s)) {
-		/* update active mission state */
-		_dataman_id = dataman_id;
-		_count[MAV_MISSION_TYPE_MISSION] = count;
-		_current_seq = seq;
-		_my_dataman_id = _dataman_id;
-
-		/* mission state saved successfully, publish offboard_mission topic */
-		_offboard_mission_pub.publish(mission);
-
 		return PX4_OK;
 
 	} else {
@@ -194,6 +183,7 @@ MavlinkMissionManager::update_active_mission(dm_item_t dataman_id, uint16_t coun
 		return PX4_ERROR;
 	}
 }
+
 int
 MavlinkMissionManager::update_geofence_count(unsigned count)
 {
@@ -305,7 +295,7 @@ MavlinkMissionManager::send_mission_item(uint8_t sysid, uint8_t compid, uint16_t
 	switch (_mission_type) {
 
 	case MAV_MISSION_TYPE_MISSION: {
-			read_result = dm_read(_dataman_id, seq, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s);
+			read_result = dm_read(_dataman_id.load(), seq, &mission_item, sizeof(mission_item_s)) == sizeof(mission_item_s);
 		}
 		break;
 
@@ -651,7 +641,7 @@ MavlinkMissionManager::handle_mission_set_current(const mavlink_message_t *msg)
 			_time_last_recv = hrt_absolute_time();
 
 			if (wpc.seq < _count[MAV_MISSION_TYPE_MISSION]) {
-				if (update_active_mission(_dataman_id, _count[MAV_MISSION_TYPE_MISSION], wpc.seq) == PX4_OK) {
+				if (update_active_mission(_dataman_id.load(), _count[MAV_MISSION_TYPE_MISSION], wpc.seq) == PX4_OK) {
 					PX4_DEBUG("WPM: MISSION_SET_CURRENT seq=%d OK", wpc.seq);
 
 				} else {
@@ -871,9 +861,7 @@ MavlinkMissionManager::handle_mission_count(const mavlink_message_t *msg)
 
 				switch (_mission_type) {
 				case MAV_MISSION_TYPE_MISSION:
-
 					/* alternate dataman ID anyway to let navigator know about changes */
-
 					if (_dataman_id == DM_KEY_WAYPOINTS_OFFBOARD_0) {
 						update_active_mission(DM_KEY_WAYPOINTS_OFFBOARD_1, 0, 0);
 
