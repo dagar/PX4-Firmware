@@ -120,6 +120,13 @@ static inline constexpr SPI::bus_device_external_cfg_t initSPIConfigExternal(SPI
 {
 	SPI::bus_device_external_cfg_t ret{};
 	ret.cs_gpio = cs_gpio;
-	ret.drdy_gpio = drdy_gpio;
+
+	if (drdy_gpio.port != PortInvalid) {
+		ret.drdy_gpio = drdy_gpio;
+
+	} else {
+		ret.drdy_gpio = 0;
+	}
+
 	return ret;
 }

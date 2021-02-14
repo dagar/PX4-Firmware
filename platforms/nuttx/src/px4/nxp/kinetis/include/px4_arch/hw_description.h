@@ -134,8 +134,8 @@ enum Pin {
 	Pin31,
 };
 struct GPIOPin {
-	Port port;
-	Pin pin;
+	Port port{PortInvalid};
+	Pin pin{Pin0};
 };
 }
 
