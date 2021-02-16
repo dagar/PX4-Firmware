@@ -38,6 +38,7 @@
 #include "Takeoff.hpp"
 #include <mathlib/mathlib.h>
 #include <lib/ecl/geo/geo.h>
+#include <px4_platform_common/log.h>
 
 void Takeoff::generateInitialRampValue(float velocity_p_gain)
 {
@@ -53,6 +54,7 @@ void Takeoff::updateTakeoffState(const bool armed, const bool landed, const bool
 	switch (_takeoff_state) {
 	case TakeoffState::disarmed:
 		if (armed) {
+			PX4_DEBUG("take off state disarmed -> spoolup");
 			_takeoff_state = TakeoffState::spoolup;
 
 		} else {
@@ -62,6 +64,7 @@ void Takeoff::updateTakeoffState(const bool armed, const bool landed, const bool
 	// FALLTHROUGH
 	case TakeoffState::spoolup:
 		if (_spoolup_time_hysteresis.get_state()) {
+			PX4_DEBUG("take off state spoolup -> ready_for_takeoff");
 			_takeoff_state = TakeoffState::ready_for_takeoff;
 
 		} else {
@@ -71,6 +74,7 @@ void Takeoff::updateTakeoffState(const bool armed, const bool landed, const bool
 	// FALLTHROUGH
 	case TakeoffState::ready_for_takeoff:
 		if (want_takeoff) {
+			PX4_DEBUG("take off state ready_for_takeoff -> rampup");
 			_takeoff_state = TakeoffState::rampup;
 			_takeoff_ramp_vz = _takeoff_ramp_vz_init;
 
@@ -81,6 +85,7 @@ void Takeoff::updateTakeoffState(const bool armed, const bool landed, const bool
 	// FALLTHROUGH
 	case TakeoffState::rampup:
 		if (_takeoff_ramp_vz >= takeoff_desired_vz) {
+			PX4_DEBUG("take off state rampup -> flight");
 			_takeoff_state = TakeoffState::flight;
 
 		} else {
@@ -90,6 +95,7 @@ void Takeoff::updateTakeoffState(const bool armed, const bool landed, const bool
 	// FALLTHROUGH
 	case TakeoffState::flight:
 		if (landed) {
+			PX4_DEBUG("take off state flight -> ready_for_takeoff");
 			_takeoff_state = TakeoffState::ready_for_takeoff;
 		}
 

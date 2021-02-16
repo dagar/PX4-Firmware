@@ -36,7 +36,7 @@
  */
 
 #include "PositionControl.hpp"
-#include "ControlMath.hpp"
+
 #include <float.h>
 #include <mathlib/mathlib.h>
 #include <px4_platform_common/defines.h>
@@ -88,27 +88,6 @@ void PositionControl::setInputSetpoint(const vehicle_local_position_setpoint_s &
 	_yawspeed_sp = setpoint.yawspeed;
 }
 
-void PositionControl::setConstraints(const vehicle_constraints_s &constraints)
-{
-	_constraints = constraints;
-
-	// For safety check if adjustable constraints are below global constraints. If they are not stricter than global
-	// constraints, then just use global constraints for the limits.
-	if (!PX4_ISFINITE(constraints.tilt) || (constraints.tilt > _lim_tilt)) {
-		_constraints.tilt = _lim_tilt;
-	}
-
-	if (!PX4_ISFINITE(constraints.speed_up) || (constraints.speed_up > _lim_vel_up)) {
-		_constraints.speed_up = _lim_vel_up;
-	}
-
-	if (!PX4_ISFINITE(constraints.speed_down) || (constraints.speed_down > _lim_vel_down)) {
-		_constraints.speed_down = _lim_vel_down;
-	}
-
-	// ignore _constraints.speed_xy TODO: remove it completely as soon as no task uses it anymore to avoid confusion
-}
-
 bool PositionControl::update(const float dt)
 {
 	// x and y input setpoints always have to come in pairs
@@ -138,7 +117,7 @@ void PositionControl::_positionControl()
 	// the desired position setpoint over the feed-forward term.
 	_vel_sp.xy() = ControlMath::constrainXY(vel_sp_position.xy(), (_vel_sp - vel_sp_position).xy(), _lim_vel_horizontal);
 	// Constrain velocity in z-direction.
-	_vel_sp(2) = math::constrain(_vel_sp(2), -_constraints.speed_up, _constraints.speed_down);
+	_vel_sp(2) = math::constrain(_vel_sp(2), -_lim_vel_up, _lim_vel_down);
 }
 
 void PositionControl::_velocityControl(const float dt)
@@ -198,7 +177,7 @@ void PositionControl::_accelerationControl()
 {
 	// Assume standard acceleration due to gravity in vertical direction for attitude generation
 	Vector3f body_z = Vector3f(-_acc_sp(0), -_acc_sp(1), CONSTANTS_ONE_G).normalized();
-	ControlMath::limitTilt(body_z, Vector3f(0, 0, 1), _constraints.tilt);
+	ControlMath::limitTilt(body_z, Vector3f(0, 0, 1), _lim_tilt);
 	// Scale thrust assuming hover thrust produces standard gravity
 	float collective_thrust = _acc_sp(2) * (_hover_thrust / CONSTANTS_ONE_G) - _hover_thrust;
 	// Project thrust to planned body attitude
@@ -241,10 +220,4 @@ void PositionControl::getLocalPositionSetpoint(vehicle_local_position_setpoint_s
 	local_position_setpoint.vz = _vel_sp(2);
 	_acc_sp.copyTo(local_position_setpoint.acceleration);
 	_thr_sp.copyTo(local_position_setpoint.thrust);
-}
-
-void PositionControl::getAttitudeSetpoint(vehicle_attitude_setpoint_s &attitude_setpoint) const
-{
-	ControlMath::thrustToAttitude(_thr_sp, _yaw_sp, attitude_setpoint);
-	attitude_setpoint.yaw_sp_move_rate = _yawspeed_sp;
 }
