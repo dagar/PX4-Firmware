@@ -40,10 +40,9 @@
 #include "PositionControl/PositionControl.hpp"
 #include "Takeoff/Takeoff.hpp"
 
-#include <commander/px4_custom_mode.h>
 #include <drivers/drv_hrt.h>
-#include <lib/controllib/blocks.hpp>
 #include <lib/hysteresis/hysteresis.h>
+#include <lib/mathlib/math/filter/LowPassFilter2pVector3f.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/systemlib/mavlink_log.h>
 #include <px4_platform_common/px4_config.h>
@@ -67,8 +66,8 @@
 
 using namespace time_literals;
 
-class MulticopterPositionControl : public ModuleBase<MulticopterPositionControl>, public control::SuperBlock,
-	public ModuleParams, public px4::ScheduledWorkItem
+class MulticopterPositionControl : public ModuleBase<MulticopterPositionControl>, public ModuleParams,
+	public px4::ScheduledWorkItem
 {
 public:
 	MulticopterPositionControl(bool vtol = false);
@@ -133,6 +132,8 @@ private:
 	};
 
 	DEFINE_PARAMETERS(
+		(ParamFloat<px4::params::MPC_VELD_LP>) _param_mpc_veld_lp,
+
 		// Position Control
 		(ParamFloat<px4::params::MPC_XY_P>) _param_mpc_xy_p,
 		(ParamFloat<px4::params::MPC_Z_P>) _param_mpc_z_p,
@@ -165,16 +166,17 @@ private:
 		(ParamFloat<px4::params::MPC_THR_MAX>) _param_mpc_thr_max
 	);
 
-	control::BlockDerivative _vel_x_deriv; /**< velocity derivative in x */
-	control::BlockDerivative _vel_y_deriv; /**< velocity derivative in y */
-	control::BlockDerivative _vel_z_deriv; /**< velocity derivative in z */
+	static constexpr uint32_t SCHEDULE_INTERVAL_US{10_ms};
+	static constexpr uint32_t SCHEDULE_RATE_HZ{1_s / SCHEDULE_INTERVAL_US};
 
 	PositionControl _control; /**< class for core PID position control */
-	PositionControlStates _states{}; /**< structure containing vehicle state information for position control */
 
-	hrt_abstime _last_warn = 0; /**< timer when the last warn message was sent out */
+	matrix::Vector3f _velocity_last{};
+	math::LowPassFilter2pVector3f _vel_deriv_lpf{SCHEDULE_RATE_HZ, 5.f};
 
-	bool _in_failsafe = false; /**< true if failsafe was entered within current cycle */
+	hrt_abstime _last_warn{0}; /**< timer when the last warn message was sent out */
+
+	bool _in_failsafe{false}; /**< true if failsafe was entered within current cycle */
 
 	bool _hover_thrust_initialized{false};
 
@@ -196,7 +198,7 @@ private:
 	uint8_t _xy_reset_counter{0};
 	uint8_t _z_reset_counter{0};
 
-	perf_counter_t _cycle_perf;
+	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle time")};
 
 	/**
 	 * Update our local parameter cache.
@@ -204,11 +206,6 @@ private:
 	 * @param force forces parameter update.
 	 */
 	int parameters_update(bool force);
-
-	/**
-	 * Check for validity of positon/velocity states.
-	 */
-	void set_vehicle_states(const vehicle_local_position_s &local_pos);
 
 	/**
 	 * Adjust the setpoint during landing.
@@ -224,8 +221,7 @@ private:
 	 * setpoints. The failsafe will occur after LOITER_TIME_BEFORE_DESCEND. If force is set
 	 * to true, the failsafe will be initiated immediately.
 	 */
-	void failsafe(const hrt_abstime &now, vehicle_local_position_setpoint_s &setpoint, const PositionControlStates &states,
-		      bool warn);
+	void failsafe(const vehicle_local_position_s &local_position, vehicle_local_position_setpoint_s &setpoint, bool warn);
 
 	/**
 	 * Reset setpoints to NAN

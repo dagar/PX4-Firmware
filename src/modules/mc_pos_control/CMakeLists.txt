@@ -44,7 +44,7 @@ px4_add_module(
 	DEPENDS
 		PositionControl
 		Takeoff
-		controllib
 		git_ecl
 		ecl_geo
+		mathlib
 	)

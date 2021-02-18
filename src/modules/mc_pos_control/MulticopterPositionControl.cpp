@@ -41,14 +41,9 @@
 using namespace matrix;
 
 MulticopterPositionControl::MulticopterPositionControl(bool vtol) :
-	SuperBlock(nullptr, "MPC"),
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
-	_vehicle_attitude_setpoint_pub(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
-	_vel_x_deriv(this, "VELD"),
-	_vel_y_deriv(this, "VELD"),
-	_vel_z_deriv(this, "VELD"),
-	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle time"))
+	_vehicle_attitude_setpoint_pub(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint))
 {
 	// fetch initial parameter values
 	parameters_update(true);
@@ -71,7 +66,6 @@ bool MulticopterPositionControl::init()
 		return false;
 	}
 
-	_time_stamp_last_loop = hrt_absolute_time();
 	ScheduleNow();
 
 	return true;
@@ -87,7 +81,10 @@ int MulticopterPositionControl::parameters_update(bool force)
 
 		// update parameters from storage
 		ModuleParams::updateParams();
-		SuperBlock::updateParams();
+
+		if (fabsf(_param_mpc_veld_lp.get() - _vel_deriv_lpf.get_cutoff_freq()) > FLT_EPSILON) {
+			_vel_deriv_lpf.set_cutoff_frequency(SCHEDULE_RATE_HZ, _param_mpc_veld_lp.get());
+		}
 
 		if (_param_mpc_tiltmax_air.get() > MAX_SAFE_TILT_DEG) {
 			_param_mpc_tiltmax_air.set(MAX_SAFE_TILT_DEG);
@@ -145,55 +142,6 @@ int MulticopterPositionControl::parameters_update(bool force)
 	return OK;
 }
 
-void MulticopterPositionControl::set_vehicle_states(const vehicle_local_position_s &local_pos)
-{
-	// only set position states if valid and finite
-	if (PX4_ISFINITE(local_pos.x) && PX4_ISFINITE(local_pos.y) && local_pos.xy_valid) {
-		_states.position(0) = local_pos.x;
-		_states.position(1) = local_pos.y;
-
-	} else {
-		_states.position(0) = _states.position(1) = NAN;
-	}
-
-	if (PX4_ISFINITE(local_pos.z) && local_pos.z_valid) {
-		_states.position(2) = local_pos.z;
-
-	} else {
-		_states.position(2) = NAN;
-	}
-
-	if (PX4_ISFINITE(local_pos.vx) && PX4_ISFINITE(local_pos.vy) && local_pos.v_xy_valid) {
-		_states.velocity(0) = local_pos.vx;
-		_states.velocity(1) = local_pos.vy;
-		_states.acceleration(0) = _vel_x_deriv.update(_states.velocity(0));
-		_states.acceleration(1) = _vel_y_deriv.update(_states.velocity(1));
-
-	} else {
-		_states.velocity(0) = _states.velocity(1) = NAN;
-		_states.acceleration(0) = _states.acceleration(1) = NAN;
-
-		// reset derivatives to prevent acceleration spikes when regaining velocity
-		_vel_x_deriv.reset();
-		_vel_y_deriv.reset();
-	}
-
-	if (PX4_ISFINITE(local_pos.vz) && local_pos.v_z_valid) {
-		_states.velocity(2) = local_pos.vz;
-		_states.acceleration(2) = _vel_z_deriv.update(_states.velocity(2));
-
-	} else {
-		_states.velocity(2) = _states.acceleration(2) = NAN;
-
-		// reset derivative to prevent acceleration spikes when regaining velocity
-		_vel_z_deriv.reset();
-	}
-
-	if (PX4_ISFINITE(local_pos.heading)) {
-		_states.yaw = local_pos.heading;
-	}
-}
-
 void MulticopterPositionControl::Run()
 {
 	if (should_exit()) {
@@ -211,13 +159,31 @@ void MulticopterPositionControl::Run()
 	vehicle_local_position_s local_pos;
 
 	if (_local_pos_sub.update(&local_pos)) {
-		const hrt_abstime time_stamp_now = local_pos.timestamp;
-		const float dt = math::constrain(((time_stamp_now - _time_stamp_last_loop) * 1e-6f), 0.002f, 0.04f);
+		const hrt_abstime time_stamp_now = local_pos.timestamp_sample;
+
+		const bool reset = (local_pos.timestamp_sample - _time_stamp_last_loop) > 1_s;
+
+		if (reset) {
+			_time_stamp_last_loop = local_pos.timestamp_sample - SCHEDULE_INTERVAL_US;
+		}
+
+		const float dt = math::constrain(((time_stamp_now - _time_stamp_last_loop) * 1e-6f), 0.001f, 0.1f);
 		_time_stamp_last_loop = time_stamp_now;
 
-		// set _dt in controllib Block for BlockDerivative
-		setDt(dt);
-		set_vehicle_states(local_pos);
+		const Vector3f position{
+			local_pos.xy_valid ? local_pos.x : NAN,
+			local_pos.xy_valid ? local_pos.y : NAN,
+			local_pos.z_valid ? local_pos.z : NAN,
+		};
+
+		const Vector3f velocity{
+			local_pos.v_xy_valid ? local_pos.vx : NAN,
+			local_pos.v_xy_valid ? local_pos.vy : NAN,
+			local_pos.v_z_valid ? local_pos.vz : NAN,
+		};
+
+		const Vector3f acceleration{(reset || !local_pos.v_xy_valid) ? _vel_deriv_lpf.reset(Vector3f{local_pos.ax, local_pos.ay, local_pos.az}) : _vel_deriv_lpf.apply(Vector3f{(velocity - _velocity_last) / dt})};
+		_velocity_last = velocity;
 
 		const bool was_in_failsafe = _in_failsafe;
 		_in_failsafe = false;
@@ -317,25 +283,36 @@ void MulticopterPositionControl::Run()
 			// Allow ramping from zero thrust on takeoff
 			const float minimum_thrust = flying ? _param_mpc_thr_min.get() : 0.f;
 
-			// update states
-			if (PX4_ISFINITE(_setpoint.vz) && (fabsf(_setpoint.vz) > FLT_EPSILON) && PX4_ISFINITE(local_pos.z_deriv)
-			    && local_pos.v_xy_valid) {
-
-				// A change in velocity is demanded. Set velocity to the derivative of position
-				// because it has less bias but blend it in across the landing speed range
-				float weighting = fminf(fabsf(_setpoint.vz) / _param_mpc_land_speed.get(), 1.f);
-				_states.velocity(2) = local_pos.z_deriv * weighting + local_pos.vz * (1.f - weighting);
-			}
-
-			// Run position control
 			_control.setThrustLimits(minimum_thrust, _param_mpc_thr_max.get());
+
 			_control.setVelocityLimits(
 				math::constrain(speed_horizontal, 0.f, _param_mpc_xy_vel_max.get()),
 				math::constrain(speed_up, 0.f, _param_mpc_z_vel_max_up.get()),
 				math::constrain(speed_down, 0.f, _param_mpc_z_vel_max_dn.get()));
-			_control.setState(_states);
+
 			_control.setInputSetpoint(_setpoint);
 
+			// update states
+			PositionControlStates states{
+				.position = position,
+				.velocity = velocity,
+				.acceleration = acceleration,
+				.yaw = local_pos.heading,
+			};
+
+			if (PX4_ISFINITE(_setpoint.vz) && (fabsf(_setpoint.vz) > FLT_EPSILON)
+			    && PX4_ISFINITE(local_pos.z_deriv) && local_pos.z_valid && local_pos.v_z_valid) {
+				// A change in velocity is demanded. Set velocity to the derivative of position
+				// because it has less bias but blend it in across the landing speed range
+				//  <  MPC_LAND_SPEED: ramp up using altitude derivative without a step
+				//  >= MPC_LAND_SPEED: use altitude derivative
+				float weighting = fminf(fabsf(_setpoint.vz) / _param_mpc_land_speed.get(), 1.f);
+				states.velocity(2) = local_pos.z_deriv * weighting + local_pos.vz * (1.f - weighting);
+			}
+
+			_control.setState(states);
+
+			// Run position control
 			if (_control.update(dt)) {
 				_failsafe_land_hysteresis.set_state_and_update(false, time_stamp_now);
 
@@ -346,7 +323,7 @@ void MulticopterPositionControl::Run()
 					_last_warn = time_stamp_now;
 				}
 
-				failsafe(time_stamp_now, _setpoint, _states, !was_in_failsafe);
+				failsafe(local_pos, _setpoint, !was_in_failsafe);
 
 				// reset constraints
 				_vehicle_constraints = {0, NAN, NAN, NAN, NAN, NAN, false, {}};
@@ -397,8 +374,8 @@ void MulticopterPositionControl::Run()
 	perf_end(_cycle_perf);
 }
 
-void MulticopterPositionControl::failsafe(const hrt_abstime &now, vehicle_local_position_setpoint_s &setpoint,
-		const PositionControlStates &states, bool warn)
+void MulticopterPositionControl::failsafe(const vehicle_local_position_s &local_position,
+		vehicle_local_position_setpoint_s &setpoint, bool warn)
 {
 	// do not warn while we are disarmed, as we might not have valid setpoints yet
 	if (!_control_mode.flag_armed) {
@@ -406,12 +383,12 @@ void MulticopterPositionControl::failsafe(const hrt_abstime &now, vehicle_local_
 	}
 
 	// Only react after a short delay
-	_failsafe_land_hysteresis.set_state_and_update(true, now);
+	_failsafe_land_hysteresis.set_state_and_update(true, local_position.timestamp);
 
 	if (_failsafe_land_hysteresis.get_state()) {
 		reset_setpoint_to_nan(setpoint);
 
-		if (PX4_ISFINITE(_states.velocity(0)) && PX4_ISFINITE(_states.velocity(1))) {
+		if (local_position.v_xy_valid) {
 			// don't move along xy
 			setpoint.vx = setpoint.vy = 0.f;
 
@@ -429,7 +406,7 @@ void MulticopterPositionControl::failsafe(const hrt_abstime &now, vehicle_local_
 			}
 		}
 
-		if (PX4_ISFINITE(_states.velocity(2))) {
+		if (local_position.v_z_valid) {
 			// don't move along z if we can stop in all dimensions
 			if (!PX4_ISFINITE(setpoint.vz)) {
 				setpoint.vz = 0.f;
