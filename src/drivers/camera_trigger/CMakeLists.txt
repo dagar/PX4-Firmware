@@ -35,11 +35,14 @@ px4_add_module(
 	MAIN camera_trigger
 	COMPILE_FLAGS
 	SRCS
-		camera_trigger.cpp
                 interfaces/src/camera_interface.cpp
+		interfaces/src/camera_interface.h
+		interfaces/src/gpio.cpp
+		interfaces/src/gpio.h
                 interfaces/src/pwm.cpp
+		interfaces/src/pwm.h
                 interfaces/src/seagull_map2.cpp
-                interfaces/src/gpio.cpp
+		interfaces/src/seagull_map2.h
+		camera_trigger.cpp
 	DEPENDS
-	)
-
+)

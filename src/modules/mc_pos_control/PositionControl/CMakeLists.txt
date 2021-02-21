@@ -32,8 +32,10 @@
 ############################################################################
 
 px4_add_library(PositionControl
-	PositionControl.cpp
 	ControlMath.cpp
+	ControlMath.hpp
+	PositionControl.cpp
+	PositionControl.hpp
 )
 target_include_directories(PositionControl
 	PUBLIC

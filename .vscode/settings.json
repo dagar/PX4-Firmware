@@ -17,7 +17,7 @@
         "cmake.buildTask": true,
         "cmake.configureOnOpen": true,
         "cmake.ctest.parallelJobs": 1,
-        "cmake.skipConfigureIfCachePresent": true,
+        "cmake.skipConfigureIfCachePresent": false,
         "cmakeExplorer.buildDir": "${workspaceFolder}/build/px4_sitl_test",
         "cmakeExplorer.parallelJobs": 1,
         "cmakeExplorer.suiteDelimiter": "-",
@@ -138,5 +138,11 @@
         "workbench.settings.enableNaturalLanguageSearch": false,
         "yaml.schemas": {
                 "${workspaceFolder}/validation/module_schema.yaml": "${workspaceFolder}/src/modules/*/module.yaml"
-        }
+        },
+        "C_Cpp.configurationWarnings": "Disabled",
+        "cmake.clearOutputBeforeBuild": false,
+        "cmake.copyCompileCommands": "${workspaceFolder}/.vscode/compile_commands.json",
+        "cmake.ignoreKitEnv": true,
+        "C_Cpp.default.compileCommands": "${workspaceFolder}/.vscode/compile_commands.json",
+        "C_Cpp.loggingLevel": "Debug"
 }
