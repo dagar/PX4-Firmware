@@ -65,6 +65,8 @@ function(px4_add_common_flags)
 		-fvisibility=hidden
 		-include visibility.h
 
+		-Wno-c99-designator
+
 		# Warnings
 		-Wall
 		-Wextra
