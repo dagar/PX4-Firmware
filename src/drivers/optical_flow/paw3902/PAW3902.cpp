@@ -34,9 +34,10 @@
 #include "PAW3902.hpp"
 
 PAW3902::PAW3902(I2CSPIBusOption bus_option, int bus, int devid, int bus_frequency, spi_mode_e spi_mode,
-		 float yaw_rotation_degrees) :
+		 spi_drdy_gpio_t drdy_gpio, float yaw_rotation_degrees) :
 	SPI(DRV_FLOW_DEVTYPE_PAW3902, MODULE_NAME, bus, devid, spi_mode, bus_frequency),
-	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus)
+	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
+	_drdy_gpio(drdy_gpio)
 {
 	if (PX4_ISFINITE(yaw_rotation_degrees)) {
 		PX4_INFO("using yaw rotation %.3f degrees (%.3f radians)",
@@ -65,8 +66,10 @@ PAW3902::~PAW3902()
 	perf_free(_interval_perf);
 	perf_free(_comms_errors);
 	perf_free(_false_motion_perf);
-	perf_free(_mode_change_perf);
 	perf_free(_register_write_fail_perf);
+	perf_free(_mode_change_bright_perf);
+	perf_free(_mode_change_low_light_perf);
+	perf_free(_mode_change_super_low_light_perf);
 }
 
 int PAW3902::init()
@@ -78,13 +81,10 @@ int PAW3902::init()
 
 	Reset();
 
-	// default to low light mode (1)
-	ModeLowLight();
+	// force to low light mode (1) initially
+	ChangeMode(Mode::LowLight, true);
 
 	_previous_collect_timestamp = hrt_absolute_time();
-
-	// schedule a cycle to start things
-	ScheduleOnInterval(SAMPLE_INTERVAL_MODE_1, SAMPLE_INTERVAL_MODE_1);
 
 	return PX4_OK;
 }
@@ -115,8 +115,40 @@ int PAW3902::probe()
 	return PX4_OK;
 }
 
+int PAW3902::DataReadyInterruptCallback(int irq, void *context, void *arg)
+{
+	static_cast<PAW3902 *>(arg)->DataReady();
+	return 0;
+}
+
+void PAW3902::DataReady()
+{
+	ScheduleNow();
+}
+
+bool PAW3902::DataReadyInterruptConfigure()
+{
+	if (_drdy_gpio == 0) {
+		return false;
+	}
+
+	// Setup data ready on falling edge
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
+}
+
+bool PAW3902::DataReadyInterruptDisable()
+{
+	if (_drdy_gpio == 0) {
+		return false;
+	}
+
+	return px4_arch_gpiosetevent(_drdy_gpio, false, false, false, nullptr, nullptr) == 0;
+}
+
 bool PAW3902::Reset()
 {
+	DataReadyInterruptDisable();
+
 	// Power on reset
 	RegisterWrite(Register::Power_Up_Reset, 0x5A);
 	usleep(1000);
@@ -131,30 +163,50 @@ bool PAW3902::Reset()
 	return true;
 }
 
-bool PAW3902::ChangeMode(Mode newMode)
+void PAW3902::exit_and_cleanup()
 {
-	if (newMode != _mode) {
+	DataReadyInterruptDisable();
+	I2CSPIDriverBase::exit_and_cleanup();
+}
+
+bool PAW3902::ChangeMode(Mode newMode, bool force)
+{
+	if (newMode != _mode || force) {
 		PX4_DEBUG("changing from mode %d -> %d", static_cast<int>(_mode), static_cast<int>(newMode));
+		DataReadyInterruptDisable();
 		ScheduleClear();
 
 		// Issue a soft reset
 		RegisterWrite(Register::Power_Up_Reset, 0x5A);
 
+		uint32_t interval_us = 0;
+
 		switch (newMode) {
 		case Mode::Bright:
 			ModeBright();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_0);
+			interval_us = SAMPLE_INTERVAL_MODE_0;
+			perf_count(_mode_change_bright_perf);
 			break;
 
 		case Mode::LowLight:
 			ModeLowLight();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_1);
+			interval_us = SAMPLE_INTERVAL_MODE_1;
+			perf_count(_mode_change_low_light_perf);
 			break;
 
 		case Mode::SuperLowLight:
 			ModeSuperLowLight();
-			ScheduleOnInterval(SAMPLE_INTERVAL_MODE_2);
+			interval_us = SAMPLE_INTERVAL_MODE_2;
+			perf_count(_mode_change_super_low_light_perf);
 			break;
+		}
+
+		if (DataReadyInterruptConfigure()) {
+			// backup schedule as a watchdog timeout
+			ScheduleDelayed(500_ms);
+
+		} else {
+			ScheduleOnInterval(interval_us);
 		}
 
 		// Discard the first three motion data.
@@ -166,9 +218,9 @@ bool PAW3902::ChangeMode(Mode newMode)
 			RegisterRead(Register::Delta_Y_H);
 		}
 
-		_mode = newMode;
+		EnableLed();
 
-		perf_count(_mode_change_perf);
+		_mode = newMode;
 	}
 
 	_bright_to_low_counter = 0;
@@ -184,7 +236,7 @@ bool PAW3902::ChangeMode(Mode newMode)
 	return true;
 }
 
-bool PAW3902::ModeBright()
+void PAW3902::ModeBright()
 {
 	// Mode 0: Bright (126 fps) 60 Lux typical
 
@@ -294,16 +346,9 @@ bool PAW3902::ModeBright()
 	usleep(10_ms); // delay 10ms
 
 	RegisterWriteVerified(0x73, 0x00);
-
-	// Enable LED_N controls
-	RegisterWriteVerified(0x7F, 0x14);
-	RegisterWriteVerified(0x6F, 0x1c);
-	RegisterWriteVerified(0x7F, 0x00);
-
-	return true;
 }
 
-bool PAW3902::ModeLowLight()
+void PAW3902::ModeLowLight()
 {
 	// Mode 1: Low Light (126 fps) 30 Lux typical
 	// low light and low speed motion tracking
@@ -414,16 +459,9 @@ bool PAW3902::ModeLowLight()
 	usleep(10_ms); // delay 10ms
 
 	RegisterWriteVerified(0x73, 0x00);
-
-	// Enable LED_N controls
-	RegisterWriteVerified(0x7F, 0x14);
-	RegisterWriteVerified(0x6F, 0x1c);
-	RegisterWriteVerified(0x7F, 0x00);
-
-	return true;
 }
 
-bool PAW3902::ModeSuperLowLight()
+void PAW3902::ModeSuperLowLight()
 {
 	// Mode 2: Super Low Light (50 fps) 9 Lux typical
 	// super low light and low speed motion tracking
@@ -534,22 +572,26 @@ bool PAW3902::ModeSuperLowLight()
 	usleep(25_ms); // delay 25ms
 
 	RegisterWriteVerified(0x73, 0x00);
+}
 
+void PAW3902::EnableLed()
+{
 	// Enable LED_N controls
 	RegisterWriteVerified(0x7F, 0x14);
 	RegisterWriteVerified(0x6F, 0x1c);
 	RegisterWriteVerified(0x7F, 0x00);
-
-	return true;
 }
 
 uint8_t PAW3902::RegisterRead(uint8_t reg, int retries)
 {
-	for (int i = 0; i < retries; i++) {
-		uint8_t cmd[2] {reg, 0};
+	uint8_t cmd[1] {reg};
 
-		if (transfer(&cmd[0], &cmd[0], sizeof(cmd)) == 0) {
-			return cmd[1];
+	if (transfer(&cmd[0], nullptr, sizeof(cmd)) == PX4_OK) {
+		px4_udelay(TIME_us_TSRAD);
+		uint8_t result[1] {0};
+
+		if (transfer(nullptr, &result[0], sizeof(result)) == PX4_OK) {
+			return result[0];
 		}
 	}
 
@@ -575,11 +617,16 @@ bool PAW3902::RegisterWriteVerified(uint8_t reg, uint8_t data, int retries)
 		cmd[0] = DIR_WRITE(reg);
 		cmd[1] = data;
 		transfer(&cmd[0], nullptr, sizeof(cmd));
+		px4_udelay(TIME_us_TSWW);
 
 		// read back to verify
-		if (RegisterRead(reg) == data) {
+		uint8_t data_read = RegisterRead(reg);
+
+		if (data_read == data) {
 			return true;
 		}
+
+		PX4_DEBUG("Register write failed 0x%02hhX: 0x%02hhX (actual value 0x%02hhX)", reg, data, data_read);
 	}
 
 	perf_count(_register_write_fail_perf);
@@ -613,7 +660,6 @@ void PAW3902::RunImpl()
 	// update for next iteration
 	_previous_collect_timestamp = timestamp_sample;
 
-
 	// check SQUAL & Shutter values
 	// To suppress false motion reports, discard Delta X and Delta Y values if the SQUAL and Shutter values meet the condition
 	// Bright Mode,			SQUAL < 0x19, Shutter ≥ 0x1FF0
@@ -621,27 +667,17 @@ void PAW3902::RunImpl()
 	// Super Low Light Mode,	SQUAL < 0x55, Shutter ≥ 0x0BC0
 	const uint16_t shutter = (buf.data.Shutter_Upper << 8) | buf.data.Shutter_Lower;
 
-	if ((buf.data.SQUAL < 0x19) && (shutter >= 0x0BC0)) {
-		PX4_DEBUG("false motion report, discarding");
-		perf_count(_false_motion_perf);
-		perf_end(_sample_perf);
-
-		// reset
-		_flow_dt_sum_usec = 0;
-		_flow_sum_x = 0;
-		_flow_sum_y = 0;
-		_flow_sample_counter = 0;
-		_flow_quality_sum = 0;
-
-		return;
-	}
-
-	const int16_t delta_x_raw = ((int16_t)buf.data.Delta_X_H << 8) | buf.data.Delta_X_L;
-	const int16_t delta_y_raw = ((int16_t)buf.data.Delta_Y_H << 8) | buf.data.Delta_Y_L;
+	bool data_valid = true;
 
 	switch (_mode) {
 	case Mode::Bright:
-		if ((shutter >= 0x1FFE) && (buf.data.RawData_Sum < 0x3C)) {
+		if ((buf.data.SQUAL < 0x19) && (shutter >= 0x1FF0)) {
+			// false motion report, discarding
+			perf_count(_false_motion_perf);
+			ResetAccumulatedData();
+			data_valid = false;
+
+		} else if ((shutter >= 0x1FFE) && (buf.data.RawData_Sum < 0x3C)) {
 			// Bright -> LowLight
 			_bright_to_low_counter++;
 
@@ -656,7 +692,13 @@ void PAW3902::RunImpl()
 		break;
 
 	case Mode::LowLight:
-		if ((shutter >= 0x1FFE) && (buf.data.RawData_Sum < 0x5A)) {
+		if ((buf.data.SQUAL < 0x46) && (shutter >= 0x1FF0)) {
+			// false motion report, discarding
+			perf_count(_false_motion_perf);
+			ResetAccumulatedData();
+			data_valid = false;
+
+		} else if ((shutter >= 0x1FFE) && (buf.data.RawData_Sum < 0x5A)) {
 			// LowLight -> SuperLowLight
 			_low_to_bright_counter = 0;
 			_low_to_superlow_counter++;
@@ -667,20 +709,29 @@ void PAW3902::RunImpl()
 
 		} else if ((shutter < 0x0BB8)) {
 			// LowLight -> Bright
-			_low_to_superlow_counter = 0;
 			_low_to_bright_counter++;
+			_low_to_superlow_counter = 0;
 
 			if (_low_to_bright_counter >= 10) { // AND valid for 10 consecutive frames
 				ChangeMode(Mode::Bright);
 			}
+
+		} else {
+			_low_to_bright_counter = 0;
+			_low_to_superlow_counter = 0;
 		}
 
 		break;
 
 	case Mode::SuperLowLight:
+		if ((buf.data.SQUAL < 0x55) && (shutter >= 0x0BC0)) {
+			// false motion report, discarding
+			perf_count(_false_motion_perf);
+			ResetAccumulatedData();
+			data_valid = false;
 
-		// SuperLowLight -> LowLight
-		if ((shutter < 0x03E8)) {
+		} else if (shutter < 0x03E8) {
+			// SuperLowLight -> LowLight
 			_superlow_to_low_counter++;
 
 			if (_superlow_to_low_counter >= 10) { // AND valid for 10 consecutive frames
@@ -694,7 +745,10 @@ void PAW3902::RunImpl()
 		break;
 	}
 
-	if (buf.data.SQUAL > 0) {
+	if (data_valid && (buf.data.SQUAL > 0)) {
+		const int16_t delta_x_raw = ((int16_t)buf.data.Delta_X_H << 8) | buf.data.Delta_X_L;
+		const int16_t delta_y_raw = ((int16_t)buf.data.Delta_Y_H << 8) | buf.data.Delta_Y_L;
+
 		_flow_dt_sum_usec += dt_flow;
 		_flow_sum_x += delta_x_raw;
 		_flow_sum_y += delta_y_raw;
@@ -702,12 +756,7 @@ void PAW3902::RunImpl()
 		_flow_quality_sum += buf.data.SQUAL;
 
 	} else {
-		// reset
-		_flow_dt_sum_usec = 0;
-		_flow_sum_x = 0;
-		_flow_sum_y = 0;
-		_flow_sample_counter = 0;
-		_flow_quality_sum = 0;
+		ResetAccumulatedData();
 		return;
 	}
 
@@ -746,6 +795,11 @@ void PAW3902::RunImpl()
 	report.timestamp = hrt_absolute_time();
 	_optical_flow_pub.publish(report);
 
+	ResetAccumulatedData();
+}
+
+void PAW3902::ResetAccumulatedData()
+{
 	// reset
 	_flow_dt_sum_usec = 0;
 	_flow_sum_x = 0;
@@ -762,6 +816,8 @@ void PAW3902::print_status()
 	perf_print_counter(_interval_perf);
 	perf_print_counter(_comms_errors);
 	perf_print_counter(_false_motion_perf);
-	perf_print_counter(_mode_change_perf);
 	perf_print_counter(_register_write_fail_perf);
+	perf_print_counter(_mode_change_bright_perf);
+	perf_print_counter(_mode_change_low_light_perf);
+	perf_print_counter(_mode_change_super_low_light_perf);
 }
