@@ -252,47 +252,23 @@ usage()
 BMM150::BMM150(int bus, const char *path, enum Rotation rotation) :
 	I2C("BMM150", path, bus, BMM150_SLAVE_ADDRESS, BMM150_BUS_SPEED),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
-	_running(false),
-	_call_interval(0),
-	_reports(nullptr),
-	_collect_phase(false),
-	_scale{},
-	_range_scale(0.01), /* default range scale from from uT to gauss */
-	_topic(nullptr),
-	_orb_class_instance(-1),
-	_class_instance(-1),
-	_power(BMM150_DEFAULT_POWER_MODE),
-	_output_data_rate(BMM150_DATA_RATE_30HZ),
-	_calibrated(false),
-	dig_x1(0),
-	dig_y1(0),
-	dig_x2(0),
-	dig_y2(0),
-	dig_z1(0),
-	dig_z2(0),
-	dig_z3(0),
-	dig_z4(0),
-	dig_xy1(0),
-	dig_xy2(0),
-	dig_xyz1(0),
-	_sample_perf(perf_alloc(PC_ELAPSED, "bmm150_read")),
-	_bad_transfers(perf_alloc(PC_COUNT, "bmm150_bad_transfers")),
-	_good_transfers(perf_alloc(PC_COUNT, "bmm150_good_transfers")),
-	_measure_perf(perf_alloc(PC_ELAPSED, "bmp280_measure")),
-	_comms_errors(perf_alloc(PC_COUNT, "bmp280_comms_errors")),
-	_duplicates(perf_alloc(PC_COUNT, "bmm150_duplicates")),
-	_rotation(rotation),
-	_got_duplicate(false)
+	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": read")),
+	_bad_transfers(perf_alloc(PC_COUNT, MODULE_NAME": bad_transfers")),
+	_good_transfers(perf_alloc(PC_COUNT, MODULE_NAME": good_transfers")),
+	_measure_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": measure")),
+	_comms_errors(perf_alloc(PC_COUNT, MODULE_NAME": comms_errors")),
+	_duplicates(perf_alloc(PC_COUNT, MODULE_NAME": duplicates")),
+	_rotation(rotation)
 {
 	_device_id.devid_s.devtype = DRV_MAG_DEVTYPE_BMM150;
 
 	// default scaling
-	_scale.x_offset = 0;
-	_scale.x_scale = 1.0f;
-	_scale.y_offset = 0;
-	_scale.y_scale = 1.0f;
-	_scale.z_offset = 0;
-	_scale.z_scale = 1.0f;
+	_mag_scale.x_offset = 0;
+	_mag_scale.x_scale = 1.0f;
+	_mag_scale.y_offset = 0;
+	_mag_scale.y_scale = 1.0f;
+	_mag_scale.z_offset = 0;
+	_mag_scale.z_scale = 1.0f;
 }
 
 BMM150 :: ~BMM150()
@@ -539,17 +515,23 @@ BMM150::collect()
 	_collect_phase = false;
 
 	bool mag_notify = true;
-	uint8_t mag_data[8], status;
+	uint8_t mag_data[8];
 	uint16_t resistance, lsb, msb, msblsb;
-	mag_report  mrb;
 
+	int16_t x_raw{0};
+	int16_t y_raw{0};
+	int16_t z_raw{0};
+
+	float x{0.f};
+	float y{0.f};
+	float z{0.f};
 
 	/* start collecting data */
 	perf_begin(_sample_perf);
 
-	status = read_reg(BMM150_R_LSB);
-
 	/* Read Magnetometer data*/
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
+
 	if (OK != get_data(BMM150_DATA_X_LSB_REG, mag_data, sizeof(mag_data))) {
 		return -EIO;
 	}
@@ -566,44 +548,42 @@ BMM150::collect()
 	*/
 
 	/* Extract X axis data */
-	lsb = ((mag_data[0] & 0xF8) >> 3);
-	msb = (((int8_t)mag_data[1]) << 5);
+	lsb = ((mag_data[0] & 0xF8));
+	msb = ((uint16_t)(mag_data[1]) << 8);
 	msblsb = (msb | lsb);
-	mrb.x_raw = (int16_t)msblsb;
+	x_raw = (int16_t)msblsb / 8;
 
 
 	/* Extract Y axis data */
-	lsb = ((mag_data[2] & 0xF8) >> 3);
-	msb = (((int8_t)mag_data[3]) << 5);
+	lsb = ((mag_data[2] & 0xF8));
+	msb = (((uint16_t)(mag_data[3])) << 8);
 	msblsb = (msb | lsb);
-	mrb.y_raw = (int16_t)msblsb;
+	y_raw = (int16_t)msblsb / 8;
 
 	/* Extract Z axis data */
-	lsb = ((mag_data[4] & 0xFE) >> 1);
-	msb = (((int8_t)mag_data[5]) << 7);
+	lsb = ((mag_data[4] & 0xFE));
+	msb = (((uint16_t)(mag_data[5])) << 8);
 	msblsb = (msb | lsb);
-	mrb.z_raw = (int16_t)msblsb;
+	z_raw = (int16_t)msblsb / 2;
 
 	/* Extract Resistance data */
-	lsb = ((mag_data[6] & 0xFC) >> 2);
-	msb = (mag_data[7] << 6);
+	lsb = ((mag_data[6] & 0xFC));
+	msb = (((uint16_t)mag_data[7]) << 8);
 	msblsb = (msb | lsb);
-	resistance = (uint16_t)msblsb;
+	resistance = (uint16_t)msblsb / 4;
 
 	/* Check whether data is new or old */
-	if (!(status & 0x01)) {
+	if (!(mag_data[6] & 0x01)) {
 		perf_end(_sample_perf);
 		perf_count(_duplicates);
-		_got_duplicate = true;
 		return -EIO;
 	}
 
-	_got_duplicate = false;
-
-	if (mrb.x_raw == 0 &&
-	    mrb.y_raw == 0 &&
-	    mrb.z_raw == 0 &&
+	if (x_raw == 0 &&
+	    y_raw == 0 &&
+	    z_raw == 0 &&
 	    resistance == 0) {
+
 		// all zero data - probably a I2C bus error
 		perf_count(_comms_errors);
 		perf_count(_bad_transfers);
@@ -614,57 +594,61 @@ BMM150::collect()
 	perf_count(_good_transfers);
 
 	/* Compensation for X axis */
-	if (mrb.x_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
+	if (x_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
 		/* no overflow */
-		if ((resistance != 0) && (dig_xyz1 != 0)) {
-			mrb.x = ((dig_xyz1 * 16384.0 / resistance) - 16384.0);
-			mrb.x = (((mrb.x_raw * ((((dig_xy2 * ((float)(mrb.x * mrb.x / (float)268435456.0)) + mrb.x * dig_xy1 /
-						   (float)16384.0)) + (float)256.0) * (dig_x2 + (float)160.0))) / (float)8192.0) + (dig_x1 * (float)8.0)) / (float)16.0;
+		if ((resistance != 0) && (_dig_xyz1 != 0)) {
+			/* this is not documented, but derived from https://github.com/BoschSensortec/BMM150-Sensor-API/blob/master/bmm150.c */
+			x = ((_dig_xyz1 * 16384.0f / resistance) - 16384.0f);
+			x = (((x_raw * ((((_dig_xy2 * ((float)(x * x / 268435456.0f)) + x * _dig_xy1 /
+					   16384.0f)) + 256.0f) * (_dig_x2 + 160.0f))) / 8192.0f) + (_dig_x1 * 8.0f)) / 16.0f;
 
 		} else {
-			mrb.x = BMM150_OVERFLOW_OUTPUT_FLOAT;
+			x = BMM150_OVERFLOW_OUTPUT_FLOAT;
 		}
 
 	} else {
-		mrb.x = BMM150_OVERFLOW_OUTPUT_FLOAT;
+		x = BMM150_OVERFLOW_OUTPUT_FLOAT;
 	}
 
 	/* Compensation for Y axis */
-	if (mrb.y_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
+	if (y_raw != BMM150_FLIP_OVERFLOW_ADCVAL) {
 		/* no overflow */
-		if ((resistance != 0) && (dig_xyz1 != 0)) {
+		if ((resistance != 0) && (_dig_xyz1 != 0)) {
 
-			mrb.y = ((((float)dig_xyz1) * (float)16384.0 / resistance) - (float)16384.0);
-			mrb.y = (((mrb.y_raw * ((((dig_xy2 * (mrb.y * mrb.y / (float)268435456.0) + mrb.y * dig_xy1 / (float)16384.0)) +
-						 (float)256.0) * (dig_y2 + (float)160.0))) / (float)8192.0) + (dig_y1 * (float)8.0)) / (float)16.0;
+			y = ((((float)_dig_xyz1) * 16384.0f / resistance) - 16384.0f);
+			y = (((y_raw * ((((_dig_xy2 * (y * y / 268435456.0f) + y * _dig_xy1 / 16384.0f)) +
+					 256.0f) * (_dig_y2 + 160.0f))) / 8192.0f) + (_dig_y1 * 8.0f)) / 16.0f;
 
 
 		} else {
-			mrb.y = BMM150_OVERFLOW_OUTPUT_FLOAT;
+			y = BMM150_OVERFLOW_OUTPUT_FLOAT;
 		}
 
 	} else {
 		/* overflow, set output to 0.0f */
-		mrb.y = BMM150_OVERFLOW_OUTPUT_FLOAT;
+		y = BMM150_OVERFLOW_OUTPUT_FLOAT;
 	}
-
 
 	/* Compensation for Z axis */
-	if (mrb.z_raw != BMM150_HALL_OVERFLOW_ADCVAL) {
+	if (z_raw != BMM150_HALL_OVERFLOW_ADCVAL) {
 		/* no overflow */
-		if ((dig_z2 != 0) && (dig_z1 != 0) && (dig_xyz1 != 0) && (resistance != 0)) {
-			mrb.z = ((((mrb.z_raw - dig_z4) * (float)131072.0) - (dig_z3 * (resistance - dig_xyz1))) / ((
-						dig_z2 + dig_z1 * resistance / (float)32768.0) * (float)4.0)) / (float)16.0;
+		if ((_dig_z2 != 0) && (_dig_z1 != 0) && (_dig_xyz1 != 0) && (resistance != 0)) {
+			z = ((((z_raw - _dig_z4) * 131072.0f) - (_dig_z3 * (resistance - _dig_xyz1))) / ((
+						_dig_z2 + _dig_z1 * resistance / 32768.0f) * 4.0f)) / 16.0f;
 		}
 
 	} else {
 		/* overflow, set output to 0.0f */
-		mrb.z = BMM150_OVERFLOW_OUTPUT_FLOAT;
+		z = BMM150_OVERFLOW_OUTPUT_FLOAT;
 	}
 
 
-	mrb.timestamp = hrt_absolute_time();
-	mrb.is_external = external();
+	sensor_mag_s mrb{};
+	mrb.timestamp = timestamp_sample;
+	mrb.x_raw = x_raw;
+	mrb.y_raw = y_raw;
+	mrb.z_raw = z_raw;
+	mrb.is_external = false;
 
 	// report the error count as the number of bad transfers.
 	// This allows the higher level code to decide if it
@@ -672,13 +656,12 @@ BMM150::collect()
 	mrb.error_count = perf_event_count(_bad_transfers);
 
 	// apply user specified rotation
-	rotate_3f(_rotation, mrb.x, mrb.y, mrb.z);
-
+	rotate_3f(_rotation, x, y, z);
 
 	/* Scaling the data */
-	mrb.x = ((mrb.x * _range_scale) - _scale.x_offset) * _scale.x_scale;
-	mrb.y = ((mrb.y * _range_scale) - _scale.y_offset) * _scale.y_scale;
-	mrb.z = ((mrb.z * _range_scale) - _scale.z_offset) * _scale.z_scale;
+	mrb.x = ((x * _range_scale) - _mag_scale.x_offset) * _mag_scale.x_scale;
+	mrb.y = ((y * _range_scale) - _mag_scale.y_offset) * _mag_scale.y_scale;
+	mrb.z = ((z * _range_scale) - _mag_scale.z_offset) * _mag_scale.z_scale;
 
 	mrb.scaling = _range_scale;
 	mrb.device_id = _device_id.devid;
@@ -699,9 +682,13 @@ BMM150::collect()
 		orb_publish(ORB_ID(sensor_mag), _topic, &mrb);
 	}
 
+	_last_raw_x = x_raw;
+	_last_raw_y = y_raw;
+	_last_raw_z = z_raw;
+	_last_resistance = resistance;
+
 	perf_end(_sample_perf);
 	return OK;
-
 }
 
 int
@@ -750,10 +737,14 @@ BMM150::ioctl(struct file *filp, int cmd, unsigned long arg)
 		return reset();
 
 	case MAGIOCSSCALE:
-		return OK;
+		/* set new scale factors */
+		memcpy(&_mag_scale, (struct mag_calibration_s *)arg, sizeof(_mag_scale));
+		return 0;
 
 	case MAGIOCGSCALE:
-		return OK;
+		/* copy out scale factors */
+		memcpy((struct mag_calibration_s *)arg, &_mag_scale, sizeof(_mag_scale));
+		return 0;
 
 	case MAGIOCCALIBRATE:
 		return OK;
@@ -920,52 +911,50 @@ int BMM150 :: set_data_rate(uint8_t data_rate)
 
 }
 
-
-int BMM150 :: init_trim_registers(void)
+int BMM150::init_trim_registers()
 {
 	int ret = OK;
 	uint8_t data[2] = {0};
 	uint16_t msb, lsb, msblsb;
 
-	dig_x1 = read_reg(BMM150_DIG_X1);
-	dig_y1 = read_reg(BMM150_DIG_Y1);
-	dig_x2 = read_reg(BMM150_DIG_X2);
-	dig_y2 = read_reg(BMM150_DIG_Y2);
-	dig_xy1 = read_reg(BMM150_DIG_XY1);
-	dig_xy2 = read_reg(BMM150_DIG_XY2);
+	_dig_x1 = read_reg(BMM150_DIG_X1);
+	_dig_y1 = read_reg(BMM150_DIG_Y1);
+	_dig_x2 = read_reg(BMM150_DIG_X2);
+	_dig_y2 = read_reg(BMM150_DIG_Y2);
+	_dig_xy1 = read_reg(BMM150_DIG_XY1);
+	_dig_xy2 = read_reg(BMM150_DIG_XY2);
 
 	ret += get_data(BMM150_DIG_Z1_LSB, data, 2);
 	lsb = data[0];
-	msb = (data[1] << 8);
+	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
-	dig_z1 = (uint16_t)msblsb;
+	_dig_z1 = (uint16_t)msblsb;
 
 	ret += get_data(BMM150_DIG_Z2_LSB, data, 2);
 	lsb = data[0];
-	msb = ((int8_t)data[1] << 8);
+	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
-	dig_z2 = (int16_t)msblsb;
+	_dig_z2 = (int16_t)msblsb;
 
 	ret += get_data(BMM150_DIG_Z3_LSB, data, 2);
 	lsb = data[0];
-	msb = ((int8_t)data[1] << 8);
+	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
-	dig_z3 = (int16_t)msblsb;
+	_dig_z3 = (int16_t)msblsb;
 
 	ret += get_data(BMM150_DIG_Z4_LSB, data, 2);
 	lsb = data[0];
-	msb = ((int8_t)data[1] << 8);
+	msb = ((uint16_t)data[1]) << 8;
 	msblsb = (msb | lsb);
-	dig_z4 = (int16_t)msblsb;
+	_dig_z4 = (int16_t)msblsb;
 
 	ret += get_data(BMM150_DIG_XYZ1_LSB, data, 2);
 	lsb = data[0];
-	msb = ((data[1] & 0x7F) << 8);
+	msb = ((uint16_t)(data[1] & 0x7F) << 8);
 	msblsb = (msb | lsb);
-	dig_xyz1 = (uint16_t)msblsb;
+	_dig_xyz1 = (uint16_t)msblsb;
 
 	return ret;
-
 }
 
 int BMM150::set_rep_xy(uint8_t rep_xy)
@@ -1032,9 +1021,10 @@ BMM150::print_info()
 	_reports->print_info("mag queue");
 
 	printf("output  (%.2f %.2f %.2f)\n", (double)_last_report.x, (double)_last_report.y, (double)_last_report.z);
-	printf("offsets (%.2f %.2f %.2f)\n", (double)_scale.x_offset, (double)_scale.y_offset, (double)_scale.z_offset);
+	printf("offsets (%.2f %.2f %.2f)\n", (double)_mag_scale.x_offset, (double)_mag_scale.y_offset,
+	       (double)_mag_scale.z_offset);
 	printf("scaling (%.2f %.2f %.2f) 1/range_scale %.2f ",
-	       (double)_scale.x_scale, (double)_scale.y_scale, (double)_scale.z_scale,
+	       (double)_mag_scale.x_scale, (double)_mag_scale.y_scale, (double)_mag_scale.z_scale,
 	       (double)(1.0f / _range_scale));
 	printf("\n");
 
