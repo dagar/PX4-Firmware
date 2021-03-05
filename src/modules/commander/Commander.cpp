@@ -2084,8 +2084,10 @@ Commander::run()
 			_geofence_violated_prev = false;
 		}
 
+		_navigator_status_sub.update();
+
 		/* Check for mission flight termination */
-		if (_armed.armed && _mission_result_sub.get().flight_termination &&
+		if (_armed.armed && _navigator_status_sub.get().flight_termination &&
 		    !_status_flags.circuit_breaker_flight_termination_disabled) {
 
 			_armed.force_failsafe = true;
@@ -2421,7 +2423,6 @@ Commander::run()
 						       &_mavlink_log_pub,
 						       (link_loss_actions_t)_param_nav_dll_act.get(),
 						       _mission_result_sub.get().finished,
-						       _mission_result_sub.get().stay_in_failsafe,
 						       _status_flags,
 						       _land_detector.landed,
 						       (link_loss_actions_t)_param_nav_rcl_act.get(),

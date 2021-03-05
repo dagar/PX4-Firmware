@@ -67,6 +67,7 @@
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/mission.h>
 #include <uORB/topics/mission_result.h>
+#include <uORB/topics/navigator_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/position_controller_landing_status.h>
 #include <uORB/topics/position_controller_status.h>
@@ -151,16 +152,18 @@ public:
 	/**
 	 * Getters
 	 */
-	struct home_position_s *get_home_position() { return &_home_pos; }
-	struct mission_result_s *get_mission_result() { return &_mission_result; }
-	struct position_setpoint_triplet_s *get_position_setpoint_triplet() { return &_pos_sp_triplet; }
-	struct position_setpoint_triplet_s *get_reposition_triplet() { return &_reposition_triplet; }
-	struct position_setpoint_triplet_s *get_takeoff_triplet() { return &_takeoff_triplet; }
-	struct vehicle_global_position_s *get_global_position() { return &_global_pos; }
-	struct vehicle_land_detected_s *get_land_detected() { return &_land_detected; }
-	struct vehicle_local_position_s *get_local_position() { return &_local_pos; }
-	struct vehicle_status_s *get_vstatus() { return &_vstatus; }
+	home_position_s *get_home_position() { return &_home_pos; }
+	mission_result_s *get_mission_result() { return &_mission_result; }
+	position_setpoint_triplet_s *get_position_setpoint_triplet() { return &_pos_sp_triplet; }
+	position_setpoint_triplet_s *get_reposition_triplet() { return &_reposition_triplet; }
+	position_setpoint_triplet_s *get_takeoff_triplet() { return &_takeoff_triplet; }
+	vehicle_global_position_s *get_global_position() { return &_global_pos; }
+	vehicle_land_detected_s *get_land_detected() { return &_land_detected; }
+	vehicle_local_position_s *get_local_position() { return &_local_pos; }
+	vehicle_status_s *get_vstatus() { return &_vstatus; }
 	PrecLand *get_precland() { return &_precland; } /**< allow others, e.g. Mission, to use the precision land block */
+
+	navigator_status_s &navigator_status() { return _navigator_status; }
 
 	const vehicle_roi_s &get_vroi() { return _vroi; }
 	void reset_vroi() { _vroi = {}; }
@@ -347,6 +350,7 @@ private:
 
 	uORB::Publication<geofence_result_s>		_geofence_result_pub{ORB_ID(geofence_result)};
 	uORB::Publication<mission_result_s>		_mission_result_pub{ORB_ID(mission_result)};
+	uORB::Publication<navigator_status_s>		_navigator_status_pub{ORB_ID(navigator_status)};
 	uORB::Publication<position_setpoint_triplet_s>	_pos_sp_triplet_pub{ORB_ID(position_setpoint_triplet)};
 	uORB::Publication<vehicle_roi_s>		_vehicle_roi_pub{ORB_ID(vehicle_roi)};
 
@@ -358,6 +362,7 @@ private:
 	// Subscriptions
 	home_position_s					_home_pos{};		/**< home position for RTL */
 	mission_result_s				_mission_result{};
+	navigator_status_s				_navigator_status{};
 	vehicle_global_position_s			_global_pos{};		/**< global vehicle position */
 	vehicle_gps_position_s				_gps_pos{};		/**< gps position */
 	vehicle_land_detected_s				_land_detected{};	/**< vehicle land_detected */

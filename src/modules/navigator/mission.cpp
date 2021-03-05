@@ -674,6 +674,7 @@ Mission::set_mission_items()
 		_navigator->set_can_loiter_at_sp(pos_sp_triplet->current.type == position_setpoint_s::SETPOINT_TYPE_LOITER);
 
 		// set mission finished
+		_navigator->navigator_status().finished = true;
 		_navigator->get_mission_result()->finished = true;
 		_navigator->set_mission_result_updated();
 
@@ -1672,6 +1673,7 @@ Mission::set_mission_item_reached()
 void
 Mission::set_current_mission_item()
 {
+	_navigator->navigator_status().finished = false;
 	_navigator->get_mission_result()->finished = false;
 	_navigator->get_mission_result()->seq_current = _current_mission_index;
 

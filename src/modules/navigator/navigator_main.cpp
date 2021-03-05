@@ -693,6 +693,9 @@ Navigator::run()
 			publish_mission_result();
 		}
 
+		_navigator_status.timestamp = hrt_absolute_time();
+		_navigator_status_pub.publish(_navigator_status);
+
 		perf_end(_loop_perf);
 	}
 }

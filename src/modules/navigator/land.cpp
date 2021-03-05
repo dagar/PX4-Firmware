@@ -51,7 +51,7 @@ Land::on_activation()
 {
 	/* set current mission item to Land */
 	set_land_item(&_mission_item, true);
-	_navigator->get_mission_result()->finished = false;
+	_navigator->navigator_status().finished = false;
 	_navigator->set_mission_result_updated();
 	reset_mission_item_reached();
 
@@ -81,7 +81,7 @@ Land::on_active()
 
 
 	if (_navigator->get_land_detected()->landed) {
-		_navigator->get_mission_result()->finished = true;
+		_navigator->navigator_status().finished = true;
 		_navigator->set_mission_result_updated();
 		set_idle_item(&_mission_item);
 

@@ -61,8 +61,8 @@ Takeoff::on_active()
 		// reset the position
 		set_takeoff_position();
 
-	} else if (is_mission_item_reached() && !_navigator->get_mission_result()->finished) {
-		_navigator->get_mission_result()->finished = true;
+	} else if (is_mission_item_reached() && !_navigator->navigator_status().finished) {
+		_navigator->navigator_status().finished = true;
 		_navigator->set_mission_result_updated();
 
 		// set loiter item so position controllers stop doing takeoff logic
@@ -120,7 +120,7 @@ Takeoff::set_takeoff_position()
 
 	// set current mission item to takeoff
 	set_takeoff_item(&_mission_item, abs_altitude);
-	_navigator->get_mission_result()->finished = false;
+	_navigator->navigator_status().finished = false;
 	_navigator->set_mission_result_updated();
 	reset_mission_item_reached();
 
