@@ -109,18 +109,17 @@
 
 MEMORY
 {
-	FLASH     (rx) : ORIGIN = 0x08000000, LENGTH = 2048K
-	DTCM1    (rwx) : ORIGIN = 0x20000000, LENGTH =   64K
-	DTCM2    (rwx) : ORIGIN = 0x20010000, LENGTH =   64K
+	ITCM_RAM  (rwx) : ORIGIN = 0x00000000, LENGTH =   64K
+	FLASH      (rx) : ORIGIN = 0x08000000, LENGTH =  128K
 
-	ITCM_RAM (rwx) : ORIGIN = 0x00000000, LENGTH =   64K
-	DTCM_RAM (rwx) : ORIGIN = 0x20000000, LENGTH =  128K
-	AXI_SRAM (rwx) : ORIGIN = 0x24000000, LENGTH =  512K /* D1 domain AXI bus */
-	SRAM1    (rwx) : ORIGIN = 0x30000000, LENGTH =  128K /* D2 domain AHB bus */
-	SRAM2    (rwx) : ORIGIN = 0x30020000, LENGTH =  128K /* D2 domain AHB bus */
-	SRAM3    (rwx) : ORIGIN = 0x30040000, LENGTH =   32K /* D2 domain AHB bus */
-	SRAM4    (rwx) : ORIGIN = 0x38000000, LENGTH =   64K /* D3 domain */
-	BKPRAM   (rwx) : ORIGIN = 0x38800000, LENGTH =    4K
+	DTCM1_RAM (rwx) : ORIGIN = 0x20000000, LENGTH =   64K
+	DTCM2_RAM (rwx) : ORIGIN = 0x20010000, LENGTH =   64K
+	AXI_SRAM  (rwx) : ORIGIN = 0x24000000, LENGTH =  512K /* D1 domain AXI bus */
+	SRAM1     (rwx) : ORIGIN = 0x30000000, LENGTH =  128K /* D2 domain AHB bus */
+	SRAM2     (rwx) : ORIGIN = 0x30020000, LENGTH =  128K /* D2 domain AHB bus */
+	SRAM3     (rwx) : ORIGIN = 0x30040000, LENGTH =   32K /* D2 domain AHB bus */
+	SRAM4     (rwx) : ORIGIN = 0x38000000, LENGTH =   64K /* D3 domain */
+	BKPRAM    (rwx) : ORIGIN = 0x38800000, LENGTH =    4K
 }
 
 OUTPUT_ARCH(arm)
@@ -197,6 +196,11 @@ SECTIONS
 		. = ALIGN(4);
 		_ebss = ABSOLUTE(.);
 	} > AXI_SRAM
+
+	/* Emit the the D3 power domain section for locating BDMA data */
+	.SRAM4 (NOLOAD) :
+	{
+	} > SRAM4
 
 	/* Stabs debugging sections. */
 	.stab 0 : { *(.stab) }

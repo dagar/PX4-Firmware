@@ -2,6 +2,7 @@
 #
 # board specific sensors init
 #------------------------------------------------------------------------------
+
 board_adc start
 
 # Internal ICM-20602

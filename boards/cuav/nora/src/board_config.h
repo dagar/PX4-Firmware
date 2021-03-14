@@ -94,12 +94,10 @@
 /* HW has to large of R termination on ADC todo:change when HW value is chosen */
 #define BOARD_ADC_OPEN_CIRCUIT_V     (5.6f)
 
-#define GPIO_HW_REV_DRIVE    /* PH14  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTH|GPIO_PIN14)
-#define GPIO_HW_REV_SENSE    /* PC3   */ GPIO_ADC12_INP13
-#define GPIO_HW_VER_DRIVE    /* PH14  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTG|GPIO_PIN3)
-#define GPIO_HW_VER_SENSE    /* PC2   */ GPIO_ADC123_INP12
+#define GPIO_HW_REV_SENSE    /* PC3 */ GPIO_ADC12_INP13
+#define GPIO_HW_VER_SENSE    /* PC2 */ GPIO_ADC123_INP12
 
-/* CAN Silence Silent mode control */
+/* CAN Silence: Silent mode control */
 #define GPIO_CAN1_SILENT_S0  /* PH2  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN2)
 #define GPIO_CAN2_SILENT_S1  /* PH3  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN3)
 
@@ -107,8 +105,8 @@
 #define GPIO_HEATER_OUTPUT   /* PA8 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN8)
 
 /* PWM */
-#define DIRECT_PWM_OUTPUT_CHANNELS   14
-#define BOARD_NUM_IO_TIMERS           4
+#define DIRECT_PWM_OUTPUT_CHANNELS  14
+#define DIRECT_INPUT_TIMER_CHANNELS 14
 
 /* Power supply control and monitoring GPIOs */
 #define BOARD_NUMBER_BRICKS             2
@@ -135,7 +133,7 @@
 #define VDD_3V3_SD_CARD_EN(on_true)        px4_arch_gpiowrite(GPIO_VDD_3V3_SD_CARD_EN, (on_true))
 
 #define SPEKTRUM_POWER(on_true)            px4_arch_gpiowrite(GPIO_VDD_5V_RC_EN, (on_true))
-#define READ_SPEKTRUM_POWER()              px4_arch_gpioread(GPIO_VDD_5V_RC_EN)
+#define READ_SPEKTRUM_POWER()              (px4_arch_gpioread(GPIO_VDD_5V_RC_EN) == 1)
 
 /* Tone alarm output */
 #define TONE_ALARM_TIMER        15  /* timer 15 */
@@ -144,18 +142,15 @@
 #define GPIO_TONE_ALARM_IDLE    /* PE5 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN5) // ALARM
 #define GPIO_TONE_ALARM         GPIO_TIM15_CH1OUT_2
 
-/* USB
- *  OTG FS: PA9  OTG_FS_VBUS VBUS sensing
- *  HS USB EN: PH15
- */
-#define GPIO_OTGFS_VBUS         /* PA9 */  (GPIO_INPUT|GPIO_PULLDOWN|GPIO_SPEED_100MHz|GPIO_PORTA|GPIO_PIN9)
+/* USB OTG FS */
+#define GPIO_OTGFS_VBUS         /* PA9 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_SPEED_100MHz|GPIO_PORTA|GPIO_PIN9)
 #define GPIO_HS_USB_EN          /* PH15 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTH|GPIO_PIN15)
 
 /* High-resolution timer */
 #define HRT_TIMER               3  /* use timer3 for the HRT */
 #define HRT_TIMER_CHANNEL       3  /* use capture/compare channel 3 */
 
-
+/* RC Serial port */
 #define HRT_PPM_CHANNEL         /* T3C1 */  1  /* use capture/compare channel 1 */
 #define GPIO_PPM_IN             /* PB4 T3C1 */ GPIO_TIM3_CH1IN_2
 #define RC_SERIAL_PORT          "/dev/ttyS5"
@@ -166,10 +161,10 @@
  * SPEKTRUM_RX (it's TX or RX in Bind) on UART8 PE0
  *   Inversion is possible in the UART and can drive GPIO_PPM_IN as an output
  */
-#define GPIO_PPM_IN_AS_OUT           (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN4)
-#define SPEKTRUM_RX_AS_GPIO_OUTPUT() px4_arch_configgpio(GPIO_PPM_IN_AS_OUT)
-#define SPEKTRUM_RX_AS_UART()       /* Can be left as uart */
-#define SPEKTRUM_OUT(_one_true)      px4_arch_gpiowrite(GPIO_PPM_IN_AS_OUT, (_one_true))
+#define GPIO_PPM_IN_AS_OUT             (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTB|GPIO_PIN4)
+#define SPEKTRUM_RX_AS_GPIO_OUTPUT()   px4_arch_configgpio(GPIO_PPM_IN_AS_OUT)
+#define SPEKTRUM_RX_AS_UART()          /* Can be left as uart */
+#define SPEKTRUM_OUT(_one_true)        px4_arch_gpiowrite(GPIO_PPM_IN_AS_OUT, (_one_true))
 
 /* RSSI_IN */
 #define GPIO_RSSI_IN                   /* PB0  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTB|GPIO_PIN0)
@@ -191,21 +186,14 @@
 #define BOARD_ADC_PERIPH_5V_OC  (!px4_arch_gpioread(GPIO_nVDD_5V_PERIPH_OC))
 #define BOARD_ADC_HIPOWER_5V_OC (!px4_arch_gpioread(GPIO_VDD_5V_HIPOWER_OC))
 
-
-/* This board provides a DMA pool and APIs */
-#define BOARD_DMA_ALLOC_POOL_SIZE 5120
-
-/* This board provides the board_on_reset interface */
-#define BOARD_HAS_ON_RESET 1
-
 #define BOARD_HAS_PWM  DIRECT_PWM_OUTPUT_CHANNELS
-
+#define BOARD_NUM_IO_TIMERS 4
+#define BOARD_DMA_ALLOC_POOL_SIZE 5120 /* This board provides a DMA pool and APIs */
+#define BOARD_HAS_ON_RESET 1 /* This board provides the board_on_reset interface */
 #define BOARD_ENABLE_CONSOLE_BUFFER
 
 #define PX4_GPIO_INIT_LIST { \
 		PX4_ADC_GPIO,                     \
-		GPIO_HW_REV_DRIVE,                \
-		GPIO_HW_VER_DRIVE,                \
 		GPIO_CAN1_TX,                     \
 		GPIO_CAN1_RX,                     \
 		GPIO_CAN2_TX,                     \

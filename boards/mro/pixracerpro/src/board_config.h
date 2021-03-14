@@ -77,7 +77,7 @@
 
 /* CAN Silence: Silent mode control */
 #define GPIO_CAN1_SILENT_S0     /* PF11 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTF|GPIO_PIN11)
-#define GPIO_CAN2_SILENT_S0     /* PF14 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTF|GPIO_PIN14)
+#define GPIO_CAN2_SILENT_S1     /* PF14 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTF|GPIO_PIN14)
 
 #define GPIO_LEVEL_SHIFTER_OE   /* PI3  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTI|GPIO_PIN3)
 #define GPIO_VDD_3V3_SENSORS_EN /* PE3  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTE|GPIO_PIN3)
@@ -85,7 +85,7 @@
 
 /* PWM */
 #define DIRECT_PWM_OUTPUT_CHANNELS  8
-#define DIRECT_INPUT_TIMER_CHANNELS  8
+#define DIRECT_INPUT_TIMER_CHANNELS 8
 
 /* Power supply control and monitoring GPIOs */
 #define GPIO_nPOWER_IN_A                /* PB5 */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTB|GPIO_PIN5)
@@ -96,30 +96,28 @@
 #define GPIO_VDD_3V3_SPEKTRUM_POWER_EN  /* PE4  */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTE|GPIO_PIN4)
 
 /* Define True logic Power Control in arch agnostic form */
-#define VDD_3V3_SPEKTRUM_POWER_EN(on_true) px4_arch_gpiowrite(GPIO_VDD_3V3_SPEKTRUM_POWER_EN, (!on_true))
-#define READ_VDD_3V3_SPEKTRUM_POWER_EN()   (px4_arch_gpioread(GPIO_VDD_3V3_SPEKTRUM_POWER_EN) == 0)
+#define SPEKTRUM_POWER(on_true)           px4_arch_gpiowrite(GPIO_VDD_3V3_SPEKTRUM_POWER_EN, (!on_true))
+#define READ_SPEKTRUM_POWER()            (px4_arch_gpioread(GPIO_VDD_3V3_SPEKTRUM_POWER_EN) == 0)
 
 /* Tone alarm output */
 #define TONE_ALARM_TIMER        2  /* timer 2 */
 #define TONE_ALARM_CHANNEL      1  /* PA15 TIM2_CH1 */
 
-#define GPIO_BUZZER_1           /* PA15 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN15) // ALARM
-
-#define GPIO_TONE_ALARM_IDLE    GPIO_BUZZER_1
+#define GPIO_TONE_ALARM_IDLE    /* PA15 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_CLEAR|GPIO_PORTA|GPIO_PIN15) // ALARM
 #define GPIO_TONE_ALARM         GPIO_TIM2_CH1OUT_2
 
 /* USB OTG FS */
-#define GPIO_OTGFS_VBUS         /* PA9 */ (GPIO_INPUT|GPIO_PULLDOWN|GPIO_SPEED_100MHz|GPIO_PORTA|GPIO_PIN9)
+#define GPIO_OTGFS_VBUS         /* PA9 */ (GPIO_INPUT|GPIO_OPENDRAIN|GPIO_SPEED_100MHz|GPIO_PORTA|GPIO_PIN9)
 
 /* High-resolution timer */
 #define HRT_TIMER               3  /* use timer3 for the HRT */
 #define HRT_TIMER_CHANNEL       2  /* use capture/compare channel 2 */
 
+/* RC Serial port */
 #define HRT_PPM_CHANNEL         /* T3C3 */  3  /* use capture/compare channel 3 */
 #define GPIO_PPM_IN             /* PB0 T3C3 */ GPIO_TIM3_CH3IN_1
-
-/* RC Serial port */
 #define RC_SERIAL_PORT          "/dev/ttyS4"
+#define RC_SERIAL_SINGLEWIRE
 
 #define GPIO_RSSI_IN            /* PC1  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN1)
 
@@ -144,7 +142,6 @@
  */
 #define BOARD_ADC_USB_CONNECTED (px4_arch_gpioread(GPIO_OTGFS_VBUS))
 #define BOARD_ADC_USB_VALID     BOARD_ADC_USB_CONNECTED
-#define BOARD_ADC_SERVO_VALID   (1) /* never powers off the Servo rail */
 #define BOARD_ADC_BRICK_VALID   (!px4_arch_gpioread(GPIO_nVDD_BRICK1_VALID))
 
 #define BOARD_HAS_PWM  DIRECT_PWM_OUTPUT_CHANNELS
@@ -161,7 +158,7 @@
 		GPIO_CAN2_TX,                     \
 		GPIO_CAN2_RX,                     \
 		GPIO_CAN1_SILENT_S0,              \
-		GPIO_CAN2_SILENT_S0,              \
+		GPIO_CAN2_SILENT_S1,              \
 		GPIO_LEVEL_SHIFTER_OE,            \
 		GPIO_VDD_3V3_SENSORS_EN,          \
 		GPIO_PWM_VOLT_SEL,                \
@@ -174,6 +171,7 @@
 		PX4_GPIO_PIN_OFF(GPIO_SDMMC1_CMD),\
 		GPIO_TONE_ALARM_IDLE,             \
 		GPIO_OTGFS_VBUS,                  \
+		GPIO_RSSI_IN,                     \
 	}
 
 __BEGIN_DECLS

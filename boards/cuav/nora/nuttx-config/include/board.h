@@ -248,6 +248,7 @@
 /* CAN */
 #define GPIO_CAN1_TX     GPIO_CAN1_TX_4        /* PH13 */
 #define GPIO_CAN1_RX     GPIO_CAN1_RX_5        /* PI9  */
+
 #define GPIO_CAN2_RX     GPIO_CAN2_RX_1        /* PB12 */
 #define GPIO_CAN2_TX     GPIO_CAN2_TX_1        /* PB13 */
 

@@ -32,12 +32,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ************************************************************************************/
-
 #pragma once
 
-/************************************************************************************
- * Included Files
- ************************************************************************************/
 #include "board_dma_map.h"
 
 #include <nuttx/config.h>
@@ -49,18 +45,14 @@
 #include "stm32_rcc.h"
 #include "stm32_sdmmc.h"
 
-/************************************************************************************
- * Pre-processor Definitions
- ************************************************************************************/
-
 /* Clocking *************************************************************************/
-/* The mRo Control Zero F7  board provides the following clock sources:
+/* The board provides the following clock sources:
  *
- *   24 MHz crystal for HSE
+ *   X1: 24 MHz crystal for HSE
  *
  * So we have these clock source available within the STM32
  *
- *   HSI: 16 MHz RC factory-trimmed
+ *   HSI: 16 MHz RC factory-trimmed internal oscillator
  *   HSE: 24 MHz crystal for HSE
  */
 #define STM32_BOARD_XTAL        24000000ul

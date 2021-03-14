@@ -111,6 +111,7 @@ MEMORY
 {
 	ITCM_RAM  (rwx) : ORIGIN = 0x00000000, LENGTH =   64K
 	FLASH      (rx) : ORIGIN = 0x08020000, LENGTH = 1920K
+
 	DTCM1_RAM (rwx) : ORIGIN = 0x20000000, LENGTH =   64K
 	DTCM2_RAM (rwx) : ORIGIN = 0x20010000, LENGTH =   64K
 	AXI_SRAM  (rwx) : ORIGIN = 0x24000000, LENGTH =  512K /* D1 domain AXI bus */
@@ -198,8 +199,7 @@ SECTIONS
 	} > AXI_SRAM
 
 	/* Emit the the D3 power domain section for locating BDMA data */
-
-	.sram4 (NOLOAD) :
+	.SRAM4 (NOLOAD) :
 	{
 	} > SRAM4
 
@@ -217,4 +217,13 @@ SECTIONS
 	.debug_line 0 : { *(.debug_line) }
 	.debug_pubnames 0 : { *(.debug_pubnames) }
 	.debug_aranges 0 : { *(.debug_aranges) }
+
+	.ramfunc : {
+		_sramfuncs = .;
+		*(.ramfunc  .ramfunc.*)
+		. = ALIGN(4);
+		_eramfuncs = .;
+	} > ITCM_RAM AT > FLASH
+
+	_framfuncs = LOADADDR(.ramfunc);
 }
