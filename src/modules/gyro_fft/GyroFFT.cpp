@@ -67,7 +67,76 @@ GyroFFT::GyroFFT() :
 
 	_imu_gyro_fft_len = _param_imu_gyro_fft_len.get();
 
-	arm_rfft_init_q15(&_rfft_q15, _imu_gyro_fft_len, 0, 1);
+	//arm_rfft_init_q15(&_rfft_q15, _imu_gyro_fft_len, 0, 1);
+	/*  Initialise the default arm status */
+	arm_status status = ARM_MATH_SUCCESS;
+
+	/*  Initialize the Real FFT length */
+	_rfft_q15.fftLenReal = (uint16_t) _imu_gyro_fft_len;
+	_rfft_q15.pTwiddleAReal = (q15_t *) realCoefAQ15;
+	_rfft_q15.pTwiddleBReal = (q15_t *) realCoefBQ15;
+	_rfft_q15.ifftFlagR = (uint8_t) 0;
+	_rfft_q15.bitReverseFlagR = (uint8_t) 1;
+
+	/*  Initialization of coef modifier depending on the FFT length */
+	switch (_rfft_q15.fftLenReal) {
+#if !defined(ARM_DSP_CONFIG_TABLES) || defined(ARM_ALL_FFT_TABLES) || (defined(ARM_TABLE_TWIDDLECOEF_Q15_256) && defined(ARM_TABLE_BITREVIDX_FXT_256))
+
+	case 512U:
+		_rfft_q15.twidCoefRModifier = 16U;
+
+#if defined(ARM_MATH_MVEI)
+		status = arm_cfft_init_q15(&(_rfft_q15.cfftInst), 256);
+
+		if (status != ARM_MATH_SUCCESS) {
+			return (status);
+		}
+
+#else
+		_rfft_q15.pCfft = &arm_cfft_sR_q15_len256;
+#endif
+		break;
+#endif
+#if !defined(ARM_DSP_CONFIG_TABLES) || defined(ARM_ALL_FFT_TABLES) || (defined(ARM_TABLE_TWIDDLECOEF_Q15_128) && defined(ARM_TABLE_BITREVIDX_FXT_128))
+
+	case 256U:
+		_rfft_q15.twidCoefRModifier = 32U;
+
+#if defined(ARM_MATH_MVEI)
+		status = arm_cfft_init_q15(&(_rfft_q15.cfftInst), 128);
+
+		if (status != ARM_MATH_SUCCESS) {
+			return (status);
+		}
+
+#else
+		_rfft_q15.pCfft = &arm_cfft_sR_q15_len128;
+#endif
+		break;
+#endif
+#if !defined(ARM_DSP_CONFIG_TABLES) || defined(ARM_ALL_FFT_TABLES) || (defined(ARM_TABLE_TWIDDLECOEF_Q15_64) && defined(ARM_TABLE_BITREVIDX_FXT_64))
+
+	case 128U:
+		_rfft_q15.twidCoefRModifier = 64U;
+
+#if defined(ARM_MATH_MVEI)
+		status = arm_cfft_init_q15(&(_rfft_q15.cfftInst), 64);
+
+		if (status != ARM_MATH_SUCCESS) {
+			return (status);
+		}
+
+#else
+		_rfft_q15.pCfft = &arm_cfft_sR_q15_len64;
+#endif
+		break;
+#endif
+
+	default:
+		/*  Reporting argument error if rfftSize is not valid value */
+		status = ARM_MATH_ARGUMENT_ERROR;
+		break;
+	}
 
 	// init Hanning window
 	for (int n = 0; n < _imu_gyro_fft_len; n++) {
