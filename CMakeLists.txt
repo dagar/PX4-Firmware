@@ -461,3 +461,6 @@ add_custom_target(install_python_requirements
 	DEPENDS ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	USES_TERMINAL
 )
+
+add_compile_options(-Wno-error -DHAS_ATOMIC_BUILTIN)
+add_subdirectory(external/eMQTT5)

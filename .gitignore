@@ -80,7 +80,6 @@ compile_commands.json
 CPackConfig.cmake
 CPackSourceConfig.cmake
 CTestTestfile.cmake
-external/
 rules.ninja
 
 # in tree build

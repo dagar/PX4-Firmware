@@ -63,3 +63,6 @@
 [submodule "src/drivers/uavcannode_gps_demo/libcanard"]
 	path = src/drivers/uavcannode_gps_demo/libcanard
 	url = https://github.com/UAVCAN/libcanard
+[submodule "external/eMQTT5"]
+	path = external/eMQTT5
+	url = https://github.com/X-Ryl669/eMQTT5.git
