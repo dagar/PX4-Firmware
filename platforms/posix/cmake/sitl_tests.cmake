@@ -34,17 +34,53 @@ set(tests
 	versioning
 )
 
+find_program(GDB gdb)
+
+set(PX4_INSTANCE 10)
+
 foreach(test_name ${tests})
 	set(test_name_prefix sitl-${test_name})
 	configure_file(${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_template.in ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated)
 
-	add_test(NAME ${test_name_prefix}
-		COMMAND $<TARGET_FILE:px4>
-			-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated
-			-t ${PX4_SOURCE_DIR}/test_data
-			${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
-		WORKING_DIRECTORY ${SITL_WORKING_DIR}
-	)
+	math(EXPR PX4_INSTANCE "${PX4_INSTANCE}+1")
+
+	if(GDB)
+		add_test(NAME ${test_name_prefix}
+			COMMAND ${GDB} --batch --quiet -n
+				-ex "handle SIGCONT nostop noprint nopass"
+				-ex "handle SIG32 nostop noprint nopass"
+				-ex "set confirm off"
+				-ex "set print pretty"
+				-ex "set pagination off"
+				-ex "set print thread-events off"
+				-ex "run"
+				-ex "info inferiors"
+				-ex "maint info program-spaces"
+				-ex "inferior 1"
+				-ex "info inferiors"
+				-ex "maint info program-spaces"
+				-ex "where"
+				-ex "info threads"
+				-ex "thread apply all bt"
+				-ex "info inferiors"
+				-ex "kill"
+				-ex "quit"
+				--args $<TARGET_FILE:px4> -d -i ${PX4_INSTANCE}
+					-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated
+					-t ${PX4_SOURCE_DIR}/test_data
+					${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
+			WORKING_DIRECTORY ${SITL_WORKING_DIR}
+		)
+
+	else()
+		add_test(NAME ${test_name_prefix}
+			COMMAND $<TARGET_FILE:px4> -d -i ${PX4_INSTANCE}
+				-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated
+				-t ${PX4_SOURCE_DIR}/test_data
+				${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
+			WORKING_DIRECTORY ${SITL_WORKING_DIR}
+		)
+	endif()
 
 	set_tests_properties(${test_name_prefix} PROPERTIES FAIL_REGULAR_EXPRESSION "${test_name} FAILED")
 	set_tests_properties(${test_name_prefix} PROPERTIES PASS_REGULAR_EXPRESSION "${test_name} PASSED")
@@ -66,13 +102,38 @@ foreach(test_name ${cmd_tests})
 	set(test_name_prefix sitl-${test_name})
 	configure_file(${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_cmd_template.in ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated)
 
-	add_test(NAME ${test_name_prefix}
-		COMMAND $<TARGET_FILE:px4>
-			-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated
-			-t ${PX4_SOURCE_DIR}/test_data
-			${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
-		WORKING_DIRECTORY ${SITL_WORKING_DIR}
-	)
+	math(EXPR PX4_INSTANCE "${PX4_INSTANCE}+1")
+
+	if(GDB)
+		add_test(NAME ${test_name_prefix}
+			COMMAND ${GDB} --batch --quiet -n
+				-ex "handle SIGCONT nostop noprint nopass"
+				-ex "handle SIG32 nostop noprint nopass"
+				-ex "set confirm off"
+				-ex "set detach-on-fork off"
+				-ex "set follow-fork-mode child"
+				-ex "set print pretty"
+				-ex "set pagination off"
+				-ex "set print thread-events off"
+				-ex "run"
+				-ex "thread apply all bt"
+				-ex "quit"
+				--args $<TARGET_FILE:px4> -d -i ${PX4_INSTANCE}
+					-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated
+					-t ${PX4_SOURCE_DIR}/test_data
+					${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
+			WORKING_DIRECTORY ${SITL_WORKING_DIR}
+		)
+
+	else()
+		add_test(NAME ${test_name_prefix}
+			COMMAND $<TARGET_FILE:px4> -d -i ${PX4_INSTANCE}
+				-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_${test_name}_generated
+				-t ${PX4_SOURCE_DIR}/test_data
+				${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
+			WORKING_DIRECTORY ${SITL_WORKING_DIR}
+		)
+	endif()
 
 	set_tests_properties(${test_name_prefix} PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL")
 	set_tests_properties(${test_name_prefix} PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
@@ -83,8 +144,9 @@ endforeach()
 
 
 # Mavlink test requires mavlink running
+math(EXPR PX4_INSTANCE "${PX4_INSTANCE}+1")
 add_test(NAME sitl-mavlink
-	COMMAND $<TARGET_FILE:px4>
+	COMMAND $<TARGET_FILE:px4> -i ${PX4_INSTANCE}
 		-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_mavlink
 		-t ${PX4_SOURCE_DIR}/test_data
 		${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
@@ -113,17 +175,14 @@ sanitizer_fail_test_on_error(sitl-mavlink)
 
 
 # Dynamic module loading test
+math(EXPR PX4_INSTANCE "${PX4_INSTANCE}+1")
 add_test(NAME dyn
-	COMMAND ${PX4_SOURCE_DIR}/Tools/sitl_run.sh
-		$<TARGET_FILE:px4>
-		none
-		none
-		test_dyn_hello
-		none
-		${PX4_SOURCE_DIR}
-		${PX4_BINARY_DIR}
-		$<TARGET_FILE:examples__dyn_hello>
-	WORKING_DIRECTORY ${SITL_WORKING_DIR})
+	COMMAND $<TARGET_FILE:px4> -i ${PX4_INSTANCE}
+		-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/test_dyn_hello
+		-t ${PX4_SOURCE_DIR}/test_data
+		${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
+	WORKING_DIRECTORY ${SITL_WORKING_DIR}
+)
 set_tests_properties(dyn PROPERTIES PASS_REGULAR_EXPRESSION "1: PASSED")
 sanitizer_fail_test_on_error(dyn)
 
@@ -138,8 +197,9 @@ set(test_cmds
 foreach(cmd_name ${test_cmds})
 	configure_file(${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/cmd_template.in ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/cmd_${cmd_name}_generated)
 
+	math(EXPR PX4_INSTANCE "${PX4_INSTANCE}+1")
 	add_test(NAME posix_${cmd_name}
-		COMMAND $<TARGET_FILE:px4>
+		COMMAND $<TARGET_FILE:px4> -i ${PX4_INSTANCE}
 			${PX4_SOURCE_DIR}/ROMFS/px4fmu_test
 			-s ${PX4_SOURCE_DIR}/posix-configs/SITL/init/test/cmd_${cmd_name}_generated
 			-t ${PX4_SOURCE_DIR}/test_data
@@ -152,7 +212,7 @@ endforeach()
 
 
 if(CMAKE_BUILD_TYPE STREQUAL Coverage)
-	setup_target_for_coverage(test_coverage "${CMAKE_CTEST_COMMAND} --output-on-failure -T Test" tests)
+	setup_target_for_coverage(test_coverage "${CMAKE_CTEST_COMMAND} --progress --output-on-failure --stop-on-failure --test-timeout=30 --schedule-random --parallel 1 -T Test" tests)
 	setup_target_for_coverage(generate_coverage "${CMAKE_COMMAND} -E echo" generic)
 
 	# TODO:

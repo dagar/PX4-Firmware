@@ -81,10 +81,18 @@ def do_nsh_cmd(port, baudrate, cmd):
 
 def main():
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument('--device', "-d", nargs='?', default=None, help='', required=True)
+    parser.add_argument('--device', "-d", nargs='?', default=None, help='', required=False)
     parser.add_argument("--baudrate", "-b", dest="baudrate", type=int, help="Mavlink port baud rate (default=57600)", default=57600)
     parser.add_argument("--cmd", "-c", dest="cmd", help="Command to run")
     args = parser.parse_args()
+
+    if args.device == None:
+        if sys.platform == "darwin":
+            args.device = "/dev/tty.usbmodem01"
+        else:
+            args.device = "/dev/ttyUSB0"
+
+        print('Trying device {:}'.format(args.device))
 
     do_nsh_cmd(args.device, args.baudrate, args.cmd)
 
