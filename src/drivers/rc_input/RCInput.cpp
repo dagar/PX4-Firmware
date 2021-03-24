@@ -246,6 +246,9 @@ void RCInput::set_rc_scan_state(RC_SCAN newState)
 	_rc_scan_begin = 0;
 	_rc_scan_state = newState;
 	_rc_scan_locked = false;
+
+	// report next lock
+	_report_lock = true;
 }
 
 void RCInput::rc_io_invert(bool invert)
