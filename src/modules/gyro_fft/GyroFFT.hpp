@@ -33,6 +33,11 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <complex.h>
+#undef I  // avoid collision of imaginary unit I with variable I in pid.h
+typedef float complex complex_t; // Better readability for type "float complex"
+
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/defines.h>
@@ -150,4 +155,55 @@ private:
 		(ParamFloat<px4::params::IMU_GYRO_FFT_MIN>) _param_imu_gyro_fft_min,
 		(ParamFloat<px4::params::IMU_GYRO_FFT_MAX>) _param_imu_gyro_fft_max
 	)
+
+
+
+	static constexpr int SDFT_SAMPLE_SIZE = 72;
+	static constexpr int SDFT_BIN_COUNT = (SDFT_SAMPLE_SIZE / 2);
+
+#define SDFT_R 0.9999f  // damping factor for guaranteed SDFT stability (r < 1.0f)
+
+	float _rPowerN;  // SDFT_R to the power of SDFT_SAMPLE_SIZE
+	bool _isInitialized = false;
+	complex_t _twiddle[SDFT_BIN_COUNT];
+	float _sdftData[SDFT_BIN_COUNT] {};
+
+	struct sdft_t {
+		uint8_t idx;                       // circular buffer index
+		uint8_t startBin;
+		uint8_t endBin;
+		uint8_t batchSize;
+		uint8_t numBatches;
+		float samples[SDFT_SAMPLE_SIZE];    // circular buffer
+		complex_t data[SDFT_BIN_COUNT]; // complex frequency spectrum
+	};
+
+	void sdftInit(sdft_t &sdft, const uint8_t startBin, const uint8_t endBin, const uint8_t numBatches);
+
+	// Add new sample to frequency spectrum
+	void sdftPush(sdft_t &sdft, const float &sample);
+
+	// Add new sample to frequency spectrum in parts
+	void sdftPushBatch(sdft_t &sdft, const float &sample, const uint8_t batchIdx);
+
+	// Get squared magnitude of frequency spectrum
+	void sdftMagSq(sdft_t &sdft, float output[]);
+
+	// Get magnitude of frequency spectrum (slower)
+	void sdftMagnitude(sdft_t &sdft, float output[]);
+
+	// Get squared magnitude of frequency spectrum with Hann window applied
+	// Hann window in frequency domain: X[k] = -0.25 * X[k-1] +0.5 * X[k] -0.25 * X[k+1]
+	void sdftWinSq(sdft_t &sdft, float output[]);
+
+	// Get magnitude of frequency spectrum with Hann window applied (slower)
+	void sdftWindow(sdft_t &sdft, float output[]);
+
+	// Apply square root to the whole sdft range
+	void applySqrt(sdft_t &sdft, float data[]);
+
+	sdft_t _sdft[3] {};
+	uint8_t _sdftStartBin{0};
+	uint8_t _sdftEndBin{72};
+	uint8_t _numSamples{72};
 };

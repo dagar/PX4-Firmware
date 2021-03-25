@@ -49,6 +49,7 @@ px4_add_module(
 		${MAX_CUSTOM_OPT_LEVEL}
 		-DARM_ALL_FFT_TABLES
 		-DARM_MATH_LOOPUNROLL
+		-Wno-error
 	INCLUDES
 		${CMSIS_ROOT}/CMSIS/Core/Include
 		${CMSIS_DSP}/Include

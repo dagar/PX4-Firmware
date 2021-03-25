@@ -63,6 +63,10 @@ GyroFFT::~GyroFFT()
 
 bool GyroFFT::init()
 {
+	for (uint8_t axis = 0; axis < 3; axis++) {
+		sdftInit(_sdft[axis], _sdftStartBin, _sdftEndBin, _numSamples);
+	}
+
 	bool buffers_allocated = false;
 
 	// arm_rfft_init_q15(&_rfft_q15, _imu_gyro_fft_len, 0, 1) manually inlined to save flash
@@ -366,6 +370,17 @@ void GyroFFT::Update(const hrt_abstime &timestamp_sample, int16_t *input[], uint
 	q15_t *gyro_data_buffer[] {_gyro_data_buffer_x, _gyro_data_buffer_y, _gyro_data_buffer_z};
 
 	for (int axis = 0; axis < 3; axis++) {
+
+
+		sdftWinSq(_sdft[axis], _sdftData);
+
+		// 2us @ F722
+		// SDFT processing in batches to synchronize with incoming downsampled data
+		float sample = input[axis][0];
+		sdftPushBatch(_sdft[axis], sample, 0);
+
+
+
 		int &buffer_index = _fft_buffer_index[axis];
 
 		for (int n = 0; n < N; n++) {
@@ -401,9 +416,9 @@ void GyroFFT::Update(const hrt_abstime &timestamp_sample, int16_t *input[], uint
 
 					if (freq_hz >= _param_imu_gyro_fft_min.get()) {
 						const int16_t real = _fft_outupt_buffer[bucket_index];
-						const int16_t complex = _fft_outupt_buffer[bucket_index + 1];
+						const int16_t imag = _fft_outupt_buffer[bucket_index + 1];
 
-						const uint32_t fft_magnitude_squared = real * real + complex * complex;
+						const uint32_t fft_magnitude_squared = real * real + imag * imag;
 
 						if (fft_magnitude_squared > MIN_SNR) {
 							for (int i = 0; i < MAX_NUM_PEAKS; i++) {
@@ -507,6 +522,107 @@ int GyroFFT::print_status()
 int GyroFFT::custom_command(int argc, char *argv[])
 {
 	return print_usage("unknown command");
+}
+
+void GyroFFT::sdftInit(sdft_t &sdft, const uint8_t startBin, const uint8_t endBin, const uint8_t numBatches)
+{
+	if (!_isInitialized) {
+		_rPowerN = powf(SDFT_R, SDFT_SAMPLE_SIZE);
+		const float c = 2.f * M_PI_F / (float)SDFT_SAMPLE_SIZE;
+		float phi = 0.f;
+
+		for (uint8_t i = 0; i < SDFT_BIN_COUNT; i++) {
+			phi = c * i;
+			_twiddle[i] = SDFT_R * (cosf(phi) + _Complex_I * sinf(phi));
+		}
+
+		_isInitialized = true;
+	}
+
+	sdft.idx = 0;
+	sdft.startBin = startBin;
+	sdft.endBin = endBin;
+	sdft.numBatches = numBatches;
+	sdft.batchSize = (sdft.endBin - sdft.startBin + 1) / sdft.numBatches + 1;
+
+	for (uint8_t i = 0; i < SDFT_SAMPLE_SIZE; i++) {
+		sdft.samples[i] = 0.f;
+	}
+
+	for (uint8_t i = 0; i < SDFT_BIN_COUNT; i++) {
+		sdft.data[i] = 0.f;
+	}
+}
+
+void GyroFFT::sdftPush(sdft_t &sdft, const float &sample)
+{
+	const float delta = sample - _rPowerN * sdft.samples[sdft.idx];
+
+	sdft.samples[sdft.idx] = sample;
+	sdft.idx = (sdft.idx + 1) % SDFT_SAMPLE_SIZE;
+
+	for (uint8_t i = sdft.startBin; i <= sdft.endBin; i++) {
+		sdft.data[i] = _twiddle[i] * (sdft.data[i] + delta);
+	}
+}
+
+void GyroFFT::sdftPushBatch(sdft_t &sdft, const float &sample, const uint8_t batchIdx)
+{
+	const uint8_t batchStart = sdft.batchSize * batchIdx;
+	uint8_t batchEnd = batchStart;
+
+	const float delta = sample - _rPowerN * sdft.samples[sdft.idx];
+
+	if (batchIdx == sdft.numBatches - 1) {
+		sdft.samples[sdft.idx] = sample;
+		sdft.idx = (sdft.idx + 1) % SDFT_SAMPLE_SIZE;
+		batchEnd += sdft.endBin - batchStart + 1;
+
+	} else {
+		batchEnd += sdft.batchSize;
+	}
+
+	for (uint8_t i = batchStart; i < batchEnd; i++) {
+		sdft.data[i] = _twiddle[i] * (sdft.data[i] + delta);
+	}
+}
+
+void GyroFFT::sdftMagSq(sdft_t &sdft, float output[])
+{
+	for (uint8_t i = sdft.startBin; i <= sdft.endBin; i++) {
+		float re = crealf(sdft.data[i]);
+		float im = cimagf(sdft.data[i]);
+		output[i] = re * re + im * im;
+	}
+}
+
+void GyroFFT::sdftMagnitude(sdft_t &sdft, float output[])
+{
+	sdftMagSq(sdft, output);
+	applySqrt(sdft, output);
+}
+
+void GyroFFT::sdftWinSq(sdft_t &sdft, float output[])
+{
+	for (uint8_t i = (sdft.startBin + 1); i < sdft.endBin; i++) {
+		complex_t val = sdft.data[i] - 0.5f * (sdft.data[i - 1] + sdft.data[i + 1]); // multiply by 2 to save one multiplication
+		float re = crealf(val);
+		float im = cimagf(val);
+		output[i] = re * re + im * im;
+	}
+}
+
+void GyroFFT::sdftWindow(sdft_t &sdft, float output[])
+{
+	sdftWinSq(sdft, output);
+	applySqrt(sdft, output);
+}
+
+void GyroFFT::applySqrt(sdft_t &sdft, float data[])
+{
+	for (uint8_t i = sdft.startBin; i <= sdft.endBin; i++) {
+		data[i] = sqrtf(data[i]);
+	}
 }
 
 int GyroFFT::print_usage(const char *reason)
