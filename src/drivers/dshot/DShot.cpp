@@ -1006,7 +1006,6 @@ int DShot::module_new_mode(const PortMode new_mode)
 	mode = DShot::MODE_NONE;
 
 	switch (new_mode) {
-	case PORT_FULL_GPIO:
 	case PORT_MODE_UNSET:
 		break;
 
@@ -1229,10 +1228,7 @@ int DShot::custom_command(int argc, char *argv[])
 	/*
 	 * Mode switches.
 	 */
-	if (!strcmp(verb, "mode_gpio")) {
-		new_mode = PORT_FULL_GPIO;
-
-	} else if (!strcmp(verb, "mode_pwm")) {
+	if (!strcmp(verb, "mode_pwm")) {
 		new_mode = PORT_FULL_PWM;
 
 		// mode: defines which outputs to drive (others may be used by other tasks such as camera capture)

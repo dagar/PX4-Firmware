@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2017-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,46 +30,49 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
-#ifndef MODULE_NAME
-#define MODULE_NAME "navio_sysfs_pwm_out"
-#endif
 
-#include "board_pwm_out.h"
+#include <drivers/drv_pwm_output.h>
 
-#include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
-#include <px4_platform_common/log.h>
+static const int MAX_NUM_PWM = 14;
+static const int FREQUENCY_PWM = 400;
 
-using namespace pwm_out;
+int _pwm_fd[MAX_NUM_PWM];
+int _pwm_num;
 
-const char NavioSysfsPWMOut::_device[] = "/sys/class/pwm/pwmchip0";
+// ::snprintf(path, sizeof(path), "%s/export", _device);
+// ::snprintf(path, sizeof(path), "%s/pwm%u/enable", _device, i);
+// ::snprintf(path, sizeof(path), "%s/pwm%u/period", _device, i);
+// ::snprintf(path, sizeof(path), "%s/pwm%u/duty_cycle", _device, i);
 
-NavioSysfsPWMOut::NavioSysfsPWMOut(int max_num_outputs)
+// /sys/class/pwm/pwmchip0/
+// /sys/class/pwm/pwmchip0/device
+// /sys/class/pwm/pwmchip0/subsystem
+// /sys/class/pwm/pwmchip0/export
+// /sys/class/pwm/pwmchip0/unexport
+// /sys/class/pwm/pwmchip0/power
+// /sys/class/pwm/pwmchip0/power/runtime_suspended_time
+// /sys/class/pwm/pwmchip0/power/autosuspend_delay_ms
+// /sys/class/pwm/pwmchip0/power/runtime_active_time
+// /sys/class/pwm/pwmchip0/power/control
+// /sys/class/pwm/pwmchip0/power/runtime_status
+// /sys/class/pwm/pwmchip0/uevent
+// /sys/class/pwm/pwmchip0/npwm
+
+int up_pwm_servo_init(uint32_t channel_mask)
 {
-	if (max_num_outputs > MAX_NUM_PWM) {
-		PX4_WARN("number of outputs too large. Setting to %i", MAX_NUM_PWM);
-		max_num_outputs = MAX_NUM_PWM;
-	}
+
+	// /sys/class/pwm/pwmchip0/export
+
+	// enable
+	//  /sys/class/pwm/pwmchip0  pwm%u/enable
 
 	for (int i = 0; i < MAX_NUM_PWM; ++i) {
 		_pwm_fd[i] = -1;
 	}
 
-	_pwm_num = max_num_outputs;
-}
 
-NavioSysfsPWMOut::~NavioSysfsPWMOut()
-{
-	for (int i = 0; i < MAX_NUM_PWM; ++i) {
-		if (_pwm_fd[i] != -1) {
-			::close(_pwm_fd[i]);
-		}
-	}
-}
 
-int NavioSysfsPWMOut::init()
-{
+
 	int i;
 	char path[128];
 
@@ -110,8 +113,25 @@ int NavioSysfsPWMOut::init()
 	return 0;
 }
 
-int NavioSysfsPWMOut::send_output_pwm(const uint16_t *pwm, int num_outputs)
+void up_pwm_servo_deinit()
 {
+	for (int i = 0; i < MAX_NUM_PWM; ++i) {
+		if (_pwm_fd[i] != -1) {
+			::close(_pwm_fd[i]);
+		}
+	}
+}
+
+int up_pwm_servo_set(unsigned channel, servo_position_t value)
+{
+	// write to %s/pwm%u/duty_cycle
+	return 0;
+
+
+
+
+
+
 	char data[16];
 
 	if (num_outputs > _pwm_num) {
@@ -133,24 +153,33 @@ int NavioSysfsPWMOut::send_output_pwm(const uint16_t *pwm, int num_outputs)
 	return ret;
 }
 
-int NavioSysfsPWMOut::pwm_write_sysfs(char *path, int value)
+servo_position_t up_pwm_servo_get(unsigned channel)
 {
-	int fd = ::open(path, O_WRONLY | O_CLOEXEC);
-	int n;
-	char data[16];
-
-	if (fd == -1) {
-		return -errno;
-	}
-
-	n = ::snprintf(data, sizeof(data), "%u", value);
-
-	if (n > 0) {
-		n = ::write(fd, data, n);	// This n is not used, but to avoid a compiler error.
-	}
-
-	::close(fd);
-
+	// read from // write to %s/pwm%u/duty_cycle
 	return 0;
 }
 
+void up_pwm_update()
+{
+	// Trigger all timer's channels in Oneshot mode to fire the oneshots with updated values.
+}
+
+uint32_t up_pwm_servo_get_rate_group(unsigned group)
+{
+	// %s/pwm%u/period
+	//  (int)1e9 / FREQUENCY_PWM
+	return 0;
+}
+
+int up_pwm_servo_set_rate_group_update(unsigned group, unsigned rate)
+{
+	// %s/pwm%u/period
+	//  (int)1e9 / FREQUENCY_PWM
+	return 0;
+}
+
+void up_pwm_servo_arm(bool armed)
+{
+	// %s/pwm%u/enable
+	// %s/export
+}

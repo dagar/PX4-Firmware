@@ -42,7 +42,19 @@
 #include <robotcontrol.h>
 #include <board_config.h>
 
-#include "board_pwm_out.h"
+/**
+ ** class BBBlueRcPWMOut
+ * PWM output class for BeagleBone Blue with Robotics Cape Library
+ *
+ * Ref: https://github.com/StrawsonDesign/Robotics_Cape_Installer
+ *      http://www.strawsondesign.com/#!manual-servos
+ */
+
+static const int MAX_NUM_PWM = 8;
+static const int MIN_FREQUENCY_PWM = 40;
+
+int _num_outputs;
+
 
 using namespace pwm_out;
 

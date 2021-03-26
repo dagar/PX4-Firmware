@@ -88,7 +88,6 @@ public:
 	/** Mode given via CLI */
 	enum PortMode {
 		PORT_MODE_UNSET = 0,
-		PORT_FULL_GPIO,
 		PORT_FULL_PWM,
 		PORT_PWM14,
 		PORT_PWM12,

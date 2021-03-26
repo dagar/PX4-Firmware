@@ -447,11 +447,6 @@ int PWMOut::set_pwm_rate(uint32_t rate_map, unsigned default_rate, unsigned alt_
 	return OK;
 }
 
-int PWMOut::set_i2c_bus_clock(unsigned bus, unsigned clock_hz)
-{
-	return device::I2C::set_bus_clock(bus, clock_hz);
-}
-
 void PWMOut::update_current_rate()
 {
 	/*
@@ -516,6 +511,7 @@ int PWMOut::task_spawn(int argc, char *argv[])
 	return PX4_OK;
 }
 
+#if defined(BOARD_HAS_CAPTURE)
 void PWMOut::capture_trampoline(void *context, uint32_t chan_index,
 				hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
 {
@@ -528,6 +524,7 @@ void PWMOut::capture_callback(uint32_t chan_index,
 {
 	fprintf(stdout, "FMU: Capture chan:%d time:%lld state:%d overflow:%d\n", chan_index, edge_time, edge_state, overflow);
 }
+#endif // BOARD_HAS_CAPTURE
 
 void PWMOut::update_pwm_out_state(bool on)
 {
@@ -784,16 +781,19 @@ void PWMOut::update_params()
 	_num_disarmed_set = num_disarmed_set;
 }
 
-int PWMOut::ioctl(file *filp, int cmd, unsigned long arg)
+int PWMOut::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
-	int ret;
+	int ret = -ENOTTY;
 
+#if defined(BOARD_HAS_CAPTURE)
 	/* try it as a Capture ioctl next */
 	ret = capture_ioctl(filp, cmd, arg);
 
 	if (ret != -ENOTTY) {
 		return ret;
 	}
+
+#endif // BOARD_HAS_CAPTURE
 
 	/* if we are in valid PWM mode, try it as a PWM ioctl as well */
 	switch (_mode) {
@@ -802,11 +802,13 @@ int PWMOut::ioctl(file *filp, int cmd, unsigned long arg)
 	case MODE_3PWM:
 	case MODE_4PWM:
 	case MODE_5PWM:
+#if defined(BOARD_HAS_CAPTURE)
 	case MODE_2PWM2CAP:
 	case MODE_3PWM1CAP:
 	case MODE_4PWM1CAP:
 	case MODE_4PWM2CAP:
 	case MODE_5PWM1CAP:
+#endif // BOARD_HAS_CAPTURE
 #if defined(BOARD_HAS_PWM) && BOARD_HAS_PWM >= 6
 	case MODE_6PWM:
 #endif
@@ -1423,29 +1425,10 @@ int PWMOut::pwm_ioctl(file *filp, int cmd, unsigned long arg)
 	return ret;
 }
 
-void PWMOut::sensor_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 1;
-	}
-
-	board_spi_reset(ms, 0xffff);
-}
-
-void PWMOut::peripheral_reset(int ms)
-{
-	if (ms < 1) {
-		ms = 10;
-	}
-
-	board_peripheral_reset(ms);
-}
-
+#if defined(BOARD_HAS_CAPTURE)
 int PWMOut::capture_ioctl(struct file *filp, int cmd, unsigned long arg)
 {
 	int	ret = -EINVAL;
-
-#if defined(BOARD_HAS_CAPTURE)
 
 	lock();
 
@@ -1586,11 +1569,9 @@ int PWMOut::capture_ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	unlock();
 
-#else
-	ret = -ENOTTY;
-#endif
 	return ret;
 }
+#endif // BOARD_HAS_CAPTURE
 
 int PWMOut::fmu_new_mode(PortMode new_mode)
 {
@@ -1602,7 +1583,6 @@ int PWMOut::fmu_new_mode(PortMode new_mode)
 	PWMOut::Mode pwm_mode1 = PWMOut::MODE_NONE;
 
 	switch (new_mode) {
-	case PORT_FULL_GPIO:
 	case PORT_MODE_UNSET:
 		break;
 
@@ -1761,17 +1741,6 @@ int PWMOut::fmu_new_mode(PortMode new_mode)
 
 	return OK;
 }
-
-
-namespace
-{
-
-int fmu_new_i2c_speed(unsigned bus, unsigned clock_hz)
-{
-	return PWMOut::set_i2c_bus_clock(bus, clock_hz);
-}
-
-} // namespace
 
 int PWMOut::test()
 {
@@ -1969,50 +1938,6 @@ int PWMOut::custom_command(int argc, char *argv[])
 	PortMode new_mode = PORT_MODE_UNSET;
 	const char *verb = argv[0];
 
-	/* does not operate on a FMU instance */
-	if (!strcmp(verb, "i2c")) {
-		if (argc > 2) {
-			int bus = strtol(argv[1], 0, 0);
-			int clock_hz = strtol(argv[2], 0, 0);
-			int ret = fmu_new_i2c_speed(bus, clock_hz);
-
-			if (ret) {
-				PX4_ERR("setting I2C clock failed");
-			}
-
-			return ret;
-		}
-
-		return print_usage("not enough arguments");
-	}
-
-	if (!strcmp(verb, "sensor_reset")) {
-		if (argc > 1) {
-			int reset_time = strtol(argv[1], nullptr, 0);
-			sensor_reset(reset_time);
-
-		} else {
-			sensor_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
-	if (!strcmp(verb, "peripheral_reset")) {
-		if (argc > 2) {
-			int reset_time = strtol(argv[2], 0, 0);
-			peripheral_reset(reset_time);
-
-		} else {
-			peripheral_reset(0);
-			PX4_INFO("reset default time");
-		}
-
-		return 0;
-	}
-
-
 	/* start pwm_out if not running */
 	if (!_pwm_out_started) {
 
@@ -2026,10 +1951,7 @@ int PWMOut::custom_command(int argc, char *argv[])
 	/*
 	 * Mode switches.
 	 */
-	if (!strcmp(verb, "mode_gpio")) {
-		new_mode = PORT_FULL_GPIO;
-
-	} else if (!strcmp(verb, "mode_pwm")) {
+	if (!strcmp(verb, "mode_pwm")) {
 		new_mode = PORT_FULL_PWM;
 
 		// mode: defines which outputs to drive (others may be used by other tasks such as camera capture)
@@ -2253,14 +2175,6 @@ mixer files.
 # endif
 	PRINT_MODULE_USAGE_COMMAND("mode_pwm1");
 #endif
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("sensor_reset", "Do a sensor reset (SPI bus)");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-	PRINT_MODULE_USAGE_COMMAND_DESCR("peripheral_reset", "Reset board peripherals");
-	PRINT_MODULE_USAGE_ARG("<ms>", "Delay time in ms between reset and re-enabling", true);
-
-	PRINT_MODULE_USAGE_COMMAND_DESCR("i2c", "Configure I2C clock rate");
-	PRINT_MODULE_USAGE_ARG("<bus_id> <rate>", "Specify the bus id (>=0) and rate in Hz", false);
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("test", "Test inputs and outputs");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();

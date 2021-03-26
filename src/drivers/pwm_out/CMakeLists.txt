@@ -38,7 +38,7 @@ px4_add_module(
 		PWMOut.cpp
 		PWMOut.hpp
 	DEPENDS
-		arch_io_pins
+		#arch_io_pins
 		mixer
 		mixer_module
 		output_limit
