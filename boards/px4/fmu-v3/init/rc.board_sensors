@@ -87,6 +87,10 @@ then
 	then
 		# v2.1 mpu9250 on SPI1
 		mpu9250 -s -b 1 start
+
+		# standard Here/Here2 connected to GPS1
+		icm20948_i2c -X -R 6 start
+		ak09916 -X -R 6 start # external AK09916 (Here2) is rotated 270 degrees yaw
 	fi
 
 else
