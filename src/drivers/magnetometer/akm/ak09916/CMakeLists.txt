@@ -35,6 +35,8 @@ px4_add_module(
 	MODULE drivers__magnetometer__akm__ak09916
 	MAIN ak09916
 	COMPILE_FLAGS
+		-O0
+		-DDEBUG_BUILD
 	SRCS
 		AKM_AK09916_registers.hpp
 		AK09916.cpp

@@ -123,9 +123,7 @@ void ICM20948_I2C::RunImpl()
 	case STATE::WAIT_FOR_RESET:
 
 		// The reset value is 0x00 for all registers other than the registers below
-		if ((RegisterRead(Register::BANK_0::WHO_AM_I) == WHOAMI)
-		    && (RegisterRead(Register::BANK_0::PWR_MGMT_1) == 0x41)) {
-
+		if ((RegisterRead(Register::BANK_0::WHO_AM_I) == WHOAMI)) {
 			// Wakeup and reset
 			RegisterWrite(Register::BANK_0::PWR_MGMT_1, PWR_MGMT_1_BIT::CLKSEL_0);
 			RegisterWrite(Register::BANK_0::USER_CTRL, USER_CTRL_BIT::SRAM_RST);
@@ -142,8 +140,8 @@ void ICM20948_I2C::RunImpl()
 				ScheduleDelayed(100_ms);
 
 			} else {
-				PX4_DEBUG("Reset not complete, check again in 10 ms");
-				ScheduleDelayed(10_ms);
+				PX4_DEBUG("Reset not complete, check again in 100 ms");
+				ScheduleDelayed(100_ms);
 			}
 		}
 
@@ -208,7 +206,8 @@ void ICM20948_I2C::RunImpl()
 				_failure_count++;
 
 				// full reset if things are failing consistently
-				if (_failure_count > 10) {
+				if (_failure_count > 1000) {
+					PX4_ERR("failure count > 10, resetting");
 					Reset();
 					return;
 				}
@@ -417,19 +416,22 @@ uint16_t ICM20948_I2C::FIFOReadCount()
 	uint8_t cmd = static_cast<uint8_t>(Register::BANK_0::FIFO_COUNTH);
 	uint8_t fifo_count_buf[2] {};
 
-	if (transfer(&cmd, 1, fifo_count_buf, 2) != PX4_OK) {
+	if (transfer(&cmd, 1, fifo_count_buf, sizeof(fifo_count_buf)) != PX4_OK) {
 		perf_count(_bad_transfer_perf);
 		return 0;
 	}
 
-	return combine(fifo_count_buf[1], fifo_count_buf[2]);
+	// FIFO_COUNTH (FIFO_CNT[12:8]) + FIFO_COUNTL (FIFO_CNT[7:0])
+	volatile uint16_t fifo_count = ((fifo_count_buf[0] & 0b1111) << 8) + fifo_count_buf[1];
+
+	return fifo_count;
 }
 
 bool ICM20948_I2C::FIFORead(const hrt_abstime &timestamp_sample, uint8_t samples)
 {
 	SelectRegisterBank(REG_BANK_SEL_BIT::USER_BANK_0);
 
-	uint8_t cmd = static_cast<uint8_t>(Register::BANK_0::FIFO_R_W);
+	uint8_t cmd = static_cast<uint8_t>(Register::BANK_0::FIFO_COUNTH);
 	FIFOTransferBuffer buffer{};
 	const size_t transfer_size = math::min(samples * sizeof(FIFO::DATA) + 2, FIFO::SIZE);
 
@@ -438,7 +440,8 @@ bool ICM20948_I2C::FIFORead(const hrt_abstime &timestamp_sample, uint8_t samples
 		return false;
 	}
 
-	const uint16_t fifo_count_bytes = combine(buffer.FIFO_COUNTH, buffer.FIFO_COUNTL);
+	// const uint16_t fifo_count_bytes = combine(buffer.FIFO_COUNTH, buffer.FIFO_COUNTL);
+	const uint16_t fifo_count_bytes = ((buffer.FIFO_COUNTH & 0b1111) << 8) + buffer.FIFO_COUNTL;
 
 	if (fifo_count_bytes >= FIFO::SIZE) {
 		perf_count(_fifo_overflow_perf);

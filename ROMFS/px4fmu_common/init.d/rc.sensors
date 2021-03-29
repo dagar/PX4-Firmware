@@ -111,7 +111,7 @@ fi
 # probe for optional external I2C devices
 if param compare SENS_EXT_I2C_PRB 1
 then
-	icm20948_i2c -X start
+	#icm20948_i2c -X start
 
 	# compasses
 	hmc5883 -T -X -q start
