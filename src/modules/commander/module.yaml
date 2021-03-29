@@ -1,0 +1,36 @@
+__max_num_config_instances: &max_num_config_instances 16
+
+module_name: commander
+
+parameters:
+    - group: Commander
+      definitions:
+
+        COM_BTN_FN${i}:
+            description:
+                short: Button ${i} function
+                long: |
+                    Button ${i} function.
+            type: int32
+            type: enum
+            values:
+                0: Unassigned
+                1: arm/disarm
+                100: Mode Manual
+                101: Mode Altitude Control
+                102: Mode Position Control
+                103: Mode Auto Mission
+                104: Mode Auto Loiter
+                105: Mode Auto RTL
+                106: Mode Acro
+                107: Mode Offboard
+                108: Mode Stabilized
+                110: Mode Auto Takeoff
+                111: Mode Auto Land
+                112: Mode Auto Follow Target
+                113: Mode Auto Precision Land
+                114: Mode Orbit
+                200: Lights toggle
+            num_instances: *max_num_config_instances
+            instance_start: 1
+            default: 0

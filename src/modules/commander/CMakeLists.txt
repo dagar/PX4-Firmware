@@ -64,6 +64,8 @@ px4_add_module(
 		ArmAuthorization
 		HealthFlags
 		sensor_calibration
+	MODULE_CONFIG
+		module.yaml
 	)
 
 if(PX4_TESTING)

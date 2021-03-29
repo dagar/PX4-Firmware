@@ -2249,3 +2249,28 @@ PARAM_DEFINE_INT32(RC_RSSI_PWM_MIN, 1000);
  *
  */
 PARAM_DEFINE_INT32(RC_RSSI_PWM_MAX, 2000);
+
+/**
+ * RC switch is a momentary button.
+ *
+ * @group Radio Calibration
+ * @min 0
+ * @max 65536
+ * @bit 0 Channel 1
+ * @bit 1 Channel 2
+ * @bit 2 Channel 3
+ * @bit 3 Channel 4
+ * @bit 4 Channel 5
+ * @bit 5 Channel 6
+ * @bit 6 Channel 7
+ * @bit 7 Channel 8
+ * @bit 8 Channel 9
+ * @bit 9 Channel 10
+ * @bit 10 Channel 11
+ * @bit 11 Channel 12
+ * @bit 12 Channel 13
+ * @bit 13 Channel 14
+ * @bit 14 Channel 15
+ * @bit 15 Channel 16
+ */
+PARAM_DEFINE_INT32(RC_SWITCH_BTN, 0);

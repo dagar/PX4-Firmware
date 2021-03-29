@@ -446,6 +446,10 @@ void RCUpdate::Run()
 				UpdateManualSetpoint(input_rc.timestamp_last_signal);
 			}
 
+			if (rc_updated) {
+				UpdateManualButtons(input_rc.timestamp_last_signal);
+			}
+
 			UpdateManualSwitches(input_rc.timestamp_last_signal);
 
 			/* Update parameters from RC Channels (tuning with RC) if activated */
@@ -500,6 +504,48 @@ switch_pos_t RCUpdate::get_rc_sw2pos_position(uint8_t func, float on_th) const
 	}
 
 	return manual_control_switches_s::SWITCH_POS_NONE;
+}
+
+void RCUpdate::UpdateManualButtons(const hrt_abstime &timestamp_sample)
+{
+	if (_param_rc_switch_btn.get() != 0) {
+		bool switches_changed = false;
+
+		manual_control_buttons_s manual_control_buttons{};
+
+		for (int i = 0; i < manual_control_buttons_s::MAX_BUTTONS; i++) {
+			if (_param_rc_switch_btn.get() & 1 << i) {
+				// switch is button
+				if (_rc.channels[i] > 0.f) {
+					manual_control_buttons.button[i] = manual_control_buttons_s::BUTTON_POS_ON;
+
+				} else {
+					manual_control_buttons.button[i] = manual_control_buttons_s::BUTTON_POS_OFF;
+				}
+
+			} else {
+				manual_control_buttons.button[i] = manual_control_buttons_s::BUTTON_POS_NONE;
+			}
+
+			if (_manual_control_buttons_last_publish.button[i] != manual_control_buttons.button[i]) {
+				switches_changed = true;
+				_manual_control_buttons_last_publish.button[i] = manual_control_buttons.button[i];
+			}
+		}
+
+		if (switches_changed) {
+			manual_control_buttons.button_changes = _manual_control_buttons_last_publish.button_changes + 1;
+		}
+
+		if (switches_changed || (hrt_elapsed_time(&_manual_control_buttons_last_publish.timestamp) >= 1_s)) {
+			manual_control_buttons.data_source = manual_control_buttons_s::SOURCE_RC;
+			manual_control_buttons.timestamp_sample = timestamp_sample;
+			manual_control_buttons.timestamp = hrt_absolute_time();
+
+			_manual_control_buttons_pub.publish(manual_control_buttons);
+			_manual_control_buttons_last_publish = manual_control_buttons;
+		}
+	}
 }
 
 void RCUpdate::UpdateManualSwitches(const hrt_abstime &timestamp_sample)

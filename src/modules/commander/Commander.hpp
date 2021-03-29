@@ -71,6 +71,7 @@
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/geofence_result.h>
 #include <uORB/topics/iridiumsbd_status.h>
+#include <uORB/topics/manual_control_buttons.h>
 #include <uORB/topics/manual_control_switches.h>
 #include <uORB/topics/mission.h>
 #include <uORB/topics/mission_result.h>
@@ -172,6 +173,7 @@ private:
 	void update_control_mode();
 
 	void UpdateEstimateValidity();
+	void UpdateManualControlButtons();
 
 	// Set the main system state based on RC and override device inputs
 	transition_result_t set_main_state(bool *changed);
@@ -339,6 +341,10 @@ private:
 	Hysteresis	_auto_disarm_killed{false};
 	Hysteresis	_offboard_available{false};
 
+	Hysteresis	_button_hysteresis[manual_control_buttons_s::MAX_BUTTONS] {};
+	int32_t         _button_function[manual_control_buttons_s::MAX_BUTTONS] {};
+	bool            _lights_toggle{false};
+
 	hrt_abstime	_last_print_mode_reject_time{0};	///< To remember when last notification was sent
 
 	bool		_last_condition_local_altitude_valid{false};
@@ -397,6 +403,7 @@ private:
 	uORB::Subscription					_iridiumsbd_status_sub{ORB_ID(iridiumsbd_status)};
 	uORB::Subscription					_land_detector_sub{ORB_ID(vehicle_land_detected)};
 	uORB::Subscription					_safety_sub{ORB_ID(safety)};
+	uORB::Subscription					_manual_control_buttons_sub{ORB_ID(manual_control_buttons)};
 	uORB::Subscription					_manual_control_switches_sub{ORB_ID(manual_control_switches)};
 	uORB::Subscription					_system_power_sub{ORB_ID(system_power)};
 	uORB::Subscription					_vehicle_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};

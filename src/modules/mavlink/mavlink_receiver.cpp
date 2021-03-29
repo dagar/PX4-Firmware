@@ -1928,15 +1928,33 @@ MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 
 	} else {
 		manual_control_setpoint_s manual{};
-
-		manual.timestamp = hrt_absolute_time();
 		manual.x = man.x / 1000.0f;
 		manual.y = man.y / 1000.0f;
 		manual.r = man.r / 1000.0f;
 		manual.z = man.z / 1000.0f;
 		manual.data_source = manual_control_setpoint_s::SOURCE_MAVLINK_0 + _mavlink->get_instance_id();
-
+		manual.timestamp = hrt_absolute_time();
 		_manual_control_setpoint_pub.publish(manual);
+
+
+		if (_manual_control_buttons_prev != man.buttons) {
+			manual_control_buttons_s buttons{};
+			buttons.timestamp_sample = manual.timestamp;
+			buttons.data_source = manual_control_buttons_s::SOURCE_MAVLINK_0 + _mavlink->get_instance_id();
+
+			for (size_t i = 0; i < sizeof(manual_control_buttons_s::button) / sizeof(manual_control_buttons_s::button[0]); i++) {
+				if (man.buttons & 1 << i) {
+					buttons.button[i] = manual_control_buttons_s::BUTTON_POS_ON;
+
+				} else {
+					buttons.button[i] = manual_control_buttons_s::BUTTON_POS_OFF;
+				}
+			}
+
+			buttons.button_changes = ++_manual_control_button_changes;
+			buttons.timestamp = hrt_absolute_time();
+			_manual_control_buttons_pub.publish(buttons);
+		}
 	}
 }
 

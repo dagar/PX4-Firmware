@@ -1627,6 +1627,21 @@ Commander::run()
 
 			_offboard_available.set_hysteresis_time_from(true, _param_com_of_loss_t.get() * 1e6f);
 
+			for (auto &hysteresis : _button_hysteresis) {
+				hysteresis.set_hysteresis_time_from(true, 500_ms);
+				hysteresis.set_hysteresis_time_from(false, 500_ms);
+			}
+
+			for (int i = 0; i < manual_control_buttons_s::MAX_BUTTONS; i++) {
+				char str[20] {};
+				sprintf(str, "COM_BTN_FN%u", i + 1);
+
+				if (param_get(param_find(str), &_button_function[i]) != PX4_OK) {
+					_button_function[i] = 0; // reset
+				}
+			}
+
+
 			param_init_forced = false;
 		}
 
@@ -2220,6 +2235,8 @@ Commander::run()
 				}
 			}
 		}
+
+		UpdateManualControlButtons();
 
 		// data link checks which update the status
 		data_link_check();
@@ -3922,6 +3939,160 @@ void Commander::UpdateEstimateValidity()
 	// condition_local_velocity_valid
 	check_posvel_validity(lpos.v_xy_valid && !_nav_test_failed, lpos.evh, _param_com_vel_fs_evh.get(), lpos.timestamp,
 			      &_last_lvel_fail_time_us, &_lvel_probation_time_us, &_status_flags.condition_local_velocity_valid);
+}
+
+void Commander::UpdateManualControlButtons()
+{
+	manual_control_buttons_s manual_control_buttons;
+
+	if (_manual_control_buttons_sub.update(&manual_control_buttons)) {
+		for (unsigned i = 0; i < manual_control_buttons_s::MAX_BUTTONS; ++i) {
+			if ((_button_function[i] > 0) && (manual_control_buttons.button[i] != manual_control_buttons_s::BUTTON_POS_NONE)) {
+				const bool button_on_prev = _button_hysteresis[i].get_state();
+
+				if (manual_control_buttons.button[i] == manual_control_buttons_s::BUTTON_POS_ON) {
+					_button_hysteresis[i].set_state_and_update(true, manual_control_buttons.timestamp);
+
+				} else if (manual_control_buttons.button[i] == manual_control_buttons_s::BUTTON_POS_OFF) {
+					_button_hysteresis[i].set_state_and_update(false, manual_control_buttons.timestamp);
+				}
+
+				const bool button_on = _button_hysteresis[i].get_state();
+
+				if (button_on_prev != button_on) {
+					PX4_INFO("button %d function %d ON: %d", i, _button_function[i], button_on);
+				}
+
+				switch (_button_function[i]) {
+				case 0: // unassigned
+					// DO NOTHING
+					break;
+
+				case 1: // arm/disarm toggle
+					if (!button_on_prev && button_on) {
+						if (!_armed.armed) {
+							arm(arm_disarm_reason_t::RC_SWITCH);
+
+						} else {
+							disarm(arm_disarm_reason_t::RC_SWITCH);
+						}
+					}
+
+					break;
+
+				case 100: // 100: Mode Manual
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_MANUAL, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 101: // 101: Mode Altitude Control
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_ALTCTL, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 102: // 102: Mode Position Control
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_POSCTL, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 103: // 103: Mode Auto Mission
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_AUTO_MISSION, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 104: // 104: Mode Auto Loiter
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_AUTO_LOITER, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 105: // 105: Mode Auto RTL
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_AUTO_RTL, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 106: // 106: Mode Acro
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_ACRO, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 107: // 107: Mode Offboard
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_OFFBOARD, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 108: // 108: Mode Stabilized
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_STAB, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 110: // 110: Mode Auto Takeoff
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_AUTO_TAKEOFF, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 111: // 111: Mode Auto Land
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_AUTO_LAND, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 112: // 112: Mode Auto Follow Target
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_AUTO_FOLLOW_TARGET, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 113: // 113: Mode Auto Precision Land
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_AUTO_PRECLAND, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 114: // 114: Mode Orbit
+					if (!button_on_prev && button_on) {
+						main_state_transition(_status, commander_state_s::MAIN_STATE_ORBIT, _status_flags, &_internal_state);
+					}
+
+					break;
+
+				case 200: // 200: Lights toggle
+					if (!button_on_prev && button_on) {
+						send_vehicle_command(vehicle_command_s::VEHICLE_CMD_ILLUMINATOR_ON_OFF, _lights_toggle);
+						_lights_toggle = !_lights_toggle;
+					}
+
+					break;
+
+				default:
+					break;
+				}
+			}
+		}
+	}
+
 }
 
 void

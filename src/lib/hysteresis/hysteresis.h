@@ -53,7 +53,7 @@ public:
 		_state(init_state),
 		_requested_state(init_state)
 	{}
-	Hysteresis() = delete; // no default constructor
+	Hysteresis() = default; // no default constructor
 
 	~Hysteresis() = default;
 
@@ -72,8 +72,8 @@ private:
 	hrt_abstime _time_from_true_us{0};
 	hrt_abstime _time_from_false_us{0};
 
-	bool _state;
-	bool _requested_state;
+	bool _state{false};
+	bool _requested_state{false};
 };
 
 } // namespace systemlib

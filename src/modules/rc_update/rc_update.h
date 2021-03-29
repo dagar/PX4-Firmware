@@ -53,6 +53,7 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_controls.h>
+#include <uORB/topics/manual_control_buttons.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/manual_control_switches.h>
 #include <uORB/topics/input_rc.h>
@@ -103,6 +104,7 @@ private:
 	 */
 	void		update_rc_functions();
 
+	void		UpdateManualButtons(const hrt_abstime &timestamp_sample);
 	void		UpdateManualSetpoint(const hrt_abstime &timestamp_sample);
 	void		UpdateManualSwitches(const hrt_abstime &timestamp_sample);
 
@@ -165,12 +167,15 @@ private:
 
 	uORB::Publication<rc_channels_s> _rc_channels_pub{ORB_ID(rc_channels)};
 	uORB::PublicationMulti<manual_control_setpoint_s> _manual_control_setpoint_pub{ORB_ID(manual_control_setpoint)};
+	uORB::PublicationMulti<manual_control_buttons_s> _manual_control_buttons_pub{ORB_ID(manual_control_buttons)};
 	uORB::Publication<manual_control_switches_s> _manual_control_switches_pub{ORB_ID(manual_control_switches)};
 	uORB::Publication<actuator_controls_s> _actuator_group_3_pub{ORB_ID(actuator_controls_3)};
 
 	manual_control_switches_s _manual_switches_previous{};
 	manual_control_switches_s _manual_switches_last_publish{};
 	rc_channels_s _rc{};
+
+	manual_control_buttons_s _manual_control_buttons_last_publish{};
 
 	rc_parameter_map_s _rc_parameter_map {};
 	float _param_rc_values[rc_parameter_map_s::RC_PARAM_MAP_NCHAN] {};	/**< parameter values for RC control */
@@ -240,7 +245,9 @@ private:
 		(ParamFloat<px4::params::RC_MAN_TH>) _param_rc_man_th,
 		(ParamFloat<px4::params::RC_RETURN_TH>) _param_rc_return_th,
 
-		(ParamInt<px4::params::RC_CHAN_CNT>) _param_rc_chan_cnt
+		(ParamInt<px4::params::RC_CHAN_CNT>) _param_rc_chan_cnt,
+
+		(ParamInt<px4::params::RC_SWITCH_BTN>) _param_rc_switch_btn
 	)
 };
 } /* namespace RCUpdate */
