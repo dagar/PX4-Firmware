@@ -71,6 +71,7 @@ struct gyro_worker_data_t {
 	calibration::Gyroscope calibrations[MAX_GYROS] {};
 
 	Vector3f offset[MAX_GYROS] {};
+	float temperature[MAX_GYROS] {NAN, NAN, NAN, NAN};
 
 	math::MedianFilter<float, 9> filter[3] {};
 };
@@ -115,6 +116,17 @@ static calibrate_return gyro_calibration_worker(gyro_worker_data_t &worker_data)
 						const Vector3f &thermal_offset{worker_data.calibrations[gyro_index].thermal_offset()};
 
 						worker_data.offset[gyro_index] += Vector3f{gyro_report.x, gyro_report.y, gyro_report.z} - thermal_offset;
+
+						if (PX4_ISFINITE(gyro_report.temperature)) {
+							if (!PX4_ISFINITE(worker_data.temperature[gyro_index])) {
+								// set first valid value
+								worker_data.temperature[gyro_index] = gyro_report.temperature;
+
+							} else {
+								worker_data.temperature[gyro_index] += gyro_report.temperature;
+							}
+						}
+
 						calibration_counter[gyro_index]++;
 
 						if (gyro_index == 0) {
@@ -157,6 +169,7 @@ static calibrate_return gyro_calibration_worker(gyro_worker_data_t &worker_data)
 		}
 
 		worker_data.offset[s] /= calibration_counter[s];
+		worker_data.temperature[s] /= calibration_counter[s];
 	}
 
 	return calibrate_return_ok;
@@ -259,6 +272,7 @@ int do_gyro_calibration(orb_advert_t *mavlink_log_pub)
 
 			if (calibration.device_id() != 0) {
 				calibration.set_offset(worker_data.offset[uorb_index]);
+				calibration.set_temperature(worker_data.temperature[uorb_index]);
 
 				calibration.PrintStatus();
 
