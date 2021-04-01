@@ -170,8 +170,8 @@ void frsky_send_frame1(int uart)
 	frsky_send_data(uart, FRSKY_ID_ACCEL_Z, roundf(vehicle_acceleration.xyz[2] * 1000.0f));
 
 	const vehicle_air_data_s &air_data = subscription_data->vehicle_air_data_sub.get();
-	frsky_send_data(uart, FRSKY_ID_BARO_ALT_BP, air_data.baro_alt_meter);
-	frsky_send_data(uart, FRSKY_ID_BARO_ALT_AP, roundf(frac(air_data.baro_alt_meter) * 100.0f));
+	frsky_send_data(uart, FRSKY_ID_BARO_ALT_BP, air_data.barometric_altitude_m);
+	frsky_send_data(uart, FRSKY_ID_BARO_ALT_AP, roundf(frac(air_data.barometric_altitude_m) * 100.0f));
 
 	const battery_status_s &bat = subscription_data->battery_status_sub.get();
 	frsky_send_data(uart, FRSKY_ID_VFAS, roundf(bat.voltage_v * 10.0f));

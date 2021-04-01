@@ -1317,9 +1317,9 @@ void EKF2::UpdateBaroSample(ekf2_timestamps_s &ekf2_timestamps)
 	if (_airdata_sub.update(&airdata)) {
 		_ekf.set_air_density(airdata.rho);
 
-		_ekf.setBaroData(baroSample{airdata.timestamp_sample, airdata.baro_alt_meter});
+		_ekf.setBaroData(baroSample{airdata.timestamp_sample, airdata.barometric_altitude_m});
 
-		_device_id_baro = airdata.baro_device_id;
+		_device_id_baro = airdata.device_id;
 
 		ekf2_timestamps.vehicle_air_data_timestamp_rel = (int16_t)((int64_t)airdata.timestamp / 100 -
 				(int64_t)ekf2_timestamps.timestamp / 100);

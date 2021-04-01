@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,42 +32,45 @@
  ****************************************************************************/
 
 /**
- * QNH for barometer
- *
- * @min 500
- * @max 1500
- * @group Sensors
- * @unit hPa
- *
- * @reboot_required true
- *
- */
-PARAM_DEFINE_FLOAT(SENS_BARO_QNH, 1013.25f);
-
-/**
- * Baro max rate.
- *
- * Barometric air data maximum publication rate. This is an upper bound,
- * actual barometric data rate is still dependant on the sensor.
- *
- * @min 1
- * @max 200
- * @group Sensors
- * @unit Hz
- *
- * @reboot_required true
- *
- */
-PARAM_DEFINE_FLOAT(SENS_BARO_RATE, 20.0f);
-
-/**
- * Sensors hub baro mode
- *
- * @value 0 Publish all barometers
- * @value 1 Publish primary barometer
+ * ID of the Baro that the calibration is for.
  *
  * @category system
- * @reboot_required true
- * @group Sensors
+ * @group Sensor Calibration
  */
-PARAM_DEFINE_INT32(SENS_BARO_MODE, 1);
+PARAM_DEFINE_INT32(CAL_BARO3_ID, 0);
+
+/**
+ * Baro 0 priority.
+ *
+ * @value -1  Uninitialized
+ * @value 0   Disabled
+ * @value 1   Min
+ * @value 25  Low
+ * @value 50  Medium (Default)
+ * @value 75  High
+ * @value 100 Max
+ *
+ * @category system
+ * @group Sensor Calibration
+ */
+PARAM_DEFINE_INT32(CAL_BARO3_PRIO, -1);
+
+/**
+ * Baro offset
+ *
+ * @category system
+ * @group Sensor Calibration
+ * @volatile
+ */
+PARAM_DEFINE_FLOAT(CAL_BARO3_OFF, 0.0f);
+
+/**
+ * Baro calibration temperature
+ *
+ * Temperature during last calibration.
+ *
+ * @category system
+ * @group Sensor Calibration
+ * @volatile
+ */
+PARAM_DEFINE_FLOAT(CAL_BARO3_TEMP, NAN);

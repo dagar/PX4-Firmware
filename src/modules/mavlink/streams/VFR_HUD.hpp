@@ -117,7 +117,7 @@ private:
 
 				/* fall back to baro altitude */
 				if (air_data.timestamp > 0) {
-					msg.alt = air_data.baro_alt_meter;
+					msg.alt = air_data.barometric_altitude_m;
 				}
 			}
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +48,8 @@ VehicleAirData::VehicleAirData() :
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers)
 {
 	_voter.set_timeout(SENSOR_TIMEOUT);
+
+	ParametersUpdate(true);
 }
 
 VehicleAirData::~VehicleAirData()
@@ -72,53 +74,33 @@ void VehicleAirData::Stop()
 	}
 }
 
-void VehicleAirData::SensorCorrectionsUpdate(bool force)
-{
-	if (_sensor_correction_sub.updated() || force) {
-		sensor_correction_s corrections;
-
-		if (_sensor_correction_sub.copy(&corrections)) {
-			for (int baro_index = 0; baro_index < MAX_SENSOR_COUNT; baro_index++) {
-				// find sensor (by device id) in sensor_correction
-				const uint32_t device_id = _last_data[baro_index].device_id;
-
-				if (device_id != 0) {
-					for (int correction_index = 0; correction_index < MAX_SENSOR_COUNT; correction_index++) {
-						if (corrections.baro_device_ids[correction_index] == device_id) {
-							switch (correction_index) {
-							case 0:
-								_thermal_offset[baro_index] = corrections.baro_offset_0;
-								break;
-
-							case 1:
-								_thermal_offset[baro_index] = corrections.baro_offset_1;
-								break;
-
-							case 2:
-								_thermal_offset[baro_index] = corrections.baro_offset_2;
-								break;
-
-							case 3:
-								_thermal_offset[baro_index] = corrections.baro_offset_3;
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-void VehicleAirData::ParametersUpdate()
+void VehicleAirData::ParametersUpdate(bool force)
 {
 	// Check if parameters have changed
-	if (_parameter_update_sub.updated()) {
+	if (_parameter_update_sub.updated() || force) {
 		// clear update
 		parameter_update_s param_update;
 		_parameter_update_sub.copy(&param_update);
 
 		updateParams();
+
+		// update priority
+		for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
+			const int32_t priority_old = _calibration[uorb_index].priority();
+			_calibration[uorb_index].ParametersUpdate();
+			const int32_t priority_new = _calibration[uorb_index].priority();
+
+			if (priority_old != priority_new) {
+				if (_priority[uorb_index] == priority_old) {
+					_priority[uorb_index] = priority_new;
+
+				} else {
+					// change relative priority to incorporate any sensor faults
+					int priority_change = priority_new - priority_old;
+					_priority[uorb_index] = math::constrain(_priority[uorb_index] + priority_change, 1, 100);
+				}
+			}
+		}
 	}
 }
 
@@ -128,15 +110,17 @@ void VehicleAirData::Run()
 
 	ParametersUpdate();
 
-	SensorCorrectionsUpdate();
-
 	bool updated[MAX_SENSOR_COUNT] {};
 
 	for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
 
+		if (!_calibration[uorb_index].enabled()) {
+			continue;
+		}
+
 		if (!_advertised[uorb_index]) {
 			// use data's timestamp to throttle advertisement checks
-			if ((_last_data[uorb_index].timestamp == 0) || (hrt_elapsed_time(&_last_data[uorb_index].timestamp) > 1_s)) {
+			if (hrt_elapsed_time(&_last_publication_timestamp[uorb_index]) > 1_s) {
 				if (_sensor_sub[uorb_index].advertised()) {
 					if (uorb_index > 0) {
 						/* the first always exists, but for each further sensor, add a new validator */
@@ -147,32 +131,57 @@ void VehicleAirData::Run()
 
 					_advertised[uorb_index] = true;
 
-					// force temperature correction update
-					SensorCorrectionsUpdate(true);
+					// advertise outputs in order if publishing all
+					if (!_param_sens_baro_mode.get()) {
+						for (int instance = 0; instance < uorb_index; instance++) {
+							_vehicle_air_data_pub[instance].advertise();
+						}
+					}
 
 					if (_selected_sensor_sub_index < 0) {
 						_sensor_sub[uorb_index].registerCallback();
 					}
 
 				} else {
-					_last_data[uorb_index].timestamp = hrt_absolute_time();
+					_last_publication_timestamp[uorb_index] = hrt_absolute_time();
 				}
 			}
 		}
 
 		if (_advertised[uorb_index]) {
-			updated[uorb_index] = _sensor_sub[uorb_index].update(&_last_data[uorb_index]);
+			sensor_baro_s report;
 
-			if (updated[uorb_index]) {
-				// millibar to Pa
-				const float raw_pressure_pascals = _last_data[uorb_index].pressure * 100.f;
+			while (_sensor_sub[uorb_index].update(&report)) {
+				updated[uorb_index] = true;
 
-				// pressure corrected with offset (if available)
-				const float pressure_corrected = (raw_pressure_pascals - _thermal_offset[uorb_index]);
+				if (_calibration[uorb_index].device_id() != report.device_id) {
+					_calibration[uorb_index].set_device_id(report.device_id);
+					_priority[uorb_index] = _calibration[uorb_index].priority();
+				}
 
-				float vect[3] {pressure_corrected, _last_data[uorb_index].temperature, 0.f};
-				_voter.put(uorb_index, _last_data[uorb_index].timestamp, vect, _last_data[uorb_index].error_count,
-					   _priority[uorb_index]);
+				if (_calibration[uorb_index].enabled()) {
+					// millibar to Pa
+					const float raw_pressure_pascals = report.pressure * 100.f;
+
+					// pressure corrected with offset (if available)
+					const float corrected = _calibration[uorb_index].Correct(raw_pressure_pascals);
+
+					float vect[3] {corrected, report.temperature, 0.f};
+					_voter.put(uorb_index, report.timestamp, vect, report.error_count, _priority[uorb_index]);
+
+					_timestamp_sample_sum[uorb_index] += report.timestamp_sample;
+					_data_sum[uorb_index] += corrected;
+					_temperature_sum[uorb_index] += report.temperature;
+					_data_sum_count[uorb_index]++;
+
+					_last_data[uorb_index] = corrected;
+				}
+			}
+
+			// add calibration slot
+			if (!_calibration[uorb_index].calibrated()) {
+				_calibration[uorb_index].set_calibration_index(uorb_index);
+				_calibration[uorb_index].ParametersSave();
 			}
 		}
 	}
@@ -188,8 +197,10 @@ void VehicleAirData::Run()
 				sub.unregisterCallback();
 			}
 
-			if (_selected_sensor_sub_index >= 0) {
-				PX4_INFO("%s switch from #%u -> #%d", "BARO", _selected_sensor_sub_index, best_index);
+			if (_param_sens_baro_mode.get() == 1) {
+				if (_selected_sensor_sub_index >= 0) {
+					PX4_INFO("%s switch from #%u -> #%d", "BARO", _selected_sensor_sub_index, best_index);
+				}
 			}
 
 			_selected_sensor_sub_index = best_index;
@@ -197,100 +208,58 @@ void VehicleAirData::Run()
 		}
 	}
 
-	if ((_selected_sensor_sub_index >= 0)
-	    && (_voter.get_sensor_state(_selected_sensor_sub_index) == DataValidator::ERROR_FLAG_NO_ERROR)
-	    && updated[_selected_sensor_sub_index]) {
+	calculateInconsistency();
 
-		const sensor_baro_s &baro = _last_data[_selected_sensor_sub_index];
+	// Publish
+	if (_param_sens_baro_mode.get()) {
+		// publish only best
+		if ((_selected_sensor_sub_index >= 0)
+		    && (_voter.get_sensor_state(_selected_sensor_sub_index) == DataValidator::ERROR_FLAG_NO_ERROR)
+		    && updated[_selected_sensor_sub_index]) {
 
-		_baro_timestamp_sum += baro.timestamp_sample;
-		_baro_sum += baro.pressure;
-		_baro_sum_count++;
+			Publish(_selected_sensor_sub_index);
+		}
 
-		if ((_param_sens_baro_rate.get() > 0)
-		    && ((_last_publication_timestamp == 0)
-			|| (hrt_elapsed_time(&_last_publication_timestamp) >= (1e6f / _param_sens_baro_rate.get())))) {
-
-			const float pressure = _baro_sum / _baro_sum_count;
-			const hrt_abstime timestamp_sample = _baro_timestamp_sum / _baro_sum_count;
-
-			// reset
-			_baro_timestamp_sum = 0;
-			_baro_sum = 0.f;
-			_baro_sum_count = 0;
-
-			// populate vehicle_air_data with primary baro and publish
-			vehicle_air_data_s out{};
-			out.timestamp_sample = timestamp_sample;
-			out.baro_device_id = baro.device_id;
-			out.baro_temp_celcius = baro.temperature;
-
-			// Convert from millibar to Pa and apply temperature compensation
-			out.baro_pressure_pa = 100.0f * pressure - _thermal_offset[_selected_sensor_sub_index];
-
-			// calculate altitude using the hypsometric equation
-			static constexpr float T1 = 15.0f - CONSTANTS_ABSOLUTE_NULL_CELSIUS; // temperature at base height in Kelvin
-			static constexpr float a = -6.5f / 1000.0f; // temperature gradient in degrees per metre
-
-			// current pressure at MSL in kPa (QNH in hPa)
-			const float p1 = _param_sens_baro_qnh.get() * 0.1f;
-
-			// measured pressure in kPa
-			const float p = out.baro_pressure_pa * 0.001f;
-
-			/*
-			 * Solve:
-			 *
-			 *     /        -(aR / g)     \
-			 *    | (p / p1)          . T1 | - T1
-			 *     \                      /
-			 * h = -------------------------------  + h1
-			 *                   a
-			 */
-			out.baro_alt_meter = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
-
-			// calculate air density
-			// estimate air density assuming typical 20degC ambient temperature
-			// TODO: use air temperature if available (differential pressure sensors)
-			static constexpr float pressure_to_density = 1.0f / (CONSTANTS_AIR_GAS_CONST * (20.0f -
-					CONSTANTS_ABSOLUTE_NULL_CELSIUS));
-
-			out.rho = pressure_to_density * out.baro_pressure_pa;
-
-			out.timestamp = hrt_absolute_time();
-			_vehicle_air_data_pub.publish(out);
-
-			_last_publication_timestamp = out.timestamp;
+	} else {
+		// publish all
+		for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
+			// publish all sensors as separate instances
+			if (updated[uorb_index] && _calibration[uorb_index].enabled() && (_calibration[uorb_index].device_id() != 0)) {
+				Publish(uorb_index, true);
+			}
 		}
 	}
 
+
 	// check failover and report
-	if (_last_failover_count != _voter.failover_count()) {
-		uint32_t flags = _voter.failover_state();
-		int failover_index = _voter.failover_index();
+	if (_param_sens_baro_mode.get()) {
+		if (_last_failover_count != _voter.failover_count()) {
+			uint32_t flags = _voter.failover_state();
+			int failover_index = _voter.failover_index();
 
-		if (flags != DataValidator::ERROR_FLAG_NO_ERROR) {
-			if (failover_index != -1) {
-				const hrt_abstime now = hrt_absolute_time();
+			if (flags != DataValidator::ERROR_FLAG_NO_ERROR) {
+				if (failover_index != -1) {
+					const hrt_abstime now = hrt_absolute_time();
 
-				if (now - _last_error_message > 3_s) {
-					mavlink_log_emergency(&_mavlink_log_pub, "%s #%i failed: %s%s%s%s%s!",
-							      "BARO",
-							      failover_index,
-							      ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
-							      ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
-							      ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TIMEOUT" : ""),
-							      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ERR CNT" : ""),
-							      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " ERR DNST" : ""));
-					_last_error_message = now;
+					if (now - _last_error_message > 3_s) {
+						mavlink_log_emergency(&_mavlink_log_pub, "%s #%i failed: %s%s%s%s%s!",
+								      "BARO",
+								      failover_index,
+								      ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
+								      ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
+								      ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TIMEOUT" : ""),
+								      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ERR CNT" : ""),
+								      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " ERR DNST" : ""));
+						_last_error_message = now;
+					}
+
+					// reduce priority of failed sensor to the minimum
+					_priority[failover_index] = 1;
 				}
-
-				// reduce priority of failed sensor to the minimum
-				_priority[failover_index] = 1;
 			}
-		}
 
-		_last_failover_count = _voter.failover_count();
+			_last_failover_count = _voter.failover_count();
+		}
 	}
 
 	// reschedule timeout
@@ -299,18 +268,128 @@ void VehicleAirData::Run()
 	perf_end(_cycle_perf);
 }
 
+void VehicleAirData::Publish(uint8_t instance, bool multi)
+{
+	if ((_param_sens_baro_rate.get() > 0) && ((_last_publication_timestamp[instance] == 0) ||
+			(hrt_elapsed_time(&_last_publication_timestamp[instance]) >= (1e6f / _param_sens_baro_rate.get())))) {
+
+		// populate vehicle_air_data with primary baro and publish
+		vehicle_air_data_s out{};
+		out.timestamp_sample = _timestamp_sample_sum[instance] / _data_sum_count[instance];
+		out.device_id = _calibration[instance].device_id();
+		out.air_temperature_celcius = _temperature_sum[instance] / _data_sum_count[instance];
+
+		// Convert from millibar to Pa and apply temperature compensation
+		out.barometric_pressure_pa = _data_sum[instance] / _data_sum_count[instance];
+
+		// calculate altitude using the hypsometric equation
+		static constexpr float T1 = 15.f - CONSTANTS_ABSOLUTE_NULL_CELSIUS; // temperature at base height in Kelvin
+		static constexpr float a = -6.5f / 1000.f; // temperature gradient in degrees per metre
+
+		// current pressure at MSL in kPa (QNH in hPa)
+		const float p1 = _param_sens_baro_qnh.get() * 0.1f;
+
+		// measured pressure in kPa
+		const float p = out.barometric_pressure_pa * 0.001f;
+
+		/*
+		 * Solve:
+		 *
+		 *     /        -(aR / g)     \
+		 *    | (p / p1)          . T1 | - T1
+		 *     \                      /
+		 * h = -------------------------------  + h1
+		 *                   a
+		 */
+		out.barometric_altitude_m = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
+
+		// calculate air density
+		// estimate air density assuming typical 20degC ambient temperature
+		// TODO: use air temperature if available (differential pressure sensors)
+		static constexpr float pressure_to_density = 1.f / (CONSTANTS_AIR_GAS_CONST * (2.f - CONSTANTS_ABSOLUTE_NULL_CELSIUS));
+
+		out.rho = pressure_to_density * out.barometric_pressure_pa;
+
+		out.timestamp = hrt_absolute_time();
+
+		if (multi) {
+			_vehicle_air_data_pub[instance].publish(out);
+
+		} else {
+			// otherwise only ever publish the first instance
+			_vehicle_air_data_pub[0].publish(out);
+		}
+
+		_last_publication_timestamp[instance] = out.timestamp;
+
+		// reset
+		_timestamp_sample_sum[instance] = 0;
+		_data_sum[instance] = 0;
+		_temperature_sum[instance] = 0;
+		_data_sum_count[instance] = 0;
+	}
+}
+
+void VehicleAirData::calculateInconsistency()
+{
+	if (_selected_sensor_sub_index >= 0) {
+
+		float mean{};
+		float all[MAX_SENSOR_COUNT] {};
+		uint8_t sensor_count = 0;
+
+		for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+			if ((_calibration[i].device_id() != 0) && _calibration[i].enabled()) {
+				sensor_count++;
+				all[i] = _last_data[i];
+				mean += all[i];
+			}
+		}
+
+		if (sensor_count > 0) {
+			mean /= sensor_count;
+
+			for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+				if ((_calibration[i].device_id() != 0) && _calibration[i].enabled()) {
+					_diff[i] = 0.95f * _diff[i] + 0.05f * (all[i] - mean);
+				}
+			}
+		}
+
+		sensors_status_s status{};
+		status.device_id_primary = _calibration[_selected_sensor_sub_index].device_id();
+
+		for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+			if ((_calibration[i].device_id() != 0) && _calibration[i].enabled()) {
+				status.device_ids[i] = _calibration[i].device_id();
+				status.inconsistency[i] = _diff[i];
+				status.healthy[i] = (_voter.get_sensor_state(i) == DataValidator::ERROR_FLAG_NO_ERROR);
+				status.calibrated[i] = _calibration[i].calibrated();
+
+			} else {
+				status.inconsistency[i] = NAN;
+			}
+		}
+
+		status.timestamp = hrt_absolute_time();
+		_sensors_status_pub.publish(status);
+	}
+}
+
 void VehicleAirData::PrintStatus()
 {
 	if (_selected_sensor_sub_index >= 0) {
-		PX4_INFO("selected barometer: %d (%d)", _last_data[_selected_sensor_sub_index].device_id, _selected_sensor_sub_index);
-
-		if (fabsf(_thermal_offset[_selected_sensor_sub_index]) > 0.f) {
-			PX4_INFO("%d temperature offset: %.4f", _last_data[_selected_sensor_sub_index].device_id,
-				 (double)_thermal_offset[_selected_sensor_sub_index]);
-		}
+		PX4_INFO("selected barometer: %d (%d)", _calibration[_selected_sensor_sub_index].device_id(),
+			 _selected_sensor_sub_index);
 	}
 
 	_voter.print();
+
+	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+		if (_advertised[i] && (_priority[i] > 0)) {
+			_calibration[i].PrintStatus();
+		}
+	}
 }
 
 }; // namespace sensors

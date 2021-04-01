@@ -445,10 +445,10 @@ static int frsky_telemetry_thread_main(int argc, char *argv[])
 				orb_copy(ORB_ID(vehicle_air_data), airdata_sub, &airdata);
 
 				if (isnan(filtered_alt)) {
-					filtered_alt = airdata.baro_alt_meter;
+					filtered_alt = airdata.barometric_altitude_m;
 
 				} else {
-					filtered_alt = .05f * airdata.baro_alt_meter + .95f * filtered_alt;
+					filtered_alt = .05f * airdata.barometric_altitude_m + .95f * filtered_alt;
 				}
 			}
 

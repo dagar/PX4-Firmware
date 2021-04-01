@@ -81,7 +81,7 @@ private:
 				_air_data_sub.copy(&air_data);
 
 				if (air_data.timestamp > 0) {
-					msg.alt = air_data.baro_alt_meter * 1000.0f;
+					msg.alt = air_data.barometric_altitude_m * 1000.0f;
 				}
 			}
 

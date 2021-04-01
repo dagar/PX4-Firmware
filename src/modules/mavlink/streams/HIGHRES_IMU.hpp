@@ -190,10 +190,10 @@ private:
 			msg.xmag = mag(0);
 			msg.ymag = mag(1);
 			msg.zmag = mag(2);
-			msg.abs_pressure = air_data.baro_pressure_pa;
+			msg.abs_pressure = air_data.barometric_pressure_pa;
 			msg.diff_pressure = differential_pressure.differential_pressure_raw_pa;
-			msg.pressure_alt = air_data.baro_alt_meter;
-			msg.temperature = air_data.baro_temp_celcius;
+			msg.pressure_alt = air_data.barometric_altitude_m;
+			msg.temperature = air_data.air_temperature_celcius;
 			msg.fields_updated = fields_updated;
 
 			mavlink_msg_highres_imu_send_struct(_mavlink->get_channel(), &msg);

@@ -197,7 +197,7 @@ void sPort_send_CUR(int uart)
 void sPort_send_ALT(int uart)
 {
 	/* send data */
-	uint32_t alt = (int)(100 * s_port_subscription_data->vehicle_air_data_sub.get().baro_alt_meter);
+	uint32_t alt = (int)(100 * s_port_subscription_data->vehicle_air_data_sub.get().barometric_altitude_m);
 	sPort_send_data(uart, SMARTPORT_ID_ALT, alt);
 }
 

@@ -41,7 +41,7 @@ int BlockLocalPositionEstimator::baroMeasure(Vector<float, n_y_baro> &y)
 {
 	//measure
 	y.setZero();
-	y(0) = _sub_airdata.get().baro_alt_meter;
+	y(0) = _sub_airdata.get().barometric_altitude_m;
 	_baroStats.update(y);
 	_time_last_baro = _sub_airdata.get().timestamp;
 	return OK;

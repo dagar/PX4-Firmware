@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,6 +56,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/sensor_preflight_mag.h>
+#include <uORB/topics/sensors_status.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 
@@ -79,19 +80,18 @@ private:
 	void Run() override;
 
 	void ParametersUpdate(bool force = false);
-
 	void Publish(uint8_t instance, bool multi = false);
 
 	/**
 	 * Calculates the magnitude in Gauss of the largest difference between the primary and any other magnetometers
 	 */
-	void calcMagInconsistency();
+	void calculateInconsistency();
 	void MagCalibrationUpdate();
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
 	uORB::Publication<sensor_preflight_mag_s> _sensor_preflight_mag_pub{ORB_ID(sensor_preflight_mag)};
-
+	uORB::Publication<sensors_status_s> _sensors_status_pub{ORB_ID(sensors_status_mag)};
 	uORB::PublicationMulti<vehicle_magnetometer_s> _vehicle_magnetometer_pub[MAX_SENSOR_COUNT] {
 		{ORB_ID(vehicle_magnetometer)},
 		{ORB_ID(vehicle_magnetometer)},
@@ -120,7 +120,7 @@ private:
 		{this, ORB_ID(sensor_mag), 0},
 		{this, ORB_ID(sensor_mag), 1},
 		{this, ORB_ID(sensor_mag), 2},
-		{this, ORB_ID(sensor_mag), 3}
+		{this, ORB_ID(sensor_mag), 3},
 	};
 
 	calibration::Magnetometer _calibration[MAX_SENSOR_COUNT];
@@ -143,13 +143,15 @@ private:
 	unsigned _last_failover_count{0};
 
 	uint64_t _timestamp_sample_sum[MAX_SENSOR_COUNT] {0};
-	matrix::Vector3f _mag_sum[MAX_SENSOR_COUNT] {};
-	int _mag_sum_count[MAX_SENSOR_COUNT] {};
+	matrix::Vector3f _data_sum[MAX_SENSOR_COUNT] {};
+	float _temperature_sum[MAX_SENSOR_COUNT] {};
+	int _data_sum_count[MAX_SENSOR_COUNT] {};
 	hrt_abstime _last_publication_timestamp[MAX_SENSOR_COUNT] {};
 
-	sensor_mag_s _last_data[MAX_SENSOR_COUNT] {};
 	bool _advertised[MAX_SENSOR_COUNT] {};
 
+	matrix::Vector3f _last_data[MAX_SENSOR_COUNT] {};
+	matrix::Vector3f _diff[MAX_SENSOR_COUNT] {};
 	float _mag_angle_diff[2] {};			/**< filtered mag angle differences between sensor instances (Ga) */
 
 	uint8_t _priority[MAX_SENSOR_COUNT] {};

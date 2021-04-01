@@ -329,11 +329,11 @@ void Sensors::diff_pres_poll()
 
 		} else {
 			// differential pressure temperature invalid, check barometer
-			if ((air_data.timestamp != 0) && PX4_ISFINITE(air_data.baro_temp_celcius)
-			    && (air_data.baro_temp_celcius >= -40.f) && (air_data.baro_temp_celcius <= 125.f)) {
+			if ((air_data.timestamp != 0) && PX4_ISFINITE(air_data.air_temperature_celcius)
+			    && (air_data.air_temperature_celcius >= -40.f) && (air_data.air_temperature_celcius <= 125.f)) {
 
 				// TODO: review PCB_TEMP_ESTIMATE_DEG, ignore for external baro
-				air_temperature_celsius = air_data.baro_temp_celcius - PCB_TEMP_ESTIMATE_DEG;
+				air_temperature_celsius = air_data.air_temperature_celcius - PCB_TEMP_ESTIMATE_DEG;
 			}
 		}
 
@@ -370,10 +370,10 @@ void Sensors::diff_pres_poll()
 		airspeed.indicated_airspeed_m_s = calc_IAS_corrected((enum AIRSPEED_COMPENSATION_MODEL)
 						  _parameters.air_cmodel,
 						  smodel, _parameters.air_tube_length, _parameters.air_tube_diameter_mm,
-						  diff_pres.differential_pressure_filtered_pa, air_data.baro_pressure_pa,
+						  diff_pres.differential_pressure_filtered_pa, air_data.barometric_pressure_pa,
 						  air_temperature_celsius);
 
-		airspeed.true_airspeed_m_s = calc_TAS_from_CAS(airspeed.indicated_airspeed_m_s, air_data.baro_pressure_pa,
+		airspeed.true_airspeed_m_s = calc_TAS_from_CAS(airspeed.indicated_airspeed_m_s, air_data.barometric_pressure_pa,
 					     air_temperature_celsius); // assume that CAS = IAS as we don't have an CAS-scale here
 
 		airspeed.air_temperature_celsius = air_temperature_celsius;

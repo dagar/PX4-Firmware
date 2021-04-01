@@ -330,7 +330,7 @@ AirspeedModule::Run()
 		input_data.att_q[1] = _vehicle_attitude.q[1];
 		input_data.att_q[2] = _vehicle_attitude.q[2];
 		input_data.att_q[3] = _vehicle_attitude.q[3];
-		input_data.air_pressure_pa = _vehicle_air_data.baro_pressure_pa;
+		input_data.air_pressure_pa = _vehicle_air_data.barometric_pressure_pa;
 		input_data.accel_z = _accel.xyz[2];
 		input_data.vel_test_ratio = _estimator_status.vel_test_ratio;
 		input_data.mag_test_ratio = _estimator_status.mag_test_ratio;
@@ -509,10 +509,9 @@ void AirspeedModule::update_ground_minus_wind_airspeed()
 	const float TAS_east = _vehicle_local_position.vy - _wind_estimate_sideslip.windspeed_east;
 	const float TAS_down = _vehicle_local_position.vz; // no wind estimate in z
 	_ground_minus_wind_TAS = sqrtf(TAS_north * TAS_north + TAS_east * TAS_east + TAS_down * TAS_down);
-	_ground_minus_wind_CAS = calc_CAS_from_TAS(_ground_minus_wind_TAS, _vehicle_air_data.baro_pressure_pa,
-				 _vehicle_air_data.baro_temp_celcius);
+	_ground_minus_wind_CAS = calc_CAS_from_TAS(_ground_minus_wind_TAS, _vehicle_air_data.barometric_pressure_pa,
+				 _vehicle_air_data.air_temperature_celcius);
 }
-
 
 void AirspeedModule::select_airspeed_and_publish()
 {

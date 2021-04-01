@@ -204,7 +204,7 @@ bool Geofence::check(const vehicle_global_position_s &global_position, const veh
 	} else {
 		// get baro altitude
 		_sub_airdata.update();
-		const float baro_altitude_amsl = _sub_airdata.get().baro_alt_meter;
+		const float baro_altitude_amsl = _sub_airdata.get().barometric_altitude_m;
 
 		if (getSource() == Geofence::GF_SOURCE_GLOBALPOS) {
 			return checkAll(global_position, baro_altitude_amsl);

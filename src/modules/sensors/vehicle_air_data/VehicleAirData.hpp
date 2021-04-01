@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@
 
 #include "data_validator/DataValidatorGroup.hpp"
 
+#include <lib/sensor_calibration/Barometer.hpp>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
@@ -44,11 +45,12 @@
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_baro.h>
-#include <uORB/topics/sensor_correction.h>
+#include <uORB/topics/sensors_status.h>
 #include <uORB/topics/vehicle_air_data.h>
 
 using namespace time_literals;
@@ -70,16 +72,22 @@ public:
 private:
 	void Run() override;
 
-	void ParametersUpdate();
-	void SensorCorrectionsUpdate(bool force = false);
+	void ParametersUpdate(bool force = false);
+	void Publish(uint8_t instance, bool multi = false);
+
+	void calculateInconsistency();
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
-	uORB::Publication<vehicle_air_data_s> _vehicle_air_data_pub{ORB_ID(vehicle_air_data)};
+	uORB::Publication<sensors_status_s> _sensors_status_pub{ORB_ID(sensors_status_baro)};
+	uORB::PublicationMulti<vehicle_air_data_s> _vehicle_air_data_pub[MAX_SENSOR_COUNT] {
+		{ORB_ID(vehicle_air_data)},
+		{ORB_ID(vehicle_air_data)},
+		{ORB_ID(vehicle_air_data)},
+		{ORB_ID(vehicle_air_data)},
+	};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
-
-	uORB::Subscription _sensor_correction_sub{ORB_ID(sensor_correction)};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_sub[MAX_SENSOR_COUNT] {
 		{this, ORB_ID(sensor_baro), 0},
@@ -88,29 +96,33 @@ private:
 		{this, ORB_ID(sensor_baro), 3},
 	};
 
+	calibration::Barometer _calibration[MAX_SENSOR_COUNT];
+
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
-	hrt_abstime _last_publication_timestamp{0};
 	hrt_abstime _last_error_message{0};
 	orb_advert_t _mavlink_log_pub{nullptr};
 
 	DataValidatorGroup _voter{1};
 	unsigned _last_failover_count{0};
 
-	uint64_t _baro_timestamp_sum{0};
-	float _baro_sum{0.f};
-	int _baro_sum_count{0};
+	uint64_t _timestamp_sample_sum[MAX_SENSOR_COUNT] {0};
+	float _data_sum[MAX_SENSOR_COUNT] {};
+	float _temperature_sum[MAX_SENSOR_COUNT] {};
+	int _data_sum_count[MAX_SENSOR_COUNT] {};
+	hrt_abstime _last_publication_timestamp[MAX_SENSOR_COUNT] {};
 
-	sensor_baro_s _last_data[MAX_SENSOR_COUNT] {};
 	bool _advertised[MAX_SENSOR_COUNT] {};
 
-	float _thermal_offset[MAX_SENSOR_COUNT] {0.f, 0.f, 0.f};
+	float _last_data[MAX_SENSOR_COUNT] {};
+	float _diff[MAX_SENSOR_COUNT] {};			/**< filtered differences between sensor instances (Pa) */
 
 	uint8_t _priority[MAX_SENSOR_COUNT] {};
 
 	int8_t _selected_sensor_sub_index{-1};
 
 	DEFINE_PARAMETERS(
+		(ParamInt<px4::params::SENS_BARO_MODE>) _param_sens_baro_mode,
 		(ParamFloat<px4::params::SENS_BARO_QNH>) _param_sens_baro_qnh,
 		(ParamFloat<px4::params::SENS_BARO_RATE>) _param_sens_baro_rate
 	)
