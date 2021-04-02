@@ -141,9 +141,9 @@ void VehicleGPSPosition::Run()
 void VehicleGPSPosition::Publish(const sensor_gps_s &gps, uint8_t selected)
 {
 	vehicle_gps_position_s gps_output{};
-
 	gps_output.timestamp = gps.timestamp;
 	gps_output.time_utc_usec = gps.time_utc_usec;
+	gps_output.device_id = gps.device_id;
 	gps_output.lat = gps.lat;
 	gps_output.lon = gps.lon;
 	gps_output.alt = gps.alt;
@@ -170,7 +170,6 @@ void VehicleGPSPosition::Publish(const sensor_gps_s &gps, uint8_t selected)
 	gps_output.satellites_used = gps.satellites_used;
 
 	gps_output.selected = selected;
-
 	_vehicle_gps_position_pub.publish(gps_output);
 }
 
