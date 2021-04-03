@@ -97,6 +97,29 @@ uORB::DeviceNode::~DeviceNode()
 }
 
 int
+uORB::DeviceNode::init()
+{
+	int ret = CDev::init();
+
+	if (ret != PX4_OK) {
+		return ret;
+	}
+
+	if (nullptr == _data) {
+		lock();
+		_data = new uint8_t[_meta->o_size * _queue_size];
+		unlock();
+	}
+
+	// failed or could not allocate
+	if (nullptr == _data) {
+		return -ENOMEM;
+	}
+
+	return PX4_OK;
+}
+
+int
 uORB::DeviceNode::open(cdev::file_t *filp)
 {
 	/* is this a publisher? */
@@ -205,42 +228,6 @@ uORB::DeviceNode::read(cdev::file_t *filp, char *buffer, size_t buflen)
 ssize_t
 uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 {
-	/*
-	 * Writes are legal from interrupt context as long as the
-	 * object has already been initialised from thread context.
-	 *
-	 * Writes outside interrupt context will allocate the object
-	 * if it has not yet been allocated.
-	 *
-	 * Note that filp will usually be NULL.
-	 */
-	if (nullptr == _data) {
-
-#ifdef __PX4_NUTTX
-
-		if (!up_interrupt_context()) {
-#endif /* __PX4_NUTTX */
-
-			lock();
-
-			/* re-check size */
-			if (nullptr == _data) {
-				_data = new uint8_t[_meta->o_size * _queue_size];
-			}
-
-			unlock();
-
-#ifdef __PX4_NUTTX
-		}
-
-#endif /* __PX4_NUTTX */
-
-		/* failed or could not allocate */
-		if (nullptr == _data) {
-			return -ENOMEM;
-		}
-	}
-
 	/* If write size does not match, that is an error */
 	if (_meta->o_size != buflen) {
 		return -EIO;
@@ -314,7 +301,6 @@ ssize_t
 uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle, const void *data)
 {
 	uORB::DeviceNode *devnode = (uORB::DeviceNode *)handle;
-	int ret;
 
 	/* check if the device handle is initialized and data is valid */
 	if ((devnode == nullptr) || (meta == nullptr) || (data == nullptr)) {
@@ -329,7 +315,7 @@ uORB::DeviceNode::publish(const orb_metadata *meta, orb_advert_t handle, const v
 	}
 
 	/* call the devnode write method with no file pointer */
-	ret = devnode->write(nullptr, (const char *)data, meta->o_size);
+	int ret = devnode->write(nullptr, (const char *)data, meta->o_size);
 
 	if (ret < 0) {
 		errno = -ret;
@@ -365,8 +351,6 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle)
 		return -EINVAL;
 	}
 
-	uORB::DeviceNode *devnode = (uORB::DeviceNode *)handle;
-
 	/*
 	 * We are cheating a bit here. First, with the current implementation, we can only
 	 * have multiple publishers for instance 0. In this case the caller will have
@@ -378,7 +362,7 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle)
 	 * of subscribers and publishers. But we also do not have a leak since future
 	 * publishers reuse the same DeviceNode object.
 	 */
-	devnode->_advertised = false;
+	static_cast<uORB::DeviceNode *>(handle)->_advertised = false;
 
 	return PX4_OK;
 }

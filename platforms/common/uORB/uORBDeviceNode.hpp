@@ -58,7 +58,7 @@ class UnitTest;
 /**
  * Per-object device instance.
  */
-class uORB::DeviceNode : public cdev::CDev, public IntrusiveSortedListNode<uORB::DeviceNode *>
+class uORB::DeviceNode final : public cdev::CDev, public IntrusiveSortedListNode<uORB::DeviceNode *>
 {
 public:
 	DeviceNode(const struct orb_metadata *meta, const uint8_t instance, const char *path, uint8_t queue_size = 1);
@@ -71,6 +71,8 @@ public:
 	DeviceNode &operator=(DeviceNode &&) = delete;
 
 	bool operator<=(const DeviceNode &rhs) const { return (strcmp(get_devname(), rhs.get_devname()) <= 0); }
+
+	int init() override;
 
 	/**
 	 * Method to create a subscriber instance and return the struct
