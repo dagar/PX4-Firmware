@@ -170,7 +170,7 @@ bool param_modify_on_import(bson_node_t node)
 		return false;
 	}
 
-	int64_t *ivalue = &node->i;
+	int32_t *ivalue = &node->i;
 
 	const char *cal_id_params[] = {
 		"CAL_ACC0_ID",

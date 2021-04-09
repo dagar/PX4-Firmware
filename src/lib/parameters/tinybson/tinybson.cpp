@@ -45,7 +45,7 @@
 
 #include "tinybson.h"
 
-#if 0
+#if 1
 # define debug(fmt, args...)		do { PX4_INFO("BSON: " fmt, ##args); } while(0)
 #else
 # define debug(fmt, args...)		do { } while(0)
@@ -64,7 +64,16 @@ read_x(bson_decoder_t decoder, void *p, size_t s)
 	CODER_CHECK(decoder);
 
 	if (decoder->fd > -1) {
-		return (BSON_READ(decoder->fd, p, s) == s) ? 0 : -1;
+		int ret = BSON_READ(decoder->fd, p, s);
+
+		if (ret == s) {
+			decoder->total_bytes_imported += ret;
+			return 0;
+		}
+
+		debug("read failed %d == %d\n", ret, s);
+
+		return -1;
 	}
 
 	if (decoder->buf != nullptr) {
@@ -79,6 +88,7 @@ read_x(bson_decoder_t decoder, void *p, size_t s)
 
 		memcpy(p, (decoder->buf + decoder->bufpos), s);
 		decoder->bufpos += s;
+		decoder->total_bytes_imported += s;
 		return 0;
 	}
 
@@ -113,8 +123,6 @@ read_double(bson_decoder_t decoder, double *d)
 int
 bson_decoder_init_file(bson_decoder_t decoder, int fd, bson_decoder_callback callback, void *priv)
 {
-	int32_t	junk;
-
 	decoder->fd = fd;
 	decoder->buf = nullptr;
 	decoder->dead = false;
@@ -125,9 +133,13 @@ bson_decoder_init_file(bson_decoder_t decoder, int fd, bson_decoder_callback cal
 	decoder->node.type = BSON_UNDEFINED;
 
 	/* read and discard document size */
-	if (read_int32(decoder, &junk)) {
+	int32_t	junk_size = 0;
+
+	if (read_int32(decoder, &junk_size)) {
 		CODER_KILL(decoder, "failed discarding length");
 	}
+
+	debug("junk_size = %d", junk_size);
 
 	/* ready for decoding */
 	return 0;
@@ -265,12 +277,12 @@ bson_decoder_next(bson_decoder_t decoder)
 			decoder->node.i = tint;
 			break;
 
-		case BSON_INT64:
-			if (read_int64(decoder, &decoder->node.i)) {
-				CODER_KILL(decoder, "read error on BSON_INT");
-			}
+		// case BSON_INT64:
+		// 	if (read_int64(decoder, &decoder->node.i)) {
+		// 		CODER_KILL(decoder, "read error on BSON_INT");
+		// 	}
 
-			break;
+		// 	break;
 
 		case BSON_DOUBLE:
 			if (read_double(decoder, &decoder->node.d)) {
@@ -340,7 +352,14 @@ write_x(bson_encoder_t encoder, const void *p, size_t s)
 
 	/* bson file encoder (non-buffered) */
 	if (encoder->fd > -1 && encoder->buf == nullptr) {
-		return (BSON_WRITE(encoder->fd, p, s) == (int)s) ? 0 : -1;
+		int ret = BSON_WRITE(encoder->fd, p, s);
+
+		if (ret == s) {
+			encoder->total_written_size += ret;
+			return 0;
+		}
+
+		return -1;
 	}
 
 	/* do we need to extend the buffer? */
@@ -353,6 +372,8 @@ write_x(bson_encoder_t encoder, const void *p, size_t s)
 			int ret = BSON_WRITE(encoder->fd, encoder->buf, encoder->bufpos);
 
 			if (ret == (int)encoder->bufpos) {
+				encoder->total_written_size += ret;
+
 				// reset buffer to beginning and continue
 				encoder->bufpos = 0;
 
@@ -432,6 +453,8 @@ bson_encoder_init_file(bson_encoder_t encoder, int fd)
 	encoder->buf = nullptr;
 	encoder->dead = false;
 
+	encoder->total_written_size = 0;
+
 	if (write_int32(encoder, 0)) {
 		CODER_KILL(encoder, "write error on document length");
 	}
@@ -448,6 +471,8 @@ bson_encoder_init_buf_file(bson_encoder_t encoder, int fd, void *buf, unsigned b
 	encoder->bufsize = bufsize;
 	encoder->dead = false;
 	encoder->realloc_ok = false;
+
+	encoder->total_written_size = 0;
 
 	if (write_int32(encoder, 0)) {
 		CODER_KILL(encoder, "write error on document length");
@@ -473,6 +498,8 @@ bson_encoder_init_buf(bson_encoder_t encoder, void *buf, unsigned bufsize)
 		encoder->realloc_ok = false;
 	}
 
+	encoder->total_written_size = 0;
+
 	if (write_int32(encoder, 0)) {
 		CODER_KILL(encoder, "write error on document length");
 	}
@@ -489,23 +516,35 @@ bson_encoder_fini(bson_encoder_t encoder)
 		CODER_KILL(encoder, "write error on document terminator");
 	}
 
-	if (encoder->fd > -1 && encoder->buf != nullptr) {
-		/* write final buffer to disk */
+	if (encoder->fd > -1 && encoder->bufpos > 0) {
 		int ret = BSON_WRITE(encoder->fd, encoder->buf, encoder->bufpos);
 
-		if (ret != (int)encoder->bufpos) {
+		if (ret == (int)encoder->bufpos) {
+			encoder->total_written_size += ret;
+
+		} else {
 			CODER_KILL(encoder, "write error");
 		}
+	}
+
+	// record document size
+	if (encoder->fd > -1) {
+		off_t offset = lseek(encoder->fd, 0, SEEK_SET);
+
+		int32_t total_document_size = encoder->total_written_size;
+
+		debug("writing document size %d to beginning of file (%d)", total_document_size, offset);
+
+		if (BSON_WRITE(encoder->fd, &total_document_size, sizeof(total_document_size)) != sizeof(total_document_size)) {
+			CODER_KILL(encoder, "write error on document length");
+		}
+
+		BSON_FSYNC(encoder->fd);
 
 	} else if (encoder->buf != nullptr) {
 		/* update buffer length */
 		int32_t len = bson_encoder_buf_size(encoder);
 		memcpy(encoder->buf, &len, sizeof(len));
-	}
-
-	/* sync file */
-	if (encoder->fd > -1) {
-		BSON_FSYNC(encoder->fd);
 	}
 
 	return 0;
@@ -549,27 +588,13 @@ int bson_encoder_append_bool(bson_encoder_t encoder, const char *name, bool valu
 }
 
 int
-bson_encoder_append_int(bson_encoder_t encoder, const char *name, int64_t value)
+bson_encoder_append_int32(bson_encoder_t encoder, const char *name, int32_t value)
 {
-	bool result;
-
 	CODER_CHECK(encoder);
 
-	/* use the smallest encoding that will hold the value */
-	if (value == (int32_t)value) {
-		debug("encoding %lld as int32", value);
-		result = write_int8(encoder, BSON_INT32) ||
-			 write_name(encoder, name) ||
-			 write_int32(encoder, value);
-
-	} else {
-		debug("encoding %lld as int64", value);
-		result = write_int8(encoder, BSON_INT64) ||
-			 write_name(encoder, name) ||
-			 write_int64(encoder, value);
-	}
-
-	if (result) {
+	if (write_int8(encoder, BSON_INT32) ||
+	    write_name(encoder, name) ||
+	    write_int32(encoder, value)) {
 		CODER_KILL(encoder, "write error on BSON_INT");
 	}
 
