@@ -119,6 +119,8 @@ struct bson_decoder_s {
 
 	int32_t                 total_document_size;
 	int32_t                 total_decoded_size;
+
+	uint32_t                import_scratch{0};
 };
 
 /**
