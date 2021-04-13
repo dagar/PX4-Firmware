@@ -45,6 +45,75 @@ using namespace time_literals;
 int
 SDP3X::probe()
 {
+	_retries = 3;
+
+	// Read Product Identifier
+	//uint8_t cmd1 = 0x367C;
+	//uint8_t cmd1 = 0xE102;
+	for (int i = 0; i < 15; i++) {
+		if (write_command(0x367C) != PX4_OK) {
+			//return PX4_ERROR;
+			continue;
+		}
+
+		if (write_command(0xE102) != PX4_OK) {
+			//return PX4_ERROR;
+			continue;
+		}
+
+		uint8_t val[18] {};
+		int ret1 = transfer(nullptr, 0, &val[0], sizeof(val));
+
+		for (int i = 0; i < sizeof(val); i++) {
+			fprintf(stderr, "val[%d]=%X, ", i, val[i]);
+		}
+
+		fprintf(stderr, "\n");
+
+		if (!crc(&val[0], 2, val[2])) {
+			fprintf(stderr, "CRC 1, 2 failed \n");
+			return PX4_ERROR;
+			continue;
+		}
+
+		if (!crc(&val[3], 2, val[5])) {
+			fprintf(stderr, "CRC 4, 5 failed \n");
+			continue;
+		}
+
+		uint32_t product_number = (val[0] << 24) + (val[1] << 16) + (val[3] << 8) + val[4];
+		uint64_t serial_number  = 0;
+		// (val[6] << 56)
+		// 			  + (val[7] << 48)
+		// 			  + (val[9] << 40)
+		// 			  + (val[10] << 32)
+		// 			  + (val[12] << 24)
+		// 			  + (val[13] << 16)
+		// 			  + (val[15] << 8)
+		// 			  + val[16];
+
+
+		fprintf(stderr, "Product Number: 0x%X\n", product_number);
+
+		if (product_number != 0) {
+			//return PX4_ERROR;
+			break;
+		}
+	}
+
+	// // Check the CRC
+	// if (!crc(&val[0], 2, val[2]) || !crc(&val[3], 2, val[5])) {
+
+
+	// 	return PX4_ERROR;
+	// }
+
+
+
+
+
+
+
 	bool require_initialization = !init_sdp3x();
 
 	if (require_initialization && _keep_retrying) {
@@ -107,6 +176,15 @@ SDP3X::read_scale()
 
 	_scale = (((uint16_t)val[6]) << 8) | val[7];
 
+
+	for (int i = 0; i < 9; i++) {
+		fprintf(stderr, " | val[%d]=%X | ", i, val[i]);
+	}
+
+	fprintf(stderr, "\n");
+
+	fprintf(stderr, "scale %X\n", _scale);
+
 	switch (_scale) {
 	case SDP3X_SCALE_PRESSURE_SDP31:
 		_device_id.devid_s.devtype = DRV_DIFF_PRESS_DEVTYPE_SDP31;
@@ -119,6 +197,10 @@ SDP3X::read_scale()
 	case SDP3X_SCALE_PRESSURE_SDP33:
 		_device_id.devid_s.devtype = DRV_DIFF_PRESS_DEVTYPE_SDP33;
 		break;
+
+	default:
+		PX4_ERR("invalid scale %X", _scale);
+		return PX4_ERROR;
 	}
 
 	return PX4_OK;
@@ -229,6 +311,8 @@ bool SDP3X::crc(const uint8_t data[], unsigned size, uint8_t checksum)
 			}
 		}
 	}
+
+	//fprintf(stderr, "data[0]=%X data[1]=%X, checksum=%X crc_value=%X\n", data[0], data[1], checksum, crc_value);
 
 	// verify checksum
 	return (crc_value == checksum);

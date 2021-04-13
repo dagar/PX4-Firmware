@@ -104,9 +104,7 @@ __END_DECLS
 __EXPORT void board_peripheral_reset(int ms)
 {
 	/* set the peripheral rails off */
-
 	VDD_5V_PERIPH_EN(false);
-	board_control_spi_sensors_power(false, 0xffff);
 
 	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
 	/* Keep Spektum on to discharge rail*/
@@ -120,9 +118,7 @@ __EXPORT void board_peripheral_reset(int ms)
 
 	/* switch the peripheral rail back on */
 	VDD_3V3_SPEKTRUM_POWER_EN(last);
-	board_control_spi_sensors_power(true, 0xffff);
 	VDD_5V_PERIPH_EN(true);
-
 }
 
 /************************************************************************************

@@ -360,7 +360,7 @@ else
 
 	else
 		#
-		# board sensors: rc.sensors
+		# board sensors: rc.board_sensors
 		#
 		set BOARD_RC_SENSORS ${R}etc/init.d/rc.board_sensors
 		if [ -f $BOARD_RC_SENSORS ]
@@ -370,7 +370,7 @@ else
 		fi
 		unset BOARD_RC_SENSORS
 
-		. ${R}etc/init.d/rc.sensors
+		sensors start
 
 		if param compare -s BAT1_SOURCE 2
 		then
@@ -504,6 +504,9 @@ else
 	then
 		gyro_calibration start
 	fi
+
+	# start optional external sensors last
+	. ${R}etc/init.d/rc.sensors_external
 
 	#
 	# Optional board supplied extras: rc.board_extras

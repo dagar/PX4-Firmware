@@ -45,6 +45,8 @@ QMC5883L::QMC5883L(I2CSPIBusOption bus_option, int bus, int bus_frequency, enum 
 	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
 	_px4_mag(get_device_id(), rotation)
 {
+	//_debug_enabled = true;
+
 	_px4_mag.set_external(external());
 }
 
@@ -87,20 +89,21 @@ void QMC5883L::print_status()
 int QMC5883L::probe()
 {
 	_retries = 1;
-
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 5; i++) {
 		// first read 0x0 once
-		const uint8_t cmd = 0;
-		uint8_t buffer{};
+		//const uint8_t cmd = 0;
+		//uint8_t buffer{};
 
-		if (transfer(&cmd, 1, &buffer, 1) == PX4_OK) {
-			const uint8_t CHIP_ID = RegisterRead(Register::CHIP_ID);
+		const uint8_t CHIP_ID = RegisterRead(Register::CHIP_ID);
+		fprintf(stderr, "CHIP_ID = %X\n", CHIP_ID);
 
-			if (CHIP_ID == Chip_ID) {
-				return PX4_OK;
-			}
+		if (CHIP_ID == Chip_ID) {
+			_retries = 0;
+			return PX4_OK;
 		}
 	}
+
+	_retries = 0;
 
 	return PX4_ERROR;
 }

@@ -34,6 +34,7 @@ px4_add_module(
 	MODULE drivers__sdp3x_airspeed
 	MAIN sdp3x_airspeed
 	COMPILE_FLAGS
+		-Wno-error
 	SRCS
 		SDP3X.cpp
 		SDP3X_main.cpp
