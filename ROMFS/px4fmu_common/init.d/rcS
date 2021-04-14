@@ -132,14 +132,6 @@ then
 	. $FRC
 else
 
-	#
-	# Set the parameter file the board supports params on
-	# MTD device.
-	#
-	if mft query -q -k MTD -s MTD_PARAMETERS -v /fs/mtd_params
-	then
-		set PARAM_FILE /fs/mtd_params
-	fi
 
 	#
 	# Load parameters.
@@ -148,6 +140,18 @@ else
 	if mft query -q -k MTD -s MTD_CALDATA -v /fs/mtd_caldata
 	then
 		param load /fs/mtd_caldata
+	fi
+
+	#
+	# Set the parameter file the board supports params on
+	# MTD device.
+	#
+	if mft query -q -k MTD -s MTD_PARAMETERS -v /fs/mtd_params
+	then
+		if mtd readtest
+		then
+			set PARAM_FILE /fs/mtd_params
+		fi
 	fi
 
 	param select $PARAM_FILE

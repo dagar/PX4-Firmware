@@ -71,23 +71,10 @@ using namespace time_literals;
 
 #if defined(FLASH_BASED_PARAMS)
 #include "flashparams/flashparams.h"
-static const char *param_default_file = nullptr; // nullptr means to store to FLASH
-#else
-inline static int flash_param_save(bool only_unsaved, param_filter_func filter) { return -1; }
-inline static int flash_param_load() { return -1; }
-inline static int flash_param_import() { return -1; }
-static const char *param_default_file = PX4_ROOTFSDIR"/eeprom/parameters";
+// nullptr means to store to FLASH
 #endif
 
 static char *param_user_file = nullptr;
-
-#ifdef __PX4_QURT
-#define PARAM_OPEN	px4_open
-#define PARAM_CLOSE	px4_close
-#else
-#define PARAM_OPEN	open
-#define PARAM_CLOSE	close
-#endif
 
 #include <px4_platform_common/workqueue.h>
 /* autosaving variables */
@@ -1113,16 +1100,15 @@ param_set_default_file(const char *filename)
 const char *
 param_get_default_file()
 {
-	return (param_user_file != nullptr) ? param_user_file : param_default_file;
+	return param_user_file;
 }
 
 int param_save_default()
 {
 	int res = PX4_ERROR;
 
-	const char *filename = param_get_default_file();
-
-	if (!filename) {
+#if defined(FLASH_BASED_PARAMS)
+	{
 		param_lock_writer();
 		perf_begin(param_export_perf);
 		res = flash_param_save(false, nullptr);
@@ -1130,16 +1116,19 @@ int param_save_default()
 		param_unlock_writer();
 		return res;
 	}
+#endif // FLASH_BASED_PARAMS
+
+	const char *filename = param_get_default_file();
 
 	int attempts = 5;
 
 	while (res != OK && attempts > 0) {
 		// write parameters to file
-		int fd = PARAM_OPEN(filename, O_WRONLY | O_CREAT, PX4_O_MODE_666);
+		int fd = open(filename, O_WRONLY | O_CREAT, PX4_O_MODE_666);
 
 		if (fd > -1) {
 			res = param_export(fd, false, nullptr);
-			PARAM_CLOSE(fd);
+			close(fd);
 
 			if (res != PX4_OK) {
 				PX4_ERR("param_export failed, retrying %d", attempts);
@@ -1165,42 +1154,51 @@ int param_save_default()
 int
 param_load_default()
 {
-	int res = 0;
 	const char *filename = param_get_default_file();
 
+#if defined(FLASH_BASED_PARAMS)
 	if (!filename) {
 		return flash_param_load();
 	}
+#endif // FLASH_BASED_PARAMS
 
-	int fd_load = PARAM_OPEN(filename, O_RDONLY);
+	for (int i = 0; i < 3; i++) {
+		int fd_load = ::open(filename, O_RDONLY);
 
-	if (fd_load < 0) {
-		/* no parameter file is OK, otherwise this is an error */
-		if (errno != ENOENT) {
-			PX4_ERR("open '%s' for reading failed", filename);
-			return -1;
+		if (fd_load < 0) {
+			/* no parameter file is OK, otherwise this is an error */
+			if (errno != ENOENT) {
+				PX4_ERR("open '%s' for reading failed", filename);
+				return -1;
+			}
+
+			return 1;
 		}
 
-		return 1;
+		int result = param_load(fd_load);
+		::close(fd_load);
+
+		if (result == 0) {
+			return 0;
+
+		} else {
+			PX4_ERR("error reading parameters from '%s', retrying", filename);
+		}
 	}
 
-	int result = param_load(fd_load);
-	PARAM_CLOSE(fd_load);
+	// clear selected default file
+	param_set_default_file(nullptr);
 
-	if (result != 0) {
-		PX4_ERR("error reading parameters from '%s'", filename);
-		return -2;
-	}
-
-	return res;
+	return -1;
 }
 
 int
 param_export(int fd, bool only_unsaved, param_filter_func filter)
 {
-	int	result = -1;
+	int result = -1;
 	perf_begin(param_export_perf);
 
+#if defined(FLASH_BASED_PARAMS)
 	if (fd < 0) {
 		param_lock_writer();
 		// flash_param_save() will take the shutdown lock
@@ -1209,6 +1207,7 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 		perf_end(param_export_perf);
 		return result;
 	}
+#endif // FLASH_BASED_PARAMS
 
 	param_wbuf_s *s = nullptr;
 	struct bson_encoder_s encoder;
@@ -1441,9 +1440,11 @@ param_import_internal(int fd, bool mark_saved)
 int
 param_import(int fd, bool mark_saved)
 {
+#if defined(FLASH_BASED_PARAMS)
 	if (fd < 0) {
 		return flash_param_import();
 	}
+#endif // FLASH_BASED_PARAMS
 
 	return param_import_internal(fd, mark_saved);
 }
@@ -1451,11 +1452,6 @@ param_import(int fd, bool mark_saved)
 int
 param_load(int fd)
 {
-	if (fd < 0) {
-		return flash_param_load();
-	}
-
-	param_reset_all_internal(false);
 	return param_import_internal(fd, true);
 }
 
