@@ -58,7 +58,7 @@
 #include <px4_platform_common/atomic_bitset.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/posix.h>
-#include <px4_platform_common/sem.h>
+#include <px4_platform_common/sem.hpp>
 #include <px4_platform_common/shutdown.h>
 #include "uthash/utarray.h"
 
@@ -139,6 +139,11 @@ static px4_sem_t param_sem_save; ///< this protects against concurrent param sav
 static void
 param_lock_reader()
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	//fprintf(stderr, "%s param_lock_reader pre %d\n", thread_name, reader_lock_holders);
+
 	do {} while (px4_sem_wait(&reader_lock_holders_lock) != 0);
 
 	++reader_lock_holders;
@@ -146,46 +151,90 @@ param_lock_reader()
 	if (reader_lock_holders == 1) {
 		// the first reader takes the lock, the next ones are allowed to just continue
 		do {} while (px4_sem_wait(&param_sem) != 0);
+
+		//fprintf(stderr, "%s param_lock_reader post %d (first reader takes the lock)\n", thread_name, reader_lock_holders);
+
+	} else {
+		//fprintf(stderr, "%s param_lock_reader post %d\n", thread_name, reader_lock_holders);
 	}
 
-	px4_sem_post(&reader_lock_holders_lock);
+	if (px4_sem_post(&reader_lock_holders_lock) != 0) {
+		fprintf(stderr, "%s param_lock_reader px4_sem_post(&reader_lock_holders_lock) error\n", thread_name);
+	}
 }
 
 /** lock the parameter store for write access */
 static void
 param_lock_writer()
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	fprintf(stderr, "%s param_lock_writer pre %d\n", thread_name, reader_lock_holders);
 	do {} while (px4_sem_wait(&param_sem) != 0);
+
+	fprintf(stderr, "%s param_lock_writer post %d\n", thread_name, reader_lock_holders);
 }
 
 /** unlock the parameter store */
 static void
 param_unlock_reader()
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	//fprintf(stderr, "%s param_unlock_reader pre %d\n", thread_name, reader_lock_holders);
 	do {} while (px4_sem_wait(&reader_lock_holders_lock) != 0);
 
 	--reader_lock_holders;
 
 	if (reader_lock_holders == 0) {
 		// the last reader releases the lock
-		px4_sem_post(&param_sem);
+		if (px4_sem_post(&param_sem) != 0) {
+			fprintf(stderr, "%s param_unlock_reader px4_sem_post error\n", thread_name);
+		}
+
+		//fprintf(stderr, "%s param_unlock_reader post %d (last reader releases the lock)\n", thread_name, reader_lock_holders);
+
+	} else {
+		//fprintf(stderr, "%s param_unlock_reader post %d\n", thread_name, reader_lock_holders);
 	}
 
-	px4_sem_post(&reader_lock_holders_lock);
+	if (px4_sem_post(&reader_lock_holders_lock) != 0) {
+		fprintf(stderr, "%s param_unlock_reader px4_sem_post(&reader_lock_holders_lock) error\n", thread_name);
+	}
 }
 
 /** unlock the parameter store */
 static void
 param_unlock_writer()
 {
-	px4_sem_post(&param_sem);
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	fprintf(stderr, "%s param_unlock_writer pre %d\n", thread_name, reader_lock_holders);
+
+	if (px4_sem_post(&param_sem) != 0) {
+		fprintf(stderr, "%s param_unlock_writer px4_sem_post error\n", thread_name);
+	}
+
+	fprintf(stderr, "%s param_unlock_writer post %d\n", thread_name, reader_lock_holders);
 }
 
 /** assert that the parameter store is locked */
 static void
 param_assert_locked()
 {
-	/* XXX */
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	int sem_val = 0;
+
+	if (px4_sem_getvalue(&param_sem, &sem_val) == 0) {
+		if (sem_val != 0) {
+			fprintf(stderr, "!!! %s param_sem value: %d\n", thread_name, sem_val);
+		}
+	}
 }
 
 void
@@ -255,6 +304,10 @@ param_find_changed(param_t param)
 void
 param_notify_changes()
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+	fprintf(stderr, "%s param_notify_changes\n", thread_name);
+
 	parameter_update_s pup{};
 	pup.instance = param_instance++;
 	pup.get_count = perf_event_count(param_get_perf);
@@ -422,6 +475,11 @@ bool param_is_volatile(param_t param)
 bool
 param_value_unsaved(param_t param)
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	fprintf(stderr, "%s param_value_unsaved %d\n", thread_name, param);
+
 	struct param_wbuf_s *s;
 	param_lock_reader();
 	s = param_find_changed(param);
@@ -494,6 +552,13 @@ param_get_value_ptr(param_t param)
 int
 param_get(param_t param, void *val)
 {
+	// char thread_name[32] {};
+	// pthread_getname_np(pthread_self(), thread_name);
+
+	// if (param_name(param)) {
+	// 	fprintf(stderr, "%s param_get %s\n", thread_name, param_name(param));
+	// }
+
 	perf_count(param_get_perf);
 
 	if (!handle_in_range(param)) {
@@ -526,6 +591,8 @@ param_get(param_t param, void *val)
 int
 param_get_default_value_internal(param_t param, void *default_val)
 {
+	param_assert_locked();
+
 	if (!handle_in_range(param)) {
 		PX4_ERR("get default value: param %d invalid", param);
 		return PX4_ERROR;
@@ -562,6 +629,11 @@ param_get_default_value_internal(param_t param, void *default_val)
 int
 param_get_default_value(param_t param, void *default_val)
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	fprintf(stderr, "%s param_get_default_value %d\n", thread_name, param);
+
 	param_lock_reader();
 	int ret = param_get_default_value_internal(param, default_val);
 	param_unlock_reader();
@@ -620,12 +692,16 @@ bool param_value_is_default(param_t param)
 int
 param_get_system_default_value(param_t param, void *default_val)
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	fprintf(stderr, "%s param_get_system_default_value %d\n", thread_name, param);
+
 	if (!handle_in_range(param)) {
 		return PX4_ERROR;
 	}
 
 	int ret = PX4_OK;
-	param_lock_reader();
 
 	switch (param_type(param)) {
 	case PARAM_TYPE_INT32:
@@ -641,7 +717,6 @@ param_get_system_default_value(param_t param, void *default_val)
 		break;
 	}
 
-	param_unlock_reader();
 	return ret;
 }
 
@@ -652,8 +727,6 @@ param_get_system_default_value(param_t param, void *default_val)
 static void
 autosave_worker(void *arg)
 {
-	bool disabled = false;
-
 	if (!param_get_default_file()) {
 		// In case we save to FLASH, defer param writes until disarmed,
 		// as writing to FLASH can stall the entire CPU (in rare cases around 300ms on STM32F7)
@@ -665,13 +738,10 @@ autosave_worker(void *arg)
 		}
 	}
 
-	param_lock_writer();
-	last_autosave_timestamp = hrt_absolute_time();
+	hrt_store_absolute_time(&last_autosave_timestamp);
 	autosave_scheduled.store(false);
-	disabled = autosave_disabled;
-	param_unlock_writer();
 
-	if (disabled) {
+	if (autosave_disabled) {
 		return;
 	}
 
@@ -703,7 +773,7 @@ param_autosave()
 	hrt_abstime delay = 300_ms;
 
 	static constexpr const hrt_abstime rate_limit = 2_s; // rate-limit saving to 2 seconds
-	const hrt_abstime last_save_elapsed = hrt_elapsed_time(&last_autosave_timestamp);
+	const hrt_abstime last_save_elapsed = hrt_elapsed_time_atomic(&last_autosave_timestamp);
 
 	if (last_save_elapsed < rate_limit && rate_limit > last_save_elapsed + delay) {
 		delay = rate_limit - last_save_elapsed;
@@ -730,6 +800,11 @@ param_control_autosave(bool enable)
 static int
 param_set_internal(param_t param, const void *val, bool mark_saved, bool notify_changes)
 {
+	char thread_name[32] {};
+	pthread_getname_np(pthread_self(), thread_name);
+
+	fprintf(stderr, "%s param_set_internal %d\n", thread_name, param);
+
 	if (!handle_in_range(param)) {
 		PX4_ERR("set invalid param %d", param);
 		return PX4_ERROR;
@@ -1198,6 +1273,14 @@ param_load_default()
 int
 param_export(int fd, bool only_unsaved, param_filter_func filter)
 {
+	/* no modified parameters -> we are done */
+	if (param_values == nullptr) {
+		return 0;
+	}
+
+	// take the file lock
+	SmartLock sl{param_sem_save};
+
 	int	result = -1;
 	perf_begin(param_export_perf);
 
@@ -1219,19 +1302,10 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 		PX4_ERR("px4_shutdown_lock() failed (%i)", shutdown_lock_ret);
 	}
 
-	// take the file lock
-	do {} while (px4_sem_wait(&param_sem_save) != 0);
-
-	param_lock_reader();
-
 	uint8_t bson_buffer[256];
 	bson_encoder_init_buf_file(&encoder, fd, &bson_buffer, sizeof(bson_buffer));
 
-	/* no modified parameters -> we are done */
-	if (param_values == nullptr) {
-		result = 0;
-		goto out;
-	}
+	param_lock_reader();
 
 	while ((s = (struct param_wbuf_s *)utarray_next(param_values, s)) != nullptr) {
 		/*
@@ -1317,8 +1391,6 @@ out:
 	}
 
 	param_unlock_reader();
-
-	px4_sem_post(&param_sem_save);
 
 	if (shutdown_lock_ret == 0) {
 		px4_shutdown_unlock();
@@ -1529,7 +1601,7 @@ void param_print_status()
 	PX4_INFO("auto save: %s", autosave_disabled ? "off" : "on");
 
 	if (!autosave_disabled && (last_autosave_timestamp > 0)) {
-		PX4_INFO("last auto save: %.3f seconds ago", hrt_elapsed_time(&last_autosave_timestamp) * 1e-6);
+		PX4_INFO("last auto save: %.3f seconds ago", hrt_elapsed_time_atomic(&last_autosave_timestamp) * 1e-6);
 	}
 
 	perf_print_counter(param_export_perf);
