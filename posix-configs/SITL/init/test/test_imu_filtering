@@ -13,17 +13,19 @@ tone_alarm start
 
 ver all
 
-param set IMU_GYRO_RATEMAX 2000
+param set IMU_GYRO_RATEMAX 1000
 
 param set IMU_GYRO_FFT_EN 1
 param set IMU_GYRO_FFT_MIN 1
 param set IMU_GYRO_FFT_MAX 1000
 
+param set IMU_GYRO_DYN_NF 1
+
 # test values
-param set IMU_GYRO_CUTOFF 40
-param set IMU_DGYRO_CUTOFF 30
-#param set IMU_GYRO_NF_FREQ 60
-#param set IMU_GYRO_NF_BW 5
+param set IMU_GYRO_CUTOFF 70
+param set IMU_DGYRO_CUTOFF 50
+param set IMU_GYRO_NF_FREQ 0
+param set IMU_GYRO_NF_BW 5
 
 # log nearly everything
 param set SDLOG_PROFILE 859
@@ -41,10 +43,12 @@ sleep 10
 
 logger off
 
-sensors status
-uorb top -a -1
+#sensors status
+#uorb top -a -1
 listener sensor_gyro
 listener sensor_gyro_fifo
+
+perf
 
 echo "ALL TESTS PASSED"
 

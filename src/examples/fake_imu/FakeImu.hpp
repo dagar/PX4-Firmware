@@ -44,6 +44,8 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/sensor_gyro_fifo.h>
 
+#include <uORB/topics/esc_status.h>
+
 class FakeImu : public ModuleBase<FakeImu>, public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
@@ -72,4 +74,7 @@ private:
 	hrt_abstime _time_start_us{0};
 
 	uint32_t _sensor_interval_us{1250};
+
+
+	uORB::Publication<esc_status_s> _esc_status_pub{ORB_ID(esc_status)};
 };

@@ -78,7 +78,7 @@ void FakeImu::Run()
 	const double y_f1 = 100.0;  // 1000 Hz Y frequency stop
 
 	const double z_f0 = 0.0;    //  100 Hz Z frequency start
-	const double z_f1 = 1000.0; // 1000 Hz Z frequency stop
+	const double z_f1 = 500.0; // 1000 Hz Z frequency stop
 
 	// amplitude
 	static constexpr double A = (INT16_MAX - 1);
@@ -91,6 +91,10 @@ void FakeImu::Run()
 	const double T = 10.0;
 
 	const double timestamp_sample_s = static_cast<double>(gyro.timestamp_sample - _time_start_us) / 1e6;
+
+	float x_freq = 0;
+	float y_freq = 0;
+	float z_freq = 0;
 
 	for (int n = 0; n < gyro.samples; n++) {
 		// timestamp_sample corresponds to last sample
@@ -106,15 +110,31 @@ void FakeImu::Run()
 		gyro.z[n] = roundf(A * sin(2 * M_PI * z_F * t));
 
 		if (n == 0) {
-			float x_freq = (x_f1 - x_f0) * (t / T) + x_f0;
-			float y_freq = (y_f1 - y_f0) * (t / T) + y_f0;
-			float z_freq = (z_f1 - z_f0) * (t / T) + z_f0;
+			x_freq = (x_f1 - x_f0) * (t / T) + x_f0;
+			y_freq = (y_f1 - y_f0) * (t / T) + y_f0;
+			z_freq = (z_f1 - z_f0) * (t / T) + z_f0;
 
 			_px4_accel.update(gyro.timestamp_sample, x_freq, y_freq, z_freq);
 		}
 	}
 
 	_px4_gyro.updateFIFO(gyro);
+
+	// publish fake esc status
+	esc_status_s esc_status{};
+
+	esc_status.esc[0].esc_rpm = x_freq * 60;
+	esc_status.esc[1].esc_rpm = y_freq * 60;
+	esc_status.esc[2].esc_rpm = z_freq * 60;
+
+	if (timestamp_sample_s > 2 && timestamp_sample_s < 2.1) {
+		esc_status.esc[0].esc_rpm = 0;
+		esc_status.esc[1].esc_rpm = 0;
+		esc_status.esc[2].esc_rpm = 0;
+	}
+
+	esc_status.timestamp = hrt_absolute_time();
+	_esc_status_pub.publish(esc_status);
 }
 
 int FakeImu::task_spawn(int argc, char *argv[])
