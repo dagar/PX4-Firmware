@@ -60,7 +60,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("cellular_status", 200);
 	add_topic("commander_state");
 	add_topic("cpuload");
-	add_topic("esc_status", 250);
+	add_topic("esc_status", 0);
 	add_topic("follow_target", 500);
 	add_topic("generator_status");
 	add_topic("heater_status");
@@ -164,7 +164,7 @@ void LoggedTopics::add_default_topics()
 	add_topic_multi("sensor_accel", 1000, 4);
 	add_topic_multi("sensor_baro", 1000, 4);
 	add_topic_multi("sensor_gps", 1000, 2);
-	add_topic_multi("sensor_gyro", 1000, 4);
+	add_topic_multi("sensor_gyro", 0, 4);
 	add_topic_multi("sensor_mag", 1000, 4);
 	add_topic_multi("vehicle_imu", 500, 4);
 	add_topic_multi("vehicle_imu_status", 1000, 4);

@@ -52,11 +52,11 @@ public:
 	}
 
 	// Filter array of samples in place using the Direct form II.
-	inline void apply(float samples[], uint8_t num_samples)
+	inline void apply(double samples[], uint8_t num_samples)
 	{
 		for (int n = 0; n < num_samples; n++) {
 			// Direct Form II implementation
-			float delay_element_0{samples[n] - _delay_element_1 *_a1 - _delay_element_2 * _a2};
+			double delay_element_0{samples[n] - _delay_element_1 *_a1 - _delay_element_2 * _a2};
 
 			// don't allow bad values to propagate via the filter
 			if (!PX4_ISFINITE(delay_element_0)) {

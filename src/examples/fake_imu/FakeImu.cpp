@@ -121,20 +121,34 @@ void FakeImu::Run()
 	_px4_gyro.updateFIFO(gyro);
 
 	// publish fake esc status
-	esc_status_s esc_status{};
+	if (timestamp_sample_s > 1) {
+		esc_status_s esc_status{};
 
-	esc_status.esc[0].esc_rpm = x_freq * 60;
-	esc_status.esc[1].esc_rpm = y_freq * 60;
-	esc_status.esc[2].esc_rpm = z_freq * 60;
+		esc_status.esc[0].esc_rpm = x_freq * 60;
+		esc_status.esc[1].esc_rpm = y_freq * 60;
+		esc_status.esc[2].esc_rpm = z_freq * 60;
 
-	if (timestamp_sample_s > 2 && timestamp_sample_s < 2.1) {
-		esc_status.esc[0].esc_rpm = 0;
-		esc_status.esc[1].esc_rpm = 0;
-		esc_status.esc[2].esc_rpm = 0;
+		if (timestamp_sample_s > 1.5 && timestamp_sample_s < 2.0) {
+			esc_status.esc[0].esc_rpm = 0;
+		}
+
+		if (timestamp_sample_s > 2.5 && timestamp_sample_s < 3.0) {
+			esc_status.esc[1].esc_rpm = 0;
+		}
+
+		if (timestamp_sample_s > 3.5 && timestamp_sample_s < 4.0) {
+			esc_status.esc[2].esc_rpm = 0;
+		}
+
+		if (timestamp_sample_s > 5.5 && timestamp_sample_s < 5.6) {
+			esc_status.esc[0].esc_rpm = 0;
+			esc_status.esc[1].esc_rpm = 0;
+			esc_status.esc[2].esc_rpm = 0;
+		}
+
+		esc_status.timestamp = hrt_absolute_time();
+		_esc_status_pub.publish(esc_status);
 	}
-
-	esc_status.timestamp = hrt_absolute_time();
-	_esc_status_pub.publish(esc_status);
 }
 
 int FakeImu::task_spawn(int argc, char *argv[])

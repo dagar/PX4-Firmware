@@ -117,7 +117,7 @@ TEST_F(NotchFilterTest, filteringLowSideDF1)
 	for (int i = 0; i < 1000; i++) {
 		float input = sinf(omega * t);
 		float output_expected = sinf(omega * t - phase_delay);
-		out = _notch_float.applyDF1(input);
+		out = _notch_float.apply(input);
 		t = i * dt;
 
 		// Let some time for the filter to settle
@@ -167,7 +167,7 @@ TEST_F(NotchFilterTest, filteringHighSideDF1)
 	for (int i = 0; i < 1000; i++) {
 		float input = sinf(omega * t);
 		float output_expected = sinf(omega * t + phase_delay);
-		out = _notch_float.applyDF1(input);
+		out = _notch_float.apply(input);
 		t = i * dt;
 
 		// Let some time for the filter to settle

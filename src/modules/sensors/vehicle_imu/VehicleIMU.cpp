@@ -165,7 +165,7 @@ bool VehicleIMU::UpdateIntervalAverage(IntervalAverage &intavg, const hrt_abstim
 		intavg.interval_count++;
 
 		// periodically calculate sensor update rate
-		if (intavg.interval_count > 10000 || ((intavg.update_interval <= FLT_EPSILON) && intavg.interval_count > 100)) {
+		if (intavg.interval_count > 10000 || ((intavg.update_interval <= FLT_EPSILON) && intavg.interval_count > 250)) {
 
 			const float sample_interval_avg = (float)intavg.interval_sum / (float)intavg.interval_count;
 
