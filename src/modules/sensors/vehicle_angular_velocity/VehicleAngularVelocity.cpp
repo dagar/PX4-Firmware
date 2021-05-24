@@ -390,6 +390,8 @@ void VehicleAngularVelocity::DisableDynamicNotchEscRpm()
 				for (int harmonic = 0; harmonic < MAX_NUM_ESC_RPM_HARMONICS; harmonic++) {
 					_dynamic_notch_filter_esc_rpm[axis][esc][harmonic].setParameters(0, 0, 0);
 				}
+
+				_esc_available.set(esc, false);
 			}
 		}
 
@@ -430,7 +432,7 @@ void VehicleAngularVelocity::UpdateDynamicNotchEscRpm(bool force)
 
 		esc_status_s esc_status;
 
-		if (_esc_status_sub.copy(&esc_status) && (hrt_elapsed_time(&esc_status.timestamp) < 3_s)) {
+		if (_esc_status_sub.copy(&esc_status) && (hrt_elapsed_time(&esc_status.timestamp) < 5_s)) {
 			for (size_t esc = 0; esc < MAX_NUM_ESC_RPM; esc++) {
 
 				bool reset = false;
@@ -443,20 +445,21 @@ void VehicleAngularVelocity::UpdateDynamicNotchEscRpm(bool force)
 					reset = true;
 				}
 
-				static constexpr float ESC_NOTCH_BW_HZ = 10.f; // TODO: configurable bandwidth
-
-				static constexpr int32_t ESC_RPM_MIN = 0; // TODO: configurable
+				// only update if ESC RPM range seems valid
+				static constexpr int32_t ESC_RPM_MIN =   10 * 60; // TODO: configurable
 				static constexpr int32_t ESC_RPM_MAX = 2000 * 60; // upper bound sanity check
 
 				if (esc_status.esc[esc].esc_rpm > ESC_RPM_MIN && esc_status.esc[esc].esc_rpm < ESC_RPM_MAX) {
 
 					const float esc_hz = static_cast<float>(esc_status.esc[esc].esc_rpm) / 60.f;
 
+					static constexpr float ESC_NOTCH_BW_HZ = 10.f; // TODO: configurable bandwidth
+
 					// update filter parameters if frequency changed by at least 0.01 Hz (or forced)
 					if (force || (fabsf(nfx0.getNotchFreq() - esc_hz) > FLT_EPSILON)
 					    || (fabsf(nfx0.getBandwidth() - ESC_NOTCH_BW_HZ) > FLT_EPSILON)) {
 
-						for (int harmonic = 0; harmonic < MAX_NUM_ESC_RPM_HARMONICS; harmonic++) {
+						for (int harmonic = MAX_NUM_ESC_RPM_HARMONICS; harmonic >= 0; harmonic--) {
 							const float frequency_hz = esc_hz * (harmonic + 1);
 
 							for (int axis = 0; axis < 3; axis++) {
@@ -481,18 +484,6 @@ void VehicleAngularVelocity::UpdateDynamicNotchEscRpm(bool force)
 
 					_dynamic_notch_esc_rpm_available = true;
 					_esc_available.set(esc, true);
-
-				} else {
-					// disable all notch filters for this ESC (if they aren't already disabled)
-					_esc_available.set(esc, false);
-
-					if (force || !reset) {
-						for (int axis = 0; axis < 3; axis++) {
-							for (int harmonic = 0; harmonic < MAX_NUM_ESC_RPM_HARMONICS; harmonic++) {
-								_dynamic_notch_filter_esc_rpm[axis][esc][harmonic].setParameters(0, 0, 0);
-							}
-						}
-					}
 				}
 			}
 

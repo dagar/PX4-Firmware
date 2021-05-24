@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -50,22 +50,12 @@
 namespace math
 {
 
-inline bool isFinite(const float &value)
-{
-	return PX4_ISFINITE(value);
-}
-
-inline bool isFinite(const matrix::Vector3f &value)
-{
-	return PX4_ISFINITE(value(0)) && PX4_ISFINITE(value(1)) && PX4_ISFINITE(value(2));
-}
-
 template<typename T>
-class NotchFilter
+class HarmonicNotchFilter
 {
 public:
-	NotchFilter() = default;
-	~NotchFilter() = default;
+	HarmonicNotchFilter() = default;
+	~HarmonicNotchFilter() = default;
 
 	void setParameters(float sample_freq, float notch_freq, float bandwidth)
 	{
@@ -84,14 +74,20 @@ public:
 		//   - notch_freq not exceed nyquist
 
 		const double alpha = tan(M_PI * (double)bandwidth / (double)sample_freq);
-		const double beta = -cos(2. * M_PI * (double)notch_freq / (double)sample_freq);
+		const double beta0 = -cos(2. * M_PI * (double)notch_freq * 1 / (double)sample_freq);
+		const double beta1 = -cos(2. * M_PI * (double)notch_freq * 2 / (double)sample_freq);
+		const double beta2 = -cos(2. * M_PI * (double)notch_freq * 3 / (double)sample_freq);
 		const double a0_inv = 1. / (alpha + 1.);
 
 		_b0 = a0_inv;
-		_b1 = 2.0 * beta * a0_inv;
+		_b1[0] = 2.0 * beta0 * a0_inv;
+		_b1[1] = 2.0 * beta1 * a0_inv;
+		_b1[2] = 2.0 * beta2 * a0_inv;
 		_b2 = a0_inv;
 
-		_a1 = _b1;
+		_a1[0] = _b1[0];
+		_a1[1] = _b1[1];
+		_a1[2] = _b1[2];
 		_a2 = (1.0 - alpha) * a0_inv;
 	}
 
@@ -137,7 +133,6 @@ public:
 			} else if (_count == 1) {
 				_delay_element_2 = _delay_element_1;
 				_delay_element_output_2 = _delay_element_output_1;
-
 				_delay_element_1 = samples[n];
 				_delay_element_output_1 = samples[n];
 
@@ -154,6 +149,10 @@ public:
 					output = samples[n];
 				}
 
+
+
+
+
 				// shift inputs
 				_delay_element_2 = _delay_element_1;
 				_delay_element_1 = samples[n];
@@ -166,15 +165,6 @@ public:
 				if (_initialized) {
 					samples[n] = output;
 				}
-
-
-				// if (_count < 100) {
-				// 	fprintf(stderr, "%d: %.4f -> %.4f (delay in:[%.4f, %.4f] out:[%.4f, %.4f])\n",
-				// 		_count, (double)samples[n], (double)output,
-				// 		(double)_delay_element_1, (double)_delay_element_2,
-				// 		(double)_delay_element_output_1, (double)_delay_element_output_2
-				// 	       );
-				// }
 			}
 
 			_count++;
@@ -182,7 +172,7 @@ public:
 		}
 
 		if (!_initialized && finite) {
-			if (_count > 500) {
+			if (_count > 100) {
 				_initialized = true;
 			}
 		}
@@ -190,30 +180,6 @@ public:
 
 	float getNotchFreq() const { return _notch_freq; }
 	float getBandwidth() const { return _bandwidth; }
-
-	// Used in unit test only
-	void getCoefficients(float a[3], float b[3]) const
-	{
-		a[0] = _a0;
-		a[1] = _a1;
-		a[2] = _a2;
-		b[0] = _b0;
-		b[1] = _b1;
-		b[2] = _b2;
-	}
-
-	float getMagnitudeResponse(float frequency) const
-	{
-		// float w = 2.f * M_PI_F * frequency / _sample_freq;
-
-		// float numerator = _b0 * _b0 + _b1 * _b1 + _b2 * _b2
-		// 		  + 2.f * (_b0 * _b1 + _b1 * _b2) * cosf(w) + 2.f * _b0 * _b2 * cosf(2.f * w);
-
-		// float denominator = 1.f + _a1 * _a1 + _a2 * _a2 + 2.f * (_a1 + _a1 * _a2) * cosf(w) + 2.f * _a2 * cosf(2.f * w);
-
-		// return sqrtf(numerator / denominator);
-		return 0;
-	}
 
 	/**
 	 * Bypasses the filter update to directly set different filter coefficients.
@@ -282,28 +248,6 @@ public:
 		_initialized = false;
 	}
 
-	void setParametersQ(float Q = 0.707f)
-	{
-		float K = tanf(M_PI_F * _sample_freq);
-
-		float norm = 1.f / (1.f + K / Q + K * K);
-
-		_a0 = (1.f + K * K) * norm;
-		_a1 = 2.f * (K * K - 1) * norm;
-		_a2 = _a0;
-
-		_b1 = _a1;
-		_b2 = (1.f - K / Q + K * K) * norm;
-	}
-
-	void PrintStatus()
-	{
-		printf("%.1f/%.1f Hz BW: %.1f a: [%.6f, %.6f, %.6f] b: [%.6f, %.6f, %.6f]\n",
-		       (double)_notch_freq, (double)_sample_freq, (double)_bandwidth,
-		       (double)1.f, (double)_a1, (double)_a2,
-		       (double)_b0, (double)_b1, (double)_b2);
-	}
-
 protected:
 	float _notch_freq{};
 	float _bandwidth{};
@@ -311,17 +255,16 @@ protected:
 
 	// All the coefficients are normalized by a0, so a0 becomes 1 here
 	double _a0{1.f};
-	double _a1{};
+	double _a1[3] {};
 	double _a2{};
 
-	double _b0{1.f};
-	double _b1{};
+	double _b1[3] {};
 	double _b2{};
 
 	double _delay_element_1;
 	double _delay_element_2;
-	double _delay_element_output_1;
-	double _delay_element_output_2;
+	double _delay_element_output_1[3];
+	double _delay_element_output_2[3];
 
 	bool _initialized{false};
 

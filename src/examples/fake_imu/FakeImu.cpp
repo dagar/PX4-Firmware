@@ -121,7 +121,7 @@ void FakeImu::Run()
 	_px4_gyro.updateFIFO(gyro);
 
 	// publish fake esc status
-	if (timestamp_sample_s > 1) {
+	if (timestamp_sample_s > 0.5) {
 		esc_status_s esc_status{};
 
 		esc_status.esc[0].esc_rpm = x_freq * 60;

@@ -145,7 +145,7 @@ private:
 	};
 
 	static constexpr int MAX_NUM_ESC_RPM = sizeof(esc_status_s::esc) / sizeof(esc_status_s::esc[0]);
-	static constexpr int MAX_NUM_ESC_RPM_HARMONICS = 3;
+	static constexpr int MAX_NUM_ESC_RPM_HARMONICS = 1;
 
 	static constexpr int MAX_NUM_FFT_PEAKS = sizeof(sensor_gyro_fft_s::peak_frequencies_x) / sizeof(
 				sensor_gyro_fft_s::peak_frequencies_x[0]);
