@@ -40,6 +40,7 @@
 #pragma once
 
 #include <lib/mathlib/mathlib.h>
+#include <lib/slew_rate/SlewRate.hpp>
 #include <matrix/matrix/math.hpp>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
@@ -74,8 +75,11 @@ struct PositionControlStates {
 class PositionControl
 {
 public:
+	PositionControl()
+	{
+		_throttle_limit_slew_rate.setSlewRate(0.1f);
+	};
 
-	PositionControl() = default;
 	~PositionControl() = default;
 
 	/**
@@ -106,6 +110,8 @@ public:
 	 * @param max maximum thrust e.g. 0.9 or 1
 	 */
 	void setThrustLimits(const float min, const float max);
+
+	void emergencyThrustLimit(bool enable = true) { _emergency_thrust_limit = enable; }
 
 	/**
 	 * Set the maximum tilt angle in radians the output attitude is allowed to have
@@ -209,4 +215,7 @@ private:
 	matrix::Vector3f _thr_sp; /**< desired thrust */
 	float _yaw_sp{}; /**< desired heading */
 	float _yawspeed_sp{}; /** desired yaw-speed */
+
+	SlewRate<float> _throttle_limit_slew_rate;
+	bool _emergency_thrust_limit{false};
 };

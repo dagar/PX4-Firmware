@@ -287,6 +287,8 @@ void MulticopterPositionControl::Run()
 			}
 		}
 
+		_control.emergencyThrustLimit(local_pos.accelerometer_clipping);
+
 		PositionControlStates states{set_vehicle_states(local_pos)};
 
 		if (_control_mode.flag_control_acceleration_enabled || _control_mode.flag_control_climb_rate_enabled) {

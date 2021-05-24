@@ -63,6 +63,8 @@ void PositionControl::setThrustLimits(const float min, const float max)
 	// make sure there's always enough thrust vector length to infer the attitude
 	_lim_thr_min = math::max(min, 10e-4f);
 	_lim_thr_max = max;
+
+	_throttle_limit_slew_rate.setSlewRate(max - min);
 }
 
 void PositionControl::updateHoverThrust(const float hover_thrust_new)
@@ -131,17 +133,29 @@ void PositionControl::_velocityControl(const float dt)
 
 	_accelerationControl();
 
+	if (_emergency_thrust_limit) {
+		// if clipping limit maximum throttle to hover thrust + margin
+		float thr_max = _hover_thrust + (_lim_thr_max - _hover_thrust) * 0.1f;
+		_throttle_limit_slew_rate.update(thr_max, dt);
+
+	} else {
+		_throttle_limit_slew_rate.update(_lim_thr_max, dt);
+	}
+
+	const float lim_thr_max = _throttle_limit_slew_rate.getState();
+
+
 	// Integrator anti-windup in vertical direction
 	if ((_thr_sp(2) >= -_lim_thr_min && vel_error(2) >= 0.0f) ||
-	    (_thr_sp(2) <= -_lim_thr_max && vel_error(2) <= 0.0f)) {
+	    (_thr_sp(2) <= -lim_thr_max && vel_error(2) <= 0.0f)) {
 		vel_error(2) = 0.f;
 	}
 
 	// Saturate maximal vertical thrust
-	_thr_sp(2) = math::max(_thr_sp(2), -_lim_thr_max);
+	_thr_sp(2) = math::max(_thr_sp(2), -lim_thr_max);
 
 	// Get allowed horizontal thrust after prioritizing vertical control
-	const float thrust_max_squared = _lim_thr_max * _lim_thr_max;
+	const float thrust_max_squared = lim_thr_max * lim_thr_max;
 	const float thrust_z_squared = _thr_sp(2) * _thr_sp(2);
 	const float thrust_max_xy_squared = thrust_max_squared - thrust_z_squared;
 	float thrust_max_xy = 0;
