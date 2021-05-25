@@ -39,12 +39,12 @@ px4_add_module(
 	MAIN afbrs50
 #	COMPILE_FLAGS
 #		-O0
-#	INCLUDES
+	INCLUDES
+		argus.h
 #		AFBR-S50/Include
 #		platform
 	SRCS
 		AFBRS50.cpp
-		AFBRS50.hpp
 		afbrs50_main.cpp
 	DEPENDS
 #		px4_work_queue

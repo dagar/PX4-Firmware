@@ -41,6 +41,15 @@
 
 #include <termios.h>
 
+#include "argus.h"
+#include "board/clock_config.h"
+#include "driver/cop.h"
+#include "driver/gpio.h"
+#include "driver/s2pi.h"
+#include "driver/uart.h"
+#include "driver/timer.h"
+#include "main.h"
+
 #include <drivers/drv_hrt.h>
 #include <lib/drivers/rangefinder/PX4Rangefinder.hpp>
 #include <lib/perf/perf_counter.h>
@@ -51,11 +60,16 @@
 using namespace time_literals;
 
 #define AFBRS50_FIELD_OF_VIEW        (0.105f) // 6 deg cone angle.
-
 #define AFBRS50_MAX_DISTANCE         30.0f
 #define AFBRS50_MIN_DISTANCE         0.01f
-
 #define AFBRS50_MEASURE_INTERVAL     100_ms // 10Hz
+
+/*! Define the SPI slave (to be used in the SPI module). */
+#define SPI_SLAVE 2
+/*! Define the SPI baud rate (to be used in the SPI module). */
+#define SPI_BAUD_RATE 5000000
+
+
 class AFBRS50 : public px4::ScheduledWorkItem
 {
 public:
@@ -92,6 +106,9 @@ private:
 	int measure();
 
 	void Run() override;
+
+	static void hardware_init(void);
+	status_t measurement_ready_callback(status_t status, void * data);
 
 	PX4Rangefinder _px4_rangefinder;
 
