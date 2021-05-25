@@ -43,11 +43,9 @@ px4_add_module(
 		AFBR-S50/Include
 		platform
 	SRCS
-		#AFBRS50.cpp
-		#AFBRS50.hpp
-		#afbrs50_main.cpp
-		example.c
-		platform/driver/s2pi.c
+		AFBRS50.cpp
+		AFBRS50.hpp
+		afbrs50_main.cpp
 	DEPENDS
 		px4_work_queue
 		afbrs50_m4_fpu

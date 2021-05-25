@@ -38,70 +38,100 @@
  *
  */
 
-#pragma once
+#ifndef _AFBRS50_H
+#define _AFBRS50_H
 
+#include <drivers/device/device.h>
 #include <drivers/drv_hrt.h>
-#include <lib/drivers/device/spi.h>
-#include <lib/perf/perf_counter.h>
-#include <px4_platform_common/atomic.h>
-#include <px4_platform_common/i2c_spi_buses.h>
 
-#define SPI_SPEED 1000000
+#include <uORB/topics/distance_sensor.h>
 
-class AFBRS50 : public device::SPI, public I2CSPIDriver<AFBRS50>
+#include <px4_platform_common/module.h>
+#include <px4_platform_common/module_params.h>
+#include <px4_platform_common/tasks.h>
+
+#include <lib/drivers/rangefinder/PX4Rangefinder.hpp>
+
+/*! Define the SPI slave (to be used in the SPI module). */
+#define SPI_SLAVE 2
+
+/*! Define the SPI baud rate (to be used in the SPI module). */
+#define SPI_BAUD_RATE 5000000
+
+#define MAX_DETECTABLE_DISTANCE          30.0f
+#define MIN_DETECTABLE_DISTANCE          0.01f
+#define NUM_SAMPLES_CONSISTENT           5
+#define MAX_SAMPLE_DEVIATION             0.15f
+class AFBRS50 : public ModuleBase<AFBRS50>
 {
 public:
-	AFBRS50(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
-		spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio);
+	AFBRS50();
 	~AFBRS50() override;
 
-	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
-					     int runtime_instance);
-	static void print_usage();
+	/**
+	 * @see ModuleBase::custom_command().
+	 * @brief main Main entry point to the module that should be
+	 *        called directly from the module's main method.
+	 * @param argc The input argument count.
+	 * @param argv Pointer to the input argument array.
+	 * @return Returns 0 iff successful, -1 otherwise.
+	 */
+	static int custom_command(int argc, char *argv[]);
 
-	void RunImpl();
+	/**
+	 * @see ModuleBase::instantiate().
+	 * @brief Instantiates the pga460 object.
+	 * @param argc The input argument count.
+	 * @param argv Pointer to the input argument array.
+	 */
+	static PGA460 *instantiate(int argc, char *argv[]);
 
-	int init() override;
-	void print_status() override;
+	/**
+	 * @see ModuleBase::print_usage().
+	 * @brief Prints the module usage to the nuttshell console.
+	 * @param reason The requested reason for printing to console.
+	 */
+	static int print_usage(const char *reason = nullptr);
+
+	/**
+	 * @see ModuleBase::task_spawn().
+	 */
+	static int task_spawn(int argc, char *argv[]);
+
+	/**
+	 * @see ModuleBase::run().
+	 */
+	void run() override;
 
 private:
-	void exit_and_cleanup() override;
 
-	int probe() override;
+	/**
+	 * @brief
+	 * @return Returns PX4_OK upon success or PX4_ERROR on fail.
+	 */
+	int init();
 
-	bool Reset();
+	/**
+	 * @brief Commands the device to perform an ultrasonic measurement.
+	 */
+	int take_measurement(const uint8_t mode);
 
-	static int DataReadyInterruptCallback(int irq, void *context, void *arg);
-	void DataReady();
-	bool DataReadyInterruptConfigure();
-	bool DataReadyInterruptDisable();
+	/**
+	 * @brief Commands the device to publish the measurement results to uORB.
+	 * @param dist The calculated distance to the object.
+	 */
+	void uORB_publish_results(const float dist);
 
-	uint8_t RegisterRead(uint8_t reg);
-	void RegisterWrite(uint8_t reg, uint8_t value);
-	void RegisterSetAndClearBits(uint8_t reg, uint8_t setbits, uint8_t clearbits);
+	/** @orb_advert_t orb_advert_t uORB advertisement topic. */
+	orb_advert_t _distance_sensor_topic{nullptr};
 
-	const spi_drdy_gpio_t _drdy_gpio;
+	/** @param _fd Returns the file descriptor from open(). */
+	int _fd{-1};
 
-	perf_counter_t _bad_register_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad register")};
-	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad transfer")};
-	perf_counter_t _fifo_empty_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO empty")};
-	perf_counter_t _fifo_overflow_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO overflow")};
-	perf_counter_t _fifo_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": FIFO reset")};
-	perf_counter_t _drdy_missed_perf{nullptr};
+	/** @param _start_loop The starting value for the loop time of the main loop. */
+	uint64_t _start_loop{0};
 
-	hrt_abstime _reset_timestamp{0};
-	hrt_abstime _last_config_check_timestamp{0};
-	int _failure_count{0};
-
-	px4::atomic<uint32_t> _drdy_fifo_read_samples{0};
-	bool _data_ready_interrupt_enabled{false};
-
-	enum class STATE : uint8_t {
-		RESET,
-		WAIT_FOR_RESET,
-		CONFIGURE,
-		FIFO_READ,
-	};
-
-	STATE _state{STATE::RESET};
+	device::Device::DeviceId _device_id;
 };
+
+#endif

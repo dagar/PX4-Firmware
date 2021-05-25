@@ -33,139 +33,165 @@
 
 #include "AFBRS50.hpp"
 
-using namespace time_literals;
-
-AFBRS50::AFBRS50(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
-		 spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio) :
-	SPI(DRV_DIST_DEVTYPE_AFBRS50, MODULE_NAME, bus, device, spi_mode, bus_frequency),
-	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
-	_drdy_gpio(drdy_gpio)
+AFBRS50::AFBRS50()
 {
-	if (drdy_gpio != 0) {
-		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME": DRDY missed");
-	}
 }
 
 AFBRS50::~AFBRS50()
 {
-	perf_free(_bad_register_perf);
-	perf_free(_bad_transfer_perf);
-	perf_free(_fifo_empty_perf);
-	perf_free(_fifo_overflow_perf);
-	perf_free(_fifo_reset_perf);
-	perf_free(_drdy_missed_perf);
+	orb_unadvertise(_distance_sensor_topic);
+}
+
+int AFBRS50::custom_command(int argc, char *argv[])
+{
+	return print_usage("Unrecognized command.");
+}
+
+AFBRS50 *AFBRS50::instantiate(int argc, char *argv[])
+{
+	AFBRS50 *AFBRS50 = new AFBRS50();
+	return AFBRS50;
 }
 
 int AFBRS50::init()
 {
-	int ret = SPI::init();
+	return PX4_OK;
+}
 
-	if (ret != PX4_OK) {
-		DEVICE_DEBUG("SPI::init failed (%i)", ret);
-		return ret;
+int AFBRS50::print_usage(const char *reason)
+{
+	if (reason) {
+		PX4_WARN("%s\n", reason);
 	}
 
-	return Reset() ? 0 : -1;
-}
+	PRINT_MODULE_DESCRIPTION(
+		R"DESCR_STR(
+### Description
+Ultrasonic range finder driver that handles the communication with the device and publishes the distance via uORB.
 
-bool AFBRS50::Reset()
-{
-	_state = STATE::RESET;
-	DataReadyInterruptDisable();
-	ScheduleClear();
-	ScheduleNow();
-	return true;
-}
+### Implementation
+This driver is implented as a NuttX task. This Implementation was chosen due to the need for polling on a message
+via UART, which is not supported in the work_queue. This driver continuously takes range measurements while it is
+running. A simple algorithm to detect false readings is implemented at the driver levelin an attemptto improve
+the quality of data that is being published. The driver will not publish data at all if it deems the sensor data
+to be invalid or unstable.
+)DESCR_STR");
 
-void AFBRS50::exit_and_cleanup()
-{
-	DataReadyInterruptDisable();
-	I2CSPIDriverBase::exit_and_cleanup();
-}
-
-void AFBRS50::print_status()
-{
-	I2CSPIDriverBase::print_status();
-
-	perf_print_counter(_bad_register_perf);
-	perf_print_counter(_bad_transfer_perf);
-	perf_print_counter(_fifo_empty_perf);
-	perf_print_counter(_fifo_overflow_perf);
-	perf_print_counter(_fifo_reset_perf);
-	perf_print_counter(_drdy_missed_perf);
-}
-
-int AFBRS50::probe()
-{
-	// const uint8_t whoami = RegisterRead(Register::WHO_AM_I);
-
-	// if (whoami != WHOAMI) {
-	// 	DEVICE_DEBUG("unexpected WHO_AM_I 0x%02x", whoami);
-	// 	return PX4_ERROR;
-	// }
+	PRINT_MODULE_USAGE_NAME("afbrs50", "driver");
+	PRINT_MODULE_USAGE_SUBCATEGORY("distance_sensor");
+	PRINT_MODULE_USAGE_COMMAND("start");
+	PRINT_MODULE_USAGE_COMMAND("status");
+	PRINT_MODULE_USAGE_COMMAND("stop");
+	PRINT_MODULE_USAGE_COMMAND("help");
 
 	return PX4_OK;
 }
 
-void AFBRS50::RunImpl()
+void AFBRS50::run()
 {
-}
+	int ret = init();
 
-int AFBRS50::DataReadyInterruptCallback(int irq, void *context, void *arg)
-{
-	static_cast<AFBRS50 *>(arg)->DataReady();
-	return 0;
-}
-
-void AFBRS50::DataReady()
-{
-	//uint32_t expected = 0;
-
-	//if (_drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
-	ScheduleNow();
-	//}
-}
-
-bool AFBRS50::DataReadyInterruptConfigure()
-{
-	if (_drdy_gpio == 0) {
-		return false;
+	if(ret != PX4_OK) {
+		PX4_INFO("Could not initialize device settings. Exiting.");
+		return;
 	}
 
-	// Setup data ready on falling edge
-	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
-}
+	struct distance_sensor_s report = {};
+	_distance_sensor_topic = orb_advertise(ORB_ID(distance_sensor), &report);
 
-bool AFBRS50::DataReadyInterruptDisable()
-{
-	if (_drdy_gpio == 0) {
-		return false;
+	if (_distance_sensor_topic == nullptr) {
+		PX4_WARN("Advertise failed.");
+		return;
 	}
 
-	return px4_arch_gpiosetevent(_drdy_gpio, false, false, false, nullptr, nullptr) == 0;
-}
+	_start_loop = hrt_absolute_time();
 
-uint8_t AFBRS50::RegisterRead(uint8_t reg)
-{
-	uint8_t cmd[2] {};
-	cmd[0] = static_cast<uint8_t>(reg); //| DIR_READ;
-	transfer(cmd, cmd, sizeof(cmd));
-	return cmd[1];
-}
+	while (!should_exit()) {
 
-void AFBRS50::RegisterWrite(uint8_t reg, uint8_t value)
-{
-	uint8_t cmd[2] { (uint8_t)reg, value };
-	transfer(cmd, cmd, sizeof(cmd));
-}
+		// Control rate.
+		uint64_t loop_time = hrt_absolute_time() - _start_loop;
+		uint32_t sleep_time = (loop_time > POLL_RATE_US) ? 0 : POLL_RATE_US - loop_time;
+		px4_usleep(sleep_time);
 
-void AFBRS50::RegisterSetAndClearBits(uint8_t reg, uint8_t setbits, uint8_t clearbits)
-{
-	const uint8_t orig_val = RegisterRead(reg);
-
-	uint8_t val = (orig_val & ~clearbits) | setbits;
-
-	if (orig_val != val) {
-		RegisterWrite(reg, val);
+		_start_loop = hrt_absolute_time();
 	}
+
+	PX4_INFO("Exiting.");
+}
+
+int AFBRS50::task_spawn(int argc, char *argv[])
+{
+	px4_main_t entry_point = (px4_main_t)&run_trampoline;
+	int stack_size = 1256;
+
+	int task_id = px4_task_spawn_cmd("afbrs50", SCHED_DEFAULT,
+					 SCHED_PRIORITY_SLOW_DRIVER, stack_size,
+					 entry_point, (char *const *)argv);
+
+	if (task_id < 0) {
+		task_id = -1;
+		return -errno;
+	}
+
+	_task_id = task_id;
+
+	return PX4_OK;
+}
+
+void AFBRS50::uORB_publish_results(const float object_distance)
+{
+	struct distance_sensor_s report = {};
+	report.timestamp = hrt_absolute_time();
+	report.device_id = _device_id.devid;
+	report.type = distance_sensor_s::MAV_DISTANCE_SENSOR_LASER;
+	report.orientation = distance_sensor_s::ROTATION_DOWNWARD_FACING;
+	report.current_distance = object_distance;
+	report.min_distance = MIN_DETECTABLE_DISTANCE;
+	report.max_distance = MAX_DETECTABLE_DISTANCE;
+	report.signal_quality = 0;
+
+	bool data_is_valid = false;
+	static uint8_t good_data_counter = 0;
+
+	// If we are within our MIN and MAX thresholds, continue.
+	if (object_distance > MIN_DETECTABLE_DISTANCE && object_distance < MAX_DETECTABLE_DISTANCE) {
+
+		// Height cannot change by more than MAX_SAMPLE_DEVIATION between measurements.
+		bool sample_deviation_valid = (report.current_distance < _previous_valid_report_distance + MAX_SAMPLE_DEVIATION)
+					      && (report.current_distance > _previous_valid_report_distance - MAX_SAMPLE_DEVIATION);
+
+		// Must have NUM_SAMPLES_CONSISTENT valid samples to be publishing.
+		if (sample_deviation_valid) {
+			good_data_counter++;
+
+			if (good_data_counter > NUM_SAMPLES_CONSISTENT - 1) {
+				good_data_counter = NUM_SAMPLES_CONSISTENT;
+				data_is_valid = true;
+
+			} else {
+				// Have not gotten NUM_SAMPLES_CONSISTENT consistently valid samples.
+				data_is_valid = false;
+			}
+
+		} else if (good_data_counter > 0) {
+			good_data_counter--;
+
+		} else {
+			// Reset our quality of data estimate after NUM_SAMPLES_CONSISTENT invalid samples.
+			_previous_valid_report_distance = _previous_report_distance;
+		}
+
+		_previous_report_distance = report.current_distance;
+	}
+
+	if (data_is_valid) {
+		report.signal_quality = 1;
+		_previous_valid_report_distance = report.current_distance;
+		orb_publish(ORB_ID(distance_sensor), _distance_sensor_topic, &report);
+	}
+}
+
+extern "C" __EXPORT int afbrs50_main(int argc, char *argv[])
+{
+	return AFBRS50::main(argc, argv);
 }
