@@ -92,7 +92,7 @@ protected:
 	int	measure() override;
 	int	collect() override;
 
-	math::LowPassFilter2p	_filter{MEAS_RATE, MEAS_DRIVER_FILTER_FREQ};
+	math::LowPassFilter2p<float> _filter{MEAS_RATE, MEAS_DRIVER_FILTER_FREQ};
 };
 
 /*
