@@ -13,6 +13,7 @@ px4_add_board(
 	UAVCAN_INTERFACES 1
 	DRIVERS
 		bootloaders
+		distance_sensor/broadcom/AFBR
 		imu/bosch/bmi088
 		optical_flow/paw3902
 		uavcannode

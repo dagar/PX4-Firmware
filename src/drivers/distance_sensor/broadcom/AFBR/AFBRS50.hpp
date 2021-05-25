@@ -62,6 +62,7 @@
 #define MIN_DETECTABLE_DISTANCE          0.01f
 #define NUM_SAMPLES_CONSISTENT           5
 #define MAX_SAMPLE_DEVIATION             0.15f
+#define POLL_RATE_US 0ULL
 class AFBRS50 : public ModuleBase<AFBRS50>
 {
 public:
@@ -84,7 +85,7 @@ public:
 	 * @param argc The input argument count.
 	 * @param argv Pointer to the input argument array.
 	 */
-	static PGA460 *instantiate(int argc, char *argv[]);
+	static AFBRS50 *instantiate(int argc, char *argv[]);
 
 	/**
 	 * @see ModuleBase::print_usage().
@@ -124,6 +125,12 @@ private:
 
 	/** @orb_advert_t orb_advert_t uORB advertisement topic. */
 	orb_advert_t _distance_sensor_topic{nullptr};
+
+	/** @param _previous_report_distance The previous reported sensor distance. */
+	float _previous_report_distance{0};
+
+	/** @param _previous_valid_report_distance The previous valid reported sensor distance. */
+	float _previous_valid_report_distance{0};
 
 	/** @param _fd Returns the file descriptor from open(). */
 	int _fd{-1};

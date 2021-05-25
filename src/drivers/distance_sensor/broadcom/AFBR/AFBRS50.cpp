@@ -49,8 +49,8 @@ int AFBRS50::custom_command(int argc, char *argv[])
 
 AFBRS50 *AFBRS50::instantiate(int argc, char *argv[])
 {
-	AFBRS50 *AFBRS50 = new AFBRS50();
-	return AFBRS50;
+	AFBRS50 *afbrs50 = new AFBRS50();
+	return afbrs50;
 }
 
 int AFBRS50::init()
