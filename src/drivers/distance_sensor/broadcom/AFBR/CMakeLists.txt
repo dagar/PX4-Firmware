@@ -44,7 +44,8 @@ px4_add_module(
 #		platform
 	SRCS
 		AFBRS50.cpp
-#		AFBRS50.hpp
+		AFBRS50.hpp
+		afbrs50_main.cpp
 	DEPENDS
 #		px4_work_queue
 #		afbrs50_m4_fpu

@@ -33,165 +33,136 @@
 
 #include "AFBRS50.hpp"
 
-AFBRS50::AFBRS50()
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lib/drivers/device/Device.hpp>
+
+AFBRS50::AFBRS50(uint8_t device_orientation):
+	ScheduledWorkItem(MODULE_NAME, px4::ins_instance_to_wq(0)),
+	_px4_rangefinder(0, device_orientation)
 {
+	device::Device::DeviceId device_id;
+	device_id.devid_s.bus_type = device::Device::DeviceBusType::DeviceBusType_SPI;
+
+	uint8_t bus_num = 0;
+
+	if (bus_num < 10) {
+		device_id.devid_s.bus = bus_num;
+	}
+
+	_px4_rangefinder.set_device_id(device_id.devid);
+	_px4_rangefinder.set_device_type(DRV_DIST_DEVTYPE_AFBRS50);
+
+	_px4_rangefinder.set_max_distance(AFBRS50_MAX_DISTANCE);
+	_px4_rangefinder.set_min_distance(AFBRS50_MIN_DISTANCE);
+	_px4_rangefinder.set_fov(AFBRS50_FIELD_OF_VIEW);
 }
 
 AFBRS50::~AFBRS50()
 {
-	orb_unadvertise(_distance_sensor_topic);
+	stop();
+
+	perf_free(_comms_error);
+	perf_free(_sample_perf);
 }
 
-int AFBRS50::custom_command(int argc, char *argv[])
+int
+AFBRS50::collect()
 {
-	return print_usage("Unrecognized command.");
+	perf_begin(_sample_perf);
+
+	//const int buffer_size = sizeof(_buffer);
+	//const int message_size = sizeof(reading_msg);
+
+	//int bytes_read = ::read(_file_descriptor, _buffer + _buffer_len, buffer_size - _buffer_len);
+
+	//if (bytes_read < 1) {
+		// Trigger a new measurement.
+		return measure();
+	//}
+
+	//_buffer_len += bytes_read;
+
+	//if (_buffer_len < message_size) {
+		// Return on next scheduled cycle to collect remaining data.
+	//	return PX4_OK;
+	//}
+
+	// NOTE: little-endian support only.
+	uint16_t distance_mm = 0;
+	float distance_m = static_cast<float>(distance_mm) / 1000.0f;
+
+	// @TODO - implement a meaningful signal quality value.
+	int8_t signal_quality = -1;
+
+	_px4_rangefinder.update(_measurement_time, distance_m, signal_quality);
+
+	perf_end(_sample_perf);
+
+	// Trigger the next measurement.
+	return measure();
 }
 
-AFBRS50 *AFBRS50::instantiate(int argc, char *argv[])
+int
+AFBRS50::init()
 {
-	AFBRS50 *afbrs50 = new AFBRS50();
-	return afbrs50;
-}
 
-int AFBRS50::init()
-{
-	return PX4_OK;
-}
+	hrt_abstime time_now = hrt_absolute_time();
 
-int AFBRS50::print_usage(const char *reason)
-{
-	if (reason) {
-		PX4_WARN("%s\n", reason);
-	}
+	const hrt_abstime timeout_usec = time_now + 500000_us; // 0.5sec
 
-	PRINT_MODULE_DESCRIPTION(
-		R"DESCR_STR(
-### Description
-Ultrasonic range finder driver that handles the communication with the device and publishes the distance via uORB.
+	while (time_now < timeout_usec) {
+		if (measure() == PX4_OK) {
+			px4_usleep(AFBRS50_MEASURE_INTERVAL);
 
-### Implementation
-This driver is implented as a NuttX task. This Implementation was chosen due to the need for polling on a message
-via UART, which is not supported in the work_queue. This driver continuously takes range measurements while it is
-running. A simple algorithm to detect false readings is implemented at the driver levelin an attemptto improve
-the quality of data that is being published. The driver will not publish data at all if it deems the sensor data
-to be invalid or unstable.
-)DESCR_STR");
-
-	PRINT_MODULE_USAGE_NAME("afbrs50", "driver");
-	PRINT_MODULE_USAGE_SUBCATEGORY("distance_sensor");
-	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_COMMAND("status");
-	PRINT_MODULE_USAGE_COMMAND("stop");
-	PRINT_MODULE_USAGE_COMMAND("help");
-
-	return PX4_OK;
-}
-
-void AFBRS50::run()
-{
-	int ret = init();
-
-	if(ret != PX4_OK) {
-		PX4_INFO("Could not initialize device settings. Exiting.");
-		return;
-	}
-
-	struct distance_sensor_s report = {};
-	_distance_sensor_topic = orb_advertise(ORB_ID(distance_sensor), &report);
-
-	if (_distance_sensor_topic == nullptr) {
-		PX4_WARN("Advertise failed.");
-		return;
-	}
-
-	_start_loop = hrt_absolute_time();
-
-	while (!should_exit()) {
-
-		// Control rate.
-		uint64_t loop_time = hrt_absolute_time() - _start_loop;
-		uint32_t sleep_time = (loop_time > POLL_RATE_US) ? 0 : POLL_RATE_US - loop_time;
-		px4_usleep(sleep_time);
-
-		_start_loop = hrt_absolute_time();
-	}
-
-	PX4_INFO("Exiting.");
-}
-
-int AFBRS50::task_spawn(int argc, char *argv[])
-{
-	px4_main_t entry_point = (px4_main_t)&run_trampoline;
-	int stack_size = 1256;
-
-	int task_id = px4_task_spawn_cmd("afbrs50", SCHED_DEFAULT,
-					 SCHED_PRIORITY_SLOW_DRIVER, stack_size,
-					 entry_point, (char *const *)argv);
-
-	if (task_id < 0) {
-		task_id = -1;
-		return -errno;
-	}
-
-	_task_id = task_id;
-
-	return PX4_OK;
-}
-
-void AFBRS50::uORB_publish_results(const float object_distance)
-{
-	struct distance_sensor_s report = {};
-	report.timestamp = hrt_absolute_time();
-	report.device_id = _device_id.devid;
-	report.type = distance_sensor_s::MAV_DISTANCE_SENSOR_LASER;
-	report.orientation = distance_sensor_s::ROTATION_DOWNWARD_FACING;
-	report.current_distance = object_distance;
-	report.min_distance = MIN_DETECTABLE_DISTANCE;
-	report.max_distance = MAX_DETECTABLE_DISTANCE;
-	report.signal_quality = 0;
-
-	bool data_is_valid = false;
-	static uint8_t good_data_counter = 0;
-
-	// If we are within our MIN and MAX thresholds, continue.
-	if (object_distance > MIN_DETECTABLE_DISTANCE && object_distance < MAX_DETECTABLE_DISTANCE) {
-
-		// Height cannot change by more than MAX_SAMPLE_DEVIATION between measurements.
-		bool sample_deviation_valid = (report.current_distance < _previous_valid_report_distance + MAX_SAMPLE_DEVIATION)
-					      && (report.current_distance > _previous_valid_report_distance - MAX_SAMPLE_DEVIATION);
-
-		// Must have NUM_SAMPLES_CONSISTENT valid samples to be publishing.
-		if (sample_deviation_valid) {
-			good_data_counter++;
-
-			if (good_data_counter > NUM_SAMPLES_CONSISTENT - 1) {
-				good_data_counter = NUM_SAMPLES_CONSISTENT;
-				data_is_valid = true;
-
-			} else {
-				// Have not gotten NUM_SAMPLES_CONSISTENT consistently valid samples.
-				data_is_valid = false;
+			if (collect() == PX4_OK) {
+				// The file descriptor can only be accessed by the process that opened it,
+				// so closing here allows the port to be opened from scheduled work queue.
+				stop();
+				return PX4_OK;
 			}
-
-		} else if (good_data_counter > 0) {
-			good_data_counter--;
-
-		} else {
-			// Reset our quality of data estimate after NUM_SAMPLES_CONSISTENT invalid samples.
-			_previous_valid_report_distance = _previous_report_distance;
 		}
 
-		_previous_report_distance = report.current_distance;
+		px4_usleep(1000);
+		time_now = hrt_absolute_time();
 	}
 
-	if (data_is_valid) {
-		report.signal_quality = 1;
-		_previous_valid_report_distance = report.current_distance;
-		orb_publish(ORB_ID(distance_sensor), _distance_sensor_topic, &report);
-	}
+	PX4_ERR("No readings from AFBRS50");
+	return PX4_ERROR;
 }
 
-extern "C" __EXPORT int afbrs50_main(int argc, char *argv[])
+int
+AFBRS50::measure()
 {
-	return AFBRS50::main(argc, argv);
+	_measurement_time = hrt_absolute_time();
+	return PX4_OK;
+}
+
+void
+AFBRS50::print_info()
+{
+	perf_print_counter(_comms_error);
+	perf_print_counter(_sample_perf);
+}
+
+void
+AFBRS50::Run()
+{
+	collect();
+}
+
+void
+AFBRS50::start()
+{
+	// Schedule the driver at regular intervals.
+	ScheduleOnInterval(AFBRS50_MEASURE_INTERVAL, AFBRS50_MEASURE_INTERVAL);
+}
+
+void
+AFBRS50::stop()
+{
+	// Clear the work queue schedule.
+	ScheduleClear();
 }

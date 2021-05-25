@@ -37,108 +37,66 @@
  * Driver for the Broadcom AFBR-S50 connected via SPI.
  *
  */
+#pragma once
 
-#ifndef _AFBRS50_H
-#define _AFBRS50_H
+#include <termios.h>
 
-#include <drivers/device/device.h>
 #include <drivers/drv_hrt.h>
-
-#include <uORB/topics/distance_sensor.h>
-
-#include <px4_platform_common/module.h>
-#include <px4_platform_common/module_params.h>
-#include <px4_platform_common/tasks.h>
-
 #include <lib/drivers/rangefinder/PX4Rangefinder.hpp>
+#include <lib/perf/perf_counter.h>
+#include <px4_platform_common/px4_config.h>
+#include <px4_platform_common/defines.h>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
-/*! Define the SPI slave (to be used in the SPI module). */
-#define SPI_SLAVE 2
+using namespace time_literals;
 
-/*! Define the SPI baud rate (to be used in the SPI module). */
-#define SPI_BAUD_RATE 5000000
+#define AFBRS50_FIELD_OF_VIEW        (0.105f) // 6 deg cone angle.
 
-#define MAX_DETECTABLE_DISTANCE          30.0f
-#define MIN_DETECTABLE_DISTANCE          0.01f
-#define NUM_SAMPLES_CONSISTENT           5
-#define MAX_SAMPLE_DEVIATION             0.15f
-#define POLL_RATE_US 0ULL
-class AFBRS50 : public ModuleBase<AFBRS50>
+#define AFBRS50_MAX_DISTANCE         30.0f
+#define AFBRS50_MIN_DISTANCE         0.01f
+
+#define AFBRS50_MEASURE_INTERVAL     100_ms // 10Hz
+class AFBRS50 : public px4::ScheduledWorkItem
 {
 public:
-	AFBRS50();
+	AFBRS50(const uint8_t device_orientation = distance_sensor_s::ROTATION_DOWNWARD_FACING);
 	~AFBRS50() override;
 
-	/**
-	 * @see ModuleBase::custom_command().
-	 * @brief main Main entry point to the module that should be
-	 *        called directly from the module's main method.
-	 * @param argc The input argument count.
-	 * @param argv Pointer to the input argument array.
-	 * @return Returns 0 iff successful, -1 otherwise.
-	 */
-	static int custom_command(int argc, char *argv[]);
+	int init();
 
 	/**
-	 * @see ModuleBase::instantiate().
-	 * @brief Instantiates the pga460 object.
-	 * @param argc The input argument count.
-	 * @param argv Pointer to the input argument array.
+	 * Diagnostics - print some basic information about the driver.
 	 */
-	static AFBRS50 *instantiate(int argc, char *argv[]);
+	void print_info();
 
 	/**
-	 * @see ModuleBase::print_usage().
-	 * @brief Prints the module usage to the nuttshell console.
-	 * @param reason The requested reason for printing to console.
+	 * Initialise the automatic measurement state machine and start it.
 	 */
-	static int print_usage(const char *reason = nullptr);
+	void start();
 
 	/**
-	 * @see ModuleBase::task_spawn().
+	 * Stop the automatic measurement state machine.
 	 */
-	static int task_spawn(int argc, char *argv[]);
-
-	/**
-	 * @see ModuleBase::run().
-	 */
-	void run() override;
+	void stop();
 
 private:
 
 	/**
-	 * @brief
-	 * @return Returns PX4_OK upon success or PX4_ERROR on fail.
+	 * Reads the data measrurement from serial UART.
 	 */
-	int init();
+	int collect();
 
 	/**
-	 * @brief Commands the device to perform an ultrasonic measurement.
+	 * Sends a data request message to the sensor.
 	 */
-	int take_measurement(const uint8_t mode);
+	int measure();
 
-	/**
-	 * @brief Commands the device to publish the measurement results to uORB.
-	 * @param dist The calculated distance to the object.
-	 */
-	void uORB_publish_results(const float dist);
+	void Run() override;
 
-	/** @orb_advert_t orb_advert_t uORB advertisement topic. */
-	orb_advert_t _distance_sensor_topic{nullptr};
+	PX4Rangefinder _px4_rangefinder;
 
-	/** @param _previous_report_distance The previous reported sensor distance. */
-	float _previous_report_distance{0};
+	hrt_abstime _measurement_time{0};
 
-	/** @param _previous_valid_report_distance The previous valid reported sensor distance. */
-	float _previous_valid_report_distance{0};
-
-	/** @param _fd Returns the file descriptor from open(). */
-	int _fd{-1};
-
-	/** @param _start_loop The starting value for the loop time of the main loop. */
-	uint64_t _start_loop{0};
-
-	device::Device::DeviceId _device_id;
+	perf_counter_t _comms_error{perf_alloc(PC_COUNT, MODULE_NAME": comms_error")};
+	perf_counter_t _sample_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": sample")};
 };
-
-#endif
