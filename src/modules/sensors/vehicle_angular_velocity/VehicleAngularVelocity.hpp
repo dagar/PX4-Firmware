@@ -33,12 +33,13 @@
 
 #pragma once
 
+#include <containers/Bitset.hpp>
 #include <lib/sensor_calibration/Gyroscope.hpp>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2pArray.hpp>
-#include <lib/mathlib/math/filter/NotchFilterArray.hpp>
+#include <lib/mathlib/math/filter/NotchFilter.hpp>
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_config.h>
@@ -76,25 +77,25 @@ private:
 	void Run() override;
 
 	void CalibrateAndPublish(bool publish, const hrt_abstime &timestamp_sample, const matrix::Vector3f &angular_velocity,
-				 const matrix::Vector3f &angular_acceleration, float scale = 1.f);
+				 const matrix::Vector3f &angular_acceleration);
 
-	float FilterAngularVelocity(int axis, float data[], int N = 1);
-	float FilterAngularAcceleration(int axis, float dt_s, float data[], int N = 1);
+	inline float FilterAngularVelocity(int axis, float data[], int N = 1);
+	inline float FilterAngularAcceleration(int axis, float dt_s, float data[], int N = 1);
 
 	void DisableDynamicNotchEscRpm();
 	void DisableDynamicNotchFFT();
 	void ParametersUpdate(bool force = false);
 
-	void ResetFilters(float new_scale = 1.f);
+	void ResetFilters();
 	void SensorBiasUpdate(bool force = false);
 	bool SensorSelectionUpdate(bool force = false);
-	void UpdateDynamicNotchEscRpm(float new_scale = 1.f, bool force = false);
-	void UpdateDynamicNotchFFT(float new_scale = 1.f, bool force = false);
+	void UpdateDynamicNotchEscRpm(bool force = false);
+	void UpdateDynamicNotchFFT(bool force = false);
 	bool UpdateSampleRate();
 
 	// scaled appropriately for current FIFO mode
-	matrix::Vector3f GetResetAngularVelocity(float new_scale = 1.f) const;
-	matrix::Vector3f GetResetAngularAcceleration(float new_scale = 1.f) const;
+	matrix::Vector3f GetResetAngularVelocity(const matrix::Vector3f &angular_velocity) const;
+	matrix::Vector3f GetResetAngularAcceleration() const;
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
@@ -119,9 +120,10 @@ private:
 	matrix::Vector3f _bias{};
 
 	matrix::Vector3f _angular_velocity{};
+	matrix::Vector3f _angular_velocity_prev{};
 	matrix::Vector3f _angular_acceleration{};
 
-	matrix::Vector3f _angular_velocity_prev{};
+	matrix::Vector3f _angular_velocity_raw_prev{};
 	hrt_abstime _timestamp_sample_last{0};
 
 	hrt_abstime _publish_interval_min_us{0};
@@ -133,7 +135,7 @@ private:
 
 	// angular velocity filters
 	math::LowPassFilter2pArray _lp_filter_velocity[3] {{kInitialRateHz, 30.f}, {kInitialRateHz, 30.f}, {kInitialRateHz, 30.f}};
-	math::NotchFilterArray<float> _notch_filter_velocity[3] {};
+	math::NotchFilter<float> _notch_filter_velocity[3] {};
 
 #if !defined(CONSTRAINED_FLASH)
 
@@ -142,14 +144,18 @@ private:
 		FFT    = 2,
 	};
 
+	static constexpr hrt_abstime DYNAMIC_NOTCH_FITLER_TIMEOUT = 5_s;
+
 	static constexpr int MAX_NUM_ESC_RPM = sizeof(esc_status_s::esc) / sizeof(esc_status_s::esc[0]);
 	static constexpr int MAX_NUM_ESC_RPM_HARMONICS = 3;
 
 	static constexpr int MAX_NUM_FFT_PEAKS = sizeof(sensor_gyro_fft_s::peak_frequencies_x) / sizeof(
 				sensor_gyro_fft_s::peak_frequencies_x[0]);
 
-	math::NotchFilterArray<float> _dynamic_notch_filter_esc_rpm[MAX_NUM_ESC_RPM][MAX_NUM_ESC_RPM_HARMONICS][3] {};
-	math::NotchFilterArray<float> _dynamic_notch_filter_fft[MAX_NUM_FFT_PEAKS][3] {};
+	math::NotchFilter<float> _dynamic_notch_filter_esc_rpm[3][MAX_NUM_ESC_RPM][MAX_NUM_ESC_RPM_HARMONICS] {};
+	math::NotchFilter<float> _dynamic_notch_filter_fft[3][MAX_NUM_FFT_PEAKS] {};
+
+	px4::Bitset<MAX_NUM_ESC_RPM> _esc_available{};
 
 	perf_counter_t _dynamic_notch_filter_esc_rpm_update_perf{nullptr};
 	perf_counter_t _dynamic_notch_filter_fft_update_perf{nullptr};
@@ -164,8 +170,6 @@ private:
 	math::LowPassFilter2p _lp_filter_acceleration[3] {{kInitialRateHz, 30.f}, {kInitialRateHz, 30.f}, {kInitialRateHz, 30.f}};
 
 	uint32_t _selected_sensor_device_id{0};
-
-	float _last_scale{0.f};
 
 	bool _reset_filters{true};
 	bool _fifo_available{false};

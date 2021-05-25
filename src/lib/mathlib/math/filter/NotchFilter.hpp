@@ -71,32 +71,20 @@ public:
 	void setParameters(float sample_freq, float notch_freq, float bandwidth);
 
 	/**
-	 * Add a new raw value to the filter using the Direct form II
+	 * Add a new raw value to the filter using the Direct Form I
 	 *
 	 * @return retrieve the filtered result
 	 */
 	inline T apply(const T &sample)
 	{
-		// Direct Form II implementation
-		const T delay_element_0{sample - _delay_element_1 *_a1 - _delay_element_2 * _a2};
-		const T output{delay_element_0 *_b0 + _delay_element_1 *_b1 + _delay_element_2 * _b2};
-
-		_delay_element_2 = _delay_element_1;
-		_delay_element_1 = delay_element_0;
-
-		return output;
-	}
-
-	/**
-	 * Add a new raw value to the filter using the Direct Form I
-	 *
-	 * @return retrieve the filtered result
-	 */
-	inline T applyDF1(const T &sample)
-	{
 		// Direct Form I implementation
-		const T output = _b0 * sample + _b1 * _delay_element_1 + _b2 * _delay_element_2 - _a1 * _delay_element_output_1 - _a2 *
-				 _delay_element_output_2;
+		T output = _b0 * sample + _b1 * _delay_element_1 + _b2 * _delay_element_2 - _a1 * _delay_element_output_1 - _a2 *
+			   _delay_element_output_2;
+
+		// don't allow bad values to propagate via the filter
+		if (!isFinite(output)) {
+			output = sample;
+		}
 
 		// shift inputs
 		_delay_element_2 = _delay_element_1;
@@ -107,6 +95,18 @@ public:
 		_delay_element_output_1 = output;
 
 		return output;
+	}
+
+	/**
+	 * Add new raw values to the filter using the Direct form I.
+	 *
+	 * @return retrieve the filtered result
+	 */
+	inline void applyArray(T samples[], int num_samples)
+	{
+		for (int n = 0; n < num_samples; n++) {
+			samples[n] = apply(samples[n]);
+		}
 	}
 
 	float getNotchFreq() const { return _notch_freq; }
@@ -150,8 +150,11 @@ public:
 		_b2 = b[2];
 	}
 
-
-	T reset(const T &sample);
+	void reset(const T &sample)
+	{
+		_delay_element_1 = _delay_element_2 = sample;
+		_delay_element_output_1 = _delay_element_output_2 = sample * (_b0 + _b1 + _b2) / (1 + _a1 + _a2);
+	}
 
 protected:
 	float _notch_freq{};
@@ -174,7 +177,7 @@ protected:
 
 /**
  * Initialises the filter by setting its parameters and coefficients.
- * If using the direct form I (applyDF1) method, allows to dynamically
+ * Using the direct form I method, allows to dynamically
  * update the filtered frequency, refresh rate and quality factor while
  * conserving the filter's history
  */
@@ -207,23 +210,6 @@ void NotchFilter<T>::setParameters(float sample_freq, float notch_freq, float ba
 
 	_a1 = _b1;
 	_a2 = (1.f - alpha) * a0_inv;
-}
-
-template<typename T>
-T NotchFilter<T>::reset(const T &sample)
-{
-	T dval = sample;
-
-	if (fabsf(_b0 + _b1 + _b2) > FLT_EPSILON) {
-		dval = dval / (_b0 + _b1 + _b2);
-	}
-
-	_delay_element_1 = dval;
-	_delay_element_2 = dval;
-	_delay_element_output_1 = {};
-	_delay_element_output_2 = {};
-
-	return apply(sample);
 }
 
 } // namespace math
