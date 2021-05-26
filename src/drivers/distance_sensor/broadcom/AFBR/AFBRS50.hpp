@@ -42,12 +42,16 @@
 #include <termios.h>
 
 #include "argus.h"
-#include "board/clock_config.h"
-#include "driver/cop.h"
-#include "driver/gpio.h"
-#include "driver/s2pi.h"
-#include "driver/uart.h"
-#include "driver/timer.h"
+
+
+//TODO: add these files from Broadcom Test
+// #include "board/clock_config.h"
+// #include "driver/cop.h"
+// #include "driver/gpio.h"
+// #include "driver/s2pi.h"
+// #include "driver/uart.h"
+// #include "driver/timer.h"
+
 #include "main.h"
 
 #include <drivers/drv_hrt.h>
