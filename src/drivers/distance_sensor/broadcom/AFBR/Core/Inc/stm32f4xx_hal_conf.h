@@ -402,14 +402,6 @@
  #include "stm32f4xx_hal_tim.h"
 #endif /* HAL_TIM_MODULE_ENABLED */
 
-#ifdef HAL_UART_MODULE_ENABLED
- #include "stm32f4xx_hal_uart.h"
-#endif /* HAL_UART_MODULE_ENABLED */
-
-#ifdef HAL_USART_MODULE_ENABLED
- #include "stm32f4xx_hal_usart.h"
-#endif /* HAL_USART_MODULE_ENABLED */
-
 #ifdef HAL_IRDA_MODULE_ENABLED
  #include "stm32f4xx_hal_irda.h"
 #endif /* HAL_IRDA_MODULE_ENABLED */

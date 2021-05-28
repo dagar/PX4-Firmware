@@ -38,28 +38,15 @@
 #include <string.h>
 #include <lib/drivers/device/Device.hpp>
 
+#include "driver/gpio.h"
+#include "driver/s2pi.h"
+#include "driver/timer.h"
+
+static void * _myData;
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-
-/*!***************************************************************************
- * @brief	printf-like function to send print messages via UART.
- *
- * @details Defined in "driver/uart.c" source file.
- *
- * 			Open an UART connection with 115200 bps, 8N1, no handshake to
- * 			receive the data on a computer.
- *
- * @param	fmt_s The usual printf parameters.
- *
- * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
- *****************************************************************************/
-extern status_t print(const char  *fmt_s, ...);
-
-/*!***************************************************************************
- * @brief	Initialization routine for board hardware and peripherals.
- *****************************************************************************/
-static void hardware_init(void);
 
 /*!***************************************************************************
  * @brief	Measurement data ready callback function.
@@ -105,14 +92,15 @@ int
 AFBRS50::collect()
 {
 	// From example.c
-	myData = 0;
+	_myData = 0;
 	/* Triggers a single measurement.
 		* Note that due to the laser safety algorithms, the method might refuse
 		* to restart a measurement when the appropriate time has not been elapsed
 		* right now. The function returns with status #STATUS_ARGUS_POWERLIMIT and
 		* the function must be called again later. Use the frame time configuration
 		* in order to adjust the timing between two measurement frames. */
-	status = Argus_TriggerMeasurement(hnd, measurement_ready_callback);
+	status_t status = Argus_TriggerMeasurement(_hnd, measurement_ready_callback);
+
 	if (status == STATUS_ARGUS_POWERLIMIT)
 	{
 		/* Not ready (due to laser safety) to restart the measurement yet.
@@ -128,7 +116,7 @@ AFBRS50::collect()
 		/* Wait until measurement data is ready. */
 		do
 		{
-			status = Argus_GetStatus(hnd);
+			status = Argus_GetStatus(_hnd);
 			__asm("nop");
 		}
 		while(status == STATUS_BUSY);
@@ -144,7 +132,7 @@ AFBRS50::collect()
 			argus_results_t res;
 
 			/* Evaluate the raw measurement results. */
-			status = Argus_EvaluateData(hnd, &res, (void*)myData);
+			status = Argus_EvaluateData(_hnd, &res, (void*)_myData);
 
 			if (status != STATUS_OK)
 			{
@@ -156,74 +144,36 @@ AFBRS50::collect()
 				/* Use the recent measurement results
 					* (converting the Q9.22 value to float and print or display it). */
 				float result = res.Bin.Range / (Q9_22_ONE / 1000);
-				print("Range: %d mm\r\n", result);
-				return result;
+				PX4_INFO("Range: %f mm\r\n", (double)result);
 			}
 		}
 	}
 
-
-
-
-	/*
-	perf_begin(_sample_perf);
-
-	//const int buffer_size = sizeof(_buffer);
-	//const int message_size = sizeof(reading_msg);
-
-	//int bytes_read = ::read(_file_descriptor, _buffer + _buffer_len, buffer_size - _buffer_len);
-
-	//if (bytes_read < 1) {
-		// Trigger a new measurement.
-		// return measure();
-	//}
-
-	//_buffer_len += bytes_read;
-
-	//if (_buffer_len < message_size) {
-		// Return on next scheduled cycle to collect remaining data.
-	//	return PX4_OK;
-	//}
-
-	// NOTE: little-endian support only.
-	uint16_t distance_mm = 0;
-	float distance_m = static_cast<float>(distance_mm) / 1000.0f;
-
-	// @TODO - implement a meaningful signal quality value.
-	int8_t signal_quality = -1;
-
-	_px4_rangefinder.update(_measurement_time, distance_m, signal_quality);
-
-	perf_end(_sample_perf);
-
-	// Trigger the next measurement.
-	return measure();
-
-	*/
+	return PX4_OK;
 }
 
 int
 AFBRS50::init()
 {
 	// From example.c
-	argus_hnd_t * hnd = Argus_CreateHandle();
-	if (hnd == 0)
+	_hnd = Argus_CreateHandle();
+	if (_hnd == 0)
 	{
-		print("ERROR: Handle not initialized\r\n");
+		PX4_INFO("ERROR: Handle not initialized\r\n");
 	}
 	hardware_init();
-	status_t status = Argus_Init(hnd, SPI_SLAVE);
+	status_t status = Argus_Init(_hnd, SPI_SLAVE);
 	if (status != STATUS_OK)
 	{
-		print("ERROR: Init status not okay: %i\r\n", status);
+		PX4_INFO("ERROR: Init status not okay: %i\r\n", status);
 	}
 	uint32_t value = Argus_GetAPIVersion();
 	uint8_t a = (value >> 24) & 0xFFU;
 	uint8_t b = (value >> 16) & 0xFFU;
 	uint8_t c = value & 0xFFFFU;
-	uint32_t id = Argus_GetChipID(hnd);
-	argus_module_version_t mv = Argus_GetModuleVersion(hnd);
-	print("\n##### AFBR-S50 API - Simple Example ##############\n"
+	uint32_t id = Argus_GetChipID(_hnd);
+	argus_module_version_t mv = Argus_GetModuleVersion(_hnd);
+	PX4_INFO("\n##### AFBR-S50 API - Simple Example ##############\n"
 		  "  API Version: v%d.%d.%d\n"
 		  "  Chip ID:     %d\n"
 		  "  Module:      %s\n"
@@ -237,7 +187,7 @@ AFBRS50::init()
 		  mv == AFBR_S50MV85I_V1 ? "AFBR-S50MV85I (v1)" :
 		  mv == AFBR_S50SV85K_V1 ? "AFBR-S50SV85K (v1)" :
 		  "unknown");
-	Argus_SetConfigurationFrameTime( hnd, 100000 ); // 0.1 second = 10 Hz
+	Argus_SetConfigurationFrameTime( _hnd, 100000 ); // 0.1 second = 10 Hz
 
 
 	hrt_abstime time_now = hrt_absolute_time();
@@ -288,7 +238,7 @@ void
 AFBRS50::start()
 {
 	// Schedule the driver at regular intervals.
-	ScheduleOnInterval(AFBRS50_MEASURE_INTERVAL, AFBRS50_MEASURE_INTERVAL);
+	ScheduleOnInterval(AFBRS50_MEASURE_INTERVAL);
 }
 
 void
@@ -298,22 +248,10 @@ AFBRS50::stop()
 	ScheduleClear();
 }
 
-static void AFBRS50::hardware_init(void)
+void AFBRS50::hardware_init(void)
 {
-	/* Initialize the board with clocks. */
-	BOARD_ClockInit();
-
-	/* Disable the watchdog timer. */
-	COP_Disable();
-
-	/* Init GPIO ports. */
-	GPIO_Init();
-
 	/* Initialize timer required by the API. */
 	Timer_Init();
-
-	/* Initialize UART for print functionality. */
-	UART_Init();
 
 	/* Initialize the S2PI hardware required by the API. */
 	S2PI_Init(SPI_SLAVE, SPI_BAUD_RATE);
@@ -332,9 +270,9 @@ status_t AFBRS50::measurement_ready_callback(status_t status, void * data)
 		 * from within this callback since it is invoked in
 		 * a interrupt service routine and should return as
 		 * soon as possible. */
-		assert(myData == 0);
+		assert(_myData == 0);
 
-		myData = data;
+		_myData = data;
 	}
 	return status;
 }

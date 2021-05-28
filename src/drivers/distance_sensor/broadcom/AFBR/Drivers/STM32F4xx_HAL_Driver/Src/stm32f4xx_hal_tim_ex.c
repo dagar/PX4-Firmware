@@ -187,7 +187,7 @@ HAL_StatusTypeDef HAL_TIMEx_HallSensor_Init(TIM_HandleTypeDef *htim, TIM_HallSen
   htim->Instance->CCMR1 |= sConfig->IC1Prescaler;
 
   /* Enable the Hall sensor interface (XOR function of the three inputs) */
-  htim->Instance->CR2 |= TIM_CR2_TI1S;
+  htim->Instance->CR2_1 |= TIM_CR2_TI1S;
 
   /* Select the TIM_TS_TI1F_ED signal as Input trigger for the TIM */
   htim->Instance->SMCR &= ~TIM_SMCR_TS;
@@ -210,8 +210,8 @@ HAL_StatusTypeDef HAL_TIMEx_HallSensor_Init(TIM_HandleTypeDef *htim, TIM_HallSen
 
   /* Select OC2REF as trigger output on TRGO: write the MMS bits in the TIMx_CR2
     register to 101 */
-  htim->Instance->CR2 &= ~TIM_CR2_MMS;
-  htim->Instance->CR2 |= TIM_TRGO_OC2REF;
+  htim->Instance->CR2_1 &= ~TIM_CR2_MMS;
+  htim->Instance->CR2_1 |= TIM_TRGO_OC2REF;
 
   /* Initialize the DMA burst operation state */
   htim->DMABurstState = HAL_DMA_BURST_STATE_READY;
@@ -1508,8 +1508,8 @@ HAL_StatusTypeDef HAL_TIMEx_PWMN_Stop_DMA(TIM_HandleTypeDef *htim, uint32_t Chan
 /**
   * @brief  Starts the TIM One Pulse signal generation on the complementary
   *         output.
-  * @note OutputChannel must match the pulse output channel chosen when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note OutputChannel must match the pulse output channel chosen when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel pulse output channel to enable
   *          This parameter can be one of the following values:
@@ -1557,8 +1557,8 @@ HAL_StatusTypeDef HAL_TIMEx_OnePulseN_Start(TIM_HandleTypeDef *htim, uint32_t Ou
 /**
   * @brief  Stops the TIM One Pulse signal generation on the complementary
   *         output.
-  * @note OutputChannel must match the pulse output channel chosen when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note OutputChannel must match the pulse output channel chosen when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel pulse output channel to disable
   *          This parameter can be one of the following values:
@@ -1596,8 +1596,8 @@ HAL_StatusTypeDef HAL_TIMEx_OnePulseN_Stop(TIM_HandleTypeDef *htim, uint32_t Out
 /**
   * @brief  Starts the TIM One Pulse signal generation in interrupt mode on the
   *         complementary channel.
-  * @note OutputChannel must match the pulse output channel chosen when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note OutputChannel must match the pulse output channel chosen when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel pulse output channel to enable
   *          This parameter can be one of the following values:
@@ -1651,8 +1651,8 @@ HAL_StatusTypeDef HAL_TIMEx_OnePulseN_Start_IT(TIM_HandleTypeDef *htim, uint32_t
 /**
   * @brief  Stops the TIM One Pulse signal generation in interrupt mode on the
   *         complementary channel.
-  * @note OutputChannel must match the pulse output channel chosen when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note OutputChannel must match the pulse output channel chosen when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel pulse output channel to disable
   *          This parameter can be one of the following values:
@@ -1757,10 +1757,10 @@ HAL_StatusTypeDef HAL_TIMEx_ConfigCommutEvent(TIM_HandleTypeDef *htim, uint32_t 
   }
 
   /* Select the Capture Compare preload feature */
-  htim->Instance->CR2 |= TIM_CR2_CCPC;
+  htim->Instance->CR2_1 |= TIM_CR2_CCPC;
   /* Select the Commutation event source */
-  htim->Instance->CR2 &= ~TIM_CR2_CCUS;
-  htim->Instance->CR2 |= CommutationSource;
+  htim->Instance->CR2_1 &= ~TIM_CR2_CCUS;
+  htim->Instance->CR2_1 |= CommutationSource;
 
   /* Disable Commutation Interrupt */
   __HAL_TIM_DISABLE_IT(htim, TIM_IT_COM);
@@ -1813,10 +1813,10 @@ HAL_StatusTypeDef HAL_TIMEx_ConfigCommutEvent_IT(TIM_HandleTypeDef *htim, uint32
   }
 
   /* Select the Capture Compare preload feature */
-  htim->Instance->CR2 |= TIM_CR2_CCPC;
+  htim->Instance->CR2_1 |= TIM_CR2_CCPC;
   /* Select the Commutation event source */
-  htim->Instance->CR2 &= ~TIM_CR2_CCUS;
-  htim->Instance->CR2 |= CommutationSource;
+  htim->Instance->CR2_1 &= ~TIM_CR2_CCUS;
+  htim->Instance->CR2_1 |= CommutationSource;
 
   /* Disable Commutation DMA request */
   __HAL_TIM_DISABLE_DMA(htim, TIM_DMA_COM);
@@ -1870,10 +1870,10 @@ HAL_StatusTypeDef HAL_TIMEx_ConfigCommutEvent_DMA(TIM_HandleTypeDef *htim, uint3
   }
 
   /* Select the Capture Compare preload feature */
-  htim->Instance->CR2 |= TIM_CR2_CCPC;
+  htim->Instance->CR2_1 |= TIM_CR2_CCPC;
   /* Select the Commutation event source */
-  htim->Instance->CR2 &= ~TIM_CR2_CCUS;
-  htim->Instance->CR2 |= CommutationSource;
+  htim->Instance->CR2_1 &= ~TIM_CR2_CCUS;
+  htim->Instance->CR2_1 |= CommutationSource;
 
   /* Enable the Commutation DMA Request */
   /* Set the DMA Commutation Callback */
@@ -1918,8 +1918,8 @@ HAL_StatusTypeDef HAL_TIMEx_MasterConfigSynchronization(TIM_HandleTypeDef *htim,
   /* Change the handler state */
   htim->State = HAL_TIM_STATE_BUSY;
 
-  /* Get the TIMx CR2 register value */
-  tmpcr2 = htim->Instance->CR2;
+  /* Get the TIMx CR2_1 register value */
+  tmpcr2 = htim->Instance->CR2_1;
 
   /* Get the TIMx SMCR register value */
   tmpsmcr = htim->Instance->SMCR;
@@ -1929,8 +1929,8 @@ HAL_StatusTypeDef HAL_TIMEx_MasterConfigSynchronization(TIM_HandleTypeDef *htim,
   /* Select the TRGO source */
   tmpcr2 |=  sMasterConfig->MasterOutputTrigger;
 
-  /* Update TIMx CR2 */
-  htim->Instance->CR2 = tmpcr2;
+  /* Update TIMx CR2_1 */
+  htim->Instance->CR2_1 = tmpcr2;
 
   if (IS_TIM_SLAVE_INSTANCE(htim->Instance))
   {

@@ -31,14 +31,16 @@
 #
 ############################################################################
 
-# add_library(afbrs50_m4_fpu STATIC IMPORTED GLOBAL)
-# set_property(TARGET afbrs50_m4_fpu PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/AFBR-S50/libafbrs50_m4_fpu.a)
+add_library(afbrs50_m4_fpu STATIC IMPORTED GLOBAL)
+set_property(TARGET afbrs50_m4_fpu PROPERTY IMPORTED_LOCATION Lib/libafbrs50_m4_fpu.a)
 
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
 	MAIN afbrs50
-#	COMPILE_FLAGS
+	COMPILE_FLAGS
 #		-O0
+		-Wno-bad-function-cast # TODO: fix and enable
+		-Wno-cast-align # TODO: fix and enable
 	INCLUDES
 		./Include
 		Core/Inc
@@ -46,15 +48,16 @@ px4_add_module(
 		Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
 		Drivers/CMSIS/Device/ST/STM32F4xx/Include
 		Drivers/CMSIS/Include
+		Platform
 	SRCS
-		AFBRS50.cpp
-		afbrs50_main.cpp
+		API/irq.c
+		API/s2pi.c
+		API/timer.c
 		Core/Src/main.c
 		Core/Src/gpio.c
 		Core/Src/dma.c
 		Core/Src/spi.c
 		Core/Src/tim.c
-		Core/Src/usart.c
 		Core/Src/stm32f4xx_it.c
 		Core/Src/stm32f4xx_hal_msp.c
 		Core/Src/system_stm32f4xx.c
@@ -74,9 +77,10 @@ px4_add_module(
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c
+		AFBRS50.cpp
+		afbrs50_main.cpp
 	DEPENDS
-#		px4_work_queue
-#		afbrs50_m4_fpu
+		px4_work_queue
+		#afbrs50_m4_fpu
 		drivers_rangefinder
 	)

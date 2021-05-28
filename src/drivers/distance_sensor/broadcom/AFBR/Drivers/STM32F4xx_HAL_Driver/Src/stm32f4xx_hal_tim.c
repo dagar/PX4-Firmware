@@ -2582,10 +2582,10 @@ HAL_StatusTypeDef HAL_TIM_OnePulse_Init(TIM_HandleTypeDef *htim, uint32_t OnePul
   TIM_Base_SetConfig(htim->Instance, &htim->Init);
 
   /* Reset the OPM Bit */
-  htim->Instance->CR1 &= ~TIM_CR1_OPM;
+  htim->Instance->CR1_1 &= ~TIM_CR1_OPM;
 
   /* Configure the OPM Mode */
-  htim->Instance->CR1 |= OnePulseMode;
+  htim->Instance->CR1_1 |= OnePulseMode;
 
   /* Initialize the DMA burst operation state */
   htim->DMABurstState = HAL_DMA_BURST_STATE_READY;
@@ -2681,8 +2681,8 @@ __weak void HAL_TIM_OnePulse_MspDeInit(TIM_HandleTypeDef *htim)
   * @brief  Starts the TIM One Pulse signal generation.
   * @note Though OutputChannel parameter is deprecated and ignored by the function
   *        it has been kept to avoid HAL_TIM API compatibility break.
-  * @note The pulse output channel is determined when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note The pulse output channel is determined when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel See note above
   * @retval HAL status
@@ -2738,8 +2738,8 @@ HAL_StatusTypeDef HAL_TIM_OnePulse_Start(TIM_HandleTypeDef *htim, uint32_t Outpu
   * @brief  Stops the TIM One Pulse signal generation.
   * @note Though OutputChannel parameter is deprecated and ignored by the function
   *        it has been kept to avoid HAL_TIM API compatibility break.
-  * @note The pulse output channel is determined when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note The pulse output channel is determined when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel See note above
   * @retval HAL status
@@ -2781,8 +2781,8 @@ HAL_StatusTypeDef HAL_TIM_OnePulse_Stop(TIM_HandleTypeDef *htim, uint32_t Output
   * @brief  Starts the TIM One Pulse signal generation in interrupt mode.
   * @note Though OutputChannel parameter is deprecated and ignored by the function
   *        it has been kept to avoid HAL_TIM API compatibility break.
-  * @note The pulse output channel is determined when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note The pulse output channel is determined when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel See note above
   * @retval HAL status
@@ -2844,8 +2844,8 @@ HAL_StatusTypeDef HAL_TIM_OnePulse_Start_IT(TIM_HandleTypeDef *htim, uint32_t Ou
   * @brief  Stops the TIM One Pulse signal generation in interrupt mode.
   * @note Though OutputChannel parameter is deprecated and ignored by the function
   *        it has been kept to avoid HAL_TIM API compatibility break.
-  * @note The pulse output channel is determined when calling 
-  *       @ref HAL_TIM_OnePulse_ConfigChannel(). 
+  * @note The pulse output channel is determined when calling
+  *       @ref HAL_TIM_OnePulse_ConfigChannel().
   * @param  htim TIM One Pulse handle
   * @param  OutputChannel See note above
   * @retval HAL status
@@ -5301,8 +5301,8 @@ HAL_StatusTypeDef HAL_TIM_ConfigTI1Input(TIM_HandleTypeDef *htim, uint32_t TI1_S
   assert_param(IS_TIM_XOR_INSTANCE(htim->Instance));
   assert_param(IS_TIM_TI1SELECTION(TI1_Selection));
 
-  /* Get the TIMx CR2 register value */
-  tmpcr2 = htim->Instance->CR2;
+  /* Get the TIMx CR2_1 register value */
+  tmpcr2 = htim->Instance->CR2_1;
 
   /* Reset the TI1 selection */
   tmpcr2 &= ~TIM_CR2_TI1S;
@@ -5311,7 +5311,7 @@ HAL_StatusTypeDef HAL_TIM_ConfigTI1Input(TIM_HandleTypeDef *htim, uint32_t TI1_S
   tmpcr2 |= TI1_Selection;
 
   /* Write to TIMxCR2 */
-  htim->Instance->CR2 = tmpcr2;
+  htim->Instance->CR2_1 = tmpcr2;
 
   return HAL_OK;
 }
@@ -6585,7 +6585,7 @@ static void TIM_DMATriggerHalfCplt(DMA_HandleTypeDef *hdma)
 void TIM_Base_SetConfig(TIM_TypeDef *TIMx, TIM_Base_InitTypeDef *Structure)
 {
   uint32_t tmpcr1;
-  tmpcr1 = TIMx->CR1;
+  tmpcr1 = TIMx->CR1_1;
 
   /* Set TIM Time Base Unit parameters ---------------------------------------*/
   if (IS_TIM_COUNTER_MODE_SELECT_INSTANCE(TIMx))
@@ -6605,7 +6605,7 @@ void TIM_Base_SetConfig(TIM_TypeDef *TIMx, TIM_Base_InitTypeDef *Structure)
   /* Set the auto-reload preload */
   MODIFY_REG(tmpcr1, TIM_CR1_ARPE, Structure->AutoReloadPreload);
 
-  TIMx->CR1 = tmpcr1;
+  TIMx->CR1_1 = tmpcr1;
 
   /* Set the Autoreload value */
   TIMx->ARR = (uint32_t)Structure->Period ;
@@ -6641,8 +6641,8 @@ static void TIM_OC1_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
 
   /* Get the TIMx CCER register value */
   tmpccer = TIMx->CCER;
-  /* Get the TIMx CR2 register value */
-  tmpcr2 =  TIMx->CR2;
+  /* Get the TIMx CR2_1 register value */
+  tmpcr2 =  TIMx->CR2_1;
 
   /* Get the TIMx CCMR1 register value */
   tmpccmrx = TIMx->CCMR1;
@@ -6686,8 +6686,8 @@ static void TIM_OC1_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
     tmpcr2 |= OC_Config->OCNIdleState;
   }
 
-  /* Write to TIMx CR2 */
-  TIMx->CR2 = tmpcr2;
+  /* Write to TIMx CR2_1 */
+  TIMx->CR2_1 = tmpcr2;
 
   /* Write to TIMx CCMR1 */
   TIMx->CCMR1 = tmpccmrx;
@@ -6716,8 +6716,8 @@ void TIM_OC2_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
 
   /* Get the TIMx CCER register value */
   tmpccer = TIMx->CCER;
-  /* Get the TIMx CR2 register value */
-  tmpcr2 =  TIMx->CR2;
+  /* Get the TIMx CR2_1 register value */
+  tmpcr2 =  TIMx->CR2_1;
 
   /* Get the TIMx CCMR1 register value */
   tmpccmrx = TIMx->CCMR1;
@@ -6762,8 +6762,8 @@ void TIM_OC2_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
     tmpcr2 |= (OC_Config->OCNIdleState << 2U);
   }
 
-  /* Write to TIMx CR2 */
-  TIMx->CR2 = tmpcr2;
+  /* Write to TIMx CR2_1 */
+  TIMx->CR2_1 = tmpcr2;
 
   /* Write to TIMx CCMR1 */
   TIMx->CCMR1 = tmpccmrx;
@@ -6792,8 +6792,8 @@ static void TIM_OC3_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
 
   /* Get the TIMx CCER register value */
   tmpccer = TIMx->CCER;
-  /* Get the TIMx CR2 register value */
-  tmpcr2 =  TIMx->CR2;
+  /* Get the TIMx CR2_1 register value */
+  tmpcr2 =  TIMx->CR2_1;
 
   /* Get the TIMx CCMR2 register value */
   tmpccmrx = TIMx->CCMR2;
@@ -6836,8 +6836,8 @@ static void TIM_OC3_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
     tmpcr2 |= (OC_Config->OCNIdleState << 4U);
   }
 
-  /* Write to TIMx CR2 */
-  TIMx->CR2 = tmpcr2;
+  /* Write to TIMx CR2_1 */
+  TIMx->CR2_1 = tmpcr2;
 
   /* Write to TIMx CCMR2 */
   TIMx->CCMR2 = tmpccmrx;
@@ -6866,8 +6866,8 @@ static void TIM_OC4_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
 
   /* Get the TIMx CCER register value */
   tmpccer = TIMx->CCER;
-  /* Get the TIMx CR2 register value */
-  tmpcr2 =  TIMx->CR2;
+  /* Get the TIMx CR2_1 register value */
+  tmpcr2 =  TIMx->CR2_1;
 
   /* Get the TIMx CCMR2 register value */
   tmpccmrx = TIMx->CCMR2;
@@ -6896,8 +6896,8 @@ static void TIM_OC4_SetConfig(TIM_TypeDef *TIMx, TIM_OC_InitTypeDef *OC_Config)
     tmpcr2 |= (OC_Config->OCIdleState << 6U);
   }
 
-  /* Write to TIMx CR2 */
-  TIMx->CR2 = tmpcr2;
+  /* Write to TIMx CR2_1 */
+  TIMx->CR2_1 = tmpcr2;
 
   /* Write to TIMx CCMR2 */
   TIMx->CCMR2 = tmpccmrx;

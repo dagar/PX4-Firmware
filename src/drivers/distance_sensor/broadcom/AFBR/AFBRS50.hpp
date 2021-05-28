@@ -43,15 +43,6 @@
 
 #include "argus.h"
 
-
-//TODO: add these files from Broadcom Test
-// #include "board/clock_config.h"
-// #include "driver/cop.h"
-// #include "driver/gpio.h"
-// #include "driver/s2pi.h"
-// #include "driver/uart.h"
-// #include "driver/timer.h"
-
 #include "main.h"
 
 #include <drivers/drv_hrt.h>
@@ -112,11 +103,13 @@ private:
 	void Run() override;
 
 	static void hardware_init(void);
-	status_t measurement_ready_callback(status_t status, void * data);
+	static status_t measurement_ready_callback(status_t status, void * data);
 
 	PX4Rangefinder _px4_rangefinder;
 
 	hrt_abstime _measurement_time{0};
+
+	argus_hnd_t * _hnd;
 
 	perf_counter_t _comms_error{perf_alloc(PC_COUNT, MODULE_NAME": comms_error")};
 	perf_counter_t _sample_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": sample")};

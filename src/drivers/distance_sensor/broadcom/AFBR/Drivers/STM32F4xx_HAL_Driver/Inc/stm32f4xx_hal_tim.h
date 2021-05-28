@@ -1062,7 +1062,7 @@ typedef  void (*pTIM_CallbackTypeDef)(TIM_HandleTypeDef *htim);  /*!< pointer to
   * @param  __HANDLE__ TIM handle
   * @retval None
   */
-#define __HAL_TIM_ENABLE(__HANDLE__)                 ((__HANDLE__)->Instance->CR1|=(TIM_CR1_CEN))
+#define __HAL_TIM_ENABLE(__HANDLE__)                 ((__HANDLE__)->Instance->CR1_1|=(TIM_CR1_CEN))
 
 /**
   * @brief  Enable the TIM main Output.
@@ -1082,7 +1082,7 @@ typedef  void (*pTIM_CallbackTypeDef)(TIM_HandleTypeDef *htim);  /*!< pointer to
     { \
       if(((__HANDLE__)->Instance->CCER & TIM_CCER_CCxNE_MASK) == 0UL) \
       { \
-        (__HANDLE__)->Instance->CR1 &= ~(TIM_CR1_CEN); \
+        (__HANDLE__)->Instance->CR1_1 &= ~(TIM_CR1_CEN); \
       } \
     } \
   } while(0)
@@ -1255,7 +1255,7 @@ typedef  void (*pTIM_CallbackTypeDef)(TIM_HandleTypeDef *htim);  /*!< pointer to
   * @note This macro is particularly useful to get the counting mode when the timer operates in Center-aligned mode or Encoder
 mode.
   */
-#define __HAL_TIM_IS_TIM_COUNTING_DOWN(__HANDLE__)    (((__HANDLE__)->Instance->CR1 &(TIM_CR1_DIR)) == (TIM_CR1_DIR))
+#define __HAL_TIM_IS_TIM_COUNTING_DOWN(__HANDLE__)    (((__HANDLE__)->Instance->CR1_1 &(TIM_CR1_DIR)) == (TIM_CR1_DIR))
 
 /**
   * @brief  Set the TIM Prescaler on runtime.
@@ -1311,8 +1311,8 @@ mode.
   */
 #define __HAL_TIM_SET_CLOCKDIVISION(__HANDLE__, __CKD__) \
   do{                                                   \
-    (__HANDLE__)->Instance->CR1 &= (~TIM_CR1_CKD);  \
-    (__HANDLE__)->Instance->CR1 |= (__CKD__);       \
+    (__HANDLE__)->Instance->CR1_1 &= (~TIM_CR1_CKD);  \
+    (__HANDLE__)->Instance->CR1_1 |= (__CKD__);       \
     (__HANDLE__)->Init.ClockDivision = (__CKD__);   \
   } while(0)
 
@@ -1324,7 +1324,7 @@ mode.
   *            @arg TIM_CLOCKDIVISION_DIV2: tDTS=2*tCK_INT
   *            @arg TIM_CLOCKDIVISION_DIV4: tDTS=4*tCK_INT
   */
-#define __HAL_TIM_GET_CLOCKDIVISION(__HANDLE__)  ((__HANDLE__)->Instance->CR1 & TIM_CR1_CKD)
+#define __HAL_TIM_GET_CLOCKDIVISION(__HANDLE__)  ((__HANDLE__)->Instance->CR1_1 & TIM_CR1_CKD)
 
 /**
   * @brief  Set the TIM Input Capture prescaler on runtime without calling another time HAL_TIM_IC_ConfigChannel() function.
@@ -1489,7 +1489,7 @@ mode.
   *        enabled)
   * @retval None
   */
-#define __HAL_TIM_URS_ENABLE(__HANDLE__)  ((__HANDLE__)->Instance->CR1|= TIM_CR1_URS)
+#define __HAL_TIM_URS_ENABLE(__HANDLE__)  ((__HANDLE__)->Instance->CR1_1|= TIM_CR1_URS)
 
 /**
   * @brief  Reset the Update Request Source (URS) bit of the TIMx_CR1 register.
@@ -1502,7 +1502,7 @@ mode.
   *           _ Update generation through the slave mode controller
   * @retval None
   */
-#define __HAL_TIM_URS_DISABLE(__HANDLE__)  ((__HANDLE__)->Instance->CR1&=~TIM_CR1_URS)
+#define __HAL_TIM_URS_DISABLE(__HANDLE__)  ((__HANDLE__)->Instance->CR1_1&=~TIM_CR1_URS)
 
 /**
   * @brief  Set the TIM Capture x input polarity on runtime.

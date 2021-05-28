@@ -359,7 +359,7 @@ typedef  void (*pSPI_CallbackTypeDef)(SPI_HandleTypeDef *hspi); /*!< pointer to 
   *            @arg SPI_IT_ERR: Error interrupt enable
   * @retval None
   */
-#define __HAL_SPI_ENABLE_IT(__HANDLE__, __INTERRUPT__)   SET_BIT((__HANDLE__)->Instance->CR2, (__INTERRUPT__))
+#define __HAL_SPI_ENABLE_IT(__HANDLE__, __INTERRUPT__)   SET_BIT((__HANDLE__)->Instance->CR2_1, (__INTERRUPT__))
 
 /** @brief  Disable the specified SPI interrupts.
   * @param  __HANDLE__ specifies the SPI handle.
@@ -371,7 +371,7 @@ typedef  void (*pSPI_CallbackTypeDef)(SPI_HandleTypeDef *hspi); /*!< pointer to 
   *            @arg SPI_IT_ERR: Error interrupt enable
   * @retval None
   */
-#define __HAL_SPI_DISABLE_IT(__HANDLE__, __INTERRUPT__)  CLEAR_BIT((__HANDLE__)->Instance->CR2, (__INTERRUPT__))
+#define __HAL_SPI_DISABLE_IT(__HANDLE__, __INTERRUPT__)  CLEAR_BIT((__HANDLE__)->Instance->CR2_1, (__INTERRUPT__))
 
 /** @brief  Check whether the specified SPI interrupt source is enabled or not.
   * @param  __HANDLE__ specifies the SPI Handle.
@@ -383,7 +383,7 @@ typedef  void (*pSPI_CallbackTypeDef)(SPI_HandleTypeDef *hspi); /*!< pointer to 
   *            @arg SPI_IT_ERR: Error interrupt enable
   * @retval The new state of __IT__ (TRUE or FALSE).
   */
-#define __HAL_SPI_GET_IT_SOURCE(__HANDLE__, __INTERRUPT__) ((((__HANDLE__)->Instance->CR2\
+#define __HAL_SPI_GET_IT_SOURCE(__HANDLE__, __INTERRUPT__) ((((__HANDLE__)->Instance->CR2_1\
                                                               & (__INTERRUPT__)) == (__INTERRUPT__)) ? SET : RESET)
 
 /** @brief  Check whether the specified SPI flag is set or not.
@@ -418,7 +418,7 @@ typedef  void (*pSPI_CallbackTypeDef)(SPI_HandleTypeDef *hspi); /*!< pointer to 
   do{                                                    \
     __IO uint32_t tmpreg_modf = 0x00U;                   \
     tmpreg_modf = (__HANDLE__)->Instance->SR;            \
-    CLEAR_BIT((__HANDLE__)->Instance->CR1, SPI_CR1_SPE); \
+    CLEAR_BIT((__HANDLE__)->Instance->CR1_1, SPI_CR1_SPE); \
     UNUSED(tmpreg_modf);                                 \
   } while(0U)
 
@@ -452,14 +452,14 @@ typedef  void (*pSPI_CallbackTypeDef)(SPI_HandleTypeDef *hspi); /*!< pointer to 
   *         This parameter can be SPI where x: 1, 2, or 3 to select the SPI peripheral.
   * @retval None
   */
-#define __HAL_SPI_ENABLE(__HANDLE__)  SET_BIT((__HANDLE__)->Instance->CR1, SPI_CR1_SPE)
+#define __HAL_SPI_ENABLE(__HANDLE__)  SET_BIT((__HANDLE__)->Instance->CR1_1, SPI_CR1_SPE)
 
 /** @brief  Disable the SPI peripheral.
   * @param  __HANDLE__ specifies the SPI Handle.
   *         This parameter can be SPI where x: 1, 2, or 3 to select the SPI peripheral.
   * @retval None
   */
-#define __HAL_SPI_DISABLE(__HANDLE__) CLEAR_BIT((__HANDLE__)->Instance->CR1, SPI_CR1_SPE)
+#define __HAL_SPI_DISABLE(__HANDLE__) CLEAR_BIT((__HANDLE__)->Instance->CR1_1, SPI_CR1_SPE)
 
 /**
   * @}
@@ -475,22 +475,22 @@ typedef  void (*pSPI_CallbackTypeDef)(SPI_HandleTypeDef *hspi); /*!< pointer to 
   *         This parameter can be SPI where x: 1, 2, or 3 to select the SPI peripheral.
   * @retval None
   */
-#define SPI_1LINE_TX(__HANDLE__)  SET_BIT((__HANDLE__)->Instance->CR1, SPI_CR1_BIDIOE)
+#define SPI_1LINE_TX(__HANDLE__)  SET_BIT((__HANDLE__)->Instance->CR1_1, SPI_CR1_BIDIOE)
 
 /** @brief  Set the SPI receive-only mode.
   * @param  __HANDLE__ specifies the SPI Handle.
   *         This parameter can be SPI where x: 1, 2, or 3 to select the SPI peripheral.
   * @retval None
   */
-#define SPI_1LINE_RX(__HANDLE__)  CLEAR_BIT((__HANDLE__)->Instance->CR1, SPI_CR1_BIDIOE)
+#define SPI_1LINE_RX(__HANDLE__)  CLEAR_BIT((__HANDLE__)->Instance->CR1_1, SPI_CR1_BIDIOE)
 
 /** @brief  Reset the CRC calculation of the SPI.
   * @param  __HANDLE__ specifies the SPI Handle.
   *         This parameter can be SPI where x: 1, 2, or 3 to select the SPI peripheral.
   * @retval None
   */
-#define SPI_RESET_CRC(__HANDLE__) do{CLEAR_BIT((__HANDLE__)->Instance->CR1, SPI_CR1_CRCEN);\
-                                       SET_BIT((__HANDLE__)->Instance->CR1, SPI_CR1_CRCEN);}while(0U)
+#define SPI_RESET_CRC(__HANDLE__) do{CLEAR_BIT((__HANDLE__)->Instance->CR1_1, SPI_CR1_CRCEN);\
+                                       SET_BIT((__HANDLE__)->Instance->CR1_1, SPI_CR1_CRCEN);}while(0U)
 
 /** @brief  Check whether the specified SPI flag is set or not.
   * @param  __SR__  copy of SPI SR register.
@@ -509,7 +509,7 @@ typedef  void (*pSPI_CallbackTypeDef)(SPI_HandleTypeDef *hspi); /*!< pointer to 
                                           ((__FLAG__) & SPI_FLAG_MASK)) ? SET : RESET)
 
 /** @brief  Check whether the specified SPI Interrupt is set or not.
-  * @param  __CR2__  copy of SPI CR2 register.
+  * @param  __CR2__  copy of SPI CR2_1 register.
   * @param  __INTERRUPT__ specifies the SPI interrupt source to check.
   *         This parameter can be one of the following values:
   *            @arg SPI_IT_TXE: Tx buffer empty interrupt enable

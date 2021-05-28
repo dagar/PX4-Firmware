@@ -101,7 +101,7 @@ status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 	for (; prescaler < 8; ++prescaler)
 	if (SystemCoreClock >> (prescaler + 1) <= baudRate_Bps)
 	break;
-	MODIFY_REG(hspi2.Instance->CR1, SPI_CR1_BR, prescaler << SPI_CR1_BR_Pos);
+	MODIFY_REG(hspi2.Instance->CR1_1, SPI_CR1_BR, prescaler << SPI_CR1_BR_Pos);
 	return STATUS_OK;
 }
 
@@ -111,7 +111,7 @@ status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 *****************************************************************************/
 uint32_t S2PI_GetBaudRate(void)
 {
-	uint32_t prescaler = (hspi2.Instance->CR1 & SPI_CR1_BR) >> SPI_CR1_BR_Pos;
+	uint32_t prescaler = (hspi2.Instance->CR1_1 & SPI_CR1_BR) >> SPI_CR1_BR_Pos;
 	return SystemCoreClock >> (prescaler + 1);
 }
 

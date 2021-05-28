@@ -28,7 +28,7 @@ SPI_HandleTypeDef hspi2;
 DMA_HandleTypeDef hdma_spi2_rx;
 DMA_HandleTypeDef hdma_spi2_tx;
 
-/* SPI2 init function */
+/* SPI2_1 init function */
 void MX_SPI2_Init(void)
 {
 
@@ -39,7 +39,7 @@ void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 1 */
 
   /* USER CODE END SPI2_Init 1 */
-  hspi2.Instance = SPI2;
+  hspi2.Instance = SPI2_1;
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
   hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
@@ -65,16 +65,16 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
 {
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-  if(spiHandle->Instance==SPI2)
+  if(spiHandle->Instance==SPI2_1)
   {
   /* USER CODE BEGIN SPI2_MspInit 0 */
 
   /* USER CODE END SPI2_MspInit 0 */
-    /* SPI2 clock enable */
+    /* SPI2_1 clock enable */
     __HAL_RCC_SPI2_CLK_ENABLE();
 
     __HAL_RCC_GPIOB_CLK_ENABLE();
-    /**SPI2 GPIO Configuration
+    /**SPI2_1 GPIO Configuration
     PB10     ------> SPI2_SCK
     PB14     ------> SPI2_MISO
     PB15     ------> SPI2_MOSI
@@ -86,7 +86,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* SPI2 DMA Init */
+    /* SPI2_1 DMA Init */
     /* SPI2_RX Init */
     hdma_spi2_rx.Instance = DMA1_Stream3;
     hdma_spi2_rx.Init.Channel = DMA_CHANNEL_0;
@@ -132,7 +132,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
 void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
 {
 
-  if(spiHandle->Instance==SPI2)
+  if(spiHandle->Instance==SPI2_1)
   {
   /* USER CODE BEGIN SPI2_MspDeInit 0 */
 
@@ -140,14 +140,14 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
     /* Peripheral clock disable */
     __HAL_RCC_SPI2_CLK_DISABLE();
 
-    /**SPI2 GPIO Configuration
+    /**SPI2_1 GPIO Configuration
     PB10     ------> SPI2_SCK
     PB14     ------> SPI2_MISO
     PB15     ------> SPI2_MOSI
     */
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10|GPIO_PIN_14|GPIO_PIN_15);
 
-    /* SPI2 DMA DeInit */
+    /* SPI2_1 DMA DeInit */
     HAL_DMA_DeInit(spiHandle->hdmarx);
     HAL_DMA_DeInit(spiHandle->hdmatx);
   /* USER CODE BEGIN SPI2_MspDeInit 1 */
