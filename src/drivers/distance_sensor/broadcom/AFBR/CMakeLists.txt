@@ -37,6 +37,7 @@ set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
 	MAIN afbrs50
+	STACK_MAIN 8000
 	COMPILE_FLAGS
 #		-O0
 		-Wno-cast-align # TODO: fix and enable
