@@ -39,7 +39,6 @@ px4_add_module(
 	MAIN afbrs50
 	COMPILE_FLAGS
 #		-O0
-		#-Wno-bad-function-cast # TODO: fix and enable
 		-Wno-cast-align # TODO: fix and enable
 	INCLUDES
 		Include

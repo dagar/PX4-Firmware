@@ -11,6 +11,10 @@
 #ifndef IRQ_H
 #define IRQ_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*!***************************************************************************
  * @defgroup	IRQ IRQ: Global Interrupt Control
  * @ingroup		driver
@@ -22,6 +26,10 @@
  *****************************************************************************/
 
 #include "platform/argus_irq.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 /*! @} */
 #endif /* IRQ_H */

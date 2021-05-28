@@ -11,6 +11,10 @@
 #ifndef S2PI_H
 #define S2PI_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*!***************************************************************************
  * @defgroup	SPI SPI: Serial Peripheral Interface
  * @ingroup		driver
@@ -122,6 +126,10 @@ status_t S2PI_PinsLow(void);
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
 status_t S2PI_PinsOff(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 /*! @} */
 #endif // S2PI_H

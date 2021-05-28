@@ -2,7 +2,7 @@
  * @file
  * @brief    	This file is part of the AFBR-S50 API.
  * @details		This file provides driver functionality for PIT (periodic interrupt timer).
- * 
+ *
  * @copyright	Copyright c 2016-2019, Avago Technologies GmbH.
  * 				All rights reserved.
  *
@@ -10,6 +10,10 @@
 
 #ifndef TIMER_H
 #define TIMER_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*!***************************************************************************
  * @defgroup	timer Timer Module
@@ -40,6 +44,9 @@
  *****************************************************************************/
 void Timer_Init(void);
 
+#ifdef __cplusplus
+}
+#endif
 
 /*! @} */
 #endif /* TIMER_H */
