@@ -157,22 +157,28 @@ AFBRS50::init()
 {
 	// From example.c
 	_hnd = Argus_CreateHandle();
+
 	if (_hnd == 0)
 	{
 		PX4_INFO("ERROR: Handle not initialized\r\n");
 	}
+
 	hardware_init();
+
 	status_t status = Argus_Init(_hnd, SPI_SLAVE);
+
 	if (status != STATUS_OK)
 	{
 		PX4_INFO("ERROR: Init status not okay: %i\r\n", status);
 	}
+
 	uint32_t value = Argus_GetAPIVersion();
 	uint8_t a = (value >> 24) & 0xFFU;
 	uint8_t b = (value >> 16) & 0xFFU;
 	uint8_t c = value & 0xFFFFU;
 	uint32_t id = Argus_GetChipID(_hnd);
 	argus_module_version_t mv = Argus_GetModuleVersion(_hnd);
+
 	PX4_INFO("\n##### AFBR-S50 API - Simple Example ##############\n"
 		  "  API Version: v%d.%d.%d\n"
 		  "  Chip ID:     %d\n"
@@ -187,8 +193,8 @@ AFBRS50::init()
 		  mv == AFBR_S50MV85I_V1 ? "AFBR-S50MV85I (v1)" :
 		  mv == AFBR_S50SV85K_V1 ? "AFBR-S50SV85K (v1)" :
 		  "unknown");
-	Argus_SetConfigurationFrameTime( _hnd, 100000 ); // 0.1 second = 10 Hz
 
+	Argus_SetConfigurationFrameTime( _hnd, 100000 ); // 0.1 second = 10 Hz
 
 	hrt_abstime time_now = hrt_absolute_time();
 
