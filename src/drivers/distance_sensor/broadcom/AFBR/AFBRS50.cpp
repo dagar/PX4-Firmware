@@ -161,6 +161,7 @@ AFBRS50::init()
 	if (_hnd == 0)
 	{
 		PX4_INFO("ERROR: Handle not initialized\r\n");
+		return PX4_ERROR;
 	}
 
 	hardware_init();
@@ -170,6 +171,7 @@ AFBRS50::init()
 	if (status != STATUS_OK)
 	{
 		PX4_INFO("ERROR: Init status not okay: %i\r\n", status);
+		return PX4_ERROR;
 	}
 
 	uint32_t value = Argus_GetAPIVersion();
@@ -196,34 +198,6 @@ AFBRS50::init()
 
 	Argus_SetConfigurationFrameTime( _hnd, 100000 ); // 0.1 second = 10 Hz
 
-	hrt_abstime time_now = hrt_absolute_time();
-
-	const hrt_abstime timeout_usec = time_now + 500000_us; // 0.5sec
-
-	while (time_now < timeout_usec) {
-		if (measure() == PX4_OK) {
-			px4_usleep(AFBRS50_MEASURE_INTERVAL);
-
-			if (collect() == PX4_OK) {
-				// The file descriptor can only be accessed by the process that opened it,
-				// so closing here allows the port to be opened from scheduled work queue.
-				stop();
-				return PX4_OK;
-			}
-		}
-
-		px4_usleep(1000);
-		time_now = hrt_absolute_time();
-	}
-
-	PX4_ERR("No readings from AFBRS50");
-	return PX4_ERROR;
-}
-
-int
-AFBRS50::measure()
-{
-	_measurement_time = hrt_absolute_time();
 	return PX4_OK;
 }
 

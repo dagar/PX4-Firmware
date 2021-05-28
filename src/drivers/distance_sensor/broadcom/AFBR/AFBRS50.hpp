@@ -91,14 +91,9 @@ public:
 private:
 
 	/**
-	 * Reads the data measrurement from serial UART.
+	 * Reads the data measurement.
 	 */
 	int collect();
-
-	/**
-	 * Sends a data request message to the sensor.
-	 */
-	int measure();
 
 	void Run() override;
 
