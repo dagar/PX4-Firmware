@@ -1,5 +1,5 @@
 #include "tim.h"
-#include "driver/timer.h"
+#include "timer.h"
 
 /*!***************************************************************************
 * @brief Initializes the timer hardware.

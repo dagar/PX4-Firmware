@@ -39,8 +39,8 @@
 #include <lib/drivers/device/Device.hpp>
 
 #include "driver/gpio.h"
-#include "driver/s2pi.h"
-#include "driver/timer.h"
+#include "s2pi.h"
+#include "timer.h"
 
 static void * _myData;
 
@@ -164,7 +164,11 @@ AFBRS50::init()
 		return PX4_ERROR;
 	}
 
-	hardware_init();
+	/* Initialize timer required by the API. */
+	Timer_Init();
+
+	/* Initialize the S2PI hardware required by the API. */
+	S2PI_Init(SPI_SLAVE, SPI_BAUD_RATE);
 
 	status_t status = Argus_Init(_hnd, SPI_SLAVE);
 
@@ -226,15 +230,6 @@ AFBRS50::stop()
 {
 	// Clear the work queue schedule.
 	ScheduleClear();
-}
-
-void AFBRS50::hardware_init(void)
-{
-	/* Initialize timer required by the API. */
-	Timer_Init();
-
-	/* Initialize the S2PI hardware required by the API. */
-	S2PI_Init(SPI_SLAVE, SPI_BAUD_RATE);
 }
 
 status_t AFBRS50::measurement_ready_callback(status_t status, void * data)

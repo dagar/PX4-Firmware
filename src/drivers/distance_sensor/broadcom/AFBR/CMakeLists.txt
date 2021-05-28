@@ -31,8 +31,8 @@
 #
 ############################################################################
 
-add_library(afbrs50_m4_fpu_os STATIC IMPORTED GLOBAL)
-set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu_os.a)
+#add_library(afbrs50_m4_fpu_os STATIC IMPORTED GLOBAL)
+#set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu_os.a)
 
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
@@ -42,7 +42,8 @@ px4_add_module(
 		-Wno-bad-function-cast # TODO: fix and enable
 		-Wno-cast-align # TODO: fix and enable
 	INCLUDES
-		./Include
+		Include
+		API/Inc
 		Core/Inc
 		Drivers/STM32F4xx_HAL_Driver/Inc
 		Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
@@ -50,9 +51,9 @@ px4_add_module(
 		Drivers/CMSIS/Include
 		Platform
 	SRCS
-		API/irq.c
-		API/s2pi.c
-		API/timer.c
+		API/Src/irq.c
+		API/Src/s2pi.c
+		API/Src/timer.c
 		Core/Src/main.c
 		Core/Src/gpio.c
 		Core/Src/dma.c
@@ -82,6 +83,6 @@ px4_add_module(
 		afbrs50_main.cpp
 	DEPENDS
 		px4_work_queue
-		afbrs50_m4_fpu_os
+		#afbrs50_m4_fpu_os
 		drivers_rangefinder
 	)

@@ -97,7 +97,6 @@ private:
 
 	void Run() override;
 
-	static void hardware_init(void);
 	static status_t measurement_ready_callback(status_t status, void * data);
 
 	PX4Rangefinder _px4_rangefinder;

@@ -2,7 +2,7 @@
  * @file
  * @brief    	This file is part of the AFBR-S50 API.
  * @details		This file provides functionality to globally turn IRQs on/off.
- * 
+ *
  * @copyright	Copyright c 2016-2019, Avago Technologies GmbH.
  * 				All rights reserved.
  *
