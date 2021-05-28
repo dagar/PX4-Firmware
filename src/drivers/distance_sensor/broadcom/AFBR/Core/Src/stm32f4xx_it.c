@@ -216,7 +216,7 @@ void EXTI4_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles DMA1 stream3 global interrupt.
+  * @brief This function handles DMA1_1 stream3 global interrupt.
   */
 void DMA1_Stream3_IRQHandler(void)
 {
@@ -230,7 +230,7 @@ void DMA1_Stream3_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles DMA1 stream4 global interrupt.
+  * @brief This function handles DMA1_1 stream4 global interrupt.
   */
 void DMA1_Stream4_IRQHandler(void)
 {

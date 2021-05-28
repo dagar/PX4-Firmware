@@ -2,7 +2,7 @@
  * @file
  * @brief    	This file is part of the AFBR-S50 API.
  * @details		This file provides DMA hardware support.
- * 
+ *
  * @copyright	Copyright c 2016-2019, Avago Technologies GmbH.
  * 				All rights reserved.
  *
@@ -36,8 +36,8 @@ static const IRQn_Type irqNumbers[4] = {DMA0_IRQn, DMA1_IRQn, DMA2_IRQn, DMA3_IR
  * Prototypes
  ******************************************************************************/
 void DMA0_IRQHandler(void);					/*!< ISR for DMA0 IRQ. */
-void DMA1_IRQHandler(void);					/*!< ISR for DMA1 IRQ. */
-void DMA2_IRQHandler(void);					/*!< ISR for DMA2 IRQ. */
+void DMA1_IRQHandler(void);					/*!< ISR for DMA1_1 IRQ. */
+void DMA2_IRQHandler(void);					/*!< ISR for DMA2_1 IRQ. */
 void DMA3_IRQHandler(void);					/*!< ISR for DMA3 IRQ. */
 static inline void DMA_IRQhandler(uint32_t channel);
 

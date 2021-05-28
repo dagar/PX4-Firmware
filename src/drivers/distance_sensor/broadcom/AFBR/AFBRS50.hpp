@@ -39,11 +39,7 @@
  */
 #pragma once
 
-#include <termios.h>
-
 #include "argus.h"
-
-#include "main.h"
 
 #include <drivers/drv_hrt.h>
 #include <lib/drivers/rangefinder/PX4Rangefinder.hpp>

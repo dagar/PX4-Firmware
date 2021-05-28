@@ -42,6 +42,8 @@
 #include "s2pi.h"
 #include "timer.h"
 
+#include "main.h"
+
 static void * _myData;
 
 /*******************************************************************************

@@ -32,14 +32,14 @@
 ############################################################################
 
 add_library(afbrs50_m4_fpu_os STATIC IMPORTED GLOBAL)
-set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib)
+set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu_os.a)
 
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
 	MAIN afbrs50
 	COMPILE_FLAGS
 #		-O0
-		-Wno-bad-function-cast # TODO: fix and enable
+		#-Wno-bad-function-cast # TODO: fix and enable
 		-Wno-cast-align # TODO: fix and enable
 	INCLUDES
 		Include
@@ -63,16 +63,16 @@ px4_add_module(
 		Core/Src/stm32f4xx_hal_msp.c
 		Core/Src/system_stm32f4xx.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.c
+		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c
+		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ex.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ramfunc.c
+		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ramfunc.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma_ex.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr_ex.c
+		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr.c
+		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr_ex.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
