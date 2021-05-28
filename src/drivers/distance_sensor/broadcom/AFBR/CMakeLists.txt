@@ -32,7 +32,7 @@
 ############################################################################
 
 add_library(afbrs50_m4_fpu_os STATIC IMPORTED GLOBAL)
-set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu_os.a)
+set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib)
 
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
