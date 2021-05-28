@@ -118,8 +118,8 @@ typedef struct
   * @{
   */
 #define RCC_HSE_OFF                      0x00000000U
-#define RCC_HSE_ON                       RCC_CR_HSEON
-#define RCC_HSE_BYPASS                   ((uint32_t)(RCC_CR_HSEBYP | RCC_CR_HSEON))
+#define RCC_HSE_ON                       RCC_CR_HSEON_111
+#define RCC_HSE_BYPASS                   ((uint32_t)(RCC_CR_HSEBYP_111 | RCC_CR_HSEON_111))
 /**
   * @}
   */
@@ -200,9 +200,9 @@ typedef struct
   *           STM32F446xx devices.
   * @{
   */
-#define RCC_SYSCLKSOURCE_HSI             RCC_CFGR_SW_HSI
-#define RCC_SYSCLKSOURCE_HSE             RCC_CFGR_SW_HSE
-#define RCC_SYSCLKSOURCE_PLLCLK          RCC_CFGR_SW_PLL
+#define RCC_SYSCLKSOURCE_HSI             RCC_CFGR_SW_HSI_1111
+#define RCC_SYSCLKSOURCE_HSE             RCC_CFGR_SW_HSE_1111
+#define RCC_SYSCLKSOURCE_PLLCLK          RCC_CFGR_SW_PLL_1111
 #define RCC_SYSCLKSOURCE_PLLRCLK         ((uint32_t)(RCC_CFGR_SW_0 | RCC_CFGR_SW_1))
 /**
   * @}
@@ -213,9 +213,9 @@ typedef struct
   *           STM32F446xx devices.
   * @{
   */
-#define RCC_SYSCLKSOURCE_STATUS_HSI     RCC_CFGR_SWS_HSI   /*!< HSI used as system clock */
-#define RCC_SYSCLKSOURCE_STATUS_HSE     RCC_CFGR_SWS_HSE   /*!< HSE used as system clock */
-#define RCC_SYSCLKSOURCE_STATUS_PLLCLK  RCC_CFGR_SWS_PLL   /*!< PLL used as system clock */
+#define RCC_SYSCLKSOURCE_STATUS_HSI     RCC_CFGR_SWS_HSI_1111   /*!< HSI used as system clock */
+#define RCC_SYSCLKSOURCE_STATUS_HSE     RCC_CFGR_SWS_HSE_1111   /*!< HSE used as system clock */
+#define RCC_SYSCLKSOURCE_STATUS_PLLCLK  RCC_CFGR_SWS_PLL_1111   /*!< PLL used as system clock */
 #define RCC_SYSCLKSOURCE_STATUS_PLLRCLK ((uint32_t)(RCC_CFGR_SWS_0 | RCC_CFGR_SWS_1))   /*!< PLLR used as system clock */
 /**
   * @}
@@ -896,17 +896,17 @@ typedef struct
                     do {                                        \
                       if ((__STATE__) == RCC_HSE_ON)            \
                       {                                         \
-                        SET_BIT(RCC->CR, RCC_CR_HSEON);         \
+                        SET_BIT(RCC->CR, RCC_CR_HSEON_111);         \
                       }                                         \
                       else if ((__STATE__) == RCC_HSE_BYPASS)   \
                       {                                         \
-                        SET_BIT(RCC->CR, RCC_CR_HSEBYP);        \
-                        SET_BIT(RCC->CR, RCC_CR_HSEON);         \
+                        SET_BIT(RCC->CR, RCC_CR_HSEBYP_111);        \
+                        SET_BIT(RCC->CR, RCC_CR_HSEON_111);         \
                       }                                         \
                       else                                      \
                       {                                         \
-                        CLEAR_BIT(RCC->CR, RCC_CR_HSEON);       \
-                        CLEAR_BIT(RCC->CR, RCC_CR_HSEBYP);      \
+                        CLEAR_BIT(RCC->CR, RCC_CR_HSEON_111);       \
+                        CLEAR_BIT(RCC->CR, RCC_CR_HSEBYP_111);      \
                       }                                         \
                     } while(0U)
 /**
@@ -988,7 +988,7 @@ typedef struct
   *         RTC clock source).
   */
 #define __HAL_RCC_RTC_CLKPRESCALER(__RTCCLKSource__) (((__RTCCLKSource__) & RCC_BDCR_RTCSEL) == RCC_BDCR_RTCSEL) ?    \
-                                                 MODIFY_REG(RCC->CFGR, RCC_CFGR_RTCPRE, ((__RTCCLKSource__) & 0xFFFFCFFU)) : CLEAR_BIT(RCC->CFGR, RCC_CFGR_RTCPRE)
+                                                 MODIFY_REG(RCC->CFGR, RCC_CFGR_RTCPRE_1111, ((__RTCCLKSource__) & 0xFFFFCFFU)) : CLEAR_BIT(RCC->CFGR, RCC_CFGR_RTCPRE_1111)
 
 #define __HAL_RCC_RTC_CONFIG(__RTCCLKSource__) do { __HAL_RCC_RTC_CLKPRESCALER(__RTCCLKSource__);    \
                                                     RCC->BDCR |= ((__RTCCLKSource__) & 0x00000FFFU);  \
@@ -1008,7 +1008,7 @@ typedef struct
   * @retval Returned value can be one of the following values:
  *            @arg @ref RCC_RTCCLKSOURCE_HSE_DIVX HSE divided by X selected as RTC clock (X can be retrieved thanks to @ref __HAL_RCC_GET_RTC_HSE_PRESCALER()
   */
-#define  __HAL_RCC_GET_RTC_HSE_PRESCALER() (READ_BIT(RCC->CFGR, RCC_CFGR_RTCPRE) | RCC_BDCR_RTCSEL)
+#define  __HAL_RCC_GET_RTC_HSE_PRESCALER() (READ_BIT(RCC->CFGR, RCC_CFGR_RTCPRE_1111) | RCC_BDCR_RTCSEL)
 
 /** @brief  Macros to force or release the Backup domain reset.
   * @note   This function resets the RTC peripheral (including the backup registers)

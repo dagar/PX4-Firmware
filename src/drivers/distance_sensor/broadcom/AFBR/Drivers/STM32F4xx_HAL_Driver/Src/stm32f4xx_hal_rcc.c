@@ -236,8 +236,8 @@ __weak HAL_StatusTypeDef HAL_RCC_OscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruc
     /* Check the parameters */
     assert_param(IS_RCC_HSE(RCC_OscInitStruct->HSEState));
     /* When the HSE is used as system clock or clock source for PLL in these cases HSE will not disabled */
-    if((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_HSE) ||\
-      ((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_PLL) && ((RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSE)))
+    if((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_HSE_1111) ||\
+      ((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_PLL_1111) && ((RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSE)))
     {
       if((__HAL_RCC_GET_FLAG(RCC_FLAG_HSERDY) != RESET) && (RCC_OscInitStruct->HSEState == RCC_HSE_OFF))
       {
@@ -288,8 +288,8 @@ __weak HAL_StatusTypeDef HAL_RCC_OscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruc
     assert_param(IS_RCC_CALIBRATION_VALUE(RCC_OscInitStruct->HSICalibrationValue));
 
     /* Check if HSI is used as system clock or as PLL source when PLL is selected as system clock */
-    if((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_HSI) ||\
-      ((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_PLL) && ((RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSI)))
+    if((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_HSI_1111) ||\
+      ((__HAL_RCC_GET_SYSCLK_SOURCE() == RCC_CFGR_SWS_PLL_1111) && ((RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSI)))
     {
       /* When HSI is used as system clock it will not disabled */
       if((__HAL_RCC_GET_FLAG(RCC_FLAG_HSIRDY) != RESET) && (RCC_OscInitStruct->HSIState != RCC_HSI_ON))
@@ -464,7 +464,7 @@ __weak HAL_StatusTypeDef HAL_RCC_OscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruc
   if ((RCC_OscInitStruct->PLL.PLLState) != RCC_PLL_NONE)
   {
     /* Check if the PLL is used as system clock or not */
-    if(__HAL_RCC_GET_SYSCLK_SOURCE() != RCC_CFGR_SWS_PLL)
+    if(__HAL_RCC_GET_SYSCLK_SOURCE() != RCC_CFGR_SWS_PLL_1111)
     {
       if((RCC_OscInitStruct->PLL.PLLState) == RCC_PLL_ON)
       {
@@ -892,17 +892,17 @@ __weak uint32_t HAL_RCC_GetSysClockFreq(void)
   /* Get SYSCLK source -------------------------------------------------------*/
   switch (RCC->CFGR & RCC_CFGR_SWS)
   {
-    case RCC_CFGR_SWS_HSI:  /* HSI used as system clock source */
+    case RCC_CFGR_SWS_HSI_1111:  /* HSI used as system clock source */
     {
       sysclockfreq = HSI_VALUE;
        break;
     }
-    case RCC_CFGR_SWS_HSE:  /* HSE used as system clock  source */
+    case RCC_CFGR_SWS_HSE_1111:  /* HSE used as system clock  source */
     {
       sysclockfreq = HSE_VALUE;
       break;
     }
-    case RCC_CFGR_SWS_PLL:  /* PLL used as system clock  source */
+    case RCC_CFGR_SWS_PLL_1111:  /* PLL used as system clock  source */
     {
       /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLLM) * PLLN
       SYSCLK = PLL_VCO / PLLP */
@@ -982,11 +982,11 @@ __weak void HAL_RCC_GetOscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruct)
   RCC_OscInitStruct->OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_LSE | RCC_OSCILLATORTYPE_LSI;
 
   /* Get the HSE configuration -----------------------------------------------*/
-  if((RCC->CR &RCC_CR_HSEBYP) == RCC_CR_HSEBYP)
+  if((RCC->CR &RCC_CR_HSEBYP_111) == RCC_CR_HSEBYP_111)
   {
     RCC_OscInitStruct->HSEState = RCC_HSE_BYPASS;
   }
-  else if((RCC->CR &RCC_CR_HSEON) == RCC_CR_HSEON)
+  else if((RCC->CR &RCC_CR_HSEON_111) == RCC_CR_HSEON_111)
   {
     RCC_OscInitStruct->HSEState = RCC_HSE_ON;
   }
@@ -996,7 +996,7 @@ __weak void HAL_RCC_GetOscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruct)
   }
 
   /* Get the HSI configuration -----------------------------------------------*/
-  if((RCC->CR &RCC_CR_HSION) == RCC_CR_HSION)
+  if((RCC->CR &RCC_CR_HSION_111) == RCC_CR_HSION_111)
   {
     RCC_OscInitStruct->HSIState = RCC_HSI_ON;
   }
@@ -1032,7 +1032,7 @@ __weak void HAL_RCC_GetOscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruct)
   }
 
   /* Get the PLL configuration -----------------------------------------------*/
-  if((RCC->CR &RCC_CR_PLLON) == RCC_CR_PLLON)
+  if((RCC->CR &RCC_CR_PLLON_111) == RCC_CR_PLLON_111)
   {
     RCC_OscInitStruct->PLL.PLLState = RCC_PLL_ON;
   }

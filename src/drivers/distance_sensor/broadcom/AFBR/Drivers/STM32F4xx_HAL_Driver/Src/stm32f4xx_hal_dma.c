@@ -287,7 +287,9 @@ HAL_StatusTypeDef HAL_DMA_Init(DMA_HandleTypeDef *hdma)
 
   /* Initialize StreamBaseAddress and StreamIndex parameters to be used to calculate
      DMA steam Base Address needed by HAL_DMA_IRQHandler() and HAL_DMA_PollForTransfer() */
-  regs = (DMA_Base_Registers *)DMA_CalcBaseAndBitshift(hdma);
+  //regs = (DMA_Base_Registers *)DMA_CalcBaseAndBitshift(hdma);
+  uint32_t temp = DMA_CalcBaseAndBitshift(hdma);
+  regs = (DMA_Base_Registers *)temp;
 
   /* Clear all interrupt flags */
   regs->IFCR = 0x3FU << hdma->StreamIndex;
@@ -349,7 +351,8 @@ HAL_StatusTypeDef HAL_DMA_DeInit(DMA_HandleTypeDef *hdma)
   hdma->Instance->FCR  = 0x00000021U;
 
   /* Get DMA steam Base Address */
-  regs = (DMA_Base_Registers *)DMA_CalcBaseAndBitshift(hdma);
+  uint32_t temp = DMA_CalcBaseAndBitshift(hdma);
+  regs = (DMA_Base_Registers *)temp;
 
   /* Clean all callbacks */
   hdma->XferCpltCallback = NULL;
