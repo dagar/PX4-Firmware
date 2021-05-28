@@ -31,8 +31,8 @@
 #
 ############################################################################
 
-add_library(afbrs50_m4_fpu STATIC IMPORTED GLOBAL)
-set_property(TARGET afbrs50_m4_fpu PROPERTY IMPORTED_LOCATION Lib/libafbrs50_m4_fpu.a)
+add_library(afbrs50_m4_fpu_os STATIC IMPORTED GLOBAL)
+set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu_os.a)
 
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
@@ -78,9 +78,10 @@ px4_add_module(
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c
 		AFBRS50.cpp
+		AFBRS50.hpp
 		afbrs50_main.cpp
 	DEPENDS
 		px4_work_queue
-		#afbrs50_m4_fpu
+		afbrs50_m4_fpu_os
 		drivers_rangefinder
 	)
