@@ -61,7 +61,7 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = SPI2_AFBR_IRQ_n_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP_111;
   HAL_GPIO_Init(SPI2_AFBR_IRQ_n_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/

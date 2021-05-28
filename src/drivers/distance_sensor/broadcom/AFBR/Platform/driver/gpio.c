@@ -2,7 +2,7 @@
  * @file
  * @brief    	This file is part of the AFBR-S50 API.
  * @details		This file provides driver functionality for GPIO.
- * 
+ *
  * @copyright	Copyright c 2016-2019, Avago Technologies GmbH.
  * 				All rights reserved.
  *
@@ -38,9 +38,9 @@ typedef struct
 	PORT_Type * port;	/*!< GPIO Port. */
 	uint32_t pin;		/*!< GPIO Pin Number. */
 	uint32_t mask;		/*!< GPIO Pin Mask. */
-	gpio_isr_t isr;		/*!< IRQ callback function. */
+	GPIO_isr_t isr;		/*!< IRQ callback function. */
 	void * isrp;		/*!< IRQ callback parameter pointer. */
-} gpio_pin_struct;
+} GPIO_pin_struct;
 
 /*******************************************************************************
  * Prototypes
@@ -48,8 +48,8 @@ typedef struct
 void PORTA_IRQHandler(void);		/* PORTA pin detect*/
 void PORTC_PORTD_IRQHandler(void);	/* Single interrupt vector for PORTC and PORTD pin detect*/
 
-static inline void GPIO_InitPin(gpio_pin_struct * const pin);
-static inline void GPIO_InitIrqPin(gpio_pin_struct * const pin);
+static inline void GPIO_InitPin(GPIO_pin_struct * const pin);
+static inline void GPIO_InitIrqPin(GPIO_pin_struct * const pin);
 
 /*******************************************************************************
  * Variables
@@ -59,96 +59,96 @@ static inline void GPIO_InitIrqPin(gpio_pin_struct * const pin);
 
 #if defined(CPU_MKL17Z256VFM4)
 
-static gpio_pin_struct myPin_PTA01			= GPIO_MAKE_PIN(BOARD_PTA01);
-static gpio_pin_struct myPin_PTA02			= GPIO_MAKE_PIN(BOARD_PTA02);
-static gpio_pin_struct myPin_PTE16			= GPIO_MAKE_PIN(BOARD_PTE16);
-static gpio_pin_struct myPin_PTE17			= GPIO_MAKE_PIN(BOARD_PTE17);
-static gpio_pin_struct myPin_PTE18			= GPIO_MAKE_PIN(BOARD_PTE18);
-static gpio_pin_struct myPin_PTE19			= GPIO_MAKE_PIN(BOARD_PTE19);
+static GPIO_pin_struct myPin_PTA01			= GPIO_MAKE_PIN(BOARD_PTA01);
+static GPIO_pin_struct myPin_PTA02			= GPIO_MAKE_PIN(BOARD_PTA02);
+static GPIO_pin_struct myPin_PTE16			= GPIO_MAKE_PIN(BOARD_PTE16);
+static GPIO_pin_struct myPin_PTE17			= GPIO_MAKE_PIN(BOARD_PTE17);
+static GPIO_pin_struct myPin_PTE18			= GPIO_MAKE_PIN(BOARD_PTE18);
+static GPIO_pin_struct myPin_PTE19			= GPIO_MAKE_PIN(BOARD_PTE19);
 
 #elif   defined(CPU_MKL46Z256VLH4) || defined(CPU_MKL46Z256VLL4) || defined(CPU_MKL46Z256VMC4) || defined(CPU_MKL46Z256VMP4)
 
 #if defined(BRIDGE)
-static gpio_pin_struct myPin_Jumper1		= GPIO_MAKE_PIN(BOARD_JUMPER1);
-static gpio_pin_struct myPin_Jumper2		= GPIO_MAKE_PIN(BOARD_JUMPER2);
+static GPIO_pin_struct myPin_Jumper1		= GPIO_MAKE_PIN(BOARD_JUMPER1);
+static GPIO_pin_struct myPin_Jumper2		= GPIO_MAKE_PIN(BOARD_JUMPER2);
 #endif
 
-//static gpio_pin_struct myPin_LedGreen		= GPIO_MAKE_PIN(BOARD_LED_GREEN);
-static gpio_pin_struct myPin_LedRed			= GPIO_MAKE_PIN(BOARD_LED_RED);
-static gpio_pin_struct myPin_SW1			= GPIO_MAKE_PIN(BOARD_SW1);
-static gpio_pin_struct myPin_SW3			= GPIO_MAKE_PIN(BOARD_SW3);
-static gpio_pin_struct myPin_PTB0 			= GPIO_MAKE_PIN(BOARD_PTB0);
-static gpio_pin_struct myPin_PTB1 			= GPIO_MAKE_PIN(BOARD_PTB1);
-static gpio_pin_struct myPin_PTB2 			= GPIO_MAKE_PIN(BOARD_PTB2);
-static gpio_pin_struct myPin_PTB3 			= GPIO_MAKE_PIN(BOARD_PTB3);
-static gpio_pin_struct myPin_PTC1 			= GPIO_MAKE_PIN(BOARD_PTC1);
-static gpio_pin_struct myPin_PTC2 			= GPIO_MAKE_PIN(BOARD_PTC2);
+//static GPIO_pin_struct myPin_LedGreen		= GPIO_MAKE_PIN(BOARD_LED_GREEN);
+static GPIO_pin_struct myPin_LedRed			= GPIO_MAKE_PIN(BOARD_LED_RED);
+static GPIO_pin_struct myPin_SW1			= GPIO_MAKE_PIN(BOARD_SW1);
+static GPIO_pin_struct myPin_SW3			= GPIO_MAKE_PIN(BOARD_SW3);
+static GPIO_pin_struct myPin_PTB0 			= GPIO_MAKE_PIN(BOARD_PTB0);
+static GPIO_pin_struct myPin_PTB1 			= GPIO_MAKE_PIN(BOARD_PTB1);
+static GPIO_pin_struct myPin_PTB2 			= GPIO_MAKE_PIN(BOARD_PTB2);
+static GPIO_pin_struct myPin_PTB3 			= GPIO_MAKE_PIN(BOARD_PTB3);
+static GPIO_pin_struct myPin_PTC1 			= GPIO_MAKE_PIN(BOARD_PTC1);
+static GPIO_pin_struct myPin_PTC2 			= GPIO_MAKE_PIN(BOARD_PTC2);
 
 #endif
 
 /* S2PI Pins */
-static gpio_pin_struct myPin_S2PI_MISO		= GPIO_MAKE_PIN(S2PI_MISO);
-static gpio_pin_struct myPin_S2PI_MOSI		= GPIO_MAKE_PIN(S2PI_MOSI);
-static gpio_pin_struct myPin_S2PI_CLK		= GPIO_MAKE_PIN(S2PI_CLK);
-static gpio_pin_struct myPin_S2PI_IRQ1		= GPIO_MAKE_PIN(S2PI_IRQ1);
-static gpio_pin_struct myPin_S2PI_CS1		= GPIO_MAKE_PIN(S2PI_CS1);
+static GPIO_pin_struct myPin_S2PI_MISO		= GPIO_MAKE_PIN(S2PI_MISO);
+static GPIO_pin_struct myPin_S2PI_MOSI		= GPIO_MAKE_PIN(S2PI_MOSI);
+static GPIO_pin_struct myPin_S2PI_CLK		= GPIO_MAKE_PIN(S2PI_CLK);
+static GPIO_pin_struct myPin_S2PI_IRQ1		= GPIO_MAKE_PIN(S2PI_IRQ1);
+static GPIO_pin_struct myPin_S2PI_CS1		= GPIO_MAKE_PIN(S2PI_CS1);
 
 #if   defined(CPU_MKL46Z256VLH4) || defined(CPU_MKL46Z256VLL4) || defined(CPU_MKL46Z256VMC4) || defined(CPU_MKL46Z256VMP4)
-static gpio_pin_struct myPin_S2PI_IRQ2		= GPIO_MAKE_PIN(S2PI_IRQ2);
-static gpio_pin_struct myPin_S2PI_CS2		= GPIO_MAKE_PIN(S2PI_CS2);
-static gpio_pin_struct myPin_S2PI_IRQ3		= GPIO_MAKE_PIN(S2PI_IRQ3);
-static gpio_pin_struct myPin_S2PI_CS3		= GPIO_MAKE_PIN(S2PI_CS3);
-static gpio_pin_struct myPin_S2PI_IRQ4		= GPIO_MAKE_PIN(S2PI_IRQ4);
-static gpio_pin_struct myPin_S2PI_CS4		= GPIO_MAKE_PIN(S2PI_CS4);
+static GPIO_pin_struct myPin_S2PI_IRQ2		= GPIO_MAKE_PIN(S2PI_IRQ2);
+static GPIO_pin_struct myPin_S2PI_CS2		= GPIO_MAKE_PIN(S2PI_CS2);
+static GPIO_pin_struct myPin_S2PI_IRQ3		= GPIO_MAKE_PIN(S2PI_IRQ3);
+static GPIO_pin_struct myPin_S2PI_CS3		= GPIO_MAKE_PIN(S2PI_CS3);
+static GPIO_pin_struct myPin_S2PI_IRQ4		= GPIO_MAKE_PIN(S2PI_IRQ4);
+static GPIO_pin_struct myPin_S2PI_CS4		= GPIO_MAKE_PIN(S2PI_CS4);
 #endif
 
 #if defined(CPU_MKL17Z256VFM4)
-gpio_pin_t Pin_PTA01						= &myPin_PTA01;			/* PortA Pin1 */
-gpio_pin_t Pin_PTA02						= &myPin_PTA02;			/* PortA Pin2 */
-gpio_pin_t Pin_PTE16						= &myPin_PTE16;			/* PortE Pin16 */
-gpio_pin_t Pin_PTE17						= &myPin_PTE17;			/* PortB Pin17 */
-gpio_pin_t Pin_PTE18						= &myPin_PTE18;			/* PortB Pin18 */
-gpio_pin_t Pin_PTE19						= &myPin_PTE19;			/* PortB Pin19 */
+GPIO_pin_t Pin_PTA01						= &myPin_PTA01;			/* PortA Pin1 */
+GPIO_pin_t Pin_PTA02						= &myPin_PTA02;			/* PortA Pin2 */
+GPIO_pin_t Pin_PTE16						= &myPin_PTE16;			/* PortE Pin16 */
+GPIO_pin_t Pin_PTE17						= &myPin_PTE17;			/* PortB Pin17 */
+GPIO_pin_t Pin_PTE18						= &myPin_PTE18;			/* PortB Pin18 */
+GPIO_pin_t Pin_PTE19						= &myPin_PTE19;			/* PortB Pin19 */
 
 #elif   defined(CPU_MKL46Z256VLH4) || defined(CPU_MKL46Z256VLL4) || defined(CPU_MKL46Z256VMC4) || defined(CPU_MKL46Z256VMP4)
-//gpio_pin_t Pin_LED_Green					= &myPin_LedGreen;		/* Green LED */
-gpio_pin_t Pin_LED_Red						= &myPin_LedRed;		/* Red LED   */
-gpio_pin_t Pin_SW1							= &myPin_SW1;			/* Switch 1  */
-gpio_pin_t Pin_SW3							= &myPin_SW3;			/* Switch 3  */
-gpio_pin_t Pin_PTB0							= &myPin_PTB0;			/* PortB Pin0 */
-gpio_pin_t Pin_PTB1							= &myPin_PTB1;			/* PortB Pin1 */
-gpio_pin_t Pin_PTB2							= &myPin_PTB2;			/* PortB Pin2 */
-gpio_pin_t Pin_PTB3							= &myPin_PTB3;			/* PortB Pin3 */
-gpio_pin_t Pin_PTC1							= &myPin_PTC1;			/* PortC Pin1 */
-gpio_pin_t Pin_PTC2							= &myPin_PTC2;			/* PortC Pin2 */
+//GPIO_pin_t Pin_LED_Green					= &myPin_LedGreen;		/* Green LED */
+GPIO_pin_t Pin_LED_Red						= &myPin_LedRed;		/* Red LED   */
+GPIO_pin_t Pin_SW1							= &myPin_SW1;			/* Switch 1  */
+GPIO_pin_t Pin_SW3							= &myPin_SW3;			/* Switch 3  */
+GPIO_pin_t Pin_PTB0							= &myPin_PTB0;			/* PortB Pin0 */
+GPIO_pin_t Pin_PTB1							= &myPin_PTB1;			/* PortB Pin1 */
+GPIO_pin_t Pin_PTB2							= &myPin_PTB2;			/* PortB Pin2 */
+GPIO_pin_t Pin_PTB3							= &myPin_PTB3;			/* PortB Pin3 */
+GPIO_pin_t Pin_PTC1							= &myPin_PTC1;			/* PortC Pin1 */
+GPIO_pin_t Pin_PTC2							= &myPin_PTC2;			/* PortC Pin2 */
 #endif
 
 
 /* S2PI Pins */
-gpio_pin_t Pin_S2PI_MISO 					= &myPin_S2PI_MISO;		/* S2PI: MISO */
-gpio_pin_t Pin_S2PI_MOSI 					= &myPin_S2PI_MOSI;		/* S2PI: MOSI */
-gpio_pin_t Pin_S2PI_CLK 					= &myPin_S2PI_CLK;		/* S2PI: Clock */
-gpio_pin_t Pin_S2PI_IRQ1 					= &myPin_S2PI_IRQ1;		/* S2PI: IRQ1, slave 1 interrupt */
-gpio_pin_t Pin_S2PI_CS1						= &myPin_S2PI_CS1;		/* S2PI: CS1, slave 1 chip select */
+GPIO_pin_t Pin_S2PI_MISO 					= &myPin_S2PI_MISO;		/* S2PI: MISO */
+GPIO_pin_t Pin_S2PI_MOSI 					= &myPin_S2PI_MOSI;		/* S2PI: MOSI */
+GPIO_pin_t Pin_S2PI_CLK 					= &myPin_S2PI_CLK;		/* S2PI: Clock */
+GPIO_pin_t Pin_S2PI_IRQ1 					= &myPin_S2PI_IRQ1;		/* S2PI: IRQ1, slave 1 interrupt */
+GPIO_pin_t Pin_S2PI_CS1						= &myPin_S2PI_CS1;		/* S2PI: CS1, slave 1 chip select */
 
 #if   defined(CPU_MKL46Z256VLH4) || defined(CPU_MKL46Z256VLL4) || defined(CPU_MKL46Z256VMC4) || defined(CPU_MKL46Z256VMP4)
 
 #if defined(BRIDGE)
 /* Jumper Pin */
-gpio_pin_t Pin_Jumper1			 			= &myPin_Jumper1;		/* Pin Jumper 1 */
-gpio_pin_t Pin_Jumper2			 			= &myPin_Jumper2;		/* Pin Jumper 2 */
+GPIO_pin_t Pin_Jumper1			 			= &myPin_Jumper1;		/* Pin Jumper 1 */
+GPIO_pin_t Pin_Jumper2			 			= &myPin_Jumper2;		/* Pin Jumper 2 */
 #endif
 
-gpio_pin_t Pin_S2PI_IRQ2 					= &myPin_S2PI_IRQ2;		/* S2PI: IRQ2, slave 2 interrupt */
-gpio_pin_t Pin_S2PI_CS2						= &myPin_S2PI_CS2;		/* S2PI: CS2, slave 2 chip select */
-gpio_pin_t Pin_S2PI_IRQ3 					= &myPin_S2PI_IRQ3;		/* S2PI: IRQ3, slave 3 interrupt */
-gpio_pin_t Pin_S2PI_CS3						= &myPin_S2PI_CS3;		/* S2PI: CS3, slave 3 chip select */
-gpio_pin_t Pin_S2PI_IRQ4 					= &myPin_S2PI_IRQ4;		/* S2PI: IRQ4, slave 4 interrupt */
-gpio_pin_t Pin_S2PI_CS4						= &myPin_S2PI_CS4;		/* S2PI: CS4, slave 4 chip select */
+GPIO_pin_t Pin_S2PI_IRQ2 					= &myPin_S2PI_IRQ2;		/* S2PI: IRQ2, slave 2 interrupt */
+GPIO_pin_t Pin_S2PI_CS2						= &myPin_S2PI_CS2;		/* S2PI: CS2, slave 2 chip select */
+GPIO_pin_t Pin_S2PI_IRQ3 					= &myPin_S2PI_IRQ3;		/* S2PI: IRQ3, slave 3 interrupt */
+GPIO_pin_t Pin_S2PI_CS3						= &myPin_S2PI_CS3;		/* S2PI: CS3, slave 3 chip select */
+GPIO_pin_t Pin_S2PI_IRQ4 					= &myPin_S2PI_IRQ4;		/* S2PI: IRQ4, slave 4 interrupt */
+GPIO_pin_t Pin_S2PI_CS4						= &myPin_S2PI_CS4;		/* S2PI: CS4, slave 4 chip select */
 #endif
 
 /*!@brief Collection of all interrupt enabled input pins. */
-gpio_pin_struct * myIrqPins[] = {
+GPIO_pin_struct * myIrqPins[] = {
 #if defined(BRIDGE)
 //		&myPin_Jumper1,
 //		&myPin_Jumper2,
@@ -170,7 +170,7 @@ gpio_pin_struct * myIrqPins[] = {
 };
 
 /*!@brief Collection of all pins (w/o interrupt). */
-gpio_pin_struct * myPins[] = {
+GPIO_pin_struct * myPins[] = {
 #if defined(BRIDGE)
 
 #else
@@ -216,7 +216,7 @@ gpio_pin_struct * myPins[] = {
 /*******************************************************************************
  * Code
  ******************************************************************************/
-static inline void GPIO_InitPin(gpio_pin_struct * const pin)
+static inline void GPIO_InitPin(GPIO_pin_struct * const pin)
 {
 	port_pin_config_t pinConfig = {
 			.driveStrength = kPORT_LowDriveStrength,
@@ -235,7 +235,7 @@ static inline void GPIO_InitPin(gpio_pin_struct * const pin)
 	GPIO_SetPinDir(pin, Pin_Output);
 }
 
-static inline void GPIO_InitIrqPin(gpio_pin_struct * const pin)
+static inline void GPIO_InitIrqPin(GPIO_pin_struct * const pin)
 {
 	port_pin_config_t pinConfig = {
 			.driveStrength = kPORT_LowDriveStrength,
@@ -305,94 +305,94 @@ void GPIO_Init(void)
 	}
 }
 
-void GPIO_SetISR(gpio_pin_t pin, gpio_isr_t f, void * p)
+void GPIO_SetISR(GPIO_pin_t pin, GPIO_isr_t f, void * p)
 {
-	((gpio_pin_struct *)pin)->isr = f;
-	((gpio_pin_struct *)pin)->isrp = p;
+	((GPIO_pin_struct *)pin)->isr = f;
+	((GPIO_pin_struct *)pin)->isrp = p;
 
 	/* Set input pin interrupts. */
-	PORT_SetPinInterruptConfig(((gpio_pin_struct *)pin)->port, ((gpio_pin_struct *)pin)->pin, kPORT_InterruptFallingEdge);
+	PORT_SetPinInterruptConfig(((GPIO_pin_struct *)pin)->port, ((GPIO_pin_struct *)pin)->pin, kPORT_InterruptFallingEdge);
 }
-void GPIO_RemoveISR(gpio_pin_t pin)
+void GPIO_RemoveISR(GPIO_pin_t pin)
 {
-	((gpio_pin_struct *)pin)->isr = 0;
-	((gpio_pin_struct *)pin)->isrp = 0;
+	((GPIO_pin_struct *)pin)->isr = 0;
+	((GPIO_pin_struct *)pin)->isrp = 0;
 
 	/* Disable input pin interrupts. */
-	PORT_SetPinInterruptConfig(((gpio_pin_struct *)pin)->port, ((gpio_pin_struct *)pin)->pin, kPORT_InterruptOrDMADisabled);
+	PORT_SetPinInterruptConfig(((GPIO_pin_struct *)pin)->port, ((GPIO_pin_struct *)pin)->pin, kPORT_InterruptOrDMADisabled);
 }
 
 /*******************************************************************************
  * Code for inline functions
  ******************************************************************************/
-void GPIO_SetPinMux(gpio_pin_t pin, uint32_t mux)
+void GPIO_SetPinMux(GPIO_pin_t pin, uint32_t mux)
 {
-	PORT_SetPinMux(((gpio_pin_struct *)pin)->port, ((gpio_pin_struct *)pin)->pin, mux);
+	PORT_SetPinMux(((GPIO_pin_struct *)pin)->port, ((GPIO_pin_struct *)pin)->pin, mux);
 }
 
-void GPIO_SetPinOutput(gpio_pin_t pin)
+void GPIO_SetPinOutput(GPIO_pin_t pin)
 {
-	(((gpio_pin_struct *)pin)->base)->PSOR = ((gpio_pin_struct *)pin)->mask;
+	(((GPIO_pin_struct *)pin)->base)->PSOR = ((GPIO_pin_struct *)pin)->mask;
 }
 
-void GPIO_ClearPinOutput(gpio_pin_t pin)
+void GPIO_ClearPinOutput(GPIO_pin_t pin)
 {
-	(((gpio_pin_struct *)pin)->base)->PCOR = ((gpio_pin_struct *)pin)->mask;
+	(((GPIO_pin_struct *)pin)->base)->PCOR = ((GPIO_pin_struct *)pin)->mask;
 }
 
-void GPIO_TogglePinOutput(gpio_pin_t pin)
+void GPIO_TogglePinOutput(GPIO_pin_t pin)
 {
-	(((gpio_pin_struct *)pin)->base)->PTOR = ((gpio_pin_struct *)pin)->mask;
+	(((GPIO_pin_struct *)pin)->base)->PTOR = ((GPIO_pin_struct *)pin)->mask;
 }
 
-void GPIO_WritePinOutput(gpio_pin_t pin, uint32_t value)
+void GPIO_WritePinOutput(GPIO_pin_t pin, uint32_t value)
 {
 	if (value == 0U)
 	{
-		(((gpio_pin_struct *)pin)->base)->PCOR = ((gpio_pin_struct *)pin)->mask;
+		(((GPIO_pin_struct *)pin)->base)->PCOR = ((GPIO_pin_struct *)pin)->mask;
 	}
 	else
 	{
-		(((gpio_pin_struct *)pin)->base)->PSOR = ((gpio_pin_struct *)pin)->mask;
+		(((GPIO_pin_struct *)pin)->base)->PSOR = ((GPIO_pin_struct *)pin)->mask;
 	}
 }
 
-uint32_t GPIO_ReadPinInput(gpio_pin_t pin)
+uint32_t GPIO_ReadPinInput(GPIO_pin_t pin)
 {
-	return ((((gpio_pin_struct *)pin)->base)->PDIR >> ((gpio_pin_struct *)pin)->pin) & 1U;
+	return ((((GPIO_pin_struct *)pin)->base)->PDIR >> ((GPIO_pin_struct *)pin)->pin) & 1U;
 }
 
-void GPIO_SetPinDir(gpio_pin_t pin, gpio_pin_direction_t dir )
+void GPIO_SetPinDir(GPIO_pin_t pin, GPIO_pin_direction_t dir )
 {
 	if (dir == Pin_Input)
 	{
-		(((gpio_pin_struct *)pin)->base)->PDDR &= ~(1U << ((gpio_pin_struct *)pin)->pin);
+		(((GPIO_pin_struct *)pin)->base)->PDDR &= ~(1U << ((GPIO_pin_struct *)pin)->pin);
 	}
 	else
 	{
-		(((gpio_pin_struct *)pin)->base)->PDDR |= (1U << ((gpio_pin_struct *)pin)->pin);
+		(((GPIO_pin_struct *)pin)->base)->PDDR |= (1U << ((GPIO_pin_struct *)pin)->pin);
 	}
 }
 
-void GPIO_SetPinPullUp(gpio_pin_t pin)
+void GPIO_SetPinPullUp(GPIO_pin_t pin)
 {
-	gpio_pin_struct * base = (gpio_pin_struct *)pin;
+	GPIO_pin_struct * base = (GPIO_pin_struct *)pin;
 	uint32_t msk = PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
 	uint32_t val = PORT_PCR_PE(1) | PORT_PCR_PS(1); // Pull enable + select high
 	base->port->PCR[base->pin] = (base->port->PCR[base->pin] & ~msk) | val;
 }
 
-void GPIO_SetPinPullDown(gpio_pin_t pin)
+void GPIO_SetPinPullDown(GPIO_pin_t pin)
 {
-	gpio_pin_struct * base = (gpio_pin_struct *)pin;
+	GPIO_pin_struct * base = (GPIO_pin_struct *)pin;
 	uint32_t msk = PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
 	uint32_t val = PORT_PCR_PE(1) | PORT_PCR_PS(0); // Pull enable + select down
 	base->port->PCR[base->pin] = (base->port->PCR[base->pin] & ~msk) | val;
 }
 
-void GPIO_SetPinPullDisable(gpio_pin_t pin)
+void GPIO_SetPinPullDisable(GPIO_pin_t pin)
 {
-	gpio_pin_struct * base = (gpio_pin_struct *)pin;
+	GPIO_pin_struct * base = (GPIO_pin_struct *)pin;
 	uint32_t msk = PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
 	uint32_t val = PORT_PCR_PE(0); // Pull disable
 	base->port->PCR[base->pin] = (base->port->PCR[base->pin] & ~msk) | val;

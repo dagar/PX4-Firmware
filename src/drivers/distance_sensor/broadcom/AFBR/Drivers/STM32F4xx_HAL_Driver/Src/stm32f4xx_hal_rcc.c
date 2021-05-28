@@ -759,7 +759,7 @@ HAL_StatusTypeDef HAL_RCC_ClockConfig(RCC_ClkInitTypeDef  *RCC_ClkInitStruct, ui
   *            @arg RCC_MCO1SOURCE_HSE: HSE clock selected as MCO1 source
   *            @arg RCC_MCO1SOURCE_PLLCLK: main PLL clock selected as MCO1 source
   *            @arg RCC_MCO2SOURCE_SYSCLK: System clock (SYSCLK) selected as MCO2 source
-  *            @arg RCC_MCO2SOURCE_PLLI2SCLK: PLLI2S clock selected as MCO2 source, available for all STM32F4 devices except STM32F410xx
+  *            @arg RCC_MCO2SOURCE_PLLI2_111SCLK: PLLI2S clock selected as MCO2 source, available for all STM32F4 devices except STM32F410xx
   *            @arg RCC_MCO2SOURCE_I2SCLK: I2SCLK clock selected as MCO2 source, available only for STM32F410Rx devices
   *            @arg RCC_MCO2SOURCE_HSE: HSE clock selected as MCO2 source
   *            @arg RCC_MCO2SOURCE_PLLCLK: main PLL clock selected as MCO2 source
@@ -1008,11 +1008,11 @@ __weak void HAL_RCC_GetOscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruct)
   RCC_OscInitStruct->HSICalibrationValue = (uint32_t)((RCC->CR &RCC_CR_HSITRIM) >> RCC_CR_HSITRIM_Pos);
 
   /* Get the LSE configuration -----------------------------------------------*/
-  if((RCC->BDCR &RCC_BDCR_LSEBYP) == RCC_BDCR_LSEBYP)
+  if((RCC->BDCR &RCC_BDCR_111_LSEBYP) == RCC_BDCR_111_LSEBYP)
   {
     RCC_OscInitStruct->LSEState = RCC_LSE_BYPASS;
   }
-  else if((RCC->BDCR &RCC_BDCR_LSEON) == RCC_BDCR_LSEON)
+  else if((RCC->BDCR &RCC_BDCR_111_LSEON) == RCC_BDCR_111_LSEON)
   {
     RCC_OscInitStruct->LSEState = RCC_LSE_ON;
   }
@@ -1022,7 +1022,7 @@ __weak void HAL_RCC_GetOscConfig(RCC_OscInitTypeDef  *RCC_OscInitStruct)
   }
 
   /* Get the LSI configuration -----------------------------------------------*/
-  if((RCC->CSR &RCC_CSR_LSION) == RCC_CSR_LSION)
+  if((RCC->CSR &RCC_CSR_111_LSION) == RCC_CSR_111_LSION)
   {
     RCC_OscInitStruct->LSIState = RCC_LSI_ON;
   }

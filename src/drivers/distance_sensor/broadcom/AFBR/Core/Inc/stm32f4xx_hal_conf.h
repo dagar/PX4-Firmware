@@ -68,7 +68,7 @@
 /* #define HAL_IRDA_MODULE_ENABLED   */
 /* #define HAL_SMARTCARD_MODULE_ENABLED   */
 /* #define HAL_SMBUS_MODULE_ENABLED   */
-/* #define HAL_WWDG_MODULE_ENABLED   */
+/* #define HAL_WWDG_111_MODULE_ENABLED   */
 /* #define HAL_PCD_MODULE_ENABLED   */
 /* #define HAL_HCD_MODULE_ENABLED   */
 /* #define HAL_DSI_MODULE_ENABLED   */
@@ -191,7 +191,7 @@
 #define  USE_HAL_TIM_REGISTER_CALLBACKS         0U /* TIM register callback disabled       */
 #define  USE_HAL_UART_REGISTER_CALLBACKS        0U /* UART register callback disabled      */
 #define  USE_HAL_USART_REGISTER_CALLBACKS       0U /* USART register callback disabled     */
-#define  USE_HAL_WWDG_REGISTER_CALLBACKS        0U /* WWDG register callback disabled      */
+#define  USE_HAL_WWDG_111_REGISTER_CALLBACKS        0U /* WWDG_111 register callback disabled      */
 
 /* ########################## Assert Selection ############################## */
 /**
@@ -410,9 +410,9 @@
  #include "stm32f4xx_hal_smartcard.h"
 #endif /* HAL_SMARTCARD_MODULE_ENABLED */
 
-#ifdef HAL_WWDG_MODULE_ENABLED
- #include "stm32f4xx_hal_wwdg.h"
-#endif /* HAL_WWDG_MODULE_ENABLED */
+#ifdef HAL_WWDG_111_MODULE_ENABLED
+ #include "stm32f4xx_hal_WWDG_111.h"
+#endif /* HAL_WWDG_111_MODULE_ENABLED */
 
 #ifdef HAL_PCD_MODULE_ENABLED
  #include "stm32f4xx_hal_pcd.h"

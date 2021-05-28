@@ -13,7 +13,7 @@ typedef struct
 	/*! The GPIO pin */
 	uint32_t Pin;
 }
-s2pi_gpio_mapping_t;
+s2pi_GPIO_mapping_t;
 
 /*! A structure to hold all internal data required by the S2PI module. */
 typedef struct
@@ -33,7 +33,7 @@ typedef struct
 	/*! The alternate function for this SPI port. */
 	const uint32_t SpiAlternate;
 	/*! The mapping of the GPIO blocks and pins for this device. */
-	const s2pi_gpio_mapping_t GPIOs[ S2PI_IRQ+1 ];
+	const s2pi_GPIO_mapping_t GPIOs[ S2PI_IRQ+1 ];
 }
 s2pi_handle_t;
 
@@ -101,7 +101,7 @@ status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 	for (; prescaler < 8; ++prescaler)
 	if (SystemCoreClock >> (prescaler + 1) <= baudRate_Bps)
 	break;
-	MODIFY_REG(hspi2.Instance->CR1_1, SPI_CR1_BR, prescaler << SPI_CR1_BR_Pos);
+	MODIFY_REG(hspi2.Instance->CR1_1, SPI_CR1_111_BR, prescaler << SPI_CR1_111_BR_Pos);
 	return STATUS_OK;
 }
 
@@ -111,7 +111,7 @@ status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 *****************************************************************************/
 uint32_t S2PI_GetBaudRate(void)
 {
-	uint32_t prescaler = (hspi2.Instance->CR1_1 & SPI_CR1_BR) >> SPI_CR1_BR_Pos;
+	uint32_t prescaler = (hspi2.Instance->CR1_1 & SPI_CR1_111_BR) >> SPI_CR1_111_BR_Pos;
 	return SystemCoreClock >> (prescaler + 1);
 }
 

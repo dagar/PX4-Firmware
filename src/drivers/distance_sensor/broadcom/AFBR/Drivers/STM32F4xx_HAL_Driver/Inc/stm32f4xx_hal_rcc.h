@@ -86,10 +86,10 @@ typedef struct
                                        This parameter can be a value of @ref RCC_AHB_Clock_Source       */
 
   uint32_t APB1CLKDivider;        /*!< The APB1 clock (PCLK1) divider. This clock is derived from the AHB clock (HCLK).
-                                       This parameter can be a value of @ref RCC_APB1_APB2_Clock_Source */
+                                       This parameter can be a value of @ref RCC_APB1_111_APB2_111_Clock_Source */
 
   uint32_t APB2CLKDivider;        /*!< The APB2 clock (PCLK2) divider. This clock is derived from the AHB clock (HCLK).
-                                       This parameter can be a value of @ref RCC_APB1_APB2_Clock_Source */
+                                       This parameter can be a value of @ref RCC_APB1_111_APB2_111_Clock_Source */
 
 }RCC_ClkInitTypeDef;
 
@@ -128,8 +128,8 @@ typedef struct
   * @{
   */
 #define RCC_LSE_OFF                    0x00000000U
-#define RCC_LSE_ON                     RCC_BDCR_LSEON
-#define RCC_LSE_BYPASS                 ((uint32_t)(RCC_BDCR_LSEBYP | RCC_BDCR_LSEON))
+#define RCC_LSE_ON                     RCC_BDCR_111_LSEON
+#define RCC_LSE_BYPASS                 ((uint32_t)(RCC_BDCR_111_LSEBYP | RCC_BDCR_111_LSEON))
 /**
   * @}
   */
@@ -237,7 +237,7 @@ typedef struct
   * @}
   */
 
-/** @defgroup RCC_APB1_APB2_Clock_Source APB1/APB2 Clock Source
+/** @defgroup RCC_APB1_111_APB2_111_Clock_Source APB1/APB2 Clock Source
   * @{
   */
 #define RCC_HCLK_DIV1                    RCC_CFGR_PPRE1_DIV1
@@ -330,7 +330,7 @@ typedef struct
 #define RCC_IT_HSIRDY                    ((uint8_t)0x04)
 #define RCC_IT_HSERDY                    ((uint8_t)0x08)
 #define RCC_IT_PLLRDY                    ((uint8_t)0x10)
-#define RCC_IT_PLLI2SRDY                 ((uint8_t)0x20)
+#define RCC_IT_PLLI2_111SRDY                 ((uint8_t)0x20)
 #define RCC_IT_CSS                       ((uint8_t)0x80)
 /**
   * @}
@@ -349,7 +349,7 @@ typedef struct
 #define RCC_FLAG_HSIRDY                  ((uint8_t)0x21)
 #define RCC_FLAG_HSERDY                  ((uint8_t)0x31)
 #define RCC_FLAG_PLLRDY                  ((uint8_t)0x39)
-#define RCC_FLAG_PLLI2SRDY               ((uint8_t)0x3B)
+#define RCC_FLAG_PLLI2_111SRDY               ((uint8_t)0x3B)
 
 /* Flags in the BDCR register */
 #define RCC_FLAG_LSERDY                  ((uint8_t)0x41)
@@ -361,7 +361,7 @@ typedef struct
 #define RCC_FLAG_PORRST                  ((uint8_t)0x7B)
 #define RCC_FLAG_SFTRST                  ((uint8_t)0x7C)
 #define RCC_FLAG_IWDGRST                 ((uint8_t)0x7D)
-#define RCC_FLAG_WWDGRST                 ((uint8_t)0x7E)
+#define RCC_FLAG_WWDG_111RST                 ((uint8_t)0x7E)
 #define RCC_FLAG_LPWRRST                 ((uint8_t)0x7F)
 /**
   * @}
@@ -376,7 +376,7 @@ typedef struct
   * @{
   */
 
-/** @defgroup RCC_AHB1_Clock_Enable_Disable AHB1 Peripheral Clock Enable Disable
+/** @defgroup RCC_AHB1_111_Clock_Enable_Disable AHB1 Peripheral Clock Enable Disable
   * @brief  Enable or disable the AHB1 peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before
@@ -385,82 +385,82 @@ typedef struct
   */
 #define __HAL_RCC_GPIOA_CLK_ENABLE()   do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOAEN);\
+                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOAEN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOAEN);\
+                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOAEN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_GPIOB_CLK_ENABLE()   do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOBEN);\
+                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOBEN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOBEN);\
+                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOBEN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_GPIOC_CLK_ENABLE()  do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOCEN);\
+                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOCEN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOCEN);\
+                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOCEN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_GPIOH_CLK_ENABLE()  do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOHEN);\
+                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOHEN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOHEN);\
+                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_GPIOHEN);\
                                         UNUSED(tmpreg); \
                                          } while(0U)
 #define __HAL_RCC_DMA1_CLK_ENABLE()  do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_DMA1EN);\
+                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_DMA1EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_DMA1EN);\
+                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_DMA1EN);\
                                         UNUSED(tmpreg); \
                                          } while(0U)
 #define __HAL_RCC_DMA2_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_DMA2EN);\
+                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_DMA2EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_DMA2EN);\
+                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1_111ENR_111_DMA2EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 
-#define __HAL_RCC_GPIOA_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1ENR_GPIOAEN))
-#define __HAL_RCC_GPIOB_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1ENR_GPIOBEN))
-#define __HAL_RCC_GPIOC_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1ENR_GPIOCEN))
-#define __HAL_RCC_GPIOH_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1ENR_GPIOHEN))
-#define __HAL_RCC_DMA1_CLK_DISABLE()         (RCC->AHB1ENR &= ~(RCC_AHB1ENR_DMA1EN))
-#define __HAL_RCC_DMA2_CLK_DISABLE()         (RCC->AHB1ENR &= ~(RCC_AHB1ENR_DMA2EN))
+#define __HAL_RCC_GPIOA_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1_111ENR_111_GPIOAEN))
+#define __HAL_RCC_GPIOB_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1_111ENR_111_GPIOBEN))
+#define __HAL_RCC_GPIOC_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1_111ENR_111_GPIOCEN))
+#define __HAL_RCC_GPIOH_CLK_DISABLE()        (RCC->AHB1ENR &= ~(RCC_AHB1_111ENR_111_GPIOHEN))
+#define __HAL_RCC_DMA1_CLK_DISABLE()         (RCC->AHB1ENR &= ~(RCC_AHB1_111ENR_111_DMA1EN))
+#define __HAL_RCC_DMA2_CLK_DISABLE()         (RCC->AHB1ENR &= ~(RCC_AHB1_111ENR_111_DMA2EN))
 /**
   * @}
   */
 
-/** @defgroup RCC_AHB1_Peripheral_Clock_Enable_Disable_Status AHB1 Peripheral Clock Enable Disable Status
+/** @defgroup RCC_AHB1_111_Peripheral_Clock_Enable_Disable_Status AHB1 Peripheral Clock Enable Disable Status
   * @brief  Get the enable or disable status of the AHB1 peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before
   *         using it.
   * @{
   */
-#define __HAL_RCC_GPIOA_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOAEN)) != RESET)
-#define __HAL_RCC_GPIOB_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOBEN)) != RESET)
-#define __HAL_RCC_GPIOC_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOCEN)) != RESET)
-#define __HAL_RCC_GPIOH_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOHEN)) != RESET)
-#define __HAL_RCC_DMA1_IS_CLK_ENABLED()         ((RCC->AHB1ENR &(RCC_AHB1ENR_DMA1EN)) != RESET)
-#define __HAL_RCC_DMA2_IS_CLK_ENABLED()         ((RCC->AHB1ENR &(RCC_AHB1ENR_DMA2EN)) != RESET)
+#define __HAL_RCC_GPIOA_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOAEN)) != RESET)
+#define __HAL_RCC_GPIOB_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOBEN)) != RESET)
+#define __HAL_RCC_GPIOC_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOCEN)) != RESET)
+#define __HAL_RCC_GPIOH_IS_CLK_ENABLED()        ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOHEN)) != RESET)
+#define __HAL_RCC_DMA1_IS_CLK_ENABLED()         ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_DMA1EN)) != RESET)
+#define __HAL_RCC_DMA2_IS_CLK_ENABLED()         ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_DMA2EN)) != RESET)
 
-#define __HAL_RCC_GPIOA_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOAEN)) == RESET)
-#define __HAL_RCC_GPIOB_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOBEN)) == RESET)
-#define __HAL_RCC_GPIOC_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOCEN)) == RESET)
-#define __HAL_RCC_GPIOH_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1ENR_GPIOHEN)) == RESET)
-#define __HAL_RCC_DMA1_IS_CLK_DISABLED()        ((RCC->AHB1ENR &(RCC_AHB1ENR_DMA1EN)) == RESET)
-#define __HAL_RCC_DMA2_IS_CLK_DISABLED()        ((RCC->AHB1ENR &(RCC_AHB1ENR_DMA2EN)) == RESET)
+#define __HAL_RCC_GPIOA_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOAEN)) == RESET)
+#define __HAL_RCC_GPIOB_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOBEN)) == RESET)
+#define __HAL_RCC_GPIOC_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOCEN)) == RESET)
+#define __HAL_RCC_GPIOH_IS_CLK_DISABLED()       ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_GPIOHEN)) == RESET)
+#define __HAL_RCC_DMA1_IS_CLK_DISABLED()        ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_DMA1EN)) == RESET)
+#define __HAL_RCC_DMA2_IS_CLK_DISABLED()        ((RCC->AHB1ENR &(RCC_AHB1_111ENR_111_DMA2EN)) == RESET)
 /**
   * @}
   */
 
-/** @defgroup RCC_APB1_Clock_Enable_Disable APB1 Peripheral Clock Enable Disable
+/** @defgroup RCC_APB1_111_Clock_Enable_Disable APB1 Peripheral Clock Enable Disable
   * @brief  Enable or disable the Low Speed APB (APB1) peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before
@@ -469,92 +469,92 @@ typedef struct
   */
 #define __HAL_RCC_TIM5_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB1ENR, RCC_APB1ENR_TIM5EN);\
+                                        SET_BIT(RCC->APB1ENR, RCC_APB1_111ENR_TIM5EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_TIM5EN);\
+                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1_111ENR_TIM5EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
-#define __HAL_RCC_WWDG_CLK_ENABLE()     do { \
+#define __HAL_RCC_WWDG_111_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB1ENR, RCC_APB1ENR_WWDGEN);\
+                                        SET_BIT(RCC->APB1ENR, RCC_APB1_111ENR_WWDG_111EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_WWDGEN);\
+                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1_111ENR_WWDG_111EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_SPI2_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB1ENR, RCC_APB1ENR_SPI2EN);\
+                                        SET_BIT(RCC->APB1ENR, RCC_APB1_111ENR_SPI2EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_SPI2EN);\
+                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1_111ENR_SPI2EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_USART2_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB1ENR, RCC_APB1ENR_USART2EN);\
+                                        SET_BIT(RCC->APB1ENR, RCC_APB1_111ENR_USART2EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_USART2EN);\
+                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1_111ENR_USART2EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_I2C1_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB1ENR, RCC_APB1ENR_I2C1EN);\
+                                        SET_BIT(RCC->APB1ENR, RCC_APB1_111ENR_I2C1EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_I2C1EN);\
+                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1_111ENR_I2C1EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_I2C2_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB1ENR, RCC_APB1ENR_I2C2EN);\
+                                        SET_BIT(RCC->APB1ENR, RCC_APB1_111ENR_I2C2EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_I2C2EN);\
+                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1_111ENR_I2C2EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_PWR_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);\
+                                        SET_BIT(RCC->APB1ENR, RCC_APB1_111ENR_PWREN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);\
+                                        tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1_111ENR_PWREN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 
-#define __HAL_RCC_TIM5_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1ENR_TIM5EN))
-#define __HAL_RCC_WWDG_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1ENR_WWDGEN))
-#define __HAL_RCC_SPI2_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1ENR_SPI2EN))
-#define __HAL_RCC_USART2_CLK_DISABLE() (RCC->APB1ENR &= ~(RCC_APB1ENR_USART2EN))
-#define __HAL_RCC_I2C1_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1ENR_I2C1EN))
-#define __HAL_RCC_I2C2_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1ENR_I2C2EN))
-#define __HAL_RCC_PWR_CLK_DISABLE()    (RCC->APB1ENR &= ~(RCC_APB1ENR_PWREN))
+#define __HAL_RCC_TIM5_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1_111ENR_TIM5EN))
+#define __HAL_RCC_WWDG_111_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1_111ENR_WWDG_111EN))
+#define __HAL_RCC_SPI2_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1_111ENR_SPI2EN))
+#define __HAL_RCC_USART2_CLK_DISABLE() (RCC->APB1ENR &= ~(RCC_APB1_111ENR_USART2EN))
+#define __HAL_RCC_I2C1_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1_111ENR_I2C1EN))
+#define __HAL_RCC_I2C2_CLK_DISABLE()   (RCC->APB1ENR &= ~(RCC_APB1_111ENR_I2C2EN))
+#define __HAL_RCC_PWR_CLK_DISABLE()    (RCC->APB1ENR &= ~(RCC_APB1_111ENR_PWREN))
 /**
   * @}
   */
 
-/** @defgroup RCC_APB1_Peripheral_Clock_Enable_Disable_Status APB1 Peripheral Clock Enable Disable Status
+/** @defgroup RCC_APB1_111_Peripheral_Clock_Enable_Disable_Status APB1 Peripheral Clock Enable Disable Status
   * @brief  Get the enable or disable status of the APB1 peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before
   *         using it.
   * @{
   */
-#define __HAL_RCC_TIM5_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_TIM5EN)) != RESET)
-#define __HAL_RCC_WWDG_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_WWDGEN)) != RESET)
-#define __HAL_RCC_SPI2_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_SPI2EN)) != RESET)
-#define __HAL_RCC_USART2_IS_CLK_ENABLED() ((RCC->APB1ENR & (RCC_APB1ENR_USART2EN)) != RESET)
-#define __HAL_RCC_I2C1_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_I2C1EN)) != RESET)
-#define __HAL_RCC_I2C2_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_I2C2EN)) != RESET)
-#define __HAL_RCC_PWR_IS_CLK_ENABLED()    ((RCC->APB1ENR & (RCC_APB1ENR_PWREN)) != RESET)
+#define __HAL_RCC_TIM5_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_TIM5EN)) != RESET)
+#define __HAL_RCC_WWDG_111_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_WWDG_111EN)) != RESET)
+#define __HAL_RCC_SPI2_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_SPI2EN)) != RESET)
+#define __HAL_RCC_USART2_IS_CLK_ENABLED() ((RCC->APB1ENR & (RCC_APB1_111ENR_USART2EN)) != RESET)
+#define __HAL_RCC_I2C1_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_I2C1EN)) != RESET)
+#define __HAL_RCC_I2C2_IS_CLK_ENABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_I2C2EN)) != RESET)
+#define __HAL_RCC_PWR_IS_CLK_ENABLED()    ((RCC->APB1ENR & (RCC_APB1_111ENR_PWREN)) != RESET)
 
-#define __HAL_RCC_TIM5_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_TIM5EN)) == RESET)
-#define __HAL_RCC_WWDG_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_WWDGEN)) == RESET)
-#define __HAL_RCC_SPI2_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_SPI2EN)) == RESET)
-#define __HAL_RCC_USART2_IS_CLK_DISABLED() ((RCC->APB1ENR & (RCC_APB1ENR_USART2EN)) == RESET)
-#define __HAL_RCC_I2C1_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_I2C1EN)) == RESET)
-#define __HAL_RCC_I2C2_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1ENR_I2C2EN)) == RESET)
-#define __HAL_RCC_PWR_IS_CLK_DISABLED()    ((RCC->APB1ENR & (RCC_APB1ENR_PWREN)) == RESET)
+#define __HAL_RCC_TIM5_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_TIM5EN)) == RESET)
+#define __HAL_RCC_WWDG_111_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_WWDG_111EN)) == RESET)
+#define __HAL_RCC_SPI2_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_SPI2EN)) == RESET)
+#define __HAL_RCC_USART2_IS_CLK_DISABLED() ((RCC->APB1ENR & (RCC_APB1_111ENR_USART2EN)) == RESET)
+#define __HAL_RCC_I2C1_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_I2C1EN)) == RESET)
+#define __HAL_RCC_I2C2_IS_CLK_DISABLED()   ((RCC->APB1ENR & (RCC_APB1_111ENR_I2C2EN)) == RESET)
+#define __HAL_RCC_PWR_IS_CLK_DISABLED()    ((RCC->APB1ENR & (RCC_APB1_111ENR_PWREN)) == RESET)
 /**
   * @}
   */
 
-/** @defgroup RCC_APB2_Clock_Enable_Disable APB2 Peripheral Clock Enable Disable
+/** @defgroup RCC_APB2_111_Clock_Enable_Disable APB2 Peripheral Clock Enable Disable
   * @brief  Enable or disable the High Speed APB (APB2) peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before
@@ -563,177 +563,177 @@ typedef struct
   */
 #define __HAL_RCC_TIM1_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_TIM1EN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_TIM1EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_TIM1EN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_TIM1EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_USART1_CLK_ENABLE()   do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_USART1EN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_USART1EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_USART1EN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_USART1EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_USART6_CLK_ENABLE()   do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_USART6EN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_USART6EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_USART6EN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_USART6EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_ADC1_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_ADC1EN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_ADC1EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_ADC1EN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_ADC1EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_SPI1_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_SPI1EN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_SPI1EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_SPI1EN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_SPI1EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_SYSCFG_CLK_ENABLE()   do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_SYSCFGEN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_SYSCFGEN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_SYSCFGEN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_SYSCFGEN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_TIM9_CLK_ENABLE()     do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_TIM9EN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_TIM9EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_TIM9EN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_TIM9EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 #define __HAL_RCC_TIM11_CLK_ENABLE()    do { \
                                         __IO uint32_t tmpreg = 0x00U; \
-                                        SET_BIT(RCC->APB2ENR, RCC_APB2ENR_TIM11EN);\
+                                        SET_BIT(RCC->APB2ENR, RCC_APB2_111ENR_TIM11EN);\
                                         /* Delay after an RCC peripheral clock enabling */ \
-                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2ENR_TIM11EN);\
+                                        tmpreg = READ_BIT(RCC->APB2ENR, RCC_APB2_111ENR_TIM11EN);\
                                         UNUSED(tmpreg); \
                                           } while(0U)
 
-#define __HAL_RCC_TIM1_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2ENR_TIM1EN))
-#define __HAL_RCC_USART1_CLK_DISABLE() (RCC->APB2ENR &= ~(RCC_APB2ENR_USART1EN))
-#define __HAL_RCC_USART6_CLK_DISABLE() (RCC->APB2ENR &= ~(RCC_APB2ENR_USART6EN))
-#define __HAL_RCC_ADC1_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2ENR_ADC1EN))
-#define __HAL_RCC_SPI1_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2ENR_SPI1EN))
-#define __HAL_RCC_SYSCFG_CLK_DISABLE() (RCC->APB2ENR &= ~(RCC_APB2ENR_SYSCFGEN))
-#define __HAL_RCC_TIM9_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2ENR_TIM9EN))
-#define __HAL_RCC_TIM11_CLK_DISABLE()  (RCC->APB2ENR &= ~(RCC_APB2ENR_TIM11EN))
+#define __HAL_RCC_TIM1_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2_111ENR_TIM1EN))
+#define __HAL_RCC_USART1_CLK_DISABLE() (RCC->APB2ENR &= ~(RCC_APB2_111ENR_USART1EN))
+#define __HAL_RCC_USART6_CLK_DISABLE() (RCC->APB2ENR &= ~(RCC_APB2_111ENR_USART6EN))
+#define __HAL_RCC_ADC1_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2_111ENR_ADC1EN))
+#define __HAL_RCC_SPI1_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2_111ENR_SPI1EN))
+#define __HAL_RCC_SYSCFG_CLK_DISABLE() (RCC->APB2ENR &= ~(RCC_APB2_111ENR_SYSCFGEN))
+#define __HAL_RCC_TIM9_CLK_DISABLE()   (RCC->APB2ENR &= ~(RCC_APB2_111ENR_TIM9EN))
+#define __HAL_RCC_TIM11_CLK_DISABLE()  (RCC->APB2ENR &= ~(RCC_APB2_111ENR_TIM11EN))
 /**
   * @}
   */
 
-/** @defgroup RCC_APB2_Peripheral_Clock_Enable_Disable_Status APB2 Peripheral Clock Enable Disable Status
+/** @defgroup RCC_APB2_111_Peripheral_Clock_Enable_Disable_Status APB2 Peripheral Clock Enable Disable Status
   * @brief  Get the enable or disable status of the APB2 peripheral clock.
   * @note   After reset, the peripheral clock (used for registers read/write access)
   *         is disabled and the application software has to enable this clock before
   *         using it.
   * @{
   */
-#define __HAL_RCC_TIM1_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_TIM1EN)) != RESET)
-#define __HAL_RCC_USART1_IS_CLK_ENABLED() ((RCC->APB2ENR & (RCC_APB2ENR_USART1EN)) != RESET)
-#define __HAL_RCC_USART6_IS_CLK_ENABLED() ((RCC->APB2ENR & (RCC_APB2ENR_USART6EN)) != RESET)
-#define __HAL_RCC_ADC1_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_ADC1EN)) != RESET)
-#define __HAL_RCC_SPI1_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_SPI1EN)) != RESET)
-#define __HAL_RCC_SYSCFG_IS_CLK_ENABLED() ((RCC->APB2ENR & (RCC_APB2ENR_SYSCFGEN)) != RESET)
-#define __HAL_RCC_TIM9_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_TIM9EN)) != RESET)
-#define __HAL_RCC_TIM11_IS_CLK_ENABLED()  ((RCC->APB2ENR & (RCC_APB2ENR_TIM11EN)) != RESET)
+#define __HAL_RCC_TIM1_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_TIM1EN)) != RESET)
+#define __HAL_RCC_USART1_IS_CLK_ENABLED() ((RCC->APB2ENR & (RCC_APB2_111ENR_USART1EN)) != RESET)
+#define __HAL_RCC_USART6_IS_CLK_ENABLED() ((RCC->APB2ENR & (RCC_APB2_111ENR_USART6EN)) != RESET)
+#define __HAL_RCC_ADC1_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_ADC1EN)) != RESET)
+#define __HAL_RCC_SPI1_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_SPI1EN)) != RESET)
+#define __HAL_RCC_SYSCFG_IS_CLK_ENABLED() ((RCC->APB2ENR & (RCC_APB2_111ENR_SYSCFGEN)) != RESET)
+#define __HAL_RCC_TIM9_IS_CLK_ENABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_TIM9EN)) != RESET)
+#define __HAL_RCC_TIM11_IS_CLK_ENABLED()  ((RCC->APB2ENR & (RCC_APB2_111ENR_TIM11EN)) != RESET)
 
-#define __HAL_RCC_TIM1_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_TIM1EN)) == RESET)
-#define __HAL_RCC_USART1_IS_CLK_DISABLED() ((RCC->APB2ENR & (RCC_APB2ENR_USART1EN)) == RESET)
-#define __HAL_RCC_USART6_IS_CLK_DISABLED() ((RCC->APB2ENR & (RCC_APB2ENR_USART6EN)) == RESET)
-#define __HAL_RCC_ADC1_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_ADC1EN)) == RESET)
-#define __HAL_RCC_SPI1_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_SPI1EN)) == RESET)
-#define __HAL_RCC_SYSCFG_IS_CLK_DISABLED() ((RCC->APB2ENR & (RCC_APB2ENR_SYSCFGEN)) == RESET)
-#define __HAL_RCC_TIM9_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2ENR_TIM9EN)) == RESET)
-#define __HAL_RCC_TIM11_IS_CLK_DISABLED()  ((RCC->APB2ENR & (RCC_APB2ENR_TIM11EN)) == RESET)
+#define __HAL_RCC_TIM1_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_TIM1EN)) == RESET)
+#define __HAL_RCC_USART1_IS_CLK_DISABLED() ((RCC->APB2ENR & (RCC_APB2_111ENR_USART1EN)) == RESET)
+#define __HAL_RCC_USART6_IS_CLK_DISABLED() ((RCC->APB2ENR & (RCC_APB2_111ENR_USART6EN)) == RESET)
+#define __HAL_RCC_ADC1_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_ADC1EN)) == RESET)
+#define __HAL_RCC_SPI1_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_SPI1EN)) == RESET)
+#define __HAL_RCC_SYSCFG_IS_CLK_DISABLED() ((RCC->APB2ENR & (RCC_APB2_111ENR_SYSCFGEN)) == RESET)
+#define __HAL_RCC_TIM9_IS_CLK_DISABLED()   ((RCC->APB2ENR & (RCC_APB2_111ENR_TIM9EN)) == RESET)
+#define __HAL_RCC_TIM11_IS_CLK_DISABLED()  ((RCC->APB2ENR & (RCC_APB2_111ENR_TIM11EN)) == RESET)
 /**
   * @}
   */
 
-/** @defgroup RCC_AHB1_Force_Release_Reset AHB1 Force Release Reset
+/** @defgroup RCC_AHB1_111_Force_Release_Reset AHB1 Force Release Reset
   * @brief  Force or release AHB1 peripheral reset.
   * @{
   */
-#define __HAL_RCC_AHB1_FORCE_RESET()    (RCC->AHB1RSTR = 0xFFFFFFFFU)
-#define __HAL_RCC_GPIOA_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1RSTR_GPIOARST))
-#define __HAL_RCC_GPIOB_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1RSTR_GPIOBRST))
-#define __HAL_RCC_GPIOC_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1RSTR_GPIOCRST))
-#define __HAL_RCC_GPIOH_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1RSTR_GPIOHRST))
-#define __HAL_RCC_DMA1_FORCE_RESET()    (RCC->AHB1RSTR |= (RCC_AHB1RSTR_DMA1RST))
-#define __HAL_RCC_DMA2_FORCE_RESET()    (RCC->AHB1RSTR |= (RCC_AHB1RSTR_DMA2RST))
+#define __HAL_RCC_AHB1_111_FORCE_RESET()    (RCC->AHB1RSTR = 0xFFFFFFFFU)
+#define __HAL_RCC_GPIOA_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1_111RSTR_111GPIOARST_111))
+#define __HAL_RCC_GPIOB_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1_111RSTR_111GPIOBRST_111))
+#define __HAL_RCC_GPIOC_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1_111RSTR_111GPIOCRST_111))
+#define __HAL_RCC_GPIOH_FORCE_RESET()   (RCC->AHB1RSTR |= (RCC_AHB1_111RSTR_111GPIOHRST_111))
+#define __HAL_RCC_DMA1_FORCE_RESET()    (RCC->AHB1RSTR |= (RCC_AHB1_111RSTR_111DMA1RST_111))
+#define __HAL_RCC_DMA2_FORCE_RESET()    (RCC->AHB1RSTR |= (RCC_AHB1_111RSTR_111DMA2RST))
 
-#define __HAL_RCC_AHB1_RELEASE_RESET()  (RCC->AHB1RSTR = 0x00U)
-#define __HAL_RCC_GPIOA_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOARST))
-#define __HAL_RCC_GPIOB_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOBRST))
-#define __HAL_RCC_GPIOC_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOCRST))
-#define __HAL_RCC_GPIOH_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_GPIOHRST))
-#define __HAL_RCC_DMA1_RELEASE_RESET()  (RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_DMA1RST))
-#define __HAL_RCC_DMA2_RELEASE_RESET()  (RCC->AHB1RSTR &= ~(RCC_AHB1RSTR_DMA2RST))
+#define __HAL_RCC_AHB1_111_RELEASE_RESET()  (RCC->AHB1RSTR = 0x00U)
+#define __HAL_RCC_GPIOA_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1_111RSTR_111GPIOARST_111))
+#define __HAL_RCC_GPIOB_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1_111RSTR_111GPIOBRST_111))
+#define __HAL_RCC_GPIOC_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1_111RSTR_111GPIOCRST_111))
+#define __HAL_RCC_GPIOH_RELEASE_RESET() (RCC->AHB1RSTR &= ~(RCC_AHB1_111RSTR_111GPIOHRST_111))
+#define __HAL_RCC_DMA1_RELEASE_RESET()  (RCC->AHB1RSTR &= ~(RCC_AHB1_111RSTR_111DMA1RST_111))
+#define __HAL_RCC_DMA2_RELEASE_RESET()  (RCC->AHB1RSTR &= ~(RCC_AHB1_111RSTR_111DMA2RST))
 /**
   * @}
   */
 
-/** @defgroup RCC_APB1_Force_Release_Reset APB1 Force Release Reset
+/** @defgroup RCC_APB1_111_Force_Release_Reset APB1 Force Release Reset
   * @brief  Force or release APB1 peripheral reset.
   * @{
   */
-#define __HAL_RCC_APB1_FORCE_RESET()     (RCC->APB1RSTR = 0xFFFFFFFFU)
-#define __HAL_RCC_TIM5_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1RSTR_TIM5RST))
-#define __HAL_RCC_WWDG_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1RSTR_WWDGRST))
-#define __HAL_RCC_SPI2_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1RSTR_SPI2RST))
-#define __HAL_RCC_USART2_FORCE_RESET()   (RCC->APB1RSTR |= (RCC_APB1RSTR_USART2RST))
-#define __HAL_RCC_I2C1_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1RSTR_I2C1RST))
-#define __HAL_RCC_I2C2_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1RSTR_I2C2RST))
-#define __HAL_RCC_PWR_FORCE_RESET()      (RCC->APB1RSTR |= (RCC_APB1RSTR_PWRRST))
+#define __HAL_RCC_APB1_111_FORCE_RESET()     (RCC->APB1RSTR = 0xFFFFFFFFU)
+#define __HAL_RCC_TIM5_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1_111RSTR_111_TIM5RST))
+#define __HAL_RCC_WWDG_111_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1_111RSTR_111_WWDG_111RST))
+#define __HAL_RCC_SPI2_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1_111RSTR_111_SPI2RST))
+#define __HAL_RCC_USART2_FORCE_RESET()   (RCC->APB1RSTR |= (RCC_APB1_111RSTR_111_USART2RST))
+#define __HAL_RCC_I2C1_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1_111RSTR_111_I2C1RST))
+#define __HAL_RCC_I2C2_FORCE_RESET()     (RCC->APB1RSTR |= (RCC_APB1_111RSTR_111_I2C2RST))
+#define __HAL_RCC_PWR_FORCE_RESET()      (RCC->APB1RSTR |= (RCC_APB1_111RSTR_111_PWRRST))
 
-#define __HAL_RCC_APB1_RELEASE_RESET()   (RCC->APB1RSTR = 0x00U)
-#define __HAL_RCC_TIM5_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1RSTR_TIM5RST))
-#define __HAL_RCC_WWDG_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1RSTR_WWDGRST))
-#define __HAL_RCC_SPI2_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1RSTR_SPI2RST))
-#define __HAL_RCC_USART2_RELEASE_RESET() (RCC->APB1RSTR &= ~(RCC_APB1RSTR_USART2RST))
-#define __HAL_RCC_I2C1_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1RSTR_I2C1RST))
-#define __HAL_RCC_I2C2_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1RSTR_I2C2RST))
-#define __HAL_RCC_PWR_RELEASE_RESET()    (RCC->APB1RSTR &= ~(RCC_APB1RSTR_PWRRST))
+#define __HAL_RCC_APB1_111_RELEASE_RESET()   (RCC->APB1RSTR = 0x00U)
+#define __HAL_RCC_TIM5_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1_111RSTR_111_TIM5RST))
+#define __HAL_RCC_WWDG_111_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1_111RSTR_111_WWDG_111RST))
+#define __HAL_RCC_SPI2_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1_111RSTR_111_SPI2RST))
+#define __HAL_RCC_USART2_RELEASE_RESET() (RCC->APB1RSTR &= ~(RCC_APB1_111RSTR_111_USART2RST))
+#define __HAL_RCC_I2C1_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1_111RSTR_111_I2C1RST))
+#define __HAL_RCC_I2C2_RELEASE_RESET()   (RCC->APB1RSTR &= ~(RCC_APB1_111RSTR_111_I2C2RST))
+#define __HAL_RCC_PWR_RELEASE_RESET()    (RCC->APB1RSTR &= ~(RCC_APB1_111RSTR_111_PWRRST))
 /**
   * @}
   */
 
-/** @defgroup RCC_APB2_Force_Release_Reset APB2 Force Release Reset
+/** @defgroup RCC_APB2_111_Force_Release_Reset APB2 Force Release Reset
   * @brief  Force or release APB2 peripheral reset.
   * @{
   */
-#define __HAL_RCC_APB2_FORCE_RESET()     (RCC->APB2RSTR = 0xFFFFFFFFU)
-#define __HAL_RCC_TIM1_FORCE_RESET()     (RCC->APB2RSTR |= (RCC_APB2RSTR_TIM1RST))
-#define __HAL_RCC_USART1_FORCE_RESET()   (RCC->APB2RSTR |= (RCC_APB2RSTR_USART1RST))
-#define __HAL_RCC_USART6_FORCE_RESET()   (RCC->APB2RSTR |= (RCC_APB2RSTR_USART6RST))
-#define __HAL_RCC_ADC_FORCE_RESET()      (RCC->APB2RSTR |= (RCC_APB2RSTR_ADCRST))
-#define __HAL_RCC_SPI1_FORCE_RESET()     (RCC->APB2RSTR |= (RCC_APB2RSTR_SPI1RST))
-#define __HAL_RCC_SYSCFG_FORCE_RESET()   (RCC->APB2RSTR |= (RCC_APB2RSTR_SYSCFGRST))
-#define __HAL_RCC_TIM9_FORCE_RESET()     (RCC->APB2RSTR |= (RCC_APB2RSTR_TIM9RST))
-#define __HAL_RCC_TIM11_FORCE_RESET()    (RCC->APB2RSTR |= (RCC_APB2RSTR_TIM11RST))
+#define __HAL_RCC_APB2_111_FORCE_RESET()     (RCC->APB2RSTR = 0xFFFFFFFFU)
+#define __HAL_RCC_TIM1_FORCE_RESET()     (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_TIM1RST))
+#define __HAL_RCC_USART1_FORCE_RESET()   (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_USART1RST))
+#define __HAL_RCC_USART6_FORCE_RESET()   (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_USART6RST))
+#define __HAL_RCC_ADC_FORCE_RESET()      (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_ADCRST))
+#define __HAL_RCC_SPI1_FORCE_RESET()     (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_SPI1RST))
+#define __HAL_RCC_SYSCFG_FORCE_RESET()   (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_SYSCFGRST))
+#define __HAL_RCC_TIM9_FORCE_RESET()     (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_TIM9RST))
+#define __HAL_RCC_TIM11_FORCE_RESET()    (RCC->APB2RSTR |= (RCC_APB2_111RSTR_111_TIM11RST))
 
-#define __HAL_RCC_APB2_RELEASE_RESET()   (RCC->APB2RSTR = 0x00U)
-#define __HAL_RCC_TIM1_RELEASE_RESET()   (RCC->APB2RSTR &= ~(RCC_APB2RSTR_TIM1RST))
-#define __HAL_RCC_USART1_RELEASE_RESET() (RCC->APB2RSTR &= ~(RCC_APB2RSTR_USART1RST))
-#define __HAL_RCC_USART6_RELEASE_RESET() (RCC->APB2RSTR &= ~(RCC_APB2RSTR_USART6RST))
-#define __HAL_RCC_ADC_RELEASE_RESET()    (RCC->APB2RSTR &= ~(RCC_APB2RSTR_ADCRST))
-#define __HAL_RCC_SPI1_RELEASE_RESET()   (RCC->APB2RSTR &= ~(RCC_APB2RSTR_SPI1RST))
-#define __HAL_RCC_SYSCFG_RELEASE_RESET() (RCC->APB2RSTR &= ~(RCC_APB2RSTR_SYSCFGRST))
-#define __HAL_RCC_TIM9_RELEASE_RESET()   (RCC->APB2RSTR &= ~(RCC_APB2RSTR_TIM9RST))
-#define __HAL_RCC_TIM11_RELEASE_RESET()  (RCC->APB2RSTR &= ~(RCC_APB2RSTR_TIM11RST))
+#define __HAL_RCC_APB2_111_RELEASE_RESET()   (RCC->APB2RSTR = 0x00U)
+#define __HAL_RCC_TIM1_RELEASE_RESET()   (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_TIM1RST))
+#define __HAL_RCC_USART1_RELEASE_RESET() (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_USART1RST))
+#define __HAL_RCC_USART6_RELEASE_RESET() (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_USART6RST))
+#define __HAL_RCC_ADC_RELEASE_RESET()    (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_ADCRST))
+#define __HAL_RCC_SPI1_RELEASE_RESET()   (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_SPI1RST))
+#define __HAL_RCC_SYSCFG_RELEASE_RESET() (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_SYSCFGRST))
+#define __HAL_RCC_TIM9_RELEASE_RESET()   (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_TIM9RST))
+#define __HAL_RCC_TIM11_RELEASE_RESET()  (RCC->APB2RSTR &= ~(RCC_APB2_111RSTR_111_TIM11RST))
 /**
   * @}
   */
 
-/** @defgroup RCC_AHB1_LowPower_Enable_Disable AHB1 Peripheral Low Power Enable Disable
+/** @defgroup RCC_AHB1_111_LowPower_Enable_Disable AHB1 Peripheral Low Power Enable Disable
   * @brief  Enable or disable the AHB1 peripheral clock during Low Power (Sleep) mode.
   * @note   Peripheral clock gating in SLEEP mode can be used to further reduce
   *         power consumption.
@@ -741,24 +741,24 @@ typedef struct
   * @note   By default, all peripheral clocks are enabled during SLEEP mode.
   * @{
   */
-#define __HAL_RCC_GPIOA_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1LPENR_GPIOALPEN))
-#define __HAL_RCC_GPIOB_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1LPENR_GPIOBLPEN))
-#define __HAL_RCC_GPIOC_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1LPENR_GPIOCLPEN))
-#define __HAL_RCC_GPIOH_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1LPENR_GPIOHLPEN))
-#define __HAL_RCC_DMA1_CLK_SLEEP_ENABLE()     (RCC->AHB1LPENR |= (RCC_AHB1LPENR_DMA1LPEN))
-#define __HAL_RCC_DMA2_CLK_SLEEP_ENABLE()     (RCC->AHB1LPENR |= (RCC_AHB1LPENR_DMA2LPEN))
+#define __HAL_RCC_GPIOA_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1_111LPENR_GPIOALPEN))
+#define __HAL_RCC_GPIOB_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1_111LPENR_GPIOBLPEN))
+#define __HAL_RCC_GPIOC_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1_111LPENR_GPIOCLPEN))
+#define __HAL_RCC_GPIOH_CLK_SLEEP_ENABLE()    (RCC->AHB1LPENR |= (RCC_AHB1_111LPENR_GPIOHLPEN))
+#define __HAL_RCC_DMA1_CLK_SLEEP_ENABLE()     (RCC->AHB1LPENR |= (RCC_AHB1_111LPENR_DMA1LPEN))
+#define __HAL_RCC_DMA2_CLK_SLEEP_ENABLE()     (RCC->AHB1LPENR |= (RCC_AHB1_111LPENR_DMA2LPEN))
 
-#define __HAL_RCC_GPIOA_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1LPENR_GPIOALPEN))
-#define __HAL_RCC_GPIOB_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1LPENR_GPIOBLPEN))
-#define __HAL_RCC_GPIOC_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1LPENR_GPIOCLPEN))
-#define __HAL_RCC_GPIOH_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1LPENR_GPIOHLPEN))
-#define __HAL_RCC_DMA1_CLK_SLEEP_DISABLE()    (RCC->AHB1LPENR &= ~(RCC_AHB1LPENR_DMA1LPEN))
-#define __HAL_RCC_DMA2_CLK_SLEEP_DISABLE()    (RCC->AHB1LPENR &= ~(RCC_AHB1LPENR_DMA2LPEN))
+#define __HAL_RCC_GPIOA_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1_111LPENR_GPIOALPEN))
+#define __HAL_RCC_GPIOB_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1_111LPENR_GPIOBLPEN))
+#define __HAL_RCC_GPIOC_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1_111LPENR_GPIOCLPEN))
+#define __HAL_RCC_GPIOH_CLK_SLEEP_DISABLE()   (RCC->AHB1LPENR &= ~(RCC_AHB1_111LPENR_GPIOHLPEN))
+#define __HAL_RCC_DMA1_CLK_SLEEP_DISABLE()    (RCC->AHB1LPENR &= ~(RCC_AHB1_111LPENR_DMA1LPEN))
+#define __HAL_RCC_DMA2_CLK_SLEEP_DISABLE()    (RCC->AHB1LPENR &= ~(RCC_AHB1_111LPENR_DMA2LPEN))
 /**
   * @}
   */
 
-/** @defgroup RCC_APB1_LowPower_Enable_Disable APB1 Peripheral Low Power Enable Disable
+/** @defgroup RCC_APB1_111_LowPower_Enable_Disable APB1 Peripheral Low Power Enable Disable
   * @brief  Enable or disable the APB1 peripheral clock during Low Power (Sleep) mode.
   * @note   Peripheral clock gating in SLEEP mode can be used to further reduce
   *         power consumption.
@@ -766,26 +766,26 @@ typedef struct
   * @note   By default, all peripheral clocks are enabled during SLEEP mode.
   * @{
   */
-#define __HAL_RCC_TIM5_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1LPENR_TIM5LPEN))
-#define __HAL_RCC_WWDG_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1LPENR_WWDGLPEN))
-#define __HAL_RCC_SPI2_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1LPENR_SPI2LPEN))
-#define __HAL_RCC_USART2_CLK_SLEEP_ENABLE()  (RCC->APB1LPENR |= (RCC_APB1LPENR_USART2LPEN))
-#define __HAL_RCC_I2C1_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1LPENR_I2C1LPEN))
-#define __HAL_RCC_I2C2_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1LPENR_I2C2LPEN))
-#define __HAL_RCC_PWR_CLK_SLEEP_ENABLE()     (RCC->APB1LPENR |= (RCC_APB1LPENR_PWRLPEN))
+#define __HAL_RCC_TIM5_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1_111LPENR_TIM5LPEN))
+#define __HAL_RCC_WWDG_111_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1_111LPENR_WWDG_111LPEN))
+#define __HAL_RCC_SPI2_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1_111LPENR_SPI2LPEN))
+#define __HAL_RCC_USART2_CLK_SLEEP_ENABLE()  (RCC->APB1LPENR |= (RCC_APB1_111LPENR_USART2LPEN))
+#define __HAL_RCC_I2C1_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1_111LPENR_I2C1LPEN))
+#define __HAL_RCC_I2C2_CLK_SLEEP_ENABLE()    (RCC->APB1LPENR |= (RCC_APB1_111LPENR_I2C2LPEN))
+#define __HAL_RCC_PWR_CLK_SLEEP_ENABLE()     (RCC->APB1LPENR |= (RCC_APB1_111LPENR_PWRLPEN))
 
-#define __HAL_RCC_TIM5_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1LPENR_TIM5LPEN))
-#define __HAL_RCC_WWDG_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1LPENR_WWDGLPEN))
-#define __HAL_RCC_SPI2_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1LPENR_SPI2LPEN))
-#define __HAL_RCC_USART2_CLK_SLEEP_DISABLE() (RCC->APB1LPENR &= ~(RCC_APB1LPENR_USART2LPEN))
-#define __HAL_RCC_I2C1_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1LPENR_I2C1LPEN))
-#define __HAL_RCC_I2C2_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1LPENR_I2C2LPEN))
-#define __HAL_RCC_PWR_CLK_SLEEP_DISABLE()    (RCC->APB1LPENR &= ~(RCC_APB1LPENR_PWRLPEN))
+#define __HAL_RCC_TIM5_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1_111LPENR_TIM5LPEN))
+#define __HAL_RCC_WWDG_111_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1_111LPENR_WWDG_111LPEN))
+#define __HAL_RCC_SPI2_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1_111LPENR_SPI2LPEN))
+#define __HAL_RCC_USART2_CLK_SLEEP_DISABLE() (RCC->APB1LPENR &= ~(RCC_APB1_111LPENR_USART2LPEN))
+#define __HAL_RCC_I2C1_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1_111LPENR_I2C1LPEN))
+#define __HAL_RCC_I2C2_CLK_SLEEP_DISABLE()   (RCC->APB1LPENR &= ~(RCC_APB1_111LPENR_I2C2LPEN))
+#define __HAL_RCC_PWR_CLK_SLEEP_DISABLE()    (RCC->APB1LPENR &= ~(RCC_APB1_111LPENR_PWRLPEN))
 /**
   * @}
   */
 
-/** @defgroup RCC_APB2_LowPower_Enable_Disable APB2 Peripheral Low Power Enable Disable
+/** @defgroup RCC_APB2_111_LowPower_Enable_Disable APB2 Peripheral Low Power Enable Disable
   * @brief  Enable or disable the APB2 peripheral clock during Low Power (Sleep) mode.
   * @note   Peripheral clock gating in SLEEP mode can be used to further reduce
   *         power consumption.
@@ -793,23 +793,23 @@ typedef struct
   * @note   By default, all peripheral clocks are enabled during SLEEP mode.
   * @{
   */
-#define __HAL_RCC_TIM1_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2LPENR_TIM1LPEN))
-#define __HAL_RCC_USART1_CLK_SLEEP_ENABLE()  (RCC->APB2LPENR |= (RCC_APB2LPENR_USART1LPEN))
-#define __HAL_RCC_USART6_CLK_SLEEP_ENABLE()  (RCC->APB2LPENR |= (RCC_APB2LPENR_USART6LPEN))
-#define __HAL_RCC_ADC1_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2LPENR_ADC1LPEN))
-#define __HAL_RCC_SPI1_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2LPENR_SPI1LPEN))
-#define __HAL_RCC_SYSCFG_CLK_SLEEP_ENABLE()  (RCC->APB2LPENR |= (RCC_APB2LPENR_SYSCFGLPEN))
-#define __HAL_RCC_TIM9_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2LPENR_TIM9LPEN))
-#define __HAL_RCC_TIM11_CLK_SLEEP_ENABLE()   (RCC->APB2LPENR |= (RCC_APB2LPENR_TIM11LPEN))
+#define __HAL_RCC_TIM1_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2_111LPENR_TIM1LPEN))
+#define __HAL_RCC_USART1_CLK_SLEEP_ENABLE()  (RCC->APB2LPENR |= (RCC_APB2_111LPENR_USART1LPEN))
+#define __HAL_RCC_USART6_CLK_SLEEP_ENABLE()  (RCC->APB2LPENR |= (RCC_APB2_111LPENR_USART6LPEN))
+#define __HAL_RCC_ADC1_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2_111LPENR_ADC1LPEN))
+#define __HAL_RCC_SPI1_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2_111LPENR_SPI1LPEN))
+#define __HAL_RCC_SYSCFG_CLK_SLEEP_ENABLE()  (RCC->APB2LPENR |= (RCC_APB2_111LPENR_SYSCFGLPEN))
+#define __HAL_RCC_TIM9_CLK_SLEEP_ENABLE()    (RCC->APB2LPENR |= (RCC_APB2_111LPENR_TIM9LPEN))
+#define __HAL_RCC_TIM11_CLK_SLEEP_ENABLE()   (RCC->APB2LPENR |= (RCC_APB2_111LPENR_TIM11LPEN))
 
-#define __HAL_RCC_TIM1_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2LPENR_TIM1LPEN))
-#define __HAL_RCC_USART1_CLK_SLEEP_DISABLE() (RCC->APB2LPENR &= ~(RCC_APB2LPENR_USART1LPEN))
-#define __HAL_RCC_USART6_CLK_SLEEP_DISABLE() (RCC->APB2LPENR &= ~(RCC_APB2LPENR_USART6LPEN))
-#define __HAL_RCC_ADC1_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2LPENR_ADC1LPEN))
-#define __HAL_RCC_SPI1_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2LPENR_SPI1LPEN))
-#define __HAL_RCC_SYSCFG_CLK_SLEEP_DISABLE() (RCC->APB2LPENR &= ~(RCC_APB2LPENR_SYSCFGLPEN))
-#define __HAL_RCC_TIM9_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2LPENR_TIM9LPEN))
-#define __HAL_RCC_TIM11_CLK_SLEEP_DISABLE()  (RCC->APB2LPENR &= ~(RCC_APB2LPENR_TIM11LPEN))
+#define __HAL_RCC_TIM1_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_TIM1LPEN))
+#define __HAL_RCC_USART1_CLK_SLEEP_DISABLE() (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_USART1LPEN))
+#define __HAL_RCC_USART6_CLK_SLEEP_DISABLE() (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_USART6LPEN))
+#define __HAL_RCC_ADC1_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_ADC1LPEN))
+#define __HAL_RCC_SPI1_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_SPI1LPEN))
+#define __HAL_RCC_SYSCFG_CLK_SLEEP_DISABLE() (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_SYSCFGLPEN))
+#define __HAL_RCC_TIM9_CLK_SLEEP_DISABLE()   (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_TIM9LPEN))
+#define __HAL_RCC_TIM11_CLK_SLEEP_DISABLE()  (RCC->APB2LPENR &= ~(RCC_APB2_111LPENR_TIM11LPEN))
 /**
   * @}
   */
@@ -861,8 +861,8 @@ typedef struct
   * @note   When the LSI is stopped, LSIRDY flag goes low after 6 LSI oscillator
   *         clock cycles.
   */
-#define __HAL_RCC_LSI_ENABLE() (*(__IO uint32_t *) RCC_CSR_LSION_BB = ENABLE)
-#define __HAL_RCC_LSI_DISABLE() (*(__IO uint32_t *) RCC_CSR_LSION_BB = DISABLE)
+#define __HAL_RCC_LSI_ENABLE() (*(__IO uint32_t *) RCC_CSR_111_LSION_BB = ENABLE)
+#define __HAL_RCC_LSI_DISABLE() (*(__IO uint32_t *) RCC_CSR_111_LSION_BB = DISABLE)
 /**
   * @}
   */
@@ -939,17 +939,17 @@ typedef struct
                     do {                                       \
                       if((__STATE__) == RCC_LSE_ON)            \
                       {                                        \
-                        SET_BIT(RCC->BDCR, RCC_BDCR_LSEON);    \
+                        SET_BIT(RCC->BDCR, RCC_BDCR_111_LSEON);    \
                       }                                        \
                       else if((__STATE__) == RCC_LSE_BYPASS)   \
                       {                                        \
-                        SET_BIT(RCC->BDCR, RCC_BDCR_LSEBYP);   \
-                        SET_BIT(RCC->BDCR, RCC_BDCR_LSEON);    \
+                        SET_BIT(RCC->BDCR, RCC_BDCR_111_LSEBYP);   \
+                        SET_BIT(RCC->BDCR, RCC_BDCR_111_LSEON);    \
                       }                                        \
                       else                                     \
                       {                                        \
-                        CLEAR_BIT(RCC->BDCR, RCC_BDCR_LSEON);  \
-                        CLEAR_BIT(RCC->BDCR, RCC_BDCR_LSEBYP); \
+                        CLEAR_BIT(RCC->BDCR, RCC_BDCR_111_LSEON);  \
+                        CLEAR_BIT(RCC->BDCR, RCC_BDCR_111_LSEBYP); \
                       }                                        \
                     } while(0U)
 /**
@@ -963,8 +963,8 @@ typedef struct
 /** @brief  Macros to enable or disable the RTC clock.
   * @note   These macros must be used only after the RTC clock source was selected.
   */
-#define __HAL_RCC_RTC_ENABLE() (*(__IO uint32_t *) RCC_BDCR_RTCEN_BB = ENABLE)
-#define __HAL_RCC_RTC_DISABLE() (*(__IO uint32_t *) RCC_BDCR_RTCEN_BB = DISABLE)
+#define __HAL_RCC_RTC_ENABLE() (*(__IO uint32_t *) RCC_BDCR_111_RTCEN_BB = ENABLE)
+#define __HAL_RCC_RTC_DISABLE() (*(__IO uint32_t *) RCC_BDCR_111_RTCEN_BB = DISABLE)
 
 /** @brief  Macros to configure the RTC clock (RTCCLK).
   * @note   As the RTC clock configuration bits are in the Backup domain and write
@@ -987,7 +987,7 @@ typedef struct
   * @note   The maximum input clock frequency for RTC is 1MHz (when using HSE as
   *         RTC clock source).
   */
-#define __HAL_RCC_RTC_CLKPRESCALER(__RTCCLKSource__) (((__RTCCLKSource__) & RCC_BDCR_RTCSEL) == RCC_BDCR_RTCSEL) ?    \
+#define __HAL_RCC_RTC_CLKPRESCALER(__RTCCLKSource__) (((__RTCCLKSource__) & RCC_BDCR_111_RTCSEL) == RCC_BDCR_111_RTCSEL) ?    \
                                                  MODIFY_REG(RCC->CFGR, RCC_CFGR_RTCPRE_1111, ((__RTCCLKSource__) & 0xFFFFCFFU)) : CLEAR_BIT(RCC->CFGR, RCC_CFGR_RTCPRE_1111)
 
 #define __HAL_RCC_RTC_CONFIG(__RTCCLKSource__) do { __HAL_RCC_RTC_CLKPRESCALER(__RTCCLKSource__);    \
@@ -1001,22 +1001,22 @@ typedef struct
   *            @arg @ref RCC_RTCCLKSOURCE_LSI LSI selected as RTC clock
   *            @arg @ref RCC_RTCCLKSOURCE_HSE_DIVX HSE divided by X selected as RTC clock (X can be retrieved thanks to @ref __HAL_RCC_GET_RTC_HSE_PRESCALER()
   */
-#define __HAL_RCC_GET_RTC_SOURCE() (READ_BIT(RCC->BDCR, RCC_BDCR_RTCSEL))
+#define __HAL_RCC_GET_RTC_SOURCE() (READ_BIT(RCC->BDCR, RCC_BDCR_111_RTCSEL))
 
 /**
   * @brief   Get the RTC and HSE clock divider (RTCPRE).
   * @retval Returned value can be one of the following values:
  *            @arg @ref RCC_RTCCLKSOURCE_HSE_DIVX HSE divided by X selected as RTC clock (X can be retrieved thanks to @ref __HAL_RCC_GET_RTC_HSE_PRESCALER()
   */
-#define  __HAL_RCC_GET_RTC_HSE_PRESCALER() (READ_BIT(RCC->CFGR, RCC_CFGR_RTCPRE_1111) | RCC_BDCR_RTCSEL)
+#define  __HAL_RCC_GET_RTC_HSE_PRESCALER() (READ_BIT(RCC->CFGR, RCC_CFGR_RTCPRE_1111) | RCC_BDCR_111_RTCSEL)
 
 /** @brief  Macros to force or release the Backup domain reset.
   * @note   This function resets the RTC peripheral (including the backup registers)
-  *         and the RTC clock source selection in RCC_CSR register.
+  *         and the RTC clock source selection in RCC_CSR_111 register.
   * @note   The BKPSRAM is not affected by this reset.
   */
-#define __HAL_RCC_BACKUPRESET_FORCE() (*(__IO uint32_t *) RCC_BDCR_BDRST_BB = ENABLE)
-#define __HAL_RCC_BACKUPRESET_RELEASE() (*(__IO uint32_t *) RCC_BDCR_BDRST_BB = DISABLE)
+#define __HAL_RCC_BACKUPRESET_FORCE() (*(__IO uint32_t *) RCC_BDCR_111_BDRST_BB = ENABLE)
+#define __HAL_RCC_BACKUPRESET_RELEASE() (*(__IO uint32_t *) RCC_BDCR_111_BDRST_BB = DISABLE)
 /**
   * @}
   */
@@ -1122,7 +1122,7 @@ typedef struct
   * @param  __MCOCLKSOURCE__ specifies the MCO clock source.
   *          This parameter can be one of the following values:
   *            @arg RCC_MCO2SOURCE_SYSCLK: System clock (SYSCLK) selected as MCO2 source
-  *            @arg RCC_MCO2SOURCE_PLLI2SCLK: PLLI2S clock selected as MCO2 source, available for all STM32F4 devices except STM32F410xx
+  *            @arg RCC_MCO2SOURCE_PLLI2_111SCLK: PLLI2S clock selected as MCO2 source, available for all STM32F4 devices except STM32F410xx
   *            @arg RCC_MCO2SOURCE_I2SCLK: I2SCLK clock selected as MCO2 source, available only for STM32F410Rx devices
   *            @arg RCC_MCO2SOURCE_HSE: HSE clock selected as MCO2 source
   *            @arg RCC_MCO2SOURCE_PLLCLK: main PLL clock selected as MCO2 source
@@ -1156,7 +1156,7 @@ typedef struct
   *            @arg RCC_IT_HSIRDY: HSI ready interrupt.
   *            @arg RCC_IT_HSERDY: HSE ready interrupt.
   *            @arg RCC_IT_PLLRDY: Main PLL ready interrupt.
-  *            @arg RCC_IT_PLLI2SRDY: PLLI2S ready interrupt.
+  *            @arg RCC_IT_PLLI2_111SRDY: PLLI2S ready interrupt.
   */
 #define __HAL_RCC_ENABLE_IT(__INTERRUPT__) (*(__IO uint8_t *) RCC_CIR_BYTE1_ADDRESS |= (__INTERRUPT__))
 
@@ -1169,7 +1169,7 @@ typedef struct
   *            @arg RCC_IT_HSIRDY: HSI ready interrupt.
   *            @arg RCC_IT_HSERDY: HSE ready interrupt.
   *            @arg RCC_IT_PLLRDY: Main PLL ready interrupt.
-  *            @arg RCC_IT_PLLI2SRDY: PLLI2S ready interrupt.
+  *            @arg RCC_IT_PLLI2_111SRDY: PLLI2S ready interrupt.
   */
 #define __HAL_RCC_DISABLE_IT(__INTERRUPT__) (*(__IO uint8_t *) RCC_CIR_BYTE1_ADDRESS &= (uint8_t)(~(__INTERRUPT__)))
 
@@ -1182,7 +1182,7 @@ typedef struct
   *            @arg RCC_IT_HSIRDY: HSI ready interrupt.
   *            @arg RCC_IT_HSERDY: HSE ready interrupt.
   *            @arg RCC_IT_PLLRDY: Main PLL ready interrupt.
-  *            @arg RCC_IT_PLLI2SRDY: PLLI2S ready interrupt.
+  *            @arg RCC_IT_PLLI2_111SRDY: PLLI2S ready interrupt.
   *            @arg RCC_IT_CSS: Clock Security System interrupt
   */
 #define __HAL_RCC_CLEAR_IT(__INTERRUPT__) (*(__IO uint8_t *) RCC_CIR_BYTE2_ADDRESS = (__INTERRUPT__))
@@ -1195,16 +1195,16 @@ typedef struct
   *            @arg RCC_IT_HSIRDY: HSI ready interrupt.
   *            @arg RCC_IT_HSERDY: HSE ready interrupt.
   *            @arg RCC_IT_PLLRDY: Main PLL ready interrupt.
-  *            @arg RCC_IT_PLLI2SRDY: PLLI2S ready interrupt.
+  *            @arg RCC_IT_PLLI2_111SRDY: PLLI2S ready interrupt.
   *            @arg RCC_IT_CSS: Clock Security System interrupt
   * @retval The new state of __INTERRUPT__ (TRUE or FALSE).
   */
 #define __HAL_RCC_GET_IT(__INTERRUPT__) ((RCC->CIR & (__INTERRUPT__)) == (__INTERRUPT__))
 
 /** @brief Set RMVF bit to clear the reset flags: RCC_FLAG_PINRST, RCC_FLAG_PORRST,
-  *        RCC_FLAG_SFTRST, RCC_FLAG_IWDGRST, RCC_FLAG_WWDGRST and RCC_FLAG_LPWRRST.
+  *        RCC_FLAG_SFTRST, RCC_FLAG_IWDGRST, RCC_FLAG_WWDG_111RST and RCC_FLAG_LPWRRST.
   */
-#define __HAL_RCC_CLEAR_RESET_FLAGS() (RCC->CSR |= RCC_CSR_RMVF)
+#define __HAL_RCC_CLEAR_RESET_FLAGS() (RCC->CSR |= RCC_CSR_111_RMVF)
 
 /** @brief  Check RCC flag is set or not.
   * @param  __FLAG__ specifies the flag to check.
@@ -1212,7 +1212,7 @@ typedef struct
   *            @arg RCC_FLAG_HSIRDY: HSI oscillator clock ready.
   *            @arg RCC_FLAG_HSERDY: HSE oscillator clock ready.
   *            @arg RCC_FLAG_PLLRDY: Main PLL clock ready.
-  *            @arg RCC_FLAG_PLLI2SRDY: PLLI2S clock ready.
+  *            @arg RCC_FLAG_PLLI2_111SRDY: PLLI2S clock ready.
   *            @arg RCC_FLAG_LSERDY: LSE oscillator clock ready.
   *            @arg RCC_FLAG_LSIRDY: LSI oscillator clock ready.
   *            @arg RCC_FLAG_BORRST: POR/PDR or BOR reset.
@@ -1220,7 +1220,7 @@ typedef struct
   *            @arg RCC_FLAG_PORRST: POR/PDR reset.
   *            @arg RCC_FLAG_SFTRST: Software reset.
   *            @arg RCC_FLAG_IWDGRST: Independent Watchdog reset.
-  *            @arg RCC_FLAG_WWDGRST: Window Watchdog reset.
+  *            @arg RCC_FLAG_WWDG_111RST: Window Watchdog reset.
   *            @arg RCC_FLAG_LPWRRST: Low Power reset.
   * @retval The new state of __FLAG__ (TRUE or FALSE).
   */
@@ -1305,18 +1305,18 @@ void HAL_RCC_CSSCallback(void);
 
 /* --- BDCR Register --- */
 /* Alias word address of RTCEN bit */
-#define RCC_BDCR_OFFSET            (RCC_OFFSET + 0x70U)
+#define RCC_BDCR_111_OFFSET            (RCC_OFFSET + 0x70U)
 #define RCC_RTCEN_BIT_NUMBER       0x0FU
-#define RCC_BDCR_RTCEN_BB          (PERIPH_BB_BASE + (RCC_BDCR_OFFSET * 32U) + (RCC_RTCEN_BIT_NUMBER * 4U))
+#define RCC_BDCR_111_RTCEN_BB          (PERIPH_BB_BASE + (RCC_BDCR_111_OFFSET * 32U) + (RCC_RTCEN_BIT_NUMBER * 4U))
 /* Alias word address of BDRST bit */
 #define RCC_BDRST_BIT_NUMBER       0x10U
-#define RCC_BDCR_BDRST_BB          (PERIPH_BB_BASE + (RCC_BDCR_OFFSET * 32U) + (RCC_BDRST_BIT_NUMBER * 4U))
+#define RCC_BDCR_111_BDRST_BB          (PERIPH_BB_BASE + (RCC_BDCR_111_OFFSET * 32U) + (RCC_BDRST_BIT_NUMBER * 4U))
 
 /* --- CSR Register --- */
 /* Alias word address of LSION bit */
-#define RCC_CSR_OFFSET             (RCC_OFFSET + 0x74U)
+#define RCC_CSR_111_OFFSET             (RCC_OFFSET + 0x74U)
 #define RCC_LSION_BIT_NUMBER        0x00U
-#define RCC_CSR_LSION_BB           (PERIPH_BB_BASE + (RCC_CSR_OFFSET * 32U) + (RCC_LSION_BIT_NUMBER * 4U))
+#define RCC_CSR_111_LSION_BB           (PERIPH_BB_BASE + (RCC_CSR_111_OFFSET * 32U) + (RCC_LSION_BIT_NUMBER * 4U))
 
 /* CR register byte 3 (Bits[23:16]) base address */
 #define RCC_CR_BYTE2_ADDRESS       0x40023802U
@@ -1328,7 +1328,7 @@ void HAL_RCC_CSSCallback(void);
 #define RCC_CIR_BYTE2_ADDRESS      ((uint32_t)(RCC_BASE + 0x0CU + 0x02U))
 
 /* BDCR register base address */
-#define RCC_BDCR_BYTE0_ADDRESS     (PERIPH_BASE + RCC_BDCR_OFFSET)
+#define RCC_BDCR_111_BYTE0_ADDRESS     (PERIPH_BASE + RCC_BDCR_111_OFFSET)
 
 #define RCC_DBP_TIMEOUT_VALUE      2U
 #define RCC_LSE_TIMEOUT_VALUE      LSE_STARTUP_TIMEOUT

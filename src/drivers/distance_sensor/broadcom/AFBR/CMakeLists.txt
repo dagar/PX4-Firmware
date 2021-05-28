@@ -64,7 +64,7 @@ px4_add_module(
 		Core/Src/system_stm32f4xx.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c
 		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c
-		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.c
+		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_RCC_ex.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash.c
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ex.c
 		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ramfunc.c
