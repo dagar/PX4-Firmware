@@ -15,7 +15,7 @@
 
 #include <stdint.h>
 
-#include "board/board_config.h"
+//#include "board/board_config.h"
 #include "driver/fsl_clock.h"
 #include "driver/fsl_port.h"
 

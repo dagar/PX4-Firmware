@@ -2,13 +2,17 @@
  * @file
  * @brief    	This file is part of the AFBR-S50 API.
  * @details		This file provides DMA hardware support.
- * 
+ *
  * @copyright	Copyright c 2016-2019, Avago Technologies GmbH.
  * 				All rights reserved.
  *****************************************************************************/
 
 #ifndef DMA_H
 #define DMA_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*!***************************************************************************
  * @defgroup	DMA DMA: Direct Memory Access
@@ -138,6 +142,10 @@ uint32_t DMA_GetUnfinishedBytes(uint32_t channel);
  *****************************************************************************/
 void DMA_ConfigTransfer(uint32_t channel, uint32_t size, dma_transfer_type_t type,
 		uint32_t sourceAddr, uint32_t destAddr, uint32_t length);
+
+#ifdef __cplusplus
+}
+#endif
 
 /*! @} */
 #endif /* DMA_H */

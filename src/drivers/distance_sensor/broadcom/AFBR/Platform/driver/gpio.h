@@ -11,6 +11,10 @@
 #ifndef GPIO_H
 #define GPIO_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*!***************************************************************************
  * @defgroup	GPIO GPIO: General Purpose Input/Output
  * @ingroup		driver
@@ -196,6 +200,10 @@ void GPIO_SetPinPullDown(GPIO_pin_t pin);
  * @param	pin The address of the GPIO pin.
  *****************************************************************************/
 void GPIO_SetPinPullDisable(GPIO_pin_t pin);
+
+#ifdef __cplusplus
+}
+#endif
 
 /*! @} */
 #endif /* GPIO_H */
