@@ -39,7 +39,7 @@ px4_add_module(
 	MAIN afbrs50
 	STACK_MAIN 8000
 	COMPILE_FLAGS
-#		-O0
+		-O0
 		-Wno-cast-align # TODO: fix and enable
 	INCLUDES
 		Include

@@ -8,4 +8,4 @@ paw3902 -s start -Y 90
 bmi088 -A -s -R 4 start
 bmi088 -G -s -R 4 start
 
-afbrs50 start
+# afbrs50 start
