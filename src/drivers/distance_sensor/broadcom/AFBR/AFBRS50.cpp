@@ -45,7 +45,7 @@
 #include "main.h"
 
 static argus_hnd_t * _hnd;
-static void * _myData;
+static volatile void * _myData;
 
 /*******************************************************************************
  * Prototypes
@@ -163,7 +163,7 @@ AFBRS50::init()
 
 	if (_hnd == 0)
 	{
-		PX4_INFO("ERROR: Handle not initialized\r\n");
+		PX4_ERR("ERROR: Handle not initialized\r\n");
 		Argus_DestroyHandle(_hnd);
 		return PX4_ERROR;
 	}
@@ -178,7 +178,7 @@ AFBRS50::init()
 
 	if (status != STATUS_OK)
 	{
-		PX4_INFO("ERROR: Init status not okay: %i\r\n", status);
+		PX4_ERR("ERROR: Init status not okay: %i\r\n", status);
 		Argus_Deinit(_hnd);
 		Argus_DestroyHandle(_hnd);
 		return PX4_ERROR;

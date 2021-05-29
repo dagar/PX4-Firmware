@@ -69,8 +69,11 @@ status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps)
 	MX_GPIO_Init();
 	MX_DMA_Init();
 	MX_SPI2_Init();
-	if (defaultSlave != S2PI_S2)
-	return ERROR_S2PI_INVALID_SLAVE;
+
+	if (defaultSlave != S2PI_S2) {
+		return ERROR_S2PI_INVALID_SLAVE;
+	}
+
 	return S2PI_SetBaudRate(baudRate_Bps);
 }
 
