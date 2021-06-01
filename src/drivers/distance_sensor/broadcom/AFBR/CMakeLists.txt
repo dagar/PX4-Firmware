@@ -31,8 +31,8 @@
 #
 ############################################################################
 
-add_library(afbrs50_m4_fpu_os STATIC IMPORTED GLOBAL)
-set_property(TARGET afbrs50_m4_fpu_os PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu_os.a)
+add_library(afbrs50_m4_fpu STATIC IMPORTED GLOBAL)
+set_property(TARGET afbrs50_m4_fpu PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu.a)
 
 add_definitions(-DUSE_HAL_DRIVER -DSTM32F412Cx)
 
@@ -85,6 +85,6 @@ px4_add_module(
 		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c
 	DEPENDS
 		px4_work_queue
-		afbrs50_m4_fpu_os
+		afbrs50_m4_fpu
 		drivers_rangefinder
 	)
