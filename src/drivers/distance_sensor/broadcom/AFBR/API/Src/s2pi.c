@@ -98,7 +98,7 @@ status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps)
 *****************************************************************************/
 status_t S2PI_GetStatus(void)
 {
-	printf("S2PI_GetStatus %d status=%d\n", up_interrupt_context(), s2pi_.Status);
+	//printf("S2PI_GetStatus %d status=%d\n", up_interrupt_context(), s2pi_.Status);
 	return s2pi_.Status;
 }
 
@@ -127,7 +127,7 @@ status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 *****************************************************************************/
 status_t S2PI_CaptureGpioControl(void)
 {
-	printf("S2PI_CaptureGpioControl\n");
+	//printf("S2PI_CaptureGpioControl\n");
 
 	/* Check if something is ongoing. */
 	IRQ_LOCK();
@@ -161,7 +161,7 @@ status_t S2PI_CaptureGpioControl(void)
 *****************************************************************************/
 status_t S2PI_ReleaseGpioControl(void)
 {
-	printf("S2PI_ReleaseGpioControl\n");
+	//printf("S2PI_ReleaseGpioControl\n");
 
 	/* Check if something is ongoing. */
 	IRQ_LOCK();
@@ -198,7 +198,7 @@ status_t S2PI_ReleaseGpioControl(void)
 status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 {
 	watchdog_pet();
-	printf("S2PI_WriteGpioPin slave=%d pin=%d, value=%d\n", slave, pin, value);
+	//printf("S2PI_WriteGpioPin slave=%d pin=%d, value=%d\n", slave, pin, value);
 
 	/* Check if pin is valid. */
 	if (pin > S2PI_IRQ || value > 1) {
@@ -240,7 +240,7 @@ status_t S2PI_ReadGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t *value)
 	*value = px4_arch_gpioread(s2pi_.GPIOs[pin]);
 	up_udelay(10);
 
-	printf("S2PI_ReadGpioPin slave=%d pin=%d, value=%d\n", slave, pin, *value);
+	//printf("S2PI_ReadGpioPin slave=%d pin=%d, value=%d\n", slave, pin, *value);
 
 	return STATUS_OK;
 }
@@ -331,8 +331,8 @@ static void broadcom_s2pi_complete_transfer_callout(void *arg)
 
 	/* Invoke callback if there is one */
 	if (s2pi_.Callback != 0) {
-		fprintf(stderr, "S2PI_TransferFrame S2PI_CompleteTransfer Invoke callback %p, callbackdata=%p, status=%d\n",
-			s2pi_.Callback, s2pi_.CallbackData, broadcom_s2pi_transfer_status);
+		// fprintf(stderr, "S2PI_TransferFrame S2PI_CompleteTransfer Invoke callback %p, callbackdata=%p, status=%d\n",
+		// 	s2pi_.Callback, s2pi_.CallbackData, broadcom_s2pi_transfer_status);
 
 		s2pi_callback_t callback = s2pi_.Callback;
 		s2pi_.Callback = 0;

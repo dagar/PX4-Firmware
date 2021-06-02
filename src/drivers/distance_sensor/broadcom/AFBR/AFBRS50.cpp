@@ -128,7 +128,7 @@ int AFBRS50::init()
 		 mv == AFBR_S50SV85K_V1 ? "AFBR-S50SV85K (v1)" :
 		 "unknown");
 
-	//Argus_SetConfigurationFrameTime( _hnd, 100000 ); // 0.1 second = 10 Hz
+	Argus_SetConfigurationFrameTime(_hnd, 100000);   // 0.1 second = 10 Hz
 
 	// Schedule the driver at regular intervals.
 	//ScheduleOnInterval(AFBRS50_MEASURE_INTERVAL);
