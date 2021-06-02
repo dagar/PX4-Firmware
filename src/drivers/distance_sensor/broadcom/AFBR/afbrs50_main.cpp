@@ -63,9 +63,6 @@ static int start(const uint8_t rotation)
 		return PX4_ERROR;
 	}
 
-	// Start the driver.
-	g_dev->start();
-
 	return PX4_OK;
 }
 

@@ -104,7 +104,7 @@ status_t NVM_Init(uint32_t size);
  * @param	buf The pointer to the data buffer with the data to be written.
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
-status_t NVM_Write(uint32_t offset, uint32_t size, uint8_t const * buf);
+status_t NVM_Write(uint32_t offset, uint32_t size, uint8_t const *buf);
 
 /*!***************************************************************************
  * @brief	Reads a block of data from the non-volatile memory.
@@ -125,7 +125,7 @@ status_t NVM_Write(uint32_t offset, uint32_t size, uint8_t const * buf);
  * @param	buf The pointer to the data buffer to copy the data to.
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
-status_t NVM_Read(uint32_t offset, uint32_t size, uint8_t * buf);
+status_t NVM_Read(uint32_t offset, uint32_t size, uint8_t *buf);
 
 #ifdef __cplusplus
 }

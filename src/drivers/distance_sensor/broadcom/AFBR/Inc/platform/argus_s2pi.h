@@ -117,22 +117,21 @@ extern "C" {
  *
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
-typedef status_t (*s2pi_callback_t)(status_t status, void * param);
+typedef status_t (*s2pi_callback_t)(status_t status, void *param);
 
 /*!***************************************************************************
  * @brief 	S2PI layer callback function type for the GPIO interrupt event.
  *
  * @param	param The provided (optional, can be null) callback parameter.
  *****************************************************************************/
-typedef void (*s2pi_irq_callback_t)(void * param);
+typedef void (*s2pi_irq_callback_t)(void *param);
 
 /*! The S2PI slave identifier. Basically an user defined enumerable type that
  *  can be used to identify the slave within the SPI module. */
 typedef int32_t s2pi_slave_t;
 
 /*!	The enumeration of S2PI pins. */
-typedef enum
-{
+typedef enum {
 	/*! The SPI clock pin. */
 	S2PI_CLK,
 
@@ -212,11 +211,11 @@ status_t S2PI_GetStatus(void);
  *         	                           was not started.
  *****************************************************************************/
 status_t S2PI_TransferFrame(s2pi_slave_t slave,
-							uint8_t const * txData,
-							uint8_t * rxData,
-							size_t frameSize,
-							s2pi_callback_t callback,
-							void * callbackData);
+			    uint8_t const *txData,
+			    uint8_t *rxData,
+			    size_t frameSize,
+			    s2pi_callback_t callback,
+			    void *callbackData);
 
 /*!***************************************************************************
  * @brief	Terminates a currently ongoing asynchronous SPI transfer.
@@ -242,9 +241,7 @@ status_t S2PI_Abort(void);
  * 			 - #STATUS_OK: Successfully installation of the callback.
  *         	 - #ERROR_S2PI_INVALID_SLAVE: A wrong slave identifier is provided.
  *****************************************************************************/
-status_t S2PI_SetIrqCallback(s2pi_slave_t slave,
-							 s2pi_irq_callback_t callback,
-							 void * callbackData);
+status_t S2PI_SetIrqCallback(s2pi_slave_t slave, s2pi_irq_callback_t callback, void *callbackData);
 
 /*!***************************************************************************
  * @brief	Reads the current status of the IRQ pin.
@@ -345,7 +342,7 @@ status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value);
  * @param	value The GPIO pin state to read (0 = low, 1 = high).
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
-status_t S2PI_ReadGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t * value);
+status_t S2PI_ReadGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t *value);
 
 #ifdef __cplusplus
 }

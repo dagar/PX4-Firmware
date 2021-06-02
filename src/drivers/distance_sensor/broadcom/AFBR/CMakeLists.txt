@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2021 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,8 @@ px4_add_module(
 	COMPILE_FLAGS
 		-O0
 		-Wno-cast-align # TODO: fix and enable
+	STACK_MAIN
+		32000
 	INCLUDES
 		Inc
 		API/Inc
@@ -57,32 +59,12 @@ px4_add_module(
 		API/Src/irq.c
 		API/Src/s2pi.c
 		API/Src/timer.c
-		Core/Src/main.c
-		Core/Src/gpio.c
-		Core/Src/dma.c
-		Core/Src/spi.c
-		Core/Src/tim.c
-		Core/Src/stm32f4xx_it.c
-		Core/Src/stm32f4xx_hal_msp.c
-		Core/Src/system_stm32f4xx.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c
-		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c
-		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_RCC_ex.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ex.c
-		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ramfunc.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma_ex.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.c
-		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr.c
-		#Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr_ex.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c
-		Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c
 	DEPENDS
+		afbrs50_m4_fpu
 		px4_work_queue
 		afbrs50_m4_fpu
 		drivers_rangefinder
+		afbrs50_m4_fpu
 	)
+
+target_link_libraries(afbrs50_m4_fpu INTERFACE drivers__distance_sensor__afbrs50)

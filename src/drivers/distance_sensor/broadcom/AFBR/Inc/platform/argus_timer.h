@@ -149,7 +149,7 @@ extern "C" {
  * @param	lct A pointer to the low counter value bits representing current
  * 				time in microseconds. Range: 0, .., 999999 µsec
  *****************************************************************************/
-void Timer_GetCounterValue(uint32_t * hct, uint32_t * lct);
+void Timer_GetCounterValue(uint32_t *hct, uint32_t *lct);
 
 /*******************************************************************************
  * Periodic Interrupt Timer Interface
@@ -164,7 +164,7 @@ void Timer_GetCounterValue(uint32_t * hct, uint32_t * lct);
  * @param	param An abstract parameter to be passed to the callback. This is
  * 					also the identifier of the given interval.
  *****************************************************************************/
-typedef void (*timer_cb_t)(void * param);
+typedef void (*timer_cb_t)(void *param);
 
 /*!***************************************************************************
  * @brief	Installs an periodic timer callback function.
@@ -213,7 +213,7 @@ status_t Timer_SetCallback(timer_cb_t f);
  *
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
-status_t Timer_SetInterval(uint32_t dt_microseconds, void * param);
+status_t Timer_SetInterval(uint32_t dt_microseconds, void *param);
 
 /*!***************************************************************************
  * @brief	Starts the timer for a specified callback parameter.
@@ -241,7 +241,7 @@ status_t Timer_SetInterval(uint32_t dt_microseconds, void * param);
  *
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
-status_t Timer_Start(uint32_t dt_microseconds, void * param);
+status_t Timer_Start(uint32_t dt_microseconds, void *param);
 
 /*!***************************************************************************
  * @brief	Stops the timer for a specified callback parameter.
@@ -257,7 +257,7 @@ status_t Timer_Start(uint32_t dt_microseconds, void * param);
  *
  * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
  *****************************************************************************/
-status_t Timer_Stop(void * param);
+status_t Timer_Stop(void *param);
 
 #ifdef __cplusplus
 }

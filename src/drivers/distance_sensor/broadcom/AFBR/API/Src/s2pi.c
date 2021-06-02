@@ -1,55 +1,52 @@
-#include "dma.h"
-#include "gpio.h"
-#include "spi.h"
+
+
 #include "irq.h"
 #include "s2pi.h"
 
-/*! A structure that holds the mapping to port and pin for all SPI modules. */
-typedef struct
-{
-	/*! The GPIO port */
-	GPIO_TypeDef * Port;
-	/*! The GPIO pin */
-	uint32_t Pin;
-}
-s2pi_GPIO_mapping_t;
+#include <stdio.h>
+
+#include <board_config.h>
+
+
+#include <nuttx/spi/spi.h>
+
+#include <drivers/drv_hrt.h>
 
 /*! A structure to hold all internal data required by the S2PI module. */
-typedef struct
-{
+typedef struct {
 	/*! Determines the current driver status. */
 	volatile status_t Status;
+
 	/*! Determines the current S2PI slave. */
 	volatile s2pi_slave_t Slave;
+
 	/*! A callback function to be called after transfer/run mode is completed. */
 	s2pi_callback_t Callback;
+
 	/*! A parameter to be passed to the callback function. */
-	void * CallbackData;
+	void *CallbackData;
+
 	/*! A callback function to be called after external interrupt is triggered. */
 	s2pi_irq_callback_t IrqCallback;
+
 	/*! A parameter to be passed to the interrupt callback function. */
-	void * IrqCallbackData;
-	/*! The alternate function for this SPI port. */
-	const uint32_t SpiAlternate;
+	void *IrqCallbackData;
+
+	struct spi_dev_s *spidev;
+
 	/*! The mapping of the GPIO blocks and pins for this device. */
-	const s2pi_GPIO_mapping_t GPIOs[ S2PI_IRQ+1 ];
+	const uint32_t GPIOs[ S2PI_IRQ + 1 ];
 }
 s2pi_handle_t;
 
-s2pi_handle_t s2pi_ = { .SpiAlternate = GPIO_AF5_SPI2,
-.GPIOs = { [ S2PI_CLK ] = { GPIOB, GPIO_PIN_10 },
-[ S2PI_CS ] = { GPIOB, GPIO_PIN_12 },
-[ S2PI_MOSI ] = { GPIOB, GPIO_PIN_15 },
-[ S2PI_MISO ] = { GPIOB, GPIO_PIN_14 },
-[ S2PI_IRQ ] = { GPIOB, GPIO_PIN_4 } } };
+s2pi_handle_t s2pi_ = { .GPIOs = { [ S2PI_CLK ]  = GPIO_SPI2_AFBR_CLK,
+				   [ S2PI_CS ]   = GPIO_SPI2_AFBR_CS_N,
+				   [ S2PI_MOSI ] = GPIO_SPI2_AFBR_MOSI,
+				   [ S2PI_MISO ] = GPIO_SPI2_AFBR_MISO,
+				   [ S2PI_IRQ ]  = GPIO_SPI2_AFBR_IRQ_N
+				 }
+		      };
 
-/*!***************************************************************************
-* @brief Initializes the GPIO driver and does pin muxing.
-* @details Does actually nothing, as all GPIO pins are initialized in
-* S2PI_Init().
-* @return -
-*****************************************************************************/
-void GPIO_Init(void) {}
 /*!***************************************************************************
 * @brief Initialize the S2PI module.
 * @details Setup the board as a S2PI master, this also sets up up the S2PI
@@ -63,15 +60,27 @@ void GPIO_Init(void) {}
 *
 * @return Returns the \link #status_t status\endlink (#STATUS_OK on success).
 *****************************************************************************/
+
+static int gpio_falling_edge(int irq, void *context, void *arg)
+{
+	//printf("gpio_falling_edge\n");
+	//up_udelay(1000);
+
+	if (s2pi_.IrqCallback != 0) {
+		s2pi_.IrqCallback(s2pi_.IrqCallbackData);
+	}
+
+	return 0;
+}
+
 status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps)
 {
-	MX_GPIO_Init();
-	MX_DMA_Init();
-	MX_SPI2_Init();
+	px4_arch_configgpio(GPIO_SPI2_AFBR_CS_N);
+	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
+	s2pi_.spidev = px4_spibus_initialize(2);
 
-	if (defaultSlave != S2PI_S2) {
-		return ERROR_S2PI_INVALID_SLAVE;
-	}
+	px4_arch_configgpio(GPIO_SPI2_AFBR_IRQ_N);
+	px4_arch_gpiosetevent(GPIO_SPI2_AFBR_IRQ_N, false, true, false, &gpio_falling_edge, NULL);
 
 	return S2PI_SetBaudRate(baudRate_Bps);
 }
@@ -86,6 +95,7 @@ status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps)
 *****************************************************************************/
 status_t S2PI_GetStatus(void)
 {
+	printf("S2PI_GetStatus %d status=%d\n", up_interrupt_context(), s2pi_.Status);
 	return s2pi_.Status;
 }
 
@@ -98,49 +108,8 @@ status_t S2PI_GetStatus(void)
 *****************************************************************************/
 status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 {
-	uint32_t prescaler = 0;
-	/* Determine the maximum possible value not greater than baudRate_Bps */
-	for (; prescaler < 8; ++prescaler)
-	if (SystemCoreClock >> (prescaler + 1) <= baudRate_Bps)
-	break;
-	MODIFY_REG(hspi2.Instance->CR1_1, SPI_CR1_111_BR, prescaler << SPI_CR1_111_BR_Pos);
+	printf("S2PI_SetBaudRate %d, actual=%d\n", baudRate_Bps, SPI_SETFREQUENCY(s2pi_.spidev, baudRate_Bps));
 	return STATUS_OK;
-}
-
-/*!***************************************************************************
-* @brief Gets the current SPI baud rate in bps.
-* @return Returns the current baud rate.
-*****************************************************************************/
-uint32_t S2PI_GetBaudRate(void)
-{
-	uint32_t prescaler = (hspi2.Instance->CR1_1 & SPI_CR1_111_BR) >> SPI_CR1_111_BR_Pos;
-	return SystemCoreClock >> (prescaler + 1);
-}
-
-/*!***************************************************************************
-* @brief Sets the mode in which the S2PI pins operate.
-* @details This is a helper function to switch the modes between SPI and GPIO.
-* @param mode The gpio mode: GPIO_MODE_AF_PP for SPI,
-* GPIO_MODE_OUTPUT_PP for GPIO.
-*****************************************************************************/
-static void S2PI_SetGPIOMode(uint32_t mode)
-{
-	GPIO_InitTypeDef GPIO_InitStruct;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-	GPIO_InitStruct.Alternate = s2pi_.SpiAlternate;
-	/* SPI CLK GPIO pin configuration */
-	GPIO_InitStruct.Pin = s2pi_.GPIOs[S2PI_CLK].Pin;
-	GPIO_InitStruct.Mode = mode;
-	HAL_GPIO_Init(s2pi_.GPIOs[S2PI_CLK].Port, &GPIO_InitStruct);
-	/* SPI MOSI GPIO pin configuration */
-	GPIO_InitStruct.Pin = s2pi_.GPIOs[S2PI_MOSI].Pin;
-	GPIO_InitStruct.Mode = mode;
-	HAL_GPIO_Init(s2pi_.GPIOs[S2PI_MOSI].Port, &GPIO_InitStruct);
-	/* SPI MISO GPIO pin configuration */
-	GPIO_InitStruct.Pin = s2pi_.GPIOs[S2PI_MISO].Pin;
-	GPIO_InitStruct.Mode = (mode == GPIO_MODE_OUTPUT_PP) ? GPIO_MODE_INPUT : mode;
-	HAL_GPIO_Init(s2pi_.GPIOs[S2PI_MISO].Port, &GPIO_InitStruct);
 }
 
 /*!*****************************************************************************
@@ -153,19 +122,28 @@ static void S2PI_SetGPIOMode(uint32_t mode)
 *****************************************************************************/
 status_t S2PI_CaptureGpioControl(void)
 {
+	printf("S2PI_CaptureGpioControl\n");
+
 	/* Check if something is ongoing. */
 	IRQ_LOCK();
 	status_t status = s2pi_.Status;
-	if (status != STATUS_IDLE)
-	{
-	IRQ_UNLOCK();
-	return status;
+
+	if (status != STATUS_IDLE) {
+		IRQ_UNLOCK();
+		return status;
 	}
+
 	s2pi_.Status = STATUS_S2PI_GPIO_MODE;
 	IRQ_UNLOCK();
+
 	/* Note: Clock must be HI after capturing */
-	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CLK].Port, s2pi_.GPIOs[S2PI_CLK].Pin, GPIO_PIN_SET);
-	S2PI_SetGPIOMode(GPIO_MODE_OUTPUT_PP);
+	px4_arch_gpiowrite(GPIO_SPI2_AFBR_CLK, 1);
+
+	// GPIO mode (output push pull)
+	px4_arch_configgpio(GPIO_SPI2_AFBR_CLK);
+	px4_arch_configgpio(GPIO_SPI2_AFBR_MOSI);
+	px4_arch_configgpio(GPIO_SPI2_AFBR_MISO);
+
 	return STATUS_OK;
 }
 
@@ -178,33 +156,30 @@ status_t S2PI_CaptureGpioControl(void)
 *****************************************************************************/
 status_t S2PI_ReleaseGpioControl(void)
 {
+	printf("S2PI_ReleaseGpioControl\n");
+
 	/* Check if something is ongoing. */
 	IRQ_LOCK();
 	status_t status = s2pi_.Status;
-	if (status != STATUS_S2PI_GPIO_MODE)
-	{
-	IRQ_UNLOCK();
-	return status;
+
+	if (status != STATUS_S2PI_GPIO_MODE) {
+		IRQ_UNLOCK();
+		return status;
 	}
+
 	s2pi_.Status = STATUS_IDLE;
 	IRQ_UNLOCK();
-	S2PI_SetGPIOMode(GPIO_MODE_AF_PP);
+
+	// SPI alternate
+	stm32_configgpio(GPIO_SPI2_SCK);
+	stm32_configgpio(GPIO_SPI2_MISO);
+	stm32_configgpio(GPIO_SPI2_MOSI);
+
+	// probably not necessary
+	stm32_spibus_initialize(2);
+
 	return STATUS_OK;
 }
-
-/*! An additional delay to be added after each GPIO access in order to decrease
-* the baud rate of the software EEPROM protocol. Increase the delay if timing
-* issues occur while reading the EERPOM.
-* e.g. Delay = 10 usec => Baud Rate < 100 kHz */
-#ifndef S2PI_GPIO_DELAY_US
-#define S2PI_GPIO_DELAY_US 10
-#endif
-#if (S2PI_GPIO_DELAY_US == 0)
-#define S2PI_GPIO_DELAY() ((void)0)
-#else
-#include "utility/time.h"
-#define S2PI_GPIO_DELAY() Time_DelayUSec(S2PI_GPIO_DELAY_US)
-#endif
 
 /*!*****************************************************************************
 * @brief Writes the output for a specified SPI pin in GPIO mode.
@@ -217,14 +192,21 @@ status_t S2PI_ReleaseGpioControl(void)
 *****************************************************************************/
 status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 {
+	printf("S2PI_WriteGpioPin slave=%d pin=%d, value=%d\n", slave, pin, value);
+
 	/* Check if pin is valid. */
-	if (pin > S2PI_IRQ || value > 1)
-	return ERROR_INVALID_ARGUMENT;
+	if (pin > S2PI_IRQ || value > 1) {
+		return ERROR_INVALID_ARGUMENT;
+	}
+
 	/* Check if in GPIO mode. */
-	if(s2pi_.Status != STATUS_S2PI_GPIO_MODE)
-	return ERROR_S2PI_INVALID_STATE;
-	HAL_GPIO_WritePin(s2pi_.GPIOs[pin].Port, s2pi_.GPIOs[pin].Pin, value);
-	S2PI_GPIO_DELAY();
+	if (s2pi_.Status != STATUS_S2PI_GPIO_MODE) {
+		return ERROR_S2PI_INVALID_STATE;
+	}
+
+	px4_arch_gpiowrite(s2pi_.GPIOs[pin], value);
+	up_udelay(10);
+
 	return STATUS_OK;
 }
 
@@ -237,19 +219,22 @@ status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 * @param value The GPIO pin state to read (0 = low, 1 = high).
 * @return Returns the \link #status_t status\endlink (#STATUS_OK on success).
 *****************************************************************************/
-status_t S2PI_ReadGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t * value)
+status_t S2PI_ReadGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t *value)
 {
 	/* Check if pin is valid. */
-	if (pin > S2PI_IRQ || !value)
+	if (pin > S2PI_IRQ || !value) {
 		return ERROR_INVALID_ARGUMENT;
+	}
 
 	/* Check if in GPIO mode. */
-	if(s2pi_.Status != STATUS_S2PI_GPIO_MODE)
+	if (s2pi_.Status != STATUS_S2PI_GPIO_MODE) {
 		return ERROR_S2PI_INVALID_STATE;
+	}
 
-	*value = HAL_GPIO_ReadPin(s2pi_.GPIOs[pin].Port, s2pi_.GPIOs[pin].Pin);
+	*value = px4_arch_gpioread(s2pi_.GPIOs[pin]);
+	up_udelay(10);
 
-	S2PI_GPIO_DELAY();
+	printf("S2PI_ReadGpioPin slave=%d pin=%d, value=%d\n", slave, pin, *value);
 
 	return STATUS_OK;
 }
@@ -268,49 +253,25 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 {
 	/* Check the driver status. */
 	IRQ_LOCK();
-
 	status_t status = s2pi_.Status;
 
-	if ( status != STATUS_IDLE ) {
+	printf("S2PI_CycleCsPin slave=%d status=%d\n", slave, status);
+
+	if (status != STATUS_IDLE) {
 		IRQ_UNLOCK();
 		return status;
 	}
 
-	s2pi_.Status = STATUS_BUSY;
 
+	s2pi_.Status = STATUS_BUSY;
 	IRQ_UNLOCK();
 
-	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_SET);
+	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
+	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
 
 	s2pi_.Status = STATUS_IDLE;
 
 	return STATUS_OK;
-}
-
-/*!***************************************************************************
-* @brief Triggers the callback function with the provided status.
-* @details It first checks if a callback function is present,
-* otherwise it returns immediately.
-* The callback function is reset to 0, and must be set up again
-* for the next transfer, if required.
-* @param status The status to be provided to the callback funcition.
-* @return Returns the status received from the callback function
-****************************************************************************/
-static inline status_t S2PI_CompleteTransfer(status_t status) {
-	s2pi_.Status = STATUS_IDLE;
-
-	/* Deactivate CS (set high), as we use GPIO pin */
-	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_SET);
-
-	/* Invoke callback if there is one */
-	if (s2pi_.Callback != 0) {
-		s2pi_callback_t callback = s2pi_.Callback;
-		s2pi_.Callback = 0;
-		status = callback(status, s2pi_.CallbackData);
-	}
-
-	return status;
 }
 
 /*!***************************************************************************
@@ -345,7 +306,29 @@ static inline status_t S2PI_CompleteTransfer(status_t status) {
 * - #STATUS_S2PI_GPIO_MODE: The module is in GPIO mode. The transfer
 * was not started.
 *****************************************************************************/
-status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const * txData, uint8_t * rxData, size_t frameSize, s2pi_callback_t callback, void * callbackData)
+
+static struct hrt_call broadcom_s2pi_transfer_finished_hrt_call = {};
+static status_t broadcom_s2pi_transfer_status = STATUS_OK;
+
+static void broadcom_s2pi_complete_transfer_callout(void *arg)
+{
+	s2pi_.Status = STATUS_IDLE;
+	/* Deactivate CS (set high), as we use GPIO pin */
+	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
+
+	/* Invoke callback if there is one */
+	if (s2pi_.Callback != 0) {
+		printf("S2PI_TransferFrame S2PI_CompleteTransfer Invoke callback %p, callbackdata=%p, status=%d\n", s2pi_.Callback,
+		       s2pi_.CallbackData, broadcom_s2pi_transfer_status);
+
+		s2pi_callback_t callback = s2pi_.Callback;
+		s2pi_.Callback = 0;
+		callback(broadcom_s2pi_transfer_status, s2pi_.CallbackData);
+	}
+}
+
+status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8_t *rxData, size_t frameSize,
+			    s2pi_callback_t callback, void *callbackData)
 {
 	/* Verify arguments. */
 	if (!txData || frameSize == 0 || frameSize >= 0x10000) {
@@ -357,90 +340,40 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const * txData, uint
 		return ERROR_S2PI_INVALID_SLAVE;
 	}
 
+	printf("S2PI_TransferFrame %d txData=%p, rxData=%p, frameSize=%d callback=%p, callbackData=%p\n",
+	       up_interrupt_context(), txData, rxData, frameSize, callback, callbackData);
+
 	/* Check the driver status, lock if idle. */
 	IRQ_LOCK();
-
 	status_t status = s2pi_.Status;
+
 	if (status != STATUS_IDLE) {
 		IRQ_UNLOCK();
 		return status;
 	}
 
 	s2pi_.Status = STATUS_BUSY;
-
 	IRQ_UNLOCK();
-
 	/* Set the callback information */
 	s2pi_.Callback = callback;
 	s2pi_.CallbackData = callbackData;
 
-	/* Manually set the chip select (active low) */
-	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_RESET);
-
-	HAL_StatusTypeDef hal_error;
-	/* Lock interrupts to prevent completion interrupt before setup is complete */
 	IRQ_LOCK();
 
-	if (rxData) {
-		//hal_error = HAL_SPI_TransmitReceive_DMA(&hspi2, (uint8_t *) txData, rxData, (uint16_t)frameSize);
-		hal_error = HAL_SPI_TransmitReceive(&hspi2, (uint8_t *) txData, rxData, (uint16_t)frameSize, (uint32_t)1000);
-	}
-	else {
-		//hal_error = HAL_SPI_Transmit_DMA(&hspi2, (uint8_t *) txData, (uint16_t) frameSize);
-		hal_error = HAL_SPI_Transmit(&hspi2, (uint8_t *) txData, (uint16_t) frameSize, (uint32_t)1000);
-	}
+	/* Manually set the chip select (active low) */
+	//SPI_SETFREQUENCY(spidev, _frequency);
+	SPI_SETMODE(s2pi_.spidev, SPIDEV_MODE3);
+	SPI_SETBITS(s2pi_.spidev, 8);
+	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
+	SPI_EXCHANGE(s2pi_.spidev, txData, rxData, frameSize);
+
+	broadcom_s2pi_transfer_status = STATUS_OK;
 
 	IRQ_UNLOCK();
 
-	if (hal_error != HAL_OK) {
-		return ERROR_FAIL;
-	}
-
-	S2PI_CompleteTransfer(STATUS_OK);
+	hrt_call_after(&broadcom_s2pi_transfer_finished_hrt_call, 100, broadcom_s2pi_complete_transfer_callout, NULL);
 
 	return STATUS_OK;
-}
-
-/**
-* @brief Tx Transfer completed callback.
-* @param hspi pointer to a SPI_HandleTypeDef structure that contains
-* the configuration information for SPI module.
-* @retval None
-*/
-void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-S2PI_CompleteTransfer(STATUS_OK);
-}
-/**
-* @brief DMA SPI transmit receive process complete callback for delayed transfer.
-* @param hdma pointer to a DMA_HandleTypeDef structure that contains
-* the configuration information for the specified DMA module.
-* @retval None
-*/
-void SPI_DMATransmitReceiveCpltDelayed(DMA_HandleTypeDef *hdma)
-{
-SPI_HandleTypeDef *hspi = (SPI_HandleTypeDef *)(((DMA_HandleTypeDef *)hdma)->Parent);
-HAL_SPI_TxCpltCallback(hspi);
-}
-/**
-* @brief Tx Transfer completed callback.
-* @param hspi pointer to a SPI_HandleTypeDef structure that contains
-* the configuration information for SPI module.
-* @retval None
-*/
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-/* Note: This interrupt callback is always invoked by the RX interrupt from the HAL. However, the
-* order of RX and TX is not specified on the device. Occasionally, the RX interrupt occurs before
-* the TX interrupt which means the SPI transfer is not yet completely finished upon the occurrence
-* of the RX interrupt. Thus, the start of a new SPI transfer may fail, since the AFBR-S50 API
-* starts it right from the interrupt callback function.
-* In order to overcome the feature, the invocation of the API callback is scheduled to whatever IRQ
-* comes last: */
-if ( hspi->hdmatx->Lock == HAL_UNLOCKED ) /* TX Interrupt already received */
-HAL_SPI_TxCpltCallback(hspi);
-else /* There is still the TX DMA Interrupt we have to wait for */
-hspi->hdmatx->XferCpltCallback = SPI_DMATransmitReceiveCpltDelayed;
 }
 
 /*!***************************************************************************
@@ -451,39 +384,22 @@ hspi->hdmatx->XferCpltCallback = SPI_DMATransmitReceiveCpltDelayed;
 *****************************************************************************/
 status_t S2PI_Abort(void)
 {
-status_t status = s2pi_.Status;
-/* Check if something is ongoing. */
-if(status == STATUS_IDLE)
-{
-return STATUS_OK;
-}
-/* Abort SPI transfer. */
-if(status == STATUS_BUSY)
-{
-HAL_SPI_Abort(&hspi2);
-}
-return STATUS_OK;
-}
+	printf("S2PI_Abort status=%d\n", s2pi_.Status);
 
-/**
-* @brief SPI Abort Complete callback.
-* @param hspi SPI handle.
-* @retval None
-*/
-void HAL_SPI_AbortCpltCallback(SPI_HandleTypeDef *hspi)
-{
-S2PI_CompleteTransfer(ERROR_ABORTED);
-}
+	status_t status = s2pi_.Status;
 
-/**
-* @brief SPI error callback.
-* @param hspi pointer to a SPI_HandleTypeDef structure that contains
-* the configuration information for SPI module.
-* @retval None
-*/
-void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
-{
-S2PI_CompleteTransfer(ERROR_FAIL);
+	/* Check if something is ongoing. */
+	if (status == STATUS_IDLE) {
+		return STATUS_OK;
+	}
+
+	/* Abort SPI transfer. */
+	if (status == STATUS_BUSY) {
+		//HAL_SPI_Abort(&hspi2);
+		// DO SOMETHING?
+	}
+
+	return STATUS_OK;
 }
 
 /*!***************************************************************************
@@ -500,13 +416,15 @@ S2PI_CompleteTransfer(ERROR_FAIL);
 * - #STATUS_OK: Successfully installation of the callback.
 * - #ERROR_S2PI_INVALID_SLAVE: A wrong slave identifier is provided.
 *****************************************************************************/
-status_t S2PI_SetIrqCallback(s2pi_slave_t slave,
-s2pi_irq_callback_t callback,
-void * callbackData)
+status_t S2PI_SetIrqCallback(s2pi_slave_t slave, s2pi_irq_callback_t callback, void *callbackData)
 {
-s2pi_.IrqCallback = callback;
-s2pi_.IrqCallbackData = callbackData;
-return STATUS_OK;
+	printf("%d S2PI_SetIrqCallback slave=%d, callback=%p, callbackData=%p \n", up_interrupt_context(), slave, callback,
+	       callbackData);
+
+	s2pi_.IrqCallback = callback;
+	s2pi_.IrqCallbackData = callbackData;
+
+	return STATUS_OK;
 }
 
 /*!***************************************************************************
@@ -528,18 +446,8 @@ return STATUS_OK;
 *****************************************************************************/
 uint32_t S2PI_ReadIrqPin(s2pi_slave_t slave)
 {
-return HAL_GPIO_ReadPin(s2pi_.GPIOs[S2PI_IRQ].Port, s2pi_.GPIOs[S2PI_IRQ].Pin);
-}
+	uint32_t value = px4_arch_gpioread(s2pi_.GPIOs[S2PI_IRQ]);
+	printf("S2PI_ReadIrqPin %d slave=%d value=%d\n", up_interrupt_context(), slave, value);
 
-/**
-* @brief EXTI line detection callbacks.
-* @param GPIO_Pin Specifies the pins connected EXTI line
-* @retval None
-*/
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-if (GPIO_Pin == s2pi_.GPIOs[S2PI_IRQ].Pin && s2pi_.IrqCallback)
-{
-s2pi_.IrqCallback(s2pi_.IrqCallbackData);
-}
+	return value;
 }

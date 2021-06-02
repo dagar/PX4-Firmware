@@ -50,17 +50,6 @@
 
 using namespace time_literals;
 
-#define AFBRS50_FIELD_OF_VIEW        (0.105f) // 6 deg cone angle.
-#define AFBRS50_MAX_DISTANCE         30.0f
-#define AFBRS50_MIN_DISTANCE         0.01f
-#define AFBRS50_MEASURE_INTERVAL     (1000000 / 10) // 10Hz
-
-/*! Define the SPI slave (to be used in the SPI module). */
-#define SPI_SLAVE 2
-/*! Define the SPI baud rate (to be used in the SPI module). */
-#define SPI_BAUD_RATE 5000000
-
-
 class AFBRS50 : public px4::ScheduledWorkItem
 {
 public:
@@ -75,25 +64,12 @@ public:
 	void print_info();
 
 	/**
-	 * Initialise the automatic measurement state machine and start it.
-	 */
-	void start();
-
-	/**
 	 * Stop the automatic measurement state machine.
 	 */
 	void stop();
 
 private:
-
-	/**
-	 * Reads the data measurement.
-	 */
-	int collect();
-
 	void Run() override;
-
-	static status_t measurement_ready_callback(status_t status, void * data);
 
 	PX4Rangefinder _px4_rangefinder;
 

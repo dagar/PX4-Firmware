@@ -1,7 +1,11 @@
-#include <assert.h>
-#include "main.h"
+
+#include <nuttx/irq.h>
+
 /*! Global lock level counter value. */
 static volatile int g_irq_lock_ct;
+
+static volatile irqstate_t irqstate_flags;
+
 /*!***************************************************************************
 * @brief Enable IRQ Interrupts
 *
@@ -12,13 +16,14 @@ static volatile int g_irq_lock_ct;
 *****************************************************************************/
 void IRQ_UNLOCK(void)
 {
-assert(g_irq_lock_ct > 0);
-if (--g_irq_lock_ct <= 0)
-{
-g_irq_lock_ct = 0;
-__enable_irq();
+	assert(g_irq_lock_ct > 0);
+
+	if (--g_irq_lock_ct <= 0) {
+		g_irq_lock_ct = 0;
+		leave_critical_section(irqstate_flags);
+	}
 }
-}
+
 /*!***************************************************************************
 * @brief Disable IRQ Interrupts
 *
@@ -29,6 +34,6 @@ __enable_irq();
 *****************************************************************************/
 void IRQ_LOCK(void)
 {
-__disable_irq();
-g_irq_lock_ct++;
+	irqstate_flags = enter_critical_section();
+	g_irq_lock_ct++;
 }

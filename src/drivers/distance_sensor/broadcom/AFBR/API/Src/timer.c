@@ -1,19 +1,27 @@
-#include "tim.h"
+
 #include "timer.h"
 
-/*!***************************************************************************
-* @brief Initializes the timer hardware.
-* @return -
-*****************************************************************************/
+#include <drivers/drv_hrt.h>
+
+#include <stdio.h>
+
+#include <board_config.h>
+
+static struct hrt_call broadcom_hrt_call = {};
+
+static timer_cb_t timer_callback_; /*! Callback function for PIT timer */
+
+static void broadcom_hrt_callout(void *arg)
+{
+	if (timer_callback_ != 0) {
+		timer_callback_(arg);
+	}
+}
+
 void Timer_Init(void)
 {
-/* Initialize the timers, see generated main.c */
-MX_TIM2_Init();
-MX_TIM4_Init();
-MX_TIM5_Init();
-/* Start the timers relevant for the LTC */
-HAL_TIM_Base_Start(&htim2);
-HAL_TIM_Base_Start(&htim5);
+	printf("Timer_Init\n");
+	hrt_cancel(&broadcom_hrt_call);
 }
 
 /*!***************************************************************************
@@ -32,21 +40,16 @@ HAL_TIM_Base_Start(&htim5);
 * time in microseconds. Range: 0, .., 999999 usec
 * @return -
 *****************************************************************************/
-void Timer_GetCounterValue(uint32_t * hct, uint32_t * lct)
+
+void Timer_GetCounterValue(uint32_t *hct, uint32_t *lct)
 {
-/* The loop makes sure that there are no glitches
-when the counter wraps between htim2 and htm2 reads. */
-do {
-*lct = __HAL_TIM_GET_COUNTER(&htim2);
-*hct = __HAL_TIM_GET_COUNTER(&htim5);
-}
-while (*lct > __HAL_TIM_GET_COUNTER(&htim2));
+	hrt_abstime time = hrt_absolute_time();
+	*hct = (time >> 32);
+	*lct = (time & 0xFFFFFFFF);
+
+	//printf("Timer_GetCounterValue %llu hct: %d lct: %d\n", last_time, *hct, *lct);
 }
 
-/*! Storage for the callback parameter */
-static void * callback_param_;
-/*! Timer interval in microseconds */
-static uint32_t period_us_;
 /*!***************************************************************************
 * @brief Starts the timer for a specified callback parameter.
 * @details Sets the callback interval for the specified parameter and starts
@@ -58,26 +61,19 @@ static uint32_t period_us_;
 * also the identifier of the given interval.
 * @return Returns the \link #status_t status\endlink (#STATUS_OK on success).
 *****************************************************************************/
-status_t Timer_Start(uint32_t period, void * param)
+
+status_t Timer_Start(uint32_t period, void *param)
 {
-callback_param_ = param;
-if (period == period_us_)
-return STATUS_OK;
-period_us_ = period;
-uint32_t prescaler = SystemCoreClock / 1000000U;
-while (period > 0xFFFF)
-{
-period >>= 1U;
-prescaler <<= 1U;
-}
-assert(prescaler <= 0x10000U);
-/* Set prescaler and period values */
-__HAL_TIM_SET_PRESCALER(&htim4, prescaler - 1);
-__HAL_TIM_SET_AUTORELOAD(&htim4, period - 1);
-/* Enable interrupt and timer */
-__HAL_TIM_ENABLE_IT(&htim4, TIM_IT_UPDATE);
-__HAL_TIM_ENABLE(&htim4);
-return STATUS_OK;
+	printf("Timer_Start %d %p\n", period, param);
+
+	if (period != 0) {
+		hrt_call_after(&broadcom_hrt_call, period, broadcom_hrt_callout, param);
+
+	} else {
+		hrt_cancel(&broadcom_hrt_call);
+	}
+
+	return STATUS_OK;
 }
 
 /*!***************************************************************************
@@ -86,15 +82,15 @@ return STATUS_OK;
 * @param param An abstract parameter that identifies the interval to be stopped.
 * @return Returns the \link #status_t status\endlink (#STATUS_OK on success).
 *****************************************************************************/
-status_t Timer_Stop(void * param)
+status_t Timer_Stop(void *param)
 {
-period_us_ = 0;
-callback_param_ = 0;
-/* Disable interrupt and timer */
-__HAL_TIM_DISABLE_IT(&htim4, TIM_IT_UPDATE);
-__HAL_TIM_ENABLE(&htim4);
-return STATUS_OK;
+	printf("Timer_Stop %p\n", param);
+
+	hrt_cancel(&broadcom_hrt_call);
+
+	return STATUS_OK;
 }
+
 /*!***************************************************************************
 * @brief Sets the timer interval for a specified callback parameter.
 * @details Sets the callback interval for the specified parameter and starts
@@ -107,13 +103,20 @@ return STATUS_OK;
 * also the identifier of the given interval.
 * @return Returns the \link #status_t status\endlink (#STATUS_OK on success).
 *****************************************************************************/
-status_t Timer_SetInterval(uint32_t dt_microseconds, void * param)
+status_t Timer_SetInterval(uint32_t dt_microseconds, void *param)
 {
-return dt_microseconds ? Timer_Start(dt_microseconds, param) : Timer_Stop(param);
+	printf("Timer_SetInterval %d %p\n", dt_microseconds, param);
+
+	if (dt_microseconds != 0) {
+		hrt_call_after(&broadcom_hrt_call, dt_microseconds, broadcom_hrt_callout, param);
+
+	} else {
+		hrt_cancel(&broadcom_hrt_call);
+	}
+
+	return STATUS_OK;
 }
 
-/*! Callback function for PIT timer */
-static timer_cb_t timer_callback_;
 /*!***************************************************************************
 * @brief Installs an periodic timer callback function.
 * @details Installs an periodic timer callback function that is invoked whenever
@@ -124,22 +127,11 @@ static timer_cb_t timer_callback_;
 * @param f The timer callback function.
 * @return Returns the \link #status_t status\endlink (#STATUS_OK on success).
 *****************************************************************************/
+
 status_t Timer_SetCallback(timer_cb_t f)
 {
-timer_callback_ = f;
-return STATUS_OK;
-}
-/**
-* @brief Period elapsed callback in non-blocking mode
-* @param htim TIM handle
-* @retval None
-*/
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-/* Trigger callback if the interrupt belongs to TIM4 and there is a callback */
-if (htim==&htim4 && timer_callback_)
-{
-timer_callback_(callback_param_);
-}
-}
+	printf("Timer_SetCallback %p\n", f);
 
+	timer_callback_ = f;
+	return STATUS_OK;
+}

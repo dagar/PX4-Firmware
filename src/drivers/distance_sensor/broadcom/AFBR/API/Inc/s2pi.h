@@ -42,8 +42,7 @@ extern "C" {
 #define S2PI_GPIO_SLAVES 0
 
 /*! The S2PI slaves. */
-enum S2PISlaves
-{
+enum S2PISlaves {
 	/*! No SPI slave selected (all pins are disabled w/ high z state). */
 	S2PI_NONE = 0,
 
@@ -91,13 +90,6 @@ enum S2PISlaves
  *****************************************************************************/
 status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps);
 
-
-/*!***************************************************************************
- * @brief	Gets the current SPI baud rate in bps.
- * @return 	Returns the current baud rate.
- *****************************************************************************/
-uint32_t S2PI_GetBaudRate(void);
-
 /*!***************************************************************************
  * @brief	Sets the SPI baud rate in bps.
  * @param	baudRate_Bps The default SPI baud rate in bauds-per-second.
@@ -106,26 +98,6 @@ uint32_t S2PI_GetBaudRate(void);
  * 			- #ERROR_S2PI_INVALID_BAUD_RATE on invalid baud rate value.
  *****************************************************************************/
 status_t S2PI_SetBaudRate(uint32_t baudRate_Bps);
-
-/*!***************************************************************************
- * @brief	Shuts the driver down, i.e. clears all pins to low state.
- * @details	Shuts down and disables the driver and its output pins. Ongoing
- * 			activity is aborted and no callback is invoked. The output pins
- * 			will go to a low level. A call to another S2PI function will
- * 			automatically start the driver before execution.
- * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
- *****************************************************************************/
-status_t S2PI_PinsLow(void);
-
-/*!***************************************************************************
- * @brief	Shuts the driver down, i.e. clears all pins to high-z state.
- * @details	Shuts down and disables the driver and its output pins. Ongoing
- * 			activity is aborted and no callback is invoked. The output pins
- * 			will go to a high-z level. A call to another S2PI function will
- * 			automatically start the driver before execution.
- * @return 	Returns the \link #status_t status\endlink (#STATUS_OK on success).
- *****************************************************************************/
-status_t S2PI_PinsOff(void);
 
 #ifdef __cplusplus
 }

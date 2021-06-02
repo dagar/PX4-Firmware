@@ -25,11 +25,11 @@ px4_add_board(
 		mft
 		mtd
 		param
-		#perf
+		perf
 		#reboot
 		#system_time
-		#top
-		#topic_listener
+		top
+		topic_listener
 		#ver
-		#work_queue
+		work_queue
 )

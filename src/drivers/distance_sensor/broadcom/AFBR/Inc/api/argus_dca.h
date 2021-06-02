@@ -3,26 +3,26 @@
  * @brief    	This file is part of the AFBR-S50 API.
  * @details		Defines the dynamic configuration adaption (DCA) setup parameters
  * 				and data structure.
- * 
+ *
  * @copyright
- * 
+ *
  * Copyright (c) 2021, Broadcom Inc
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from
  *    this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -156,8 +156,7 @@
 /*!***************************************************************************
  * @brief	The dynamic configuration algorithm enable flags.
  *****************************************************************************/
-typedef enum
-{
+typedef enum {
 	/*! DCA is disabled and will be completely skipped. */
 	DCA_ENABLE_OFF = 0,
 
@@ -172,8 +171,7 @@ typedef enum
 /*!***************************************************************************
  * @brief	The dynamic configuration algorithm Optical Output Power stages enumerator.
  *****************************************************************************/
-typedef enum
-{
+typedef enum {
 	/*! Low output power stage. */
 	DCA_POWER_LOW = 0,
 
@@ -191,8 +189,7 @@ typedef enum
 /*!***************************************************************************
  * @brief	The dynamic configuration algorithm Pixel Input Gain stages enumerator.
  *****************************************************************************/
-typedef enum
-{
+typedef enum {
 	/*! Low gain stage. */
 	DCA_GAIN_LOW = 0,
 
@@ -238,8 +235,7 @@ typedef enum
  * 			- [14-15]: Gain Stages
  * 			.
  *****************************************************************************/
-typedef enum
-{
+typedef enum {
 	/*! No state flag set. */
 	ARGUS_STATE_NONE = 0,
 
@@ -332,8 +328,7 @@ typedef enum
  * 			 - All that features are heeding the Laser Safety limits.
  * 			 .
  *****************************************************************************/
-typedef struct
-{
+typedef struct {
 	/*! Enables the automatic configuration adaption features.
 	 *  Enables the dynamic part if #DCA_ENABLE_DYNAMIC and the static only if
 	 *  #DCA_ENABLE_STATIC. If set to DCA_ENABLE_OFF, the DCA is completely
