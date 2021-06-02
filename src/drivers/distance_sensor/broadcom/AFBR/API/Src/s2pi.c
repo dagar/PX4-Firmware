@@ -239,15 +239,19 @@ status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 *****************************************************************************/
 status_t S2PI_ReadGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t * value)
 {
-/* Check if pin is valid. */
-if (pin > S2PI_IRQ || !value)
-return ERROR_INVALID_ARGUMENT;
-/* Check if in GPIO mode. */
-if(s2pi_.Status != STATUS_S2PI_GPIO_MODE)
-return ERROR_S2PI_INVALID_STATE;
-*value = HAL_GPIO_ReadPin(s2pi_.GPIOs[pin].Port, s2pi_.GPIOs[pin].Pin);
-S2PI_GPIO_DELAY();
-return STATUS_OK;
+	/* Check if pin is valid. */
+	if (pin > S2PI_IRQ || !value)
+		return ERROR_INVALID_ARGUMENT;
+
+	/* Check if in GPIO mode. */
+	if(s2pi_.Status != STATUS_S2PI_GPIO_MODE)
+		return ERROR_S2PI_INVALID_STATE;
+
+	*value = HAL_GPIO_ReadPin(s2pi_.GPIOs[pin].Port, s2pi_.GPIOs[pin].Pin);
+
+	S2PI_GPIO_DELAY();
+
+	return STATUS_OK;
 }
 
 /*!***************************************************************************
@@ -262,20 +266,51 @@ return STATUS_OK;
 *****************************************************************************/
 status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 {
-/* Check the driver status. */
-IRQ_LOCK();
-status_t status = s2pi_.Status;
-if ( status != STATUS_IDLE )
-{
-IRQ_UNLOCK();
-return status;
+	/* Check the driver status. */
+	IRQ_LOCK();
+
+	status_t status = s2pi_.Status;
+
+	if ( status != STATUS_IDLE ) {
+		IRQ_UNLOCK();
+		return status;
+	}
+
+	s2pi_.Status = STATUS_BUSY;
+
+	IRQ_UNLOCK();
+
+	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_SET);
+
+	s2pi_.Status = STATUS_IDLE;
+
+	return STATUS_OK;
 }
-s2pi_.Status = STATUS_BUSY;
-IRQ_UNLOCK();
-HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_RESET);
-HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_SET);
-s2pi_.Status = STATUS_IDLE;
-return STATUS_OK;
+
+/*!***************************************************************************
+* @brief Triggers the callback function with the provided status.
+* @details It first checks if a callback function is present,
+* otherwise it returns immediately.
+* The callback function is reset to 0, and must be set up again
+* for the next transfer, if required.
+* @param status The status to be provided to the callback funcition.
+* @return Returns the status received from the callback function
+****************************************************************************/
+static inline status_t S2PI_CompleteTransfer(status_t status) {
+	s2pi_.Status = STATUS_IDLE;
+
+	/* Deactivate CS (set high), as we use GPIO pin */
+	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_SET);
+
+	/* Invoke callback if there is one */
+	if (s2pi_.Callback != 0) {
+		s2pi_callback_t callback = s2pi_.Callback;
+		s2pi_.Callback = 0;
+		status = callback(status, s2pi_.CallbackData);
+	}
+
+	return status;
 }
 
 /*!***************************************************************************
@@ -310,70 +345,60 @@ return STATUS_OK;
 * - #STATUS_S2PI_GPIO_MODE: The module is in GPIO mode. The transfer
 * was not started.
 *****************************************************************************/
-status_t S2PI_TransferFrame(s2pi_slave_t spi_slave,
-uint8_t const * txData,
-uint8_t * rxData,
-size_t frameSize,
-s2pi_callback_t callback,
-void * callbackData)
+status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const * txData, uint8_t * rxData, size_t frameSize, s2pi_callback_t callback, void * callbackData)
 {
-/* Verify arguments. */
-if (!txData || frameSize == 0 || frameSize >= 0x10000)
-return ERROR_INVALID_ARGUMENT;
-/* Check the spi slave.*/
-if (spi_slave != S2PI_S2)
-return ERROR_S2PI_INVALID_SLAVE;
-/* Check the driver status, lock if idle. */
-IRQ_LOCK();
-status_t status = s2pi_.Status;
-if (status != STATUS_IDLE)
-{
-IRQ_UNLOCK();
-return status;
-}
-s2pi_.Status = STATUS_BUSY;
-IRQ_UNLOCK();
-/* Set the callback information */
-s2pi_.Callback = callback;
-s2pi_.CallbackData = callbackData;
-/* Manually set the chip select (active low) */
-HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_RESET);
-HAL_StatusTypeDef hal_error;
-/* Lock interrupts to prevent completion interrupt before setup is complete */
-IRQ_LOCK();
-if (rxData)
-hal_error = HAL_SPI_TransmitReceive_DMA(&hspi2, (uint8_t *) txData, rxData, (uint16_t)
-frameSize);
-else
-hal_error = HAL_SPI_Transmit_DMA(&hspi2, (uint8_t *) txData, (uint16_t) frameSize);
-IRQ_UNLOCK();
-if (hal_error != HAL_OK)
-return ERROR_FAIL;
-return STATUS_OK;
-}
+	/* Verify arguments. */
+	if (!txData || frameSize == 0 || frameSize >= 0x10000) {
+		return ERROR_INVALID_ARGUMENT;
+	}
 
-/*!***************************************************************************
-* @brief Triggers the callback function with the provided status.
-* @details It first checks if a callback function is present,
-* otherwise it returns immediately.
-* The callback function is reset to 0, and must be set up again
-* for the next transfer, if required.
-* @param status The status to be provided to the callback funcition.
-* @return Returns the status received from the callback function
-****************************************************************************/
-static inline status_t S2PI_CompleteTransfer(status_t status)
-{
-s2pi_.Status = STATUS_IDLE;
-/* Deactivate CS (set high), as we use GPIO pin */
-HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_SET);
-/* Invoke callback if there is one */
-if (s2pi_.Callback != 0)
-{
-s2pi_callback_t callback = s2pi_.Callback;
-s2pi_.Callback = 0;
-status = callback(status, s2pi_.CallbackData);
-}
-return status;
+	/* Check the spi slave.*/
+	if (spi_slave != S2PI_S2) {
+		return ERROR_S2PI_INVALID_SLAVE;
+	}
+
+	/* Check the driver status, lock if idle. */
+	IRQ_LOCK();
+
+	status_t status = s2pi_.Status;
+	if (status != STATUS_IDLE) {
+		IRQ_UNLOCK();
+		return status;
+	}
+
+	s2pi_.Status = STATUS_BUSY;
+
+	IRQ_UNLOCK();
+
+	/* Set the callback information */
+	s2pi_.Callback = callback;
+	s2pi_.CallbackData = callbackData;
+
+	/* Manually set the chip select (active low) */
+	HAL_GPIO_WritePin(s2pi_.GPIOs[S2PI_CS].Port, s2pi_.GPIOs[S2PI_CS].Pin, GPIO_PIN_RESET);
+
+	HAL_StatusTypeDef hal_error;
+	/* Lock interrupts to prevent completion interrupt before setup is complete */
+	IRQ_LOCK();
+
+	if (rxData) {
+		//hal_error = HAL_SPI_TransmitReceive_DMA(&hspi2, (uint8_t *) txData, rxData, (uint16_t)frameSize);
+		hal_error = HAL_SPI_TransmitReceive(&hspi2, (uint8_t *) txData, rxData, (uint16_t)frameSize, (uint32_t)1000);
+	}
+	else {
+		//hal_error = HAL_SPI_Transmit_DMA(&hspi2, (uint8_t *) txData, (uint16_t) frameSize);
+		hal_error = HAL_SPI_Transmit(&hspi2, (uint8_t *) txData, (uint16_t) frameSize, (uint32_t)1000);
+	}
+
+	IRQ_UNLOCK();
+
+	if (hal_error != HAL_OK) {
+		return ERROR_FAIL;
+	}
+
+	S2PI_CompleteTransfer(STATUS_OK);
+
+	return STATUS_OK;
 }
 
 /**

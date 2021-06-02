@@ -183,29 +183,30 @@ AFBRS50::init()
 		return PX4_ERROR;
 	}
 
-	uint32_t value = Argus_GetAPIVersion();
-	uint8_t a = (value >> 24) & 0xFFU;
-	uint8_t b = (value >> 16) & 0xFFU;
-	uint8_t c = value & 0xFFFFU;
-	uint32_t id = Argus_GetChipID(_hnd);
-	argus_module_version_t mv = Argus_GetModuleVersion(_hnd);
+	//uint32_t value = Argus_GetAPIVersion();
+	//PX4_INFO("AFBR API Verion %d", value);
+	//uint8_t a = (value >> 24) & 0xFFU;
+	//uint8_t b = (value >> 16) & 0xFFU;
+	//uint8_t c = value & 0xFFFFU;
+	//uint32_t id = Argus_GetChipID(_hnd);
+	//argus_module_version_t mv = Argus_GetModuleVersion(_hnd);
 
-	PX4_INFO("\n##### AFBR-S50 API - Simple Example ##############\n"
-		  "  API Version: v%d.%d.%d\n"
-		  "  Chip ID:     %d\n"
-		  "  Module:      %s\n"
-		  "##################################################\n",
-		  a, b, c, id,
-		  mv == AFBR_S50MV85G_V1 ? "AFBR-S50MV85G (v1)" :
-		  mv == AFBR_S50MV85G_V2 ? "AFBR-S50MV85G (v2)" :
-		  mv == AFBR_S50MV85G_V3 ? "AFBR-S50MV85G (v3)" :
-		  mv == AFBR_S50LV85D_V1 ? "AFBR-S50LV85D (v1)" :
-		  mv == AFBR_S50MV68B_V1 ? "AFBR-S50MV68B (v1)" :
-		  mv == AFBR_S50MV85I_V1 ? "AFBR-S50MV85I (v1)" :
-		  mv == AFBR_S50SV85K_V1 ? "AFBR-S50SV85K (v1)" :
-		  "unknown");
+	// PX4_INFO("\n##### AFBR-S50 API - Simple Example ##############\n"
+	// 	  "  API Version: v%d.%d.%d\n"
+	// 	  "  Chip ID:     %d\n"
+	// 	  "  Module:      %s\n"
+	// 	  "##################################################\n",
+	// 	  a, b, c, id,
+	// 	  mv == AFBR_S50MV85G_V1 ? "AFBR-S50MV85G (v1)" :
+	// 	  mv == AFBR_S50MV85G_V2 ? "AFBR-S50MV85G (v2)" :
+	// 	  mv == AFBR_S50MV85G_V3 ? "AFBR-S50MV85G (v3)" :
+	// 	  mv == AFBR_S50LV85D_V1 ? "AFBR-S50LV85D (v1)" :
+	// 	  mv == AFBR_S50MV68B_V1 ? "AFBR-S50MV68B (v1)" :
+	// 	  mv == AFBR_S50MV85I_V1 ? "AFBR-S50MV85I (v1)" :
+	// 	  mv == AFBR_S50SV85K_V1 ? "AFBR-S50SV85K (v1)" :
+	// 	  "unknown");
 
-	Argus_SetConfigurationFrameTime( _hnd, 100000 ); // 0.1 second = 10 Hz
+	//Argus_SetConfigurationFrameTime( _hnd, 100000 ); // 0.1 second = 10 Hz
 
 	return PX4_OK;
 }

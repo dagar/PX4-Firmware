@@ -39,7 +39,6 @@ add_definitions(-DUSE_HAL_DRIVER -DSTM32F412Cx)
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
 	MAIN afbrs50
-	STACK_MAIN 8000
 	COMPILE_FLAGS
 		-O0
 		-Wno-cast-align # TODO: fix and enable
