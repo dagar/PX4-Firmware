@@ -38,7 +38,6 @@
 #include <string.h>
 #include <lib/drivers/device/Device.hpp>
 
-#include "driver/gpio.h"
 #include "s2pi.h"
 #include "timer.h"
 

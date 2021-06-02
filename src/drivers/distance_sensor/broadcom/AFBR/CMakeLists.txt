@@ -44,14 +44,13 @@ px4_add_module(
 		-O0
 		-Wno-cast-align # TODO: fix and enable
 	INCLUDES
-		Include
+		Inc
 		API/Inc
 		Core/Inc
 		Drivers/STM32F4xx_HAL_Driver/Inc
 		Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
 		Drivers/CMSIS/Device/ST/STM32F4xx/Include
 		Drivers/CMSIS/Include
-		Platform
 	SRCS
 		AFBRS50.cpp
 		AFBRS50.hpp

@@ -2,7 +2,6 @@
 #include "gpio.h"
 #include "spi.h"
 #include "irq.h"
-#include "driver/gpio.h"
 #include "s2pi.h"
 
 /*! A structure that holds the mapping to port and pin for all SPI modules. */
