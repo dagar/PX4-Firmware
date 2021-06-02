@@ -12,6 +12,8 @@
 
 #include <drivers/drv_hrt.h>
 
+#include <drivers/drv_watchdog.h>
+
 /*! A structure to hold all internal data required by the S2PI module. */
 typedef struct {
 	/*! Determines the current driver status. */
@@ -63,9 +65,6 @@ s2pi_handle_t s2pi_ = { .GPIOs = { [ S2PI_CLK ]  = GPIO_SPI2_AFBR_CLK,
 
 static int gpio_falling_edge(int irq, void *context, void *arg)
 {
-	//printf("gpio_falling_edge\n");
-	//up_udelay(1000);
-
 	if (s2pi_.IrqCallback != 0) {
 		s2pi_.IrqCallback(s2pi_.IrqCallbackData);
 	}
@@ -75,12 +74,16 @@ static int gpio_falling_edge(int irq, void *context, void *arg)
 
 status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps)
 {
+	fprintf(stderr, "S2PI_Init\n");
+
 	px4_arch_configgpio(GPIO_SPI2_AFBR_CS_N);
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
 	s2pi_.spidev = px4_spibus_initialize(2);
 
 	px4_arch_configgpio(GPIO_SPI2_AFBR_IRQ_N);
 	px4_arch_gpiosetevent(GPIO_SPI2_AFBR_IRQ_N, false, true, false, &gpio_falling_edge, NULL);
+
+	usleep(10000);
 
 	return S2PI_SetBaudRate(baudRate_Bps);
 }
@@ -109,6 +112,8 @@ status_t S2PI_GetStatus(void)
 status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 {
 	printf("S2PI_SetBaudRate %d, actual=%d\n", baudRate_Bps, SPI_SETFREQUENCY(s2pi_.spidev, baudRate_Bps));
+	SPI_SETMODE(s2pi_.spidev, SPIDEV_MODE3);
+	SPI_SETBITS(s2pi_.spidev, 8);
 	return STATUS_OK;
 }
 
@@ -192,6 +197,7 @@ status_t S2PI_ReleaseGpioControl(void)
 *****************************************************************************/
 status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 {
+	watchdog_pet();
 	printf("S2PI_WriteGpioPin slave=%d pin=%d, value=%d\n", slave, pin, value);
 
 	/* Check if pin is valid. */
@@ -307,19 +313,26 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 * was not started.
 *****************************************************************************/
 
+static struct hrt_call broadcom_s2pi_transfer_hrt_call = {};
 static struct hrt_call broadcom_s2pi_transfer_finished_hrt_call = {};
+
 static status_t broadcom_s2pi_transfer_status = STATUS_OK;
+
+static uint8_t *broadcom_txData = NULL;
+static uint8_t *broadcom_rxData = NULL;
+static size_t broadcom_framesize = 0;
 
 static void broadcom_s2pi_complete_transfer_callout(void *arg)
 {
 	s2pi_.Status = STATUS_IDLE;
+
 	/* Deactivate CS (set high), as we use GPIO pin */
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
 
 	/* Invoke callback if there is one */
 	if (s2pi_.Callback != 0) {
-		printf("S2PI_TransferFrame S2PI_CompleteTransfer Invoke callback %p, callbackdata=%p, status=%d\n", s2pi_.Callback,
-		       s2pi_.CallbackData, broadcom_s2pi_transfer_status);
+		fprintf(stderr, "S2PI_TransferFrame S2PI_CompleteTransfer Invoke callback %p, callbackdata=%p, status=%d\n",
+			s2pi_.Callback, s2pi_.CallbackData, broadcom_s2pi_transfer_status);
 
 		s2pi_callback_t callback = s2pi_.Callback;
 		s2pi_.Callback = 0;
@@ -327,9 +340,23 @@ static void broadcom_s2pi_complete_transfer_callout(void *arg)
 	}
 }
 
+static void broadcom_s2pi_transfer_callout(void *arg)
+{
+	//fprintf(stderr, "S2PI_TransferFrame %d txData=%p, rxData=%p, frameSize=%d\n", up_interrupt_context(), broadcom_txData, broadcom_rxData, broadcom_framesize);
+
+	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
+	SPI_EXCHANGE(s2pi_.spidev, broadcom_txData, broadcom_rxData, broadcom_framesize);
+
+	broadcom_s2pi_transfer_status = STATUS_OK;
+
+	hrt_call_after(&broadcom_s2pi_transfer_finished_hrt_call, 0, broadcom_s2pi_complete_transfer_callout, NULL);
+}
+
 status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8_t *rxData, size_t frameSize,
 			    s2pi_callback_t callback, void *callbackData)
 {
+	watchdog_pet();
+
 	/* Verify arguments. */
 	if (!txData || frameSize == 0 || frameSize >= 0x10000) {
 		return ERROR_INVALID_ARGUMENT;
@@ -339,9 +366,6 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8
 	if (spi_slave != S2PI_S2) {
 		return ERROR_S2PI_INVALID_SLAVE;
 	}
-
-	printf("S2PI_TransferFrame %d txData=%p, rxData=%p, frameSize=%d callback=%p, callbackData=%p\n",
-	       up_interrupt_context(), txData, rxData, frameSize, callback, callbackData);
 
 	/* Check the driver status, lock if idle. */
 	IRQ_LOCK();
@@ -353,25 +377,16 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8
 	}
 
 	s2pi_.Status = STATUS_BUSY;
-	IRQ_UNLOCK();
+
 	/* Set the callback information */
 	s2pi_.Callback = callback;
 	s2pi_.CallbackData = callbackData;
-
-	IRQ_LOCK();
-
-	/* Manually set the chip select (active low) */
-	//SPI_SETFREQUENCY(spidev, _frequency);
-	SPI_SETMODE(s2pi_.spidev, SPIDEV_MODE3);
-	SPI_SETBITS(s2pi_.spidev, 8);
-	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
-	SPI_EXCHANGE(s2pi_.spidev, txData, rxData, frameSize);
-
-	broadcom_s2pi_transfer_status = STATUS_OK;
+	broadcom_txData = (uint8_t *)txData;
+	broadcom_rxData = rxData;
+	broadcom_framesize = frameSize;
+	hrt_call_after(&broadcom_s2pi_transfer_hrt_call, 0, broadcom_s2pi_transfer_callout, NULL);
 
 	IRQ_UNLOCK();
-
-	hrt_call_after(&broadcom_s2pi_transfer_finished_hrt_call, 100, broadcom_s2pi_complete_transfer_callout, NULL);
 
 	return STATUS_OK;
 }
