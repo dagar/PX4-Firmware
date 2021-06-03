@@ -236,7 +236,7 @@ private:
 	void send_controls();
 	void send_heartbeat();
 	void send_mavlink_message(const mavlink_message_t &aMsg);
-	void update_sensors(const hrt_abstime &time, const mavlink_hil_sensor_t &sensors);
+	void update_sensors(const hrt_abstime &time, mavlink_hil_sensor_t &sensors);
 
 	static void *sending_trampoline(void *);
 

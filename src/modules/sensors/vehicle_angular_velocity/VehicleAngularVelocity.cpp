@@ -351,6 +351,14 @@ Vector3f VehicleAngularVelocity::GetResetAngularVelocity() const
 		//  start with last valid vehicle body frame angular velocity and compute equivalent raw data (for current sensor selection)
 		Vector3f angular_velocity_uncalibrated{_calibration.Uncorrect(_angular_velocity + _bias)};
 
+		PX4_WARN("reset angular velocity raw [%.6f, %.6f, %.6f] + old bias [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f] (raw prev [%.6f, %.6f, %.6f])",
+			 (double)_angular_velocity(0), (double)_angular_velocity(1), (double)_angular_velocity(2),
+			 (double)_bias(0), (double)_bias(1), (double)_bias(2),
+			 (double)angular_velocity_uncalibrated(0), (double)angular_velocity_uncalibrated(1),
+			 (double)angular_velocity_uncalibrated(2),
+			 (double)_angular_velocity_raw_prev(0), (double)_angular_velocity_raw_prev(1), (double)_angular_velocity_raw_prev(2)
+			);
+
 		if (PX4_ISFINITE(angular_velocity_uncalibrated(0))
 		    && PX4_ISFINITE(angular_velocity_uncalibrated(1))
 		    && PX4_ISFINITE(angular_velocity_uncalibrated(2))) {
@@ -368,6 +376,11 @@ Vector3f VehicleAngularVelocity::GetResetAngularAcceleration() const
 		// angular acceleration filtering is performed on unscaled angular velocity data
 		//  start with last valid vehicle body frame angular acceleration and compute equivalent raw data (for current sensor selection)
 		Vector3f angular_acceleration{_calibration.rotation().I() *_angular_acceleration};
+
+		PX4_WARN("reset angular acceleration raw [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f]",
+			 (double)_angular_acceleration(0), (double)_angular_acceleration(1), (double)_angular_acceleration(2),
+			 (double)angular_acceleration(0), (double)angular_acceleration(1), (double)angular_acceleration(2)
+			);
 
 		if (PX4_ISFINITE(angular_acceleration(0))
 		    && PX4_ISFINITE(angular_acceleration(1))
@@ -664,6 +677,8 @@ void VehicleAngularVelocity::Run()
 		while (_sensor_fifo_sub.update(&sensor_fifo_data)) {
 			const float dt_s = math::constrain(sensor_fifo_data.dt * 1e-6f, 0.00002f, 0.02f); // 20 us to 20 ms
 
+			bool filter_reset = false;
+
 			// in FIFO mode the unscaled raw data is filtered, reset filters on any scale change
 			if (_reset_filters) {
 				ResetFilters();
@@ -671,6 +686,8 @@ void VehicleAngularVelocity::Run()
 				if (_reset_filters) {
 					continue; // not safe to run until filters configured
 				}
+
+				filter_reset = true;
 			}
 
 			UpdateDynamicNotchEscRpm();
@@ -701,6 +718,18 @@ void VehicleAngularVelocity::Run()
 				// Publish
 				CalibrateAndPublish(!_sensor_fifo_sub.updated(), sensor_fifo_data.timestamp_sample, angular_velocity_unscaled,
 						    angular_acceleration_unscaled);
+
+				if (filter_reset) {
+					PX4_WARN("first angular velocity after reset raw [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f] (filtered) => +bias [%.6f, %.6f, %.6f] + calibration [%.6f, %.6f, %.6f] (raw prev [%.6f, %.6f, %.6f])",
+						 (double)sensor_fifo_data.x[0] * (double)sensor_fifo_data.scale,
+						 (double)sensor_fifo_data.y[0] * (double)sensor_fifo_data.scale,
+						 (double)sensor_fifo_data.z[0] * (double)sensor_fifo_data.scale,
+						 (double)angular_velocity_unscaled(0), (double)angular_velocity_unscaled(1), (double)angular_velocity_unscaled(2),
+						 (double)_bias(0), (double)_bias(1), (double)_bias(2),
+						 (double)_angular_velocity(0), (double)_angular_velocity(1), (double)_angular_velocity(2),
+						 (double)_angular_velocity_prev(0), (double)_angular_velocity_prev(1), (double)_angular_velocity_prev(2)
+						);
+				}
 			}
 		}
 
@@ -718,12 +747,16 @@ void VehicleAngularVelocity::Run()
 				const float dt_s = math::constrain(((sensor_data.timestamp_sample - _timestamp_sample_last) * 1e-6f), 0.00002f, 0.02f);
 				_timestamp_sample_last = sensor_data.timestamp_sample;
 
+				bool filter_reset = false;
+
 				if (_reset_filters) {
 					ResetFilters();
 
 					if (_reset_filters) {
 						continue; // not safe to run until filters configured
 					}
+
+					filter_reset = true;
 				}
 
 				UpdateDynamicNotchEscRpm();
@@ -745,6 +778,16 @@ void VehicleAngularVelocity::Run()
 
 				// Publish
 				CalibrateAndPublish(!_sensor_sub.updated(), sensor_data.timestamp_sample, angular_velocity, angular_acceleration);
+
+				if (filter_reset) {
+					PX4_WARN("first angular velocity after reset raw [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f] (filtered) => +bias [%.6f, %.6f, %.6f] + calibration [%.6f, %.6f, %.6f] (raw prev [%.6f, %.6f, %.6f])",
+						 (double)sensor_data.x, (double)sensor_data.y, (double)sensor_data.z,
+						 (double)angular_velocity(0), (double)angular_velocity(1), (double)angular_velocity(2),
+						 (double)_bias(0), (double)_bias(1), (double)_bias(2),
+						 (double)_angular_velocity(0), (double)_angular_velocity(1), (double)_angular_velocity(2),
+						 (double)_angular_velocity_prev(0), (double)_angular_velocity_prev(1), (double)_angular_velocity_prev(2)
+						);
+				}
 			}
 		}
 	}

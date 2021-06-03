@@ -195,7 +195,7 @@ void Simulator::send_controls()
 	}
 }
 
-void Simulator::update_sensors(const hrt_abstime &time, const mavlink_hil_sensor_t &sensors)
+void Simulator::update_sensors(const hrt_abstime &time, mavlink_hil_sensor_t &sensors)
 {
 	// temperature only updated with baro
 	if ((sensors.fields_updated & SensorSource::BARO) == SensorSource::BARO) {
@@ -250,6 +250,27 @@ void Simulator::update_sensors(const hrt_abstime &time, const mavlink_hil_sensor
 	// gyro
 	if ((sensors.fields_updated & SensorSource::GYRO) == SensorSource::GYRO) {
 		for (int i = 0; i < GYRO_COUNT_MAX; i++) {
+			matrix::Vector3f gyro_bias{};
+
+			switch (i) {
+			case 0:
+				gyro_bias = {0.01f, 0.05f, 0.1f};
+				break;
+			case 1:
+				gyro_bias = {0.1f, 0.03f, 0.05f};
+				break;
+			case 2:
+				gyro_bias = {-0.01f, -0.05f, -0.1f};
+				break;
+			case 3:
+				gyro_bias = {-0.03f, -0.02f, -0.01f};
+				break;
+			}
+
+			sensors.xgyro += gyro_bias(0);
+			sensors.ygyro += gyro_bias(1);
+			sensors.zgyro += gyro_bias(2);
+
 			if (i == 0) {
 				// gyro 0 is simulated FIFO
 				static constexpr float GYRO_FIFO_SCALE = math::radians(2000.f / 32768.f);
