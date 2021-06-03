@@ -351,13 +351,13 @@ Vector3f VehicleAngularVelocity::GetResetAngularVelocity() const
 		//  start with last valid vehicle body frame angular velocity and compute equivalent raw data (for current sensor selection)
 		Vector3f angular_velocity_uncalibrated{_calibration.Uncorrect(_angular_velocity + _bias)};
 
-		PX4_WARN("reset angular velocity raw [%.6f, %.6f, %.6f] + old bias [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f] (raw prev [%.6f, %.6f, %.6f])",
-			 (double)_angular_velocity(0), (double)_angular_velocity(1), (double)_angular_velocity(2),
-			 (double)_bias(0), (double)_bias(1), (double)_bias(2),
-			 (double)angular_velocity_uncalibrated(0), (double)angular_velocity_uncalibrated(1),
-			 (double)angular_velocity_uncalibrated(2),
-			 (double)_angular_velocity_raw_prev(0), (double)_angular_velocity_raw_prev(1), (double)_angular_velocity_raw_prev(2)
-			);
+		// PX4_WARN("reset angular velocity raw [%.6f, %.6f, %.6f] + old bias [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f] (raw prev [%.6f, %.6f, %.6f])",
+		// 	 (double)_angular_velocity(0), (double)_angular_velocity(1), (double)_angular_velocity(2),
+		// 	 (double)_bias(0), (double)_bias(1), (double)_bias(2),
+		// 	 (double)angular_velocity_uncalibrated(0), (double)angular_velocity_uncalibrated(1),
+		// 	 (double)angular_velocity_uncalibrated(2),
+		// 	 (double)_angular_velocity_raw_prev(0), (double)_angular_velocity_raw_prev(1), (double)_angular_velocity_raw_prev(2)
+		// 	);
 
 		if (PX4_ISFINITE(angular_velocity_uncalibrated(0))
 		    && PX4_ISFINITE(angular_velocity_uncalibrated(1))
@@ -377,10 +377,10 @@ Vector3f VehicleAngularVelocity::GetResetAngularAcceleration() const
 		//  start with last valid vehicle body frame angular acceleration and compute equivalent raw data (for current sensor selection)
 		Vector3f angular_acceleration{_calibration.rotation().I() *_angular_acceleration};
 
-		PX4_WARN("reset angular acceleration raw [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f]",
-			 (double)_angular_acceleration(0), (double)_angular_acceleration(1), (double)_angular_acceleration(2),
-			 (double)angular_acceleration(0), (double)angular_acceleration(1), (double)angular_acceleration(2)
-			);
+		// PX4_WARN("reset angular acceleration raw [%.6f, %.6f, %.6f] => [%.6f, %.6f, %.6f]",
+		// 	 (double)_angular_acceleration(0), (double)_angular_acceleration(1), (double)_angular_acceleration(2),
+		// 	 (double)angular_acceleration(0), (double)angular_acceleration(1), (double)angular_acceleration(2)
+		// 	);
 
 		if (PX4_ISFINITE(angular_acceleration(0))
 		    && PX4_ISFINITE(angular_acceleration(1))
@@ -809,6 +809,10 @@ void VehicleAngularVelocity::CalibrateAndPublish(bool publish, const hrt_abstime
 		vehicle_angular_acceleration_s v_angular_acceleration;
 		v_angular_acceleration.timestamp_sample = timestamp_sample;
 		_angular_acceleration.copyTo(v_angular_acceleration.xyz);
+
+		const Vector3f angular_acceleration_reset = GetResetAngularAcceleration();
+		angular_acceleration_reset.copyTo(v_angular_acceleration.xyz_raw_reset);
+
 		v_angular_acceleration.timestamp = hrt_absolute_time();
 		_vehicle_angular_acceleration_pub.publish(v_angular_acceleration);
 
@@ -816,6 +820,10 @@ void VehicleAngularVelocity::CalibrateAndPublish(bool publish, const hrt_abstime
 		vehicle_angular_velocity_s v_angular_velocity;
 		v_angular_velocity.timestamp_sample = timestamp_sample;
 		_angular_velocity.copyTo(v_angular_velocity.xyz);
+
+		const Vector3f angular_velocity_reset = GetResetAngularVelocity();
+		angular_velocity_reset.copyTo(v_angular_velocity.xyz_raw_reset);
+
 		v_angular_velocity.timestamp = hrt_absolute_time();
 		_vehicle_angular_velocity_pub.publish(v_angular_velocity);
 

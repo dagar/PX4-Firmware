@@ -4,4 +4,6 @@ uint64 timestamp_sample # timestamp of the data sample on which this message is 
 
 float32[3] xyz		# Bias corrected angular velocity about the FRD body frame XYZ-axis in rad/s
 
+float32[3] xyz_raw_reset
+
 # TOPICS vehicle_angular_velocity vehicle_angular_velocity_groundtruth
