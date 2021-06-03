@@ -10,7 +10,7 @@
 #include <nuttx/spi/spi.h>
 
 #include <drivers/drv_hrt.h>
-
+#include <px4_platform_common/workqueue.h>
 
 /*! A structure to hold all internal data required by the S2PI module. */
 typedef struct {
@@ -291,8 +291,8 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 * was not started.
 *****************************************************************************/
 
-static struct hrt_call broadcom_s2pi_transfer_hrt_call = {};
-static struct hrt_call broadcom_s2pi_transfer_finished_hrt_call = {};
+static struct work_s broadcom_s2pi_transfer_work = {};
+static struct work_s broadcom_s2pi_transfer_finished_work = {};
 
 static uint8_t *broadcom_txData = NULL;
 static uint8_t *broadcom_rxData = NULL;
@@ -300,9 +300,14 @@ static size_t broadcom_framesize = 0;
 
 static void broadcom_s2pi_complete_transfer_callout(void *arg)
 {
-	s2pi_.Status = STATUS_IDLE;
 
-	/* Deactivate CS (set high), as we use GPIO pin */
+}
+
+static void broadcom_s2pi_transfer_callout(void *arg)
+{
+	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
+	SPI_EXCHANGE(s2pi_.spidev, broadcom_txData, broadcom_rxData, broadcom_framesize);
+	s2pi_.Status = STATUS_IDLE;
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
 
 	/* Invoke callback if there is one */
@@ -311,14 +316,6 @@ static void broadcom_s2pi_complete_transfer_callout(void *arg)
 		s2pi_.Callback = 0;
 		callback(STATUS_OK, s2pi_.CallbackData);
 	}
-}
-
-static void broadcom_s2pi_transfer_callout(void *arg)
-{
-	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
-	SPI_EXCHANGE(s2pi_.spidev, broadcom_txData, broadcom_rxData, broadcom_framesize);
-
-	hrt_call_after(&broadcom_s2pi_transfer_finished_hrt_call, 0, broadcom_s2pi_complete_transfer_callout, NULL);
 }
 
 status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8_t *rxData, size_t frameSize,
@@ -351,7 +348,7 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8
 	broadcom_txData = (uint8_t *)txData;
 	broadcom_rxData = rxData;
 	broadcom_framesize = frameSize;
-	hrt_call_after(&broadcom_s2pi_transfer_hrt_call, 0, broadcom_s2pi_transfer_callout, NULL);
+	work_queue(HPWORK, &broadcom_s2pi_transfer_work, broadcom_s2pi_transfer_callout, NULL, 0);
 
 	IRQ_UNLOCK();
 
@@ -375,8 +372,8 @@ status_t S2PI_Abort(void)
 
 	/* Abort SPI transfer. */
 	if (status == STATUS_BUSY) {
-		hrt_cancel(&broadcom_s2pi_transfer_hrt_call);
-		hrt_cancel(&broadcom_s2pi_transfer_finished_hrt_call);
+		work_cancel(HPWORK, &broadcom_s2pi_transfer_work);
+		work_cancel(HPWORK, &broadcom_s2pi_transfer_finished_work);
 	}
 
 	return STATUS_OK;
