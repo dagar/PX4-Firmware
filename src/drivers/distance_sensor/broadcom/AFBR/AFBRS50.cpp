@@ -214,9 +214,9 @@ void AFBRS50::Run()
 				status = Argus_EvaluateData(_hnd, &res, (void *)_myData);
 
 				if (status == STATUS_OK) {
-					float result = res.Bin.Range / (Q9_22_ONE / 1000);
-					//fprintf(stderr, "result = %.3f m\n", (double)result);
-					_px4_rangefinder.update(hrt_absolute_time(), result);
+					float result_mm = res.Bin.Range / (Q9_22_ONE / 1000);
+					fprintf(stderr, "result = %.3f m\n", (double)result_mm / 1000.f);
+					_px4_rangefinder.update(hrt_absolute_time(), result_mm / 1000.f);
 
 					_state = STATE::MEASURE;
 					ScheduleDelayed(10_ms);
