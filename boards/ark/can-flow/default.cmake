@@ -29,7 +29,8 @@ px4_add_board(
 		#reboot
 		#system_time
 		top
-		topic_listener
+		#topic_listener
+		uorb
 		#ver
 		work_queue
 )

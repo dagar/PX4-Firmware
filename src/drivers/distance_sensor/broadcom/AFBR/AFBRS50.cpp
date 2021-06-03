@@ -81,65 +81,12 @@ AFBRS50::~AFBRS50()
 	perf_free(_sample_perf);
 }
 
-int AFBRS50::init()
-{
-	_hnd = Argus_CreateHandle();
-
-	if (_hnd == 0) {
-		PX4_ERR("ERROR: Handle not initialized\r\n");
-		Argus_DestroyHandle(_hnd);
-		return PX4_ERROR;
-	}
-
-	/* Initialize the S2PI hardware required by the API. */
-	printf("S2PI_Init\n");
-	S2PI_Init(SPI_SLAVE, SPI_BAUD_RATE);
-
-	printf("Argus_Init\n");
-	status_t status = Argus_Init(_hnd, SPI_SLAVE);
-
-	if (status != STATUS_OK) {
-		PX4_ERR("ERROR: Init status not okay: %i\r\n", status);
-		Argus_Deinit(_hnd);
-		Argus_DestroyHandle(_hnd);
-		return PX4_ERROR;
-	}
-
-	uint32_t value = Argus_GetAPIVersion();
-	PX4_INFO("AFBR API Verion %d", value);
-	uint8_t a = (value >> 24) & 0xFFU;
-	uint8_t b = (value >> 16) & 0xFFU;
-	uint8_t c = value & 0xFFFFU;
-	uint32_t id = Argus_GetChipID(_hnd);
-	argus_module_version_t mv = Argus_GetModuleVersion(_hnd);
-
-	PX4_INFO("\n##### AFBR-S50 API - Simple Example ##############\n"
-		 "  API Version: v%d.%d.%d\n"
-		 "  Chip ID:     %d\n"
-		 "  Module:      %s\n"
-		 "##################################################\n",
-		 a, b, c, id,
-		 mv == AFBR_S50MV85G_V1 ? "AFBR-S50MV85G (v1)" :
-		 mv == AFBR_S50MV85G_V2 ? "AFBR-S50MV85G (v2)" :
-		 mv == AFBR_S50MV85G_V3 ? "AFBR-S50MV85G (v3)" :
-		 mv == AFBR_S50LV85D_V1 ? "AFBR-S50LV85D (v1)" :
-		 mv == AFBR_S50MV68B_V1 ? "AFBR-S50MV68B (v1)" :
-		 mv == AFBR_S50MV85I_V1 ? "AFBR-S50MV85I (v1)" :
-		 mv == AFBR_S50SV85K_V1 ? "AFBR-S50SV85K (v1)" :
-		 "unknown");
-
-	Argus_SetConfigurationFrameTime(_hnd, 100000);   // 0.1 second = 10 Hz
-
-	// Schedule the driver at regular intervals.
-	//ScheduleOnInterval(AFBRS50_MEASURE_INTERVAL);
-
-	return PX4_OK;
-}
-
 static status_t measurement_ready_callback(status_t status, void *data)
 {
 	if (status != STATUS_OK) {
 		/* Error Handling ...*/
+		_myData = nullptr;
+
 	} else {
 		/* Inform the main task about new data ready.
 		 * Note: do not call the evaluate measurement method
@@ -154,49 +101,142 @@ static status_t measurement_ready_callback(status_t status, void *data)
 	return status;
 }
 
+int AFBRS50::init()
+{
+	_hnd = Argus_CreateHandle();
+
+	if (_hnd == 0) {
+		PX4_ERR("Handle not initialized");
+		Argus_DestroyHandle(_hnd);
+		return PX4_ERROR;
+	}
+
+	// Initialize the S2PI hardware required by the API.
+	S2PI_Init(SPI_SLAVE, SPI_BAUD_RATE);
+
+	status_t status = Argus_Init(_hnd, SPI_SLAVE);
+
+	if (status != STATUS_OK) {
+		PX4_ERR("Init status not okay: %i", status);
+		Argus_Deinit(_hnd);
+		Argus_DestroyHandle(_hnd);
+		return PX4_ERROR;
+	}
+
+	// Schedule the driver at regular intervals.
+	ScheduleOnInterval(AFBRS50_MEASURE_INTERVAL, AFBRS50_MEASURE_INTERVAL);
+
+	return PX4_OK;
+}
+
 void AFBRS50::Run()
 {
-	// From example.c
-	_myData = nullptr;
+	switch (_state) {
+	case STATE::CONFIGURE: {
+			uint32_t value = Argus_GetAPIVersion();
+			PX4_INFO_RAW("AFBR API Verion %d\n", value);
 
-	/* Triggers a single measurement.
-	* Note that due to the laser safety algorithms, the method might refuse
-	* to restart a measurement when the appropriate time has not been elapsed
-	* right now. The function returns with status #STATUS_ARGUS_POWERLIMIT and
-	* the function must be called again later. Use the frame time configuration
-	* in order to adjust the timing between two measurement frames.
-	*/
-	status_t status = Argus_TriggerMeasurement(_hnd, measurement_ready_callback);
+			uint8_t a = (value >> 24) & 0xFFU;
+			uint8_t b = (value >> 16) & 0xFFU;
+			uint8_t c = value & 0xFFFFU;
+			PX4_INFO_RAW("API Version: v%d.%d.%d\n", a, b, c);
 
-	if (status == STATUS_ARGUS_POWERLIMIT) {
-		/* Not ready (due to laser safety) to restart the measurement yet. Come back later. */
+			uint32_t id = Argus_GetChipID(_hnd);
+			PX4_INFO_RAW("Chip ID: %d\n", id);
 
-	} else if (status != STATUS_OK) {
-		/* Error Handling ...*/
-	} else {
-		/* Wait until measurement data is ready. */
-		do {
-			status = Argus_GetStatus(_hnd);
+			argus_module_version_t mv = Argus_GetModuleVersion(_hnd);
 
-		} while (status == STATUS_BUSY);
+			switch (mv) {
+			case AFBR_S50MV85G_V1:
+				PX4_INFO_RAW("AFBR-S50MV85G (v1)\n");
+				break;
 
-		if (status != STATUS_OK) {
-			/* Error Handling ...*/
-		} else {
-			// Evaluate the raw measurement results.
-			argus_results_t res{};
-			status = Argus_EvaluateData(_hnd, &res, (void *)_myData);
+			case AFBR_S50MV85G_V2:
+				PX4_INFO_RAW("AFBR-S50MV85G (v2)\n");
+				break;
 
-			if (status != STATUS_OK) {
-				/* Error Handling ...*/
+			case AFBR_S50MV85G_V3:
+				PX4_INFO_RAW("AFBR-S50MV85G (v3)\n");
+				break;
+
+			case AFBR_S50LV85D_V1:
+				PX4_INFO_RAW("AFBR-S50LV85D (v1)\n");
+				break;
+
+			case AFBR_S50MV68B_V1:
+				PX4_INFO_RAW("AFBR-S50MV68B (v1)\n");
+				break;
+
+			case AFBR_S50MV85I_V1:
+				PX4_INFO_RAW("AFBR-S50MV85I (v1)\n");
+				break;
+
+			case AFBR_S50SV85K_V1:
+				PX4_INFO_RAW("AFBR-S50SV85K (v1)\n");
+				break;
+
+			default:
+				//"unknown";
+				break;
+			}
+
+			Argus_SetConfigurationFrameTime(_hnd, AFBRS50_MEASURE_INTERVAL);
+
+			_state = STATE::MEASURE;
+			ScheduleDelayed(AFBRS50_MEASURE_INTERVAL);
+		}
+		break;
+
+	case STATE::MEASURE: {
+			/* Triggers a single measurement.
+			* Note that due to the laser safety algorithms, the method might refuse
+			* to restart a measurement when the appropriate time has not been elapsed
+			* right now. The function returns with status #STATUS_ARGUS_POWERLIMIT and
+			* the function must be called again later. Use the frame time configuration
+			* in order to adjust the timing between two measurement frames.
+			*/
+			_myData = nullptr;
+			status_t status = Argus_TriggerMeasurement(_hnd, measurement_ready_callback);
+
+			if (status != STATUS_ARGUS_POWERLIMIT) {
+				_state = STATE::COLLECT;
+			}
+
+			ScheduleDelayed(AFBRS50_MEASURE_INTERVAL);
+		}
+		break;
+
+	case STATE::COLLECT: {
+			status_t status = Argus_GetStatus(_hnd);
+
+			if (_myData != nullptr) {
+				argus_results_t res{};
+				status = Argus_EvaluateData(_hnd, &res, (void *)_myData);
+
+				if (status == STATUS_OK) {
+					float result = res.Bin.Range / (Q9_22_ONE / 1000);
+					//fprintf(stderr, "result = %.3f m\n", (double)result);
+					_px4_rangefinder.update(hrt_absolute_time(), result);
+
+					_state = STATE::MEASURE;
+					ScheduleDelayed(10_ms);
+					break;
+
+				} else {
+					// check again
+					ScheduleDelayed(10_ms);
+				}
 
 			} else {
-				// Use the recent measurement results
-				// (converting the Q9.22 value to float and print or display it).
-				float result = res.Bin.Range / (Q9_22_ONE / 1000);
-				PX4_INFO("Range: %f mm\r\n", (double)result);
+				// retry
+				_state = STATE::COLLECT;
+				ScheduleDelayed(10_ms);
 			}
 		}
+		break;
+
+	default:
+		break;
 	}
 }
 

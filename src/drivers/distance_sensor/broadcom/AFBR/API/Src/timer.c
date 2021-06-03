@@ -20,7 +20,6 @@ static void broadcom_hrt_callout(void *arg)
 
 void Timer_Init(void)
 {
-	printf("Timer_Init\n");
 	hrt_cancel(&broadcom_hrt_call);
 }
 
@@ -46,8 +45,6 @@ void Timer_GetCounterValue(uint32_t *hct, uint32_t *lct)
 	hrt_abstime time = hrt_absolute_time();
 	*hct = (time >> 32);
 	*lct = (time & 0xFFFFFFFF);
-
-	//printf("Timer_GetCounterValue %llu hct: %d lct: %d\n", last_time, *hct, *lct);
 }
 
 /*!***************************************************************************
@@ -64,8 +61,6 @@ void Timer_GetCounterValue(uint32_t *hct, uint32_t *lct)
 
 status_t Timer_Start(uint32_t period, void *param)
 {
-	printf("Timer_Start %d %p\n", period, param);
-
 	if (period != 0) {
 		hrt_call_after(&broadcom_hrt_call, period, broadcom_hrt_callout, param);
 
@@ -84,10 +79,7 @@ status_t Timer_Start(uint32_t period, void *param)
 *****************************************************************************/
 status_t Timer_Stop(void *param)
 {
-	printf("Timer_Stop %p\n", param);
-
 	hrt_cancel(&broadcom_hrt_call);
-
 	return STATUS_OK;
 }
 
@@ -105,8 +97,6 @@ status_t Timer_Stop(void *param)
 *****************************************************************************/
 status_t Timer_SetInterval(uint32_t dt_microseconds, void *param)
 {
-	printf("Timer_SetInterval %d %p\n", dt_microseconds, param);
-
 	if (dt_microseconds != 0) {
 		hrt_call_after(&broadcom_hrt_call, dt_microseconds, broadcom_hrt_callout, param);
 
@@ -130,8 +120,6 @@ status_t Timer_SetInterval(uint32_t dt_microseconds, void *param)
 
 status_t Timer_SetCallback(timer_cb_t f)
 {
-	printf("Timer_SetCallback %p\n", f);
-
 	timer_callback_ = f;
 	return STATUS_OK;
 }

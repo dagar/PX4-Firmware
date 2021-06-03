@@ -71,6 +71,12 @@ public:
 private:
 	void Run() override;
 
+	enum class STATE : uint8_t {
+		CONFIGURE,
+		MEASURE,
+		COLLECT,
+	} _state{STATE::CONFIGURE};
+
 	PX4Rangefinder _px4_rangefinder;
 
 	hrt_abstime _measurement_time{0};

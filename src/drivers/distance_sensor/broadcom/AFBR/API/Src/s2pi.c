@@ -7,12 +7,10 @@
 
 #include <board_config.h>
 
-
 #include <nuttx/spi/spi.h>
 
 #include <drivers/drv_hrt.h>
 
-#include <drivers/drv_watchdog.h>
 
 /*! A structure to hold all internal data required by the S2PI module. */
 typedef struct {
@@ -74,16 +72,12 @@ static int gpio_falling_edge(int irq, void *context, void *arg)
 
 status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps)
 {
-	fprintf(stderr, "S2PI_Init\n");
-
 	px4_arch_configgpio(GPIO_SPI2_AFBR_CS_N);
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
 	s2pi_.spidev = px4_spibus_initialize(2);
 
 	px4_arch_configgpio(GPIO_SPI2_AFBR_IRQ_N);
 	px4_arch_gpiosetevent(GPIO_SPI2_AFBR_IRQ_N, false, true, false, &gpio_falling_edge, NULL);
-
-	usleep(10000);
 
 	return S2PI_SetBaudRate(baudRate_Bps);
 }
@@ -98,7 +92,6 @@ status_t S2PI_Init(s2pi_slave_t defaultSlave, uint32_t baudRate_Bps)
 *****************************************************************************/
 status_t S2PI_GetStatus(void)
 {
-	//printf("S2PI_GetStatus %d status=%d\n", up_interrupt_context(), s2pi_.Status);
 	return s2pi_.Status;
 }
 
@@ -111,7 +104,6 @@ status_t S2PI_GetStatus(void)
 *****************************************************************************/
 status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 {
-	printf("S2PI_SetBaudRate %d, actual=%d\n", baudRate_Bps, SPI_SETFREQUENCY(s2pi_.spidev, baudRate_Bps));
 	SPI_SETMODE(s2pi_.spidev, SPIDEV_MODE3);
 	SPI_SETBITS(s2pi_.spidev, 8);
 	return STATUS_OK;
@@ -127,8 +119,6 @@ status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 *****************************************************************************/
 status_t S2PI_CaptureGpioControl(void)
 {
-	//printf("S2PI_CaptureGpioControl\n");
-
 	/* Check if something is ongoing. */
 	IRQ_LOCK();
 	status_t status = s2pi_.Status;
@@ -161,8 +151,6 @@ status_t S2PI_CaptureGpioControl(void)
 *****************************************************************************/
 status_t S2PI_ReleaseGpioControl(void)
 {
-	//printf("S2PI_ReleaseGpioControl\n");
-
 	/* Check if something is ongoing. */
 	IRQ_LOCK();
 	status_t status = s2pi_.Status;
@@ -197,9 +185,6 @@ status_t S2PI_ReleaseGpioControl(void)
 *****************************************************************************/
 status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 {
-	watchdog_pet();
-	//printf("S2PI_WriteGpioPin slave=%d pin=%d, value=%d\n", slave, pin, value);
-
 	/* Check if pin is valid. */
 	if (pin > S2PI_IRQ || value > 1) {
 		return ERROR_INVALID_ARGUMENT;
@@ -211,7 +196,6 @@ status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 	}
 
 	px4_arch_gpiowrite(s2pi_.GPIOs[pin], value);
-	up_udelay(10);
 
 	return STATUS_OK;
 }
@@ -238,9 +222,6 @@ status_t S2PI_ReadGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t *value)
 	}
 
 	*value = px4_arch_gpioread(s2pi_.GPIOs[pin]);
-	up_udelay(10);
-
-	//printf("S2PI_ReadGpioPin slave=%d pin=%d, value=%d\n", slave, pin, *value);
 
 	return STATUS_OK;
 }
@@ -261,13 +242,10 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 	IRQ_LOCK();
 	status_t status = s2pi_.Status;
 
-	printf("S2PI_CycleCsPin slave=%d status=%d\n", slave, status);
-
 	if (status != STATUS_IDLE) {
 		IRQ_UNLOCK();
 		return status;
 	}
-
 
 	s2pi_.Status = STATUS_BUSY;
 	IRQ_UNLOCK();
@@ -316,8 +294,6 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 static struct hrt_call broadcom_s2pi_transfer_hrt_call = {};
 static struct hrt_call broadcom_s2pi_transfer_finished_hrt_call = {};
 
-static status_t broadcom_s2pi_transfer_status = STATUS_OK;
-
 static uint8_t *broadcom_txData = NULL;
 static uint8_t *broadcom_rxData = NULL;
 static size_t broadcom_framesize = 0;
@@ -331,23 +307,16 @@ static void broadcom_s2pi_complete_transfer_callout(void *arg)
 
 	/* Invoke callback if there is one */
 	if (s2pi_.Callback != 0) {
-		// fprintf(stderr, "S2PI_TransferFrame S2PI_CompleteTransfer Invoke callback %p, callbackdata=%p, status=%d\n",
-		// 	s2pi_.Callback, s2pi_.CallbackData, broadcom_s2pi_transfer_status);
-
 		s2pi_callback_t callback = s2pi_.Callback;
 		s2pi_.Callback = 0;
-		callback(broadcom_s2pi_transfer_status, s2pi_.CallbackData);
+		callback(STATUS_OK, s2pi_.CallbackData);
 	}
 }
 
 static void broadcom_s2pi_transfer_callout(void *arg)
 {
-	//fprintf(stderr, "S2PI_TransferFrame %d txData=%p, rxData=%p, frameSize=%d\n", up_interrupt_context(), broadcom_txData, broadcom_rxData, broadcom_framesize);
-
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
 	SPI_EXCHANGE(s2pi_.spidev, broadcom_txData, broadcom_rxData, broadcom_framesize);
-
-	broadcom_s2pi_transfer_status = STATUS_OK;
 
 	hrt_call_after(&broadcom_s2pi_transfer_finished_hrt_call, 0, broadcom_s2pi_complete_transfer_callout, NULL);
 }
@@ -355,8 +324,6 @@ static void broadcom_s2pi_transfer_callout(void *arg)
 status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8_t *rxData, size_t frameSize,
 			    s2pi_callback_t callback, void *callbackData)
 {
-	watchdog_pet();
-
 	/* Verify arguments. */
 	if (!txData || frameSize == 0 || frameSize >= 0x10000) {
 		return ERROR_INVALID_ARGUMENT;
@@ -399,8 +366,6 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8
 *****************************************************************************/
 status_t S2PI_Abort(void)
 {
-	printf("S2PI_Abort status=%d\n", s2pi_.Status);
-
 	status_t status = s2pi_.Status;
 
 	/* Check if something is ongoing. */
@@ -410,8 +375,8 @@ status_t S2PI_Abort(void)
 
 	/* Abort SPI transfer. */
 	if (status == STATUS_BUSY) {
-		//HAL_SPI_Abort(&hspi2);
-		// DO SOMETHING?
+		hrt_cancel(&broadcom_s2pi_transfer_hrt_call);
+		hrt_cancel(&broadcom_s2pi_transfer_finished_hrt_call);
 	}
 
 	return STATUS_OK;
@@ -433,9 +398,6 @@ status_t S2PI_Abort(void)
 *****************************************************************************/
 status_t S2PI_SetIrqCallback(s2pi_slave_t slave, s2pi_irq_callback_t callback, void *callbackData)
 {
-	printf("%d S2PI_SetIrqCallback slave=%d, callback=%p, callbackData=%p \n", up_interrupt_context(), slave, callback,
-	       callbackData);
-
 	s2pi_.IrqCallback = callback;
 	s2pi_.IrqCallbackData = callbackData;
 
@@ -461,8 +423,5 @@ status_t S2PI_SetIrqCallback(s2pi_slave_t slave, s2pi_irq_callback_t callback, v
 *****************************************************************************/
 uint32_t S2PI_ReadIrqPin(s2pi_slave_t slave)
 {
-	uint32_t value = px4_arch_gpioread(s2pi_.GPIOs[S2PI_IRQ]);
-	printf("S2PI_ReadIrqPin %d slave=%d value=%d\n", up_interrupt_context(), slave, value);
-
-	return value;
+	return px4_arch_gpioread(s2pi_.GPIOs[S2PI_IRQ]);
 }

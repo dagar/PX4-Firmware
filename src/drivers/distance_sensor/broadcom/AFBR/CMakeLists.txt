@@ -34,23 +34,16 @@
 add_library(afbrs50_m4_fpu STATIC IMPORTED GLOBAL)
 set_property(TARGET afbrs50_m4_fpu PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/libafbrs50_m4_fpu.a)
 
-add_definitions(-DUSE_HAL_DRIVER -DSTM32F412Cx)
-
 px4_add_module(
 	MODULE drivers__distance_sensor__afbrs50
 	MAIN afbrs50
 	COMPILE_FLAGS
-		-O0
-		-Wno-cast-align # TODO: fix and enable
 	STACK_MAIN
-		32000
+		8192
 	INCLUDES
 		Inc
 		API/Inc
 		Core/Inc
-		Drivers/STM32F4xx_HAL_Driver/Inc
-		Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
-		Drivers/CMSIS/Device/ST/STM32F4xx/Include
 		Drivers/CMSIS/Include
 	SRCS
 		AFBRS50.cpp
@@ -60,9 +53,7 @@ px4_add_module(
 		API/Src/s2pi.c
 		API/Src/timer.c
 	DEPENDS
-		afbrs50_m4_fpu
 		px4_work_queue
-		afbrs50_m4_fpu
 		drivers_rangefinder
 		afbrs50_m4_fpu
 	)
