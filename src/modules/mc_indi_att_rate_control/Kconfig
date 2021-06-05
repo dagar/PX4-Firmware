@@ -1,0 +1,5 @@
+menuconfig MODULES_MC_INDI_ATT_RATE_CONTROL
+	bool "mc_indi_att_rate_control"
+	default n
+	---help---
+		Enable support for mc_indi_att_rate_control
