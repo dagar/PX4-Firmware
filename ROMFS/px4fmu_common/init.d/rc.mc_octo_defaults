@@ -11,6 +11,8 @@
 set MIXER octo_x
 set PWM_OUT 12345678
 
+param set-default MAV_TYPE 14
+
 param set-default PWM_MAIN_MIN1 1075
 param set-default PWM_MAIN_MIN2 1075
 param set-default PWM_MAIN_MIN3 1075

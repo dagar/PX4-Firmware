@@ -7,6 +7,8 @@
 
 set VEHICLE_TYPE fw
 
+param set-default MAV_TYPE 1
+
 #
 # Default parameters for fixed wing UAVs.
 #

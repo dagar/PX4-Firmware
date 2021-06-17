@@ -23,3 +23,5 @@
 
 # MAIN set by rc.mc_octo_defaults
 set MIXER octo_cox
+
+param set-default MAV_TYPE 3

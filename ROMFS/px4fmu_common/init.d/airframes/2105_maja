@@ -25,6 +25,11 @@
 
 . ${R}etc/init.d/rc.fw_defaults
 
+set MIXER AAERTWF
+# use PWM parameters for throttle channel
+param set-default PWM_MAIN_DIS5 1000
+
+
 param set-default FW_AIRSPD_MIN 10
 param set-default FW_AIRSPD_TRIM 15
 param set-default FW_AIRSPD_MAX 20
@@ -38,8 +43,3 @@ param set-default FW_WR_I 0.2
 param set-default FW_WR_IMAX 0.8
 param set-default FW_WR_P 1
 param set-default FW_W_RMAX 0
-
-set MIXER AAERTWF
-
-# use PWM parameters for throttle channel
-param set-default PWM_MAIN_DIS5 1000

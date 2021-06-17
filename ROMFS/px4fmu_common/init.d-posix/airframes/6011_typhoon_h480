@@ -5,7 +5,9 @@
 # @type Hexarotor x
 #
 
-. ${R}etc/init.d/rc.mc_defaults
+. ${R}etc/init.d/rc.mc_hex_defaults
+
+set MIXER hexa_x
 
 param set-default MC_PITCHRATE_P 0.0800
 param set-default MC_PITCHRATE_I 0.0400
@@ -25,7 +27,3 @@ param set-default TRIG_MODE 4
 param set-default MNT_MODE_IN 4
 param set-default MNT_MODE_OUT 2
 param set-default MAV_PROTO_VER 2
-
-set MAV_TYPE 13
-
-set MIXER hexa_x

@@ -18,6 +18,7 @@
 . ${R}etc/init.d/rc.mc_defaults
 
 set MIXER tri_y_yaw-
+param set-default MAV_TYPE 15
 
 param set-default PWM_MAIN_MIN1 1100
 param set-default PWM_MAIN_MIN2 1100

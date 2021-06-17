@@ -5,8 +5,10 @@
 # @type Hexarotor x
 #
 
-. ${R}etc/init.d/rc.mc_defaults
+. ${R}etc/init.d/rc.mc_hex_defaults
 . ${R}etc/init.d/rc.ctrlalloc
+
+set MIXER direct
 
 param set-default MPC_XY_VEL_I_ACC 4
 param set-default MPC_XY_VEL_P_ACC 3
@@ -65,8 +67,3 @@ param set-default CA_MC_R5_PX -0.866025
 param set-default CA_MC_R5_PY -0.5
 param set-default CA_MC_R5_CT 9.5
 param set-default CA_MC_R5_KM -0.05
-
-set MAV_TYPE 13
-
-# set MIXER hexa_x
-set MIXER direct

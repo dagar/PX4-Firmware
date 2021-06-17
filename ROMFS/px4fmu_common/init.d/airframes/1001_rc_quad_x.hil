@@ -8,7 +8,7 @@
 # @maintainer Lorenz Meier <lorenz@px4.io>
 #
 
-. ${R}etc/init.d/rc.mc_defaults
+. ${R}etc/init.d/rc.mc_quad_defaults
 
 set MIXER quad_x
 

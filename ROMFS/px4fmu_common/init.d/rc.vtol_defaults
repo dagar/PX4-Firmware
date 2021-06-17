@@ -7,6 +7,8 @@
 
 set VEHICLE_TYPE vtol
 
+param set-default MAV_TYPE 22
+
 param set-default EKF2_ARSP_THR 10
 param set-default EKF2_FUSE_BETA 1
 

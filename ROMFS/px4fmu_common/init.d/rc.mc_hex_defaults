@@ -11,6 +11,8 @@
 set MIXER hexa_x
 set PWM_OUT 123456
 
+param set-default MAV_TYPE 13
+
 param set-default PWM_MAIN_MIN1 1075
 param set-default PWM_MAIN_MIN2 1075
 param set-default PWM_MAIN_MIN3 1075

@@ -20,6 +20,8 @@
 
 set MIXER coax
 
+param set-default MAV_TYPE 3
+
 param set-default MC_ROLL_P 6.5
 param set-default MC_ROLLRATE_P 0.17
 param set-default MC_ROLLRATE_I 0.05

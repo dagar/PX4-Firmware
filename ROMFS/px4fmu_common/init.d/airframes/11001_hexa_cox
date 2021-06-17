@@ -24,3 +24,5 @@
 . ${R}etc/init.d/rc.mc_hex_defaults
 
 set MIXER hexa_cox
+
+param set-default MAV_TYPE 3
