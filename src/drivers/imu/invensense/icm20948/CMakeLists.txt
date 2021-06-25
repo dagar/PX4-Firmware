@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,10 +30,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+
 px4_add_module(
 	MODULE drivers__imu__invensense__icm20948
 	MAIN icm20948
 	COMPILE_FLAGS
+		#-DDEBUG_BUILD
+		${MAX_CUSTOM_OPT_LEVEL}
 	SRCS
 		AKM_AK09916_registers.hpp
 		ICM20948.cpp
@@ -43,10 +46,10 @@ px4_add_module(
 		icm20948_main.cpp
 		InvenSense_ICM20948_registers.hpp
 	DEPENDS
-		px4_work_queue
 		drivers_accelerometer
 		drivers_gyroscope
 		drivers_magnetometer
+		px4_work_queue
 	)
 
 px4_add_module(

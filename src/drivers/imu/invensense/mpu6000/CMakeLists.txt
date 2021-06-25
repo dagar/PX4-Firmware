@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,6 +35,8 @@ px4_add_module(
 	MODULE drivers__imu__invensense__mpu6000
 	MAIN mpu6000
 	COMPILE_FLAGS
+		#-DDEBUG_BUILD
+		${MAX_CUSTOM_OPT_LEVEL}
 	SRCS
 		MPU6000.cpp
 		MPU6000.hpp

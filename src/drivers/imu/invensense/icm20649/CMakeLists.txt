@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,17 +30,20 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+
 px4_add_module(
 	MODULE drivers__imu__invensense__icm20649
 	MAIN icm20649
 	COMPILE_FLAGS
+		#-DDEBUG_BUILD
+		${MAX_CUSTOM_OPT_LEVEL}
 	SRCS
 		ICM20649.cpp
 		ICM20649.hpp
 		icm20649_main.cpp
 		InvenSense_ICM20649_registers.hpp
 	DEPENDS
-		px4_work_queue
 		drivers_accelerometer
 		drivers_gyroscope
+		px4_work_queue
 	)

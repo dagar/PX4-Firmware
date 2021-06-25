@@ -35,6 +35,8 @@ px4_add_module(
 	MODULE drivers__imu__invensense__mpu6500
 	MAIN mpu6500
 	COMPILE_FLAGS
+		#-DDEBUG_BUILD
+		${MAX_CUSTOM_OPT_LEVEL}
 	SRCS
 		MPU6500.cpp
 		MPU6500.hpp

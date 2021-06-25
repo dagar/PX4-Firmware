@@ -40,17 +40,6 @@
 using namespace time_literals;
 using matrix::Vector3f;
 
-static constexpr int32_t sum(const int16_t samples[], uint8_t len)
-{
-	int32_t sum = 0;
-
-	for (int n = 0; n < len; n++) {
-		sum += samples[n];
-	}
-
-	return sum;
-}
-
 PX4Gyroscope::PX4Gyroscope(uint32_t device_id, enum Rotation rotation) :
 	_device_id{device_id},
 	_rotation{rotation}
@@ -92,68 +81,4 @@ void PX4Gyroscope::set_scale(float scale)
 
 		_scale = scale;
 	}
-}
-
-void PX4Gyroscope::update(const hrt_abstime &timestamp_sample, float x, float y, float z)
-{
-	// Apply rotation (before scaling)
-	rotate_3f(_rotation, x, y, z);
-
-	sensor_gyro_s report;
-
-	report.timestamp_sample = timestamp_sample;
-	report.device_id = _device_id;
-	report.temperature = _temperature;
-	report.error_count = _error_count;
-	report.x = x * _scale;
-	report.y = y * _scale;
-	report.z = z * _scale;
-	report.samples = 1;
-	report.timestamp = hrt_absolute_time();
-
-	_sensor_pub.publish(report);
-}
-
-void PX4Gyroscope::updateFIFO(sensor_gyro_fifo_s &sample)
-{
-	// rotate all raw samples and publish fifo
-	const uint8_t N = sample.samples;
-
-	for (int n = 0; n < N; n++) {
-		rotate_3i(_rotation, sample.x[n], sample.y[n], sample.z[n]);
-	}
-
-	sample.device_id = _device_id;
-	sample.scale = _scale;
-	sample.timestamp = hrt_absolute_time();
-	_sensor_fifo_pub.publish(sample);
-
-
-	// trapezoidal integration (equally spaced, scaled by dt later)
-	const Vector3f integral{
-		(0.5f * (_last_sample[0] + sample.x[N - 1]) + sum(sample.x, N - 1)),
-		(0.5f * (_last_sample[1] + sample.y[N - 1]) + sum(sample.y, N - 1)),
-		(0.5f * (_last_sample[2] + sample.z[N - 1]) + sum(sample.z, N - 1)),
-	};
-
-	_last_sample[0] = sample.x[N - 1];
-	_last_sample[1] = sample.y[N - 1];
-	_last_sample[2] = sample.z[N - 1];
-
-
-	const float scale = _scale / N;
-
-	sensor_gyro_s report;
-
-	report.timestamp_sample = sample.timestamp_sample;
-	report.device_id = _device_id;
-	report.temperature = _temperature;
-	report.error_count = _error_count;
-	report.x = integral(0) * scale;
-	report.y = integral(1) * scale;
-	report.z = integral(2) * scale;
-	report.samples = N;
-	report.timestamp = hrt_absolute_time();
-
-	_sensor_pub.publish(report);
 }

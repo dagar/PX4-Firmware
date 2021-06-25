@@ -40,30 +40,6 @@
 using namespace time_literals;
 using matrix::Vector3f;
 
-static constexpr int32_t sum(const int16_t samples[], uint8_t len)
-{
-	int32_t sum = 0;
-
-	for (int n = 0; n < len; n++) {
-		sum += samples[n];
-	}
-
-	return sum;
-}
-
-static constexpr uint8_t clipping(const int16_t samples[], int16_t clip_limit, uint8_t len)
-{
-	unsigned clip_count = 0;
-
-	for (int n = 0; n < len; n++) {
-		if (abs(samples[n]) >= clip_limit) {
-			clip_count++;
-		}
-	}
-
-	return clip_count;
-}
-
 PX4Accelerometer::PX4Accelerometer(uint32_t device_id, enum Rotation rotation) :
 	_device_id{device_id},
 	_rotation{rotation}
@@ -107,77 +83,6 @@ void PX4Accelerometer::set_scale(float scale)
 
 		UpdateClipLimit();
 	}
-}
-
-void PX4Accelerometer::update(const hrt_abstime &timestamp_sample, float x, float y, float z)
-{
-	// Apply rotation (before scaling)
-	rotate_3f(_rotation, x, y, z);
-
-	// publish
-	sensor_accel_s report;
-
-	report.timestamp_sample = timestamp_sample;
-	report.device_id = _device_id;
-	report.temperature = _temperature;
-	report.error_count = _error_count;
-	report.x = x * _scale;
-	report.y = y * _scale;
-	report.z = z * _scale;
-	report.clip_counter[0] = (fabsf(x) >= _clip_limit);
-	report.clip_counter[1] = (fabsf(y) >= _clip_limit);
-	report.clip_counter[2] = (fabsf(z) >= _clip_limit);
-	report.samples = 1;
-	report.timestamp = hrt_absolute_time();
-
-	_sensor_pub.publish(report);
-}
-
-void PX4Accelerometer::updateFIFO(sensor_accel_fifo_s &sample)
-{
-	// rotate all raw samples and publish fifo
-	const uint8_t N = sample.samples;
-
-	for (int n = 0; n < N; n++) {
-		rotate_3i(_rotation, sample.x[n], sample.y[n], sample.z[n]);
-	}
-
-	sample.device_id = _device_id;
-	sample.scale = _scale;
-	sample.timestamp = hrt_absolute_time();
-	_sensor_fifo_pub.publish(sample);
-
-
-	// trapezoidal integration (equally spaced, scaled by dt later)
-	const Vector3f integral{
-		(0.5f * (_last_sample[0] + sample.x[N - 1]) + sum(sample.x, N - 1)),
-		(0.5f * (_last_sample[1] + sample.y[N - 1]) + sum(sample.y, N - 1)),
-		(0.5f * (_last_sample[2] + sample.z[N - 1]) + sum(sample.z, N - 1)),
-	};
-
-	_last_sample[0] = sample.x[N - 1];
-	_last_sample[1] = sample.y[N - 1];
-	_last_sample[2] = sample.z[N - 1];
-
-
-	const float scale = _scale / (float)N;
-
-	// publish
-	sensor_accel_s report;
-	report.timestamp_sample = sample.timestamp_sample;
-	report.device_id = _device_id;
-	report.temperature = _temperature;
-	report.error_count = _error_count;
-	report.x = integral(0) * scale;
-	report.y = integral(1) * scale;
-	report.z = integral(2) * scale;
-	report.clip_counter[0] = clipping(sample.x, _clip_limit, N);
-	report.clip_counter[1] = clipping(sample.y, _clip_limit, N);
-	report.clip_counter[2] = clipping(sample.z, _clip_limit, N);
-	report.samples = N;
-	report.timestamp = hrt_absolute_time();
-
-	_sensor_pub.publish(report);
 }
 
 void PX4Accelerometer::UpdateClipLimit()
