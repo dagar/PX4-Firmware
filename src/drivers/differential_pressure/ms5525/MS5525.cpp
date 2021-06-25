@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2017-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,33 +33,24 @@
 
 #include "MS5525.hpp"
 
-int
-MS5525::measure()
+MS5525::~MS5525()
 {
-	int ret = PX4_ERROR;
-
-	if (_inited) {
-		// send the command to begin a conversion.
-		uint8_t cmd = _current_cmd;
-		ret = transfer(&cmd, 1, nullptr, 0);
-
-		if (ret != PX4_OK) {
-			perf_count(_comms_errors);
-		}
-
-	} else {
-		_inited = init_ms5525();
-
-		if (_inited) {
-			ret = PX4_OK;
-		}
-	}
-
-	return ret;
+	perf_free(_sample_perf);
+	perf_free(_comms_errors);
 }
 
-bool
-MS5525::init_ms5525()
+int MS5525::probe()
+{
+	// read anything
+
+
+	// n_prom[7] set to 0x00
+
+
+	return PX4_OK;
+}
+
+bool MS5525::init_ms5525()
 {
 	// Step 1 - reset
 	uint8_t cmd = CMD_RESET;
@@ -128,8 +119,7 @@ MS5525::init_ms5525()
 	}
 }
 
-uint8_t
-MS5525::prom_crc4(uint16_t n_prom[]) const
+uint8_t MS5525::prom_crc4(uint16_t n_prom[]) const
 {
 	// see Measurement Specialties AN520
 
@@ -166,10 +156,11 @@ MS5525::prom_crc4(uint16_t n_prom[]) const
 	return (n_rem ^ 0x00);
 }
 
-int
-MS5525::collect()
+int MS5525::collect()
 {
 	perf_begin(_sample_perf);
+
+	const hrt_abstime timestamp_sample = hrt_absolute_time();
 
 	// read ADC
 	uint8_t cmd = CMD_ADC_READ;
@@ -181,7 +172,7 @@ MS5525::collect()
 	}
 
 	// read 24 bits from the sensor
-	uint8_t val[3];
+	uint8_t val[3] {};
 	ret = transfer(nullptr, 0, &val[0], 3);
 
 	if (ret != PX4_OK) {
@@ -248,71 +239,258 @@ MS5525::collect()
 	static constexpr float PSI_to_Pa = 6894.757f;
 	const float diff_press_pa_raw = diff_press_PSI * PSI_to_Pa;
 
-	const float temperature_c = TEMP * 0.01f;
+	const float temperature = TEMP * 0.01f;
 
-	if (PX4_ISFINITE(diff_press_pa_raw)) {
-		differential_pressure_s diff_pressure{};
 
-		diff_pressure.error_count = perf_event_count(_comms_errors);
-		diff_pressure.differential_pressure_raw_pa = diff_press_pa_raw - _diff_pres_offset;
-		diff_pressure.differential_pressure_filtered_pa = _filter.apply(diff_press_pa_raw) - _diff_pres_offset;
-		diff_pressure.temperature = temperature_c;
-		diff_pressure.device_id = _device_id.devid;
-		diff_pressure.timestamp = hrt_absolute_time();
-
-		_airspeed_pub.publish(diff_pressure);
+	if (TEMP == 2000) {
+		// error
 	}
 
-	ret = OK;
+	sensor_differential_pressure_s report{};
+	report.timestamp_sample = timestamp_sample;
+	report.device_id = get_device_id();
+	report.differential_pressure_pa = diff_press_pa_raw;
+	report.temperature = temperature;
+	report.error_count = perf_event_count(_comms_errors);
+	report.timestamp = hrt_absolute_time();
+	_differential_pressure_pub.publish(report);
 
 	perf_end(_sample_perf);
 
-	return ret;
+	return PX4_OK;
 }
 
-void
-MS5525::RunImpl()
+void MS5525::RunImpl()
 {
-	int ret = PX4_ERROR;
+	const hrt_abstime now = hrt_absolute_time();
 
-	// collection phase
-	if (_collect_phase) {
-		// perform collection
-		ret = collect();
+	switch (_state) {
+	case STATE::RESET: {
+			uint8_t cmd = CMD_RESET;
+			int ret = transfer(&cmd, 1, nullptr, 0);
 
-		if (OK != ret) {
-			/* restart the measurement state machine */
-			_collect_phase = false;
-			_sensor_ok = false;
-			ScheduleNow();
-			return;
+			if (ret != PX4_OK) {
+				perf_count(_comms_errors);
+				//return false;
+			}
 		}
+		break;
 
-		// next phase is measurement
-		_collect_phase = false;
+	case STATE::WAIT_FOR_RESET: {
 
-		// is there a collect->measure gap?
-		if (_measure_interval > CONVERSION_INTERVAL) {
 
-			// schedule a fresh cycle call when we are ready to measure again
-			ScheduleDelayed(_measure_interval - CONVERSION_INTERVAL);
-
-			return;
 		}
+		break;
+
+	case STATE::READ_CALIBRATION: {
+			// Step 2 - read calibration coefficients from prom
+
+			// prom layout
+			// 0 factory data and the setup
+			// 1-6 calibration coefficients
+			// 7 serial code and CRC
+			uint16_t prom[8];
+
+			for (uint8_t i = 0; i < 8; i++) {
+				cmd = CMD_PROM_START + i * 2;
+
+				// request PROM value
+				ret = transfer(&cmd, 1, nullptr, 0);
+
+				if (ret != PX4_OK) {
+					perf_count(_comms_errors);
+					return false;
+				}
+
+				// read 2 byte value
+				uint8_t val[2];
+				ret = transfer(nullptr, 0, &val[0], 2);
+
+				if (ret == PX4_OK) {
+					prom[i] = (val[0] << 8) | val[1];
+
+				} else {
+					perf_count(_comms_errors);
+					return false;
+				}
+			}
+
+			// Step 3 - check CRC
+			const uint8_t crc = prom_crc4(prom);
+			const uint8_t onboard_crc = prom[7] & 0xF;
+
+			if (crc == onboard_crc) {
+				// store valid calibration coefficients
+				C1 = prom[1];
+				C2 = prom[2];
+				C3 = prom[3];
+				C4 = prom[4];
+				C5 = prom[5];
+				C6 = prom[6];
+
+				Tref = int64_t(C5) * (1UL << Q5);
+				_device_id.devid_s.devtype = DRV_DIFF_PRESS_DEVTYPE_MS5525;
+
+				return true;
+
+			} else {
+				PX4_ERR("CRC mismatch");
+				return false;
+			}
+
+		}
+		break;
+
+
+	case MEASURE_PRESSURE: {
+			// send the command to begin a conversion.
+			uint8_t cmd = CMD_CONVERT_PRES;
+			ret = transfer(&cmd, 1, nullptr, 0);
+
+			if (ret != PX4_OK) {
+				perf_count(_comms_errors);
+			}
+
+			_state = STATE::COLLECT_PRESSURE;
+			ScheduleDelayed(10_ms);
+		}
+		break;
+
+	case COLLECT_PRESSURE: {
+			// read ADC
+			uint8_t cmd = CMD_ADC_READ;
+			int ret = transfer(&cmd, 1, nullptr, 0);
+
+			if (ret != PX4_OK) {
+				perf_count(_comms_errors);
+				return ret;
+			}
+
+			// read 24 bits from the sensor
+			uint8_t val[3] {};
+			ret = transfer(nullptr, 0, &val[0], 3);
+
+			if (ret != PX4_OK) {
+				perf_count(_comms_errors);
+				return ret;
+			}
+
+			uint32_t adc = (val[0] << 16) | (val[1] << 8) | val[2];
+
+			// If the conversion is not executed before the ADC read command, or the ADC read command is repeated, it will give 0 as the output
+			// result. If the ADC read command is sent during conversion the result will be 0, the conversion will not stop and
+			// the final result will be wrong. Conversion sequence sent during the already started conversion process will yield
+			// incorrect result as well.
+			if (adc == 0) {
+				perf_count(_comms_errors);
+				//return EAGAIN;
+			}
+
+			D1 = adc;
+
+			// publish
+
+
+
+
+			// not ready yet
+			if (D1 == 0 || D2 == 0) {
+				return EAGAIN;
+			}
+
+			// Difference between actual and reference temperature
+			//  dT = D2 - Tref
+			const int64_t dT = D2 - Tref;
+
+			// Measured temperature
+			//  TEMP = 20°C + dT * TEMPSENS
+			const int64_t TEMP = 2000 + (dT * int64_t(C6)) / (1UL << Q6);
+
+			// Offset at actual temperature
+			//  OFF = OFF_T1 + TCO * dT
+			const int64_t OFF = int64_t(C2) * (1UL << Q2) + (int64_t(C4) * dT) / (1UL << Q4);
+
+			// Sensitivity at actual temperature
+			//  SENS = SENS_T1 + TCS * dT
+			const int64_t SENS = int64_t(C1) * (1UL << Q1) + (int64_t(C3) * dT) / (1UL << Q3);
+
+			// Temperature Compensated Pressure (example 24996 = 2.4996 psi)
+			//  P = D1 * SENS - OFF
+			const int64_t P = (D1 * SENS / (1UL << 21) - OFF) / (1UL << 15);
+
+			const float diff_press_PSI = P * 0.0001f;
+
+			// 1 PSI = 6894.76 Pascals
+			static constexpr float PSI_to_Pa = 6894.757f;
+			const float diff_press_pa_raw = diff_press_PSI * PSI_to_Pa;
+
+			const float temperature = TEMP * 0.01f;
+
+
+			if (TEMP == 2000) {
+				// error
+			}
+
+			sensor_differential_pressure_s report{};
+			report.timestamp_sample = timestamp_sample;
+			report.device_id = get_device_id();
+			report.differential_pressure_pa = diff_press_pa_raw;
+			report.temperature = temperature;
+			report.error_count = perf_event_count(_comms_errors);
+			report.timestamp = hrt_absolute_time();
+			_differential_pressure_pub.publish(report);
+
+		}
+		break;
+
+	case MEASURE_TEMPERATURE: {
+			// send the command to begin a conversion.
+			uint8_t cmd = CMD_CONVERT_TEMP;
+
+			if (transfer(&cmd, 1, nullptr, 0) != PX4_OK) {
+				perf_count(_comms_errors);
+			}
+
+			// TODO: conversion time?
+			_state = STATE::COLLECT_TEMPERATURE;
+			ScheduleDelayed(10_ms);
+		}
+		break;
+
+	case COLLECT_TEMPERATURE: {
+			// read ADC
+			uint8_t cmd = CMD_ADC_READ;
+			int ret = transfer(&cmd, 1, nullptr, 0);
+
+			if (ret != PX4_OK) {
+				perf_count(_comms_errors);
+				return ret;
+			}
+
+			// read 24 bits from the sensor
+			uint8_t val[3] {};
+
+			if (transfer(nullptr, 0, &val[0], 3) != PX4_OK) {
+				perf_count(_comms_errors);
+				//return ret;
+			}
+
+			uint32_t adc = (val[0] << 16) | (val[1] << 8) | val[2];
+
+			// If the conversion is not executed before the ADC read command, or the ADC read command is repeated, it will give 0 as the output
+			// result. If the ADC read command is sent during conversion the result will be 0, the conversion will not stop and
+			// the final result will be wrong. Conversion sequence sent during the already started conversion process will yield
+			// incorrect result as well.
+			if (adc == 0) {
+				perf_count(_comms_errors);
+				//return EAGAIN;
+			}
+
+			_D2 = adc;
+
+			_state = STATE::MEASURE_PRESSURE;
+			ScheduleDelayed(10_ms);
+		}
+		break;
 	}
-
-	/* measurement phase */
-	ret = measure();
-
-	if (OK != ret) {
-		DEVICE_DEBUG("measure error");
-	}
-
-	_sensor_ok = (ret == OK);
-
-	// next phase is collection
-	_collect_phase = true;
-
-	// schedule a fresh cycle call when the measurement is done
-	ScheduleDelayed(CONVERSION_INTERVAL);
 }

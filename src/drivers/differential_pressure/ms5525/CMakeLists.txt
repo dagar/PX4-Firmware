@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2017-2021 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,13 +31,14 @@
 #
 ############################################################################
 px4_add_module(
-	MODULE drivers__ms5525_airspeed
-	MAIN ms5525_airspeed
+	MODULE drivers__differential_pressure__ms5525
+	MAIN ms5525
 	COMPILE_FLAGS
 	SRCS
+		ms5525_main.cpp
 		MS5525.cpp
-		MS5525_main.cpp
+		MS5525.hpp
 	DEPENDS
-		drivers__airspeed
 		mathlib
+		px4_work_queue
 	)
