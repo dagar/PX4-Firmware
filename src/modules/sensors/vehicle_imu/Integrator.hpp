@@ -60,7 +60,7 @@ public:
 	 */
 	inline void put(const matrix::Vector3f &val, const float dt)
 	{
-		if (dt > 0.f && dt <= (_reset_interval_min * 2.f)) {
+		if (dt > 0.f && dt <= 1.f) {
 			_alpha += integrate(val, dt);
 
 		} else {
@@ -75,6 +75,7 @@ public:
 	 * @param reset_interval	New reset time interval for the integrator in microseconds.
 	 */
 	void set_reset_interval(uint32_t reset_interval_us) { _reset_interval_min = reset_interval_us * 1e-6f; }
+	float get_reset_interval() const { return _reset_interval_min; }
 
 	/**
 	 * Set required samples for reset. This won't reset the integrator.
@@ -155,7 +156,7 @@ public:
 	 */
 	inline void put(const matrix::Vector3f &val, const float dt)
 	{
-		if (dt > 0.f && dt <= (_reset_interval_min * 2.f)) {
+		if (dt > 0.f && dt <= 1.f) {
 			// Use trapezoidal integration to calculate the delta integral
 			const matrix::Vector3f delta_alpha{integrate(val, dt)};
 

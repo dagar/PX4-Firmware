@@ -138,7 +138,9 @@ private:
 
 	uint32_t _backup_schedule_timeout_us{20000};
 
-	bool _data_gap{false};
+	bool _accel_data_gap{false};
+	bool _gyro_data_gap{false};
+
 	bool _update_integrator_config{true};
 	bool _intervals_configured{false};
 	bool _publish_status{false};

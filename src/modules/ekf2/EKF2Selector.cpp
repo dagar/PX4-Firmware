@@ -306,7 +306,7 @@ bool EKF2Selector::UpdateErrorScores()
 				_instance[i].relative_test_ratio = 0;
 			}
 
-		} else if (hrt_elapsed_time(&_instance[i].timestamp_sample_last) > status_timeout) {
+		} else if (!_instance[i].timeout && hrt_elapsed_time(&_instance[i].timestamp_sample_last) > status_timeout) {
 			_instance[i].healthy = false;
 			_instance[i].timeout = true;
 		}
