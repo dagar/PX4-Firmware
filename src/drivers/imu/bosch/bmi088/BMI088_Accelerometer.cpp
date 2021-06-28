@@ -220,13 +220,17 @@ void BMI088_Accelerometer::RunImpl()
 						FIFOReset();
 						perf_count(_fifo_overflow_perf);
 						samples = 0;
+
+					} else if (samples <= _fifo_samples + 2) {
+						// tolerate minimal jitter (up to 2 frames) to maintain consistent overall scheduling
+						samples = math::min(_fifo_samples, fifo_frame_counter);
 					}
 				}
 			}
 
 			bool success = false;
 
-			if (samples >= 1) {
+			if (samples >= math::max(1, _fifo_samples / 2)) {
 				if (FIFORead(now, samples)) {
 					success = true;
 
@@ -361,7 +365,7 @@ int BMI088_Accelerometer::DataReadyInterruptCallback(int irq, void *context, voi
 
 void BMI088_Accelerometer::DataReady()
 {
-	uint32_t expected = 0;
+	int32_t expected = 0;
 
 	if (_drdy_fifo_read_samples.compare_exchange(&expected, _fifo_samples)) {
 		ScheduleNow();

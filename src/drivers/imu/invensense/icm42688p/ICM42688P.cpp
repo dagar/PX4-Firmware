@@ -369,7 +369,7 @@ int ICM42688P::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM42688P::DataReady()
 {
-	uint32_t expected = 0;
+	int32_t expected = 0;
 
 	if (_drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
 		ScheduleNow();

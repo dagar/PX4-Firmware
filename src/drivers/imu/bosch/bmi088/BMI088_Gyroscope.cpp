@@ -193,8 +193,16 @@ void BMI088_Gyroscope::RunImpl()
 				} else if (fifo_frame_counter == 0) {
 					perf_count(_fifo_empty_perf);
 
-				} else if (fifo_frame_counter >= 1) {
-					if (FIFORead(now, fifo_frame_counter)) {
+				} else if (fifo_frame_counter >= math::max(1, _fifo_samples / 2))) {
+
+					uint8_t samples = fifo_frame_counter;
+
+					// tolerate minimal jitter (up to 2 frames) to maintain consistent overall scheduling
+					if (fifo_frame_counter <= _fifo_samples + 2) {
+						samples = math::min(_fifo_samples, fifo_frame_counter);
+					}
+
+					if (FIFORead(now, samples)) {
 						success = true;
 
 						if (_failure_count > 0) {
@@ -318,7 +326,7 @@ int BMI088_Gyroscope::DataReadyInterruptCallback(int irq, void *context, void *a
 
 void BMI088_Gyroscope::DataReady()
 {
-	uint32_t expected = 0;
+	int32_t expected = 0;
 
 	if (_drdy_fifo_read_samples.compare_exchange(&expected, _fifo_samples)) {
 		ScheduleNow();

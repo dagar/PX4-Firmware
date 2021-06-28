@@ -182,7 +182,7 @@ void ICM20689::RunImpl()
 
 		} else {
 			// RESET not complete
-			if (hrt_elapsed_time(&_reset_timestamp) > 1000_ms) {
+			if ((now - _reset_timestamp) > 1000_ms) {
 				PX4_DEBUG("Reset failed, retrying");
 				_state = STATE::RESET;
 				ScheduleDelayed(100_ms);
@@ -215,7 +215,7 @@ void ICM20689::RunImpl()
 
 		} else {
 			// CONFIGURE not complete
-			if (hrt_elapsed_time(&_reset_timestamp) > 1000_ms) {
+			if ((now - _reset_timestamp) > 1000_ms) {
 				PX4_DEBUG("Configure failed, resetting");
 				_state = STATE::RESET;
 
@@ -229,8 +229,10 @@ void ICM20689::RunImpl()
 		break;
 
 	case STATE::FIFO_READ: {
+			hrt_abstime timestamp_sample = now;
+
 			if (_data_ready_interrupt_enabled) {
-				// scheduled from interrupt if _drdy_fifo_read_samples was set
+				// scheduled from interrupt if _drdy_fifo_read_samples was set as expected
 				if (_drdy_fifo_read_samples.fetch_and(0) != _fifo_gyro_samples) {
 					perf_count(_drdy_missed_perf);
 				}
@@ -252,16 +254,21 @@ void ICM20689::RunImpl()
 
 			} else {
 				// FIFO count (size in bytes) should be a multiple of the FIFO::DATA structure
-				const uint8_t samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) *
-							SAMPLES_PER_TRANSFER; // round down to nearest
+				uint8_t samples = fifo_count / sizeof(FIFO::DATA);
+
+				// adjust samples to tolerate minimal jitter to maintain consistent overall scheduling
+				if (samples == _fifo_gyro_samples + 1) {
+					timestamp_sample -= FIFO_SAMPLE_DT;
+					samples--;
+				}
 
 				if (samples > FIFO_MAX_SAMPLES) {
 					// not technically an overflow, but more samples than we expected or can publish
 					FIFOReset();
 					perf_count(_fifo_overflow_perf);
 
-				} else if (samples >= 1) {
-					if (FIFORead(now, samples)) {
+				} else if (samples >= SAMPLES_PER_TRANSFER) {
+					if (FIFORead(timestamp_sample, samples)) {
 						success = true;
 
 						if (_failure_count > 0) {
@@ -281,7 +288,7 @@ void ICM20689::RunImpl()
 				}
 			}
 
-			if (!success || hrt_elapsed_time(&_last_config_check_timestamp) > 100_ms) {
+			if (!success || (now - _last_config_check_timestamp) > 100_ms) {
 				// check configuration registers periodically or immediately following any failure
 				if (RegisterCheck(_register_cfg[_checked_register])) {
 					_last_config_check_timestamp = now;
@@ -295,7 +302,7 @@ void ICM20689::RunImpl()
 
 			} else {
 				// periodically update temperature (~1 Hz)
-				if (hrt_elapsed_time(&_temperature_update_timestamp) >= 1_s) {
+				if ((now - _temperature_update_timestamp) >= 1_s) {
 					UpdateTemperature();
 					_temperature_update_timestamp = now;
 				}
@@ -403,13 +410,13 @@ int ICM20689::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ICM20689::DataReady()
 {
-	uint32_t expected = 0;
+	int32_t expected = 0;
 
 	// at least the required number of samples in the FIFO
 	if (((_drdy_count.fetch_add(1) + 1) >= _fifo_gyro_samples)
 	    && _drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
 
-		_drdy_count.store(0);
+		_drdy_count.fetch_sub(_fifo_gyro_samples);
 		ScheduleNow();
 	}
 }

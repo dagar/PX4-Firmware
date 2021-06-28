@@ -371,13 +371,13 @@ int MPU6000::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void MPU6000::DataReady()
 {
-	uint32_t expected = 0;
+	int32_t expected = 0;
 
 	// at least the required number of samples in the FIFO
 	if (((_drdy_count.fetch_add(1) + 1) >= _fifo_gyro_samples)
 	    && _drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
 
-		_drdy_count.store(0);
+		_drdy_count.fetch_sub(_fifo_gyro_samples);
 		ScheduleNow();
 	}
 }

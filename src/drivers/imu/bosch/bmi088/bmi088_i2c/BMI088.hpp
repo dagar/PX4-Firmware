@@ -74,7 +74,7 @@ protected:
 	int _total_failure_count{0};
 
 
-	px4::atomic<uint32_t> _drdy_fifo_read_samples{0};
+	px4::atomic<int32_t> _drdy_fifo_read_samples{0};
 	bool _data_ready_interrupt_enabled{false};
 
 	enum class STATE : uint8_t {

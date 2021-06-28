@@ -161,13 +161,13 @@ void LoggedTopics::add_default_topics()
 	add_topic_multi("differential_pressure", 1000, 2);
 	add_topic_multi("distance_sensor", 1000);
 	add_topic_multi("optical_flow", 1000, 1);
-	add_topic_multi("sensor_accel", 1000, 4);
+	add_topic_multi("sensor_accel", 0, 4);
 	add_topic_multi("sensor_baro", 1000, 4);
 	add_topic_multi("sensor_gps", 1000, 2);
-	add_topic_multi("sensor_gyro", 1000, 4);
+	add_topic_multi("sensor_gyro", 0, 4);
 	add_topic_multi("sensor_mag", 1000, 4);
-	add_topic_multi("vehicle_imu", 500, 4);
-	add_topic_multi("vehicle_imu_status", 1000, 4);
+	add_topic_multi("vehicle_imu", 0, 4);
+	add_topic_multi("vehicle_imu_status", 0, 4);
 	add_topic_multi("vehicle_magnetometer", 500, 4);
 
 #ifdef CONFIG_ARCH_BOARD_PX4_SITL

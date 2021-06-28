@@ -69,6 +69,7 @@ enum class Register : uint8_t {
 	INT_MAP_1     = 0x1A,
 
 	INT_OUT_CTRL  = 0x20,
+	INT_RST_LATCH = 0x21,
 
 	FIFO_CONFIG_0 = 0x30,
 
@@ -97,6 +98,9 @@ enum ACCD_HBW_BIT : uint8_t {
 // PMU_RANGE
 enum PMU_RANGE_BIT : uint8_t {
 	// range<3:0>
+	range_16g_set   = Bit3 | Bit2, //  ́1100b ́ -> ±16g range
+	range_16g_clear = Bit1 | Bit0,
+
 	range_2g  = Bit1 | Bit0, //  ́0011b ́ -> ±2g range
 	range_4g  = Bit2 | Bit0, //  ́0101b ́ -> ±4g range
 	range_8g  = Bit3,        //  ́1000b ́ -> ±8g range
@@ -125,6 +129,12 @@ enum INT_MAP_1_BIT : uint8_t {
 enum INT_OUT_CTRL_BIT : uint8_t {
 	int1_od  = Bit1,
 	int1_lvl = Bit0,
+};
+
+// INT_RST_LATCH
+enum INT_RST_LATCH_BIT : uint8_t {
+	// latch_int<3:0>
+	latch_int_temp_500_us = Bit3 | Bit1 // ´1010b´ -> temporary, 500 us
 };
 
 // FIFO_CONFIG_1

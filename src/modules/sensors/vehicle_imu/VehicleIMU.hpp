@@ -102,11 +102,13 @@ private:
 
 	hrt_abstime _accel_timestamp_sample_last{0};
 	hrt_abstime _gyro_timestamp_sample_last{0};
+	hrt_abstime _accel_timestamp_last{0};
 	hrt_abstime _gyro_timestamp_last{0};
 
 	math::WelfordMean<matrix::Vector2f> _accel_interval_mean{};
 	math::WelfordMean<matrix::Vector2f> _gyro_interval_mean{};
 
+	math::WelfordMean<matrix::Vector2f> _accel_update_latency_mean{};
 	math::WelfordMean<matrix::Vector2f> _gyro_update_latency_mean{};
 
 	float _accel_interval_best_variance{INFINITY};
@@ -149,6 +151,15 @@ private:
 
 	perf_counter_t _accel_generation_gap_perf{perf_alloc(PC_COUNT, MODULE_NAME": accel data gap")};
 	perf_counter_t _gyro_generation_gap_perf{perf_alloc(PC_COUNT, MODULE_NAME": gyro data gap")};
+
+	perf_counter_t _interval_accel_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": interval accel")};
+	perf_counter_t _interval_gyro_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": interval gyro")};
+
+	perf_counter_t _publish_latency_accel_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": publish latency accel")};
+	perf_counter_t _publish_latency_gyro_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": publish latency gyro")};
+
+	perf_counter_t _publish_dt_accel_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": publish dt accel")};
+	perf_counter_t _publish_dt_gyro_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": publish dt gyro")};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::IMU_INTEG_RATE>) _param_imu_integ_rate,

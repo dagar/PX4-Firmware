@@ -221,15 +221,22 @@ void MPU9250_I2C::RunImpl()
 
 			} else {
 				// FIFO count (size in bytes) should be a multiple of the FIFO::DATA structure
-				const uint8_t samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) *
-							SAMPLES_PER_TRANSFER; // round down to nearest
+				uint8_t samples = (fifo_count / sizeof(FIFO::DATA) / SAMPLES_PER_TRANSFER) *
+						  SAMPLES_PER_TRANSFER; // round down to nearest
+
+				if (_data_ready_interrupt_enabled) {
+					// samples exceed max, but not behind by an entire cycle
+					if ((samples > FIFO_MAX_SAMPLES) && (samples < (FIFO_MAX_SAMPLES + _fifo_gyro_samples / 2))) {
+						samples = FIFO_MAX_SAMPLES;
+					}
+				}
 
 				if (samples > FIFO_MAX_SAMPLES) {
 					// not technically an overflow, but more samples than we expected or can publish
 					FIFOReset();
 					perf_count(_fifo_overflow_perf);
 
-				} else if (samples >= 1) {
+				} else if (samples >= math::max(SAMPLES_PER_TRANSFER, _fifo_gyro_samples / 2)) {
 					if (FIFORead(now, samples)) {
 						success = true;
 
@@ -372,13 +379,13 @@ int MPU9250_I2C::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void MPU9250_I2C::DataReady()
 {
-	uint32_t expected = 0;
+	int32_t expected = 0;
 
 	// at least the required number of samples in the FIFO
 	if (((_drdy_count.fetch_add(1) + 1) >= _fifo_gyro_samples)
 	    && _drdy_fifo_read_samples.compare_exchange(&expected, _fifo_gyro_samples)) {
 
-		_drdy_count.store(0);
+		_drdy_count.fetch_sub(_fifo_gyro_samples);
 		ScheduleNow();
 	}
 }
