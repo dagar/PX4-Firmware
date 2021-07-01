@@ -143,6 +143,8 @@ private:
 
 	sensor_gyro_fft_s _sensor_gyro_fft{};
 
+	hrt_abstime _last_update[3][MAX_NUM_PEAKS] {};
+
 	int32_t _imu_gyro_fft_len{256};
 
 	DEFINE_PARAMETERS(
