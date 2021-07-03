@@ -31,15 +31,6 @@
 #
 ############################################################################
 
-set(CMSIS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS_5)
-set(CMSIS_DSP ${CMSIS_ROOT}/CMSIS/DSP)
-
-if(${PX4_PLATFORM} MATCHES "NuttX")
-	add_compile_options(-DARM_MATH_DSP)
-endif()
-
-add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wno-nested-externs>)
-
 px4_add_module(
 	MODULE modules__gyro_fft
 	MAIN gyro_fft
@@ -47,29 +38,10 @@ px4_add_module(
 		4096
 	COMPILE_FLAGS
 		${MAX_CUSTOM_OPT_LEVEL}
-		-DARM_ALL_FFT_TABLES
-		-DARM_MATH_LOOPUNROLL
-	INCLUDES
-		${CMSIS_ROOT}/CMSIS/Core/Include
-		${CMSIS_DSP}/Include
 	SRCS
 		GyroFFT.cpp
 		GyroFFT.hpp
-
-		${CMSIS_ROOT}/CMSIS/Core/Include/cmsis_compiler.h
-		${CMSIS_ROOT}/CMSIS/Core/Include/cmsis_gcc.h
-		${CMSIS_DSP}/Include/arm_common_tables.h
-		${CMSIS_DSP}/Include/arm_const_structs.h
-		${CMSIS_DSP}/Include/arm_math.h
-		${CMSIS_DSP}/Source/BasicMathFunctions/arm_mult_q15.c
-		${CMSIS_DSP}/Source/CommonTables/arm_common_tables.c
-		${CMSIS_DSP}/Source/CommonTables/arm_const_structs.c
-		${CMSIS_DSP}/Source/SupportFunctions/arm_float_to_q15.c
-		${CMSIS_DSP}/Source/TransformFunctions/arm_bitreversal2.c
-		${CMSIS_DSP}/Source/TransformFunctions/arm_cfft_q15.c
-		${CMSIS_DSP}/Source/TransformFunctions/arm_cfft_radix4_q15.c
-		${CMSIS_DSP}/Source/TransformFunctions/arm_rfft_init_q15.c
-		${CMSIS_DSP}/Source/TransformFunctions/arm_rfft_q15.c
+		SlidingDFT.hpp
 	DEPENDS
 		px4_work_queue
 )

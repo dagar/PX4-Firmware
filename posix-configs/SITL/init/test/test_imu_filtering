@@ -13,7 +13,7 @@ tone_alarm start
 
 ver all
 
-param set IMU_GYRO_RATEMAX 1000
+param set IMU_GYRO_RATEMAX 800
 
 param set IMU_GYRO_FFT_EN 1
 param set IMU_GYRO_FFT_MIN 1
