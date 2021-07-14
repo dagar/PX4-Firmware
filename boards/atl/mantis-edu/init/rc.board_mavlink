@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# board specific MAVLink startup script.
+#------------------------------------------------------------------------------
+
+set GIMBAL_TTY /dev/ttyS3
+set MAV_RATE 40000
+set BAUDRATE 500000
+
+vmount start -d ${GIMBAL_TTY} -b ${BAUDRATE}
+mavlink start -r ${MAV_RATE} -d ${GIMBAL_TTY} -m config -b ${BAUDRATE}
+mavlink stream -d ${GIMBAL_TTY} -s SYSTEM_TIME -r 0.5
+
+# optical flow
+mavlink start -d /dev/ttyS2 -m custom -b 500000
+
+# Start MAVLink on the USB port
+mavlink start -d /dev/ttyACM0
