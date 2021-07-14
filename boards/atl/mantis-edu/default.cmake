@@ -9,7 +9,7 @@ px4_add_board(
 	ROMFSROOT px4fmu_common
 	DRIVERS
 		adc/board_adc
-		barometer/mpc2520
+		barometer/maiertek/mpc2520
 		camera_capture
 		gps
 		#heater
