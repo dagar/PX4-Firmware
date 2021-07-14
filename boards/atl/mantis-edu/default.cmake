@@ -17,7 +17,7 @@ px4_add_board(
 		#lights/rgbled_pwm
 		magnetometer/isentek/ist8310
 		rc_input
-		#tap_esc # TODO: add
+		tap_esc
 	MODULES
 		battery_status
 		camera_feedback
