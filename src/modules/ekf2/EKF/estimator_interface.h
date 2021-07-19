@@ -63,6 +63,7 @@
 #include <matrix/math.hpp>
 #include <mathlib/mathlib.h>
 #include <mathlib/math/filter/AlphaFilter.hpp>
+#include <mathlib/math/filter/MedianFilter.hpp>
 
 using namespace estimator;
 
@@ -405,6 +406,25 @@ protected:
 	// state logic becasue they will be cleared externally after being read.
 	warning_event_status_u _warning_events{};
 	information_event_status_u _information_events{};
+
+	uint64_t _baro_sample_delayed_time_us_last{0};
+	uint32_t _baro_hgt_counter{0};
+	AlphaFilter<float> _baro_hgt_lpf{0.1f};
+
+	uint64_t _gps_sample_delayed_time_us_last{0};
+	uint32_t _gps_hgt_counter{0};
+	AlphaFilter<float> _gps_hgt_lpf{0.1f};
+
+	uint32_t _rng_hgt_counter{0};
+	math::MedianFilter<float, 5> _rng_hgt_filter{};
+
+	uint64_t _ev_sample_delayed_time_us_last{0};
+	uint32_t _ev_hgt_counter{0};
+	AlphaFilter<float> _ev_hgt_lpf{0.1f};
+
+	uint64_t _mag_sample_delayed_time_us_last{0};
+	uint32_t _mag_counter{0};
+	AlphaFilter<Vector3f> _mag_lpf{0.1f}; ///< filtered magnetometer measurement for instant reset (Gauss)
 
 private:
 
