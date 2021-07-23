@@ -37,7 +37,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <random>
 
 #include "zero_order_hover_thrust_ekf.hpp"

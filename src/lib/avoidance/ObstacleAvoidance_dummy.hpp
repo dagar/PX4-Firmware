@@ -44,7 +44,7 @@
 #include <commander/px4_custom_mode.h>
 
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 
 class ObstacleAvoidance

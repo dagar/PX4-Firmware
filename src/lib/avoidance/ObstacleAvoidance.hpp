@@ -57,7 +57,7 @@
 
 #include <lib/hysteresis/hysteresis.h>
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 const vehicle_trajectory_waypoint_s empty_trajectory_waypoint = {0, 0, {0, 0, 0, 0, 0, 0, 0},
 	{	{0, {NAN, NAN, NAN}, {NAN, NAN, NAN}, {NAN, NAN, NAN}, NAN, NAN, false, UINT8_MAX, {0, 0}},

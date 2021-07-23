@@ -1,7 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <cstdlib>
-#include "../../../../../matrix/matrix/math.hpp"
+#include "../../../../../matrix/math.hpp"
 #include "util.h"
 
 typedef matrix::Vector<float, 24> Vector24f;

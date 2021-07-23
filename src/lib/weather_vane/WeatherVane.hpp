@@ -43,7 +43,7 @@
 #pragma once
 
 #include <px4_platform_common/module_params.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 class WeatherVane : public ModuleParams
 {

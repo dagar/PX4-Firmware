@@ -63,7 +63,7 @@
 
 #pragma once
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <geo/geo.h>
 #include <mathlib/mathlib.h>
 

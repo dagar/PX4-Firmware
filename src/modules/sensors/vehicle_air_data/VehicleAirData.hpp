@@ -36,7 +36,7 @@
 #include "data_validator/DataValidatorGroup.hpp"
 
 #include <lib/mathlib/math/Limits.hpp>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/systemlib/mavlink_log.h>
 #include <px4_platform_common/log.h>

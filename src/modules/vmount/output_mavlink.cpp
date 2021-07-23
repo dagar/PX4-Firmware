@@ -41,7 +41,7 @@
 #include "output_mavlink.h"
 
 #include <math.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 #include <uORB/topics/vehicle_command.h>
 #include <px4_platform_common/defines.h>

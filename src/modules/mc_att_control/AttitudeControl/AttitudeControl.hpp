@@ -48,7 +48,7 @@
 
 #pragma once
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <mathlib/math/Limits.hpp>
 
 class AttitudeControl

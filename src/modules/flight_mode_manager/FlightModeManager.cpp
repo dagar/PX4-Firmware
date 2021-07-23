@@ -34,7 +34,7 @@
 #include "FlightModeManager.hpp"
 
 #include <lib/mathlib/mathlib.h>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 using namespace time_literals;
 

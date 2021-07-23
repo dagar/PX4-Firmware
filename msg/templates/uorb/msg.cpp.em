@@ -73,7 +73,7 @@ topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in so
 #include <uORB/topics/uORBTopics.hpp>
 #include <drivers/drv_hrt.h>
 #include <lib/drivers/device/Device.hpp>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <lib/mathlib/mathlib.h>
 
 @# join all msg files in one line e.g: "float[3] position;float[3] velocity;bool armed"

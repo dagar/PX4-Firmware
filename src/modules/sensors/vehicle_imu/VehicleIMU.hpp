@@ -37,7 +37,7 @@
 
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/mathlib/math/WelfordMean.hpp>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/sensor_calibration/Accelerometer.hpp>
 #include <lib/sensor_calibration/Gyroscope.hpp>

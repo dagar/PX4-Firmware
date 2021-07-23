@@ -46,7 +46,7 @@
 
 #include <parameters/param.h>
 #include <drivers/drv_hrt.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 class Tailsitter : public VtolType
 {

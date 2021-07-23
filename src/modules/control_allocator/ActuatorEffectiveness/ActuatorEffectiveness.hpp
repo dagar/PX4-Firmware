@@ -43,7 +43,7 @@
 
 #include <ControlAllocation/ControlAllocation.hpp>
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <uORB/topics/vehicle_actuator_setpoint.h>
 
 class ActuatorEffectiveness

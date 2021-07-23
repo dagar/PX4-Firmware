@@ -37,7 +37,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 #include "ManualVelocitySmoothingXY.hpp"
 

@@ -42,7 +42,7 @@
 
 #include <uORB/topics/actuator_controls.h>
 #include <px4_platform_common/defines.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 namespace vmount
 {

@@ -38,7 +38,7 @@
 #pragma once
 
 #include <drivers/drv_hrt.h>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <px4_platform_common/defines.h>
 #include <uORB/topics/sensor_gps.h>
 

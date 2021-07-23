@@ -43,7 +43,7 @@
 
 #include <px4_platform_common/module_params.h>
 #include <drivers/drv_hrt.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/landing_gear.h>
 #include <uORB/topics/vehicle_local_position.h>

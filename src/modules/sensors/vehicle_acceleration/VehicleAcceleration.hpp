@@ -35,7 +35,7 @@
 
 #include <lib/sensor_calibration/Accelerometer.hpp>
 #include <lib/mathlib/math/Limits.hpp>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module_params.h>

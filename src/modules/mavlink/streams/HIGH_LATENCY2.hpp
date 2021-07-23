@@ -36,7 +36,7 @@
 
 #include <lib/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/actuator_controls.h>

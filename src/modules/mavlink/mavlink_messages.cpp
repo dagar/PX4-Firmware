@@ -48,7 +48,7 @@
 #include <lib/conversion/rotation.h>
 #include <lib/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <px4_platform_common/time.h>
 #include <math.h>
 

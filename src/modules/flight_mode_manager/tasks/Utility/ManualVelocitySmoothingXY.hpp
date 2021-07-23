@@ -40,7 +40,7 @@
 
 #include <motion_planning/VelocitySmoothing.hpp>
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 using matrix::Vector2f;
 

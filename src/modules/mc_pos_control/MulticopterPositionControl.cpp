@@ -35,7 +35,7 @@
 
 #include <float.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include "PositionControl/ControlMath.hpp"
 
 using namespace matrix;

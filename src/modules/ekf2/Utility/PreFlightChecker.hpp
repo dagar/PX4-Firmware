@@ -45,7 +45,7 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/estimator_innovations.h>
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 #include "InnovationLpf.hpp"
 

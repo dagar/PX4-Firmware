@@ -43,7 +43,7 @@
 
 #pragma once
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <mathlib/mathlib.h>
 #include <px4_platform_common/module_params.h>
 #include <hysteresis/hysteresis.h>

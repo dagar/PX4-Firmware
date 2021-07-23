@@ -40,7 +40,7 @@
 
 #pragma once
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 
 namespace ControlMath

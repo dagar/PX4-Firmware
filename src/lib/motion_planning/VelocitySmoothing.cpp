@@ -36,7 +36,7 @@
 #include <cstdio>
 #include <float.h>
 #include <mathlib/mathlib.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 using matrix::sign;
 

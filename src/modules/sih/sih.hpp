@@ -38,7 +38,7 @@
 #include <px4_platform_common/posix.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
-#include <matrix/matrix/math.hpp>   // matrix, vectors, dcm, quaterions
+#include <lib/mathlib/matrix/math.hpp>   // matrix, vectors, dcm, quaterions
 #include <conversion/rotation.h>    // math::radians,
 #include <lib/geo/geo.h>        // to get the physical constants
 #include <drivers/drv_hrt.h>        // to get the real time

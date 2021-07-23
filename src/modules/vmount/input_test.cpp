@@ -42,7 +42,7 @@
 #include <math.h>
 
 #include <px4_platform_common/posix.h>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <lib/mathlib/mathlib.h>
 
 

@@ -35,7 +35,7 @@
 #define SCALED_IMU2_HPP
 
 #include <lib/geo/geo.h>
-#include <lib/matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 #include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/vehicle_imu.h>

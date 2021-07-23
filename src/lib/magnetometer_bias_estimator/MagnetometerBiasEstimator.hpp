@@ -41,7 +41,7 @@
 
 #pragma once
 
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <lib/conversion/rotation.h>
 #include <px4_module_params.h>
 #include <drivers/drv_hrt.h>

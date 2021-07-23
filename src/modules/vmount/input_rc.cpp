@@ -41,7 +41,7 @@
 
 #include <math.h>
 #include <errno.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 #include <px4_platform_common/posix.h>
 #include <px4_platform_common/defines.h>
 

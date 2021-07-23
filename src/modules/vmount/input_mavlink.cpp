@@ -52,7 +52,7 @@
 #include <px4_platform_common/posix.h>
 #include <errno.h>
 #include <math.h>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 namespace vmount
 {

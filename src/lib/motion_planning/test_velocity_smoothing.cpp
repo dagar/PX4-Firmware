@@ -38,7 +38,7 @@
 
 #include "VelocitySmoothing.hpp"
 #include <cstdio>
-#include <matrix/matrix/math.hpp>
+#include <lib/mathlib/matrix/math.hpp>
 
 int main(int argc, char *argv[])
 {

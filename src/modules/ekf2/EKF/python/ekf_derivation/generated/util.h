@@ -1,4 +1,4 @@
-#include "../../../../../matrix/matrix/math.hpp"
+#include "../../../../../matrix/math.hpp"
 
 typedef matrix::SquareMatrix<float, 24> SquareMatrix24f;
 
