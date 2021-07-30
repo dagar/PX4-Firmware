@@ -141,7 +141,7 @@ bool verify_ram_address(uint32_t bot, uint32_t size)
 {
 	bool ret = true;
 #if defined STM32_IS_SRAM
-	ret =  STM32_IS_SRAM(bot) && STM32_IS_SRAM(bot +  size);
+	ret = STM32_IS_SRAM(bot) && STM32_IS_SRAM(bot + size);
 #endif
 	return ret;
 }
@@ -213,7 +213,6 @@ static void identify(const char *caller)
 		syslog(LOG_INFO, "[%s] ", caller);
 	}
 }
-
 
 /****************************************************************************
  * hardfault_get_desc
@@ -478,8 +477,7 @@ static int write_registers_info(int fdout, info_s *pi, char *buffer, int sz)
 /****************************************************************************
  * write_interrupt_stack_info
  ****************************************************************************/
-static int write_interrupt_stack_info(int fdout, info_s *pi, char *buffer,
-				      unsigned int sz)
+static int write_interrupt_stack_info(int fdout, info_s *pi, char *buffer, unsigned int sz)
 {
 	int ret = ENOENT;
 
@@ -511,8 +509,7 @@ static int write_user_stack_info(int fdout, info_s *pi, char *buffer,
 /****************************************************************************
  * write_dump_info
  ****************************************************************************/
-static int write_dump_info(int fdout, info_s *info, struct bbsramd_s *desc,
-			   char *buffer, unsigned int sz)
+static int write_dump_info(int fdout, info_s *info, struct bbsramd_s *desc, char *buffer, unsigned int sz)
 {
 	char fmtbuff[ TIME_FMT_LEN + 1];
 	format_fault_time(HEADER_TIME_FMT, &desc->lastwrite, fmtbuff, sizeof(fmtbuff));
@@ -537,11 +534,9 @@ static int write_dump_info(int fdout, info_s *info, struct bbsramd_s *desc,
 	}
 
 #ifdef CONFIG_TASK_NAME_SIZE
-	n = snprintf(buffer, sz, " in file:%s at line: %d running task: %s\n",
-		     info->filename, info->lineno, info->name);
+	n = snprintf(buffer, sz, " in file:%s at line: %d running task: %s\n", info->filename, info->lineno, info->name);
 #else
-	n = snprintf(buffer, sz, " in file:%s at line: %d \n",
-		     info->filename, info->lineno);
+	n = snprintf(buffer, sz, " in file:%s at line: %d \n", info->filename, info->lineno);
 #endif
 
 	if (n != write(fdout, buffer, n)) {
@@ -572,8 +567,7 @@ static int write_dump_info(int fdout, info_s *info, struct bbsramd_s *desc,
 /****************************************************************************
  * write_dump_time
  ****************************************************************************/
-static int write_dump_time(char *caller, char *tag, int fdout,
-			   struct timespec *ts, char *buffer, unsigned int sz)
+static int write_dump_time(char *caller, char *tag, int fdout, struct timespec *ts, char *buffer, unsigned int sz)
 {
 	int ret = OK;
 	char fmtbuff[ TIME_FMT_LEN + 1];
@@ -586,27 +580,27 @@ static int write_dump_time(char *caller, char *tag, int fdout,
 
 	return ret;
 }
+
 /****************************************************************************
  * write_dump_footer
  ****************************************************************************/
-static int write_dump_header(char *caller, int fdout, struct timespec *ts,
-			     char *buffer, unsigned int sz)
+static int write_dump_header(char *caller, int fdout, struct timespec *ts, char *buffer, unsigned int sz)
 {
 	return write_dump_time(caller, "Begin", fdout, ts, buffer, sz);
 }
+
 /****************************************************************************
  * write_dump_footer
  ****************************************************************************/
-static int write_dump_footer(char *caller, int fdout, struct timespec *ts,
-			     char *buffer, unsigned int sz)
+static int write_dump_footer(char *caller, int fdout, struct timespec *ts, char *buffer, unsigned int sz)
 {
 	return write_dump_time(caller, "END", fdout, ts, buffer, sz);
 }
+
 /****************************************************************************
  * write_intterupt_satck
  ****************************************************************************/
-static int write_intterupt_stack(int fdin, int fdout, info_s *pi, char *buffer,
-				 unsigned int sz)
+static int write_intterupt_stack(int fdin, int fdout, info_s *pi, char *buffer, unsigned int sz)
 {
 	int ret = ENOENT;
 
@@ -624,12 +618,10 @@ static int write_intterupt_stack(int fdin, int fdout, info_s *pi, char *buffer,
 	return ret;
 }
 
-
 /****************************************************************************
  * write_user_stack
  ****************************************************************************/
-static int write_user_stack(int fdin, int fdout, info_s *pi, char *buffer,
-			    unsigned int sz)
+static int write_user_stack(int fdin, int fdout, info_s *pi, char *buffer, unsigned int sz)
 {
 	int ret = ENOENT;
 
@@ -655,7 +647,6 @@ static int write_user_stack(int fdin, int fdout, info_s *pi, char *buffer,
  */
 static int hardfault_append_to_ulog(const char *caller, int fdin)
 {
-
 	int ret = 0;
 	int write_size_remaining = lseek(fdin, 0, SEEK_END);
 
@@ -778,7 +769,6 @@ static int hardfault_append_to_ulog(const char *caller, int fdin)
 		goto out;
 	}
 
-
 	// now append the data
 	lseek(ulog_fd, 0, SEEK_END);
 
@@ -844,7 +834,6 @@ out:
 	return ret;
 }
 
-
 /****************************************************************************
  * commit
  ****************************************************************************/
@@ -857,7 +846,6 @@ static int hardfault_commit(char *caller)
 	ret = hardfault_get_desc(caller, &desc, false);
 
 	if (ret >= 0) {
-
 		int fd = ret;
 		state = (desc.lastwrite.tv_sec || desc.lastwrite.tv_nsec) ?  OK : 1;
 		int rv = close(fd);
@@ -867,7 +855,6 @@ static int hardfault_commit(char *caller)
 			syslog(LOG_INFO, "Failed to Close Fault Log (%d)\n", rv);
 
 		} else {
-
 			if (state != OK) {
 				identify(caller);
 				syslog(LOG_INFO, "Nothing to save\n");
@@ -919,12 +906,10 @@ static int hardfault_commit(char *caller)
 	return ret;
 }
 
-
 /****************************************************************************
  * hardfault_dowrite
  ****************************************************************************/
-static int hardfault_dowrite(char *caller, int infd, int outfd,
-			     struct bbsramd_s *desc, int format)
+static int hardfault_dowrite(char *caller, int infd, int outfd, struct bbsramd_s *desc, int format)
 {
 	int ret = -ENOMEM;
 	char *line = zalloc(OUT_BUFFER_LEN);
@@ -1018,7 +1003,6 @@ static int hardfault_dowrite(char *caller, int infd, int outfd,
 	return ret;
 }
 
-
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -1110,7 +1094,6 @@ __EXPORT int hardfault_increment_reboot(char *caller, bool reset)
 		syslog(LOG_INFO, "Failed to open Fault reboot count file [%s] (%d)\n", HARDFAULT_REBOOT_PATH, ret);
 
 	} else {
-
 		ret = OK;
 
 		if (!reset) {
@@ -1142,10 +1125,10 @@ __EXPORT int hardfault_increment_reboot(char *caller, bool reset)
 
 	return ret;
 }
+
 /****************************************************************************
  * hardfault_write
  ****************************************************************************/
-
 __EXPORT int hardfault_write(char *caller, int fd, int format, bool rearm)
 {
 	struct bbsramd_s desc;
