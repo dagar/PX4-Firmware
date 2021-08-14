@@ -191,14 +191,6 @@ public:
 	// error magnitudes (rad), (m/sec), (m)
 	const Vector3f &getOutputTrackingError() const { return _output_tracking_error; }
 
-	// First argument returns GPS drift  metrics in the following array locations
-	// 0 : Horizontal position drift rate (m/s)
-	// 1 : Vertical position drift rate (m/s)
-	// 2 : Filtered horizontal velocity (m/s)
-	// Second argument returns true when IMU movement is blocking the drift calculation
-	// Function returns true if the metrics have been updated and not returned previously by this function
-	bool get_gps_drift_metrics(float drift[3], bool *blocked);
-
 	// return true if the global position estimate is valid
 	// return true if the origin is set we are not doing unconstrained free inertial navigation
 	// and have not started using synthetic position observations to constrain drift
@@ -245,9 +237,6 @@ public:
 	Vector3f getMagBiasVariance() const { return Vector3f{P(19, 19), P(20, 20), P(21, 21)}; }
 
 	bool accel_bias_inhibited() const { return _accel_bias_inhibit[0] || _accel_bias_inhibit[1] || _accel_bias_inhibit[2]; }
-
-	// get GPS check status
-	void get_gps_check_status(uint16_t *val) const { *val = _gps_check_fail_status.value; }
 
 	const auto &state_reset_status() const { return _state_reset_status; }
 
@@ -489,11 +478,6 @@ private:
 	Vector3f _pos_err_integ{};	///< integral of position tracking error (m.s)
 	Vector3f _output_tracking_error{}; ///< contains the magnitude of the angle, velocity and position track errors (rad, m/s, m)
 
-	// variables used for the GPS quality checks
-	Vector3f _gps_pos_deriv_filt{};	///< GPS NED position derivative (m/sec)
-	Vector2f _gps_velNE_filt{};	///< filtered GPS North and East velocity (m/sec)
-
-	float _gps_velD_diff_filt{0.0f};	///< GPS filtered Down velocity (m/sec)
 	uint64_t _last_gps_fail_us{0};		///< last system time in usec that the GPS failed it's checks
 	uint64_t _last_gps_pass_us{0};		///< last system time in usec that the GPS passed it's checks
 	float _gps_error_norm{1.0f};		///< normalised gps error
@@ -525,8 +509,6 @@ private:
 	float _saved_mag_bf_variance[4] {};	///< magnetic field state variances that have been saved for use at the next initialisation (Gauss**2)
 	Matrix2f _saved_mag_ef_covmat{};		///< NE magnetic field state covariance sub-matrix saved for use at the next initialisation (Gauss**2)
 	bool _velpos_reset_request{false};	///< true when a large yaw error has been fixed and a velocity and position state reset is required
-
-	gps_check_fail_status_u _gps_check_fail_status{};
 
 	// variables used to inhibit accel bias learning
 	bool _accel_bias_inhibit[3] {};		///< true when the accel bias learning is being inhibited for the specified axis
@@ -804,9 +786,6 @@ private:
 	// calculate the earth rotation vector from a given latitude
 	Vector3f calcEarthRateNED(float lat_rad) const;
 
-	// return true id the GPS quality is good enough to set an origin and start aiding
-	bool gps_is_good(const gps_message &gps);
-
 	// Control the filter fusion modes
 	void controlFusionModes();
 
@@ -1035,8 +1014,6 @@ private:
 	// Resets the horizontal velocity and position to the default navigation sensor
 	// Returns true if the reset was successful
 	bool resetYawToEKFGSF();
-
-	void resetGpsDriftCheckFilters();
 };
 
 #endif // !EKF_EKF_H

@@ -66,7 +66,6 @@
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/distance_sensor.h>
 #include <uORB/topics/ekf2_timestamps.h>
-#include <uORB/topics/ekf_gps_drift.h>
 #include <uORB/topics/estimator_baro_bias.h>
 #include <uORB/topics/estimator_event_flags.h>
 #include <uORB/topics/estimator_innovations.h>
@@ -136,7 +135,6 @@ private:
 
 	void PublishAttitude(const hrt_abstime &timestamp);
 	void PublishBaroBias(const hrt_abstime &timestamp);
-	void PublishEkfDriftMetrics(const hrt_abstime &timestamp);
 	void PublishEventFlags(const hrt_abstime &timestamp);
 	void PublishGlobalPosition(const hrt_abstime &timestamp);
 	void PublishInnovations(const hrt_abstime &timestamp, const imuSample &imu);
@@ -281,7 +279,6 @@ private:
 	uint32_t _filter_information_event_changes{0};
 
 	uORB::PublicationMulti<ekf2_timestamps_s>            _ekf2_timestamps_pub{ORB_ID(ekf2_timestamps)};
-	uORB::PublicationMulti<ekf_gps_drift_s>              _ekf_gps_drift_pub{ORB_ID(ekf_gps_drift)};
 	uORB::PublicationMulti<estimator_baro_bias_s>        _estimator_baro_bias_pub{ORB_ID(estimator_baro_bias)};
 	uORB::PublicationMulti<estimator_innovations_s>      _estimator_innovation_test_ratios_pub{ORB_ID(estimator_innovation_test_ratios)};
 	uORB::PublicationMulti<estimator_innovations_s>      _estimator_innovation_variances_pub{ORB_ID(estimator_innovation_variances)};
@@ -393,18 +390,6 @@ private:
 		_param_ekf2_mag_acclim,	///< integer used to specify the type of magnetometer fusion used
 		(ParamExtFloat<px4::params::EKF2_MAG_YAWLIM>)
 		_param_ekf2_mag_yawlim,	///< yaw rate threshold used by mode select logic (rad/sec)
-
-		(ParamExtInt<px4::params::EKF2_GPS_CHECK>)
-		_param_ekf2_gps_check,	///< bitmask used to control which GPS quality checks are used
-		(ParamExtFloat<px4::params::EKF2_REQ_EPH>) _param_ekf2_req_eph,	///< maximum acceptable horiz position error (m)
-		(ParamExtFloat<px4::params::EKF2_REQ_EPV>) _param_ekf2_req_epv,	///< maximum acceptable vert position error (m)
-		(ParamExtFloat<px4::params::EKF2_REQ_SACC>) _param_ekf2_req_sacc,	///< maximum acceptable speed error (m/s)
-		(ParamExtInt<px4::params::EKF2_REQ_NSATS>) _param_ekf2_req_nsats,	///< minimum acceptable satellite count
-		(ParamExtFloat<px4::params::EKF2_REQ_PDOP>)
-		_param_ekf2_req_pdop,	///< maximum acceptable position dilution of precision
-		(ParamExtFloat<px4::params::EKF2_REQ_HDRIFT>)
-		_param_ekf2_req_hdrift,	///< maximum acceptable horizontal drift speed (m/s)
-		(ParamExtFloat<px4::params::EKF2_REQ_VDRIFT>) _param_ekf2_req_vdrift,	///< maximum acceptable vertical drift speed (m/s)
 
 		// measurement source control
 		(ParamExtInt<px4::params::EKF2_AID_MASK>)

@@ -633,7 +633,7 @@ void Ekf::controlHeightSensorTimeouts()
 		if (_control_status.flags.baro_hgt) {
 			// check if GPS height is available
 			const gpsSample &gps_init = _gps_buffer.get_newest();
-			const bool gps_hgt_accurate = (gps_init.vacc < _params.req_vacc);
+			const bool gps_hgt_accurate = (gps_init.vacc < 8.f); // TODO
 
 			// check for inertial sensing errors in the last BADACC_PROBATION seconds
 			const bool prev_bad_vert_accel = isRecent(_time_bad_vert_accel, BADACC_PROBATION);
@@ -661,7 +661,7 @@ void Ekf::controlHeightSensorTimeouts()
 		} else if (_control_status.flags.gps_hgt) {
 			// check if GPS height is available
 			const gpsSample &gps_init = _gps_buffer.get_newest();
-			const bool gps_hgt_accurate = (gps_init.vacc < _params.req_vacc);
+			const bool gps_hgt_accurate = (gps_init.vacc < 8.f); // TODO
 
 			// check the baro height source for consistency and freshness
 			const baroSample &baro_init = _baro_buffer.get_newest();

@@ -97,14 +97,6 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 	_param_ekf2_mag_type(_params->mag_fusion_type),
 	_param_ekf2_mag_acclim(_params->mag_acc_gate),
 	_param_ekf2_mag_yawlim(_params->mag_yaw_rate_gate),
-	_param_ekf2_gps_check(_params->gps_check_mask),
-	_param_ekf2_req_eph(_params->req_hacc),
-	_param_ekf2_req_epv(_params->req_vacc),
-	_param_ekf2_req_sacc(_params->req_sacc),
-	_param_ekf2_req_nsats(_params->req_nsats),
-	_param_ekf2_req_pdop(_params->req_pdop),
-	_param_ekf2_req_hdrift(_params->req_hdrift),
-	_param_ekf2_req_vdrift(_params->req_vdrift),
 	_param_ekf2_aid_mask(_params->fusion_mode),
 	_param_ekf2_hgt_mode(_params->vdist_sensor_type),
 	_param_ekf2_terr_mask(_params->terrain_fusion_mode),
@@ -191,7 +183,6 @@ bool EKF2::multi_init(int imu, int mag)
 	_wind_pub.advertise();
 
 	_ekf2_timestamps_pub.advertise();
-	_ekf_gps_drift_pub.advertise();
 	_estimator_baro_bias_pub.advertise();
 	_estimator_event_flags_pub.advertise();
 	_estimator_innovation_test_ratios_pub.advertise();
@@ -534,7 +525,6 @@ void EKF2::Run()
 
 			// publish status/logging messages
 			PublishBaroBias(now);
-			PublishEkfDriftMetrics(now);
 			PublishEventFlags(now);
 			PublishStates(now);
 			PublishStatus(now);
@@ -608,24 +598,6 @@ void EKF2::PublishBaroBias(const hrt_abstime &timestamp)
 
 			_last_baro_bias_published = status.bias;
 		}
-	}
-}
-
-void EKF2::PublishEkfDriftMetrics(const hrt_abstime &timestamp)
-{
-	// publish GPS drift data only when updated to minimise overhead
-	float gps_drift[3];
-	bool blocked;
-
-	if (_ekf.get_gps_drift_metrics(gps_drift, &blocked)) {
-		ekf_gps_drift_s drift_data;
-		drift_data.hpos_drift_rate = gps_drift[0];
-		drift_data.vpos_drift_rate = gps_drift[1];
-		drift_data.hspd = gps_drift[2];
-		drift_data.blocked = blocked;
-		drift_data.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
-
-		_ekf_gps_drift_pub.publish(drift_data);
 	}
 }
 
@@ -1110,12 +1082,6 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 	status.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
 
 	_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
-
-	_ekf.get_gps_check_status(&status.gps_check_fail_flags);
-
-	// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
-	// the GPS Fix bit, which is always checked)
-	status.gps_check_fail_flags &= ((uint16_t)_params->gps_check_mask << 1) | 1;
 
 	status.control_mode_flags = _ekf.control_status().value;
 	status.filter_fault_flags = _ekf.fault_status().value;

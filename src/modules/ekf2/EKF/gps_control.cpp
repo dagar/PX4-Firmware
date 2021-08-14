@@ -58,10 +58,10 @@ void Ekf::controlGpsFusion()
 		const bool mandatory_conditions_passing = _control_status.flags.tilt_align
 		                                          && _control_status.flags.yaw_align
 							  && _NED_origin_initialised;
-		const bool continuing_conditions_passing = mandatory_conditions_passing
-		                                           && !gps_checks_failing;
-		const bool starting_conditions_passing = continuing_conditions_passing
-							 && gps_checks_passing;
+
+		const bool continuing_conditions_passing = mandatory_conditions_passing && !gps_checks_failing;
+
+		const bool starting_conditions_passing = continuing_conditions_passing && gps_checks_passing;
 
 		if (_control_status.flags.gps) {
 			if (mandatory_conditions_passing) {

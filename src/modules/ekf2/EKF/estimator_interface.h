@@ -312,12 +312,9 @@ protected:
 	bool _initialised{false};      // true if the ekf interface instance (data buffering) is initialized
 
 	bool _NED_origin_initialised{false};
-	bool _gps_speed_valid{false};
 	float _gps_origin_eph{0.0f}; // horizontal position uncertainty of the GPS origin
 	float _gps_origin_epv{0.0f}; // vertical position uncertainty of the GPS origin
 	MapProjection _pos_ref{}; // Contains WGS-84 position latitude and longitude of the EKF origin
-	MapProjection _gps_pos_prev{}; // Contains WGS-84 position latitude and longitude of the previous GPS message
-	float _gps_alt_prev{0.0f};	// height from the previous GPS message (m)
 	float _gps_yaw_offset{0.0f};	// Yaw offset angle for dual GPS antennas used for yaw estimation (radians).
 
 	// innovation consistency check monitoring ratios
@@ -342,14 +339,8 @@ protected:
 	bool _deadreckon_time_exceeded{true};	// true if the horizontal nav solution has been deadreckoning for too long and is invalid
 	bool _is_wind_dead_reckoning{false};	// true if we are navigationg reliant on wind relative measurements
 
-	float _gps_drift_metrics[3] {};	// Array containing GPS drift metrics
-					// [0] Horizontal position drift rate (m/s)
-					// [1] Vertical position drift rate (m/s)
-					// [2] Filtered horizontal velocity (m/s)
-
 	uint64_t _time_last_on_ground_us{0};	///< last time we were on the ground (uSec)
 	uint64_t _time_last_in_air{0};		///< last time we were in air (uSec)
-	bool _gps_drift_updated{false};	// true when _gps_drift_metrics has been updated and is ready for retrieval
 
 	// data buffer instances
 	RingBuffer<imuSample> _imu_buffer{12};           // buffer length 12 with default parameters

@@ -313,17 +313,6 @@ struct parameters {
 	int32_t flow_qual_min{1};		///< minimum acceptable quality integer from  the flow sensor
 	float flow_innov_gate{3.0f};		///< optical flow fusion innovation consistency gate size (STD)
 
-	// these parameters control the strictness of GPS quality checks used to determine if the GPS is
-	// good enough to set a local origin and commence aiding
-	int32_t gps_check_mask{21};		///< bitmask used to control which GPS quality checks are used
-	float req_hacc{5.0f};			///< maximum acceptable horizontal position error (m)
-	float req_vacc{8.0f};			///< maximum acceptable vertical position error (m)
-	float req_sacc{1.0f};			///< maximum acceptable speed error (m/s)
-	int32_t req_nsats{6};			///< minimum acceptable satellite count
-	float req_pdop{2.0f};			///< maximum acceptable position dilution of precision
-	float req_hdrift{0.3f};			///< maximum acceptable horizontal drift speed (m/s)
-	float req_vdrift{0.5f};			///< maximum acceptable vertical drift speed (m/s)
-
 	// XYZ offset of sensors in body axes (m)
 	Vector3f imu_pos_body;			///< xyz position of IMU in body frame (m)
 	Vector3f gps_pos_body;			///< xyz position of the GPS antenna in body frame (m)
@@ -435,23 +424,6 @@ union innovation_fault_status_u {
 	} flags;
 	uint16_t value;
 
-};
-
-// publish the status of various GPS quality checks
-union gps_check_fail_status_u {
-	struct {
-		uint16_t fix    : 1; ///< 0 - true if the fix type is insufficient (no 3D solution)
-		uint16_t nsats  : 1; ///< 1 - true if number of satellites used is insufficient
-		uint16_t pdop   : 1; ///< 2 - true if position dilution of precision is insufficient
-		uint16_t hacc   : 1; ///< 3 - true if reported horizontal accuracy is insufficient
-		uint16_t vacc   : 1; ///< 4 - true if reported vertical accuracy is insufficient
-		uint16_t sacc   : 1; ///< 5 - true if reported speed accuracy is insufficient
-		uint16_t hdrift : 1; ///< 6 - true if horizontal drift is excessive (can only be used when stationary on ground)
-		uint16_t vdrift : 1; ///< 7 - true if vertical drift is excessive (can only be used when stationary on ground)
-		uint16_t hspeed : 1; ///< 8 - true if horizontal speed is excessive (can only be used when stationary on ground)
-		uint16_t vspeed : 1; ///< 9 - true if vertical speed error is excessive
-	} flags;
-	uint16_t value;
 };
 
 // bitmask containing filter control status

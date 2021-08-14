@@ -81,8 +81,6 @@ void Ekf::reset()
 	_innov_check_fail_status.value = 0;
 
 	_prev_dvel_bias_var.zero();
-
-	resetGpsDriftCheckFilters();
 }
 
 bool Ekf::update()

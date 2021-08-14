@@ -734,27 +734,6 @@ void Ekf::setEkfGlobalOrigin(const double latitude, const double longitude, cons
 	}
 }
 
-/*
-	First argument returns GPS drift  metrics in the following array locations
-	0 : Horizontal position drift rate (m/s)
-	1 : Vertical position drift rate (m/s)
-	2 : Filtered horizontal velocity (m/s)
-	Second argument returns true when IMU movement is blocking the drift calculation
-	Function returns true if the metrics have been updated and not returned previously by this function
-*/
-bool Ekf::get_gps_drift_metrics(float drift[3], bool *blocked)
-{
-	memcpy(drift, _gps_drift_metrics, 3 * sizeof(float));
-	*blocked = !_control_status.flags.vehicle_at_rest;
-
-	if (_gps_drift_updated) {
-		_gps_drift_updated = false;
-		return true;
-	}
-
-	return false;
-}
-
 // get the 1-sigma horizontal and vertical position uncertainty of the ekf WGS-84 position
 void Ekf::get_ekf_gpos_accuracy(float *ekf_eph, float *ekf_epv) const
 {
@@ -1802,10 +1781,4 @@ void Ekf::runYawEKFGSF()
 	    PX4_ISFINITE(_gps_sample_delayed.vel(0)) && PX4_ISFINITE(_gps_sample_delayed.vel(1))) {
 		_yawEstimator.setVelocity(_gps_sample_delayed.vel.xy(), _gps_sample_delayed.vacc);
 	}
-}
-
-void Ekf::resetGpsDriftCheckFilters()
-{
-	_gps_velNE_filt.setZero();
-	_gps_pos_deriv_filt.setZero();
 }

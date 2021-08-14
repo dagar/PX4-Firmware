@@ -64,7 +64,6 @@ set(msg_files
 	differential_pressure.msg
 	distance_sensor.msg
 	ekf2_timestamps.msg
-	ekf_gps_drift.msg
 	esc_report.msg
 	esc_status.msg
 	estimator_baro_bias.msg
@@ -150,6 +149,7 @@ set(msg_files
 	sensor_preflight_mag.msg
 	sensor_selection.msg
 	sensors_status_imu.msg
+	sensors_status_gps.msg
 	system_power.msg
 	takeoff_status.msg
 	task_stack_info.msg
