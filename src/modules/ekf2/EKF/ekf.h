@@ -306,7 +306,7 @@ public:
 	matrix::Quatf getVisionAlignmentQuaternion() const { return Quatf(_R_ev_to_ekf); };
 
 	// use the latest IMU data at the current time horizon.
-	Quatf calculate_quaternion() const;
+	Quatf calculate_quaternion(const imuSample& imu_sample_new) const;
 
 	// set minimum continuous period without GPS fail required to mark a healthy GPS status
 	void set_min_required_gps_health_time(uint32_t time_us) { _min_gps_health_time_us = time_us; }

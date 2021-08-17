@@ -523,11 +523,11 @@ void Ekf::applyCorrectionToOutputBuffer(const Vector3f &vel_correction, const Ve
 /*
  * Predict the previous quaternion output state forward using the latest IMU delta angle data.
 */
-Quatf Ekf::calculate_quaternion() const
+Quatf Ekf::calculate_quaternion(const imuSample& imu_sample_new) const
 {
 	// Correct delta angle data for bias errors using bias state estimates from the EKF and also apply
 	// corrections required to track the EKF quaternion states
-	const Vector3f delta_angle{_newest_high_rate_imu_sample.delta_ang - _state.delta_ang_bias * (_dt_imu_avg / _dt_ekf_avg) + _delta_angle_corr};
+	const Vector3f delta_angle{imu_sample_new.delta_ang - _state.delta_ang_bias * (_dt_imu_avg / _dt_ekf_avg) + _delta_angle_corr};
 
 	// increment the quaternions using the corrected delta angle vector
 	// the quaternions must always be normalised after modification

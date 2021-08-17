@@ -64,9 +64,7 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/topics/airspeed.h>
-#include <uORB/topics/airspeed_validated.h>
 #include <uORB/topics/distance_sensor.h>
-#include <uORB/topics/ekf2_timestamps.h>
 #include <uORB/topics/ekf_gps_drift.h>
 #include <uORB/topics/estimator_baro_bias.h>
 #include <uORB/topics/estimator_event_flags.h>
@@ -79,7 +77,6 @@
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
@@ -102,7 +99,7 @@ class EKF2 final : public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
 	EKF2() = delete;
-	EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode);
+	EKF2(bool multi_mode, const px4::wq_config_t &config);
 	~EKF2() override;
 
 	/** @see ModuleBase */
@@ -135,38 +132,39 @@ private:
 
 	void Run() override;
 
-	void PublishAttitude(const hrt_abstime &timestamp);
-	void PublishBaroBias(const hrt_abstime &timestamp);
-	void PublishEkfDriftMetrics(const hrt_abstime &timestamp);
-	void PublishEventFlags(const hrt_abstime &timestamp);
-	void PublishGlobalPosition(const hrt_abstime &timestamp);
-	void PublishInnovations(const hrt_abstime &timestamp);
-	void PublishInnovationTestRatios(const hrt_abstime &timestamp);
-	void PublishInnovationVariances(const hrt_abstime &timestamp);
+	// output predictor publications
+	void PublishAttitude(const imuSample &imu_sample_new);
 	void PublishLocalPosition(const hrt_abstime &timestamp);
-	void PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu);
-	void PublishOdometryAligned(const hrt_abstime &timestamp, const vehicle_odometry_s &ev_odom);
-	void PublishOpticalFlowVel(const hrt_abstime &timestamp);
-	void PublishSensorBias(const hrt_abstime &timestamp);
-	void PublishStates(const hrt_abstime &timestamp);
-	void PublishStatus(const hrt_abstime &timestamp);
-	void PublishStatusFlags(const hrt_abstime &timestamp);
-	void PublishWindEstimate(const hrt_abstime &timestamp);
-	void PublishYawEstimatorStatus(const hrt_abstime &timestamp);
+	void PublishGlobalPosition(const hrt_abstime &timestamp);
+	void PublishOdometry(const imuSample &imu);
 
-	void UpdateAirspeedSample(ekf2_timestamps_s &ekf2_timestamps);
-	void UpdateAuxVelSample(ekf2_timestamps_s &ekf2_timestamps);
-	void UpdateBaroSample(ekf2_timestamps_s &ekf2_timestamps);
-	bool UpdateExtVisionSample(ekf2_timestamps_s &ekf2_timestamps, vehicle_odometry_s &ev_odom);
-	bool UpdateFlowSample(ekf2_timestamps_s &ekf2_timestamps);
-	void UpdateGpsSample(ekf2_timestamps_s &ekf2_timestamps);
-	void UpdateMagSample(ekf2_timestamps_s &ekf2_timestamps);
-	void UpdateRangeSample(ekf2_timestamps_s &ekf2_timestamps);
+	void PublishBaroBias();
+	void PublishEkfDriftMetrics();
+	void PublishEventFlags();
+	void PublishInnovations(const imuSample &imu);
+	void PublishInnovationTestRatios();
+	void PublishInnovationVariances();
+	void PublishOdometryAligned(const vehicle_odometry_s &ev_odom);
+	void PublishOpticalFlowVel();
+	void PublishSensorBias();
+	void PublishStates();
+	void PublishStatus();
+	void PublishStatusFlags();
+	void PublishWindEstimate();
+	void PublishYawEstimatorStatus();
+
+	void UpdateAirspeedSample();
+	void UpdateAuxVelSample();
+	void UpdateBaroSample();
+	bool UpdateExtVisionSample(vehicle_odometry_s &ev_odom);
+	void UpdateFlowSample();
+	void UpdateGpsSample();
+	void UpdateMagSample();
+	void UpdateRangeSample();
 
 	void UpdateAccelCalibration(const hrt_abstime &timestamp);
 	void UpdateGyroCalibration(const hrt_abstime &timestamp);
 	void UpdateMagCalibration(const hrt_abstime &timestamp);
-
 
 	/*
 	 * Calculate filtered WGS84 height from estimated AMSL height
@@ -175,7 +173,6 @@ private:
 
 	static constexpr float sq(float x) { return x * x; };
 
-	const bool _replay_mode{false};			///< true when we use replay data from a log
 	const bool _multi_mode;
 	int _instance{0};
 
@@ -191,7 +188,6 @@ private:
 	perf_counter_t _msg_missed_imu_perf{perf_alloc(PC_COUNT, MODULE_NAME": IMU message missed")};
 	perf_counter_t _msg_missed_air_data_perf{nullptr};
 	perf_counter_t _msg_missed_airspeed_perf{nullptr};
-	perf_counter_t _msg_missed_airspeed_validated_perf{nullptr};
 	perf_counter_t _msg_missed_distance_sensor_perf{nullptr};
 	perf_counter_t _msg_missed_gps_perf{nullptr};
 	perf_counter_t _msg_missed_landing_target_pose_perf{nullptr};
@@ -242,13 +238,11 @@ private:
 	float _last_baro_bias_published{};
 
 	float _airspeed_scale_factor{1.0f}; ///< scale factor correction applied to airspeed measurements
-	hrt_abstime _airspeed_validated_timestamp_last{0};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::Subscription _airdata_sub{ORB_ID(vehicle_air_data)};
 	uORB::Subscription _airspeed_sub{ORB_ID(airspeed)};
-	uORB::Subscription _airspeed_validated_sub{ORB_ID(airspeed_validated)};
 	uORB::Subscription _ev_odom_sub{ORB_ID(vehicle_visual_odometry)};
 	uORB::Subscription _landing_target_pose_sub{ORB_ID(landing_target_pose)};
 	uORB::Subscription _magnetometer_sub{ORB_ID(vehicle_magnetometer)};
@@ -259,7 +253,6 @@ private:
 	uORB::Subscription _vehicle_gps_position_sub{ORB_ID(vehicle_gps_position)};
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 
-	uORB::SubscriptionCallbackWorkItem _sensor_combined_sub{this, ORB_ID(sensor_combined)};
 	uORB::SubscriptionCallbackWorkItem _vehicle_imu_sub{this, ORB_ID(vehicle_imu)};
 
 	uORB::SubscriptionMultiArray<distance_sensor_s> _distance_sensor_subs{ORB_ID::distance_sensor};
@@ -284,7 +277,6 @@ private:
 	uint32_t _filter_warning_event_changes{0};
 	uint32_t _filter_information_event_changes{0};
 
-	uORB::PublicationMulti<ekf2_timestamps_s>            _ekf2_timestamps_pub{ORB_ID(ekf2_timestamps)};
 	uORB::PublicationMulti<ekf_gps_drift_s>              _ekf_gps_drift_pub{ORB_ID(ekf_gps_drift)};
 	uORB::PublicationMulti<estimator_baro_bias_s>        _estimator_baro_bias_pub{ORB_ID(estimator_baro_bias)};
 	uORB::PublicationMulti<estimator_innovations_s>      _estimator_innovation_test_ratios_pub{ORB_ID(estimator_innovation_test_ratios)};

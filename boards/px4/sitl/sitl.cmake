@@ -9,7 +9,6 @@ set_property(CACHE config_sitl_debugger PROPERTY STRINGS "disable;gdb;lldb")
 set(REPLAY_FILE "$ENV{replay}")
 if(REPLAY_FILE)
 	message(STATUS "Building with uorb publisher rules support")
-	add_definitions(-DORB_USE_PUBLISHER_RULES)
 
 	message(STATUS "Building without lockstep for replay")
 	set(ENABLE_LOCKSTEP_SCHEDULER no)

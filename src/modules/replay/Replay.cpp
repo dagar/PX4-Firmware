@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -62,7 +62,6 @@
 #include <logger/messages.h>
 
 #include "Replay.hpp"
-#include "ReplayEkf2.hpp"
 
 #define PARAMS_OVERRIDE_FILE PX4_ROOTFSDIR "/replay_params.txt"
 
@@ -74,16 +73,6 @@ namespace px4
 
 char *Replay::_replay_file = nullptr;
 
-Replay::CompatSensorCombinedDtType::CompatSensorCombinedDtType(int gyro_integral_dt_offset_log,
-		int gyro_integral_dt_offset_intern, int accelerometer_integral_dt_offset_log,
-		int accelerometer_integral_dt_offset_intern)
-	: _gyro_integral_dt_offset_log(gyro_integral_dt_offset_log),
-	  _gyro_integral_dt_offset_intern(gyro_integral_dt_offset_intern),
-	  _accelerometer_integral_dt_offset_log(accelerometer_integral_dt_offset_log),
-	  _accelerometer_integral_dt_offset_intern(accelerometer_integral_dt_offset_intern)
-{
-}
-
 Replay::~Replay()
 {
 	for (size_t i = 0; i < _subscriptions.size(); ++i) {
@@ -91,27 +80,6 @@ Replay::~Replay()
 	}
 
 	_subscriptions.clear();
-}
-
-void *
-Replay::CompatSensorCombinedDtType::apply(void *data)
-{
-	// the types have the same size so we can do the conversion in-place
-	uint8_t *ptr = (uint8_t *)data;
-
-	float gyro_integral_dt;
-	memcpy(&gyro_integral_dt, ptr + _gyro_integral_dt_offset_log, sizeof(float));
-
-	float accel_integral_dt;
-	memcpy(&accel_integral_dt, ptr + _accelerometer_integral_dt_offset_log, sizeof(float));
-
-	uint32_t igyro_integral_dt = (uint32_t)(gyro_integral_dt * 1e6f);
-	memcpy(ptr + _gyro_integral_dt_offset_intern, &igyro_integral_dt, sizeof(float));
-
-	uint32_t iaccel_integral_dt = (uint32_t)(accel_integral_dt * 1e6f);
-	memcpy(ptr + _accelerometer_integral_dt_offset_intern, &iaccel_integral_dt, sizeof(float));
-
-	return data;
 }
 
 void
@@ -237,6 +205,8 @@ Replay::readFileDefinitions(std::ifstream &file)
 			break;
 
 		case (int)ULogMessageType::PARAMETER:
+
+			// case (int)ULogMessageType::PARAMETER_DEFAULT: // TODO
 			if (!readAndApplyParameter(file, message_header.msg_size)) {
 				return false;
 			}
@@ -249,7 +219,7 @@ Replay::readFileDefinitions(std::ifstream &file)
 
 		case (int)ULogMessageType::INFO: //skip
 		case (int)ULogMessageType::INFO_MULTIPLE: //skip
-		case (int)ULogMessageType::PARAMETER_DEFAULT:
+		case (int)ULogMessageType::PARAMETER_DEFAULT: // TODO
 			file.seekg(message_header.msg_size, ios::cur);
 			break;
 
@@ -396,7 +366,6 @@ Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 		return true;
 	}
 
-	CompatBase *compat = nullptr;
 
 	// check the format: the field definitions must match
 	// FIXME: this should check recursively, all used nested types
@@ -405,78 +374,49 @@ Replay::readAndAddSubscription(std::ifstream &file, uint16_t msg_size)
 	const string orb_fields = parseOrbFields(orb_meta->o_fields);
 
 	if (file_format != orb_fields) {
-		// check if we have a compatibility conversion available
-		if (topic_name == "sensor_combined") {
-			if (orb_fields == "uint64_t timestamp;float[3] gyro_rad;uint32_t gyro_integral_dt;"
-			    "int32_t accelerometer_timestamp_relative;float[3] accelerometer_m_s2;"
-			    "uint32_t accelerometer_integral_dt" &&
-			    file_format == "uint64_t timestamp;float[3] gyro_rad;float gyro_integral_dt;"
-			    "int32_t accelerometer_timestamp_relative;float[3] accelerometer_m_s2;"
-			    "float accelerometer_integral_dt;") {
+		PX4_ERR("Formats for %s don't match. Will ignore it.", topic_name.c_str());
+		PX4_WARN(" Internal format:");
+		size_t start = 0;
 
-				int gyro_integral_dt_offset_log;
-				int gyro_integral_dt_offset_intern;
-				int accelerometer_integral_dt_offset_log;
-				int accelerometer_integral_dt_offset_intern;
-				int unused;
+		for (size_t i = 0; i < orb_fields.length(); ++i) {
+			if (orb_fields[i] == ';') {
+				std::string field(orb_fields.substr(start, i - start));
 
-				if (findFieldOffset(file_format, "gyro_integral_dt", gyro_integral_dt_offset_log, unused) &&
-				    findFieldOffset(orb_fields, "gyro_integral_dt", gyro_integral_dt_offset_intern, unused) &&
-				    findFieldOffset(file_format, "accelerometer_integral_dt", accelerometer_integral_dt_offset_log, unused) &&
-				    findFieldOffset(orb_fields, "accelerometer_integral_dt", accelerometer_integral_dt_offset_intern, unused)) {
+				if (file_format.find(field) != std::string::npos) {
+					PX4_WARN(" - %s", field.c_str());
 
-					compat = new CompatSensorCombinedDtType(gyro_integral_dt_offset_log, gyro_integral_dt_offset_intern,
-										accelerometer_integral_dt_offset_log, accelerometer_integral_dt_offset_intern);
+				} else {
+					PX4_ERR(" - %s", field.c_str());
 				}
+
+				start = i + 1;
 			}
 		}
 
-		if (!compat) {
-			PX4_ERR("Formats for %s don't match. Will ignore it.", topic_name.c_str());
-			PX4_WARN(" Internal format:");
-			size_t start = 0;
+		PX4_WARN(" File format    : %s", file_format.c_str());
+		start = 0;
 
-			for (size_t i = 0; i < orb_fields.length(); ++i) {
-				if (orb_fields[i] == ';') {
-					std::string field(orb_fields.substr(start, i - start));
+		for (size_t i = 0; i < file_format.length(); ++i) {
+			if (file_format[i] == ';') {
+				std::string field(file_format.substr(start, i - start));
 
-					if (file_format.find(field) != std::string::npos) {
-						PX4_WARN(" - %s", field.c_str());
+				if (orb_fields.find(field) != std::string::npos) {
+					PX4_WARN(" - %s", field.c_str());
 
-					} else {
-						PX4_ERR(" - %s", field.c_str());
-					}
-
-					start = i + 1;
+				} else {
+					PX4_ERR(" - %s", field.c_str());
 				}
+
+				start = i + 1;
 			}
-
-			PX4_WARN(" File format    : %s", file_format.c_str());
-			start = 0;
-
-			for (size_t i = 0; i < file_format.length(); ++i) {
-				if (file_format[i] == ';') {
-					std::string field(file_format.substr(start, i - start));
-
-					if (orb_fields.find(field) != std::string::npos) {
-						PX4_WARN(" - %s", field.c_str());
-
-					} else {
-						PX4_ERR(" - %s", field.c_str());
-					}
-
-					start = i + 1;
-				}
-			}
-
-			return true; // not a fatal error
 		}
+
+		return true; // not a fatal error
 	}
 
 	Subscription *subscription = new Subscription();
 	subscription->orb_meta = orb_meta;
 	subscription->multi_id = multi_id;
-	subscription->compat = compat;
 
 	//find the timestamp offset
 	int field_size;
@@ -832,6 +772,15 @@ Replay::readDefinitionsAndApplyParams(std::ifstream &file)
 void
 Replay::run()
 {
+	uint64_t timestamp_last = 0;
+
+	// time starts at 0
+	{
+		struct timespec ts {};
+		abstime_to_ts(&ts, timestamp_last);
+		px4_clock_settime(CLOCK_MONOTONIC, &ts);
+	}
+
 	ifstream replay_file(_replay_file, ios::in | ios::binary);
 
 	if (!readDefinitionsAndApplyParams(replay_file)) {
@@ -844,10 +793,6 @@ Replay::run()
 	if (speedup) {
 		_speed_factor = atof(speedup);
 	}
-
-	onEnterMainLoop();
-
-	_replay_start_time = hrt_absolute_time();
 
 	PX4_INFO("Replay in progress...");
 
@@ -862,14 +807,17 @@ Replay::run()
 		return;
 	}
 
-	const uint64_t timestamp_offset = getTimestampOffset();
 	uint32_t nr_published_messages = 0;
 	streampos last_additional_message_pos = _data_section_start;
 
-	while (!should_exit() && replay_file) {
+	int imu_publish_count = 0;
+	bool imu_published = false;
 
-		//Find the next message to publish. Messages from different subscriptions don't need
-		//to be in chronological order, so we need to check all subscriptions
+	hrt_abstime last_update = 0;
+
+	while (!should_exit() && replay_file) {
+		// Find the next message to publish. Messages from different subscriptions don't need
+		// to be in chronological order, so we need to check all subscriptions
 		uint64_t next_file_time = 0;
 		int next_msg_id = -1;
 		bool first_time = true;
@@ -891,46 +839,110 @@ Replay::run()
 		}
 
 		if (next_msg_id == -1) {
-			break; //no active subscription anymore. We're done.
+			break; // no active subscription anymore. We're done.
 		}
 
 		Subscription &sub = *_subscriptions[next_msg_id];
 
 		if (next_file_time == 0) {
-			//someone didn't set the timestamp properly. Consider the message invalid
+			// someone didn't set the timestamp properly. Consider the message invalid
+			PX4_ERR("%s:%d missing timestamp", sub.orb_meta->o_name, sub.multi_id);
 			nextDataMessage(replay_file, sub, next_msg_id);
 			continue;
 		}
 
-		//handle additional messages between last and next published data
+
+		if (findTopic(_publisher_rule, sub.orb_meta->o_name)) {
+			PX4_DEBUG("not allowing publish topic %s", sub.orb_meta->o_name);
+			//return (orb_advert_t)_Instance;
+		}
+
+
+		// ekf2 replay
+		if (sub.orb_meta &&
+		    ((strcmp(sub.orb_meta->o_name, "estimator_status") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "estimator_local_position") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "estimator_global_position") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "estimator_attitude") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "estimator_sensor_bias") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "ekf_gps_drift") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "vehicle_attitude") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "vehicle_local_position") == 0)
+		     || (strcmp(sub.orb_meta->o_name, "vehicle_global_position") == 0))
+		   ) {
+			// skipping blocked message
+			nextDataMessage(replay_file, sub, next_msg_id);
+			continue;
+		}
+
+		// handle additional messages between last and next published data
 		replay_file.seekg(last_additional_message_pos);
 		streampos next_additional_message_pos = sub.next_read_pos;
 		readAndHandleAdditionalMessages(replay_file, next_additional_message_pos);
 		last_additional_message_pos = next_additional_message_pos;
 
-		const uint64_t publish_timestamp = handleTopicDelay(next_file_time, timestamp_offset);
+		const uint64_t publish_timestamp = sub.next_timestamp;
+
+		// adjust the lockstep time to the publication time
+		struct timespec ts {};
+		abstime_to_ts(&ts, publish_timestamp);
+		px4_clock_settime(CLOCK_MONOTONIC, &ts);
+
+		if (_replay_start_time == 0) {
+			_replay_start_time = hrt_absolute_time();
+		}
 
 		// It's time to publish
 		readTopicDataToBuffer(sub, replay_file);
-		memcpy(_read_buffer.data() + sub.timestamp_offset, &publish_timestamp, sizeof(uint64_t)); //adjust the timestamp
 
-		if (handleTopicUpdate(sub, _read_buffer.data(), replay_file)) {
+		if (publish_timestamp >= timestamp_last) {
+			PX4_DEBUG("%lu [%lu] (+%lu us) publishing %s:%d", hrt_absolute_time(), publish_timestamp,
+				  publish_timestamp - timestamp_last,
+				  sub.orb_meta->o_name, sub.multi_id);
+
+		} else {
+			PX4_ERR("%s:%d bad timestamp %lu (last timestamp %lu)", sub.orb_meta->o_name, sub.multi_id, publish_timestamp,
+				timestamp_last);
+		}
+
+		if (publishTopic(sub, _read_buffer.data())) {
 			++nr_published_messages;
 		}
+
+		timestamp_last = publish_timestamp;
 
 		nextDataMessage(replay_file, sub, next_msg_id);
 
 		// TODO: output status (eg. every sec), including total duration...
+
+
+		// Wait for other modules, such as logger or ekf2
+		if (imu_published) {
+			px4_lockstep_wait_for_components();
+
+		} else {
+			if (sub.orb_meta) {
+				if (strcmp(sub.orb_meta->o_name, "vehicle_imu") == 0) {
+					imu_publish_count++;
+
+					if (imu_publish_count > 1000) {
+						//imu_published = true;
+					}
+				}
+			}
+
+			//system_usleep(1);
+		}
+
+		if (hrt_elapsed_time(&last_update) >= 1_s) {
+			PX4_INFO("[%.6fs] %d messages published", timestamp_last * 1e-6, nr_published_messages);
+			last_update = timestamp_last;
+		}
 	}
 
 	for (auto &subscription : _subscriptions) {
 		if (!subscription) {
 			continue;
-		}
-
-		if (subscription->compat) {
-			delete subscription->compat;
-			subscription->compat = nullptr;
 		}
 
 		if (subscription->orb_advert) {
@@ -943,8 +955,6 @@ Replay::run()
 		PX4_INFO("Replay done (published %u msgs, %.3lf s)", nr_published_messages,
 			 (double)hrt_elapsed_time(&_replay_start_time) / 1.e6);
 	}
-
-	onExitMainLoop();
 
 	if (!should_exit()) {
 		replay_file.close();
@@ -972,48 +982,9 @@ Replay::readTopicDataToBuffer(const Subscription &sub, std::ifstream &replay_fil
 }
 
 bool
-Replay::handleTopicUpdate(Subscription &sub, void *data, std::ifstream &replay_file)
-{
-	return publishTopic(sub, data);
-}
-
-uint64_t
-Replay::handleTopicDelay(uint64_t next_file_time, uint64_t timestamp_offset)
-{
-	const uint64_t publish_timestamp = next_file_time + timestamp_offset;
-
-	// wait if necessary
-	uint64_t cur_time = hrt_absolute_time();
-
-	// if some topics have a timestamp smaller than the log file start, publish them immediately
-	if (cur_time < publish_timestamp && next_file_time > _file_start_time) {
-		if (_speed_factor > FLT_EPSILON) {
-			// avoid many small usleep calls
-			_accumulated_delay += (publish_timestamp - cur_time) / _speed_factor;
-
-			if (_accumulated_delay > 3000) {
-				system_usleep(_accumulated_delay);
-				_accumulated_delay = 0.f;
-			}
-		}
-
-		// adjust the lockstep time to the publication time
-		struct timespec ts;
-		abstime_to_ts(&ts, publish_timestamp);
-		px4_clock_settime(CLOCK_MONOTONIC, &ts);
-	}
-
-	return publish_timestamp;
-}
-
-bool
 Replay::publishTopic(Subscription &sub, void *data)
 {
 	bool published = false;
-
-	if (sub.compat) {
-		data = sub.compat->apply(data);
-	}
 
 	if (sub.orb_advert) {
 		orb_publish(sub.orb_meta, sub.orb_advert, data);
@@ -1056,6 +1027,118 @@ Replay::publishTopic(Subscription &sub, void *data)
 	return published;
 }
 
+bool Replay::startsWith(const char *pre, const char *str)
+{
+	size_t lenpre = strlen(pre);
+	size_t lenstr = strlen(str);
+	return lenstr < lenpre ? false : strncmp(pre, str, lenpre) == 0;
+}
+
+bool Replay::findTopic(const PublisherRule &rule, const char *topic_name)
+{
+	const char **topics_ptr = rule.topics;
+
+	while (*topics_ptr) {
+		if (strcmp(*topics_ptr, topic_name) == 0) {
+			return true;
+		}
+
+		++topics_ptr;
+	}
+
+	return false;
+}
+
+void Replay::strTrim(const char **str)
+{
+	while (**str == ' ' || **str == '\t') { ++(*str); }
+}
+
+int Replay::readPublisherRulesFromFile(const char *file_name, PublisherRule &rule)
+{
+	static const int line_len = 1024;
+	int ret = PX4_OK;
+	char *line = new char[line_len];
+
+	if (!line) {
+		return -ENOMEM;
+	}
+
+	FILE *fp = fopen(file_name, "r");
+
+	if (fp == NULL) {
+		delete[](line);
+		return -errno;
+	}
+
+	const char *restrict_topics_str = "restrict_topics:";
+
+	rule.topics = nullptr;
+
+	while (fgets(line, line_len, fp) && ret == PX4_OK) {
+
+		if (strlen(line) < 2 || line[0] == '#') {
+			continue;
+		}
+
+		if (startsWith(restrict_topics_str, line)) {
+			// read topics list
+			char *start = line + strlen(restrict_topics_str);
+			strTrim((const char **)&start);
+			char *topics = strdup(start);
+			int topic_len = 0;
+			int num_topics = 0;
+
+			for (int i = 0; topics[i]; ++i) {
+				if (topics[i] == ',' || topics[i] == '\n') {
+					if (topic_len > 0) {
+						topics[i] = 0;
+						++num_topics;
+					}
+
+					topic_len = 0;
+
+				} else {
+					++topic_len;
+				}
+			}
+
+			if (num_topics > 0) {
+				rule.topics = new const char *[num_topics + 1];
+				int topic = 0;
+				strTrim((const char **)&topics);
+				rule.topics[topic++] = topics;
+
+				while (topic < num_topics) {
+					if (*topics == 0) {
+						++topics;
+						strTrim((const char **)&topics);
+						rule.topics[topic++] = topics;
+
+					} else {
+						++topics;
+					}
+				}
+
+				rule.topics[num_topics] = nullptr;
+			}
+
+		} else {
+			PX4_ERR("orb rules file: wrong format: %s", line);
+			ret = -EINVAL;
+		}
+	}
+
+	if (ret == PX4_OK && !rule.topics) {
+		PX4_ERR("Wrong format in orb publisher rules file");
+		ret = -EINVAL;
+	}
+
+	delete[](line);
+	fclose(fp);
+	return ret;
+}
+
 int
 Replay::custom_command(int argc, char *argv[])
 {
@@ -1066,6 +1149,8 @@ Replay::custom_command(int argc, char *argv[])
 	if (!strcmp(argv[0], "trystart")) {
 		return Replay::task_spawn(argc, argv);
 	}
+
+	// ignore?
 
 	return print_usage("unknown command");
 }
@@ -1133,17 +1218,9 @@ Replay *
 Replay::instantiate(int argc, char *argv[])
 {
 	// check the replay mode
-	const char *replay_mode = getenv(replay::ENV_MODE);
+	//const char *replay_mode = getenv(replay::ENV_MODE);
 
-	Replay *instance = nullptr;
-
-	if (replay_mode && strcmp(replay_mode, "ekf2") == 0) {
-		PX4_INFO("Ekf2 replay mode");
-		instance = new ReplayEkf2();
-
-	} else {
-		instance = new Replay();
-	}
+	Replay *instance = new Replay();
 
 	return instance;
 }
