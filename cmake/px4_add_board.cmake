@@ -43,7 +43,6 @@
 #			[ TOOLCHAIN <string> ]
 #			[ ARCHITECTURE <string> ]
 #			[ ROMFSROOT <string> ]
-#			[ BUILD_BOOTLOADER ]
 #			[ IO <string> ]
 #			[ UAVCAN_INTERFACES <string> ]
 #			[ UAVCAN_PERIPHERALS <list> ]
@@ -68,7 +67,6 @@
 #		TOOLCHAIN		: cmake toolchain
 #		ARCHITECTURE		: name of the CPU CMake is building for (used by the toolchain)
 #		ROMFSROOT		: relative path to the ROMFS root directory
-#		BUILD_BOOTLOADER	: flag to enable building and including the bootloader config
 #		IO			: name of IO board to be built and included in the ROMFS (requires a valid ROMFSROOT)
 #		UAVCAN_INTERFACES	: number of interfaces for UAVCAN
 #		UAVCAN_PERIPHERALS      : list of UAVCAN peripheral firmware to build and embed
@@ -154,7 +152,6 @@ function(px4_add_board)
 			SERIAL_PORTS
 			UAVCAN_PERIPHERALS
 		OPTIONS
-			BUILD_BOOTLOADER
 			CONSTRAINED_FLASH
 			NO_HELP
 			CONSTRAINED_MEMORY
@@ -229,10 +226,6 @@ function(px4_add_board)
 	# ROMFS
 	if(ROMFSROOT)
 		set(config_romfs_root ${ROMFSROOT} CACHE INTERNAL "ROMFS root" FORCE)
-
-		if(BUILD_BOOTLOADER)
-			set(config_build_bootloader "1" CACHE INTERNAL "build bootloader" FORCE)
-		endif()
 
 		# IO board (placed in ROMFS)
 		if(IO)
