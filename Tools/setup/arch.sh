@@ -59,7 +59,6 @@ sudo pacman -Sy --noconfirm --needed \
 	nettle \
 	ninja \
 	python-pip \
-	rsync \
 	shellcheck \
 	tar \
 	unzip \

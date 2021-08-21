@@ -93,7 +93,6 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends i
 	python3-pip \
 	python3-setuptools \
 	python3-wheel \
-	rsync \
 	shellcheck \
 	unzip \
 	zip \
@@ -141,6 +140,7 @@ if [[ $INSTALL_NUTTX == "true" ]]; then
 		libisl-dev \
 		libmpc-dev \
 		libmpfr-dev \
+		libncurses5 \
 		libncurses5-dev \
 		libncursesw5-dev \
 		libtool \
