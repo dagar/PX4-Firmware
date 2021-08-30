@@ -40,7 +40,6 @@
 #include <drivers/device/device.h>
 #include <drivers/device/i2c.h>
 #include <drivers/drv_hrt.h>
-#include <drivers/drv_input_capture.h>
 #include <drivers/drv_mixer.h>
 #include <drivers/drv_pwm_output.h>
 #include <lib/cdev/CDev.hpp>
@@ -67,7 +66,6 @@ using namespace time_literals;
 /** Mode given via CLI */
 enum PortMode {
 	PORT_MODE_UNSET = 0,
-	PORT_FULL_GPIO,
 	PORT_FULL_PWM,
 	PORT_PWM14,
 	PORT_PWM12,
@@ -78,19 +76,12 @@ enum PortMode {
 	PORT_PWM3,
 	PORT_PWM2,
 	PORT_PWM1,
-	PORT_PWM3CAP1,
-	PORT_PWM4CAP1,
-	PORT_PWM4CAP2,
-	PORT_PWM5CAP1,
-	PORT_PWM2CAP2,
-	PORT_CAPTURE,
 };
 
 #if !defined(BOARD_HAS_PWM)
 #  error "board_config.h needs to define BOARD_HAS_PWM"
 #endif
 
-// TODO: keep in sync with drivers/camera_capture
 #define PX4FMU_DEVICE_PATH	"/dev/px4fmu"
 
 static constexpr int PWM_OUT_MAX_INSTANCES{(DIRECT_PWM_OUTPUT_CHANNELS > 8) ? 2 : 1};
@@ -103,21 +94,13 @@ public:
 		MODE_NONE,
 		MODE_1PWM,
 		MODE_2PWM,
-		MODE_2PWM2CAP,
 		MODE_3PWM,
-		MODE_3PWM1CAP,
 		MODE_4PWM,
-		MODE_4PWM1CAP,
-		MODE_4PWM2CAP,
 		MODE_5PWM,
-		MODE_5PWM1CAP,
 		MODE_6PWM,
 		MODE_8PWM,
 		MODE_12PWM,
 		MODE_14PWM,
-		MODE_4CAP,
-		MODE_5CAP,
-		MODE_6CAP,
 
 		MODE_NO_REQUEST
 	};
@@ -167,10 +150,6 @@ public:
 
 	static int	set_i2c_bus_clock(unsigned bus, unsigned clock_hz);
 
-	static void	capture_trampoline(void *context, uint32_t chan_index,
-					   hrt_abstime edge_time, uint32_t edge_state,
-					   uint32_t overflow);
-
 	bool updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 			   unsigned num_outputs, unsigned num_control_groups_updated) override;
 
@@ -215,8 +194,6 @@ private:
 	perf_counter_t	_cycle_perf;
 	perf_counter_t	_interval_perf;
 
-	void		capture_callback(uint32_t chan_index,
-					 hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
 	void		update_current_rate();
 	int			set_pwm_rate(unsigned rate_map, unsigned default_rate, unsigned alt_rate);
 	int			pwm_ioctl(file *filp, int cmd, unsigned long arg);
@@ -227,8 +204,6 @@ private:
 
 	static void		sensor_reset(int ms);
 	static void		peripheral_reset(int ms);
-
-	int		capture_ioctl(file *filp, int cmd, unsigned long arg);
 
 	PWMOut(const PWMOut &) = delete;
 	PWMOut operator=(const PWMOut &) = delete;

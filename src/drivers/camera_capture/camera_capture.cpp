@@ -214,66 +214,7 @@ CameraCapture::set_capture_control(bool enabled)
 	_gpio_capture = true;
 	reset_statistics(false);
 
-#else
-
-	int fd = ::open(PX4FMU_DEVICE_PATH, O_RDWR);
-
-	if (fd < 0) {
-		PX4_ERR("open fail");
-		return;
-	}
-
-	input_capture_config_t conf;
-	conf.channel = 5; // FMU chan 6
-	conf.filter = 0;
-
-	if (_camera_capture_mode == 0) {
-		conf.edge = _camera_capture_edge ? Rising : Falling;
-
-	} else {
-		conf.edge = Both;
-	}
-
-	conf.callback = nullptr;
-	conf.context = nullptr;
-
-	if (enabled) {
-
-		conf.callback = &CameraCapture::capture_trampoline;
-		conf.context = this;
-
-		unsigned int capture_count = 0;
-
-		if (::ioctl(fd, INPUT_CAP_GET_COUNT, (unsigned long)&capture_count) != 0) {
-			PX4_INFO("Not in a capture mode");
-
-			unsigned long mode = PWM_SERVO_MODE_4PWM2CAP;
-
-			if (::ioctl(fd, PWM_SERVO_SET_MODE, mode) == 0) {
-				PX4_INFO("Mode changed to 4PWM2CAP");
-
-			} else {
-				PX4_ERR("Mode NOT changed to 4PWM2CAP!");
-				goto err_out;
-			}
-		}
-	}
-
-	if (::ioctl(fd, INPUT_CAP_SET_CALLBACK, (unsigned long)&conf) == 0) {
-		_capture_enabled = enabled;
-		_gpio_capture = false;
-
-	} else {
-		PX4_ERR("Unable to set capture callback for chan %" PRIu8 "\n", conf.channel);
-		_capture_enabled = false;
-		goto err_out;
-	}
-
-	reset_statistics(false);
-
-err_out:
-	::close(fd);
-#endif
+#endif // BOARD_CAPTURE_GPIO
 }
 
 void

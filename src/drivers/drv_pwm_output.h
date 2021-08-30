@@ -222,23 +222,15 @@ typedef uint16_t	servo_position_t;
 #define PWM_SERVO_MODE_NONE         0
 #define PWM_SERVO_MODE_1PWM         1
 #define PWM_SERVO_MODE_2PWM         2
-#define PWM_SERVO_MODE_2PWM2CAP     3
-#define PWM_SERVO_MODE_3PWM         4
-#define PWM_SERVO_MODE_3PWM1CAP     5
-#define PWM_SERVO_MODE_4PWM         6
-#define PWM_SERVO_MODE_4PWM1CAP     7
-#define PWM_SERVO_MODE_4PWM2CAP     8
-#define PWM_SERVO_MODE_5PWM         9
-#define PWM_SERVO_MODE_5PWM1CAP    10
-#define PWM_SERVO_MODE_6PWM        11
-#define PWM_SERVO_MODE_8PWM        12
-#define PWM_SERVO_MODE_12PWM       13
-#define PWM_SERVO_MODE_14PWM       14
-#define PWM_SERVO_MODE_4CAP        15
-#define PWM_SERVO_MODE_5CAP        16
-#define PWM_SERVO_MODE_6CAP        17
-#define PWM_SERVO_ENTER_TEST_MODE  18
-#define PWM_SERVO_EXIT_TEST_MODE   19
+#define PWM_SERVO_MODE_3PWM         3
+#define PWM_SERVO_MODE_4PWM         4
+#define PWM_SERVO_MODE_5PWM         5
+#define PWM_SERVO_MODE_6PWM         6
+#define PWM_SERVO_MODE_8PWM         7
+#define PWM_SERVO_MODE_12PWM        8
+#define PWM_SERVO_MODE_14PWM        9
+#define PWM_SERVO_ENTER_TEST_MODE  10
+#define PWM_SERVO_EXIT_TEST_MODE   11
 #define PWM_SERVO_SET_MODE         _PX4_IOC(_PWM_SERVO_BASE, 34)
 
 /*

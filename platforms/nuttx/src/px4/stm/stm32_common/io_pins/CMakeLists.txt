@@ -32,7 +32,6 @@
 ############################################################################
 
 px4_add_library(arch_io_pins
-	input_capture.c
 	io_timer.c
 	pwm_servo.c
 	pwm_trigger.c
