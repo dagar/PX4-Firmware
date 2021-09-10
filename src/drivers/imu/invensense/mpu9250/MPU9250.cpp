@@ -296,18 +296,50 @@ void MPU9250::RunImpl()
 				// FIFO count (size in bytes) should be a multiple of the FIFO::DATA structure
 				uint8_t samples = fifo_count / sizeof(FIFO::DATA);
 
-				// tolerate minor jitter, leave sample to next iteration if behind by only 1
-				if (samples == _fifo_gyro_samples + 1) {
-					timestamp_sample -= FIFO_SAMPLE_DT;
-					samples--;
+				const int extra_samples = samples - _fifo_gyro_samples;
+
+				if (_data_ready_interrupt_enabled) {
+					_drdy_count.fetch_sub(samples);
+
+					if (extra_samples == 0) {
+						_drdy_count_deficit = 0;
+
+					} else if (extra_samples > 0) {
+						_drdy_count_deficit += extra_samples;
+
+						if (_drdy_count_deficit >= FIFO_MAX_SAMPLES) {
+							// scheduling is getting behind, reset data ready count
+							_drdy_count.store(0);
+							_drdy_count_deficit = 0;
+						}
+					}
+
+					// tolerate minor jitter, if only behind by a few samples leave the extras for the next iteration
+					if ((extra_samples > 0) && (extra_samples < _fifo_gyro_samples)) {
+						samples = _fifo_gyro_samples;
+
+					} else if ((extra_samples >= _fifo_gyro_samples) || (samples > FIFO_MAX_SAMPLES)) {
+						// not technically an overflow, but more samples than we expected or can publish
+						FIFOReset();
+						perf_count(_fifo_overflow_perf);
+						samples = 0;
+					}
+
+				} else {
+					if (samples > _fifo_gyro_samples) {
+						// grab desired number of samples, but reschedule next cycle sooner
+						timestamp_sample -= extra_samples * FIFO_SAMPLE_DT;
+						samples = _fifo_gyro_samples;
+						ScheduleOnInterval(_fifo_empty_interval_us, _fifo_empty_interval_us - (extra_samples * FIFO_SAMPLE_DT));
+
+					} else if (samples < _fifo_gyro_samples) {
+						// reschedule next cycle to catch the desired number of samples
+						ScheduleOnInterval(_fifo_empty_interval_us, (_fifo_gyro_samples - samples) * FIFO_SAMPLE_DT);
+					}
 				}
 
-				if (samples > FIFO_MAX_SAMPLES) {
-					// not technically an overflow, but more samples than we expected or can publish
-					FIFOReset();
-					perf_count(_fifo_overflow_perf);
-
-				} else if (samples >= SAMPLES_PER_TRANSFER) {
+				// only transfer the desired number of samples
+				if (samples == _fifo_gyro_samples) {
 					if (FIFORead(timestamp_sample, samples)) {
 						success = true;
 
@@ -450,10 +482,9 @@ int MPU9250::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void MPU9250::DataReady()
 {
-	// at least the required number of samples in the FIFO
-	if (++_drdy_count >= _fifo_gyro_samples) {
+	// the required number of samples in the FIFO
+	if (_drdy_count.fetch_add() == _fifo_gyro_samples + 1) {
 		_drdy_timestamp_sample.store(hrt_absolute_time());
-		_drdy_count -= _fifo_gyro_samples;
 		ScheduleNow();
 	}
 }
@@ -603,7 +634,7 @@ void MPU9250::FIFOReset()
 	RegisterSetAndClearBits(Register::USER_CTRL, USER_CTRL_BIT::FIFO_RST, USER_CTRL_BIT::FIFO_EN);
 
 	// reset while FIFO is disabled
-	_drdy_count = 0;
+	_drdy_count.store(0);
 	_drdy_timestamp_sample.store(0);
 
 	// FIFO_EN: enable both gyro and accel

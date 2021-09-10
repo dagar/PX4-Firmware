@@ -151,8 +151,10 @@ private:
 	int _failure_count{0};
 
 	px4::atomic<hrt_abstime> _drdy_timestamp_sample{0};
-	int32_t _drdy_count{0};
+	px4::atomic<int32_t> _drdy_count{0};
 	bool _data_ready_interrupt_enabled{false};
+
+	int32_t _drdy_count_deficit{0};
 
 	enum class STATE : uint8_t {
 		RESET,
