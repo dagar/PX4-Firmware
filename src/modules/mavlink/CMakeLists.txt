@@ -58,7 +58,6 @@ px4_add_module(
 		mavlink_shell.cpp
 		mavlink_simple_analyzer.cpp
 		mavlink_stream.cpp
-		mavlink_timesync.cpp
 		mavlink_ulog.cpp
 		tune_publisher.cpp
 	MODULE_CONFIG
@@ -73,6 +72,7 @@ px4_add_module(
 		git_mavlink_v2
 		conversion
 		geo
+		timesync
 		version
 	UNITY_BUILD
 	)

@@ -498,11 +498,13 @@ hrt_call_invoke()
 	hrt_unlock();
 }
 
-void abstime_to_ts(struct timespec *ts, hrt_abstime abstime)
+struct timespec abstime_to_ts(hrt_abstime abstime)
 {
-	ts->tv_sec = abstime / 1000000;
-	abstime -= ts->tv_sec * 1000000;
-	ts->tv_nsec = abstime * 1000;
+	struct timespec ts {};
+	ts.tv_sec = abstime / 1000000;
+	abstime -= ts.tv_sec * 1000000;
+	ts.tv_nsec = abstime * 1000;
+	return ts;
 }
 
 int px4_clock_gettime(clockid_t clk_id, struct timespec *tp)

@@ -47,23 +47,34 @@ system_time_main(int argc, char *argv[])
 {
 	if (argc >= 2) {
 		if (!strcmp(argv[1], "get")) {
-			//get system time
+			// get system time
 			struct timespec ts = {};
 			px4_clock_gettime(CLOCK_REALTIME, &ts);
+
+			// quick hack for testing
+			PX4_INFO("unix -> hrt = %llu (%llu)", ts_to_abstime(&ts), hrt_absolute_time());
+
 			time_t utc_time_sec = ts.tv_sec + (ts.tv_nsec / 1e9);
 
-			//convert to date time
+			// convert to date time
 			char buf[80];
 			struct tm date_time;
 			localtime_r(&utc_time_sec, &date_time);
 			strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S %Z", &date_time);
 
-			//get time since boot
+			// get time since boot
 			hrt_abstime since_boot_sec = hrt_absolute_time() / 1_s;
 
 			PX4_INFO("Unix epoch time: %ld", (long)utc_time_sec);
 			PX4_INFO("System time: %s", buf);
 			PX4_INFO("Uptime (since boot): %" PRIu64 " s", since_boot_sec);
+
+			// quick hack for testing
+			const hrt_abstime now_us = hrt_absolute_time();
+			struct timespec ts_abstime = abstime_to_ts(now_us);
+			time_t abstime_utc_time_sec = (ts_abstime.tv_sec * 1000000) + (ts_abstime.tv_nsec / 1000);
+			PX4_INFO("hrt (%llu) -> unix = %lu (%llu)", now_us, abstime_utc_time_sec, ts_to_abstime(&ts_abstime));
+
 			return 0;
 		}
 

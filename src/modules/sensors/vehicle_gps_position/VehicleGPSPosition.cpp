@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,6 +43,9 @@ VehicleGPSPosition::VehicleGPSPosition() :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers)
 {
+	for (auto &ts : _timesync) {
+		ts.set_source(timesync_status_s::SOURCE_GPS);
+	}
 }
 
 VehicleGPSPosition::~VehicleGPSPosition()
@@ -118,8 +121,62 @@ void VehicleGPSPosition::Run()
 		if (gps_updated) {
 			any_gps_updated = true;
 
-			_sensor_gps_sub[i].copy(&gps_data);
-			_gps_blending.setGpsData(gps_data, i);
+			if (_sensor_gps_sub[i].copy(&gps_data)) {
+
+				const bool sync_converged = _timesync[i].sync_converged();
+
+				if (gps_data.time_utc_usec > _gps_utc_time_us[i]) {
+					_timesync[i].update(gps_data.timestamp_sample, gps_data.time_utc_usec);
+
+				} else {
+					_timesync[i].reset_filter();
+				}
+
+				_gps_utc_time_us[i] = gps_data.time_utc_usec;
+
+				if (!sync_converged && _timesync[i].sync_converged()) {
+					struct timespec ts {};
+					px4_clock_gettime(CLOCK_REALTIME, &ts);
+
+					// convert to date time
+					char buf[80];
+					struct tm date_time;
+					time_t utc_time_sec_current = ts.tv_sec + (ts.tv_nsec / 1e9);
+					localtime_r(&utc_time_sec_current, &date_time);
+					strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S %Z", &date_time);
+					PX4_INFO("Current system time: %s", buf);
+					uint64_t ts_abstime_current_us = ts.tv_sec * 1e6 + ts.tv_nsec / 1000;
+
+					uint64_t ts_abstime_us = hrt_absolute_time();
+
+					if (_timesync[i].convert_local_to_remote(ts_abstime_us)) {
+						if (llabs(ts_abstime_current_us - ts_abstime_us) > 10_ms) {
+							ts.tv_sec = ts_abstime_us / 1000000;
+							ts_abstime_us -= ts.tv_sec * 1000000;
+							ts.tv_nsec = ts_abstime_us * 1000; // microseconds -> nanoseconds
+
+							// TODO: only update if the difference exceeds threshold
+							if (px4_clock_settime(CLOCK_REALTIME, &ts) == 0) {
+								// convert to date time
+								time_t utc_time_sec = ts.tv_sec + (ts.tv_nsec / 1e9);
+								localtime_r(&utc_time_sec, &date_time);
+								strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S %Z", &date_time);
+
+								PX4_INFO("Updated System time: %s", buf);
+							}
+						}
+					}
+				}
+
+				// TODO: once GPS time_utc_usec offset relative to timestamp_sample is estimated should we use it as the sample timestamp?
+				// uint64_t gps_time = gps_data.time_utc_usec;
+
+				// if (_timesync[i].adjust_stamp(gps_time)) {
+				// 	gps_data.timestamp_sample = gps_time;
+				// }
+
+				_gps_blending.setGpsData(gps_data, i);
+			}
 
 			if (!_sensor_gps_sub[i].registered()) {
 				_sensor_gps_sub[i].registerCallback();
@@ -142,8 +199,14 @@ void VehicleGPSPosition::Publish(const sensor_gps_s &gps, uint8_t selected)
 {
 	vehicle_gps_position_s gps_output{};
 
-	gps_output.timestamp = gps.timestamp;
+	gps_output.timestamp_sample = gps.timestamp_sample;
+
 	gps_output.time_utc_usec = gps.time_utc_usec;
+
+	uint64_t time_utc_usec = gps.time_utc_usec;
+	_timesync[0].convert_remote_to_local(time_utc_usec);
+	gps_output.timestamp_sample2 = time_utc_usec;
+
 	gps_output.lat = gps.lat;
 	gps_output.lon = gps.lon;
 	gps_output.alt = gps.alt;
@@ -154,6 +217,7 @@ void VehicleGPSPosition::Publish(const sensor_gps_s &gps, uint8_t selected)
 	gps_output.epv = gps.epv;
 	gps_output.hdop = gps.hdop;
 	gps_output.vdop = gps.vdop;
+	gps_output.pdop = sqrtf(gps.hdop * gps.hdop + gps.vdop * gps.vdop);
 	gps_output.noise_per_ms = gps.noise_per_ms;
 	gps_output.jamming_indicator = gps.jamming_indicator;
 	gps_output.jamming_state = gps.jamming_state;
@@ -162,7 +226,6 @@ void VehicleGPSPosition::Publish(const sensor_gps_s &gps, uint8_t selected)
 	gps_output.vel_e_m_s = gps.vel_e_m_s;
 	gps_output.vel_d_m_s = gps.vel_d_m_s;
 	gps_output.cog_rad = gps.cog_rad;
-	gps_output.timestamp_time_relative = gps.timestamp_time_relative;
 	gps_output.heading = gps.heading;
 	gps_output.heading_offset = gps.heading_offset;
 	gps_output.fix_type = gps.fix_type;
@@ -170,13 +233,20 @@ void VehicleGPSPosition::Publish(const sensor_gps_s &gps, uint8_t selected)
 	gps_output.satellites_used = gps.satellites_used;
 
 	gps_output.selected = selected;
-
+	gps_output.timestamp = hrt_absolute_time();
 	_vehicle_gps_position_pub.publish(gps_output);
 }
 
 void VehicleGPSPosition::PrintStatus()
 {
 	//PX4_INFO("selected GPS: %d", _gps_select_index);
+
+	for (uint8_t i = 0; i < GPS_MAX_RECEIVERS; i++) {
+		if (_timesync[i].sync_converged()) {
+
+		}
+	}
+
 }
 
 }; // namespace sensors
