@@ -416,8 +416,9 @@ int MPU6500::DataReadyInterruptCallback(int irq, void *context, void *arg)
 void MPU6500::DataReady()
 {
 	// at least the required number of samples in the FIFO
-	if (++_drdy_count >= _fifo_gyro_samples) {
-		_drdy_timestamp_sample.store(hrt_absolute_time());
+	uint64_t expected = 0;
+
+	if ((++_drdy_count >= _fifo_gyro_samples) && _drdy_timestamp_sample.compare_exchange(&expected, hrt_absolute_time())) {
 		_drdy_count -= _fifo_gyro_samples;
 		ScheduleNow();
 	}
