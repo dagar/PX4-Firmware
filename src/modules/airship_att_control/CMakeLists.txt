@@ -40,4 +40,6 @@ px4_add_module(
 		airship_att_control_main.cpp
 	DEPENDS
 		px4_work_queue
+	PUBLICATIONS
+		"px4::msg::ActuatorControls /actuator_controls_0"
 	)

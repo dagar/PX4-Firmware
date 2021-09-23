@@ -124,7 +124,6 @@ define_property(GLOBAL PROPERTY PX4_MODULE_LIBRARIES
                  BRIEF_DOCS "PX4 module libs"
                  FULL_DOCS "List of all PX4 module libraries"
                  )
-
 define_property(GLOBAL PROPERTY PX4_MODULE_PATHS
                  BRIEF_DOCS "PX4 module paths"
                  FULL_DOCS "List of paths to all PX4 modules"
@@ -133,7 +132,10 @@ define_property(GLOBAL PROPERTY PX4_SRC_FILES
                  BRIEF_DOCS "src files from all PX4 modules & libs"
                  FULL_DOCS "SRC files from px4_add_{module,library}"
                  )
-
+define_property(GLOBAL PROPERTY PX4_PUBLICATIONS
+                 BRIEF_DOCS "PX4 publication topics"
+                 FULL_DOCS "List of topics published by PX4"
+                 )
 #=============================================================================
 # configuration
 #
@@ -230,7 +232,7 @@ project(px4 CXX C ASM)
 
 set(package-contact "px4users@googlegroups.com")
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -432,6 +434,111 @@ target_link_libraries(parameters_interface INTERFACE parameters)
 
 # firmware added last to generate the builtin for included modules
 add_subdirectory(platforms/${PX4_PLATFORM})
+
+
+
+get_property(publications GLOBAL PROPERTY PX4_PUBLICATIONS)
+list(REMOVE_DUPLICATES publications)
+list(SORT publications)
+
+set(pub_all_topics)
+set(PX4_MSG_TYPE_ID)
+set(PX4_MSG_TOPIC_ID)
+set(PX4_MSG_TOPIC_ORB_ID)
+
+set(PX4_ORB_DECLARE_STR)
+set(PX4_ORB_DEFINE_STR)
+set(PX4_ORB_HEADER_INCLUDE_STR)
+set(PX4_ORB_TOPIC_COUNT 0)
+
+foreach(pub ${publications})
+	#message(STATUS "pub: ${pub}")
+	string(REPLACE " /" ";" pub ${pub})
+
+	list(GET pub 0 pub_type)
+	list(GET pub 1 pub_topic)
+
+	string(REPLACE "::" ";" pub_type_split ${pub_type})
+	list(GET pub_type_split 2 pub_type_simple_lower)
+
+	# Pascal case to snake case (PubType -> pub_type)
+	string(REGEX REPLACE "(.)([A-Z][a-z]+)" "\\1_\\2" pub_type_simple_lower "${pub_type_simple_lower}")
+	string(REGEX REPLACE "([a-z0-9])([A-Z])" "\\1_\\2" pub_type_simple_lower "${pub_type_simple_lower}")
+	string(TOLOWER "${pub_type_simple_lower}" pub_type_simple_lower)
+
+	message(STATUS "pub: Type: ${pub_type}, Topic: ${pub_topic} (${pub_type_simple_lower})")
+
+
+
+
+	# pub_type to include path (eg px4::msg::VehicleStatus => px4/msg/vehicle_status.hpp)
+	#  temporary create px4/msg/vehicle_status.hpp which simply includes <uORB/topics/vehicle_status.h>
+
+
+
+
+	list(APPEND pub_all_topics ${pub_topic})
+
+	list(APPEND PX4_MSG_TYPE_ID ${pub_type})
+
+	#list(APPEND PX4_MSG_TOPIC_ID ${pub_topic})
+	set(PX4_MSG_TOPIC_ID "${PX4_MSG_TOPIC_ID}\t${pub_topic},\n")
+	set(PX4_MSG_TOPIC_ORB_ID "${PX4_MSG_TOPIC_ORB_ID}\tORB_ID(${pub_topic}),\n")
+
+	# PX4_MSG_TYPE_ID
+	# PX4_MSG_TOPIC_ID
+
+	# .h  ORB_DECLARE(actuator_controls_0);
+	# .c  ORB_DEFINE(actuator_controls_0, struct actuator_controls_s, 48, __orb_actuator_controls_fields, static_cast<uint8_t>(ORB_ID::actuator_controls_0));
+
+
+	set(PX4_ORB_DECLARE_STR
+		"${PX4_ORB_DECLARE_STR}ORB_DECLARE(${pub_topic});\n")
+
+	# ORB_DEFINE(actuator_armed, struct actuator_armed_s, 16, __orb_actuator_armed_fields, static_cast<uint8_t>(ORB_ID::actuator_armed));
+	set(PX4_ORB_DEFINE_STR
+		"${PX4_ORB_DEFINE_STR}ORB_DEFINE(${pub_topic}, ${pub_type}, ${pub_type}::SIZE_NO_PADDING, ${pub_type}::FIELDS, static_cast<uint8_t>(ORB_ID::${pub_topic}));\n")
+
+	set(PX4_ORB_HEADER_INCLUDE_STR
+		"${PX4_ORB_HEADER_INCLUDE_STR}#include <uORB/topics/${pub_type_simple_lower}.h>\n")
+
+	math(EXPR PX4_ORB_TOPIC_COUNT "${PX4_ORB_TOPIC_COUNT}+1")
+
+endforeach()
+list(REMOVE_DUPLICATES PX4_MSG_TYPE_ID)
+#list(REMOVE_DUPLICATES PX4_MSG_TOPIC_ID)
+
+#message(STATUS "PX4_MSG_TYPE_ID: ${PX4_MSG_TYPE_ID}")
+#message(STATUS "PX4_MSG_TOPIC_ID: ${PX4_MSG_TOPIC_ID}")
+
+configure_file(uORBTopics.cpp.in ${CMAKE_BINARY_DIR}/uORBTopics.cpp)
+configure_file(uORBTopics.hpp.in ${CMAKE_BINARY_DIR}/uORBTopics.hpp)
+
+# .hpp enum ORB_ID
+# .cpp struct orb_metadat ORB_ID() array
+
+foreach(f ${msg_files})
+	#message(STATUS "MSG: ${f}")
+endforeach()
+
+
+add_library(uorb_msgs ${uorb_headers} ${CMAKE_BINARY_DIR}/uORBTopics.cpp ${CMAKE_BINARY_DIR}/uORBTopics.hpp)
+target_link_libraries(uorb_msgs PRIVATE m)
+add_dependencies(uorb_msgs prebuild_targets uorb_headers)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #=============================================================================
 # uORB graph generation: add a custom target 'uorb_graph'

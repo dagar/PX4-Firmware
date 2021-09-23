@@ -51,4 +51,8 @@ px4_add_module(
 		ControlAllocation
 		mixer
 		px4_work_queue
+	PUBLICATIONS
+		"px4::msg::ControlAllocatorStatus /control_allocator_status"
+		"px4::msg::ActuatorMotors /actuator_motors"
+		"px4::msg::ActuatorServos /actuator_servos"
 )

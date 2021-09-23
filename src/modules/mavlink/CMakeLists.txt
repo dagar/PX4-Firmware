@@ -110,6 +110,44 @@ px4_add_module(
 		tunes
 		version
 	UNITY_BUILD
+	PUBLICATIONS
+
+		"px4::msg::Mission /mission"
+		"px4::msg::RcParameterMap /rc_parameter_map"
+		"px4::msg::TelemetryStatus /telemetry_status"
+		"px4::msg::TimesyncStatus /timesync_status"
+		"px4::msg::UavcanParameterRequest /uavcan_parameter_request" # TODO: srv
+		"px4::msg::UavcanParameterValue /uavcan_parameter_value" # TODO: srv
+		"px4::msg::UlogStreamAck /ulog_stream_ack" # TODO: srv
+
+		"px4::msg::InternalCombustionEngineStatus /internal_combustion_engine_status" # TODO: SITL
+
+		# TODO: mavlink receiver
+		"px4::msg::CollisionReport /collision_report"
+		"px4::msg::VehicleOdometry /vehicle_visual_odometry"
+		"px4::msg::VehicleOdometry /vehicle_mocap_odometry"
+		"px4::msg::OffboardControlMode /offboard_control_mode"
+		"px4::msg::CameraStatus /camera_status"
+		"px4::msg::CellularStatus /cellular_status"
+		"px4::msg::FollowTarget /follow_target"
+		"px4::msg::GimbalManagerSetAttitude /gimbal_manager_set_attitude"
+		"px4::msg::GimbalManagerSetManualControl /gimbal_manager_set_manual_control"
+		"px4::msg::GimbalDeviceInformation /gimbal_device_information"
+		"px4::msg::LandingTargetPose /landing_target_pose"
+		"px4::msg::OnboardComputerStatus /onboard_computer_status"
+		"px4::msg::Ping /ping"
+		"px4::msg::GpsInjectData /gps_inject_data"
+		"px4::msg::RadioStatus /radio_status"
+		"px4::msg::TransponderReport /transponder_report"
+		"px4::msg::GeneratorStatus /generator_status"
+
+
+		"px4::msg::DebugArray /debug_array"
+		"px4::msg::DebugKeyValue /debug_key_value"
+		"px4::msg::DebugValue /debug_value"
+		"px4::msg::DebugVect /debug_vect"
+
+
 	)
 
 if(PX4_TESTING)

@@ -49,4 +49,6 @@ px4_add_module(
 		mixer_module
 		output_limit
 		tunes
+	PUBLICATIONS
+		"px4::msg::EscStatus /esc_status"
 	)

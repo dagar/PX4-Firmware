@@ -39,4 +39,8 @@ px4_add_module(
 	DEPENDS
 		circuit_breaker
 		px4_work_queue
+	PUBLICATIONS
+		"px4::msg::LedControl /led_control"
+		"px4::msg::Safety /safety"
+		"px4::msg::TuneControl /tune_control"
 	)

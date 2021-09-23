@@ -127,6 +127,17 @@ px4_add_module(
 		px4_work_queue
 		WeatherVane
 		flighttasks_generated
+	PUBLICATIONS
+		"px4::msg::LandingGear /landing_gear"
+		"px4::msg::VehicleLocalPositionSetpoint /trajectory_setpoint"
+		"px4::msg::VehicleConstraints /vehicle_constraints"
+		"px4::msg::OrbitStatus /orbit_status"
+		"px4::msg::CollisionConstraints /collision_constraints"
+		"px4::msg::ObstacleDistance /obstacle_distance_fused"
+		"px4::msg::ObstacleDistance /obstacle_distance"
+		"px4::msg::VehicleTrajectoryBezier /vehicle_trajectory_bezier"
+		"px4::msg::VehicleTrajectoryWaypoint /vehicle_trajectory_waypoint"
+		"px4::msg::VehicleTrajectoryWaypoint /vehicle_trajectory_waypoint_desired"
 )
 
 # add all flight task dependencies

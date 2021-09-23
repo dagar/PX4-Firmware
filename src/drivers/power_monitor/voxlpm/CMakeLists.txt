@@ -39,4 +39,6 @@ px4_add_module(
 	DEPENDS
 		battery
 		px4_work_queue
+	PUBLICATIONS
+		"px4::msg::PowerMonitor /power_monitor"
 	)

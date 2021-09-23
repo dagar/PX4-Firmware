@@ -59,4 +59,19 @@ px4_add_module(
 		vehicle_gps_position
 		vehicle_imu
 		vehicle_magnetometer
+	PUBLICATIONS
+		"px4::msg::Airspeed /airspeed"
+		"px4::msg::SensorCombined /sensor_combined"
+		"px4::msg::SensorSelection /sensor_selection"
+		"px4::msg::SensorsStatusImu /sensors_status_imu"
+		"px4::msg::SensorPreflightMag /sensor_preflight_mag"
+
+		"px4::msg::VehicleAcceleration /vehicle_acceleration"
+		"px4::msg::VehicleMagnetometer /vehicle_magnetometer"
+		"px4::msg::VehicleAirData /vehicle_air_data"
+		"px4::msg::VehicleImu /vehicle_imu"
+		"px4::msg::VehicleImuStatus /vehicle_imu_status"
+		"px4::msg::VehicleGpsPosition /vehicle_gps_position"
+		"px4::msg::VehicleAngularVelocity /vehicle_angular_velocity"
+		"px4::msg::VehicleAngularAcceleration /vehicle_angular_acceleration"
 	)

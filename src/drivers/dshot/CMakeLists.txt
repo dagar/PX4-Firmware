@@ -53,4 +53,7 @@ px4_add_module(
 		output_limit
 	MODULE_CONFIG
 		module.yaml
+	PUBLICATIONS
+		"px4::msg::ActuatorOutputs /actuator_outputs"
+		"px4::msg::EscStatus /esc_status"
 	)

@@ -50,4 +50,6 @@ px4_add_module(
 		interfaces/src/gpio.cpp
 	DEPENDS
 		px4_work_queue
+	PUBLICATIONS
+		"px4::msg::CameraTrigger /camera_trigger"
 	)

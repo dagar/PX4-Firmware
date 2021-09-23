@@ -44,5 +44,7 @@ px4_add_module(
 		AirshipLandDetector.cpp
 	DEPENDS
 		hysteresis
+	PUBLICATIONS
+		"px4::msg::VehicleLandDetected /vehicle_land_detected"
 	)
 
