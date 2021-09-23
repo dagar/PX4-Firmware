@@ -138,7 +138,7 @@ define_property(GLOBAL PROPERTY PX4_SRC_FILES
 # configuration
 #
 
-set(CONFIG "px4_sitl_default" CACHE STRING "desired configuration")
+set(CONFIG "px4_ros2_default" CACHE STRING "desired configuration") # TODO
 
 include(px4_add_module)
 set(config_module_list)
@@ -191,10 +191,6 @@ set_property(GLOBAL PROPERTY PX4_MODULE_CONFIG_FILES)
 include(platforms/${PX4_PLATFORM}/cmake/px4_impl_os.cmake)
 list(APPEND CMAKE_MODULE_PATH ${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake)
 
-if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/init.cmake")
-	include(init)
-endif()
-
 # CMake build type (Debug Release RelWithDebInfo MinSizeRel Coverage)
 if(NOT CMAKE_BUILD_TYPE)
 	if(${PX4_PLATFORM} STREQUAL "nuttx")
@@ -244,6 +240,10 @@ if (NOT CATKIN_DEVEL_PREFIX)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PX4_BINARY_DIR})
 else()
 	SET(BUILD_SHARED_LIBS OFF)
+endif()
+
+if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/init.cmake")
+	include(init)
 endif()
 
 #=============================================================================
@@ -316,18 +316,18 @@ if(NOT PX4_CHIP)
 endif()
 
 #=============================================================================
-# build flags
-#
-include(px4_add_common_flags)
-px4_add_common_flags()
-px4_os_add_flags()
-
-#=============================================================================
 # board cmake init (optional)
 #
 if(EXISTS ${PX4_BOARD_DIR}/cmake/init.cmake)
 	include(${PX4_BOARD_DIR}/cmake/init.cmake)
 endif()
+
+#=============================================================================
+# build flags
+#
+include(px4_add_common_flags)
+px4_add_common_flags()
+px4_os_add_flags()
 
 #=============================================================================
 # message, and airframe generation
@@ -411,7 +411,11 @@ include(px4_add_library)
 add_subdirectory(src/lib EXCLUDE_FROM_ALL)
 
 add_subdirectory(platforms/${PX4_PLATFORM}/src/px4)
-add_subdirectory(platforms EXCLUDE_FROM_ALL)
+if(${PX4_PLATFORM} MATCHES "ros2") # TODO: fix
+	add_subdirectory(platforms/common/work_queue EXCLUDE_FROM_ALL)
+else()
+	add_subdirectory(platforms EXCLUDE_FROM_ALL)
+endif()
 
 if(EXISTS "${PX4_BOARD_DIR}/CMakeLists.txt")
 	add_subdirectory(${PX4_BOARD_DIR})
@@ -458,17 +462,13 @@ include(doxygen)
 include(metadata)
 include(package)
 
-# print size
-add_custom_target(size
-	COMMAND size $<TARGET_FILE:px4>
-	DEPENDS px4
-	WORKING_DIRECTORY ${PX4_BINARY_DIR}
-	USES_TERMINAL
-	)
-
 # install python requirements using configured python
 add_custom_target(install_python_requirements
 	COMMAND ${PYTHON_EXECUTABLE} -m pip install --requirement ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	DEPENDS ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	USES_TERMINAL
 )
+
+if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/finalize.cmake")
+	include(finalize)
+endif()

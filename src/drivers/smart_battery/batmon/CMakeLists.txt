@@ -39,6 +39,6 @@ px4_add_module(
 		batmon.cpp
 
 	DEPENDS
-		drivers__smbus_sbs
+		#drivers__smbus_sbs
 		drivers__smbus
 	)

@@ -1,0 +1,39 @@
+
+px4_add_board(
+	PLATFORM ros2
+	ROMFSROOT px4fmu_common
+	DRIVERS
+		#pwm_out_sim
+	MODULES
+		#airship_att_control
+		#airspeed_selector
+		#attitude_estimator_q
+		#camera_feedback
+		#commander
+		#dataman
+		#ekf2
+		#events
+		#flight_mode_manager
+		#fw_att_control
+		#fw_pos_control_l1
+		#gyro_calibration
+		#gyro_fft
+		#land_detector
+		#landing_target_estimator
+		#logger
+		#mavlink
+		#mc_att_control
+		#mc_hover_thrust_estimator
+		#mc_pos_control
+		#mc_rate_control
+		#micrortps_bridge
+		#navigator
+		#rc_update
+		#rover_pos_control
+		#sensors
+		#sih
+		#simulator
+		#temperature_compensation
+		#vmount
+		#vtol_att_control
+	)

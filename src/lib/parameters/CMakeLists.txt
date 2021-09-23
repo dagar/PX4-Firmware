@@ -127,9 +127,9 @@ add_custom_command(OUTPUT px4_parameters.hpp
 		px_generate_params.py
 		templates/px4_parameters.hpp.jinja
 	)
+add_custom_target(generate_parameters DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/px4_parameters.hpp)
 
 set(SRCS)
-
 list(APPEND SRCS parameters.cpp)
 if(BUILD_TESTING)
 	list(APPEND SRCS param_translation_unit_tests.cpp)

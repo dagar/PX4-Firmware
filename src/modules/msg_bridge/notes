@@ -1,0 +1,20 @@
+
+
+
+  - uORB communicator or list of every publication?
+
+  - use ROS serial to get all messages published within PX4 and copied
+    - send out on serial, UDP, or TCP
+  - incoming messages publish
+    - keep track of incoming/outgoing messages?
+
+
+  - parameters
+
+  - try to send ALL by default
+  - PX4_INFO/PX4_WARN/PX4_DEBUG
+  - dataman and mission handling
+
+ROS2
+  - generate PX4 embedded messages (sorted by field size)
+  - use in logger

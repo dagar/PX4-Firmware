@@ -113,7 +113,7 @@ static void mavlink_usb_check(void *arg)
 		case UsbAutoStartState::connecting:
 			if (vbus_present && vbus_present_prev) {
 				if (ttyacm_fd < 0) {
-					ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
+					//ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
 				}
 
 				if (ttyacm_fd >= 0) {
