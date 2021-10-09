@@ -46,128 +46,166 @@ if(EXISTS ${BOARD_DEFCONFIG})
     endif()
 
 
+
+    # determine which config flags are for directories
+
+
+    # CONFIG_DRIVER
+    # CONFIG_MODULE
+
+    #   - collect defines per module
+    #   - don't allow underscore in names
+    #   - once established as a directory, everything below must be a directory or module
+    #      - error if we end up with defines that don't map to an actual module
+    #   -  these defines will then be limited in scope to that specific module
+
+
+
+
+    # CONFIG_BOARD_
+    # CONFIG_COMMON_
+
+
+
+    # module_drivers_imu_invensense_icm20602
+    #     # cmake properties per target
+    #     # COMPILE_DEFINITIONS
+    #
+    #   px4_add_module MODULE
+
+    set(module_dir_tree)
+
     # parse board config options for cmake
-    file(STRINGS ${BOARD_CONFIG} ConfigContents)
-    foreach(NameAndValue ${ConfigContents})
+    file(STRINGS ${BOARD_CONFIG} config_contents)
+    foreach(name_and_value ${config_contents})
         # Strip leading spaces
-        string(REGEX REPLACE "^[ ]+" "" NameAndValue ${NameAndValue})
+        string(REGEX REPLACE "^[ ]+" "" name_and_value ${name_and_value})
 
         # Find variable name
-        string(REGEX MATCH "^CONFIG[^=]+" Name ${NameAndValue})
+        string(REGEX MATCH "^CONFIG[^=]+" name ${name_and_value})
 
-        if(Name)
+        if(name)
             # Find the value
-            string(REPLACE "${Name}=" "" Value ${NameAndValue})
+            string(REPLACE "${name}=" "" value ${name_and_value})
 
-            if(Value)
+            if(value)
                 # remove extra quotes
-                string(REPLACE "\"" "" Value ${Value})
+                string(REPLACE "\"" "" value ${value})
 
                 # Set the variable
-                set(${Name} ${Value} CACHE INTERNAL "BOARD DEFCONFIG: ${Name}" FORCE)
+                set(${name} ${value} CACHE INTERNAL "BOARD DEFCONFIG: ${name}" FORCE)
+
+                message(STATUS "BOARD DEFCONFIG: ${name}=${value}")
             endif()
-        endif()
 
-        # Find variable name
-        string(REGEX MATCH "^CONFIG_BOARD_" Board ${NameAndValue})
 
-        if(Board)
-            string(REPLACE "CONFIG_BOARD_" "" ConfigKey ${Name})
-            if(Value)
-                set(${ConfigKey} ${Value})
-                message(STATUS "${ConfigKey} ${Value}")
-            endif()
-        endif()
 
-        # Find variable name
-        string(REGEX MATCH "^CONFIG_DRIVERS[^=]+" Drivers ${NameAndValue})
+            # CONFIG_BOARD_
+            # CONFIG_COMMON_
 
-        if(Drivers)
-            # Find the value
-            string(REPLACE "${Name}=" "" Value ${NameAndValue})
-            string(REPLACE "CONFIG_DRIVERS_" "" driver ${Name})
-            string(TOLOWER ${driver} driver)
 
-            string(REPLACE "_" "/" driver_path ${driver})
+            # Find variable name
+            string(REGEX MATCH "^CONFIG_BOARD_" board ${name_and_value})
+            string(REGEX MATCH "^CONFIG_COMMON_" common ${name_and_value})
 
-            # Pattern 1 XXX / XXX_XXX
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+_[a-z0-9]+).*$" "\\1" driver_p1_folder ${driver})
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+_[a-z0-9]+).*$" "\\2" driver_p1_subfolder ${driver})
-
-            # Pattern 2 XXX_XXX / XXXXXX
-            string(REGEX REPLACE "(^[a-z]+_[a-z0-9]+)_([a-z0-9]+).*$" "\\1" driver_p2_folder ${driver})
-            string(REGEX REPLACE "(^[a-z]+_[a-z0-9]+)_([a-z0-9]+).*$" "\\2" driver_p2_subfolder ${driver})
-
-            # Pattern 3 XXXXXX / XXX_XXX / XXXXXX
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+_[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\1" driver_p3_folder ${driver})
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+_[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\2" driver_p3_subfolder ${driver})
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+_[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\3" driver_p3_subsubfolder ${driver})
-
-            # Pattern 4 XXX_XXX / XXX_XXX_XXX
-            string(REGEX REPLACE "(^[a-z]+_[a-z0-9]+)_([a-z_0-9]+).*$" "\\1" driver_p4_folder ${driver})
-            string(REGEX REPLACE "(^[a-z]+_[a-z0-9]+)_([a-z_0-9]+).*$" "\\2" driver_p4_subfolder ${driver})
-
-            # Pattern 5 XXXXXX / XXXXXX / XXX_XXX
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+[a-z0-9]+)_([a-z0-9]+_[a-z0-9]+).*$" "\\1" driver_p5_folder ${driver})
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+[a-z0-9]+)_([a-z0-9]+_[a-z0-9]+).*$" "\\2" driver_p5_subfolder ${driver})
-            string(REGEX REPLACE "(^[a-z]+)_([a-z0-9]+[a-z0-9]+)_([a-z0-9]+_[a-z0-9]+).*$" "\\3" driver_p5_subsubfolder ${driver})
-
-            # Trick circumvent PX4 src naming problem with underscores and slashes
-            if(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver})
-                list(APPEND config_module_list drivers/${driver})
-            elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_path})
-                list(APPEND config_module_list drivers/${driver_path})
-            elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p3_folder}/${driver_p3_subfolder}/${driver_p3_subsubfolder})
-                list(APPEND config_module_list drivers/${driver_p3_folder}/${driver_p3_subfolder}/${driver_p3_subsubfolder})
-            elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p1_folder}/${driver_p1_subfolder})
-                list(APPEND config_module_list drivers/${driver_p1_folder}/${driver_p1_subfolder})
-            elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p4_folder}/${driver_p4_subfolder})
-                list(APPEND config_module_list drivers/${driver_p4_folder}/${driver_p4_subfolder})
-            elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p2_folder}/${driver_p2_subfolder})
-                list(APPEND config_module_list drivers/${driver_p2_folder}/${driver_p2_subfolder})
-            elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p5_folder}/${driver_p5_subfolder}/${driver_p5_subsubfolder})
-                list(APPEND config_module_list drivers/${driver_p5_folder}/${driver_p5_subfolder}/${driver_p5_subsubfolder})
+            if(board)
+                string(REPLACE "CONFIG_BOARD_" "" config_key ${name})
+                if(value)
+                    set(${config_key} ${value})
+                    message(STATUS "${config_key} ${value}")
+                endif()
+            elseif(common)
+                # TODO:
             else()
-                message(FATAL_ERROR "Couldn't find path for ${driver}")
+
+                # everything else must be a module
+                string(REPLACE "CONFIG_" "" module ${name})
+                string(TOLOWER ${module} module)
+                string(REPLACE "_" "/" module_path ${module})
+
+
+                message(STATUS "module_path: ${module_path}")
+
+
+                # drivers/px4io
+                # drivers/lights/neopixel
+                # drivers/imu/invensense/icm20602
+
+
+
+                # Pattern 1 XXX / XXX
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+).*$" "\\1" p1_folder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+).*$" "\\2" p1_subfolder ${module})
+
+                # Pattern 2 XXX / XXX / XXX
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\1" p2_folder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\2" p2_subfolder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\3" p2_subsubfolder ${module})
+
+                # Pattern 3 XXX / XXX / XXX
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\1" p3_folder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\2" p3_subfolder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\3" p3_subsubfolder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\4" p3_subsubsubfolder ${module})
+
+                # Pattern 4 XXX / XXX / XXX / XXX
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\1" p4_folder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\2" p4_subfolder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\3" p4_subsubfolder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\4" p4_subsubsubfolder ${module})
+                string(REGEX REPLACE "(^[a-z]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+)_([a-z]+[a-z0-9]+).*$" "\\4" p4_subsubsubsubfolder ${module})
+
+
+                if(EXISTS "${PX4_SOURCE_DIR}/src/${p4_folder}/${p4_subfolder}/${p4_subsubfolder}/${p4_subsubsubfolder}/${p4_subsubsubsubfolder}/CMakeLists.txt")
+                    message(STATUS "    p4: ${p4_folder} : ${p4_subfolder} : ${p4_subsubfolder} : ${p4_subsubsubfolder} : ${p4_subsubsubsubfolder}")
+
+                elseif(EXISTS "${PX4_SOURCE_DIR}/src/${p3_folder}/${p3_subfolder}/${p3_subsubfolder}/${p3_subsubsubfolder}/CMakeLists.txt")
+                    message(STATUS "    p3: ${p3_folder} : ${p3_subfolder} : ${p3_subsubfolder} : ${p3_subsubsubfolder}")
+
+                elseif(EXISTS "${PX4_SOURCE_DIR}/src/${p2_folder}/${p2_subfolder}/${p2_subsubfolder}/CMakeLists.txt")
+                    message(STATUS "    p2: ${p2_folder} : ${p2_subfolder} : ${p2_subsubfolder}")
+
+                elseif(EXISTS "${PX4_SOURCE_DIR}/src/${p1_folder}/${p1_subfolder}/CMakeLists.txt")
+                    message(STATUS "    p1: ${p1_folder} : ${p1_subfolder}")
+                else()
+                    message(FATAL_ERROR " ${module}????")
+                endif()
+
+
+                # if(EXISTS ${PX4_SOURCE_DIR}/src/${p1_folder}/${driver_path})
+                #     list(APPEND config_module_list drivers/${driver_path})
+                # elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p3_folder}/${driver_p3_subfolder}/${driver_p3_subsubfolder})
+                #     list(APPEND config_module_list drivers/${driver_p3_folder}/${driver_p3_subfolder}/${driver_p3_subsubfolder})
+                # elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p1_folder}/${driver_p1_subfolder})
+                #     list(APPEND config_module_list drivers/${driver_p1_folder}/${driver_p1_subfolder})
+                # elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p4_folder}/${driver_p4_subfolder})
+                #     list(APPEND config_module_list drivers/${driver_p4_folder}/${driver_p4_subfolder})
+                # elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p2_folder}/${driver_p2_subfolder})
+                #     list(APPEND config_module_list drivers/${driver_p2_folder}/${driver_p2_subfolder})
+                # elseif(EXISTS ${PX4_SOURCE_DIR}/src/drivers/${driver_p5_folder}/${driver_p5_subfolder}/${driver_p5_subsubfolder})
+                #     list(APPEND config_module_list drivers/${driver_p5_folder}/${driver_p5_subfolder}/${driver_p5_subsubfolder})
+                # else()
+                #     message(FATAL_ERROR "Couldn't find path for ${driver}")
+                # endif()
+
+
+
+
+
+
+
+
             endif()
 
+
+
         endif()
 
-        # Find variable name
-        string(REGEX MATCH "^CONFIG_MODULES[^=]+" Modules ${NameAndValue})
 
-        if(Modules)
-            # Find the value
-            string(REPLACE "${Name}=" "" Value ${NameAndValue})
-            string(REPLACE "CONFIG_MODULES_" "" module ${Name})
-            string(TOLOWER ${module} module)
 
-            list(APPEND config_module_list modules/${module})
-        endif()
+        # underscoe (_) is directory delimeter
 
-        # Find variable name
-        string(REGEX MATCH "^CONFIG_SYSTEMCMDS[^=]+" Systemcmds ${NameAndValue})
 
-        if(Systemcmds)
-            # Find the value
-            string(REPLACE "${Name}=" "" Value ${NameAndValue})
-            string(REPLACE "CONFIG_SYSTEMCMDS_" "" systemcmd ${Name})
-            string(TOLOWER ${systemcmd} systemcmd)
-
-            list(APPEND config_module_list systemcmds/${systemcmd})
-        endif()
-
-        # Find variable name
-        string(REGEX MATCH "^CONFIG_EXAMPLES[^=]+" Examples ${NameAndValue})
-
-        if(Examples)
-            # Find the value
-            string(REPLACE "${Name}=" "" Value ${NameAndValue})
-            string(REPLACE "CONFIG_EXAMPLES_" "" example ${Name})
-            string(TOLOWER ${example} example)
-
-            list(APPEND config_module_list examples/${example})
-        endif()
 
     endforeach()
 
