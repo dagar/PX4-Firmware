@@ -360,7 +360,6 @@ private:
 	hrt_abstime	_rc_signal_lost_timestamp{0};		///< Time at which the RC reception was lost
 	int32_t		_flight_mode_slots[manual_control_switches_s::MODE_SLOT_NUM] {};
 
-	hrt_abstime	_boot_timestamp{0};
 	hrt_abstime	_last_disarmed_timestamp{0};
 	hrt_abstime	_timestamp_engine_healthy{0}; ///< absolute time when engine was healty
 	hrt_abstime	_overload_start{0};		///< time when CPU overload started

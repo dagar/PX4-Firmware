@@ -58,6 +58,8 @@ uint8 VEHICLE_TYPE_AIRSHIP = 4
 # state machine / state of vehicle.
 # Encodes the complete system state and is set by the commander app.
 
+uint64 boot_timestamp
+
 uint8 nav_state				# set navigation state machine to specified value
 uint64 nav_state_timestamp              # time when current nav_state activated
 uint8 arming_state			# current arming state

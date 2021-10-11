@@ -266,18 +266,18 @@ void VehicleMagnetometer::MagCalibrationUpdate()
 
 	} else {
 		// Continuous mag calibration is running when not armed
-		if (_magnetometer_bias_estimate_sub.updated()) {
-			magnetometer_bias_estimate_s mag_bias_est;
+		magnetometer_bias_estimate_s mag_bias_est;
 
-			if (_magnetometer_bias_estimate_sub.copy(&mag_bias_est)) {
-				for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
-					if (mag_bias_est.valid[mag_index]) {
-						const Vector3f bias{mag_bias_est.bias_x[mag_index],
-								    mag_bias_est.bias_y[mag_index],
-								    mag_bias_est.bias_z[mag_index]};
-						_calibration_estimator_bias[mag_index] = bias;
-						_on_ground_mag_bias_estimate_available = true;
-					}
+		if (_magnetometer_bias_estimate_sub.update(&mag_bias_est)) {
+			for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
+				if (mag_bias_est.valid[mag_index]) {
+
+					const Vector3f bias{mag_bias_est.bias_x[mag_index],
+							    mag_bias_est.bias_y[mag_index],
+							    mag_bias_est.bias_z[mag_index]};
+
+					_calibration_estimator_bias[mag_index] = bias;
+					_on_ground_mag_bias_estimate_available = true;
 				}
 			}
 		}

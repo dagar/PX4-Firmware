@@ -100,10 +100,14 @@ private:
 	bool _reset_field_estimator[MAX_SENSOR_COUNT] {};
 	bool _valid[MAX_SENSOR_COUNT] {};
 
+	hrt_abstime _valid_timestamp[MAX_SENSOR_COUNT] {};
+
 	bool _armed{false};
 	bool _system_calibrating{false};
 	bool _system_sensors_initialized{false};
 	uint8_t _arming_state{0};
+
+	uint32_t _calibration_device_ids[MAX_SENSOR_COUNT] {};
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 

@@ -80,19 +80,31 @@ void MagBiasEstimator::Run()
 		exit_and_cleanup();
 	}
 
+	bool auto_calibrate_allowed = false;
+
 	if (_vehicle_status_sub.updated()) {
 		vehicle_status_s vehicle_status;
 
 		if (_vehicle_status_sub.copy(&vehicle_status)) {
 			if (_arming_state != vehicle_status.arming_state) {
-				_armed = vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED;
+				_armed = (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
+				_arming_state = vehicle_status.arming_state;
 
 				// reset on any arming state change
 				for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
 					_reset_field_estimator[mag_index] = true;
 				}
 
-				_arming_state = vehicle_status.arming_state;
+				if (_armed) {
+					ScheduleOnInterval(1_s);
+
+				} else {
+					ScheduleOnInterval(20_ms); // 50 Hz
+				}
+			}
+
+			if (hrt_elapsed_time(&vehicle_status.boot_timestamp) > 60_s) {
+				auto_calibrate_allowed = true;
 			}
 		}
 	}
@@ -121,23 +133,43 @@ void MagBiasEstimator::Run()
 
 			_bias_estimator[mag_index].setLearningGain(_param_mbe_learn_gain.get());
 		}
+
+		for (unsigned i = 0; i < MAX_SENSOR_COUNT; ++i) {
+			char str[20] {};
+			sprintf(str, "CAL_%s%u_ID", "MAG", i);
+			int32_t device_id_val = 0;
+
+			if (param_get(param_find_no_notification(str), &device_id_val) == OK) {
+				_calibration_device_ids[i] = device_id_val;
+			}
+		}
 	}
 
 	if (_vehicle_status_flags_sub.updated()) {
 		vehicle_status_flags_s vehicle_status_flags;
 
 		if (_vehicle_status_flags_sub.copy(&vehicle_status_flags)) {
+			bool reset = false;
 
 			// do nothing during regular sensor calibration
-			_system_calibrating = vehicle_status_flags.condition_calibration_enabled;
-			_system_sensors_initialized = vehicle_status_flags.condition_system_sensors_initialized
-						      && vehicle_status_flags.condition_system_hotplug_timeout;
+			if (_system_calibrating != vehicle_status_flags.condition_calibration_enabled) {
+				_system_calibrating = vehicle_status_flags.condition_calibration_enabled;
+				reset = true;
+			}
+
+			bool system_sensors_initialized = vehicle_status_flags.condition_system_sensors_initialized
+							  && vehicle_status_flags.condition_system_hotplug_timeout;
+
+			if (_system_sensors_initialized != system_sensors_initialized) {
+				reset = true;
+			}
+
+			if (reset) {
+				return;
+			}
 		}
 	}
 
-	if (_system_calibrating || !_system_sensors_initialized) {
-		return;
-	}
 
 	perf_begin(_cycle_perf);
 
@@ -152,6 +184,8 @@ void MagBiasEstimator::Run()
 		}
 	}
 
+	bool updated = false;
+
 	for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
 		sensor_mag_s sensor_mag;
 
@@ -159,8 +193,8 @@ void MagBiasEstimator::Run()
 
 			// apply existing mag calibration
 			_calibration[mag_index].set_device_id(sensor_mag.device_id, sensor_mag.is_external);
-			const Vector3f raw_mag{sensor_mag.x, sensor_mag.y, sensor_mag.z};
-			const Vector3f mag_calibrated = _calibration[mag_index].Correct(raw_mag);
+
+			const Vector3f mag_calibrated = _calibration[mag_index].Correct(Vector3f{sensor_mag.x, sensor_mag.y, sensor_mag.z});
 
 			float dt = (sensor_mag.timestamp_sample - _timestamp_last_update[mag_index]) * 1e-6f;
 			_timestamp_last_update[mag_index] = sensor_mag.timestamp_sample;
@@ -176,8 +210,11 @@ void MagBiasEstimator::Run()
 
 				_reset_field_estimator[mag_index] = false;
 				_valid[mag_index] = false;
+				_valid_timestamp[mag_index] = 0;
 
 			} else {
+				updated = true;
+
 				const Vector3f bias_prev = _bias_estimator[mag_index].getBias();
 
 				_bias_estimator[mag_index].updateEstimate(angular_velocity, mag_calibrated, dt);
@@ -185,20 +222,28 @@ void MagBiasEstimator::Run()
 				const Vector3f &bias = _bias_estimator[mag_index].getBias();
 				const Vector3f bias_rate = (bias - bias_prev) / dt;
 
-				Vector3f fitness;
-				fitness(0) = fabsf(angular_velocity(0)) / fmaxf(fabsf(bias_rate(1)) + fabsf(bias_rate(2)), 0.02f);
-				fitness(1) = fabsf(angular_velocity(1)) / fmaxf(fabsf(bias_rate(0)) + fabsf(bias_rate(2)), 0.02f);
-				fitness(2) = fabsf(angular_velocity(2)) / fmaxf(fabsf(bias_rate(0)) + fabsf(bias_rate(1)), 0.02f);
-
 				if (!PX4_ISFINITE(bias(0)) || !PX4_ISFINITE(bias(1)) || !PX4_ISFINITE(bias(2)) || bias.longerThan(5.f)) {
 					_reset_field_estimator[mag_index] = true;
 					_valid[mag_index] = false;
+					_valid_timestamp[mag_index] = 0;
 
 				} else {
+
+					Vector3f fitness{
+						fabsf(angular_velocity(0)) / fmaxf(fabsf(bias_rate(1)) + fabsf(bias_rate(2)), 0.02f),
+						fabsf(angular_velocity(1)) / fmaxf(fabsf(bias_rate(0)) + fabsf(bias_rate(2)), 0.02f),
+						fabsf(angular_velocity(2)) / fmaxf(fabsf(bias_rate(0)) + fabsf(bias_rate(1)), 0.02f)
+					};
+
 					const bool bias_significant = bias.longerThan(0.04f);
 					const bool has_converged = fitness(0) > 20.f || fitness(1) > 20.f || fitness(2) > 20.f;
 
 					if (bias_significant && has_converged) {
+
+						if (!_valid[mag_index]) {
+							_valid_timestamp[mag_index] = hrt_absolute_time();
+						}
+
 						_valid[mag_index] = true;
 					}
 				}
@@ -206,7 +251,62 @@ void MagBiasEstimator::Run()
 		}
 	}
 
-	publishMagBiasEstimate();
+	if (updated) {
+		if (!_system_calibrating && _system_sensors_initialized) {
+			publishMagBiasEstimate();
+		}
+
+		if (auto_calibrate_allowed && !_system_calibrating && _system_sensors_initialized) {
+
+			// all mag calibration slots currently empty
+			bool all_mags_uncalibrated = true;
+
+			for (auto &cal_id : _calibration_device_ids) {
+				if (cal_id != 0) {
+					all_mags_uncalibrated = false;
+					break;
+				}
+			}
+
+			if (all_mags_uncalibrated) {
+				// all present mags must have a valid bias estimate
+				bool all_mag_estimates_valid = true;
+
+				int mag_count = 0;
+
+				for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
+					if (_calibration[mag_index].device_id() != 0) {
+						mag_count++;
+
+						if (!_valid[mag_index] || (hrt_elapsed_time(&_valid_timestamp[mag_index]) < 60_s)) {
+							all_mag_estimates_valid = false;
+							break;
+						}
+					}
+				}
+
+				// TODO: all mag bias estimates continuously valid for > 60 seconds with no change in arming state, system calibrating, etc, etc
+				if ((mag_count > 0) && all_mag_estimates_valid) {
+					bool calibration_param_save_needed = false;
+
+					for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
+						_calibration[mag_index].set_calibration_index(mag_index);
+						const Vector3f new_offset = _calibration[mag_index].BiasCorrectedSensorOffset(_bias_estimator[mag_index].getBias());
+
+						if (_calibration[mag_index].set_offset(new_offset)) {
+							_calibration[mag_index].ParametersSave();
+							calibration_param_save_needed = true;
+							_reset_field_estimator[mag_index] = true;
+						}
+					}
+
+					if (calibration_param_save_needed) {
+						param_notify_changes();
+					}
+				}
+			}
+		}
+	}
 
 	perf_end(_cycle_perf);
 }
@@ -217,15 +317,14 @@ void MagBiasEstimator::publishMagBiasEstimate()
 
 	for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
 		const Vector3f &bias = _bias_estimator[mag_index].getBias();
-
-		mag_bias_est.timestamp = hrt_absolute_time();
 		mag_bias_est.bias_x[mag_index] = bias(0);
 		mag_bias_est.bias_y[mag_index] = bias(1);
 		mag_bias_est.bias_z[mag_index] = bias(2);
+
 		mag_bias_est.valid[mag_index] = _valid[mag_index];
 	}
 
-
+	mag_bias_est.timestamp = hrt_absolute_time();
 	_magnetometer_bias_estimate_pub.publish(mag_bias_est);
 }
 

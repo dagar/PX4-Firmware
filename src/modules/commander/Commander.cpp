@@ -435,7 +435,7 @@ bool Commander::shutdown_if_allowed()
 {
 	return TRANSITION_DENIED != arming_state_transition(_status, _safety, vehicle_status_s::ARMING_STATE_SHUTDOWN,
 			_armed, false /* fRunPreArmChecks */, &_mavlink_log_pub, _status_flags, _arm_requirements,
-			hrt_elapsed_time(&_boot_timestamp), arm_disarm_reason_t::shutdown);
+			hrt_elapsed_time(&_status.boot_timestamp), arm_disarm_reason_t::shutdown);
 }
 
 static constexpr const char *arm_disarm_reason_str(arm_disarm_reason_t calling_reason)
@@ -595,7 +595,7 @@ transition_result_t Commander::arm(arm_disarm_reason_t calling_reason, bool run_
 					 &_mavlink_log_pub,
 					 _status_flags,
 					 _arm_requirements,
-					 hrt_elapsed_time(&_boot_timestamp), calling_reason);
+					 hrt_elapsed_time(&_status.boot_timestamp), calling_reason);
 
 	if (arming_res == TRANSITION_CHANGED) {
 		mavlink_log_info(&_mavlink_log_pub, "Armed by %s\t", arm_disarm_reason_str(calling_reason));
@@ -621,7 +621,7 @@ transition_result_t Commander::disarm(arm_disarm_reason_t calling_reason)
 					 &_mavlink_log_pub,
 					 _status_flags,
 					 _arm_requirements,
-					 hrt_elapsed_time(&_boot_timestamp), calling_reason);
+					 hrt_elapsed_time(&_status.boot_timestamp), calling_reason);
 
 	if (arming_res == TRANSITION_CHANGED) {
 		mavlink_log_info(&_mavlink_log_pub, "Disarmed by %s\t", arm_disarm_reason_str(calling_reason));
@@ -984,7 +984,7 @@ Commander::handle_command(const vehicle_command_s &cmd)
 
 					/* update home position on arming if at least 500 ms from commander start spent to avoid setting home on in-air restart */
 					if (cmd_arms && (arming_res == TRANSITION_CHANGED) &&
-					    (hrt_absolute_time() > (_boot_timestamp + INAIR_RESTART_HOLDOFF_INTERVAL)) && !_home_pub.get().manual_home) {
+					    (hrt_absolute_time() > (_status.boot_timestamp + INAIR_RESTART_HOLDOFF_INTERVAL)) && !_home_pub.get().manual_home) {
 
 						set_home_position();
 					}
@@ -1200,7 +1200,7 @@ Commander::handle_command(const vehicle_command_s &cmd)
 
 	case vehicle_command_s::VEHICLE_CMD_CONTROL_HIGH_LATENCY: {
 			// if no high latency telemetry exists send a failed acknowledge
-			if (_high_latency_datalink_heartbeat > _boot_timestamp) {
+			if (_high_latency_datalink_heartbeat > _status.boot_timestamp) {
 				cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_FAILED;
 				mavlink_log_critical(&_mavlink_log_pub, "Control high latency failed! Telemetry unavailable\t");
 				events::send(events::ID("commander_ctrl_high_latency_failed"), {events::Log::Critical, events::LogInternal::Info},
@@ -1769,12 +1769,12 @@ Commander::run()
 	_status.is_vtol = is_vtol(_status);
 	_status.is_vtol_tailsitter = is_vtol_tailsitter(_status);
 
-	_boot_timestamp = hrt_absolute_time();
+	_status.boot_timestamp = hrt_absolute_time();
 
 	// initially set to failed
-	_last_lpos_fail_time_us = _boot_timestamp;
-	_last_gpos_fail_time_us = _boot_timestamp;
-	_last_lvel_fail_time_us = _boot_timestamp;
+	_last_lpos_fail_time_us = _status.boot_timestamp;
+	_last_gpos_fail_time_us = _status.boot_timestamp;
+	_last_lvel_fail_time_us = _status.boot_timestamp;
 
 	int32_t airmode = 0;
 	int32_t rc_map_arm_switch = 0;
@@ -1785,7 +1785,7 @@ Commander::run()
 	// run preflight immediately to find all relevant parameters, but don't report
 	PreFlightCheck::preflightCheck(&_mavlink_log_pub, _status, _status_flags, false,
 				       true,
-				       hrt_elapsed_time(&_boot_timestamp));
+				       hrt_elapsed_time(&_status.boot_timestamp));
 
 	while (!should_exit()) {
 
@@ -1946,7 +1946,7 @@ Commander::run()
 					// set the home position when taking off, but only if we were previously disarmed
 					// and at least 500 ms from commander start spent to avoid setting home on in-air restart
 					if (_should_set_home_on_takeoff && !_land_detector.landed &&
-					    (hrt_elapsed_time(&_boot_timestamp) > INAIR_RESTART_HOLDOFF_INTERVAL)) {
+					    (hrt_elapsed_time(&_status.boot_timestamp) > INAIR_RESTART_HOLDOFF_INTERVAL)) {
 						if (was_landed) {
 							_should_set_home_on_takeoff = !set_home_position();
 
@@ -2064,7 +2064,7 @@ Commander::run()
 						     "ESCs telemetry timeout");
 					_status_flags.condition_escs_error = true;
 
-				} else if (_last_esc_status_updated == 0 && hrt_elapsed_time(&_boot_timestamp) > 5000_ms) {
+				} else if (_last_esc_status_updated == 0 && hrt_elapsed_time(&_status.boot_timestamp) > 5000_ms) {
 					/* Detect if esc telemetry is not connected after reboot */
 					mavlink_log_critical(&_mavlink_log_pub, "ESCs telemetry not connected\t");
 					events::send(events::ID("commander_esc_telemetry_not_con"), events::Log::Critical,
@@ -2144,7 +2144,7 @@ Commander::run()
 
 			arming_state_transition(_status, _safety, vehicle_status_s::ARMING_STATE_STANDBY, _armed,
 						true /* fRunPreArmChecks */, &_mavlink_log_pub, _status_flags,
-						_arm_requirements, hrt_elapsed_time(&_boot_timestamp),
+						_arm_requirements, hrt_elapsed_time(&_status.boot_timestamp),
 						arm_disarm_reason_t::transition_to_standby);
 		}
 
@@ -2156,7 +2156,7 @@ Commander::run()
 			_mission_result_sub.update();
 
 			// if mission_result is valid for the current mission
-			const bool mission_result_ok = (mission_result.timestamp > _boot_timestamp)
+			const bool mission_result_ok = (mission_result.timestamp > _status.boot_timestamp)
 						       && (mission_result.instance_count > 0);
 
 			_status_flags.condition_auto_mission_available = mission_result_ok && mission_result.valid;
@@ -2771,7 +2771,7 @@ Commander::run()
 				* (all output drivers should be started / unlocked last in the boot process
 				* when the rest of the system is fully initialized)
 				*/
-				_armed.prearmed = (hrt_elapsed_time(&_boot_timestamp) > 5_s);
+				_armed.prearmed = (hrt_elapsed_time(&_status.boot_timestamp) > 5_s);
 				break;
 
 			case PrearmedMode::SAFETY_BUTTON:
@@ -2801,7 +2801,7 @@ Commander::run()
 			// Evaluate current prearm status
 			if (!_armed.armed && !_status_flags.condition_calibration_enabled) {
 				bool preflight_check_res = PreFlightCheck::preflightCheck(nullptr, _status, _status_flags, false, true,
-							   hrt_elapsed_time(&_boot_timestamp));
+							   hrt_elapsed_time(&_status.boot_timestamp));
 
 				// skip arm authorization check until actual arming attempt
 				PreFlightCheck::arm_requirements_t arm_req = _arm_requirements;
@@ -2855,7 +2855,7 @@ Commander::run()
 		}
 
 		/* play sensor failure tunes if we already waited for hotplug sensors to come up and failed */
-		_status_flags.condition_system_hotplug_timeout = (hrt_elapsed_time(&_boot_timestamp) > HOTPLUG_SENS_TIMEOUT);
+		_status_flags.condition_system_hotplug_timeout = (hrt_elapsed_time(&_status.boot_timestamp) > HOTPLUG_SENS_TIMEOUT);
 
 		if (!sensor_fail_tune_played && (!_status_flags.condition_system_sensors_initialized
 						 && _status_flags.condition_system_hotplug_timeout)) {
@@ -3579,7 +3579,7 @@ void Commander::data_link_check()
 					if (!_armed.armed && !_status_flags.condition_calibration_enabled) {
 						// make sure to report preflight check failures to a connecting GCS
 						PreFlightCheck::preflightCheck(&_mavlink_log_pub, _status, _status_flags, true, false,
-									       hrt_elapsed_time(&_boot_timestamp));
+									       hrt_elapsed_time(&_status.boot_timestamp));
 					}
 				}
 
