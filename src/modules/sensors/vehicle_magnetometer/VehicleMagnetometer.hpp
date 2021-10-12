@@ -111,13 +111,11 @@ private:
 	uORB::SubscriptionMultiArray<estimator_sensor_bias_s> _estimator_sensor_bias_subs{ORB_ID::estimator_sensor_bias};
 
 	bool _in_flight_mag_cal_available{false}; ///< from navigation filter
-	bool _on_ground_mag_bias_estimate_available{false}; ///< from pre-takeoff mag_bias_estimator
-	bool _should_save_on_disarm{false};
 
 	struct MagCal {
 		uint32_t device_id{0};
-		matrix::Vector3f mag_offset{};
-		matrix::Vector3f mag_bias_variance{};
+		matrix::Vector3f offset{};
+		matrix::Vector3f variance{};
 	} _mag_cal[ORB_MULTI_MAX_INSTANCES] {};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_sub[MAX_SENSOR_COUNT] {
@@ -126,6 +124,8 @@ private:
 		{this, ORB_ID(sensor_mag), 2},
 		{this, ORB_ID(sensor_mag), 3}
 	};
+
+	hrt_abstime _last_calibration_update{0};
 
 	matrix::Vector3f _calibration_estimator_bias[MAX_SENSOR_COUNT] {};
 
