@@ -113,7 +113,7 @@ static void mavlink_usb_check(void *arg)
 		case UsbAutoStartState::connecting:
 			if (vbus_present && vbus_present_prev) {
 				if (ttyacm_fd < 0) {
-					ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
+					ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDWR | O_NONBLOCK);
 				}
 
 				if (ttyacm_fd >= 0) {
@@ -126,9 +126,12 @@ static void mavlink_usb_check(void *arg)
 						// non-blocking read
 						int nread = ::read(ttyacm_fd, buffer, sizeof(buffer));
 
-#if defined(DEBUG_BUILD)
+#if 1
 
 						if (nread > 0) {
+							//fflush(stdout);
+							//fflush(stderr);
+							fprintf(stderr, "\n");
 							fprintf(stderr, "%d bytes\n", nread);
 
 							for (int i = 0; i < nread; i++) {
@@ -136,6 +139,8 @@ static void mavlink_usb_check(void *arg)
 							}
 
 							fprintf(stderr, "\n");
+							//fflush(stdout);
+							//fflush(stderr);
 						}
 
 #endif // DEBUG_BUILD
@@ -150,19 +155,22 @@ static void mavlink_usb_check(void *arg)
 							if (nread >= MAVLINK_HEARTBEAT_MIN_LENGTH) {
 								// scan buffer for mavlink HEARTBEAT (v1 & v2)
 								for (int i = 0; i < nread - MAVLINK_HEARTBEAT_MIN_LENGTH; i++) {
-									if ((buffer[i] = 0xFE) && (buffer[i + 1] = 9) && (buffer[i + 5] == 0)) {
+									if ((buffer[i] == 0xFE) && (buffer[i + 1] == 9) && (buffer[i + 5] == 0)) {
 										// mavlink v1 HEARTBEAT
 										//  buffer[0]: start byte (0xFE for mavlink v1)
 										//  buffer[1]: length (9 for HEARTBEAT)
 										//  buffer[3]: SYSID
 										//  buffer[4]: COMPID
 										//  buffer[5]: mavlink message id (0 for HEARTBEAT)
+
+										// TODO: check HEARTBEAT mavlink_version?
+
 										syslog(LOG_INFO, "%s: launching mavlink (HEARTBEAT v1 from SYSID:%d COMPID:%d)\n",
 										       USB_DEVICE_PATH, buffer[i + 3], buffer[i + 4]);
 										launch_mavlink = true;
 										break;
 
-									} else if ((buffer[i] = 0xFD) && (buffer[i + 1] = 9)
+									} else if ((buffer[i] == 0xFD) && (buffer[i + 1] == 9)
 										   && (buffer[i + 7] == 0) && (buffer[i + 8] == 0) && (buffer[i + 9] == 0)) {
 										// mavlink v2 HEARTBEAT
 										//  buffer[0]: start byte (0xFD for mavlink v2)
@@ -177,6 +185,40 @@ static void mavlink_usb_check(void *arg)
 									}
 								}
 							}
+
+
+
+							if (!launch_mavlink && (nread >= 6)) {
+								// blheli suite
+								// 6 bytes
+								// |24|4D|3C|0|1|1
+								if ((buffer[0] = 0x24) && (buffer[1] = 0x4D) && (buffer[2] == 0x3C)) {
+									syslog(LOG_INFO, "%s: blheli suite detected\n", USB_DEVICE_PATH);
+								}
+							}
+
+							if (!launch_mavlink && (nread >= 16)) {
+								// look for ublox
+
+								// 16 bytes
+								// |B5|62|6|8B|8|0|0|0|0|0|1F|0|31|10|F9|7F
+								// |B5|62|6|8B|8|0|0|0|0|0|1F|0|31|10|F9|7F
+
+								// 8 bytes
+								// |B5|62|A|4|0|0|E|34
+								if ((buffer[0] = 0xB5) && (buffer[1] = 0x62) && (buffer[2] == 0x06) && (buffer[3] == 0x8B) && (buffer[4] == 0x08)) {
+									syslog(LOG_INFO, "%s: ublox detected\n", USB_DEVICE_PATH);
+
+									static const char *gps_argv[] {"gps", "stop", nullptr};
+									char **exec_argv = (char **)gps_argv;
+
+									exec_builtin(exec_argv[0], exec_argv, nullptr, 0);
+
+									// read from /dev/ttyACM0 and write to /dev/ttyS0
+									// read from /dev/ttyS0 and write to /dev/ttyACM0
+								}
+							}
+
 
 							if (!launch_mavlink && (nread >= 3)) {
 								// nshterm (3 carriage returns)
@@ -349,7 +391,7 @@ int px4_platform_init()
 	px4_log_initialize();
 
 #if defined(CONFIG_SYSTEM_CDCACM)
-	work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, nullptr, 0);
+	//work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, nullptr, 0);
 #endif // CONFIG_SYSTEM_CDCACM
 
 	return PX4_OK;

@@ -1,0 +1,5 @@
+menuconfig SYSTEMCMDS_SERIAL_PASSTHROUGH
+	bool "serial_passthrough"
+	default n
+	---help---
+		Enable support for serial passthrough
