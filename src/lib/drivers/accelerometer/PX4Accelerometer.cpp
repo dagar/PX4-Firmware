@@ -50,25 +50,13 @@ static constexpr int32_t sum(const int16_t samples[], uint8_t len)
 	return sum;
 }
 
-static constexpr uint8_t clipping(const int16_t samples[], uint8_t len)
-{
-	unsigned clip_count = 0;
-
-	for (int n = 0; n < len; n++) {
-		if ((samples[n] == INT16_MIN) || (samples[n] == INT16_MAX)) {
-			clip_count++;
-		}
-	}
-
-	return clip_count;
-}
-
 PX4Accelerometer::PX4Accelerometer(uint32_t device_id, enum Rotation rotation) :
 	_device_id{device_id},
 	_rotation{rotation}
 {
 	// advertise immediately to keep instance numbering in sync
 	_sensor_pub.advertise();
+	_sensor_fifo_pub.advertise();
 
 	param_get(param_find("IMU_GYRO_RATEMAX"), &_imu_gyro_rate_max);
 }
@@ -103,8 +91,6 @@ void PX4Accelerometer::set_scale(float scale)
 		}
 
 		_scale = scale;
-
-		UpdateClipLimit();
 	}
 }
 
@@ -113,7 +99,6 @@ void PX4Accelerometer::update(const hrt_abstime &timestamp_sample, float x, floa
 	// Apply rotation (before scaling)
 	rotate_3f(_rotation, x, y, z);
 
-	// publish
 	sensor_accel_s report;
 
 	report.timestamp_sample = timestamp_sample;
@@ -123,9 +108,6 @@ void PX4Accelerometer::update(const hrt_abstime &timestamp_sample, float x, floa
 	report.x = x * _scale;
 	report.y = y * _scale;
 	report.z = z * _scale;
-	report.clip_counter[0] = (fabsf(x) >= _clip_limit);
-	report.clip_counter[1] = (fabsf(y) >= _clip_limit);
-	report.clip_counter[2] = (fabsf(z) >= _clip_limit);
 	report.samples = 1;
 	report.timestamp = hrt_absolute_time();
 
@@ -164,17 +146,8 @@ void PX4Accelerometer::updateFIFO(sensor_accel_fifo_s &sample)
 	_last_sample[1] = sample.y[N - 1];
 	_last_sample[2] = sample.z[N - 1];
 
-	report.clip_counter[0] = clipping(sample.x, N);
-	report.clip_counter[1] = clipping(sample.y, N);
-	report.clip_counter[2] = clipping(sample.z, N);
 	report.samples = N;
 	report.timestamp = hrt_absolute_time();
 
 	_sensor_pub.publish(report);
-}
-
-void PX4Accelerometer::UpdateClipLimit()
-{
-	// 99.9% of potential max
-	_clip_limit = math::constrain((_range / _scale) * 0.999f, 0.f, (float)INT16_MAX);
 }

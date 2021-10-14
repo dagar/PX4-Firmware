@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "VehicleIMU.hpp"
+#include "VehicleIMUFifo.hpp"
 
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/events.h>
@@ -57,8 +57,8 @@ static constexpr int32_t sum(const int16_t samples[], uint8_t len)
 	return sum;
 }
 
-VehicleIMU::VehicleIMU(int instance, uint32_t accel_device_id, uint32_t gyro_device_id,
-		       const px4::wq_config_t &config) :
+VehicleIMUFifo::VehicleIMUFifo(int instance, uint32_t accel_device_id, uint32_t gyro_device_id,
+			       const px4::wq_config_t &config) :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, config),
 	_instance(instance)
@@ -67,48 +67,33 @@ VehicleIMU::VehicleIMU(int instance, uint32_t accel_device_id, uint32_t gyro_dev
 
 	for (uint8_t i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		// accel
-		uORB::SubscriptionData<sensor_accel_s> sensor_accel_sub{ORB_ID(sensor_accel), i};
-
-		if (sensor_accel_sub.get().device_id == accel_device_id) {
-			_sensor_accel_sub.ChangeInstance(i);
-		}
-
 		uORB::SubscriptionData<sensor_accel_fifo_s> sensor_accel_fifo_sub{ORB_ID(sensor_accel_fifo), i};
 
 		if (sensor_accel_fifo_sub.get().device_id == accel_device_id) {
 			_sensor_accel_fifo_sub.ChangeInstance(i);
-			_accel_fifo = true;
+			_accel_scale = sensor_accel_fifo_sub.get().scale;
 		}
-
 
 		// gyro
-		uORB::SubscriptionData<sensor_gyro_s> sensor_gyro_sub{ORB_ID(sensor_gyro), i};
-
-		if (sensor_gyro_sub.get().device_id == gyro_device_id) {
-			_sensor_gyro_sub.ChangeInstance(i);
-		}
-
 		uORB::SubscriptionData<sensor_gyro_fifo_s> sensor_gyro_fifo_sub{ORB_ID(sensor_gyro_fifo), i};
 
 		if (sensor_gyro_fifo_sub.get().device_id == gyro_device_id) {
 			_sensor_gyro_fifo_sub.ChangeInstance(i);
-			_gyro_fifo = true;
+			_gyro_scale = sensor_gyro_fifo_sub.get().scale;
 		}
 	}
 
 	_accel_integrator.set_reset_interval(_imu_integration_interval_us);
-	_accel_integrator.set_reset_samples(sensor_accel_s::ORB_QUEUE_LENGTH);
+	_accel_integrator.set_reset_samples(sensor_accel_fifo_s::ORB_QUEUE_LENGTH);
 
 	_gyro_integrator.set_reset_interval(_imu_integration_interval_us);
-	_gyro_integrator.set_reset_samples(sensor_gyro_s::ORB_QUEUE_LENGTH);
+	_gyro_integrator.set_reset_samples(sensor_gyro_fifo_s::ORB_QUEUE_LENGTH);
 
 #if defined(ENABLE_LOCKSTEP_SCHEDULER)
 	// currently with lockstep every raw sample needs a corresponding vehicle_imu publication
-	_sensor_gyro_sub.set_required_updates(1);
 	_sensor_gyro_fifo_sub.set_required_updates(1);
 #else
 	// schedule conservatively until the actual accel & gyro rates are known
-	_sensor_gyro_sub.set_required_updates(sensor_gyro_s::ORB_QUEUE_LENGTH / 2);
 	_sensor_gyro_fifo_sub.set_required_updates(sensor_gyro_fifo_s::ORB_QUEUE_LENGTH / 2);
 #endif
 
@@ -117,7 +102,7 @@ VehicleIMU::VehicleIMU(int instance, uint32_t accel_device_id, uint32_t gyro_dev
 	_vehicle_imu_status_pub.advertise();
 }
 
-VehicleIMU::~VehicleIMU()
+VehicleIMUFifo::~VehicleIMUFifo()
 {
 	Stop();
 
@@ -128,32 +113,26 @@ VehicleIMU::~VehicleIMU()
 	_vehicle_imu_status_pub.unadvertise();
 }
 
-bool VehicleIMU::Start()
+bool VehicleIMUFifo::Start()
 {
 	// force initial updates
 	ParametersUpdate(true);
 
-	if (_gyro_fifo) {
-		_sensor_gyro_fifo_sub.registerCallback();
-
-	} else {
-		_sensor_gyro_sub.registerCallback();
-	}
+	_sensor_gyro_fifo_sub.registerCallback();
 
 	ScheduleNow();
 	return true;
 }
 
-void VehicleIMU::Stop()
+void VehicleIMUFifo::Stop()
 {
 	// clear all registered callbacks
-	_sensor_gyro_sub.unregisterCallback();
 	_sensor_gyro_fifo_sub.unregisterCallback();
 
 	Deinit();
 }
 
-void VehicleIMU::ParametersUpdate(bool force)
+void VehicleIMUFifo::ParametersUpdate(bool force)
 {
 	// Check if parameters have changed
 	if (_parameter_update_sub.updated() || force) {
@@ -170,7 +149,7 @@ void VehicleIMU::ParametersUpdate(bool force)
 
 		// constrain IMU integration time 1-10 milliseconds (100-1000 Hz)
 		int32_t imu_integration_rate_hz = constrain(_param_imu_integ_rate.get(),
-						  (int32_t)100, math::max(_param_imu_gyro_ratemax.get(), (int32_t) 1000));
+						  (int32_t)100, math::max(_param_imu_gyro_ratemax.get(), (int32_t)1000));
 
 		if (imu_integration_rate_hz != _param_imu_integ_rate.get()) {
 			PX4_WARN("IMU_INTEG_RATE updated %" PRId32 " -> %" PRIu32, _param_imu_integ_rate.get(), imu_integration_rate_hz);
@@ -187,39 +166,17 @@ void VehicleIMU::ParametersUpdate(bool force)
 	}
 }
 
-bool VehicleIMU::AccelAvailable()
+bool VehicleIMUFifo::AccelAvailable()
 {
-	if (_accel_fifo) {
-		if (_sensor_accel_fifo_sub.updated()) {
-			return true;
-		}
-
-	} else {
-		if (_sensor_accel_sub.updated()) {
-			return true;
-		}
-	}
-
-	return false;
+	return _sensor_accel_fifo_sub.updated();
 }
 
-bool VehicleIMU::GyroAvailable()
+bool VehicleIMUFifo::GyroAvailable()
 {
-	if (_gyro_fifo) {
-		if (_sensor_gyro_fifo_sub.updated()) {
-			return true;
-		}
-
-	} else {
-		if (_sensor_gyro_sub.updated()) {
-			return true;
-		}
-	}
-
-	return false;
+	return _sensor_gyro_fifo_sub.updated();
 }
 
-void VehicleIMU::Run()
+void VehicleIMUFifo::Run()
 {
 	const hrt_abstime now_us = hrt_absolute_time();
 
@@ -253,10 +210,7 @@ void VehicleIMU::Run()
 
 		// update gyro until integrator ready and not falling behind
 		if (!_gyro_integrator.integral_ready() || consume_all_gyro) {
-			if (_gyro_fifo && UpdateGyroFifo()) {
-				updated = true;
-
-			} else if (!_gyro_fifo && UpdateGyro()) {
+			if (UpdateGyroFifo()) {
 				updated = true;
 			}
 		}
@@ -268,10 +222,7 @@ void VehicleIMU::Run()
 		       && (!_accel_integrator.integral_ready() || !_intervals_configured || _data_gap
 			   || (_accel_timestamp_sample_last < (_gyro_timestamp_sample_last - 0.5f * _accel_interval_us)))) {
 
-			if (_accel_fifo && UpdateAccelFifo()) {
-				updated = true;
-
-			} else if (!_accel_fifo && UpdateAccel()) {
+			if (UpdateAccelFifo()) {
 				updated = true;
 			}
 		}
@@ -310,155 +261,7 @@ void VehicleIMU::Run()
 	}
 }
 
-bool VehicleIMU::UpdateAccel()
-{
-	bool updated = false;
-
-	// integrate queued accel
-	sensor_accel_s accel;
-
-	if (_sensor_accel_sub.update(&accel)) {
-		if (_sensor_accel_sub.get_last_generation() != _accel_last_generation + 1) {
-			_data_gap = true;
-			perf_count(_accel_generation_gap_perf);
-
-			// reset average sample measurement
-			_accel_interval_mean.reset();
-
-		} else {
-			// collect sample interval average for filters
-			if (accel.timestamp_sample > _accel_timestamp_sample_last) {
-				if ((_accel_timestamp_sample_last != 0) && (accel.samples > 0)) {
-					float interval_us = accel.timestamp_sample - _accel_timestamp_sample_last;
-					_accel_interval_mean.update(Vector2f{interval_us, 1});
-				}
-
-			} else {
-				PX4_ERR("%d - accel %" PRIu32 " timestamp error timestamp_sample: %" PRIu64 ", previous timestamp_sample: %" PRIu64,
-					_instance, accel.device_id, accel.timestamp_sample, _accel_timestamp_sample_last);
-			}
-
-			if (accel.timestamp < accel.timestamp_sample) {
-				PX4_ERR("%d - accel %" PRIu32 " timestamp (%" PRIu64 ") < timestamp_sample (%" PRIu64 ")",
-					_instance, accel.device_id, accel.timestamp, accel.timestamp_sample);
-			}
-
-			const int interval_count = _accel_interval_mean.count();
-			const float interval_variance = _accel_interval_mean.variance()(0);
-
-			// check measured interval periodically
-			if ((_accel_interval_mean.valid() && (interval_count % 10 == 0))
-			    && (!PX4_ISFINITE(_accel_interval_best_variance)
-				|| (interval_variance < _accel_interval_best_variance)
-				|| (interval_count > 1000))) {
-
-				const float interval_mean = _accel_interval_mean.mean()(0);
-				const float interval_mean_fifo = interval_mean / _accel_interval_mean.mean()(1);
-
-				// update sample rate if previously invalid or changed
-				const float interval_delta_us = fabsf(interval_mean - _accel_interval_us);
-				const float percent_changed = interval_delta_us / _accel_interval_us;
-
-				if (!PX4_ISFINITE(_accel_interval_us) || (percent_changed > 0.001f)) {
-					if (PX4_ISFINITE(interval_mean) && PX4_ISFINITE(interval_mean_fifo) && PX4_ISFINITE(interval_variance)) {
-						// update integrator configuration if interval has changed by more than 10%
-						if (interval_delta_us > 0.1f * _accel_interval_us) {
-							_update_integrator_config = true;
-						}
-
-						_accel_interval_us = interval_mean;
-						_accel_interval_samples = _accel_interval_mean.mean()(1);
-
-						_accel_interval_best_variance = interval_variance;
-
-						_status.accel_rate_hz = 1e6f / interval_mean;
-						_status.accel_raw_rate_hz = 1e6f / interval_mean_fifo; // FIFO
-
-						_publish_status = true;
-
-					} else {
-						_accel_interval_mean.reset();
-					}
-				}
-			}
-
-			if (interval_count > 10000) {
-				// reset periodically to prevent numerical issues
-				_accel_interval_mean.reset();
-			}
-		}
-
-		_accel_last_generation = _sensor_accel_sub.get_last_generation();
-
-		_accel_calibration.set_device_id(accel.device_id);
-
-		if (accel.error_count != _status.accel_error_count) {
-			_publish_status = true;
-			_status.accel_error_count = accel.error_count;
-		}
-
-		const Vector3f accel_raw{accel.x, accel.y, accel.z};
-		_accel_sum += accel_raw;
-		_accel_temperature += accel.temperature;
-		_accel_sum_count++;
-
-		const float dt = (accel.timestamp_sample - _accel_timestamp_sample_last) * 1e-6f;
-		_accel_timestamp_sample_last = accel.timestamp_sample;
-
-		_accel_integrator.put(accel_raw, dt);
-		updated = true;
-
-		// if (accel.clip_counter[0] > 0 || accel.clip_counter[1] > 0 || accel.clip_counter[2] > 0) {
-		// 	// rotate sensor clip counts into vehicle body frame
-		// 	const Vector3f clipping{_accel_calibration.rotation() *
-		// 				Vector3f{(float)accel.clip_counter[0], (float)accel.clip_counter[1], (float)accel.clip_counter[2]}};
-
-		// 	// round to get reasonble clip counts per axis (after board rotation)
-		// 	const uint8_t clip_x = roundf(fabsf(clipping(0)));
-		// 	const uint8_t clip_y = roundf(fabsf(clipping(1)));
-		// 	const uint8_t clip_z = roundf(fabsf(clipping(2)));
-
-		// 	_status.accel_clipping[0] += clip_x;
-		// 	_status.accel_clipping[1] += clip_y;
-		// 	_status.accel_clipping[2] += clip_z;
-
-		// 	if (clip_x > 0) {
-		// 		_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_X;
-		// 	}
-
-		// 	if (clip_y > 0) {
-		// 		_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Y;
-		// 	}
-
-		// 	if (clip_z > 0) {
-		// 		_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Z;
-		// 	}
-
-		// 	_publish_status = true;
-
-		// 	if (_accel_calibration.enabled() && (hrt_elapsed_time(&_last_clipping_notify_time) > 3_s)) {
-		// 		// start notifying the user periodically if there's significant continuous clipping
-		// 		const uint64_t clipping_total = _status.accel_clipping[0] + _status.accel_clipping[1] + _status.accel_clipping[2];
-
-		// 		if (clipping_total > _last_clipping_notify_total_count + 1000) {
-		// 			mavlink_log_critical(&_mavlink_log_pub, "Accel %" PRIu8 " clipping, not safe to fly!\t", _instance);
-		// 			/* EVENT
-		// 			 * @description Land now, and check the vehicle setup.
-		// 			 * Clipping can lead to fly-aways.
-		// 			 */
-		// 			events::send<uint8_t>(events::ID("vehicle_imu_accel_clipping"), events::Log::Critical,
-		// 					      "Accel {1} clipping, not safe to fly!", _instance);
-		// 			_last_clipping_notify_time = accel.timestamp_sample;
-		// 			_last_clipping_notify_total_count = clipping_total;
-		// 		}
-		// 	}
-		// }
-	}
-
-	return updated;
-}
-
-bool VehicleIMU::UpdateAccelFifo()
+bool VehicleIMUFifo::UpdateAccelFifo()
 {
 	bool updated = false;
 
@@ -551,16 +354,41 @@ bool VehicleIMU::UpdateAccelFifo()
 		_accel_timestamp_sample_last = accel_fifo.timestamp_sample;
 
 
+		// TODO:
+		//  is gyro ready to publish?
+		//    yes
+		//     - determine number of accel samples to integrate
+		//     - integrate them all
 
-		// // trapezoidal integration (equally spaced)
-		// const float scale = _scale / (float)N;
-		// report.x = (0.5f * (_last_sample[0] + sample.x[N - 1]) + sum(sample.x, N - 1)) * scale;
-		// report.y = (0.5f * (_last_sample[1] + sample.y[N - 1]) + sum(sample.y, N - 1)) * scale;
-		// report.z = (0.5f * (_last_sample[2] + sample.z[N - 1]) + sum(sample.z, N - 1)) * scale;
+		if (fabsf(_accel_scale - accel_fifo.scale) > 0.f) {
+			// scale changed
+			_accel_scale = accel_fifo.scale;
+		}
 
-		// _last_sample[0] = sample.x[N - 1];
-		// _last_sample[1] = sample.y[N - 1];
-		// _last_sample[2] = sample.z[N - 1];
+		if (_gyro_integrator.integral_ready()) {
+
+			_gyro_integrator.integral_dt();
+
+			_accel_integrator.integral_dt();
+
+			// N * accel_fifo.dt;
+
+
+		} else {
+			// trapezoidal integration (equally spaced)
+			const float scale = _accel_scale / (float)N;
+			_accel_integration(0) += (0.5f * (_accel_last_sample[0] + accel_fifo.x[N - 1]) + sum(accel_fifo.x, N - 1)) * scale;
+			_accel_integration(1) += (0.5f * (_accel_last_sample[1] + accel_fifo.y[N - 1]) + sum(accel_fifo.y, N - 1)) * scale;
+			_accel_integration(2) += (0.5f * (_accel_last_sample[2] + accel_fifo.z[N - 1]) + sum(accel_fifo.z, N - 1)) * scale;
+
+			_accel_last_sample[0] = accel_fifo.x[N - 1];
+			_accel_last_sample[1] = accel_fifo.y[N - 1];
+			_accel_last_sample[2] = accel_fifo.z[N - 1];
+		}
+
+
+
+
 
 
 		for (int n = 0; n < N; n++) {
@@ -605,110 +433,7 @@ bool VehicleIMU::UpdateAccelFifo()
 	return updated;
 }
 
-bool VehicleIMU::UpdateGyro()
-{
-	bool updated = false;
-
-	// integrate queued gyro
-	sensor_gyro_s gyro;
-
-	if (_sensor_gyro_sub.update(&gyro)) {
-		if (_sensor_gyro_sub.get_last_generation() != _gyro_last_generation + 1) {
-			_data_gap = true;
-			perf_count(_gyro_generation_gap_perf);
-
-			// reset average sample measurement
-			_gyro_interval_mean.reset();
-
-		} else {
-			// collect sample interval average for filters
-			if (gyro.timestamp_sample > _gyro_timestamp_sample_last) {
-				if ((_gyro_timestamp_sample_last != 0) && (gyro.samples > 0)) {
-					float interval_us = gyro.timestamp_sample - _gyro_timestamp_sample_last;
-					_gyro_interval_mean.update(Vector2f{interval_us, (float)gyro.samples});
-				}
-
-			} else {
-				PX4_ERR("%d - gyro %" PRIu32 " timestamp error timestamp_sample: %" PRIu64 ", previous timestamp_sample: %" PRIu64,
-					_instance, gyro.device_id, gyro.timestamp_sample, _gyro_timestamp_sample_last);
-			}
-
-			if (gyro.timestamp < gyro.timestamp_sample) {
-				PX4_ERR("%d - gyro %" PRIu32 " timestamp (%" PRIu64 ") < timestamp_sample (%" PRIu64 ")",
-					_instance, gyro.device_id, gyro.timestamp, gyro.timestamp_sample);
-			}
-
-			const int interval_count = _gyro_interval_mean.count();
-			const float interval_variance = _gyro_interval_mean.variance()(0);
-
-			// check measured interval periodically
-			if ((_gyro_interval_mean.valid() && (interval_count % 10 == 0))
-			    && (!PX4_ISFINITE(_gyro_interval_best_variance)
-				|| (interval_variance < _gyro_interval_best_variance)
-				|| (interval_count > 1000))) {
-
-				const float interval_mean = _gyro_interval_mean.mean()(0);
-				const float interval_mean_fifo = interval_mean / _gyro_interval_mean.mean()(1);
-
-				// update sample rate if previously invalid or changed
-				const float interval_delta_us = fabsf(interval_mean - _gyro_interval_us);
-				const float percent_changed = interval_delta_us / _gyro_interval_us;
-
-				if (!PX4_ISFINITE(_gyro_interval_us) || (percent_changed > 0.001f)) {
-					if (PX4_ISFINITE(interval_mean) && PX4_ISFINITE(interval_mean_fifo) && PX4_ISFINITE(interval_variance)) {
-						// update integrator configuration if interval has changed by more than 10%
-						if (interval_delta_us > 0.1f * _gyro_interval_us) {
-							_update_integrator_config = true;
-						}
-
-						_gyro_interval_us = interval_mean;
-						_gyro_interval_samples = _gyro_interval_mean.mean()(1);
-
-						_gyro_interval_best_variance = interval_variance;
-
-						_status.gyro_rate_hz = 1e6f / interval_mean;
-						_status.gyro_raw_rate_hz = 1e6f / interval_mean_fifo; // FIFO
-
-						_publish_status = true;
-
-					} else {
-						_gyro_interval_mean.reset();
-					}
-				}
-			}
-
-			if (interval_count > 10000) {
-				// reset periodically to prevent numerical issues
-				_gyro_interval_mean.reset();
-			}
-		}
-
-		_gyro_last_generation = _sensor_gyro_sub.get_last_generation();
-		_gyro_timestamp_last = gyro.timestamp;
-
-		_gyro_calibration.set_device_id(gyro.device_id);
-
-		if (gyro.error_count != _status.gyro_error_count) {
-			_publish_status = true;
-			_status.gyro_error_count = gyro.error_count;
-		}
-
-		const Vector3f gyro_raw{gyro.x, gyro.y, gyro.z};
-		_gyro_sum += gyro_raw;
-		_gyro_temperature += gyro.temperature;
-		_gyro_sum_count++;
-
-		const float dt = (gyro.timestamp_sample - _gyro_timestamp_sample_last) * 1e-6f;
-		_gyro_timestamp_sample_last = gyro.timestamp_sample;
-
-		_gyro_integrator.put(gyro_raw, dt);
-		updated = true;
-	}
-
-	return updated;
-}
-
-bool VehicleIMU::UpdateGyroFifo()
+bool VehicleIMUFifo::UpdateGyroFifo()
 {
 	bool updated = false;
 
@@ -818,7 +543,7 @@ bool VehicleIMU::UpdateGyroFifo()
 	return updated;
 }
 
-bool VehicleIMU::Publish()
+bool VehicleIMUFifo::Publish()
 {
 	bool updated = false;
 
@@ -896,7 +621,7 @@ bool VehicleIMU::Publish()
 	return updated;
 }
 
-void VehicleIMU::UpdateIntegratorConfiguration()
+void VehicleIMUFifo::UpdateIntegratorConfiguration()
 {
 	if (PX4_ISFINITE(_accel_interval_us) && PX4_ISFINITE(_gyro_interval_us)) {
 
@@ -904,7 +629,7 @@ void VehicleIMU::UpdateIntegratorConfiguration()
 		uint8_t gyro_integral_samples = math::max(1, (int)roundf(_imu_integration_interval_us / _gyro_interval_us));
 
 		// if gyro samples exceeds queue depth, instead round to nearest even integer to improve scheduling options
-		if (gyro_integral_samples > sensor_gyro_s::ORB_QUEUE_LENGTH) {
+		if (gyro_integral_samples > sensor_gyro_fifo_s::ORB_QUEUE_LENGTH) {
 			gyro_integral_samples = math::max(1, (int)roundf(_imu_integration_interval_us / _gyro_interval_us / 2) * 2);
 		}
 
@@ -916,80 +641,39 @@ void VehicleIMU::UpdateIntegratorConfiguration()
 		// let the gyro set the configuration and scheduling
 		// relaxed minimum integration time required
 		_accel_integrator.set_reset_interval(roundf((accel_integral_samples - 0.5f) * _accel_interval_us));
-
-		if (_accel_fifo) {
-			_accel_integrator.set_reset_samples(accel_integral_samples * _accel_interval_samples);
-
-		} else {
-			_accel_integrator.set_reset_samples(accel_integral_samples);
-		}
+		_accel_integrator.set_reset_samples(accel_integral_samples * _accel_interval_samples);
 
 		_gyro_integrator.set_reset_interval(roundf((gyro_integral_samples - 0.5f) * _gyro_interval_us));
+		_gyro_integrator.set_reset_samples(gyro_integral_samples * _gyro_interval_samples);
 
-		if (_gyro_fifo) {
-			_gyro_integrator.set_reset_samples(gyro_integral_samples * _gyro_interval_samples);
-
-		} else {
-			_gyro_integrator.set_reset_samples(gyro_integral_samples);
-		}
-
-		_backup_schedule_timeout_us = math::min(sensor_accel_s::ORB_QUEUE_LENGTH * _accel_interval_us,
-							sensor_gyro_s::ORB_QUEUE_LENGTH * _gyro_interval_us);
+		_backup_schedule_timeout_us = math::min(sensor_accel_fifo_s::ORB_QUEUE_LENGTH * _accel_interval_us,
+							sensor_gyro_fifo_s::ORB_QUEUE_LENGTH * _gyro_interval_us);
 
 		// gyro: find largest integer multiple of gyro_integral_samples
-		if (_gyro_fifo) {
-			for (int n = sensor_gyro_fifo_s::ORB_QUEUE_LENGTH; n > 0; n--) {
-				if (gyro_integral_samples > sensor_gyro_fifo_s::ORB_QUEUE_LENGTH) {
-					gyro_integral_samples /= 2;
-				}
-
-				if (gyro_integral_samples % n == 0) {
-					_sensor_gyro_sub.unregisterCallback();
-
-					_sensor_gyro_fifo_sub.set_required_updates(n);
-					_sensor_gyro_fifo_sub.registerCallback();
-
-					_intervals_configured = true;
-					_update_integrator_config = false;
-
-					PX4_INFO("accel (%" PRIu32 "), gyro FIFO (%" PRIu32 "), accel samples: %" PRIu8 ", gyro FIFO samples: %" PRIu8
-						 ", accel interval: %.1f, gyro interval: %.1f sub samples: %d",
-						 _accel_calibration.device_id(), _gyro_calibration.device_id(), accel_integral_samples, gyro_integral_samples,
-						 (double)_accel_interval_us, (double)_gyro_interval_us, n);
-
-					break;
-				}
+		for (int n = sensor_gyro_fifo_s::ORB_QUEUE_LENGTH; n > 0; n--) {
+			if (gyro_integral_samples > sensor_gyro_fifo_s::ORB_QUEUE_LENGTH) {
+				gyro_integral_samples /= 2;
 			}
 
-		} else {
-			for (int n = sensor_gyro_s::ORB_QUEUE_LENGTH; n > 0; n--) {
-				if (gyro_integral_samples > sensor_gyro_s::ORB_QUEUE_LENGTH) {
-					gyro_integral_samples /= 2;
-				}
+			if (gyro_integral_samples % n == 0) {
+				_sensor_gyro_fifo_sub.set_required_updates(n);
+				_sensor_gyro_fifo_sub.registerCallback();
 
-				if (gyro_integral_samples % n == 0) {
-					_sensor_gyro_fifo_sub.unregisterCallback();
+				_intervals_configured = true;
+				_update_integrator_config = false;
 
-					_sensor_gyro_sub.set_required_updates(n);
-					_sensor_gyro_sub.registerCallback();
+				PX4_INFO("accel FIFO (%" PRIu32 "), gyro FIFO (%" PRIu32 "), accel samples: %" PRIu8 ", gyro FIFO samples: %" PRIu8
+					 ", accel interval: %.1f, gyro interval: %.1f sub samples: %d",
+					 _accel_calibration.device_id(), _gyro_calibration.device_id(), accel_integral_samples, gyro_integral_samples,
+					 (double)_accel_interval_us, (double)_gyro_interval_us, n);
 
-					_intervals_configured = true;
-					_update_integrator_config = false;
-
-					PX4_INFO("accel (%" PRIu32 "), gyro (%" PRIu32 "), accel samples: %" PRIu8 ", gyro samples: %" PRIu8
-						 ", accel interval: %.1f, gyro interval: %.1f sub samples: %d",
-						 _accel_calibration.device_id(), _gyro_calibration.device_id(), accel_integral_samples, gyro_integral_samples,
-						 (double)_accel_interval_us, (double)_gyro_interval_us, n);
-
-					break;
-				}
+				break;
 			}
 		}
-
 	}
 }
 
-void VehicleIMU::UpdateAccelVibrationMetrics(const Vector3f &acceleration)
+void VehicleIMUFifo::UpdateAccelVibrationMetrics(const Vector3f &acceleration)
 {
 	// Accel high frequency vibe = filtered length of (acceleration - acceleration_prev)
 	_status.accel_vibration_metric = 0.99f * _status.accel_vibration_metric
@@ -998,7 +682,7 @@ void VehicleIMU::UpdateAccelVibrationMetrics(const Vector3f &acceleration)
 	_acceleration_prev = acceleration;
 }
 
-void VehicleIMU::UpdateGyroVibrationMetrics(const Vector3f &angular_velocity)
+void VehicleIMUFifo::UpdateGyroVibrationMetrics(const Vector3f &angular_velocity)
 {
 	// Gyro high frequency vibe = filtered length of (angular_velocity - angular_velocity_prev)
 	_status.gyro_vibration_metric = 0.99f * _status.gyro_vibration_metric
@@ -1011,7 +695,7 @@ void VehicleIMU::UpdateGyroVibrationMetrics(const Vector3f &angular_velocity)
 	_angular_velocity_prev = angular_velocity;
 }
 
-void VehicleIMU::PrintStatus()
+void VehicleIMUFifo::PrintStatus()
 {
 	PX4_INFO("%" PRIu8 " - Accel: %" PRIu32 ", interval: %.1f us (SD %.1f us), Gyro: %" PRIu32
 		 ", interval: %.1f us (SD %.1f us)",

@@ -54,7 +54,7 @@ public:
 	void set_device_type(uint8_t devtype);
 	void set_error_count(uint32_t error_count) { _error_count = error_count; }
 	void increase_error_count() { _error_count++; }
-	void set_range(float range) { _range = range; UpdateClipLimit(); }
+	void set_range(float range) { _range = range; }
 	void set_scale(float scale);
 	void set_temperature(float temperature) { _temperature = temperature; }
 
@@ -65,8 +65,6 @@ public:
 	int get_instance() { return _sensor_pub.get_instance(); };
 
 private:
-	void UpdateClipLimit();
-
 	uORB::PublicationMulti<sensor_accel_s> _sensor_pub{ORB_ID(sensor_accel)};
 	uORB::PublicationMulti<sensor_accel_fifo_s>  _sensor_fifo_pub{ORB_ID(sensor_accel_fifo)};
 
@@ -78,8 +76,6 @@ private:
 	float			_range{16 * CONSTANTS_ONE_G};
 	float			_scale{1.f};
 	float			_temperature{NAN};
-
-	float			_clip_limit{_range / _scale};
 
 	uint32_t		_error_count{0};
 

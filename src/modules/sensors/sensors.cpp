@@ -77,6 +77,7 @@
 #include "vehicle_air_data/VehicleAirData.hpp"
 #include "vehicle_gps_position/VehicleGPSPosition.hpp"
 #include "vehicle_imu/VehicleIMU.hpp"
+#include "vehicle_imu/VehicleIMUFifo.hpp"
 #include "vehicle_magnetometer/VehicleMagnetometer.hpp"
 
 using namespace sensors;
@@ -180,6 +181,7 @@ private:
 	VehicleGPSPosition	*_vehicle_gps_position{nullptr};
 
 	VehicleIMU      *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
+	VehicleIMUFifo  *_vehicle_imu_fifo_list[MAX_SENSOR_COUNT] {};
 
 	uint8_t _n_accel{0};
 	uint8_t _n_baro{0};
@@ -286,6 +288,13 @@ Sensors::~Sensors()
 		if (vehicle_imu) {
 			vehicle_imu->Stop();
 			delete vehicle_imu;
+		}
+	}
+
+	for (auto &vehicle_imu_fifo : _vehicle_imu_fifo_list) {
+		if (vehicle_imu_fifo) {
+			vehicle_imu_fifo->Stop();
+			delete vehicle_imu_fifo;
 		}
 	}
 
@@ -562,14 +571,14 @@ void Sensors::InitializeVehicleIMU()
 {
 	// create a VehicleIMU instance for each accel/gyro pair
 	for (uint8_t i = 0; i < MAX_SENSOR_COUNT; i++) {
-		if (_vehicle_imu_list[i] == nullptr) {
+		if (_vehicle_imu_fifo_list[i] == nullptr) {
 
-			uORB::Subscription accel_sub{ORB_ID(sensor_accel), i};
-			sensor_accel_s accel{};
+			uORB::Subscription accel_sub{ORB_ID(sensor_accel_fifo), i};
+			sensor_accel_fifo_s accel{};
 			accel_sub.copy(&accel);
 
-			uORB::Subscription gyro_sub{ORB_ID(sensor_gyro), i};
-			sensor_gyro_s gyro{};
+			uORB::Subscription gyro_sub{ORB_ID(sensor_gyro_fifo), i};
+			sensor_gyro_fifo_s gyro{};
 			gyro_sub.copy(&gyro);
 
 			if (accel.device_id > 0 && gyro.device_id > 0) {
@@ -578,15 +587,16 @@ void Sensors::InitializeVehicleIMU()
 				const bool multi_mode = (_param_sens_imu_mode.get() == 0);
 				const px4::wq_config_t &wq_config = multi_mode ? px4::ins_instance_to_wq(i) : px4::wq_configurations::INS0;
 
-				VehicleIMU *imu = new VehicleIMU(i, i, i, wq_config);
+				//VehicleIMU *imu = new VehicleIMU(i, accel.device_id, gyro.device_id, wq_config);
+				VehicleIMUFifo *imu_fifo = new VehicleIMUFifo(i, accel.device_id, gyro.device_id, wq_config);
 
-				if (imu != nullptr) {
+				if (imu_fifo != nullptr) {
 					// Start VehicleIMU instance and store
-					if (imu->Start()) {
-						_vehicle_imu_list[i] = imu;
+					if (imu_fifo->Start()) {
+						_vehicle_imu_fifo_list[i] = imu_fifo;
 
 					} else {
-						delete imu;
+						delete imu_fifo;
 					}
 				}
 
@@ -782,6 +792,13 @@ int Sensors::print_status()
 	PX4_INFO_RAW("\n");
 
 	for (auto &i : _vehicle_imu_list) {
+		if (i != nullptr) {
+			PX4_INFO_RAW("\n");
+			i->PrintStatus();
+		}
+	}
+
+	for (auto &i : _vehicle_imu_fifo_list) {
 		if (i != nullptr) {
 			PX4_INFO_RAW("\n");
 			i->PrintStatus();

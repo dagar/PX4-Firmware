@@ -8,9 +8,9 @@ float32 scale
 
 uint8 samples             # number of valid samples
 
-int16[32] x               # angular velocity in the FRD board frame X-axis in rad/s
-int16[32] y               # angular velocity in the FRD board frame Y-axis in rad/s
-int16[32] z               # angular velocity in the FRD board frame Z-axis in rad/s
+int16[16] x               # angular velocity in the FRD board frame X-axis in rad/s
+int16[16] y               # angular velocity in the FRD board frame Y-axis in rad/s
+int16[16] z               # angular velocity in the FRD board frame Z-axis in rad/s
 
 float32 temperature       # temperature in degrees Celsius
 

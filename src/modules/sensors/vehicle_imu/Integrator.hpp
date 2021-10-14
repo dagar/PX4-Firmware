@@ -94,6 +94,8 @@ public:
 	 */
 	inline bool integral_ready() const { return (_integrated_samples >= _reset_samples_min) || (_integral_dt >= _reset_interval_min); }
 
+	float integral_dt() const { return _integral_dt; }
+
 	void reset()
 	{
 		_alpha.zero();
