@@ -46,11 +46,11 @@ using math::constrain;
 namespace sensors
 {
 
-static constexpr uint8_t clipping(const int16_t samples[], uint8_t len)
+static constexpr uint8_t clipping(const int16_t samples[], int first_sample, int last_sample)
 {
 	unsigned clip_count = 0;
 
-	for (int n = 0; n < len; n++) {
+	for (int n = first_sample; n <= last_sample; n++) {
 		if ((samples[n] == INT16_MIN) || (samples[n] == INT16_MAX)) {
 			clip_count++;
 		}
@@ -59,11 +59,11 @@ static constexpr uint8_t clipping(const int16_t samples[], uint8_t len)
 	return clip_count;
 }
 
-static constexpr int32_t sum(const int16_t samples[], uint8_t len)
+static constexpr int32_t sum(const int16_t samples[], int first_sample, int last_sample)
 {
 	int32_t sum = 0;
 
-	for (int n = 0; n < len; n++) {
+	for (int n = first_sample; n <= last_sample; n++) {
 		sum += samples[n];
 	}
 
@@ -178,11 +178,14 @@ void VehicleIMUFifo::Run()
 		return;
 	}
 
+	// reset data gap monitor
+	_data_gap = false;
+
 	sensor_imu_fifo_s sensor_imu_fifo;
 
 	while (_sensor_imu_fifo_sub.update(&sensor_imu_fifo)) {
 
-		bool consume_all = !_intervals_configured;
+		bool consume_all = !_intervals_configured || _data_gap;
 
 		// monitor scheduling latency and force catch up with latest gyro if falling behind
 		if (_sensor_imu_fifo_sub.updated() && (_update_latency_mean.count() > 100)
@@ -286,66 +289,6 @@ void VehicleIMUFifo::Run()
 		_temperature_sum += sensor_imu_fifo.temperature;
 		_temperature_sum_count++;
 
-		int clip_counter[3] {
-			clipping(sensor_imu_fifo.accel_x, N), clipping(sensor_imu_fifo.accel_y, N), clipping(sensor_imu_fifo.accel_z, N)
-		};
-
-		if (clip_counter[0] > 0 || clip_counter[1] > 0 || clip_counter[2] > 0) {
-			// rotate sensor clip counts into vehicle body frame
-			const Vector3f clipping{_accel_calibration.rotation() *Vector3f{(float)clip_counter[0], (float)clip_counter[1], (float)clip_counter[2]}};
-
-			// round to get reasonble clip counts per axis (after board rotation)
-			const uint8_t clip_x = roundf(fabsf(clipping(0)));
-			const uint8_t clip_y = roundf(fabsf(clipping(1)));
-			const uint8_t clip_z = roundf(fabsf(clipping(2)));
-
-			_status.accel_clipping[0] += clip_x;
-			_status.accel_clipping[1] += clip_y;
-			_status.accel_clipping[2] += clip_z;
-
-			if (clip_x > 0) {
-				_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_X;
-			}
-
-			if (clip_y > 0) {
-				_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Y;
-			}
-
-			if (clip_z > 0) {
-				_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Z;
-			}
-
-			_publish_status = true;
-
-			if (_accel_calibration.enabled() && (hrt_elapsed_time(&_last_clipping_notify_time) > 3_s)) {
-				// start notifying the user periodically if there's significant continuous clipping
-				const uint64_t clipping_total = _status.accel_clipping[0] + _status.accel_clipping[1] + _status.accel_clipping[2];
-
-				if (clipping_total > _last_clipping_notify_total_count + 1000) {
-					mavlink_log_critical(&_mavlink_log_pub, "Accel %" PRIu8 " clipping, not safe to fly!\t", _instance);
-					/* EVENT
-					 * @description Land now, and check the vehicle setup.
-					 * Clipping can lead to fly-aways.
-					 */
-					events::send<uint8_t>(events::ID("vehicle_imu_accel_clipping"), events::Log::Critical,
-							      "Accel {1} clipping, not safe to fly!", _instance);
-					_last_clipping_notify_time = sensor_imu_fifo.timestamp_sample;
-					_last_clipping_notify_total_count = clipping_total;
-				}
-			}
-		}
-
-		const float dt_s = sensor_imu_fifo.dt * 1e-6f;
-
-		// integrate gyro
-		for (int n = 0; n < N; n++) {
-			Vector3f gyro_raw{
-				(float)sensor_imu_fifo.gyro_x[n] *sensor_imu_fifo.gyro_scale,
-				(float)sensor_imu_fifo.gyro_y[n] *sensor_imu_fifo.gyro_scale,
-				(float)sensor_imu_fifo.gyro_z[n] *sensor_imu_fifo.gyro_scale};
-			_gyro_integrator.put(gyro_raw, dt_s);
-		}
-
 		if (fabsf(sensor_imu_fifo.accel_scale - _accel_scale) > FLT_EPSILON) {
 			// rescale last sample on scale change
 			float rescale = _accel_scale / sensor_imu_fifo.accel_scale;
@@ -357,19 +300,28 @@ void VehicleIMUFifo::Run()
 			_accel_scale = sensor_imu_fifo.accel_scale;
 		}
 
-		// integrate accel
-		// trapezoidal integration (equally spaced)
-		_accel_integral(0) += (0.5f * (_last_accel_sample[0] + sensor_imu_fifo.accel_x[N - 1]) + sum(sensor_imu_fifo.accel_x,
-				       N - 1));
-		_accel_integral(1) += (0.5f * (_last_accel_sample[1] + sensor_imu_fifo.accel_y[N - 1]) + sum(sensor_imu_fifo.accel_y,
-				       N - 1));
-		_accel_integral(2) += (0.5f * (_last_accel_sample[2] + sensor_imu_fifo.accel_z[N - 1]) + sum(sensor_imu_fifo.accel_z,
-				       N - 1));
+		const float dt_s = sensor_imu_fifo.dt * 1e-6f;
 
-		_last_accel_sample[0] = sensor_imu_fifo.accel_x[N - 1];
-		_last_accel_sample[1] = sensor_imu_fifo.accel_y[N - 1];
-		_last_accel_sample[2] = sensor_imu_fifo.accel_z[N - 1];
+		int last_sample = N - 1;
 
+		if (!consume_all && (_gyro_integrator.integrated_samples() + N > _gyro_integrator.get_reset_samples())) {
+			// TODO: publish early and then integrate the rest?
+			if (_gyro_integrator.get_reset_samples() > _gyro_integrator.integrated_samples()) {
+				int required_samples = _gyro_integrator.get_reset_samples() - _gyro_integrator.integrated_samples();
+
+				if (required_samples < sensor_imu_fifo_s::FIFO_SIZE / 2) {
+					last_sample = N - required_samples;
+
+					PX4_DEBUG("intgrated samples (%d) + N (%d) > reset samples (%d)   %" PRIu8 " - IMU: %" PRIu32 ", Req samples: %d",
+						  _gyro_integrator.integrated_samples(), N, _gyro_integrator.get_reset_samples(),
+						  _instance, _accel_calibration.device_id(), required_samples);
+				}
+			}
+		}
+
+		IntegrateAccel(sensor_imu_fifo.accel_x, sensor_imu_fifo.accel_y, sensor_imu_fifo.accel_z, 0, last_sample);
+		IntegrateGyro(sensor_imu_fifo.gyro_x, sensor_imu_fifo.gyro_y, sensor_imu_fifo.gyro_z, 0, last_sample,
+			      sensor_imu_fifo.gyro_scale, dt_s);
 
 		// reconfigure integrators if calculated sensor intervals have changed
 		if (_update_integrator_config || !_intervals_configured) {
@@ -402,10 +354,93 @@ void VehicleIMUFifo::Run()
 					const float time_run_s = now_us * 1e-6f;
 
 					_update_latency_mean.update(Vector2f{time_run_s - _timestamp_sample_last * 1e-6f, time_run_s - _timestamp_last * 1e-6f});
+
+
+					// integrate leftover samples
+					if (last_sample < N - 1) {
+						IntegrateAccel(sensor_imu_fifo.accel_x, sensor_imu_fifo.accel_y, sensor_imu_fifo.accel_z, last_sample + 1, N - 1);
+						IntegrateGyro(sensor_imu_fifo.gyro_x, sensor_imu_fifo.gyro_y, sensor_imu_fifo.gyro_z, last_sample + 1, N - 1,
+							      sensor_imu_fifo.gyro_scale, dt_s);
+
+					}
+
+
 					return;
 				}
 			}
 		}
+	}
+}
+
+void VehicleIMUFifo::IntegrateAccel(const int16_t x[], const int16_t y[], const int16_t z[],
+				    int first_sample, int last_sample)
+{
+	// integrate accel
+	// trapezoidal integration (equally spaced)
+	_accel_integral(0) += (0.5f * (_last_accel_sample[0] + x[last_sample]) + sum(x, first_sample, last_sample - 1));
+	_accel_integral(1) += (0.5f * (_last_accel_sample[1] + y[last_sample]) + sum(y, first_sample, last_sample - 1));
+	_accel_integral(2) += (0.5f * (_last_accel_sample[2] + z[last_sample]) + sum(z, first_sample, last_sample - 1));
+
+	_last_accel_sample[0] = x[last_sample];
+	_last_accel_sample[1] = y[last_sample];
+	_last_accel_sample[2] = z[last_sample];
+
+	int clip_counter[3] {
+		clipping(x, first_sample, last_sample),
+		clipping(y, first_sample, last_sample),
+		clipping(z, first_sample, last_sample),
+	};
+
+	if (clip_counter[0] > 0 || clip_counter[1] > 0 || clip_counter[2] > 0) {
+		// rotate sensor clip counts into vehicle body frame
+		const Vector3f clipping{_accel_calibration.rotation() *Vector3f{(float)clip_counter[0], (float)clip_counter[1], (float)clip_counter[2]}};
+
+		// round to get reasonble clip counts per axis (after board rotation)
+		const uint8_t clip_x = roundf(fabsf(clipping(0)));
+		const uint8_t clip_y = roundf(fabsf(clipping(1)));
+		const uint8_t clip_z = roundf(fabsf(clipping(2)));
+
+		_status.accel_clipping[0] += clip_x;
+		_status.accel_clipping[1] += clip_y;
+		_status.accel_clipping[2] += clip_z;
+
+		if (clip_x > 0) {
+			_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_X;
+		}
+
+		if (clip_y > 0) {
+			_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Y;
+		}
+
+		if (clip_z > 0) {
+			_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Z;
+		}
+
+		if (_accel_calibration.enabled() && (hrt_elapsed_time(&_last_clipping_notify_time) > 3_s)) {
+			// start notifying the user periodically if there's significant continuous clipping
+			const uint64_t clipping_total = _status.accel_clipping[0] + _status.accel_clipping[1] + _status.accel_clipping[2];
+
+			if (clipping_total > _last_clipping_notify_total_count + 1000) {
+				mavlink_log_critical(&_mavlink_log_pub, "Accel %" PRIu8 " clipping, not safe to fly!\t", _instance);
+				/* EVENT
+				 * @description Land now, and check the vehicle setup.
+				 * Clipping can lead to fly-aways.
+				 */
+				events::send<uint8_t>(events::ID("vehicle_imu_accel_clipping"), events::Log::Critical,
+						      "Accel {1} clipping, not safe to fly!", _instance);
+				_last_clipping_notify_time = hrt_absolute_time();
+				_last_clipping_notify_total_count = clipping_total;
+			}
+		}
+	}
+}
+
+void VehicleIMUFifo::IntegrateGyro(const int16_t x[], const int16_t y[], const int16_t z[], int first_sample,
+				   int last_sample, float scale, float dt_s)
+{
+	for (int n = first_sample; n <= last_sample; n++) {
+		Vector3f gyro_raw{(float)x[n] *scale, (float)y[n] *scale, (float)z[n] *scale};
+		_gyro_integrator.put(gyro_raw, dt_s);
 	}
 }
 

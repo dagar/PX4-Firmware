@@ -78,6 +78,10 @@ private:
 		     const matrix::Vector3f &delta_velocity, uint16_t delta_velocity_dt);
 	void Run() override;
 
+	void IntegrateAccel(const int16_t x[], const int16_t y[], const int16_t z[], int first_sample, int last_sample);
+	void IntegrateGyro(const int16_t x[], const int16_t y[], const int16_t z[], int first_sample, int last_sample,
+			   float scale, float dt_s);
+
 	void UpdateIntegratorConfiguration();
 	void UpdateAccelVibrationMetrics(const matrix::Vector3f &acceleration);
 	void UpdateGyroVibrationMetrics(const matrix::Vector3f &angular_velocity);
@@ -135,6 +139,7 @@ private:
 
 	uint32_t _backup_schedule_timeout_us{20000};
 
+	bool _data_gap{false};
 	bool _update_integrator_config{true};
 	bool _intervals_configured{false};
 	bool _publish_status{false};
