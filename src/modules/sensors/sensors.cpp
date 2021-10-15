@@ -183,6 +183,8 @@ private:
 	VehicleIMU      *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
 	VehicleIMUFifo  *_vehicle_imu_fifo_list[MAX_SENSOR_COUNT] {};
 
+	int _total_imu_count{0};
+
 	uint8_t _n_accel{0};
 	uint8_t _n_baro{0};
 	uint8_t _n_gps{0};
@@ -218,6 +220,7 @@ private:
 	void		InitializeVehicleAirData();
 	void		InitializeVehicleGPSPosition();
 	void		InitializeVehicleIMU();
+	void            InitializeVehicleIMUFifo();
 	void		InitializeVehicleMagnetometer();
 
 	DEFINE_PARAMETERS(
@@ -571,32 +574,73 @@ void Sensors::InitializeVehicleIMU()
 {
 	// create a VehicleIMU instance for each accel/gyro pair
 	for (uint8_t i = 0; i < MAX_SENSOR_COUNT; i++) {
-		if (_vehicle_imu_fifo_list[i] == nullptr) {
+		if (_vehicle_imu_list[i] == nullptr) {
 
-			uORB::Subscription accel_sub{ORB_ID(sensor_accel_fifo), i};
-			sensor_accel_fifo_s accel{};
+			uORB::Subscription accel_sub{ORB_ID(sensor_accel), i};
+			sensor_accel_s accel{};
 			accel_sub.copy(&accel);
 
-			uORB::Subscription gyro_sub{ORB_ID(sensor_gyro_fifo), i};
-			sensor_gyro_fifo_s gyro{};
+			uORB::Subscription gyro_sub{ORB_ID(sensor_gyro), i};
+			sensor_gyro_s gyro{};
 			gyro_sub.copy(&gyro);
 
 			if (accel.device_id > 0 && gyro.device_id > 0) {
 				// if the sensors module is responsible for voting (SENS_IMU_MODE 1) then run every VehicleIMU in the same WQ
 				//   otherwise each VehicleIMU runs in a corresponding INSx WQ
 				const bool multi_mode = (_param_sens_imu_mode.get() == 0);
-				const px4::wq_config_t &wq_config = multi_mode ? px4::ins_instance_to_wq(i) : px4::wq_configurations::INS0;
+				const px4::wq_config_t &wq_config = multi_mode ? px4::ins_instance_to_wq(_total_imu_count) :
+								    px4::wq_configurations::INS0;
 
-				//VehicleIMU *imu = new VehicleIMU(i, accel.device_id, gyro.device_id, wq_config);
-				VehicleIMUFifo *imu_fifo = new VehicleIMUFifo(i, accel.device_id, gyro.device_id, wq_config);
+				VehicleIMU *imu = new VehicleIMU(_total_imu_count, accel.device_id, gyro.device_id, wq_config);
+
+				if (imu != nullptr) {
+					// Start VehicleIMU instance and store
+					if (imu->Start()) {
+						_vehicle_imu_list[i] = imu;
+						_total_imu_count++;
+
+					} else {
+						delete imu;
+						_total_imu_count--;
+					}
+				}
+
+			} else {
+				// abort on first failure, try again later
+				return;
+			}
+		}
+	}
+}
+
+void Sensors::InitializeVehicleIMUFifo()
+{
+	// create a VehicleIMU instance for each accel/gyro pair
+	for (uint8_t i = 0; i < MAX_SENSOR_COUNT; i++) {
+		if (_vehicle_imu_fifo_list[i] == nullptr) {
+
+			uORB::Subscription sensor_imu_fifo_sub{ORB_ID(sensor_imu_fifo), i};
+			sensor_imu_fifo_s sensor_imu_fifo{};
+			sensor_imu_fifo_sub.copy(&sensor_imu_fifo);
+
+			if (sensor_imu_fifo.device_id != 0) {
+				// if the sensors module is responsible for voting (SENS_IMU_MODE 1) then run every VehicleIMU in the same WQ
+				//   otherwise each VehicleIMU runs in a corresponding INSx WQ
+				const bool multi_mode = (_param_sens_imu_mode.get() == 0);
+				const px4::wq_config_t &wq_config = multi_mode ? px4::ins_instance_to_wq(_total_imu_count) :
+								    px4::wq_configurations::INS0;
+
+				VehicleIMUFifo *imu_fifo = new VehicleIMUFifo(_total_imu_count, sensor_imu_fifo.device_id, wq_config);
 
 				if (imu_fifo != nullptr) {
 					// Start VehicleIMU instance and store
 					if (imu_fifo->Start()) {
 						_vehicle_imu_fifo_list[i] = imu_fifo;
+						_total_imu_count++;
 
 					} else {
 						delete imu_fifo;
+						_total_imu_count--;
 					}
 				}
 
@@ -637,6 +681,7 @@ void Sensors::Run()
 	if (_last_config_update == 0) {
 		InitializeVehicleAirData();
 		InitializeVehicleIMU();
+		InitializeVehicleIMUFifo();
 		InitializeVehicleGPSPosition();
 		InitializeVehicleMagnetometer();
 		_voted_sensors_update.init(_sensor_combined);
@@ -698,6 +743,7 @@ void Sensors::Run()
 		// sensor device id (not just orb_group_count) must be populated before IMU init can succeed
 		_voted_sensors_update.initializeSensors();
 		InitializeVehicleIMU();
+		InitializeVehicleIMUFifo();
 
 		_last_config_update = hrt_absolute_time();
 

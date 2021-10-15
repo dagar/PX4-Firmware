@@ -123,7 +123,7 @@ bool VehicleAngularVelocity::UpdateSampleRate()
 				const uint8_t samples = roundf(configured_interval_us / publish_interval_us);
 
 				if (_fifo_available) {
-					_sensor_fifo_sub.set_required_updates(math::constrain(samples, (uint8_t)1, sensor_gyro_fifo_s::ORB_QUEUE_LENGTH));
+					_sensor_fifo_sub.set_required_updates(math::constrain(samples, (uint8_t)1, sensor_imu_fifo_s::ORB_QUEUE_LENGTH));
 
 				} else {
 					_sensor_sub.set_required_updates(math::constrain(samples, (uint8_t)1, sensor_gyro_s::ORB_QUEUE_LENGTH));
@@ -208,19 +208,19 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(bool force)
 
 		if (_selected_sensor_device_id != sensor_selection.gyro_device_id) {
 
-			// see if the selected sensor publishes sensor_gyro_fifo
+			// see if the selected sensor publishes sensor_imu_fifo
 			for (uint8_t i = 0; i < MAX_SENSOR_COUNT; i++) {
-				uORB::SubscriptionData<sensor_gyro_fifo_s> sensor_gyro_fifo_sub{ORB_ID(sensor_gyro_fifo), i};
+				uORB::SubscriptionData<sensor_imu_fifo_s> sensor_imu_fifo_sub{ORB_ID(sensor_imu_fifo), i};
 
-				if ((sensor_gyro_fifo_sub.get().device_id != 0)
-				    && (sensor_gyro_fifo_sub.get().device_id == sensor_selection.gyro_device_id)) {
+				if ((sensor_imu_fifo_sub.get().device_id != 0)
+				    && (sensor_imu_fifo_sub.get().device_id == sensor_selection.gyro_device_id)) {
 					if (_sensor_fifo_sub.ChangeInstance(i) && _sensor_fifo_sub.registerCallback()) {
 						// make sure non-FIFO sub is unregistered
 						_sensor_sub.unregisterCallback();
 
 						// record selected sensor
 						_selected_sensor_device_id = sensor_selection.gyro_device_id;
-						_calibration.set_device_id(sensor_gyro_fifo_sub.get().device_id);
+						_calibration.set_device_id(sensor_imu_fifo_sub.get().device_id);
 
 						_timestamp_sample_last = 0;
 						_filter_sample_rate_hz = NAN;
@@ -659,7 +659,7 @@ void VehicleAngularVelocity::Run()
 
 	if (_fifo_available) {
 		// process all outstanding fifo messages
-		sensor_gyro_fifo_s sensor_fifo_data;
+		sensor_imu_fifo_s sensor_fifo_data;
 
 		while (_sensor_fifo_sub.update(&sensor_fifo_data)) {
 			const float dt_s = math::constrain(sensor_fifo_data.dt * 1e-6f, 0.00002f, 0.02f); // 20 us to 20 ms
@@ -677,20 +677,19 @@ void VehicleAngularVelocity::Run()
 			UpdateDynamicNotchFFT();
 
 			const int N = sensor_fifo_data.samples;
-			static constexpr int FIFO_SIZE_MAX = sizeof(sensor_fifo_data.x) / sizeof(sensor_fifo_data.x[0]);
 
-			if ((N > 0) && (N <= FIFO_SIZE_MAX)) {
+			if ((N > 0) && (N <= sensor_imu_fifo_s::FIFO_SIZE)) {
 				Vector3f angular_velocity_unscaled;
 				Vector3f angular_acceleration_unscaled;
 
-				int16_t *raw_data_array[] {sensor_fifo_data.x, sensor_fifo_data.y, sensor_fifo_data.z};
+				int16_t *raw_data_array[] {sensor_fifo_data.gyro_x, sensor_fifo_data.gyro_y, sensor_fifo_data.gyro_z};
 
 				for (int axis = 0; axis < 3; axis++) {
 					// copy raw int16 sensor samples to float array for filtering
-					float data[FIFO_SIZE_MAX];
+					float data[sensor_imu_fifo_s::FIFO_SIZE];
 
 					for (int n = 0; n < N; n++) {
-						data[n] = sensor_fifo_data.scale * raw_data_array[axis][n];
+						data[n] = sensor_fifo_data.gyro_scale * raw_data_array[axis][n];
 					}
 
 					// save last filtered sample

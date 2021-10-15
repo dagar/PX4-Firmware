@@ -178,7 +178,8 @@ bool VehicleAcceleration::SensorSelectionUpdate(bool force)
 				}
 			}
 
-			PX4_ERR("unable to find or subscribe to selected sensor (%" PRIu32 ")", sensor_selection.accel_device_id);
+			// TODO
+			//PX4_ERR("unable to find or subscribe to selected sensor (%" PRIu32 ")", sensor_selection.accel_device_id);
 			_calibration.set_device_id(0);
 		}
 	}

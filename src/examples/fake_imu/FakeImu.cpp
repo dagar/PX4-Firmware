@@ -64,10 +64,10 @@ void FakeImu::Run()
 		return;
 	}
 
-	sensor_gyro_fifo_s gyro{};
-	gyro.timestamp_sample = hrt_absolute_time();
-	gyro.samples = roundf(IMU_RATE_HZ / (1e6 / _sensor_interval_us));
-	gyro.dt = 1e6 / IMU_RATE_HZ;
+	sensor_imu_fifo_s sensor_imu_fifo{};
+	sensor_imu_fifo.timestamp_sample = hrt_absolute_time();
+	sensor_imu_fifo.samples = roundf(IMU_RATE_HZ / (1e6 / _sensor_interval_us));
+	sensor_imu_fifo.dt = 1e6 / IMU_RATE_HZ;
 
 	const double dt_s = 1 / IMU_RATE_HZ;
 
@@ -105,20 +105,20 @@ void FakeImu::Run()
 		const double y_F = y_f0 + (y_f1 - y_f0) * t / (2 * T);
 		const double z_F = z_f0 + (z_f1 - z_f0) * t / (2 * T);
 
-		gyro.x[n] = roundf(A * sin(2 * M_PI * x_F * t));
-		gyro.y[n] = roundf(A * sin(2 * M_PI * y_F * t));
-		gyro.z[n] = roundf(A * sin(2 * M_PI * z_F * t));
+		sensor_imu_fifo.gyro_x[n] = roundf(A * sin(2 * M_PI * x_F * t));
+		sensor_imu_fifo.gyro_y[n] = roundf(A * sin(2 * M_PI * y_F * t));
+		sensor_imu_fifo.gyro_z[n] = roundf(A * sin(2 * M_PI * z_F * t));
 
 		if (n == 0) {
 			x_freq = (x_f1 - x_f0) * (t / T) + x_f0;
 			y_freq = (y_f1 - y_f0) * (t / T) + y_f0;
 			z_freq = (z_f1 - z_f0) * (t / T) + z_f0;
 
-			_px4_accel.update(gyro.timestamp_sample, x_freq, y_freq, z_freq);
+			//_px4_accel.update(gyro.timestamp_sample, x_freq, y_freq, z_freq);
 		}
 	}
 
-	_px4_gyro.updateFIFO(gyro);
+	//_px4_gyro.updateFIFO(gyro);
 
 #if defined(FAKE_IMU_FAKE_ESC_STATUS)
 

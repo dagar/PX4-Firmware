@@ -42,13 +42,13 @@ namespace Bosch::BMI055::Accelerometer
 
 BMI055_Accelerometer::BMI055_Accelerometer(const I2CSPIDriverConfig &config) :
 	BMI055(config),
-	_px4_accel(get_device_id(), config.rotation)
+	_rotation(config.rotation)
 {
 	if (config.drdy_gpio != 0) {
 		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME"_accel: DRDY missed");
 	}
 
-	ConfigureSampleRate(_px4_accel.get_max_rate_hz());
+	ConfigureSampleRate(RATE);
 }
 
 BMI055_Accelerometer::~BMI055_Accelerometer()
@@ -263,23 +263,23 @@ void BMI055_Accelerometer::ConfigureAccel()
 
 	switch (PMU_RANGE) {
 	case range_2g_set:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 1024.f); // 1024 LSB/g, 0.98mg/LSB
-		_px4_accel.set_range(2.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 1024.f; // 1024 LSB/g, 0.98mg/LSB
+		_accel_range = 2.f * CONSTANTS_ONE_G;
 		break;
 
 	case range_4g_set:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 512.f); // 512 LSB/g, 1.95mg/LSB
-		_px4_accel.set_range(4.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 512.f; // 512 LSB/g, 1.95mg/LSB
+		_accel_range = 4.f * CONSTANTS_ONE_G;
 		break;
 
 	case range_8g_set:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 256.f); // 256 LSB/g, 3.91mg/LSB
-		_px4_accel.set_range(8.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 256.f; // 256 LSB/g, 3.91mg/LSB
+		_accel_range = 8.f * CONSTANTS_ONE_G;
 		break;
 
 	case range_16g_set:
-		_px4_accel.set_scale(CONSTANTS_ONE_G / 128.f); // 128 LSB/g, 7.81mg/LSB
-		_px4_accel.set_range(16.f * CONSTANTS_ONE_G);
+		_accel_scale = CONSTANTS_ONE_G / 128.f; // 128 LSB/g, 7.81mg/LSB
+		_accel_range = 16.f * CONSTANTS_ONE_G;
 		break;
 	}
 }
@@ -415,30 +415,44 @@ bool BMI055_Accelerometer::FIFORead(const hrt_abstime &timestamp_sample, uint8_t
 		return false;
 	}
 
-	sensor_accel_fifo_s accel{};
-	accel.timestamp_sample = timestamp_sample;
-	accel.samples = samples;
-	accel.dt = FIFO_SAMPLE_DT;
+	sensor_accel_s sensor_accel{};
+	sensor_accel.timestamp_sample = timestamp_sample;
+	sensor_accel.device_id = get_device_id();
+
+	float accel_sum[3] {};
 
 	for (int i = 0; i < samples; i++) {
 		const FIFO::DATA &fifo_sample = buffer.f[i];
 
 		// acc_x_msb<11:4> + acc_x_lsb<3:0>
-		const int16_t accel_x = combine(fifo_sample.ACCD_X_MSB, fifo_sample.ACCD_X_LSB) >> 4;
-		const int16_t accel_y = combine(fifo_sample.ACCD_Y_MSB, fifo_sample.ACCD_Y_LSB) >> 4;
-		const int16_t accel_z = combine(fifo_sample.ACCD_Z_MSB, fifo_sample.ACCD_Z_LSB) >> 4;
+		int16_t accel_x = combine(fifo_sample.ACCD_X_MSB, fifo_sample.ACCD_X_LSB) >> 4;
+		int16_t accel_y = combine(fifo_sample.ACCD_Y_MSB, fifo_sample.ACCD_Y_LSB) >> 4;
+		int16_t accel_z = combine(fifo_sample.ACCD_Z_MSB, fifo_sample.ACCD_Z_LSB) >> 4;
 
 		// sensor's frame is +x forward, +y left, +z up
 		//  flip y & z to publish right handed with z down (x forward, y right, z down)
-		accel.x[i] = accel_x;
-		accel.y[i] = (accel_y == INT16_MIN) ? INT16_MAX : -accel_y;
-		accel.z[i] = (accel_z == INT16_MIN) ? INT16_MAX : -accel_z;
+		// accel_x = accel_x;
+		accel_y = (accel_y == INT16_MIN) ? INT16_MAX : -accel_y;
+		accel_z = (accel_z == INT16_MIN) ? INT16_MAX : -accel_z;
+
+		rotate_3i(_rotation, accel_x, accel_y, accel_z);
+
+		accel_sum[0] += accel_x * _accel_scale;
+		accel_sum[1] += accel_y * _accel_scale;
+		accel_sum[2] += accel_z * _accel_scale;
 	}
 
-	_px4_accel.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
-				   perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
+	sensor_accel.x = accel_sum[0] / samples;
+	sensor_accel.y = accel_sum[1] / samples;
+	sensor_accel.z = accel_sum[2] / samples;
 
-	_px4_accel.updateFIFO(accel);
+	sensor_accel.range = _accel_range;
+	sensor_accel.temperature = _temperature;
+	sensor_accel.error_count = perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
+				   perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf);
+
+	sensor_accel.timestamp = hrt_absolute_time();
+	_sensor_accel_pub.publish(sensor_accel);
 
 	return true;
 }
@@ -472,7 +486,7 @@ void BMI055_Accelerometer::UpdateTemperature()
 	float temperature = static_cast<int8_t>(RegisterRead(Register::ACCD_TEMP)) * 0.5f + 23.f;
 
 	if (PX4_ISFINITE(temperature)) {
-		_px4_accel.set_temperature(temperature);
+		_temperature = temperature;
 
 	} else {
 		perf_count(_bad_transfer_perf);

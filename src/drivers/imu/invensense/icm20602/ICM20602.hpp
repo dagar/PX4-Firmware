@@ -43,13 +43,14 @@
 #include "InvenSense_ICM20602_registers.hpp"
 
 #include <drivers/drv_hrt.h>
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/drivers/device/spi.h>
-#include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
 #include <lib/geo/geo.h>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/atomic.h>
 #include <px4_platform_common/i2c_spi_buses.h>
+
+#include <uORB/PublicationMulti.hpp>
+#include <uORB/topics/sensor_imu_fifo.h>
 
 using namespace InvenSense_ICM20602;
 
@@ -76,7 +77,7 @@ private:
 	static constexpr float ACCEL_RATE{GYRO_RATE / SAMPLES_PER_TRANSFER}; // 4000 Hz accel
 
 	// maximum FIFO samples per transfer is limited to the size of sensor_accel_fifo/sensor_gyro_fifo
-	static constexpr int32_t FIFO_MAX_SAMPLES{math::min(math::min(FIFO::SIZE / sizeof(FIFO::DATA), sizeof(sensor_gyro_fifo_s::x) / sizeof(sensor_gyro_fifo_s::x[0])), sizeof(sensor_accel_fifo_s::x) / sizeof(sensor_accel_fifo_s::x[0]) * (int)(GYRO_RATE / ACCEL_RATE))};
+	static constexpr int32_t FIFO_MAX_SAMPLES{math::min(FIFO::SIZE / sizeof(FIFO::DATA), (size_t)sensor_imu_fifo_s::FIFO_SIZE)};
 
 	// Transfer data
 	struct FIFOTransferBuffer {
@@ -120,14 +121,15 @@ private:
 	bool FIFORead(const hrt_abstime &timestamp_sample, uint8_t samples);
 	void FIFOReset();
 
-	bool ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
-	void ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
-	bool ProcessTemperature(const FIFO::DATA fifo[], const uint8_t samples);
+	bool ProcessTemperature(const FIFO::DATA fifo[], const uint8_t samples, sensor_imu_fifo_s &sensor_imu_fifo);
 
 	const spi_drdy_gpio_t _drdy_gpio;
 
-	PX4Accelerometer _px4_accel;
-	PX4Gyroscope _px4_gyro;
+	uORB::PublicationMulti<sensor_imu_fifo_s> _sensor_imu_fifo_pub{ORB_ID(sensor_imu_fifo)};
+
+	const enum Rotation _rotation;
+	float _accel_scale{0.f};
+	float _gyro_scale{0.f};
 
 	perf_counter_t _bad_register_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad register")};
 	perf_counter_t _bad_transfer_perf{perf_alloc(PC_COUNT, MODULE_NAME": bad transfer")};

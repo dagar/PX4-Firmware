@@ -66,9 +66,7 @@ px4_add_module(
 	DEPENDS
 		airspeed
 		component_general_json # for checksums.h
-		drivers_accelerometer
 		drivers_barometer
-		drivers_gyroscope
 		drivers_magnetometer
 		git_mavlink_v2
 		conversion

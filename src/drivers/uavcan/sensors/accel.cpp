@@ -36,7 +36,6 @@
  */
 
 #include "accel.hpp"
-#include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 
 const char *const UavcanAccelBridge::NAME = "accel";
 
@@ -69,7 +68,6 @@ void UavcanAccelBridge::imu_sub_cb(const uavcan::ReceivedDataStructure<uavcan::e
 	}
 
 	// Cast our generic CDev pointer to the sensor-specific driver class
-	PX4Accelerometer *accel = (PX4Accelerometer *)channel->h_driver;
 
 	if (accel == nullptr) {
 		return;

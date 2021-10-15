@@ -50,9 +50,7 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_accel.h>
-#include <uORB/topics/sensor_accel_fifo.h>
 #include <uORB/topics/sensor_gyro.h>
-#include <uORB/topics/sensor_gyro_fifo.h>
 #include <uORB/topics/vehicle_imu.h>
 #include <uORB/topics/vehicle_imu_status.h>
 
@@ -75,19 +73,12 @@ public:
 	void PrintStatus();
 
 private:
-
-	inline bool AccelAvailable();
-	inline bool GyroAvailable();
-
 	void ParametersUpdate(bool force = false);
 	bool Publish();
 	void Run() override;
 
 	bool UpdateAccel();
-	bool UpdateAccelFifo();
-
 	bool UpdateGyro();
-	bool UpdateGyroFifo();
 
 	void UpdateIntegratorConfiguration();
 	void UpdateAccelVibrationMetrics(const matrix::Vector3f &acceleration);
@@ -99,10 +90,7 @@ private:
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::Subscription _sensor_accel_sub{ORB_ID::sensor_accel};
-	uORB::Subscription _sensor_accel_fifo_sub{ORB_ID::sensor_accel_fifo};
-
 	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub{this, ORB_ID(sensor_gyro)};
-	uORB::SubscriptionCallbackWorkItem _sensor_gyro_fifo_sub{this, ORB_ID(sensor_gyro_fifo)};
 
 	calibration::Accelerometer _accel_calibration{};
 	calibration::Gyroscope _gyro_calibration{};
@@ -125,10 +113,7 @@ private:
 	float _gyro_interval_best_variance{(float)INFINITY};
 
 	float _accel_interval_us{NAN};
-	int _accel_interval_samples{1};
-
 	float _gyro_interval_us{NAN};
-	int _gyro_interval_samples{1};
 
 	unsigned _accel_last_generation{0};
 	unsigned _gyro_last_generation{0};
@@ -152,9 +137,6 @@ private:
 	orb_advert_t _mavlink_log_pub{nullptr};
 
 	uint32_t _backup_schedule_timeout_us{20000};
-
-	bool _accel_fifo{false};
-	bool _gyro_fifo{false};
 
 	bool _data_gap{false};
 	bool _update_integrator_config{true};

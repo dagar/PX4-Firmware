@@ -41,7 +41,5 @@ px4_add_module(
 		icm20602_main.cpp
 		InvenSense_ICM20602_registers.hpp
 	DEPENDS
-		drivers_accelerometer
-		drivers_gyroscope
 		px4_work_queue
 	)

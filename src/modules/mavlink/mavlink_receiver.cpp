@@ -72,9 +72,7 @@
 MavlinkReceiver::~MavlinkReceiver()
 {
 	delete _tune_publisher;
-	delete _px4_accel;
 	delete _px4_baro;
-	delete _px4_gyro;
 	delete _px4_mag;
 #if !defined(CONSTRAINED_FLASH)
 	delete[] _received_msg_stats;
@@ -2340,34 +2338,16 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 
 	// gyro
 	if ((hil_sensor.fields_updated & SensorSource::GYRO) == SensorSource::GYRO) {
-		if (_px4_gyro == nullptr) {
-			// 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-			_px4_gyro = new PX4Gyroscope(1310988);
-		}
-
-		if (_px4_gyro != nullptr) {
-			if (PX4_ISFINITE(temperature)) {
-				_px4_gyro->set_temperature(temperature);
-			}
-
-			_px4_gyro->update(timestamp, hil_sensor.xgyro, hil_sensor.ygyro, hil_sensor.zgyro);
-		}
+		// TODO
 	}
 
 	// accelerometer
 	if ((hil_sensor.fields_updated & SensorSource::ACCEL) == SensorSource::ACCEL) {
-		if (_px4_accel == nullptr) {
-			// 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-			_px4_accel = new PX4Accelerometer(1310988);
-		}
+		// if (PX4_ISFINITE(temperature)) {
+		// 	_px4_accel->set_temperature(temperature);
+		// }
 
-		if (_px4_accel != nullptr) {
-			if (PX4_ISFINITE(temperature)) {
-				_px4_accel->set_temperature(temperature);
-			}
-
-			_px4_accel->update(timestamp, hil_sensor.xacc, hil_sensor.yacc, hil_sensor.zacc);
-		}
+		// _px4_accel->update(timestamp, hil_sensor.xacc, hil_sensor.yacc, hil_sensor.zacc);
 	}
 
 	// magnetometer
@@ -2808,36 +2788,25 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 
 	/* accelerometer */
 	{
-		if (_px4_accel == nullptr) {
-			// 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-			_px4_accel = new PX4Accelerometer(1310988);
+		// if (_px4_accel == nullptr) {
+		// 	// 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
+		// 	_px4_accel = new PX4Accelerometer(1310988);
 
-			if (_px4_accel == nullptr) {
-				PX4_ERR("PX4Accelerometer alloc failed");
-			}
-		}
+		// 	if (_px4_accel == nullptr) {
+		// 		PX4_ERR("PX4Accelerometer alloc failed");
+		// 	}
+		// }
 
-		if (_px4_accel != nullptr) {
-			// accel in mG
-			_px4_accel->set_scale(CONSTANTS_ONE_G / 1000.0f);
-			_px4_accel->update(timestamp_sample, hil_state.xacc, hil_state.yacc, hil_state.zacc);
-		}
+		// if (_px4_accel != nullptr) {
+		// 	// accel in mG
+		// 	_px4_accel->set_scale(CONSTANTS_ONE_G / 1000.0f);
+		// 	_px4_accel->update(timestamp_sample, hil_state.xacc, hil_state.yacc, hil_state.zacc);
+		// }
 	}
 
 	/* gyroscope */
 	{
-		if (_px4_gyro == nullptr) {
-			// 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
-			_px4_gyro = new PX4Gyroscope(1310988);
-
-			if (_px4_gyro == nullptr) {
-				PX4_ERR("PX4Gyroscope alloc failed");
-			}
-		}
-
-		if (_px4_gyro != nullptr) {
-			_px4_gyro->update(timestamp_sample, hil_state.rollspeed, hil_state.pitchspeed, hil_state.yawspeed);
-		}
+		// TODO
 	}
 
 	/* battery status */
