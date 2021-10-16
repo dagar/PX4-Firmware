@@ -86,10 +86,16 @@ void MSGBridge::Run()
 		} else {
 			PX4_ERR("opening %s failed", _device);
 		}
-
-
-
 	}
+
+
+
+
+
+
+
+
+
 
 	ScheduleDelayed(100_ms);
 

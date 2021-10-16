@@ -19,18 +19,30 @@ endif()
 add_compile_options(-Wno-error)
 
 
-# commander
+
+
+# mc_rate_control_ros2
 add_executable(mc_rate_control ${CMAKE_SOURCE_DIR}/src/modules/mc_rate_control_ros2/MulticopterRateControl.cpp)
 target_link_libraries(mc_rate_control px4_layer work_queue)
 ament_target_dependencies(mc_rate_control rclcpp std_msgs)
 rosidl_target_interfaces(mc_rate_control ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
 add_dependencies(mc_rate_control generate_parameters)
+
+
+
+# msg_bridge_ros2
+add_executable(msg_bridge ${CMAKE_SOURCE_DIR}/src/modules/msg_bridge_ros2/MSGBridge.cpp)
+target_link_libraries(msg_bridge px4_layer work_queue)
+ament_target_dependencies(msg_bridge rclcpp std_msgs)
+rosidl_target_interfaces(msg_bridge ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_dependencies(msg_bridge generate_parameters)
+
 
 
 install(
   TARGETS
     mc_rate_control
+    msg_bridge
   DESTINATION lib/${PROJECT_NAME}
 )
 
