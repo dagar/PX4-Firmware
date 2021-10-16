@@ -62,7 +62,7 @@ static constexpr size_t orb_topics_count() { return ORB_TOPICS_COUNT; }
  */
 extern const struct orb_metadata *const *orb_get_topics() __EXPORT;
 
-enum class ORB_ID : uint8_t {
+enum class ORB_ID {
 @[for idx, topic_name in enumerate(topic_names_all)]@
 	@(topic_name) = @(idx),
 @[end for]
@@ -70,3 +70,18 @@ enum class ORB_ID : uint8_t {
 };
 
 const struct orb_metadata *get_orb_meta(ORB_ID id);
+
+
+static constexpr const char *get_topic_string(ORB_ID orb_id)
+{
+	switch (orb_id) {
+@[for idx, topic_name in enumerate(topic_names_all)]@
+	case ORB_ID::@(topic_name): return "@(topic_name)";
+@[end for]
+
+	default:
+		return nullptr;
+	}
+
+	return nullptr;
+}

@@ -53,14 +53,17 @@
 
 @{
 import genmsg.msgs
+import copy
 
 from px_generate_uorb_topic_helper import * # this is in Tools/
 
 uorb_struct = '%s_s'%name_snake_case
 
 sorted_fields = sorted(spec.parsed_fields(), key=sizeof_field_type, reverse=True)
+sorted_fields_no_padding = copy.deepcopy(sorted_fields)
 struct_size, padding_end_size = add_padding_bytes(sorted_fields, search_path)
 topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in sorted_fields]
+
 }@
 
 #include <inttypes.h>
@@ -73,13 +76,34 @@ topic_fields = ["%s %s" % (convert_type(field.type), field.name) for field in so
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/mathlib/mathlib.h>
 
+@{
+for field in spec.parsed_fields():
+	if not field.is_builtin:
+		pass
+		# TODO
+		#include_header = field.type.split("/")[1]
+		# convert to snake_case and include
+		#print("#include <uORB/topics/%s.h>" % include_header)
+}@
+
 @# join all msg files in one line e.g: "float[3] position;float[3] velocity;bool armed"
 @# This is used for the logger
 constexpr char __orb_@(name_snake_case)_fields[] = "@( ";".join(topic_fields) );";
 
+
+#if defined(__PX4_ROS2)
+
+@[for topic in topics]@
+ORB_DEFINE(@topic, px4_embedded::@uorb_struct, @(struct_size-padding_end_size), __orb_@(name_snake_case)_fields, static_cast<uint8_t>(ORB_ID::@topic));
+@[end for]
+
+#else
+
 @[for topic in topics]@
 ORB_DEFINE(@topic, struct @uorb_struct, @(struct_size-padding_end_size), __orb_@(name_snake_case)_fields, static_cast<uint8_t>(ORB_ID::@topic));
 @[end for]
+
+
 
 void print_message(const @uorb_struct &message)
 {
@@ -95,5 +119,6 @@ void print_message(const @uorb_struct &message)
 	@( print_field(field) )@
 @[end for]@
 @[end if]@
-
 }
+
+#endif

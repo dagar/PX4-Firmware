@@ -77,8 +77,8 @@ public:
 	bool subscribe()
 	{
 		if (_subscription == nullptr) {
-			_subscription = _node.create_subscription<S>(::get_topic(_id), 1, std::bind(&Subscription2<S>::topic_callback, this,
-					_1));
+			_subscription = _node.create_subscription<S>(::get_topic_string(_id), 1, std::bind(&Subscription2<S>::topic_callback,
+					this, _1));
 		}
 
 		return (_subscription != nullptr);

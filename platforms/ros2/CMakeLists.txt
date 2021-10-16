@@ -18,8 +18,7 @@ endif()
 
 add_compile_options(-Wno-error)
 
-
-
+include_directories(${PX4_BINARY_DIR})
 
 # mc_rate_control_ros2
 add_executable(mc_rate_control ${CMAKE_SOURCE_DIR}/src/modules/mc_rate_control_ros2/MulticopterRateControl.cpp)
@@ -32,10 +31,10 @@ add_dependencies(mc_rate_control generate_parameters)
 
 # msg_bridge_ros2
 add_executable(msg_bridge ${CMAKE_SOURCE_DIR}/src/modules/msg_bridge_ros2/MSGBridge.cpp)
-target_link_libraries(msg_bridge px4_layer work_queue)
+target_link_libraries(msg_bridge px4_layer work_queue uorb_msgs)
 ament_target_dependencies(msg_bridge rclcpp std_msgs)
 rosidl_target_interfaces(msg_bridge ${PROJECT_NAME} "rosidl_typesupport_cpp")
-add_dependencies(msg_bridge generate_parameters)
+add_dependencies(msg_bridge generate_parameters uorb_msgs)
 
 
 

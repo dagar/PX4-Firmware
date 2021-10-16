@@ -78,7 +78,7 @@ public:
 	 */
 	Publication(rclcpp::Node *node, ORB_ID id) : _node(*node), _id(id)
 	{
-		_publisher = _node.create_publisher<T>(::get_topic(_id), ORB_QSIZE); // TODO
+		_publisher = _node.create_publisher<T>(::get_topic_string(_id), ORB_QSIZE); // TODO
 	}
 
 	bool advertised() { return (_publisher != nullptr); }
@@ -86,7 +86,7 @@ public:
 	bool advertise()
 	{
 		if (!advertised()) {
-			_publisher = _node.create_publisher<T>(get_topic(_id), ORB_QSIZE);
+			_publisher = _node.create_publisher<T>(get_topic_string(_id), ORB_QSIZE);
 		}
 
 		return advertised();

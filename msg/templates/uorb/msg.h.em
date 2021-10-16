@@ -56,6 +56,7 @@ import re
 
 from px_generate_uorb_topic_helper import * # this is in Tools/
 
+px4_struct = '%s'%name_snake_case
 uorb_struct = '%s_s'%name_snake_case
 uorb_struct_upper = name_snake_case.upper()
 }@
@@ -81,6 +82,11 @@ for field in spec.parsed_fields():
             name = re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
             print('#include <uORB/topics/%s.h>'%(name))
 }@
+
+
+#ifdef __PX4_ROS2
+namespace px4_embedded {
+#endif // __PX4_ROS2
 
 @# Constants c style
 #ifndef __cplusplus
@@ -129,13 +135,48 @@ for constant in spec.constants:
 #endif
 };
 
-#ifdef __cplusplus
+
+#if defined(__PX4_ROS2)
+} // namespace px4_embedded
+
+#include "px4/msg/@(px4_struct).hpp"
+using @(uorb_struct) = px4::msg::@(spec.short_name);
+
+inline px4::msg::@(spec.short_name) px4_embedded_to_ros2(const px4_embedded::@(uorb_struct)& msg_in)
+{
+	px4::msg::@(spec.short_name) msg_out;
+@{
+for field in spec.parsed_fields():
+
+	#print(field, field.is_builtin, field.base_type, field.is_array, field.array_len)
+
+	if field.is_builtin and not field.is_array:
+		print("	msg_out.%s = msg_in.%s;" % (field.name, field.name))
+	elif field.is_builtin and field.is_array:
+		print("	std::copy(std::begin(msg_in.%s), std::end(msg_in.%s), msg_out.%s.begin());" % (field.name, field.name, field.name))
+	elif not field.is_builtin:
+		#print("	msg_out.%s = px4_embedded_to_ros2(msg_in.%s);" % (field.name, field.name))
+		print("	// %s.%s not printed" % (name_snake_case, field.name))
+	else:
+		print("	#error %s.%s not printed" % (name_snake_case, field.name))
+
+}@
+
+	return msg_out;
+}
+
+
+#else
+
+# ifdef __cplusplus
 namespace px4 {
 	namespace msg {
 		using @(spec.short_name) = @(uorb_struct);
 	} // namespace msg
 } // namespace px4
-#endif
+# endif
+
+#endif // PX4_ROS2
 
 /* register this as object request broker structure */
 @[for topic in topics]@

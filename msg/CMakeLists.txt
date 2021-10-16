@@ -300,5 +300,12 @@ add_custom_command(
 	)
 
 add_library(uorb_msgs ${uorb_headers} ${msg_out_path}/uORBTopics.hpp ${uorb_sources} ${msg_source_out_path}/uORBTopics.cpp)
-target_link_libraries(uorb_msgs PRIVATE m)
+target_link_libraries(uorb_msgs m)
 add_dependencies(uorb_msgs prebuild_targets uorb_headers)
+
+
+
+if(${PX4_PLATFORM} MATCHES "ros2") # TODO: fix
+	ament_target_dependencies(uorb_msgs rclcpp std_msgs)
+	rosidl_target_interfaces(uorb_msgs ${PROJECT_NAME} "rosidl_typesupport_cpp")
+endif()

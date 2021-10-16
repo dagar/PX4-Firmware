@@ -21,6 +21,8 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/Publication.hpp>
 
+#include <uORB/topics/vehicle_status.h>
+
 #include <px4_platform_common/Node.hpp>
 #include <px4_platform_common/module_params.h>
 
@@ -92,7 +94,7 @@ private:
 	uORB::Subscription2<px4::msg::VehicleLandDetected> _vehicle_land_detected_sub{this, ORB_ID::vehicle_land_detected};
 	uORB::Subscription2<px4::msg::VehicleStatus> _vehicle_status_sub{this, ORB_ID::vehicle_status};
 
-	uORB::Publication<px4::msg::ActuatorControls>      _actuators_0_pub{this, ORB_ID::actuator_controls};
+	uORB::Publication<px4::msg::ActuatorControls>      _actuators_0_pub{this, ORB_ID::actuator_controls_0};
 	uORB::Publication<px4::msg::RateCtrlStatus>       _controller_status_pub{this, ORB_ID::rate_ctrl_status};	/**< controller status publication */
 	uORB::Publication<px4::msg::VehicleRatesSetpoint> _v_rates_sp_pub{this, ORB_ID::vehicle_rates_setpoint};			/**< rate setpoint publication */
 
