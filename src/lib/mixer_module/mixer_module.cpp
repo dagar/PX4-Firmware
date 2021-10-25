@@ -787,6 +787,9 @@ bool MixingOutput::updateDynamicMixer()
 		// TODO
 	}
 
+	actuator_feedback_s actuator_feedback{};
+
+
 	// get output values
 	float outputs[MAX_ACTUATORS];
 	bool all_disabled = true;
@@ -802,14 +805,31 @@ bool MixingOutput::updateDynamicMixer()
 				outputs[i] = NAN;
 			}
 
+			//actuator_feedback.function[i] = 0; // TODO
+
+			actuator_feedback.min[i] = _min_value[i]; // TODO: scale
+			actuator_feedback.max[i] = _max_value[i]; // TODO: scale
+
 		} else {
 			outputs[i] = NAN;
 		}
+
+		actuator_feedback.actuator[i] = outputs[i];
 	}
 
 	if (!all_disabled) {
 		limitAndUpdateOutputs(outputs, has_updates);
 	}
+
+
+
+
+	strncpy(actuator_feedback.prefix, _param_prefix, sizeof(actuator_feedback.prefix));
+
+	actuator_feedback.timestamp = hrt_absolute_time();
+	_actuator_feedback_pub.publish(actuator_feedback);
+
+
 
 	return true;
 }

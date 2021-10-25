@@ -40,6 +40,7 @@ set(msg_files
 	actuator_armed.msg
 	actuator_controls.msg
 	actuator_controls_status.msg
+	actuator_feedback.msg
 	actuator_motors.msg
 	actuator_outputs.msg
 	actuator_servos.msg

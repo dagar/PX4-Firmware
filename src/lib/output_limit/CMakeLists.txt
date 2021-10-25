@@ -32,5 +32,5 @@
 ############################################################################
 
 add_library(output_limit output_limit.cpp)
+target_compile_options(output_limit PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
 target_link_libraries(output_limit PRIVATE prebuild_targets)
-
