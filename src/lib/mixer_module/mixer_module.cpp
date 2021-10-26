@@ -67,25 +67,22 @@ static const FunctionProvider all_function_providers[] = {
 };
 
 MixingOutput::MixingOutput(const char *param_prefix, uint8_t max_num_outputs, OutputModuleInterface &interface,
-			   SchedulingPolicy scheduling_policy,
-			   bool support_esc_calibration, bool ramp_up)
-	: ModuleParams(&interface),
-	  _control_subs{
+			   SchedulingPolicy scheduling_policy, bool support_esc_calibration, bool ramp_up) :
+	ModuleParams(&interface),
+	_output_ramp_up(ramp_up),
+	_control_subs{
 	{&interface, ORB_ID(actuator_controls_0)},
 	{&interface, ORB_ID(actuator_controls_1)},
 	{&interface, ORB_ID(actuator_controls_2)},
 	{&interface, ORB_ID(actuator_controls_3)},
 },
 _scheduling_policy(scheduling_policy),
-_support_esc_calibration(support_esc_calibration),
-_max_num_outputs(max_num_outputs < MAX_ACTUATORS ? max_num_outputs : MAX_ACTUATORS),
-_interface(interface),
-_control_latency_perf(perf_alloc(PC_ELAPSED, "control latency")),
-_param_prefix(param_prefix)
+		   _support_esc_calibration(support_esc_calibration),
+		   _max_num_outputs(max_num_outputs < MAX_ACTUATORS ? max_num_outputs : MAX_ACTUATORS),
+		   _interface(interface),
+		   _control_latency_perf(perf_alloc(PC_ELAPSED, "control latency")),
+		   _param_prefix(param_prefix)
 {
-	output_limit_init(&_output_limit);
-	_output_limit.ramp_up = ramp_up;
-
 	/* Safely initialize armed flags */
 	_armed.armed = false;
 	_armed.prearmed = false;
@@ -685,7 +682,7 @@ bool MixingOutput::updateStaticMixer()
 				_controls[i].control[actuator_controls_s::INDEX_THROTTLE] = 1.0f;
 
 				/* Switch off the output limit ramp for the calibration. */
-				_output_limit.state = OUTPUT_LIMIT_STATE_ON;
+				_output_state = OutputLimitState::ON;
 			}
 		}
 	}
@@ -710,8 +707,7 @@ bool MixingOutput::updateStaticMixer()
 	const unsigned mixed_num_outputs = _mixers->mix(outputs, _max_num_outputs);
 
 	/* the output limit call takes care of out of band errors, NaN and constrains */
-	output_limit_calc(_throttle_armed, armNoThrottle(), mixed_num_outputs, _reverse_output_mask,
-			  _disarmed_value, _min_value, _max_value, outputs, _current_output_value, &_output_limit);
+	output_limit_calc(mixed_num_outputs, outputs);
 
 	/* overwrite outputs in case of force_failsafe with _failsafe_value values */
 	if (_armed.force_failsafe) {
@@ -811,8 +807,7 @@ void
 MixingOutput::limitAndUpdateOutputs(float outputs[MAX_ACTUATORS], bool has_updates)
 {
 	/* the output limit call takes care of out of band errors, NaN and constrains */
-	output_limit_calc(_throttle_armed, armNoThrottle(), _max_num_outputs, _reverse_output_mask,
-			  _disarmed_value, _min_value, _max_value, outputs, _current_output_value, &_output_limit);
+	output_limit_calc(_max_num_outputs, outputs);
 
 	/* overwrite outputs in case of force_failsafe with _failsafe_value values */
 	if (_armed.force_failsafe) {
@@ -838,6 +833,165 @@ MixingOutput::limitAndUpdateOutputs(float outputs[MAX_ACTUATORS], bool has_updat
 		setAndPublishActuatorOutputs(_max_num_outputs, actuator_outputs);
 
 		updateLatencyPerfCounter(actuator_outputs);
+	}
+}
+
+uint16_t MixingOutput::output_limit_calc_single(bool reversed, uint16_t disarmed_output,
+		uint16_t min_output, uint16_t max_output, float output) const
+{
+	/* check for invalid / disabled channels */
+	if (!PX4_ISFINITE(output)) {
+		return disarmed_output;
+	}
+
+	if (reversed) {
+		output = -1.f * output;
+	}
+
+	uint16_t effective_output = output * (max_output - min_output) / 2 + (max_output + min_output) / 2;
+
+	/* last line of defense against invalid inputs */
+	return math::constrain(effective_output, min_output, max_output);
+}
+
+void
+MixingOutput::output_limit_calc(const int num_channels, const float output[MAX_ACTUATORS])
+{
+	// time to slowly ramp up the ESCs
+	static constexpr hrt_abstime RAMP_TIME_US = 500_ms;
+
+	/* first evaluate state changes */
+	switch (_output_state) {
+	case OutputLimitState::INIT:
+		if (_throttle_armed) {
+			/* set arming time for the first call */
+			if (_output_time_armed == 0) {
+				_output_time_armed = hrt_absolute_time();
+			}
+
+			// time for the ESCs to initialize (this is not actually needed if the signal is sent right after boot)
+			if (hrt_elapsed_time(&_output_time_armed) >= 50_ms) {
+				_output_state = OutputLimitState::OFF;
+			}
+		}
+
+		break;
+
+	case OutputLimitState::OFF:
+		if (_throttle_armed) {
+			if (_output_ramp_up) {
+				_output_state = OutputLimitState::RAMP;
+
+			} else {
+				_output_state = OutputLimitState::ON;
+			}
+
+			// reset arming time, used for ramp timing
+			_output_time_armed = hrt_absolute_time();
+		}
+
+		break;
+
+	case OutputLimitState::RAMP:
+		if (!_throttle_armed) {
+			_output_state = OutputLimitState::OFF;
+
+		} else if (hrt_elapsed_time(&_output_time_armed) >= RAMP_TIME_US) {
+			_output_state = OutputLimitState::ON;
+		}
+
+		break;
+
+	case OutputLimitState::ON:
+		if (!_throttle_armed) {
+			_output_state = OutputLimitState::OFF;
+		}
+
+		break;
+	}
+
+	/* if the system is pre-armed, the limit state is temporarily on,
+	 * as some outputs are valid and the non-valid outputs have been
+	 * set to NaN. This is not stored in the state machine though,
+	 * as the throttle channels need to go through the ramp at
+	 * regular arming time.
+	 */
+	auto local_limit_state = _output_state;
+
+	if (armNoThrottle()) {
+		local_limit_state = OutputLimitState::ON;
+	}
+
+	/* then set _current_output_value based on state */
+	switch (local_limit_state) {
+	case OutputLimitState::OFF:
+	case OutputLimitState::INIT:
+		for (int i = 0; i < num_channels; i++) {
+			_current_output_value[i] = _disarmed_value[i];
+		}
+
+		break;
+
+	case OutputLimitState::RAMP: {
+			hrt_abstime diff = hrt_elapsed_time(&_output_time_armed);
+
+			static constexpr int PROGRESS_INT_SCALING = 10000;
+			int progress = diff * PROGRESS_INT_SCALING / RAMP_TIME_US;
+
+			if (progress > PROGRESS_INT_SCALING) {
+				progress = PROGRESS_INT_SCALING;
+			}
+
+			for (int i = 0; i < num_channels; i++) {
+
+				float control_value = output[i];
+
+				/* check for invalid / disabled channels */
+				if (!PX4_ISFINITE(control_value)) {
+					_current_output_value[i] = _disarmed_value[i];
+					continue;
+				}
+
+				uint16_t ramp_min_output;
+
+				/* if a disarmed output value was set, blend between disarmed and min */
+				if (_disarmed_value[i] > 0) {
+
+					/* safeguard against overflows */
+					int disarmed = _disarmed_value[i];
+
+					if (disarmed > _min_value[i]) {
+						disarmed = _min_value[i];
+					}
+
+					int disarmed_min_diff = _min_value[i] - disarmed;
+					ramp_min_output = disarmed + (disarmed_min_diff * progress) / PROGRESS_INT_SCALING;
+
+				} else {
+					/* no disarmed output value set, choose min output */
+					ramp_min_output = _min_value[i];
+				}
+
+				if (_reverse_output_mask & (1 << i)) {
+					control_value = -1.f * control_value;
+				}
+
+				_current_output_value[i] = control_value * (_max_value[i] - ramp_min_output) / 2 + (_max_value[i] + ramp_min_output) /
+							   2;
+
+				/* last line of defense against invalid inputs */
+				_current_output_value[i] = math::constrain(_current_output_value[i], ramp_min_output, _max_value[i]);
+			}
+		}
+		break;
+
+	case OutputLimitState::ON:
+		for (int i = 0; i < num_channels; i++) {
+			_current_output_value[i] = output_limit_calc_single(_reversible_motors & (1 << i), _disarmed_value[i], _min_value[i],
+						   _max_value[i], output[i]);
+		}
+
+		break;
 	}
 }
 
@@ -977,7 +1131,7 @@ int MixingOutput::controlCallback(uintptr_t handle, uint8_t control_group, uint8
 	input = math::constrain(input, -1.f, 1.f);
 
 	/* motor spinup phase - lock throttle to zero */
-	if (output->_output_limit.state == OUTPUT_LIMIT_STATE_RAMP) {
+	if (output->_output_state == OutputLimitState::RAMP) {
 		if ((control_group == actuator_controls_s::GROUP_INDEX_ATTITUDE ||
 		     control_group == actuator_controls_s::GROUP_INDEX_ATTITUDE_ALTERNATE) &&
 		    control_index == actuator_controls_s::INDEX_THROTTLE) {

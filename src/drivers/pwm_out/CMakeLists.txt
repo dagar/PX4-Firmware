@@ -43,5 +43,4 @@ px4_add_module(
 		arch_io_pins
 		mixer
 		mixer_module
-		output_limit
 	)

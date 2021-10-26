@@ -42,7 +42,6 @@ px4_add_module(
 		arch_dshot
 		mixer
 		mixer_module
-		output_limit
 	MODULE_CONFIG
 		module.yaml
 	)

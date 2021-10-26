@@ -45,7 +45,6 @@
 #include <px4_platform_common/px4_config.h>
 #include <lib/mixer/MixerGroup.hpp>
 #include <lib/mixer/mixer_load.h>
-#include <output_limit/output_limit.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
 
@@ -343,13 +342,12 @@ bool MixerTest::mixerTest()
 	/*
 	 * Output limit structure
 	 */
-	output_limit_t output_limit;
 	bool should_arm = false;
-	uint16_t r_page_servo_disarmed[output_max];
-	uint16_t r_page_servo_control_min[output_max];
-	uint16_t r_page_servo_control_max[output_max];
-	uint16_t r_page_servos[output_max];
-	uint16_t servo_predicted[output_max];
+	uint16_t r_page_servo_disarmed[output_max] {};
+	uint16_t r_page_servo_control_min[output_max] {};
+	uint16_t r_page_servo_control_max[output_max] {};
+	uint16_t r_page_servos[output_max] {};
+	uint16_t servo_predicted[output_max] {};
 	int16_t reverse_pwm_mask = 0;
 
 	bool load_ok = load_mixer(MIXER_PATH(IO_pass.mix), 8);
@@ -364,8 +362,6 @@ bool MixerTest::mixerTest()
 	unsigned mixed;
 	const int jmax = 5;
 
-	output_limit_init(&output_limit);
-
 	/* run through arming phase */
 	for (unsigned i = 0; i < output_max; i++) {
 		actuator_controls[i] = 0.1f;
@@ -379,9 +375,6 @@ bool MixerTest::mixerTest()
 	/* mix */
 	should_prearm = true;
 	mixed = mixer_group.mix(&outputs[0], output_max);
-
-	output_limit_calc(should_arm, should_prearm, mixed, reverse_pwm_mask, r_page_servo_disarmed, r_page_servo_control_min,
-			  r_page_servo_control_max, outputs, r_page_servos, &output_limit);
 
 	//PX4_INFO("mixed %d outputs (max %d), values:", mixed, output_max);
 
@@ -416,13 +409,10 @@ bool MixerTest::mixerTest()
 	hrt_abstime starttime = hrt_absolute_time();
 	unsigned sleepcount = 0;
 
-	while (hrt_elapsed_time(&starttime) < INIT_TIME_US + RAMP_TIME_US + 2 * sleep_quantum_us) {
+	while (hrt_elapsed_time(&starttime) < 2 * sleep_quantum_us) {
 
 		/* mix */
 		mixed = mixer_group.mix(&outputs[0], output_max);
-
-		output_limit_calc(should_arm, should_prearm, mixed, reverse_pwm_mask, r_page_servo_disarmed, r_page_servo_control_min,
-				  r_page_servo_control_max, outputs, r_page_servos, &output_limit);
 
 		//warnx("mixed %d outputs (max %d), values:", mixed, output_max);
 		for (unsigned i = 0; i < mixed; i++) {
@@ -430,14 +420,12 @@ bool MixerTest::mixerTest()
 			//fprintf(stderr, "ramp:\t %d: out: %8.4f, servo: %d \n", i, (double)outputs[i], (int)r_page_servos[i]);
 
 			/* check mixed outputs to be zero during init phase */
-			if (hrt_elapsed_time(&starttime) < INIT_TIME_US &&
-			    r_page_servos[i] != r_page_servo_disarmed[i]) {
+			if (r_page_servos[i] != r_page_servo_disarmed[i]) {
 				PX4_ERR("disarmed servo value mismatch: %d vs %d", r_page_servos[i], r_page_servo_disarmed[i]);
 				return false;
 			}
 
-			if (hrt_elapsed_time(&starttime) >= INIT_TIME_US &&
-			    r_page_servos[i] + 1 <= r_page_servo_disarmed[i]) {
+			if (r_page_servos[i] + 1 <= r_page_servo_disarmed[i]) {
 				PX4_ERR("ramp servo value mismatch");
 				return false;
 			}
@@ -465,9 +453,6 @@ bool MixerTest::mixerTest()
 		/* mix */
 		mixed = mixer_group.mix(&outputs[0], output_max);
 
-		output_limit_calc(should_arm, should_prearm, mixed, reverse_pwm_mask, r_page_servo_disarmed, r_page_servo_control_min,
-				  r_page_servo_control_max, outputs, r_page_servos, &output_limit);
-
 		//fprintf(stderr, "mixed %d outputs (max %d)", mixed, output_max);
 
 		for (unsigned i = 0; i < mixed; i++) {
@@ -492,9 +477,6 @@ bool MixerTest::mixerTest()
 
 		/* mix */
 		mixed = mixer_group.mix(&outputs[0], output_max);
-
-		output_limit_calc(should_arm, should_prearm, mixed, reverse_pwm_mask, r_page_servo_disarmed, r_page_servo_control_min,
-				  r_page_servo_control_max, outputs, r_page_servos, &output_limit);
 
 		//warnx("mixed %d outputs (max %d), values:", mixed, output_max);
 		for (unsigned i = 0; i < mixed; i++) {
@@ -525,13 +507,10 @@ bool MixerTest::mixerTest()
 	sleepcount = 0;
 	should_arm = true;
 
-	while (hrt_elapsed_time(&starttime) < 600000 + RAMP_TIME_US) {
+	while (hrt_elapsed_time(&starttime) < 600000) {
 
 		/* mix */
 		mixed = mixer_group.mix(&outputs[0], output_max);
-
-		output_limit_calc(should_arm, should_prearm, mixed, reverse_pwm_mask, r_page_servo_disarmed, r_page_servo_control_min,
-				  r_page_servo_control_max, outputs, r_page_servos, &output_limit);
 
 		//warnx("mixed %d outputs (max %d), values:", mixed, output_max);
 		for (unsigned i = 0; i < mixed; i++) {
@@ -542,16 +521,14 @@ bool MixerTest::mixerTest()
 
 			//fprintf(stderr, "ramp:\t %d: out: %8.4f, servo: %d \n", i, (double)outputs[i], (int)r_page_servos[i]);
 
-			if (hrt_elapsed_time(&starttime) < RAMP_TIME_US &&
-			    (r_page_servos[i] + 1 <= r_page_servo_disarmed[i] ||
+			if ((r_page_servos[i] + 1 <= r_page_servo_disarmed[i] ||
 			     r_page_servos[i] > servo_predicted[i])) {
 				PX4_ERR("ramp servo value mismatch");
 				return false;
 			}
 
 			/* check post ramp phase */
-			if (hrt_elapsed_time(&starttime) > RAMP_TIME_US &&
-			    abs(servo_predicted[i] - r_page_servos[i]) > 2) {
+			if (abs(servo_predicted[i] - r_page_servos[i]) > 2) {
 				printf("\t %d: %8.4f predicted: %d, servo: %d\n", i, (double)outputs[i], servo_predicted[i], (int)r_page_servos[i]);
 				PX4_ERR("mixer violated predicted value");
 				return false;
