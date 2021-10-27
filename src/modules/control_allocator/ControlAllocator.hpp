@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,6 +44,7 @@
 #include <ActuatorEffectiveness/ActuatorEffectiveness.hpp>
 #include <ActuatorEffectiveness/ActuatorEffectivenessCustom.hpp>
 #include <ActuatorEffectiveness/ActuatorEffectivenessMultirotor.hpp>
+#include <ActuatorEffectiveness/ActuatorEffectivenessPlane.hpp>
 #include <ActuatorEffectiveness/ActuatorEffectivenessStandardVTOL.hpp>
 #include <ActuatorEffectiveness/ActuatorEffectivenessTiltrotorVTOL.hpp>
 
@@ -62,8 +63,6 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_motors.h>
 #include <uORB/topics/actuator_servos.h>
-#include <uORB/topics/airspeed.h>
-#include <uORB/topics/battery_status.h>
 #include <uORB/topics/control_allocator_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_torque_setpoint.h>
@@ -129,6 +128,7 @@ private:
 		STANDARD_VTOL  = 1,
 		TILTROTOR_VTOL = 2,
 		CUSTOM         = 3,
+		PLANE          = 4,
 	};
 
 	EffectivenessSource _effectiveness_source_id{EffectivenessSource::NONE};
@@ -147,15 +147,12 @@ private:
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
-	uORB::Subscription _airspeed_sub{ORB_ID(airspeed)};				/**< airspeed subscription */
-
 	matrix::Vector3f _torque_sp;
 	matrix::Vector3f _thrust_sp;
 
 	// float _battery_scale_factor{1.0f};
-	// float _airspeed_scale_factor{1.0f};
 
-	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
+	perf_counter_t	_loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
 	hrt_abstime _last_run{0};
 	hrt_abstime _timestamp_sample{0};

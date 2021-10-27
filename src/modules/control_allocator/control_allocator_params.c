@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,6 +51,7 @@
  * @value 1 Standard VTOL (WIP)
  * @value 2 Tiltrotor VTOL (WIP)
  * @value 3 Custom (CA_ACTn* torque and thrust parameters)
+ * @value 4 Plane (WIP)
  * @group Control Allocation
  */
 PARAM_DEFINE_INT32(CA_AIRFRAME, 0);

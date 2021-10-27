@@ -45,15 +45,15 @@
 
 #include <px4_platform_common/module_params.h>
 #include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionInterval.hpp>
 
+using namespace matrix;
 using namespace time_literals;
 
 class ActuatorEffectivenessMultirotor: public ModuleParams, public ActuatorEffectiveness
 {
 public:
-	ActuatorEffectivenessMultirotor(ModuleParams *parent);
-	virtual ~ActuatorEffectivenessMultirotor() = default;
+	ActuatorEffectivenessMultirotor(ModuleParams *parent) : ModuleParams(parent) {};
+	~ActuatorEffectivenessMultirotor() override = default;
 
 	static constexpr int NUM_ROTORS_MAX = 8;
 
