@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ class ControlAllocationPseudoInverse: public ControlAllocation
 {
 public:
 	ControlAllocationPseudoInverse() = default;
-	virtual ~ControlAllocationPseudoInverse() = default;
+	virtual ~ControlAllocationPseudoInverse() override = default;
 
 	virtual void allocate() override;
 	virtual void setEffectivenessMatrix(const matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &effectiveness,

@@ -32,47 +32,42 @@
  ****************************************************************************/
 
 /**
- * @file ActuatorEffectiveness.hpp
+ * @file ActuatorEffectivenessPlane.hpp
  *
- * Interface for Actuator Effectiveness
+ * Actuator effectiveness for a plane.
  *
- * @author Julien Lecoeur <julien.lecoeur@gmail.com>
  */
 
 #pragma once
 
-#include <ControlAllocation/ControlAllocation.hpp>
+#include "ActuatorEffectiveness.hpp"
 
-#include <matrix/matrix/math.hpp>
+#include <px4_platform_common/module_params.h>
+#include <uORB/Subscription.hpp>
+#include <uORB/topics/airspeed_validated.h>
 
-class ActuatorEffectiveness
+class ActuatorEffectivenessPlane: public ModuleParams, public ActuatorEffectiveness
 {
 public:
-	ActuatorEffectiveness() = default;
-	virtual ~ActuatorEffectiveness() = default;
+	ActuatorEffectivenessPlane(ModuleParams *parent) : ModuleParams(parent) {};
+	~ActuatorEffectivenessPlane() override = default;
 
-	static constexpr uint8_t NUM_ACTUATORS = ControlAllocation::NUM_ACTUATORS;
-	static constexpr uint8_t NUM_AXES = ControlAllocation::NUM_AXES;
+	bool getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix, bool force) override;
 
-	/**
-	 * Get the control effectiveness matrix if updated
-	 *
-	 * @return true if updated and matrix is set
-	 */
-	virtual bool getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix, bool force) = 0;
-
-	/**
-	 * Get the actuator trims
-	 *
-	 * @return Actuator trims
-	 */
-	const matrix::Vector<float, NUM_ACTUATORS> &getActuatorTrim() const { return _trim; }
-
-	/**
-	 * Get the number of actuators
-	 */
-	virtual int numActuators() const = 0;
+	int numActuators() const override { return NUM_ACTUATORS; };
 
 protected:
-	matrix::Vector<float, NUM_ACTUATORS> _trim;			///< Actuator trim
+	void updateAirspeedScaling(bool force = false);
+
+	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> _effectiveness{};
+
+	uORB::Subscription _airspeed_sub{ORB_ID(airspeed_validated)};
+
+	float _airspeed_scaling_prev{0.f};
+
+	bool _updated{false};
+
+	DEFINE_PARAMETERS(
+		(ParamFloat<px4::params::FW_AIRSPD_TRIM>) _param_airspeed_ias_trim
+	)
 };

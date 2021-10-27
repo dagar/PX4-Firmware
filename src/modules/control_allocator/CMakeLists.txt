@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2019-2021 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,6 +44,8 @@ px4_add_module(
 		ActuatorEffectiveness/ActuatorEffectivenessCustom.hpp
 		ActuatorEffectiveness/ActuatorEffectivenessMultirotor.cpp
 		ActuatorEffectiveness/ActuatorEffectivenessMultirotor.hpp
+		ActuatorEffectiveness/ActuatorEffectivenessPlane.cpp
+		ActuatorEffectiveness/ActuatorEffectivenessPlane.hpp
 		ActuatorEffectiveness/ActuatorEffectivenessStandardVTOL.cpp
 		ActuatorEffectiveness/ActuatorEffectivenessStandardVTOL.hpp
 		ActuatorEffectiveness/ActuatorEffectivenessTiltrotorVTOL.cpp
@@ -65,11 +67,24 @@ px4_add_module(
 		module.yaml
 )
 
+
+
+# ControlAllocation test
 px4_add_library(ControlAllocation_testing
 	ControlAllocation/ControlAllocation.cpp
 	ControlAllocation/ControlAllocationPseudoInverse.cpp
 )
 target_link_libraries(ControlAllocation_testing PRIVATE mathlib)
-
 px4_add_unit_gtest(SRC ControlAllocation/ControlAllocationPseudoInverseTest.cpp LINKLIBS ControlAllocation_testing)
-# px4_add_unit_gtest(SRC ActuatorEffectivenessMultirotorTest.cpp LINKLIBS ActuatorEffectiveness)
+
+
+# ActuatorEffectiveness test
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+px4_add_library(ActuatorEffectiveness_testing
+	ActuatorEffectiveness/ActuatorEffectivenessMultirotor.cpp
+)
+target_link_libraries(ActuatorEffectiveness_testing PRIVATE mathlib)
+
+# TODO: linking issue
+#px4_add_unit_gtest(SRC ActuatorEffectiveness/ActuatorEffectivenessMultirotorTest.cpp LINKLIBS ActuatorEffectiveness_testing)
+

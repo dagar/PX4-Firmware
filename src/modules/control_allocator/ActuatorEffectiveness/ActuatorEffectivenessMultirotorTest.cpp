@@ -40,7 +40,8 @@
  */
 
 #include <gtest/gtest.h>
-#include <ActuatorEffectivenessMultirotor.hpp>
+
+#include <ActuatorEffectiveness/ActuatorEffectivenessMultirotor.hpp>
 
 using namespace matrix;
 
@@ -48,44 +49,44 @@ TEST(ActuatorEffectivenessMultirotorTest, AllZeroCase)
 {
 	// Quad wide geometry
 	ActuatorEffectivenessMultirotor::MultirotorGeometry geometry = {};
-	geometry.rotors[0].position_x = 1.0f;
-	geometry.rotors[0].position_y = 1.0f;
-	geometry.rotors[0].position_z = 0.0f;
-	geometry.rotors[0].axis_x = 0.0f;
-	geometry.rotors[0].axis_y = 0.0f;
-	geometry.rotors[0].axis_z = -1.0f;
+	geometry.rotors[0].position(0) = 1.0f;
+	geometry.rotors[0].position(1) = 1.0f;
+	geometry.rotors[0].position(2) = 0.0f;
+	geometry.rotors[0].axis(0) = 0.0f;
+	geometry.rotors[0].axis(1) = 0.0f;
+	geometry.rotors[0].axis(2) = -1.0f;
 	geometry.rotors[0].thrust_coef = 1.0f;
 	geometry.rotors[0].moment_ratio = 0.05f;
 
-	geometry.rotors[1].position_x = -1.0f;
-	geometry.rotors[1].position_y = -1.0f;
-	geometry.rotors[1].position_z = 0.0f;
-	geometry.rotors[1].axis_x = 0.0f;
-	geometry.rotors[1].axis_y = 0.0f;
-	geometry.rotors[1].axis_z = -1.0f;
+	geometry.rotors[1].position(0) = -1.0f;
+	geometry.rotors[1].position(1) = -1.0f;
+	geometry.rotors[1].position(2) = 0.0f;
+	geometry.rotors[1].axis(0) = 0.0f;
+	geometry.rotors[1].axis(1) = 0.0f;
+	geometry.rotors[1].axis(2) = -1.0f;
 	geometry.rotors[1].thrust_coef = 1.0f;
 	geometry.rotors[1].moment_ratio = 0.05f;
 
-	geometry.rotors[2].position_x = 1.0f;
-	geometry.rotors[2].position_y = -1.0f;
-	geometry.rotors[2].position_z = 0.0f;
-	geometry.rotors[2].axis_x = 0.0f;
-	geometry.rotors[2].axis_y = 0.0f;
-	geometry.rotors[2].axis_z = -1.0f;
+	geometry.rotors[2].position(0) = 1.0f;
+	geometry.rotors[2].position(1) = -1.0f;
+	geometry.rotors[2].position(2) = 0.0f;
+	geometry.rotors[2].axis(0) = 0.0f;
+	geometry.rotors[2].axis(1) = 0.0f;
+	geometry.rotors[2].axis(2) = -1.0f;
 	geometry.rotors[2].thrust_coef = 1.0f;
 	geometry.rotors[2].moment_ratio = -0.05f;
 
-	geometry.rotors[3].position_x = -1.0f;
-	geometry.rotors[3].position_y = 1.0f;
-	geometry.rotors[3].position_z = 0.0f;
-	geometry.rotors[3].axis_x = 0.0f;
-	geometry.rotors[3].axis_y = 0.0f;
-	geometry.rotors[3].axis_z = -1.0f;
+	geometry.rotors[3].position(0) = -1.0f;
+	geometry.rotors[3].position(1) = 1.0f;
+	geometry.rotors[3].position(2) = 0.0f;
+	geometry.rotors[3].axis(0) = 0.0f;
+	geometry.rotors[3].axis(1) = 0.0f;
+	geometry.rotors[3].axis(2) = -1.0f;
 	geometry.rotors[3].thrust_coef = 1.0f;
 	geometry.rotors[3].moment_ratio = -0.05f;
 
-	matrix::Matrix<float, ActuatorEffectiveness::NUM_AXES, ActuatorEffectiveness::NUM_ACTUATORS> effectiveness =
-		ActuatorEffectivenessMultirotor::computeEffectivenessMatrix(geometry);
+	Matrix<float, ActuatorEffectivenessMultirotor::NUM_AXES, ActuatorEffectivenessMultirotor::NUM_ACTUATORS> effectiveness{};
+	ActuatorEffectivenessMultirotor::computeEffectivenessMatrix(geometry, effectiveness);
 
 	const float expected[ActuatorEffectiveness::NUM_AXES][ActuatorEffectiveness::NUM_ACTUATORS] = {
 		{-1.0f,   1.0f,   1.0f,  -1.0f,  0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
@@ -95,8 +96,8 @@ TEST(ActuatorEffectivenessMultirotorTest, AllZeroCase)
 		{ 0.f,    0.f,    0.f,    0.f,   0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f},
 		{-1.0f,  -1.0f,  -1.0f,  -1.0f,  0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f}
 	};
-	matrix::Matrix<float, ActuatorEffectiveness::NUM_AXES, ActuatorEffectiveness::NUM_ACTUATORS> effectiveness_expected(
-		expected);
+	Matrix<float, ActuatorEffectivenessMultirotor::NUM_AXES, ActuatorEffectivenessMultirotor::NUM_ACTUATORS>
+	effectiveness_expected{expected};
 
 	EXPECT_EQ(effectiveness, effectiveness_expected);
 }

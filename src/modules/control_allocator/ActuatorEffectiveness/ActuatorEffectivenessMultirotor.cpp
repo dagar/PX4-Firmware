@@ -41,11 +41,6 @@
 
 #include "ActuatorEffectivenessMultirotor.hpp"
 
-ActuatorEffectivenessMultirotor::ActuatorEffectivenessMultirotor(ModuleParams *parent):
-	ModuleParams(parent)
-{
-}
-
 bool
 ActuatorEffectivenessMultirotor::getEffectivenessMatrix(matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> &matrix,
 		bool force)
