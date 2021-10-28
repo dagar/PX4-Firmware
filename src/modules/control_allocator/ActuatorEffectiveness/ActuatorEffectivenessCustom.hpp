@@ -59,8 +59,7 @@ public:
 
 	int numActuators() const override { return _num_actuators; }
 private:
-
-	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> _matrix{};
+	matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS> _effectiveness{};
 
 	int _num_actuators{0};
 

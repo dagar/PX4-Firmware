@@ -62,6 +62,32 @@ void ActuatorEffectivenessPlane::updateAirspeedScaling(bool force)
 						{ 0.f, 0.f, 0.f,       0.f, 0.f,  0.f,       0.f,       0.f,       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f}  // THRUST Z
 					};
 
+					_effectiveness.zero();
+
+					// Roll: ailerons actuators 5 & 6
+					_effectiveness(0, 5) = -0.5f * SC;
+					_effectiveness(0, 6) =  0.5f * SC;
+
+					// Pitch: elevator on actuator 7
+					_effectiveness(1, 7) = 0.5f * SC;
+
+					// Yaw: rudder on actuator 2
+					_effectiveness(2, 2) = 0.5f * SC;
+
+					// Throttle: actuator 4
+					_effectiveness(3, 4) = 0.5f * SC;
+
+
+					// TODO: AAERT?
+					// TODO: functions, directions, etc
+					//  airspeed scaling option per actuator?
+					//  battery scaling option per actuator?
+					//    MC motor, Roll, Pitch, Yaw, custom?
+
+
+
+
+
 					_effectiveness = matrix::Matrix<float, NUM_AXES, NUM_ACTUATORS>(B_plane);
 
 					_airspeed_scaling_prev = airspeed_scaling;
