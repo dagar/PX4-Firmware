@@ -58,6 +58,10 @@ MavlinkStream::update(const hrt_abstime &t)
 {
 	update_data();
 
+	if (!updated()) {
+		return 0;
+	}
+
 	bool sent = false;
 
 	if (_interval == 0) {
@@ -85,6 +89,9 @@ MavlinkStream::update(const hrt_abstime &t)
 				_last_sent = math::constrain(_last_sent + _interval, t - _interval, t);
 				sent = true;
 			}
+
+		} else {
+			set_subscription_interval(_interval);
 		}
 
 	} else {
@@ -95,6 +102,9 @@ MavlinkStream::update(const hrt_abstime &t)
 				_last_sent = math::constrain(_last_sent + interval, t - interval, t);
 				sent = true;
 			}
+
+		} else {
+			set_subscription_interval(interval);
 		}
 	}
 

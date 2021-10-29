@@ -47,6 +47,8 @@ public:
 	const char *get_name() const override { return MavlinkStreamOpticalFlowRad::get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
 
+	bool updated() override { return _optical_flow_sub.updated(); }
+
 	unsigned get_size() override
 	{
 		return _optical_flow_sub.advertised() ? (MAVLINK_MSG_ID_OPTICAL_FLOW_RAD_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;

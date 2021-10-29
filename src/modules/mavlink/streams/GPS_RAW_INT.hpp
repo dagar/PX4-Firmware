@@ -47,6 +47,8 @@ public:
 	const char *get_name() const override { return get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
 
+	bool updated() override { return _sensor_gps_sub.updated(); }
+
 	unsigned get_size() override
 	{
 		return _sensor_gps_sub.advertised() ? (MAVLINK_MSG_ID_GPS_RAW_INT_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;

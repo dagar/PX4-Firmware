@@ -51,6 +51,8 @@ public:
 	const char *get_name() const override { return get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
 
+	bool updated() override { return _lpos_sub.updated() || _airspeed_validated_sub.updated(); }
+
 	unsigned get_size() override
 	{
 		if (_lpos_sub.advertised() || _airspeed_validated_sub.advertised()) {

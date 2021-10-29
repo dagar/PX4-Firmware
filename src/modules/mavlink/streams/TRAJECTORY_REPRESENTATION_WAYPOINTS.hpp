@@ -47,6 +47,8 @@ public:
 	static constexpr const char *get_name_static() { return "TRAJECTORY_REPRESENTATION_WAYPOINTS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_TRAJECTORY_REPRESENTATION_WAYPOINTS; }
 
+	bool updated() override { return _traj_wp_avoidance_sub.updated(); }
+
 	unsigned get_size() override
 	{
 		if (_traj_wp_avoidance_sub.advertised()) {

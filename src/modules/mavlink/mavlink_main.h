@@ -68,6 +68,7 @@
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/posix.h>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/SubscriptionInterval.hpp>
@@ -85,9 +86,6 @@
 #include "mavlink_shell.h"
 #include "mavlink_ulog.h"
 
-#define DEFAULT_BAUD_RATE       57600
-#define DEFAULT_DEVICE_NAME     "/dev/ttyS1"
-
 #define HASH_PARAM              "_HASH_CHECK"
 
 #if defined(CONFIG_NET) || defined(__PX4_POSIX)
@@ -104,7 +102,7 @@ enum class Protocol {
 
 using namespace time_literals;
 
-class Mavlink final : public ModuleParams
+class Mavlink final : public ModuleParams, public px4::ScheduledWorkItem
 {
 
 public:
@@ -195,7 +193,7 @@ public:
 	 */
 	int			get_component_id() const { return mavlink_system.compid; }
 
-	const char *_device_name{DEFAULT_DEVICE_NAME};
+	char _device_name[20] {};
 
 	enum MAVLINK_MODE {
 		MAVLINK_MODE_NORMAL = 0,
@@ -305,8 +303,6 @@ public:
 	 * @return free space in the UART TX buffer
 	 */
 	unsigned		get_free_tx_buf();
-
-	static int		start_helper(int argc, char *argv[]);
 
 	/**
 	 * Enable / disable Hardware in the Loop simulation mode.
@@ -508,7 +504,7 @@ public:
 	{
 		if (_mavlink_ulog) { return; }
 
-		_mavlink_ulog = MavlinkULog::try_start(_datarate, 0.7f, target_system, target_component);
+		_mavlink_ulog = MavlinkULog::try_start(this, _datarate, 0.7f, target_system, target_component);
 	}
 
 	const events::SendProtocol &get_events_protocol() const { return _events; };
@@ -543,7 +539,6 @@ private:
 	MavlinkReceiver 	_receiver;
 
 	int			_instance_id{-1};
-	int			_task_id{-1};
 
 	px4::atomic_bool	_task_should_exit{false};
 	px4::atomic_bool	_task_running{false};
@@ -580,6 +575,8 @@ private:
 
 	px4::atomic_bool	_should_check_events{false};    /**< Events subscription: only one MAVLink instance should check */
 
+	uint16_t _event_sequence_offset{0}; // offset to account for skipped events, not sent via MAVLink
+
 	int		_main_loop_delay{MAVLINK_MAX_INTERVAL};	/**< mainloop delay, depends on data rate */
 
 	List<MavlinkStream *>		_streams;
@@ -599,7 +596,7 @@ private:
 
 	int			_uart_fd{-1};
 
-	int			_baudrate{57600};
+	int			_baudrate{0};
 	int			_datarate{1000};		///< data rate for normal streams (attitude, position, etc.)
 	float			_rate_mult{1.0f};
 	float			_rate_div{1.0f};
@@ -705,8 +702,7 @@ private:
 
 	void			mavlink_update_parameters();
 
-	int mavlink_open_uart(const int baudrate = DEFAULT_BAUD_RATE,
-			      const char *uart_name = DEFAULT_DEVICE_NAME,
+	int mavlink_open_uart(const char *uart_name, const int baudrate,
 			      const FLOW_CONTROL_MODE flow_control = FLOW_CONTROL_AUTO);
 
 	static constexpr unsigned RADIO_BUFFER_CRITICAL_LOW_PERCENTAGE = 25;
@@ -768,7 +764,6 @@ private:
 	void init_udp();
 #endif // MAVLINK_UDP
 
-
 	void set_channel();
 
 	bool set_instance_id();
@@ -776,7 +771,16 @@ private:
 	/**
 	 * Main mavlink task.
 	 */
-	int task_main(int argc, char *argv[]);
+	struct setup_data_t {
+		int argc;
+		char **argv;
+		int return_code{-1};
+	};
+	static void initializer_trampoline(void *argument);
+
+	int setup(int argc, char *argv[]);
+
+	void Run() override;
 
 	// Disallow copy construction and move assignment.
 	Mavlink(const Mavlink &) = delete;

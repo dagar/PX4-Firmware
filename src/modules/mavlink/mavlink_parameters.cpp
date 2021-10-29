@@ -464,7 +464,7 @@ MavlinkParametersManager::send_one()
 			uint32_t hash = param_hash_check();
 
 			/* build the one-off response message */
-			mavlink_param_value_t msg;
+			mavlink_param_value_t msg{};
 			msg.param_count = param_count_used();
 			msg.param_index = -1;
 			strncpy(msg.param_id, HASH_PARAM, MAVLINK_MSG_PARAM_VALUE_FIELD_PARAM_ID_LEN);
@@ -516,8 +516,6 @@ MavlinkParametersManager::send_param(param_t param, int component_id)
 		return 1;
 	}
 
-	mavlink_param_value_t msg;
-
 	/*
 	 * get param value, since MAVLink encodes float and int params in the same
 	 * space during transmission, copy param onto float val_buf
@@ -528,6 +526,7 @@ MavlinkParametersManager::send_param(param_t param, int component_id)
 		return 2;
 	}
 
+	mavlink_param_value_t msg{};
 	msg.param_value = param_value;
 
 	msg.param_count = param_count_used();

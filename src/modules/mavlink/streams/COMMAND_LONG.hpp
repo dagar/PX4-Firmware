@@ -53,9 +53,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamCommandLong(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	explicit MavlinkStreamCommandLong(Mavlink *mavlink) : MavlinkStream(mavlink)
+	{
+		_vehicle_command_sub.registerCallback();
+	}
 
-	uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};
+	uORB::SubscriptionCallbackWorkItem _vehicle_command_sub{_mavlink, ORB_ID(vehicle_command)};
 
 	bool send() override
 	{
