@@ -1196,10 +1196,12 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 			if (interval != 0) {
 				/* set new interval */
 				stream->set_interval(interval);
+				_rate_multi_update_last = 0; // force rate calculation update
 
 			} else {
 				/* delete stream */
 				_streams.deleteNode(stream);
+				_rate_multi_update_last = 0; // force rate calculation update
 				return OK; // must finish with loop after node is deleted
 			}
 
@@ -1214,6 +1216,7 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 	if (stream != nullptr) {
 		stream->set_interval(interval);
 		_streams.add(stream);
+		_rate_multi_update_last = 0; // force rate calculation update
 
 		return OK;
 	}
@@ -1468,6 +1471,8 @@ Mavlink::update_rate_mult()
 
 	/* ensure the rate multiplier never drops below 5% so that something is always sent */
 	_rate_mult = math::constrain(_rate_mult, 0.05f, 1.0f);
+
+	_rate_div = 1.f / _rate_mult;
 }
 
 void
@@ -1855,6 +1860,8 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		ret = -1;
 		break;
 	}
+
+	_rate_multi_update_last = 0; // force rate calculation update
 
 	if (configure_single_stream && !stream_configured && strcmp(configure_single_stream, "HEARTBEAT") != 0) {
 		// stream was not found, assume it is disabled by default
@@ -2285,7 +2292,11 @@ Mavlink::task_main(int argc, char *argv[])
 
 		const hrt_abstime t = hrt_absolute_time();
 
-		update_rate_mult();
+		// update rate multiplier at ~ 10 Hz
+		if (t > _rate_multi_update_last + 100_ms) {
+			update_rate_mult();
+			_rate_multi_update_last = t;
+		}
 
 		// check for parameter updates
 		if (_parameter_update_sub.updated()) {

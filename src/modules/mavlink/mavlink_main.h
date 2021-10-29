@@ -422,6 +422,7 @@ public:
 	List<MavlinkStream *> &get_streams() { return _streams; }
 
 	float			get_rate_mult() const { return _rate_mult; }
+	float			get_rate_div() const { return _rate_div; }
 
 	float			get_baudrate() { return _baudrate; }
 
@@ -602,6 +603,7 @@ private:
 	int			_baudrate{57600};
 	int			_datarate{1000};		///< data rate for normal streams (attitude, position, etc.)
 	float			_rate_mult{1.0f};
+	float			_rate_div{1.0f};
 
 	bool			_radio_status_available{false};
 	bool			_radio_status_critical{false};
@@ -632,6 +634,8 @@ private:
 	unsigned		_bytes_txerr{0};
 	unsigned		_bytes_rx{0};
 	hrt_abstime		_bytes_timestamp{0};
+
+	hrt_abstime             _rate_multi_update_last{0};
 
 #if defined(MAVLINK_UDP)
 	BROADCAST_MODE		_mav_broadcast {BROADCAST_MODE_OFF};
