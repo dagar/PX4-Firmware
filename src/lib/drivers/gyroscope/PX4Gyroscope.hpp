@@ -60,11 +60,62 @@ public:
 
 	void update(const hrt_abstime &timestamp_sample, float x, float y, float z);
 
-	void updateFIFO(sensor_gyro_fifo_s &sample);
+	inline void updateFIFO(sensor_gyro_fifo_s &sample)
+	{
+		// rotate all raw samples and publish fifo
+		const uint8_t N = sample.samples;
+
+		for (int n = 0; n < N; n++) {
+			rotate_3i(_rotation, sample.x[n], sample.y[n], sample.z[n]);
+		}
+
+		sample.device_id = _device_id;
+		sample.scale = _scale;
+		sample.timestamp = hrt_absolute_time();
+		_sensor_fifo_pub.publish(sample);
+
+
+		// publish
+		sensor_gyro_s report;
+		report.timestamp_sample = sample.timestamp_sample;
+		report.device_id = _device_id;
+		report.temperature = _temperature;
+		report.error_count = _error_count;
+
+		// trapezoidal integration (equally spaced)
+		const float scale = _scale / (float)N;
+		report.x = (0.5f * (_last_sample[0] + sample.x[N - 1]) + sum(sample.x, N - 1)) * scale;
+		report.y = (0.5f * (_last_sample[1] + sample.y[N - 1]) + sum(sample.y, N - 1)) * scale;
+		report.z = (0.5f * (_last_sample[2] + sample.z[N - 1]) + sum(sample.z, N - 1)) * scale;
+
+		_last_sample[0] = sample.x[N - 1];
+		_last_sample[1] = sample.y[N - 1];
+		_last_sample[2] = sample.z[N - 1];
+
+		report.samples = N;
+		report.timestamp = hrt_absolute_time();
+
+		_sensor_pub.publish(report);
+	}
+
+
 
 	int get_instance() { return _sensor_pub.get_instance(); };
 
 private:
+
+
+	static constexpr int32_t sum(const int16_t samples[], uint8_t len)
+	{
+		int32_t sum = 0;
+
+		for (int n = 0; n < len; n++) {
+			sum += samples[n];
+		}
+
+		return sum;
+	}
+
 	uORB::PublicationMulti<sensor_gyro_s> _sensor_pub{ORB_ID(sensor_gyro)};
 	uORB::PublicationMulti<sensor_gyro_fifo_s>  _sensor_fifo_pub{ORB_ID(sensor_gyro_fifo)};
 
