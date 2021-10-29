@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,9 +42,11 @@
 
 #pragma once
 
-#include <parameters/param.h>
-
 #include "mavlink_bridge_header.h"
+#include "mavlink_stream.h"
+
+#include <lib/parameters/param.h>
+
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionInterval.hpp>
@@ -58,30 +60,27 @@ using namespace time_literals;
 
 class Mavlink;
 
-class MavlinkParametersManager
+class MavlinkParametersManager : public MavlinkStream
 {
 public:
 	explicit MavlinkParametersManager(Mavlink *mavlink);
 	~MavlinkParametersManager() = default;
 
-	/**
-	 * Handle sending of messages. Call this regularly at a fixed frequency.
-	 * @param t current time
-	 */
-	void send();
+	static constexpr const char *get_name_static() { return "PARAM_VALUE"; }
+	const char *get_name() const override { return MavlinkParametersManager::get_name_static(); }
 
-	unsigned get_size();
+	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_PARAM_VALUE; }
+	uint16_t get_id() override { return get_id_static(); }
+
+	unsigned get_size() override;
+	unsigned get_size_avg() { return 0; }
+
+	bool send() override;
 
 	void handle_message(const mavlink_message_t *msg);
 
 private:
-	int		_send_all_index{-1};
 
-	/* do not allow top copying this class */
-	MavlinkParametersManager(MavlinkParametersManager &);
-	MavlinkParametersManager &operator = (const MavlinkParametersManager &);
-
-protected:
 	/// send a single param if a PARAM_REQUEST_LIST is in progress
 	/// @return true if a parameter was sent
 	bool send_one();
@@ -154,7 +153,7 @@ protected:
 	hrt_abstime _param_update_time{0};
 	int _param_update_index{0};
 
-	Mavlink *_mavlink;
+	int _send_all_index{-1};
 
 	bool _first_send{false};
 };

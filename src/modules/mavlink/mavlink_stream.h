@@ -66,7 +66,9 @@ public:
 	 *
 	 * @param interval the interval in microseconds (us) between messages
 	 */
-	void set_interval(const int interval) { _interval = interval; }
+	virtual void set_interval(const int interval) { _interval = interval; }
+
+	virtual void set_subscription_interval(const uint32_t interval_us) { }
 
 	/**
 	 * Get the interval
@@ -121,6 +123,8 @@ public:
 	 * stream needs to be sent immediately.
 	 */
 	void reset_last_sent() { _last_sent = 0; }
+
+	virtual bool updated() { return true; }
 
 protected:
 	Mavlink      *const _mavlink;

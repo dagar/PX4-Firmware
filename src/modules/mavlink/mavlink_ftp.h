@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2014, 2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2014-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,6 +43,8 @@
 #include <systemlib/err.h>
 #include <drivers/drv_hrt.h>
 
+#include "mavlink_stream.h"
+
 #ifndef MAVLINK_FTP_UNIT_TEST
 #include "mavlink_bridge_header.h"
 #else
@@ -50,20 +52,27 @@
 #endif
 
 class MavlinkFtpTest;
-class Mavlink;
 
 /// MAVLink remote file server. Support FTP like commands using MAVLINK_MSG_ID_FILE_TRANSFER_PROTOCOL message.
-class MavlinkFTP
+class MavlinkFTP : public MavlinkStream
 {
 public:
 	MavlinkFTP(Mavlink *mavlink);
 	~MavlinkFTP();
 
+	static constexpr const char *get_name_static() { return "MAVLINK_FTP"; }
+	const char *get_name() const override { return MavlinkFTP::get_name_static(); }
+
+	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_FILE_TRANSFER_PROTOCOL; }
+	uint16_t get_id() override { return get_id_static(); }
+
+	unsigned get_size() override;
+
 	/**
 	 * Handle sending of messages. Call this regularly at a fixed frequency.
 	 * @param t current time
 	 */
-	void send();
+	bool send() override;
 
 	/// Handle possible FTP message
 	void handle_message(const mavlink_message_t *msg);
@@ -128,8 +137,6 @@ public:
 		kErrFileNotFound                ///< File/directory not found
 	};
 
-	unsigned get_size();
-
 private:
 	char		*_data_as_cstring(PayloadHeader *payload);
 
@@ -151,9 +158,9 @@ private:
 	ErrorCode	_workRename(PayloadHeader *payload);
 	ErrorCode	_workCalcFileCRC32(PayloadHeader *payload);
 
-	uint8_t _getServerSystemId(void);
-	uint8_t _getServerComponentId(void);
-	uint8_t _getServerChannel(void);
+	uint8_t _getServerSystemId();
+	uint8_t _getServerComponentId();
+	uint8_t _getServerChannel();
 
 	/**
 	 * make sure that the working buffers _work_buffer* are allocated
@@ -182,8 +189,6 @@ private:
 
 	ReceiveMessageFunc_t	_utRcvMsgFunc{};	///< Unit test override for mavlink message sending
 	void			*_worker_data{nullptr};	///< Additional parameter to _utRcvMsgFunc;
-
-	Mavlink *_mavlink;
 
 	/* do not allow copying this class */
 	MavlinkFTP(const MavlinkFTP &);

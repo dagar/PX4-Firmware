@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -72,13 +72,26 @@ uint16_t MavlinkMissionManager::_safepoint_update_counter = 0;
 		 (_msg.target_component == MAV_COMP_ID_ALL)))
 
 MavlinkMissionManager::MavlinkMissionManager(Mavlink *mavlink) :
-	_mavlink(mavlink)
+	MavlinkStream(mavlink),
+	_slow_rate_limiter(_interval / 5.0f)
 {
 	init_offboard_mission();
 }
 
-void
-MavlinkMissionManager::init_offboard_mission()
+unsigned MavlinkMissionManager::get_size()
+{
+	if (_state == MAVLINK_WPM_STATE_SENDLIST) {
+		return MAVLINK_MSG_ID_MISSION_ITEM_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+
+	} else if (_state == MAVLINK_WPM_STATE_GETLIST) {
+		return MAVLINK_MSG_ID_MISSION_REQUEST + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+
+	} else {
+		return 0;
+	}
+}
+
+void MavlinkMissionManager::init_offboard_mission()
 {
 	if (!_dataman_init) {
 		_dataman_init = true;
@@ -474,12 +487,11 @@ MavlinkMissionManager::send_mission_item_reached(uint16_t seq)
 	PX4_DEBUG("WPM: Send MISSION_ITEM_REACHED reached_seq %u", wp_reached.seq);
 }
 
-void
-MavlinkMissionManager::send()
+bool MavlinkMissionManager::send()
 {
 	// do not send anything over high latency communication
 	if (_mavlink->get_mode() == Mavlink::MAVLINK_MODE_IRIDIUM) {
-		return;
+		return false;
 	}
 
 	mission_result_s mission_result{};
@@ -553,11 +565,11 @@ MavlinkMissionManager::send()
 		_time_last_sent = 0;
 		_time_last_recv = 0;
 	}
+
+	return true;
 }
 
-
-void
-MavlinkMissionManager::handle_message(const mavlink_message_t *msg)
+void MavlinkMissionManager::handle_message(const mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
 	case MAVLINK_MSG_ID_MISSION_ACK:

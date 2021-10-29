@@ -41,14 +41,10 @@
 
 #pragma once
 
-#include "mavlink_ftp.h"
-#include "mavlink_log_handler.h"
-#include "mavlink_mission.h"
-#include "mavlink_parameters.h"
 #include "mavlink_timesync.h"
 #include "tune_publisher.h"
 
-#include <geo/geo.h>
+#include <lib/geo/geo.h>
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/drivers/barometer/PX4Barometer.hpp>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
@@ -124,18 +120,13 @@ public:
 	MavlinkReceiver(Mavlink *parent);
 	~MavlinkReceiver() override;
 
-	void start();
-	void stop();
+	void update();
 
 	bool component_was_seen(int system_id, int component_id);
 	void enable_message_statistics() { _message_statistics_enabled = true; }
 	void print_detailed_rx_stats() const;
 
-	void request_stop() { _should_exit.store(true); }
-
 private:
-	static void *start_trampoline(void *context);
-	void run();
 
 	void acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result, uint8_t progress = 0);
 
@@ -234,8 +225,6 @@ private:
 	void update_message_statistics(const mavlink_message_t &message);
 	void update_rx_stats(const mavlink_message_t &message);
 
-	px4::atomic_bool 	_should_exit{false};
-	pthread_t		_thread {};
 	/**
 	 * @brief Updates optical flow parameters.
 	 */
@@ -243,10 +232,6 @@ private:
 
 	Mavlink				*_mavlink;
 
-	MavlinkFTP			_mavlink_ftp;
-	MavlinkLogHandler		_mavlink_log_handler;
-	MavlinkMissionManager		_mission_manager;
-	MavlinkParametersManager	_parameters_manager;
 	MavlinkTimesync			_mavlink_timesync;
 
 	mavlink_status_t		_status{}; ///< receiver status, used for mavlink_parse_char()
@@ -351,8 +336,6 @@ private:
 	uORB::Subscription 	_actuator_controls_3_sub{ORB_ID(actuator_controls_3)};
 	uORB::Subscription	_autotune_attitude_control_status_sub{ORB_ID(autotune_attitude_control_status)};
 
-	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
-
 	// hil_sensor and hil_state_quaternion
 	enum SensorSource {
 		ACCEL		= 0b111,
@@ -411,8 +394,4 @@ private:
 		(ParamFloat<px4::params::BAT_EMERGEN_THR>)  _param_bat_emergen_thr,
 		(ParamFloat<px4::params::BAT_LOW_THR>)      _param_bat_low_thr
 	);
-
-	// Disallow copy construction and move assignment.
-	MavlinkReceiver(const MavlinkReceiver &) = delete;
-	MavlinkReceiver operator=(const MavlinkReceiver &) = delete;
 };

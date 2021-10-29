@@ -45,6 +45,8 @@ public:
 	const char *get_name() const override { return get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
 
+	bool updated() override { return _att_sub.updated(); }
+
 	unsigned get_size() override
 	{
 		if (_att_sub.advertised() || _gpos_sub.advertised()) {

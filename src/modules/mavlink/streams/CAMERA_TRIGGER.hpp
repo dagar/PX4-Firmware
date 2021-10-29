@@ -50,6 +50,8 @@ public:
 
 	bool const_rate() override { return true; }
 
+	bool updated() override { return _camera_trigger_sub.updated(); }
+
 	unsigned get_size() override
 	{
 		if (_camera_trigger_sub.advertised()) {

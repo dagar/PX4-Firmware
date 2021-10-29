@@ -54,17 +54,7 @@ static const char *kTmpData    = MOUNTPOINT "/$log$.txt";
 #define PX4LOG_DIRECTORY    DT_DIR
 #endif
 
-//#define MAVLINK_LOG_HANDLER_VERBOSE
-
-#ifdef MAVLINK_LOG_HANDLER_VERBOSE
-#define PX4LOG_WARN(fmt, ...) warnx(fmt, ##__VA_ARGS__)
-#else
-#define PX4LOG_WARN(fmt, ...)
-#endif
-
-//-------------------------------------------------------------------
-static bool
-stat_file(const char *file, time_t *date = nullptr, uint32_t *size = nullptr)
+static bool stat_file(const char *file, time_t *date = nullptr, uint32_t *size = nullptr)
 {
 	struct stat st;
 
@@ -79,20 +69,17 @@ stat_file(const char *file, time_t *date = nullptr, uint32_t *size = nullptr)
 	return false;
 }
 
-//-------------------------------------------------------------------
-MavlinkLogHandler::MavlinkLogHandler(Mavlink *mavlink)
-	: _mavlink(mavlink)
+MavlinkLogHandler::MavlinkLogHandler(Mavlink *mavlink) :
+	MavlinkStream(mavlink)
 {
-
 }
+
 MavlinkLogHandler::~MavlinkLogHandler()
 {
 	_close_and_unlink_files();
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::handle_message(const mavlink_message_t *msg)
+void MavlinkLogHandler::handle_message(const mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
 	case MAVLINK_MSG_ID_LOG_REQUEST_LIST:
@@ -113,32 +100,48 @@ MavlinkLogHandler::handle_message(const mavlink_message_t *msg)
 	}
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::send()
+unsigned MavlinkLogHandler::get_size()
+{
+	//-- Sending Log Entries
+	if (_current_status == LogHandlerState::Listing) {
+		// Sending Log Data (contents of one of the log files)
+		return MAVLINK_MSG_ID_LOG_ENTRY_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+
+	} else if (_current_status == LogHandlerState::SendingData) {
+		// Idle
+		return MAVLINK_MSG_ID_LOG_DATA_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+
+	} else {
+		return 0;
+	}
+}
+
+bool MavlinkLogHandler::send()
 {
 	//-- An arbitrary count of max bytes in one go (one of the two below but never both)
-#define MAX_BYTES_SEND 256 * 1024
+	static constexpr size_t MAX_BYTES_SEND = 256 * 1024;
 	size_t count = 0;
 
 	//-- Log Entries
 	while (_current_status == LogHandlerState::Listing
-	       && _mavlink->get_free_tx_buf() > MAVLINK_MSG_ID_LOG_ENTRY_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES
+	       && _mavlink->get_free_tx_buf() > get_size()
 	       && count < MAX_BYTES_SEND) {
+
 		count += _log_send_listing();
 	}
 
 	//-- Log Data
 	while (_current_status == LogHandlerState::SendingData
-	       && _mavlink->get_free_tx_buf() > MAVLINK_MSG_ID_LOG_DATA_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES
+	       && _mavlink->get_free_tx_buf() > get_size()
 	       && count < MAX_BYTES_SEND) {
+
 		count += _log_send_data();
 	}
+
+	return true;
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::_log_request_list(const mavlink_message_t *msg)
+void MavlinkLogHandler::_log_request_list(const mavlink_message_t *msg)
 {
 	mavlink_log_request_list_t request;
 	mavlink_msg_log_request_list_decode(msg, &request);
@@ -166,27 +169,21 @@ MavlinkLogHandler::_log_request_list(const mavlink_message_t *msg)
 
 	if (_log_count) {
 		//-- Define (and clamp) range
-		_next_entry = request.start < _log_count ? request.start :
-			      _log_count - 1;
-		_last_entry = request.end   < _log_count ? request.end :
-			      _log_count - 1;
+		_next_entry = request.start < _log_count ? request.start : _log_count - 1;
+		_last_entry = request.end   < _log_count ? request.end : _log_count - 1;
 	}
 
-	PX4LOG_WARN("\nMavlinkLogHandler::_log_request_list: start: %d last: %d count: %d",
-		    _next_entry,
-		    _last_entry,
-		    _log_count);
+	PX4_DEBUG("\nMavlinkLogHandler::_log_request_list: start: %d last: %d count: %d", _next_entry, _last_entry, _log_count);
+
 	//-- Enable streaming
 	_current_status = LogHandlerState::Listing;
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::_log_request_data(const mavlink_message_t *msg)
+void MavlinkLogHandler::_log_request_data(const mavlink_message_t *msg)
 {
 	//-- If we haven't listed, we can't do much
 	if (_current_status == LogHandlerState::Inactive) {
-		PX4LOG_WARN("MavlinkLogHandler::_log_request_data Log request with no list requested.");
+		PX4_DEBUG("MavlinkLogHandler::_log_request_data Log request with no list requested.");
 		return;
 	}
 
@@ -195,8 +192,8 @@ MavlinkLogHandler::_log_request_data(const mavlink_message_t *msg)
 
 	//-- Does the requested log exist?
 	if (request.id >= _log_count) {
-		PX4LOG_WARN("MavlinkLogHandler::_log_request_data Requested log %" PRIu16 " but we only have %u.", request.id,
-			    _log_count);
+		PX4_DEBUG("MavlinkLogHandler::_log_request_data Requested log %" PRIu16 " but we only have %u.", request.id,
+			  _log_count);
 		return;
 	}
 
@@ -211,7 +208,8 @@ MavlinkLogHandler::_log_request_data(const mavlink_message_t *msg)
 
 		if (!_get_entry(_current_log_index, _current_log_size, time_utc,
 				_current_log_filename, sizeof(_current_log_filename))) {
-			PX4LOG_WARN("LogListHelper::get_entry failed.");
+
+			PX4_DEBUG("LogListHelper::get_entry failed.");
 			return;
 		}
 
@@ -235,9 +233,7 @@ MavlinkLogHandler::_log_request_data(const mavlink_message_t *msg)
 	_current_status = LogHandlerState::SendingData;
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::_log_request_erase(const mavlink_message_t * /*msg*/)
+void MavlinkLogHandler::_log_request_erase(const mavlink_message_t * /*msg*/)
 {
 	/*
 	mavlink_log_erase_t request;
@@ -250,19 +246,15 @@ MavlinkLogHandler::_log_request_erase(const mavlink_message_t * /*msg*/)
 	_delete_all(kLogRoot);
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::_log_request_end(const mavlink_message_t * /*msg*/)
+void MavlinkLogHandler::_log_request_end(const mavlink_message_t * /*msg*/)
 {
-	PX4LOG_WARN("MavlinkLogHandler::_log_request_end");
+	PX4_DEBUG("MavlinkLogHandler::_log_request_end");
 
 	_current_status = LogHandlerState::Inactive;
 	_close_and_unlink_files();
 }
 
-//-------------------------------------------------------------------
-size_t
-MavlinkLogHandler::_log_send_listing()
+size_t MavlinkLogHandler::_log_send_listing()
 {
 	mavlink_log_entry_t response;
 	uint32_t size, date;
@@ -282,23 +274,21 @@ MavlinkLogHandler::_log_send_listing()
 		_next_entry++;
 	}
 
-	PX4LOG_WARN("MavlinkLogHandler::_log_send_listing id: %" PRIu16 " count: %" PRIu16 " last: %" PRIu16 " size: %" PRIu32
-		    " date: %" PRIu32 " status: %" PRIu32,
-		    response.id,
-		    response.num_logs,
-		    response.last_log_num,
-		    response.size,
-		    response.time_utc,
-		    (uint32_t)_current_status);
+	PX4_DEBUG("MavlinkLogHandler::_log_send_listing id: %" PRIu16 " count: %" PRIu16 " last: %" PRIu16 " size: %" PRIu32
+		  " date: %" PRIu32 " status: %" PRIu32,
+		  response.id,
+		  response.num_logs,
+		  response.last_log_num,
+		  response.size,
+		  response.time_utc,
+		  (uint32_t)_current_status);
+
 	return sizeof(response);
 }
 
-//-------------------------------------------------------------------
-size_t
-MavlinkLogHandler::_log_send_data()
+size_t MavlinkLogHandler::_log_send_data()
 {
-	mavlink_log_data_t response;
-	memset(&response, 0, sizeof(response));
+	mavlink_log_data_t response{};
 	uint32_t len = _current_log_data_remaining;
 
 	if (len > sizeof(response.data)) {
@@ -320,7 +310,6 @@ MavlinkLogHandler::_log_send_data()
 	return sizeof(response);
 }
 
-//-------------------------------------------------------------------
 void MavlinkLogHandler::_close_and_unlink_files()
 {
 	if (_current_log_filep) {
@@ -333,9 +322,7 @@ void MavlinkLogHandler::_close_and_unlink_files()
 	unlink(kTmpData);
 }
 
-//-------------------------------------------------------------------
-bool
-MavlinkLogHandler::_get_entry(int idx, uint32_t &size, uint32_t &date, char *filename, int filename_len)
+bool MavlinkLogHandler::_get_entry(int idx, uint32_t &size, uint32_t &date, char *filename, int filename_len)
 {
 	//-- Find log file in log list file created during init()
 	size = 0;
@@ -372,9 +359,7 @@ MavlinkLogHandler::_get_entry(int idx, uint32_t &size, uint32_t &date, char *fil
 	return result;
 }
 
-//-------------------------------------------------------------------
-bool
-MavlinkLogHandler::_open_for_transmit()
+bool MavlinkLogHandler::_open_for_transmit()
 {
 	if (_current_log_filep) {
 		::fclose(_current_log_filep);
@@ -384,23 +369,21 @@ MavlinkLogHandler::_open_for_transmit()
 	_current_log_filep = ::fopen(_current_log_filename, "rb");
 
 	if (!_current_log_filep) {
-		PX4LOG_WARN("MavlinkLogHandler::open_for_transmit Could not open %s", _current_log_filename);
+		PX4_DEBUG("MavlinkLogHandler::open_for_transmit Could not open %s", _current_log_filename);
 		return false;
 	}
 
 	return true;
 }
 
-//-------------------------------------------------------------------
-size_t
-MavlinkLogHandler::_get_log_data(uint8_t len, uint8_t *buffer)
+size_t MavlinkLogHandler::_get_log_data(uint8_t len, uint8_t *buffer)
 {
 	if (!_current_log_filename[0]) {
 		return 0;
 	}
 
 	if (!_current_log_filep) {
-		PX4LOG_WARN("MavlinkLogHandler::get_log_data file not open %s", _current_log_filename);
+		PX4_DEBUG("MavlinkLogHandler::get_log_data file not open %s", _current_log_filename);
 		return 0;
 	}
 
@@ -409,7 +392,7 @@ MavlinkLogHandler::_get_log_data(uint8_t len, uint8_t *buffer)
 	if (offset && fseek(_current_log_filep, offset, SEEK_CUR)) {
 		fclose(_current_log_filep);
 		_current_log_filep = nullptr;
-		PX4LOG_WARN("MavlinkLogHandler::get_log_data Seek error in %s", _current_log_filename);
+		PX4_DEBUG("MavlinkLogHandler::get_log_data Seek error in %s", _current_log_filename);
 		return 0;
 	}
 
@@ -417,9 +400,7 @@ MavlinkLogHandler::_get_log_data(uint8_t len, uint8_t *buffer)
 	return result;
 }
 
-
-void
-MavlinkLogHandler::_reset_list_helper()
+void MavlinkLogHandler::_reset_list_helper()
 {
 	_next_entry = 0;
 	_last_entry = 0;
@@ -431,11 +412,9 @@ MavlinkLogHandler::_reset_list_helper()
 	_current_log_filep = nullptr;
 }
 
-void
-MavlinkLogHandler::_init_list_helper()
+void MavlinkLogHandler::_init_list_helper()
 {
 	/*
-
 		When this helper is created, it scans the log directory
 		and collects all log files found into one file for easy,
 		subsequent access.
@@ -457,7 +436,7 @@ MavlinkLogHandler::_init_list_helper()
 	FILE *f = ::fopen(kTmpData, "w");
 
 	if (!f) {
-		PX4LOG_WARN("MavlinkLogHandler::init Error creating %s", kTmpData);
+		PX4_DEBUG("MavlinkLogHandler::init Error creating %s", kTmpData);
 		closedir(dp);
 		return;
 	}
@@ -485,14 +464,12 @@ MavlinkLogHandler::_init_list_helper()
 
 	// Rename temp file to data file
 	if (rename(kTmpData, kLogData)) {
-		PX4LOG_WARN("MavlinkLogHandler::init Error renaming %s", kTmpData);
+		PX4_DEBUG("MavlinkLogHandler::init Error renaming %s", kTmpData);
 		_log_count = 0;
 	}
 }
 
-//-------------------------------------------------------------------
-bool
-MavlinkLogHandler::_get_session_date(const char *path, const char *dir, time_t &date)
+bool MavlinkLogHandler::_get_session_date(const char *path, const char *dir, time_t &date)
 {
 	if (strlen(dir) > 4) {
 		// Always try to get file time first
@@ -517,9 +494,7 @@ MavlinkLogHandler::_get_session_date(const char *path, const char *dir, time_t &
 	return false;
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::_scan_logs(FILE *f, const char *dir, time_t &date)
+void MavlinkLogHandler::_scan_logs(FILE *f, const char *dir, time_t &date)
 {
 	DIR *dp = opendir(dir);
 
@@ -548,9 +523,7 @@ MavlinkLogHandler::_scan_logs(FILE *f, const char *dir, time_t &date)
 	}
 }
 
-//-------------------------------------------------------------------
-bool
-MavlinkLogHandler::_get_log_time_size(const char *path, const char *file, time_t &date, uint32_t &size)
+bool MavlinkLogHandler::_get_log_time_size(const char *path, const char *file, time_t &date, uint32_t &size)
 {
 	if (file && file[0]) {
 		if (strstr(file, ".px4log") || strstr(file, ".ulg")) {
@@ -580,9 +553,7 @@ MavlinkLogHandler::_get_log_time_size(const char *path, const char *file, time_t
 	return false;
 }
 
-//-------------------------------------------------------------------
-void
-MavlinkLogHandler::_delete_all(const char *dir)
+void MavlinkLogHandler::_delete_all(const char *dir)
 {
 	//-- Open log directory
 	DIR *dp = opendir(dir);
@@ -608,7 +579,7 @@ MavlinkLogHandler::_delete_all(const char *dir)
 				_delete_all(log_path); //Recursive call. TODO: consider add protection
 
 				if (rmdir(log_path)) {
-					PX4LOG_WARN("MavlinkLogHandler::delete_all Error removing %s", log_path);
+					PX4_DEBUG("MavlinkLogHandler::delete_all Error removing %s", log_path);
 				}
 			}
 		}
@@ -620,7 +591,7 @@ MavlinkLogHandler::_delete_all(const char *dir)
 
 			if (path_is_ok) {
 				if (unlink(log_path)) {
-					PX4LOG_WARN("MavlinkLogHandler::delete_all Error deleting %s", log_path);
+					PX4_DEBUG("MavlinkLogHandler::delete_all Error deleting %s", log_path);
 				}
 			}
 		}

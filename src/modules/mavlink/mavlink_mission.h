@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -52,6 +52,7 @@
 
 #include "mavlink_bridge_header.h"
 #include "mavlink_rate_limiter.h"
+#include "mavlink_stream.h"
 
 enum MAVLINK_WPM_STATES {
 	MAVLINK_WPM_STATE_IDLE = 0,
@@ -74,22 +75,25 @@ static constexpr uint64_t MAVLINK_MISSION_RETRY_TIMEOUT_DEFAULT = 250000; ///< P
 
 class Mavlink;
 
-class MavlinkMissionManager
+class MavlinkMissionManager : public MavlinkStream
 {
 public:
 	explicit MavlinkMissionManager(Mavlink *mavlink);
-
 	~MavlinkMissionManager() = default;
 
-	/**
-	 * Handle sending of messages. Call this regularly at a fixed frequency.
-	 * @param t current time
-	 */
-	void send();
+	static constexpr const char *get_name_static() { return "MISSION_ITEM"; }
+	const char *get_name() const override { return MavlinkMissionManager::get_name_static(); }
+
+	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_MISSION_ITEM; }
+	uint16_t get_id() override { return get_id_static(); }
+
+	unsigned get_size() override;
+
+	bool send() override;
 
 	void handle_message(const mavlink_message_t *msg);
 
-	void check_active_mission(void);
+	void check_active_mission();
 
 private:
 	enum MAVLINK_WPM_STATES _state {MAVLINK_WPM_STATE_IDLE};	///< Current state
@@ -104,8 +108,8 @@ private:
 
 	unsigned		_filesystem_errcount{0};		///< File system error count
 
-	static dm_item_t		_dataman_id;				///< Global Dataman storage ID for active mission
-	dm_item_t			_my_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_0};			///< class Dataman storage ID
+	static dm_item_t	_dataman_id;				///< Global Dataman storage ID for active mission
+	dm_item_t		_my_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_0}; ///< class Dataman storage ID
 
 	static bool		_dataman_init;				///< Dataman initialized
 
@@ -114,7 +118,7 @@ private:
 
 	int32_t			_last_reached{-1};			///< Last reached waypoint in active mission (-1 means nothing reached)
 
-	dm_item_t			_transfer_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_1};		///< Dataman storage ID for current transmission
+	dm_item_t		_transfer_dataman_id{DM_KEY_WAYPOINTS_OFFBOARD_1}; ///< Dataman storage ID for current transmission
 
 	uint16_t		_transfer_count{0};			///< Items count in current transmission
 	uint16_t		_transfer_seq{0};			///< Item sequence in current transmission
@@ -135,8 +139,6 @@ private:
 	bool			_geofence_locked{false};		///< if true, we currently hold the dm_lock for the geofence (transaction in progress)
 
 	MavlinkRateLimiter	_slow_rate_limiter{100 * 1000};		///< Rate limit sending of the current WP sequence to 10 Hz
-
-	Mavlink *_mavlink;
 
 	static constexpr unsigned int	FILESYSTEM_ERRCOUNT_NOTIFY_LIMIT =
 		2;	///< Error count limit before stopping to report FS errors

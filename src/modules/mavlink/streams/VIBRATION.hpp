@@ -48,6 +48,8 @@ public:
 	const char *get_name() const override { return get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
 
+	bool updated() override { return _sensor_selection_sub.updated() || _vehicle_imu_status_subs.updated(); }
+
 	unsigned get_size() override
 	{
 		if (_sensor_selection_sub.advertised() && _vehicle_imu_status_subs.advertised()) {

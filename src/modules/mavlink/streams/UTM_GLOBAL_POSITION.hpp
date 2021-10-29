@@ -53,6 +53,8 @@ public:
 
 	bool const_rate() override { return true; }
 
+	bool updated() override { return _global_pos_sub.updated(); }
+
 	unsigned get_size() override
 	{
 		return _global_pos_sub.advertised() ? MAVLINK_MSG_ID_UTM_GLOBAL_POSITION_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;

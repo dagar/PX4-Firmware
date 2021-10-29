@@ -84,10 +84,6 @@ MavlinkReceiver::~MavlinkReceiver()
 MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	ModuleParams(nullptr),
 	_mavlink(parent),
-	_mavlink_ftp(parent),
-	_mavlink_log_handler(parent),
-	_mission_manager(parent),
-	_parameters_manager(parent),
 	_mavlink_timesync(parent)
 {
 	_handle_sens_flow_maxhgt = param_find("SENS_FLOW_MAXHGT");
@@ -3128,19 +3124,8 @@ MavlinkReceiver::handle_message_gimbal_device_information(mavlink_message_t *msg
 	_gimbal_device_information_pub.publish(gimbal_information);
 }
 
-void
-MavlinkReceiver::run()
+void MavlinkReceiver::update()
 {
-	/* set thread name */
-	{
-		char thread_name[17];
-		snprintf(thread_name, sizeof(thread_name), "mavlink_rcv_if%d", _mavlink->get_instance_id());
-		px4_prctl(PR_SET_NAME, thread_name, px4_getpid());
-	}
-
-	// poll timeout in ms. Also defines the max update frequency of the mission & param manager, etc.
-	const int timeout = 10;
-
 #if defined(__PX4_POSIX)
 	/* 1500 is the Wifi MTU, so we make sure to fit a full packet */
 	uint8_t buf[1600 * 5];
@@ -3172,29 +3157,35 @@ MavlinkReceiver::run()
 #endif // MAVLINK_UDP
 
 	ssize_t nread = 0;
-	hrt_abstime last_send_update = 0;
 
-	while (!_mavlink->should_exit()) {
-
-		// check for parameter updates
-		if (_parameter_update_sub.updated()) {
-			// clear update
-			parameter_update_s pupdate;
-			_parameter_update_sub.copy(&pupdate);
-
-			// update parameters from storage
-			updateParams();
-		}
-
-		int ret = poll(&fds[0], 1, timeout);
-
-		if (ret > 0) {
+	if (!_mavlink->should_exit()) {
+		if (::poll(&fds[0], 1, 0) > 0) {
 			if (_mavlink->get_protocol() == Protocol::SERIAL) {
-				/* non-blocking read. read may return negative values */
-				nread = ::read(fds[0].fd, buf, sizeof(buf));
+				if (fds[0].revents & POLLIN) {
+
+					// Check the number of bytes available in the buffer
+					int bytes_available = 0;
+					::ioctl(fds[0].fd, FIONREAD, (unsigned long)&bytes_available);
+
+					// to avoid reading very small chunks wait for data before reading
+					// this is designed to target one message, so >20 bytes at a time
+					const int character_count = 20;
+
+					if (bytes_available < character_count) {
+						//const unsigned sleeptime = character_count * 1000000 / (_mavlink->get_baudrate() / 10);
+
+						// TODO: fix
+						//ScheduleDelayed(sleeptime);
+						return;
+
+					} else {
+						// non-blocking read. read may return negative values
+						nread = ::read(fds[0].fd, buf, sizeof(buf));
+					}
+				}
 
 				if (nread == -1 && errno == ENOTCONN) { // Not connected (can happen for USB)
-					usleep(100000);
+					return;
 				}
 			}
 
@@ -3246,29 +3237,6 @@ MavlinkReceiver::run()
 						/* handle generic messages and commands */
 						handle_message(&msg);
 
-						/* handle packet with mission manager */
-						_mission_manager.handle_message(&msg);
-
-						/* handle packet with parameter component */
-						if (_mavlink->boot_complete()) {
-							// make sure mavlink app has booted before we start processing parameter sync
-							_parameters_manager.handle_message(&msg);
-
-						} else {
-							if (hrt_elapsed_time(&_mavlink->get_first_start_time()) > 20_s) {
-								PX4_ERR("system boot did not complete in 20 seconds");
-								_mavlink->set_boot_complete();
-							}
-						}
-
-						if (_mavlink->ftp_enabled()) {
-							/* handle packet with ftp component */
-							_mavlink_ftp.handle_message(&msg);
-						}
-
-						/* handle packet with log component */
-						_mavlink_log_handler.handle_message(&msg);
-
 						/* handle packet with timesync component */
 						_mavlink_timesync.handle_message(&msg);
 
@@ -3312,28 +3280,11 @@ MavlinkReceiver::run()
 			}
 
 #endif // MAVLINK_UDP
-
-		} else if (ret == -1) {
-			usleep(10000);
 		}
 
 		const hrt_abstime t = hrt_absolute_time();
 
 		CheckHeartbeats(t);
-
-		if (t - last_send_update > timeout * 1000) {
-			_mission_manager.check_active_mission();
-			_mission_manager.send();
-
-			_parameters_manager.send();
-
-			if (_mavlink->ftp_enabled()) {
-				_mavlink_ftp.send();
-			}
-
-			_mavlink_log_handler.send();
-			last_send_update = t;
-		}
 
 		if (_tune_publisher != nullptr) {
 			_tune_publisher->publish_next_tune(t);
@@ -3522,24 +3473,6 @@ void MavlinkReceiver::print_detailed_rx_stats() const
 	}
 }
 
-void MavlinkReceiver::start()
-{
-	pthread_attr_t receiveloop_attr;
-	pthread_attr_init(&receiveloop_attr);
-
-	struct sched_param param;
-	(void)pthread_attr_getschedparam(&receiveloop_attr, &param);
-	param.sched_priority = SCHED_PRIORITY_MAX - 80;
-	(void)pthread_attr_setschedparam(&receiveloop_attr, &param);
-
-	pthread_attr_setstacksize(&receiveloop_attr,
-				  PX4_STACK_ADJUSTED(sizeof(MavlinkReceiver) + 2840 + MAVLINK_RECEIVER_NET_ADDED_STACK));
-
-	pthread_create(&_thread, &receiveloop_attr, MavlinkReceiver::start_trampoline, (void *)this);
-
-	pthread_attr_destroy(&receiveloop_attr);
-}
-
 void
 MavlinkReceiver::updateParams()
 {
@@ -3563,15 +3496,3 @@ MavlinkReceiver::updateParams()
 	}
 }
 
-void *MavlinkReceiver::start_trampoline(void *context)
-{
-	MavlinkReceiver *self = reinterpret_cast<MavlinkReceiver *>(context);
-	self->run();
-	return nullptr;
-}
-
-void MavlinkReceiver::stop()
-{
-	_should_exit.store(true);
-	pthread_join(_thread, nullptr);
-}

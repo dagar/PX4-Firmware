@@ -39,6 +39,9 @@
  */
 
 #include "mavlink_ulog.h"
+
+#include "mavlink_main.h"
+
 #include <px4_platform_common/log.h>
 #include <errno.h>
 #include <mathlib/mathlib.h>
@@ -49,16 +52,20 @@ px4_sem_t MavlinkULog::_lock;
 const float MavlinkULog::_rate_calculation_delta_t = 0.1f;
 
 
-MavlinkULog::MavlinkULog(int datarate, float max_rate_factor, uint8_t target_system, uint8_t target_component)
-	: _target_system(target_system), _target_component(target_component),
-	  _max_rate_factor(max_rate_factor),
-	  _max_num_messages(math::max(1, (int)ceilf(_rate_calculation_delta_t *_max_rate_factor * datarate /
-				      (MAVLINK_MSG_ID_LOGGING_DATA_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES)))),
-	  _current_rate_factor(max_rate_factor)
+MavlinkULog::MavlinkULog(Mavlink *mavlink, int datarate, float max_rate_factor, uint8_t target_system,
+			 uint8_t target_component) :
+	_ulog_stream_sub(mavlink, ORB_ID(ulog_stream)),
+	_target_system(target_system),
+	_target_component(target_component),
+	_max_rate_factor(max_rate_factor),
+	_max_num_messages(math::max(1, (int)ceilf(_rate_calculation_delta_t *_max_rate_factor * datarate /
+				    (MAVLINK_MSG_ID_LOGGING_DATA_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES)))),
+	_current_rate_factor(max_rate_factor)
 {
 	// make sure we won't read any old messages
-	while (_ulog_stream_sub.update()) {
-
+	while (_ulog_stream_sub.updated()) {
+		ulog_stream_s ulog_stream;
+		_ulog_stream_sub.copy(&ulog_stream);
 	}
 
 	_waiting_for_initial_ack = true;
@@ -114,15 +121,13 @@ int MavlinkULog::handle_update(mavlink_channel_t channel)
 					PX4_DEBUG("re-sending ulog mavlink message (try=%i)", _sent_tries);
 					_last_sent_time = hrt_absolute_time();
 
-					const ulog_stream_s &ulog_data = _ulog_stream_sub.get();
-
 					mavlink_logging_data_acked_t msg;
-					msg.sequence = ulog_data.msg_sequence;
-					msg.length = ulog_data.length;
-					msg.first_message_offset = ulog_data.first_message_offset;
+					msg.sequence = _ulog_data.msg_sequence;
+					msg.length = _ulog_data.length;
+					msg.first_message_offset = _ulog_data.first_message_offset;
 					msg.target_system = _target_system;
 					msg.target_component = _target_component;
-					memcpy(msg.data, ulog_data.data, sizeof(msg.data));
+					memcpy(msg.data, _ulog_data.data, sizeof(msg.data));
 					mavlink_msg_logging_data_acked_send_struct(channel, &msg);
 				}
 			}
@@ -133,43 +138,40 @@ int MavlinkULog::handle_update(mavlink_channel_t channel)
 		}
 	}
 
-
 	while ((_current_num_msgs < _max_num_messages) && _ulog_stream_sub.updated()) {
 		const unsigned last_generation = _ulog_stream_sub.get_last_generation();
-		_ulog_stream_sub.update();
+		_ulog_stream_sub.copy(&_ulog_data);
 
 		if (_ulog_stream_sub.get_last_generation() != last_generation + 1) {
 			perf_count(_msg_missed_ulog_stream_perf);
 		}
 
-		const ulog_stream_s &ulog_data = _ulog_stream_sub.get();
-
-		if (ulog_data.timestamp > 0) {
-			if (ulog_data.flags & ulog_stream_s::FLAGS_NEED_ACK) {
+		if (_ulog_data.timestamp > 0) {
+			if (_ulog_data.flags & ulog_stream_s::FLAGS_NEED_ACK) {
 				_sent_tries = 1;
 				_last_sent_time = hrt_absolute_time();
 				lock();
-				_wait_for_ack_sequence = ulog_data.msg_sequence;
+				_wait_for_ack_sequence = _ulog_data.msg_sequence;
 				_ack_received = false;
 				unlock();
 
 				mavlink_logging_data_acked_t msg;
-				msg.sequence = ulog_data.msg_sequence;
-				msg.length = ulog_data.length;
-				msg.first_message_offset = ulog_data.first_message_offset;
+				msg.sequence = _ulog_data.msg_sequence;
+				msg.length = _ulog_data.length;
+				msg.first_message_offset = _ulog_data.first_message_offset;
 				msg.target_system = _target_system;
 				msg.target_component = _target_component;
-				memcpy(msg.data, ulog_data.data, sizeof(msg.data));
+				memcpy(msg.data, _ulog_data.data, sizeof(msg.data));
 				mavlink_msg_logging_data_acked_send_struct(channel, &msg);
 
 			} else {
 				mavlink_logging_data_t msg;
-				msg.sequence = ulog_data.msg_sequence;
-				msg.length = ulog_data.length;
-				msg.first_message_offset = ulog_data.first_message_offset;
+				msg.sequence = _ulog_data.msg_sequence;
+				msg.length = _ulog_data.length;
+				msg.first_message_offset = _ulog_data.first_message_offset;
 				msg.target_system = _target_system;
 				msg.target_component = _target_component;
-				memcpy(msg.data, ulog_data.data, sizeof(msg.data));
+				memcpy(msg.data, _ulog_data.data, sizeof(msg.data));
 				mavlink_msg_logging_data_send_struct(channel, &msg);
 			}
 		}
@@ -207,7 +209,7 @@ void MavlinkULog::initialize()
 	_init = true;
 }
 
-MavlinkULog *MavlinkULog::try_start(int datarate, float max_rate_factor, uint8_t target_system,
+MavlinkULog *MavlinkULog::try_start(Mavlink *mavlink, int datarate, float max_rate_factor, uint8_t target_system,
 				    uint8_t target_component)
 {
 	MavlinkULog *ret = nullptr;
@@ -215,7 +217,7 @@ MavlinkULog *MavlinkULog::try_start(int datarate, float max_rate_factor, uint8_t
 	lock();
 
 	if (!_instance) {
-		ret = _instance = new MavlinkULog(datarate, max_rate_factor, target_system, target_component);
+		ret = _instance = new MavlinkULog(mavlink, datarate, max_rate_factor, target_system, target_component);
 
 		if (!_instance) {
 			failed = true;

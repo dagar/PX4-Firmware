@@ -166,7 +166,7 @@ const wq_config_t &
 serial_port_to_wq(const char *serial)
 {
 	if (serial == nullptr) {
-		return wq_configurations::hp_default;
+		return wq_configurations::UART_UNKNOWN;
 
 	} else if (strstr(serial, "ttyS0")) {
 		return wq_configurations::UART0;

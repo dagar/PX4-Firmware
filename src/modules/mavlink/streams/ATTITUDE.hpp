@@ -48,6 +48,10 @@ public:
 	const char *get_name() const override { return get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
 
+	bool updated() override { return _att_sub.updated(); }
+
+	void set_subscription_interval(const uint32_t interval_us) override { _att_sub.set_interval_us(interval_us); _att_sub.registerCallback(); }
+
 	unsigned get_size() override
 	{
 		return _att_sub.advertised() ? MAVLINK_MSG_ID_ATTITUDE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
@@ -56,7 +60,7 @@ public:
 private:
 	explicit MavlinkStreamAttitude(Mavlink *mavlink) : MavlinkStream(mavlink) {}
 
-	uORB::Subscription _att_sub{ORB_ID(vehicle_attitude)};
+	uORB::SubscriptionCallbackWorkItem _att_sub{_mavlink, ORB_ID(vehicle_attitude)};
 	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 
 	bool send() override

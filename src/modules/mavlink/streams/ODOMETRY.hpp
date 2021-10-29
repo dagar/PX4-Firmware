@@ -47,6 +47,16 @@ public:
 	const char *get_name() const override { return get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
 
+	bool updated() override
+	{
+		if (_mavlink->odometry_loopback_enabled()) {
+			return _vodom_sub.updated();
+
+		} else {
+			return _odom_sub.updated();
+		}
+	}
+
 	unsigned get_size() override
 	{
 		if (_mavlink->odometry_loopback_enabled()) {

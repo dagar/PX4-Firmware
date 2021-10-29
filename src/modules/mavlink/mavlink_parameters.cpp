@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2015-2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2015-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,18 +47,16 @@
 #include <lib/systemlib/mavlink_log.h>
 
 MavlinkParametersManager::MavlinkParametersManager(Mavlink *mavlink) :
-	_mavlink(mavlink)
+	MavlinkStream(mavlink)
 {
 }
 
-unsigned
-MavlinkParametersManager::get_size()
+unsigned MavlinkParametersManager::get_size()
 {
 	return MAVLINK_MSG_ID_PARAM_VALUE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
 }
 
-void
-MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
+void MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
 	case MAVLINK_MSG_ID_PARAM_REQUEST_LIST: {
@@ -275,8 +273,7 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 	}
 }
 
-void
-MavlinkParametersManager::send()
+bool MavlinkParametersManager::send()
 {
 	if (!_first_send) {
 		// parameters QGC can't tolerate not finding (2020-11-11)
@@ -323,6 +320,8 @@ MavlinkParametersManager::send()
 	// Send while burst is not exceeded, we still have buffer space and still something to send
 	while ((i++ < max_num_to_send) && (_mavlink->get_free_tx_buf() >= get_size()) && !_mavlink->radio_status_critical()
 	       && send_params()) {}
+
+	return true;
 }
 
 bool
@@ -342,8 +341,7 @@ MavlinkParametersManager::send_params()
 	}
 }
 
-bool
-MavlinkParametersManager::send_untransmitted()
+bool MavlinkParametersManager::send_untransmitted()
 {
 	bool sent_one = false;
 
@@ -450,8 +448,7 @@ MavlinkParametersManager::send_uavcan()
 	return false;
 }
 
-bool
-MavlinkParametersManager::send_one()
+bool MavlinkParametersManager::send_one()
 {
 	if (_send_all_index >= 0) {
 		/* send all parameters if requested, but only after the system has booted */
@@ -464,7 +461,7 @@ MavlinkParametersManager::send_one()
 			uint32_t hash = param_hash_check();
 
 			/* build the one-off response message */
-			mavlink_param_value_t msg;
+			mavlink_param_value_t msg{};
 			msg.param_count = param_count_used();
 			msg.param_index = -1;
 			strncpy(msg.param_id, HASH_PARAM, MAVLINK_MSG_PARAM_VALUE_FIELD_PARAM_ID_LEN);
@@ -504,8 +501,7 @@ MavlinkParametersManager::send_one()
 	return false;
 }
 
-int
-MavlinkParametersManager::send_param(param_t param, int component_id)
+int MavlinkParametersManager::send_param(param_t param, int component_id)
 {
 	if (param == PARAM_INVALID) {
 		return 1;
@@ -515,8 +511,6 @@ MavlinkParametersManager::send_param(param_t param, int component_id)
 	if (_mavlink->get_free_tx_buf() < MAVLINK_MSG_ID_PARAM_VALUE_LEN) {
 		return 1;
 	}
-
-	mavlink_param_value_t msg;
 
 	/*
 	 * get param value, since MAVLink encodes float and int params in the same
@@ -528,6 +522,7 @@ MavlinkParametersManager::send_param(param_t param, int component_id)
 		return 2;
 	}
 
+	mavlink_param_value_t msg{};
 	msg.param_value = param_value;
 
 	msg.param_count = param_count_used();

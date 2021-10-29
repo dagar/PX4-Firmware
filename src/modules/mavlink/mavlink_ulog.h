@@ -48,11 +48,13 @@
 #include <lib/perf/perf_counter.h>
 
 #include <uORB/Publication.hpp>
-#include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/ulog_stream.h>
 #include <uORB/topics/ulog_stream_ack.h>
 
 #include "mavlink_bridge_header.h"
+
+class Mavlink;
 
 /**
  * @class MavlinkULog
@@ -75,7 +77,8 @@ public:
 	 * @param target_component ID for mavlink message
 	 * @return instance, or nullptr
 	 */
-	static MavlinkULog *try_start(int datarate, float max_rate_factor, uint8_t target_system, uint8_t target_component);
+	static MavlinkULog *try_start(Mavlink *mavlink, int datarate, float max_rate_factor, uint8_t target_system,
+				      uint8_t target_component);
 
 	/**
 	 * stop the stream. It also deletes the singleton object, so make sure cleanup
@@ -101,7 +104,7 @@ public:
 
 private:
 
-	MavlinkULog(int datarate, float max_rate_factor, uint8_t target_system, uint8_t target_component);
+	MavlinkULog(Mavlink *mavlink, int datarate, float max_rate_factor, uint8_t target_system, uint8_t target_component);
 
 	~MavlinkULog();
 
@@ -122,21 +125,26 @@ private:
 	static MavlinkULog *_instance;
 	static const float _rate_calculation_delta_t; ///< rate update interval
 
-	uORB::SubscriptionData<ulog_stream_s> _ulog_stream_sub{ORB_ID(ulog_stream)};
+	Mavlink *_mavlink{nullptr};
+
+	uORB::SubscriptionCallbackWorkItem _ulog_stream_sub;
 	uORB::Publication<ulog_stream_ack_s> _ulog_stream_ack_pub{ORB_ID(ulog_stream_ack)};
-	uint16_t _wait_for_ack_sequence;
-	uint8_t _sent_tries = 0;
-	volatile bool _ack_received = false; ///< set to true if a matching ack received
-	hrt_abstime _last_sent_time = 0; ///< last time we sent a message that requires an ack
-	bool _waiting_for_initial_ack = false;
+
+	ulog_stream_s _ulog_data{};
+
+	uint16_t _wait_for_ack_sequence{0};
+	uint8_t _sent_tries{0};
+	volatile bool _ack_received{false}; ///< set to true if a matching ack received
+	hrt_abstime _last_sent_time{0}; ///< last time we sent a message that requires an ack
+	bool _waiting_for_initial_ack{false};
 	const uint8_t _target_system;
 	const uint8_t _target_component;
 
 	const float _max_rate_factor; ///< maximum rate percentage at which we're allowed to push data
 	const int _max_num_messages; ///< maximum number of messages we can send within _rate_calculation_delta_t
-	float _current_rate_factor; ///< currently used rate percentage
-	int _current_num_msgs = 0;  ///< number of messages sent within the current time interval
-	hrt_abstime _next_rate_check; ///< next timestamp at which to update the rate
+	float _current_rate_factor{0}; ///< currently used rate percentage
+	int _current_num_msgs{0};  ///< number of messages sent within the current time interval
+	hrt_abstime _next_rate_check{0}; ///< next timestamp at which to update the rate
 
 	perf_counter_t _msg_missed_ulog_stream_perf{perf_alloc(PC_COUNT, MODULE_NAME": ulog_stream messages missed")};
 
