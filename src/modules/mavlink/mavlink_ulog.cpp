@@ -48,9 +48,7 @@
 
 bool MavlinkULog::_init = false;
 MavlinkULog *MavlinkULog::_instance = nullptr;
-px4_sem_t MavlinkULog::_lock;
 const float MavlinkULog::_rate_calculation_delta_t = 0.1f;
-
 
 MavlinkULog::MavlinkULog(Mavlink *mavlink, int datarate, float max_rate_factor, uint8_t target_system,
 			 uint8_t target_component) :
@@ -71,6 +69,8 @@ MavlinkULog::MavlinkULog(Mavlink *mavlink, int datarate, float max_rate_factor, 
 	_waiting_for_initial_ack = true;
 	_last_sent_time = hrt_absolute_time(); //(ab)use this timestamp during initialization
 	_next_rate_check = _last_sent_time + _rate_calculation_delta_t * 1.e6f;
+
+	_ulog_stream_sub.registerCallback();
 }
 
 MavlinkULog::~MavlinkULog()
@@ -150,10 +150,8 @@ int MavlinkULog::handle_update(mavlink_channel_t channel)
 			if (_ulog_data.flags & ulog_stream_s::FLAGS_NEED_ACK) {
 				_sent_tries = 1;
 				_last_sent_time = hrt_absolute_time();
-				lock();
 				_wait_for_ack_sequence = _ulog_data.msg_sequence;
 				_ack_received = false;
-				unlock();
 
 				mavlink_logging_data_acked_t msg;
 				msg.sequence = _ulog_data.msg_sequence;
@@ -205,7 +203,6 @@ void MavlinkULog::initialize()
 		return;
 	}
 
-	px4_sem_init(&_lock, 1, 1);
 	_init = true;
 }
 
@@ -214,7 +211,6 @@ MavlinkULog *MavlinkULog::try_start(Mavlink *mavlink, int datarate, float max_ra
 {
 	MavlinkULog *ret = nullptr;
 	bool failed = false;
-	lock();
 
 	if (!_instance) {
 		ret = _instance = new MavlinkULog(mavlink, datarate, max_rate_factor, target_system, target_component);
@@ -223,8 +219,6 @@ MavlinkULog *MavlinkULog::try_start(Mavlink *mavlink, int datarate, float max_ra
 			failed = true;
 		}
 	}
-
-	unlock();
 
 	if (failed) {
 		PX4_ERR("alloc failed");
@@ -235,28 +229,20 @@ MavlinkULog *MavlinkULog::try_start(Mavlink *mavlink, int datarate, float max_ra
 
 void MavlinkULog::stop()
 {
-	lock();
-
 	if (_instance) {
 		delete _instance;
 		_instance = nullptr;
 	}
-
-	unlock();
 }
 
 void MavlinkULog::handle_ack(mavlink_logging_ack_t ack)
 {
-	lock();
-
 	if (_instance) { // make sure stop() was not called right before
 		if (_wait_for_ack_sequence == ack.sequence) {
 			_ack_received = true;
 			publish_ack(ack.sequence);
 		}
 	}
-
-	unlock();
 }
 
 void MavlinkULog::publish_ack(uint16_t sequence)

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -52,17 +52,22 @@ public:
 
 	bool updated() override { return _local_pos_sub.updated(); }
 
+	void set_subscription_interval(const uint32_t interval_us) override { _local_pos_sub.set_interval_us(interval_us); _local_pos_sub.registerCallback(); }
+
 	unsigned get_size() override
 	{
 		return _local_pos_sub.advertised() ? MAVLINK_MSG_ID_ALTITUDE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
 	}
 
 private:
-	explicit MavlinkStreamAltitude(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	explicit MavlinkStreamAltitude(Mavlink *mavlink) :
+		MavlinkStream(mavlink),
+		_local_pos_sub{mavlink, ORB_ID(vehicle_local_position)}
+	{}
 
 	uORB::Subscription _air_data_sub{ORB_ID(vehicle_air_data)};
 	uORB::Subscription _home_sub{ORB_ID(home_position)};
-	uORB::Subscription _local_pos_sub{ORB_ID(vehicle_local_position)};
+	uORB::SubscriptionCallbackWorkItem _local_pos_sub;
 
 	bool send() override
 	{

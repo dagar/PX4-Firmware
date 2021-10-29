@@ -49,15 +49,22 @@ public:
 
 	bool const_rate() override { return true; }
 
+	bool updated() override { return _transponder_report_sub.updated(); }
+
+	void set_subscription_interval(const uint32_t interval_us) override { _transponder_report_sub.set_interval_us(interval_us); _transponder_report_sub.registerCallback(); }
+
 	unsigned get_size() override
 	{
 		return _transponder_report_sub.advertised() ? MAVLINK_MSG_ID_ADSB_VEHICLE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
 	}
 
 private:
-	explicit MavlinkStreamADSBVehicle(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	explicit MavlinkStreamADSBVehicle(Mavlink *mavlink) :
+		MavlinkStream(mavlink),
+		_transponder_report_sub(mavlink, ORB_ID(transponder_report))
+	{}
 
-	uORB::Subscription _transponder_report_sub{ORB_ID(transponder_report)};
+	uORB::SubscriptionCallbackWorkItem _transponder_report_sub;
 
 	bool send() override
 	{

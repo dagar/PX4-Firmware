@@ -46,16 +46,6 @@
 #include "mavlink_main.h"
 #include <lib/systemlib/mavlink_log.h>
 
-MavlinkParametersManager::MavlinkParametersManager(Mavlink *mavlink) :
-	MavlinkStream(mavlink)
-{
-}
-
-unsigned MavlinkParametersManager::get_size()
-{
-	return MAVLINK_MSG_ID_PARAM_VALUE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
-}
-
 void MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
@@ -305,21 +295,26 @@ bool MavlinkParametersManager::send()
 		_first_send = true;
 	}
 
-	int max_num_to_send;
-
 	if (_mavlink->get_protocol() == Protocol::SERIAL && !_mavlink->is_usb_uart()) {
-		max_num_to_send = 3;
+
+		if (_mavlink->get_flow_control_enabled() && !_mavlink->radio_status_critical()) {
+			while ((_mavlink->get_free_tx_buf() >= get_size()) && send_params()) {}
+
+		} else {
+			int max_num_to_send = 3;
+			int i = 0;
+
+			while ((i++ < max_num_to_send) && (_mavlink->get_free_tx_buf() >= get_size()) && !_mavlink->radio_status_critical()
+			       && send_params()) {}
+		}
 
 	} else {
-		// speed up parameter loading via UDP or USB: try to send 20 at once
-		max_num_to_send = 20;
+		int max_num_to_send = 20;
+		int i = 0;
+
+		// Send while burst is not exceeded, we still have buffer space and still something to send
+		while ((i++ < max_num_to_send) && (_mavlink->get_free_tx_buf() >= get_size()) && send_params()) {}
 	}
-
-	int i = 0;
-
-	// Send while burst is not exceeded, we still have buffer space and still something to send
-	while ((i++ < max_num_to_send) && (_mavlink->get_free_tx_buf() >= get_size()) && !_mavlink->radio_status_critical()
-	       && send_params()) {}
 
 	return true;
 }

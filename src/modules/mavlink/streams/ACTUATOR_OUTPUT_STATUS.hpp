@@ -49,15 +49,20 @@ public:
 
 	bool updated() override { return _act_output_sub.updated(); }
 
+	void set_subscription_interval(const uint32_t interval_us) override { _act_output_sub.set_interval_us(interval_us); _act_output_sub.registerCallback(); }
+
 	unsigned get_size() override
 	{
 		return _act_output_sub.advertised() ? (MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
 	}
 
 private:
-	explicit MavlinkStreamActuatorOutputStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	explicit MavlinkStreamActuatorOutputStatus(Mavlink *mavlink) :
+		MavlinkStream(mavlink),
+		_act_output_sub{mavlink, ORB_ID(actuator_outputs)}
+	{}
 
-	uORB::Subscription _act_output_sub{ORB_ID(actuator_outputs)};
+	uORB::SubscriptionCallbackWorkItem _act_output_sub;
 
 	bool send() override
 	{

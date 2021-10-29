@@ -242,7 +242,7 @@ Mavlink::set_channel()
 
 	default:
 		PX4_WARN("instance ID %d is out of range", _instance_id);
-		px4_task_exit(1);
+		//px4_task_exit(1);
 		break;
 	}
 }
@@ -1203,6 +1203,7 @@ int Mavlink::configure_stream(const char *stream_name, const float rate)
 			if (interval != 0) {
 				/* set new interval */
 				stream->set_interval(interval);
+				stream->set_subscription_interval(interval);
 				_force_rate_mult_update = true;
 
 			} else {
@@ -1439,7 +1440,8 @@ Mavlink::update_rate_mult()
 	}
 
 	// update main loop delay
-	_main_loop_delay = math::constrain(min_interval / 3, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
+	_main_loop_delay = math::constrain(min_interval, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
+	ScheduleOnInterval(_main_loop_delay, _main_loop_delay);
 
 	float mavlink_ulog_streaming_rate_inv = 1.0f;
 
@@ -2250,15 +2252,15 @@ int Mavlink::setup(int argc, char *argv[])
 	}
 
 	/* PARAM_VALUE stream */
-	_parameters_manager.set_interval(3000);
+	_parameters_manager.set_interval(-1);
 	_streams.add(&_parameters_manager);
 
 	/* MAVLINK_FTP stream */
-	_mavlink_ftp.set_interval(12500);
+	_mavlink_ftp.set_interval(-1);
 	_streams.add(&_mavlink_ftp);
 
 	/* MAVLINK_Log_Handler */
-	_mavlink_log_handler.set_interval(12500);
+	_mavlink_log_handler.set_interval(-1);
 	_streams.add(&_mavlink_log_handler);
 
 	/* MISSION_STREAM stream, actually sends all MISSION_XXX messages at some rate depending on
@@ -2296,10 +2298,8 @@ int Mavlink::setup(int argc, char *argv[])
 		send_autopilot_capabilities();
 	}
 
-	/* start the MAVLink receiver last to avoid a race */
-	ScheduleDelayed(100_ms);
-
 	_mavlink_start_time = hrt_absolute_time();
+	ScheduleDelayed(100_ms);
 
 	return PX4_OK;
 }
@@ -2339,7 +2339,7 @@ void Mavlink::Run()
 
 	if (!should_transmit()) {
 		check_requested_subscriptions();
-		ScheduleDelayed(10_ms);
+		ScheduleDelayed(100_ms);
 		return;
 	}
 
@@ -2567,9 +2567,6 @@ void Mavlink::Run()
 			}
 		}
 
-		// TODO: improve
-		_receiver.update();
-
 		/* handle new events */
 		if (check_events()) {
 			if (_event_sub.updated()) {
@@ -2673,7 +2670,51 @@ void Mavlink::Run()
 		perf_end(_loop_perf);
 	}
 
-	ScheduleDelayed(_main_loop_delay);
+
+
+
+	// Check the number of bytes available in the buffer
+	int bytes_available = 0;
+	::ioctl(get_uart_fd(), FIONREAD, (unsigned long)&bytes_available);
+
+	// to avoid reading very small chunks wait for data before reading
+	// this is designed to target one message, so >20 bytes at a time
+	const int character_count = 20;
+
+	if (bytes_available > character_count) {
+		_receiver.update();
+
+	} else {
+		struct pollfd fds[1] {};
+
+		if (get_protocol() == Protocol::SERIAL) {
+			fds[0].fd = get_uart_fd();
+			fds[0].events = POLLIN;
+		}
+
+#if defined(MAVLINK_UDP)
+		struct sockaddr_in srcaddr {};
+		socklen_t addrlen = sizeof(srcaddr);
+
+		if (get_protocol() == Protocol::UDP) {
+			fds[0].fd = get_socket_fd();
+			fds[0].events = POLLIN;
+		}
+
+#endif // MAVLINK_UDP
+		int poll_ret = ::poll(&fds[0], 1, _main_loop_delay / 1000 / 2);
+
+		if (poll_ret == 0) {
+			// poll timeout
+			ScheduleNow();
+			return;
+
+		} else if (poll_ret > 0) {
+			if (fds[0].revents & POLLIN) {
+				_receiver.update();
+			}
+		}
+	}
 }
 
 void Mavlink::check_requested_subscriptions()

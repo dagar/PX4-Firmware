@@ -59,9 +59,13 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAttitudeQuaternion(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	explicit MavlinkStreamAttitudeQuaternion(Mavlink *mavlink) :
+		MavlinkStream(mavlink),
+		_att_sub(mavlink, ORB_ID(vehicle_attitude))
+	{
+	}
 
-	uORB::SubscriptionCallbackWorkItem _att_sub{_mavlink, ORB_ID(vehicle_attitude)};
+	uORB::SubscriptionCallbackWorkItem _att_sub;
 	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
 

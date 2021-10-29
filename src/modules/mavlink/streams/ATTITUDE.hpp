@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,9 +58,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAttitude(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	explicit MavlinkStreamAttitude(Mavlink *mavlink) :
+		MavlinkStream(mavlink),
+		_att_sub{mavlink, ORB_ID(vehicle_attitude)}
+	{}
 
-	uORB::SubscriptionCallbackWorkItem _att_sub{_mavlink, ORB_ID(vehicle_attitude)};
+	uORB::SubscriptionCallbackWorkItem _att_sub;
 	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 
 	bool send() override

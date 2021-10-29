@@ -66,6 +66,14 @@ public:
 
 	bool updated() override { return _act_ctrl_sub && _act_ctrl_sub->updated(); }
 
+	void set_subscription_interval(const uint32_t interval_us) override
+	{
+		if (_act_ctrl_sub) {
+			_act_ctrl_sub->set_interval_us(interval_us);
+			_act_ctrl_sub->registerCallback();
+		}
+	}
+
 	unsigned get_size() override
 	{
 		return (_act_ctrl_sub
@@ -78,19 +86,19 @@ private:
 		// XXX this can be removed once the multiplatform system remaps topics
 		switch (N) {
 		case 0:
-			_act_ctrl_sub = new uORB::Subscription{ORB_ID(actuator_controls_0)};
+			_act_ctrl_sub = new uORB::SubscriptionCallbackWorkItem{_mavlink, ORB_ID(actuator_controls_0)};
 			break;
 
 		case 1:
-			_act_ctrl_sub = new uORB::Subscription{ORB_ID(actuator_controls_1)};
+			_act_ctrl_sub = new uORB::SubscriptionCallbackWorkItem{_mavlink, ORB_ID(actuator_controls_1)};
 			break;
 
 		case 2:
-			_act_ctrl_sub = new uORB::Subscription{ORB_ID(actuator_controls_2)};
+			_act_ctrl_sub = new uORB::SubscriptionCallbackWorkItem{_mavlink, ORB_ID(actuator_controls_2)};
 			break;
 
 		case 3:
-			_act_ctrl_sub = new uORB::Subscription{ORB_ID(actuator_controls_3)};
+			_act_ctrl_sub = new uORB::SubscriptionCallbackWorkItem{_mavlink, ORB_ID(actuator_controls_3)};
 			break;
 		}
 	}
@@ -100,7 +108,7 @@ private:
 		delete _act_ctrl_sub;
 	}
 
-	uORB::Subscription *_act_ctrl_sub{nullptr};
+	uORB::SubscriptionCallbackWorkItem *_act_ctrl_sub{nullptr};
 
 	bool send() override
 	{
