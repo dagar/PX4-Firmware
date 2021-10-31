@@ -291,18 +291,20 @@ MavlinkMissionManager::send_mission_current(int32_t seq)
 void
 MavlinkMissionManager::send_mission_count(uint8_t sysid, uint8_t compid, uint16_t count, MAV_MISSION_TYPE mission_type)
 {
-	_time_last_sent = hrt_absolute_time();
+	if (hrt_elapsed_time(&_time_last_mission_count_sent) > 100_ms) {
+		mavlink_mission_count_t wpc{};
 
-	mavlink_mission_count_t wpc{};
+		wpc.target_system = sysid;
+		wpc.target_component = compid;
+		wpc.count = count;
+		wpc.mission_type = mission_type;
 
-	wpc.target_system = sysid;
-	wpc.target_component = compid;
-	wpc.count = count;
-	wpc.mission_type = mission_type;
+		mavlink_msg_mission_count_send_struct(_mavlink->get_channel(), &wpc);
+		_time_last_mission_count_sent = hrt_absolute_time();
+		_time_last_sent = _time_last_mission_count_sent;
 
-	mavlink_msg_mission_count_send_struct(_mavlink->get_channel(), &wpc);
-
-	PX4_DEBUG("WPM: Send MISSION_COUNT %u to ID %u, mission type=%i", wpc.count, wpc.target_system, mission_type);
+		PX4_DEBUG("WPM: Send MISSION_COUNT %u to ID %u, mission type=%i", wpc.count, wpc.target_system, mission_type);
+	}
 }
 
 void
@@ -1748,7 +1750,7 @@ void MavlinkMissionManager::check_active_mission()
 		return;
 	}
 
-	if (!(_my_dataman_id == _dataman_id)) {
+	if (_my_dataman_id != _dataman_id) {
 		PX4_DEBUG("WPM: New mission detected (possibly over different Mavlink instance) Updating");
 
 		_my_dataman_id = _dataman_id;

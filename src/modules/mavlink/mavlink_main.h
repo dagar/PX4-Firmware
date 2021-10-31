@@ -433,6 +433,20 @@ public:
 	bool			get_wait_to_transmit() { return _wait_to_transmit; }
 	bool			should_transmit() { return (_transmitting_enabled && (!_wait_to_transmit || (_wait_to_transmit && _received_messages))); }
 
+
+	bool canTransmit(size_t size_bytes)
+	{
+		if (size_bytes <= get_free_tx_buf()) {
+			const float datarate_dt_inv = 1.f / (hrt_elapsed_time(&_bytes_timestamp) * 1e-6f);
+
+			if ((_bytes_tx + size_bytes) * datarate_dt_inv <= _datarate) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	bool			message_buffer_write(const void *ptr, int size);
 
 	void			lockMessageBufferMutex(void) { pthread_mutex_lock(&_message_buffer_mutex); }
@@ -537,6 +551,7 @@ public:
 
 	static hrt_abstime &get_first_start_time() { return _first_start_time; }
 
+	bool radio_status_available() const { return _radio_status_available; }
 	bool radio_status_critical() const { return _radio_status_critical; }
 
 private:

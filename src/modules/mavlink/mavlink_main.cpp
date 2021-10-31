@@ -2288,6 +2288,7 @@ Mavlink::task_main(int argc, char *argv[])
 	uint16_t event_sequence_offset = 0; // offset to account for skipped events, not sent via MAVLink
 
 	_mavlink_start_time = hrt_absolute_time();
+	_bytes_timestamp = _mavlink_start_time;
 
 	while (!should_exit()) {
 		/* main loop */
@@ -2588,23 +2589,20 @@ Mavlink::task_main(int argc, char *argv[])
 			}
 		}
 
-		/* update TX/RX rates*/
+		// update TX/RX rates
 		if (t > _bytes_timestamp + 1_s) {
-			if (_bytes_timestamp != 0) {
-				const float dt = (t - _bytes_timestamp) * 1e-6f;
+			const float dt = (t - _bytes_timestamp) * 1e-6f;
 
-				_tstatus.tx_rate_avg = _bytes_tx / dt;
-				_tstatus.tx_error_rate_avg = _bytes_txerr / dt;
-				_tstatus.rx_rate_avg = _bytes_rx / dt;
+			_tstatus.tx_rate_avg = _bytes_tx / dt;
+			_tstatus.tx_error_rate_avg = _bytes_txerr / dt;
+			_tstatus.rx_rate_avg = _bytes_rx / dt;
 
-				_bytes_tx = 0;
-				_bytes_txerr = 0;
-				_bytes_rx = 0;
+			_bytes_tx = 0;
+			_bytes_txerr = 0;
+			_bytes_rx = 0;
+			_bytes_timestamp = _last_write_try_time;
 
-				_force_rate_mult_update = true;
-			}
-
-			_bytes_timestamp = t;
+			_force_rate_mult_update = true;
 		}
 
 		// publish status at 1 Hz, or sooner if HEARTBEAT has updated

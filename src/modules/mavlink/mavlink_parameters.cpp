@@ -308,21 +308,30 @@ MavlinkParametersManager::send()
 		_first_send = true;
 	}
 
-	int max_num_to_send;
+	int max_num_to_send = 1;
 
-	if (_mavlink->get_protocol() == Protocol::SERIAL && !_mavlink->is_usb_uart()) {
-		max_num_to_send = 3;
+	if (_mavlink->is_usb_uart() || (_mavlink->get_protocol() != Protocol::SERIAL)) {
+		// speed up parameter loading via UDP or USB: try to send up to 100 at once (respecting max data rate)
+		max_num_to_send = 100;
 
-	} else {
-		// speed up parameter loading via UDP or USB: try to send 20 at once
+	} else if ((_mavlink->get_protocol() == Protocol::SERIAL) && _mavlink->get_flow_control_enabled()) {
 		max_num_to_send = 20;
+
+	} else if ((_mavlink->get_protocol() == Protocol::SERIAL) && _mavlink->radio_status_available()
+		   && !_mavlink->radio_status_critical()) {
+
+		max_num_to_send = 3;
 	}
 
-	int i = 0;
+	for (int i = 0; i < max_num_to_send; i++) {
+		// Send while burst is not exceeded, we still have buffer space and still something to send
+		if (_mavlink->canTransmit(get_size())) {
+			send_params();
 
-	// Send while burst is not exceeded, we still have buffer space and still something to send
-	while ((i++ < max_num_to_send) && (_mavlink->get_free_tx_buf() >= get_size()) && !_mavlink->radio_status_critical()
-	       && send_params()) {}
+		} else {
+			break;
+		}
+	}
 }
 
 bool
@@ -381,7 +390,7 @@ MavlinkParametersManager::send_untransmitted()
 					break;
 				}
 			}
-		} while ((_mavlink->get_free_tx_buf() >= get_size()) && !_mavlink->radio_status_critical()
+		} while ((_mavlink->canTransmit(get_size())) && !_mavlink->radio_status_critical()
 			 && (_param_update_index < (int) param_count()));
 
 		// Flag work as done once all params have been sent
@@ -512,7 +521,7 @@ MavlinkParametersManager::send_param(param_t param, int component_id)
 	}
 
 	/* no free TX buf to send this param */
-	if (_mavlink->get_free_tx_buf() < MAVLINK_MSG_ID_PARAM_VALUE_LEN) {
+	if (!_mavlink->canTransmit(MAVLINK_MSG_ID_PARAM_VALUE_LEN)) {
 		return 1;
 	}
 

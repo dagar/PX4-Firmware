@@ -3321,18 +3321,22 @@ MavlinkReceiver::run()
 
 		CheckHeartbeats(t);
 
-		if (t - last_send_update > timeout * 1000) {
-			_mission_manager.check_active_mission();
-			_mission_manager.send();
-
+		if (!_mavlink->radio_status_available() || (_mavlink->radio_status_available() && !_mavlink->radio_status_critical())) {
 			_parameters_manager.send();
 
-			if (_mavlink->ftp_enabled()) {
-				_mavlink_ftp.send();
-			}
+			if (t - last_send_update > timeout * 1000) {
 
-			_mavlink_log_handler.send();
-			last_send_update = t;
+				_mission_manager.check_active_mission();
+				_mission_manager.send();
+
+				if (_mavlink->ftp_enabled()) {
+					_mavlink_ftp.send();
+				}
+
+				_mavlink_log_handler.send();
+
+				last_send_update = t;
+			}
 		}
 
 		if (_tune_publisher != nullptr) {

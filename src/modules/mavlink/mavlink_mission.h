@@ -97,6 +97,7 @@ private:
 
 	uint64_t		_time_last_recv{0};
 	uint64_t		_time_last_sent{0};
+	uint64_t		_time_last_mission_count_sent{0};
 
 	uint8_t			_reached_sent_count{0};			///< last time when the vehicle reached a waypoint
 
