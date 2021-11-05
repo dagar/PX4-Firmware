@@ -32,9 +32,12 @@
 ############################################################################
 
 px4_add_library(drivers__hott
-	messages.cpp
 	comms.cpp
+	comms.h
+	messages.cpp
+	messages.h
 )
+target_link_libraries(drivers__hott PRIVATE geo)
 
 add_subdirectory(hott_sensors)
 add_subdirectory(hott_telemetry)
