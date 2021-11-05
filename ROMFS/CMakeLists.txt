@@ -318,7 +318,7 @@ add_custom_target(romfs_gen_files_target
 
 add_custom_command(
 	OUTPUT romfs_pruned.stamp
-	COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/Tools/px_romfs_pruner.py --folder ${romfs_gen_root_dir} --board ${PX4_BOARD}
+	#COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/Tools/px_romfs_pruner.py --folder ${romfs_gen_root_dir} --board ${PX4_BOARD}
 	COMMAND ${CMAKE_COMMAND} -E touch romfs_pruned.stamp
 	DEPENDS
 		romfs_copy.stamp

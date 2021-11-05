@@ -87,6 +87,13 @@ OBJDUMP = ${CMAKE_OBJDUMP}
 ARCHCCVERSION = $(shell $(CC) -v 2>&1 | sed -n '/^gcc version/p' | sed -e 's/^gcc version \([0-9\.]\)/\1/g' -e 's/[-\ ].*//g' -e '1q')
 ARCHCCMAJOR = $(shell echo $(ARCHCCVERSION) | cut -d'.' -f1)
 
+
+# ELF module definitions
+CELFFLAGS = $(CFLAGS) -mlong-calls # --target1-abs
+CXXELFFLAGS = $(CXXFLAGS) -mlong-calls # --target1-abs
+LDELFFLAGS = -r -e main -T $(BOARD_DIR)$(DELIM)scripts$(DELIM)gnu-elf.ld
+
+
 ifeq ($(CONFIG_DEBUG_CUSTOMOPT),y)
    MAXOPTIMIZATION = $(CONFIG_DEBUG_OPTLEVEL)
 else
