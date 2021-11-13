@@ -77,7 +77,7 @@ PARAM_DEFINE_INT32(CA_METHOD, 0);
  * @boolean
  * @group Control Allocation
  */
-PARAM_DEFINE_INT32(CA_BAT_SCALE_EN, 0);
+PARAM_DEFINE_BOOL(CA_BAT_SCALE_EN, 0);
 
 /**
  * Airspeed scaler
@@ -87,7 +87,7 @@ PARAM_DEFINE_INT32(CA_BAT_SCALE_EN, 0);
  * @boolean
  * @group Control Allocation
  */
-PARAM_DEFINE_INT32(CA_AIR_SCALE_EN, 0);
+PARAM_DEFINE_BOOL(CA_AIR_SCALE_EN, 0);
 
 /**
  * Minimum value for actuator 0

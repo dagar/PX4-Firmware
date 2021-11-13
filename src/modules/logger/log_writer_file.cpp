@@ -354,7 +354,6 @@ void LogWriterFile::run()
 		}
 
 		int poll_count = 0;
-		int written = 0;
 		hrt_abstime last_fsync = hrt_absolute_time();
 
 		pthread_mutex_lock(&_mtx);
@@ -420,7 +419,19 @@ void LogWriterFile::run()
 
 #endif
 
-					written = buffer.write_to_file(read_ptr, available, call_fsync);
+					int written = 0;
+
+					for (int retry = 0; retry < 3; retry++) {
+						written = buffer.write_to_file(read_ptr, available, call_fsync);
+
+						if (written >= 0) {
+							break;
+
+						} else {
+							PX4_ERR("write failed (%i:%s), %d/3", errno, strerror(errno), retry + 1);
+							px4_usleep(10000);
+						}
+					}
 
 					/* buffer.mark_read() requires _mtx to be locked */
 					pthread_mutex_lock(&_mtx);
@@ -634,6 +645,8 @@ bool LogWriterFile::LogFileBuffer::start_log(const char *filename)
 
 	if (_buffer == nullptr) {
 		_buffer = (uint8_t *) px4_cache_aligned_alloc(_buffer_size);
+
+		PX4_INFO("buffer at address: %p, size: %zu\n", (void *)&_buffer, _buffer_size);
 
 		if (_buffer == nullptr) {
 			PX4_ERR("Can't create log buffer");

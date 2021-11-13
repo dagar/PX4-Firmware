@@ -205,8 +205,10 @@ struct param_import_state {
 static int
 param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 {
-	float f;
+	bool b;
 	int32_t i;
+	float f;
+
 	void *v = nullptr;
 	int result = -1;
 	struct param_import_state *state = (struct param_import_state *)priv;
@@ -238,6 +240,17 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 	 */
 
 	switch (node->type) {
+	case BSON_BOOL:
+		if (param_type(param) != PARAM_TYPE_BOOL) {
+			PX4_WARN("unexpected type for %s", node->name);
+			result = 1; // just skip this entry
+			goto out;
+		}
+
+		b = node->b;
+		v = &b;
+		break;
+
 	case BSON_INT32:
 		if (param_type(param) != PARAM_TYPE_INT32) {
 			PX4_WARN("unexpected type for %s", node->name);
@@ -245,7 +258,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 			goto out;
 		}
 
-		i = node->i;
+		i = node->i32;
 		v = &i;
 		break;
 

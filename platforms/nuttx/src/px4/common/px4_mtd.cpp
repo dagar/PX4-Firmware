@@ -74,23 +74,23 @@ static int ramtron_attach(mtd_instance_s &instance)
 	return ENXIO;
 #else
 
-	/* initialize the right spi */
-	struct spi_dev_s *spi = px4_spibus_initialize(px4_find_spi_bus(instance.devid));
-
-	if (spi == nullptr) {
-		PX4_ERR("failed to locate spi bus");
-		return -ENXIO;
-	}
-
-	/* this resets the spi bus, set correct bus speed again */
-	SPI_SETFREQUENCY(spi, 10 * 1000 * 1000);
-	SPI_SETBITS(spi, 8);
-	SPI_SETMODE(spi, SPIDEV_MODE3);
-	SPI_SELECT(spi, instance.devid, false);
-
 	/* start the RAMTRON driver, attempt 5 times */
-
 	for (int i = 0; i < 5; i++) {
+
+		/* initialize the right spi */
+		struct spi_dev_s *spi = px4_spibus_initialize(px4_find_spi_bus(instance.devid));
+
+		if (spi == nullptr) {
+			PX4_ERR("failed to locate spi bus");
+			return -ENXIO;
+		}
+
+		/* this resets the spi bus, set correct bus speed again */
+		SPI_SETFREQUENCY(spi, 10 * 1000 * 1000);
+		SPI_SETBITS(spi, 8);
+		SPI_SETMODE(spi, SPIDEV_MODE3);
+		SPI_SELECT(spi, instance.devid, false);
+
 		instance.mtd_dev = ramtron_initialize(spi);
 
 		if (instance.mtd_dev) {

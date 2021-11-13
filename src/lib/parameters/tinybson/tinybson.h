@@ -49,18 +49,19 @@
 
 /** subset of the BSON node types we might care about */
 typedef enum {
-	BSON_EOO = 0,
-	BSON_DOUBLE = 1,
-	BSON_STRING = 2,
-	BSON_OBJECT = 3,
-	BSON_ARRAY = 4,
-	BSON_BINDATA = 5,
+	BSON_EOO       = 0,
+	BSON_DOUBLE    = 1,
+	BSON_STRING    = 2,
+	BSON_OBJECT    = 3,
+	BSON_ARRAY     = 4,
+	BSON_BINDATA   = 5,
 	BSON_UNDEFINED = 6,
-	BSON_BOOL = 8,
-	BSON_DATE = 9,
-	BSON_nullptr = 10,
-	BSON_INT32 = 16,
-	BSON_INT64 = 18
+	BSON_BOOL      = 8,
+	BSON_DATE      = 9,
+	BSON_nullptr   = 10,
+	BSON_INT32     = 16,
+	BSON_TIMESTAMP = 17,
+	BSON_INT64     = 18
 } bson_type_t;
 
 typedef enum bson_binary_subtype {
@@ -86,9 +87,10 @@ typedef struct bson_node_s {
 	bson_type_t		type;
 	bson_binary_subtype_t	subtype;
 	union {
-		int64_t		i;
-		double		d;
 		bool		b;
+		int32_t		i32;
+		int64_t		i64;
+		double		d;
 	};
 } *bson_node_t;
 
@@ -119,6 +121,13 @@ struct bson_decoder_s {
 
 	int32_t                 total_document_size;
 	int32_t                 total_decoded_size;
+
+	int32_t                 count_node_bool{0};
+	int32_t                 count_node_int32{0};
+	int32_t                 count_node_int64{0};
+	int32_t                 count_node_double{0};
+	int32_t                 count_node_string{0};
+	int32_t                 count_node_bindata{0};
 };
 
 /**

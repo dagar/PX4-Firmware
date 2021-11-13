@@ -122,8 +122,10 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 				if (param == PARAM_INVALID) {
 					PX4_ERR("unknown param: %s", name);
 
-				} else if (!((param_type(param) == PARAM_TYPE_INT32 && set.param_type == MAV_PARAM_TYPE_INT32) ||
-					     (param_type(param) == PARAM_TYPE_FLOAT && set.param_type == MAV_PARAM_TYPE_REAL32))) {
+				} else if (!((param_type(param) == PARAM_TYPE_BOOL && set.param_type == MAV_PARAM_TYPE_UINT8) ||
+					     (param_type(param) == PARAM_TYPE_INT32 && set.param_type == MAV_PARAM_TYPE_INT32) ||
+					     (param_type(param) == PARAM_TYPE_FLOAT && set.param_type == MAV_PARAM_TYPE_REAL32))
+					  ) {
 					PX4_ERR("param types mismatch param: %s", name);
 
 				} else {
@@ -428,14 +430,19 @@ MavlinkParametersManager::send_uavcan()
 #pragma GCC diagnostic pop
 #endif
 
-		if (value.param_type == MAV_PARAM_TYPE_REAL32) {
-			msg.param_type = MAVLINK_TYPE_FLOAT;
-			msg.param_value = value.real_value;
+		if (value.param_type == MAV_PARAM_TYPE_UINT8) {
+			bool val = (bool)value.int_value;
+			memcpy(&msg.param_value, &val, sizeof(bool));
+			msg.param_type = MAVLINK_TYPE_UINT8_T;
 
-		} else {
+		} else if (value.param_type == MAV_PARAM_TYPE_INT32) {
 			int32_t val = (int32_t)value.int_value;
 			memcpy(&msg.param_value, &val, sizeof(int32_t));
 			msg.param_type = MAVLINK_TYPE_INT32_T;
+
+		} else if (value.param_type == MAV_PARAM_TYPE_REAL32) {
+			msg.param_type = MAVLINK_TYPE_FLOAT;
+			msg.param_value = value.real_value;
 		}
 
 		// Re-pack the message with the UAVCAN node ID
@@ -556,7 +563,10 @@ MavlinkParametersManager::send_param(param_t param, int component_id)
 	 * Map onboard parameter type to MAVLink type,
 	 * endianess matches (both little endian)
 	 */
-	if (type == PARAM_TYPE_INT32) {
+	if (type == PARAM_TYPE_BOOL) {
+		msg.param_type = MAVLINK_TYPE_UINT8_T;
+
+	} else if (type == PARAM_TYPE_INT32) {
 		msg.param_type = MAVLINK_TYPE_INT32_T;
 
 	} else if (type == PARAM_TYPE_FLOAT) {

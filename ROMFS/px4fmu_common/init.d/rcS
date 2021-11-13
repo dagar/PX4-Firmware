@@ -62,6 +62,15 @@ ver all
 # REBOOTWORK this needs to start after the flight control loop.
 if mount -t vfat /dev/mmcsd0 /fs/microsd
 then
+	if [ -f /fs/microsd/.format ]
+	then
+		echo "INFO [init] formatting SD"
+		umount /fs/microsd
+		mkfatfs /dev/mmcsd0
+		mkfatfs -F 32 /dev/mmcsd0
+		mount -t vfat /dev/mmcsd0 /fs/microsd
+	fi
+
 	set PX4_INIT_TEST_FILE "/fs/microsd/.px4_init_test_file"
 	date >> $PX4_INIT_TEST_FILE
 
