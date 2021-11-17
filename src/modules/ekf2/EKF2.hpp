@@ -241,6 +241,8 @@ private:
 	Vector3f _last_gyro_calibration_published{};
 	Vector3f _last_mag_calibration_published{};
 
+	hrt_abstime _last_sensor_bias_published{0};
+
 	float _last_baro_bias_published{};
 
 	float _airspeed_scale_factor{1.0f}; ///< scale factor correction applied to airspeed measurements
