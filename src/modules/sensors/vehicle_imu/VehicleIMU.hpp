@@ -167,6 +167,7 @@ private:
 	struct InFlightCalibration {
 		matrix::Vector3f offset{};
 		matrix::Vector3f bias_variance{};
+		float temperature{NAN};
 		bool valid{false};
 	};
 

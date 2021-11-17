@@ -1785,24 +1785,22 @@ void EKF2::UpdateAccelCalibration(const hrt_abstime &timestamp)
 	// State variance assumed for accelerometer bias storage.
 	// This is a reference variance used to calculate the fraction of learned accelerometer bias that will be used to update the stored value.
 	// Larger values cause a larger fraction of the learned biases to be used.
-	static constexpr float max_var_allowed = 1e-3f;
-	static constexpr float min_var_allowed = max_var_allowed * 1e-2f;
+	static constexpr float max_var_allowed = 0.01f;
 
 	const Vector3f bias_variance{_ekf.getAccelBiasVariance()};
 
 	// Check if conditions are OK for learning of accelerometer bias values
 	// the EKF is operating in the correct mode and there are no filter faults
 	if ((_ekf.fault_status().value == 0)
-	    && !_ekf.control_status_flags().vehicle_at_rest
-	    && (_ekf.control_status_flags().baro_hgt || _ekf.control_status_flags().rng_hgt
-		|| _ekf.control_status_flags().gps_hgt || _ekf.control_status_flags().ev_hgt)
+	    && !_ekf.accel_bias_inhibited()
+	    && !_preflt_checker.hasHorizFailed()
 	    && !_preflt_checker.hasVertFailed()
 	    && !_ekf.warning_event_flags().height_sensor_timeout
 	    && !_ekf.warning_event_flags().invalid_accel_bias_cov_reset
 	    && !_ekf.innov_check_fail_status_flags().reject_ver_pos
 	    && !_ekf.innov_check_fail_status_flags().reject_ver_vel
 	    && (bias_variance.max() < max_var_allowed)
-	    && (bias_variance.min() > min_var_allowed)
+	    && (bias_variance.min() > 0.f)
 	   ) {
 
 		if (_accel_cal.last_us != 0) {
@@ -1828,9 +1826,7 @@ void EKF2::UpdateAccelCalibration(const hrt_abstime &timestamp)
 			PX4_DEBUG("%d, clearing learned accel bias", _instance);
 		}
 
-		_accel_cal.last_us = 0;
-		_accel_cal.total_time_us = 0;
-		_accel_cal.cal_available = false;
+		_accel_cal = {};
 	}
 }
 
@@ -1839,17 +1835,15 @@ void EKF2::UpdateGyroCalibration(const hrt_abstime &timestamp)
 	// State variance assumed for accelerometer bias storage.
 	// This is a reference variance used to calculate the fraction of learned accelerometer bias that will be used to update the stored value.
 	// Larger values cause a larger fraction of the learned biases to be used.
-	static constexpr float max_var_allowed = 1e-3f;
-	static constexpr float min_var_allowed = max_var_allowed * 1e-2f;
+	static constexpr float max_var_allowed = 0.01f;
 
 	const Vector3f bias_variance{_ekf.getGyroBiasVariance()};
 
 	// Check if conditions are OK for learning of gyro bias values
 	// the EKF is operating in the correct mode and there are no filter faults
 	if ((_ekf.fault_status().value == 0)
-	    && !_ekf.control_status_flags().vehicle_at_rest
 	    && (bias_variance.max() < max_var_allowed)
-	    && (bias_variance.min() > min_var_allowed)
+	    && (bias_variance.min() > 0.f)
 	   ) {
 
 		if (_gyro_cal.last_us != 0) {
@@ -1875,9 +1869,7 @@ void EKF2::UpdateGyroCalibration(const hrt_abstime &timestamp)
 			PX4_DEBUG("%d, clearing learned gyro bias", _instance);
 		}
 
-		_gyro_cal.last_us = 0;
-		_gyro_cal.total_time_us = 0;
-		_gyro_cal.cal_available = false;
+		_gyro_cal = {};
 	}
 }
 

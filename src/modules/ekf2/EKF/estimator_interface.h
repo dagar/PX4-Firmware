@@ -179,8 +179,10 @@ public:
 	// Return true if at least one source of horizontal aiding is active
 	// the flags considered are opt_flow, gps, ev_vel and ev_pos
 	bool isHorizontalAidingActive() const;
+	bool isHeightAidingActive() const;
 
 	int getNumberOfActiveHorizontalAidingSources() const;
+	int getNumberOfActiveHeightAidingSources() const;
 
 	// return true if the EKF is dead reckoning the position using inertial data only
 	bool inertial_dead_reckoning() const { return _is_dead_reckoning; }

@@ -60,10 +60,6 @@ void Gyroscope::set_device_id(uint32_t device_id, bool external)
 		set_external(external);
 		_device_id = device_id;
 
-		if (_device_id != 0) {
-			_calibration_index = FindCalibrationIndex(SensorString(), _device_id);
-		}
-
 		ParametersUpdate();
 		SensorCorrectionsUpdate(true);
 	}
@@ -151,6 +147,10 @@ void Gyroscope::set_rotation(Rotation rotation)
 
 void Gyroscope::ParametersUpdate()
 {
+	if (_device_id != 0) {
+		_calibration_index = FindCalibrationIndex(SensorString(), _device_id);
+	}
+
 	if (_calibration_index >= 0) {
 
 		// CAL_GYROx_ROT
