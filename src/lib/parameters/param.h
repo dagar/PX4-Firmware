@@ -376,15 +376,6 @@ __EXPORT void		param_foreach(void (*func)(void *arg, param_t param), void *arg, 
 __EXPORT int 		param_set_default_file(const char *filename);
 
 /**
- * Get the default parameter file name.
- *
- * @return		The path to the current default parameter file; either as
- *			a result of a call to param_set_default_file, or the
- *			built-in default.
- */
-__EXPORT const char	*param_get_default_file(void);
-
-/**
  * Save parameters to the default file.
  * Note: this method requires a large amount of stack size!
  *

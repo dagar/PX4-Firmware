@@ -71,12 +71,10 @@ using namespace time_literals;
 
 #if defined(FLASH_BASED_PARAMS)
 #include "flashparams/flashparams.h"
-static const char *param_default_file = nullptr; // nullptr means to store to FLASH
 #else
 inline static int flash_param_save(bool only_unsaved, param_filter_func filter) { return -1; }
 inline static int flash_param_load() { return -1; }
 inline static int flash_param_import() { return -1; }
-static const char *param_default_file = PX4_ROOTFSDIR"/eeprom/parameters";
 #endif
 
 static char *param_user_file = nullptr;
@@ -86,7 +84,7 @@ static char *param_user_file = nullptr;
 static hrt_abstime last_autosave_timestamp = 0;
 static struct work_s autosave_work {};
 static px4::atomic_bool autosave_scheduled{false};
-static bool autosave_disabled = false;
+static bool autosave_disabled = true;
 
 static constexpr uint16_t param_info_count = sizeof(px4::parameters) / sizeof(param_info_s);
 static px4::AtomicBitset<param_info_count> params_active;  // params found
@@ -644,7 +642,7 @@ autosave_worker(void *arg)
 {
 	bool disabled = false;
 
-	if (!param_get_default_file()) {
+	if (!param_user_file) {
 		// In case we save to FLASH, defer param writes until disarmed,
 		// as writing to FLASH can stall the entire CPU (in rare cases around 300ms on STM32F7)
 		uORB::SubscriptionData<actuator_armed_s> armed_sub{ORB_ID(actuator_armed)};
@@ -1092,7 +1090,12 @@ param_set_default_file(const char *filename)
 	}
 
 	if (filename) {
+		// TODO: check if file exists?
 		param_user_file = strdup(filename);
+		PX4_INFO("selected parameter default file %s", param_user_file);
+
+		// enable auto save was a valid file is set
+		autosave_disabled = false;
 	}
 
 #endif /* FLASH_BASED_PARAMS */
@@ -1100,25 +1103,25 @@ param_set_default_file(const char *filename)
 	return 0;
 }
 
-const char *
-param_get_default_file()
-{
-	return (param_user_file != nullptr) ? param_user_file : param_default_file;
-}
-
 int param_save_default()
 {
-	int res = PX4_ERROR;
-
-	const char *filename = param_get_default_file();
-
-	if (!filename) {
+#if defined(FLASH_BASED_PARAMS)
+	{
 		param_lock_writer();
 		perf_begin(param_export_perf);
-		res = flash_param_save(false, nullptr);
+		int res = flash_param_save(false, nullptr);
 		perf_end(param_export_perf);
 		param_unlock_writer();
 		return res;
+	}
+#endif // FLASH_BASED_PARAMS
+
+
+	int res = PX4_ERROR;
+	const char *filename = param_user_file;
+
+	if (!filename) {
+		return -1;
 	}
 
 	int attempts = 5;
@@ -1156,7 +1159,7 @@ int
 param_load_default()
 {
 	int res = 0;
-	const char *filename = param_get_default_file();
+	const char *filename = param_user_file;
 
 	if (!filename) {
 		return flash_param_load();
@@ -1461,7 +1464,7 @@ param_load(int fd)
 		return flash_param_load();
 	}
 
-	param_reset_all_internal(false);
+	//param_reset_all_internal(false);
 	return param_import_internal(fd, true);
 }
 
@@ -1513,10 +1516,10 @@ void param_print_status()
 	PX4_INFO("summary: %d/%d (used/total)", param_count_used(), param_count());
 
 #ifndef FLASH_BASED_PARAMS
-	const char *filename = param_get_default_file();
+	const char *filename = param_user_file;
 
 	if (filename != nullptr) {
-		PX4_INFO("file: %s", param_get_default_file());
+		PX4_INFO("file: %s", param_user_file);
 	}
 
 #endif /* FLASH_BASED_PARAMS */

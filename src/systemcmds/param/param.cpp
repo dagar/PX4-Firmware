@@ -209,9 +209,6 @@ param_main(int argc, char *argv[])
 		if (!strcmp(argv[1], "load")) {
 			if (argc >= 3) {
 				return do_load(argv[2]);
-
-			} else {
-				return do_load(param_get_default_file());
 			}
 		}
 
@@ -230,12 +227,6 @@ param_main(int argc, char *argv[])
 
 			} else {
 				param_set_default_file(nullptr);
-			}
-
-			const char *default_file = param_get_default_file();
-
-			if (default_file) {
-				PX4_INFO("selected parameter default file %s", default_file);
 			}
 
 			return 0;
@@ -463,7 +454,7 @@ do_import(const char *param_file_name)
 	bool mark_saved = false;
 
 	if (param_file_name == nullptr) {
-		param_file_name = param_get_default_file();
+		//param_file_name = param_get_default_file();
 		mark_saved = true; // if imported from default storage, mark as saved
 	}
 

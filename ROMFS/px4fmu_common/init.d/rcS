@@ -35,7 +35,6 @@ set MIXER_AUX none
 set MIXER_FILE none
 set MIXER_EXTRA none
 set OUTPUT_MODE none
-set PARAM_FILE /fs/microsd/params
 set PWM_OUT none
 set PWM_MAIN_RATE p:PWM_MAIN_RATE
 set PWM_AUX_OUT none
@@ -57,56 +56,6 @@ set VEHICLE_TYPE none
 ver all
 
 #
-# Try to mount the microSD card.
-#
-# REBOOTWORK this needs to start after the flight control loop.
-if mount -t vfat /dev/mmcsd0 /fs/microsd
-then
-	set PX4_INIT_TEST_FILE "/fs/microsd/.px4_init_test_file"
-	date >> $PX4_INIT_TEST_FILE
-
-	if [ -f $PX4_INIT_TEST_FILE ]
-	then
-		cat $PX4_INIT_TEST_FILE
-		rm $PX4_INIT_TEST_FILE
-
-		if [ ! -f $PX4_INIT_TEST_FILE ]
-		then
-			set SDCARD_AVAILABLE yes
-		fi
-	fi
-fi
-
-if [ $SDCARD_AVAILABLE = no ]
-then
-	set STARTUP_TUNE 14 # tune 14 = SD_INIT
-	if mkfatfs -F 32 /dev/mmcsd0
-	then
-		if mount -t vfat /dev/mmcsd0 /fs/microsd
-		then
-			set SDCARD_AVAILABLE yes
-			echo "INFO [init] card formatted"
-
-		else
-			set STARTUP_TUNE 15 # tune 15 = SD_ERROR
-			echo "ERROR [init] format failed"
-		fi
-	fi
-fi
-
-if [ $SDCARD_AVAILABLE = yes ]
-then
-	if hardfault_log check
-	then
-		set STARTUP_TUNE 2 # tune 2 = ERROR_TUNE
-		if hardfault_log commit
-		then
-			hardfault_log reset
-		fi
-	fi
-fi
-
-#
 # Look for an init script on the microSD card.
 # Disable autostart if the script found.
 #
@@ -115,29 +64,6 @@ then
 	. $FRC
 else
 
-	#
-	# Set the parameter file the board supports params on
-	# MTD device.
-	#
-	if mft query -q -k MTD -s MTD_PARAMETERS -v /fs/mtd_params
-	then
-		set PARAM_FILE /fs/mtd_params
-	fi
-
-	#
-	# Load parameters.
-	#
-	# if the board has a storage for (factory) calibration data
-	if mft query -q -k MTD -s MTD_CALDATA -v /fs/mtd_caldata
-	then
-		param load /fs/mtd_caldata
-	fi
-
-	param select $PARAM_FILE
-	if ! param import
-	then
-		param reset_all
-	fi
 	if ver hwcmp PX4_FMU_V5X PX4_FMU_V6X
 	then
 		netman update -i eth0
@@ -537,7 +463,6 @@ unset MIXER
 unset MIXER_AUX
 unset MIXER_FILE
 unset OUTPUT_MODE
-unset PARAM_FILE
 unset PWM_AUX_OUT
 unset PWM_AUX_RATE
 unset PWM_MAIN_RATE

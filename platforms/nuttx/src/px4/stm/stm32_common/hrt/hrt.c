@@ -244,6 +244,7 @@
 # error HRT_TIMER_CHANNEL must be a value between 1 and 4
 #endif
 
+static bool initialized = false;
 /*
  * Queue of callout entries.
  */
@@ -736,13 +737,17 @@ hrt_store_absolute_time(volatile hrt_abstime *t)
 void
 hrt_init(void)
 {
-	sq_init(&callout_queue);
-	hrt_tim_init();
+	if (!initialized) {
+		sq_init(&callout_queue);
+		hrt_tim_init();
 
 #ifdef HRT_PPM_CHANNEL
-	/* configure the PPM input pin */
-	px4_arch_configgpio(GPIO_PPM_IN);
+		/* configure the PPM input pin */
+		px4_arch_configgpio(GPIO_PPM_IN);
 #endif
+
+		initialized = true;
+	}
 }
 
 /**

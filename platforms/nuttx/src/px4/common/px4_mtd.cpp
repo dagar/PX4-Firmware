@@ -228,51 +228,9 @@ mtd_instance_s *px4_mtd_get_instances(unsigned int *count)
 	return instances;
 }
 
-// Define the default FRAM usage
-#if !defined(CONFIG_MTD_RAMTRON)
-
-static const px4_mtd_manifest_t default_mtd_config = {
-};
-
-#else
-
-const px4_mft_device_t spifram  = {             // FM25V02A on FMUM 32K 512 X 64
-	.bus_type = px4_mft_device_t::SPI,
-	.devid    = SPIDEV_FLASH(0)
-};
-
-const px4_mtd_entry_t fram = {
-	.device = &spifram,
-	.npart = 2,
-	.partd = {
-		{
-			.type = MTD_PARAMETERS,
-			.path = "/fs/mtd_params",
-			.nblocks = 32
-		},
-		{
-			.type = MTD_WAYPOINTS,
-			.path = "/fs/mtd_waypoints",
-			.nblocks = 32
-
-		}
-	},
-};
-
-
-static const px4_mtd_manifest_t default_mtd_config = {
-	.nconfigs   = 1,
-	.entries = {
-		&fram,
-	}
-};
-#endif
-
-int px4_mtd_config(const px4_mtd_manifest_t *mft_mtd)
+int px4_mtd_config(const px4_mtd_manifest_t *mtd_list)
 {
 	int rv = -EINVAL;
-
-	const px4_mtd_manifest_t *mtd_list = mft_mtd ? mft_mtd : &default_mtd_config;
 
 	if (mtd_list == nullptr) {
 		PX4_ERR("Invalid mtd configuration!");

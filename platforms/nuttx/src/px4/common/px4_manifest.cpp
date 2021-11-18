@@ -61,16 +61,13 @@ static const px4_mft_s default_mft = {
 	.mfts = &mtd_mft
 };
 
-
 const px4_mft_s *board_get_manifest(void)
 {
 	return &default_mft;
 }
 
-
 __EXPORT int px4_mft_configure(const px4_mft_s *mft)
 {
-
 	if (mft != nullptr) {
 		for (uint32_t m = 0; m < mft->nmft; m++) {
 			switch (mft->mfts[m].type) {

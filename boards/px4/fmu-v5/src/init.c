@@ -73,7 +73,6 @@
 #include <px4_platform_common/init.h>
 #include <px4_platform/gpio.h>
 #include <px4_platform/board_determine_hw_info.h>
-#include <px4_platform/board_dma_alloc.h>
 
 /****************************************************************************
  * Pre-Processor Definitions
@@ -220,8 +219,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	VDD_5V_WIFI_EN(true);
 
 	/* Need hrt running before using the ADC */
-
-	px4_platform_init();
+	hrt_init();
 
 	if (OK == board_determine_hw_info()) {
 		syslog(LOG_INFO, "[boot] Rev 0x%1x : Ver 0x%1x %s\n", board_get_hw_revision(), board_get_hw_version(),
@@ -248,11 +246,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		px4_arch_configgpio(_GPIO_PULL_DOWN_INPUT(GPIO_CAN3_RX));
 	}
 
-	/* configure the DMA allocator */
 
-	if (board_dma_alloc_init() < 0) {
-		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
-	}
 
 #if defined(SERIAL_HAVE_RXDMA)
 	// set up the serial DMA polling at 1ms intervals for received bytes that have not triggered a DMA event.
@@ -266,10 +260,6 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	led_on(LED_GREEN); // Indicate Power.
 	led_off(LED_BLUE);
 
-	if (board_hardfault_init(2, true) != 0) {
-		led_on(LED_RED);
-	}
-
 #ifdef CONFIG_MMCSD
 	int ret = stm32_sdio_initialize();
 
@@ -280,9 +270,7 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 
 #endif /* CONFIG_MMCSD */
 
-	/* Configure the HW based on the manifest */
-
-	px4_platform_configure();
+	px4_platform_init();
 
 	return OK;
 }

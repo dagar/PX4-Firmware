@@ -44,8 +44,12 @@
 
 #include <fcntl.h>
 
+#include <syslog.h>
+
 #include <sys/mount.h>
 #include <syslog.h>
+
+#include <px4_platform/board_dma_alloc.h>
 
 #if defined(CONFIG_I2C)
 # include <px4_platform_common/i2c.h>
@@ -56,10 +60,47 @@
 #include <px4_platform_common/crypto.h>
 #endif
 
+#include <px4_platform_common/mtd_manifest.h>
+
+#if defined(CONFIG_MTD_RAMTRON)
+#include <nuttx/spi/spi.h>
+// Define the default FRAM usage
+const px4_mft_device_t spifram  = {             // FM25V02A on FMUM 32K 512 X 64
+	.bus_type = px4_mft_device_t::SPI,
+	.devid    = SPIDEV_FLASH(0)
+};
+
+const px4_mtd_entry_t fram = {
+	.device = &spifram,
+	.npart = 2,
+	.partd = {
+		{
+			.type = MTD_PARAMETERS,
+			.path = "/fs/mtd_params",
+			.nblocks = 32
+		},
+		{
+			.type = MTD_WAYPOINTS,
+			.path = "/fs/mtd_waypoints",
+			.nblocks = 32
+
+		}
+	},
+};
+
+static const px4_mtd_manifest_t default_mtd_config = {
+	.nconfigs   = 1,
+	.entries = {
+		&fram,
+	}
+};
+#endif
+
 extern void cdcacm_init(void);
 
 int px4_platform_init()
 {
+	syslog(LOG_INFO, "[boot] px4_platform_init\n");
 
 	int ret = px4_console_buffer_init();
 
@@ -81,8 +122,6 @@ int px4_platform_init()
 #endif
 
 	hrt_init();
-
-	param_init();
 
 	/* configure CPU load estimation */
 #ifdef CONFIG_SCHED_INSTRUMENTATION
@@ -118,6 +157,7 @@ int px4_platform_init()
 #endif // CONFIG_I2C
 
 #if defined(CONFIG_FS_PROCFS)
+	syslog(LOG_INFO, "[boot] mount procfs\n");
 	int ret_mount_procfs = mount(nullptr, "/proc", "procfs", 0, nullptr);
 
 	if (ret < 0) {
@@ -127,6 +167,7 @@ int px4_platform_init()
 #endif // CONFIG_FS_PROCFS
 
 #if defined(CONFIG_FS_BINFS)
+	syslog(LOG_INFO, "[boot] mount binfs\n");
 	int ret_mount_binfs = nx_mount(nullptr, "/bin", "binfs", 0, nullptr);
 
 	if (ret_mount_binfs < 0) {
@@ -140,11 +181,95 @@ int px4_platform_init()
 
 	uorb_start();
 
+
+	// configure the DMA allocator
+	if (board_dma_alloc_init() < 0) {
+		syslog(LOG_ERR, "[boot] DMA alloc FAILED\n");
+	}
+
+	// Mount filesystem
+	int mount_ret = nx_mount("/dev/mmcsd0", "/fs/microsd", "vfat", 0, NULL);
+
+	if (mount_ret < 0) {
+		syslog(LOG_ERR, "[boot] Failed to mount the SDCARD. %d\n", ret);
+		// TODO: scan
+		// TODO: format
+
+		// TODO: littlefs test
+	}
+
+
+
+	char *parameter_path = nullptr;
+	const px4_mtd_manifest_t *mtd_list = nullptr;
+
+	const px4_mft_s *mft = board_get_manifest();
+
+	if (mft != nullptr) {
+		syslog(LOG_INFO, "[boot] board manifest MTD\n");
+
+		for (uint32_t m = 0; m < mft->nmft; m++) {
+			if (mft->mfts[m].type == MTD) {
+				mtd_list = (px4_mtd_manifest_t *)mft->mfts[m].pmft;
+			}
+		}
+	}
+
+	if (!mtd_list) {
+		mtd_list = &default_mtd_config;
+	}
+
+	if (mtd_list) {
+		syslog(LOG_INFO, "[boot] board manifest px4_mtd_config\n");
+		px4_mtd_config(mtd_list);
+
+		// mtd_list->nconfigs
+		for (uint32_t i = 0; i < mtd_list->nconfigs; i++) {
+			const px4_mtd_entry_t *entry = mtd_list->entries[i];
+
+			if (entry) {
+				for (uint32_t p = 0; p < entry->npart; p++) {
+					if (entry->partd[p].type == MTD_PARAMETERS) {
+						syslog(LOG_INFO, "[boot] board manifest %s\n", entry->partd[p].path);
+						parameter_path = (char *)entry->partd[p].path;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	syslog(LOG_INFO, "[boot] param init\n");
+	param_init();
+
+	// param_init_file();
+	// param_init_flash();
+
+	if (parameter_path) {
+		//param_load(int fd);
+		param_set_default_file(parameter_path);
+		param_load_default();
+	}
+
+	// TODO: backup parameters to SD card if import fails
+
+
+
+	// TODO:
+	//  - hardfault
+	//  - sd mount
+
+
+
 	px4_log_initialize();
 
 #if defined(CONFIG_SYSTEM_CDCACM) && defined(CONFIG_BUILD_FLAT)
 	cdcacm_init();
 #endif
+
+	if (board_hardfault_init(2, true) != 0) {
+		syslog(LOG_ERR, "[boot] hard fault init failed\n");
+	}
 
 	return PX4_OK;
 }
@@ -152,5 +277,4 @@ int px4_platform_init()
 int px4_platform_configure(void)
 {
 	return px4_mft_configure(board_get_manifest());
-
 }
