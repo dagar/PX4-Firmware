@@ -540,9 +540,22 @@ int EstimatorInterface::getNumberOfActiveHorizontalAidingSources() const
 	       + int(_control_status.flags.fuse_aspd && _control_status.flags.fuse_beta);
 }
 
+int EstimatorInterface::getNumberOfActiveHeightAidingSources() const
+{
+	return int(_control_status.flags.baro_hgt)
+	       + int(_control_status.flags.rng_hgt)
+	       + int(_control_status.flags.gps_hgt)
+	       + int(_control_status.flags.ev_hgt);
+}
+
 bool EstimatorInterface::isHorizontalAidingActive() const
 {
 	return getNumberOfActiveHorizontalAidingSources() > 0;
+}
+
+bool EstimatorInterface::isHeightAidingActive() const
+{
+	return getNumberOfActiveHeightAidingSources() > 0;
 }
 
 void EstimatorInterface::printBufferAllocationFailed(const char *buffer_name)

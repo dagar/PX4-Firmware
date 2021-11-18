@@ -1776,7 +1776,7 @@ void EKF2::UpdateAccelCalibration(const hrt_abstime &timestamp)
 {
 	// Check if conditions are OK for learning of accelerometer bias values
 	// the EKF is operating in the correct mode and there are no filter faults
-	if (_ekf.control_status_flags().in_air && (_ekf.fault_status().value == 0)
+	if (!_ekf.accel_bias_inhibited() && (_ekf.fault_status().value == 0)
 	    && !(_param_ekf2_aid_mask.get() & MASK_INHIBIT_ACC_BIAS)) {
 
 		if (_accel_cal.last_us != 0) {

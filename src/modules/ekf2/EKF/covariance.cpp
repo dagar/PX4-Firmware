@@ -149,8 +149,24 @@ void Ekf::predictCovariance()
 	for (unsigned stateIndex = 13; stateIndex <= 15; stateIndex++) {
 		const unsigned index = stateIndex - 13;
 
-		// When on ground, only consider an accel bias observable if aligned with the gravity vector
-		const bool is_bias_observable = (fabsf(_R_to_earth(2, index)) > 0.8f) || _control_status.flags.in_air;
+		bool is_bias_observable = _control_status.flags.in_air;
+
+		if (!_control_status.flags.in_air) {
+			if (fabsf(_R_to_earth(2, index)) > 0.8f) {
+				// consider an accel bias observable if aligned with the gravity vector
+				is_bias_observable = true;
+
+			} else if (index == 0 || index == 1) {
+				if (isHorizontalAidingActive()) {
+					is_bias_observable = true;
+				}
+			} else if (index == 2) {
+				if (isHeightAidingActive()) {
+					is_bias_observable = true;
+				}
+			}
+		}
+
 		const bool do_inhibit_axis = do_inhibit_all_axes || !is_bias_observable || _imu_sample_delayed.delta_vel_clipping[index];
 
 		if (do_inhibit_axis) {
