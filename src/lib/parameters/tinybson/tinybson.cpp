@@ -51,8 +51,8 @@
 # define debug(fmt, args...)		do { } while(0)
 #endif
 
-#define CODER_CHECK(_c)		do { if (_c->dead) { debug("coder dead"); return -1; }} while(0)
-#define CODER_KILL(_c, _reason)	do { debug("killed: %s", _reason); _c->dead = true; return -1; } while(0)
+#define CODER_CHECK(_c)		do { if (_c->dead) { PX4_ERR("coder dead"); return -1; }} while(0)
+#define CODER_KILL(_c, _reason)	do { PX4_ERR("killed: %s", _reason); _c->dead = true; return -1; } while(0)
 
 static int
 read_x(bson_decoder_t decoder, void *p, size_t s)
@@ -190,7 +190,6 @@ int
 bson_decoder_next(bson_decoder_t decoder)
 {
 	int8_t	tbyte;
-	int32_t tint;
 	unsigned nlen;
 
 	CODER_CHECK(decoder);
@@ -269,20 +268,23 @@ bson_decoder_next(bson_decoder_t decoder)
 			}
 
 			decoder->node.b = (tbyte != 0);
+			decoder->count_node_bool++;
 			break;
 
 		case BSON_INT32:
-			if (read_int32(decoder, &tint)) {
+			if (read_int32(decoder, &decoder->node.i32)) {
 				CODER_KILL(decoder, "read error on BSON_INT");
 			}
 
-			decoder->node.i = tint;
+			decoder->count_node_int32++;
 			break;
 
 		case BSON_INT64:
-			if (read_int64(decoder, &decoder->node.i)) {
+			if (read_int64(decoder, &decoder->node.i64)) {
 				CODER_KILL(decoder, "read error on BSON_INT");
 			}
+
+			decoder->count_node_int64++;
 
 			break;
 
@@ -291,12 +293,16 @@ bson_decoder_next(bson_decoder_t decoder)
 				CODER_KILL(decoder, "read error on BSON_DOUBLE");
 			}
 
+			decoder->count_node_double++;
+
 			break;
 
 		case BSON_STRING:
 			if (read_int32(decoder, &decoder->pending)) {
 				CODER_KILL(decoder, "read error on BSON_STRING length");
 			}
+
+			decoder->count_node_string++;
 
 			break;
 
@@ -310,6 +316,7 @@ bson_decoder_next(bson_decoder_t decoder)
 			}
 
 			decoder->node.subtype = (bson_binary_subtype_t)tbyte;
+			decoder->count_node_bindata++;
 			break;
 
 		/* XXX currently not supporting other types */

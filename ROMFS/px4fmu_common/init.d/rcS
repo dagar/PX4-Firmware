@@ -121,7 +121,10 @@ else
 	#
 	if mft query -q -k MTD -s MTD_PARAMETERS -v /fs/mtd_params
 	then
-		set PARAM_FILE /fs/mtd_params
+		if mtd readtest /fs/mtd_params
+		then
+			set PARAM_FILE /fs/mtd_params
+		fi
 	fi
 
 	#
@@ -130,14 +133,27 @@ else
 	# if the board has a storage for (factory) calibration data
 	if mft query -q -k MTD -s MTD_CALDATA -v /fs/mtd_caldata
 	then
-		param load /fs/mtd_caldata
+		if mtd readtest /fs/mtd_caldata
+		then
+			param load /fs/mtd_caldata
+		fi
 	fi
 
 	param select $PARAM_FILE
 	if ! param import
 	then
-		param reset_all
+		# log to SD card?
+
+		# dump error output to file and console
+
+		echo "ERROR [init] param immport failed"
+		set STARTUP_TUNE 2 # tune 2 = ERROR_TUNE
+
+		cp $PARAM_FILE /fs/microsd/params_import_fail_backup.bson
+
+		param dump $PARAM_FILE
 	fi
+
 	if ver hwcmp PX4_FMU_V5X PX4_FMU_V6X
 	then
 		netman update -i eth0

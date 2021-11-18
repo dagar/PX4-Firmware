@@ -50,6 +50,7 @@
 #include <crc32.h>
 #include <float.h>
 #include <math.h>
+#include <sys/stat.h>
 
 #include <containers/Bitset.hpp>
 #include <drivers/drv_hrt.h>
@@ -126,6 +127,9 @@ static px4_sem_t param_sem_save; ///< this protects against concurrent param sav
 ///< we use a separate lock to allow concurrent param reads and saves.
 ///< a param_set could still be blocked by a param save, because it
 ///< needs to take the reader lock
+
+static size_t   bson_export_size = 0;
+static uint32_t bson_export_crc32 = 0;
 
 /** lock the parameter store for read access */
 static void
@@ -1131,8 +1135,11 @@ int param_save_default()
 			res = param_export(fd, false, nullptr);
 			::close(fd);
 
-			if (res != PX4_OK) {
+			if (res == PX4_OK) {
+				// open again and verify crc32
+			} else {
 				PX4_ERR("param_export failed, retrying %d", attempts);
+				px4_usleep(10000); // sleep 10 milliseconds before trying again
 			}
 
 		} else {
@@ -1144,6 +1151,35 @@ int param_save_default()
 
 	if (res != OK) {
 		PX4_ERR("failed to write parameters to file: %s", filename);
+	}
+
+	// save backup
+	{
+		// TODO: numbered format if time not available
+		//  or always numbered version monotonically increasing?
+		//  file checksum?
+		//   log
+
+		struct timespec ts {};
+		px4_clock_gettime(CLOCK_REALTIME, &ts);
+		time_t utc_time_sec = ts.tv_sec + (ts.tv_nsec / 1e9);
+
+		tm tt{};
+		gmtime_r(&utc_time_sec, &tt);
+
+		char backup_filename[80] {};
+		strftime(backup_filename, sizeof(backup_filename), "/fs/microsd/parameters/parameters_%Y%m%dT%H%M%SZ.bson", &tt);
+		// strncpy(log_dir + n, file_name.log_dir, log_dir_len - n);
+		int mkdir_ret = mkdir("/fs/microsd/parameters", S_IRWXU | S_IRWXG | S_IRWXO); // TODO: only if necesssary
+		(void)mkdir_ret;
+
+		PX4_WARN("\nwriting backup parameters %s\n\n", backup_filename);
+		int fd_backup = ::open(backup_filename, O_WRONLY | O_CREAT, PX4_O_MODE_666);
+
+		if (fd_backup > -1) {
+			param_export(fd_backup, false, nullptr);
+			::close(fd_backup);
+		}
 	}
 
 	return res;
@@ -1188,20 +1224,16 @@ param_load_default()
 int
 param_export(int fd, bool only_unsaved, param_filter_func filter)
 {
-	int	result = -1;
 	perf_begin(param_export_perf);
 
 	if (fd < 0) {
 		param_lock_writer();
 		// flash_param_save() will take the shutdown lock
-		result = flash_param_save(only_unsaved, filter);
+		int result = flash_param_save(only_unsaved, filter);
 		param_unlock_writer();
 		perf_end(param_export_perf);
 		return result;
 	}
-
-	param_wbuf_s *s = nullptr;
-	struct bson_encoder_s encoder;
 
 	int shutdown_lock_ret = px4_shutdown_lock();
 
@@ -1214,8 +1246,16 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 
 	param_lock_reader();
 
+	bson_encoder_s encoder{};
 	uint8_t bson_buffer[256];
 	bson_encoder_init_buf_file(&encoder, fd, &bson_buffer, sizeof(bson_buffer));
+
+	int result = PX4_ERROR;
+	param_wbuf_s *s = nullptr;
+	uint32_t export_crc32 = 0;
+	int32_t export_count_int32 = 0;
+	int32_t export_count_double = 0;
+	size_t total_size = sizeof(int32_t);
 
 	/* no modified parameters -> we are done */
 	if (param_values == nullptr) {
@@ -1223,7 +1263,7 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 		goto out;
 	}
 
-	while ((s = (struct param_wbuf_s *)utarray_next(param_values, s)) != nullptr) {
+	while ((s = (param_wbuf_s *)utarray_next(param_values, s)) != nullptr) {
 		/*
 		 * If we are only saving values changed since last save, and this
 		 * one hasn't, then skip it
@@ -1263,16 +1303,20 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 
 		s->unsaved = false;
 
-		const char *name = param_name(s->param);
-		const size_t size = param_size(s->param);
-
 		/* append the appropriate BSON type object */
 		switch (param_type(s->param)) {
 		case PARAM_TYPE_INT32: {
+				const char *name = param_name(s->param);
 				const int32_t i = s->val.i;
-				PX4_DEBUG("exporting: %s (%d) size: %lu val: %d", name, s->param, (long unsigned int)size, i);
+				size_t bson_size = sizeof(int8_t) + strlen(name) + 1 + sizeof(i);
+				total_size += bson_size;
+				PX4_DEBUG("exporting: %s (%d) (name size: %d) size: %lu val: %d - size: %d, total_size: %d", name, s->param,
+					  strlen(name) + 1, (long unsigned int)param_size(s->param), i, bson_size, total_size);
 
-				if (bson_encoder_append_int(&encoder, name, i) != 0) {
+				if (bson_encoder_append_int(&encoder, name, i) == 0) {
+					export_count_int32++;
+
+				} else {
 					PX4_ERR("BSON append failed for '%s'", name);
 					goto out;
 				}
@@ -1280,10 +1324,17 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 			break;
 
 		case PARAM_TYPE_FLOAT: {
+				const char *name = param_name(s->param);
 				const double f = (double)s->val.f;
-				PX4_DEBUG("exporting: %s (%d) size: %lu val: %.3f", name, s->param, (long unsigned int)size, (double)f);
+				size_t bson_size = sizeof(int8_t) + strlen(name) + 1 + sizeof(f);
+				total_size += bson_size;
+				PX4_DEBUG("exporting: %s (%d) (name size: %d) size: %lu val: %.3f - size: %d, total_size: %d", name, s->param,
+					  strlen(name) + 1, (long unsigned int)param_size(s->param), (double)f, bson_size, total_size);
 
-				if (bson_encoder_append_double(&encoder, name, f) != 0) {
+				if (bson_encoder_append_double(&encoder, name, f) == 0) {
+					export_count_double++;
+
+				} else {
 					PX4_ERR("BSON append failed for '%s'", name);
 					goto out;
 				}
@@ -1291,8 +1342,13 @@ param_export(int fd, bool only_unsaved, param_filter_func filter)
 			break;
 
 		default:
-			PX4_ERR("%s unrecognized parameter type %d, skipping export", name, param_type(s->param));
+			PX4_ERR("%s unrecognized parameter type %d, skipping export", param_name(s->param), param_type(s->param));
 		}
+
+		const char *name = param_name(s->param);
+		const void *val = &(s->val);
+		export_crc32 = crc32part((const uint8_t *)name, strlen(name), export_crc32);
+		export_crc32 = crc32part((const uint8_t *)val, param_size(s->param), export_crc32);
 	}
 
 	result = 0;
@@ -1303,6 +1359,13 @@ out:
 		if (bson_encoder_fini(&encoder) != PX4_OK) {
 			PX4_ERR("BSON encoder finialize failed");
 			result = -1;
+		}
+
+		PX4_INFO("BSON final size = %" PRIi32 ", crc32: %" PRIu32, encoder.total_document_size, export_crc32);
+
+		if (filter == nullptr) {
+			bson_export_size = encoder.total_document_size;
+			bson_export_crc32 = export_crc32;
 		}
 	}
 
@@ -1366,7 +1429,7 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 				goto out;
 			}
 
-			i = node->i;
+			i = node->i32;
 			v = &i;
 
 			PX4_DEBUG("Imported %s with value %d", param_name(param), i);
@@ -1388,8 +1451,14 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 		break;
 
 	default:
-		PX4_DEBUG("unrecognised node type");
+		PX4_ERR("%s unrecognised node type %d", node->name, node->type);
+		result = 1; // just skip this entry
 		goto out;
+	}
+
+	{
+		decoder->crc32 = crc32part((const uint8_t *)node->name, strlen(node->name), decoder->crc32);
+		decoder->crc32 = crc32part((const uint8_t *)v, param_size(param), decoder->crc32);
 	}
 
 	if (param_set_internal(param, v, state->mark_saved, true)) {
@@ -1402,6 +1471,30 @@ param_import_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
 
 out:
 	return result;
+}
+
+static int
+param_dump_callback(bson_decoder_t decoder, void *priv, bson_node_t node)
+{
+	switch (node->type) {
+	case BSON_INT32:
+		PX4_INFO_RAW("%s = %" PRIi32 " (BSON_INT32)\n", node->name, node->i32);
+		return 1;
+
+	case BSON_DOUBLE:
+		PX4_INFO_RAW("%s = %.4f (BSON_DOUBLE)\n", node->name, node->d);
+		return 1;
+
+	case BSON_EOO:
+		PX4_DEBUG("end of parameters");
+		return 0;
+
+	default:
+		PX4_INFO_RAW("ERROR %s unknown node type %d\n", node->name, node->type);
+		return 1; // just skip this entry
+	}
+
+	return -1;
 }
 
 static int
@@ -1422,8 +1515,11 @@ param_import_internal(int fd, bool mark_saved)
 			} while (result > 0);
 
 			if (result == 0) {
-				PX4_INFO("BSON document size %" PRId32 " bytes, decoded %" PRId32 " bytes", decoder.total_document_size,
-					 decoder.total_decoded_size);
+				PX4_INFO("BSON document size %" PRId32 " bytes, decoded %" PRId32 " bytes, int32:%" PRIu16 ", double:%" PRIu16
+					 ", crc32: %" PRIu32,
+					 decoder.total_document_size, decoder.total_decoded_size,
+					 decoder.count_node_int32, decoder.count_node_double, decoder.crc32);
+
 				return 0;
 
 			} else if (result == -ENODATA) {
@@ -1439,6 +1535,7 @@ param_import_internal(int fd, bool mark_saved)
 		}
 
 		lseek(fd, 0, SEEK_SET);
+		px4_usleep(10000);
 	}
 
 	return -1;
@@ -1463,6 +1560,37 @@ param_load(int fd)
 
 	param_reset_all_internal(false);
 	return param_import_internal(fd, true);
+}
+
+int
+param_dump(int fd)
+{
+	bson_decoder_s decoder;
+	param_import_state state;
+
+	if (bson_decoder_init_file(&decoder, fd, param_dump_callback, &state) == 0) {
+		int result = -1;
+
+		do {
+			result = bson_decoder_next(&decoder);
+
+		} while (result > 0);
+
+		if (result == 0) {
+			PX4_INFO_RAW("\nBSON document size %" PRId32 " bytes, decoded %" PRId32 " bytes, int32:%" PRIu16 ", double:%" PRIu16
+				     "\n",
+				     decoder.total_document_size, decoder.total_decoded_size,
+				     decoder.count_node_int32, decoder.count_node_double
+				    );
+
+			return 0;
+
+		} else {
+			PX4_ERR("param dump failed (%d)", result);
+		}
+	}
+
+	return -1;
 }
 
 void
