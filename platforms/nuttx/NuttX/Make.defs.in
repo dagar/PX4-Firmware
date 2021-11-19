@@ -102,7 +102,7 @@ FLAGS = $(MAXOPTIMIZATION) -g2 \
 	-fno-strict-aliasing \
 	-fomit-frame-pointer \
 	-Wall \
-	-Werror \
+	-Wno-error \
 	-Wextra \
 	-Wlogical-op \
 	-Wno-cpp \

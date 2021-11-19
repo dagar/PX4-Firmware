@@ -109,14 +109,14 @@ static int ramtron_attach(mtd_instance_s &instance)
 		return -EIO;
 	}
 
-	int ret = instance.mtd_dev->ioctl(instance.mtd_dev, MTDIOC_SETSPEED, (unsigned long)10 * 1000 * 1000);
+	// int ret = instance.mtd_dev->ioctl(instance.mtd_dev, MTDIOC_SETSPEED, (unsigned long)10 * 1000 * 1000);
 
-	if (ret != OK) {
-		// FIXME: From the previous warning call, it looked like this should have been fatal error instead. Tried
-		// that but setting the bus speed does fail all the time. Which was then exiting and the board would
-		// not run correctly. So changed to PX4_WARN.
-		PX4_WARN("failed to set bus speed");
-	}
+	// if (ret != OK) {
+	// 	// FIXME: From the previous warning call, it looked like this should have been fatal error instead. Tried
+	// 	// that but setting the bus speed does fail all the time. Which was then exiting and the board would
+	// 	// not run correctly. So changed to PX4_WARN.
+	// 	PX4_WARN("failed to set bus speed");
+	// }
 
 	return 0;
 #endif
