@@ -66,6 +66,7 @@ extern "C" {
 #include <stm32_uart.h>
 #include <arch/board/board.h>
 #include "arm_internal.h"
+#include <stm32_dtcm.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
@@ -216,6 +217,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	VDD_5V_HIPOWER_EN(true);
 	VDD_3V3_SENSORS4_EN(true);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
+
+	dtcm_initialize();
 
 	/* Need hrt running before using the ADC */
 

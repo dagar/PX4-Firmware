@@ -45,6 +45,8 @@
 #include <lib/drivers/device/Device.hpp>
 #include <lib/mathlib/mathlib.h>
 
+#include <stm32_dtcm.h>
+
 #include <limits.h>
 #include <string.h>
 
@@ -298,6 +300,8 @@ WorkQueueManagerRun(int, char **)
 			if (ret_setschedparam != 0) {
 				PX4_ERR("setting sched params for %s failed (%i)", wq->name, ret_setschedparam);
 			}
+
+			attr.stackaddr = dtcm_malloc(attr.stacksize + 300);
 
 			// create thread
 			pthread_t thread;

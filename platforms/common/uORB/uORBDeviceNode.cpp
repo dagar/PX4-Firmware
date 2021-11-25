@@ -80,7 +80,9 @@ uORB::DeviceNode::DeviceNode(const struct orb_metadata *meta, const uint8_t inst
 
 uORB::DeviceNode::~DeviceNode()
 {
-	delete[] _data;
+	PX4_INFO("deleted %s:%d", _meta->o_name, _instance);
+	dtcm_free(_data);
+	//free(_data);
 
 	CDev::unregister_driver_and_memory();
 }
@@ -174,7 +176,12 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 
 			/* re-check size */
 			if (nullptr == _data) {
-				_data = new uint8_t[_meta->o_size * _queue_size];
+				_data = (uint8_t *)dtcm_malloc(_meta->o_size * _queue_size);
+
+				if (_data == nullptr) {
+					PX4_ERR("dtcm alloc failed %s", _meta->o_name);
+					//_data = (uint8_t *)malloc(_meta->o_size * _queue_size);
+				}
 			}
 
 			unlock();

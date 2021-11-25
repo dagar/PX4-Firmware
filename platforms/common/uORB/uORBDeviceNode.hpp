@@ -42,6 +42,8 @@
 #include <containers/List.hpp>
 #include <px4_platform_common/atomic.h>
 
+#include <stm32_dtcm.h>
+
 namespace uORB
 {
 class DeviceNode;
@@ -71,6 +73,20 @@ public:
 	DeviceNode &operator=(DeviceNode &&) = delete;
 
 	bool operator<=(const DeviceNode &rhs) const { return (strcmp(get_devname(), rhs.get_devname()) <= 0); }
+
+	void *operator new (size_t size)
+	{
+		//void *p = dtcm_malloc(size);
+		void *p = malloc(size);
+
+		return p;
+	}
+
+	void operator delete (void *p)
+	{
+		//dtcm_free(p);
+		free(p);
+	}
 
 	/**
 	 * Method to create a subscriber instance and return the struct

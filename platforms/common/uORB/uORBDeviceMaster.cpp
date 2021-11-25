@@ -45,6 +45,8 @@
 
 #include <math.h>
 
+#include <stm32_dtcm.h>
+
 #ifndef __PX4_QURT // QuRT has no poll()
 #include <poll.h>
 #endif // PX4_QURT
