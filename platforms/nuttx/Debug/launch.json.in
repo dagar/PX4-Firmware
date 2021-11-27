@@ -10,6 +10,7 @@
             "type": "cortex-debug",
             "servertype": "jlink",
             "interface": "swd",
+            "rtos": "/opt/SEGGER/JLink_V758c/GDBServer/RTOSPlugin_NuttX.so",
             //"ipAddress": "server:19020",
             "cwd": "${workspaceFolder}",
             "internalConsoleOptions": "openOnSessionStart",
@@ -17,8 +18,8 @@
                 "source ${workspaceFolder}/platforms/nuttx/Debug/PX4",
                 "source ${workspaceFolder}/platforms/nuttx/Debug/NuttX",
                 "source ${workspaceFolder}/platforms/nuttx/Debug/ARMv7M",
-                "set mem inaccessible-by-default off",
-                "set print pretty",
+                "source ${workspaceFolder}/platforms/nuttx/Debug/JLink_NuttX_GDBServer",
+                "set mem inaccessible-by-default off"
             ]
         },
         {

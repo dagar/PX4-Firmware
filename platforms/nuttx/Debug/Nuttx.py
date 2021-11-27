@@ -159,7 +159,7 @@ class NX_task(object):
 		for i in range(pidhash_type.range()[0],pidhash_type.range()[1]):
 			entry = pidhash_value[i]
 			pid = parse_int(entry['pid'])
-			if pid is not -1:
+			if pid != -1:
 				result.append(pid)
 		return result
 

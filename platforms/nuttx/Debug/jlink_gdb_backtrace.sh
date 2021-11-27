@@ -44,8 +44,6 @@ info_nxthreads
 
 nxthread_all_bt
 
-quit
-
 EOL
 
 ${GDB_CMD} -silent --nh --nx --nw -batch -ix=${WORKSPACE}/platforms/nuttx/NuttX/nuttx/tools/nuttx-gdbinit -x ${gdb_cmd_file} ${1}

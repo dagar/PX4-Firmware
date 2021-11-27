@@ -1,0 +1,11 @@
+
+echo Loading NuttX JLink hook.\n
+
+define hookpost-file
+  echo "hookpost-file"
+  eval "monitor rtosconf pid_offset %d", &((struct tcb_s *)(0))->pid
+  eval "monitor rtosconf regs_offset %d", &((struct tcb_s *)(0))->xcp.regs
+  eval "monitor rtosconf state_offset %d", &((struct tcb_s *)(0))->task_state
+  eval "monitor rtosconf name_offset %d", &((struct tcb_s *)(0))->name
+  eval "monitor rtosconf prio_offset %d", &((struct tcb_s *)(0))->sched_priority
+end

@@ -13,10 +13,11 @@ else
 	exit 1
 fi
 
-@JLinkGDBServerExe_PATH@ -device @DEBUG_DEVICE@ -select usb -endian little -if SWD -speed auto -ir -LocalhostOnly 1 -strict -vd -singlerun &
+@JLinkGDBServerExe_PATH@ -device @DEBUG_DEVICE@ -select usb -endian little -if SWD -speed auto -ir -LocalhostOnly 1 -strict -vd -singlerun -rtos /opt/SEGGER/JLink_V758c/GDBServer/RTOSPlugin_NuttX.so &
 
 cd @PX4_BINARY_DIR@ && ${GDB_CMD} -silent -nh \
 	-iex "set auto-load safe-path @PX4_BINARY_DIR@" \
+	-ix=@PX4_SOURCE_DIR@/platforms/nuttx/Debug/JLink_NuttX_GDBServer \
 	-ix=@PX4_SOURCE_DIR@/platforms/nuttx/NuttX/nuttx/tools/nuttx-gdbinit \
 	-ex "target remote localhost:2331" \
 	-ex "monitor reset 0" \
