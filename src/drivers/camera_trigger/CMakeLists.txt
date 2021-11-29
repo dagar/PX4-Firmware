@@ -52,4 +52,5 @@ px4_add_module(
 		px4_work_queue
 	PUBLICATIONS
 		"px4::msg::CameraTrigger /camera_trigger"
+		"px4::msg::PpsCapture /pps_capture" # TODO
 	)

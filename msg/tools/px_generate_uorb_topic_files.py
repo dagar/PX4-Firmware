@@ -34,7 +34,7 @@
 
 """
 px_generate_uorb_topic_files.py
-Generates c/cpp header/source files for uorb topics from .msg (ROS syntax)
+Generates c/cpp header/source files for uorb topics from .msg
 message files
 """
 
@@ -82,49 +82,18 @@ __license__ = "BSD"
 __email__ = "thomasgubler@gmail.com"
 
 
-TEMPLATE_FILE = ['msg.h.em', 'msg.cpp.em']
-OUTPUT_FILE_EXT = ['.h', '.cpp']
+TEMPLATE_FILE = ['msg.h.em']
+OUTPUT_FILE_EXT = ['.h']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
-TOPICS_TOKEN = '# TOPICS '
-IDL_TEMPLATE_FILE = 'msg.idl.em'
-
 CONSTRAINED_FLASH = False
-
 
 class MsgScope:
     NONE = 0
     SEND = 1
     RECEIVE = 2
 
-def get_topics(filename):
-    """
-    Get TOPICS names from a "# TOPICS" line
-    """
-    ofile = open(filename, 'r')
-    text = ofile.read()
-    result = []
-    for each_line in text.split('\n'):
-        if each_line.startswith(TOPICS_TOKEN):
-            topic_names_str = each_line.strip()
-            topic_names_str = topic_names_str.replace(TOPICS_TOKEN, "")
-            topic_names_list = topic_names_str.split(" ")
-            for topic in topic_names_list:
-                # topic name PascalCase (file name) to snake_case (topic name)
-                topic_name = re.sub(r'(?<!^)(?=[A-Z])', '_', topic).lower()
-                result.append(topic_name)
-    ofile.close()
-
-    if len(result) == 0:
-        # topic name PascalCase (file name) to snake_case (topic name)
-        file_base_name = os.path.basename(filename).replace(".msg", "")
-        topic_name = re.sub(r'(?<!^)(?=[A-Z])', '_', file_base_name).lower()
-        result.append(topic_name)
-
-    return result
-
-
-def generate_output_from_file(format_idx, filename, outputdir, package, templatedir, includepath):
+def generate_output_from_file(filename, outputdir, package, templatedir, includepath):
     """
     Converts a single .msg file to an uorb header/source file
     """
@@ -141,24 +110,6 @@ def generate_output_from_file(format_idx, filename, outputdir, package, template
     for field in spec.parsed_fields():
         field_name_and_type.update({field.name: field.type})
 
-    # assert if the timestamp field exists
-    try:
-        assert 'timestamp' in field_name_and_type
-    except AssertionError:
-        print("[ERROR] uORB topic files generator:\n\tgenerate_output_from_file:\tNo 'timestamp' field found in " +
-              spec.short_name + " msg definition!")
-        exit(1)
-
-    # assert if the timestamp field is of type uint64
-    try:
-        assert field_name_and_type.get('timestamp') == 'uint64'
-    except AssertionError:
-        print("[ERROR] uORB topic files generator:\n\tgenerate_output_from_file:\t'timestamp' field in " + spec.short_name +
-              " msg definition is not of type uint64 but rather of type " + field_name_and_type.get('timestamp') + "!")
-        exit(1)
-
-    topics = get_topics(filename)
-
     if includepath:
         search_path = genmsg.command_line.includepath_to_dict(includepath)
     else:
@@ -174,7 +125,6 @@ def generate_output_from_file(format_idx, filename, outputdir, package, template
         "search_path": search_path,
         "msg_context": msg_context,
         "spec": spec,
-        "topics": topics,
         "constrained_flash": CONSTRAINED_FLASH
     }
 
@@ -182,89 +132,12 @@ def generate_output_from_file(format_idx, filename, outputdir, package, template
     if not os.path.isdir(outputdir):
         os.makedirs(outputdir)
 
-    template_file = os.path.join(templatedir, TEMPLATE_FILE[format_idx])
-    output_file = os.path.join(outputdir, full_type_name_snake + OUTPUT_FILE_EXT[format_idx])
+    template_file = os.path.join(templatedir, TEMPLATE_FILE[0])
+    output_file = os.path.join(outputdir, full_type_name_snake + OUTPUT_FILE_EXT[0])
 
     return generate_by_template(output_file, template_file, em_globals)
 
-
-def generate_idl_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, fastrtps_version, ros2_distro, msgs):
-    """
-    Generates an .idl from .msg file
-    """
-    msg = os.path.join(msg_dir, filename_msg + ".msg")
-
-    if (alias != ""):
-        em_globals = get_em_globals(
-            msg, alias, package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.NONE)
-        spec_short_name = alias
-    else:
-        em_globals = get_em_globals(
-            msg, "", package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.NONE)
-        spec_short_name = em_globals["spec"].short_name
-
-    # Make sure output directory exists:
-    if not os.path.isdir(outputdir):
-        os.makedirs(outputdir)
-
-    template_file = os.path.join(templatedir, IDL_TEMPLATE_FILE)
-    if version.parse(fastrtps_version) <= version.parse('1.7.2'):
-        output_file = os.path.join(outputdir, IDL_TEMPLATE_FILE.replace(
-            "msg.idl.em", str(spec_short_name + "_.idl")))
-    else:
-        output_file = os.path.join(outputdir, IDL_TEMPLATE_FILE.replace(
-            "msg.idl.em", str(spec_short_name + ".idl")))
-
-    return generate_by_template(output_file, template_file, em_globals)
-
-
-def generate_uRTPS_general(filename_send_msgs, filename_alias_send_msgs, filename_receive_msgs, filename_alias_receive_msgs,
-                           msg_dir, outputdir, templatedir, package, includepath, msgs, fastrtps_version, ros2_distro, template_name):
-    """
-    Generates source file by msg content
-    """
-    send_msgs = list(os.path.join(msg_dir, msg + ".msg")
-                     for msg in filename_send_msgs)
-    receive_msgs = list(os.path.join(msg_dir, msg + ".msg")
-                        for msg in filename_receive_msgs)
-
-    alias_send_msgs = list([os.path.join(
-        msg_dir, msg[1] + ".msg"), msg[0]] for msg in filename_alias_send_msgs)
-
-    alias_receive_msgs = list([os.path.join(
-        msg_dir, msg[1] + ".msg"), msg[0]] for msg in filename_alias_receive_msgs)
-
-    em_globals_list = []
-    if send_msgs:
-        em_globals_list.extend([get_em_globals(
-            f, "", package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.SEND) for f in send_msgs])
-
-    if alias_send_msgs:
-        em_globals_list.extend([get_em_globals(
-            f[0], f[1], package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.SEND) for f in alias_send_msgs])
-
-    if receive_msgs:
-        em_globals_list.extend([get_em_globals(
-            f, "", package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.RECEIVE) for f in receive_msgs])
-
-    if alias_receive_msgs:
-        em_globals_list.extend([get_em_globals(
-            f[0], f[1], package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.RECEIVE) for f in alias_receive_msgs])
-
-    merged_em_globals = merge_em_globals_list(em_globals_list)
-
-    # Make sure output directory exists:
-    if not os.path.isdir(outputdir):
-        os.makedirs(outputdir)
-
-    template_file = os.path.join(templatedir, template_name)
-    output_file = os.path.join(
-        outputdir, template_name.replace(".em", ""))
-
-    return generate_by_template(output_file, template_file, merged_em_globals)
-
-
-def generate_topic_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, msgs, fastrtps_version, ros2_distro, template_name):
+def generate_topic_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, msgs, template_name):
     """
     Generates a sources and headers from .msg file
     """
@@ -272,11 +145,11 @@ def generate_topic_file(filename_msg, msg_dir, alias, outputdir, templatedir, pa
 
     if (alias):
         em_globals = get_em_globals(
-            msg, alias, package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.NONE)
+            msg, alias, package, includepath, msgs, MsgScope.NONE)
         spec_short_name = alias
     else:
         em_globals = get_em_globals(
-            msg, "", package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.NONE)
+            msg, "", package, includepath, msgs, MsgScope.NONE)
         spec_short_name = em_globals["spec"].short_name
 
     # Make sure output directory exists:
@@ -290,7 +163,7 @@ def generate_topic_file(filename_msg, msg_dir, alias, outputdir, templatedir, pa
     return generate_by_template(output_file, template_file, em_globals)
 
 
-def get_em_globals(filename_msg, alias, package, includepath, msgs, fastrtps_version, ros2_distro, scope):
+def get_em_globals(filename_msg, alias, package, includepath, msgs, scope):
     """
     Generates em globals dictionary
     """
@@ -299,8 +172,6 @@ def get_em_globals(filename_msg, alias, package, includepath, msgs, fastrtps_ver
     full_type_name = genmsg.gentools.compute_full_type_name(package, os.path.basename(filename_msg))
 
     spec = genmsg.msg_loader.load_msg_from_file(msg_context, filename_msg, full_type_name)
-
-    topics = get_topics(filename_msg)
 
     if includepath:
         search_path = genmsg.command_line.includepath_to_dict(includepath)
@@ -317,13 +188,9 @@ def get_em_globals(filename_msg, alias, package, includepath, msgs, fastrtps_ver
         "search_path": search_path,
         "msg_context": msg_context,
         "spec": spec,
-        "topics": topics,
         "msgs": msgs,
         "scope": scope,
-        "package": package,
-        "alias": alias,
-        "fastrtps_version": fastrtps_version,
-        "ros2_distro": ros2_distro
+        "package": package
     }
 
     return em_globals
@@ -373,9 +240,7 @@ def append_to_include_path(path_to_append, curr_include, package):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Convert msg files to uorb headers/sources')
-    parser.add_argument('--headers', help='Generate header files', action='store_true')
-    parser.add_argument('--sources', help='Generate source files', action='store_true')
+    parser = argparse.ArgumentParser(description='Convert msg files to uorb headers')
     parser.add_argument('-f', dest='file',
                         help="files to convert (use only without -d)",
                         nargs="+")
@@ -400,13 +265,6 @@ if __name__ == "__main__":
 
     CONSTRAINED_FLASH = args.constrained_flash
 
-    if args.headers:
-        generate_idx = 0
-    elif args.sources:
-        generate_idx = 1
-    else:
-        print('Error: either --headers or --sources must be specified')
-        exit(-1)
     if args.file is not None:
         for f in args.file:
-            generate_output_from_file(generate_idx, f, args.outputdir, args.package, args.templatedir, INCL_DEFAULT)
+            generate_output_from_file(f, args.outputdir, args.package, args.templatedir, INCL_DEFAULT)

@@ -194,6 +194,9 @@ serial_port_to_wq(const char *serial)
 
 	} else if (strstr(serial, "ttyS8")) {
 		return wq_configurations::UART8;
+
+	} else if (strstr(serial, "ttyACM0")) {
+		return wq_configurations::UART_USB;
 	}
 
 	PX4_DEBUG("unknown serial port: %s", serial);

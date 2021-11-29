@@ -28,7 +28,7 @@ pipeline {
           ]
 
           def base_builds = [
-            target: ["px4_sitl_rtps"],
+            target: ["px4_sitl_default"],
             image: docker_images.base,
             archive: false
           ]
@@ -61,7 +61,6 @@ pipeline {
                      "holybro_pix32v5_default",
                      "matek_h743-slim",
                      "modalai_fc-v1_default",
-                     "modalai_fc-v1_rtps",
                      "modalai_fc-v2_default",
                      "mro_ctrl-zero-f7_default",
                      "mro_ctrl-zero-f7-oem_default",
@@ -74,10 +73,8 @@ pipeline {
                      "mro_x21-777_default",
                      "mro_x21_default",
                      "nxp_fmuk66-e_default",
-                     "nxp_fmuk66-e_rtps",
                      "nxp_fmuk66-e_socketcan",
                      "nxp_fmuk66-v3_default",
-                     "nxp_fmuk66-v3_rtps",
                      "nxp_fmuk66-v3_socketcan",
                      "nxp_fmurt1062-v1_default",
                      "nxp_ucans32k146_canbootloader",
@@ -93,7 +90,6 @@ pipeline {
                      "px4_fmu-v4pro_default",
                      "px4_fmu-v5_debug",
                      "px4_fmu-v5_default",
-                     "px4_fmu-v5_rtps",
                      "px4_fmu-v5_stackcheck",
                      "px4_fmu-v5_uavcanv0periph",
                      "px4_fmu-v5_uavcanv1",

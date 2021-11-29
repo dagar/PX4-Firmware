@@ -58,3 +58,15 @@ enum class ORB_ID : uint8_t {
 };
 
 const struct orb_metadata *get_orb_meta(ORB_ID id);
+
+
+static constexpr const char *get_topic_string(ORB_ID orb_id)
+{
+	switch (orb_id) {
+@PX4_MSG_TOPIC_ID_STRING@
+	default:
+		return nullptr;
+	}
+
+	return nullptr;
+}

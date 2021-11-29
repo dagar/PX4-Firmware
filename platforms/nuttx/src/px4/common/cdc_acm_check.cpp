@@ -93,10 +93,23 @@ static void mavlink_usb_check(void *arg)
 				}
 
 				if (ttyacm_fd >= 0) {
+
+					bool launch_ros2_bridge = false;
+					bool launch_mavlink = false;
+					bool launch_nshterm = false;
+
 					int bytes_available = 0;
 					int retval = ::ioctl(ttyacm_fd, FIONREAD, &bytes_available);
 
-					if ((retval == OK) && (bytes_available >= 3)) {
+					syslog(LOG_INFO, "retval=%d, bytes_available=%d\n", retval, bytes_available);
+
+
+					if ((retval == OK) && (bytes_available == 0)) {
+						launch_ros2_bridge = true;
+
+						syslog(LOG_INFO, "%s: launching msg_bridge\n", USB_DEVICE_PATH);
+
+					} else if ((retval == OK) && (bytes_available >= 3)) {
 						char buffer[80];
 
 						// non-blocking read
@@ -116,11 +129,10 @@ static void mavlink_usb_check(void *arg)
 
 #endif // DEBUG_BUILD
 
+						if (nread == 0) {
+							launch_ros2_bridge = true;
 
-						if (nread > 0) {
-							bool launch_mavlink = false;
-							bool launch_nshterm = false;
-
+						} else if (nread > 0) {
 							static constexpr int MAVLINK_HEARTBEAT_MIN_LENGTH = 9;
 
 							if (nread >= MAVLINK_HEARTBEAT_MIN_LENGTH) {
@@ -165,36 +177,40 @@ static void mavlink_usb_check(void *arg)
 									}
 								}
 							}
-
-							if (launch_mavlink || launch_nshterm) {
-								// cleanup serial port
-								close(ttyacm_fd);
-								ttyacm_fd = -1;
-
-								static const char *mavlink_argv[] {"mavlink", "start", "-d", USB_DEVICE_PATH, nullptr};
-								static const char *nshterm_argv[] {"nshterm", USB_DEVICE_PATH, nullptr};
-
-								char **exec_argv = nullptr;
-
-								if (launch_nshterm) {
-									exec_argv = (char **)nshterm_argv;
-
-								} else if (launch_mavlink) {
-									exec_argv = (char **)mavlink_argv;
-								}
-
-								sched_lock();
-
-								if (exec_builtin(exec_argv[0], exec_argv, nullptr, 0) > 0) {
-									usb_auto_start_state = UsbAutoStartState::connected;
-
-								} else {
-									usb_auto_start_state = UsbAutoStartState::disconnecting;
-								}
-
-								sched_unlock();
-							}
 						}
+					}
+
+					if (launch_ros2_bridge || launch_mavlink || launch_nshterm) {
+						// cleanup serial port
+						close(ttyacm_fd);
+						ttyacm_fd = -1;
+
+						static const char *ros2_bridge_argv[] {"msg_bridge", "start", "-d", USB_DEVICE_PATH, nullptr};
+						static const char *mavlink_argv[] {"mavlink", "start", "-d", USB_DEVICE_PATH, nullptr};
+						static const char *nshterm_argv[] {"nshterm", USB_DEVICE_PATH, nullptr};
+
+						char **exec_argv = nullptr;
+
+						if (launch_ros2_bridge) {
+							exec_argv = (char **)ros2_bridge_argv;
+
+						} else if (launch_mavlink) {
+							exec_argv = (char **)mavlink_argv;
+
+						} else if (launch_nshterm) {
+							exec_argv = (char **)nshterm_argv;
+						}
+
+						sched_lock();
+
+						if (exec_builtin(exec_argv[0], exec_argv, nullptr, 0) > 0) {
+							usb_auto_start_state = UsbAutoStartState::connected;
+
+						} else {
+							usb_auto_start_state = UsbAutoStartState::disconnecting;
+						}
+
+						sched_unlock();
 					}
 				}
 

@@ -48,4 +48,5 @@ px4_add_module(
 		arch_io_pins
 	PUBLICATIONS
 		"px4::msg::CameraTrigger /camera_trigger"
+		"px4::msg::PpsCapture /pps_capture" # TODO
 )

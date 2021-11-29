@@ -1,0 +1,5 @@
+menuconfig MODULES_MSG_BRIDGE
+	bool "msg_bridge"
+	default n
+	---help---
+		Enable support for msg_bridge

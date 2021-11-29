@@ -52,5 +52,3 @@ float32 aux5
 float32 aux6
 
 bool sticks_moving
-
-# TOPICS manual_control_setpoint manual_control_input

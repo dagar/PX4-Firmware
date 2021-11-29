@@ -23,5 +23,3 @@ uint8 apply_flaps       	# flap config specifier
 uint8 FLAPS_OFF = 0     	# no flaps
 uint8 FLAPS_LAND = 1    	# landing config flaps
 uint8 FLAPS_TAKEOFF = 2 	# take-off config flaps
-
-# TOPICS vehicle_attitude_setpoint mc_virtual_attitude_setpoint fw_virtual_attitude_setpoint

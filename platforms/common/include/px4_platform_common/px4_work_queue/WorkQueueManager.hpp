@@ -76,16 +76,17 @@ static constexpr wq_config_t hp_default{"wq:hp_default", 1900, -18};
 
 static constexpr wq_config_t uavcan{"wq:uavcan", 3624, -19};
 
-static constexpr wq_config_t UART0{"wq:UART0", 1632, -21};
-static constexpr wq_config_t UART1{"wq:UART1", 1632, -22};
-static constexpr wq_config_t UART2{"wq:UART2", 1632, -23};
-static constexpr wq_config_t UART3{"wq:UART3", 1632, -24};
-static constexpr wq_config_t UART4{"wq:UART4", 1632, -25};
-static constexpr wq_config_t UART5{"wq:UART5", 1632, -26};
-static constexpr wq_config_t UART6{"wq:UART6", 1632, -27};
-static constexpr wq_config_t UART7{"wq:UART7", 1632, -28};
-static constexpr wq_config_t UART8{"wq:UART8", 1632, -29};
-static constexpr wq_config_t UART_UNKNOWN{"wq:UART_UNKNOWN", 1632, -30};
+static constexpr wq_config_t UART0{"wq:UART0", 2000, -21};
+static constexpr wq_config_t UART1{"wq:UART1", 2000, -22};
+static constexpr wq_config_t UART2{"wq:UART2", 2000, -23};
+static constexpr wq_config_t UART3{"wq:UART3", 2000, -24};
+static constexpr wq_config_t UART4{"wq:UART4", 2000, -25};
+static constexpr wq_config_t UART5{"wq:UART5", 2000, -26};
+static constexpr wq_config_t UART6{"wq:UART6", 2000, -27};
+static constexpr wq_config_t UART7{"wq:UART7", 2000, -28};
+static constexpr wq_config_t UART8{"wq:UART8", 2000, -29};
+static constexpr wq_config_t UART_UNKNOWN{"wq:UART_UNKNOWN", 2000, -30};
+static constexpr wq_config_t UART_USB{"wq:UART_USB", 3000, -1};
 
 static constexpr wq_config_t lp_default{"wq:lp_default", 1920, -50};
 
