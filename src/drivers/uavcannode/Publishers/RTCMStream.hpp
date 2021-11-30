@@ -35,7 +35,7 @@
 
 #include "UavcanPublisherBase.hpp"
 
-#include <ardupilot/gnss/MovingBaselineData.hpp>
+#include <uavcan/equipment/gnss/RTCMStream.hpp>
 
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/gps_inject_data.h>
@@ -43,16 +43,16 @@
 namespace uavcannode
 {
 
-class MovingBaselineDataPub :
+class RTCMStreamPub :
 	public UavcanPublisherBase,
 	public uORB::SubscriptionCallbackWorkItem,
-	private uavcan::Publisher<ardupilot::gnss::MovingBaselineData>
+	private uavcan::Publisher<uavcan::equipment::gnss::RTCMStream>
 {
 public:
-	MovingBaselineDataPub(px4::WorkItem *work_item, uavcan::INode &node) :
-		UavcanPublisherBase(ardupilot::gnss::MovingBaselineData::DefaultDataTypeID),
+	RTCMStreamPub(px4::WorkItem *work_item, uavcan::INode &node) :
+		UavcanPublisherBase(uavcan::equipment::gnss::RTCMStream::DefaultDataTypeID),
 		uORB::SubscriptionCallbackWorkItem(work_item, ORB_ID(gps_inject_data)),
-		uavcan::Publisher<ardupilot::gnss::MovingBaselineData>(node)
+		uavcan::Publisher<uavcan::equipment::gnss::RTCMStream>(node)
 	{
 		this->setPriority(uavcan::TransferPriority::NumericallyMax);
 	}
@@ -62,24 +62,25 @@ public:
 		if (uORB::SubscriptionCallbackWorkItem::advertised()) {
 			printf("\t%s -> %s:%d\n",
 			       uORB::SubscriptionCallbackWorkItem::get_topic()->o_name,
-			       ardupilot::gnss::MovingBaselineData::getDataTypeFullName(),
+			       uavcan::equipment::gnss::RTCMStream::getDataTypeFullName(),
 			       id());
 		}
 	}
 
 	void BroadcastAnyUpdates() override
 	{
-		using ardupilot::gnss::MovingBaselineData;
+		using uavcan::equipment::gnss::RTCMStream;
 
-		// gps_inject_data -> ardupilot::gnss::MovingBaselineData
+		// gps_inject_data -> uavcan::equipment::gnss::RTCMStream
 		gps_inject_data_s inject_data;
 
 		if (uORB::SubscriptionCallbackWorkItem::update(&inject_data)) {
 			// Prevent republishing rtcm data we received from uavcan
 			if (inject_data.device_id > uavcan::NodeID::Max) {
-				ardupilot::gnss::MovingBaselineData movingbaselinedata{};
+				RTCMStream rtcmstream{};
+				rtcmstream.protocol_id = RTCMStream::PROTOCOL_ID_RTCM3;
 
-				const size_t capacity = movingbaselinedata.data.capacity();
+				const size_t capacity = rtcmstream.data.capacity();
 				size_t written = 0;
 				int result = 0;
 
@@ -91,16 +92,16 @@ public:
 					}
 
 					for (size_t i = 0; i < chunk_size; ++i) {
-						movingbaselinedata.data.push_back(inject_data.data[written]);
+						rtcmstream.data.push_back(inject_data.data[written]);
 						written += 1;
 					}
 
-					result = uavcan::Publisher<ardupilot::gnss::MovingBaselineData>::broadcast(movingbaselinedata);
+					result = uavcan::Publisher<uavcan::equipment::gnss::RTCMStream>::broadcast(rtcmstream);
 
 					// ensure callback is registered
 					uORB::SubscriptionCallbackWorkItem::registerCallback();
 
-					movingbaselinedata.data.clear();
+					rtcmstream.data.clear();
 				}
 			}
 		}

@@ -35,7 +35,7 @@
 
 #include "UavcanSubscriberBase.hpp"
 
-#include <ardupilot/gnss/MovingBaselineData.hpp>
+#include <uavcan/equipment/gnss/RTCMStream.hpp>
 
 #include <lib/drivers/device/Device.hpp>
 #include <uORB/Publication.hpp>
@@ -44,26 +44,26 @@
 namespace uavcannode
 {
 
-class MovingBaselineData;
+class RTCMStream;
 
-typedef uavcan::MethodBinder<MovingBaselineData *,
-	void (MovingBaselineData::*)(const uavcan::ReceivedDataStructure<ardupilot::gnss::MovingBaselineData>&)>
-	MovingBaselineDataBinder;
+typedef uavcan::MethodBinder<RTCMStream *,
+	void (RTCMStream::*)(const uavcan::ReceivedDataStructure<uavcan::equipment::gnss::RTCMStream>&)>
+	RTCMStreamBinder;
 
-class MovingBaselineData :
+class RTCMStream :
 	public UavcanSubscriberBase,
-	private uavcan::Subscriber<ardupilot::gnss::MovingBaselineData, MovingBaselineDataBinder>
+	private uavcan::Subscriber<uavcan::equipment::gnss::RTCMStream, RTCMStreamBinder>
 {
 public:
-	MovingBaselineData(uavcan::INode &node) :
-		UavcanSubscriberBase(ardupilot::gnss::MovingBaselineData::DefaultDataTypeID),
-		uavcan::Subscriber<ardupilot::gnss::MovingBaselineData, MovingBaselineDataBinder>(node)
+	RTCMStream(uavcan::INode &node) :
+		UavcanSubscriberBase(uavcan::equipment::gnss::RTCMStream::DefaultDataTypeID),
+		uavcan::Subscriber<uavcan::equipment::gnss::RTCMStream, RTCMStreamBinder>(node)
 	{}
 
 	bool init()
 	{
-		if (start(MovingBaselineDataBinder(this, &MovingBaselineData::callback)) < 0) {
-			PX4_ERR("ardupilot::gnss::MovingBaselineData subscription failed");
+		if (start(RTCMStreamBinder(this, &RTCMStream::callback)) < 0) {
+			PX4_ERR("uavcan::equipment::gnss::RTCMStream subscription failed");
 			return false;
 		}
 
@@ -73,13 +73,13 @@ public:
 	void PrintInfo() const override
 	{
 		printf("\t%s:%d -> %s\n",
-		       ardupilot::gnss::MovingBaselineData::getDataTypeFullName(),
-		       ardupilot::gnss::MovingBaselineData::DefaultDataTypeID,
+		       uavcan::equipment::gnss::RTCMStream::getDataTypeFullName(),
+		       uavcan::equipment::gnss::RTCMStream::DefaultDataTypeID,
 		       _gps_inject_data_pub.get_topic()->o_name);
 	}
 
 private:
-	void callback(const uavcan::ReceivedDataStructure<ardupilot::gnss::MovingBaselineData> &msg)
+	void callback(const uavcan::ReceivedDataStructure<uavcan::equipment::gnss::RTCMStream> &msg)
 	{
 		// Don't republish a message from ourselves
 		if (msg.getSrcNodeID().get() != getNode().getNodeID().get()) {

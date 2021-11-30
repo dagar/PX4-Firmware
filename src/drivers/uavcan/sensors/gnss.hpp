@@ -53,7 +53,7 @@
 #include <uavcan/equipment/gnss/Auxiliary.hpp>
 #include <uavcan/equipment/gnss/Fix.hpp>
 #include <uavcan/equipment/gnss/Fix2.hpp>
-#include <ardupilot/gnss/MovingBaselineData.hpp>
+#include <uavcan/equipment/gnss/RTCMStream.hpp>
 
 #include <lib/perf/perf_counter.h>
 
@@ -87,9 +87,7 @@ private:
 	void process_fixx(const uavcan::ReceivedDataStructure<FixType> &msg,
 			  uint8_t fix_type,
 			  const float (&pos_cov)[9], const float (&vel_cov)[9],
-			  const bool valid_pos_cov, const bool valid_vel_cov,
-			  const float heading, const float heading_offset,
-			  const float heading_accuracy);
+			  const bool valid_pos_cov, const bool valid_vel_cov);
 
 	void handleInjectDataTopic();
 	bool injectData(const uint8_t *data, size_t data_len);
@@ -115,7 +113,7 @@ private:
 	uavcan::Subscriber<uavcan::equipment::gnss::Auxiliary, AuxiliaryCbBinder> _sub_auxiliary;
 	uavcan::Subscriber<uavcan::equipment::gnss::Fix, FixCbBinder> _sub_fix;
 	uavcan::Subscriber<uavcan::equipment::gnss::Fix2, Fix2CbBinder> _sub_fix2;
-	uavcan::Publisher<ardupilot::gnss::MovingBaselineData> _pub_rtcm;
+	uavcan::Publisher<uavcan::equipment::gnss::RTCMStream> _pub_rtcm;
 
 	uint64_t	_last_gnss_auxiliary_timestamp{0};
 	float		_last_gnss_auxiliary_hdop{0.0f};
