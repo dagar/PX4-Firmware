@@ -484,10 +484,12 @@ union filter_control_status_u {
 		uint32_t rng_stuck   : 1; ///< 21 - true when rng data wasn't ready for more than 10s and new rng values haven't changed enough
 		uint32_t gps_yaw     : 1; ///< 22 - true when yaw (not ground course) data fusion from a GPS receiver is intended
 		uint32_t mag_aligned_in_flight   : 1; ///< 23 - true when the in-flight mag field alignment has been completed
-		uint32_t ev_vel      : 1; ///< 24 - true when local frame velocity data fusion from external vision measurements is intended
-		uint32_t synthetic_mag_z : 1; ///< 25 - true when we are using a synthesized measurement for the magnetometer Z component
-		uint32_t vehicle_at_rest : 1; ///< 26 - true when the vehicle is at rest
-		uint32_t gps_yaw_fault : 1; ///< 27 - true when the GNSS heading has been declared faulty and is no longer being used
+		uint32_t ev_vel                  : 1; ///< 24 - true when local frame velocity data fusion from external vision measurements is intended
+		uint32_t synthetic_mag_z         : 1; ///< 25 - true when we are using a synthesized measurement for the magnetometer Z component
+		uint32_t vehicle_at_rest         : 1; ///< 26 - true when the vehicle is at rest
+		uint32_t gps_yaw_fault           : 1; ///< 27 - true when the GNSS heading has been declared faulty and is no longer being used
+		uint32_t inertial_dead_reckoning : 1; ///< 28 - true if we are no longer fusing measurements that constrain horizontal velocity drift
+		uint32_t wind_dead_reckoning     : 1; ///< 29 - true if we are navigationg reliant on wind relative measurements
 	} flags;
 	uint32_t value;
 };

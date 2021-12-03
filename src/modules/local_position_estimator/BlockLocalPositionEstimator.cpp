@@ -817,7 +817,6 @@ void BlockLocalPositionEstimator::publishGlobalPos()
 		_pub_gpos.get().epv = epv;
 		_pub_gpos.get().terrain_alt = _altOrigin - xLP(X_tz);
 		_pub_gpos.get().terrain_alt_valid = _estimatorInitialized & EST_TZ;
-		_pub_gpos.get().dead_reckoning = !(_estimatorInitialized & EST_XY);
 		_pub_gpos.get().timestamp = hrt_absolute_time();
 		_pub_gpos.update();
 	}

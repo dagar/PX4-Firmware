@@ -59,6 +59,7 @@ static constexpr const char reason_no_local_position[] = "no local position";
 static constexpr const char reason_no_global_position[] = "no global position";
 static constexpr const char reason_no_datalink[] = "no datalink";
 static constexpr const char reason_no_rc_and_no_datalink[] = "no RC and no datalink";
+static constexpr const char reason_no_gps[] = "no GPS";
 
 // This array defines the arming state transitions. The rows are the new state, and the columns
 // are the current state. Using new state and current state you can index into the array which
@@ -444,7 +445,7 @@ using event_failsafe_reason_t = events::px4::enums::failsafe_reason_t;
 static void enable_failsafe(vehicle_status_s &status, bool old_failsafe, orb_advert_t *mavlink_log_pub,
 			    event_failsafe_reason_t event_failsafe_reason)
 {
-	if (!old_failsafe && status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
+	if (!old_failsafe && true/*status.arming_state == vehicle_status_s::ARMING_STATE_ARMED*/) {
 		// make sure intermittent failsafes don't lead to infinite delay by not constantly reseting the timestamp
 		if (status.failsafe_timestamp == 0 ||
 		    hrt_elapsed_time(&status.failsafe_timestamp) > 30_s) {
@@ -467,6 +468,8 @@ static void enable_failsafe(vehicle_status_s &status, bool old_failsafe, orb_adv
 		case event_failsafe_reason_t::no_datalink: reason = reason_no_datalink; break;
 
 		case event_failsafe_reason_t::no_rc_and_no_datalink: reason = reason_no_rc_and_no_datalink; break;
+
+		case event_failsafe_reason_t::no_gps: reason = reason_no_gps; break;
 		}
 
 		mavlink_log_critical(mavlink_log_pub, "Failsafe enabled: %s\t", reason);
@@ -579,6 +582,12 @@ bool set_nav_state(vehicle_status_s &status, actuator_armed_s &armed, commander_
 			status.nav_state = vehicle_status_s::NAVIGATION_STATE_AUTO_RTL;
 
 		} else if (status.mission_failure) {
+			status.nav_state = vehicle_status_s::NAVIGATION_STATE_AUTO_RTL;
+
+		} else if (status_flags.position_dead_reckoning && status_flags.condition_global_position_valid
+			   && status_flags.position_reliant_on_gps && !status_flags.condition_gps_position_valid) {
+			// initiate RTL if we've lost GPS, but global position is still valid
+			enable_failsafe(status, old_failsafe, mavlink_log_pub, event_failsafe_reason_t::no_gps);
 			status.nav_state = vehicle_status_s::NAVIGATION_STATE_AUTO_RTL;
 
 		} else if (status.data_link_lost && data_link_loss_act_configured
