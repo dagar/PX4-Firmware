@@ -50,6 +50,7 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_test.h>
 #include <uORB/topics/failure_detector_status.h>
+#include <uORB/topics/failure_injection.h>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/test_motor.h>
 #include <uORB/topics/vehicle_command_ack.h>
@@ -273,7 +274,9 @@ private:
 		(ParamFloat<px4::params::CP_DIST>) _param_cp_dist,
 
 		(ParamFloat<px4::params::BAT_LOW_THR>) _param_bat_low_thr,
-		(ParamFloat<px4::params::BAT_CRIT_THR>) _param_bat_crit_thr
+		(ParamFloat<px4::params::BAT_CRIT_THR>) _param_bat_crit_thr,
+
+		(ParamBool<px4::params::SYS_FAILURE_EN>) _param_sys_failure_injection_enabled
 	)
 
 	enum class PrearmedMode {
@@ -393,6 +396,7 @@ private:
 	// commander publications
 	actuator_armed_s        _armed{};
 	commander_state_s       _internal_state{};
+	failure_injection_s     _failure_injection{};
 	vehicle_control_mode_s  _vehicle_control_mode{};
 	vehicle_status_s        _status{};
 	vehicle_status_flags_s  _status_flags{};
@@ -439,6 +443,7 @@ private:
 	uORB::Publication<actuator_armed_s>			_armed_pub{ORB_ID(actuator_armed)};
 	uORB::Publication<commander_state_s>			_commander_state_pub{ORB_ID(commander_state)};
 	uORB::Publication<failure_detector_status_s>		_failure_detector_status_pub{ORB_ID(failure_detector_status)};
+	uORB::Publication<failure_injection_s>			_failure_injection_pub{ORB_ID(failure_injection)};
 	uORB::Publication<test_motor_s>				_test_motor_pub{ORB_ID(test_motor)};
 	uORB::Publication<actuator_test_s>			_actuator_test_pub{ORB_ID(actuator_test)};
 	uORB::Publication<vehicle_control_mode_s>		_control_mode_pub{ORB_ID(vehicle_control_mode)};
