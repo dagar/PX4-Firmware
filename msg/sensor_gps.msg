@@ -1,8 +1,8 @@
 # GPS position in WGS84 coordinates.
-# the field 'timestamp' is for the position & velocity (microseconds)
-uint64 timestamp		# time since system start (microseconds)
+uint64 timestamp          # time since system start (microseconds)
+uint64 timestamp_sample
 
-uint32 device_id                # unique device ID for the sensor that does not change between power cycles
+uint32 device_id          # unique device ID for the sensor that does not change between power cycles
 
 int32 lat			# Latitude in 1E-7 degrees
 int32 lon			# Longitude in 1E-7 degrees
