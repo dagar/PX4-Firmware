@@ -78,13 +78,13 @@ public:
 	void getEvVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getEvVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const;
 
-	void getBaroHgtInnov(float &baro_hgt_innov) const { baro_hgt_innov = _baro_hgt_innov(2); }
-	void getBaroHgtInnovVar(float &baro_hgt_innov_var) const { baro_hgt_innov_var = _baro_hgt_innov_var(2); }
-	void getBaroHgtInnovRatio(float &baro_hgt_innov_ratio) const { baro_hgt_innov_ratio = _baro_hgt_test_ratio(1); }
+	void getBaroHgtInnov(float &baro_hgt_innov) const { baro_hgt_innov = _baro_hgt_innov; }
+	void getBaroHgtInnovVar(float &baro_hgt_innov_var) const { baro_hgt_innov_var = _baro_hgt_innov_var; }
+	void getBaroHgtInnovRatio(float &baro_hgt_innov_ratio) const { baro_hgt_innov_ratio = _baro_hgt_test_ratio; }
 
-	void getRngHgtInnov(float &rng_hgt_innov) const { rng_hgt_innov = _rng_hgt_innov(2); }
-	void getRngHgtInnovVar(float &rng_hgt_innov_var) const { rng_hgt_innov_var = _rng_hgt_innov_var(2); }
-	void getRngHgtInnovRatio(float &rng_hgt_innov_ratio) const { rng_hgt_innov_ratio = _rng_hgt_test_ratio(1); }
+	void getRngHgtInnov(float &rng_hgt_innov) const { rng_hgt_innov = _rng_hgt_innov; }
+	void getRngHgtInnovVar(float &rng_hgt_innov_var) const { rng_hgt_innov_var = _rng_hgt_innov_var; }
+	void getRngHgtInnovRatio(float &rng_hgt_innov_ratio) const { rng_hgt_innov_ratio = _rng_hgt_test_ratio; }
 
 	void getAuxVelInnov(float aux_vel_innov[2]) const;
 	void getAuxVelInnovVar(float aux_vel_innov[2]) const;
@@ -372,7 +372,10 @@ private:
 	bool _using_synthetic_position{false};	///< true if we are using a synthetic position to constrain drift
 
 	uint64_t _time_last_hor_pos_fuse{0};	///< time the last fusion of horizontal position measurements was performed (uSec)
-	uint64_t _time_last_hgt_fuse{0};	///< time the last fusion of vertical position measurements was performed (uSec)
+	uint64_t _time_last_baro_hgt_fuse{0};
+	uint64_t _time_last_gps_hgt_fuse{0};
+	uint64_t _time_last_rng_hgt_fuse{0};
+	uint64_t _time_last_ev_hgt_fuse{0};
 	uint64_t _time_last_hor_vel_fuse{0};	///< time the last fusion of horizontal velocity measurements was performed (uSec)
 	uint64_t _time_last_ver_vel_fuse{0};	///< time the last fusion of verticalvelocity measurements was performed (uSec)
 	uint64_t _time_last_delpos_fuse{0};	///< time the last fusion of incremental horizontal position measurements was performed (uSec)
@@ -427,8 +430,17 @@ private:
 	Vector3f _last_vel_obs{};			///< last velocity observation (m/s)
 	Vector3f _last_vel_obs_var{};		///< last velocity observation variance (m/s)**2
 	Vector2f _last_fail_hvel_innov{};		///< last failed horizontal velocity innovation (m/s)**2
-	float _vert_pos_innov_ratio{0.f};	///< vertical position innovation divided by estimated standard deviation of innovation
-	uint64_t _vert_pos_fuse_attempt_time_us{0};	///< last system time in usec vertical position measurement fuson was attempted
+
+	float _vert_pos_innov_ratio_baro{0.f};	///< vertical position innovation divided by estimated standard deviation of innovation
+	float _vert_pos_innov_ratio_gps{0.f};
+	float _vert_pos_innov_ratio_rng{0.f};
+	float _vert_pos_innov_ratio_ev{0.f};
+
+	uint64_t _vert_pos_baro_fuse_attempt_time_us{0};
+	uint64_t _vert_pos_gps_fuse_attempt_time_us{0};
+	uint64_t _vert_pos_rng_fuse_attempt_time_us{0};
+	uint64_t _vert_pos_ev_fuse_attempt_time_us{0};
+
 	float _vert_vel_innov_ratio{0.f};		///< standard deviation of vertical velocity innovation
 	uint64_t _vert_vel_fuse_time_us{0};	///< last system time in usec time vertical velocity measurement fuson was attempted
 
@@ -444,11 +456,11 @@ private:
 	Vector3f _ev_pos_innov{};	///< external vision position innovations (m)
 	Vector3f _ev_pos_innov_var{};	///< external vision position innovation variances (m**2)
 
-	Vector3f _baro_hgt_innov{};		///< baro hgt innovations (m)
-	Vector3f _baro_hgt_innov_var{};	///< baro hgt innovation variances (m**2)
+	float _baro_hgt_innov{};		///< baro hgt innovations (m)
+	float _baro_hgt_innov_var{};	///< baro hgt innovation variances (m**2)
 
-	Vector3f _rng_hgt_innov{};	///< range hgt innovations (m)
-	Vector3f _rng_hgt_innov_var{};	///< range hgt innovation variances (m**2)
+	float _rng_hgt_innov{};	///< range hgt innovations (m)
+	float _rng_hgt_innov_var{};	///< range hgt innovation variances (m**2)
 
 	Vector3f _aux_vel_innov{};	///< horizontal auxiliary velocity innovations: (m/sec)
 	Vector3f _aux_vel_innov_var{};	///< horizontal auxiliary velocity innovation variances: ((m/sec)**2)
@@ -549,14 +561,9 @@ private:
 	bool _hagl_valid{false};		///< true when the height above ground estimate is valid
 	terrain_fusion_status_u _hagl_sensor_status{}; ///< Struct indicating type of sensor used to estimate height above ground
 
-	// height sensor status
-	bool _baro_hgt_faulty{false};		///< true if valid baro data is unavailable for use
-	bool _gps_hgt_intermittent{false};	///< true if gps height into the buffer is intermittent
-
 	// imu fault status
 	uint64_t _time_bad_vert_accel{0};	///< last time a bad vertical accel was detected (uSec)
 	uint64_t _time_good_vert_accel{0};	///< last time a good vertical accel was detected (uSec)
-	bool _bad_vert_accel_detected{false};	///< true when bad vertical accelerometer data has been detected
 	uint16_t _clip_counter{0};		///< counter that increments when clipping ad decrements when not
 
 	// variables used to control range aid functionality
@@ -665,8 +672,6 @@ private:
 
 	inline void resetVerticalPositionTo(const float &new_vert_pos);
 
-	void resetHeight();
-
 	// fuse optical flow line of sight rate measurements
 	void fuseOptFlow();
 
@@ -678,9 +683,6 @@ private:
 
 	bool fuseHorizontalPosition(const Vector3f &innov, const Vector2f &innov_gate, const Vector3f &obs_var,
 				    Vector3f &innov_var, Vector2f &test_ratiov, bool inhibit_gate = false);
-
-	bool fuseVerticalPosition(const Vector3f &innov, const Vector2f &innov_gate, const Vector3f &obs_var,
-				  Vector3f &innov_var, Vector2f &test_ratio, bool fuse = true);
 
 	void fuseGpsVelPos();
 
@@ -889,9 +891,6 @@ private:
 	// control fusion of auxiliary velocity observations
 	void controlAuxVelFusion();
 
-	// control for height sensor timeouts, sensor changes and state resets
-	void controlHeightSensorTimeouts();
-
 	void checkVerticalAccelerationHealth();
 
 	// control for combined height fusion mode (implemented for switching between baro and range height)
@@ -924,8 +923,6 @@ private:
 	void startRngHgtFusion();
 	void startRngAidHgtFusion();
 	void startEvHgtFusion();
-
-	void updateBaroHgtBias();
 
 	// return an estimation of the GPS altitude variance
 	float getGpsHeightVariance();

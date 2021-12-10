@@ -228,7 +228,10 @@ bool Ekf::initialiseFilter()
 	_terrain_initialised = initHagl();
 
 	// reset the essential fusion timeout counters
-	_time_last_hgt_fuse = _time_last_imu;
+	_time_last_baro_hgt_fuse = _time_last_imu;
+	_time_last_gps_hgt_fuse = _time_last_imu;
+	_time_last_rng_hgt_fuse = _time_last_imu;
+	_time_last_ev_hgt_fuse = _time_last_imu;
 	_time_last_hor_pos_fuse = _time_last_imu;
 	_time_last_delpos_fuse = _time_last_imu;
 	_time_last_hor_vel_fuse = _time_last_imu;

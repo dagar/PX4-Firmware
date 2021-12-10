@@ -624,20 +624,6 @@ PARAM_DEFINE_FLOAT(EKF2_TAS_GATE, 3.0f);
 PARAM_DEFINE_INT32(EKF2_AID_MASK, 1);
 
 /**
- * Determines the primary source of height data used by the EKF.
- *
- * The range sensor option should only be used when for operation over a flat surface as the local NED origin will move up and down with ground level.
- *
- * @group EKF2
- * @value 0 Barometric pressure
- * @value 1 GPS
- * @value 2 Range sensor
- * @value 3 Vision
- * @reboot_required true
- */
-PARAM_DEFINE_INT32(EKF2_HGT_MODE, 0);
-
-/**
  * Integer bitmask controlling fusion sources of the terrain estimator
  *
  * Set bits in the following positions to enable:

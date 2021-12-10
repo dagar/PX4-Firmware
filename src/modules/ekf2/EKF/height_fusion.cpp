@@ -40,13 +40,6 @@
 
 void Ekf::fuseBaroHgt()
 {
-	// Turn off ground effect compensation if it times out
-	if (_control_status.flags.gnd_effect) {
-		if (isTimedOut(_time_last_gnd_effect_on, GNDEFFECT_TIMEOUT)) {
-			_control_status.flags.gnd_effect = false;
-		}
-	}
-
 	const float unbiased_baro = _baro_sample_delayed.hgt - _baro_b_est.getBias();
 
 	if (!PX4_ISFINITE(_baro_hgt_offset)) {
@@ -67,15 +60,15 @@ void Ekf::fuseBaroHgt()
 		_baro_hgt_offset += local_time_step * math::constrain(offset_rate_correction, -0.1f, 0.1f);
 	}
 
-	Vector2f baro_hgt_innov_gate;
-	Vector3f baro_hgt_obs_var;
 
 	// vertical position innovation - baro measurement has opposite sign to earth z axis
-	_baro_hgt_innov(2) = _state.pos(2) + unbiased_baro - _baro_hgt_offset;
+	float innov = _state.pos(2) + unbiased_baro - _baro_hgt_offset;
+
 	// observation variance - user parameter defined
-	baro_hgt_obs_var(2) = sq(fmaxf(_params.baro_noise, 0.01f));
-	// innovation gate size
-	baro_hgt_innov_gate(1) = fmaxf(_params.baro_innov_gate, 1.0f);
+	float obs_var = sq(fmaxf(_params.baro_noise, 0.01f));
+
+	// innovation variance
+	float innov_var = P(9, 9) + obs_var;
 
 	// Compensate for positive static pressure transients (negative vertical position innovations)
 	// caused by rotor wash ground interaction by applying a temporary deadzone to baro innovations.
@@ -83,18 +76,43 @@ void Ekf::fuseBaroHgt()
 	const float deadzone_end = deadzone_start + _params.gnd_effect_deadzone;
 
 	if (_control_status.flags.gnd_effect) {
-		if (_baro_hgt_innov(2) < -deadzone_start) {
-			if (_baro_hgt_innov(2) <= -deadzone_end) {
-				_baro_hgt_innov(2) += deadzone_end;
+		if (isTimedOut(_time_last_gnd_effect_on, GNDEFFECT_TIMEOUT)) {
+			_control_status.flags.gnd_effect = false;
 
-			} else {
-				_baro_hgt_innov(2) = -deadzone_start;
+		} else {
+			if (innov < -deadzone_start) {
+				if (innov <= -deadzone_end) {
+					innov += deadzone_end;
+
+				} else {
+					innov = -deadzone_start;
+				}
 			}
 		}
 	}
 
-	fuseVerticalPosition(_baro_hgt_innov, baro_hgt_innov_gate,
-			     baro_hgt_obs_var, _baro_hgt_innov_var, _baro_hgt_test_ratio, _control_status.flags.baro_hgt);
+	// test ratio
+	float innov_gate = fmaxf(_params.baro_innov_gate, 1.f);
+	float test_ratio = sq(innov) / (sq(innov_gate) * innov_var);
+
+	_vert_pos_innov_ratio_baro = innov / sqrtf(innov_var);
+	_vert_pos_baro_fuse_attempt_time_us = _time_last_imu;
+
+	bool innov_check_pass = (_baro_hgt_test_ratio <= 1.f);
+
+	if (_control_status.flags.baro_hgt && innov_check_pass) {
+		_time_last_baro_hgt_fuse = _time_last_imu;
+		_innov_check_fail_status.flags.reject_ver_pos_baro = false;
+		fuseVelPosHeight(innov, innov_var, 5);
+
+	} else {
+		_innov_check_fail_status.flags.reject_ver_pos_baro = true;
+	}
+
+	// save
+	_baro_hgt_innov = innov;
+	_baro_hgt_innov_var = innov_var;
+	_baro_hgt_test_ratio = test_ratio;
 }
 
 void Ekf::fuseGpsHgt()
@@ -115,16 +133,31 @@ void Ekf::fuseGpsHgt()
 		_gps_hgt_offset += local_time_step * math::constrain(0.1f * _gps_pos_innov(2), -0.1f, 0.1f);
 	}
 
-	Vector2f gps_hgt_innov_gate;
-	Vector3f gps_hgt_obs_var;
 	// vertical position innovation - gps measurement has opposite sign to earth z axis
-	_gps_pos_innov(2) = _state.pos(2) + _gps_sample_delayed.hgt - _gps_alt_ref - _gps_hgt_offset;
-	gps_hgt_obs_var(2) = getGpsHeightVariance();
-	// innovation gate size
-	gps_hgt_innov_gate(1) = fmaxf(_params.baro_innov_gate, 1.0f);
+	float innov = _state.pos(2) + _gps_sample_delayed.hgt - _gps_alt_ref - _gps_hgt_offset;
+	float innov_var = P(9, 9) + getGpsHeightVariance();
+	float innov_gate = fmaxf(_params.baro_innov_gate, 1.f);
 
-	fuseVerticalPosition(_gps_pos_innov, gps_hgt_innov_gate,
-			     gps_hgt_obs_var, _gps_pos_innov_var, _gps_pos_test_ratio, _control_status.flags.gps_hgt);
+	float test_ratio = sq(innov) / (sq(innov_gate) * innov_var);
+
+	_vert_pos_innov_ratio_gps = innov / sqrtf(innov_var);
+	_vert_pos_gps_fuse_attempt_time_us = _time_last_imu;
+
+	bool innov_check_pass = (test_ratio <= 1.f);
+
+	if (_control_status.flags.gps_hgt && innov_check_pass) {
+		_time_last_gps_hgt_fuse = _time_last_imu;
+		_innov_check_fail_status.flags.reject_ver_pos_gps = false;
+		fuseVelPosHeight(innov, innov_var, 5);
+
+	} else {
+		_innov_check_fail_status.flags.reject_ver_pos_gps = true;
+	}
+
+	// save
+	_gps_pos_innov(2) = innov;
+	_gps_pos_innov_var(2) = innov_var;
+	_gps_pos_test_ratio(2) = test_ratio;
 }
 
 void Ekf::fuseRngHgt()
@@ -152,22 +185,37 @@ void Ekf::fuseRngHgt()
 		const float local_time_step = math::constrain(1e-6f * _delta_time_rng_us, 0.f, 1.f);
 
 		// apply a 10 second first order low pass filter to height offset
-		_rng_hgt_offset += local_time_step * math::constrain(0.1f * _rng_hgt_innov(2), -0.1f, 0.1f);
+		_rng_hgt_offset += local_time_step * math::constrain(0.1f * _rng_hgt_innov, -0.1f, 0.1f);
 	}
 
-	Vector2f rng_hgt_innov_gate;
-	Vector3f rng_hgt_obs_var;
 	// use range finder with tilt correction
-	_rng_hgt_innov(2) = _state.pos(2) - (-math::max(_range_sensor.getDistBottom(),
-					     _params.rng_gnd_clearance)) - _rng_hgt_offset;
-	// observation variance - user parameter defined
-	rng_hgt_obs_var(2) = fmaxf(sq(_params.range_noise)
-				   + sq(_params.range_noise_scaler * _range_sensor.getDistBottom()), 0.01f);
-	// innovation gate size
-	rng_hgt_innov_gate(1) = fmaxf(_params.range_innov_gate, 1.0f);
+	float innov = _state.pos(2) - (-math::max(_range_sensor.getDistBottom(), _params.rng_gnd_clearance)) - _rng_hgt_offset;
 
-	fuseVerticalPosition(_rng_hgt_innov, rng_hgt_innov_gate,
-			     rng_hgt_obs_var, _rng_hgt_innov_var, _rng_hgt_test_ratio, _control_status.flags.rng_hgt);
+	// observation variance - user parameter defined
+	float obs_var = fmaxf(sq(_params.range_noise) + sq(_params.range_noise_scaler * _range_sensor.getDistBottom()), 0.01f);
+
+	float innov_var = P(9, 9) + obs_var;
+	float innov_gate = fmaxf(_params.range_innov_gate, 1.f);
+
+	float test_ratio = sq(innov) / (sq(innov_gate) * innov_var);
+
+	_vert_pos_innov_ratio_rng = innov / sqrtf(innov_var);
+	_vert_pos_rng_fuse_attempt_time_us = _time_last_imu;
+
+	bool innov_check_pass = (test_ratio <= 1.f);
+
+	if (_control_status.flags.rng_hgt && innov_check_pass) {
+		_time_last_rng_hgt_fuse = _time_last_imu;
+		_innov_check_fail_status.flags.reject_ver_pos_rng = false;
+		fuseVelPosHeight(innov, innov_var, 5);
+	} else {
+		_innov_check_fail_status.flags.reject_ver_pos_rng = true;
+	}
+
+	// save
+	_rng_hgt_innov = innov;
+	_rng_hgt_innov_var = innov_var;
+	_rng_hgt_test_ratio = test_ratio;
 }
 
 void Ekf::fuseEvHgt()
@@ -185,19 +233,35 @@ void Ekf::fuseEvHgt()
 		const float local_time_step = math::constrain(1e-6f * _delta_time_ev_us, 0.f, 1.f);
 
 		// apply a 10 second first order low pass filter to height offset
-		_ev_hgt_offset += local_time_step * math::constrain(0.1f * _gps_pos_innov(2), -0.1f, 0.1f);
+		_ev_hgt_offset += local_time_step * math::constrain(0.1f * _ev_pos_innov(2), -0.1f, 0.1f);
 	}
 
-	Vector2f ev_hgt_innov_gate;
-	Vector3f ev_hgt_obs_var;
 	// calculate the innovation assuming the external vision observation is in local NED frame
-	_ev_pos_innov(2) = _state.pos(2) - _ev_sample_delayed.pos(2) - _ev_hgt_offset;
+	float innov = _state.pos(2) - _ev_sample_delayed.pos(2) - _ev_hgt_offset;
 
 	// observation variance - defined externally
-	ev_hgt_obs_var(2) = fmaxf(_ev_sample_delayed.posVar(2), sq(0.01f));
-	// innovation gate size
-	ev_hgt_innov_gate(1) = fmaxf(_params.ev_pos_innov_gate, 1.0f);
+	const float obs_var = fmaxf(_ev_sample_delayed.posVar(2), sq(0.01f));
 
-	fuseVerticalPosition(_ev_pos_innov, ev_hgt_innov_gate,
-			     ev_hgt_obs_var, _ev_pos_innov_var, _ev_pos_test_ratio, _control_status.flags.ev_hgt);
+	const float innov_gate = fmaxf(_params.ev_pos_innov_gate, 1.f);
+	const float innov_var = P(9, 9) + obs_var;
+
+	float test_ratio = sq(innov) / (sq(innov_gate) * innov_var);
+
+	_vert_pos_innov_ratio_ev = innov / sqrtf(innov_var);
+	_vert_pos_ev_fuse_attempt_time_us = _time_last_imu;
+
+	bool innov_check_pass = (test_ratio <= 1.f);
+
+	if (_control_status.flags.ev_hgt && innov_check_pass) {
+		_time_last_ev_hgt_fuse = _time_last_imu;
+		_innov_check_fail_status.flags.reject_ver_pos_ev = false;
+		fuseVelPosHeight(innov, innov_var, 5);
+	} else {
+		_innov_check_fail_status.flags.reject_ver_pos_ev = true;
+	}
+
+	// save
+	_ev_pos_innov(2) = innov;
+	_ev_pos_innov_var(2) = innov_var;
+	_ev_pos_test_ratio(2) = test_ratio;
 }

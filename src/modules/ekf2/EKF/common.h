@@ -165,12 +165,6 @@ struct auxVelSample {
 	Vector3f velVar;	///< estimated error variance of the NE velocity (m/sec)**2
 };
 
-// Integer definitions for vdist_sensor_type
-#define VDIST_SENSOR_BARO  0	///< Use baro height
-#define VDIST_SENSOR_GPS   1	///< Use GPS height
-#define VDIST_SENSOR_RANGE 2	///< Use range finder height
-#define VDIST_SENSOR_EV    3    ///< Use external vision
-
 // Bit locations for mag_declination_source
 #define MASK_USE_GEO_DECL   (1<<0)  ///< set to true to use the declination from the geo library when the GPS position becomes available, set to false to always use the EKF2_MAG_DECL value
 #define MASK_SAVE_GEO_DECL  (1<<1)  ///< set to true to set the EKF2_MAG_DECL parameter to the value returned by the geo library
@@ -216,7 +210,6 @@ enum TerrainFusionMask : int32_t {
 struct parameters {
 	// measurement source control
 	int32_t fusion_mode{MASK_USE_GPS};		///< bitmasked integer that selects which aiding sources will be used
-	int32_t vdist_sensor_type{VDIST_SENSOR_BARO};	///< selects the primary source for height data
 	int32_t terrain_fusion_mode{TerrainFusionMask::TerrainFuseRangeFinder |
 				    TerrainFusionMask::TerrainFuseOpticalFlow}; ///< aiding source(s) selection bitmask for the terrain estimator
 	int32_t sensor_interval_min_ms{20};		///< minimum time of arrival difference between non IMU sensor updates. Sets the size of the observation buffers. (mSec)
@@ -435,9 +428,12 @@ union innovation_fault_status_u {
 		bool reject_hagl: 1;		///< 10 - true if the height above ground observation has been rejected
 		bool reject_optflow_X: 1;	///< 11 - true if the X optical flow observation has been rejected
 		bool reject_optflow_Y: 1;	///< 12 - true if the Y optical flow observation has been rejected
+		bool reject_ver_pos_baro: 1;	///< 13 - true if true if baro vertical position observations have been rejected
+		bool reject_ver_pos_gps: 1;	///< 14 - true if true if gps vertical position observations have been rejected
+		bool reject_ver_pos_rng: 1;	///< 15 - true if true if rng vertical position observations have been rejected
+		bool reject_ver_pos_ev: 1;	///< 16 - true if true if ev vertical position observations have been rejected
 	} flags;
-	uint16_t value;
-
+	uint32_t value;
 };
 
 // publish the status of various GPS quality checks

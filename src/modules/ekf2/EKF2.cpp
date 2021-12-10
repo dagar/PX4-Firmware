@@ -106,7 +106,6 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 	_param_ekf2_req_hdrift(_params->req_hdrift),
 	_param_ekf2_req_vdrift(_params->req_vdrift),
 	_param_ekf2_aid_mask(_params->fusion_mode),
-	_param_ekf2_hgt_mode(_params->vdist_sensor_type),
 	_param_ekf2_terr_mask(_params->terrain_fusion_mode),
 	_param_ekf2_noaid_tout(_params->valid_timeout_max),
 	_param_ekf2_rng_noise(_params->range_noise),
@@ -1265,6 +1264,10 @@ void EKF2::PublishStatusFlags(const hrt_abstime &timestamp)
 		status_flags.reject_hagl                     = _ekf.innov_check_fail_status_flags().reject_hagl;
 		status_flags.reject_optflow_x                = _ekf.innov_check_fail_status_flags().reject_optflow_X;
 		status_flags.reject_optflow_y                = _ekf.innov_check_fail_status_flags().reject_optflow_Y;
+		status_flags.reject_ver_pos_baro             = _ekf.innov_check_fail_status_flags().reject_ver_pos_baro;
+		status_flags.reject_ver_pos_gps              = _ekf.innov_check_fail_status_flags().reject_ver_pos_gps;
+		status_flags.reject_ver_pos_rng              = _ekf.innov_check_fail_status_flags().reject_ver_pos_rng;
+		status_flags.reject_ver_pos_ev               = _ekf.innov_check_fail_status_flags().reject_ver_pos_ev;
 
 		status_flags.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 		_estimator_status_flags_pub.publish(status_flags);

@@ -145,7 +145,6 @@ void EstimatorInterface::setMagData(const magSample &mag_sample)
 		_mag_timestamp_sum = 0;
 	}
 
-
 	if (_mag_counter == 0) {
 		_mag_lpf.reset(mag_sample.mag);
 
@@ -174,7 +173,7 @@ void EstimatorInterface::setGpsData(const gps_message &gps)
 	}
 
 	// limit data rate to prevent data being lost
-	const bool need_gps = (_params.fusion_mode & MASK_USE_GPS) || (_params.vdist_sensor_type == VDIST_SENSOR_GPS);
+	const bool need_gps = (_params.fusion_mode & MASK_USE_GPS);
 
 	// TODO: remove checks that are not timing related
 	if (((gps.time_usec - _time_last_gps) > _min_obs_interval_us) && need_gps && gps.fix_type > 2) {
@@ -273,7 +272,6 @@ void EstimatorInterface::setBaroData(const baroSample &baro_sample)
 		_baro_alt_sum = 0.0f;
 		_baro_timestamp_sum = 0;
 	}
-
 
 	// accumulate enough height measurements to be confident in the quality of the data
 	if (_baro_hgt_counter == 0) {
@@ -407,7 +405,6 @@ void EstimatorInterface::setExtVisionData(const extVisionSample &evdata)
 		_ext_vision_buffer.push(ev_sample_new);
 	}
 
-
 	// accumulate enough height measurements to be confident in the quality of the data
 	if (_ev_hgt_counter == 0) {
 		_ev_hgt_lpf.reset(evdata.pos(2));
@@ -517,7 +514,7 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 	}
 
 	// range aid or range height
-	if (_params.range_aid || (_params.vdist_sensor_type == VDIST_SENSOR_RANGE)) {
+	if (_params.range_aid) {
 		max_time_delay_ms = math::max(_params.range_delay_ms, max_time_delay_ms);
 	}
 

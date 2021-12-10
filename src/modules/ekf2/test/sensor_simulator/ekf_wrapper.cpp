@@ -12,7 +12,6 @@ EkfWrapper::~EkfWrapper()
 
 void EkfWrapper::setBaroHeight()
 {
-	_ekf_params->vdist_sensor_type = VDIST_SENSOR_BARO;
 }
 
 bool EkfWrapper::isIntendingBaroHeightFusion() const
@@ -22,7 +21,6 @@ bool EkfWrapper::isIntendingBaroHeightFusion() const
 
 void EkfWrapper::setGpsHeight()
 {
-	_ekf_params->vdist_sensor_type = VDIST_SENSOR_GPS;
 }
 
 bool EkfWrapper::isIntendingGpsHeightFusion() const
@@ -32,7 +30,6 @@ bool EkfWrapper::isIntendingGpsHeightFusion() const
 
 void EkfWrapper::setRangeHeight()
 {
-	_ekf_params->vdist_sensor_type = VDIST_SENSOR_RANGE;
 }
 
 bool EkfWrapper::isIntendingRangeHeightFusion() const
@@ -42,7 +39,6 @@ bool EkfWrapper::isIntendingRangeHeightFusion() const
 
 void EkfWrapper::setVisionHeight()
 {
-	_ekf_params->vdist_sensor_type = VDIST_SENSOR_EV;
 }
 
 bool EkfWrapper::isIntendingVisionHeightFusion() const

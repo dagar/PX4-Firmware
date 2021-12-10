@@ -85,13 +85,6 @@ void Ekf::controlFusionModes()
 		}
 	}
 
-	// check for intermittent data (before pop_first_older_than)
-	const baroSample &baro_init = _baro_buffer.get_newest();
-	_baro_hgt_faulty = !isRecent(baro_init.time_us, 2 * BARO_MAX_INTERVAL);
-
-	const gpsSample &gps_init = _gps_buffer.get_newest();
-	_gps_hgt_intermittent = !isRecent(gps_init.time_us, 2 * GPS_MAX_INTERVAL);
-
 	// check for arrival of new sensor data at the fusion time horizon
 	_time_prev_gps_us = _gps_sample_delayed.time_us;
 
@@ -188,9 +181,6 @@ void Ekf::controlFusionModes()
 
 
 	_tas_data_ready = _airspeed_buffer.pop_first_older_than(_imu_sample_delayed.time_us, &_airspeed_sample_delayed);
-
-	// check for height sensor timeouts and reset and change sensor if necessary
-	controlHeightSensorTimeouts();
 
 	// control use of observations for aiding
 	controlMagFusion();
@@ -632,138 +622,6 @@ void Ekf::controlGpsYawFusion(bool gps_checks_passing, bool gps_checks_failing)
 	}
 }
 
-void Ekf::controlHeightSensorTimeouts()
-{
-	/*
-	 * Handle the case where we have not fused height measurements recently and
-	 * uncertainty exceeds the max allowable. Reset using the best available height
-	 * measurement source, continue using it after the reset and declare the current
-	 * source failed if we have switched.
-	*/
-
-	checkVerticalAccelerationHealth();
-
-	// check if height is continuously failing because of accel errors
-	const bool continuous_bad_accel_hgt = isTimedOut(_time_good_vert_accel, (uint64_t)_params.bad_acc_reset_delay_us);
-
-	// check if height has been inertial deadreckoning for too long
-	// in vision hgt mode check for vision data
-	const bool hgt_fusion_timeout = isTimedOut(_time_last_hgt_fuse, (uint64_t)5e6);
-
-	if (hgt_fusion_timeout || continuous_bad_accel_hgt) {
-
-		bool request_height_reset = false;
-		const char *failing_height_source = nullptr;
-		const char *new_height_source = nullptr;
-
-		if (_control_status.flags.baro_hgt) {
-			// check if GPS height is available
-			const gpsSample &gps_init = _gps_buffer.get_newest();
-			const bool gps_hgt_accurate = (gps_init.vacc < _params.req_vacc);
-
-			// check for inertial sensing errors in the last BADACC_PROBATION seconds
-			const bool prev_bad_vert_accel = isRecent(_time_bad_vert_accel, BADACC_PROBATION);
-
-			// reset to GPS if adequate GPS data is available and the timeout cannot be blamed on IMU data
-			const bool reset_to_gps = !_gps_hgt_intermittent &&
-						  ((gps_hgt_accurate && !prev_bad_vert_accel) || _baro_hgt_faulty);
-
-			if (reset_to_gps) {
-				// set height sensor health
-				_baro_hgt_faulty = true;
-
-				startGpsHgtFusion();
-
-				request_height_reset = true;
-				failing_height_source = "baro";
-				new_height_source = "gps";
-
-			} else if (!_baro_hgt_faulty) {
-				request_height_reset = true;
-				failing_height_source = "baro";
-				new_height_source = "baro";
-			}
-
-		} else if (_control_status.flags.gps_hgt) {
-			// check if GPS height is available
-			const gpsSample &gps_init = _gps_buffer.get_newest();
-			const bool gps_hgt_accurate = (gps_init.vacc < _params.req_vacc);
-
-			// check the baro height source for consistency and freshness
-			const baroSample &baro_init = _baro_buffer.get_newest();
-			const float baro_innov = _state.pos(2) - (_hgt_sensor_offset - baro_init.hgt + _baro_hgt_offset);
-			const bool baro_data_consistent = fabsf(baro_innov) < (sq(_params.baro_noise) + P(9, 9)) * sq(_params.baro_innov_gate);
-
-			// if baro data is acceptable and GPS data is inaccurate, reset height to baro
-			const bool reset_to_baro = !_baro_hgt_faulty &&
-						   ((baro_data_consistent && !gps_hgt_accurate) || _gps_hgt_intermittent);
-
-			if (reset_to_baro) {
-				startBaroHgtFusion();
-
-				request_height_reset = true;
-				failing_height_source = "gps";
-				new_height_source = "baro";
-
-			} else if (!_gps_hgt_intermittent) {
-				request_height_reset = true;
-				failing_height_source = "gps";
-				new_height_source = "gps";
-			}
-
-		} else if (_control_status.flags.rng_hgt) {
-
-			if (_range_sensor.isHealthy()) {
-				request_height_reset = true;
-				failing_height_source = "rng";
-				new_height_source = "rng";
-
-			} else if (!_baro_hgt_faulty) {
-				startBaroHgtFusion();
-
-				request_height_reset = true;
-				failing_height_source = "rng";
-				new_height_source = "baro";
-			}
-
-		} else if (_control_status.flags.ev_hgt) {
-			// check if vision data is available
-			const extVisionSample &ev_init = _ext_vision_buffer.get_newest();
-			const bool ev_data_available = isRecent(ev_init.time_us, 2 * EV_MAX_INTERVAL);
-
-			if (ev_data_available) {
-				request_height_reset = true;
-				failing_height_source = "ev";
-				new_height_source = "ev";
-
-			} else if (_range_sensor.isHealthy()) {
-				// Fallback to rangefinder data if available
-				startRngHgtFusion();
-				request_height_reset = true;
-				failing_height_source = "ev";
-				new_height_source = "rng";
-
-			} else if (!_baro_hgt_faulty) {
-				startBaroHgtFusion();
-
-				request_height_reset = true;
-				failing_height_source = "ev";
-				new_height_source = "baro";
-			}
-		}
-
-		if (failing_height_source && new_height_source) {
-			_warning_events.flags.height_sensor_timeout = true;
-			ECL_WARN("%s hgt timeout - reset to %s", failing_height_source, new_height_source);
-		}
-
-		// Reset vertical position and velocity states to the last measurement
-		if (request_height_reset) {
-			resetHeight();
-		}
-	}
-}
-
 void Ekf::checkVerticalAccelerationHealth()
 {
 	// Check for IMU accelerometer vibration induced clipping as evidenced by the vertical
@@ -774,19 +632,46 @@ void Ekf::checkVerticalAccelerationHealth()
 	bool is_inertial_nav_falling = false;
 	bool are_vertical_pos_and_vel_independant = false;
 
-	if (isRecent(_vert_pos_fuse_attempt_time_us, 1000000)) {
+
+	if (isRecent(_vert_pos_gps_fuse_attempt_time_us, 1000000) || isRecent(_vert_pos_ev_fuse_attempt_time_us, 1000000)) {
+
 		if (isRecent(_vert_vel_fuse_time_us, 1000000)) {
 			// If vertical position and velocity come from independent sensors then we can
 			// trust them more if they disagree with the IMU, but need to check that they agree
 			const bool using_gps_for_both = _control_status.flags.gps_hgt && _control_status.flags.gps;
 			const bool using_ev_for_both = _control_status.flags.ev_hgt && _control_status.flags.ev_vel;
+
 			are_vertical_pos_and_vel_independant = !(using_gps_for_both || using_ev_for_both);
-			is_inertial_nav_falling |= _vert_vel_innov_ratio > _params.vert_innov_test_lim && _vert_pos_innov_ratio > 0.0f;
-			is_inertial_nav_falling |= _vert_pos_innov_ratio > _params.vert_innov_test_lim && _vert_vel_innov_ratio > 0.0f;
+
+			if (_control_status.flags.gps_hgt) {
+				if (_vert_vel_innov_ratio > _params.vert_innov_test_lim && _vert_pos_innov_ratio_gps > 0) {
+					is_inertial_nav_falling = true;
+				}
+
+				if (_vert_pos_innov_ratio_gps > _params.vert_innov_test_lim && _vert_vel_innov_ratio > 0) {
+					is_inertial_nav_falling = true;
+				}
+			}
+
+			if (_control_status.flags.ev_hgt) {
+				if (_vert_vel_innov_ratio > _params.vert_innov_test_lim && _vert_pos_innov_ratio_ev > 0) {
+					is_inertial_nav_falling = true;
+				}
+
+				if (_vert_pos_innov_ratio_ev > _params.vert_innov_test_lim && _vert_vel_innov_ratio > 0) {
+					is_inertial_nav_falling = true;
+				}
+			}
 
 		} else {
 			// only height sensing available
-			is_inertial_nav_falling = _vert_pos_innov_ratio > _params.vert_innov_test_lim;
+			if (_control_status.flags.gps_hgt) {
+				is_inertial_nav_falling = _vert_pos_innov_ratio_gps > _params.vert_innov_test_lim;
+			}
+
+			if (_control_status.flags.ev_hgt) {
+				is_inertial_nav_falling = _vert_pos_innov_ratio_ev > _params.vert_innov_test_lim;
+			}
 		}
 	}
 
@@ -828,103 +713,253 @@ void Ekf::checkVerticalAccelerationHealth()
 
 void Ekf::controlHeightFusion()
 {
-	checkRangeAidSuitability();
-	const bool do_range_aid = (_params.range_aid == 1) && isRangeAidSuitable();
+	/*
+	 * Handle the case where we have not fused height measurements recently and
+	 * uncertainty exceeds the max allowable. Reset using the best available height
+	 * measurement source, continue using it after the reset and declare the current
+	 * source failed if we have switched.
+	*/
+	checkVerticalAccelerationHealth();
 
-	switch (_params.vdist_sensor_type) {
-	default:
-		ECL_ERR("Invalid hgt mode: %d", _params.vdist_sensor_type);
+	// check if height is continuously failing because of accel errors
+	const bool continuous_bad_accel_hgt = isTimedOut(_time_good_vert_accel, (uint64_t)_params.bad_acc_reset_delay_us);
 
-	// FALLTHROUGH
-	case VDIST_SENSOR_BARO:
-		if (do_range_aid) {
-			if (!_control_status.flags.rng_hgt && _range_sensor.isDataHealthy()) {
-				startRngAidHgtFusion();
-			}
+	// check for inertial sensing errors in the last BADACC_PROBATION seconds
+	const bool prev_bad_vert_accel = isRecent(_time_bad_vert_accel, BADACC_PROBATION);
 
-		} else {
-			if (!_control_status.flags.baro_hgt && !_baro_hgt_faulty) {
-				startBaroHgtFusion();
-			}
-		}
 
-		break;
 
-	case VDIST_SENSOR_RANGE:
-		// If we are supposed to be using range finder data as the primary height sensor, have bad range measurements
-		// and are on the ground, then synthesise a measurement at the expected on ground value
-		if (!_control_status.flags.in_air
-		    && !_range_sensor.isDataHealthy()
-		    && _range_sensor.isRegularlySendingData()
-		    && _range_sensor.isDataReady()) {
+	// check if height has been inertial deadreckoning for too long
+	// in vision hgt mode check for vision data
+	const bool baro_hgt_fusion_timeout = isTimedOut(_time_last_baro_hgt_fuse, (uint64_t)5e6);
+	const bool gps_hgt_fusion_timeout  = isTimedOut(_time_last_gps_hgt_fuse, (uint64_t)5e6);
+	const bool rng_hgt_fusion_timeout  = isTimedOut(_time_last_rng_hgt_fuse, (uint64_t)5e6);
+	const bool ev_hgt_fusion_timeout   = isTimedOut(_time_last_ev_hgt_fuse, (uint64_t)5e6);
 
-			_range_sensor.setRange(_params.rng_gnd_clearance);
-			_range_sensor.setValidity(true); // bypass the checks
-		}
 
-		if (!_control_status.flags.rng_hgt) {
-			if (_range_sensor.isDataHealthy()) {
-				startRngHgtFusion();
-			}
-		}
+	bool request_height_reset = false;
 
-		break;
 
-	case VDIST_SENSOR_GPS:
-		// NOTE: emergency fallback due to extended loss of currently selected sensor data or failure
-		// to pass innovation cinsistency checks is handled elsewhere in Ekf::controlHeightSensorTimeouts.
-		// Do switching between GPS and rangefinder if using range finder as a height source when close
-		// to ground and moving slowly. Also handle switch back from emergency Baro sensor when GPS recovers.
-		if (do_range_aid) {
-			if (!_control_status_prev.flags.rng_hgt && _range_sensor.isDataHealthy()) {
-				startRngAidHgtFusion();
-			}
+	// check for intermittent data (before pop_first_older_than)
+	const baroSample &baro_init = _baro_buffer.get_newest();
+	bool baro_hgt_faulty = !isRecent(baro_init.time_us, 2 * BARO_MAX_INTERVAL);
 
-		} else {
-			if (!_control_status.flags.gps_hgt) {
-				if (!_gps_hgt_intermittent && _gps_checks_passed) {
-					// In fallback mode and GPS has recovered so start using it
-					startGpsHgtFusion();
+	const gpsSample &gps_init = _gps_buffer.get_newest();
+	bool gps_hgt_intermittent = !isRecent(gps_init.time_us, 2 * GPS_MAX_INTERVAL);
 
-				} else if (!_control_status.flags.baro_hgt && !_baro_hgt_faulty) {
-					// Use baro as a fallback
-					startBaroHgtFusion();
-				}
-			}
-		}
 
-		break;
+	// check the baro height source for consistency and freshness
+	const float baro_innov = _state.pos(2) - (- baro_init.hgt + _baro_hgt_offset);
+	const bool baro_data_consistent = fabsf(baro_innov) < (sq(_params.baro_noise) + P(9, 9)) * sq(_params.baro_innov_gate);
 
-	case VDIST_SENSOR_EV:
-		// don't start using EV data unless data is arriving frequently
-		if (!_control_status.flags.ev_hgt && isRecent(_time_last_ext_vision, 2 * EV_MAX_INTERVAL)) {
-			startEvHgtFusion();
-		}
+	// check if vision data is available
+	const extVisionSample &ev_init = _ext_vision_buffer.get_newest();
+	const bool ev_data_available = isRecent(ev_init.time_us, 2 * EV_MAX_INTERVAL);
 
-		break;
+
+	if (hgt_fusion_timeout || continuous_bad_accel_hgt) {
+		// check if GPS height is available
+		const gpsSample &gps_init = _gps_buffer.get_newest();
+		const bool gps_hgt_accurate = (gps_init.vacc < _params.req_vacc);
+
+		// reset to GPS if adequate GPS data is available and the timeout cannot be blamed on IMU data
+		const bool reset_to_gps = !gps_hgt_intermittent && ((gps_hgt_accurate && !prev_bad_vert_accel) || baro_hgt_faulty);
+
+		// if baro data is acceptable and GPS data is inaccurate, reset height to baro
+		const bool reset_to_baro = !baro_hgt_faulty && ((baro_data_consistent && !gps_hgt_accurate) || gps_hgt_intermittent);
 	}
 
-	updateBaroHgtBias();
+	// Reset vertical position and velocity states to the last measurement
+	if (request_height_reset) {
+		// reset the vertical position
+		if (_control_status.flags.rng_hgt) {
+
+			// a fallback from any other height source to rangefinder happened
+			if (!_control_status_prev.flags.rng_hgt) {
+
+				if (_control_status.flags.in_air && isTerrainEstimateValid()) {
+					_rng_hgt_offset = _terrain_vpos;
+
+				} else if (_control_status.flags.in_air) {
+					_rng_hgt_offset = _range_sensor.getDistBottom() + _state.pos(2);
+
+				} else {
+					_rng_hgt_offset = _params.rng_gnd_clearance;
+				}
+
+			}
+
+			// update the state and associated variance
+			resetVerticalPositionTo(_rng_hgt_offset - _range_sensor.getDistBottom());
+
+			// the state variance is the same as the observation
+			P.uncorrelateCovarianceSetVariance<1>(9, sq(_params.range_noise));
+
+			// reset the height sensor offsets which is subtracted from the readings if we need to use it as a backup
+			_baro_hgt_offset = (_baro_hgt_counter == 0) ? NAN : (_state.pos(2) + _baro_hgt_lpf.getState());
+			_gps_hgt_offset  = (_gps_hgt_counter == 0)  ? NAN : (_state.pos(2) + _gps_hgt_lpf.getState() - _gps_alt_ref);
+			_ev_hgt_offset   = (_ev_hgt_counter == 0)   ? NAN : (_state.pos(2) + _ev_hgt_lpf.getState());
+
+		} else if (_control_status.flags.baro_hgt) {
+
+			if (!baro_hgt_faulty) {
+				// initialize vertical position with newest baro measurement
+				resetVerticalPositionTo(-_baro_hgt_lpf.getState() + _baro_hgt_offset);
+
+				// the state variance is the same as the observation
+				P.uncorrelateCovarianceSetVariance<1>(9, sq(_params.baro_noise));
+
+			} else {
+				// TODO: reset to last known baro based estimate
+			}
+
+			// reset the height sensor offsets which is subtracted from the readings if we need to use it as a backup
+			_gps_hgt_offset  = (_gps_hgt_counter == 0)  ? NAN : (_state.pos(2) + _gps_hgt_lpf.getState() - _gps_alt_ref);
+			_rng_hgt_offset  = (_rng_hgt_counter == 0)  ? NAN : (_state.pos(2) + _range_sensor.getDistBottom());
+			_ev_hgt_offset   = (_ev_hgt_counter == 0)   ? NAN : (_state.pos(2) + _ev_hgt_lpf.getState());
+
+		} else if (_control_status.flags.gps_hgt) {
+			// initialize vertical position and velocity with newest gps measurement
+			if (!gps_hgt_intermittent) {
+				gpsSample gps_sample;
+
+				if (!_gps_buffer.peek_first_older_than(_imu_sample_delayed.time_us, &gps_sample)) {
+					gps_sample = _gps_buffer.get_newest();
+				}
+
+				resetVerticalPositionTo(_gps_hgt_offset - _gps_hgt_lpf.getState() + _gps_alt_ref);
+
+				// the state variance is the same as the observation
+				P.uncorrelateCovarianceSetVariance<1>(9, sq(gps_sample.vacc));
+
+			} else {
+				// TODO: reset to last known gps based estimate
+			}
+
+			// reset the height sensor offsets which is subtracted from the readings if we need to use it as a backup
+			_baro_hgt_offset = (_baro_hgt_counter == 0) ? NAN : (_state.pos(2) + _baro_hgt_lpf.getState());
+			_rng_hgt_offset  = (_rng_hgt_counter == 0)  ? NAN : (_state.pos(2) + _range_sensor.getDistBottom());
+			_ev_hgt_offset   = (_ev_hgt_counter == 0)   ? NAN : (_state.pos(2) + _ev_hgt_lpf.getState());
+
+		} else if (_control_status.flags.ev_hgt) {
+			extVisionSample ext_vision_sample;
+
+			if (!_ext_vision_buffer.peek_first_older_than(_imu_sample_delayed.time_us, &ext_vision_sample)) {
+				ext_vision_sample = _ext_vision_buffer.get_newest();
+			}
+
+			resetVerticalPositionTo(_ev_hgt_lpf.getState() + _ev_hgt_offset);
+
+			P.uncorrelateCovarianceSetVariance<1>(9, sq(ext_vision_sample.posVar(2)));
+
+			// reset the height sensor offsets which is subtracted from the readings if we need to use it as a backup
+			_baro_hgt_offset = (_baro_hgt_counter == 0) ? NAN : (_state.pos(2) + _baro_hgt_lpf.getState());
+			_gps_hgt_offset  = (_gps_hgt_counter == 0)  ? NAN : (_state.pos(2) + _gps_hgt_lpf.getState() - _gps_alt_ref);
+			_rng_hgt_offset  = (_rng_hgt_counter == 0)  ? NAN : (_state.pos(2) + _range_sensor.getDistBottom());
+		}
+
+		// reset the vertical velocity state
+		if (_control_status.flags.gps && !gps_hgt_intermittent) {
+			gpsSample gps_sample;
+
+			if (!_gps_buffer.peek_first_older_than(_imu_sample_delayed.time_us, &gps_sample)) {
+				gps_sample = _gps_buffer.get_newest();
+			}
+
+			// If we are using GPS, then use it to reset the vertical velocity
+			resetVerticalVelocityTo(gps_sample.vel(2));
+
+			// the state variance is the same as the observation
+			P.uncorrelateCovarianceSetVariance<1>(6, sq(1.5f * gps_sample.sacc));
+
+		} else if (_control_status.flags.ev_vel) {
+			extVisionSample ext_vision_sample;
+
+			if (!_ext_vision_buffer.peek_first_older_than(_imu_sample_delayed.time_us, &ext_vision_sample)) {
+				ext_vision_sample = _ext_vision_buffer.get_newest();
+			}
+
+			// use the most recent data if it's time offset from the fusion time horizon is smaller
+			resetVerticalVelocityTo(ext_vision_sample.vel(2));
+
+			P.uncorrelateCovarianceSetVariance<1>(6, math::max(getVisionVelocityVarianceInEkfFrame()(2), sq(0.05f)));
+
+		} else {
+			// we don't know what the vertical velocity is, so set it to zero
+			resetVerticalVelocityTo(0.0f);
+
+			// Set the variance to a value large enough to allow the state to converge quickly
+			// that does not destabilise the filter
+			P.uncorrelateCovarianceSetVariance<1>(6, 10.0f);
+		}
+
+	}
+
+
+
+	// Baro bias estimation using GPS altitude
+	if (_baro_data_ready) {
+		const float dt = math::constrain(1e-6f * _delta_time_baro_us, 0.0f, 1.0f);
+		_baro_b_est.setMaxStateNoise(_params.baro_noise);
+		_baro_b_est.setProcessNoiseStdDev(_params.baro_drift_rate);
+		_baro_b_est.predict(dt);
+	}
+
+	if (_gps_data_ready && !gps_hgt_intermittent
+	    && _gps_checks_passed && _NED_origin_initialised
+	    && !baro_hgt_faulty) {
+		// Use GPS altitude as a reference to compute the baro bias measurement
+		const float baro_bias = (_baro_sample_delayed.hgt - _baro_hgt_offset)
+					- (_gps_sample_delayed.hgt - _gps_alt_ref);
+		const float baro_bias_var = getGpsHeightVariance() + sq(_params.baro_noise);
+		_baro_b_est.fuseBias(baro_bias, baro_bias_var);
+	}
 
 	// baro
-	if (_baro_data_ready && !_baro_hgt_faulty) {
+	if (_baro_data_ready && !baro_hgt_faulty) {
+
+		if (!_control_status.flags.baro_hgt) {
+			startBaroHgtFusion();
+		}
+
 		fuseBaroHgt();
 	}
 
 	// GPS
-	if (_gps_data_ready) {
+	if (_gps_data_ready && !gps_hgt_intermittent && _gps_checks_passed) {
+
+		if (!_control_status.flags.gps_hgt) {
+			startGpsHgtFusion();
+		}
+
 		fuseGpsHgt();
 	}
 
 	// range
-	if (_range_sensor.isDataHealthy()) {
+	if (_params.range_aid == 1) {
+		checkRangeAidSuitability();
+
+		if (!_control_status.flags.rng_hgt && isRangeAidSuitable()) {
+			startRngAidHgtFusion();
+		}
+
 		fuseRngHgt();
 	}
 
 	// vision
-	if (_control_status.flags.ev_hgt && _ev_data_ready) {
+	if (_ev_data_ready) {
+		if (!_control_status.flags.ev_hgt) {
+			startEvHgtFusion();
+		}
+
 		fuseEvHgt();
 	}
+
+
+	_innov_check_fail_status.flags.reject_ver_pos = _innov_check_fail_status.flags.reject_ver_pos_baro
+		|| _innov_check_fail_status.flags.reject_ver_pos_gps
+		|| _innov_check_fail_status.flags.reject_ver_pos_rng
+		|| _innov_check_fail_status.flags.reject_ver_pos_ev;
 }
 
 void Ekf::checkRangeAidSuitability()
