@@ -1333,21 +1333,6 @@ void Ekf::startEvHgtFusion()
 	}
 }
 
-void Ekf::updateBaroHgtOffset()
-{
-	// calculate a filtered offset between the baro origin and local NED origin if we are not
-	// using the baro as a height reference
-	if (!_control_status.flags.baro_hgt && _baro_data_ready) {
-		const float local_time_step = math::constrain(1e-6f * _delta_time_baro_us, 0.0f, 1.0f);
-
-		// apply a 10 second first order low pass filter to baro offset
-		const float unbiased_baro = _baro_sample_delayed.hgt - _baro_b_est.getBias();
-
-		const float offset_rate_correction = 0.1f * (unbiased_baro + _state.pos(2) - _baro_hgt_offset);
-		_baro_hgt_offset += local_time_step * math::constrain(offset_rate_correction, -0.1f, 0.1f);
-	}
-}
-
 float Ekf::getGpsHeightVariance()
 {
 	// observation variance - receiver defined and parameter limited
@@ -1376,17 +1361,6 @@ void Ekf::updateBaroHgtBias()
 					- (_gps_sample_delayed.hgt - _gps_alt_ref);
 		const float baro_bias_var = getGpsHeightVariance() + sq(_params.baro_noise);
 		_baro_b_est.fuseBias(baro_bias, baro_bias_var);
-	}
-}
-
-void Ekf::checkGroundEffectTimeout()
-{
-	// Turn off ground effect compensation if it times out
-	if (_control_status.flags.gnd_effect) {
-		if (isTimedOut(_time_last_gnd_effect_on, GNDEFFECT_TIMEOUT)) {
-
-			_control_status.flags.gnd_effect = false;
-		}
 	}
 }
 
