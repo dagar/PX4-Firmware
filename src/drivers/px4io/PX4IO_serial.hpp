@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,8 +30,57 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
-
 #pragma once
 
-#include "../../../stm32_common/include/px4_arch/px4io_serial.h"
+#include <stdint.h>
+#include <stdbool.h>
 
+#include <px4_platform_common/px4_config.h>
+#include <px4_platform_common/micro_hal.h>
+
+#include <lib/perf/perf_counter.h>
+
+#include <lib/drivers/device/device.h>
+#include <modules/px4iofirmware/protocol.h>
+
+class PX4IO_serial
+{
+public:
+	PX4IO_serial();
+	~PX4IO_serial();
+
+	int init();
+
+	int read_io(unsigned offset, void *data, unsigned count = 1);
+	int write_io(unsigned address, void *data, unsigned count = 1);
+
+private:
+	int _io_fd{-1};
+
+	/*
+	 * XXX tune this value
+	 *
+	 * At 1.5Mbps each register takes 13.3µs, and we always transfer a full packet.
+	 * Packet overhead is 26µs for the four-byte header.
+	 *
+	 * 32 registers = 451µs
+	 *
+	 * Maybe we can just send smaller packets (e.g. 8 regs) and loop for larger (less common)
+	 * transfers? Could cause issues with any regs expecting to be written atomically...
+	 */
+	static IOPacket _io_buffer px4_cache_aligned_data();
+
+	/**
+	 * Performance counters.
+	 */
+	perf_counter_t _pc_txns{perf_alloc(PC_ELAPSED, MODULE_NAME": txns")};
+	perf_counter_t _pc_retries{perf_alloc(PC_COUNT, MODULE_NAME": retries")};
+	perf_counter_t _pc_timeouts{perf_alloc(PC_COUNT, MODULE_NAME": timeouts")};
+	perf_counter_t _pc_crcerrs{perf_alloc(PC_COUNT, MODULE_NAME": crcerrs")};
+	perf_counter_t _pc_protoerrs{perf_alloc(PC_COUNT, MODULE_NAME": protoerrs")};
+	perf_counter_t _pc_uerrs{perf_alloc(PC_COUNT, MODULE_NAME": uarterrs")};
+	perf_counter_t _pc_idle{perf_alloc(PC_COUNT, MODULE_NAME": idle")};
+	perf_counter_t _pc_badidle{perf_alloc(PC_COUNT, MODULE_NAME": badidle")};
+};
+
+PX4IO_serial *PX4IO_serial_interface();

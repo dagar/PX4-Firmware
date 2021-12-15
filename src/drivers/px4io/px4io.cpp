@@ -83,9 +83,7 @@
 
 #include "uploader.h"
 
-#include "modules/dataman/dataman.h"
-
-#include "px4io_driver.h"
+#include "PX4IO_serial.hpp"
 
 #define PX4IO_SET_DEBUG			_IOC(0xff00, 0)
 #define PX4IO_REBOOT_BOOTLOADER		_IOC(0xff00, 1)
@@ -109,7 +107,7 @@ public:
 	 * Initialize all class variables.
 	 */
 	PX4IO() = delete;
-	explicit PX4IO(device::Device *interface);
+	explicit PX4IO(PX4IO_serial *interface);
 
 	~PX4IO() override;
 
@@ -183,7 +181,7 @@ private:
 
 	static constexpr int PX4IO_MAX_ACTUATORS = 8;
 
-	device::Device *const _interface;
+	PX4IO_serial *const _interface;
 
 	unsigned		_hardware{0};		///< Hardware revision
 	unsigned		_max_actuators{0};		///< Maximum # of actuators supported by PX4IO
@@ -361,7 +359,7 @@ private:
 
 #define PX4IO_DEVICE_PATH	"/dev/px4io"
 
-PX4IO::PX4IO(device::Device *interface) :
+PX4IO::PX4IO(PX4IO_serial *interface) :
 	CDev(PX4IO_DEVICE_PATH),
 	OutputModuleInterface(MODULE_NAME, px4::serial_port_to_wq(PX4IO_SERIAL_DEVICE)),
 	_interface(interface)
@@ -1384,7 +1382,7 @@ int PX4IO::io_reg_set(uint8_t page, uint8_t offset, const uint16_t *values, unsi
 	}
 
 	perf_begin(_interface_write_perf);
-	int ret = _interface->write((page << 8) | offset, (void *)values, num_values);
+	int ret = _interface->write_io((page << 8) | offset, (void *)values, num_values);
 	perf_end(_interface_write_perf);
 
 	if (ret != (int)num_values) {
@@ -1409,7 +1407,7 @@ int PX4IO::io_reg_get(uint8_t page, uint8_t offset, uint16_t *values, unsigned n
 	}
 
 	perf_begin(_interface_read_perf);
-	int ret = _interface->read((page << 8) | offset, reinterpret_cast<void *>(values), num_values);
+	int ret = _interface->read_io((page << 8) | offset, reinterpret_cast<void *>(values), num_values);
 	perf_end(_interface_read_perf);
 
 	if (ret != (int)num_values) {
@@ -2039,25 +2037,15 @@ int PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 	return ret;
 }
 
-static device::Device *get_interface()
+static PX4IO_serial *get_interface()
 {
-	device::Device *interface = PX4IO_serial_interface();
-
-	if (interface != nullptr) {
-		if (interface->init() != OK) {
-			PX4_ERR("interface init failed");
-			delete interface;
-			interface = nullptr;
-		}
-	}
-
-	return interface;
+	return PX4IO_serial_interface();
 }
 
 static int detect(int argc, char *argv[])
 {
 	/* allocate the interface */
-	device::Device *interface = get_interface();
+	PX4IO_serial *interface = get_interface();
 
 	if (interface == nullptr) {
 		PX4_ERR("interface allocation failed");
@@ -2087,7 +2075,7 @@ int PX4IO::checkcrc(int argc, char *argv[])
 		return 1;
 	}
 
-	device::Device *interface = get_interface();
+	PX4IO_serial *interface = get_interface();
 
 	if (interface == nullptr) {
 		PX4_ERR("interface allocation failed");
@@ -2271,7 +2259,7 @@ int PX4IO::lockdown(int argc, char *argv[])
 
 int PX4IO::task_spawn(int argc, char *argv[])
 {
-	device::Device *interface = get_interface();
+	PX4IO_serial *interface = get_interface();
 
 	if (interface == nullptr) {
 		PX4_ERR("Failed to create interface");
@@ -2334,7 +2322,7 @@ int PX4IO::custom_command(int argc, char *argv[])
 
 		while (ret != OK && retries < MAX_RETRIES) {
 
-			device::Device *interface = get_interface();
+			PX4IO_serial *interface = get_interface();
 
 			if (interface == nullptr) {
 				PX4_ERR("interface allocation failed");
