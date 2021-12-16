@@ -926,7 +926,7 @@ private:
 	void updateBaroHgtOffset();
 	void updateBaroHgtBias();
 
-	void checkGroundEffectTimeout();
+	void updateGroundEffect();
 
 	// return an estimation of the GPS altitude variance
 	float getGpsHeightVariance();
