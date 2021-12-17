@@ -922,6 +922,11 @@ void Ekf::resetAccelBias()
 	_prev_dvel_bias_var = P.slice<3, 3>(13, 13).diag();
 }
 
+void Ekf::resetBaroBias()
+{
+	_baro_b_est.reset();
+}
+
 void Ekf::resetMagBias()
 {
 	// Zero the magnetometer bias states

@@ -89,6 +89,10 @@ public:
 	float getBiasVar() const { return _state_var; }
 	const status &getStatus() const { return _status; }
 
+	void reset() {
+		_state = 0.f;
+	}
+
 private:
 	float _state{0.f};
 	float _state_max{100.f};

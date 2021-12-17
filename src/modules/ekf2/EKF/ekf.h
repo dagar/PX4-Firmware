@@ -183,6 +183,8 @@ public:
 	// Reset all magnetometer bias states and covariances to initial alignment values.
 	void resetMagBias();
 
+	void resetBaroBias();
+
 	Vector3f getVelocityVariance() const { return P.slice<3, 3>(4, 4).diag(); };
 
 	Vector3f getPositionVariance() const { return P.slice<3, 3>(7, 7).diag(); }

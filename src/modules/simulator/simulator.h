@@ -292,6 +292,8 @@ private:
 	float _last_magy{0.0f};
 	float _last_magz{0.0f};
 
+	float _last_baro{0.0f};
+
 #if defined(ENABLE_LOCKSTEP_SCHEDULER)
 	px4::atomic<bool> _has_initialized {false};
 #endif

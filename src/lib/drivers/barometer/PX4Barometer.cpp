@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2018-2021 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,40 +31,4 @@
  *
  ****************************************************************************/
 
-
 #include "PX4Barometer.hpp"
-
-#include <lib/drivers/device/Device.hpp>
-
-PX4Barometer::PX4Barometer(uint32_t device_id)
-{
-	_sensor_baro_pub.get().device_id = device_id;
-}
-
-PX4Barometer::~PX4Barometer()
-{
-	_sensor_baro_pub.unadvertise();
-}
-
-void PX4Barometer::set_device_type(uint8_t devtype)
-{
-	// current DeviceStructure
-	union device::Device::DeviceId device_id;
-	device_id.devid = _sensor_baro_pub.get().device_id;
-
-	// update to new device type
-	device_id.devid_s.devtype = devtype;
-
-	// copy back to report
-	_sensor_baro_pub.get().device_id = device_id.devid;
-}
-
-void PX4Barometer::update(const hrt_abstime &timestamp_sample, float pressure)
-{
-	sensor_baro_s &report = _sensor_baro_pub.get();
-
-	report.timestamp_sample = timestamp_sample;
-	report.pressure = pressure;
-	report.timestamp = hrt_absolute_time();
-	_sensor_baro_pub.update();
-}

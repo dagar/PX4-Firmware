@@ -108,15 +108,13 @@ MS5611::init()
 		}
 
 		/* state machine will have generated a report, copy it out */
-		const sensor_baro_s &brp = _px4_barometer.get();
-
 		if (_device_type == MS5607_DEVICE) {
-			if (brp.pressure < 520.0f) {
+			if (_last_pressure < 520.0f) {
 				/* This is likely not this device, abort */
 				ret = -EINVAL;
 				break;
 
-			} else if (brp.pressure > 1500.0f) {
+			} else if (_last_pressure > 1500.0f) {
 				/* This is likely not this device, abort */
 				ret = -EINVAL;
 				break;
@@ -331,6 +329,8 @@ MS5611::collect()
 		float pressure = P / 100.0f;		/* convert to millibar */
 
 		_px4_barometer.update(timestamp_sample, pressure);
+
+		_last_pressure = pressure;
 	}
 
 	/* update the measurement state machine */
