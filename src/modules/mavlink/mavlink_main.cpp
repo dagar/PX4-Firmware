@@ -60,6 +60,8 @@
 #include "mavlink_receiver.h"
 #include "mavlink_main.h"
 
+#include <poll.h>
+
 // Guard against MAVLink misconfiguration
 #ifndef MAVLINK_CRC_EXTRA
 #error MAVLINK_CRC_EXTRA has to be defined on PX4 systems
@@ -729,7 +731,6 @@ Mavlink::get_free_tx_buf()
 
 void Mavlink::send_start(int length)
 {
-	pthread_mutex_lock(&_send_mutex);
 	_last_write_try_time = hrt_absolute_time();
 
 	// check if there is space in the buffer
@@ -750,7 +751,6 @@ void Mavlink::send_start(int length)
 void Mavlink::send_finish()
 {
 	if (_tx_buffer_low || (_buf_fill == 0)) {
-		pthread_mutex_unlock(&_send_mutex);
 		return;
 	}
 
@@ -811,8 +811,6 @@ void Mavlink::send_finish()
 	}
 
 	_buf_fill = 0;
-
-	pthread_mutex_unlock(&_send_mutex);
 }
 
 void Mavlink::send_bytes(const uint8_t *buf, unsigned packet_len)
@@ -1140,6 +1138,16 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 {
 	PX4_DEBUG("configure_stream(%s, %.3f)", stream_name, (double)rate);
 
+
+	if (rate < -1.5f) {
+		if (configure_streams_to_default(stream_name) == 0) {
+
+		}
+	}
+
+
+
+
 	/* calculate interval in us, -1 means unlimited stream, 0 means disabled */
 	int interval = 0;
 
@@ -1187,36 +1195,6 @@ Mavlink::configure_stream(const char *stream_name, const float rate)
 	PX4_WARN("stream %s not found", stream_name);
 	return PX4_ERROR;
 #endif
-}
-
-void
-Mavlink::configure_stream_threadsafe(const char *stream_name, const float rate)
-{
-	/* orb subscription must be done from the main thread,
-	 * set _subscribe_to_stream and _subscribe_to_stream_rate fields
-	 * which polled in mavlink main loop */
-	if (!should_exit()) {
-		/* wait for previous subscription completion */
-		while (_subscribe_to_stream != nullptr) {
-			px4_usleep(MAIN_LOOP_DELAY / 2);
-		}
-
-		/* copy stream name */
-		unsigned n = strlen(stream_name) + 1;
-		char *s = new char[n];
-		strcpy(s, stream_name);
-
-		/* set subscription task */
-		_subscribe_to_stream_rate = rate;
-		_subscribe_to_stream = s;
-
-		/* wait for subscription */
-		do {
-			px4_usleep(MAIN_LOOP_DELAY / 2);
-		} while (_subscribe_to_stream != nullptr);
-
-		delete[] s;
-	}
 }
 
 int
@@ -1391,7 +1369,7 @@ Mavlink::update_rate_mult()
 	}
 
 	// update main loop delay
-	_main_loop_delay = math::constrain(min_interval / 3, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
+	int main_loop_delay = math::constrain(min_interval / 3, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
 
 	float mavlink_ulog_streaming_rate_inv = 1.0f;
 
@@ -1399,7 +1377,7 @@ Mavlink::update_rate_mult()
 		mavlink_ulog_streaming_rate_inv = 1.0f - _mavlink_ulog->current_data_rate();
 
 		// ensure update is at least twice the default logger rate
-		_main_loop_delay = math::min(_main_loop_delay, 3500 / 2); // TODO: poll ulog_stream
+		main_loop_delay = math::min(main_loop_delay, 3500 / 2); // TODO: poll ulog_stream
 	}
 
 	/* scale up and down as the link permits */
@@ -1412,8 +1390,6 @@ Mavlink::update_rate_mult()
 
 	float hardware_mult = 1.0f;
 	bool log_radio_timeout = false;
-
-	pthread_mutex_lock(&_radio_status_mutex);
 
 	// scale down if we have a TX err rate suggesting link congestion
 	if ((_tstatus.tx_error_rate_avg > 0.f) && !_radio_status_critical) {
@@ -1438,8 +1414,6 @@ Mavlink::update_rate_mult()
 	// reset
 	_radio_status_changed = false;
 
-	pthread_mutex_unlock(&_radio_status_mutex);
-
 	if (log_radio_timeout) {
 		PX4_ERR("instance %d: RADIO_STATUS timeout", _instance_id);
 	}
@@ -1449,12 +1423,16 @@ Mavlink::update_rate_mult()
 
 	/* ensure the rate multiplier never drops below 5% so that something is always sent */
 	_rate_mult = math::constrain(_rate_mult, 0.05f, 1.0f);
+
+	if (main_loop_delay != _main_loop_delay) {
+		PX4_INFO("main loop delay %d us -> %d us", _main_loop_delay, main_loop_delay);
+		_main_loop_delay = main_loop_delay;
+	}
 }
 
 void
 Mavlink::update_radio_status(const radio_status_s &radio_status)
 {
-	pthread_mutex_lock(&_radio_status_mutex);
 	_rstatus = radio_status;
 	_radio_status_available = true;
 
@@ -1486,8 +1464,6 @@ Mavlink::update_radio_status(const radio_status_s &radio_status)
 			_radio_status_changed = true;
 		}
 	}
-
-	pthread_mutex_unlock(&_radio_status_mutex);
 }
 
 int
@@ -2172,10 +2148,6 @@ Mavlink::task_main(int argc, char *argv[])
 
 	set_channel();
 
-	/* initialize send mutex */
-	pthread_mutex_init(&_send_mutex, nullptr);
-	pthread_mutex_init(&_radio_status_mutex, nullptr);
-
 	/* if we are passing on mavlink messages, we need to prepare a buffer for this instance */
 	if (_forwarding_on) {
 		/* initialize message buffer if multiplexing is on.
@@ -2243,8 +2215,6 @@ Mavlink::task_main(int argc, char *argv[])
 		send_autopilot_capabilities();
 	}
 
-	_receiver.start();
-
 	uint16_t event_sequence_offset = 0; // offset to account for skipped events, not sent via MAVLink
 
 	_mavlink_start_time = hrt_absolute_time();
@@ -2252,17 +2222,70 @@ Mavlink::task_main(int argc, char *argv[])
 
 	while (!should_exit()) {
 		/* main loop */
-		px4_usleep(_main_loop_delay);
-
 		if (!should_transmit()) {
-			check_requested_subscriptions();
+			_receiver.Update();
+			px4_usleep(100_ms);
 			continue;
+		}
+
+		// update TX/RX rates
+		{
+			const hrt_abstime now_us = hrt_absolute_time();
+
+			if (now_us > _bytes_timestamp + 1_s) {
+				const float dt = (now_us - _bytes_timestamp) * 1e-6f;
+
+				_tstatus.tx_rate_avg = _bytes_tx / dt;
+				_tstatus.tx_error_rate_avg = _bytes_txerr / dt;
+				_tstatus.rx_rate_avg = _bytes_rx / dt;
+
+				_bytes_tx = 0;
+				_bytes_txerr = 0;
+				_bytes_rx = 0;
+				_bytes_timestamp = now_us;
+
+				_force_rate_mult_update = true;
+			}
+		}
+
+		struct pollfd fds[1] {};
+
+		if (get_protocol() == Protocol::SERIAL) {
+			fds[0].fd = get_uart_fd();
+			fds[0].events = POLLIN;
+		}
+
+#if defined(MAVLINK_UDP)
+
+		else if (get_protocol() == Protocol::UDP) {
+			fds[0].fd = get_socket_fd();
+			fds[0].events = POLLIN;
+		}
+
+#endif // MAVLINK_UDP
+
+		int poll_ret = poll(&fds[0], 1, _main_loop_delay / 1000);
+
+		if (poll_ret > 0) {
+			if (fds[0].revents & POLLIN) {
+				perf_begin(_receiver_update_perf);
+				_receiver.Update();
+				perf_end(_receiver_update_perf);
+			}
+
+		} else if (poll_ret == -1) {
+			px4_usleep(_main_loop_delay);
 		}
 
 		perf_count(_loop_interval_perf);
 		perf_begin(_loop_perf);
 
 		const hrt_abstime t = hrt_absolute_time();
+
+		if (t > _last_receiver_periodic_update + 10_ms) {
+			_receiver.UpdatePeriodic();
+			_last_receiver_periodic_update = t;
+		}
 
 		// update rate multiplier periodically, or immediately if radio status or intervals have changed
 		if (_radio_status_changed || _force_rate_mult_update || (t >= _rate_multi_update_last + 1_s)) {
@@ -2280,13 +2303,20 @@ Mavlink::task_main(int argc, char *argv[])
 			// update parameters from storage
 			mavlink_update_parameters();
 
+			_receiver.updateParams();
+
 #if defined(CONFIG_NET)
 
-			if (!multicast_enabled()) {
+			if ((get_protocol() == Protocol::UDP) && !multicast_enabled()) {
 				_src_addr_initialized = false;
 			}
 
 #endif // CONFIG_NET
+		}
+
+		if (t < _last_run + _main_loop_delay) {
+			int sleep_time_us = math::constrain((int)(_main_loop_delay - (t - _last_run)), 0, _main_loop_delay);
+			px4_usleep(sleep_time_us);
 		}
 
 		configure_sik_radio();
@@ -2427,8 +2457,6 @@ Mavlink::task_main(int argc, char *argv[])
 			}
 		}
 
-		check_requested_subscriptions();
-
 		/* update streams */
 		for (const auto &stream : _streams) {
 			stream->update(t);
@@ -2547,34 +2575,15 @@ Mavlink::task_main(int argc, char *argv[])
 			}
 		}
 
-		// update TX/RX rates
-		if (t > _bytes_timestamp + 1_s) {
-			const float dt = (t - _bytes_timestamp) * 1e-6f;
-
-			_tstatus.tx_rate_avg = _bytes_tx / dt;
-			_tstatus.tx_error_rate_avg = _bytes_txerr / dt;
-			_tstatus.rx_rate_avg = _bytes_rx / dt;
-
-			_bytes_tx = 0;
-			_bytes_txerr = 0;
-			_bytes_rx = 0;
-			_bytes_timestamp = _last_write_try_time;
-
-			_force_rate_mult_update = true;
-		}
-
 		// publish status at 1 Hz, or sooner if HEARTBEAT has updated
 		if ((hrt_elapsed_time(&_tstatus.timestamp) >= 1_s) || _tstatus_updated) {
 			publish_telemetry_status();
 		}
 
+		_last_run = t;
+
 		perf_end(_loop_perf);
 	}
-
-	_receiver.stop();
-
-	delete _subscribe_to_stream;
-	_subscribe_to_stream = nullptr;
 
 	/* delete streams */
 	_streams.clear();
@@ -2601,84 +2610,9 @@ Mavlink::task_main(int argc, char *argv[])
 		_mavlink_ulog = nullptr;
 	}
 
-	pthread_mutex_destroy(&_send_mutex);
-	pthread_mutex_destroy(&_radio_status_mutex);
-
 	PX4_INFO("exiting channel %i", (int)_channel);
 
 	return OK;
-}
-
-void Mavlink::check_requested_subscriptions()
-{
-	if (_subscribe_to_stream != nullptr) {
-		if (_subscribe_to_stream_rate < -1.5f) {
-			if (configure_streams_to_default(_subscribe_to_stream) == 0) {
-				if (get_protocol() == Protocol::SERIAL) {
-					PX4_DEBUG("stream %s on device %s set to default rate", _subscribe_to_stream, _device_name);
-				}
-
-#if defined(MAVLINK_UDP)
-
-				else if (get_protocol() == Protocol::UDP) {
-					PX4_DEBUG("stream %s on UDP port %hu set to default rate", _subscribe_to_stream, _network_port);
-				}
-
-#endif // MAVLINK_UDP
-
-			} else {
-				PX4_ERR("setting stream %s to default failed", _subscribe_to_stream);
-			}
-
-		} else if (configure_stream(_subscribe_to_stream, _subscribe_to_stream_rate) == 0) {
-			if (fabsf(_subscribe_to_stream_rate) > 0.00001f) {
-				if (get_protocol() == Protocol::SERIAL) {
-					PX4_DEBUG("stream %s on device %s enabled with rate %.1f Hz", _subscribe_to_stream, _device_name,
-						  (double)_subscribe_to_stream_rate);
-
-				}
-
-#if defined(MAVLINK_UDP)
-
-				else if (get_protocol() == Protocol::UDP) {
-					PX4_DEBUG("stream %s on UDP port %hu enabled with rate %.1f Hz", _subscribe_to_stream, _network_port,
-						  (double)_subscribe_to_stream_rate);
-				}
-
-#endif // MAVLINK_UDP
-
-			} else {
-				if (get_protocol() == Protocol::SERIAL) {
-					PX4_DEBUG("stream %s on device %s disabled", _subscribe_to_stream, _device_name);
-
-				}
-
-#if defined(MAVLINK_UDP)
-
-				else if (get_protocol() == Protocol::UDP) {
-					PX4_DEBUG("stream %s on UDP port %hu disabled", _subscribe_to_stream, _network_port);
-				}
-
-#endif // MAVLINK_UDP
-			}
-
-		} else {
-			if (get_protocol() == Protocol::SERIAL) {
-				PX4_ERR("stream %s on device %s not found", _subscribe_to_stream, _device_name);
-
-			}
-
-#if defined(MAVLINK_UDP)
-
-			else if (get_protocol() == Protocol::UDP) {
-				PX4_ERR("stream %s on UDP port %hu not found", _subscribe_to_stream, _network_port);
-			}
-
-#endif // MAVLINK_UDP
-		}
-
-		_subscribe_to_stream = nullptr;
-	}
 }
 
 void Mavlink::publish_telemetry_status()
@@ -2814,7 +2748,7 @@ Mavlink::start(int argc, char *argv[])
 	px4_task_spawn_cmd("mavlink_main",
 			   SCHED_DEFAULT,
 			   SCHED_PRIORITY_DEFAULT,
-			   PX4_STACK_ADJUSTED(2896) + MAVLINK_NET_ADDED_STACK,
+			   PX4_STACK_ADJUSTED(2944) + MAVLINK_NET_ADDED_STACK,
 			   (px4_main_t)&Mavlink::start_helper,
 			   (char *const *)argv);
 
@@ -3185,7 +3119,7 @@ Mavlink::stream_command(int argc, char *argv[])
 		}
 
 		if (inst != nullptr) {
-			inst->configure_stream_threadsafe(stream_name, rate);
+			inst->configure_stream(stream_name, rate);
 
 		} else {
 

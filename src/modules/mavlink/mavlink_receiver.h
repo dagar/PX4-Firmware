@@ -124,18 +124,19 @@ public:
 	MavlinkReceiver(Mavlink *parent);
 	~MavlinkReceiver() override;
 
-	void start();
-	void stop();
-
 	bool component_was_seen(int system_id, int component_id);
 	void enable_message_statistics() { _message_statistics_enabled = true; }
 	void print_detailed_rx_stats() const;
 
-	void request_stop() { _should_exit.store(true); }
+	void Update();
+	void UpdatePeriodic();
+
+	/**
+	 * @brief Updates optical flow parameters.
+	 */
+	void updateParams() override;
 
 private:
-	static void *start_trampoline(void *context);
-	void run();
 
 	void acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result, uint8_t progress = 0);
 
@@ -228,13 +229,6 @@ private:
 
 	void update_message_statistics(const mavlink_message_t &message);
 	void update_rx_stats(const mavlink_message_t &message);
-
-	px4::atomic_bool 	_should_exit{false};
-	pthread_t		_thread {};
-	/**
-	 * @brief Updates optical flow parameters.
-	 */
-	void updateParams() override;
 
 	Mavlink				*_mavlink;
 
@@ -346,8 +340,6 @@ private:
 	uORB::Subscription 	_actuator_controls_3_sub{ORB_ID(actuator_controls_3)};
 	uORB::Subscription	_autotune_attitude_control_status_sub{ORB_ID(autotune_attitude_control_status)};
 
-	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
-
 	// hil_sensor and hil_state_quaternion
 	enum SensorSource {
 		ACCEL		= 0b111,
@@ -369,6 +361,7 @@ private:
 	// Allocated if needed.
 	TunePublisher *_tune_publisher{nullptr};
 
+	hrt_abstime _last_send_update{0};
 	hrt_abstime _last_heartbeat_check{0};
 
 	hrt_abstime _heartbeat_type_antenna_tracker{0};

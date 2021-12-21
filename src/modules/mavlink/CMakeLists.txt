@@ -76,6 +76,8 @@ px4_add_module(
 	COMPILE_FLAGS
 		-Wno-enum-compare # ROTATION <-> MAV_SENSOR_ROTATION
 		#-DDEBUG_BUILD
+		-O0
+		-Wno-error
 	SRCS
 		mavlink.c
 		mavlink_command_sender.cpp
@@ -109,7 +111,7 @@ px4_add_module(
 		mavlink_c
 		tunes
 		version
-	UNITY_BUILD
+	#UNITY_BUILD
 	)
 
 if(PX4_TESTING)

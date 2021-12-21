@@ -127,11 +127,7 @@ public:
 
 	bool running() const { return _task_running.load(); }
 	bool should_exit() const { return _task_should_exit.load(); }
-	void request_stop()
-	{
-		_task_should_exit.store(true);
-		_receiver.request_stop();
-	}
+	void request_stop() { _task_should_exit.store(true); }
 
 	/**
 	 * Display the mavlink status.
@@ -356,8 +352,6 @@ public:
 
 	mavlink_channel_t	get_channel() const { return _channel; }
 
-	void			configure_stream_threadsafe(const char *stream_name, float rate = -1.0f);
-
 	orb_advert_t		*get_mavlink_log_pub() { return &_mavlink_log_pub; }
 
 	/**
@@ -431,9 +425,6 @@ public:
 	}
 
 	bool			message_buffer_write(const void *ptr, int size);
-
-	void			lockMessageBufferMutex(void) { pthread_mutex_lock(&_message_buffer_mutex); }
-	void			unlockMessageBufferMutex(void) { pthread_mutex_unlock(&_message_buffer_mutex); }
 
 	/**
 	 * Count transmitted bytes
@@ -537,6 +528,14 @@ public:
 	bool radio_status_available() const { return _radio_status_available; }
 	bool radio_status_critical() const { return _radio_status_critical; }
 
+	/**
+	 * Configure a single stream.
+	 * @param stream_name
+	 * @param rate streaming rate in Hz, -1 = unlimited rate
+	 * @return 0 on success, <0 on error
+	 */
+	int configure_stream(const char *stream_name, const float rate = -1.0f);
+
 private:
 	MavlinkReceiver 	_receiver;
 
@@ -563,8 +562,8 @@ private:
 
 	static bool		_boot_complete;
 
-	static constexpr int	MAVLINK_MIN_INTERVAL{1000};  // 1000 Hz
-	static constexpr int	MAVLINK_MAX_INTERVAL{20000}; //   50 Hz
+	static constexpr int	MAVLINK_MIN_INTERVAL{2000};  // 500 Hz
+	static constexpr int	MAVLINK_MAX_INTERVAL{20000}; //  50 Hz
 
 	mavlink_message_t	_mavlink_buffer {};
 	mavlink_status_t	_mavlink_status {};
@@ -615,8 +614,6 @@ private:
 
 	bool			_mavlink_link_termination_allowed{false};
 
-	char			*_subscribe_to_stream{nullptr};
-	float			_subscribe_to_stream_rate{0.0f};  ///< rate of stream to subscribe to (0=disable, -1=unlimited, -2=default)
 	bool			_udp_initialised{false};
 
 	FLOW_CONTROL_MODE	_flow_control_mode{Mavlink::FLOW_CONTROL_OFF};
@@ -677,8 +674,6 @@ private:
 	mavlink_message_buffer	_message_buffer {};
 
 	pthread_mutex_t		_message_buffer_mutex {};
-	pthread_mutex_t		_send_mutex {};
-	pthread_mutex_t         _radio_status_mutex {};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::MAV_SYS_ID>) _param_mav_sys_id,
@@ -700,6 +695,8 @@ private:
 	perf_counter_t _loop_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": tx run interval")};           /**< loop interval performance counter */
 	perf_counter_t _send_byte_error_perf{perf_alloc(PC_COUNT, MODULE_NAME": send_bytes error")};           /**< send bytes error count */
 
+	perf_counter_t _receiver_update_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": receiver update")};
+
 	void			mavlink_update_parameters();
 
 	int mavlink_open_uart(const int baudrate = DEFAULT_BAUD_RATE,
@@ -712,13 +709,8 @@ private:
 
 	static hrt_abstime _first_start_time;
 
-	/**
-	 * Configure a single stream.
-	 * @param stream_name
-	 * @param rate streaming rate in Hz, -1 = unlimited rate
-	 * @return 0 on success, <0 on error
-	 */
-	int configure_stream(const char *stream_name, const float rate = -1.0f);
+	hrt_abstime _last_run{0};
+	hrt_abstime _last_receiver_periodic_update{0};
 
 	/**
 	 * Configure default streams according to _mode for either all streams or only a single
@@ -743,8 +735,6 @@ private:
 	void pass_message(const mavlink_message_t *msg);
 
 	void publish_telemetry_status();
-
-	void check_requested_subscriptions();
 
 	/**
 	 * Reconfigure a SiK radio if requested by MAV_SIK_RADIO_ID

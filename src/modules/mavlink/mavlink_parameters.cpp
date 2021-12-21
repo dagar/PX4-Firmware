@@ -62,6 +62,7 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 {
 	switch (msg->msgid) {
 	case MAVLINK_MSG_ID_PARAM_REQUEST_LIST: {
+			PX4_INFO("PARAM_REQUEST_LIST");
 			/* request all parameters */
 			mavlink_param_request_list_t req_list;
 			mavlink_msg_param_request_list_decode(msg, &req_list);
@@ -92,6 +93,7 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 		}
 
 	case MAVLINK_MSG_ID_PARAM_SET: {
+			PX4_INFO("PARAM_SET");
 			/* set parameter */
 			mavlink_param_set_t set;
 			mavlink_msg_param_set_decode(msg, &set);
@@ -162,6 +164,7 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 		}
 
 	case MAVLINK_MSG_ID_PARAM_REQUEST_READ: {
+			PX4_INFO("PARAM_REQUEST_READ");
 			/* request one parameter */
 			mavlink_param_request_read_t req_read;
 			mavlink_msg_param_request_read_decode(msg, &req_read);
@@ -228,6 +231,7 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 		}
 
 	case MAVLINK_MSG_ID_PARAM_MAP_RC: {
+			PX4_INFO("PARAM_MAP_RC");
 			/* map a rc channel to a parameter */
 			mavlink_param_map_rc_t map_rc;
 			mavlink_msg_param_map_rc_decode(msg, &map_rc);
@@ -320,7 +324,7 @@ MavlinkParametersManager::send()
 	} else if ((_mavlink->get_protocol() == Protocol::SERIAL) && _mavlink->radio_status_available()
 		   && !_mavlink->radio_status_critical()) {
 
-		max_num_to_send = 3;
+		max_num_to_send = 10;
 	}
 
 	for (int i = 0; i < max_num_to_send; i++) {
@@ -329,7 +333,7 @@ MavlinkParametersManager::send()
 			send_params();
 
 		} else {
-			break;
+			return;
 		}
 	}
 }
@@ -516,6 +520,8 @@ MavlinkParametersManager::send_one()
 int
 MavlinkParametersManager::send_param(param_t param, int component_id)
 {
+	PX4_INFO("send_param(%s, %d)", param_name(param), component_id);
+
 	if (param == PARAM_INVALID) {
 		return 1;
 	}
