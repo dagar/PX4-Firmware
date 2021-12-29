@@ -255,8 +255,6 @@ public:
 	const bool &global_origin_valid() const { return _NED_origin_initialised; }
 	const MapProjection &global_origin() const { return _pos_ref; }
 
-	void print_status();
-
 	static constexpr unsigned FILTER_UPDATE_PERIOD_MS{10};	// ekf prediction period in milliseconds - this should ideally be an integer multiple of the IMU time delta
 	static constexpr float FILTER_UPDATE_PERIOD_S{FILTER_UPDATE_PERIOD_MS * 0.001f};
 

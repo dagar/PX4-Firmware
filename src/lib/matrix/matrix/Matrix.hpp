@@ -360,21 +360,49 @@ public:
 
 		for (size_t i = 0; i < M; i++) {
 			for (size_t j = 0; j < N; j++) {
-				snprintf(buf + strlen(buf), n - strlen(buf), "\t%8.8g", double(self(i, j))); // directly append to the string buffer
+				snprintf(buf + strlen(buf), n - strlen(buf), "\t%.5f", double(self(i, j))); // directly append to the string buffer
 			}
 
 			snprintf(buf + strlen(buf), n - strlen(buf), "\n");
 		}
 	}
 
-	void print() const
+	void print(float eps = 0.00001f) const
 	{
-		// element: tab, point, 8 digits, 4 scientific notation chars; row: newline; string: \0 end
-		static const size_t n = 15 * N * M + M + 1;
-		char *buf = new char[n];
-		write_string(buf, n);
-		printf("%s\n", buf);
-		delete[] buf;
+		// print column numbering
+		if (N > 1) {
+			printf("  ");
+
+			for (size_t i = 0; i < N; i++) {
+				printf("|%2d      ", i);
+
+			}
+
+			printf("\n");
+		}
+
+		const Matrix<Type, M, N> &self = *this;
+
+		for (size_t i = 0; i < M; i++) {
+			printf("%2d|", i); // print row numbering
+
+			for (size_t j = 0; j < N; j++) {
+				double d = static_cast<double>(self(i, j));
+
+				// avoid -0.0 for display
+				if (fabs(d - 0.0) < (double)eps) {
+					//d = 0.0;
+
+					// print fixed width zero
+					printf(" 0       ");
+
+				} else {
+					printf("% 6.5f ", d);
+				}
+			}
+
+			printf("\n");
+		}
 	}
 
 	Matrix<Type, N, M> transpose() const

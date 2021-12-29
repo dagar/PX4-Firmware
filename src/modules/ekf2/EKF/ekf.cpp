@@ -525,3 +525,45 @@ Quatf Ekf::calculate_quaternion() const
 	// the quaternions must always be normalised after modification
 	return Quatf{_output_new.quat_nominal * AxisAnglef{delta_angle}}.unit();
 }
+
+void Ekf::print_status()
+{
+	printf("Q: (0-3)\n");
+	_state.quat_nominal.print();
+
+	printf("Velocity: (4-6)\n");
+	_state.vel.print();
+
+	printf("Position: (7-9)\n");
+	_state.pos.print();
+
+	printf("Delta Angle Bias: (10-12)\n");
+	_state.delta_ang_bias.print();
+
+	printf("Delta Velocity Bias: (13-15)\n");
+	_state.delta_vel_bias.print();
+
+	printf("Magnetic Field: (16-18)\n");
+	_state.mag_I.print();
+
+	printf("Magnetic Bias: (19-21)\n");
+	_state.mag_B.print();
+
+	printf("Wind: (22-23)\n");
+	_state.wind_vel.print();
+
+	printf("P:\n");
+	P.print();
+
+	printf("imu buffer: %d (%d Bytes)\n", _imu_buffer.get_length(), _imu_buffer.get_total_size());
+	printf("gps buffer: %d (%d Bytes)\n", _gps_buffer.get_length(), _gps_buffer.get_total_size());
+	printf("mag buffer: %d (%d Bytes)\n", _mag_buffer.get_length(), _mag_buffer.get_total_size());
+	printf("baro buffer: %d (%d Bytes)\n", _baro_buffer.get_length(), _baro_buffer.get_total_size());
+	printf("range buffer: %d (%d Bytes)\n", _range_buffer.get_length(), _range_buffer.get_total_size());
+	printf("airspeed buffer: %d (%d Bytes)\n", _airspeed_buffer.get_length(), _airspeed_buffer.get_total_size());
+	printf("flow buffer: %d (%d Bytes)\n", _flow_buffer.get_length(), _flow_buffer.get_total_size());
+	printf("vision buffer: %d (%d Bytes)\n", _ext_vision_buffer.get_length(), _ext_vision_buffer.get_total_size());
+	printf("output buffer: %d (%d Bytes)\n", _output_buffer.get_length(), _output_buffer.get_total_size());
+	printf("output vert buffer: %d (%d Bytes)\n", _output_vert_buffer.get_length(), _output_vert_buffer.get_total_size());
+	printf("drag buffer: %d (%d Bytes)\n", _drag_buffer.get_length(), _drag_buffer.get_total_size());
+}
