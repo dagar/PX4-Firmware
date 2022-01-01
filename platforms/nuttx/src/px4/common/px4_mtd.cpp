@@ -39,6 +39,8 @@
  * @author David Sidrane <david.sidrane@nscdg.com>
  */
 
+#if defined(CONFIG_MTD)
+
 #ifndef MODULE_NAME
 #define MODULE_NAME "PX4_MTD"
 #endif
@@ -57,6 +59,7 @@
 #include <nuttx/drivers/drivers.h>
 #include <nuttx/spi/spi.h>
 #include <nuttx/mtd/mtd.h>
+#include <nuttx/fs/fs.h>
 
 extern "C" {
 	struct mtd_dev_s *ramtron_initialize(FAR struct spi_dev_s *dev);
@@ -251,18 +254,12 @@ const px4_mft_device_t spifram  = {             // FM25V02A on FMUM 32K 512 X 64
 
 const px4_mtd_entry_t fram = {
 	.device = &spifram,
-	.npart = 2,
+	.npart = 1,
 	.partd = {
 		{
 			.type = MTD_PARAMETERS,
 			.path = "/fs/mtd_params",
-			.nblocks = 32
-		},
-		{
-			.type = MTD_WAYPOINTS,
-			.path = "/fs/mtd_waypoints",
-			.nblocks = 32
-
+			.nblocks = 64
 		}
 	},
 };
@@ -388,25 +385,27 @@ memoryout:
 				goto errout;
 			}
 
-			/* Initialize to provide an FTL block driver on the MTD FLASH interface */
-
+			// Initialize to provide an FTL block driver on the MTD FLASH interface
 			snprintf(blockname, sizeof(blockname), "/dev/mtdblock%d", total_blocks);
 
-			rv = ftl_initialize(total_blocks, instances[i].part_dev[part]);
+			printf("register_mtddriver: blockname: %s\n", blockname);
+
+			rv = register_mtddriver(blockname, instances[i].part_dev[part], 0755, nullptr);
 
 			if (rv < 0) {
-				PX4_ERR("ftl_initialize %s failed: %d", blockname, rv);
+				PX4_ERR("register_mtddriver %s failed: %d", blockname, rv);
 				goto errout;
 			}
 
 			total_blocks++;
 
-			/* Now create a character device on the block device */
+			// Now create a character device on the block device
+			rv = nx_mount(blockname, instances[i].partition_names[part], "littlefs", 0, "autoformat");
 
-			rv = bchdev_register(blockname, instances[i].partition_names[part], false);
+			printf("nx_mount: blockname: %s partition: %s\n", blockname, instances[i].partition_names[part]);
 
 			if (rv < 0) {
-				PX4_ERR("bchdev_register %s failed: %d", instances[i].partition_names[part], rv);
+				PX4_ERR("nx_mount %s failed: %d", instances[i].partition_names[part], rv);
 				goto errout;
 			}
 
@@ -470,3 +469,5 @@ __EXPORT int px4_mtd_query(const char *sub, const char *val, const char **get)
 
 	return rv;
 }
+
+#endif // CONFIG_MTD
