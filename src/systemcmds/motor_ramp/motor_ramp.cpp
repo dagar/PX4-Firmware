@@ -293,12 +293,14 @@ int set_min_pwm(int fd, unsigned long max_channels, int pwm_value)
 
 int set_out(int fd, unsigned long max_channels, float output)
 {
-	int ret;
+	// TODO
+	int ret = 0;
 	int pwm = (_max_pwm - _min_pwm) * output + _min_pwm;
 
 	for (unsigned i = 0; i < max_channels; i++) {
 
-		ret = ioctl(fd, PWM_SERVO_SET(i), pwm);
+		// TODO:
+		//ret = ioctl(fd, PWM_SERVO_SET(i), pwm);
 
 		if (ret != OK) {
 			PX4_ERR("PWM_SERVO_SET(%d), value: %d", i, pwm);
@@ -404,12 +406,13 @@ int motor_ramp_thread_main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (px4_ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_ENTER_TEST_MODE) < 0) {
-		PX4_ERR("Failed to Enter pwm test mode");
-		px4_close(fd);
-		_thread_running = false;
-		return 1;
-	}
+	// TODO
+	// if (px4_ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_ENTER_TEST_MODE) < 0) {
+	// 	PX4_ERR("Failed to Enter pwm test mode");
+	// 	px4_close(fd);
+	// 	_thread_running = false;
+	// 	return 1;
+	// }
 
 	if (prepare(fd, &max_channels) != OK) {
 		_thread_should_exit = true;
@@ -509,20 +512,23 @@ int motor_ramp_thread_main(int argc, char *argv[])
 		/* set previous servo values */
 		for (unsigned i = 0; i < servo_count; i++) {
 
-			if (px4_ioctl(fd, PWM_SERVO_SET(i), (unsigned long)last_spos.values[i]) < 0) {
-				PX4_ERR("PWM_SERVO_SET(%d)", i);
-				px4_close(fd);
-				_thread_running = false;
-				return 1;
-			}
+			// TODO
+
+			// if (px4_ioctl(fd, PWM_SERVO_SET(i), (unsigned long)last_spos.values[i]) < 0) {
+			// 	PX4_ERR("PWM_SERVO_SET(%d)", i);
+			// 	px4_close(fd);
+			// 	_thread_running = false;
+			// 	return 1;
+			// }
 		}
 
-		if (px4_ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_EXIT_TEST_MODE) < 0) {
-			PX4_ERR("Failed to Exit pwm test mode");
-			px4_close(fd);
-			_thread_running = false;
-			return 1;
-		}
+		// TODO:
+		// if (px4_ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_EXIT_TEST_MODE) < 0) {
+		// 	PX4_ERR("Failed to Exit pwm test mode");
+		// 	px4_close(fd);
+		// 	_thread_running = false;
+		// 	return 1;
+		// }
 
 		px4_close(fd);
 	}
