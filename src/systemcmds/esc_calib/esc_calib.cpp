@@ -270,22 +270,6 @@ extern "C" __EXPORT int esc_calib_main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	/* tell IO/FMU that its ok to disable its safety with the switch */
-	ret = ioctl(fd, PWM_SERVO_SET_ARM_OK, 0);
-
-	if (ret != OK) {
-		PX4_ERR("PWM_SERVO_SET_ARM_OK");
-		goto cleanup;
-	}
-
-	/* tell IO/FMU that the system is armed (it will output values if safety is off) */
-	ret = ioctl(fd, PWM_SERVO_ARM, 0);
-
-	if (ret != OK) {
-		PX4_ERR("PWM_SERVO_ARM");
-		goto cleanup;
-	}
-
 	printf("Outputs armed");
 
 
@@ -369,14 +353,6 @@ extern "C" __EXPORT int esc_calib_main(int argc, char *argv[])
 
 		/* rate limit to ~ 20 Hz */
 		px4_usleep(50000);
-	}
-
-	/* disarm */
-	ret = ioctl(fd, PWM_SERVO_DISARM, 0);
-
-	if (ret != OK) {
-		PX4_ERR("PWM_SERVO_DISARM");
-		goto cleanup;
 	}
 
 	printf("Outputs disarmed");

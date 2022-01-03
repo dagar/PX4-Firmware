@@ -46,10 +46,10 @@
 class PX4IO_Uploader
 {
 public:
-	PX4IO_Uploader();
-	virtual ~PX4IO_Uploader() = default;
+	PX4IO_Uploader() = default;
+	~PX4IO_Uploader() = default;
 
-	int			upload(const char *filenames[]);
+	int upload(const char *filenames[]);
 
 private:
 	enum {
@@ -85,10 +85,10 @@ private:
 
 	};
 
-	int			_io_fd;
-	int			_fw_fd;
+	int			_io_fd{-1};
+	int			_fw_fd{-1};
 
-	uint32_t		bl_rev; /**< bootloader revision */
+	uint32_t		bl_rev{0}; /**< bootloader revision */
 
 	void			log(const char *fmt, ...);
 

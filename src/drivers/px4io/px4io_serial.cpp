@@ -43,45 +43,34 @@
 
 uint8_t PX4IO_serial::_io_buffer_storage[sizeof(IOPacket)];
 
-static PX4IO_serial *g_interface;
-
-PX4IO_serial::PX4IO_serial() :
-	_pc_txns(perf_alloc(PC_ELAPSED, MODULE_NAME": txns")),
-	_pc_retries(perf_alloc(PC_COUNT, MODULE_NAME": retries")),
-	_pc_timeouts(perf_alloc(PC_COUNT, MODULE_NAME": timeouts")),
-	_pc_crcerrs(perf_alloc(PC_COUNT, MODULE_NAME": crcerrs")),
-	_pc_protoerrs(perf_alloc(PC_COUNT, MODULE_NAME": protoerrs")),
-	_pc_uerrs(perf_alloc(PC_COUNT, MODULE_NAME": uarterrs")),
-	_pc_idle(perf_alloc(PC_COUNT, MODULE_NAME": idle")),
-	_pc_badidle(perf_alloc(PC_COUNT, MODULE_NAME": badidle")),
-	_bus_semaphore(SEM_INITIALIZER(0))
+PX4IO_serial::PX4IO_serial()
 {
-	g_interface = this;
+	fprintf(stderr, "PX4IO_serial()\n");
+	usleep(20000);
 }
 
 PX4IO_serial::~PX4IO_serial()
 {
+	fprintf(stderr, "~PX4IO_serial()\n");
+	usleep(20000);
+
 	/* kill our semaphores */
 	px4_sem_destroy(&_bus_semaphore);
 
 	perf_free(_pc_txns);
-	perf_free(_pc_retries);
-	perf_free(_pc_timeouts);
+	perf_free(_pc_retry_read);
+	perf_free(_pc_retry_write);
 	perf_free(_pc_crcerrs);
 	perf_free(_pc_protoerrs);
-	perf_free(_pc_uerrs);
-	perf_free(_pc_idle);
-	perf_free(_pc_badidle);
-
-	if (g_interface == this) {
-		g_interface = nullptr;
-	}
 
 	close(_uart_fd);
 }
 
 int PX4IO_serial::init()
 {
+	fprintf(stderr, "PX4IO_serial::init()\n");
+	usleep(20000);
+
 	_io_buffer_ptr = (IOPacket *)&_io_buffer_storage[0];
 
 	/* create semaphores */
@@ -165,6 +154,10 @@ int PX4IO_serial::init()
 int
 PX4IO_serial::write(unsigned address, void *data, unsigned count)
 {
+	if (_uart_fd < 0) {
+		init();
+	}
+
 	uint8_t page = address >> 8;
 	uint8_t offset = address & 0xff;
 	const uint16_t *values = reinterpret_cast<const uint16_t *>(data);
@@ -207,7 +200,7 @@ PX4IO_serial::write(unsigned address, void *data, unsigned count)
 			break;
 		}
 
-		perf_count(_pc_retries);
+		perf_count(_pc_retry_write);
 	}
 
 	px4_sem_post(&_bus_semaphore);
@@ -222,6 +215,10 @@ PX4IO_serial::write(unsigned address, void *data, unsigned count)
 int
 PX4IO_serial::read(unsigned address, void *data, unsigned count)
 {
+	if (_uart_fd < 0) {
+		init();
+	}
+
 	uint8_t page = address >> 8;
 	uint8_t offset = address & 0xff;
 	uint16_t *values = reinterpret_cast<uint16_t *>(data);
@@ -248,34 +245,31 @@ PX4IO_serial::read(unsigned address, void *data, unsigned count)
 
 		/* successful transaction? */
 		if (result == OK) {
-
-			/* check result in packet */
 			if (PKT_CODE(*_io_buffer_ptr) == PKT_CODE_ERROR) {
+				// check result in packet
 
-				/* IO didn't like it - no point retrying */
+				// IO didn't like it - no point retrying
 				result = -EINVAL;
 				perf_count(_pc_protoerrs);
 
-				/* compare the received count with the expected count */
-
 			} else if (PKT_COUNT(*_io_buffer_ptr) != count) {
+				// compare the received count with the expected count
 
-				/* IO returned the wrong number of registers - no point retrying */
+				// IO returned the wrong number of registers - no point retrying
 				result = -EIO;
 				perf_count(_pc_protoerrs);
 
 				/* successful read */
 
 			} else {
-
-				/* copy back the result */
+				// copy back the result
 				memcpy(values, &_io_buffer_ptr->regs[0], (2 * count));
 			}
 
 			break;
 		}
 
-		perf_count(_pc_retries);
+		perf_count(_pc_retry_read);
 	}
 
 	px4_sem_post(&_bus_semaphore);
@@ -289,10 +283,6 @@ PX4IO_serial::read(unsigned address, void *data, unsigned count)
 
 int PX4IO_serial::_bus_exchange(IOPacket *_packet)
 {
-	if (_uart_fd < 0) {
-		init();
-	}
-
 	_current_packet = _packet;
 
 	perf_begin(_pc_txns);

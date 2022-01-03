@@ -64,16 +64,10 @@
 // define for comms logging
 //#define UDEBUG
 
-PX4IO_Uploader::PX4IO_Uploader() :
-	_io_fd(-1),
-	_fw_fd(-1),
-	bl_rev(0)
+int PX4IO_Uploader::upload(const char *filenames[])
 {
-}
+	fprintf(stderr, "PX4IO_Uploader::upload\n");
 
-int
-PX4IO_Uploader::upload(const char *filenames[])
-{
 	int	ret;
 	const char *filename = NULL;
 	size_t fw_size;

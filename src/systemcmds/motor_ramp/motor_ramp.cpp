@@ -338,18 +338,6 @@ int prepare(int fd, unsigned long *max_channels)
 		return 1;
 	}
 
-	/* tell IO/FMU that its ok to disable its safety with the switch */
-	if (px4_ioctl(fd, PWM_SERVO_SET_ARM_OK, 0) != OK) {
-		PX4_ERR("PWM_SERVO_SET_ARM_OK");
-		return 1;
-	}
-
-	/* tell IO/FMU that the system is armed (it will output values if safety is off) */
-	if (px4_ioctl(fd, PWM_SERVO_ARM, 0) != OK) {
-		PX4_ERR("PWM_SERVO_ARM");
-		return 1;
-	}
-
 	/* tell IO to switch off safety without using the safety switch */
 	if (px4_ioctl(fd, PWM_SERVO_SET_FORCE_SAFETY_OFF, 0) != OK) {
 		PX4_ERR("PWM_SERVO_SET_FORCE_SAFETY_OFF");
@@ -399,13 +387,6 @@ int motor_ramp_thread_main(int argc, char *argv[])
 	/* get current pwm min */
 	if (px4_ioctl(fd, PWM_SERVO_GET_MIN_PWM, (long unsigned int)&last_min) < 0) {
 		PX4_ERR("failed getting pwm min values");
-		px4_close(fd);
-		_thread_running = false;
-		return 1;
-	}
-
-	if (px4_ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_ENTER_TEST_MODE) < 0) {
-		PX4_ERR("Failed to Enter pwm test mode");
 		px4_close(fd);
 		_thread_running = false;
 		return 1;

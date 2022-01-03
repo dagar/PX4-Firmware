@@ -35,6 +35,7 @@ px4_add_module(
 	MAIN px4io
 	COMPILE_FLAGS
 		-Wno-cast-align # TODO: fix and enable
+		-DBEBUG_BUILD
 	SRCS
 		px4io.cpp
 		px4io_serial.cpp

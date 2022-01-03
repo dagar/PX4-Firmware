@@ -411,9 +411,6 @@ bool PWMOut::update_pwm_out_state(bool on)
 bool PWMOut::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 			   unsigned num_outputs, unsigned num_control_groups_updated)
 {
-	if (_test_mode) {
-		return false;
-	}
 
 	/* output to the servos */
 	if (_pwm_initialized) {
@@ -711,23 +708,8 @@ int PWMOut::pwm_ioctl(device::file_t *filp, int cmd, unsigned long arg)
 	lock();
 
 	switch (cmd) {
-	case PWM_SERVO_ARM:
-		update_pwm_out_state(true);
-		break;
-
-	case PWM_SERVO_SET_ARM_OK:
-	case PWM_SERVO_CLEAR_ARM_OK:
 	case PWM_SERVO_SET_FORCE_SAFETY_OFF:
 	case PWM_SERVO_SET_FORCE_SAFETY_ON:
-		break;
-
-	case PWM_SERVO_DISARM:
-
-		/* Ignore disarm if disarmed PWM is set already. */
-		if (_num_disarmed_set == 0) {
-			update_pwm_out_state(false);
-		}
-
 		break;
 
 	case PWM_SERVO_GET_DEFAULT_UPDATE_RATE:
@@ -750,40 +732,6 @@ int PWMOut::pwm_ioctl(device::file_t *filp, int cmd, unsigned long arg)
 		*(uint32_t *)arg = _pwm_alt_rate_channels;
 		break;
 
-	case PWM_SERVO_SET_FAILSAFE_PWM: {
-			struct pwm_output_values *pwm = (struct pwm_output_values *)arg;
-
-			/* discard if too many values are sent */
-			if (pwm->channel_count > FMU_MAX_ACTUATORS || _mixing_output.useDynamicMixing()) {
-				ret = -EINVAL;
-				break;
-			}
-
-			for (unsigned i = 0; i < pwm->channel_count; i++) {
-				if (pwm->values[i] == 0) {
-					/* ignore 0 */
-				} else if (pwm->values[i] > PWM_HIGHEST_MAX) {
-					_mixing_output.failsafeValue(i) = PWM_HIGHEST_MAX;
-
-				}
-
-#if PWM_LOWEST_MIN > 0
-
-				else if (pwm->values[i] < PWM_LOWEST_MIN) {
-					_mixing_output.failsafeValue(i) = PWM_LOWEST_MIN;
-
-				}
-
-#endif
-
-				else {
-					_mixing_output.failsafeValue(i) = pwm->values[i];
-				}
-			}
-
-			break;
-		}
-
 	case PWM_SERVO_GET_FAILSAFE_PWM: {
 			struct pwm_output_values *pwm = (struct pwm_output_values *)arg;
 
@@ -792,50 +740,6 @@ int PWMOut::pwm_ioctl(device::file_t *filp, int cmd, unsigned long arg)
 			}
 
 			pwm->channel_count = FMU_MAX_ACTUATORS;
-			break;
-		}
-
-	case PWM_SERVO_SET_DISARMED_PWM: {
-			struct pwm_output_values *pwm = (struct pwm_output_values *)arg;
-
-			/* discard if too many values are sent */
-			if (pwm->channel_count > FMU_MAX_ACTUATORS || _mixing_output.useDynamicMixing()) {
-				ret = -EINVAL;
-				break;
-			}
-
-			for (unsigned i = 0; i < pwm->channel_count; i++) {
-				if (pwm->values[i] == 0) {
-					/* ignore 0 */
-				} else if (pwm->values[i] > PWM_HIGHEST_MAX) {
-					_mixing_output.disarmedValue(i) = PWM_HIGHEST_MAX;
-				}
-
-#if PWM_LOWEST_MIN > 0
-
-				else if (pwm->values[i] < PWM_LOWEST_MIN) {
-					_mixing_output.disarmedValue(i) = PWM_LOWEST_MIN;
-				}
-
-#endif
-
-				else {
-					_mixing_output.disarmedValue(i) = pwm->values[i];
-				}
-			}
-
-			/*
-			 * update the counter
-			 * this is needed to decide if disarmed PWM output should be turned on or not
-			 */
-			_num_disarmed_set = 0;
-
-			for (unsigned i = 0; i < FMU_MAX_ACTUATORS; i++) {
-				if (_mixing_output.disarmedValue(i) > 0) {
-					_num_disarmed_set++;
-				}
-			}
-
 			break;
 		}
 
@@ -1048,23 +952,6 @@ int PWMOut::pwm_ioctl(device::file_t *filp, int cmd, unsigned long arg)
 		*(unsigned *)arg = _num_outputs;
 		break;
 
-	case PWM_SERVO_SET_MODE: {
-			switch (arg) {
-			case PWM_SERVO_ENTER_TEST_MODE:
-				_test_mode = true;
-				break;
-
-			case PWM_SERVO_EXIT_TEST_MODE:
-				_test_mode = false;
-				break;
-
-			default:
-				ret = -EINVAL;
-			}
-
-			break;
-		}
-
 	case MIXERIOCRESET:
 		_mixing_output.resetMixerThreadSafe();
 
@@ -1089,125 +976,8 @@ int PWMOut::pwm_ioctl(device::file_t *filp, int cmd, unsigned long arg)
 	return ret;
 }
 
-int PWMOut::test(const char *dev)
-{
-	int	 fd;
-	unsigned servo_count = 0;
-	unsigned pwm_value = 1000;
-	int	 direction = 1;
-	int  ret;
-	int   rv = -1;
-
-	fd = ::open(dev, O_RDWR);
-
-	if (fd < 0) {
-		PX4_ERR("open fail");
-		return -1;
-	}
-
-	if (::ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_ENTER_TEST_MODE) < 0) {
-		PX4_ERR("Failed to Enter pwm test mode");
-		goto err_out_no_test;
-	}
-
-	if (::ioctl(fd, PWM_SERVO_ARM, 0) < 0) {
-		PX4_ERR("servo arm failed");
-		goto err_out;
-	}
-
-	if (::ioctl(fd, PWM_SERVO_GET_COUNT, (unsigned long)&servo_count) != 0) {
-		PX4_ERR("Unable to get servo count");
-		goto err_out;
-	}
-
-	PX4_INFO("Testing %u servos", servo_count);
-
-	struct pollfd fds;
-
-	fds.fd = 0; /* stdin */
-
-	fds.events = POLLIN;
-
-	PX4_INFO("Press CTRL-C or 'c' to abort.");
-
-	for (;;) {
-		/* sweep all servos between 1000..2000 */
-		servo_position_t servos[servo_count];
-
-		for (unsigned i = 0; i < servo_count; i++) {
-			servos[i] = pwm_value;
-		}
-
-		for (unsigned i = 0; i < servo_count;	i++) {
-			if (::ioctl(fd, PWM_SERVO_SET(i), servos[i]) < 0) {
-				PX4_ERR("servo %u set failed", i);
-				goto err_out;
-			}
-		}
-
-		if (direction > 0) {
-			if (pwm_value < 2000) {
-				pwm_value++;
-
-			} else {
-				direction = -1;
-			}
-
-		} else {
-			if (pwm_value > 1000) {
-				pwm_value--;
-
-			} else {
-				direction = 1;
-			}
-		}
-
-		/* readback servo values */
-		for (unsigned i = 0; i < servo_count; i++) {
-			servo_position_t value;
-
-			if (::ioctl(fd, PWM_SERVO_GET(i), (unsigned long)&value)) {
-				PX4_ERR("error reading PWM servo %u", i);
-				goto err_out;
-			}
-
-			if (value != servos[i]) {
-				PX4_ERR("servo %u readback error, got %" PRIu16 " expected %" PRIu16, i, value, servos[i]);
-				goto err_out;
-			}
-		}
-
-		/* Check if user wants to quit */
-		char c;
-		ret = ::poll(&fds, 1, 0);
-
-		if (ret > 0) {
-
-			::read(0, &c, 1);
-
-			if (c == 0x03 || c == 0x63 || c == 'q') {
-				PX4_INFO("User abort");
-				break;
-			}
-		}
-	}
-
-	rv = 0;
-
-err_out:
-
-	if (::ioctl(fd, PWM_SERVO_SET_MODE, PWM_SERVO_EXIT_TEST_MODE) < 0) {
-		PX4_ERR("Failed to Exit pwm test mode");
-	}
-
-err_out_no_test:
-	::close(fd);
-	return rv;
-}
-
 int PWMOut::custom_command(int argc, char *argv[])
 {
-
 	int ch = 0;
 	int myoptind = 0;
 	const char *myoptarg = nullptr;
@@ -1242,10 +1012,6 @@ int PWMOut::custom_command(int argc, char *argv[])
 		if (ret) {
 			return ret;
 		}
-	}
-
-	if (!strcmp(verb, "test")) {
-		return test(dev);
 	}
 
 	return print_usage("unknown command");
@@ -1317,7 +1083,6 @@ By default the module runs on a work queue with a callback on the uORB actuator_
 
 	PRINT_MODULE_USAGE_NAME("pwm_out", "driver");
 	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("test", "Test outputs");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
 	return 0;

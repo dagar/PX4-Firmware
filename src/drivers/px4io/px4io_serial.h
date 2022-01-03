@@ -68,14 +68,11 @@ private:
 	/**
 	 * Performance counters.
 	 */
-	perf_counter_t		_pc_txns;
-	perf_counter_t		_pc_retries;
-	perf_counter_t		_pc_timeouts;
-	perf_counter_t		_pc_crcerrs;
-	perf_counter_t		_pc_protoerrs;
-	perf_counter_t		_pc_uerrs;
-	perf_counter_t		_pc_idle;
-	perf_counter_t		_pc_badidle;
+	perf_counter_t _pc_txns{perf_alloc(PC_ELAPSED, MODULE_NAME": txns")};
+	perf_counter_t _pc_retry_read{perf_alloc(PC_COUNT, MODULE_NAME": retry read")};
+	perf_counter_t _pc_retry_write{perf_alloc(PC_COUNT, MODULE_NAME": retry write")};
+	perf_counter_t _pc_crcerrs{perf_alloc(PC_COUNT, MODULE_NAME": crcerrs")};
+	perf_counter_t _pc_protoerrs{perf_alloc(PC_COUNT, MODULE_NAME": protoerrs")};
 
 	/*
 	 * XXX tune this value
@@ -88,14 +85,14 @@ private:
 	 * Maybe we can just send smaller packets (e.g. 8 regs) and loop for larger (less common)
 	 * transfers? Could cause issues with any regs expecting to be written atomically...
 	 */
-	IOPacket		*_io_buffer_ptr;
+	IOPacket		*_io_buffer_ptr{nullptr};;
 
 	/** bus-ownership lock */
-	px4_sem_t			_bus_semaphore;
+	px4_sem_t			_bus_semaphore{};
 
 	int _uart_fd{-1};
 
-	IOPacket *_current_packet;
+	IOPacket *_current_packet{nullptr};
 
 	/**
 	 * IO Buffer storage
