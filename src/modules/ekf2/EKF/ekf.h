@@ -46,7 +46,6 @@
 #include "estimator_interface.h"
 
 #include "EKFGSF_yaw.h"
-#include "baro_bias_estimator.hpp"
 
 class Ekf final : public EstimatorInterface
 {
@@ -183,8 +182,6 @@ public:
 	// Reset all magnetometer bias states and covariances to initial alignment values.
 	void resetMagBias();
 
-	void resetBaroBias();
-
 	Vector3f getVelocityVariance() const { return P.slice<3, 3>(4, 4).diag(); };
 
 	Vector3f getPositionVariance() const { return P.slice<3, 3>(7, 7).diag(); }
@@ -317,8 +314,6 @@ public:
 	// returns false when data is not available
 	bool getDataEKFGSF(float *yaw_composite, float *yaw_variance, float yaw[N_MODELS_EKFGSF],
 			   float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]);
-
-	const BaroBiasEstimator::status &getBaroBiasEstimatorStatus() const { return _baro_b_est.getStatus(); }
 
 private:
 
@@ -1021,8 +1016,6 @@ private:
 
 	// yaw estimator instance
 	EKFGSF_yaw _yawEstimator{};
-
-	BaroBiasEstimator _baro_b_est{};
 
 	int64_t _ekfgsf_yaw_reset_time{0};	///< timestamp of last emergency yaw reset (uSec)
 	bool _do_ekfgsf_yaw_reset{false};	// true when an emergency yaw reset has been requested

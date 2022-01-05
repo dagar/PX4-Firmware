@@ -35,6 +35,8 @@
 
 #include "data_validator/DataValidatorGroup.hpp"
 
+#include "BaroBiasEstimator.hpp"
+
 #include <lib/sensor_calibration/Barometer.hpp>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/matrix/matrix/math.hpp>
@@ -54,9 +56,12 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_baro.h>
 #include <uORB/topics/sensor_correction.h>
+#include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/sensors_status.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_control_mode.h>
+
+#include <uORB/topics/estimator_baro_bias.h>
 
 using namespace time_literals;
 
@@ -98,6 +103,7 @@ private:
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::Subscription _differential_pressure_sub{ORB_ID(differential_pressure)};
+	uORB::Subscription _sensor_gps_sub{ORB_ID(sensor_gps)};
 	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_sub[MAX_SENSOR_COUNT] {
@@ -147,6 +153,20 @@ private:
 		float variance{};
 		float temperature{NAN};
 	} _baro_cal[ORB_MULTI_MAX_INSTANCES] {};
+
+
+	uORB::PublicationMulti<estimator_baro_bias_s> _estimator_baro_bias_pub[MAX_SENSOR_COUNT] {
+		{ORB_ID(estimator_baro_bias)},
+		{ORB_ID(estimator_baro_bias)},
+		{ORB_ID(estimator_baro_bias)},
+		{ORB_ID(estimator_baro_bias)},
+	};
+
+	BaroBiasEstimator _baro_b_est[MAX_SENSOR_COUNT] {};
+
+	float _last_baro_bias_published{};
+
+	float _gps_altitude{0.f};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::SENS_BARO_MODE>) _param_sens_baro_mode,

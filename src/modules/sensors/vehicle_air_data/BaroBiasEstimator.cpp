@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,12 +32,12 @@
  ****************************************************************************/
 
 /**
- * @file baro_bias_estimator.cpp
+ * @file BaroBiasEstimator.cpp
  *
  * @author Mathieu Bresciani 	<mathieu@auterion.com>
  */
 
-#include "baro_bias_estimator.hpp"
+#include "BaroBiasEstimator.hpp"
 
 void BaroBiasEstimator::predict(const float dt)
 {
@@ -59,6 +59,11 @@ void BaroBiasEstimator::constrainStateVar()
 
 void BaroBiasEstimator::fuseBias(const float measurement, const float measurement_var)
 {
+	if (!_initialized) {
+		_state = measurement;
+		_initialized = true;
+	}
+
 	const float innov_var = _state_var + measurement_var;
 	const float innov = measurement - _state;
 	const float K = _state_var / innov_var;
@@ -67,7 +72,6 @@ void BaroBiasEstimator::fuseBias(const float measurement, const float measuremen
 	if (isTestRatioPassing(innov_test_ratio)) {
 		updateState(K, innov);
 		updateStateCovariance(K);
-
 	}
 
 	if (isLargeOffsetDetected()) {

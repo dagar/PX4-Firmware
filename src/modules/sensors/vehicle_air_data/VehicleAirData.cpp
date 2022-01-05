@@ -254,6 +254,22 @@ void VehicleAirData::Run()
 
 	ParametersUpdate();
 
+
+	float gps_altitude = NAN;
+	float gps_alt_var = NAN;
+
+	if (_sensor_gps_sub.updated()) {
+		sensor_gps_s sensor_gps;
+
+		if (_sensor_gps_sub.copy(&sensor_gps)) {
+			if (sensor_gps.fix_type >= 3 && sensor_gps.epv < 10) {
+				gps_altitude = sensor_gps.alt * 0.001f;
+				gps_alt_var = sensor_gps.epv * sensor_gps.epv;
+			}
+		}
+	}
+
+
 	AirTemperatureUpdate();
 
 	bool updated[MAX_SENSOR_COUNT] {};
@@ -324,6 +340,7 @@ void VehicleAirData::Run()
 				}
 
 				_last_data[uorb_index] = pressure_corrected;
+
 			}
 		}
 	}
@@ -351,22 +368,91 @@ void VehicleAirData::Run()
 		}
 	}
 
-	// Publish
-	if (_param_sens_baro_mode.get()) {
-		// publish only best sensor
-		if ((_selected_sensor_sub_index >= 0)
-		    && (_voter.get_sensor_state(_selected_sensor_sub_index) == DataValidator::ERROR_FLAG_NO_ERROR)
-		    && updated[_selected_sensor_sub_index]) {
 
-			Publish(_selected_sensor_sub_index);
-		}
 
-	} else {
-		// publish all
-		for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
-			// publish all sensors as separate instances
-			if (updated[uorb_index] && (_calibration[uorb_index].device_id() != 0)) {
-				Publish(uorb_index, true);
+
+
+
+
+	for (int instance = 0; instance < MAX_SENSOR_COUNT; instance++) {
+		// publish all sensors as separate instances
+		if (updated[instance]) {
+
+			const hrt_abstime timestamp_sample = _timestamp_sample_sum[instance] / _data_sum_count[instance];
+
+			if ((_param_sens_baro_rate.get() > 0) && (_data_sum_count[instance] > 0)
+			    && ((timestamp_sample - _last_publication_timestamp[instance]) >= (1e6f / _param_sens_baro_rate.get()))
+			   ) {
+
+				const float pressure_pa = _data_sum[instance] / _data_sum_count[instance];
+				const float temperature = _temperature_sum[instance] / _data_sum_count[instance];
+
+				float altitude = PressureToAltitude(pressure_pa, temperature);
+
+				// Baro bias estimation using GPS altitude
+				const float dt = math::constrain(1e-6f * (timestamp_sample - _last_publication_timestamp[instance]), 0.f, 1.f);
+				_baro_b_est[instance].setMaxStateNoise(2.f); // TODO: baro_noise
+				_baro_b_est[instance].setProcessNoiseStdDev(0.005f); // TODO
+				_baro_b_est[instance].predict(dt);
+
+
+				if (PX4_ISFINITE(gps_altitude)) {
+					// Use GPS altitude as a reference to compute the baro bias measurement
+					const float baro_bias = altitude - gps_altitude;
+					const float baro_bias_var = gps_alt_var + (2.f * 2.f); // TODO: baro_noise sq(baro_noise)
+
+					_baro_b_est[instance].fuseBias(baro_bias, baro_bias_var);
+				}
+
+				const BaroBiasEstimator::status &status = _baro_b_est[instance].getStatus();
+
+				estimator_baro_bias_s baro_bias{};
+				baro_bias.timestamp_sample = timestamp_sample;
+				baro_bias.baro_device_id = 0;//_device_id_baro;
+				baro_bias.bias = status.bias;
+				baro_bias.bias_var = status.bias_var;
+				baro_bias.innov = status.innov;
+				baro_bias.innov_var = status.innov_var;
+				baro_bias.innov_test_ratio = status.innov_test_ratio;
+				baro_bias.timestamp = hrt_absolute_time();
+				_estimator_baro_bias_pub[instance].publish(baro_bias);
+
+
+				// calculate air density
+				float air_density = pressure_pa / (CONSTANTS_AIR_GAS_CONST * (_air_temperature_celsius -
+								   CONSTANTS_ABSOLUTE_NULL_CELSIUS));
+
+				// populate vehicle_air_data with and publish
+				vehicle_air_data_s out{};
+				out.timestamp_sample = timestamp_sample;
+				out.baro_device_id = _calibration[instance].device_id();
+				out.baro_alt_meter = altitude;
+				out.baro_temp_celcius = temperature;
+				out.baro_pressure_pa = pressure_pa;
+				out.rho = air_density;
+				out.calibration_count = _calibration[instance].calibration_count();
+				out.timestamp = hrt_absolute_time();
+
+
+				if (_param_sens_baro_mode.get()
+				    && (_selected_sensor_sub_index == instance)
+				    && (_voter.get_sensor_state(_selected_sensor_sub_index) == DataValidator::ERROR_FLAG_NO_ERROR)
+				   ) {
+					// otherwise only ever publish the first instance
+					_vehicle_air_data_pub[0].publish(out);
+
+				} else {
+					// publish all
+					_vehicle_air_data_pub[instance].publish(out);
+				}
+
+				_last_publication_timestamp[instance] = timestamp_sample;
+
+				// reset
+				_timestamp_sample_sum[instance] = 0;
+				_data_sum[instance] = 0;
+				_temperature_sum[instance] = 0;
+				_data_sum_count[instance] = 0;
 			}
 		}
 	}
@@ -413,7 +499,6 @@ void VehicleAirData::Run()
 
 float VehicleAirData::PressureToAltitude(float pressure_pa, float temperature) const
 {
-
 	// calculate altitude using the hypsometric equation
 	static constexpr float T1 = 15.f - CONSTANTS_ABSOLUTE_NULL_CELSIUS; // temperature at base height in Kelvin
 	static constexpr float a = -6.5f / 1000.f; // temperature gradient in degrees per metre
@@ -435,53 +520,12 @@ float VehicleAirData::PressureToAltitude(float pressure_pa, float temperature) c
 	 */
 	float altitude = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
 
-
 	return altitude;
 }
 
 void VehicleAirData::Publish(uint8_t instance, bool multi)
 {
-	if ((_param_sens_baro_rate.get() > 0) && (_data_sum_count[instance] > 0)
-	    && ((_last_publication_timestamp[instance] == 0)
-		|| (hrt_elapsed_time(&_last_publication_timestamp[instance]) >= (1e6f / _param_sens_baro_rate.get())))) {
 
-		const float pressure_pa = _data_sum[instance] / _data_sum_count[instance];
-		const float temperature = _temperature_sum[instance] / _data_sum_count[instance];
-		const hrt_abstime timestamp_sample = _timestamp_sample_sum[instance] / _data_sum_count[instance];
-
-		float altitude = PressureToAltitude(pressure_pa, temperature);
-
-		// calculate air density
-		float air_density = pressure_pa / (CONSTANTS_AIR_GAS_CONST * (_air_temperature_celsius -
-						   CONSTANTS_ABSOLUTE_NULL_CELSIUS));
-
-		// populate vehicle_air_data with and publish
-		vehicle_air_data_s out{};
-		out.timestamp_sample = timestamp_sample;
-		out.baro_device_id = _calibration[instance].device_id();
-		out.baro_alt_meter = altitude;
-		out.baro_temp_celcius = temperature;
-		out.baro_pressure_pa = pressure_pa;
-		out.rho = air_density;
-		out.calibration_count = _calibration[instance].calibration_count();
-		out.timestamp = hrt_absolute_time();
-
-		if (multi) {
-			_vehicle_air_data_pub[instance].publish(out);
-
-		} else {
-			// otherwise only ever publish the first instance
-			_vehicle_air_data_pub[0].publish(out);
-		}
-
-		_last_publication_timestamp[instance] = out.timestamp;
-
-		// reset
-		_timestamp_sample_sum[instance] = 0;
-		_data_sum[instance] = 0;
-		_temperature_sum[instance] = 0;
-		_data_sum_count[instance] = 0;
-	}
 }
 
 void VehicleAirData::PublishStatus()

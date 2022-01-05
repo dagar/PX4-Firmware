@@ -41,9 +41,7 @@
 void Ekf::fuseBaroHgt()
 {
 	// vertical position innovation - baro measurement has opposite sign to earth z axis
-	const float unbiased_baro = _baro_sample_delayed.hgt - _baro_b_est.getBias();
-
-	_baro_hgt_innov = _state.pos(2) + unbiased_baro - _baro_hgt_offset;
+	_baro_hgt_innov = _state.pos(2) + _baro_sample_delayed.hgt - _baro_hgt_offset;
 
 	// Compensate for positive static pressure transients (negative vertical position innovations)
 	// caused by rotor wash ground interaction by applying a temporary deadzone to baro innovations.

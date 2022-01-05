@@ -32,6 +32,8 @@
 ############################################################################
 
 px4_add_library(vehicle_air_data
+	BaroBiasEstimator.cpp
+	BaroBiasEstimator.hpp
 	VehicleAirData.cpp
 	VehicleAirData.hpp
 )
