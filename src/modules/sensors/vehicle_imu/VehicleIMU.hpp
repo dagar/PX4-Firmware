@@ -96,9 +96,6 @@ private:
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
-	// Used to check, save and use learned magnetometer biases
-	uORB::SubscriptionMultiArray<estimator_sensor_bias_s> _estimator_sensor_bias_subs{ORB_ID::estimator_sensor_bias};
-
 	uORB::Subscription _sensor_accel_sub;
 	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub;
 
@@ -115,8 +112,6 @@ private:
 	hrt_abstime _accel_timestamp_sample_last{0};
 	hrt_abstime _gyro_timestamp_sample_last{0};
 	hrt_abstime _gyro_timestamp_last{0};
-
-	hrt_abstime _in_flight_calibration_check_timestamp_last{0};
 
 	math::WelfordMean<matrix::Vector3f> _raw_accel_mean{};
 	math::WelfordMean<matrix::Vector3f> _raw_gyro_mean{};
@@ -162,6 +157,11 @@ private:
 	const uint8_t _instance;
 
 	bool _armed{false};
+
+	// Used to check, save and use learned biases
+	uORB::SubscriptionMultiArray<estimator_sensor_bias_s, ORB_MULTI_MAX_INSTANCES> _estimator_sensor_bias_subs{ORB_ID::estimator_sensor_bias};
+
+	hrt_abstime _in_flight_calibration_check_timestamp_last{0};
 
 	bool _accel_cal_available{false};
 	bool _gyro_cal_available{false};

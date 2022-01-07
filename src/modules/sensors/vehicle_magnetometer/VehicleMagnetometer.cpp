@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020, 2001 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -246,7 +246,45 @@ void VehicleMagnetometer::UpdateMagBiasEstimate()
 	}
 }
 
-void VehicleMagnetometer::UpdateMagCalibration()
+void VehicleMagnetometer::SensorCalibrationUpdate()
+{
+	for (int i = 0; i < _estimator_sensor_bias_subs.size(); i++) {
+		estimator_sensor_bias_s estimator_sensor_bias;
+
+		if (_estimator_sensor_bias_subs[i].update(&estimator_sensor_bias)
+		    && (hrt_elapsed_time(&estimator_sensor_bias.timestamp) < 1_s)) {
+
+			if (estimator_sensor_bias.mag_bias_valid && estimator_sensor_bias.mag_bias_stable
+			    && (estimator_sensor_bias.mag_device_id != 0) &&
+			   ) {
+
+				const Vector3f bias{estimator_sensor_bias.mag_bias};
+				const Vector3f bias_variance{estimator_sensor_bias.mag_bias_variance};
+
+				// find corresponding mag calibration
+				for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
+					if (_calibration[mag_index].device_id() == estimator_sensor_bias.mag_device_id) {
+
+						_mag_cal[i].device_id = estimator_sensor_bias.mag_device_id;
+
+						// readd estimated bias that was removed before publishing vehicle_magnetometer
+						_mag_cal[i].offset = _calibration[mag_index].BiasCorrectedSensorOffset(bias) +
+								     _calibration_estimator_bias[mag_index];
+
+						_mag_cal[i].variance = bias_variance;
+						_mag_cal[i].temperature = _last_data[mag_index].temperature;
+
+						_in_flight_mag_cal_available = true;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+}
+
+void VehicleMagnetometer::SensorCalibrationSave()
 {
 	// State variance assumed for magnetometer bias storage.
 	// This is a reference variance used to calculate the fraction of learned magnetometer bias that will be used to update the stored value.
@@ -255,46 +293,7 @@ void VehicleMagnetometer::UpdateMagCalibration()
 	static constexpr float min_var_allowed = magb_vref * 0.01f;
 	static constexpr float max_var_allowed = magb_vref * 100.f;
 
-	if (_armed) {
-		static constexpr uint8_t mag_cal_size = sizeof(_mag_cal) / sizeof(_mag_cal[0]);
-
-		for (int i = 0; i < math::min(_estimator_sensor_bias_subs.size(), mag_cal_size); i++) {
-			estimator_sensor_bias_s estimator_sensor_bias;
-
-			if (_estimator_sensor_bias_subs[i].update(&estimator_sensor_bias)) {
-
-				const Vector3f bias{estimator_sensor_bias.mag_bias};
-				const Vector3f bias_variance{estimator_sensor_bias.mag_bias_variance};
-
-				const bool valid = (hrt_elapsed_time(&estimator_sensor_bias.timestamp) < 1_s)
-						   && (estimator_sensor_bias.mag_device_id != 0) &&
-						   estimator_sensor_bias.mag_bias_valid &&
-						   estimator_sensor_bias.mag_bias_stable &&
-						   (bias_variance.min() > min_var_allowed) && (bias_variance.max() < max_var_allowed);
-
-				if (valid) {
-					// find corresponding mag calibration
-					for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
-						if (_calibration[mag_index].device_id() == estimator_sensor_bias.mag_device_id) {
-
-							_mag_cal[i].device_id = estimator_sensor_bias.mag_device_id;
-
-							// readd estimated bias that was removed before publishing vehicle_magnetometer
-							_mag_cal[i].offset = _calibration[mag_index].BiasCorrectedSensorOffset(bias) +
-									     _calibration_estimator_bias[mag_index];
-
-							_mag_cal[i].variance = bias_variance;
-							_mag_cal[i].temperature = _last_data[mag_index].temperature;
-
-							_in_flight_mag_cal_available = true;
-							break;
-						}
-					}
-				}
-			}
-		}
-
-	} else if (_in_flight_mag_cal_available) {
+	if (_in_flight_mag_cal_available) {
 		// not armed and mag cal available
 		bool calibration_param_save_needed = false;
 		// iterate through available bias estimates and fuse them sequentially using a Kalman Filter scheme

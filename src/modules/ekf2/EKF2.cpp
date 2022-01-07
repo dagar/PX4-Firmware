@@ -1080,7 +1080,7 @@ void EKF2::PublishSensorBias(const hrt_abstime &timestamp)
 			gyro_bias.copyTo(bias.gyro_bias);
 			bias.gyro_bias_limit = math::radians(20.f); // 20 degrees/s see Ekf::constrainStates()
 			_ekf.getGyroBiasVariance().copyTo(bias.gyro_bias_variance);
-			bias.gyro_bias_valid = true;  // TODO
+			bias.gyro_bias_valid = true; // TODO
 			bias.gyro_bias_stable = _gyro_cal.cal_available;
 			_last_gyro_bias_published = gyro_bias;
 		}
@@ -1090,7 +1090,7 @@ void EKF2::PublishSensorBias(const hrt_abstime &timestamp)
 			accel_bias.copyTo(bias.accel_bias);
 			bias.accel_bias_limit = _params->acc_bias_lim;
 			_ekf.getAccelBiasVariance().copyTo(bias.accel_bias_variance);
-			bias.accel_bias_valid = true;  // TODO
+			bias.accel_bias_valid = true; // TODO
 			bias.accel_bias_stable = _accel_cal.cal_available;
 			_last_accel_bias_published = accel_bias;
 		}
@@ -1791,9 +1791,6 @@ void EKF2::UpdateAccelCalibration(const hrt_abstime &timestamp)
 		return;
 	}
 
-	// State variance assumed for accelerometer bias storage.
-	// This is a reference variance used to calculate the fraction of learned accelerometer bias that will be used to update the stored value.
-	// Larger values cause a larger fraction of the learned biases to be used.
 	static constexpr float max_var_allowed = 1e-3f;
 	static constexpr float max_var_ratio = 1e2f;
 
@@ -1838,9 +1835,6 @@ void EKF2::UpdateAccelCalibration(const hrt_abstime &timestamp)
 
 void EKF2::UpdateGyroCalibration(const hrt_abstime &timestamp)
 {
-	// State variance assumed for accelerometer bias storage.
-	// This is a reference variance used to calculate the fraction of learned accelerometer bias that will be used to update the stored value.
-	// Larger values cause a larger fraction of the learned biases to be used.
 	static constexpr float max_var_allowed = 1e-3f;
 	static constexpr float max_var_ratio = 1e2f;
 
@@ -1881,7 +1875,16 @@ void EKF2::UpdateMagCalibration(const hrt_abstime &timestamp)
 {
 	// Check if conditions are OK for learning of magnetometer bias values
 	// the EKF is operating in the correct mode and there are no filter faults
-	if (_ekf.control_status_flags().in_air && _ekf.control_status_flags().mag_3D && (_ekf.fault_status().value == 0)) {
+
+	static constexpr float max_var_allowed = 1e-3f;
+	static constexpr float max_var_ratio = 1e2f;
+
+	const Vector3f bias_variance{_ekf.getMagBiasVariance()};
+
+	bool valid = _ekf.control_status_flags().in_air && (_ekf.fault_status().value == 0)
+		     && (bias_variance.max() < max_var_allowed) && (bias_variance.max() < max_var_ratio * bias_variance.min());
+
+	if (valid && _ekf.control_status_flags().mag_3D) {
 
 		if (_mag_cal.last_us != 0) {
 			_mag_cal.total_time_us += timestamp - _mag_cal.last_us;
@@ -1899,12 +1902,13 @@ void EKF2::UpdateMagCalibration(const hrt_abstime &timestamp)
 		// but keep the accumulated calibration time
 		_mag_cal.last_us = 0;
 
-		if (_ekf.fault_status().value != 0) {
+		if (!valid) {
 			// if a filter fault has occurred, assume previous learning was invalid and do not
 			// count it towards total learning time.
 			_mag_cal.total_time_us = 0;
 		}
 	}
+
 
 	if (!_armed) {
 		// update stored declination value

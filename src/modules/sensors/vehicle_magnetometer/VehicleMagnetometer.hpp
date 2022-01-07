@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -111,7 +111,7 @@ private:
 	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 
 	// Used to check, save and use learned magnetometer biases
-	uORB::SubscriptionMultiArray<estimator_sensor_bias_s> _estimator_sensor_bias_subs{ORB_ID::estimator_sensor_bias};
+	uORB::SubscriptionMultiArray<estimator_sensor_bias_s, ORB_MULTI_MAX_INSTANCES> _estimator_sensor_bias_subs{ORB_ID::estimator_sensor_bias};
 
 	bool _in_flight_mag_cal_available{false}; ///< from navigation filter
 
