@@ -329,7 +329,7 @@ __EXPORT int		param_export(const char *filename, param_filter_func filter);
  *
  * This function merges the imported parameters with the current parameter set.
  *
- * @param fd		File descriptor to import from (-1 selects the FLASH storage).
+ * @param fd		File descriptor to import from.
  * @return		Zero on success, nonzero if an error occurred during import.
  *			Note that in the failure case, parameters may be inconsistent.
  */
@@ -341,7 +341,7 @@ __EXPORT int		param_import(int fd);
  * This function resets all parameters to their default values, then loads new
  * values from a file.
  *
- * @param fd		File descriptor to import from (-1 selects the FLASH storage).
+ * @param fd		File descriptor to import from.
  * @return		Zero on success, nonzero if an error occurred during import.
  *			Note that in the failure case, parameters may be inconsistent.
  */
@@ -376,7 +376,6 @@ __EXPORT void		param_foreach(void (*func)(void *arg, param_t param), void *arg, 
 
 /**
  * Set the default parameter file name.
- * This has no effect if the FLASH-based storage is enabled.
  *
  * @param filename	Path to the default parameter file.  The file is not required to
  *			exist.

@@ -43,6 +43,7 @@ if(NOT PX4_BOARD MATCHES "io-v2")
 		cpuload.cpp
 		gpio.c
 		print_load.cpp
+		mtd_progmem.c
 		tasks.cpp
 		px4_nuttx_impl.cpp
 		px4_init.cpp
@@ -57,6 +58,7 @@ if(NOT PX4_BOARD MATCHES "io-v2")
 			arch_board_critmon
 			arch_version
 			nuttx_apps
+			nuttx_arch
 			nuttx_sched
 			px4_work_queue
 			uORB

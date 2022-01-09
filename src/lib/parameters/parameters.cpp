@@ -69,14 +69,6 @@ using namespace time_literals;
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/Subscription.hpp>
 
-#if defined(FLASH_BASED_PARAMS)
-#include "flashparams/flashparams.h"
-#else
-inline static int flash_param_save(param_filter_func filter) { return -1; }
-inline static int flash_param_load() { return -1; }
-inline static int flash_param_import() { return -1; }
-#endif
-
 static char *param_default_file = nullptr;
 static char *param_backup_file = nullptr;
 
@@ -121,7 +113,7 @@ static perf_counter_t param_find_perf;
 static perf_counter_t param_get_perf;
 static perf_counter_t param_set_perf;
 
-static px4_sem_t param_sem_save; ///< this protects against concurrent param saves (file or flash access).
+static px4_sem_t param_sem_save; ///< this protects against concurrent param saves (file access).
 ///< we use a separate lock to allow concurrent param reads and saves.
 ///< a param_set could still be blocked by a param save, because it
 ///< needs to take the reader lock
@@ -674,23 +666,17 @@ param_get_system_default_value(param_t param, void *default_val)
 static void
 autosave_worker(void *arg)
 {
-	bool disabled = false;
+	uORB::SubscriptionData<actuator_armed_s> armed_sub{ORB_ID(actuator_armed)};
 
-	if (!param_get_default_file()) {
-		// In case we save to FLASH, defer param writes until disarmed,
-		// as writing to FLASH can stall the entire CPU (in rare cases around 300ms on STM32F7)
-		uORB::SubscriptionData<actuator_armed_s> armed_sub{ORB_ID(actuator_armed)};
-
-		if (armed_sub.get().armed) {
-			work_queue(LPWORK, &autosave_work, (worker_t)&autosave_worker, nullptr, USEC2TICK(1_s));
-			return;
-		}
+	if (armed_sub.get().armed) {
+		work_queue(LPWORK, &autosave_work, (worker_t)&autosave_worker, nullptr, USEC2TICK(1_s));
+		return;
 	}
 
 	param_lock_writer();
 	last_autosave_timestamp = hrt_absolute_time();
 	autosave_scheduled.store(false);
-	disabled = autosave_disabled;
+	bool disabled = autosave_disabled;
 	param_unlock_writer();
 
 	if (disabled) {
@@ -853,18 +839,6 @@ out:
 
 	return result;
 }
-
-#if defined(FLASH_BASED_PARAMS)
-int param_set_external(param_t param, const void *val, bool mark_saved, bool notify_changes)
-{
-	return param_set_internal(param, val, mark_saved, notify_changes);
-}
-
-const void *param_get_value_ptr_external(param_t param)
-{
-	return param_get_value_ptr(param);
-}
-#endif
 
 int param_set(param_t param, const void *val)
 {
@@ -1123,11 +1097,6 @@ param_set_default_file(const char *filename)
 		return PX4_ERROR;
 	}
 
-#ifdef FLASH_BASED_PARAMS
-	// the default for flash-based params is always the FLASH
-	(void)filename;
-#else
-
 	if (param_default_file != nullptr) {
 		// we assume this is not in use by some other thread
 		free(param_default_file);
@@ -1137,8 +1106,6 @@ param_set_default_file(const char *filename)
 	if (filename) {
 		param_default_file = strdup(filename);
 	}
-
-#endif /* FLASH_BASED_PARAMS */
 
 	return 0;
 }
@@ -1225,11 +1192,6 @@ int param_save_default()
 				px4_usleep(10000); // wait at least 10 milliseconds before trying again
 			}
 		}
-
-	} else {
-		perf_begin(param_export_perf);
-		res = flash_param_save(nullptr);
-		perf_end(param_export_perf);
 	}
 
 	if (res != PX4_OK) {
@@ -1279,7 +1241,7 @@ param_load_default()
 	const char *filename = param_get_default_file();
 
 	if (!filename) {
-		return flash_param_load();
+		return -1;
 	}
 
 	int fd_load = ::open(filename, O_RDONLY);
@@ -1426,17 +1388,9 @@ param_export(const char *filename, param_filter_func filter)
 	param_lock_reader();
 
 	int fd = ::open(filename, O_RDWR | O_CREAT, PX4_O_MODE_666);
-	int result = PX4_ERROR;
 
 	perf_begin(param_export_perf);
-
-	if (fd > -1) {
-		result = param_export_internal(fd, filter);
-
-	} else {
-		result = flash_param_save(filter);
-	}
-
+	int result = param_export_internal(fd, filter);
 	perf_end(param_export_perf);
 
 	param_unlock_reader();
@@ -1692,20 +1646,12 @@ param_import_internal(int fd)
 int
 param_import(int fd)
 {
-	if (fd < 0) {
-		return flash_param_import();
-	}
-
 	return param_import_internal(fd);
 }
 
 int
 param_load(int fd)
 {
-	if (fd < 0) {
-		return flash_param_load();
-	}
-
 	param_reset_all_internal(false);
 	return param_import_internal(fd);
 }
@@ -1793,7 +1739,6 @@ void param_print_status()
 {
 	PX4_INFO("summary: %d/%d (used/total)", param_count_used(), param_count());
 
-#ifndef FLASH_BASED_PARAMS
 	const char *filename = param_get_default_file();
 
 	if (filename != nullptr) {
@@ -1803,8 +1748,6 @@ void param_print_status()
 	if (param_backup_file) {
 		PX4_INFO("backup file: %s", param_backup_file);
 	}
-
-#endif /* FLASH_BASED_PARAMS */
 
 	if (param_values != nullptr) {
 		PX4_INFO("storage array: %d/%d elements (%zu bytes total)",
