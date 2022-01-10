@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2012-2016 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2012-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,6 +54,82 @@ enum perf_counter_type {
 struct perf_ctr_header;
 typedef struct perf_ctr_header	*perf_counter_t;
 
+#if defined(__cplusplus)
+
+/**
+ * Header common to all counters.
+ */
+struct perf_ctr_header {
+public:
+	sq_entry_t		link{nullptr};	/**< list linkage */
+	enum perf_counter_type type;	/**< counter type */
+	const char		*_name{nullptr};	/**< counter name */
+	const char		*_module_name{nullptr}; /**< counter's module name */
+};
+
+#if defined(MODULE_NAME)
+# define PERF_DEFAULT_MODULE_NAME MODULE_NAME
+#else
+# define PERF_DEFAULT_MODULE_NAME nullptr
+#endif
+
+/**
+ * PC_EVENT counter.
+ */
+class perf_ctr_count : public perf_ctr_header
+{
+public:
+	perf_ctr_count(const char *name, const char *module_name = PERF_DEFAULT_MODULE_NAME);
+	perf_ctr_count() = delete;
+
+	~perf_ctr_count();
+
+	uint64_t		event_count{0};
+};
+
+/**
+ * PC_ELAPSED counter.
+ */
+class perf_ctr_elapsed : public perf_ctr_header
+{
+public:
+	perf_ctr_elapsed(const char *name, const char *module_name = PERF_DEFAULT_MODULE_NAME);
+	perf_ctr_elapsed() = delete;
+
+	~perf_ctr_elapsed();
+
+	uint64_t		event_count{0};
+	uint64_t		time_start{0};
+	uint64_t		time_total{0};
+	uint32_t		time_least{0};
+	uint32_t		time_most{0};
+	float			mean{0.0f};
+	float			M2{0.0f};
+};
+
+/**
+ * PC_INTERVAL counter.
+ */
+class perf_ctr_interval : public perf_ctr_header
+{
+public:
+	perf_ctr_interval(const char *name, const char *module_name = PERF_DEFAULT_MODULE_NAME);
+	perf_ctr_interval() = delete;
+
+	~perf_ctr_interval();
+
+	uint64_t		event_count{0};
+	uint64_t		time_event{0};
+	uint64_t		time_first{0};
+	uint64_t		time_last{0};
+	uint32_t		time_least{0};
+	uint32_t		time_most{0};
+	float			mean{0.0f};
+	float			M2{0.0f};
+};
+
+#endif // __cplusplus
+
 __BEGIN_DECLS
 
 /**
@@ -64,19 +140,24 @@ __BEGIN_DECLS
  * @return			Handle for the new counter, or NULL if a counter
  *				could not be allocated.
  */
-#ifndef perf_alloc	// perf_alloc might be defined to be NULL in src/modules/px4iofirmware/px4io.h
 __EXPORT extern perf_counter_t	perf_alloc(enum perf_counter_type type, const char *name);
-#endif
 
 /**
- * Get the reference to an existing counter or create a new one if it does not exist.
+ * Create a new local counter.
  *
- * @param type			The type of the counter.
+ * @param type			The type of the new counter.
+ * @param module_name		The counter's module name.
  * @param name			The counter name.
- * @return			Handle for the counter, or NULL if a counter
+ * @return			Handle for the new counter, or NULL if a counter
  *				could not be allocated.
  */
-__EXPORT extern perf_counter_t	perf_alloc_once(enum perf_counter_type type, const char *name);
+__EXPORT extern perf_counter_t	perf_alloc_module(enum perf_counter_type type, const char *module_name,
+		const char *name);
+
+
+// #if defined(MODULE_NAME)
+// inline perf_counter_t perf_alloc_module(enum perf_counter_type type, const char *name) { return perf_alloc(type, name, MODULE_NAME); }
+// #endif
 
 /**
  * Free a counter.
