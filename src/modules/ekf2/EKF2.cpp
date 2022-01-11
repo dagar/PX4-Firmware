@@ -1452,7 +1452,7 @@ void EKF2::UpdateBaroSample(ekf2_timestamps_s &ekf2_timestamps)
 		}
 
 		if (reset) {
-			//_ekf.resetBaroBias();
+			//_ekf.resetBaroBias(); // TODO: reset baro origin?
 			_device_id_baro = airdata.baro_device_id;
 			_baro_calibration_count = airdata.calibration_count;
 		}

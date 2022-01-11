@@ -97,13 +97,13 @@ public:
 private:
 	float _state{0.f};
 	float _state_max{100.f};
-	float _state_drift_rate{0.005f}; ///< in m/s
+	float _state_drift_rate{0.005f}; ///< process noise for barometric height bias estimation (m/s)
 	float _dt{0.01f};
 
 	float _gate_size{3.f}; ///< Used for innovation filtering (innovation test ratio)
 	float _state_var{0.1f}; ///< Initial state uncertainty variance (m^2)
 	float _process_var{25.0e-6f}; ///< State process noise variance (m^2/s^2)
-	float _state_var_max{2.f}; ///< Used to constrain the state variance (m^2)
+	float _state_var_max{3.5f}; ///< Used to constrain the state variance (m^2)
 
 	AlphaFilter<float> _signed_innov_test_ratio_lpf; ///< innovation sequence monitoring; used to detect a bias in the state
 

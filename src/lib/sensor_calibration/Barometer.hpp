@@ -51,18 +51,20 @@ public:
 	static constexpr const char *SensorString() { return "BARO"; }
 
 	Barometer();
-	explicit Barometer(uint32_t device_id, bool external = false);
+	explicit Barometer(uint32_t device_id);
 
 	~Barometer() = default;
 
 	void PrintStatus();
 
-	void set_calibration_index(uint8_t calibration_index) { _calibration_index = calibration_index; }
-	void set_device_id(uint32_t device_id, bool external = false);
-	void set_external(bool external = true);
+	bool set_calibration_index(int calibration_index);
+	void set_device_id(uint32_t device_id);
 	bool set_offset(const float &offset);
+	void set_temperature(float temperature) { _temperature = temperature; };
 
+	bool calibrated() const { return (_device_id != 0) && (_calibration_index >= 0); }
 	uint8_t calibration_count() const { return _calibration_count; }
+	int8_t calibration_index() const { return _calibration_index; }
 	uint32_t device_id() const { return _device_id; }
 	bool enabled() const { return (_priority > 0); }
 	bool external() const { return _external; }
@@ -81,7 +83,14 @@ public:
 		return corrected_data + _thermal_offset + _offset;
 	}
 
-	bool ParametersSave();
+	// Compute sensor offset from bias (board frame)
+	float BiasCorrectedSensorOffset(const float &bias) const
+	{
+		return bias + _thermal_offset + _offset;
+	}
+
+	bool ParametersLoad();
+	bool ParametersSave(int desired_calibration_index = -1, bool force = false);
 	void ParametersUpdate();
 
 	void Reset();
@@ -89,10 +98,13 @@ public:
 	void SensorCorrectionsUpdate(bool force = false);
 
 private:
+	static constexpr float TEMPERATURE_INVALID = -1000.f;
+
 	uORB::Subscription _sensor_correction_sub{ORB_ID(sensor_correction)};
 
 	float _offset{0};
 	float _thermal_offset{0};
+	float _temperature{NAN};
 
 	int8_t _calibration_index{-1};
 	uint32_t _device_id{0};

@@ -909,7 +909,6 @@ void Ekf::controlHeightFusion()
 		break;
 	}
 
-	updateBaroHgtBias();
 	updateBaroHgtOffset();
 	checkGroundEffectTimeout();
 

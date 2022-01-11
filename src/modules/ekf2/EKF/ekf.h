@@ -911,7 +911,6 @@ private:
 	void startEvHgtFusion();
 
 	void updateBaroHgtOffset();
-	void updateBaroHgtBias();
 
 	void checkGroundEffectTimeout();
 

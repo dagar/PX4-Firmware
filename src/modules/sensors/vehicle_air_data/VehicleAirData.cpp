@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -103,8 +103,16 @@ void VehicleAirData::ParametersUpdate(bool force)
 
 		// update priority
 		for (int instance = 0; instance < MAX_SENSOR_COUNT; instance++) {
+
+			const auto calibration_count = _calibration[instance].calibration_count();
 			const int32_t priority_old = _calibration[instance].priority();
+
 			_calibration[instance].ParametersUpdate();
+
+			if (calibration_count != _calibration[instance].calibration_count()) {
+				_baro_b_est[instance].reset();
+			}
+
 			const int32_t priority_new = _calibration[instance].priority();
 
 			if (priority_old != priority_new) {
@@ -159,19 +167,6 @@ void VehicleAirData::SensorCalibrationUpdate()
 							//		     _calibration_estimator_bias[baro_index];
 
 							_baro_cal[i].offset = bias; // TODO
-
-
-
-							// TODO: use altitude bias to determine barometer bias
-
-
-							// pressure_pa + pressure_bias
-							//  altitude - bias
-
-
-							// float altitude = PressureToAltitude(pressure_pa, temperature);
-
-
 
 
 							_baro_cal[i].variance = bias_variance;
@@ -295,13 +290,6 @@ void VehicleAirData::Run()
 
 					_advertised[uorb_index] = true;
 
-					// advertise outputs in order if publishing all
-					if (!_param_sens_baro_mode.get()) {
-						for (int instance = 0; instance < uorb_index; instance++) {
-							_vehicle_air_data_pub[instance].advertise();
-						}
-					}
-
 					if (_selected_sensor_sub_index < 0) {
 						_sensor_sub[uorb_index].registerCallback();
 					}
@@ -319,7 +307,7 @@ void VehicleAirData::Run()
 				updated[uorb_index] = true;
 
 				if (_calibration[uorb_index].device_id() != report.device_id) {
-					_calibration[uorb_index].set_device_id(report.device_id, report.is_external);
+					_calibration[uorb_index].set_device_id(report.device_id);
 					_priority[uorb_index] = _calibration[uorb_index].priority();
 				}
 
@@ -356,23 +344,16 @@ void VehicleAirData::Run()
 				sub.unregisterCallback();
 			}
 
-			if (_param_sens_baro_mode.get()) {
-				if (_selected_sensor_sub_index >= 0) {
-					PX4_INFO("%s switch from #%" PRId8 " -> #%d", _calibration[_selected_sensor_sub_index].SensorString(),
-						 _selected_sensor_sub_index, best_index);
-				}
+
+			if (_selected_sensor_sub_index >= 0) {
+				PX4_INFO("%s switch from #%" PRId8 " -> #%d", _calibration[_selected_sensor_sub_index].SensorString(),
+					 _selected_sensor_sub_index, best_index);
 			}
 
 			_selected_sensor_sub_index = best_index;
 			_sensor_sub[_selected_sensor_sub_index].registerCallback();
 		}
 	}
-
-
-
-
-
-
 
 	for (int instance = 0; instance < MAX_SENSOR_COUNT; instance++) {
 		// publish all sensors as separate instances
@@ -387,28 +368,105 @@ void VehicleAirData::Run()
 				const float pressure_pa = _data_sum[instance] / _data_sum_count[instance];
 				const float temperature = _temperature_sum[instance] / _data_sum_count[instance];
 
-				float altitude = PressureToAltitude(pressure_pa, temperature);
+				float pressure_altitude = PressureToAltitude(pressure_pa, temperature);
 
 				// Baro bias estimation using GPS altitude
 				const float dt = math::constrain(1e-6f * (timestamp_sample - _last_publication_timestamp[instance]), 0.f, 1.f);
-				_baro_b_est[instance].setMaxStateNoise(2.f); // TODO: baro_noise
-				_baro_b_est[instance].setProcessNoiseStdDev(0.005f); // TODO
-				_baro_b_est[instance].predict(dt);
+				_last_publication_timestamp[instance] = timestamp_sample;
 
+				_baro_b_est[instance].predict(dt);
 
 				if (PX4_ISFINITE(gps_altitude)) {
 					// Use GPS altitude as a reference to compute the baro bias measurement
-					const float baro_bias = altitude - gps_altitude;
-					const float baro_bias_var = gps_alt_var + (2.f * 2.f); // TODO: baro_noise sq(baro_noise)
+					const float baro_bias = pressure_altitude - gps_altitude;
+					const float baro_bias_var = gps_alt_var + (3.5f * 3.5f); // TODO: baro_noise sq(baro_noise)
 
 					_baro_b_est[instance].fuseBias(baro_bias, baro_bias_var);
 				}
 
+				float altitude = pressure_altitude;
+
 				const BaroBiasEstimator::status &status = _baro_b_est[instance].getStatus();
 
+				if (status.innov_test_ratio < 1.f) { // TODO: if valid
+					altitude = pressure_altitude - _baro_b_est[instance].getBias();
+
+					if (!_calibration[instance].calibrated() && _baro_b_est[instance].getBiasVar() < 0.1f) {
+						float front = -10000.f;
+						float middle = NAN;
+						float last = 10000.f;
+
+						float bias = NAN;
+
+						// perform a binary search
+						while (front <= last) {
+							middle = front + (last - front) / 2;
+							float altitude_calibrated = PressureToAltitude(pressure_pa - middle, temperature);
+
+							if (altitude_calibrated > altitude + 0.1f) {
+								last = middle;
+
+							} else if (altitude_calibrated < altitude - 0.1f) {
+								front = middle;
+
+							} else {
+								bias = middle;
+								break;
+							}
+						}
+
+						if (PX4_ISFINITE(bias)) {
+							float offset = _calibration[instance].BiasCorrectedSensorOffset(bias);
+							float offset_orig = _calibration[instance].offset();
+
+							if (_calibration[instance].set_offset(offset)) {
+								_calibration[instance].set_temperature(temperature);
+
+								if (_calibration[instance].ParametersSave(instance)) {
+									PX4_INFO("%s %d (%" PRIu32 ") offset committed: %.3f -> %.3f",
+										 _calibration[instance].SensorString(), instance, _calibration[instance].device_id(),
+										 (double)offset_orig, (double)offset);
+
+									_calibration[instance].PrintStatus();
+								}
+							}
+
+							_baro_b_est[instance].reset();
+						}
+					}
+				}
+
+				if ((_selected_sensor_sub_index == instance)
+				    && (_voter.get_sensor_state(_selected_sensor_sub_index) == DataValidator::ERROR_FLAG_NO_ERROR)
+				   ) {
+					// calculate air density
+					float air_density = pressure_pa / (CONSTANTS_AIR_GAS_CONST * (_air_temperature_celsius -
+									   CONSTANTS_ABSOLUTE_NULL_CELSIUS));
+
+					// populate vehicle_air_data with and publish
+					vehicle_air_data_s out{};
+					out.timestamp_sample = timestamp_sample;
+					out.baro_device_id = _calibration[instance].device_id();
+					out.baro_alt_meter = altitude;
+					out.baro_temp_celcius = temperature;
+					out.baro_pressure_pa = pressure_pa;
+					out.rho = air_density;
+					out.calibration_count = _calibration[instance].calibration_count();
+					out.timestamp = hrt_absolute_time();
+
+					_vehicle_air_data_pub.publish(out);
+				}
+
+				// reset
+				_timestamp_sample_sum[instance] = 0;
+				_data_sum[instance] = 0;
+				_temperature_sum[instance] = 0;
+				_data_sum_count[instance] = 0;
+
+				// publish baro bias status
 				estimator_baro_bias_s baro_bias{};
 				baro_bias.timestamp_sample = timestamp_sample;
-				baro_bias.baro_device_id = 0;//_device_id_baro;
+				baro_bias.baro_device_id = _calibration[instance].device_id();
 				baro_bias.bias = status.bias;
 				baro_bias.bias_var = status.bias_var;
 				baro_bias.innov = status.innov;
@@ -416,77 +474,38 @@ void VehicleAirData::Run()
 				baro_bias.innov_test_ratio = status.innov_test_ratio;
 				baro_bias.timestamp = hrt_absolute_time();
 				_estimator_baro_bias_pub[instance].publish(baro_bias);
-
-
-				// calculate air density
-				float air_density = pressure_pa / (CONSTANTS_AIR_GAS_CONST * (_air_temperature_celsius -
-								   CONSTANTS_ABSOLUTE_NULL_CELSIUS));
-
-				// populate vehicle_air_data with and publish
-				vehicle_air_data_s out{};
-				out.timestamp_sample = timestamp_sample;
-				out.baro_device_id = _calibration[instance].device_id();
-				out.baro_alt_meter = altitude;
-				out.baro_temp_celcius = temperature;
-				out.baro_pressure_pa = pressure_pa;
-				out.rho = air_density;
-				out.calibration_count = _calibration[instance].calibration_count();
-				out.timestamp = hrt_absolute_time();
-
-
-				if (_param_sens_baro_mode.get()
-				    && (_selected_sensor_sub_index == instance)
-				    && (_voter.get_sensor_state(_selected_sensor_sub_index) == DataValidator::ERROR_FLAG_NO_ERROR)
-				   ) {
-					// otherwise only ever publish the first instance
-					_vehicle_air_data_pub[0].publish(out);
-
-				} else {
-					// publish all
-					_vehicle_air_data_pub[instance].publish(out);
-				}
-
-				_last_publication_timestamp[instance] = timestamp_sample;
-
-				// reset
-				_timestamp_sample_sum[instance] = 0;
-				_data_sum[instance] = 0;
-				_temperature_sum[instance] = 0;
-				_data_sum_count[instance] = 0;
 			}
 		}
 	}
 
 
 	// check failover and report
-	if (_param_sens_baro_mode.get() == 1) {
-		if (_last_failover_count != _voter.failover_count()) {
-			uint32_t flags = _voter.failover_state();
-			int failover_index = _voter.failover_index();
+	if (_last_failover_count != _voter.failover_count()) {
+		uint32_t flags = _voter.failover_state();
+		int failover_index = _voter.failover_index();
 
-			if (flags != DataValidator::ERROR_FLAG_NO_ERROR) {
-				if (failover_index != -1) {
-					const hrt_abstime now = hrt_absolute_time();
+		if (flags != DataValidator::ERROR_FLAG_NO_ERROR) {
+			if (failover_index != -1) {
+				const hrt_abstime now = hrt_absolute_time();
 
-					if (now - _last_error_message > 3_s) {
-						mavlink_log_emergency(&_mavlink_log_pub, "%s #%i failed: %s%s%s%s%s!",
-								      _calibration[0].SensorString(),
-								      failover_index,
-								      ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
-								      ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
-								      ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TIMEOUT" : ""),
-								      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ERR CNT" : ""),
-								      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " ERR DNST" : ""));
-						_last_error_message = now;
-					}
-
-					// reduce priority of failed sensor to the minimum
-					_priority[failover_index] = 1;
+				if (now - _last_error_message > 3_s) {
+					mavlink_log_emergency(&_mavlink_log_pub, "%s #%i failed: %s%s%s%s%s!",
+							      _calibration[0].SensorString(),
+							      failover_index,
+							      ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
+							      ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
+							      ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TIMEOUT" : ""),
+							      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ERR CNT" : ""),
+							      ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " ERR DNST" : ""));
+					_last_error_message = now;
 				}
-			}
 
-			_last_failover_count = _voter.failover_count();
+				// reduce priority of failed sensor to the minimum
+				_priority[failover_index] = 1;
+			}
 		}
+
+		_last_failover_count = _voter.failover_count();
 	}
 
 	PublishStatus();
@@ -521,6 +540,12 @@ float VehicleAirData::PressureToAltitude(float pressure_pa, float temperature) c
 	float altitude = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
 
 	return altitude;
+}
+
+float VehicleAirData::AltitudeToPressure(float altitude_m, float temperature) const
+{
+	float pressure = 0;
+	return pressure;
 }
 
 void VehicleAirData::Publish(uint8_t instance, bool multi)

@@ -45,9 +45,6 @@ public:
 	PX4Barometer(uint32_t device_id) : _device_id{device_id} {}
 	~PX4Barometer() { _sensor_pub.unadvertise(); }
 
-	bool external() { return _external; }
-
-	void set_device_id(uint32_t device_id) { _device_id = device_id; }
 	void set_device_type(uint8_t devtype)
 	{
 		// current DeviceStructure
@@ -62,9 +59,7 @@ public:
 	}
 
 	void set_error_count(uint32_t error_count) { _error_count = error_count; }
-	void increase_error_count() { _error_count++; }
 	void set_temperature(float temperature) { _temperature = temperature; }
-	void set_external(bool external) { _external = external; }
 
 	void update(const hrt_abstime &timestamp_sample, float pressure_pa)
 	{
@@ -74,8 +69,6 @@ public:
 		report.pressure = pressure_pa;
 		report.temperature = _temperature;
 		report.error_count = _error_count;
-
-		report.is_external = _external;
 
 		report.timestamp = hrt_absolute_time();
 		_sensor_pub.publish(report);
@@ -90,6 +83,4 @@ private:
 
 	float			_temperature{NAN};
 	uint32_t		_error_count{0};
-
-	bool _external{false};
 };

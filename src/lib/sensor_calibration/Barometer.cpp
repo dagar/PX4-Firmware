@@ -48,45 +48,25 @@ Barometer::Barometer()
 	Reset();
 }
 
-Barometer::Barometer(uint32_t device_id, bool external)
+Barometer::Barometer(uint32_t device_id)
 {
-	Reset();
-	set_device_id(device_id, external);
+	set_device_id(device_id);
 }
 
-void Barometer::set_device_id(uint32_t device_id, bool external)
+void Barometer::set_device_id(uint32_t device_id)
 {
-	if (_device_id != device_id || _external != external) {
-		set_external(external);
-		_device_id = device_id;
+	bool external = DeviceExternal(device_id);
 
-		if (_device_id != 0) {
-			_calibration_index = FindCalibrationIndex(SensorString(), _device_id);
-		}
+	if (_device_id != device_id || _external != external) {
+
+		_device_id = device_id;
+		_external = external;
+
+		Reset();
 
 		ParametersUpdate();
 		SensorCorrectionsUpdate(true);
 	}
-}
-
-void Barometer::set_external(bool external)
-{
-	// update priority default appropriately if not set
-	if (_calibration_index < 0 || _priority < 0) {
-		if ((_priority < 0) || (_priority > 100)) {
-			_priority = external ? DEFAULT_EXTERNAL_PRIORITY : DEFAULT_PRIORITY;
-
-		} else if (!_external && external && (_priority == DEFAULT_PRIORITY)) {
-			// internal -> external
-			_priority = DEFAULT_EXTERNAL_PRIORITY;
-
-		} else if (_external && !external && (_priority == DEFAULT_EXTERNAL_PRIORITY)) {
-			// external -> internal
-			_priority = DEFAULT_PRIORITY;
-		}
-	}
-
-	_external = external;
 }
 
 void Barometer::SensorCorrectionsUpdate(bool force)
@@ -144,31 +124,70 @@ bool Barometer::set_offset(const float &offset)
 	return false;
 }
 
+bool Barometer::set_calibration_index(int calibration_index)
+{
+	if ((calibration_index >= 0) && (calibration_index < MAX_SENSOR_COUNT)) {
+		_calibration_index = calibration_index;
+		return true;
+	}
+
+	return false;
+}
+
 void Barometer::ParametersUpdate()
 {
-	if (_calibration_index >= 0) {
+	if (_device_id == 0) {
+		return;
+	}
+
+	_calibration_index = FindCurrentCalibrationIndex(SensorString(), _device_id);
+
+	if (_calibration_index == -1) {
+		// no saved calibration available
+		Reset();
+
+	} else {
+		ParametersLoad();
+	}
+}
+
+bool Barometer::ParametersLoad()
+{
+	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// CAL_BAROx_PRIO
 		_priority = GetCalibrationParamInt32(SensorString(), "PRIO", _calibration_index);
 
 		if ((_priority < 0) || (_priority > 100)) {
 			// reset to default, -1 is the uninitialized parameter value
-			int32_t new_priority = _external ? DEFAULT_EXTERNAL_PRIORITY : DEFAULT_PRIORITY;
+			static constexpr int32_t CAL_PRIO_UNINITIALIZED = -1;
 
-			if (_priority != -1) {
-				PX4_ERR("%s %" PRIu32 " (%" PRId8 ") invalid priority %" PRId32 ", resetting to %" PRId32, SensorString(), _device_id,
-					_calibration_index, _priority, new_priority);
+			if (_priority != CAL_PRIO_UNINITIALIZED) {
+				PX4_ERR("%s %" PRIu32 " (%" PRId8 ") invalid priority %" PRId32 ", resetting", SensorString(), _device_id,
+					_calibration_index, _priority);
+
+				SetCalibrationParam(SensorString(), "PRIO", _calibration_index, CAL_PRIO_UNINITIALIZED);
 			}
 
-			SetCalibrationParam(SensorString(), "PRIO", _calibration_index, new_priority);
-			_priority = new_priority;
+			_priority = _external ? DEFAULT_EXTERNAL_PRIORITY : DEFAULT_PRIORITY;
+		}
+
+		// CAL_BAROx_TEMP
+		float cal_temp = GetCalibrationParamFloat(SensorString(), "TEMP", _calibration_index);
+
+		if (cal_temp > TEMPERATURE_INVALID) {
+			set_temperature(cal_temp);
+
+		} else {
+			set_temperature(NAN);
 		}
 
 		// CAL_BAROx_OFF
-		set_offset(GetCalibrationParamInt32(SensorString(), "OFF", _calibration_index));
+		set_offset(GetCalibrationParamFloat(SensorString(), "OFF", _calibration_index));
 
-	} else {
-		Reset();
+		return true;
 	}
+
+	return false;
 }
 
 void Barometer::Reset()
@@ -176,6 +195,7 @@ void Barometer::Reset()
 	_offset = 0;
 
 	_thermal_offset = 0;
+	_temperature = NAN;
 
 	_priority = _external ? DEFAULT_EXTERNAL_PRIORITY : DEFAULT_PRIORITY;
 
@@ -184,14 +204,37 @@ void Barometer::Reset()
 	_calibration_count = 0;
 }
 
-bool Barometer::ParametersSave()
+bool Barometer::ParametersSave(int desired_calibration_index, bool force)
 {
-	if (_calibration_index >= 0) {
+	if (force && desired_calibration_index >= 0 && desired_calibration_index < MAX_SENSOR_COUNT) {
+		_calibration_index = desired_calibration_index;
+
+	} else if (!force || (_calibration_index < 0)
+		   || (desired_calibration_index != -1 && desired_calibration_index != _calibration_index)) {
+
+		// ensure we have a valid calibration slot (matching existing or first available slot)
+		int8_t calibration_index_prev = _calibration_index;
+		_calibration_index = FindAvailableCalibrationIndex(SensorString(), _device_id, desired_calibration_index);
+
+		if (calibration_index_prev >= 0 && (calibration_index_prev != _calibration_index)) {
+			PX4_WARN("%s %" PRIu32 " calibration index changed %" PRIi8 " -> %" PRIi8, SensorString(), _device_id,
+				 calibration_index_prev, _calibration_index);
+		}
+	}
+
+	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// save calibration
 		bool success = true;
 		success &= SetCalibrationParam(SensorString(), "ID", _calibration_index, _device_id);
 		success &= SetCalibrationParam(SensorString(), "PRIO", _calibration_index, _priority);
 		success &= SetCalibrationParam(SensorString(), "OFF", _calibration_index, _offset);
+
+		if (PX4_ISFINITE(_temperature)) {
+			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, _temperature);
+
+		} else {
+			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, TEMPERATURE_INVALID);
+		}
 
 		return success;
 	}
@@ -201,10 +244,22 @@ bool Barometer::ParametersSave()
 
 void Barometer::PrintStatus()
 {
-	PX4_INFO("%s %" PRIu32 " EN: %d, offset: %.4f", SensorString(), device_id(), enabled(), (double)_offset);
+	if (external()) {
+		PX4_INFO_RAW("%s %" PRIu32
+			     " EN: %d, offset: %05.3f, %.1f degC, Ext\n",
+			     SensorString(), device_id(), enabled(),
+			     (double)_offset,
+			     (double)_temperature);
 
-	if (fabsf(_thermal_offset) > 0.f) {
-		PX4_INFO("%s %" PRIu32 " temperature offset: %.4f", SensorString(), _device_id, (double)_thermal_offset);
+	} else {
+		PX4_INFO_RAW("%s %" PRIu32 " EN: %d, offset: %05.3f, %.1f degC, Internal\n",
+			     SensorString(), device_id(), enabled(),
+			     (double)_offset,
+			     (double)_temperature);
+	}
+
+	if (_thermal_offset > 0.f) {
+		PX4_INFO_RAW("%s %" PRIu32 " temperature offset: %.4f\n", SensorString(), _device_id, (double)_thermal_offset);
 	}
 }
 

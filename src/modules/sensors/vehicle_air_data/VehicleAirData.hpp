@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020-2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2020-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -84,21 +84,18 @@ private:
 
 	void AirTemperatureUpdate();
 	void ParametersUpdate(bool force = false);
-	float PressureToAltitude(float pressure_pa, float temperature) const;
 	void Publish(uint8_t instance, bool multi = false);
 	void PublishStatus();
 	void SensorCalibrationUpdate();
+
+	float PressureToAltitude(float pressure_pa, float temperature) const;
+	float AltitudeToPressure(float altitude_m, float temperature) const;
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
 	uORB::Publication<sensors_status_s> _sensors_status_baro_pub{ORB_ID(sensors_status_baro)};
 
-	uORB::PublicationMulti<vehicle_air_data_s> _vehicle_air_data_pub[MAX_SENSOR_COUNT] {
-		{ORB_ID(vehicle_air_data)},
-		{ORB_ID(vehicle_air_data)},
-		{ORB_ID(vehicle_air_data)},
-		{ORB_ID(vehicle_air_data)},
-	};
+	uORB::Publication<vehicle_air_data_s> _vehicle_air_data_pub{ORB_ID(vehicle_air_data)};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
@@ -169,7 +166,6 @@ private:
 	float _gps_altitude{0.f};
 
 	DEFINE_PARAMETERS(
-		(ParamInt<px4::params::SENS_BARO_MODE>) _param_sens_baro_mode,
 		(ParamFloat<px4::params::SENS_BARO_QNH>) _param_sens_baro_qnh,
 		(ParamFloat<px4::params::SENS_BARO_RATE>) _param_sens_baro_rate
 	)
