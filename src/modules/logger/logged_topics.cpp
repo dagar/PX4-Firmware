@@ -60,7 +60,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("cellular_status", 200);
 	add_topic("commander_state");
 	add_topic("cpuload");
-	add_optional_topic("esc_status", 250);
+	add_topic("esc_status");
 	add_topic("failure_detector_status", 100);
 	add_topic("follow_target", 500);
 	add_optional_topic("generator_status");
@@ -117,7 +117,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("wind", 1000);
 
 	// multi topics
-	add_optional_topic_multi("actuator_outputs", 100, 3);
+	add_topic_multi("actuator_outputs", 3);
 	add_topic_multi("airspeed_wind", 1000, 4);
 	add_topic_multi("control_allocator_status", 200, 2);
 	add_optional_topic_multi("rate_ctrl_status", 200, 2);
@@ -173,7 +173,7 @@ void LoggedTopics::add_default_topics()
 	add_optional_topic_multi("sensor_baro", 1000, 4);
 	add_topic_multi("sensor_gps", 1000, 2);
 	add_optional_topic("pps_capture", 1000);
-	add_optional_topic_multi("sensor_gyro", 1000, 4);
+	add_optional_topic_multi("sensor_gyro", 1, 4);
 	add_optional_topic_multi("sensor_mag", 1000, 4);
 	add_topic_multi("vehicle_imu", 500, 4);
 	add_topic_multi("vehicle_imu_status", 1000, 4);
