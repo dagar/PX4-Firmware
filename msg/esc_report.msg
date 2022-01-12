@@ -18,3 +18,7 @@ uint8 FAILURE_OVER_RPM_MASK = 8			# (1 << 3)
 uint8 FAILURE_INCONSISTENT_CMD_MASK = 16 	# (1 << 4)  Set if ESC received an inconsistent command (i.e out of boundaries)
 uint8 FAILURE_MOTOR_STUCK_MASK = 32		# (1 << 5)
 uint8 FAILURE_GENERIC_MASK = 64			# (1 << 6)
+
+
+
+uint16 esc_command

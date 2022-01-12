@@ -128,6 +128,7 @@ private:
 		DShotTelemetry handler{};
 		uORB::PublicationMultiData<esc_status_s> esc_status_pub{ORB_ID(esc_status)};
 		int last_motor_index{-1};
+		int last_esc_cmd{-1};
 	};
 
 	void enable_dshot_outputs(const bool enabled);

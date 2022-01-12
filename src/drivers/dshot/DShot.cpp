@@ -289,6 +289,11 @@ void DShot::handle_new_telemetry_data(const int motor_index, const DShotTelemetr
 		esc_status.esc[motor_index].esc_current     = static_cast<float>(data.current) * 0.01f;
 		esc_status.esc[motor_index].esc_temperature = static_cast<float>(data.temperature);
 		// TODO: accumulate consumption and use for battery estimation
+
+		if (_telemetry->last_esc_cmd != -1) {
+			esc_status.esc[motor_index].esc_command = _telemetry->last_esc_cmd;
+			_telemetry->last_esc_cmd = -1; // reset
+		}
 	}
 
 	// publish when motor index wraps (which is robust against motor timeouts)
@@ -425,7 +430,13 @@ bool DShot::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 				up_dshot_motor_command(i, _current_command.command, true);
 
 			} else {
-				up_dshot_motor_command(i, DShot_cmd_motor_stop, telemetry_index == requested_telemetry_index);
+				uint16_t command = DShot_cmd_motor_stop;
+
+				if ((telemetry_index == requested_telemetry_index) && _telemetry) {
+					_telemetry->last_esc_cmd = command;
+				}
+
+				up_dshot_motor_command(i, command, telemetry_index == requested_telemetry_index);
 			}
 
 			telemetry_index += _mixing_output.isFunctionSet(i);
@@ -463,12 +474,18 @@ bool DShot::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 				}
 			}
 
+			uint16_t command = DShot_cmd_motor_stop;
+
 			if (output == DSHOT_DISARM_VALUE) {
-				up_dshot_motor_command(i, DShot_cmd_motor_stop, telemetry_index == requested_telemetry_index);
+				up_dshot_motor_command(i, command, telemetry_index == requested_telemetry_index);
 
 			} else {
-				up_dshot_motor_data_set(i, math::min(output, static_cast<uint16_t>(DSHOT_MAX_THROTTLE)),
-							telemetry_index == requested_telemetry_index);
+				command = math::min(output, static_cast<uint16_t>(DSHOT_MAX_THROTTLE));
+				up_dshot_motor_data_set(i, command, telemetry_index == requested_telemetry_index);
+			}
+
+			if ((telemetry_index == requested_telemetry_index) && _telemetry) {
+				_telemetry->last_esc_cmd = command;
 			}
 
 			telemetry_index += _mixing_output.isFunctionSet(i);
