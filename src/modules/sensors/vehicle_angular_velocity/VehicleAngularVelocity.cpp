@@ -594,8 +594,7 @@ void VehicleAngularVelocity::UpdateDynamicNotchFFT(const hrt_abstime &time_now_u
 
 		if (_sensor_gyro_fft_sub.copy(&sensor_gyro_fft)
 		    && (sensor_gyro_fft.device_id == _selected_sensor_device_id)
-		    && (time_now_us < sensor_gyro_fft.timestamp + DYNAMIC_NOTCH_FITLER_TIMEOUT)
-		    && ((fabsf(sensor_gyro_fft.sensor_sample_rate_hz - _filter_sample_rate_hz) / _filter_sample_rate_hz) < 0.02f)) {
+		    && (time_now_us < sensor_gyro_fft.timestamp + DYNAMIC_NOTCH_FITLER_TIMEOUT)) {
 
 			static constexpr float peak_freq_min = 10.f; // lower bound TODO: configurable?
 
