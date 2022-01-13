@@ -36,6 +36,7 @@
 #include <lib/mathlib/math/filter/MedianFilter.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
+#include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
@@ -112,6 +113,7 @@ private:
 	unsigned _gyro_last_generation{0};
 
 	math::MedianFilter<float, 5> _median_filter[3][MAX_NUM_PEAKS] {};
+	AlphaFilter<float> _output_filter[3][MAX_NUM_PEAKS] {};
 
 	sensor_gyro_fft_s _sensor_gyro_fft{};
 

@@ -129,6 +129,15 @@ void GyroFFT::VehicleIMUStatusUpdate(bool force)
 			// update gyro sample rate
 			if ((vehicle_imu_status.gyro_device_id == _selected_sensor_device_id) && (vehicle_imu_status.gyro_rate_hz > 0)) {
 				_gyro_sample_rate_hz = vehicle_imu_status.gyro_rate_hz;
+
+				for (int axis = 0; axis < 3; axis++) {
+					for (int i = 0; i < MAX_NUM_PEAKS; i++) {
+
+						_output_filter[axis][i].setCutoffFreq(_gyro_sample_rate_hz, 100.f);
+					}
+				}
+
+
 				return;
 			}
 		}
@@ -446,7 +455,7 @@ void GyroFFT::UpdateOutput(const hrt_abstime &timestamp_sample, int axis, float 
 
 		if (PX4_ISFINITE(smallest_diff) && (smallest_diff > 0)) {
 			// smallest diff found, copy newly found peak into same slot previously published
-			float peak_frequency = _median_filter[axis][closest_prev_peak].apply(peak_frequencies[closest_new_peak]);
+			float peak_frequency = _output_filter[axis][closest_prev_peak].update(peak_frequencies[closest_new_peak]);
 			//float peak_frequency = peak_frequencies[closest_new_peak];
 
 			if (peak_frequency > 0) {
@@ -473,7 +482,7 @@ void GyroFFT::UpdateOutput(const hrt_abstime &timestamp_sample, int axis, float 
 
 	// clear any stale entries
 	for (int peak_out = 0; peak_out < MAX_NUM_PEAKS; peak_out++) {
-		if (timestamp_sample - _last_update[axis][peak_out] > 500_ms) {
+		if (timestamp_sample - _last_update[axis][peak_out] > 100_ms) {
 			peak_frequencies_publish[axis][peak_out] = NAN;
 			peak_snr_publish[axis][peak_out] = NAN;
 
@@ -498,7 +507,7 @@ void GyroFFT::UpdateOutput(const hrt_abstime &timestamp_sample, int axis, float 
 
 				if (oldest_slot >= 0) {
 					// copy peak to output slot
-					float peak_frequency = _median_filter[axis][oldest_slot].apply(peak_frequencies[peak_new]);
+					float peak_frequency = _output_filter[axis][oldest_slot].update(peak_frequencies[peak_new]);
 					//float peak_frequency = peak_frequencies[peak_new];
 
 					if (peak_frequency > 0) {

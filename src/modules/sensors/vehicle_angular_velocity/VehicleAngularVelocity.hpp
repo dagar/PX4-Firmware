@@ -144,7 +144,7 @@ private:
 	static constexpr hrt_abstime DYNAMIC_NOTCH_FITLER_TIMEOUT = 1_s;
 
 	static constexpr int MAX_NUM_ESC_RPM = sizeof(esc_status_s::esc) / sizeof(esc_status_s::esc[0]);
-	static constexpr int MAX_NUM_ESC_RPM_HARMONICS = 3;
+	static constexpr int MAX_NUM_ESC_RPM_HARMONICS = 6;
 
 	static constexpr int MAX_NUM_FFT_PEAKS = sizeof(sensor_gyro_fft_s::peak_frequencies_x) / sizeof(
 				sensor_gyro_fft_s::peak_frequencies_x[0]);
