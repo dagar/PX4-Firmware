@@ -143,7 +143,7 @@ bool Ekf::initialiseFilter()
 	}
 
 	// Sum the magnetometer measurements
-	if (_mag_buffer.pop_first_older_than(_imu_sample_delayed.time_us, &_mag_sample_delayed)) {
+	if (_mag_buffer && _mag_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_mag_sample_delayed)) {
 		if (_mag_sample_delayed.time_us != 0) {
 			if (_mag_counter == 0) {
 				_mag_lpf.reset(_mag_sample_delayed.mag);
@@ -157,7 +157,7 @@ bool Ekf::initialiseFilter()
 	}
 
 	// accumulate enough height measurements to be confident in the quality of the data
-	if (_baro_buffer.pop_first_older_than(_imu_sample_delayed.time_us, &_baro_sample_delayed)) {
+	if (_baro_buffer && _baro_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_baro_sample_delayed)) {
 		if (_baro_sample_delayed.time_us != 0) {
 			if (_baro_counter == 0) {
 				_baro_hgt_offset = _baro_sample_delayed.hgt;
@@ -519,9 +519,9 @@ Quatf Ekf::calculate_quaternion() const
 {
 	// Correct delta angle data for bias errors using bias state estimates from the EKF and also apply
 	// corrections required to track the EKF quaternion states
-	const Vector3f delta_angle{_newest_high_rate_imu_sample.delta_ang - _state.delta_ang_bias * (_dt_imu_avg / _dt_ekf_avg) + _delta_angle_corr};
+	const Vector3f delta_angle{_newest_high_rate_imu_sample.delta_ang - _state.delta_ang_bias *(_dt_imu_avg / _dt_ekf_avg) + _delta_angle_corr};
 
 	// increment the quaternions using the corrected delta angle vector
 	// the quaternions must always be normalised after modification
-	return Quatf{_output_new.quat_nominal * AxisAnglef{delta_angle}}.unit();
+	return Quatf{_output_new.quat_nominal *AxisAnglef{delta_angle}}.unit();
 }

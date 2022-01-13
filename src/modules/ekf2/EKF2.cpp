@@ -243,6 +243,8 @@ int EKF2::print_status()
 	perf_print_counter(_msg_missed_odometry_perf);
 	perf_print_counter(_msg_missed_optical_flow_perf);
 
+	_ekf.print_status();
+
 	return 0;
 }
 
@@ -271,6 +273,38 @@ void EKF2::Run()
 
 		if (param_aspd_scale != PARAM_INVALID) {
 			param_get(param_aspd_scale, &_airspeed_scale_factor);
+		}
+
+		// if using baro ensure sensor interval minimum is sufficient to accommodate system averaged baro output
+		if (_param_ekf2_hgt_mode.get() == 0) {
+			int32_t sens_baro_rate = 0;
+
+			if (param_get(param_find("SENS_BARO_RATE"), &sens_baro_rate) == PX4_OK) {
+				if (sens_baro_rate > 0) {
+					float interval_ms = 1000.f / sens_baro_rate;
+
+					if (interval_ms > _params->sensor_interval_min_ms) {
+						PX4_INFO("updating sensor_interval_min_ms %.3f -> %.3f", (double)_params->sensor_interval_min_ms, (double)interval_ms);
+						_params->sensor_interval_min_ms = interval_ms;
+					}
+				}
+			}
+		}
+
+		// if using mag ensure sensor interval minimum is sufficient to accommodate system averaged mag output
+		if (_params->mag_fusion_type != MAG_FUSE_TYPE_NONE) {
+			int32_t sens_mag_rate = 0;
+
+			if (param_get(param_find("SENS_MAG_RATE"), &sens_mag_rate) == PX4_OK) {
+				if (sens_mag_rate > 0) {
+					float interval_ms = 1000.f / sens_mag_rate;
+
+					if (interval_ms > _params->sensor_interval_min_ms) {
+						PX4_INFO("updating sensor_interval_min_ms %.3f -> %.3f", (double)_params->sensor_interval_min_ms, (double)interval_ms);
+						_params->sensor_interval_min_ms = interval_ms;
+					}
+				}
+			}
 		}
 	}
 
