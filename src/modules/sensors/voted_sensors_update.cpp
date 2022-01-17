@@ -106,8 +106,9 @@ void VotedSensorsUpdate::parametersUpdate()
 					} else {
 						// change relative priority to incorporate any sensor faults
 						int priority_change = _accel.priority_configured[uorb_index] - accel_priority_old;
-						_accel.priority[uorb_index] = math::constrain(_accel.priority[uorb_index] + priority_change, static_cast<int32_t>(1),
-									      static_cast<int32_t>(100));
+
+						_accel.priority[uorb_index] = math::constrain(static_cast<int8_t>(_accel.priority[uorb_index] + priority_change),
+									      static_cast<int8_t>(1), static_cast<int8_t>(100));
 					}
 				}
 			}
@@ -129,8 +130,9 @@ void VotedSensorsUpdate::parametersUpdate()
 					} else {
 						// change relative priority to incorporate any sensor faults
 						int priority_change = _gyro.priority_configured[uorb_index] - gyro_priority_old;
-						_gyro.priority[uorb_index] = math::constrain(_gyro.priority[uorb_index] + priority_change, static_cast<int32_t>(1),
-									     static_cast<int32_t>(100));
+
+						_gyro.priority[uorb_index] = math::constrain(static_cast<int8_t>(_gyro.priority[uorb_index] + priority_change),
+									     static_cast<int8_t>(1), static_cast<int8_t>(100));
 					}
 				}
 			}
@@ -140,6 +142,8 @@ void VotedSensorsUpdate::parametersUpdate()
 
 void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 {
+	const hrt_abstime time_now_us = hrt_absolute_time();
+
 	for (int uorb_index = 0; uorb_index < MAX_SENSOR_COUNT; uorb_index++) {
 		vehicle_imu_s imu_report;
 
@@ -176,10 +180,10 @@ void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 
 			_last_accel_timestamp[uorb_index] = imu_report.timestamp_sample;
 
-			_accel.voter.put(uorb_index, imu_report.timestamp_sample, _last_sensor_data[uorb_index].accelerometer_m_s2,
+			_accel.voter.put(uorb_index, imu_report.timestamp, _last_sensor_data[uorb_index].accelerometer_m_s2,
 					 imu_status.accel_error_count, _accel.priority[uorb_index]);
 
-			_gyro.voter.put(uorb_index, imu_report.timestamp_sample, _last_sensor_data[uorb_index].gyro_rad,
+			_gyro.voter.put(uorb_index, imu_report.timestamp, _last_sensor_data[uorb_index].gyro_rad,
 					imu_status.gyro_error_count, _gyro.priority[uorb_index]);
 		}
 	}
@@ -187,8 +191,8 @@ void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 	// find the best sensor
 	int accel_best_index = -1;
 	int gyro_best_index = -1;
-	_accel.voter.get_best(hrt_absolute_time(), &accel_best_index);
-	_gyro.voter.get_best(hrt_absolute_time(), &gyro_best_index);
+	_accel.voter.get_best(time_now_us, &accel_best_index);
+	_gyro.voter.get_best(time_now_us, &gyro_best_index);
 
 	if (!_param_sens_imu_mode.get() && ((_selection.timestamp != 0) || (_sensor_selection_sub.updated()))) {
 		// use sensor_selection to find best
@@ -196,9 +200,6 @@ void VotedSensorsUpdate::imuPoll(struct sensor_combined_s &raw)
 			// reset inconsistency checks against primary
 			for (int sensor_index = 0; sensor_index < MAX_SENSOR_COUNT; sensor_index++) {
 				_accel_diff[sensor_index].zero();
-			}
-
-			for (int sensor_index = 0; sensor_index < MAX_SENSOR_COUNT; sensor_index++) {
 				_gyro_diff[sensor_index].zero();
 			}
 		}
@@ -326,9 +327,6 @@ bool VotedSensorsUpdate::checkFailover(SensorData &sensor, const char *sensor_na
 
 					_last_error_message = now;
 				}
-
-				// reduce priority of failed sensor to the minimum
-				sensor.priority[failover_index] = 1;
 			}
 		}
 
@@ -378,11 +376,11 @@ void VotedSensorsUpdate::initSensorClass(SensorData &sensor_data, uint8_t sensor
 
 void VotedSensorsUpdate::printStatus()
 {
-	PX4_INFO("selected gyro: %" PRIu32 " (%" PRIu8 ")", _selection.gyro_device_id, _gyro.last_best_vote);
+	PX4_INFO_RAW("selected gyro: %" PRIu32 " (%" PRIu8 ")\n", _selection.gyro_device_id, _gyro.last_best_vote);
 	_gyro.voter.print();
 
 	PX4_INFO_RAW("\n");
-	PX4_INFO("selected accel: %" PRIu32 " (%" PRIu8 ")", _selection.accel_device_id, _accel.last_best_vote);
+	PX4_INFO_RAW("selected accel: %" PRIu32 " (%" PRIu8 ")\n", _selection.accel_device_id, _accel.last_best_vote);
 	_accel.voter.print();
 }
 

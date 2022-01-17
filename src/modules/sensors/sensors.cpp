@@ -404,7 +404,8 @@ void Sensors::diff_pres_poll()
 		/* push data into validator */
 		float airspeed_input[3] = { diff_pres.differential_pressure_raw_pa, diff_pres.temperature, 0.0f };
 
-		_airspeed_validator.put(airspeed.timestamp, airspeed_input, diff_pres.error_count, 100); // TODO: real priority?
+		int8_t priority = 100; // TODO: real priority?
+		_airspeed_validator.put(airspeed.timestamp, airspeed_input, diff_pres.error_count, priority);
 
 		airspeed.confidence = _airspeed_validator.confidence(hrt_absolute_time());
 
@@ -769,7 +770,7 @@ int Sensors::print_status()
 	}
 
 	PX4_INFO_RAW("\n");
-	PX4_INFO("Airspeed status:");
+	PX4_INFO_RAW("Airspeed status:\n");
 	_airspeed_validator.print();
 
 	PX4_INFO_RAW("\n");

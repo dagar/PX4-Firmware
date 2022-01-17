@@ -109,7 +109,7 @@ private:
 
 	float _thermal_offset[MAX_SENSOR_COUNT] {0.f, 0.f, 0.f};
 
-	uint8_t _priority[MAX_SENSOR_COUNT] {};
+	int8_t _priority[MAX_SENSOR_COUNT] {};
 
 	int8_t _selected_sensor_sub_index{-1};
 

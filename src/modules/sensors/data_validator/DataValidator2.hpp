@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2015-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file DataValidator.hpp
+ * @file DataValidator2.hpp
  *
  * A data validation class to identify anomalies in data streams
  *
@@ -44,47 +44,123 @@
 #include <math.h>
 #include <stdint.h>
 
-class DataValidator
+class DataValidator2
 {
 public:
 	static const unsigned dimensions = 3;
 
-	DataValidator() = default;
-	~DataValidator() = default;
-
-	/**
-	 * Put an item into the validator.
-	 *
-	 * @param val		Item to put
-	 */
-	void put(uint64_t timestamp, float val, uint32_t error_count, int8_t &priority);
+	DataValidator2() = default;
+	~DataValidator2() = default;
 
 	/**
 	 * Put a 3D item into the validator.
 	 *
 	 * @param val		Item to put
 	 */
-	void put(uint64_t timestamp, const float val[dimensions], uint32_t error_count, int8_t &priority);
+	void put(uint64_t timestamp, const float val[dimensions], uint32_t error_count, int8_t &priority)
+	{
+		_event_count++;
 
-	/**
-	 * Get the next sibling in the group
-	 *
-	 * @return		the next sibling
-	 */
-	DataValidator *sibling() { return _sibling; }
+		if (error_count > _error_count) {
+			_error_density += (error_count - _error_count);
 
-	/**
-	 * Set the sibling to the next node in the group
-	 *
-	 */
-	void setSibling(DataValidator *new_sibling) { _sibling = new_sibling; }
+		} else if (_error_density > 0) {
+			_error_density--;
+		}
+
+		_error_count = error_count;
+
+		for (unsigned i = 0; i < dimensions; i++) {
+			if (_time_last == 0) {
+				_mean[i] = 0;
+				_lp[i] = val[i];
+				_M2[i] = 0;
+
+			} else {
+				float lp_val = val[i] - _lp[i];
+
+				float delta_val = lp_val - _mean[i];
+				_mean[i] += delta_val / _event_count;
+				_M2[i] += delta_val * (lp_val - _mean[i]);
+				_rms[i] = sqrtf(_M2[i] / (_event_count - 1));
+
+				if (fabsf(_value[i] - val[i]) < 0.000001f) {
+					_value_equal_count++;
+
+				} else {
+					_value_equal_count = 0;
+				}
+			}
+
+			// XXX replace with better filter, make it auto-tune to update rate
+			_lp[i] = _lp[i] * 0.99f + 0.01f * val[i];
+
+			_value[i] = val[i];
+		}
+
+		// confidence
+		_confidence = confidence(timestamp);
+
+		if (_confidence <= 0.0f) {
+			if (_priority > 1) {
+				_priority = 1;
+			}
+		}
+
+		if (_priority == UNINITIALIZED_PRIORITY) {
+			_priority = priority;
+		}
+
+		_time_last = timestamp;
+	}
 
 	/**
 	 * Get the confidence of this validator
 	 * @return		the confidence between 0 and 1
 	 */
 	float confidence() const { return _confidence; }
-	float confidence(uint64_t timestamp);
+	float confidence(uint64_t timestamp)
+	{
+		float confidence = 1.0f;
+
+		/* check if we have any data */
+		if (_time_last == 0) {
+			_error_mask |= ERROR_FLAG_NO_DATA;
+			confidence = 0.0f;
+
+		} else if (timestamp - _time_last > _timeout_interval) {
+			/* timed out - that's it */
+			_error_mask |= ERROR_FLAG_TIMEOUT;
+			confidence = 0.0f;
+
+		} else if (_value_equal_count > _value_equal_count_threshold) {
+			/* we got the exact same sensor value N times in a row */
+			_error_mask |= ERROR_FLAG_STALE_DATA;
+			confidence = 0.0f;
+
+		} else if (_error_count > NORETURN_ERRCOUNT) {
+			/* check error count limit */
+			_error_mask |= ERROR_FLAG_HIGH_ERRCOUNT;
+			confidence = 0.0f;
+
+		} else if (_error_density > ERROR_DENSITY_WINDOW) {
+			/* cap error density counter at window size */
+			_error_mask |= ERROR_FLAG_HIGH_ERRDENSITY;
+			_error_density = ERROR_DENSITY_WINDOW;
+		}
+
+		/* no critical errors */
+		if (confidence > 0.0f) {
+			/* return local error density for last N measurements */
+			confidence = 1.0f - (_error_density / ERROR_DENSITY_WINDOW);
+
+			if (confidence > 0.0f) {
+				_error_mask = ERROR_FLAG_NO_ERROR;
+			}
+		}
+
+		return confidence;
+	}
 
 	/**
 	 * Get the error count of this validator
@@ -131,7 +207,18 @@ public:
 	 * Print the validator value
 	 *
 	 */
-	void print();
+	void print()
+	{
+		if (_time_last == 0) {
+			PX4_INFO_RAW("\tno data\n");
+			return;
+		}
+
+		for (unsigned i = 0; i < dimensions; i++) {
+			PX4_INFO_RAW("\tval: %8.4f, lp: %8.4f mean dev: %8.4f RMS: %8.4f conf: %8.4f\n", (double)_value[i],
+				     (double)_lp[i], (double)_mean[i], (double)_rms[i], (double)_confidence);
+		}
+	}
 
 	/**
 	 * Set the timeout value
@@ -190,18 +277,10 @@ private:
 	float _value[dimensions] {}; /**< last value */
 
 	unsigned _value_equal_count{0}; /**< equal values in a row */
-	unsigned _value_equal_count_threshold{
-		VALUE_EQUAL_COUNT_DEFAULT}; /**< when to consider an equal count as a problem */
+	unsigned _value_equal_count_threshold{VALUE_EQUAL_COUNT_DEFAULT}; /**< when to consider an equal count as a problem */
 
-	DataValidator *_sibling{nullptr}; /**< sibling in the group */
-
-	static const constexpr unsigned NORETURN_ERRCOUNT =
-		10000; /**< if the error count reaches this value, return sensor as invalid */
+	static const constexpr unsigned NORETURN_ERRCOUNT = 10000; /**< if the error count reaches this value, return sensor as invalid */
 	static const constexpr float ERROR_DENSITY_WINDOW = 100.0f; /**< window in measurement counts for errors */
-	static const constexpr unsigned VALUE_EQUAL_COUNT_DEFAULT =
-		100; /**< if the sensor value is the same (accumulated also between axes) this many times, flag it */
+	static const constexpr unsigned VALUE_EQUAL_COUNT_DEFAULT = 100; /**< if the sensor value is the same (accumulated also between axes) this many times, flag it */
 
-	/* we don't want this class to be copied */
-	DataValidator(const DataValidator &) = delete;
-	DataValidator operator=(const DataValidator &) = delete;
 };

@@ -162,7 +162,7 @@ private:
 
 	float _mag_angle_diff[2] {};			/**< filtered mag angle differences between sensor instances (Ga) */
 
-	uint8_t _priority[MAX_SENSOR_COUNT] {};
+	int8_t _priority[MAX_SENSOR_COUNT] {};
 
 	int8_t _selected_sensor_sub_index{-1};
 

@@ -47,7 +47,6 @@
 
 DataValidatorGroup::DataValidatorGroup(unsigned siblings)
 {
-
 	DataValidator *next = nullptr;
 	DataValidator *prev = nullptr;
 
@@ -82,7 +81,6 @@ DataValidatorGroup::~DataValidatorGroup()
 
 DataValidator *DataValidatorGroup::add_new_validator()
 {
-
 	DataValidator *validator = new DataValidator();
 
 	if (!validator) {
@@ -97,7 +95,6 @@ DataValidator *DataValidatorGroup::add_new_validator()
 
 void DataValidatorGroup::set_timeout(uint32_t timeout_interval_us)
 {
-
 	DataValidator *next = _first;
 
 	while (next != nullptr) {
@@ -110,7 +107,6 @@ void DataValidatorGroup::set_timeout(uint32_t timeout_interval_us)
 
 void DataValidatorGroup::set_equal_value_threshold(uint32_t threshold)
 {
-
 	DataValidator *next = _first;
 
 	while (next != nullptr) {
@@ -120,9 +116,8 @@ void DataValidatorGroup::set_equal_value_threshold(uint32_t threshold)
 }
 
 void DataValidatorGroup::put(unsigned index, uint64_t timestamp, const float val[3], uint32_t error_count,
-			     uint8_t priority)
+			     int8_t &priority)
 {
-
 	DataValidator *next = _first;
 	unsigned i = 0;
 
@@ -139,7 +134,6 @@ void DataValidatorGroup::put(unsigned index, uint64_t timestamp, const float val
 
 float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 {
-
 	DataValidator *next = _first;
 
 	// XXX This should eventually also include voting
@@ -147,33 +141,38 @@ float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 	float pre_check_confidence = 1.0f;
 	int pre_check_prio = -1;
 	float max_confidence = -1.0f;
-	int max_priority = -1000;
+	int8_t max_priority = DataValidator::UNINITIALIZED_PRIORITY;
 	int max_index = -1;
 	DataValidator *best = nullptr;
 
 	int i = 0;
 
 	while (next != nullptr) {
-		float confidence = next->confidence(timestamp);
 
 		if (i == pre_check_best) {
 			pre_check_prio = next->priority();
-			pre_check_confidence = confidence;
+			pre_check_confidence = next->confidence();
+
+			if (best == nullptr) {
+				best = next;
+			}
 		}
 
 		/*
 		 * Switch if:
-		 * 1) the confidence is higher and priority is equal or higher
-		 * 2) the confidence is less than 1% different and the priority is higher
+		 * 1) no current errors
+		 * 2) the confidence is higher and priority is equal or higher
+		 * 3) the confidence is less than 1% different and the priority is higher
 		 */
-		if ((((max_confidence < MIN_REGULAR_CONFIDENCE) && (confidence >= MIN_REGULAR_CONFIDENCE)) ||
-		     (confidence > max_confidence && (next->priority() >= max_priority)) ||
-		     (fabsf(confidence - max_confidence) < 0.01f && (next->priority() > max_priority))) &&
-		    (confidence > 0.0f)) {
-			max_index = i;
-			max_confidence = confidence;
-			max_priority = next->priority();
-			best = next;
+		if ((next->state() == DataValidator::ERROR_FLAG_NO_ERROR) && !next->timeout(timestamp)) {
+			if (((next->confidence() > max_confidence) && (next->priority() >= max_priority)) ||
+			    (fabsf(next->confidence() - max_confidence) < 0.01f && (next->priority() > max_priority))) {
+
+				max_index = i;
+				max_confidence = next->confidence();
+				max_priority = next->priority();
+				best = next;
+			}
 		}
 
 		next = next->sibling();
@@ -225,8 +224,8 @@ float *DataValidatorGroup::get_best(uint64_t timestamp, int *index)
 
 void DataValidatorGroup::print()
 {
-	PX4_INFO("validator: best: %d, prev best: %d, failsafe: %s (%u events)", _curr_best, _prev_best,
-		 (_toggle_count > 0) ? "YES" : "NO", _toggle_count);
+	PX4_INFO_RAW("validator: best: %d, prev best: %d, failsafe: %s (%u events)\n", _curr_best, _prev_best,
+		     (_toggle_count > 0) ? "YES" : "NO", _toggle_count);
 
 	DataValidator *next = _first;
 	unsigned i = 0;
@@ -235,13 +234,13 @@ void DataValidatorGroup::print()
 		if (next->used()) {
 			uint32_t flags = next->state();
 
-			PX4_INFO("sensor #%u, prio: %d, state:%s%s%s%s%s%s", i, next->priority(),
-				 ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TOUT" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ECNT" : ""),
-				 ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " EDNST" : ""),
-				 ((flags == DataValidator::ERROR_FLAG_NO_ERROR) ? " OK" : ""));
+			PX4_INFO_RAW("sensor #%u, prio: %d, state:%s%s%s%s%s%s\n", i, next->priority(),
+				     ((flags & DataValidator::ERROR_FLAG_NO_DATA) ? " OFF" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_STALE_DATA) ? " STALE" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_TIMEOUT) ? " TOUT" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_HIGH_ERRCOUNT) ? " ECNT" : ""),
+				     ((flags & DataValidator::ERROR_FLAG_HIGH_ERRDENSITY) ? " EDNST" : ""),
+				     ((flags == DataValidator::ERROR_FLAG_NO_ERROR) ? " OK" : ""));
 
 			next->print();
 		}
@@ -271,7 +270,6 @@ int DataValidatorGroup::failover_index()
 
 uint32_t DataValidatorGroup::failover_state()
 {
-
 	DataValidator *next = _first;
 	unsigned i = 0;
 
@@ -306,7 +304,7 @@ uint32_t DataValidatorGroup::get_sensor_state(unsigned index)
 	return UINT32_MAX;
 }
 
-uint8_t DataValidatorGroup::get_sensor_priority(unsigned index)
+int8_t DataValidatorGroup::get_sensor_priority(unsigned index)
 {
 	DataValidator *next = _first;
 	unsigned i = 0;
