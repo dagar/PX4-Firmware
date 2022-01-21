@@ -98,6 +98,9 @@ int BMM150::probe()
 		} else if ((POWER_CONTROL == 0) && (CHIP_ID == 0)) {
 			return PX4_OK;
 		}
+
+		// enable retries if necessary
+		_retries = 4;
 	}
 
 	return PX4_ERROR;

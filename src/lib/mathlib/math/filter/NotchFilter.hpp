@@ -246,7 +246,7 @@ bool NotchFilter<T>::setParameters(float sample_freq, float notch_freq, float ba
 			_b1 = 2.f * beta * _b0;
 			_a1 = _b1;
 
-			if (notch_freq_diff > _bandwidth) {
+			if (notch_freq_diff > math::max(0.01f * _sample_freq, _bandwidth)) {
 				// force reset
 				_initialized = false;
 			}
