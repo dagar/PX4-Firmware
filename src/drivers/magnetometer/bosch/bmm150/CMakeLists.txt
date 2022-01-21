@@ -35,6 +35,7 @@ px4_add_module(
 	MODULE drivers__magnetometer__bosch__bmm150
 	MAIN bmm150
 	COMPILE_FLAGS
+		-DDEBUG_BUILD
 	SRCS
 		BMM150.cpp
 		BMM150.hpp
