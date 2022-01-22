@@ -55,7 +55,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 if (EXISTS "${PX4_SOURCE_DIR}/msg/tools/urtps_bridge_topics.yaml")
 	set(config_rtps_send_topics)
 	execute_process(
-		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/msg/tools/uorb_rtps_classifier.py -sa
+		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/msg/tools/uorb_rtps_classifier.py -s
 		OUTPUT_VARIABLE config_rtps_send_topics
 	)
 	set(config_rtps_send_alias_topics "")
@@ -71,7 +71,7 @@ if (EXISTS "${PX4_SOURCE_DIR}/msg/tools/urtps_bridge_topics.yaml")
 
 	set(config_rtps_receive_topics)
 	execute_process(
-		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/msg/tools/uorb_rtps_classifier.py -ra
+		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/msg/tools/uorb_rtps_classifier.py -r
 		OUTPUT_VARIABLE config_rtps_receive_topics
 	)
 	set(config_rtps_receive_alias_topics "")
@@ -86,7 +86,7 @@ if (EXISTS "${PX4_SOURCE_DIR}/msg/tools/urtps_bridge_topics.yaml")
 	STRING(REPLACE "\n" "" config_rtps_receive_topics "${config_rtps_receive_topics}")
 endif()
 
-if (FASTRTPSGEN AND (config_rtps_send_topics OR config_rtps_receive_topics))
+if(FASTRTPSGEN AND (config_rtps_send_topics OR config_rtps_receive_topics))
 	option(GENERATE_RTPS_BRIDGE "enable RTPS and microCDR" ON)
 endif()
 

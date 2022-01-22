@@ -90,7 +90,7 @@ parser.add_argument("-m", "--mkdir-build", dest='mkdir_build',
                     action="store_true", help="Flag to create 'build' dir")
 parser.add_argument("-l", "--generate-cmakelists", dest='cmakelists',
                     action="store_true", help="Flag to generate a CMakeLists.txt file for the micro-RTPS agent")
-parser.add_argument("-t", "--topic-msg-dir", dest='msgdir', type=str,
+parser.add_argument("-t", "--msg-dir", dest='msgdir', type=str,
                     help="Topics message, by default using relative path 'msg/'", default="msg")
 parser.add_argument("-b", "--uorb-templates-dir", dest='uorb_templates', type=str,
                     help="uORB templates, by default using relative path to msgdir 'templates/uorb_microcdr'", default=default_uorb_templates_dir)

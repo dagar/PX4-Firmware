@@ -3,9 +3,6 @@
 # This file maps all the topics that are to be used on the microRTPS bridge.
 # When one wants to add a new topic to the bridge, it should add it to this file
 # and mark it to be sent or received from the link.
-# For alias/multi-topic messages (i.e. the ones found on the '#TOPICS' of the
-# uORB messages), these can be also added, requiring an extra entry ('base') to
-# define the base message.
 #
 # IMPORTANT NOTICE: The IDs of the messages sent on the bridge get generated
 # according to the order of the messages in this file. To keep consistency and
@@ -27,65 +24,85 @@
 #####
 rtps:
   # topic ID 1
-  - msg:     debug_array
+  - topic: debug_array
+    msg: DebugArray
     receive: true
   # topic ID 2
-  - msg:     debug_key_value
+  - topic: debug_key_value
+    msg: DebugKeyValue
     receive: true
   # topic ID 3
-  - msg:     debug_value
+  - topic: debug_value
+    msg: DebugValue
     receive: true
   # ...
-  - msg:     debug_vect
+  - topic: debug_vect
+    msg: DebugVect
     receive: true
-  - msg:     offboard_control_mode
+  - topic: offboard_control_mode
+    msg: OffboardControlMode
     receive: true
-  - msg:     optical_flow
+  - topic: optical_flow
+    msg: OpticalFlow
     receive: true
-  - msg:     position_setpoint
+  - topic: position_setpoint_triplet
+    msg: PositionSetpointTriplet
     receive: true
-  - msg:     position_setpoint_triplet
+  - topic: telemetry_status
+    msg: TelemetryStatus
     receive: true
-  - msg:     telemetry_status
-    receive: true
-  - msg:     timesync
+  - topic: timesync
+    msg: Timesync
     receive: true
     send:    true
-  - msg:     trajectory_waypoint
+  - topic: trajectory_waypoint
+    msg: TrajectoryWaypoint
     send:    true
-  - msg:     vehicle_command
+  - topic: vehicle_command
+    msg: VehicleCommand
     receive: true
-  - msg:     vehicle_control_mode
+  - topic: vehicle_control_mode
+    msg: VehicleControlMode
     send:    true
-  - msg:     vehicle_local_position_setpoint
+  - topic:   vehicle_local_position_setpoint
+    msg: VehicleLocalPositionSetpoint
     receive: true
-  - msg:     trajectory_setpoint # multi-topic / alias of vehicle_local_position_setpoint
-    base:    vehicle_local_position_setpoint
+  - topic:   trajectory_setpoint
+    base:    VehicleLocalPositionSetpoint
     receive: true
-  - msg:     vehicle_odometry
+  - topic:   vehicle_odometry
+    msg: VehicleOdometry
     send:    true
-  - msg:     vehicle_mocap_odometry # multi-topic / alias of vehicle_odometry
-    base:    vehicle_odometry
+  - topic:   vehicle_mocap_odometry
+    msg:    VehicleOdometry
     receive: true
-  - msg:     vehicle_visual_odometry # multi-topic / alias of vehicle_odometry
-    base:    vehicle_odometry
+  - topic:   vehicle_visual_odometry
+    msg:    VehicleOdometry
     receive: true
-  - msg:     vehicle_status
+  - topic:   vehicle_status
+    msg: VehicleStatus
     send:    true
-  - msg:     vehicle_trajectory_waypoint
+  - topic:   vehicle_trajectory_waypoint
+    msg: VehicleTrajectoryWaypoint
     receive: true
-  - msg:     vehicle_trajectory_waypoint_desired # multi-topic / alias of vehicle_trajectory_waypoint
-    base:    vehicle_trajectory_waypoint
+  - topic:   vehicle_trajectory_waypoint_desired
+    msg:    VehicleTrajectoryWaypoint
     send:    true
-  - msg:     collision_constraints
+  - topic:   collision_constraints
+    msg: CollisionConstraints
     send:    true
-  - msg:     onboard_computer_status
+  - topic:   onboard_computer_status
+    msg: OnboardComputerStatus
     receive: true
-  - msg:     trajectory_bezier
+  - topic:   trajectory_bezier
+    msg: TrajectoryBezier
     receive: true
-  - msg:     vehicle_trajectory_bezier
+  - topic:   vehicle_trajectory_bezier
+    msg: VehicleTrajectoryBezier
     receive: true
-  - msg:     timesync_status
+  - topic:   timesync_status
+    msg: TimesyncStatus
     send:    true
-  - msg:     sensor_combined
+  - topic:   sensor_combined
+    msg: SensorCombined
     send:    true
