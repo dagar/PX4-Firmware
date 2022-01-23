@@ -254,6 +254,9 @@ else()
 	SET(BUILD_SHARED_LIBS OFF)
 endif()
 
+
+add_subdirectory(msg)
+
 if(EXISTS "${PX4_SOURCE_DIR}/platforms/${PX4_PLATFORM}/cmake/init.cmake")
 	include(init)
 endif()
@@ -334,6 +337,13 @@ if(EXISTS ${PX4_BOARD_DIR}/cmake/init.cmake)
 	include(${PX4_BOARD_DIR}/cmake/init.cmake)
 endif()
 
+
+###############################################################################
+# msgs
+###############################################################################
+include(px4_generate_interfaces_uorb)
+
+
 #=============================================================================
 # build flags
 #
@@ -345,8 +355,6 @@ px4_os_add_flags()
 # message, and airframe generation
 #
 include(px4_metadata)
-
-add_subdirectory(msg EXCLUDE_FROM_ALL)
 
 px4_generate_airframes_xml(BOARD ${PX4_BOARD})
 
@@ -555,7 +563,7 @@ else()
 	# .hpp enum ORB_ID
 	# .cpp struct orb_metadat ORB_ID() array
 
-	foreach(f ${msg_files})
+	foreach(f ${px4_msg_files})
 		#message(STATUS "MSG: ${f}")
 	endforeach()
 endif()

@@ -251,19 +251,14 @@ if __name__ == "__main__":
                         help='directory with template files',)
     parser.add_argument('-k', dest='package', default=PACKAGE,
                         help='package name')
-    parser.add_argument('-o', dest='outputdir',
-                        help='output directory for header files')
+    parser.add_argument('-o', dest='outputdir', help='output directory for header files')
     parser.add_argument('-p', dest='prefix', default='',
-                        help='string added as prefix to the output file '
-                        ' name when converting directories')
-    parser.add_argument('--constrained-flash', dest='constrained_flash', default=False, action='store_true',
-                        help='set to save flash space')
+                        help='string added as prefix to the output file name when converting directories')
     args = parser.parse_args()
 
     if args.include_paths:
         append_to_include_path(args.include_paths, INCL_DEFAULT, args.package)
 
-    CONSTRAINED_FLASH = args.constrained_flash
 
     if args.file is not None:
         for f in args.file:

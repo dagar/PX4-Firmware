@@ -34,8 +34,6 @@
 # Support IN_LIST if() operator
 cmake_policy(SET CMP0057 NEW)
 
-include(px4_list_make_absolute)
-
 set(msg_files
 	ActionRequest.msg
 	ActuatorArmed.msg
@@ -207,60 +205,14 @@ set(msg_files
 	Wind.msg
 	YawEstimatorStatus.msg
 )
+
 list(SORT msg_files)
 
-px4_list_make_absolute(msg_files ${CMAKE_CURRENT_SOURCE_DIR} ${msg_files})
 
-if(NOT EXTERNAL_MODULES_LOCATION STREQUAL "")
-	# Check that the msg directory and the CMakeLists.txt file exists
-	if(EXISTS ${EXTERNAL_MODULES_LOCATION}/msg/CMakeLists.txt)
-		add_subdirectory(${EXTERNAL_MODULES_LOCATION}/msg external_msg)
+set(px4_msg_files)
+foreach(f ${msg_files})
+	list(APPEND px4_msg_files "msg/${f}")
+endforeach(f)
 
-		# Add each of the external message files to the global msg_files list
-		foreach(external_msg_file ${config_msg_list_external})
-			list(APPEND msg_files ${EXTERNAL_MODULES_LOCATION}/msg/${external_msg_file})
-		endforeach()
-	endif()
-endif()
-
-# set parent scope msg_files for other modules to consume (eg topic_listener)
-set(msg_files ${msg_files} PARENT_SCOPE)
-
-# headers
-set(msg_out_path ${PX4_BINARY_DIR}/uORB/topics)
-set(msg_source_out_path	${CMAKE_CURRENT_BINARY_DIR}/topics_sources)
-
-set(uorb_headers)
-foreach(msg_file ${msg_files})
-	get_filename_component(msg ${msg_file} NAME_WE)
-
-	# Pascal case to snake case (MsgFile -> msg_file)
-	string(REGEX REPLACE "(.)([A-Z][a-z]+)" "\\1_\\2" msg "${msg}")
-	string(REGEX REPLACE "([a-z0-9])([A-Z])" "\\1_\\2" msg "${msg}")
-	string(TOLOWER "${msg}" msg)
-
-	list(APPEND uorb_headers ${msg_out_path}/${msg}.h)
-endforeach()
-
-if(px4_constrained_flash_build)
-	set(added_arguments --constrained-flash)
-endif()
-
-# Generate uORB headers
-add_custom_command(OUTPUT ${uorb_headers}
-	COMMAND ${PYTHON_EXECUTABLE} tools/px_generate_uorb_topic_files.py
-		-f ${msg_files}
-		-i ${CMAKE_CURRENT_SOURCE_DIR}
-		-o ${msg_out_path}
-		-e templates/uorb
-		${added_arguments}
-	DEPENDS
-		${msg_files}
-		templates/uorb/msg.h.em
-		tools/px_generate_uorb_topic_files.py
-		tools/px_generate_uorb_topic_helper.py
-	COMMENT "Generating uORB topic headers"
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	VERBATIM
-	)
-add_custom_target(uorb_headers DEPENDS ${uorb_headers})
+# set parent scope px4_msg_files for other modules to consume (eg topic_listener)
+set(px4_msg_files ${px4_msg_files} PARENT_SCOPE)
