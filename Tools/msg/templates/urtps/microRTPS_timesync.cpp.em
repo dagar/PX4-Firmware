@@ -11,7 +11,7 @@
 @###############################################
 @{
 import genmsg.msgs
-from px_generate_uorb_topic_files import MsgScope # this is in Tools/
+from px_generate_rtps_topic_files import MsgScope # this is in Tools/
 
 package = package[0]
 fastrtps_version = fastrtps_version[0]

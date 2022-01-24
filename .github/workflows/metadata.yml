@@ -141,7 +141,7 @@ jobs:
     - name: PX4 ROS msgs
       run: |
         git clone https://github.com/PX4/px4_msgs.git
-        python3 msg/tools/uorb_to_ros_msgs.py msg/ px4_msgs/msg/
+        cp msg/*.msg px4_msgs/msg/
 
   ROS2_bridge:
     runs-on: ubuntu-latest

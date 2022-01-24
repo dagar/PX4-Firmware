@@ -24,7 +24,7 @@ add_custom_command(OUTPUT ${uorb_headers}
 		-f ${msg_files}
 		-i ${PX4_SOURCE_DIR}/msg
 		-o ${msg_out_path}
-		-e ${PX4_SOURCE_DIR}/Tools/msg/templates/uorb
+		-e ${PX4_SOURCE_DIR}/Tools/msg/templates/uorb/msg.h.em
 	DEPENDS
 		${msg_files}
 		${PX4_SOURCE_DIR}/Tools/msg/templates/uorb/msg.h.em

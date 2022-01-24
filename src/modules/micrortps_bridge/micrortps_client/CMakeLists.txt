@@ -37,23 +37,8 @@ get_filename_component(micrortps_bridge_path ${msg_out_path} PATH)
 option(BUILD_MICRORTPS_AGENT "enable building the micrortps_agent after its generation" OFF)
 
 if (NOT "${config_rtps_send_topics}" STREQUAL "" OR NOT "${config_rtps_receive_topics}" STREQUAL "")
-	set(send_topic_files)
-	foreach(topic ${config_rtps_send_topics})
-		list(APPEND send_topic_files ${PX4_SOURCE_DIR}/msg/${topic}.msg)
-	endforeach()
 
-	set(receive_topic_files)
-	foreach(topic ${config_rtps_receive_topics})
-		list(APPEND receive_topic_files ${PX4_SOURCE_DIR}/msg/${topic}.msg)
-	endforeach()
-
-	if (NOT "${config_rtps_send_alias_topics}" STREQUAL "")
-		set(config_rtps_send_topics "${config_rtps_send_topics};${config_rtps_send_alias_topics}")
-	endif()
-
-	if (NOT "${config_rtps_receive_alias_topics}" STREQUAL "")
-		set(config_rtps_receive_topics "${config_rtps_receive_topics};${config_rtps_receive_alias_topics}")
-	endif()
+	set(topic_bridge_files_out)
 
 	foreach(topic ${config_rtps_send_topics})
 		list(APPEND topic_bridge_files_out ${micrortps_bridge_path}/micrortps_agent/src/${topic}_Publisher.cpp)
@@ -72,7 +57,7 @@ if (NOT "${config_rtps_send_topics}" STREQUAL "" OR NOT "${config_rtps_receive_t
 		)
 
 	add_custom_command(OUTPUT ${topic_bridge_files_out}
-		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/msg/tools/generate_microRTPS_bridge.py
+		COMMAND ${PYTHON_EXECUTABLE} ${PX4_SOURCE_DIR}/Tools/msg/tools/generate_microRTPS_bridge.py
 			--fastrtpsgen-dir $ENV{FASTRTPSGEN_DIR}
 			--generate-idl
 			--mkdir-build
@@ -83,9 +68,10 @@ if (NOT "${config_rtps_send_topics}" STREQUAL "" OR NOT "${config_rtps_receive_t
 			--agent-outdir ${micrortps_bridge_path}/micrortps_agent/src
 			--client-outdir ${micrortps_bridge_path}/micrortps_client
 			--idl-dir ${micrortps_bridge_path}/micrortps_agent/idl
-			>micrortps_bridge.log 2>&1 || cat micrortps_bridge.log
-		DEPENDS ${send_topic_files} ${receive_topic_files} ${PX4_SOURCE_DIR}/msg/tools/urtps_bridge_topics.yaml
+			#>micrortps_bridge.log 2>&1 || cat micrortps_bridge.log
+		DEPENDS ${PX4_SOURCE_DIR}/Tools/msg/urtps_bridge_topics.yaml
 		COMMENT "Generating RTPS topic bridge"
+		WORKING_DIRECTORY ${PX4_SOURCE_DIR}
 	)
 	add_custom_target(topic_bridge_files DEPENDS ${topic_bridge_files_out})
 

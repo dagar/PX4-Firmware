@@ -41,12 +41,13 @@ import sys
 import os
 import argparse
 import shutil
-import px_generate_uorb_topic_files
-from uorb_rtps_classifier import Classifier
+import px_generate_rtps_topic_files
 import subprocess
 import glob
 import errno
 import re
+from typing import Dict, List, Tuple
+import yaml
 
 try:
     from six.moves import input
@@ -74,7 +75,7 @@ default_agent_out = "src/modules/micrortps_bridge/micrortps_agent"
 default_uorb_templates_dir = "templates/uorb_microcdr"
 default_urtps_templates_dir = "templates/urtps"
 default_urtps_topics_file = "tools/urtps_bridge_topics.yaml"
-default_package_name = px_generate_uorb_topic_files.PACKAGE
+default_package_name = px_generate_rtps_topic_files.PACKAGE
 
 parser = argparse.ArgumentParser()
 
@@ -130,8 +131,8 @@ package = args.package
 
 # Msg files path
 msg_dir = os.path.abspath(args.msgdir)
-px_generate_uorb_topic_files.append_to_include_path(
-    {msg_dir}, px_generate_uorb_topic_files.INCL_DEFAULT, package)
+px_generate_rtps_topic_files.append_to_include_path(
+    {msg_dir}, px_generate_rtps_topic_files.INCL_DEFAULT, package)
 
 # Agent files output path
 agent_out_dir = os.path.abspath(args.agentdir)
@@ -248,9 +249,25 @@ uorb_templates_dir = (args.uorb_templates if os.path.isabs(args.uorb_templates)
 urtps_templates_dir = (args.urtps_templates if os.path.isabs(args.urtps_templates)
                        else os.path.join(msg_dir, args.urtps_templates))
 
+
+# Get messages to send and to receive
+topics_to_send: Dict[str, str] = dict()
+topics_to_receive: Dict[str, str] = dict()
+msg_list: List[str] = []
+
 # parse yaml file into a map of ids and messages to send and receive
-classifier = (Classifier(os.path.abspath(args.yaml_file), msg_dir) if os.path.isabs(args.yaml_file)
-              else Classifier(os.path.join(msg_dir, args.yaml_file), msg_dir))
+yaml_file = "Tools/msg/urtps_bridge_topics.yaml"
+with open(yaml_file, 'r') as file:
+    topic_map = yaml.safe_load(file)
+
+    # Setup dictionary with an ID map for the messages
+    for topic in topic_map['rtps']:
+        if 'send' in list(topic.keys()):
+            topics_to_send[topic['topic']] = topic['msg']
+
+        if 'receive' in list(topic.keys()):
+            topics_to_receive[topic['topic']] = topic['msg']
+
 
 
 uRTPS_CLIENT_TEMPL_FILE = 'microRTPS_client.cpp.em'
@@ -269,79 +286,50 @@ uRTPS_SUBSCRIBER_H_TEMPL_FILE = 'Subscriber.h.em'
 def generate_agent(out_dir):
     global fastrtps_version
 
-    if classifier.msgs_to_send:
-        for msg_file in classifier.msgs_to_send:
-            if gen_idl:
-                if out_dir != agent_out_dir:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_file, msg_dir, "", os.path.join(out_dir, "/idl"), urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-                else:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_file, msg_dir, "", idl_dir, urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-            px_generate_uorb_topic_files.generate_topic_file(msg_file, msg_dir, "", out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_PUBLISHER_SRC_TEMPL_FILE)
-            px_generate_uorb_topic_files.generate_topic_file(msg_file, msg_dir, "", out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_PUBLISHER_H_TEMPL_FILE)
+    for topic in topics_to_send:
+        print("topic: ", topic)
+        topic_name = topic['topic']
+        topic_msg = topic['msg']
+        if gen_idl:
+            if out_dir != agent_out_dir:
+                px_generate_rtps_topic_files.generate_idl_file(topic_name, msg_dir, topic_msg, os.path.join(out_dir, "/idl"), urtps_templates_dir,
+                                                                package, px_generate_rtps_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, msg_list)
+            else:
+                px_generate_rtps_topic_files.generate_idl_file(topic_name, msg_dir, topic_msg, idl_dir, urtps_templates_dir,
+                                                                package, px_generate_rtps_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, msg_list)
+        px_generate_rtps_topic_files.generate_topic_file(topic_name, msg_dir, topic_msg, out_dir, urtps_templates_dir,
+                                                            package, px_generate_rtps_topic_files.INCL_DEFAULT, msg_list, fastrtps_version, ros2_distro, uRTPS_PUBLISHER_SRC_TEMPL_FILE)
+        px_generate_rtps_topic_files.generate_topic_file(topic_name, msg_dir, topic_msg, out_dir, urtps_templates_dir,
+                                                            package, px_generate_rtps_topic_files.INCL_DEFAULT, msg_list, fastrtps_version, ros2_distro, uRTPS_PUBLISHER_H_TEMPL_FILE)
 
-    if classifier.alias_msgs_to_send:
-        for msg_file in classifier.alias_msgs_to_send:
-            msg_alias = msg_file[0]
-            msg_name = msg_file[1]
-            if gen_idl:
-                if out_dir != agent_out_dir:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_name, msg_dir, msg_alias, os.path.join(out_dir, "/idl"), urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-                else:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_name, msg_dir, msg_alias, idl_dir, urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-            px_generate_uorb_topic_files.generate_topic_file(msg_name, msg_dir, msg_alias, out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_PUBLISHER_SRC_TEMPL_FILE)
-            px_generate_uorb_topic_files.generate_topic_file(msg_name, msg_dir, msg_alias, out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_PUBLISHER_H_TEMPL_FILE)
+    for topic in topics_to_receive:
+        topic_name = topic['topic']
+        topic_msg = topic['msg']
+        if gen_idl:
+            if out_dir != agent_out_dir:
+                px_generate_rtps_topic_files.generate_idl_file(topic_name, msg_dir, topic_msg, os.path.join(out_dir, "/idl"), urtps_templates_dir,
+                                                                package, px_generate_rtps_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, msg_list)
+            else:
+                px_generate_rtps_topic_files.generate_idl_file(topic_name, msg_dir, topic_msg, idl_dir, urtps_templates_dir,
+                                                                package, px_generate_rtps_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, msg_list)
+        px_generate_rtps_topic_files.generate_topic_file(topic_name, msg_dir, topic_msg, out_dir, urtps_templates_dir,
+                                                            package, px_generate_rtps_topic_files.INCL_DEFAULT, msg_list, fastrtps_version, ros2_distro, uRTPS_SUBSCRIBER_SRC_TEMPL_FILE)
+        px_generate_rtps_topic_files.generate_topic_file(topic_name, msg_dir, topic_msg, out_dir, urtps_templates_dir,
+                                                            package, px_generate_rtps_topic_files.INCL_DEFAULT, msg_list, fastrtps_version, ros2_distro, uRTPS_SUBSCRIBER_H_TEMPL_FILE)
 
-    if classifier.msgs_to_receive:
-        for msg_file in classifier.msgs_to_receive:
-            if gen_idl:
-                if out_dir != agent_out_dir:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_file, msg_dir, "", os.path.join(out_dir, "/idl"), urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-                else:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_file, msg_dir, "", idl_dir, urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-            px_generate_uorb_topic_files.generate_topic_file(msg_file, msg_dir, "", out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_SUBSCRIBER_SRC_TEMPL_FILE)
-            px_generate_uorb_topic_files.generate_topic_file(msg_file, msg_dir, "", out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_SUBSCRIBER_H_TEMPL_FILE)
-
-    if classifier.alias_msgs_to_receive:
-        for msg_file in classifier.alias_msgs_to_receive:
-            msg_alias = msg_file[0]
-            msg_name = msg_file[1]
-            if gen_idl:
-                if out_dir != agent_out_dir:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_name, msg_dir, msg_alias, os.path.join(out_dir, "/idl"), urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-                else:
-                    px_generate_uorb_topic_files.generate_idl_file(msg_name, msg_dir, msg_alias, idl_dir, urtps_templates_dir,
-                                                                   package, px_generate_uorb_topic_files.INCL_DEFAULT, fastrtps_version, ros2_distro, classifier.msg_list)
-            px_generate_uorb_topic_files.generate_topic_file(msg_name, msg_dir, msg_alias, out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_SUBSCRIBER_SRC_TEMPL_FILE)
-            px_generate_uorb_topic_files.generate_topic_file(msg_name, msg_dir, msg_alias, out_dir, urtps_templates_dir,
-                                                             package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_SUBSCRIBER_H_TEMPL_FILE)
-
-    px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, out_dir,
-                                                        urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_TEMPL_FILE)
-    px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, out_dir,
-                                                        urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_TIMESYNC_CPP_TEMPL_FILE)
-    px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, out_dir,
-                                                        urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_TIMESYNC_H_TEMPL_FILE)
-    px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, out_dir,
-                                                        urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_TOPICS_H_TEMPL_FILE)
-    px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, out_dir,
-                                                        urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_TOPICS_SRC_TEMPL_FILE)
+    px_generate_rtps_topic_files.generate_uRTPS_general(topics_to_send, topics_to_receive, msg_dir, out_dir,
+                                                        urtps_templates_dir, package, px_generate_rtps_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_TEMPL_FILE)
+    px_generate_rtps_topic_files.generate_uRTPS_general(topics_to_send, topics_to_receive, msg_dir, out_dir,
+                                                        urtps_templates_dir, package, px_generate_rtps_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_TIMESYNC_CPP_TEMPL_FILE)
+    px_generate_rtps_topic_files.generate_uRTPS_general(topics_to_send, topics_to_receive, msg_dir, out_dir,
+                                                        urtps_templates_dir, package, px_generate_rtps_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_TIMESYNC_H_TEMPL_FILE)
+    px_generate_rtps_topic_files.generate_uRTPS_general(topics_to_send, topics_to_receive, msg_dir, out_dir,
+                                                        urtps_templates_dir, package, px_generate_rtps_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_TOPICS_H_TEMPL_FILE)
+    px_generate_rtps_topic_files.generate_uRTPS_general(topics_to_send, topics_to_receive, msg_dir, out_dir,
+                                                        urtps_templates_dir, package, px_generate_rtps_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_TOPICS_SRC_TEMPL_FILE)
     if cmakelists:
-        px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir, os.path.dirname(out_dir),
-                                                            urtps_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_CMAKELISTS_TEMPL_FILE)
+        px_generate_rtps_topic_files.generate_uRTPS_general(topics_to_send, classifier.alias_msgs_to_send, topics_to_receive, msg_dir, os.path.dirname(out_dir),
+                                                            urtps_templates_dir, package, px_generate_rtps_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_AGENT_CMAKELISTS_TEMPL_FILE)
 
     # Final steps to install agent
     mkdir_p(os.path.join(out_dir, "fastrtpsgen"))
@@ -425,12 +413,11 @@ def generate_client(out_dir):
         if os.path.isfile(def_file):
             os.rename(def_file, def_file.replace(".h", ".h_"))
 
-    px_generate_uorb_topic_files.generate_uRTPS_general(classifier.msgs_to_send, classifier.alias_msgs_to_send, classifier.msgs_to_receive, classifier.alias_msgs_to_receive, msg_dir,
-                                                        out_dir, uorb_templates_dir, package, px_generate_uorb_topic_files.INCL_DEFAULT, classifier.msg_list, fastrtps_version, ros2_distro, uRTPS_CLIENT_TEMPL_FILE)
+    px_generate_rtps_topic_files.generate_uRTPS_general(topics_to_send, topics_to_receive, msg_dir,
+                                                        out_dir, uorb_templates_dir, package, px_generate_rtps_topic_files.INCL_DEFAULT, msg_list, fastrtps_version, ros2_distro, uRTPS_CLIENT_TEMPL_FILE)
 
     # Final steps to install client
-    cp_wildcard(os.path.join(urtps_templates_dir,
-                             "microRTPS_transport.*"), out_dir)
+    cp_wildcard(os.path.join(urtps_templates_dir, "microRTPS_transport.*"), out_dir)
 
     return 0
 

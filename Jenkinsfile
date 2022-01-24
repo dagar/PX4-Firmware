@@ -294,14 +294,10 @@ pipeline {
             withCredentials([usernamePassword(credentialsId: 'px4buildbot_github_personal_token', passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
               sh("git clone https://${GIT_USER}:${GIT_PASS}@github.com/PX4/px4_msgs.git")
               // 'master' branch
-              sh('./msg/tools/uorb_to_ros_msgs.py msg/ px4_msgs/msg/')
+              sh('cp msg/*.msg px4_msgs/msg/')
               sh('cd px4_msgs; git status; git add .; git commit -a -m "Update message definitions `date`" || true')
               sh('cd px4_msgs; git push origin master || true')
-              // 'ros1' branch
-              sh('cd px4_msgs; git checkout ros1')
-              sh('./msg/tools/uorb_to_ros_msgs.py msg/ px4_msgs/msg/')
-              sh('cd px4_msgs; git status; git add .; git commit -a -m "Update message definitions `date`" || true')
-              sh('cd px4_msgs; git push origin ros1 || true')
+
               sh('rm -rf px4_msgs')
             }
           }
@@ -327,10 +323,10 @@ pipeline {
               sh('cd px4_ros_com; git status; git add .; git commit -a -m "Update uORB RTPS ID map `date`" || true')
               sh('cd px4_ros_com; git push origin ${BRANCH_NAME} || true')
               // deploy uORB RTPS required tools
-              sh('cp msg/tools/uorb_rtps_classifier.py px4_ros_com/scripts/uorb_rtps_classifier.py')
-              sh('cp msg/tools/generate_microRTPS_bridge.py px4_ros_com/scripts/generate_microRTPS_bridge.py')
-              sh('cp msg/tools/px_generate_uorb_topic_files.py px4_ros_com/scripts/px_generate_uorb_topic_files.py')
-              sh('cp msg/tools/px_generate_uorb_topic_helper.py px4_ros_com/scripts/px_generate_uorb_topic_helper.py')
+              sh('cp Tools/msg/tools/uorb_rtps_classifier.py px4_ros_com/scripts/uorb_rtps_classifier.py')
+              sh('cp Tools/msg/tools/generate_microRTPS_bridge.py px4_ros_com/scripts/generate_microRTPS_bridge.py')
+              sh('cp Tools/msg/tools/px_generate_rtps_topic_files.py px4_ros_com/scripts/px_generate_rtps_topic_files.py')
+              sh('cp Tools/msg/tools/px_generate_uorb_topic_helper.py px4_ros_com/scripts/px_generate_uorb_topic_helper.py')
               // deploy templates
               sh('cp msg/templates/urtps/microRTPS_agent.cpp.em px4_ros_com/templates/microRTPS_agent.cpp.em')
               sh('cp msg/templates/urtps/microRTPS_timesync.cpp.em px4_ros_com/templates/microRTPS_timesync.cpp.em')

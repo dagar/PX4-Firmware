@@ -77,23 +77,14 @@ except ImportError as e:
 
 
 __author__ = "Sergey Belash, Thomas Gubler, Beat Kueng"
-__copyright__ = "Copyright (C) 2013-2021 PX4 Development Team."
+__copyright__ = "Copyright (C) 2013-2022 PX4 Development Team."
 __license__ = "BSD"
 __email__ = "thomasgubler@gmail.com"
 
-
-TEMPLATE_FILE = ['msg.h.em']
-OUTPUT_FILE_EXT = ['.h']
 INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
-CONSTRAINED_FLASH = False
 
-class MsgScope:
-    NONE = 0
-    SEND = 1
-    RECEIVE = 2
-
-def generate_output_from_file(filename, outputdir, package, templatedir, includepath):
+def generate_output_from_file(filename, outputdir, package, template_file, includepath):
     """
     Converts a single .msg file to an uorb header/source file
     """
@@ -124,114 +115,35 @@ def generate_output_from_file(filename, outputdir, package, templatedir, include
         "md5sum": md5sum,
         "search_path": search_path,
         "msg_context": msg_context,
-        "spec": spec,
-        "constrained_flash": CONSTRAINED_FLASH
+        "spec": spec
     }
 
     # Make sure output directory exists:
     if not os.path.isdir(outputdir):
         os.makedirs(outputdir)
 
-    template_file = os.path.join(templatedir, TEMPLATE_FILE[0])
-    output_file = os.path.join(outputdir, full_type_name_snake + OUTPUT_FILE_EXT[0])
+    output_file = os.path.join(outputdir, full_type_name_snake + '.h')
 
-    return generate_by_template(output_file, template_file, em_globals)
-
-def generate_topic_file(filename_msg, msg_dir, alias, outputdir, templatedir, package, includepath, msgs, template_name):
-    """
-    Generates a sources and headers from .msg file
-    """
-    msg = os.path.join(msg_dir, filename_msg + ".msg")
-
-    if (alias):
-        em_globals = get_em_globals(
-            msg, alias, package, includepath, msgs, MsgScope.NONE)
-        spec_short_name = alias
-    else:
-        em_globals = get_em_globals(
-            msg, "", package, includepath, msgs, MsgScope.NONE)
-        spec_short_name = em_globals["spec"].short_name
-
-    # Make sure output directory exists:
-    if not os.path.isdir(outputdir):
-        os.makedirs(outputdir)
-
-    template_file = os.path.join(templatedir, template_name)
-    output_file = os.path.join(
-        outputdir, spec_short_name + "_" + template_name.replace(".em", ""))
-
-    return generate_by_template(output_file, template_file, em_globals)
-
-
-def get_em_globals(filename_msg, alias, package, includepath, msgs, scope):
-    """
-    Generates em globals dictionary
-    """
-    msg_context = genmsg.msg_loader.MsgContext.create_default()
-
-    full_type_name = genmsg.gentools.compute_full_type_name(package, os.path.basename(filename_msg))
-
-    spec = genmsg.msg_loader.load_msg_from_file(msg_context, filename_msg, full_type_name)
-
-    if includepath:
-        search_path = genmsg.command_line.includepath_to_dict(includepath)
-    else:
-        search_path = {}
-
-    genmsg.msg_loader.load_depends(msg_context, spec, search_path)
-
-    md5sum = genmsg.gentools.compute_md5(msg_context, spec)
-
-    em_globals = {
-        "file_name_in": filename_msg,
-        "md5sum": md5sum,
-        "search_path": search_path,
-        "msg_context": msg_context,
-        "spec": spec,
-        "msgs": msgs,
-        "scope": scope,
-        "package": package
-    }
-
-    return em_globals
-
-
-def merge_em_globals_list(em_globals_list):
-    """
-        Merges a list of em_globals to a single dictionary where each attribute is a list
-    """
-    if len(em_globals_list) < 1:
-        return {}
-
-    merged_em_globals = {}
-    for name in em_globals_list[0]:
-        merged_em_globals[name] = [em_globals[name] for em_globals in em_globals_list]
-
-    return merged_em_globals
-
-
-def generate_by_template(output_file, template_file, em_globals):
-    """
-    Invokes empy intepreter to geneate output_file by the
-    given template_file and predefined em_globals dict
-    """
     # check if folder exists:
     folder_name = os.path.dirname(output_file)
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
 
     ofile = open(output_file, 'w')
+
     # todo, reuse interpreter
-    interpreter = em.Interpreter(output=ofile, globals=em_globals, options={
-                                 em.RAW_OPT: True, em.BUFFERED_OPT: True})
+    interpreter = em.Interpreter(output=ofile, globals=em_globals, options={em.RAW_OPT: True, em.BUFFERED_OPT: True})
+
     try:
         interpreter.file(open(template_file))
     except OSError as e:
         ofile.close()
         os.remove(output_file)
         raise
+
     interpreter.shutdown()
     ofile.close()
+
     return True
 
 def append_to_include_path(path_to_append, curr_include, package):
@@ -241,25 +153,16 @@ def append_to_include_path(path_to_append, curr_include, package):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convert msg files to uorb headers')
-    parser.add_argument('-f', dest='file',
-                        help="files to convert (use only without -d)",
-                        nargs="+")
-    parser.add_argument('-i', dest="include_paths",
-                        help='Additional Include Paths', nargs="*",
-                        default=None)
-    parser.add_argument('-e', dest='templatedir',
-                        help='directory with template files',)
-    parser.add_argument('-k', dest='package', default=PACKAGE,
-                        help='package name')
+    parser.add_argument('-f', dest='file', help="files to convert (use only without -d)", nargs="+")
+    parser.add_argument('-i', dest="include_paths", help='Additional Include Paths', nargs="*", default=None)
+    parser.add_argument('-e', dest='template_file', help='directory with template files',)
+    parser.add_argument('-k', dest='package', default=PACKAGE, help='package name')
     parser.add_argument('-o', dest='outputdir', help='output directory for header files')
-    parser.add_argument('-p', dest='prefix', default='',
-                        help='string added as prefix to the output file name when converting directories')
     args = parser.parse_args()
 
     if args.include_paths:
         append_to_include_path(args.include_paths, INCL_DEFAULT, args.package)
 
-
     if args.file is not None:
         for f in args.file:
-            generate_output_from_file(f, args.outputdir, args.package, args.templatedir, INCL_DEFAULT)
+            generate_output_from_file(f, args.outputdir, args.package, args.template_file, INCL_DEFAULT)

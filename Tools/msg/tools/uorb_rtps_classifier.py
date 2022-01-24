@@ -38,59 +38,18 @@ import os
 from typing import Dict, List, Tuple
 import yaml
 
-
-class Classifier():
-    """Class to classify RTPS msgs as to send, receive and set their IDs."""
-
-    def __init__(self, yaml_file, msg_folder) -> None:
-        self.msg_folder = msg_folder
-        self.topic_map = self.parse_yaml_msgs_file(yaml_file)
-
-        # Get messages to send and to receive
-        self.topics_to_send: List[Tuple[str, str]] = []
-        self.topics_to_receive: List[Tuple[str, str]] = []
-        self.topics_list: List[str] = []
-
-        # Create message map
-        self.setup_topic_map()
-
-        self.msg_files_send    = [os.path.join(self.msg_folder, msg + ".msg") for msg in list(self.topics_to_send.keys())]
-        self.msg_files_receive = [os.path.join(self.msg_folder, msg + ".msg") for msg in list(self.topics_to_receive.keys())]
-
-    def setup_topic_map(self) -> None:
-        """Setup dictionary with an ID map for the messages."""
-        for topic in self.topic_map['rtps']:
-            if 'send' in list(topic.keys()):
-                self.topics_to_send.append((topic['topic'], topic['msg']))
-
-            if 'receive' in list(topic.keys()):
-                self.topics_to_receive.append((topic['topic'], topic['msg']))
-
-            self.topics_list.append(topic['topic'])
-
-    @staticmethod
-    def parse_yaml_msgs_file(yaml_file) -> dict:
-        """Parses a yaml file into a dict."""
-        try:
-            with open(yaml_file, 'r') as file:
-                return yaml.safe_load(file)
-        except OSError as err:
-            if err.errno == errno.ENOENT:
-                raise IOError(errno.ENOENT, os.strerror(errno.ENOENT), yaml_file)
-            raise
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-s", "--send", dest='send', action="store_true", help="Get topics to be sent")
-    parser.add_argument("-r", "--receive", dest='receive', action="store_true", help="Get topics to be received")
-    parser.add_argument("-i", "--ignore", dest='ignore', action="store_true", help="Get topics to be ignored")
+    parser.add_argument("--send-topics", dest='send_topics', action="store_true", help="Get topics to be sent")
+    parser.add_argument("--send-msgs", dest='send_msgs', action="store_true", help="Get msg files for topics to be sent")
+    parser.add_argument("--receive-topics", dest='receive_topics', action="store_true", help="Get topics to be received")
+    parser.add_argument("--receive-msgs", dest='receive_msgs', action="store_true", help="Get msg files for topics to be received")
     parser.add_argument("-p", "--path", dest='path', action="store_true", help="Get msgs and its paths")
     parser.add_argument("-m", "--msg-dir", dest='msgdir', type=str, help="message dir, by default msg/", default="msg")
     parser.add_argument("-y", "--rtps-ids-file", dest='yaml_file', type=str,
-                        help="RTPS msg IDs definition file absolute path, by default use relative path to msg, tools/urtps_bridge_topics.yaml",
-                        default='tools/urtps_bridge_topics.yaml')
+                        help="RTPS msg IDs definition file absolute path, by default use relative path to PX4, Tools/msg/urtps_bridge_topics.yaml",
+                        default='Tools/msg/urtps_bridge_topics.yaml')
 
     # Parse arguments
     args = parser.parse_args()
@@ -101,48 +60,43 @@ if __name__ == "__main__":
     else:
         msg_dir = os.path.abspath(args.msgdir)
 
-
-    if os.path.isabs(args.yaml_file):
-        yaml_file = os.path.abspath(args.yaml_file)
-    else:
-        yaml_file = os.path.join(msg_dir, args.yaml_file)
-
-
-    print(yaml_file)
-
-    with open(yaml_file, 'r') as file:
+    with open(args.yaml_file, 'r') as file:
         topic_map = yaml.safe_load(file)
 
         # Get messages to send and to receive
-        topics_to_send: List[Tuple[str, str]] = []
-        topics_to_receive: List[Tuple[str, str]] = []
+        topics_to_send: Dict[str, str] = dict()
+        topics_to_receive: Dict[str, str] = dict()
+
         topics_list: List[str] = []
+
+        #print(topic_map)
 
         # Setup dictionary with an ID map for the messages
         for topic in topic_map['rtps']:
-            print("topic ", topic)
+            #print("topic ", topic, topic.keys())
 
             if 'send' in list(topic.keys()):
-                topics_to_send.append((topic['topic'], topic['msg']))
+                topics_to_send[topic['topic']] = topic['msg']
 
             if 'receive' in list(topic.keys()):
-                topics_to_receive.append((topic['topic'], topic['msg']))
+                topics_to_receive[topic['topic']] = topic['msg']
 
             topics_list.append(topic['topic'])
 
 
-        msg_files_send    = [os.path.join(msg_dir, msg + ".msg") for msg in list(topics_to_send.keys())]
-        msg_files_receive = [os.path.join(msg_dir, msg + ".msg") for msg in list(topics_to_receive.keys())]
+        msg_files_send    = [os.path.join(msg_dir, msg + ".msg") for msg in list(topics_to_send.values())]
+        msg_files_receive = [os.path.join(msg_dir, msg + ".msg") for msg in list(topics_to_receive.values())]
+
+        if args.send_topics:
+            print((', '.join(str(msg) for msg in sorted(topics_to_send))))
+
+        elif args.send_msgs:
+            print(('send files: ' + ', '.join(str(msg_file) for msg_file in msg_files_send) + '\n'))
+
+        elif args.receive_topics:
+            print((', '.join(str(msg) for msg in sorted(topics_to_receive))))
+
+        elif args.receive_msgs:
+            print(('receive files: ' + ', '.join(str(msg_file) for msg_file in msg_files_receive) + '\n'))
 
 
-        if args.send:
-            if args.path:
-                print(('send files: ' + ', '.join(str(msg_file) for msg_file in msg_files_send) + '\n'))
-            else:
-                print((', '.join(str(msg) for msg in sorted(topics_to_send))))
-
-        if args.receive:
-            if args.path:
-                print(('receive files: ' + ', '.join(str(msg_file) for msg_file in msg_files_receive) + '\n'))
-            else:
-                print((', '.join(str(msg) for msg in sorted(topics_to_receive))))

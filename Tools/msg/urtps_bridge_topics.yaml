@@ -68,7 +68,7 @@ rtps:
     msg: VehicleLocalPositionSetpoint
     receive: true
   - topic:   trajectory_setpoint
-    base:    VehicleLocalPositionSetpoint
+    msg:    VehicleLocalPositionSetpoint
     receive: true
   - topic:   vehicle_odometry
     msg: VehicleOdometry

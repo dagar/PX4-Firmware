@@ -79,7 +79,7 @@ function update_agent_templates {
   declare -a code_generators=( \
     "uorb_rtps_classifier.py" \
     "generate_microRTPS_bridge.py" \
-    "px_generate_uorb_topic_files.py" \
+    "px_generate_rtps_topic_files.py" \
     )
   for file in ${code_generators[@]}; do
     compare_and_update "$PX4_DIR/msg/tools/$file $ws_dir/src/px4_ros_com/scripts/$file" \
@@ -107,7 +107,7 @@ function update_px4_ros_com {
 # function to update px4_msgs
 function update_px4_msgs {
   find "$ws_dir/src/px4_msgs/msg/" -maxdepth 1 -type f -delete
-  python3 $PX4_DIR/msg/tools/uorb_to_ros_msgs.py $PX4_DIR/msg/ $ws_dir/src/px4_msgs/msg/
+  cp $PX4_DIR/msg/*.msg $ws_dir/src/px4_msgs/msg/
 }
 
 # decisor

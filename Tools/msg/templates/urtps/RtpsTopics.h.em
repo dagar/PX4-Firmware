@@ -15,7 +15,7 @@
 import genmsg.msgs
 import os
 from packaging import version
-from px_generate_uorb_topic_files import MsgScope # this is in Tools/
+from px_generate_rtps_topic_files import MsgScope # this is in Tools/
 
 send_topics = [(alias[idx] if alias[idx] else s.short_name) for idx, s in enumerate(spec) if scope[idx] == MsgScope.SEND]
 recv_topics = [(alias[idx] if alias[idx] else s.short_name) for idx, s in enumerate(spec) if scope[idx] == MsgScope.RECEIVE]
