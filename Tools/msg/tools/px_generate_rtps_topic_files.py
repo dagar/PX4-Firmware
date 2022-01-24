@@ -88,9 +88,6 @@ INCL_DEFAULT = ['std_msgs:./msg/std_msgs']
 PACKAGE = 'px4'
 IDL_TEMPLATE_FILE = 'msg.idl.em'
 
-CONSTRAINED_FLASH = False
-
-
 class MsgScope:
     NONE = 0
     SEND = 1
@@ -127,8 +124,7 @@ def generate_output_from_file(format_idx, filename, outputdir, package, template
         "md5sum": md5sum,
         "search_path": search_path,
         "msg_context": msg_context,
-        "spec": spec,
-        "constrained_flash": CONSTRAINED_FLASH
+        "spec": spec
     }
 
     # Make sure output directory exists:
@@ -168,8 +164,7 @@ def generate_idl_file(filename_msg, msg_dir, alias, outputdir, templatedir, pack
     return generate_by_template(output_file, template_file, em_globals)
 
 
-def generate_uRTPS_general(send_topics, receive_topics,
-                           msg_dir, outputdir, templatedir, package, includepath, msgs, fastrtps_version, ros2_distro, template_name):
+def generate_uRTPS_general(send_topics, receive_topics, msg_dir, outputdir, templatedir, package, includepath, msgs, fastrtps_version, ros2_distro, template_name):
     """
     Generates source file by msg content
     """
@@ -177,14 +172,16 @@ def generate_uRTPS_general(send_topics, receive_topics,
     em_globals_list = []
 
     if send_topics:
-        em_globals_list.extend([get_em_globals(
-            f.key(), f.value(), package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.SEND) for f in send_topics])
+        em_globals_list.extend([get_em_globals(f.key(), f.value(), package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.SEND) for f in send_topics])
 
     if receive_topics:
-        em_globals_list.extend([get_em_globals(
-            f[0], f[1], package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.RECEIVE) for f in receive_topics])
+        em_globals_list.extend([get_em_globals(f[0], f[1], package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.RECEIVE) for f in receive_topics])
 
-    merged_em_globals = merge_em_globals_list(em_globals_list)
+
+    merged_em_globals = {}
+    for name in em_globals_list[0]:
+        merged_em_globals[name] = [em_globals[name] for em_globals in em_globals_list]
+
 
     # Make sure output directory exists:
     if not os.path.isdir(outputdir):
@@ -196,34 +193,6 @@ def generate_uRTPS_general(send_topics, receive_topics,
     return generate_by_template(output_file, template_file, merged_em_globals)
 
 
-def generate_topic_file(filename_msg, msg_dir, outputdir, templatedir, package, includepath, msgs, fastrtps_version, ros2_distro, template_name):
-    """
-    Generates a sources and headers from .msg file
-    """
-    msg = os.path.join(msg_dir, filename_msg + ".msg")
-
-    alias = False
-
-    if (alias):
-        em_globals = get_em_globals(
-            msg, alias, package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.NONE)
-        spec_short_name = alias
-    else:
-        em_globals = get_em_globals(
-            msg, "", package, includepath, msgs, fastrtps_version, ros2_distro, MsgScope.NONE)
-        spec_short_name = em_globals["spec"].short_name
-
-    # Make sure output directory exists:
-    if not os.path.isdir(outputdir):
-        os.makedirs(outputdir)
-
-    template_file = os.path.join(templatedir, template_name)
-    output_file = os.path.join(
-        outputdir, spec_short_name + "_" + template_name.replace(".em", ""))
-
-    return generate_by_template(output_file, template_file, em_globals)
-
-
 def get_em_globals(filename_msg, alias, package, includepath, msgs, fastrtps_version, ros2_distro, scope):
     """
     Generates em globals dictionary
@@ -233,7 +202,9 @@ def get_em_globals(filename_msg, alias, package, includepath, msgs, fastrtps_ver
     full_type_name = genmsg.gentools.compute_full_type_name(package, os.path.basename(filename_msg))
 
     spec = genmsg.msg_loader.load_msg_from_file(msg_context, filename_msg, full_type_name)
+
     topics = get_multi_topics(filename_msg)
+
     if includepath:
         search_path = genmsg.command_line.includepath_to_dict(includepath)
     else:
@@ -264,20 +235,6 @@ def get_em_globals(filename_msg, alias, package, includepath, msgs, fastrtps_ver
     return em_globals
 
 
-def merge_em_globals_list(em_globals_list):
-    """
-        Merges a list of em_globals to a single dictionary where each attribute is a list
-    """
-    if len(em_globals_list) < 1:
-        return {}
-
-    merged_em_globals = {}
-    for name in em_globals_list[0]:
-        merged_em_globals[name] = [em_globals[name] for em_globals in em_globals_list]
-
-    return merged_em_globals
-
-
 def generate_by_template(output_file, template_file, em_globals):
     """
     Invokes empy intepreter to geneate output_file by the
@@ -289,139 +246,21 @@ def generate_by_template(output_file, template_file, em_globals):
         os.makedirs(folder_name)
 
     ofile = open(output_file, 'w')
+
     # todo, reuse interpreter
     interpreter = em.Interpreter(output=ofile, globals=em_globals, options={em.RAW_OPT: True, em.BUFFERED_OPT: True})
+
     try:
         interpreter.file(open(template_file))
     except OSError as e:
         ofile.close()
         os.remove(output_file)
         raise
+
     interpreter.shutdown()
     ofile.close()
+
     return True
-
-
-def convert_dir(format_idx, inputdir, outputdir, package, templatedir):
-    """
-    Converts all .msg files in inputdir to uORB header/source files
-    """
-
-    # Find the most recent modification time in input dir
-    maxinputtime = 0
-    for f in os.listdir(inputdir):
-        fni = os.path.join(inputdir, f)
-        if os.path.isfile(fni):
-            it = os.path.getmtime(fni)
-            if it > maxinputtime:
-                maxinputtime = it
-
-    # Find the most recent modification time in output dir
-    maxouttime = 0
-    if os.path.isdir(outputdir):
-        for f in os.listdir(outputdir):
-            fni = os.path.join(outputdir, f)
-            if os.path.isfile(fni):
-                it = os.path.getmtime(fni)
-                if it > maxouttime:
-                    maxouttime = it
-
-    # Do not generate if nothing changed on the input
-    if (maxinputtime != 0 and maxouttime != 0 and maxinputtime < maxouttime):
-        return False
-
-    includepath = INCL_DEFAULT + [':'.join([package, inputdir])]
-    for f in os.listdir(inputdir):
-        # Ignore hidden files
-        if f.startswith("."):
-            continue
-
-        fn = os.path.join(inputdir, f)
-        # Only look at actual files
-        if not os.path.isfile(fn):
-            continue
-
-        if fn[-4:].lower() != '.msg':
-            continue
-
-        generate_output_from_file(
-            format_idx, fn, outputdir, package, templatedir, includepath)
-    return True
-
-
-def copy_changed(inputdir, outputdir, prefix='', quiet=False):
-    """
-    Copies files from inputdir to outputdir if they don't exist in
-    ouputdir or if their content changed
-    """
-
-    # Make sure output directory exists:
-    if not os.path.isdir(outputdir):
-        os.makedirs(outputdir)
-
-    for input_file in os.listdir(inputdir):
-        fni = os.path.join(inputdir, input_file)
-        if os.path.isfile(fni):
-            # Check if input_file exists in outpoutdir, copy the file if not
-            fno = os.path.join(outputdir, prefix + input_file)
-            if not os.path.isfile(fno):
-                shutil.copy(fni, fno)
-                if not quiet:
-                    print("{0}: new header file".format(fno))
-                continue
-
-            if os.path.getmtime(fni) > os.path.getmtime(fno):
-                # The file exists in inputdir and outputdir
-                # only copy if contents do not match
-                if not filecmp.cmp(fni, fno):
-                    shutil.copy(fni, fno)
-                    if not quiet:
-                        print("{0}: updated".format(input_file))
-                    continue
-
-            if not quiet:
-                print("{0}: unchanged".format(input_file))
-
-
-def convert_dir_save(format_idx, inputdir, outputdir, package, templatedir, temporarydir, prefix, quiet=False):
-    """
-    Converts all .msg files in inputdir to uORB header files
-    Unchanged existing files are not overwritten.
-    """
-    # Create new headers in temporary output directory
-    convert_dir(format_idx, inputdir, temporarydir, package, templatedir)
-    if generate_idx == 1:
-        generate_topics_list_file(inputdir, temporarydir, TOPICS_LIST_TEMPLATE_FILE[1], templatedir)
-
-    # Copy changed headers from temporary dir to output dir
-    copy_changed(temporarydir, outputdir, prefix, quiet)
-
-
-def generate_topics_list_file(msgdir, outputdir, template_filename, templatedir):
-    # generate cpp file with topics list
-    msgs = get_msgs_list(msgdir)
-    multi_topics = []
-    for msg in msgs:
-        msg_filename = os.path.join(msgdir, msg)
-        multi_topics.extend(get_multi_topics(msg_filename))
-    tl_globals = {"msgs": msgs, "multi_topics": multi_topics}
-    tl_template_file = os.path.join(templatedir, template_filename)
-    tl_out_file = os.path.join(outputdir, template_filename.replace(".em", ""))
-    generate_by_template(tl_out_file, tl_template_file, tl_globals)
-
-
-def generate_topics_list_file_from_files(files, outputdir, template_filename, templatedir):
-    # generate cpp file with topics list
-    filenames = [os.path.basename(p) for p in files if os.path.basename(p).endswith(".msg")]
-    multi_topics = []
-    for msg_filename in files:
-        multi_topics.extend(get_multi_topics(msg_filename))
-
-    tl_globals = {"msgs": filenames, "multi_topics": multi_topics}
-    tl_template_file = os.path.join(templatedir, template_filename)
-    tl_out_file = os.path.join(outputdir, template_filename.replace(".em", ""))
-    generate_by_template(tl_out_file, tl_template_file, tl_globals)
-
 
 def append_to_include_path(path_to_append, curr_include, package):
     for p in path_to_append:
@@ -429,41 +268,22 @@ def append_to_include_path(path_to_append, curr_include, package):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='Convert msg files to uorb headers/sources')
-    parser.add_argument('--headers', help='Generate header files',
-                        action='store_true')
-    parser.add_argument('--sources', help='Generate source files',
-                        action='store_true')
+    parser = argparse.ArgumentParser(description='Convert msg files to RTPS headers/sources')
+    parser.add_argument('--headers', help='Generate header files', action='store_true')
+    parser.add_argument('--sources', help='Generate source files', action='store_true')
     parser.add_argument('-d', dest='dir', help='directory with msg files')
-    parser.add_argument('-f', dest='file',
-                        help="files to convert (use only without -d)",
-                        nargs="+")
-    parser.add_argument('-i', dest="include_paths",
-                        help='Additional Include Paths', nargs="*",
-                        default=None)
-    parser.add_argument('-e', dest='templatedir',
-                        help='directory with template files',)
-    parser.add_argument('-k', dest='package', default=PACKAGE,
-                        help='package name')
-    parser.add_argument('-o', dest='outputdir',
-                        help='output directory for header files')
-    parser.add_argument('-t', dest='temporarydir',
-                        help='temporary directory')
-    parser.add_argument('-p', dest='prefix', default='',
-                        help='string added as prefix to the output file '
-                        ' name when converting directories')
-    parser.add_argument('-q', dest='quiet', default=False, action='store_true',
-                        help='string added as prefix to the output file '
-                        ' name when converting directories')
-    parser.add_argument('--constrained-flash', dest='constrained_flash', default=False, action='store_true',
-                        help='set to save flash space')
+    parser.add_argument('-f', dest='file', help="files to convert (use only without -d)", nargs="+")
+    parser.add_argument('-i', dest="include_paths", help='Additional Include Paths', nargs="*", default=None)
+    parser.add_argument('-e', dest='templatedir', help='directory with template files',)
+    parser.add_argument('-k', dest='package', default=PACKAGE, help='package name')
+    parser.add_argument('-o', dest='outputdir', help='output directory for header files')
+    parser.add_argument('-p', dest='prefix', default='', help='string added as prefix to the output file name when converting directories')
+    parser.add_argument('-q', dest='quiet', default=False, action='store_true', help='string added as prefix to the output file name when converting directories')
+
     args = parser.parse_args()
 
     if args.include_paths:
         append_to_include_path(args.include_paths, INCL_DEFAULT, args.package)
-
-    CONSTRAINED_FLASH = args.constrained_flash
 
     if args.headers:
         generate_idx = 0
@@ -472,20 +292,7 @@ if __name__ == "__main__":
     else:
         print('Error: either --headers or --sources must be specified')
         exit(-1)
+
     if args.file is not None:
         for f in args.file:
-            generate_output_from_file(
-                generate_idx, f, args.temporarydir, args.package, args.templatedir, INCL_DEFAULT)
-
-        generate_topics_list_file_from_files(args.file, args.outputdir, TOPICS_LIST_TEMPLATE_FILE[generate_idx], args.templatedir)
-        copy_changed(args.temporarydir, args.outputdir, args.prefix, args.quiet)
-    elif args.dir is not None:
-        convert_dir_save(
-            generate_idx,
-            args.dir,
-            args.outputdir,
-            args.package,
-            args.templatedir,
-            args.temporarydir,
-            args.prefix,
-            args.quiet)
+            generate_output_from_file(generate_idx, f, args.outputdir, args.package, args.templatedir, INCL_DEFAULT)

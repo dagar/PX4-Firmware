@@ -286,10 +286,13 @@ uRTPS_SUBSCRIBER_H_TEMPL_FILE = 'Subscriber.h.em'
 def generate_agent(out_dir):
     global fastrtps_version
 
-    for topic in topics_to_send:
-        print("topic: ", topic)
-        topic_name = topic['topic']
-        topic_msg = topic['msg']
+    print("generate_agent", topics_to_send)
+
+    for topic_name in topics_to_send:
+        topic_msg = topics_to_send[topic_name]
+
+        print("topic_name: ", topic_name, " topic_msg: ", topic_msg)
+
         if gen_idl:
             if out_dir != agent_out_dir:
                 px_generate_rtps_topic_files.generate_idl_file(topic_name, msg_dir, topic_msg, os.path.join(out_dir, "/idl"), urtps_templates_dir,

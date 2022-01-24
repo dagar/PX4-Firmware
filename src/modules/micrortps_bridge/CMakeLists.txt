@@ -125,7 +125,6 @@ if (GENERATE_RTPS_BRIDGE)
 			-i ${PX4_SOURCE_DIR}/msg/
 			-o ${msg_out_path_microcdr}
 			-e ${PX4_SOURCE_DIR}/Tools/msg/templates/uorb_microcdr
-			-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/headers_microcdr
 			#-q
 		DEPENDS
 			${PX4_SOURCE_DIR}/Tools/msg/tools/px_generate_rtps_topic_files.py
@@ -144,7 +143,6 @@ if (GENERATE_RTPS_BRIDGE)
 			-i ${PX4_SOURCE_DIR}/msg/
 			-o ${msg_source_out_path_microcdr}
 			-e ${PX4_SOURCE_DIR}/Tools/msg/templates/uorb_microcdr
-			-t ${CMAKE_CURRENT_BINARY_DIR}/tmp/sources_microcdr
 			#-q
 		DEPENDS
 			${PX4_SOURCE_DIR}/Tools/msg/tools/px_generate_rtps_topic_files.py
