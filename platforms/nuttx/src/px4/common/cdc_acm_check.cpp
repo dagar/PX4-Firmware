@@ -47,11 +47,14 @@ __END_DECLS
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/actuator_armed.h>
 
+#include <px4_platform_common/shutdown.h>
+
 #define USB_DEVICE_PATH "/dev/ttyACM0"
 
 static struct work_s usb_serial_work;
 static bool vbus_present_prev = false;
 static int ttyacm_fd = -1;
+static bool never_armed = true;
 
 enum class UsbAutoStartState {
 	disconnected,
@@ -68,6 +71,11 @@ static void mavlink_usb_check(void *arg)
 	uORB::SubscriptionData<actuator_armed_s> actuator_armed_sub{ORB_ID(actuator_armed)};
 
 	const bool armed = actuator_armed_sub.get().armed;
+
+	if (armed && never_armed) {
+		never_armed = false;
+	}
+
 	const bool vbus_present = (board_read_VBUS_state() == PX4_OK);
 
 	if (!armed) {
@@ -88,6 +96,12 @@ static void mavlink_usb_check(void *arg)
 
 		case UsbAutoStartState::connecting:
 			if (vbus_present && vbus_present_prev) {
+
+				if (!never_armed) {
+					px4_reboot_request(false);
+					return;
+				}
+
 				if (ttyacm_fd < 0) {
 					ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
 				}
