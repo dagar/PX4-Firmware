@@ -39,9 +39,9 @@
  * @author Paul Riseborough <p_riseborough@live.com.au>
  *
  */
-#include "../ecl.h"
 #include "ukf.h"
-#include "mathlib.h"
+
+#include <mathlib/mathlib.h>
 
 void Ukf::fuseSideslip()
 {

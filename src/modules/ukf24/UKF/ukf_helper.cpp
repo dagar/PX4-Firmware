@@ -40,9 +40,9 @@
  *
  */
 
-#include "../ecl.h"
 #include "ukf.h"
-#include "mathlib.h"
+
+#include <lib/mathlib/mathlib.h>
 #include <cstdlib>
 
 // Reset the velocity states. If we have a recent and valid
@@ -58,11 +58,11 @@ bool Ukf::resetVelocity()
 		_ukf_states.data.vel = _gps_sample_delayed.vel;
 
 		// use GPS accuracy to reset variances
-		setDiag(3,5,sq(_gps_sample_delayed.sacc));
+		setDiag(3, 5, sq(_gps_sample_delayed.sacc));
 
 	} else if (_control_status.flags.opt_flow || _control_status.flags.ev_pos) {
 		_ukf_states.data.vel.setZero();
-		zeroOffDiag(3,5);
+		zeroOffDiag(3, 5);
 
 	} else {
 		return false;
@@ -108,12 +108,12 @@ bool Ukf::resetPosition()
 		_ukf_states.data.pos(1) = _gps_sample_delayed.pos(1);
 
 		// use GPS accuracy to reset variances
-		setDiag(6,7,sq(_gps_sample_delayed.hacc));
+		setDiag(6, 7, sq(_gps_sample_delayed.hacc));
 
 	} else if (_control_status.flags.opt_flow) {
 		_ukf_states.data.pos(0) = 0.0f;
 		_ukf_states.data.pos(1) = 0.0f;
-		zeroOffDiag(6,7);
+		zeroOffDiag(6, 7);
 
 	} else if (_control_status.flags.ev_pos) {
 		// this reset is only called if we have new ev data at the fusion time horizon
@@ -121,7 +121,7 @@ bool Ukf::resetPosition()
 		_ukf_states.data.pos(1) = _ev_sample_delayed.posNED(1);
 
 		// use EV accuracy to reset variances
-		setDiag(6,7,sq(_ev_sample_delayed.posErr));
+		setDiag(6, 7, sq(_ev_sample_delayed.posErr));
 
 	} else {
 		return false;
@@ -152,7 +152,7 @@ bool Ukf::resetPosition()
 void Ukf::resetHeight()
 {
 	// Get the most recent GPS data
-	const gpsSample& gps_newest = _gps_buffer.get_newest();
+	const gpsSample &gps_newest = _gps_buffer.get_newest();
 
 	// store the current vertical position and velocity for reference so we can calculate and publish the reset amount
 	float old_vert_pos = _ukf_states.data.pos(2);
@@ -179,12 +179,12 @@ void Ukf::resetHeight()
 			zeroCovMat(8, 8);
 
 			// the state variance is the same as the observation
-			P_UKF(8,8) = sq(_params.range_noise);
+			P_UKF(8, 8) = sq(_params.range_noise);
 
 			vert_pos_reset = true;
 
 			// reset the baro offset which is subtracted from the baro reading if we need to use it as a backup
-			const baroSample& baro_newest = _baro_buffer.get_newest();
+			const baroSample &baro_newest = _baro_buffer.get_newest();
 			_baro_hgt_offset = baro_newest.hgt + _ukf_states.data.pos(2);
 
 		} else {
@@ -194,7 +194,7 @@ void Ukf::resetHeight()
 
 	} else if (_control_status.flags.baro_hgt) {
 		// initialize vertical position with newest baro measurement
-		const baroSample& baro_newest = _baro_buffer.get_newest();
+		const baroSample &baro_newest = _baro_buffer.get_newest();
 
 		if (_time_last_imu - baro_newest.time_us < 2 * BARO_MAX_INTERVAL) {
 			_ukf_states.data.pos(2) = _hgt_sensor_offset - baro_newest.hgt + _baro_hgt_offset;
@@ -203,7 +203,7 @@ void Ukf::resetHeight()
 			zeroCovMat(8, 8);
 
 			// the state variance is the same as the observation
-			P_UKF(8,8) = sq(_params.baro_noise);
+			P_UKF(8, 8) = sq(_params.baro_noise);
 
 			vert_pos_reset = true;
 
@@ -220,12 +220,12 @@ void Ukf::resetHeight()
 			zeroCovMat(8, 8);
 
 			// the state variance is the same as the observation
-			P_UKF(8,8) = sq(gps_newest.hacc);
+			P_UKF(8, 8) = sq(gps_newest.hacc);
 
 			vert_pos_reset = true;
 
 			// reset the baro offset which is subtracted from the baro reading if we need to use it as a backup
-			const baroSample& baro_newest = _baro_buffer.get_newest();
+			const baroSample &baro_newest = _baro_buffer.get_newest();
 			_baro_hgt_offset = baro_newest.hgt + _ukf_states.data.pos(2);
 
 		} else {
@@ -234,7 +234,7 @@ void Ukf::resetHeight()
 
 	} else if (_control_status.flags.ev_hgt) {
 		// initialize vertical position with newest measurement
-		const extVisionSample& ev_newest = _ext_vision_buffer.get_newest();
+		const extVisionSample &ev_newest = _ext_vision_buffer.get_newest();
 
 		// use the most recent data if it's time offset from the fusion time horizon is smaller
 		int32_t dt_newest = ev_newest.time_us - _imu_sample_delayed.time_us;
@@ -260,7 +260,7 @@ void Ukf::resetHeight()
 		_ukf_states.data.vel(2) = gps_newest.vel(2);
 
 		// the state variance is the same as the observation
-		P_UKF(5,5) = sq(1.5f * gps_newest.sacc);
+		P_UKF(5, 5) = sq(1.5f * gps_newest.sacc);
 
 	} else {
 		// we don't know what the vertical velocity is, so set it to zero
@@ -268,7 +268,7 @@ void Ukf::resetHeight()
 
 		// Set the variance to a value large enough to allow the state to converge quickly
 		// that does not destabilise the filter
-		P_UKF(5,5) = 10.0f;
+		P_UKF(5, 5) = 10.0f;
 
 	}
 
@@ -313,6 +313,7 @@ void Ukf::resetHeight()
 		_output_vert_delayed.vel_d_integ = _ukf_states.data.pos(2);
 		_output_vert_new.vel_d_integ = _ukf_states.data.pos(2);
 	}
+
 	if (vert_vel_reset) {
 		_output_vert_delayed.vel_d = _ukf_states.data.vel(2);
 		_output_vert_new.vel_d = _ukf_states.data.vel(2);
@@ -348,6 +349,7 @@ bool Ukf::realignYawGPS()
 {
 	// Need at least 5 m/s of GPS horizontal speed and ratio of velocity error to velocity < 0.15  for a reliable alignment
 	float gpsSpeed = sqrtf(sq(_gps_sample_delayed.vel(0)) + sq(_gps_sample_delayed.vel(1)));
+
 	if ((gpsSpeed > 5.0f) && (_gps_sample_delayed.sacc < (0.15f * gpsSpeed))) {
 		// check for excessive GPS velocity innovations
 		bool badVelInnov = ((_vel_pos_test_ratio[0] > 1.0f) || (_vel_pos_test_ratio[1] > 1.0f)) && _control_status.flags.gps;
@@ -398,11 +400,12 @@ bool Ukf::realignYawGPS()
 			} else if (_control_status.flags.wind) {
 				// we have previously aligned yaw in-flight and have wind estimates so set the yaw such that the vehicle nose is
 				// aligned with the wind relative GPS velocity vector
-				euler321(2) = atan2f((_gps_sample_delayed.vel(1) - _ukf_states.data.wind_vel(1)) , (_gps_sample_delayed.vel(0) - _ukf_states.data.wind_vel(0)));
+				euler321(2) = atan2f((_gps_sample_delayed.vel(1) - _ukf_states.data.wind_vel(1)),
+						     (_gps_sample_delayed.vel(0) - _ukf_states.data.wind_vel(0)));
 
 			} else {
 				// we don't have wind estimates, so align yaw to the GPS velocity vector
-				euler321(2) = atan2f(_gps_sample_delayed.vel(1) , _gps_sample_delayed.vel(0));
+				euler321(2) = atan2f(_gps_sample_delayed.vel(1), _gps_sample_delayed.vel(0));
 
 			}
 
@@ -420,15 +423,15 @@ bool Ukf::realignYawGPS()
 			_ukf_states.data.mag_I = _R_to_earth * _mag_sample_delayed.mag;
 
 			// use the combined UKF and GPS speed variance to calculate a rough estimate of the yaw error after alignment
-			float SpdErrorVariance = sq(_gps_sample_delayed.sacc) + P_UKF(3,3) + P_UKF(4,4);
+			float SpdErrorVariance = sq(_gps_sample_delayed.sacc) + P_UKF(3, 3) + P_UKF(4, 4);
 			float sineYawError = math::constrain(sqrtf(SpdErrorVariance) / gpsSpeed, 0.0f, 1.0f);
-			P_UKF(2,2) = sq(asinf(sineYawError));
+			P_UKF(2, 2) = sq(asinf(sineYawError));
 
 			// reset the corresponding rows and columns in the covariance matrix and set the variances on the magnetic field states to the measurement variance
 			zeroCovMat(15, 20);
 
 			for (uint8_t index = 15; index <= 20; index ++) {
-				P_UKF(index,index) = sq(_params.mag_noise);
+				P_UKF(index, index) = sq(_params.mag_noise);
 			}
 
 			// record the start time for the magnetic field alignment
@@ -462,7 +465,7 @@ bool Ukf::realignYawGPS()
 			zeroCovMat(15, 20);
 
 			for (uint8_t index = 15; index <= 20; index ++) {
-				P_UKF(index,index) = sq(_params.mag_noise);
+				P_UKF(index, index) = sq(_params.mag_noise);
 			}
 
 			// record the start time for the magnetic field alignment
@@ -598,7 +601,7 @@ bool Ukf::resetMagHeading(Vector3f &mag_init)
 	zeroCovMat(15, 20);
 
 	for (uint8_t index = 15; index <= 20; index ++) {
-		P_UKF(index,index) = sq(_params.mag_noise);
+		P_UKF(index, index) = sq(_params.mag_noise);
 	}
 
 	// record the time for the magnetic field alignment event
@@ -636,18 +639,19 @@ bool Ukf::resetMagHeading(Vector3f &mag_init)
 		_R_to_earth = quat_to_invrotmat(_ukf_states.data.quat);
 
 		// reset the rotation from the EV to UKF frame of reference if it is being used
-		if ((_params.fusion_mode & MASK_ROTATE_EV) && (_params.fusion_mode & MASK_USE_EVPOS) && !(_params.fusion_mode & MASK_USE_EVYAW)) {
+		if ((_params.fusion_mode & MASK_ROTATE_EV) && (_params.fusion_mode & MASK_USE_EVPOS)
+		    && !(_params.fusion_mode & MASK_USE_EVYAW)) {
 			resetExtVisRotMat();
 		}
 
 		// update the yaw angle variance using the variance of the measurement
 		if (_params.fusion_mode & MASK_USE_EVYAW) {
 			// using error estimate from external vision data
-			P_UKF(2,2) = sq(fmaxf(_ev_sample_delayed.angErr, 1.0e-2f));
+			P_UKF(2, 2) = sq(fmaxf(_ev_sample_delayed.angErr, 1.0e-2f));
 
 		} else if (_params.mag_fusion_type <= MAG_FUSE_TYPE_AUTOFW) {
 			// using magnetic heading tuning parameter
-			P_UKF(2,2) = sq(fmaxf(_params.mag_heading_noise, 1.0e-2f));
+			P_UKF(2, 2) = sq(fmaxf(_params.mag_heading_noise, 1.0e-2f));
 		}
 
 		// add the reset amount to the output observer buffered data
@@ -676,6 +680,7 @@ void Ukf::calcMagDeclination()
 	if (_flt_mag_align_complete) {
 		// Use value consistent with earth field state
 		_mag_declination = atan2f(_ukf_states.data.mag_I(1), _ukf_states.data.mag_I(0));
+
 	} else if (_params.mag_declination_source & MASK_USE_GEO_DECL) {
 		// use parameter value until GPS is available, then use value returned by geo library
 		if (_NED_origin_initialised) {
@@ -699,9 +704,9 @@ void Ukf::makeSymmetrical(uint8_t first, uint8_t last)
 {
 	for (unsigned row = first; row <= last; row++) {
 		for (unsigned col = 0; col < row; col++) {
-			double tmp = (P_UKF(row,col) + P_UKF(col,row)) / 2;
-			P_UKF(row,col) = tmp;
-			P_UKF(col,row) = tmp;
+			double tmp = (P_UKF(row, col) + P_UKF(col, row)) / 2;
+			P_UKF(row, col) = tmp;
+			P_UKF(col, row) = tmp;
 		}
 	}
 }
@@ -725,11 +730,13 @@ void Ukf::constrainStates()
 	}
 
 	for (int i = 0; i < 3; i++) {
-		_ukf_states.data.gyro_bias(i) = math::constrain(_ukf_states.data.gyro_bias(i), -0.349066f * _dt_ukf_avg, 0.349066f * _dt_ukf_avg);
+		_ukf_states.data.gyro_bias(i) = math::constrain(_ukf_states.data.gyro_bias(i), -0.349066f * _dt_ukf_avg,
+						0.349066f * _dt_ukf_avg);
 	}
 
 	for (int i = 0; i < 3; i++) {
-		_ukf_states.data.accel_bias(i) = math::constrain(_ukf_states.data.accel_bias(i), -_params.acc_bias_lim * _dt_ukf_avg, _params.acc_bias_lim * _dt_ukf_avg);
+		_ukf_states.data.accel_bias(i) = math::constrain(_ukf_states.data.accel_bias(i), -_params.acc_bias_lim * _dt_ukf_avg,
+						 _params.acc_bias_lim * _dt_ukf_avg);
 	}
 
 	for (int i = 0; i < 3; i++) {
@@ -887,7 +894,7 @@ void Ukf::get_gyro_bias(float bias[3])
 void Ukf::get_covariances(float *covariances)
 {
 	for (unsigned i = 0; i < UKF_N_STATES; i++) {
-		covariances[i] = P_UKF(i,i);
+		covariances[i] = P_UKF(i, i);
 	}
 }
 
@@ -933,8 +940,8 @@ void Ukf::get_ukf_gpos_accuracy(float *ukf_eph, float *ukf_epv, bool *dead_recko
 			       (_control_status.flags.fuse_beta && _control_status.flags.fuse_aspd));
 
 	if (vel_pos_aiding && _NED_origin_initialised) {
-		hpos_err = sqrtf(P_UKF(6,6) + P_UKF(7,7) + sq(_gps_origin_eph));
-		vpos_err = sqrtf(P_UKF(8,8) + sq(_gps_origin_epv));
+		hpos_err = sqrtf(P_UKF(6, 6) + P_UKF(7, 7) + sq(_gps_origin_eph));
+		vpos_err = sqrtf(P_UKF(8, 8) + sq(_gps_origin_epv));
 
 	} else {
 		hpos_err = 0.0f;
@@ -967,8 +974,8 @@ void Ukf::get_ukf_lpos_accuracy(float *ukf_eph, float *ukf_epv, bool *dead_recko
 			       (_control_status.flags.fuse_beta && _control_status.flags.fuse_aspd));
 
 	if (vel_pos_aiding && _NED_origin_initialised) {
-		hpos_err = sqrtf(P_UKF(7,7) + P_UKF(6,6));
-		vpos_err = sqrtf(P_UKF(8,8));
+		hpos_err = sqrtf(P_UKF(7, 7) + P_UKF(6, 6));
+		vpos_err = sqrtf(P_UKF(8, 8));
 
 	} else {
 		hpos_err = 0.0f;
@@ -1000,8 +1007,8 @@ void Ukf::get_ukf_vel_accuracy(float *ukf_evh, float *ukf_evv, bool *dead_reckon
 			       (_control_status.flags.fuse_beta && _control_status.flags.fuse_aspd));
 
 	if (vel_pos_aiding && _NED_origin_initialised) {
-		hvel_err = sqrtf(P_UKF(4,4) + P_UKF(3,3));
-		vvel_err = sqrtf(P_UKF(5,5));
+		hvel_err = sqrtf(P_UKF(4, 4) + P_UKF(3, 3));
+		vvel_err = sqrtf(P_UKF(5, 5));
 
 	} else {
 		hvel_err = 0.0f;
@@ -1045,11 +1052,13 @@ void Ukf::get_ukf_ctrl_limits(float *vxy_max, bool *limit_hagl)
 	bool flow_limit_hagl;
 
 	// If relying on optical flow for navigation we need to keep within flow and range sensor limits
-	bool relying_on_optical_flow = _control_status.flags.opt_flow && !(_control_status.flags.gps || _control_status.flags.ev_pos);
+	bool relying_on_optical_flow = _control_status.flags.opt_flow && !(_control_status.flags.gps
+				       || _control_status.flags.ev_pos);
+
 	if (relying_on_optical_flow) {
 		// Allow ground relative velocity to use 50% of available flow sensor range to allow for angular motion
 		flow_gnd_spd_max = 0.5f * _params.flow_rate_max * (_terrain_vpos - _ukf_states.data.pos(2));
-		flow_gnd_spd_max = fmaxf(flow_gnd_spd_max , 0.0f);
+		flow_gnd_spd_max = fmaxf(flow_gnd_spd_max, 0.0f);
 
 		flow_limit_hagl = true;
 
@@ -1080,14 +1089,14 @@ bool Ukf::reset_imu_bias()
 
 	// Set the corresponding variances to the values use for initial alignment
 	float dt = 0.001f * (float)FILTER_UPDATE_PERIOD_MS;
-	P_UKF(11,11) = P_UKF(10,10) = P_UKF(9,9) = sq(_params.switch_on_gyro_bias * dt);
-	P_UKF(14,14) = P_UKF(13,13) = P_UKF(12,12) = sq(_params.switch_on_accel_bias * dt);
+	P_UKF(11, 11) = P_UKF(10, 10) = P_UKF(9, 9) = sq(_params.switch_on_gyro_bias * dt);
+	P_UKF(14, 14) = P_UKF(13, 13) = P_UKF(12, 12) = sq(_params.switch_on_accel_bias * dt);
 	_last_imu_bias_cov_reset_us = _imu_sample_delayed.time_us;
 
 	// Set previous frame values
-	_prev_dvel_bias_var(0) = P_UKF(12,12);
-	_prev_dvel_bias_var(1) = P_UKF(13,13);
-	_prev_dvel_bias_var(2) = P_UKF(14,14);
+	_prev_dvel_bias_var(0) = P_UKF(12, 12);
+	_prev_dvel_bias_var(1) = P_UKF(13, 13);
+	_prev_dvel_bias_var(2) = P_UKF(14, 14);
 
 	_sigma_points_are_stale = true;
 	return true;
@@ -1099,12 +1108,14 @@ bool Ukf::reset_imu_bias()
 // Innovation Test Ratios - these are the ratio of the innovation to the acceptance threshold.
 // A value > 1 indicates that the sensor measurement has exceeded the maximum acceptable level and has been rejected by the UKF
 // Where a measurement type is a vector quantity, eg magnetoemter, GPS position, etc, the maximum value is returned.
-void Ukf::get_innovation_test_status(uint16_t *status, float *mag, float *vel, float *pos, float *hgt, float *tas, float *hagl, float *beta)
+void Ukf::get_innovation_test_status(uint16_t *status, float *mag, float *vel, float *pos, float *hgt, float *tas,
+				     float *hagl, float *beta)
 {
 	// return the integer bitmask containing the consistency check pass/fail satus
 	*status = _innov_check_fail_status.value;
 	// return the largest magnetometer innovation test ratio
-	*mag = sqrtf(math::max(_yaw_test_ratio, math::max(math::max(_mag_test_ratio[0], _mag_test_ratio[1]), _mag_test_ratio[2])));
+	*mag = sqrtf(math::max(_yaw_test_ratio, math::max(math::max(_mag_test_ratio[0], _mag_test_ratio[1]),
+			       _mag_test_ratio[2])));
 	// return the largest NED velocity innovation test ratio
 	*vel = sqrtf(math::max(math::max(_vel_pos_test_ratio[0], _vel_pos_test_ratio[1]), _vel_pos_test_ratio[2]));
 	// return the largest NE position innovation test ratio
@@ -1123,11 +1134,17 @@ void Ukf::get_innovation_test_status(uint16_t *status, float *mag, float *vel, f
 void Ukf::get_ukf_soln_status(uint16_t *status)
 {
 	ukf_solution_status soln_status{};
-	soln_status.flags.attitude = _control_status.flags.tilt_align && _control_status.flags.yaw_align && (_fault_status.value == 0);
-	soln_status.flags.velocity_horiz = (_control_status.flags.gps || _control_status.flags.ev_pos || _control_status.flags.opt_flow || (_control_status.flags.fuse_beta && _control_status.flags.fuse_aspd)) && (_fault_status.value == 0);
-	soln_status.flags.velocity_vert = (_control_status.flags.baro_hgt || _control_status.flags.ev_hgt || _control_status.flags.gps_hgt || _control_status.flags.rng_hgt) && (_fault_status.value == 0);
-	soln_status.flags.pos_horiz_rel = (_control_status.flags.gps || _control_status.flags.ev_pos || _control_status.flags.opt_flow ) && (_fault_status.value == 0);
-	soln_status.flags.pos_horiz_abs = (_control_status.flags.gps || _control_status.flags.ev_pos) && (_fault_status.value == 0);
+	soln_status.flags.attitude = _control_status.flags.tilt_align && _control_status.flags.yaw_align
+				     && (_fault_status.value == 0);
+	soln_status.flags.velocity_horiz = (_control_status.flags.gps || _control_status.flags.ev_pos
+					    || _control_status.flags.opt_flow || (_control_status.flags.fuse_beta && _control_status.flags.fuse_aspd))
+					   && (_fault_status.value == 0);
+	soln_status.flags.velocity_vert = (_control_status.flags.baro_hgt || _control_status.flags.ev_hgt
+					   || _control_status.flags.gps_hgt || _control_status.flags.rng_hgt) && (_fault_status.value == 0);
+	soln_status.flags.pos_horiz_rel = (_control_status.flags.gps || _control_status.flags.ev_pos
+					   || _control_status.flags.opt_flow) && (_fault_status.value == 0);
+	soln_status.flags.pos_horiz_abs = (_control_status.flags.gps || _control_status.flags.ev_pos)
+					  && (_fault_status.value == 0);
 	soln_status.flags.pos_vert_abs = soln_status.flags.velocity_vert;
 	soln_status.flags.pos_vert_agl = get_terrain_valid();
 	soln_status.flags.const_pos_mode = !soln_status.flags.velocity_horiz;
@@ -1135,7 +1152,8 @@ void Ukf::get_ukf_soln_status(uint16_t *status)
 	soln_status.flags.pred_pos_horiz_abs = soln_status.flags.pos_vert_abs;
 	bool gps_vel_innov_bad = (_vel_pos_test_ratio[0] > 1.0f) || (_vel_pos_test_ratio[1] > 1.0f);
 	bool gps_pos_innov_bad = (_vel_pos_test_ratio[3] > 1.0f) || (_vel_pos_test_ratio[4] > 1.0f);
-	bool mag_innov_good = (_mag_test_ratio[0] < 1.0f) && (_mag_test_ratio[1] < 1.0f) && (_mag_test_ratio[2] < 1.0f) && (_yaw_test_ratio < 1.0f);
+	bool mag_innov_good = (_mag_test_ratio[0] < 1.0f) && (_mag_test_ratio[1] < 1.0f) && (_mag_test_ratio[2] < 1.0f)
+			      && (_yaw_test_ratio < 1.0f);
 	soln_status.flags.gps_glitch = (gps_vel_innov_bad || gps_pos_innov_bad) && mag_innov_good;
 	soln_status.flags.accel_error = _bad_vert_accel_detected;
 	*status = soln_status.value;
@@ -1151,9 +1169,10 @@ void Ukf::fuse(float *K, float innovation)
 	// Calculate the quaternion correction from the attitude error vector
 	float normdp2 = sq(_ukf_states.data.att(0)) + sq(_ukf_states.data.att(1)) + sq(_ukf_states.data.att(2));
 	Quatf dq;
-	dq(0) = (-_grp_a * normdp2 + _grp_f*sqrtf( sq(_grp_f) + (1.0f - sq(_grp_a)) * normdp2)) / (sq(_grp_f) + normdp2);
-	for (uint8_t i=0; i<3; i++) {
-		dq(i+1) = (_grp_a + dq(0)) * _ukf_states.data.att(i) / _grp_f;
+	dq(0) = (-_grp_a * normdp2 + _grp_f * sqrtf(sq(_grp_f) + (1.0f - sq(_grp_a)) * normdp2)) / (sq(_grp_f) + normdp2);
+
+	for (uint8_t i = 0; i < 3; i++) {
+		dq(i + 1) = (_grp_a + dq(0)) * _ukf_states.data.att(i) / _grp_f;
 	}
 
 	// apply the correction to the stored quaternion state and renormalize
@@ -1193,13 +1212,14 @@ void Ukf::zeroCovMat(uint8_t first, uint8_t last)
 {
 	// zero rows
 	uint8_t row;
+
 	for (row = first; row <= last; row++) {
-		memset(&P_UKF(row,0), 0, sizeof(P_UKF(0,0)) * 23);
+		memset(&P_UKF(row, 0), 0, sizeof(P_UKF(0, 0)) * 23);
 	}
 
 	// zero columns
 	for (row = 0; row <= 22; row++) {
-		memset(&P_UKF(row,first), 0, sizeof(P_UKF(0,0)) * (1 + last - first));
+		memset(&P_UKF(row, first), 0, sizeof(P_UKF(0, 0)) * (1 + last - first));
 	}
 }
 
@@ -1208,8 +1228,9 @@ void Ukf::zeroOffDiag(uint8_t first, uint8_t last)
 	// save diagonal elements
 	uint8_t row;
 	float variances[UKF_N_STATES];
+
 	for (row = first; row <= last; row++) {
-		variances[row] = P_UKF(row,row);
+		variances[row] = P_UKF(row, row);
 	}
 
 	// zero rows and columns
@@ -1217,7 +1238,7 @@ void Ukf::zeroOffDiag(uint8_t first, uint8_t last)
 
 	// restore diagonals
 	for (row = first; row <= last; row++) {
-		P_UKF(row,row) = variances[row];
+		P_UKF(row, row) = variances[row];
 	}
 }
 
@@ -1228,8 +1249,9 @@ void Ukf::setDiag(uint8_t first, uint8_t last, float variance)
 
 	// set diagonals
 	uint8_t row;
+
 	for (row = first; row <= last; row++) {
-		P_UKF(row,row) = variance;
+		P_UKF(row, row) = variance;
 	}
 
 }
@@ -1247,8 +1269,11 @@ bool Ukf::inertial_dead_reckoning()
 			    && ((_time_last_imu - _time_last_pos_fuse <= _params.no_aid_timeout_max)
 				|| (_time_last_imu - _time_last_vel_fuse <= _params.no_aid_timeout_max)
 				|| (_time_last_imu - _time_last_delpos_fuse <= _params.no_aid_timeout_max));
-	bool optFlowAiding = _control_status.flags.opt_flow && (_time_last_imu - _time_last_of_fuse <= _params.no_aid_timeout_max);
-	bool airDataAiding = _control_status.flags.wind && (_time_last_imu - _time_last_arsp_fuse <= _params.no_aid_timeout_max) && (_time_last_imu - _time_last_beta_fuse <= _params.no_aid_timeout_max);
+	bool optFlowAiding = _control_status.flags.opt_flow
+			     && (_time_last_imu - _time_last_of_fuse <= _params.no_aid_timeout_max);
+	bool airDataAiding = _control_status.flags.wind
+			     && (_time_last_imu - _time_last_arsp_fuse <= _params.no_aid_timeout_max)
+			     && (_time_last_imu - _time_last_beta_fuse <= _params.no_aid_timeout_max);
 
 	return !velPosAiding && !optFlowAiding && !airDataAiding;
 }
@@ -1340,30 +1365,38 @@ void Ukf::calcExtVisRotMat()
 	Vector3f rot_vec;
 	float delta;
 	float scaler;
+
 	if (q_error(0) >= 0.0f) {
-	    delta = 2 * acosf(q_error(0));
-	    if (delta > 1e-6f) {
-		    scaler = 1.0f /  sinf(delta/2);
-	    } else {
-		    // The rotation is too small to calculate a vector accurately
-		    // Make the rotation vector zero
-		    scaler = 0.0f;
-	    }
+		delta = 2 * acosf(q_error(0));
+
+		if (delta > 1e-6f) {
+			scaler = 1.0f /  sinf(delta / 2);
+
+		} else {
+			// The rotation is too small to calculate a vector accurately
+			// Make the rotation vector zero
+			scaler = 0.0f;
+		}
+
 	} else {
-	    delta = 2 * acosf(-q_error(0));
-	    if (delta > 1e-6f) {
-		   scaler = -1.0f /  sinf(delta/2);
-	    } else {
-		    // The rotation is too small to calculate a vector accurately
-		    // Make the rotation vector zero
-		    scaler = 0.0f;
-	    }
+		delta = 2 * acosf(-q_error(0));
+
+		if (delta > 1e-6f) {
+			scaler = -1.0f /  sinf(delta / 2);
+
+		} else {
+			// The rotation is too small to calculate a vector accurately
+			// Make the rotation vector zero
+			scaler = 0.0f;
+		}
 	}
+
 	rot_vec(0) = q_error(2) * scaler;
 	rot_vec(1) = q_error(3) * scaler;
 	rot_vec(2) = q_error(4) * scaler;
 
 	float rot_vec_norm = rot_vec.norm();
+
 	if (rot_vec_norm > 1e-6f) {
 		// ensure magnitude of rotation matches the quaternion
 		rot_vec = rot_vec * (delta / rot_vec_norm);
@@ -1371,13 +1404,14 @@ void Ukf::calcExtVisRotMat()
 		// apply an input limiter to protect from spikes
 		Vector3f _input_delta_vec = rot_vec - _ev_rot_vec_filt;
 		float input_delta_mag = _input_delta_vec.norm();
+
 		if (input_delta_mag > 0.1f) {
 			rot_vec = _ev_rot_vec_filt + rot_vec * (0.1f / input_delta_mag);
 		}
 
 		// Apply a first order IIR low pass filter
 		const float omega_lpf_us = 0.2e-6f; // cutoff frequency in rad/uSec
-		float alpha = math::constrain(omega_lpf_us * (float)(_time_last_imu - _ev_rot_last_time_us) , 0.0f , 1.0f);
+		float alpha = math::constrain(omega_lpf_us * (float)(_time_last_imu - _ev_rot_last_time_us), 0.0f, 1.0f);
 		_ev_rot_last_time_us = _time_last_imu;
 		_ev_rot_vec_filt = _ev_rot_vec_filt * (1.0f - alpha) + rot_vec * alpha;
 
@@ -1401,21 +1435,25 @@ void Ukf::resetExtVisRotMat()
 	// convert to a delta angle and reset
 	Vector3f rot_vec;
 	float delta;
+
 	if (q_error(0) >= 0.0f) {
-	    delta = 2 * acosf(q_error(0));
-	    rot_vec(0) = q_error(1) / sinf(delta/2);
-	    rot_vec(1) = q_error(2) / sinf(delta/2);
-	    rot_vec(2) = q_error(3) / sinf(delta/2);
+		delta = 2 * acosf(q_error(0));
+		rot_vec(0) = q_error(1) / sinf(delta / 2);
+		rot_vec(1) = q_error(2) / sinf(delta / 2);
+		rot_vec(2) = q_error(3) / sinf(delta / 2);
+
 	} else {
-	    delta = 2 * acosf(-q_error(1));
-	    rot_vec(0) = -q_error(2) / sinf(delta/2);
-	    rot_vec(1) = -q_error(3) / sinf(delta/2);
-	    rot_vec(2) = -q_error(4) / sinf(delta/2);
+		delta = 2 * acosf(-q_error(1));
+		rot_vec(0) = -q_error(2) / sinf(delta / 2);
+		rot_vec(1) = -q_error(3) / sinf(delta / 2);
+		rot_vec(2) = -q_error(4) / sinf(delta / 2);
 	}
 
 	float rot_vec_norm = rot_vec.norm();
+
 	if (rot_vec_norm > 1e-9f) {
 		_ev_rot_vec_filt = rot_vec * delta / rot_vec_norm;
+
 	} else {
 		_ev_rot_vec_filt.zero();
 	}
@@ -1429,6 +1467,7 @@ void Ukf::get_ukf2ev_quaternion(float *quat)
 {
 	Quatf quat_ukf2ev;
 	quat_ukf2ev.from_axis_angle(_ev_rot_vec_filt);
+
 	for (unsigned i = 0; i < 4; i++) {
 		quat[i] = quat_ukf2ev(i);
 	}
@@ -1437,10 +1476,11 @@ void Ukf::get_ukf2ev_quaternion(float *quat)
 // initialise UKF class variables
 void Ukf::initUkfClassVariables()
 {
-	_ukf_wm[0] = _ukf_lambda/(_ukf_lambda+(float)UKF_N_AUG_STATES);
+	_ukf_wm[0] = _ukf_lambda / (_ukf_lambda + (float)UKF_N_AUG_STATES);
 	_ukf_wc[0] = _ukf_wm[0] + 1.0f - sq(_ukf_alpha) + _ukf_beta;
 	float temp = 0.5f / (float)UKF_N_AUG_STATES;
-	for (uint8_t i=1; i<UKF_N_SIGMA; i++) {
+
+	for (uint8_t i = 1; i < UKF_N_SIGMA; i++) {
 		_ukf_wm[i] = temp;
 		_ukf_wc[i] = temp;
 	}

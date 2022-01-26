@@ -42,13 +42,10 @@
 
 #include "estimator_interface.h"
 
-#include "../ecl.h"
-#include <math.h>
-#include "mathlib.h"
+#include <mathlib/mathlib.h>
 
 // Accumulate imu data and store to buffer at desired rate
-void EstimatorInterface::setIMUData(uint64_t time_usec, uint64_t delta_ang_dt, uint64_t delta_vel_dt,
-				    float (&delta_ang)[3], float (&delta_vel)[3])
+void EstimatorInterface::setIMUData(const imuSample &imu_sample_new)
 {
 	if (!_initialised) {
 		init(time_usec);
@@ -63,15 +60,6 @@ void EstimatorInterface::setIMUData(uint64_t time_usec, uint64_t delta_ang_dt, u
 		_dt_imu_avg = 0.8f * _dt_imu_avg + 0.2f * dt;
 	}
 
-	// copy data
-	imuSample imu_sample_new;
-	imu_sample_new.delta_ang = Vector3f(delta_ang);
-	imu_sample_new.delta_vel = Vector3f(delta_vel);
-
-	// convert time from us to secs
-	imu_sample_new.delta_ang_dt = delta_ang_dt / 1e6f;
-	imu_sample_new.delta_vel_dt = delta_vel_dt / 1e6f;
-	imu_sample_new.time_us = time_usec;
 	_imu_ticks++;
 
 	// calculate a metric which indicates the amount of coning vibration
@@ -109,6 +97,7 @@ void EstimatorInterface::setIMUData(uint64_t time_usec, uint64_t delta_ang_dt, u
 			// Do not retry if allocation has failed previously
 			if (_drag_buffer.get_length() < _obs_buffer_length) {
 				_drag_buffer_fail = !_drag_buffer.allocate(_obs_buffer_length);
+
 				if (_drag_buffer_fail) {
 					ECL_ERR("UKF drag buffer allocation failed");
 					return;
@@ -164,6 +153,7 @@ void EstimatorInterface::setMagData(uint64_t time_usec, float (&data)[3])
 	// Do not retry if allocation has failed previously
 	if (_mag_buffer.get_length() < _obs_buffer_length) {
 		_mag_buffer_fail = !_mag_buffer.allocate(_obs_buffer_length);
+
 		if (_mag_buffer_fail) {
 			ECL_ERR("UKF mag buffer allocation failed");
 			return;
@@ -195,6 +185,7 @@ void EstimatorInterface::setGpsData(uint64_t time_usec, struct gps_message *gps)
 	// Do not retry if allocation has failed previously
 	if (_gps_buffer.get_length() < _obs_buffer_length) {
 		_gps_buffer_fail = !_gps_buffer.allocate(_obs_buffer_length);
+
 		if (_gps_buffer_fail) {
 			ECL_ERR("UKF GPS buffer allocation failed");
 			return;
@@ -248,6 +239,7 @@ void EstimatorInterface::setBaroData(uint64_t time_usec, float data)
 	// Do not retry if allocation has failed previously
 	if (_baro_buffer.get_length() < _obs_buffer_length) {
 		_baro_buffer_fail = !_baro_buffer.allocate(_obs_buffer_length);
+
 		if (_baro_buffer_fail) {
 			ECL_ERR("UKF baro buffer allocation failed");
 			return;
@@ -280,6 +272,7 @@ void EstimatorInterface::setAirspeedData(uint64_t time_usec, float true_airspeed
 	// Do not retry if allocation has failed previously
 	if (_airspeed_buffer.get_length() < _obs_buffer_length) {
 		_airspeed_buffer_fail = !_airspeed_buffer.allocate(_obs_buffer_length);
+
 		if (_airspeed_buffer_fail) {
 			ECL_ERR("UKF airspeed buffer allocation failed");
 			return;
@@ -309,6 +302,7 @@ void EstimatorInterface::setRangeData(uint64_t time_usec, float data)
 	// Do not retry if allocation has failed previously
 	if (_range_buffer.get_length() < _obs_buffer_length) {
 		_range_buffer_fail = !_range_buffer.allocate(_obs_buffer_length);
+
 		if (_range_buffer_fail) {
 			ECL_ERR("UKF range finder buffer allocation failed");
 			return;
@@ -337,6 +331,7 @@ void EstimatorInterface::setOpticalFlowData(uint64_t time_usec, flow_message *fl
 	// Do not retry if allocation has failed previously
 	if (_flow_buffer.get_length() < _obs_buffer_length) {
 		_flow_buffer_fail = !_flow_buffer.allocate(_obs_buffer_length);
+
 		if (_flow_buffer_fail) {
 			ECL_ERR("UKF optical flow buffer allocation failed");
 			return;
@@ -350,6 +345,7 @@ void EstimatorInterface::setOpticalFlowData(uint64_t time_usec, flow_message *fl
 		float delta_time = 1e-6f * (float)flow->dt;
 		float delta_time_min = 5e-7f * (float)_min_obs_interval_us;
 		bool delta_time_good = delta_time >= delta_time_min;
+
 		if (!delta_time_good) {
 			// protect against overflow casued by division with very small delta_time
 			delta_time = delta_time_min;
@@ -416,6 +412,7 @@ void EstimatorInterface::setExtVisionData(uint64_t time_usec, ext_vision_message
 	// Do not retry if allocation has failed previously
 	if (_ext_vision_buffer.get_length() < _obs_buffer_length) {
 		_ev_buffer_fail = !_ext_vision_buffer.allocate(_obs_buffer_length);
+
 		if (_ev_buffer_fail) {
 			ECL_ERR("UKF external vision buffer allocation failed");
 			return;
@@ -452,6 +449,7 @@ void EstimatorInterface::setAuxVelData(uint64_t time_usec, float (&data)[2], flo
 	// Do not retry if allocation has failed previously
 	if (_auxvel_buffer.get_length() < _obs_buffer_length) {
 		_auxvel_buffer_fail = !_auxvel_buffer.allocate(_obs_buffer_length);
+
 		if (_auxvel_buffer_fail) {
 			ECL_ERR("UKF aux vel buffer allocation failed");
 			return;
@@ -478,13 +476,13 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 {
 	// find the maximum time delay the buffers are required to handle
 	uint16_t max_time_delay_ms = math::max(_params.mag_delay_ms,
-					 math::max(_params.range_delay_ms,
-					     math::max(_params.gps_delay_ms,
-						 math::max(_params.flow_delay_ms,
-						     math::max(_params.ev_delay_ms,
-							 math::max(_params.auxvel_delay_ms,
-							     math::max(_params.min_delay_ms,
-								 math::max(_params.airspeed_delay_ms, _params.baro_delay_ms))))))));
+					       math::max(_params.range_delay_ms,
+							       math::max(_params.gps_delay_ms,
+									       math::max(_params.flow_delay_ms,
+											       math::max(_params.ev_delay_ms,
+													       math::max(_params.auxvel_delay_ms,
+															       math::max(_params.min_delay_ms,
+																	       math::max(_params.airspeed_delay_ms, _params.baro_delay_ms))))))));
 
 	// calculate the IMU buffer length required to accomodate the maximum delay with some allowance for jitter
 	_imu_buffer_length = (max_time_delay_ms / FILTER_UPDATE_PERIOD_MS) + 1;
@@ -554,7 +552,8 @@ bool EstimatorInterface::local_position_is_valid()
 	return !inertial_dead_reckoning();
 }
 
-void EstimatorInterface::print_status() {
+void EstimatorInterface::print_status()
+{
 	ECL_INFO("local position valid: %s", local_position_is_valid() ? "yes" : "no");
 	ECL_INFO("global position valid: %s", global_position_is_valid() ? "yes" : "no");
 

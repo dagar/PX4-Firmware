@@ -40,10 +40,15 @@
  * @author Paul Riseborough <p_riseborough@live.com.au>
  *
  */
+#ifndef UKF_COMMON_H
+#define UKF_COMMON_H
+
+#include <matrix/math.hpp>
 
 namespace estimator
 {
 
+using matrix::AxisAnglef;
 using matrix::Dcmf;
 using matrix::Eulerf;
 using matrix::Matrix3f;
@@ -52,12 +57,19 @@ using matrix::Vector2f;
 using matrix::Vector3f;
 using matrix::wrap_pi;
 
+enum class velocity_frame_t : uint8_t {
+	LOCAL_FRAME_FRD,
+	BODY_FRAME_FRD
+};
+
 struct gps_message {
-	uint64_t time_usec;
+	uint64_t time_usec{0};
 	int32_t lat;		///< Latitude in 1E-7 degrees
 	int32_t lon;		///< Longitude in 1E-7 degrees
 	int32_t alt;		///< Altitude in 1E-3 meters (millimeters) above MSL
-	uint8_t fix_type;	///< 0-1: no fix, 2: 2D fix, 3: 3D fix, 4: RTCM code differential, 5: Real-Time
+	float yaw;		///< yaw angle. NaN if not set (used for dual antenna GPS), (rad, [-PI, PI])
+	float yaw_offset;	///< Heading/Yaw offset for dual antenna GPS - refer to description for GPS_YAW_OFFSET
+	uint8_t fix_type;	///< 0-1: no fix, 2: 2D fix, 3: 3D fix, 4: RTCM code differential, 5: Real-Time Kinematic
 	float eph;		///< GPS horizontal position accuracy in m
 	float epv;		///< GPS vertical position accuracy in m
 	float sacc;		///< GPS speed accuracy in m/s
@@ -83,84 +95,88 @@ struct ext_vision_message {
 };
 
 struct outputSample {
+	uint64_t    time_us{0};	///< timestamp of the measurement (uSec)
 	Quatf  quat_nominal;	///< nominal quaternion describing vehicle attitude
 	Vector3f    vel;	///< NED velocity estimate in earth frame (m/sec)
 	Vector3f    pos;	///< NED position estimate in earth frame (m/sec)
-	uint64_t    time_us;	///< timestamp of the measurement (uSec)
 };
 
 struct outputVert {
+	uint64_t    time_us{0};		///< timestamp of the measurement (uSec)
 	float	    vel_d;		///< D velocity calculated using alternative algorithm (m/sec)
 	float	    vel_d_integ;	///< Integral of vel_d (m)
 	float	    dt;			///< delta time (sec)
-	uint64_t    time_us;		///< timestamp of the measurement (uSec)
 };
 
 struct imuSample {
+	uint64_t    time_us{0};		///< timestamp of the measurement (uSec)
 	Vector3f    delta_ang;		///< delta angle in body frame (integrated gyro measurements) (rad)
 	Vector3f    delta_vel;		///< delta velocity in body frame (integrated accelerometer measurements) (m/sec)
 	float       delta_ang_dt;	///< delta angle integration period (sec)
 	float       delta_vel_dt;	///< delta velocity integration period (sec)
-	uint64_t    time_us;		///< timestamp of the measurement (uSec)
+	bool        delta_vel_clipping[3] {}; ///< true (per axis) if this sample contained any accelerometer clipping
 };
 
 struct gpsSample {
+	uint64_t    time_us{0};	///< timestamp of the measurement (uSec)
 	Vector2f    pos;	///< NE earth frame gps horizontal position measurement (m)
 	float       hgt;	///< gps height measurement (m)
 	Vector3f    vel;	///< NED earth frame gps velocity measurement (m/sec)
+	float	    yaw;	///< yaw angle. NaN if not set (used for dual antenna GPS), (rad, [-PI, PI])
 	float	    hacc;	///< 1-std horizontal position error (m)
 	float	    vacc;	///< 1-std vertical position error (m)
 	float       sacc;	///< 1-std speed error (m/sec)
-	uint64_t    time_us;	///< timestamp of the measurement (uSec)
 };
 
 struct magSample {
+	uint64_t    time_us{0};	///< timestamp of the measurement (uSec)
 	Vector3f    mag;	///< NED magnetometer body frame measurements (Gauss)
-	uint64_t    time_us;	///< timestamp of the measurement (uSec)
 };
 
 struct baroSample {
-	float       hgt{0.0f};	///< pressure altitude above sea level (m)
 	uint64_t    time_us{0};	///< timestamp of the measurement (uSec)
+	float       hgt;	///< pressure altitude above sea level (m)
 };
 
 struct rangeSample {
-	float       rng;	///< range (distance to ground) measurement (m)
-	uint64_t    time_us;	///< timestamp of the measurement (uSec)
+	uint64_t    time_us{0};	///< timestamp of the measurement (uSec)
+	float       rng;	    ///< range (distance to ground) measurement (m)
+	int8_t
+	quality;    ///< Signal quality in percent (0...100%), where 0 = invalid signal, 100 = perfect signal, and -1 = unknown signal quality.
 };
 
 struct airspeedSample {
+	uint64_t    time_us{0};		///< timestamp of the measurement (uSec)
 	float       true_airspeed;	///< true airspeed measurement (m/sec)
-	float 		eas2tas;	///< equivalent to true airspeed factor
-	uint64_t    time_us;		///< timestamp of the measurement (uSec)
+	float       eas2tas;		///< equivalent to true airspeed factor
 };
 
 struct flowSample {
-	uint8_t  quality;	///< quality indicator between 0 and 255
+	uint64_t time_us{0};	///< timestamp of the integration period leading edge (uSec)
 	Vector2f flowRadXY;	///< measured delta angle of the image about the X and Y body axes (rad), RH rotaton is positive
 	Vector2f flowRadXYcomp;	///< measured delta angle of the image about the X and Y body axes after removal of body rotation (rad), RH rotation is positive
 	Vector3f gyroXYZ;	///< measured delta angle of the inertial frame about the body axes obtained from rate gyro measurements (rad), RH rotation is positive
 	float    dt;		///< amount of integration time (sec)
-	uint64_t time_us;	///< timestamp of the integration period mid-point (uSec)
+	uint8_t  quality;	///< quality indicator between 0 and 255
 };
 
 struct extVisionSample {
+	uint64_t time_us{0};	///< timestamp of the measurement (uSec)
 	Vector3f posNED;	///< measured NED position relative to the local origin (m)
 	Quatf quat;		///< measured quaternion orientation defining rotation from NED to body frame
 	float posErr;		///< 1-Sigma spherical position accuracy (m)
 	float angErr;		///< 1-Sigma angular error (rad)
-	uint64_t time_us;	///< timestamp of the measurement (uSec)
 };
 
 struct dragSample {
+	uint64_t time_us{0};	///< timestamp of the measurement (uSec)
 	Vector2f accelXY;	///< measured specific force along the X and Y body axes (m/sec**2)
-	uint64_t time_us;	///< timestamp of the measurement (uSec)
 };
 
 struct auxVelSample {
+	uint64_t time_us{0};	///< timestamp of the measurement (uSec)
 	Vector2f velNE;		///< measured NE velocity relative to the local origin (m/sec)
 	Vector2f velVarNE;	///< estimated error variance of the NE velocity (m/sec)**2
-	uint64_t time_us;	///< timestamp of the measurement (uSec)
 };
 
 // Integer definitions for vdist_sensor_type
@@ -321,9 +337,9 @@ struct parameters {
 	float acc_bias_learn_tc{0.5f};		///< time constant used to control the decaying envelope filters applied to the accel and gyro magnitudes (sec)
 
 	unsigned no_gps_timeout_max{7000000};	///< maximum time we allow dead reckoning while both gps position and velocity measurements are being
-						///< rejected before attempting to reset the states to the GPS measurement (uSec)
+	///< rejected before attempting to reset the states to the GPS measurement (uSec)
 	unsigned no_aid_timeout_max{1000000};	///< maximum lapsed time from last fusion of measurements that constrain drift before
-						///< the UKF will report that it is dead-reckoning (uSec)
+	///< the UKF will report that it is dead-reckoning (uSec)
 
 	// multi-rotor drag specific force fusion
 	float drag_noise{2.5f};			///< observation noise variance for drag specific force measurements (m/sec**2)**2
@@ -448,9 +464,12 @@ union ukf_solution_status {
 		uint16_t pos_horiz_abs      : 1; ///< 4 - True if the horizontal position (absolute) estimate is good
 		uint16_t pos_vert_abs       : 1; ///< 5 - True if the vertical position (absolute) estimate is good
 		uint16_t pos_vert_agl       : 1; ///< 6 - True if the vertical position (above ground) estimate is good
-		uint16_t const_pos_mode     : 1; ///< 7 - True if the UKF is in a constant position mode and is not using external measurements (eg GPS or optical flow)
-		uint16_t pred_pos_horiz_rel : 1; ///< 8 - True if the UKF has sufficient data to enter a mode that will provide a (relative) position estimate
-		uint16_t pred_pos_horiz_abs : 1; ///< 9 - True if the UKF has sufficient data to enter a mode that will provide a (absolute) position estimate
+uint16_t const_pos_mode     :
+		1; ///< 7 - True if the UKF is in a constant position mode and is not using external measurements (eg GPS or optical flow)
+uint16_t pred_pos_horiz_rel :
+		1; ///< 8 - True if the UKF has sufficient data to enter a mode that will provide a (relative) position estimate
+uint16_t pred_pos_horiz_abs :
+		1; ///< 9 - True if the UKF has sufficient data to enter a mode that will provide a (absolute) position estimate
 		uint16_t gps_glitch         : 1; ///< 10 - True if the UKF has detected a GPS glitch
 		uint16_t accel_error        : 1; ///< 11 - True if the UKF has detected bad accelerometer data
 	} flags;
@@ -458,3 +477,4 @@ union ukf_solution_status {
 };
 
 }
+#endif // !UKF_COMMON_H

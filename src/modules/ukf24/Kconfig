@@ -1,0 +1,5 @@
+menuconfig MODULES_UKF24
+	bool "ukf24"
+	default n
+	---help---
+		Enable support for ukf24

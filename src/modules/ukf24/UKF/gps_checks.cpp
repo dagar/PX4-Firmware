@@ -39,10 +39,10 @@
  *
  */
 
-#include "../ecl.h"
 #include "ukf.h"
-#include "mathlib.h"
-#include "geo.h"
+
+#include <lib/world_magnetic_model/geo_mag_declination.h>
+#include <mathlib/mathlib.h>
 
 // GPS pre-flight check bit locations
 #define MASK_GPS_NSATS  (1<<0)
@@ -61,6 +61,7 @@ bool Ukf::collect_gps(uint64_t time_usec, struct gps_message *gps)
 	// Also run checks if the vehicle is on-ground as the check data can be used by vehicle pre-flight checks
 	if (!_control_status.flags.in_air || !_NED_origin_initialised || !_control_status.flags.gps) {
 		bool gps_checks_pass = gps_is_good(gps);
+
 		if (!_NED_origin_initialised && gps_checks_pass) {
 			// If we have good GPS data set the origin's WGS-84 position to the last gps fix
 			double lat = gps->lat / 1.0e7;
@@ -92,6 +93,7 @@ bool Ukf::collect_gps(uint64_t time_usec, struct gps_message *gps)
 				_control_status.flags.rng_hgt = false;
 				// zero the sensor offset
 				_hgt_sensor_offset = 0.0f;
+
 			} else {
 				ECL_INFO("UKF GPS checks passed (WGS-84 origin set)");
 			}
@@ -138,6 +140,7 @@ bool Ukf::gps_is_good(struct gps_message *gps)
 	// calculate position movement since last GPS fix
 	if (_gps_pos_prev.timestamp > 0) {
 		map_projection_project(&_gps_pos_prev, lat, lon, &delta_posN, &delta_PosE);
+
 	} else {
 		// no previous position has been set
 		map_projection_init_timestamped(&_gps_pos_prev, lat, lon, _time_last_imu);

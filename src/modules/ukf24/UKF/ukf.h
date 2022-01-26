@@ -40,8 +40,12 @@
  *
  */
 
+#ifndef UKF_UKF_H
+#define UKF_UKF_H
+
 #include "estimator_interface.h"
-#include "geo.h"
+
+#include <lib/geo/geo.h>
 #include <matrix/math.hpp>
 
 using namespace matrix;
@@ -227,7 +231,8 @@ public:
 	// Innovation Test Ratios - these are the ratio of the innovation to the acceptance threshold.
 	// A value > 1 indicates that the sensor measurement has exceeded the maximum acceptable level and has been rejected by the UKF
 	// Where a measurement type is a vector quantity, eg magnetoemter, GPS position, etc, the maximum value is returned.
-	void get_innovation_test_status(uint16_t *status, float *mag, float *vel, float *pos, float *hgt, float *tas, float *hagl, float *beta);
+	void get_innovation_test_status(uint16_t *status, float *mag, float *vel, float *pos, float *hgt, float *tas,
+					float *hagl, float *beta);
 
 	// return a bitmask integer that describes which state estimates can be used for flight control
 	void get_ukf_soln_status(uint16_t *status);
@@ -240,29 +245,29 @@ private:
 	// UKF IMPLEMENTATION SPECIFIC
 
 	// Define Unscented Transform scaling parameters and weight vectors
-	#define UKF_N_STATES 23
-	#define UKF_N_Q 6
-	#define UKF_N_AUG_STATES 29 // Size of augmented state vector [3x1 rotVec ; 3x1 velNED ; 3x1 posNED ; 3x1 dAngBias ; 3x1 dVelBias ; 3x1 magNED ; 3x1 magXYZ ; 2x1 velWindNE ; 3x1 dAngNoise ; 3x1 dVelNoise]
-	#define UKF_N_SIGMA 59
+#define UKF_N_STATES 23
+#define UKF_N_Q 6
+#define UKF_N_AUG_STATES 29 // Size of augmented state vector [3x1 rotVec ; 3x1 velNED ; 3x1 posNED ; 3x1 dAngBias ; 3x1 dVelBias ; 3x1 magNED ; 3x1 magXYZ ; 2x1 velWindNE ; 3x1 dAngNoise ; 3x1 dVelNoise]
+#define UKF_N_SIGMA 59
 
 	// Parameters controlling the unscented transform
 	const float _ukf_alpha{1.0f};	///< Primary scaling parameter
 	const float _ukf_beta{2.0f};	///< Secondary scaling parameter (Gaussian assumption)
 	const float _ukf_kappa{0.0f};	///< Tertiary scaling parameter
-	const float _ukf_lambda{sq(_ukf_alpha) * ((float)UKF_N_AUG_STATES + _ukf_kappa) - (float)UKF_N_AUG_STATES};
+	const float _ukf_lambda{sq(_ukf_alpha) *((float)UKF_N_AUG_STATES + _ukf_kappa) - (float)UKF_N_AUG_STATES};
 	float _ukf_wm[UKF_N_SIGMA];	///< vector of weights used to calculate expected value of state vector from sigma points
 	float _ukf_wc[UKF_N_SIGMA];	///< vector of weights used to calculate covariance from sigma points
 
 	// Generalized Rodrigues Parameter (GRP) coefficients
 	// set to values that give a vector magntude that is equal to the rotation angle for small rotations
 	const float _grp_a{1.0f};		///< Generalized Rodrigues Parameter (GRP) coefficient A
-	const float _grp_f{2.0f*(_grp_a+1.0f)};	///< Generalized Rodrigues Parameter (GRP) coefficient F
+	const float _grp_f{2.0f * (_grp_a + 1.0f)};	///< Generalized Rodrigues Parameter (GRP) coefficient F
 
 	// UKF covariance prediction variables
-	matrix::SquareMatrix<double, UKF_N_STATES> P_UKF;	///< state covariance matrix
-	matrix::SquareMatrix<double, UKF_N_STATES> SP_UKF;	/// lower diagonal Cholesky decomposition for the state covariance matrix
-	matrix::SquareMatrix<double,6> Q_UKF;			///< control input noise covariance matrix
-	matrix::SquareMatrix<double, 6> SQ_UKF;			///< lower diagonal Cholesky decomposition for the input noise covariance matrix
+	matrix::SquareMatrix<double, UKF_N_STATES> P_UKF; ///< state covariance matrix
+	matrix::SquareMatrix<double, UKF_N_STATES> SP_UKF; /// lower diagonal Cholesky decomposition for the state covariance matrix
+	matrix::SquareMatrix<double, 6> Q_UKF; ///< control input noise covariance matrix
+	matrix::SquareMatrix<double, 6> SQ_UKF; ///< lower diagonal Cholesky decomposition for the input noise covariance matrix
 	matrix::SquareMatrix<float, UKF_N_AUG_STATES> SPA_UKF;	///< lower diagonal Cholesky decomposition for the augmented state covariance matrix
 	matrix::Matrix<float, UKF_N_AUG_STATES, UKF_N_SIGMA> _sigma_x_a;///< augmented state vector sigma points
 	Quatf _sigma_quat[UKF_N_SIGMA] {};			///< array of quaternions corresponding to the state vector sigma points
@@ -364,17 +369,17 @@ private:
 
 	uint64_t _last_imu_bias_cov_reset_us{0};	///< time the last reset of IMU delta angle and velocity state covariances was performed (uSec)
 
-	Vector3f _earth_rate_NED;	///< earth rotation vector (NED) in rad/s
+	Vector3f _earth_rate_NED{};	///< earth rotation vector (NED) in rad/s
 
-	Dcmf _R_to_earth;	///< transformation matrix from body frame to earth frame from last UKF predition
+	Dcmf _R_to_earth{};	///< transformation matrix from body frame to earth frame from last UKF predition
 
 	// used by magnetometer fusion mode selection
-	Vector2f _accel_lpf_NE;			///< Low pass filtered horizontal earth frame acceleration (m/sec**2)
+	Vector2f _accel_lpf_NE{};			///< Low pass filtered horizontal earth frame acceleration (m/sec**2)
 	float _yaw_delta_ef{0.0f};		///< Recent change in yaw angle measured about the earth frame D axis (rad)
 	float _yaw_rate_lpf_ef{0.0f};		///< Filtered angular rate about earth frame D axis (rad/sec)
 	bool _mag_bias_observable{false};	///< true when there is enough rotation to make magnetometer bias errors observable
 	bool _yaw_angle_observable{false};	///< true when there is enough horizontal acceleration to make yaw observable
-	uint64_t _time_yaw_started{0};		///< last system time in usec that a yaw rotation moaneouvre was detected
+	uint64_t _time_yaw_started{0};		///< last system time in usec that a yaw rotation manoeuvre was detected
 	uint8_t _num_bad_flight_yaw_events{0};	///< number of times a bad heading has been detected in flight and required a yaw reset
 
 	float _vel_pos_innov[6] {};	///< NED velocity and position innovations: 0-2 vel (m/sec),  3-5 pos (m)
@@ -693,3 +698,5 @@ private:
 	void CalcSigmaPoints();
 
 };
+
+#endif // !UKF_UKF_H

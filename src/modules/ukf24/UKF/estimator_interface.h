@@ -40,20 +40,41 @@
  *
  */
 
-#include <matrix/matrix/math.hpp>
-#include "RingBuffer.h"
-#include "geo.h"
+#ifndef UKF_ESTIMATOR_INTERFACE_H
+#define UKF_ESTIMATOR_INTERFACE_H
+
+#if defined(MODULE_NAME)
+# define ECL_INFO PX4_INFO
+# define ECL_WARN PX4_WARN
+# define ECL_ERR  PX4_ERR
+# define ECL_DEBUG PX4_DEBUG
+#else
+# define ECL_INFO(X, ...) printf(X "\n", ##__VA_ARGS__)
+# define ECL_WARN(X, ...) fprintf(stderr, X "\n", ##__VA_ARGS__)
+# define ECL_ERR(X, ...) fprintf(stderr, X "\n", ##__VA_ARGS__)
+
+# if defined(DEBUG_BUILD)
+#  define ECL_DEBUG(X, ...) fprintf(stderr, X "\n", ##__VA_ARGS__)
+# else
+#  define ECL_DEBUG(X, ...)
+#endif
+
+#endif
+
 #include "common.h"
-#include "mathlib.h"
+#include "RingBuffer.h"
+
+#include <lib/geo/geo.h>
+#include <matrix/math.hpp>
+#include <mathlib/mathlib.h>
 
 using namespace estimator;
 
 class EstimatorInterface
 {
-
 public:
 	EstimatorInterface() = default;
-	virtual ~EstimatorInterface() = default;
+	~EstimatorInterface() = default;
 
 	virtual bool init(uint64_t timestamp) = 0;
 	virtual bool update() = 0;
@@ -166,7 +187,8 @@ public:
 	virtual bool collect_imu(imuSample &imu) { return true; }
 
 	// set delta angle imu data
-	void setIMUData(uint64_t time_usec, uint64_t delta_ang_dt, uint64_t delta_vel_dt, float (&delta_ang)[3], float (&delta_vel)[3]);
+	void setIMUData(uint64_t time_usec, uint64_t delta_ang_dt, uint64_t delta_vel_dt, float (&delta_ang)[3],
+			float (&delta_vel)[3]);
 
 	// set magnetometer data
 	void setMagData(uint64_t time_usec, float (&data)[3]);
@@ -197,7 +219,7 @@ public:
 	parameters *getParamHandle() {return &_params;}
 
 	// set vehicle landed status data
-	void set_in_air_status(bool in_air) {_control_status.flags.in_air = in_air;}
+	void set_in_air_status(bool in_air) { _control_status.flags.in_air = in_air; }
 
 	/*
 	Reset all IMU bias states and covariances to initial alignment values.
@@ -207,13 +229,13 @@ public:
 	virtual bool reset_imu_bias() = 0;
 
 	// get vehicle landed status data
-	bool get_in_air_status() {return _control_status.flags.in_air;}
+	bool get_in_air_status() { return _control_status.flags.in_air; }
 
 	// set vehicle is fixed wing status
-	void set_is_fixed_wing(bool is_fixed_wing) {_control_status.flags.fixed_wing = is_fixed_wing;}
+	void set_is_fixed_wing(bool is_fixed_wing) { _control_status.flags.fixed_wing = is_fixed_wing; }
 
 	// set flag if synthetic sideslip measurement should be fused
-	void set_fuse_beta_flag(bool fuse_beta) {_control_status.flags.fuse_beta = (fuse_beta && _control_status.flags.in_air);}
+	void set_fuse_beta_flag(bool fuse_beta) { _control_status.flags.fuse_beta = (fuse_beta && _control_status.flags.in_air); }
 
 	// set flag if static pressure rise due to ground effect is expected
 	// use _params.gnd_effect_deadzone to adjust for expected rise in static pressure
@@ -228,7 +250,7 @@ public:
 	void set_update_mag_states_only_flag(bool update_mag_states_only) {_control_status.flags.update_mag_states_only = update_mag_states_only;}
 
 	// set air density used by the multi-rotor specific drag force fusion
-	void set_air_density(float air_density) {_air_density = air_density;}
+	void set_air_density(float air_density) { _air_density = air_density; }
 
 	// return true if the global position estimate is valid
 	virtual bool global_position_is_valid() = 0;
@@ -259,6 +281,7 @@ public:
 	void get_velocity(float *vel)
 	{
 		Vector3f vel_earth = _output_new.vel - _vel_imu_rel_body_ned;
+
 		for (unsigned i = 0; i < 3; i++) {
 			vel[i] = vel_earth(i);
 		}
@@ -339,28 +362,20 @@ public:
 	// Innovation Test Ratios - these are the ratio of the innovation to the acceptance threshold.
 	// A value > 1 indicates that the sensor measurement has exceeded the maximum acceptable level and has been rejected by the UKF
 	// Where a measurement type is a vector quantity, eg magnetoemter, GPS position, etc, the maximum value is returned.
-	virtual void get_innovation_test_status(uint16_t *status, float *mag, float *vel, float *pos, float *hgt, float *tas, float *hagl, float *beta) = 0;
+	virtual void get_innovation_test_status(uint16_t *status, float *mag, float *vel, float *pos, float *hgt, float *tas,
+						float *hagl, float *beta) = 0;
 
 	// return a bitmask integer that describes which state estimates can be used for flight control
 	virtual void get_ukf_soln_status(uint16_t *status) = 0;
 
 	// Getter for the average imu update period in s
-	float get_dt_imu_avg()
-	{
-		return _dt_imu_avg;
-	}
+	float get_dt_imu_avg() const { return _dt_imu_avg; }
 
 	// Getter for the imu sample on the delayed time horizon
-	imuSample get_imu_sample_delayed()
-	{
-		return _imu_sample_delayed;
-	}
+	const imuSample &get_imu_sample_delayed() const { return _imu_sample_delayed; }
 
 	// Getter for the baro sample on the delayed time horizon
-	baroSample get_baro_sample_delayed()
-	{
-		return _baro_sample_delayed;
-	}
+	const baroSample &get_baro_sample_delayed() const { return _baro_sample_delayed; }
 
 	// Getter for a flag indicating if the UKF should update (completed downsampling process)
 	bool get_imu_updated()
@@ -370,7 +385,7 @@ public:
 
 	void print_status();
 
-	static const unsigned FILTER_UPDATE_PERIOD_MS = 8;	// UKF prediction period in milliseconds - this should ideally be an integer multiple of the IMU time delta
+	static const unsigned FILTER_UPDATE_PERIOD_MS{8}; // UKF prediction period in milliseconds - this should ideally be an integer multiple of the IMU time delta
 
 protected:
 
@@ -435,8 +450,10 @@ protected:
 	bool _gps_speed_valid{false};
 	float _gps_origin_eph{0.0f}; // horizontal position uncertainty of the GPS origin
 	float _gps_origin_epv{0.0f}; // vertical position uncertainty of the GPS origin
-	struct map_projection_reference_s _pos_ref {};   // Contains WGS-84 position latitude and longitude (radians) of the UKF origin
-	struct map_projection_reference_s _gps_pos_prev {};   // Contains WGS-84 position latitude and longitude (radians) of the previous GPS message
+	struct map_projection_reference_s
+		_pos_ref {};   // Contains WGS-84 position latitude and longitude (radians) of the UKF origin
+	struct map_projection_reference_s
+		_gps_pos_prev {};   // Contains WGS-84 position latitude and longitude (radians) of the previous GPS message
 	float _gps_alt_prev{0.0f};	// height from the previous GPS message (m)
 
 	// innovation consistency check monitoring ratios
@@ -455,9 +472,9 @@ protected:
 	Vector3f _delta_ang_prev;	// delta angle from the previous IMU measurement
 	Vector3f _delta_vel_prev;	// delta velocity from the previous IMU measurement
 	float _vibe_metrics[3] {};	// IMU vibration metrics
-					// [0] Level of coning vibration in the IMU delta angles (rad^2)
-					// [1] high frequency vibraton level in the IMU delta angle data (rad)
-					// [2] high frequency vibration level in the IMU delta velocity data (m/s)
+	// [0] Level of coning vibration in the IMU delta angles (rad^2)
+	// [1] high frequency vibraton level in the IMU delta angle data (rad)
+	// [2] high frequency vibration level in the IMU delta velocity data (m/s)
 
 	// data buffer instances
 	RingBuffer<imuSample> _imu_buffer;
@@ -519,3 +536,4 @@ protected:
 	Matrix3f quat_to_invrotmat(const Quatf &quat);
 
 };
+#endif // !EKF_ESTIMATOR_INTERFACE_H

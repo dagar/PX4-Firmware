@@ -40,12 +40,13 @@
  */
 
 #include "ukf.h"
-#include "mathlib.h"
+
+#include <mathlib/mathlib.h>
 
 bool Ukf::initHagl()
 {
 	// get most recent range measurement from buffer
-	const rangeSample& latest_measurement = _range_buffer.get_newest();
+	const rangeSample &latest_measurement = _range_buffer.get_newest();
 
 	if ((_time_last_imu - latest_measurement.time_us) < (uint64_t)2e5 && _R_rng_to_earth_2_2 > _params.range_cos_max_tilt) {
 		// if we have a fresh measurement, use it to initialise the terrain estimator
@@ -86,8 +87,8 @@ void Ukf::runTerrainEstimator()
 		_terrain_var += sq(_imu_sample_delayed.delta_vel_dt * _params.terrain_p_noise);
 
 		// process noise due to terrain gradient
-		_terrain_var += sq(_imu_sample_delayed.delta_vel_dt * _params.terrain_gradient) * (sq(_ukf_states.data.vel(0)) + sq(_ukf_states.data.vel(
-					1)));
+		_terrain_var += sq(_imu_sample_delayed.delta_vel_dt * _params.terrain_gradient) * (sq(_ukf_states.data.vel(0)) + sq(
+					_ukf_states.data.vel(1)));
 
 		// limit the variance to prevent it becoming badly conditioned
 		_terrain_var = math::constrain(_terrain_var, 0.0f, 1e4f);
@@ -124,7 +125,8 @@ void Ukf::fuseHagl()
 		_hagl_innov = pred_hagl - meas_hagl;
 
 		// calculate the observation variance adding the variance of the vehicles own height uncertainty
-		float obs_variance = fmaxf(P_UKF(8,8), 0.0f) + sq(_params.range_noise) + sq(_params.range_noise_scaler * _range_sample_delayed.rng);
+		float obs_variance = fmaxf(P_UKF(8, 8),
+					   0.0f) + sq(_params.range_noise) + sq(_params.range_noise_scaler * _range_sample_delayed.rng);
 
 		// calculate the innovation variance - limiting it to prevent a badly conditioned fusion
 		_hagl_innov_var = fmaxf(_terrain_var + obs_variance, obs_variance);
@@ -159,7 +161,7 @@ void Ukf::fuseHagl()
 bool Ukf::get_terrain_valid()
 {
 	if (_terrain_initialised && _range_data_continuous && !_rng_stuck &&
-		  (_time_last_imu - _time_last_hagl_fuse < (uint64_t)5e6)) {
+	    (_time_last_imu - _time_last_hagl_fuse < (uint64_t)5e6)) {
 		return true;
 
 	} else {
@@ -177,7 +179,6 @@ void Ukf::get_hagl_innov(float *hagl_innov)
 {
 	memcpy(hagl_innov, &_hagl_innov, sizeof(_hagl_innov));
 }
-
 
 void Ukf::get_hagl_innov_var(float *hagl_innov_var)
 {

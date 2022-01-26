@@ -39,9 +39,9 @@
  * @author Paul Riseborough <p_riseborough@live.com.au>
  *
  */
-#include "../ecl.h"
 #include "ukf.h"
-#include "mathlib.h"
+
+#include <mathlib/mathlib.h>
 
 void Ukf::fuseMag()
 {
@@ -57,9 +57,11 @@ void Ukf::fuseHeading()
 	if (_control_status.flags.mag_hdg) {
 		// using magnetic heading tuning parameter
 		R_YAW = sq(fmaxf(_params.mag_heading_noise, 1.0e-2f));
+
 	} else if (_control_status.flags.ev_yaw) {
 		// using error estimate from external vision data
 		R_YAW = sq(fmaxf(_ev_sample_delayed.angErr, 1.0e-2f));
+
 	} else {
 		// there is no yaw observation
 		return;
@@ -71,10 +73,11 @@ void Ukf::fuseHeading()
 
 	float sigma_y_pred[UKF_N_SIGMA];
 	float sigma_y_meas[UKF_N_SIGMA];
+
 	// determine if a 321 or 312 Euler sequence is best
 	if (fabsf(_R_to_earth(2, 0)) < fabsf(_R_to_earth(2, 1))) {
 
-		for (uint8_t s=0; s<UKF_N_SIGMA; s++) {
+		for (uint8_t s = 0; s < UKF_N_SIGMA; s++) {
 			// rotate the magnetometer measurement into earth frame
 			Eulerf euler321(_sigma_quat[s]);
 			sigma_y_pred[s] = euler321(2); // we will need the predicted heading to calculate the innovation
@@ -89,11 +92,12 @@ void Ukf::fuseHeading()
 				if (_control_status.flags.mag_3D) {
 					// don't apply bias corrections if we are learning them
 					mag_earth_pred = R_to_earth * _mag_sample_delayed.mag;
+
 				} else {
 					Vector3f mag_body;
-					mag_body(0) = _mag_sample_delayed.mag(0) - _sigma_x_a(18,s);
-					mag_body(1) = _mag_sample_delayed.mag(1) - _sigma_x_a(19,s);
-					mag_body(2) = _mag_sample_delayed.mag(2) - _sigma_x_a(20,s);
+					mag_body(0) = _mag_sample_delayed.mag(0) - _sigma_x_a(18, s);
+					mag_body(1) = _mag_sample_delayed.mag(1) - _sigma_x_a(19, s);
+					mag_body(2) = _mag_sample_delayed.mag(2) - _sigma_x_a(20, s);
 					mag_earth_pred = R_to_earth * mag_body;
 				}
 
@@ -103,18 +107,21 @@ void Ukf::fuseHeading()
 			} else if (_control_status.flags.ev_yaw) {
 				// calculate the yaw angle for a 321 sequence
 				// Expressions obtained from yaw_input_321.c produced by https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/quat2yaw321.m
-				float Tbn_1_0 = 2.0f*(_ev_sample_delayed.quat(0)*_ev_sample_delayed.quat(3)+_ev_sample_delayed.quat(1)*_ev_sample_delayed.quat(2));
-				float Tbn_0_0 = sq(_ev_sample_delayed.quat(0))+sq(_ev_sample_delayed.quat(1))-sq(_ev_sample_delayed.quat(2))-sq(_ev_sample_delayed.quat(3));
-				sigma_y_meas[s] = atan2f(Tbn_1_0,Tbn_0_0);
+				float Tbn_1_0 = 2.0f * (_ev_sample_delayed.quat(0) * _ev_sample_delayed.quat(3) + _ev_sample_delayed.quat(
+								1) * _ev_sample_delayed.quat(2));
+				float Tbn_0_0 = sq(_ev_sample_delayed.quat(0)) + sq(_ev_sample_delayed.quat(1)) - sq(_ev_sample_delayed.quat(2)) - sq(
+							_ev_sample_delayed.quat(3));
+				sigma_y_meas[s] = atan2f(Tbn_1_0, Tbn_0_0);
 
 			} else {
 				// there is no yaw observation
 				return;
 			}
 		}
+
 	} else {
 
-		for (uint8_t s=0; s<UKF_N_SIGMA; s++) {
+		for (uint8_t s = 0; s < UKF_N_SIGMA; s++) {
 			Dcmf R_to_earth = quat_to_invrotmat(_sigma_quat[s]);
 			/* Calculate the 312 sequence euler angles that rotate from earth to body frame
 			 * Derived from https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/quat2yaw312.m
@@ -143,25 +150,26 @@ void Ukf::fuseHeading()
 				float cp = cosf(pitch);
 				float sr = sinf(roll);
 				float cr = cosf(roll);
-				R_to_earth(0,0) = cy*cp-sy*sp*sr;
-				R_to_earth(0,1) = -sy*cr;
-				R_to_earth(0,2) = cy*sp+sy*cp*sr;
-				R_to_earth(1,0) = sy*cp+cy*sp*sr;
-				R_to_earth(1,1) = cy*cr;
-				R_to_earth(1,2) = sy*sp-cy*cp*sr;
-				R_to_earth(2,0) = -sp*cr;
-				R_to_earth(2,1) = sr;
-				R_to_earth(2,2) = cp*cr;
+				R_to_earth(0, 0) = cy * cp - sy * sp * sr;
+				R_to_earth(0, 1) = -sy * cr;
+				R_to_earth(0, 2) = cy * sp + sy * cp * sr;
+				R_to_earth(1, 0) = sy * cp + cy * sp * sr;
+				R_to_earth(1, 1) = cy * cr;
+				R_to_earth(1, 2) = sy * sp - cy * cp * sr;
+				R_to_earth(2, 0) = -sp * cr;
+				R_to_earth(2, 1) = sr;
+				R_to_earth(2, 2) = cp * cr;
 
 				// rotate the magnetometer measurements into earth frame using a zero yaw angle
 				if (_control_status.flags.mag_3D) {
 					// don't apply bias corrections if we are learning them
 					mag_earth_pred = R_to_earth * _mag_sample_delayed.mag;
+
 				} else {
 					Vector3f mag_body;
-					mag_body(0) = _mag_sample_delayed.mag(0) - _sigma_x_a(18,s);
-					mag_body(1) = _mag_sample_delayed.mag(1) - _sigma_x_a(19,s);
-					mag_body(2) = _mag_sample_delayed.mag(2) - _sigma_x_a(20,s);
+					mag_body(0) = _mag_sample_delayed.mag(0) - _sigma_x_a(18, s);
+					mag_body(1) = _mag_sample_delayed.mag(1) - _sigma_x_a(19, s);
+					mag_body(2) = _mag_sample_delayed.mag(2) - _sigma_x_a(20, s);
 					mag_earth_pred = R_to_earth * mag_body;
 				}
 
@@ -171,9 +179,11 @@ void Ukf::fuseHeading()
 			} else if (_control_status.flags.ev_yaw) {
 				// calculate the yaw angle for a 312 sequence
 				// Values from yaw_input_312.c file produced by https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/quat2yaw312.m
-				float Tbn_0_1_neg = 2.0f*(_ev_sample_delayed.quat(0)*_ev_sample_delayed.quat(3)-_ev_sample_delayed.quat(1)*_ev_sample_delayed.quat(2));
-				float Tbn_1_1 = sq(_ev_sample_delayed.quat(0))-sq(_ev_sample_delayed.quat(1))+sq(_ev_sample_delayed.quat(2))-sq(_ev_sample_delayed.quat(3));
-				sigma_y_meas[s] = atan2f(Tbn_0_1_neg,Tbn_1_1);
+				float Tbn_0_1_neg = 2.0f * (_ev_sample_delayed.quat(0) * _ev_sample_delayed.quat(3) - _ev_sample_delayed.quat(
+								    1) * _ev_sample_delayed.quat(2));
+				float Tbn_1_1 = sq(_ev_sample_delayed.quat(0)) - sq(_ev_sample_delayed.quat(1)) + sq(_ev_sample_delayed.quat(2)) - sq(
+							_ev_sample_delayed.quat(3));
+				sigma_y_meas[s] = atan2f(Tbn_0_1_neg, Tbn_1_1);
 
 			} else {
 				// there is no yaw observation
@@ -187,18 +197,22 @@ void Ukf::fuseHeading()
 	float Pyy;
 	float Pxy[UKF_N_STATES] = {};
 	Pyy = R_YAW;
-	for (int sigma_index=0; sigma_index<UKF_N_SIGMA; sigma_index++) { // lopo through sigma points
+
+	for (int sigma_index = 0; sigma_index < UKF_N_SIGMA; sigma_index++) { // lopo through sigma points
 		//Pyy +=  param.ukf.wc(s)*(psi_m(:,s) - y_m)*(psi_m(:,s) - y_m)';
 		Pyy += _ukf_wc[sigma_index] * sq(sigma_y_pred[sigma_index] - sigma_y_pred[0]);
-		for (int state_index=0; state_index<UKF_N_STATES; state_index++) { // loop through states
+
+		for (int state_index = 0; state_index < UKF_N_STATES; state_index++) { // loop through states
 			//Pxy += param.ukf.wc(s)*(sigma_x_a(1:param.ukf.nP,si) - x_m)*(psi_m(:,s) - y_m)';
-			Pxy[state_index] += _ukf_wc[sigma_index] * (_sigma_x_a(state_index,sigma_index) - _sigma_x_a(state_index,0)) * (sigma_y_pred[sigma_index] - sigma_y_pred[0]);
+			Pxy[state_index] += _ukf_wc[sigma_index] * (_sigma_x_a(state_index, sigma_index) - _sigma_x_a(state_index,
+					    0)) * (sigma_y_pred[sigma_index] - sigma_y_pred[0]);
 		}
 	}
 
 	// Check innovation variance
 	_heading_innov_var = Pyy;
 	float heading_innov_var_inv;
+
 	// check if the innovation variance calculation is badly conditioned
 	if (_heading_innov_var >= R_YAW) {
 		// the innovation variance contribution from the state covariances is not negative, no fault
@@ -218,9 +232,11 @@ void Ukf::fuseHeading()
 	// calculate the Kalman gains
 	// only calculate gains for states we are using - don't modify magnetic field states
 	float Kfusion[UKF_N_STATES] = {};
+
 	for (uint8_t row = 0; row <= 14; row++) {
 		Kfusion[row] = Pxy[row] / Pyy;
 	}
+
 	if (_control_status.flags.wind) {
 		for (uint8_t row = 21; row <= 22; row++) {
 			Kfusion[row] = Pxy[row] / Pyy;
@@ -264,6 +280,7 @@ void Ukf::fuseHeading()
 
 	// update covariance matrix via P = P - K*Pyy*K'
 	float KPK[UKF_N_STATES][UKF_N_STATES];
+
 	for (unsigned row = 0; row < UKF_N_STATES; row++) {
 		for (unsigned column = 0; column < UKF_N_STATES; column++) {
 			KPK[row][column] = Kfusion[row] * Pyy * Kfusion[column];
@@ -274,10 +291,11 @@ void Ukf::fuseHeading()
 	// the covariance marix is unhealthy and must be corrected
 	bool healthy = true;
 	_fault_status.flags.bad_mag_hdg = false;
+
 	for (int i = 0; i < UKF_N_STATES; i++) {
-		if (P_UKF(i,i) < KPK[i][i]) {
+		if (P_UKF(i, i) < KPK[i][i]) {
 			// zero rows and columns
-			zeroCovMat(i,i);
+			zeroCovMat(i, i);
 
 			//flag as unhealthy
 			healthy = false;
@@ -293,9 +311,10 @@ void Ukf::fuseHeading()
 		// apply the covariance corrections
 		for (unsigned row = 0; row < UKF_N_STATES; row++) {
 			for (unsigned column = 0; column < UKF_N_STATES; column++) {
-				P_UKF(row,column) -= KPK[row][column];
+				P_UKF(row, column) -= KPK[row][column];
 			}
 		}
+
 		_sigma_points_are_stale = true;
 
 		// correct the covariance marix for gross errors

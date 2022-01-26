@@ -41,7 +41,9 @@
  */
 
 #include "ukf.h"
-#include "mathlib.h"
+
+#include <mathlib/mathlib.h>
+#include <float.h>
 
 void Ukf::fuseOptFlow()
 {
@@ -53,7 +55,6 @@ void Ukf::get_flow_innov(float flow_innov[2])
 	memcpy(flow_innov, _flow_innov, sizeof(_flow_innov));
 }
 
-
 void Ukf::get_flow_innov_var(float flow_innov_var[2])
 {
 	memcpy(flow_innov_var, _flow_innov_var, sizeof(_flow_innov_var));
@@ -63,7 +64,6 @@ void Ukf::get_drag_innov(float drag_innov[2])
 {
 	memcpy(drag_innov, _drag_innov, sizeof(_drag_innov));
 }
-
 
 void Ukf::get_drag_innov_var(float drag_innov_var[2])
 {
@@ -109,8 +109,8 @@ void Ukf::calcOptFlowBias()
 float Ukf::calcOptFlowMeasVar()
 {
 	// calculate the observation noise variance - scaling noise linearly across flow quality range
-	float R_LOS_best = fmaxf(_params.flow_noise, 0.05f);
-	float R_LOS_worst = fmaxf(_params.flow_noise_qual_min, 0.05f);
+	const float R_LOS_best = fmaxf(_params.flow_noise, 0.05f);
+	const float R_LOS_worst = fmaxf(_params.flow_noise_qual_min, 0.05f);
 
 	// calculate a weighting that varies between 1 when flow quality is best and 0 when flow quality is worst
 	float weighting = (255.0f - (float)_params.flow_qual_min);
@@ -123,8 +123,8 @@ float Ukf::calcOptFlowMeasVar()
 		weighting = 0.0f;
 	}
 
-	// take the weighted average of the observation noie for the best and wort flow quality
-	float R_LOS = sq(R_LOS_best * weighting + R_LOS_worst * (1.0f - weighting));
+	// take the weighted average of the observation noise for the best and wort flow quality
+	const float R_LOS = sq(R_LOS_best * weighting + R_LOS_worst * (1.0f - weighting));
 
 	return R_LOS;
 }

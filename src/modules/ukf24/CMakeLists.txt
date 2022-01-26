@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015-2022 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,16 +30,52 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 #############################################################################
+
+add_subdirectory(Utility)
+
 px4_add_module(
-	MODULE modules__ekf2
-	MAIN ekf2
+	MODULE modules__ukf24
+	MAIN ukf24
 	COMPILE_FLAGS
-		-Wno-sign-compare # TODO: fix all sign-compare
-	STACK_MAIN 2500
-	STACK_MAX 4000
+		#${MAX_CUSTOM_OPT_LEVEL}
+		-fno-associative-math
+		#-DDEBUG_BUILD
+	INCLUDES
+		UKF
+	STACK_MAX
+		3600
 	SRCS
-		ekf2_main.cpp
+		UKF/RingBuffer.h
+		UKF/airspeed_fusion.cpp
+		UKF/common.h
+		UKF/control.cpp
+		UKF/covariance.cpp
+		UKF/estimator_interface.cpp
+		UKF/estimator_interface.h
+		UKF/gps_checks.cpp
+		UKF/mag_fusion.cpp
+		UKF/terrain_estimator.cpp
+		UKF/ukf.cpp
+		UKF/ukf.h
+		UKF/ukf_helper.cpp
+		UKF/vel_pos_fusion.cpp
+
+		UKF24.cpp
+		UKF24.hpp
+		#UKF24Selector.cpp
+		#UKF24Selector.hpp
+
 	DEPENDS
-		platforms__common
-		git_ecl
+		geo
+		hysteresis
+		perf
+		UKF24Utility
+		px4_work_queue
+		world_magnetic_model
+	#UNITY_BUILD
 	)
+
+if(BUILD_TESTING)
+	#add_subdirectory(EKF)
+	#add_subdirectory(test)
+endif()

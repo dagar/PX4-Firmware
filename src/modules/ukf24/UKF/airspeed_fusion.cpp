@@ -40,9 +40,9 @@
  * @author Paul Riseborough <p_riseborough@live.com.au>
  *
  */
-#include "../ecl.h"
+
 #include "ukf.h"
-#include "mathlib.h"
+#include <mathlib/mathlib.h>
 
 void Ukf::fuseAirspeed()
 {
@@ -57,13 +57,14 @@ void Ukf::get_wind_velocity(float *wind)
 
 void Ukf::get_wind_velocity_var(float *wind_var)
 {
-	wind_var[0] = P_UKF(21,21);
-	wind_var[1] = P_UKF(22,22);
+	wind_var[0] = P_UKF(21, 21);
+	wind_var[1] = P_UKF(22, 22);
 }
 
 void Ukf::get_true_airspeed(float *tas)
 {
-	float tempvar = sqrtf(sq(_state.vel(0) - _state.wind_vel(0)) + sq(_state.vel(1) - _state.wind_vel(1)) + sq(_state.vel(2)));
+	float tempvar = sqrtf(sq(_state.vel(0) - _state.wind_vel(0)) + sq(_state.vel(1) - _state.wind_vel(1)) + sq(_state.vel(
+				      2)));
 	memcpy(tas, &tempvar, sizeof(float));
 }
 

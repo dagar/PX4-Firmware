@@ -39,9 +39,9 @@
  * @author Paul Riseborough <p_riseborough@live.com.au>
  */
 
-#include "../ecl.h"
 #include "ukf.h"
-#include "mathlib.h"
+
+#include <lib/mathlib/mathlib.h>
 
 bool Ukf::init(uint64_t timestamp)
 {
@@ -141,7 +141,7 @@ bool Ukf::initialiseFilter()
 	// Keep accumulating measurements until we have a minimum of 10 samples for the required sensors
 
 	// Sum the IMU delta angle measurements
-	const imuSample& imu_init = _imu_buffer.get_newest();
+	const imuSample &imu_init = _imu_buffer.get_newest();
 	_delVel_sum += imu_init.delta_vel;
 
 	// Sum the magnetometer measurements
@@ -193,7 +193,7 @@ bool Ukf::initialiseFilter()
 
 	// accumulate enough height measurements to be confident in the qulaity of the data
 	if (_primary_hgt_source == VDIST_SENSOR_BARO || _primary_hgt_source == VDIST_SENSOR_GPS ||
-		  _primary_hgt_source == VDIST_SENSOR_RANGE || _primary_hgt_source == VDIST_SENSOR_EV) {
+	    _primary_hgt_source == VDIST_SENSOR_RANGE || _primary_hgt_source == VDIST_SENSOR_EV) {
 		// if the user parameter specifies use of GPS/range/EV finder for height we use baro height initially and switch to GPS/range/EV finder
 		// later when it passes checks.
 		if (_baro_buffer.pop_first_older_than(_imu_sample_delayed.time_us, &_baro_sample_delayed)) {
@@ -230,7 +230,8 @@ bool Ukf::initialiseFilter()
 	// check to see if we have enough measurements and return false if not
 	bool hgt_count_fail = _hgt_counter <= 2 * _obs_buffer_length;
 	bool mag_count_fail = _mag_counter <= 2 * _obs_buffer_length;
-	bool ev_count_fail = ((_params.fusion_mode & MASK_USE_EVPOS) || (_params.fusion_mode & MASK_USE_EVYAW)) && (_ev_counter <= 2 * _obs_buffer_length);
+	bool ev_count_fail = ((_params.fusion_mode & MASK_USE_EVPOS) || (_params.fusion_mode & MASK_USE_EVYAW))
+			     && (_ev_counter <= 2 * _obs_buffer_length);
 
 	if (hgt_count_fail || mag_count_fail || ev_count_fail) {
 		return false;
@@ -278,14 +279,15 @@ bool Ukf::initialiseFilter()
 		_control_status.flags.yaw_align = resetMagHeading(mag_init);
 
 		// initialise the rotation from EV to UKF navigation frame if required
-		if ((_params.fusion_mode & MASK_ROTATE_EV) && (_params.fusion_mode & MASK_USE_EVPOS) && !(_params.fusion_mode & MASK_USE_EVYAW)) {
+		if ((_params.fusion_mode & MASK_ROTATE_EV) && (_params.fusion_mode & MASK_USE_EVPOS)
+		    && !(_params.fusion_mode & MASK_USE_EVYAW)) {
 			resetExtVisRotMat();
 		}
 
 		if (_control_status.flags.rng_hgt) {
 			// if we are using the range finder as the primary source, then calculate the baro height at origin so  we can use baro as a backup
 			// so it can be used as a backup ad set the initial height using the range finder
-			const baroSample& baro_newest = _baro_buffer.get_newest();
+			const baroSample &baro_newest = _baro_buffer.get_newest();
 			_baro_hgt_offset = baro_newest.hgt;
 			_ukf_states.data.pos(2) = -math::max(_rng_filt_state * _R_rng_to_earth_2_2, _params.rng_gnd_clearance);
 			ECL_INFO("UKF using range finder height - commencing alignment");
@@ -330,16 +332,19 @@ void Ukf::predictSigmaPoints()
 	Vector3f earth_dang_bf = _R_to_earth.transpose() * _earth_rate_NED * _imu_sample_delayed.delta_ang_dt;
 
 	// loop through each sigma point index
-	for (uint8_t s=0; s<UKF_N_SIGMA; s++) {
+	for (uint8_t s = 0; s < UKF_N_SIGMA; s++) {
 		// copy sigma points to local state vector
-		for (uint8_t i=3; i<UKF_N_AUG_STATES; i++) {
-			_ukf_states_local.vector(i) = _sigma_x_a(i,s);
+		for (uint8_t i = 3; i < UKF_N_AUG_STATES; i++) {
+			_ukf_states_local.vector(i) = _sigma_x_a(i, s);
 		}
+
 		_ukf_states_local.data.quat = _sigma_quat[s];
 
 		// apply imu bias corrections
-		Vector3f corrected_delta_ang = _imu_sample_delayed.delta_ang - _ukf_states_local.data.gyro_bias + _ukf_states_local.data.dang_err;
-		Vector3f corrected_delta_vel = _imu_sample_delayed.delta_vel - _ukf_states_local.data.accel_bias + _ukf_states_local.data.dvel_err;
+		Vector3f corrected_delta_ang = _imu_sample_delayed.delta_ang - _ukf_states_local.data.gyro_bias +
+					       _ukf_states_local.data.dang_err;
+		Vector3f corrected_delta_vel = _imu_sample_delayed.delta_vel - _ukf_states_local.data.accel_bias +
+					       _ukf_states_local.data.dvel_err;
 
 		// correct delta angles for earth rotation rate
 		corrected_delta_ang -= earth_dang_bf;
@@ -383,8 +388,9 @@ void Ukf::predictSigmaPoints()
 
 		// copy local quaternion, velocity and position states to sigma point
 		_sigma_quat[s] = _ukf_states_local.data.quat;
-		for (uint8_t i=3; i<9; i++) {
-			_sigma_x_a(i,s) = _ukf_states_local.vector(i);
+
+		for (uint8_t i = 3; i < 9; i++) {
+			_sigma_x_a(i, s) = _ukf_states_local.vector(i);
 		}
 
 	}
@@ -466,7 +472,7 @@ bool Ukf::collect_imu(imuSample &imu)
 void Ukf::calculateOutputStates()
 {
 	// Use full rate IMU data at the current time horizon
-	const imuSample& imu_new = _imu_sample_new;
+	const imuSample &imu_new = _imu_sample_new;
 
 	// correct delta angles for bias offsets
 	Vector3f delta_angle;
@@ -476,9 +482,9 @@ void Ukf::calculateOutputStates()
 	delta_angle(2) = _imu_sample_new.delta_ang(2) - _ukf_states.data.gyro_bias(2) * dt_scale_correction;
 
 	// calculate a yaw change about the earth frame vertical
-	float spin_del_ang_D = _R_to_earth_now(2,0) * delta_angle(0) +
-			_R_to_earth_now(2,1) * delta_angle(1) +
-			_R_to_earth_now(2,2) * delta_angle(2);
+	float spin_del_ang_D = _R_to_earth_now(2, 0) * delta_angle(0) +
+			       _R_to_earth_now(2, 1) * delta_angle(1) +
+			       _R_to_earth_now(2, 2) * delta_angle(2);
 	_yaw_delta_ef += spin_del_ang_D;
 
 	// Calculate filtered yaw rate to be used by the magnetomer fusion type selection logic
@@ -638,13 +644,14 @@ void Ukf::calculateOutputStates()
 
 			for (uint8_t counter = 0; counter < (size - 1); counter++) {
 				const uint8_t index_next = (index + 1) % size;
-				outputVert& current_state = _output_vert_buffer[index];
-				outputVert& next_state = _output_vert_buffer[index_next];
+				outputVert &current_state = _output_vert_buffer[index];
+				outputVert &next_state = _output_vert_buffer[index_next];
 
 				// correct the velocity
 				if (counter == 0) {
 					current_state.vel_d += vel_d_correction;
 				}
+
 				next_state.vel_d += vel_d_correction;
 
 				// position is propagated forward using the corrected velocity and a trapezoidal integrator
