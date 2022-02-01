@@ -60,7 +60,7 @@ private:
 
 	uORB::Subscription _gpos_sub{ORB_ID(vehicle_global_position)};
 	uORB::Subscription _lpos_sub{ORB_ID(vehicle_local_position)};
-	uORB::Subscription _home_sub{ORB_ID(home_position)};
+	uORB::Subscription _home_position_sub{ORB_ID(home_position)};
 	uORB::Subscription _air_data_sub{ORB_ID(vehicle_air_data)};
 
 	bool send() override
@@ -86,9 +86,8 @@ private:
 			}
 
 			home_position_s home{};
-			_home_sub.copy(&home);
 
-			if ((home.timestamp > 0) && home.valid_alt) {
+			if (_home_position_sub.copy(&home) && (home.timestamp > 0) && home.valid_altitude) {
 				if (lpos.z_valid) {
 					msg.relative_alt = -(lpos.z - home.z) * 1000.0f;
 

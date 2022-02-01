@@ -33,7 +33,7 @@ bool FlightTask::updateInitialize()
 	_time_stamp_last = _time_stamp_current;
 
 	_sub_vehicle_local_position.update();
-	_sub_home_position.update();
+	_home_position_sub.update();
 
 	_evaluateVehicleLocalPosition();
 	_evaluateVehicleLocalPositionSetpoint();
@@ -193,8 +193,8 @@ void FlightTask::_evaluateDistanceToGround()
 	if (PX4_ISFINITE(_dist_to_bottom)) {
 		_dist_to_ground = _dist_to_bottom;
 
-	} else if (_sub_home_position.get().valid_alt) {
-		_dist_to_ground = -(_position(2) - _sub_home_position.get().z);
+	} else if (_home_position_sub.get().valid_altitude) {
+		_dist_to_ground = -(_position(2) - _home_position_sub.get().z);
 	}
 }
 

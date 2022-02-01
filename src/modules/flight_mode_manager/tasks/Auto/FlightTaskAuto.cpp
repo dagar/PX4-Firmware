@@ -97,7 +97,6 @@ bool FlightTaskAuto::updateInitialize()
 {
 	bool ret = FlightTask::updateInitialize();
 
-	_sub_home_position.update();
 	_sub_vehicle_status.update();
 	_sub_triplet_setpoint.update();
 
@@ -520,15 +519,23 @@ void FlightTaskAuto::_set_heading_from_mode()
 		break;
 
 	case 1: // Heading points towards home.
-		if (_sub_home_position.get().valid_lpos) {
-			v = Vector2f(&_sub_home_position.get().x) - Vector2f(_position);
+		if (_home_position_sub.get().valid_local_position) {
+			const Vector2f home{_home_position_sub.get().x, _home_position_sub.get().y};
+			v = home - Vector2f(_position);
+
+		} else {
+			v.setAll(NAN);
 		}
 
 		break;
 
 	case 2: // Heading point away from home.
-		if (_sub_home_position.get().valid_lpos) {
-			v = Vector2f(_position) - Vector2f(&_sub_home_position.get().x);
+		if (_home_position_sub.get().valid_local_position) {
+			const Vector2f home{_home_position_sub.get().x, _home_position_sub.get().y};
+			v = Vector2f(_position) - home;
+
+		} else {
+			v.setAll(NAN);
 		}
 
 		break;

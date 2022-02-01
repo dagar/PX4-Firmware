@@ -49,13 +49,13 @@ public:
 
 	unsigned get_size() override
 	{
-		return _home_sub.advertised() ? (MAVLINK_MSG_ID_HOME_POSITION_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
+		return _home_position_sub.advertised() ? (MAVLINK_MSG_ID_HOME_POSITION_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
 	}
 
 private:
 	explicit MavlinkStreamHomePosition(Mavlink *mavlink) : MavlinkStream(mavlink) {}
 
-	uORB::Subscription _home_sub{ORB_ID(home_position)};
+	uORB::Subscription _home_position_sub{ORB_ID(home_position)};
 
 	bool send() override
 	{
@@ -63,24 +63,33 @@ private:
 		// the GCS does pick it up at one point
 		home_position_s home;
 
-		if (_home_sub.advertised() && _home_sub.copy(&home)) {
-			if (home.valid_hpos) {
+		if (_home_position_sub.advertised() && _home_position_sub.copy(&home)) {
+			if (home.valid_global_position) {
 				mavlink_home_position_t msg{};
 
-				msg.latitude  = home.lat * 1e7;
-				msg.longitude = home.lon * 1e7;
-				msg.altitude  = home.alt * 1e3f;
+				msg.latitude  = home.lat * 1e7;  // degE7
+				msg.longitude = home.lon * 1e7;  // degE7
+				msg.altitude  = home.alt * 1e3f; // degE7
 
-				msg.x = home.x;
-				msg.y = home.y;
-				msg.z = home.z;
+				if (home.valid_local_position) {
+					msg.x = home.x;
+					msg.y = home.y;
+					msg.z = home.z;
 
-				matrix::Quatf q(matrix::Eulerf(0.f, 0.f, home.yaw));
-				q.copyTo(msg.q);
+				} else {
+					msg.x = NAN;
+					msg.y = NAN;
+					msg.z = NAN;
+				}
 
-				msg.approach_x = 0.f;
-				msg.approach_y = 0.f;
-				msg.approach_z = 0.f;
+				if (PX4_ISFINITE(home.yaw)) {
+					matrix::Quatf q(matrix::Eulerf(0.f, 0.f, home.yaw));
+					q.copyTo(msg.q);
+				}
+
+				msg.approach_x = NAN;
+				msg.approach_y = NAN;
+				msg.approach_z = NAN;
 
 				msg.time_usec = home.timestamp;
 

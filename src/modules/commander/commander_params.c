@@ -203,15 +203,30 @@ PARAM_DEFINE_FLOAT(COM_RC_LOSS_T, 0.5f);
 PARAM_DEFINE_FLOAT(COM_RCL_ACT_T, 15.0f);
 
 /**
- * Home position enabled
+ * Home position
  *
  * Set home position automatically if possible.
  *
  * @group Commander
  * @reboot_required true
- * @boolean
+ * @value 0 Disabled
+ * @value 1 Altitude only
+ * @value 2 Enabled
  */
-PARAM_DEFINE_INT32(COM_HOME_EN, 1);
+PARAM_DEFINE_INT32(COM_HOME_EN, 2);
+
+/**
+ * Home position configuration
+ *
+ * @group Commander
+ * @reboot_required true
+ * @min 0
+ * @max 8
+ * @bit 0 Allow manual home position
+ * @bit 1 Allow in air updates
+ * @bit 2 Altitude only (no position)
+ */
+PARAM_DEFINE_INT32(COM_HOME_POS_CFG, 2);
 
 /**
  * Home set horizontal threshold

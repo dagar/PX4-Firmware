@@ -747,13 +747,14 @@ void EKF2::PublishGlobalPosition(const hrt_abstime &timestamp)
 		float delta_xy[2];
 		_ekf.get_posNE_reset(delta_xy, &global_pos.lat_lon_reset_counter);
 
+		// TODO:alt_reset_counter
+
 		global_pos.alt = -position(2) + _ekf.getEkfGlobalOriginAltitude(); // Altitude AMSL in meters
 		global_pos.alt_ellipsoid = filter_altitude_ellipsoid(global_pos.alt);
 
 		// global altitude has opposite sign of local down position
 		float delta_z;
-		uint8_t z_reset_counter;
-		_ekf.get_posD_reset(&delta_z, &z_reset_counter);
+		_ekf.get_posD_reset(&delta_z, &global_pos.alt_reset_counter);
 		global_pos.delta_alt = -delta_z;
 
 		_ekf.get_ekf_gpos_accuracy(&global_pos.eph, &global_pos.epv);

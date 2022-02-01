@@ -501,7 +501,7 @@ void FlightModeManager::generateTrajectorySetpoint(const float dt,
 void FlightModeManager::limitAltitude(vehicle_local_position_setpoint_s &setpoint,
 				      const vehicle_local_position_s &vehicle_local_position)
 {
-	if (_param_lndmc_alt_max.get() < 0.0f || !_home_position_sub.get().valid_alt
+	if (_param_lndmc_alt_max.get() < 0.0f || !_home_position_sub.get().valid_altitude
 	    || !vehicle_local_position.z_valid || !vehicle_local_position.v_z_valid) {
 		// there is no altitude limitation present or the required information not available
 		return;

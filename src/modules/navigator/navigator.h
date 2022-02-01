@@ -171,9 +171,9 @@ public:
 
 	void reset_vroi() { _vroi = {}; }
 
-	bool home_alt_valid() { return (_home_pos.timestamp > 0 && _home_pos.valid_alt); }
+	bool home_alt_valid() { return (_home_pos.timestamp > 0 && _home_pos.valid_altitude); }
 
-	bool home_position_valid() { return (_home_pos.timestamp > 0 && _home_pos.valid_alt && _home_pos.valid_hpos && _home_pos.valid_lpos); }
+	bool home_position_valid() { return (_home_pos.timestamp > 0 && _home_pos.valid_altitude && _home_pos.valid_global_position && _home_pos.valid_local_position); }
 
 	Geofence &get_geofence() { return _geofence; }
 
@@ -336,7 +336,7 @@ private:
 
 	uORB::Subscription _global_pos_sub{ORB_ID(vehicle_global_position)};	/**< global position subscription */
 	uORB::Subscription _gps_pos_sub{ORB_ID(vehicle_gps_position)};		/**< gps position subscription */
-	uORB::Subscription _home_pos_sub{ORB_ID(home_position)};		/**< home position subscription */
+	uORB::Subscription _home_position_sub{ORB_ID(home_position)};		/**< home position subscription */
 	uORB::Subscription _land_detected_sub{ORB_ID(vehicle_land_detected)};	/**< vehicle land detected subscription */
 	uORB::Subscription _pos_ctrl_landing_status_sub{ORB_ID(position_controller_landing_status)};	/**< position controller landing status subscription */
 	uORB::Subscription _traffic_sub{ORB_ID(transponder_report)};		/**< traffic subscription */

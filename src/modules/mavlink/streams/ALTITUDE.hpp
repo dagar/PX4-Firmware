@@ -59,7 +59,7 @@ private:
 	explicit MavlinkStreamAltitude(Mavlink *mavlink) : MavlinkStream(mavlink) {}
 
 	uORB::Subscription _air_data_sub{ORB_ID(vehicle_air_data)};
-	uORB::Subscription _home_sub{ORB_ID(home_position)};
+	uORB::Subscription _home_position_sub{ORB_ID(home_position)};
 	uORB::Subscription _local_pos_sub{ORB_ID(vehicle_local_position)};
 
 	bool send() override
@@ -101,9 +101,8 @@ private:
 				msg.altitude_local = -local_pos.z;
 
 				home_position_s home{};
-				_home_sub.copy(&home);
 
-				if (home.valid_alt) {
+				if (_home_position_sub.copy(&home) && home.valid_altitude) {
 					msg.altitude_relative = -(local_pos.z - home.z);
 
 				} else {

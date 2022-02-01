@@ -159,20 +159,12 @@ private:
 
 	void reset_posvel_validity();
 
-	bool set_home_position();
-	bool set_home_position_alt_only();
-	bool set_in_air_home_position();
-	bool isGPosGoodForInitializingHomePos(const vehicle_global_position_s &gpos) const;
-	void fillLocalHomePos(home_position_s &home, const vehicle_local_position_s &lpos) const;
-	void fillLocalHomePos(home_position_s &home, float x, float y, float z, float heading) const;
-	void fillGlobalHomePos(home_position_s &home, const vehicle_global_position_s &gpos) const;
-	void fillGlobalHomePos(home_position_s &home, double lat, double lon, float alt) const;
-	void setHomePosValid();
-	void updateHomePositionYaw(float yaw);
-
 	void update_control_mode();
 
 	void UpdateEstimateValidity();
+
+	void UpdateHomePosition();
+	void CheckHomePositionResets();
 
 	bool shutdown_if_allowed();
 
@@ -290,7 +282,6 @@ private:
 	static constexpr uint64_t COMMANDER_MONITORING_INTERVAL{10_ms};
 
 	static constexpr uint64_t HOTPLUG_SENS_TIMEOUT{8_s};	/**< wait for hotplug sensors to come online for upto 8 seconds */
-	static constexpr uint64_t INAIR_RESTART_HOLDOFF_INTERVAL{500_ms};
 
 	const int64_t POSVEL_PROBATION_MIN = 1_s;	/**< minimum probation duration (usec) */
 	const int64_t POSVEL_PROBATION_MAX = 100_s;	/**< maximum probation duration (usec) */
@@ -377,14 +368,18 @@ private:
 	hrt_abstime	_overload_start{0};		///< time when CPU overload started
 
 	uint32_t	_counter{0};
-	uint8_t		_heading_reset_counter{0};
+
+	uint8_t _home_xy_reset_counter{0};
+	uint8_t _home_z_reset_counter{0};
+	uint8_t _home_alt_reset_counter{0};
+	uint8_t _home_heading_reset_counter{0};
 
 	bool		_status_changed{true};
 	bool		_arm_tune_played{false};
 	bool		_was_armed{false};
 	bool		_failsafe_old{false};	///< check which state machines for changes, clear "changed" flag
 	bool		_have_taken_off_since_arming{false};
-	bool		_should_set_home_on_takeoff{true};
+	bool		_local_position_valid_for_home{true};
 	bool		_system_power_usb_connected{false};
 
 	cpuload_s		_cpuload{};
@@ -401,6 +396,7 @@ private:
 	vehicle_control_mode_s  _vehicle_control_mode{};
 	vehicle_status_s        _status{};
 	vehicle_status_flags_s  _status_flags{};
+	vehicle_status_flags_s  _status_flags_prev{};
 
 	WorkerThread _worker_thread;
 
