@@ -40,25 +40,12 @@
  * @author Siddharth B Purohit <siddharthbharatpurohit@gmail.com>
  */
 
-#include "estimator_interface.h"
+#include "ekf.h"
 
 #include <mathlib/mathlib.h>
 
-EstimatorInterface::~EstimatorInterface()
-{
-	delete _gps_buffer;
-	delete _mag_buffer;
-	delete _baro_buffer;
-	delete _range_buffer;
-	delete _airspeed_buffer;
-	delete _flow_buffer;
-	delete _ext_vision_buffer;
-	delete _drag_buffer;
-	delete _auxvel_buffer;
-}
-
 // Accumulate imu data and store to buffer at desired rate
-void EstimatorInterface::setIMUData(const imuSample &imu_sample)
+void Ekf::setIMUData(const imuSample &imu_sample)
 {
 	// TODO: resolve misplaced responsibility
 	if (!_initialised) {
@@ -96,7 +83,7 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 	}
 }
 
-bool EstimatorInterface::checkIfVehicleAtRest(float dt, const imuSample &imu)
+bool Ekf::checkIfVehicleAtRest(float dt, const imuSample &imu)
 {
 	// detect if the vehicle is not moving when on ground
 	if (!_control_status.flags.in_air) {
@@ -115,7 +102,7 @@ bool EstimatorInterface::checkIfVehicleAtRest(float dt, const imuSample &imu)
 }
 
 
-void EstimatorInterface::setMagData(const magSample &mag_sample)
+void Ekf::setMagData(const magSample &mag_sample)
 {
 	if (!_initialised) {
 		return;
@@ -151,7 +138,7 @@ void EstimatorInterface::setMagData(const magSample &mag_sample)
 	}
 }
 
-void EstimatorInterface::setGpsData(const gps_message &gps)
+void Ekf::setGpsData(const gps_message &gps)
 {
 	if (!_initialised) {
 		return;
@@ -210,7 +197,7 @@ void EstimatorInterface::setGpsData(const gps_message &gps)
 	}
 }
 
-void EstimatorInterface::setBaroData(const baroSample &baro_sample)
+void Ekf::setBaroData(const baroSample &baro_sample)
 {
 	if (!_initialised) {
 		return;
@@ -245,7 +232,7 @@ void EstimatorInterface::setBaroData(const baroSample &baro_sample)
 	}
 }
 
-void EstimatorInterface::setAirspeedData(const airspeedSample &airspeed_sample)
+void Ekf::setAirspeedData(const airspeedSample &airspeed_sample)
 {
 	if (!_initialised) {
 		return;
@@ -276,7 +263,7 @@ void EstimatorInterface::setAirspeedData(const airspeedSample &airspeed_sample)
 	}
 }
 
-void EstimatorInterface::setRangeData(const rangeSample &range_sample)
+void Ekf::setRangeData(const rangeSample &range_sample)
 {
 	if (!_initialised) {
 		return;
@@ -306,7 +293,7 @@ void EstimatorInterface::setRangeData(const rangeSample &range_sample)
 	}
 }
 
-void EstimatorInterface::setOpticalFlowData(const flowSample &flow)
+void Ekf::setOpticalFlowData(const flowSample &flow)
 {
 	if (!_initialised) {
 		return;
@@ -338,7 +325,7 @@ void EstimatorInterface::setOpticalFlowData(const flowSample &flow)
 }
 
 // set attitude and position data derived from an external vision system
-void EstimatorInterface::setExtVisionData(const extVisionSample &evdata)
+void Ekf::setExtVisionData(const extVisionSample &evdata)
 {
 	if (!_initialised) {
 		return;
@@ -369,7 +356,7 @@ void EstimatorInterface::setExtVisionData(const extVisionSample &evdata)
 	}
 }
 
-void EstimatorInterface::setAuxVelData(const auxVelSample &auxvel_sample)
+void Ekf::setAuxVelData(const auxVelSample &auxvel_sample)
 {
 	if (!_initialised) {
 		return;
@@ -400,7 +387,7 @@ void EstimatorInterface::setAuxVelData(const auxVelSample &auxvel_sample)
 	}
 }
 
-void EstimatorInterface::setDragData(const imuSample &imu)
+void Ekf::setDragData(const imuSample &imu)
 {
 	// down-sample the drag specific force data by accumulating and calculating the mean when
 	// sufficient samples have been collected
@@ -451,7 +438,7 @@ void EstimatorInterface::setDragData(const imuSample &imu)
 	}
 }
 
-bool EstimatorInterface::initialise_interface(uint64_t timestamp)
+bool Ekf::initialise_interface(uint64_t timestamp)
 {
 	// find the maximum time delay the buffers are required to handle
 
@@ -523,18 +510,18 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 	return true;
 }
 
-bool EstimatorInterface::isOnlyActiveSourceOfHorizontalAiding(const bool aiding_flag) const
+bool Ekf::isOnlyActiveSourceOfHorizontalAiding(const bool aiding_flag) const
 {
 	return aiding_flag && !isOtherSourceOfHorizontalAidingThan(aiding_flag);
 }
 
-bool EstimatorInterface::isOtherSourceOfHorizontalAidingThan(const bool aiding_flag) const
+bool Ekf::isOtherSourceOfHorizontalAidingThan(const bool aiding_flag) const
 {
 	const int nb_sources = getNumberOfActiveHorizontalAidingSources();
 	return aiding_flag ? nb_sources > 1 : nb_sources > 0;
 }
 
-int EstimatorInterface::getNumberOfActiveHorizontalAidingSources() const
+int Ekf::getNumberOfActiveHorizontalAidingSources() const
 {
 	return int(_control_status.flags.gps)
 	       + int(_control_status.flags.opt_flow)
@@ -545,19 +532,19 @@ int EstimatorInterface::getNumberOfActiveHorizontalAidingSources() const
 	       + int(_control_status.flags.fuse_aspd && _control_status.flags.fuse_beta);
 }
 
-bool EstimatorInterface::isHorizontalAidingActive() const
+bool Ekf::isHorizontalAidingActive() const
 {
 	return getNumberOfActiveHorizontalAidingSources() > 0;
 }
 
-void EstimatorInterface::printBufferAllocationFailed(const char *buffer_name)
+void Ekf::printBufferAllocationFailed(const char *buffer_name)
 {
 	if (buffer_name) {
 		ECL_ERR("%s buffer allocation failed", buffer_name);
 	}
 }
 
-void EstimatorInterface::print_status()
+void Ekf::print_status()
 {
 	printf("IMU average dt: %.6f seconds\n", (double)_dt_imu_avg);
 	printf("EKF average dt: %.6f seconds\n", (double)_dt_ekf_avg);

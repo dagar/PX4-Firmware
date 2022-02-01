@@ -43,6 +43,19 @@
 
 #include <mathlib/mathlib.h>
 
+Ekf::~Ekf()
+{
+	delete _gps_buffer;
+	delete _mag_buffer;
+	delete _baro_buffer;
+	delete _range_buffer;
+	delete _airspeed_buffer;
+	delete _flow_buffer;
+	delete _ext_vision_buffer;
+	delete _drag_buffer;
+	delete _auxvel_buffer;
+}
+
 bool Ekf::init(uint64_t timestamp)
 {
 	bool ret = initialise_interface(timestamp);
@@ -517,18 +530,4 @@ void Ekf::applyCorrectionToOutputBuffer(const Vector3f &vel_correction, const Ve
 
 	// update output state to corrected values
 	_output_new = _output_buffer.get_newest();
-}
-
-/*
- * Predict the previous quaternion output state forward using the latest IMU delta angle data.
-*/
-Quatf Ekf::calculate_quaternion() const
-{
-	// Correct delta angle data for bias errors using bias state estimates from the EKF and also apply
-	// corrections required to track the EKF quaternion states
-	const Vector3f delta_angle{_newest_high_rate_imu_sample.delta_ang - _state.delta_ang_bias * (_dt_imu_avg / _dt_ekf_avg) + _delta_angle_corr};
-
-	// increment the quaternions using the corrected delta angle vector
-	// the quaternions must always be normalised after modification
-	return Quatf{_output_new.quat_nominal * AxisAnglef{delta_angle}}.unit();
 }

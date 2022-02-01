@@ -52,7 +52,7 @@ namespace sensor
 class Sensor
 {
 public:
-	virtual ~Sensor() {};
+	virtual ~Sensor() = default;
 
 	/*
 	 * run sanity checks on the current data
