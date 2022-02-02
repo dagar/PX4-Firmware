@@ -104,7 +104,9 @@ void Ekf::controlMagFusion()
 	_mag_yaw_reset_req |= !_control_status.flags.yaw_align;
 	_mag_yaw_reset_req |= _mag_inhibit_yaw_reset_req;
 
-	if (noOtherYawAidingThanMag() && mag_data_ready) {
+	// TODO: review
+	//if (noOtherYawAidingThanMag() && mag_data_ready) {
+	if (mag_data_ready) {
 		// Determine if we should use simple magnetic heading fusion which works better when
 		// there are large external disturbances or the more accurate 3-axis fusion
 		switch (_params.mag_fusion_type) {

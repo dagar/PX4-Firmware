@@ -541,13 +541,16 @@ bool Ekf::resetMagHeading(bool increase_yaw_var, bool update_buffer)
 
 bool Ekf::resetYawToEv()
 {
-	const float yaw_new = getEuler312Yaw(_ev_sample_delayed.quat);
-	const float yaw_new_variance = fmaxf(_ev_sample_delayed.angVar, sq(1.0e-2f));
+	if (!_control_status.flags.mag_3D && !_control_status.flags.mag_hdg && !_control_status.flags.gps_yaw) {
+		const float yaw_new = getEuler312Yaw(_ev_sample_delayed.quat);
+		const float yaw_new_variance = fmaxf(_ev_sample_delayed.angVar, sq(1.0e-2f));
 
-	resetQuatStateYaw(yaw_new, yaw_new_variance, true);
-	_R_ev_to_ekf.setIdentity();
+		resetQuatStateYaw(yaw_new, yaw_new_variance, true);
+		_R_ev_to_ekf.setIdentity();
+		return true;
+	}
 
-	return true;
+	return false;
 }
 
 // Return the magnetic declination in radians to be used by the alignment and fusion processing
@@ -1573,10 +1576,6 @@ void Ekf::stopGpsFusion()
 	if (_control_status.flags.gps_yaw) {
 		stopGpsYawFusion();
 	}
-
-	// We do not need to know the true North anymore
-	// EV yaw can start again
-	_inhibit_ev_yaw_use = false;
 }
 
 void Ekf::stopGpsPosFusion()
@@ -1635,13 +1634,9 @@ void Ekf::startEvVelFusion()
 
 void Ekf::startEvYawFusion()
 {
-	// turn on fusion of external vision yaw measurements and disable all magnetometer fusion
+	// turn on fusion of external vision yaw measurements
 	_control_status.flags.ev_yaw = true;
-	_control_status.flags.mag_dec = false;
-
-	stopMagHdgFusion();
-	stopMag3DFusion();
-
+	resetYawToEv();
 	_information_events.flags.starting_vision_yaw_fusion = true;
 	ECL_INFO("starting vision yaw fusion");
 }
@@ -1771,9 +1766,6 @@ bool Ekf::resetYawToEKFGSF()
 		} else if (_control_status.flags.gps_yaw) {
 			_control_status.flags.gps_yaw_fault = true;
 			_warning_events.flags.emergency_yaw_reset_gps_yaw_stopped = true;
-
-		} else if (_control_status.flags.ev_yaw) {
-			_inhibit_ev_yaw_use = true;
 		}
 
 		ECL_WARN("Emergency yaw reset");

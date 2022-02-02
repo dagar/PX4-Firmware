@@ -781,6 +781,7 @@ void EKF2::PublishInnovations(const hrt_abstime &timestamp, const imuSample &imu
 	innovations.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
 	_ekf.getGpsVelPosInnov(innovations.gps_hvel, innovations.gps_vvel, innovations.gps_hpos, innovations.gps_vpos);
 	_ekf.getEvVelPosInnov(innovations.ev_hvel, innovations.ev_vvel, innovations.ev_hpos, innovations.ev_vpos);
+	_ekf.getEvYawInnov(innovations.ev_yaw);
 	_ekf.getBaroHgtInnov(innovations.baro_vpos);
 	_ekf.getRngHgtInnov(innovations.rng_vpos);
 	_ekf.getAuxVelInnov(innovations.aux_hvel);
@@ -817,6 +818,7 @@ void EKF2::PublishInnovationTestRatios(const hrt_abstime &timestamp)
 	_ekf.getGpsVelPosInnovRatio(test_ratios.gps_hvel[0], test_ratios.gps_vvel, test_ratios.gps_hpos[0],
 				    test_ratios.gps_vpos);
 	_ekf.getEvVelPosInnovRatio(test_ratios.ev_hvel[0], test_ratios.ev_vvel, test_ratios.ev_hpos[0], test_ratios.ev_vpos);
+	_ekf.getEvYawInnovRatio(test_ratios.ev_yaw);
 	_ekf.getBaroHgtInnovRatio(test_ratios.baro_vpos);
 	_ekf.getRngHgtInnovRatio(test_ratios.rng_vpos);
 	_ekf.getAuxVelInnovRatio(test_ratios.aux_hvel[0]);
@@ -841,6 +843,7 @@ void EKF2::PublishInnovationVariances(const hrt_abstime &timestamp)
 	variances.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
 	_ekf.getGpsVelPosInnovVar(variances.gps_hvel, variances.gps_vvel, variances.gps_hpos, variances.gps_vpos);
 	_ekf.getEvVelPosInnovVar(variances.ev_hvel, variances.ev_vvel, variances.ev_hpos, variances.ev_vpos);
+	_ekf.getEvYawInnovVar(variances.ev_yaw);
 	_ekf.getBaroHgtInnovVar(variances.baro_vpos);
 	_ekf.getRngHgtInnovVar(variances.rng_vpos);
 	_ekf.getAuxVelInnovVar(variances.aux_hvel);

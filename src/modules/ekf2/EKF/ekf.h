@@ -78,6 +78,10 @@ public:
 	void getEvVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getEvVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const;
 
+	void getEvYawInnov(float &ev_yaw_innov) const { ev_yaw_innov = _ev_yaw_innov; }
+	void getEvYawInnovVar(float &ev_yaw_innov_var) const { ev_yaw_innov_var = _ev_yaw_innov_var; }
+	void getEvYawInnovRatio(float &ev_yaw_innov_ratio) const { ev_yaw_innov_ratio = _ev_yaw_test_ratio; }
+
 	void getBaroHgtInnov(float &baro_hgt_innov) const { baro_hgt_innov = _baro_hgt_innov; }
 	void getBaroHgtInnovVar(float &baro_hgt_innov_var) const { baro_hgt_innov_var = _baro_hgt_innov_var; }
 	void getBaroHgtInnovRatio(float &baro_hgt_innov_ratio) const { baro_hgt_innov_ratio = _baro_hgt_test_ratio; }
@@ -102,8 +106,8 @@ public:
 
 	void getHeadingInnov(float &heading_innov) const { heading_innov = _heading_innov; }
 	void getHeadingInnovVar(float &heading_innov_var) const { heading_innov_var = _heading_innov_var; }
-
 	void getHeadingInnovRatio(float &heading_innov_ratio) const { heading_innov_ratio = _yaw_test_ratio; }
+
 	void getMagInnov(float mag_innov[3]) const { _mag_innov.copyTo(mag_innov); }
 	void getMagInnovVar(float mag_innov_var[3]) const { _mag_innov_var.copyTo(mag_innov_var); }
 	void getMagInnovRatio(float &mag_innov_ratio) const { mag_innov_ratio = _mag_test_ratio.max(); }
@@ -359,8 +363,8 @@ private:
 	bool _fuse_hpos_as_odom{false};		///< true when the NE position data is being fused using an odometry assumption
 	Vector2f _hpos_pred_prev{};		///< previous value of NE position state used by odometry fusion (m)
 	bool _hpos_prev_available{false};	///< true when previous values of the estimate and measurement are available for use
+	Quatf _quat_pred_prev{};
 	Dcmf _R_ev_to_ekf;			///< transformation matrix that rotates observations from the EV to the EKF navigation frame, initialized with Identity
-	bool _inhibit_ev_yaw_use{false};	///< true when the vision yaw data should not be used (e.g.: NE fusion requires true North)
 
 	// booleans true when fresh sensor data is available at the fusion time horizon
 	bool _gps_data_ready{false};	///< true when new GPS data has fallen behind the fusion time horizon and is available to be fused
@@ -439,6 +443,9 @@ private:
 
 	Vector3f _ev_pos_innov{};	///< external vision position innovations (m)
 	Vector3f _ev_pos_innov_var{};	///< external vision position innovation variances (m**2)
+
+	float _ev_yaw_innov{};		///< external vision yaw innovations
+	float _ev_yaw_innov_var{};	///< external vision yaw innovation variances
 
 	float _baro_hgt_innov{};		///< baro hgt innovations (m)
 	float _baro_hgt_innov_var{};	///< baro hgt innovation variances (m**2)
@@ -585,13 +592,13 @@ private:
 	// yaw : angle observation defined as the first rotation in a 321 Tait-Bryan rotation sequence (rad)
 	// yaw_variance : variance of the yaw angle observation (rad^2)
 	// zero_innovation : Fuse data with innovation set to zero
-	void fuseYaw321(const float yaw, const float yaw_variance, bool zero_innovation = false);
+	void fuseYaw321(const float yaw_innovation, const float yaw_variance);
 
 	// fuse the yaw angle defined as the first rotation in a 312 Tait-Bryan rotation sequence
 	// yaw : angle observation defined as the first rotation in a 312 Tait-Bryan rotation sequence (rad)
 	// yaw_variance : variance of the yaw angle observation (rad^2)
 	// zero_innovation : Fuse data with innovation set to zero
-	void fuseYaw312(const float yaw, const float yaw_variance, bool zero_innovation = false);
+	void fuseYaw312(const float yaw_innovation, const float yaw_variance);
 
 	// update quaternion states and covariances using an innovation, observation variance and Jacobian vector
 	// innovation : prediction - measurement

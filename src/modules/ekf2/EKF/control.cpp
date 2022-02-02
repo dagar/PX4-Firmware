@@ -193,15 +193,9 @@ void Ekf::controlExternalVisionFusion()
 			reset = true;
 		}
 
-		if (_inhibit_ev_yaw_use) {
-			stopEvYawFusion();
-		}
-
 		// if the ev data is not in a NED reference frame, then the transformation between EV and EKF navigation frames
 		// needs to be calculated and the observations rotated into the EKF frame of reference
-		if ((_params.fusion_mode & MASK_ROTATE_EV) && ((_params.fusion_mode & MASK_USE_EVPOS)
-				|| (_params.fusion_mode & MASK_USE_EVVEL)) && !_control_status.flags.ev_yaw) {
-
+		if (_params.fusion_mode & MASK_ROTATE_EV) {
 			// rotate EV measurements into the EKF Navigation frame
 			calcExtVisRotMat();
 		}
@@ -224,15 +218,14 @@ void Ekf::controlExternalVisionFusion()
 		}
 
 		// external vision yaw aiding selection logic
-		if (!_inhibit_ev_yaw_use && (_params.fusion_mode & MASK_USE_EVYAW) && !_control_status.flags.ev_yaw
-		    && _control_status.flags.tilt_align) {
-
+		if ((_params.fusion_mode & MASK_USE_EVYAW) && !_control_status.flags.ev_yaw && _control_status.flags.tilt_align) {
 			// don't start using EV data unless data is arriving frequently
 			if (isRecent(_time_last_ext_vision, 2 * EV_MAX_INTERVAL)) {
 				if (resetYawToEv()) {
 					_control_status.flags.yaw_align = true;
-					startEvYawFusion();
 				}
+
+				startEvYawFusion();
 			}
 		}
 
@@ -346,21 +339,36 @@ void Ekf::controlExternalVisionFusion()
 				resetYawToEv();
 			}
 
+			// calculate the the innovation and wrap to the interval between +-pi
 			if (shouldUse321RotationSequence(_R_to_earth)) {
-				float measured_hdg = getEuler321Yaw(_ev_sample_delayed.quat);
-				fuseYaw321(measured_hdg, _ev_sample_delayed.angVar);
+				float yaw = wrap_pi(getEuler321Yaw(_state.quat_nominal));
+				float yaw_prev = wrap_pi(getEuler321Yaw(_quat_pred_prev));
+
+				float measured_hdg_prev = wrap_pi(getEuler321Yaw(_ev_sample_delayed_prev.quat));
+				float measured_hdg = wrap_pi(getEuler321Yaw(_ev_sample_delayed.quat));
+
+				float delta_heading = wrap_pi(measured_hdg_prev - measured_hdg);
+
+				float innovation = wrap_pi(yaw - yaw_prev - delta_heading);
+
+				fuseYaw321(innovation, _ev_sample_delayed.angVar);
 
 			} else {
-				float measured_hdg = getEuler312Yaw(_ev_sample_delayed.quat);
-				fuseYaw312(measured_hdg, _ev_sample_delayed.angVar);
+				float yaw = wrap_pi(getEuler312Yaw(_state.quat_nominal));
+				float yaw_prev = wrap_pi(getEuler312Yaw(_quat_pred_prev));
+
+				float measured_hdg_prev = wrap_pi(getEuler312Yaw(_ev_sample_delayed_prev.quat));
+				float measured_hdg = wrap_pi(getEuler312Yaw(_ev_sample_delayed.quat));
+
+				float delta_heading = wrap_pi(measured_hdg_prev - measured_hdg);
+
+				float innovation = wrap_pi(yaw - yaw_prev - delta_heading);
+
+				fuseYaw312(innovation, _ev_sample_delayed.angVar);
 			}
 		}
 
-		// record observation and estimate for use next time
-		_ev_sample_delayed_prev = _ev_sample_delayed;
-		_hpos_pred_prev = _state.pos.xy();
-
-	} else if ((_control_status.flags.ev_pos || _control_status.flags.ev_vel ||  _control_status.flags.ev_yaw)
+	} else if ((_control_status.flags.ev_pos || _control_status.flags.ev_vel || _control_status.flags.ev_yaw)
 		   && isTimedOut(_time_last_ext_vision, (uint64_t)_params.reset_timeout_max)) {
 
 		// Turn off EV fusion mode if no data has been received
@@ -368,6 +376,11 @@ void Ekf::controlExternalVisionFusion()
 		_warning_events.flags.vision_data_stopped = true;
 		ECL_WARN("vision data stopped");
 	}
+
+	// record observation and estimate for use next time
+	_ev_sample_delayed_prev = _ev_sample_delayed;
+	_hpos_pred_prev = _state.pos.xy();
+	_quat_pred_prev = _state.quat_nominal;
 }
 
 void Ekf::controlOpticalFlowFusion()
