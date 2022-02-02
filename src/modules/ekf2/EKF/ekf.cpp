@@ -43,6 +43,9 @@
 
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 bool Ekf::init(uint64_t timestamp)
 {
 	bool ret = initialise_interface(timestamp);
@@ -533,3 +536,5 @@ Quatf Ekf::calculate_quaternion() const
 	// the quaternions must always be normalised after modification
 	return Quatf{_output_new.quat_nominal * AxisAnglef{delta_angle}}.unit();
 }
+
+} // namespace estimator

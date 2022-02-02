@@ -246,17 +246,6 @@ public:
 		}
 	}
 
-	void copyToColumnMajor(Type dst[P * Q]) const
-	{
-		const Slice<Type, P, Q, M, N> &self = *this;
-
-		for (size_t i = 0; i < P; i++) {
-			for (size_t j = 0; j < Q; j++) {
-				dst[i + (j * M)] = self(i, j);
-			}
-		}
-	}
-
 	Vector < Type, P < Q ? P : Q > diag() const
 	{
 		const Slice<Type, P, Q, M, N> &self = *this;

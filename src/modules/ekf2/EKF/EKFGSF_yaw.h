@@ -24,7 +24,7 @@ static constexpr float _m_2pi_inv = 0.159154943f;
 static constexpr float _m_pi = 3.14159265f;
 static constexpr float _m_pi2 = 1.57079632f;
 
-using namespace estimator;
+namespace estimator {
 
 class EKFGSF_yaw
 {
@@ -134,4 +134,7 @@ private:
 	// return the probability of the state estimate for the specified EKF assuming a gaussian error distribution
 	float gaussianDensity(const uint8_t model_index) const;
 };
+
+} // namespace estimator
+
 #endif // !EKF_EKFGSF_YAW_H

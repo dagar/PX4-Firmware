@@ -43,6 +43,9 @@
 #include "ekf.h"
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 void Ekf::controlFusionModes()
 {
 	// Store the status to enable change detection
@@ -1109,3 +1112,5 @@ void Ekf::processVelPosResetRequest()
 		_time_last_hor_vel_fuse = _time_last_imu;
 	}
 }
+
+} // namespace estimator

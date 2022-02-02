@@ -47,14 +47,19 @@
 namespace estimator
 {
 
-using matrix::AxisAnglef;
-using matrix::Dcmf;
-using matrix::Eulerf;
-using matrix::Matrix3f;
-using matrix::Quatf;
-using matrix::Vector2f;
-using matrix::Vector3f;
+//using px4_float_t = double;
+using px4_float_t = float;
+
+using AxisAnglef = matrix::AxisAngle<px4_float_t>;
+using Dcmf = matrix::Dcm<px4_float_t>;
+using Eulerf = matrix::Euler<px4_float_t>;
+using Matrix3f = matrix::SquareMatrix<px4_float_t, 3>;
+using Quatf = matrix::Quaternion<px4_float_t>;
+using Vector2f = matrix::Vector2<px4_float_t>;
+using Vector3f = matrix::Vector3<px4_float_t>;
+
 using matrix::wrap_pi;
+
 
 enum class velocity_frame_t : uint8_t {
 	LOCAL_FRAME_FRD,

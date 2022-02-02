@@ -1,6 +1,10 @@
+#include "common.h" // px4_float_t
+
 #include "utils.hpp"
 
-matrix::Dcmf taitBryan312ToRotMat(const matrix::Vector3f &rot312)
+namespace estimator {
+
+Dcmf taitBryan312ToRotMat(const Vector3f &rot312)
 {
 	// Calculate the frame2 to frame 1 rotation matrix from a 312 Tait-Bryan rotation sequence
 	const float c2 = cosf(rot312(2)); // third rotation is pitch
@@ -10,7 +14,7 @@ matrix::Dcmf taitBryan312ToRotMat(const matrix::Vector3f &rot312)
 	const float s0 = sinf(rot312(0)); // first rotation is yaw
 	const float c0 = cosf(rot312(0));
 
-	matrix::Dcmf R;
+	Dcmf R;
 	R(0, 0) = c0 * c2 - s0 * s1 * s2;
 	R(1, 1) = c0 * c1;
 	R(2, 2) = c2 * c1;
@@ -32,7 +36,7 @@ float kahanSummation(float sum_previous, float input, float &accumulator)
 	return t;
 }
 
-matrix::Dcmf quatToInverseRotMat(const matrix::Quatf &quat)
+Dcmf quatToInverseRotMat(const Quatf &quat)
 {
 	const float q00 = quat(0) * quat(0);
 	const float q11 = quat(1) * quat(1);
@@ -45,7 +49,7 @@ matrix::Dcmf quatToInverseRotMat(const matrix::Quatf &quat)
 	const float q13 = quat(1) * quat(3);
 	const float q23 = quat(2) * quat(3);
 
-	matrix::Dcmf dcm;
+	Dcmf dcm;
 	dcm(0, 0) = q00 + q11 - q22 - q33;
 	dcm(1, 1) = q00 - q11 + q22 - q33;
 	dcm(2, 2) = q00 - q11 - q22 + q33;
@@ -59,7 +63,7 @@ matrix::Dcmf quatToInverseRotMat(const matrix::Quatf &quat)
 	return dcm;
 }
 
-float getEuler321Yaw(const matrix::Quatf &q)
+float getEuler321Yaw(const Quatf &q)
 {
 	// Values from yaw_input_321.c file produced by
 	// https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/quat2yaw321.m
@@ -68,7 +72,7 @@ float getEuler321Yaw(const matrix::Quatf &q)
 	return atan2f(a, b);
 }
 
-float getEuler312Yaw(const matrix::Quatf &q)
+float getEuler312Yaw(const Quatf &q)
 {
 	// Values from yaw_input_312.c file produced by
 	// https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/quat2yaw312.m
@@ -77,24 +81,26 @@ float getEuler312Yaw(const matrix::Quatf &q)
 	return atan2f(a, b);
 }
 
-matrix::Dcmf updateEuler321YawInRotMat(float yaw, const matrix::Dcmf &rot_in)
+Dcmf updateEuler321YawInRotMat(float yaw, const Dcmf &rot_in)
 {
-	matrix::Eulerf euler321(rot_in);
+	Eulerf euler321(rot_in);
 	euler321(2) = yaw;
-	return matrix::Dcmf(euler321);
+	return Dcmf(euler321);
 }
 
-matrix::Dcmf updateEuler312YawInRotMat(float yaw, const matrix::Dcmf &rot_in)
+Dcmf updateEuler312YawInRotMat(float yaw, const Dcmf &rot_in)
 {
-	const matrix::Vector3f rotVec312(yaw,  // yaw
+	const Vector3f rotVec312(yaw,  // yaw
 					 asinf(rot_in(2, 1)),  // roll
 					 atan2f(-rot_in(2, 0), rot_in(2, 2)));  // pitch
 	return taitBryan312ToRotMat(rotVec312);
 }
 
-matrix::Dcmf updateYawInRotMat(float yaw, const matrix::Dcmf &rot_in)
+Dcmf updateYawInRotMat(float yaw, const Dcmf &rot_in)
 {
 	return shouldUse321RotationSequence(rot_in) ?
 	       updateEuler321YawInRotMat(yaw, rot_in) :
 	       updateEuler312YawInRotMat(yaw, rot_in);
 }
+
+} // namespace estimator

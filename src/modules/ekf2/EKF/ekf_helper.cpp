@@ -44,6 +44,9 @@
 #include <mathlib/mathlib.h>
 #include <cstdlib>
 
+namespace estimator
+{
+
 void Ekf::resetVelocity()
 {
 	if (_control_status.flags.gps && isTimedOut(_last_gps_fail_us, (uint64_t)_min_gps_health_time_us)) {
@@ -1824,3 +1827,6 @@ void Ekf::resetGpsDriftCheckFilters()
 	_gps_velNE_filt.setZero();
 	_gps_pos_deriv_filt.setZero();
 }
+
+} // namespace estimator
+

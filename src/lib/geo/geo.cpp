@@ -68,7 +68,7 @@ void MapProjection::initReference(double lat_0, double lon_0, uint64_t timestamp
 	_ref_init_done = true;
 }
 
-void MapProjection::project(double lat, double lon, float &x, float &y) const
+void MapProjection::project(double lat, double lon, double &x, double &y) const
 {
 	const double lat_rad = math::radians(lat);
 	const double lon_rad = math::radians(lon);
@@ -78,7 +78,7 @@ void MapProjection::project(double lat, double lon, float &x, float &y) const
 
 	const double cos_d_lon = cos(lon_rad - _ref_lon);
 
-	const double arg = math::constrain(_ref_sin_lat * sin_lat + _ref_cos_lat * cos_lat * cos_d_lon, -1.0,  1.0);
+	const double arg = math::constrain(_ref_sin_lat * sin_lat + _ref_cos_lat * cos_lat * cos_d_lon, -1.0, 1.0);
 	const double c = acos(arg);
 
 	double k = 1.0;
@@ -87,14 +87,24 @@ void MapProjection::project(double lat, double lon, float &x, float &y) const
 		k = (c / sin(c));
 	}
 
-	x = static_cast<float>(k * (_ref_cos_lat * sin_lat - _ref_sin_lat * cos_lat * cos_d_lon) * CONSTANTS_RADIUS_OF_EARTH);
-	y = static_cast<float>(k * cos_lat * sin(lon_rad - _ref_lon) * CONSTANTS_RADIUS_OF_EARTH);
+	x = k * (_ref_cos_lat * sin_lat - _ref_sin_lat * cos_lat * cos_d_lon) * CONSTANTS_RADIUS_OF_EARTH;
+	y = k * cos_lat * sin(lon_rad - _ref_lon) * CONSTANTS_RADIUS_OF_EARTH;
 }
 
-void MapProjection::reproject(float x, float y, double &lat, double &lon) const
+void MapProjection::project(double lat, double lon, float &x, float &y) const
 {
-	const double x_rad = (double)x / CONSTANTS_RADIUS_OF_EARTH;
-	const double y_rad = (double)y / CONSTANTS_RADIUS_OF_EARTH;
+	double xd;
+	double yd;
+	project(lat, lon, xd, yd);
+
+	x = static_cast<float>(xd);
+	y = static_cast<float>(yd);
+}
+
+void MapProjection::reproject(double x, double y, double &lat, double &lon) const
+{
+	const double x_rad = x / CONSTANTS_RADIUS_OF_EARTH;
+	const double y_rad = y / CONSTANTS_RADIUS_OF_EARTH;
 	const double c = sqrt(x_rad * x_rad + y_rad * y_rad);
 
 	if (fabs(c) > 0) {
@@ -111,6 +121,13 @@ void MapProjection::reproject(float x, float y, double &lat, double &lon) const
 		lat = math::degrees(_ref_lat);
 		lon = math::degrees(_ref_lon);
 	}
+}
+
+void MapProjection::reproject(float x, float y, double &lat, double &lon) const
+{
+	double xd = static_cast<double>(x);
+	double yd = static_cast<double>(y);
+	reproject(xd, yd, lat, lon);
 }
 
 float get_distance_to_next_waypoint(double lat_now, double lon_now, double lat_next, double lon_next)

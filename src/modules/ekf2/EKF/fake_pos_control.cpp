@@ -38,6 +38,9 @@
 
 #include "ekf.h"
 
+namespace estimator
+{
+
 void Ekf::controlFakePosFusion()
 {
 	// If we aren't doing any aiding, fake position measurements at the last known position to constrain drift
@@ -123,3 +126,6 @@ void Ekf::fuseFakePosition()
 		_time_last_fake_pos_fuse = _time_last_imu;
 	}
 }
+
+} // namespace estimator
+

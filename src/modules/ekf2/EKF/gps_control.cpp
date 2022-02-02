@@ -39,6 +39,9 @@
 #include "ekf.h"
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 void Ekf::controlGpsFusion()
 {
 	if (!(_params.fusion_mode & MASK_USE_GPS)) {
@@ -217,3 +220,5 @@ void Ekf::processYawEstimatorResetRequest()
 		}
 	}
 }
+
+} // namespace estimator

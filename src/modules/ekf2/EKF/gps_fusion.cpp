@@ -39,6 +39,9 @@
 /* #include <mathlib/mathlib.h> */
 #include "ekf.h"
 
+namespace estimator
+{
+
 void Ekf::fuseGpsVelPos()
 {
 	Vector2f gps_vel_innov_gates; // [horizontal vertical]
@@ -89,3 +92,5 @@ void Ekf::fuseGpsVelPos()
 	fuseVerticalVelocity(_gps_vel_innov, gps_vel_innov_gates, _last_vel_obs_var, _gps_vel_innov_var, _gps_vel_test_ratio);
 	fuseHorizontalPosition(_gps_pos_innov, gps_pos_innov_gates, gps_pos_obs_var, _gps_pos_innov_var, _gps_pos_test_ratio);
 }
+
+} // namespace estimator

@@ -38,6 +38,9 @@
 
 #include "ekf.h"
 
+namespace estimator
+{
+
 void Ekf::fuseBaroHgt()
 {
 	// vertical position innovation - baro measurement has opposite sign to earth z axis
@@ -117,3 +120,5 @@ void Ekf::fuseEvHgt()
 	fuseVerticalPosition(_ev_pos_innov(2), innov_gate, obs_var,
 			     _ev_pos_innov_var(2), _ev_pos_test_ratio(1));
 }
+
+} // namespace estimator

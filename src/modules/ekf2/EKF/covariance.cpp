@@ -47,6 +47,9 @@
 #include <math.h>
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 // Sets initial values for the covariance matrix
 // Do not call before quaternion states have been initialised
 void Ekf::initialiseCovariance()
@@ -1163,3 +1166,5 @@ void Ekf::resetWindCovarianceUsingAirspeed()
 	P(22, 22) += P(4, 4);
 	P(23, 23) += P(5, 5);
 }
+
+} // namespace estimator

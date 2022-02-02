@@ -40,6 +40,9 @@ px4_add_module(
 		${MAX_CUSTOM_OPT_LEVEL}
 		-fno-associative-math
 		#-DDEBUG_BUILD
+		#-Wno-error=double-promotion
+		-Wno-double-promotion
+		-Wno-error=double-promotion
 	INCLUDES
 		EKF
 	STACK_MAX

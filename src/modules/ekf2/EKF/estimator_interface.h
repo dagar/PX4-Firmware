@@ -71,7 +71,8 @@
 #include <mathlib/mathlib.h>
 #include <mathlib/math/filter/AlphaFilter.hpp>
 
-using namespace estimator;
+namespace estimator
+{
 
 class EstimatorInterface
 {
@@ -183,7 +184,7 @@ public:
 	// return true if the EKF is dead reckoning the position using inertial data only
 	bool inertial_dead_reckoning() const { return _is_dead_reckoning; }
 
-	const matrix::Quatf &getQuaternion() const { return _output_new.quat_nominal; }
+	const estimator::Quatf &getQuaternion() const { return _output_new.quat_nominal; }
 
 	// get the velocity of the body frame origin in local NED earth frame
 	Vector3f getVelocity() const { return _output_new.vel - _vel_imu_rel_body_ned; }
@@ -421,4 +422,6 @@ private:
 	uint8_t _drag_sample_count{0};	// number of drag specific force samples assumulated at the filter prediction rate
 	float _drag_sample_time_dt{0.0f};	// time integral across all samples used to form _drag_down_sampled (sec)
 };
+
+} // namespace estimator
 #endif // !EKF_ESTIMATOR_INTERFACE_H

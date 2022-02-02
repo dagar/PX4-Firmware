@@ -44,6 +44,9 @@
 
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 EstimatorInterface::~EstimatorInterface()
 {
 	delete _gps_buffer;
@@ -579,3 +582,5 @@ void EstimatorInterface::print_status()
 	printf("output buffer: %d/%d (%d Bytes)\n", _output_buffer.entries(), _output_buffer.get_length(), _output_buffer.get_total_size());
 	printf("output vert buffer: %d/%d (%d Bytes)\n", _output_vert_buffer.entries(), _output_vert_buffer.get_length(), _output_vert_buffer.get_total_size());
 }
+
+} // namespace estimator

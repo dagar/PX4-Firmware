@@ -47,6 +47,9 @@
 #include <float.h>
 #include "utils.hpp"
 
+namespace estimator
+{
+
 void Ekf::fuseOptFlow()
 {
 	float gndclearance = fmaxf(_params.rng_gnd_clearance, 0.1f);
@@ -114,7 +117,7 @@ void Ekf::fuseOptFlow()
 	// The derivation allows for an arbitrary body to flow sensor frame rotation which is
 	// currently not supported by the EKF, so assume sensor frame is aligned with the
 	// body frame
-	const Dcmf Tbs = matrix::eye<float, 3>();
+	const Dcmf Tbs = matrix::eye<px4_float_t, 3>();
 
 	// Sub Expressions
 	const float HK0 = -Tbs(1,0)*q2 + Tbs(1,1)*q1 + Tbs(1,2)*q0;
@@ -402,3 +405,5 @@ float Ekf::calcOptFlowMeasVar()
 
 	return R_LOS;
 }
+
+} // namespace estimator

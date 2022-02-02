@@ -42,7 +42,10 @@
 #include <vector>
 #include <mathlib/mathlib.h>
 
+#include "EKF/common.h"
 #include "EKF/utils.hpp"
+
+using namespace estimator;
 
 TEST(eclPowfTest, compareToStandardImplementation)
 {

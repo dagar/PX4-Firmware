@@ -45,6 +45,9 @@
 #include "ekf.h"
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 void Ekf::fuseAirspeed()
 {
 	const float &vn = _state.vel(0); // Velocity in north direction
@@ -205,3 +208,5 @@ void Ekf::resetWindToZero()
 	// start with a small initial uncertainty to improve the initial estimate
 	P.uncorrelateCovarianceSetVariance<2>(22, _params.initial_wind_uncertainty);
 }
+
+} // namespace estimator

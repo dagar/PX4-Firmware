@@ -39,6 +39,9 @@
 #include "ekf.h"
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 void Ekf::controlMagFusion()
 {
 	bool mag_data_ready = false;
@@ -402,3 +405,5 @@ bool Ekf::otherHeadingSourcesHaveStopped()
 
 	return  result;
 }
+
+} // namespace estimator

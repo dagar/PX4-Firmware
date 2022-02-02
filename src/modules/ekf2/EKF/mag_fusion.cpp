@@ -45,6 +45,9 @@
 
 #include <mathlib/mathlib.h>
 
+namespace estimator
+{
+
 void Ekf::fuseMag(const Vector3f &mag)
 {
 	// assign intermediate variables
@@ -908,3 +911,5 @@ float Ekf::calculate_synthetic_mag_z_measurement(const Vector3f &mag_meas, const
 
 	return (mag_z_body_pred < 0) ? -mag_z_abs : mag_z_abs;
 }
+
+} // namespace estimator

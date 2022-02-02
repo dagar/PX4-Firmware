@@ -244,6 +244,7 @@ public:
 	 * @param x north
 	 * @param y east
 	 */
+	void project(double lat, double lon, double &x, double &y) const;
 	void project(double lat, double lon, float &x, float &y) const;
 
 	/**
@@ -253,7 +254,7 @@ public:
 	 * @param lon in degrees (8.1234567°, not 81234567°)
 	 * @return the point in local coordinates as north / east
 	 */
-	inline matrix::Vector2f project(double lat, double lon) const
+	inline matrix::Vector2<float> project(double lat, double lon) const
 	{
 		matrix::Vector2f res;
 		project(lat, lon, res(0), res(1));
@@ -269,5 +270,6 @@ public:
 	 * @param lat in degrees (47.1234567°, not 471234567°)
 	 * @param lon in degrees (8.1234567°, not 81234567°)
 	 */
+	void reproject(double x, double y, double &lat, double &lon) const;
 	void reproject(float x, float y, double &lat, double &lon) const;
 };

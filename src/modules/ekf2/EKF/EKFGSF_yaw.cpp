@@ -1,6 +1,8 @@
 #include "EKFGSF_yaw.h"
 #include <cstdlib>
 
+namespace estimator {
+
 EKFGSF_yaw::EKFGSF_yaw()
 {
 	// this flag must be false when we start
@@ -536,3 +538,5 @@ void EKFGSF_yaw::setVelocity(const Vector2f &velocity, float accuracy)
 	_vel_accuracy = accuracy;
 	_vel_data_updated = true;
 }
+
+} // namespace estimator

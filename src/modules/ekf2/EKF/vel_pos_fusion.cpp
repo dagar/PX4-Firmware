@@ -44,6 +44,9 @@
 #include <mathlib/mathlib.h>
 #include "ekf.h"
 
+namespace estimator
+{
+
 bool Ekf::fuseHorizontalVelocity(const Vector3f &innov, const Vector2f &innov_gate, const Vector3f &obs_var,
 				 Vector3f &innov_var, Vector2f &test_ratio)
 {
@@ -248,3 +251,5 @@ void Ekf::setVelPosFaultStatus(const int index, const bool status)
 		_fault_status.flags.bad_pos_D = status;
 	}
 }
+
+} // namespace estimator
