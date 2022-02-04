@@ -370,6 +370,8 @@ protected:
 	RingBuffer<dragSample> *_drag_buffer{nullptr};
 	RingBuffer<auxVelSample> *_auxvel_buffer{nullptr};
 
+	bool _never_moved{true};
+
 	// timestamps of latest in buffer saved measurement in microseconds
 	uint64_t _time_last_imu{0};
 	uint64_t _time_last_gps{0};

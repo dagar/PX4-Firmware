@@ -173,6 +173,8 @@ bool Ekf::initialiseFilter()
 			}
 
 			_baro_counter++;
+
+			ECL_INFO("_baro_hgt_offset: %.3f", (double)_baro_hgt_offset);
 		}
 	}
 

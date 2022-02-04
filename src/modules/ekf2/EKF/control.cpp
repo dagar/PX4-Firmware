@@ -85,6 +85,13 @@ void Ekf::controlFusionModes()
 		}
 	}
 
+	if (_never_moved && (!_control_status.flags.vehicle_at_rest || _control_status.flags.in_air)) {
+		ECL_INFO("moved");
+		_never_moved = false;
+
+		ECL_INFO("_baro_hgt_offset: %.3f (FINAL)", (double)_baro_hgt_offset);
+	}
+
 	if (_baro_buffer) {
 		// check for intermittent data (before pop_first_older_than)
 		const baroSample &baro_init = _baro_buffer->get_newest();
@@ -92,6 +99,11 @@ void Ekf::controlFusionModes()
 
 		const uint64_t baro_time_prev = _baro_sample_delayed.time_us;
 		_baro_data_ready = _baro_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_baro_sample_delayed);
+
+		if (_never_moved) {
+			_baro_hgt_offset = 0.9f * _baro_hgt_offset + 0.1f * _baro_sample_delayed.hgt;
+			_baro_counter++;
+		}
 
 		// if we have a new baro sample save the delta time between this sample and the last sample which is
 		// used below for baro offset calculations
@@ -174,6 +186,38 @@ void Ekf::controlFusionModes()
 
 	// Additional horizontal velocity data from an auxiliary sensor can be fused
 	controlAuxVelFusion();
+
+	if (!_control_status.flags.in_air && _control_status.flags.vehicle_at_rest) {
+		const Vector3f vel_obs{0.f, 0.f, 0.f};
+		const Vector3f innovation = _state.vel - vel_obs;
+
+		const float obs_var = sq(0.0001f);
+
+		Vector3f innov_var;
+		innov_var(0) = P(4, 4) + obs_var;
+		innov_var(1) = P(5, 5) + obs_var;
+		innov_var(2) = P(6, 6) + obs_var;
+
+		fuseVelPosHeight(innovation(0), innov_var(0), 0);
+		fuseVelPosHeight(innovation(1), innov_var(1), 1);
+		fuseVelPosHeight(innovation(2), innov_var(2), 2);
+	}
+
+	if (_never_moved) {
+		const Vector3f pos_obs{0.f, 0.f, 0.f};
+		const Vector3f innovation = _state.pos - pos_obs;
+
+		const float obs_var = sq(0.01f);
+
+		Vector3f innov_var;
+		innov_var(0) = P(7, 7) + obs_var;
+		innov_var(1) = P(8, 8) + obs_var;
+		innov_var(2) = P(9, 9) + obs_var;
+
+		fuseVelPosHeight(innovation(0), innov_var(0), 3);
+		fuseVelPosHeight(innovation(1), innov_var(1), 4);
+		fuseVelPosHeight(innovation(2), innov_var(2), 5);
+	}
 
 	// Fake position measurement for constraining drift when no other velocity or position measurements
 	controlFakePosFusion();
