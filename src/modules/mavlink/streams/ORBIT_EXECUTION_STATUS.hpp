@@ -39,7 +39,7 @@
 class MavlinkStreamOrbitStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamOrbitStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamOrbitStatus(); }
 
 	static constexpr const char *get_name_static() { return "ORBIT_EXECUTION_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ORBIT_EXECUTION_STATUS; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamOrbitStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::SubscriptionMultiArray<orbit_status_s, 2> _orbit_status_subs{ORB_ID::orbit_status};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		orbit_status_s orbit_status;
 		bool updated = false;
@@ -73,7 +71,7 @@ private:
 				msg_orbit_execution_status.y = orbit_status.y * 1e7;
 				msg_orbit_execution_status.z = orbit_status.z;
 
-				mavlink_msg_orbit_execution_status_send_struct(_mavlink->get_channel(), &msg_orbit_execution_status);
+				mavlink_msg_orbit_execution_status_send_struct(mavlink.get_channel(), &msg_orbit_execution_status);
 
 				// only one subscription should ever be active at any time, so we can exit here
 				updated = true;

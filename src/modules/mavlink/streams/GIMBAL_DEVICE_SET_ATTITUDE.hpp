@@ -39,7 +39,7 @@
 class MavlinkStreamGimbalDeviceSetAttitude : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGimbalDeviceSetAttitude(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGimbalDeviceSetAttitude(); }
 
 	static constexpr const char *get_name_static() { return "GIMBAL_DEVICE_SET_ATTITUDE"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GIMBAL_DEVICE_SET_ATTITUDE; }
@@ -57,11 +57,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGimbalDeviceSetAttitude(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _gimbal_device_set_attitude_sub{ORB_ID(gimbal_device_set_attitude)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		gimbal_device_set_attitude_s gimbal_device_set_attitude;
 
@@ -82,7 +80,7 @@ private:
 			msg.angular_velocity_y = gimbal_device_set_attitude.angular_velocity_y;
 			msg.angular_velocity_z = gimbal_device_set_attitude.angular_velocity_z;
 
-			mavlink_msg_gimbal_device_set_attitude_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_gimbal_device_set_attitude_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

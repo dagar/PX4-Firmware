@@ -43,7 +43,7 @@
 class MavlinkStreamVFRHUD : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamVFRHUD(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamVFRHUD(); }
 
 	static constexpr const char *get_name_static() { return "VFR_HUD"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_VFR_HUD; }
@@ -61,8 +61,6 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamVFRHUD(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _lpos_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _armed_sub{ORB_ID(actuator_armed)};
 	uORB::Subscription _act0_sub{ORB_ID(actuator_controls_0)};
@@ -70,7 +68,7 @@ private:
 	uORB::Subscription _airspeed_validated_sub{ORB_ID(airspeed_validated)};
 	uORB::Subscription _air_data_sub{ORB_ID(vehicle_air_data)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		if (_lpos_sub.updated() || _airspeed_validated_sub.updated()) {
 
@@ -125,7 +123,7 @@ private:
 				msg.climb = -lpos.vz;
 			}
 
-			mavlink_msg_vfr_hud_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_vfr_hud_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

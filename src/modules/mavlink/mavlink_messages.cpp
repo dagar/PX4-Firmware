@@ -566,13 +566,13 @@ const char *get_stream_name(const uint16_t msg_id)
 	return nullptr;
 }
 
-MavlinkStream *create_mavlink_stream(const char *stream_name, Mavlink *mavlink)
+MavlinkStream *create_mavlink_stream(const char *stream_name)
 {
 	// search for stream with specified name in supported streams list
 	if (stream_name != nullptr) {
 		for (const auto &stream : streams_list) {
 			if (strcmp(stream_name, stream.get_name()) == 0) {
-				return stream.new_instance(mavlink);
+				return stream.new_instance();
 			}
 		}
 	}
@@ -580,12 +580,12 @@ MavlinkStream *create_mavlink_stream(const char *stream_name, Mavlink *mavlink)
 	return nullptr;
 }
 
-MavlinkStream *create_mavlink_stream(const uint16_t msg_id, Mavlink *mavlink)
+MavlinkStream *create_mavlink_stream(const uint16_t msg_id)
 {
 	// search for stream with specified name in supported streams list
 	for (const auto &stream : streams_list) {
 		if (msg_id == stream.get_id()) {
-			return stream.new_instance(mavlink);
+			return stream.new_instance();
 		}
 	}
 

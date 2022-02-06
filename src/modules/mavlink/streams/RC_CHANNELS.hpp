@@ -39,7 +39,7 @@
 class MavlinkStreamRCChannels : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamRCChannels(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamRCChannels(); }
 
 	static constexpr const char *get_name_static() { return "RC_CHANNELS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_RC_CHANNELS; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamRCChannels(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _input_rc_sub{ORB_ID(input_rc)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		input_rc_s rc;
 
@@ -87,7 +85,7 @@ private:
 			msg.chan18_raw = (rc.channel_count > 17) ? rc.values[17] : UINT16_MAX;
 			msg.rssi = (rc.channel_count > 0) ? rc.rssi : 0;
 
-			mavlink_msg_rc_channels_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_rc_channels_send_struct(mavlink.get_channel(), &msg);
 			return true;
 		}
 

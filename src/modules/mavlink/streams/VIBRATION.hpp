@@ -40,7 +40,7 @@
 class MavlinkStreamVibration : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamVibration(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamVibration(); }
 
 	static constexpr const char *get_name_static() { return "VIBRATION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_VIBRATION; }
@@ -58,12 +58,10 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamVibration(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _sensor_selection_sub{ORB_ID(sensor_selection)};
 	uORB::SubscriptionMultiArray<vehicle_imu_status_s, 3> _vehicle_imu_status_subs{ORB_ID::vehicle_imu_status};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		if (_vehicle_imu_status_subs.updated()) {
 			mavlink_vibration_t msg{};
@@ -117,7 +115,7 @@ private:
 				}
 			}
 
-			mavlink_msg_vibration_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_vibration_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

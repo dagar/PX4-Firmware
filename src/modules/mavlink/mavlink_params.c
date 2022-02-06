@@ -159,6 +159,7 @@ PARAM_DEFINE_INT32(MAV_HB_FORW_EN, 1);
  * serving as a loopback of the received ODOMETRY messages on the Mavlink receiver.
  *
  * @boolean
+ * @reboot_required
  * @group MAVLink
  */
 PARAM_DEFINE_INT32(MAV_ODOM_LP, 0);

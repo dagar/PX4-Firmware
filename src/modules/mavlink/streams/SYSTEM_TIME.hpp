@@ -37,7 +37,7 @@
 class MavlinkStreamSystemTime : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamSystemTime(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamSystemTime(); }
 
 	static constexpr const char *get_name_static() { return "SYSTEM_TIME"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_SYSTEM_TIME; }
@@ -51,9 +51,7 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamSystemTime(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		timespec tv;
 		px4_clock_gettime(CLOCK_REALTIME, &tv);
@@ -65,7 +63,7 @@ private:
 		// If the time is before 2001-01-01, it's probably the default 2000
 		// and we don't need to bother sending it because it's definitely wrong.
 		if (msg.time_unix_usec > 978307200000000) {
-			mavlink_msg_system_time_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_system_time_send_struct(mavlink.get_channel(), &msg);
 			return true;
 		}
 

@@ -40,7 +40,7 @@
 class MavlinkStreamEstimatorStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamEstimatorStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamEstimatorStatus(); }
 
 	static constexpr const char *get_name_static() { return "ESTIMATOR_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ESTIMATOR_STATUS; }
@@ -54,12 +54,10 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamEstimatorStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _estimator_selector_status_sub{ORB_ID(estimator_selector_status)};
 	uORB::Subscription _estimator_status_sub{ORB_ID(estimator_status)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		// use primary estimator_status
 		if (_estimator_selector_status_sub.updated()) {
@@ -86,7 +84,7 @@ private:
 			est_msg.pos_horiz_accuracy = est.pos_horiz_accuracy;
 			est_msg.pos_vert_accuracy = est.pos_vert_accuracy;
 			est_msg.flags = est.solution_status_flags;
-			mavlink_msg_estimator_status_send_struct(_mavlink->get_channel(), &est_msg);
+			mavlink_msg_estimator_status_send_struct(mavlink.get_channel(), &est_msg);
 
 			return true;
 		}

@@ -41,7 +41,7 @@
 class MavlinkStreamPositionTargetGlobalInt : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamPositionTargetGlobalInt(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamPositionTargetGlobalInt(); }
 
 	static constexpr const char *get_name_static() { return "POSITION_TARGET_GLOBAL_INT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT; }
@@ -56,13 +56,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamPositionTargetGlobalInt(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _control_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _lpos_sp_sub{ORB_ID(vehicle_local_position_setpoint)};
 	uORB::Subscription _pos_sp_triplet_sub{ORB_ID(position_setpoint_triplet)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_control_mode_s control_mode{};
 		_control_mode_sub.copy(&control_mode);
@@ -101,7 +99,7 @@ private:
 					msg.yaw_rate = lpos_sp.yawspeed;
 				}
 
-				mavlink_msg_position_target_global_int_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_position_target_global_int_send_struct(mavlink.get_channel(), &msg);
 
 				return true;
 			}

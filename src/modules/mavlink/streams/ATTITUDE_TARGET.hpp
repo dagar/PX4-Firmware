@@ -40,7 +40,7 @@
 class MavlinkStreamAttitudeTarget : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAttitudeTarget(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamAttitudeTarget(); }
 
 	static constexpr const char *get_name_static() { return "ATTITUDE_TARGET"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ATTITUDE_TARGET; }
@@ -54,13 +54,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAttitudeTarget(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _att_sp_sub{ORB_ID(vehicle_attitude_setpoint)};
 	uORB::Subscription _att_rates_sp_sub{ORB_ID(vehicle_rates_setpoint)};
 	hrt_abstime _last_att_sp_update{0};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_attitude_setpoint_s att_sp;
 
@@ -93,7 +91,7 @@ private:
 
 			msg.thrust = matrix::Vector3f(att_sp.thrust_body).norm();
 
-			mavlink_msg_attitude_target_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_attitude_target_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

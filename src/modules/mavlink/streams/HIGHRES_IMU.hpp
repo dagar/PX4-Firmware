@@ -47,7 +47,7 @@ using matrix::Vector3f;
 class MavlinkStreamHighresIMU : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamHighresIMU(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamHighresIMU(); }
 
 	static constexpr const char *get_name_static() { return "HIGHRES_IMU"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_HIGHRES_IMU; }
@@ -61,8 +61,6 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamHighresIMU(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::SubscriptionMultiArray<vehicle_imu_s, 3> _vehicle_imu_subs{ORB_ID::vehicle_imu};
 	uORB::Subscription _estimator_sensor_bias_sub{ORB_ID(estimator_sensor_bias)};
 	uORB::Subscription _estimator_selector_status_sub{ORB_ID(estimator_selector_status)};
@@ -71,7 +69,7 @@ private:
 	uORB::Subscription _magnetometer_sub{ORB_ID(vehicle_magnetometer)};
 	uORB::Subscription _air_data_sub{ORB_ID(vehicle_air_data)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		bool updated = false;
 
@@ -196,7 +194,7 @@ private:
 			msg.temperature = air_data.baro_temp_celcius;
 			msg.fields_updated = fields_updated;
 
-			mavlink_msg_highres_imu_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_highres_imu_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

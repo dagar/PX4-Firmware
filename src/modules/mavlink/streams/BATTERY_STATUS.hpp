@@ -39,7 +39,7 @@
 class MavlinkStreamBatteryStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamBatteryStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamBatteryStatus(); }
 
 	static constexpr const char *get_name_static() { return "BATTERY_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_BATTERY_STATUS; }
@@ -54,11 +54,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamBatteryStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::SubscriptionMultiArray<battery_status_s, battery_status_s::MAX_INSTANCES> _battery_status_subs{ORB_ID::battery_status};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		bool updated = false;
 
@@ -177,7 +175,7 @@ private:
 					bat_msg.voltages_ext[cell] = cell_voltages[mavlink_cell_slots + cell];
 				}
 
-				mavlink_msg_battery_status_send_struct(_mavlink->get_channel(), &bat_msg);
+				mavlink_msg_battery_status_send_struct(mavlink.get_channel(), &bat_msg);
 				updated = true;
 			}
 		}

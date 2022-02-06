@@ -40,7 +40,7 @@
 class MavlinkStreamScaledPressure3 : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamScaledPressure3(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamScaledPressure3(); }
 
 	static constexpr const char *get_name_static() { return "SCALED_PRESSURE3"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_SCALED_PRESSURE3; }
@@ -58,12 +58,10 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamScaledPressure3(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _differential_pressure_sub{ORB_ID(differential_pressure), 2};
 	uORB::Subscription _sensor_baro_sub{ORB_ID(sensor_baro), 2};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		if (_sensor_baro_sub.updated() || _differential_pressure_sub.updated()) {
 			mavlink_scaled_pressure3_t msg{};
@@ -87,7 +85,7 @@ private:
 				msg.temperature_press_diff = roundf(differential_pressure.temperature * 100.f); // centidegrees
 			}
 
-			mavlink_msg_scaled_pressure3_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_scaled_pressure3_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

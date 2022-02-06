@@ -39,7 +39,7 @@
 class MavlinkStreamGimbalManagerStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGimbalManagerStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGimbalManagerStatus(); }
 
 	static constexpr const char *get_name_static() { return "GIMBAL_MANAGER_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GIMBAL_MANAGER_STATUS; }
@@ -57,11 +57,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGimbalManagerStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _gimbal_manager_status_sub{ORB_ID(gimbal_manager_status)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		gimbal_manager_status_s gimbal_manager_status;
 
@@ -76,7 +74,7 @@ private:
 			msg.secondary_control_sysid = gimbal_manager_status.secondary_control_sysid;
 			msg.secondary_control_compid = gimbal_manager_status.secondary_control_compid;
 
-			mavlink_msg_gimbal_manager_status_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_gimbal_manager_status_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

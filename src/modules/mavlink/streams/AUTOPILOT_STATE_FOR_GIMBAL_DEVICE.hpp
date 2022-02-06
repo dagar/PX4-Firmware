@@ -44,7 +44,7 @@
 class MavlinkStreamAutopilotStateForGimbalDevice : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAutopilotStateForGimbalDevice(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamAutopilotStateForGimbalDevice(); }
 
 	static constexpr const char *get_name_static() { return "AUTOPILOT_STATE_FOR_GIMBAL_DEVICE"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_AUTOPILOT_STATE_FOR_GIMBAL_DEVICE; }
@@ -62,8 +62,6 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAutopilotStateForGimbalDevice(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _estimator_selector_status_sub{ORB_ID(estimator_selector_status)};
 	uORB::Subscription _estimator_status_sub{ORB_ID(estimator_status)};
 	uORB::Subscription _att_sub{ORB_ID(vehicle_attitude)};
@@ -71,7 +69,7 @@ private:
 	uORB::Subscription _att_sp_sub{ORB_ID(vehicle_attitude_setpoint)};
 	uORB::Subscription _landed_sub{ORB_ID(vehicle_land_detected)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_attitude_s att;
 
@@ -131,7 +129,7 @@ private:
 				}
 			}
 
-			mavlink_msg_autopilot_state_for_gimbal_device_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_autopilot_state_for_gimbal_device_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

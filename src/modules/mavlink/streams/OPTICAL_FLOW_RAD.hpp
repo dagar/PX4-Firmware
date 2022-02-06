@@ -39,7 +39,7 @@
 class MavlinkStreamOpticalFlowRad : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamOpticalFlowRad(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamOpticalFlowRad(); }
 
 	static constexpr const char *get_name_static() { return "OPTICAL_FLOW_RAD"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_OPTICAL_FLOW_RAD; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamOpticalFlowRad(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _optical_flow_sub{ORB_ID(optical_flow)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		optical_flow_s flow;
 
@@ -78,7 +76,7 @@ private:
 			msg.time_delta_distance_us = flow.time_since_last_sonar_update;
 			msg.temperature = flow.gyro_temperature;
 
-			mavlink_msg_optical_flow_rad_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_optical_flow_rad_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

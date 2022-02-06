@@ -39,7 +39,7 @@
 class MavlinkStreamADSBVehicle : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamADSBVehicle(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamADSBVehicle(); }
 
 	static constexpr const char *get_name_static() { return "ADSB_VEHICLE"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ADSB_VEHICLE; }
@@ -55,11 +55,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamADSBVehicle(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _transponder_report_sub{ORB_ID(transponder_report)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		transponder_report_s pos;
 
@@ -97,7 +95,7 @@ private:
 
 			if (pos.flags & transponder_report_s::PX4_ADSB_FLAGS_VALID_SQUAWK) { msg.flags |= ADSB_FLAGS_VALID_SQUAWK; }
 
-			mavlink_msg_adsb_vehicle_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_adsb_vehicle_send_struct(mavlink.get_channel(), &msg);
 			return true;
 		}
 

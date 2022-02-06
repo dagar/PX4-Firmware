@@ -39,7 +39,7 @@
 class MavlinkStreamGPSRawInt : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGPSRawInt(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGPSRawInt(); }
 
 	static constexpr const char *get_name_static() { return "GPS_RAW_INT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GPS_RAW_INT; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGPSRawInt(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _sensor_gps_sub{ORB_ID(sensor_gps), 0};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		sensor_gps_s gps;
 
@@ -99,7 +97,7 @@ private:
 				}
 			}
 
-			mavlink_msg_gps_raw_int_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_gps_raw_int_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

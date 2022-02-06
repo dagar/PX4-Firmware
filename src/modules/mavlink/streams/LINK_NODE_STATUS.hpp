@@ -37,7 +37,7 @@
 class MavlinkStreamLinkNodeStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamLinkNodeStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamLinkNodeStatus(); }
 
 	static constexpr const char *get_name_static() { return "LINK_NODE_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_LINK_NODE_STATUS; }
@@ -51,13 +51,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamLinkNodeStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		mavlink_link_node_status_t link_node_status{};
 
-		const telemetry_status_s &tstatus = _mavlink->telemetry_status();
+		const telemetry_status_s &tstatus = mavlink.telemetry_status();
 		link_node_status.tx_buf = 0; // % TODO
 		link_node_status.rx_buf = 0; // % TODO
 		link_node_status.tx_rate = tstatus.tx_rate_avg;
@@ -71,7 +69,7 @@ private:
 
 		link_node_status.timestamp = hrt_absolute_time();
 
-		mavlink_msg_link_node_status_send_struct(_mavlink->get_channel(), &link_node_status);
+		mavlink_msg_link_node_status_send_struct(mavlink.get_channel(), &link_node_status);
 
 		return true;
 	}

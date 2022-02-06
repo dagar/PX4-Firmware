@@ -39,7 +39,7 @@
 class MavlinkStreamGPSRTCMData : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGPSRTCMData(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGPSRTCMData(); }
 
 	static constexpr const char *get_name_static() { return "GPS_RTCM_DATA"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GPS_RTCM_DATA; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGPSRTCMData(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _gps_inject_data_sub{ORB_ID(gps_inject_data), 0};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		gps_inject_data_s gps_inject_data;
 
@@ -68,7 +66,7 @@ private:
 			msg.flags = gps_inject_data.flags;
 			memcpy(msg.data, gps_inject_data.data, sizeof(msg.data));
 
-			mavlink_msg_gps_rtcm_data_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_gps_rtcm_data_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

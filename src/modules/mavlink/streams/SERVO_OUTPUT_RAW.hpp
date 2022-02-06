@@ -40,7 +40,7 @@ template <int N>
 class MavlinkStreamServoOutputRaw : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamServoOutputRaw<N>(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamServoOutputRaw<N>(); }
 
 	static constexpr const char *get_name_static()
 	{
@@ -66,11 +66,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamServoOutputRaw(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _act_sub{ORB_ID(actuator_outputs), N};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		actuator_outputs_s act;
 
@@ -98,7 +96,7 @@ private:
 			msg.servo15_raw = act.output[14];
 			msg.servo16_raw = act.output[15];
 
-			mavlink_msg_servo_output_raw_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_servo_output_raw_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

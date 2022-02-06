@@ -39,7 +39,7 @@
 class MavlinkStreamSmartBatteryInfo : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamSmartBatteryInfo(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamSmartBatteryInfo(); }
 
 	static constexpr const char *get_name_static() { return "SMART_BATTERY_INFO"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_SMART_BATTERY_INFO; }
@@ -54,11 +54,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamSmartBatteryInfo(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::SubscriptionMultiArray<battery_status_s, battery_status_s::MAX_INSTANCES> _battery_status_subs{ORB_ID::battery_status};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		bool updated = false;
 
@@ -96,7 +94,7 @@ private:
 				msg.charging_minimum_voltage = -1;
 				msg.resting_minimum_voltage = -1;
 
-				mavlink_msg_smart_battery_info_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_smart_battery_info_send_struct(mavlink.get_channel(), &msg);
 				updated = true;
 			}
 		}

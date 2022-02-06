@@ -39,7 +39,7 @@
 class MavlinkStreamGpsGlobalOrigin : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGpsGlobalOrigin(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGpsGlobalOrigin(); }
 
 	static constexpr const char *get_name_static() { return "GPS_GLOBAL_ORIGIN"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN; }
@@ -56,7 +56,8 @@ public:
 		return 0;
 	}
 
-	bool request_message(float param2, float param3, float param4, float param5, float param6, float param7) override
+	bool request_message(Mavlink &mavlink, float param2, float param3, float param4, float param5, float param6,
+			     float param7) override
 	{
 		if (_valid) {
 			_force_next_send = true;
@@ -67,8 +68,6 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGpsGlobalOrigin(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
 
 	uint64_t _ref_timestamp{0};
@@ -79,7 +78,7 @@ private:
 	bool _valid{false};
 	bool _force_next_send{true};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_local_position_s vehicle_local_position;
 
@@ -99,7 +98,7 @@ private:
 					msg.longitude = round(vehicle_local_position.ref_lon * 1e7); // double degree -> int32 degreeE7
 					msg.altitude = roundf(vehicle_local_position.ref_alt * 1e3f); // float m -> int32 mm
 					msg.time_usec = vehicle_local_position.ref_timestamp; // int64 time since system boot
-					mavlink_msg_gps_global_origin_send_struct(_mavlink->get_channel(), &msg);
+					mavlink_msg_gps_global_origin_send_struct(mavlink.get_channel(), &msg);
 
 					_ref_timestamp = vehicle_local_position.ref_timestamp;
 					_ref_lat       = vehicle_local_position.ref_lat;

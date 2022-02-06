@@ -40,7 +40,7 @@
 class MavlinkStreamAttitude : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAttitude(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamAttitude(); }
 
 	static constexpr const char *get_name_static() { return "ATTITUDE"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ATTITUDE; }
@@ -54,12 +54,10 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAttitude(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _att_sub{ORB_ID(vehicle_attitude)};
 	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_attitude_s att;
 
@@ -79,7 +77,7 @@ private:
 			msg.pitchspeed = angular_velocity.xyz[1];
 			msg.yawspeed = angular_velocity.xyz[2];
 
-			mavlink_msg_attitude_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_attitude_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

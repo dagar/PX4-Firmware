@@ -42,7 +42,7 @@
 class MavlinkStreamGlobalPositionInt : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGlobalPositionInt(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGlobalPositionInt(); }
 
 	static constexpr const char *get_name_static() { return "GLOBAL_POSITION_INT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GLOBAL_POSITION_INT; }
@@ -56,14 +56,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGlobalPositionInt(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _gpos_sub{ORB_ID(vehicle_global_position)};
 	uORB::Subscription _lpos_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _home_sub{ORB_ID(home_position)};
 	uORB::Subscription _air_data_sub{ORB_ID(vehicle_air_data)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_global_position_s gpos;
 		vehicle_local_position_s lpos;
@@ -112,7 +110,7 @@ private:
 
 			msg.hdg = math::degrees(matrix::wrap_2pi(lpos.heading)) * 100.0f;
 
-			mavlink_msg_global_position_int_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_global_position_int_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

@@ -40,7 +40,7 @@
 class MavlinkStreamNavControllerOutput : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamNavControllerOutput(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamNavControllerOutput(); }
 
 	static constexpr const char *get_name_static() { return "NAV_CONTROLLER_OUTPUT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT; }
@@ -55,12 +55,10 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamNavControllerOutput(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _position_controller_status_sub{ORB_ID(position_controller_status)};
 	uORB::Subscription _tecs_status_sub{ORB_ID(tecs_status)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		position_controller_status_s pos_ctrl_status;
 
@@ -80,7 +78,7 @@ private:
 			msg.alt_error = tecs_status.altitude_filtered - tecs_status.altitude_sp;
 			msg.aspd_error = tecs_status.true_airspeed_filtered - tecs_status.true_airspeed_sp;
 
-			mavlink_msg_nav_controller_output_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_nav_controller_output_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

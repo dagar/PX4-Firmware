@@ -40,7 +40,7 @@ template <int N>
 class MavlinkStreamActuatorControlTarget : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamActuatorControlTarget<N>(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamActuatorControlTarget<N>(); }
 
 	static constexpr const char *get_name_static()
 	{
@@ -73,7 +73,7 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamActuatorControlTarget(Mavlink *mavlink) : MavlinkStream(mavlink)
+	MavlinkStreamActuatorControlTarget()
 	{
 		// XXX this can be removed once the multiplatform system remaps topics
 		switch (N) {
@@ -102,7 +102,7 @@ private:
 
 	uORB::Subscription *_act_ctrl_sub{nullptr};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		actuator_controls_s act_ctrl;
 
@@ -116,7 +116,7 @@ private:
 				msg.controls[i] = act_ctrl.control[i];
 			}
 
-			mavlink_msg_actuator_control_target_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_actuator_control_target_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

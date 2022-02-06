@@ -39,7 +39,7 @@
 class MavlinkStreamAttPosMocap : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAttPosMocap(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamAttPosMocap(); }
 
 	static constexpr const char *get_name_static() { return "ATT_POS_MOCAP"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ATT_POS_MOCAP; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAttPosMocap(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _mocap_sub{ORB_ID(vehicle_mocap_odometry)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_odometry_s mocap;
 
@@ -74,7 +72,7 @@ private:
 			msg.z = mocap.z;
 			// msg.covariance =
 
-			mavlink_msg_att_pos_mocap_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_att_pos_mocap_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

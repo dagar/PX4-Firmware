@@ -40,7 +40,7 @@
 class MavlinkStreamHygrometerSensor : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamHygrometerSensor(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamHygrometerSensor(); }
 
 	static constexpr const char *get_name_static() { return "HYGROMETER_SENSOR"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_HYGROMETER_SENSOR; }
@@ -55,11 +55,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamHygrometerSensor(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::SubscriptionMultiArray<sensor_hygrometer_s> _sensor_hygrometer_subs{ORB_ID::sensor_hygrometer};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		bool updated = false;
 
@@ -72,7 +70,7 @@ private:
 				msg.temperature = roundf(sensor_hygrometer.temperature * 100.f); // degrees to centidegrees (int16_t)
 				msg.humidity    = roundf(sensor_hygrometer.humidity);            // % (uint16_t)
 
-				mavlink_msg_hygrometer_sensor_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_hygrometer_sensor_send_struct(mavlink.get_channel(), &msg);
 
 				updated = true;
 			}

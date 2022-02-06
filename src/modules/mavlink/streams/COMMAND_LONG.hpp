@@ -39,7 +39,7 @@
 class MavlinkStreamCommandLong : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamCommandLong(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamCommandLong(); }
 
 	static constexpr const char *get_name_static() { return "COMMAND_LONG"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_COMMAND_LONG; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamCommandLong(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		bool sent = false;
 		const unsigned last_generation = _vehicle_command_sub.get_last_generation();
@@ -73,15 +71,15 @@ private:
 			const bool px4_internal_cmd = (cmd.command >= vehicle_command_s::VEHICLE_CMD_PX4_INTERNAL_START);
 
 			// internal commands
-			const bool target_system_internal = (cmd.target_system == _mavlink->get_system_id())
-							    && (cmd.target_component == _mavlink->get_component_id())
+			const bool target_system_internal = (cmd.target_system == mavlink.get_system_id())
+							    && (cmd.target_component == mavlink.get_component_id())
 							    && (cmd.source_system == cmd.target_system)
 							    && (cmd.source_component == cmd.target_component);
 
 			if (!cmd.from_external && !px4_internal_cmd && !target_system_internal) {
 				PX4_DEBUG("sending command %d to %d/%d", cmd.command, cmd.target_system, cmd.target_component);
 
-				MavlinkCommandSender::instance().handle_vehicle_command(cmd, _mavlink->get_channel());
+				MavlinkCommandSender::instance().handle_vehicle_command(cmd, mavlink.get_channel());
 				sent = true;
 
 			} else {
@@ -89,7 +87,7 @@ private:
 			}
 		}
 
-		MavlinkCommandSender::instance().check_timeout(_mavlink->get_channel());
+		MavlinkCommandSender::instance().check_timeout(mavlink.get_channel());
 
 		return sent;
 	}

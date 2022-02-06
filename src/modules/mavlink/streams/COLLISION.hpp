@@ -39,7 +39,7 @@
 class MavlinkStreamCollision : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamCollision(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamCollision(); }
 
 	static constexpr const char *get_name_static() { return "COLLISION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_COLLISION; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamCollision(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _collision_sub{ORB_ID(collision_report)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		collision_report_s report;
 		bool sent = false;
@@ -73,7 +71,7 @@ private:
 			msg.altitude_minimum_delta = report.altitude_minimum_delta;
 			msg.horizontal_minimum_delta = report.horizontal_minimum_delta;
 
-			mavlink_msg_collision_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_collision_send_struct(mavlink.get_channel(), &msg);
 			sent = true;
 		}
 

@@ -41,7 +41,7 @@
 class MavlinkStreamAttitudeQuaternion : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAttitudeQuaternion(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamAttitudeQuaternion(); }
 
 	static constexpr const char *get_name_static() { return "ATTITUDE_QUATERNION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ATTITUDE_QUATERNION; }
@@ -55,13 +55,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamAttitudeQuaternion(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _att_sub{ORB_ID(vehicle_attitude)};
 	uORB::Subscription _angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_attitude_s att;
 
@@ -100,7 +98,7 @@ private:
 				msg.repr_offset_q[3] = 0.0f;
 			}
 
-			mavlink_msg_attitude_quaternion_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_attitude_quaternion_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

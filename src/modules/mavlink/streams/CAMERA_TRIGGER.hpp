@@ -40,7 +40,7 @@
 class MavlinkStreamCameraTrigger : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamCameraTrigger(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamCameraTrigger(); }
 
 	static constexpr const char *get_name_static() { return "CAMERA_TRIGGER"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_CAMERA_TRIGGER; }
@@ -61,8 +61,6 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamCameraTrigger(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _camera_trigger_sub{ORB_ID(camera_trigger)};
 	uORB::Subscription _camera_status_sub{ORB_ID(camera_status)};
 	camera_status_s _camera_status = {
@@ -72,7 +70,7 @@ private:
 	};
 	int _sequence {1};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		camera_trigger_s camera_trigger;
 
@@ -82,7 +80,7 @@ private:
 				mavlink_camera_trigger_t msg{};
 				msg.time_usec = camera_trigger.timestamp;
 				msg.seq = camera_trigger.seq;
-				mavlink_msg_camera_trigger_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_camera_trigger_send_struct(mavlink.get_channel(), &msg);
 
 				_camera_status_sub.update(&_camera_status);
 
@@ -99,7 +97,7 @@ private:
 				vcmd.target_system = mavlink_system.sysid;
 				vcmd.target_component = _camera_status.active_comp_id;
 
-				MavlinkCommandSender::instance().handle_vehicle_command(vcmd, _mavlink->get_channel());
+				MavlinkCommandSender::instance().handle_vehicle_command(vcmd, mavlink.get_channel());
 
 
 				// TODO: move this camera_trigger and publish as a vehicle_command
@@ -118,7 +116,7 @@ private:
 				command_long_msg.param6 = NAN;
 				command_long_msg.param7 = NAN;
 
-				mavlink_msg_command_long_send_struct(_mavlink->get_channel(), &command_long_msg);
+				mavlink_msg_command_long_send_struct(mavlink.get_channel(), &command_long_msg);
 
 				return true;
 			}

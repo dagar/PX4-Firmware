@@ -43,7 +43,7 @@
 class MavlinkStreamScaledIMU : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamScaledIMU(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamScaledIMU(); }
 
 	static constexpr const char *get_name_static() { return "SCALED_IMU"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_SCALED_IMU; }
@@ -61,12 +61,10 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamScaledIMU(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _vehicle_imu_sub{ORB_ID(vehicle_imu), 0};
 	uORB::Subscription _sensor_mag_sub{ORB_ID(sensor_mag), 0};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		if (_vehicle_imu_sub.updated() || _sensor_mag_sub.updated()) {
 			mavlink_scaled_imu_t msg{};
@@ -104,7 +102,7 @@ private:
 				msg.temperature = sensor_mag.temperature;
 			}
 
-			mavlink_msg_scaled_imu_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_scaled_imu_send_struct(mavlink.get_channel(), &msg);
 			return true;
 		}
 

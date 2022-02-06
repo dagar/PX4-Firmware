@@ -42,7 +42,7 @@
 class MavlinkStreamHeartbeat : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamHeartbeat(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamHeartbeat(); }
 
 	static constexpr const char *get_name_static() { return "HEARTBEAT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_HEARTBEAT; }
@@ -58,14 +58,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamHeartbeat(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _acturator_armed_sub{ORB_ID(actuator_armed)};
 	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::Subscription _vehicle_status_flags_sub{ORB_ID(vehicle_status_flags)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		// always send the heartbeat, independent of the update status of the topics
 		vehicle_status_s vehicle_status{};
@@ -138,10 +136,10 @@ private:
 		}
 
 
-		mavlink_msg_heartbeat_send(_mavlink->get_channel(), _mavlink->get_system_type(), MAV_AUTOPILOT_PX4,
+		mavlink_msg_heartbeat_send(mavlink.get_channel(), mavlink.get_system_type(), MAV_AUTOPILOT_PX4,
 					   base_mode, custom_mode.data, system_status);
 
-		_mavlink->set_first_heartbeat_sent();
+		mavlink.set_first_heartbeat_sent();
 
 		return true;
 	}

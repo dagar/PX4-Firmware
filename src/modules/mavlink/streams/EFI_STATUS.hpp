@@ -39,7 +39,7 @@
 class MavlinkStreamEfiStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamEfiStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamEfiStatus(); }
 
 	static constexpr const char *get_name_static() { return "EFI_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_EFI_STATUS; }
@@ -54,11 +54,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamEfiStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _internal_combustion_engine_status_sub{ORB_ID(internal_combustion_engine_status)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		internal_combustion_engine_status_s internal_combustion_engine_status;
 
@@ -84,7 +82,7 @@ private:
 			msg.throttle_out = internal_combustion_engine_status.throttle_position_percent;
 			msg.pt_compensation = internal_combustion_engine_status.lambda_coefficient;
 
-			mavlink_msg_efi_status_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_efi_status_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

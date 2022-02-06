@@ -39,7 +39,7 @@
 class MavlinkStreamGimbalDeviceAttitudeStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGimbalDeviceAttitudeStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGimbalDeviceAttitudeStatus(); }
 
 	static constexpr const char *get_name_static() { return "GIMBAL_DEVICE_ATTITUDE_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GIMBAL_DEVICE_ATTITUDE_STATUS; }
@@ -57,11 +57,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGimbalDeviceAttitudeStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _gimbal_device_attitude_status_sub{ORB_ID(gimbal_device_attitude_status)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		gimbal_device_attitude_status_s gimbal_device_attitude_status{};
 
@@ -86,7 +84,7 @@ private:
 
 			msg.failure_flags = gimbal_device_attitude_status.failure_flags;
 
-			mavlink_msg_gimbal_device_attitude_status_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_gimbal_device_attitude_status_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

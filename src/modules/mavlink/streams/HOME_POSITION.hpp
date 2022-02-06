@@ -39,7 +39,7 @@
 class MavlinkStreamHomePosition : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamHomePosition(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamHomePosition(); }
 
 	static constexpr const char *get_name_static() { return "HOME_POSITION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_HOME_POSITION; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamHomePosition(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _home_sub{ORB_ID(home_position)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		// we're sending the GPS home periodically to ensure the
 		// the GCS does pick it up at one point
@@ -84,7 +82,7 @@ private:
 
 				msg.time_usec = home.timestamp;
 
-				mavlink_msg_home_position_send_struct(_mavlink->get_channel(), &msg);
+				mavlink_msg_home_position_send_struct(mavlink.get_channel(), &msg);
 
 				return true;
 			}

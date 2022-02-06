@@ -41,7 +41,7 @@
 class MavlinkStreamSysStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamSysStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamSysStatus(); }
 
 	static constexpr const char *get_name_static() { return "SYS_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_SYS_STATUS; }
@@ -55,13 +55,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamSysStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
 	uORB::Subscription _cpuload_sub{ORB_ID(cpuload)};
 	uORB::SubscriptionMultiArray<battery_status_s, battery_status_s::MAX_INSTANCES> _battery_status_subs{ORB_ID::battery_status};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		if (_status_sub.updated() || _cpuload_sub.updated() || _battery_status_subs.updated()) {
 			vehicle_status_s status{};
@@ -125,7 +123,7 @@ private:
 				msg.battery_remaining = -1;
 			}
 
-			mavlink_msg_sys_status_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_sys_status_send_struct(mavlink.get_channel(), &msg);
 			return true;
 		}
 

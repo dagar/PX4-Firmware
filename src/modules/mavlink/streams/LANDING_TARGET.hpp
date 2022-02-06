@@ -39,7 +39,7 @@
 class MavlinkStreamLandingTarget : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamLandingTarget(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamLandingTarget(); }
 
 	static constexpr const char *get_name_static() { return "LANDING_TARGET"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_LANDING_TARGET; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamLandingTarget(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _landing_target_sub{ORB_ID(landing_target_pose)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		landing_target_pose_s target;
 
@@ -72,7 +70,7 @@ private:
 			msg.z = target.z_rel;
 			msg.position_valid = target.rel_pos_valid;
 
-			mavlink_msg_landing_target_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_landing_target_send_struct(mavlink.get_channel(), &msg);
 			return true;
 		}
 

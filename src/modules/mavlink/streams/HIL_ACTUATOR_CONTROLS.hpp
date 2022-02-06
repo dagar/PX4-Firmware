@@ -41,7 +41,7 @@
 class MavlinkStreamHILActuatorControls : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamHILActuatorControls(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamHILActuatorControls(); }
 
 	static constexpr const char *get_name_static() { return "HIL_ACTUATOR_CONTROLS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_HIL_ACTUATOR_CONTROLS; }
@@ -55,13 +55,11 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamHILActuatorControls(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _act_sub{ORB_ID(actuator_outputs)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		actuator_outputs_s act;
 
@@ -71,7 +69,7 @@ private:
 
 			static constexpr float pwm_center = (PWM_DEFAULT_MAX + PWM_DEFAULT_MIN) / 2;
 
-			unsigned system_type = _mavlink->get_system_type();
+			unsigned system_type = mavlink.get_system_type();
 
 			/* scale outputs depending on system type */
 			if (system_type == MAV_TYPE_QUADROTOR ||
@@ -185,7 +183,7 @@ private:
 
 			msg.flags = 0;
 
-			mavlink_msg_hil_actuator_controls_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_hil_actuator_controls_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

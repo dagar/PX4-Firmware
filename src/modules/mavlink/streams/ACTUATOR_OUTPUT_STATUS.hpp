@@ -39,7 +39,7 @@
 class MavlinkStreamActuatorOutputStatus : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamActuatorOutputStatus(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamActuatorOutputStatus(); }
 
 	static constexpr const char *get_name_static() { return "ACTUATOR_OUTPUT_STATUS"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamActuatorOutputStatus(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _act_output_sub{ORB_ID(actuator_outputs)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		actuator_outputs_s act;
 
@@ -74,7 +72,7 @@ private:
 				msg.actuator[i] = act.output[i];
 			}
 
-			mavlink_msg_actuator_output_status_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_actuator_output_status_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

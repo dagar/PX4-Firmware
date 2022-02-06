@@ -39,7 +39,7 @@
 class MavlinkStreamCameraImageCaptured : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamCameraImageCaptured(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamCameraImageCaptured(); }
 
 	static constexpr const char *get_name_static() { return "CAMERA_IMAGE_CAPTURED"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_CAMERA_IMAGE_CAPTURED; }
@@ -55,11 +55,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamCameraImageCaptured(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _capture_sub{ORB_ID(camera_capture)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		camera_capture_s capture;
 
@@ -81,7 +79,7 @@ private:
 			msg.capture_result = capture.result;
 			msg.file_url[0] = '\0';
 
-			mavlink_msg_camera_image_captured_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_camera_image_captured_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

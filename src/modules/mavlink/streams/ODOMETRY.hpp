@@ -39,7 +39,7 @@
 class MavlinkStreamOdometry : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamOdometry(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamOdometry(); }
 
 	static constexpr const char *get_name_static() { return "ODOMETRY"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_ODOMETRY; }
@@ -49,7 +49,7 @@ public:
 
 	unsigned get_size() override
 	{
-		if (_mavlink->odometry_loopback_enabled()) {
+		if (_odometry_loopback_enabled) {
 			return _vodom_sub.advertised() ? MAVLINK_MSG_ID_ODOMETRY_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES : 0;
 
 		} else {
@@ -58,12 +58,20 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamOdometry(Mavlink *mavlink) : MavlinkStream(mavlink) {}
+	MavlinkStreamOdometry()
+	{
+		int32_t mav_odom_lp = 0;
+		param_get(param_find("MAV_ODOM_LP"), &mav_odom_lp);
+
+		_odometry_loopback_enabled = (mav_odom_lp != 0);
+	}
 
 	uORB::Subscription _odom_sub{ORB_ID(vehicle_odometry)};
 	uORB::Subscription _vodom_sub{ORB_ID(vehicle_visual_odometry)};
 
-	bool send() override
+	bool _odometry_loopback_enabled{false};
+
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_odometry_s odom;
 		// check if it is to send visual odometry loopback or not
@@ -71,7 +79,7 @@ private:
 
 		mavlink_odometry_t msg{};
 
-		if (_mavlink->odometry_loopback_enabled()) {
+		if (_odometry_loopback_enabled) {
 			odom_updated = _vodom_sub.update(&odom);
 
 			// set the frame_id according to the local frame of the data
@@ -161,7 +169,7 @@ private:
 
 			msg.reset_counter = odom.reset_counter;
 
-			mavlink_msg_odometry_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_odometry_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

@@ -39,7 +39,7 @@
 class MavlinkStreamTimesync : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamTimesync(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamTimesync(); }
 
 	static constexpr const char *get_name_static() { return "TIMESYNC"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_TIMESYNC; }
@@ -53,16 +53,14 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamTimesync(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		mavlink_timesync_t msg{};
 
 		msg.tc1 = 0;
 		msg.ts1 = hrt_absolute_time() * 1000; // boot time in nanoseconds
 
-		mavlink_msg_timesync_send_struct(_mavlink->get_channel(), &msg);
+		mavlink_msg_timesync_send_struct(mavlink.get_channel(), &msg);
 
 		return true;
 	}

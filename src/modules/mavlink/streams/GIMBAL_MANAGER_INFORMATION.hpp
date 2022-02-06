@@ -39,7 +39,7 @@
 class MavlinkStreamGimbalManagerInformation : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamGimbalManagerInformation(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamGimbalManagerInformation(); }
 
 	static constexpr const char *get_name_static() { return "GIMBAL_MANAGER_INFORMATION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_GIMBAL_MANAGER_INFORMATION; }
@@ -57,11 +57,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamGimbalManagerInformation(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _gimbal_manager_information_sub{ORB_ID(gimbal_manager_information)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		gimbal_manager_information_s gimbal_manager_information;
 
@@ -79,7 +77,7 @@ private:
 			msg.yaw_min = gimbal_manager_information.yaw_min;
 			msg.yaw_max = gimbal_manager_information.yaw_max;
 
-			mavlink_msg_gimbal_manager_information_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_gimbal_manager_information_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

@@ -43,7 +43,7 @@
 class MavlinkStreamUTMGlobalPosition : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamUTMGlobalPosition(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamUTMGlobalPosition(); }
 
 	static constexpr const char *get_name_static() { return "UTM_GLOBAL_POSITION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_UTM_GLOBAL_POSITION; }
@@ -59,15 +59,13 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamUTMGlobalPosition(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _local_pos_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _global_pos_sub{ORB_ID(vehicle_global_position)};
 	uORB::Subscription _position_setpoint_triplet_sub{ORB_ID(position_setpoint_triplet)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::Subscription _land_detected_sub{ORB_ID(vehicle_land_detected)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_global_position_s global_pos;
 
@@ -182,7 +180,7 @@ private:
 
 			msg.update_rate = 0; // Data driven mode
 
-			mavlink_msg_utm_global_position_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_utm_global_position_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

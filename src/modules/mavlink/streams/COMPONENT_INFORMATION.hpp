@@ -45,7 +45,7 @@
 class MavlinkStreamComponentInformation : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamComponentInformation(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamComponentInformation(); }
 
 	static constexpr const char *get_name_static() { return "COMPONENT_INFORMATION"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_COMPONENT_INFORMATION; }
@@ -58,7 +58,7 @@ public:
 		return 0; // never streamed
 	}
 
-	bool request_message(float param2, float param3, float param4,
+	bool request_message(Mavlink &mavlink, float param2, float param3, float param4,
 			     float param5, float param6, float param7) override
 	{
 		mavlink_component_information_t component_info{};
@@ -69,14 +69,12 @@ public:
 		component_info.general_metadata_file_crc = component_information::component_general_crc;
 
 		component_info.time_boot_ms = hrt_absolute_time() / 1000;
-		mavlink_msg_component_information_send_struct(_mavlink->get_channel(), &component_info);
+		mavlink_msg_component_information_send_struct(mavlink.get_channel(), &component_info);
 
 		return true;
 	}
 private:
-	explicit MavlinkStreamComponentInformation(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		return false;
 	}

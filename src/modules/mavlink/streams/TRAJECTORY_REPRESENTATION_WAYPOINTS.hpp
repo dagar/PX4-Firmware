@@ -39,7 +39,7 @@
 class MavlinkStreamTrajectoryRepresentationWaypoints: public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamTrajectoryRepresentationWaypoints(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamTrajectoryRepresentationWaypoints(); }
 
 	const char *get_name() const override { return get_name_static(); }
 	uint16_t get_id() override { return get_id_static(); }
@@ -57,11 +57,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamTrajectoryRepresentationWaypoints(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _traj_wp_avoidance_sub{ORB_ID(vehicle_trajectory_waypoint_desired)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_trajectory_waypoint_s traj_wp_avoidance_desired;
 
@@ -112,7 +110,7 @@ private:
 
 			msg.valid_points = number_valid_points;
 
-			mavlink_msg_trajectory_representation_waypoints_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_trajectory_representation_waypoints_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

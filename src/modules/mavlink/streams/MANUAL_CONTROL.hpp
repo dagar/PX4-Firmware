@@ -40,7 +40,7 @@
 class MavlinkStreamManualControl : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamManualControl(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamManualControl(); }
 
 	static constexpr const char *get_name_static() { return "MANUAL_CONTROL"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_MANUAL_CONTROL; }
@@ -55,12 +55,10 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamManualControl(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _manual_control_switches_sub{ORB_ID(manual_control_switches)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		manual_control_setpoint_s manual_control_setpoint;
 
@@ -84,7 +82,7 @@ private:
 				msg.buttons |= (manual_control_switches.kill_switch << (shift * 6));
 			}
 
-			mavlink_msg_manual_control_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_manual_control_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}

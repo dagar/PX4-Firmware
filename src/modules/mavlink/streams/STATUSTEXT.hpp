@@ -41,7 +41,7 @@
 class MavlinkStreamStatustext : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamStatustext(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamStatustext(); }
 
 	static constexpr const char *get_name_static() { return "STATUSTEXT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_STATUSTEXT; }
@@ -55,8 +55,6 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamStatustext(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	~MavlinkStreamStatustext()
 	{
 		perf_free(_missed_msg_count_perf);
@@ -66,9 +64,9 @@ private:
 	perf_counter_t _missed_msg_count_perf{perf_alloc(PC_COUNT, MODULE_NAME": STATUSTEXT missed messages")};
 	uint16_t _id{0};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
-		if (_mavlink->is_connected()) {
+		if (mavlink.is_connected()) {
 			const unsigned last_generation = _mavlink_log_sub.get_last_generation();
 
 			mavlink_log_s mavlink_log;
@@ -79,7 +77,7 @@ private:
 
 					if (_mavlink_log_sub.get_last_generation() != (last_generation + 1)) {
 						perf_count(_missed_msg_count_perf);
-						PX4_DEBUG("channel %d has missed %d mavlink log messages", _mavlink->get_channel(),
+						PX4_DEBUG("channel %d has missed %d mavlink log messages", mavlink.get_channel(),
 							  perf_event_count(_missed_msg_count_perf));
 					}
 
@@ -103,7 +101,7 @@ private:
 							memcpy(&msg.text[0], &text[0], chunk_size);
 						}
 
-						mavlink_msg_statustext_send_struct(_mavlink->get_channel(), &msg);
+						mavlink_msg_statustext_send_struct(mavlink.get_channel(), &msg);
 
 						if (text_size <= max_chunk_size) {
 							break;

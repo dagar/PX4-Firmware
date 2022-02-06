@@ -42,7 +42,7 @@
 class MavlinkStreamMagCalReport : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamMagCalReport(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamMagCalReport(); }
 
 	static constexpr const char *get_name_static() { return "MAG_CAL_REPORT"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_MAG_CAL_REPORT; }
@@ -56,14 +56,12 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamMagCalReport(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
 	uORB::SubscriptionMultiArray<sensor_mag_s, MAX_SENSOR_COUNT> _sensor_mag_subs{ORB_ID::sensor_mag};
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		bool sent = false;
 		parameter_update_s parameter_update;
@@ -100,7 +98,7 @@ private:
 						msg.new_orientation = calibration.rotation_enum();
 						msg.scale_factor = 1.f;
 
-						mavlink_msg_mag_cal_report_send_struct(_mavlink->get_channel(), &msg);
+						mavlink_msg_mag_cal_report_send_struct(mavlink.get_channel(), &msg);
 						sent = true;
 					}
 				}

@@ -39,7 +39,7 @@
 class MavlinkStreamPositionTargetLocalNed : public MavlinkStream
 {
 public:
-	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamPositionTargetLocalNed(mavlink); }
+	static MavlinkStream *new_instance() { return new MavlinkStreamPositionTargetLocalNed(); }
 
 	static constexpr const char *get_name_static() { return "POSITION_TARGET_LOCAL_NED"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED; }
@@ -53,11 +53,9 @@ public:
 	}
 
 private:
-	explicit MavlinkStreamPositionTargetLocalNed(Mavlink *mavlink) : MavlinkStream(mavlink) {}
-
 	uORB::Subscription _pos_sp_sub{ORB_ID(vehicle_local_position_setpoint)};
 
-	bool send() override
+	bool send(Mavlink &mavlink) override
 	{
 		vehicle_local_position_setpoint_s pos_sp;
 
@@ -128,7 +126,7 @@ private:
 			msg.yaw = pos_sp.yaw;
 			msg.yaw_rate = pos_sp.yawspeed;
 
-			mavlink_msg_position_target_local_ned_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_position_target_local_ned_send_struct(mavlink.get_channel(), &msg);
 
 			return true;
 		}
