@@ -37,11 +37,125 @@
 
 #include <lib/parameters/param.h>
 
+#include <px4_platform_common/param.h>
+
 using namespace matrix;
 using namespace time_literals;
 
 namespace calibration
 {
+
+const param_t param_cal_id[Magnetometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_MAG0_ID),
+	static_cast<param_t>(px4::params::CAL_MAG1_ID),
+	static_cast<param_t>(px4::params::CAL_MAG2_ID),
+	static_cast<param_t>(px4::params::CAL_MAG3_ID),
+};
+
+const param_t param_cal_prio[Magnetometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_MAG0_PRIO),
+	static_cast<param_t>(px4::params::CAL_MAG1_PRIO),
+	static_cast<param_t>(px4::params::CAL_MAG2_PRIO),
+	static_cast<param_t>(px4::params::CAL_MAG3_PRIO),
+};
+
+const param_t param_cal_rot[Magnetometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_MAG0_ROT),
+	static_cast<param_t>(px4::params::CAL_MAG1_ROT),
+	static_cast<param_t>(px4::params::CAL_MAG2_ROT),
+	static_cast<param_t>(px4::params::CAL_MAG3_ROT),
+};
+
+const param_t param_cal_temp[Magnetometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_MAG0_TEMP),
+	static_cast<param_t>(px4::params::CAL_MAG1_TEMP),
+	static_cast<param_t>(px4::params::CAL_MAG2_TEMP),
+	static_cast<param_t>(px4::params::CAL_MAG3_TEMP),
+};
+
+static constexpr param_t param_cal_off[3][Magnetometer::MAX_SENSOR_COUNT] {
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_XOFF),
+		static_cast<param_t>(px4::params::CAL_MAG1_XOFF),
+		static_cast<param_t>(px4::params::CAL_MAG2_XOFF),
+		static_cast<param_t>(px4::params::CAL_MAG3_XOFF),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_YOFF),
+		static_cast<param_t>(px4::params::CAL_MAG1_YOFF),
+		static_cast<param_t>(px4::params::CAL_MAG2_YOFF),
+		static_cast<param_t>(px4::params::CAL_MAG3_YOFF),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_ZOFF),
+		static_cast<param_t>(px4::params::CAL_MAG1_ZOFF),
+		static_cast<param_t>(px4::params::CAL_MAG2_ZOFF),
+		static_cast<param_t>(px4::params::CAL_MAG3_ZOFF),
+	},
+};
+
+static constexpr param_t param_cal_scale[3][Magnetometer::MAX_SENSOR_COUNT] {
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_XSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG1_XSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG2_XSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG3_XSCALE),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_YSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG1_YSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG2_YSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG3_YSCALE),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_ZSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG1_ZSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG2_ZSCALE),
+		static_cast<param_t>(px4::params::CAL_MAG3_ZSCALE),
+	},
+};
+
+static constexpr param_t param_cal_odiag[3][Magnetometer::MAX_SENSOR_COUNT] {
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_XODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG1_XODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG2_XODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG3_XODIAG),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_YODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG1_YODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG2_YODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG3_YODIAG),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_ZODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG1_ZODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG2_ZODIAG),
+		static_cast<param_t>(px4::params::CAL_MAG3_ZODIAG),
+	},
+};
+
+static constexpr param_t param_cal_comp[3][Magnetometer::MAX_SENSOR_COUNT] {
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_XCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG1_XCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG2_XCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG3_XCOMP),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_YCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG1_YCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG2_YCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG3_YCOMP),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_MAG0_ZCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG1_ZCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG2_ZCOMP),
+		static_cast<param_t>(px4::params::CAL_MAG3_ZCOMP),
+	},
+};
 
 Magnetometer::Magnetometer()
 {
@@ -160,7 +274,8 @@ bool Magnetometer::ParametersLoad()
 {
 	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// CAL_MAGx_ROT
-		int32_t rotation_value = GetCalibrationParamInt32(SensorString(), "ROT", _calibration_index);
+		int32_t rotation_value = ROTATION_NONE;
+		param_get(param_cal_rot[_calibration_index], &rotation_value);
 
 		if (_external) {
 			if ((rotation_value >= ROTATION_MAX) || (rotation_value < 0)) {
@@ -176,7 +291,7 @@ bool Magnetometer::ParametersLoad()
 		}
 
 		// CAL_MAGx_PRIO
-		_priority = GetCalibrationParamInt32(SensorString(), "PRIO", _calibration_index);
+		param_get(param_cal_prio[_calibration_index], &_priority);
 
 		if ((_priority < 0) || (_priority > 100)) {
 			// reset to default, -1 is the uninitialized parameter value
@@ -186,14 +301,15 @@ bool Magnetometer::ParametersLoad()
 				PX4_ERR("%s %" PRIu32 " (%" PRId8 ") invalid priority %" PRId32 ", resetting", SensorString(), _device_id,
 					_calibration_index, _priority);
 
-				SetCalibrationParam(SensorString(), "PRIO", _calibration_index, CAL_PRIO_UNINITIALIZED);
+				param_set_no_notification(param_cal_prio[_calibration_index], &CAL_PRIO_UNINITIALIZED);
 			}
 
 			_priority = _external ? DEFAULT_EXTERNAL_PRIORITY : DEFAULT_PRIORITY;
 		}
 
 		// CAL_MAGx_TEMP
-		float cal_temp = GetCalibrationParamFloat(SensorString(), "TEMP", _calibration_index);
+		float cal_temp = TEMPERATURE_INVALID;
+		param_get(param_cal_temp[_calibration_index], &cal_temp);
 
 		if (cal_temp > TEMPERATURE_INVALID) {
 			set_temperature(cal_temp);
@@ -203,16 +319,26 @@ bool Magnetometer::ParametersLoad()
 		}
 
 		// CAL_MAGx_OFF{X,Y,Z}
-		set_offset(GetCalibrationParamsVector3f(SensorString(), "OFF", _calibration_index));
+		param_get(param_cal_off[0][_calibration_index], &_offset(0));
+		param_get(param_cal_off[1][_calibration_index], &_offset(1));
+		param_get(param_cal_off[2][_calibration_index], &_offset(2));
 
 		// CAL_MAGx_SCALE{X,Y,Z}
-		set_scale(GetCalibrationParamsVector3f(SensorString(), "SCALE", _calibration_index));
+		param_get(param_cal_scale[0][_calibration_index], &_scale(0, 0));
+		param_get(param_cal_scale[1][_calibration_index], &_scale(1, 1));
+		param_get(param_cal_scale[2][_calibration_index], &_scale(2, 2));
 
 		// CAL_MAGx_ODIAG{X,Y,Z}
-		set_offdiagonal(GetCalibrationParamsVector3f(SensorString(), "ODIAG", _calibration_index));
+		Vector3f offdiagonal{0, 0, 0};
+		param_get(param_cal_odiag[0][_calibration_index], &offdiagonal(0));
+		param_get(param_cal_odiag[1][_calibration_index], &offdiagonal(1));
+		param_get(param_cal_odiag[2][_calibration_index], &offdiagonal(2));
+		set_offdiagonal(offdiagonal);
 
 		// CAL_MAGx_COMP{X,Y,Z}
-		_power_compensation = GetCalibrationParamsVector3f(SensorString(), "COMP", _calibration_index);
+		param_get(param_cal_comp[0][_calibration_index], &_power_compensation(0));
+		param_get(param_cal_comp[1][_calibration_index], &_power_compensation(1));
+		param_get(param_cal_comp[2][_calibration_index], &_power_compensation(2));
 
 		return true;
 	}
@@ -265,34 +391,48 @@ bool Magnetometer::ParametersSave(int desired_calibration_index, bool force)
 
 	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// save calibration
-		bool success = true;
-		success &= SetCalibrationParam(SensorString(), "ID", _calibration_index, _device_id);
-		success &= SetCalibrationParam(SensorString(), "PRIO", _calibration_index, _priority);
-		success &= SetCalibrationParamsVector3f(SensorString(), "OFF", _calibration_index, _offset);
+		int ret = PX4_OK;
 
-		const Vector3f scale{_scale.diag()};
-		success &= SetCalibrationParamsVector3f(SensorString(), "SCALE", _calibration_index, scale);
+		ret |= param_set_no_notification(param_cal_id[_calibration_index], &_device_id);
+		ret |= param_set_no_notification(param_cal_prio[_calibration_index], &_priority);
 
-		const Vector3f off_diag{_scale(0, 1), _scale(0, 2), _scale(1, 2)};
-		success &= SetCalibrationParamsVector3f(SensorString(), "ODIAG", _calibration_index, off_diag);
+		ret |= param_set_no_notification(param_cal_off[0][_calibration_index], &_offset(0));
+		ret |= param_set_no_notification(param_cal_off[1][_calibration_index], &_offset(1));
+		ret |= param_set_no_notification(param_cal_off[2][_calibration_index], &_offset(2));
 
-		success &= SetCalibrationParamsVector3f(SensorString(), "COMP", _calibration_index, _power_compensation);
+		// scale (diagonal)
+		ret |= param_set_no_notification(param_cal_scale[0][_calibration_index], &_scale(0, 0));
+		ret |= param_set_no_notification(param_cal_scale[1][_calibration_index], &_scale(1, 1));
+		ret |= param_set_no_notification(param_cal_scale[2][_calibration_index], &_scale(2, 2));
+
+		// offdiagonal
+		ret |= param_set_no_notification(param_cal_odiag[0][_calibration_index], &_scale(0, 1));
+		ret |= param_set_no_notification(param_cal_odiag[1][_calibration_index], &_scale(0, 2));
+		ret |= param_set_no_notification(param_cal_odiag[2][_calibration_index], &_scale(1, 2));
+
+		// power compensation
+		ret |= param_set_no_notification(param_cal_comp[0][_calibration_index], &_power_compensation(0));
+		ret |= param_set_no_notification(param_cal_comp[1][_calibration_index], &_power_compensation(1));
+		ret |= param_set_no_notification(param_cal_comp[2][_calibration_index], &_power_compensation(2));
 
 		if (_external) {
-			success &= SetCalibrationParam(SensorString(), "ROT", _calibration_index, (int32_t)_rotation_enum);
+			int32_t rot = static_cast<int32_t>(_rotation_enum);
+			ret |= param_set_no_notification(param_cal_rot[_calibration_index], &rot);
 
 		} else {
-			success &= SetCalibrationParam(SensorString(), "ROT", _calibration_index, -1); // internal
+			int32_t rot = -1; // internal
+			ret |= param_set_no_notification(param_cal_rot[_calibration_index], &rot);
 		}
 
 		if (PX4_ISFINITE(_temperature)) {
-			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, _temperature);
+			ret |= param_set_no_notification(param_cal_temp[_calibration_index], &_temperature);
 
 		} else {
-			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, TEMPERATURE_INVALID);
+			float temperature = TEMPERATURE_INVALID;
+			ret |= param_set_no_notification(param_cal_temp[_calibration_index], &temperature);
 		}
 
-		return success;
+		return (ret == PX4_OK);
 	}
 
 	return false;

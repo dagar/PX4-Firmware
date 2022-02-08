@@ -487,7 +487,8 @@ param_get(param_t param, void *val)
 	}
 
 	if (!params_active[param]) {
-		PX4_DEBUG("get: param %" PRId16 " (%s) not active", param, param_name(param));
+		params_active.set(param, true);
+		PX4_ERR("get: param %" PRId16 " (%s) not active", param, param_name(param));
 	}
 
 	int result = PX4_ERROR;

@@ -37,11 +37,83 @@
 
 #include <lib/parameters/param.h>
 
+#include <px4_platform_common/param.h>
+
 using namespace matrix;
 using namespace time_literals;
 
 namespace calibration
 {
+
+const param_t param_cal_id[Accelerometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_ACC0_ID),
+	static_cast<param_t>(px4::params::CAL_ACC1_ID),
+	static_cast<param_t>(px4::params::CAL_ACC2_ID),
+	static_cast<param_t>(px4::params::CAL_ACC3_ID),
+};
+
+const param_t param_cal_prio[Accelerometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_ACC0_PRIO),
+	static_cast<param_t>(px4::params::CAL_ACC1_PRIO),
+	static_cast<param_t>(px4::params::CAL_ACC2_PRIO),
+	static_cast<param_t>(px4::params::CAL_ACC3_PRIO),
+};
+
+const param_t param_cal_rot[Accelerometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_ACC0_ROT),
+	static_cast<param_t>(px4::params::CAL_ACC1_ROT),
+	static_cast<param_t>(px4::params::CAL_ACC2_ROT),
+	static_cast<param_t>(px4::params::CAL_ACC3_ROT),
+};
+
+const param_t param_cal_temp[Accelerometer::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_ACC0_TEMP),
+	static_cast<param_t>(px4::params::CAL_ACC1_TEMP),
+	static_cast<param_t>(px4::params::CAL_ACC2_TEMP),
+	static_cast<param_t>(px4::params::CAL_ACC3_TEMP),
+};
+
+static constexpr param_t param_cal_off[3][Accelerometer::MAX_SENSOR_COUNT] {
+	{
+		static_cast<param_t>(px4::params::CAL_ACC0_XOFF),
+		static_cast<param_t>(px4::params::CAL_ACC1_XOFF),
+		static_cast<param_t>(px4::params::CAL_ACC2_XOFF),
+		static_cast<param_t>(px4::params::CAL_ACC3_XOFF),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_ACC0_YOFF),
+		static_cast<param_t>(px4::params::CAL_ACC1_YOFF),
+		static_cast<param_t>(px4::params::CAL_ACC2_YOFF),
+		static_cast<param_t>(px4::params::CAL_ACC3_YOFF),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_ACC0_ZOFF),
+		static_cast<param_t>(px4::params::CAL_ACC1_ZOFF),
+		static_cast<param_t>(px4::params::CAL_ACC2_ZOFF),
+		static_cast<param_t>(px4::params::CAL_ACC3_ZOFF),
+	},
+};
+
+static constexpr param_t param_cal_scale[3][Accelerometer::MAX_SENSOR_COUNT] {
+	{
+		static_cast<param_t>(px4::params::CAL_ACC0_XSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC1_XSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC2_XSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC3_XSCALE),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_ACC0_YSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC1_YSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC2_YSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC3_YSCALE),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_ACC0_ZSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC1_ZSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC2_ZSCALE),
+		static_cast<param_t>(px4::params::CAL_ACC3_ZSCALE),
+	},
+};
 
 Accelerometer::Accelerometer()
 {
@@ -175,7 +247,8 @@ bool Accelerometer::ParametersLoad()
 {
 	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// CAL_ACCx_ROT
-		int32_t rotation_value = GetCalibrationParamInt32(SensorString(), "ROT", _calibration_index);
+		int32_t rotation_value = ROTATION_NONE;
+		param_get(param_cal_rot[_calibration_index], &rotation_value);
 
 		if (_external) {
 			if ((rotation_value >= ROTATION_MAX) || (rotation_value < 0)) {
@@ -191,7 +264,7 @@ bool Accelerometer::ParametersLoad()
 		}
 
 		// CAL_ACCx_PRIO
-		_priority = GetCalibrationParamInt32(SensorString(), "PRIO", _calibration_index);
+		param_get(param_cal_prio[_calibration_index], &_priority);
 
 		if ((_priority < 0) || (_priority > 100)) {
 			// reset to default, -1 is the uninitialized parameter value
@@ -201,14 +274,15 @@ bool Accelerometer::ParametersLoad()
 				PX4_ERR("%s %" PRIu32 " (%" PRId8 ") invalid priority %" PRId32 ", resetting", SensorString(), _device_id,
 					_calibration_index, _priority);
 
-				SetCalibrationParam(SensorString(), "PRIO", _calibration_index, CAL_PRIO_UNINITIALIZED);
+				param_set_no_notification(param_cal_prio[_calibration_index], &CAL_PRIO_UNINITIALIZED);
 			}
 
 			_priority = _external ? DEFAULT_EXTERNAL_PRIORITY : DEFAULT_PRIORITY;
 		}
 
 		// CAL_ACCx_TEMP
-		float cal_temp = GetCalibrationParamFloat(SensorString(), "TEMP", _calibration_index);
+		float cal_temp = TEMPERATURE_INVALID;
+		param_get(param_cal_temp[_calibration_index], &cal_temp);
 
 		if (cal_temp > TEMPERATURE_INVALID) {
 			set_temperature(cal_temp);
@@ -218,10 +292,14 @@ bool Accelerometer::ParametersLoad()
 		}
 
 		// CAL_ACCx_OFF{X,Y,Z}
-		set_offset(GetCalibrationParamsVector3f(SensorString(), "OFF", _calibration_index));
+		param_get(param_cal_off[0][_calibration_index], &_offset(0));
+		param_get(param_cal_off[1][_calibration_index], &_offset(1));
+		param_get(param_cal_off[2][_calibration_index], &_offset(2));
 
 		// CAL_ACCx_SCALE{X,Y,Z}
-		set_scale(GetCalibrationParamsVector3f(SensorString(), "SCALE", _calibration_index));
+		param_get(param_cal_scale[0][_calibration_index], &_scale(0));
+		param_get(param_cal_scale[1][_calibration_index], &_scale(1));
+		param_get(param_cal_scale[2][_calibration_index], &_scale(2));
 
 		return true;
 	}
@@ -272,27 +350,37 @@ bool Accelerometer::ParametersSave(int desired_calibration_index, bool force)
 
 	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// save calibration
-		bool success = true;
-		success &= SetCalibrationParam(SensorString(), "ID", _calibration_index, _device_id);
-		success &= SetCalibrationParam(SensorString(), "PRIO", _calibration_index, _priority);
-		success &= SetCalibrationParamsVector3f(SensorString(), "OFF", _calibration_index, _offset);
-		success &= SetCalibrationParamsVector3f(SensorString(), "SCALE", _calibration_index, _scale);
+		int ret = PX4_OK;
+
+		ret |= param_set_no_notification(param_cal_id[_calibration_index], &_device_id);
+		ret |= param_set_no_notification(param_cal_prio[_calibration_index], &_priority);
+
+		ret |= param_set_no_notification(param_cal_off[0][_calibration_index], &_offset(0));
+		ret |= param_set_no_notification(param_cal_off[1][_calibration_index], &_offset(1));
+		ret |= param_set_no_notification(param_cal_off[2][_calibration_index], &_offset(2));
+
+		ret |= param_set_no_notification(param_cal_scale[0][_calibration_index], &_scale(0));
+		ret |= param_set_no_notification(param_cal_scale[1][_calibration_index], &_scale(1));
+		ret |= param_set_no_notification(param_cal_scale[2][_calibration_index], &_scale(2));
 
 		if (_external) {
-			success &= SetCalibrationParam(SensorString(), "ROT", _calibration_index, (int32_t)_rotation_enum);
+			int32_t rot = static_cast<int32_t>(_rotation_enum);
+			ret |= param_set_no_notification(param_cal_rot[_calibration_index], &rot);
 
 		} else {
-			success &= SetCalibrationParam(SensorString(), "ROT", _calibration_index, -1); // internal
+			int32_t rot = -1; // internal
+			ret |= param_set_no_notification(param_cal_rot[_calibration_index], &rot);
 		}
 
 		if (PX4_ISFINITE(_temperature)) {
-			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, _temperature);
+			ret |= param_set_no_notification(param_cal_temp[_calibration_index], &_temperature);
 
 		} else {
-			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, TEMPERATURE_INVALID);
+			float temperature = TEMPERATURE_INVALID;
+			ret |= param_set_no_notification(param_cal_temp[_calibration_index], &temperature);
 		}
 
-		return success;
+		return (ret == PX4_OK);
 	}
 
 	return false;

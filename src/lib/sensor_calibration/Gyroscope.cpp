@@ -37,11 +37,62 @@
 
 #include <lib/parameters/param.h>
 
+#include <px4_platform_common/param.h>
+
 using namespace matrix;
 using namespace time_literals;
 
 namespace calibration
 {
+
+const param_t param_cal_id[Gyroscope::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_GYRO0_ID),
+	static_cast<param_t>(px4::params::CAL_GYRO1_ID),
+	static_cast<param_t>(px4::params::CAL_GYRO2_ID),
+	static_cast<param_t>(px4::params::CAL_GYRO3_ID),
+};
+
+const param_t param_cal_prio[Gyroscope::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_GYRO0_PRIO),
+	static_cast<param_t>(px4::params::CAL_GYRO1_PRIO),
+	static_cast<param_t>(px4::params::CAL_GYRO2_PRIO),
+	static_cast<param_t>(px4::params::CAL_GYRO3_PRIO),
+};
+
+const param_t param_cal_rot[Gyroscope::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_GYRO0_ROT),
+	static_cast<param_t>(px4::params::CAL_GYRO1_ROT),
+	static_cast<param_t>(px4::params::CAL_GYRO2_ROT),
+	static_cast<param_t>(px4::params::CAL_GYRO3_ROT),
+};
+
+const param_t param_cal_temp[Gyroscope::MAX_SENSOR_COUNT] {
+	static_cast<param_t>(px4::params::CAL_GYRO0_TEMP),
+	static_cast<param_t>(px4::params::CAL_GYRO1_TEMP),
+	static_cast<param_t>(px4::params::CAL_GYRO2_TEMP),
+	static_cast<param_t>(px4::params::CAL_GYRO3_TEMP),
+};
+
+static constexpr param_t param_cal_off[3][Gyroscope::MAX_SENSOR_COUNT] {
+	{
+		static_cast<param_t>(px4::params::CAL_GYRO0_XOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO1_XOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO2_XOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO3_XOFF),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_GYRO0_YOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO1_YOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO2_YOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO3_YOFF),
+	},
+	{
+		static_cast<param_t>(px4::params::CAL_GYRO0_ZOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO1_ZOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO2_ZOFF),
+		static_cast<param_t>(px4::params::CAL_GYRO3_ZOFF),
+	},
+};
 
 Gyroscope::Gyroscope()
 {
@@ -160,7 +211,8 @@ bool Gyroscope::ParametersLoad()
 {
 	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// CAL_GYROx_ROT
-		int32_t rotation_value = GetCalibrationParamInt32(SensorString(), "ROT", _calibration_index);
+		int32_t rotation_value = ROTATION_NONE;
+		param_get(param_cal_rot[_calibration_index], &rotation_value);
 
 		if (_external) {
 			if ((rotation_value >= ROTATION_MAX) || (rotation_value < 0)) {
@@ -176,7 +228,7 @@ bool Gyroscope::ParametersLoad()
 		}
 
 		// CAL_GYROx_PRIO
-		_priority = GetCalibrationParamInt32(SensorString(), "PRIO", _calibration_index);
+		param_get(param_cal_prio[_calibration_index], &_priority);
 
 		if ((_priority < 0) || (_priority > 100)) {
 			// reset to default, -1 is the uninitialized parameter value
@@ -186,14 +238,15 @@ bool Gyroscope::ParametersLoad()
 				PX4_ERR("%s %" PRIu32 " (%" PRId8 ") invalid priority %" PRId32 ", resetting", SensorString(), _device_id,
 					_calibration_index, _priority);
 
-				SetCalibrationParam(SensorString(), "PRIO", _calibration_index, CAL_PRIO_UNINITIALIZED);
+				param_set_no_notification(param_cal_prio[_calibration_index], &CAL_PRIO_UNINITIALIZED);
 			}
 
 			_priority = _external ? DEFAULT_EXTERNAL_PRIORITY : DEFAULT_PRIORITY;
 		}
 
 		// CAL_GYROx_TEMP
-		float cal_temp = GetCalibrationParamFloat(SensorString(), "TEMP", _calibration_index);
+		float cal_temp = TEMPERATURE_INVALID;
+		param_get(param_cal_temp[_calibration_index], &cal_temp);
 
 		if (cal_temp > TEMPERATURE_INVALID) {
 			set_temperature(cal_temp);
@@ -203,7 +256,9 @@ bool Gyroscope::ParametersLoad()
 		}
 
 		// CAL_GYROx_OFF{X,Y,Z}
-		set_offset(GetCalibrationParamsVector3f(SensorString(), "OFF", _calibration_index));
+		param_get(param_cal_off[0][_calibration_index], &_offset(0));
+		param_get(param_cal_off[1][_calibration_index], &_offset(1));
+		param_get(param_cal_off[2][_calibration_index], &_offset(2));
 
 		return true;
 	}
@@ -253,26 +308,33 @@ bool Gyroscope::ParametersSave(int desired_calibration_index, bool force)
 
 	if (_calibration_index >= 0 && _calibration_index < MAX_SENSOR_COUNT) {
 		// save calibration
-		bool success = true;
-		success &= SetCalibrationParam(SensorString(), "ID", _calibration_index, _device_id);
-		success &= SetCalibrationParam(SensorString(), "PRIO", _calibration_index, _priority);
-		success &= SetCalibrationParamsVector3f(SensorString(), "OFF", _calibration_index, _offset);
+		int ret = PX4_OK;
+
+		ret |= param_set_no_notification(param_cal_id[_calibration_index], &_device_id);
+		ret |= param_set_no_notification(param_cal_prio[_calibration_index], &_priority);
+
+		ret |= param_set_no_notification(param_cal_off[0][_calibration_index], &_offset(0));
+		ret |= param_set_no_notification(param_cal_off[1][_calibration_index], &_offset(1));
+		ret |= param_set_no_notification(param_cal_off[2][_calibration_index], &_offset(2));
 
 		if (_external) {
-			success &= SetCalibrationParam(SensorString(), "ROT", _calibration_index, (int32_t)_rotation_enum);
+			int32_t rot = static_cast<int32_t>(_rotation_enum);
+			ret |= param_set_no_notification(param_cal_rot[_calibration_index], &rot);
 
 		} else {
-			success &= SetCalibrationParam(SensorString(), "ROT", _calibration_index, -1); // internal
+			int32_t rot = -1; // internal
+			ret |= param_set_no_notification(param_cal_rot[_calibration_index], &rot);
 		}
 
 		if (PX4_ISFINITE(_temperature)) {
-			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, _temperature);
+			ret |= param_set_no_notification(param_cal_temp[_calibration_index], &_temperature);
 
 		} else {
-			success &= SetCalibrationParam(SensorString(), "TEMP", _calibration_index, TEMPERATURE_INVALID);
+			float temperature = TEMPERATURE_INVALID;
+			ret |= param_set_no_notification(param_cal_temp[_calibration_index], &temperature);
 		}
 
-		return success;
+		return (ret == PX4_OK);
 	}
 
 	return false;
