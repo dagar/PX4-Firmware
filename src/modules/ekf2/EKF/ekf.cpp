@@ -84,6 +84,8 @@ void Ekf::reset()
 
 	_control_status.flags.vehicle_at_rest = true;
 
+	_never_moved = true;
+
 	resetGpsDriftCheckFilters();
 }
 
@@ -91,16 +93,17 @@ bool Ekf::update()
 {
 	bool updated = false;
 
-	if (!_filter_initialised) {
-		_filter_initialised = initialiseFilter();
-
-		if (!_filter_initialised) {
-			return false;
-		}
-	}
-
 	// Only run the filter if IMU data in the buffer has been updated
 	if (_imu_updated) {
+
+		if (!_filter_initialised) {
+			_filter_initialised = initialiseFilter();
+
+			if (!_filter_initialised) {
+				return false;
+			}
+		}
+
 		// perform state and covariance prediction for the main filter
 		predictState();
 		predictCovariance();
@@ -117,33 +120,17 @@ bool Ekf::update()
 		runYawEKFGSF();
 	}
 
-	// the output observer always runs
-	// Use full rate IMU data at the current time horizon
-	calculateOutputStates(_newest_high_rate_imu_sample);
+	if (_filter_initialised) {
+		// the output observer always runs
+		// Use full rate IMU data at the current time horizon
+		calculateOutputStates(_newest_high_rate_imu_sample);
+	}
 
 	return updated;
 }
 
 bool Ekf::initialiseFilter()
 {
-	// Filter accel for tilt initialization
-	const imuSample &imu_init = _imu_buffer.get_newest();
-
-	// protect against zero data
-	if (imu_init.delta_vel_dt < 1e-4f || imu_init.delta_ang_dt < 1e-4f) {
-		return false;
-	}
-
-	if (_is_first_imu_sample) {
-		_accel_lpf.reset(imu_init.delta_vel / imu_init.delta_vel_dt);
-		_gyro_lpf.reset(imu_init.delta_ang / imu_init.delta_ang_dt);
-		_is_first_imu_sample = false;
-
-	} else {
-		_accel_lpf.update(imu_init.delta_vel / imu_init.delta_vel_dt);
-		_gyro_lpf.update(imu_init.delta_ang / imu_init.delta_ang_dt);
-	}
-
 	// Sum the magnetometer measurements
 	if (_mag_buffer) {
 		magSample mag_sample;
@@ -166,10 +153,11 @@ bool Ekf::initialiseFilter()
 	if (_baro_buffer && _baro_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_baro_sample_delayed)) {
 		if (_baro_sample_delayed.time_us != 0) {
 			if (_baro_counter == 0) {
+				_baro_lpf.reset(_baro_sample_delayed.hgt);
 				_baro_hgt_offset = _baro_sample_delayed.hgt;
 
 			} else {
-				_baro_hgt_offset = 0.9f * _baro_hgt_offset + 0.1f * _baro_sample_delayed.hgt;
+				_baro_hgt_offset = _baro_lpf.update(_baro_sample_delayed.hgt);
 			}
 
 			_baro_counter++;
@@ -177,13 +165,13 @@ bool Ekf::initialiseFilter()
 	}
 
 	if (_params.mag_fusion_type <= MAG_FUSE_TYPE_3D) {
-		if (_mag_counter < _obs_buffer_length) {
+		if (_mag_counter == 0) {
 			// not enough mag samples accumulated
 			return false;
 		}
 	}
 
-	if (_baro_counter < _obs_buffer_length) {
+	if (_baro_counter == 0) {
 		// not enough baro samples accumulated
 		return false;
 	}
@@ -232,8 +220,8 @@ bool Ekf::initialiseTilt()
 	const float accel_norm = _accel_lpf.getState().norm();
 	const float gyro_norm = _gyro_lpf.getState().norm();
 
-	if (accel_norm < 0.8f * CONSTANTS_ONE_G ||
-	    accel_norm > 1.2f * CONSTANTS_ONE_G ||
+	if (accel_norm < 0.7f * CONSTANTS_ONE_G ||
+	    accel_norm > 1.3f * CONSTANTS_ONE_G ||
 	    gyro_norm > math::radians(15.0f)) {
 		return false;
 	}

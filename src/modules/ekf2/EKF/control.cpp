@@ -85,6 +85,10 @@ void Ekf::controlFusionModes()
 		}
 	}
 
+	if (_never_moved && (!_control_status.flags.vehicle_at_rest || _control_status.flags.in_air)) {
+		_never_moved = false;
+	}
+
 	if (_baro_buffer) {
 		// check for intermittent data (before pop_first_older_than)
 		const baroSample &baro_init = _baro_buffer->get_newest();
@@ -92,6 +96,16 @@ void Ekf::controlFusionModes()
 
 		const uint64_t baro_time_prev = _baro_sample_delayed.time_us;
 		_baro_data_ready = _baro_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_baro_sample_delayed);
+
+		if (_baro_data_ready) {
+			_baro_lpf.update(_baro_sample_delayed.hgt);
+			_baro_counter++;
+		}
+
+		if (_never_moved) {
+			// continue updating baro height offset if we've never moved
+			_baro_hgt_offset = _baro_lpf.getState();
+		}
 
 		// if we have a new baro sample save the delta time between this sample and the last sample which is
 		// used below for baro offset calculations
@@ -108,6 +122,10 @@ void Ekf::controlFusionModes()
 		// check for arrival of new sensor data at the fusion time horizon
 		_time_prev_gps_us = _gps_sample_delayed.time_us;
 		_gps_data_ready = _gps_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_gps_sample_delayed);
+
+		if (_gps_data_ready) {
+			_gps_hgt_lpf.update(_gps_sample_delayed.hgt);
+		}
 	}
 
 	if (_range_buffer) {

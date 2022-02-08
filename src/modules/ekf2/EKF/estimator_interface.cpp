@@ -89,6 +89,16 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 		// this will occur if data is overwritten before its time stamp falls behind the fusion time horizon
 		_min_obs_interval_us = (imu_sample.time_us - _imu_sample_delayed.time_us) / (_obs_buffer_length - 1);
 
+		if (_is_first_imu_sample) {
+			_accel_lpf.reset(_imu_sample_delayed.delta_vel / _imu_sample_delayed.delta_vel_dt);
+			_gyro_lpf.reset(_imu_sample_delayed.delta_ang / _imu_sample_delayed.delta_ang_dt);
+			_is_first_imu_sample = false;
+
+		} else {
+			_accel_lpf.update(_imu_sample_delayed.delta_vel / _imu_sample_delayed.delta_vel_dt);
+			_gyro_lpf.update(_imu_sample_delayed.delta_ang / _imu_sample_delayed.delta_ang_dt);
+		}
+
 		setDragData(imu_sample);
 	}
 }
@@ -124,6 +134,7 @@ void EstimatorInterface::setMagData(const magSample &mag_sample)
 		mag_sample_new.mag = mag_sample.mag;
 
 		_mag_buffer->push(mag_sample_new);
+
 	} else {
 		ECL_ERR("mag data too fast %" PRIu64, mag_sample.time_us - _time_last_mag);
 	}
@@ -183,6 +194,7 @@ void EstimatorInterface::setGpsData(const gps_message &gps)
 		}
 
 		_gps_buffer->push(gps_sample_new);
+
 	} else {
 		ECL_ERR("GPS data too fast %" PRIu64, gps.time_usec - _time_last_gps);
 	}
@@ -218,6 +230,7 @@ void EstimatorInterface::setBaroData(const baroSample &baro_sample)
 		baro_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_baro_buffer->push(baro_sample_new);
+
 	} else {
 		ECL_ERR("baro data too fast %" PRIu64, baro_sample.time_us - _time_last_baro);
 	}

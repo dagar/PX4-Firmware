@@ -370,6 +370,17 @@ protected:
 	RingBuffer<dragSample> *_drag_buffer{nullptr};
 	RingBuffer<auxVelSample> *_auxvel_buffer{nullptr};
 
+	// Variables used by the initial filter alignment
+	bool _is_first_imu_sample{true};
+	uint32_t _baro_counter{0};		///< number of baro samples read during initialisation
+	uint32_t _mag_counter{0};		///< number of magnetometer samples read during initialisation
+	AlphaFilter<Vector3f> _accel_lpf{0.1f};	///< filtered accelerometer measurement used to align tilt (m/s/s)
+	AlphaFilter<Vector3f> _gyro_lpf{0.1f};	///< filtered gyro measurement used for alignment excessive movement check (rad/sec)
+	AlphaFilter<float> _baro_lpf{0.1f};
+	AlphaFilter<float> _gps_hgt_lpf{0.1f};
+
+	bool _never_moved{true};
+
 	// timestamps of latest in buffer saved measurement in microseconds
 	uint64_t _time_last_imu{0};
 	uint64_t _time_last_gps{0};

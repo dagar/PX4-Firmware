@@ -499,13 +499,6 @@ private:
 	uint64_t _last_gps_origin_time_us{0};	///< time the origin was last set (uSec)
 	float _gps_alt_ref{0.0f};		///< WGS-84 height (m)
 
-	// Variables used by the initial filter alignment
-	bool _is_first_imu_sample{true};
-	uint32_t _baro_counter{0};		///< number of baro samples read during initialisation
-	uint32_t _mag_counter{0};		///< number of magnetometer samples read during initialisation
-	AlphaFilter<Vector3f> _accel_lpf{0.1f};	///< filtered accelerometer measurement used to align tilt (m/s/s)
-	AlphaFilter<Vector3f> _gyro_lpf{0.1f};	///< filtered gyro measurement used for alignment excessive movement check (rad/sec)
-
 	// Variables used to perform in flight resets and switch between height sources
 	AlphaFilter<Vector3f> _mag_lpf{0.1f};	///< filtered magnetometer measurement for instant reset (Gauss)
 	float _hgt_sensor_offset{0.0f};		///< set as necessary if desired to maintain the same height after a height reset (m)

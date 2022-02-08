@@ -275,16 +275,14 @@ void Ekf::resetHeight()
 
 		// reset the baro offset which is subtracted from the baro reading if we need to use it as a backup
 		if (_baro_buffer) {
-			const baroSample &baro_newest = _baro_buffer->get_newest();
-			_baro_hgt_offset = baro_newest.hgt + _state.pos(2);
+			_baro_hgt_offset = _baro_lpf.getState();
 		}
 
 	} else if (_control_status.flags.baro_hgt) {
 		// initialize vertical position with newest baro measurement
 		if (!_baro_hgt_faulty) {
 			if (_baro_buffer) {
-				const baroSample &baro_newest = _baro_buffer->get_newest();
-				resetVerticalPositionTo(-baro_newest.hgt + _baro_hgt_offset);
+				resetVerticalPositionTo(-_baro_lpf.getState() + _baro_hgt_offset);
 			}
 
 			// the state variance is the same as the observation
@@ -298,15 +296,14 @@ void Ekf::resetHeight()
 		// initialize vertical position and velocity with newest gps measurement
 		if (!_gps_hgt_intermittent && _gps_buffer) {
 			const gpsSample &gps_newest = _gps_buffer->get_newest();
-			resetVerticalPositionTo(_hgt_sensor_offset - gps_newest.hgt + _gps_alt_ref);
+			resetVerticalPositionTo(_hgt_sensor_offset - _gps_hgt_lpf.getState() + _gps_alt_ref);
 
 			// the state variance is the same as the observation
 			P.uncorrelateCovarianceSetVariance<1>(9, sq(gps_newest.vacc));
 
 			// reset the baro offset which is subtracted from the baro reading if we need to use it as a backup
 			if (_baro_buffer) {
-				const baroSample &baro_newest = _baro_buffer->get_newest();
-				_baro_hgt_offset = baro_newest.hgt + _state.pos(2);
+				_baro_hgt_offset = _baro_lpf.getState() + _state.pos(2);
 			}
 
 		} else {
