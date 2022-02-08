@@ -175,6 +175,8 @@ void Ekf::controlFusionModes()
 	// Additional horizontal velocity data from an auxiliary sensor can be fused
 	controlAuxVelFusion();
 
+	controlZeroVelocityUpdate();
+
 	// Fake position measurement for constraining drift when no other velocity or position measurements
 	controlFakePosFusion();
 

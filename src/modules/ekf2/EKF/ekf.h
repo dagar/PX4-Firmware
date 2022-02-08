@@ -874,6 +874,8 @@ private:
 	// control fusion of fake position observations to constrain drift
 	void controlFakePosFusion();
 
+	void controlZeroVelocityUpdate();
+
 	// control fusion of auxiliary velocity observations
 	void controlAuxVelFusion();
 
