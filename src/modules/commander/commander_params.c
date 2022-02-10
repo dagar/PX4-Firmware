@@ -226,7 +226,7 @@ PARAM_DEFINE_INT32(COM_HOME_EN, 2);
  * @bit 1 Allow in air updates
  * @bit 2 Altitude only (no position)
  */
-PARAM_DEFINE_INT32(COM_HOME_POS_CFG, 2);
+PARAM_DEFINE_INT32(COM_HOME_CFG, 2);
 
 /**
  * Home set horizontal threshold
@@ -255,18 +255,6 @@ PARAM_DEFINE_FLOAT(COM_HOME_H_T, 5.0f);
  * @increment 0.5
  */
 PARAM_DEFINE_FLOAT(COM_HOME_V_T, 10.0f);
-
-/**
- * Allows setting the home position after takeoff
- *
- * If set to true, the autopilot is allowed to set its home position after takeoff
- * The true home position is back-computed if a local position is estimate if available.
- * If no local position is available, home is set to the current position.
- *
- * @boolean
- * @group Commander
- */
-PARAM_DEFINE_INT32(COM_HOME_IN_AIR, 0);
 
 /**
  * RC control input mode

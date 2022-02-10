@@ -86,6 +86,7 @@
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/wind.h>
 
@@ -163,8 +164,11 @@ private:
 
 	void UpdateEstimateValidity();
 
-	void UpdateHomePosition();
-	void CheckHomePositionResets();
+	bool UpdateHomePosition(bool force = false);
+	void UpdateHomePositionInAir(const vehicle_local_position_s &local_position);
+	void CheckHomePositionResets(const vehicle_local_position_s &lpos);
+
+	void ValidateAndPublishHomePosition(home_position_s &home);
 
 	bool shutdown_if_allowed();
 
@@ -189,9 +193,9 @@ private:
 		(ParamInt<px4::params::COM_RCL_EXCEPT>) _param_com_rcl_except,
 
 		(ParamBool<px4::params::COM_HOME_EN>) _param_com_home_en,
+		(ParamInt<px4::params::COM_HOME_CFG>) _param_com_home_cfg,
 		(ParamFloat<px4::params::COM_HOME_H_T>) _param_com_home_h_t,
 		(ParamFloat<px4::params::COM_HOME_V_T>) _param_com_home_v_t,
-		(ParamBool<px4::params::COM_HOME_IN_AIR>) _param_com_home_in_air,
 
 		(ParamFloat<px4::params::COM_POS_FS_EPH>) _param_com_pos_fs_eph,
 		(ParamFloat<px4::params::COM_POS_FS_EPV>) _param_com_pos_fs_epv, 	/*Not realy used for now*/
@@ -371,7 +375,6 @@ private:
 
 	uint8_t _home_xy_reset_counter{0};
 	uint8_t _home_z_reset_counter{0};
-	uint8_t _home_alt_reset_counter{0};
 	uint8_t _home_heading_reset_counter{0};
 
 	bool		_status_changed{true};
@@ -416,6 +419,7 @@ private:
 	uORB::Subscription					_system_power_sub{ORB_ID(system_power)};
 	uORB::Subscription					_vehicle_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 	uORB::Subscription					_vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
+	uORB::Subscription					_vehicle_gps_position_sub{ORB_ID(vehicle_gps_position)};
 	uORB::Subscription					_vtol_vehicle_status_sub{ORB_ID(vtol_vehicle_status)};
 	uORB::Subscription					_wind_sub{ORB_ID(wind)};
 
