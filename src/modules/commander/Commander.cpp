@@ -3756,13 +3756,27 @@ void Commander::estimator_check()
 	_global_position_sub.update();
 
 	if (_local_position_sub.update()) {
-		CheckHomePositionResets(_local_position_sub.get());
+		const vehicle_local_position_s &lpos = _local_position_sub.get();
+
+		CheckHomePositionResets(lpos);
+
+		const bool local_position_valid_for_home = lpos.xy_valid && (lpos.eph < _param_com_home_h_t.get()) && lpos.z_valid && (lpos.epv < _param_com_home_v_t.get());
 
 		if (!_armed.armed && _land_detector.landed) {
 			UpdateHomePosition();
 
+			// TODO: helpers checking lpos eph, epv
+			_local_position_valid_for_home = local_position_valid_for_home
+
 		} else {
-			UpdateHomePositionInAir(_local_position_sub.get());
+			// once flying local position must be valid continously in order to be used for in air home
+			if (!local_position_valid_for_home) {
+				_local_position_valid_for_home = false;
+			}
+
+			if (local_position_valid_for_home) {
+				UpdateHomePositionInAir(_local_position_sub.get());
+			}
 		}
 
 	}
@@ -4017,9 +4031,6 @@ bool Commander::UpdateHomePosition(bool force)
 						tune_home_set(true);
 					}
 				}
-
-				_local_position_valid_for_home = _home_pub.get().valid_local_position;
-
 			}
 		}
 	}
@@ -4032,7 +4043,7 @@ void Commander::UpdateHomePositionInAir(const vehicle_local_position_s &lpos)
 	// flying and allowed to set home in air
 
 	// monitor lpos.eph and lpos.epv while in flight
-	// - if global position becomes balid back compute global home if local position was valid the entire time
+	// - if global position becomes valid back compute global home if local position was valid the entire time
 	if (lpos.xy_valid && (lpos.eph < _param_com_home_h_t.get())
 	    && lpos.z_valid && (lpos.epv < _param_com_home_v_t.get())) {
 
@@ -4090,10 +4101,6 @@ void Commander::UpdateHomePositionInAir(const vehicle_local_position_s &lpos)
 
 			ValidateAndPublishHomePosition(home);
 		}
-
-	} else {
-		// invalidate
-		_local_position_valid_for_home = false;
 	}
 }
 
