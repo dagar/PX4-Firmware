@@ -46,6 +46,8 @@ OutputPredictor::OutputPredictor() :
 	_lp_filter_linear_acceleration.set_cutoff_frequency(kInitialRateHz, _param_imu_accel_cutoff.get());
 	_lp_filter_velocity_body.set_cutoff_frequency(kInitialRateHz, _param_imu_accel_cutoff.get());
 	_lp_filter_velocity_ned.set_cutoff_frequency(kInitialRateHz, _param_imu_accel_cutoff.get());
+
+	_output_new.quat_nominal.setIdentity();
 }
 
 OutputPredictor::~OutputPredictor()
@@ -93,6 +95,21 @@ void OutputPredictor::Run()
 	}
 
 	control_state_s control_state{};
+
+
+	const float dt = (accel.timestamp_sample - _accel_timestamp_sample_last) * 1e-6f;
+	_accel_timestamp_sample_last = accel.timestamp_sample;
+
+	const Vector3f accel_raw{accel.x, accel.y, accel.z};
+	// _accel_integrator.put(accel_raw, dt);
+
+
+	const float dt = (gyro.timestamp_sample - _gyro_timestamp_sample_last) * 1e-6f;
+	_gyro_timestamp_sample_last = gyro.timestamp_sample;
+
+	const Vector3f gyro_raw{gyro.x, gyro.y, gyro.z};
+	_gyro_integrator.put(gyro_raw, dt);
+
 
 	sensor_gyro_s gyro;
 
@@ -512,8 +529,7 @@ void OutputPredictor::alignOutputFilter(const Quatf &quat_nominal, const Vector3
 
 	// loop through the output filter state history and add the deltas
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].quat_nominal = q_delta * _output_buffer[i].quat_nominal;
-		_output_buffer[i].quat_nominal.normalize();
+		_output_buffer[i].quat_nominal = Quatf(q_delta * _output_buffer[i].quat_nominal).normalized();
 		_output_buffer[i].velocity_NED += vel_ned_delta;
 		_output_buffer[i].velocity_body += vel_body_delta;
 		_output_buffer[i].position += pos_delta;
@@ -529,11 +545,9 @@ void OutputPredictor::CalculateQuaternionOutput(const hrt_abstime &timestamp_sam
 	const Vector3f delta_angle(imu_delta_angle + _delta_angle_corr);
 
 	// rotate the previous INS quaternion by the delta quaternions
-	_output_new.time_us = timestamp_sample;
-	_output_new.quat_nominal = _output_new.quat_nominal * Quatf{AxisAnglef{delta_angle}};
-
 	// the quaternions must always be normalised after modification
-	_output_new.quat_nominal.normalize();
+	_output_new.time_us = timestamp_sample;
+	_output_new.quat_nominal = Quatf(_output_new.quat_nominal * Quatf{AxisAnglef{delta_angle}}).normalized();
 
 	// correct velocity for IMU offset
 	// TODO: calculate angular acceleration
@@ -542,12 +556,12 @@ void OutputPredictor::CalculateQuaternionOutput(const hrt_abstime &timestamp_sam
 void OutputPredictor::CalculateOutputStates(const hrt_abstime &timestamp_sample, const Vector3f &delta_velocity,
 		const float dt)
 {
+	// save the previous velocity so we can use trapezoidal integration
+	const Vector3f vel_last(_output_new.velocity_NED);
+
 	// rotate the delta velocity to earth frame
 	Vector3f delta_vel_earth{Dcmf{_output_new.quat_nominal} *delta_velocity}; // TODO: use quat synchronized with delta velocity
 	delta_vel_earth(2) += CONSTANTS_ONE_G * dt; // correct for measured acceleration due to gravity
-
-	// save the previous velocity so we can use trapezoidal integration
-	const Vector3f vel_last(_output_new.velocity_NED);
 
 	// increment the INS velocity states by the measurement plus corrections
 	// do the same for vertical state used by alternative correction algorithm
