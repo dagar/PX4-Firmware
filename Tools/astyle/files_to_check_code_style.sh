@@ -11,10 +11,14 @@ exec find boards msg src platforms test \
     -path msg/templates/urtps -prune -o \
     -path platforms/nuttx/NuttX -prune -o \
     -path platforms/qurt/dspal -prune -o \
+    -path src/drivers/ins/vectornav/libvnc -prune -o \
     -path src/drivers/uavcan/libuavcan -prune -o \
     -path src/drivers/uavcan/uavcan_drivers/kinetis/driver/include/uavcan_kinetis -prune -o \
     -path src/drivers/uavcan_v1/libcanard -prune -o \
     -path src/drivers/uavcannode_gps_demo/libcanard -prune -o \
+    -path src/lib/crypto/libtomcrypt -prune -o \
+    -path src/lib/crypto/libtommath -prune -o \
+    -path src/lib/crypto/monocypher -prune -o \
     -path src/lib/crypto/monocypher -prune -o \
     -path src/lib/events/libevents -prune -o \
     -path src/lib/parameters/uthash -prune -o \
@@ -24,7 +28,4 @@ exec find boards msg src platforms test \
     -path src/modules/micrortps_bridge/micro-CDR -prune -o \
     -path src/modules/micrortps_bridge/microRTPS_client -prune -o \
     -path test/mavsdk_tests/catch2 -prune -o \
-    -path src/lib/crypto/monocypher -prune -o \
-    -path src/lib/crypto/libtomcrypt -prune -o \
-    -path src/lib/crypto/libtommath -prune -o \
     -type f \( -name "*.c" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) | grep $PATTERN
