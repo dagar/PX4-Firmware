@@ -10,16 +10,11 @@ int processErrorReceived(char *errorMessage, VnError errorCode);
 
 int main(void)
 {
-	VnSensor vs;
-	char modelNumber[30];
-	char strConversions[50];
-	vec3f ypr;
-	YawPitchRollMagneticAccelerationAndAngularRatesRegister reg;
-	VpeBasicControlRegister vpeReg;
-	uint32_t oldHz, newHz;
-	VnAsciiAsync asyncType;
-	BinaryOutputRegister bor;
-	VnError error;
+
+
+
+
+
 
 	/* This example walks through using the VectorNav C Library to connect to
 	 * and interact with a VectorNav sensor using the VnSensor structure. */
@@ -36,7 +31,10 @@ int main(void)
 	const uint32_t SENSOR_BAUDRATE = 115200;
 
 	/* We first need to initialize our VnSensor structure. */
+	VnSensor vs;
 	VnSensor_initialize(&vs);
+
+	VnError error;
 
 	/* Now connect to our sensor. */
 	if ((error = VnSensor_connect(&vs, SENSOR_PORT, SENSOR_BAUDRATE)) != E_NONE) {
@@ -44,6 +42,8 @@ int main(void)
 	}
 
 	/* Let's query the sensor's model number. */
+	char modelNumber[30];
+
 	if ((error = VnSensor_readModelNumber(&vs, modelNumber, sizeof(modelNumber))) != E_NONE) {
 		return processErrorReceived("Error reading model number.", error);
 	}
@@ -51,14 +51,19 @@ int main(void)
 	printf("Model Number: %s\n", modelNumber);
 
 	/* Get some orientation data from the sensor. */
+	vec3f ypr;
+
 	if ((error = VnSensor_readYawPitchRoll(&vs, &ypr)) != E_NONE) {
 		return processErrorReceived("Error reading yaw pitch roll.", error);
 	}
 
+	char strConversions[50];
 	str_vec3f(strConversions, ypr);
 	printf("Current YPR: %s\n", strConversions);
 
 	/* Get some orientation and IMU data. */
+	YawPitchRollMagneticAccelerationAndAngularRatesRegister reg;
+
 	if ((error = VnSensor_readYawPitchRollMagneticAccelerationAndAngularRates(&vs, &reg)) != E_NONE) {
 		return processErrorReceived("Error reading orientation and IMU data.", error);
 	}
@@ -75,6 +80,8 @@ int main(void)
 	/* Let's do some simple reconfiguration of the sensor. As it comes from the
 	 * factory, the sensor outputs asynchronous data at 40 Hz. We will change
 	 * this to 2 Hz for demonstration purposes. */
+	uint32_t oldHz;
+
 	if ((error = VnSensor_readAsyncDataOutputFrequency(&vs, &oldHz)) != E_NONE) {
 		return processErrorReceived("Error reading async data output frequency.", error);
 	}
@@ -82,6 +89,8 @@ int main(void)
 	if ((error = VnSensor_writeAsyncDataOutputFrequency(&vs, 2, true)) != E_NONE) {
 		return processErrorReceived("Error writing async data output frequency.", error);
 	}
+
+	uint32_t newHz;
 
 	if ((error = VnSensor_readAsyncDataOutputFrequency(&vs, &newHz)) != E_NONE) {
 		return processErrorReceived("Error reading async data output frequency.", error);
@@ -95,6 +104,8 @@ int main(void)
 	 * only the values of interest, and then write the configuration to the
 	 * register. This allows preserving the current settings for the register's
 	 * other fields. Below, we change the heading mode used by the sensor. */
+	VpeBasicControlRegister vpeReg;
+
 	if ((error = VnSensor_readVpeBasicControl(&vs, &vpeReg)) != E_NONE) {
 		return processErrorReceived("Error reading VPE basic control.", error);
 	}
@@ -130,6 +141,8 @@ int main(void)
 		return processErrorReceived("Error writing to async data output type.", error);
 	}
 
+	VnAsciiAsync asyncType;
+
 	if ((error = VnSensor_readAsyncDataOutputType(&vs, &asyncType)) != E_NONE) {
 		return processErrorReceived("Error reading async data output type.", error);
 	}
@@ -162,9 +175,10 @@ int main(void)
 	/* First we create a structure for setting the configuration information
 	 * for the binary output register to send yaw, pitch, roll data out at
 	 * 4 Hz. */
+	BinaryOutputRegister bor;
 	BinaryOutputRegister_initialize(
 		&bor,
-		ASYNCMODE_PORT1,
+		ASYNCMODE_BOTH,
 		200,
 		COMMONGROUP_TIMESTARTUP | COMMONGROUP_YAWPITCHROLL,	/* Note use of binary OR to configure flags. */
 		TIMEGROUP_NONE,
