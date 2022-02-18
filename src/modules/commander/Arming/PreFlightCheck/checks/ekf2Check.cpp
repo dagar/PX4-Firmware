@@ -64,15 +64,6 @@ bool PreFlightCheck::ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 	float mag_test_ratio_limit = 1.f;
 	param_get(param_find("COM_ARM_EKF_YAW"), &mag_test_ratio_limit);
 
-	int32_t arm_without_gps = 0;
-	param_get(param_find("COM_ARM_WO_GPS"), &arm_without_gps);
-
-	int32_t sys_has_gps = 1;
-	param_get(param_find("SYS_HAS_GPS"), &sys_has_gps);
-
-	bool gps_success = false;
-	bool gps_present = false;
-
 	// Get estimator status data if available and exit with a fail recorded if not
 	uORB::SubscriptionData<estimator_selector_status_s> estimator_selector_status_sub{ORB_ID(estimator_selector_status)};
 	uORB::SubscriptionData<estimator_status_s> status_sub{ORB_ID(estimator_status), estimator_selector_status_sub.get().primary_instance};
@@ -163,82 +154,7 @@ bool PreFlightCheck::ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 		goto out;
 	}
 
-	// If GPS aiding is required, declare fault condition if the required GPS quality checks are failing
-	if (sys_has_gps == 1) {
-		const bool ekf_gps_fusion = status.control_mode_flags & (1 << estimator_status_s::CS_GPS);
-		const bool ekf_gps_check_fail = status.gps_check_fail_flags > 0;
-
-		gps_present = true;
-		gps_success = ekf_gps_fusion; // default to success if gps data is fused
-
-		if (ekf_gps_check_fail) {
-			if (report_fail) {
-				// Only report the first failure to avoid spamming
-				const char *message = nullptr;
-
-				if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_GPS_FIX)) {
-					message = "Preflight%s: GPS fix too low";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MIN_SAT_COUNT)) {
-					message = "Preflight%s: not enough GPS Satellites";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_PDOP)) {
-					message = "Preflight%s: GPS PDOP too high";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_HORZ_ERR)) {
-					message = "Preflight%s: GPS Horizontal Pos Error too high";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_VERT_ERR)) {
-					message = "Preflight%s: GPS Vertical Pos Error too high";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_SPD_ERR)) {
-					message = "Preflight%s: GPS Speed Accuracy too low";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_HORZ_DRIFT)) {
-					message = "Preflight%s: GPS Horizontal Pos Drift too high";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_VERT_DRIFT)) {
-					message = "Preflight%s: GPS Vertical Pos Drift too high";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_HORZ_SPD_ERR)) {
-					message = "Preflight%s: GPS Hor Speed Drift too high";
-
-				} else if (status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_VERT_SPD_ERR)) {
-					message = "Preflight%s: GPS Vert Speed Drift too high";
-
-				} else {
-					if (!ekf_gps_fusion) {
-						// Likely cause unknown
-						message = "Preflight%s: Estimator not using GPS";
-						gps_present = false;
-
-					} else {
-						// if we land here there was a new flag added and the code not updated. Show a generic message.
-						message = "Preflight%s: Poor GPS Quality";
-					}
-				}
-
-				if (message) {
-					if (!arm_without_gps) {
-						mavlink_log_critical(mavlink_log_pub, message, " Fail");
-
-					} else {
-						mavlink_log_warning(mavlink_log_pub, message, "");
-					}
-				}
-			}
-
-			gps_success = false;
-
-			if (!arm_without_gps) {
-				success = false;
-				goto out;
-			}
-		}
-	}
-
 out:
-	set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_GPS, gps_present, !arm_without_gps, gps_success, vehicle_status);
 	return success;
 }
 

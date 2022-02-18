@@ -45,6 +45,7 @@ px4_add_library(PreFlightCheck
 	checks/powerCheck.cpp
 	checks/airframeCheck.cpp
 	checks/ekf2Check.cpp
+	checks/gpsCheck.cpp
 	checks/failureDetectorCheck.cpp
 	checks/manualControlCheck.cpp
 	checks/cpuResourceCheck.cpp

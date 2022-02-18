@@ -115,6 +115,9 @@ private:
 
 	static bool ekf2CheckSensorBias(orb_advert_t *mavlink_log_pub, const bool report_fail);
 
+	static bool gpsCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &vehicle_status, const bool optional,
+			     const bool report_fail);
+
 	static bool failureDetectorCheck(orb_advert_t *mavlink_log_pub, const vehicle_status_s &status, const bool report_fail,
 					 const bool prearm);
 
