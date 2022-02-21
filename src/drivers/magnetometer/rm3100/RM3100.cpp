@@ -164,19 +164,13 @@ void RM3100::RunImpl()
 
 	case STATE::READ: {
 			struct TransferBuffer {
-				uint8_t STAT1;
-				uint8_t DATAXL;
-				uint8_t DATAXH;
-				uint8_t DATAYL;
-				uint8_t DATAYH;
-				uint8_t DATAZL;
-				uint8_t DATAZH;
+				uint8_t MX[3];
+				uint8_t MY[3];
+				uint8_t MZ[3];
 			} buffer{};
 
 			bool success = false;
-			uint8_t cmd = static_cast<uint8_t>(Register::STAT1);
-
-
+			uint8_t cmd = static_cast<uint8_t>(Register::MX);
 
 			// (range: -8388608 to 8388607)
 
