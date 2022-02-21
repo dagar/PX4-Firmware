@@ -4148,16 +4148,29 @@ void Commander::UpdateEstimateValidity()
 		}
 	}
 
+	bool xy_valid = lpos.xy_valid && !_nav_test_failed;
+	bool v_xy_valid = lpos.v_xy_valid && !_nav_test_failed;
+
+	if (!_armed.armed) {
+		if (status.pre_flt_fail_innov_heading || status.pre_flt_fail_innov_vel_horiz) {
+			xy_valid = false;
+		}
+
+		if (status.pre_flt_fail_innov_vel_horiz) {
+			v_xy_valid = false;
+		}
+	}
+
 	_status_flags.condition_global_position_valid =
-		check_posvel_validity(lpos.xy_valid && !_nav_test_failed, gpos.eph, _param_com_pos_fs_eph.get(), gpos.timestamp,
+		check_posvel_validity(xy_valid, gpos.eph, _param_com_pos_fs_eph.get(), gpos.timestamp,
 				      &_last_gpos_fail_time_us, &_gpos_probation_time_us, _status_flags.condition_global_position_valid);
 
 	_status_flags.condition_local_position_valid =
-		check_posvel_validity(lpos.xy_valid && !_nav_test_failed, lpos.eph, lpos_eph_threshold_adj, lpos.timestamp,
+		check_posvel_validity(xy_valid, lpos.eph, lpos_eph_threshold_adj, lpos.timestamp,
 				      &_last_lpos_fail_time_us, &_lpos_probation_time_us, _status_flags.condition_local_position_valid);
 
 	_status_flags.condition_local_velocity_valid =
-		check_posvel_validity(lpos.v_xy_valid && !_nav_test_failed, lpos.evh, _param_com_vel_fs_evh.get(), lpos.timestamp,
+		check_posvel_validity(v_xy_valid, lpos.evh, _param_com_vel_fs_evh.get(), lpos.timestamp,
 				      &_last_lvel_fail_time_us, &_lvel_probation_time_us, _status_flags.condition_local_velocity_valid);
 }
 
