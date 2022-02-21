@@ -493,9 +493,6 @@ void EKF2::Run()
 
 				// let the EKF know if the vehicle motion is that of a fixed wing (forward flight only relative to wind)
 				_ekf.set_is_fixed_wing(is_fixed_wing);
-
-				_preflt_checker.setVehicleCanObserveHeadingInFlight(vehicle_status.vehicle_type !=
-						vehicle_status_s::VEHICLE_TYPE_ROTARY_WING);
 			}
 		}
 
@@ -556,6 +553,8 @@ void EKF2::Run()
 
 		if (_ekf.update()) {
 			perf_set_elapsed(_ecl_ekf_update_full_perf, hrt_elapsed_time(&ekf_update_start));
+
+			UpdatePreflightChecks();
 
 			PublishLocalPosition(now);
 			PublishOdometry(now, imu_sample_new);
@@ -783,14 +782,14 @@ void EKF2::PublishInnovations(const hrt_abstime &timestamp)
 	innovations.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
 	_ekf.getGpsVelPosInnov(innovations.gps_hvel, innovations.gps_vvel, innovations.gps_hpos, innovations.gps_vpos);
 	_ekf.getEvVelPosInnov(innovations.ev_hvel, innovations.ev_vvel, innovations.ev_hpos, innovations.ev_vpos);
-	_ekf.getBaroHgtInnov(innovations.baro_vpos);
-	_ekf.getRngHgtInnov(innovations.rng_vpos);
+	innovations.baro_vpos = _ekf.getBaroHgtInnov();
+	innovations.rng_vpos = _ekf.getRngHgtInnov();
 	_ekf.getAuxVelInnov(innovations.aux_hvel);
 	_ekf.getFlowInnov(innovations.flow);
-	_ekf.getHeadingInnov(innovations.heading);
-	_ekf.getMagInnov(innovations.mag_field);
-	_ekf.getDragInnov(innovations.drag);
-	_ekf.getAirspeedInnov(innovations.airspeed);
+	innovations.heading = _ekf.getHeadingInnov();
+	innovations.mag_field = _ekf.getMagInnov();
+	_ekf.getDragInnov().copyTo(innovations.drag);
+	innovations.airspeed = _ekf.getAirspeedInnov();
 	_ekf.getBetaInnov(innovations.beta);
 	_ekf.getHaglInnov(innovations.hagl);
 	// Not yet supported
@@ -798,21 +797,6 @@ void EKF2::PublishInnovations(const hrt_abstime &timestamp)
 
 	innovations.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 	_estimator_innovations_pub.publish(innovations);
-
-	// calculate noise filtered velocity innovations which are used for pre-flight checking
-	if (!_ekf.control_status_flags().in_air) {
-		// TODO: move to run before publications
-		_preflt_checker.setUsingGpsAiding(_ekf.control_status_flags().gps);
-		_preflt_checker.setUsingFlowAiding(_ekf.control_status_flags().opt_flow);
-		_preflt_checker.setUsingEvPosAiding(_ekf.control_status_flags().ev_pos);
-		_preflt_checker.setUsingEvVelAiding(_ekf.control_status_flags().ev_vel);
-
-		_preflt_checker.update(_ekf.get_imu_sample_delayed().delta_ang_dt, innovations);
-
-	} else if (_ekf.control_status_flags().in_air != _ekf.control_status_prev_flags().in_air) {
-		// reset preflight checks if transitioning back to landed
-		_preflt_checker.reset();
-	}
 }
 
 void EKF2::PublishInnovationTestRatios(const hrt_abstime &timestamp)
@@ -823,16 +807,16 @@ void EKF2::PublishInnovationTestRatios(const hrt_abstime &timestamp)
 	_ekf.getGpsVelPosInnovRatio(test_ratios.gps_hvel[0], test_ratios.gps_vvel, test_ratios.gps_hpos[0],
 				    test_ratios.gps_vpos);
 	_ekf.getEvVelPosInnovRatio(test_ratios.ev_hvel[0], test_ratios.ev_vvel, test_ratios.ev_hpos[0], test_ratios.ev_vpos);
-	_ekf.getBaroHgtInnovRatio(test_ratios.baro_vpos);
-	_ekf.getRngHgtInnovRatio(test_ratios.rng_vpos);
-	_ekf.getAuxVelInnovRatio(test_ratios.aux_hvel[0]);
-	_ekf.getFlowInnovRatio(test_ratios.flow[0]);
-	_ekf.getHeadingInnovRatio(test_ratios.heading);
+	test_ratios.baro_vpos = _ekf.getBaroHgtInnovRatio();
+	test_ratios.rng_vpos = _ekf.getRngHgtInnovRatio();
+	_ekf.getAuxVelInnovRatio().copyTo(test_ratios.aux_hvel);
+	_ekf.getFlowInnovRatio().copyTo(test_ratios.flow);
+	test_ratios.heading = _ekf.getHeadingInnovRatio();
 	_ekf.getMagInnovRatio(test_ratios.mag_field[0]);
 	_ekf.getDragInnovRatio(&test_ratios.drag[0]);
-	_ekf.getAirspeedInnovRatio(test_ratios.airspeed);
-	_ekf.getBetaInnovRatio(test_ratios.beta);
-	_ekf.getHaglInnovRatio(test_ratios.hagl);
+	test_ratios.airspeed = _ekf.getAirspeedInnovRatio();
+	test_ratios.beta = _ekf.getBetaInnovRatio();
+	test_ratios.hagl = _ekf.getHaglInnovRatio();
 	// Not yet supported
 	test_ratios.aux_vvel = NAN;
 
@@ -893,9 +877,9 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 
 	// TODO: better status reporting
 	lpos.xy_valid = _ekf.local_position_is_valid();
-	lpos.z_valid = !_preflt_checker.hasVertFailed();
+	lpos.z_valid = !_has_vert_vel_failed && !_has_height_failed;
 	lpos.v_xy_valid = _ekf.local_position_is_valid();
-	lpos.v_z_valid = !_preflt_checker.hasVertFailed();
+	lpos.v_z_valid = !_has_vert_vel_failed && !_has_height_failed;
 
 	// Position of local NED origin in GPS / WGS84 frame
 	if (_ekf.global_origin_valid()) {
@@ -1179,10 +1163,10 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 
 	status.time_slip = _last_time_slip_us * 1e-6f;
 
-	status.pre_flt_fail_innov_heading = _preflt_checker.hasHeadingFailed();
-	status.pre_flt_fail_innov_vel_horiz = _preflt_checker.hasHorizVelFailed();
-	status.pre_flt_fail_innov_vel_vert = _preflt_checker.hasVertVelFailed();
-	status.pre_flt_fail_innov_height = _preflt_checker.hasHeightFailed();
+	status.pre_flt_fail_innov_heading = _has_heading_failed;
+	status.pre_flt_fail_innov_vel_horiz = _has_horiz_vel_failed;
+	status.pre_flt_fail_innov_vel_vert = _has_vert_vel_failed;
+	status.pre_flt_fail_innov_height = _has_height_failed;
 	status.pre_flt_fail_mag_field_disturbed = _ekf.control_status_flags().mag_field_disturbed;
 
 	status.accel_device_id = _device_id_accel;
@@ -1802,6 +1786,89 @@ void EKF2::UpdateRangeSample(ekf2_timestamps_s &ekf2_timestamps)
 	}
 }
 
+void EKF2::UpdatePreflightChecks()
+{
+	// calculate noise filtered velocity innovations which are used for pre-flight checking
+	if (!_ekf.control_status_flags().in_air) {
+
+		const float alpha = InnovationLpf::computeAlphaFromDtAndTauInv(_ekf.get_imu_sample_delayed().delta_ang_dt,
+				    _innov_lpf_tau_inv);
+
+		// Select the max allowed heading innovaton depending on whether we are not aiding navigation using
+		// observations in the NE reference frame and if the vehicle can use GPS course to realign in flight (fixedwing sideslip fusion).
+		float heading_test_limit = heading_test_limit;
+
+		if ((_ekf.control_status_flags().gps || _ekf.control_status_flags().ev_pos)
+		    && !_ekf.control_status_flags().fixed_wing) {
+
+			heading_test_limit = _nav_heading_innov_test_lim; // more restrictive test limit
+		}
+
+		const float heading_innov_spike_lim = 2.0f * heading_test_limit;
+
+		float heading_innov = 0.f;
+		_ekf.getHeadingInnov(heading_innov);
+
+		const float heading_innov_lpf = _filter_heading_innov.update(heading_innov, alpha, heading_innov_spike_lim);
+
+		_has_heading_failed = fabsf(heading_innov_lpf) > heading_test_limit || fabsf(heading_innov) > heading_innov_spike_lim;
+
+		_has_horiz_vel_failed = false;
+
+		if (_ekf.control_status_flags().gps || _ekf.control_status_flags().ev_vel) {
+			const Vector3f vel_innov{_ekf.getVelocityInnovations()};
+
+			Vector2f vel_ne_innov_lpf{
+				_filter_vel_n_innov.update(vel_innov(0), alpha, _vel_innov_spike_lim),
+				_filter_vel_e_innov.update(vel_innov(1), alpha, _vel_innov_spike_lim)
+			};
+
+			if (vel_ne_innov_lpf.norm_squared() > sq(_vel_innov_test_lim)
+			    || Vector2f(vel_innov).norm_squared() > sq(_vel_innov_spike_lim)) {
+
+				_has_horiz_vel_failed = true;
+			}
+
+			float vel_d_innov_lpf = _filter_vel_d_innov.update(vel_innov(2), alpha, _vel_innov_spike_lim);
+
+			_has_vert_vel_failed = fabsf(vel_d_innov_lpf) > _vel_innov_test_lim || fabsf(vel_innov(2)) > _vel_innov_spike_lim;
+		}
+
+		if (_ekf.control_status_flags().opt_flow) {
+			float flow_innov[2];
+			_ekf.getFlowInnov(flow_innov);
+
+			Vector2f flow_innov_lpf{
+				_filter_flow_x_innov.update(flow_innov[0], alpha, _flow_innov_spike_lim),
+				_filter_flow_y_innov.update(flow_innov[1], alpha, _flow_innov_spike_lim)
+			};
+
+			if (flow_innov_lpf.norm_squared() > sq(_flow_innov_test_lim)
+			    || Vector2f(flow_innov).norm_squared() > sq(_flow_innov_spike_lim)) {
+				_has_horiz_vel_failed = true;
+			}
+		}
+
+
+		const float hgt_innov = fmaxf(fabsf(innov.gps_vpos), fmaxf(fabs(innov.ev_vpos),
+					      fabs(innov.rng_vpos))); // only temporary solution
+		const float hgt_innov_lpf = _filter_hgt_innov.update(hgt_innov, alpha, _hgt_innov_spike_lim);
+
+		// return fabsf(innov_lpf) > test_limit || fabsf(innov) > spike_limit;
+		_has_height_failed = fabsf(hgt_innov_lpf) > _hgt_innov_test_lim || fabsf(hgt_innov) > _hgt_innov_spike_lim;
+
+	} else if (_ekf.control_status_flags().in_air != _ekf.control_status_prev_flags().in_air) {
+		// reset preflight checks if transitioning back to landed
+		_filter_vel_n_innov.reset();
+		_filter_vel_e_innov.reset();
+		_filter_vel_d_innov.reset();
+		_filter_hgt_innov.reset();
+		_filter_heading_innov.reset();
+		_filter_flow_x_innov.reset();
+		_filter_flow_y_innov.reset();
+	}
+}
+
 void EKF2::UpdateAccelCalibration(const hrt_abstime &timestamp)
 {
 	if (_param_ekf2_aid_mask.get() & MASK_INHIBIT_ACC_BIAS) {
@@ -1818,7 +1885,7 @@ void EKF2::UpdateAccelCalibration(const hrt_abstime &timestamp)
 	// the EKF is operating in the correct mode and there are no filter faults
 	if ((_ekf.fault_status().value == 0)
 	    && !_ekf.accel_bias_inhibited()
-	    && !_preflt_checker.hasHorizFailed() && !_preflt_checker.hasVertFailed()
+	    && !_has_heading_failed && !_has_horiz_vel_failed && !_has_vert_vel_failed || !_has_height_failed
 	    && (_ekf.control_status_flags().baro_hgt || _ekf.control_status_flags().rng_hgt
 		|| _ekf.control_status_flags().gps_hgt || _ekf.control_status_flags().ev_hgt)
 	    && !_ekf.warning_event_flags().height_sensor_timeout && !_ekf.warning_event_flags().invalid_accel_bias_cov_reset

@@ -42,9 +42,9 @@
 #define EKF2_HPP
 
 #include "EKF/ekf.h"
-#include "Utility/PreFlightChecker.hpp"
 
 #include "EKF2Selector.hpp"
+#include "InnovationLpf.hpp"
 
 #include <float.h>
 
@@ -163,10 +163,11 @@ private:
 	void UpdateMagSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateRangeSample(ekf2_timestamps_s &ekf2_timestamps);
 
+	void UpdatePreflightChecks();
+
 	void UpdateAccelCalibration(const hrt_abstime &timestamp);
 	void UpdateGyroCalibration(const hrt_abstime &timestamp);
 	void UpdateMagCalibration(const hrt_abstime &timestamp);
-
 
 	/*
 	 * Calculate filtered WGS84 height from estimated AMSL height
@@ -302,12 +303,42 @@ private:
 	uORB::PublicationMulti<vehicle_odometry_s>           _odometry_pub;
 	uORB::PublicationMulti<wind_s>              _wind_pub;
 
-
-	PreFlightChecker _preflt_checker;
-
 	Ekf _ekf;
 
 	parameters *_params;	///< pointer to ekf parameter struct (located in _ekf class instance)
+
+	// Low-pass filters for innovation pre-flight checks
+	InnovationLpf _filter_vel_n_innov;	///< Preflight low pass filter N axis velocity innovations (m/sec)
+	InnovationLpf _filter_vel_e_innov;	///< Preflight low pass filter E axis velocity innovations (m/sec)
+	InnovationLpf _filter_vel_d_innov;	///< Preflight low pass filter D axis velocity innovations (m/sec)
+	InnovationLpf _filter_hgt_innov;	///< Preflight low pass filter height innovation (m)
+	InnovationLpf _filter_heading_innov;	///< Preflight low pass filter heading innovation magntitude (rad)
+	InnovationLpf _filter_flow_x_innov;	///< Preflight low pass filter optical flow innovation (rad)
+	InnovationLpf _filter_flow_y_innov;	///< Preflight low pass filter optical flow innovation (rad)
+
+	bool _has_heading_failed{};
+	bool _has_horiz_vel_failed{};
+	bool _has_vert_vel_failed{};
+	bool _has_height_failed{};
+
+	// Preflight low pass filter time constant inverse (1/sec)
+	static constexpr float _innov_lpf_tau_inv = 0.2f;
+	// Maximum permissible velocity innovation to pass pre-flight checks (m/sec)
+	static constexpr float _vel_innov_test_lim = 0.5f;
+	// Maximum permissible height innovation to pass pre-flight checks (m)
+	static constexpr float _hgt_innov_test_lim = 1.5f;
+	// Maximum permissible yaw innovation to pass pre-flight checks when aiding inertial nav using NE frame observations (rad)
+	static constexpr float _nav_heading_innov_test_lim = 0.25f;
+	// Maximum permissible yaw innovation to pass pre-flight checks when not aiding inertial nav using NE frame observations (rad)
+	static constexpr float _heading_innov_test_lim = 0.52f;
+	// Maximum permissible flow innovation to pass pre-flight checks
+	static constexpr float _flow_innov_test_lim = 0.25f;
+	// Preflight velocity innovation spike limit (m/sec)
+	static constexpr float _vel_innov_spike_lim = 2.0f * _vel_innov_test_lim;
+	// Preflight position innovation spike limit (m)
+	static constexpr float _hgt_innov_spike_lim = 2.0f * _hgt_innov_test_lim;
+	// Preflight flow innovation spike limit (rad)
+	static constexpr float _flow_innov_spike_lim = 2.0f * _flow_innov_test_lim;
 
 	DEFINE_PARAMETERS(
 		(ParamExtInt<px4::params::EKF2_PREDICT_US>) _param_ekf2_predict_us,

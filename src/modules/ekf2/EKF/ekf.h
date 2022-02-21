@@ -70,6 +70,8 @@ public:
 	// should be called every time new data is pushed into the filter
 	bool update();
 
+	Vector3f getVelocityInnovations() const;
+
 	void getGpsVelPosInnov(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getGpsVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getGpsVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const;
@@ -78,21 +80,21 @@ public:
 	void getEvVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getEvVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const;
 
-	void getBaroHgtInnov(float &baro_hgt_innov) const { baro_hgt_innov = _baro_hgt_innov; }
-	void getBaroHgtInnovVar(float &baro_hgt_innov_var) const { baro_hgt_innov_var = _baro_hgt_innov_var; }
-	void getBaroHgtInnovRatio(float &baro_hgt_innov_ratio) const { baro_hgt_innov_ratio = _baro_hgt_test_ratio; }
+	float getBaroHgtInnov() const { return _baro_hgt_innov; }
+	float getBaroHgtInnovVar() const { return _baro_hgt_innov_var; }
+	float getBaroHgtInnovRatio() const { return _baro_hgt_test_ratio; }
 
-	void getRngHgtInnov(float &rng_hgt_innov) const { rng_hgt_innov = _rng_hgt_innov; }
-	void getRngHgtInnovVar(float &rng_hgt_innov_var) const { rng_hgt_innov_var = _rng_hgt_innov_var; }
-	void getRngHgtInnovRatio(float &rng_hgt_innov_ratio) const { rng_hgt_innov_ratio = _rng_hgt_test_ratio; }
+	float getRngHgtInnov() const { return _rng_hgt_innov; }
+	float getRngHgtInnovVar() const { return _rng_hgt_innov_var; }
+	float getRngHgtInnovRatio() const { return _rng_hgt_test_ratio; }
 
-	void getAuxVelInnov(float aux_vel_innov[2]) const;
-	void getAuxVelInnovVar(float aux_vel_innov[2]) const;
-	void getAuxVelInnovRatio(float &aux_vel_innov_ratio) const { aux_vel_innov_ratio = _aux_vel_test_ratio(0); }
+	Vector3f getAuxVelInnov() const { return _aux_vel_innov; }
+	Vector3f getAuxVelInnovVar() const { return _aux_vel_innov_var; }
+	float getAuxVelInnovRatio() const { return _aux_vel_test_ratio(0); }
 
-	void getFlowInnov(float flow_innov[2]) const { _flow_innov.copyTo(flow_innov); }
-	void getFlowInnovVar(float flow_innov_var[2]) const { _flow_innov_var.copyTo(flow_innov_var); }
-	void getFlowInnovRatio(float &flow_innov_ratio) const { flow_innov_ratio = _optflow_test_ratio; }
+	Vector2f getFlowInnov() const { return _flow_innov; }
+	Vector2f getFlowInnovVar() const { return _flow_innov_var; }
+	float getFlowInnovRatio() const { return _optflow_test_ratio; }
 
 	const Vector2f &getFlowVelBody() const { return _flow_vel_body; }
 	const Vector2f &getFlowVelNE() const { return _flow_vel_ne; }
@@ -100,29 +102,30 @@ public:
 	const Vector2f &getFlowUncompensated() const { return _flow_sample_delayed.flow_xy_rad; }
 	const Vector3f &getFlowGyro() const { return _flow_sample_delayed.gyro_xyz; }
 
-	void getHeadingInnov(float &heading_innov) const { heading_innov = _heading_innov; }
-	void getHeadingInnovVar(float &heading_innov_var) const { heading_innov_var = _heading_innov_var; }
+	float getHeadingInnov() const { return _heading_innov; }
+	float getHeadingInnovVar() const { return _heading_innov_var; }
 
-	void getHeadingInnovRatio(float &heading_innov_ratio) const { heading_innov_ratio = _yaw_test_ratio; }
-	void getMagInnov(float mag_innov[3]) const { _mag_innov.copyTo(mag_innov); }
-	void getMagInnovVar(float mag_innov_var[3]) const { _mag_innov_var.copyTo(mag_innov_var); }
-	void getMagInnovRatio(float &mag_innov_ratio) const { mag_innov_ratio = _mag_test_ratio.max(); }
+	float getHeadingInnovRatio() const { return _yaw_test_ratio; }
 
-	void getDragInnov(float drag_innov[2]) const { _drag_innov.copyTo(drag_innov); }
-	void getDragInnovVar(float drag_innov_var[2]) const { _drag_innov_var.copyTo(drag_innov_var); }
-	void getDragInnovRatio(float drag_innov_ratio[2]) const { _drag_test_ratio.copyTo(drag_innov_ratio); }
+	Vector3f getMagInnov() const { return _mag_innov; }
+	Vector3f getMagInnovVar() const { return _mag_innov_var; }
+	float getMagInnovRatio() const { return _mag_test_ratio.max(); }
 
-	void getAirspeedInnov(float &airspeed_innov) const { airspeed_innov = _airspeed_innov; }
-	void getAirspeedInnovVar(float &airspeed_innov_var) const { airspeed_innov_var = _airspeed_innov_var; }
-	void getAirspeedInnovRatio(float &airspeed_innov_ratio) const { airspeed_innov_ratio = _tas_test_ratio; }
+	Vector2f getDragInnov() const { return _drag_innov; }
+	Vector2f getDragInnovVar() const { return _drag_innov_var; }
+	Vector2f getDragInnovRatio() const { return _drag_test_ratio; }
 
-	void getBetaInnov(float &beta_innov) const { beta_innov = _beta_innov; }
-	void getBetaInnovVar(float &beta_innov_var) const { beta_innov_var = _beta_innov_var; }
-	void getBetaInnovRatio(float &beta_innov_ratio) const { beta_innov_ratio = _beta_test_ratio; }
+	float getAirspeedInnov() const { return _airspeed_innov; }
+	float getAirspeedInnovVar() const { return _airspeed_innov_var; }
+	float getAirspeedInnovRatio() const { return _tas_test_ratio; }
 
-	void getHaglInnov(float &hagl_innov) const { hagl_innov = _hagl_innov; }
-	void getHaglInnovVar(float &hagl_innov_var) const { hagl_innov_var = _hagl_innov_var; }
-	void getHaglInnovRatio(float &hagl_innov_ratio) const { hagl_innov_ratio = _hagl_test_ratio; }
+	float getBetaInnov() const { return _beta_innov; }
+	float getBetaInnovVar() const { return _beta_innov_var; }
+	float getBetaInnovRatio() const { return _beta_test_ratio; }
+
+	float getHaglInnov() const { return _hagl_innov; }
+	float getHaglInnovVar() const { return _hagl_innov_var; }
+	float getHaglInnovRatio() const { return _hagl_test_ratio; }
 
 	// get the state vector at the delayed time horizon
 	matrix::Vector<float, 24> getStateAtFusionHorizonAsVector() const;

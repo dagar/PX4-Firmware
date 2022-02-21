@@ -626,11 +626,31 @@ Vector3f Ekf::calcEarthRateNED(float lat_rad) const
 			-CONSTANTS_EARTH_SPIN_RATE * sinf(lat_rad));
 }
 
+Vector3f Ekf::getVelocityInnovations() const
+{
+	Vector3f innov{};
+
+	if (_control_status.flags.gps) {
+		innov(0) = fmaxf(innov(0), fabsf(_gps_vel_innov(0)));
+		innov(1) = fmaxf(innov(1), fabsf(_gps_vel_innov(1)));
+		innov(2) = fmaxf(innov(2), fabsf(_gps_vel_innov(2)));
+	}
+
+	if (_control_status.flags.ev_vel) {
+		innov(0) = fmaxf(innov(0), fabsf(_ev_vel_innov(0)));
+		innov(1) = fmaxf(innov(1), fabsf(_ev_vel_innov(1)));
+		innov(2) = fmaxf(innov(2), fabsf(_ev_vel_innov(2)));
+	}
+
+	return innov;
+}
+
 void Ekf::getGpsVelPosInnov(float hvel[2], float &vvel, float hpos[2],  float &vpos) const
 {
 	hvel[0] = _gps_vel_innov(0);
 	hvel[1] = _gps_vel_innov(1);
 	vvel    = _gps_vel_innov(2);
+
 	hpos[0] = _gps_pos_innov(0);
 	hpos[1] = _gps_pos_innov(1);
 	vpos    = _gps_pos_innov(2);
@@ -641,6 +661,7 @@ void Ekf::getGpsVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float 
 	hvel[0] = _gps_vel_innov_var(0);
 	hvel[1] = _gps_vel_innov_var(1);
 	vvel    = _gps_vel_innov_var(2);
+
 	hpos[0] = _gps_pos_innov_var(0);
 	hpos[1] = _gps_pos_innov_var(1);
 	vpos    = _gps_pos_innov_var(2);
@@ -659,6 +680,7 @@ void Ekf::getEvVelPosInnov(float hvel[2], float &vvel, float hpos[2], float &vpo
 	hvel[0] = _ev_vel_innov(0);
 	hvel[1] = _ev_vel_innov(1);
 	vvel    = _ev_vel_innov(2);
+
 	hpos[0] = _ev_pos_innov(0);
 	hpos[1] = _ev_pos_innov(1);
 	vpos    = _ev_pos_innov(2);
@@ -669,6 +691,7 @@ void Ekf::getEvVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &
 	hvel[0] = _ev_vel_innov_var(0);
 	hvel[1] = _ev_vel_innov_var(1);
 	vvel    = _ev_vel_innov_var(2);
+
 	hpos[0] = _ev_pos_innov_var(0);
 	hpos[1] = _ev_pos_innov_var(1);
 	vpos    = _ev_pos_innov_var(2);
@@ -680,18 +703,6 @@ void Ekf::getEvVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vp
 	vvel = _ev_vel_test_ratio(1);
 	hpos = _ev_pos_test_ratio(0);
 	vpos = _ev_pos_test_ratio(1);
-}
-
-void Ekf::getAuxVelInnov(float aux_vel_innov[2]) const
-{
-	aux_vel_innov[0] = _aux_vel_innov(0);
-	aux_vel_innov[1] = _aux_vel_innov(1);
-}
-
-void Ekf::getAuxVelInnovVar(float aux_vel_innov_var[2]) const
-{
-	aux_vel_innov_var[0] = _aux_vel_innov_var(0);
-	aux_vel_innov_var[1] = _aux_vel_innov_var(1);
 }
 
 // get the state vector at the delayed time horizon

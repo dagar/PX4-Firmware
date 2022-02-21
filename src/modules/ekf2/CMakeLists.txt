@@ -31,8 +31,6 @@
 #
 #############################################################################
 
-add_subdirectory(Utility)
-
 px4_add_module(
 	MODULE modules__ekf2
 	MAIN ekf2
@@ -79,7 +77,6 @@ px4_add_module(
 		geo
 		hysteresis
 		perf
-		EKF2Utility
 		px4_work_queue
 		world_magnetic_model
 	UNITY_BUILD
