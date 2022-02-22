@@ -631,27 +631,18 @@ private:
 	bool fuseVelPosHeight(const float innov, const float innov_var, const int obs_index);
 
 	void resetVelocity();
-
-	void resetVelocityToGps();
-
-	void resetHorizontalVelocityToOpticalFlow();
-
-	void resetVelocityToVision();
-
-	void resetHorizontalVelocityToZero();
-
 	void resetVelocityTo(const Vector3f &vel);
-
 	void resetHorizontalVelocityTo(const Vector2f &new_horz_vel);
-
 	void resetVerticalVelocityTo(float new_vert_vel);
 
+	void resetVelocityToGps();
+	void resetHorizontalVelocityToOpticalFlow();
+	void resetVelocityToVision();
+	void resetHorizontalVelocityToZero();
+
 	void resetHorizontalPosition();
-
 	void resetHorizontalPositionToGps();
-
 	void resetHorizontalPositionToVision();
-
 	void resetHorizontalPositionTo(const Vector2f &new_horz_pos);
 
 	void resetVerticalPositionTo(float new_vert_pos);

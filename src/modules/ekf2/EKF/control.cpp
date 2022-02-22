@@ -289,7 +289,7 @@ void Ekf::controlExternalVisionFusion()
 						resetVelocity();
 					}
 
-					resetHorizontalPosition();
+					resetHorizontalPositionToVision();
 				}
 			}
 
@@ -460,7 +460,7 @@ void Ekf::controlOpticalFlowFusion()
 				const bool flow_aid_only = !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow);
 
 				if (flow_aid_only) {
-					resetVelocity();
+					resetHorizontalVelocityToOpticalFlow();
 					resetHorizontalPosition();
 				}
 			}
@@ -483,7 +483,7 @@ void Ekf::controlOpticalFlowFusion()
 			if (isTimedOut(_time_last_of_fuse, _params.reset_timeout_max)
 			    && !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow)) {
 
-				resetVelocity();
+				resetHorizontalVelocityToOpticalFlow();
 				resetHorizontalPosition();
 			}
 		}
@@ -1075,9 +1075,5 @@ void Ekf::processVelPosResetRequest()
 		resetVelocity();
 		resetHorizontalPosition();
 		_velpos_reset_request = false;
-
-		// Reset the timeout counters
-		_time_last_hor_pos_fuse = _time_last_imu;
-		_time_last_hor_vel_fuse = _time_last_imu;
 	}
 }

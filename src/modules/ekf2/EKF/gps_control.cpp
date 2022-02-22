@@ -208,8 +208,6 @@ void Ekf::processYawEstimatorResetRequest()
 	    && isTimedOut(_ekfgsf_yaw_reset_time, 5000000)) {
 		if (resetYawToEKFGSF()) {
 			_ekfgsf_yaw_reset_time = _time_last_imu;
-			_time_last_hor_pos_fuse = _time_last_imu;
-			_time_last_hor_vel_fuse = _time_last_imu;
 
 			_do_ekfgsf_yaw_reset = false;
 			_velpos_reset_request = false; // included in yaw reset

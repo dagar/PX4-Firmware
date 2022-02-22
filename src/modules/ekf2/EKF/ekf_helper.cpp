@@ -136,6 +136,9 @@ void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
 
 	_state_reset_status.velNE_change = delta_horz_vel;
 	_state_reset_status.velNE_counter++;
+
+	// Reset the timout timer
+	_time_last_hor_vel_fuse = _time_last_imu;
 }
 
 void Ekf::resetVerticalVelocityTo(float new_vert_vel)
@@ -153,6 +156,9 @@ void Ekf::resetVerticalVelocityTo(float new_vert_vel)
 
 	_state_reset_status.velD_change = delta_vert_vel;
 	_state_reset_status.velD_counter++;
+
+	// Reset the timout timer
+	_time_last_ver_vel_fuse = _time_last_imu;
 }
 
 void Ekf::resetHorizontalPosition()
@@ -227,6 +233,9 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
 
 	_state_reset_status.posNE_change = delta_horz_pos;
 	_state_reset_status.posNE_counter++;
+
+	// Reset the timout timer
+	_time_last_hor_pos_fuse = _time_last_imu;
 }
 
 void Ekf::resetVerticalPositionTo(const float new_vert_pos)
@@ -1723,8 +1732,10 @@ bool Ekf::resetYawToEKFGSF()
 	resetQuatStateYaw(_yawEstimator.getYaw(), _yawEstimator.getYawVar(), true);
 
 	// reset velocity and position states to GPS - if yaw is fixed then the filter should start to operate correctly
-	resetVelocity();
-	resetHorizontalPosition();
+	if (_control_status.flags.gps) {
+		resetVelocityToGps();
+		resetHorizontalPositionToGps();
+	}
 
 	// record a magnetic field alignment event to prevent possibility of the EKF trying to reset the yaw to the mag later in flight
 	_flt_mag_align_start_time = _imu_sample_delayed.time_us;
