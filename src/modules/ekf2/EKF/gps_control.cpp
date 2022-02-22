@@ -101,12 +101,6 @@ void Ekf::controlGpsFusion()
 					stopGpsFusion();
 					_warning_events.flags.gps_quality_poor = true;
 					ECL_WARN("GPS quality poor - stopping use");
-
-					// TODO: move this to EV control logic
-					// Reset position state to external vision if we are going to use absolute values
-					if (_control_status.flags.ev_pos && !(_params.fusion_mode & MASK_ROTATE_EV)) {
-						resetHorizontalPosition();
-					}
 				}
 
 			} else { // mandatory conditions are not passing
@@ -125,7 +119,6 @@ void Ekf::controlGpsFusion()
 
 					// Stop the vision for yaw fusion and do not allow it to start again
 					stopEvYawFusion();
-					_inhibit_ev_yaw_use = true;
 
 				} else {
 					startGpsFusion();
@@ -138,7 +131,19 @@ void Ekf::controlGpsFusion()
 		}
 
 		processYawEstimatorResetRequest();
-		processVelPosResetRequest();
+
+		if (_velpos_reset_request) {
+			if (_control_status.flags.gps) {
+				resetVelocityToGps();
+				resetHorizontalPositionToGps();
+
+				_velpos_reset_request = false;
+
+				// Reset the timeout counters
+				_time_last_hor_pos_fuse = _time_last_imu;
+				_time_last_hor_vel_fuse = _time_last_imu;
+			}
+		}
 
 	} else if (_control_status.flags.gps && (_imu_sample_delayed.time_us - _gps_sample_delayed.time_us > (uint64_t)10e6)) {
 		stopGpsFusion();

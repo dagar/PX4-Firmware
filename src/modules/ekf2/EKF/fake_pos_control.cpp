@@ -80,7 +80,6 @@ void Ekf::startFakePosFusion()
 {
 	if (!_using_synthetic_position) {
 		_using_synthetic_position = true;
-		_fuse_hpos_as_odom = false; // TODO: needed?
 		resetFakePosFusion();
 	}
 }

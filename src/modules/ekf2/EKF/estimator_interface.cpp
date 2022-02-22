@@ -52,7 +52,7 @@ EstimatorInterface::~EstimatorInterface()
 	delete _range_buffer;
 	delete _airspeed_buffer;
 	delete _flow_buffer;
-	delete _ext_vision_buffer;
+	delete _external_vision[0].buffer;
 	delete _drag_buffer;
 	delete _auxvel_buffer;
 }
@@ -316,34 +316,28 @@ void EstimatorInterface::setOpticalFlowData(const flowSample &flow)
 }
 
 // set attitude and position data derived from an external vision system
-void EstimatorInterface::setExtVisionData(const extVisionSample &evdata)
+void EstimatorInterface::setExtVisionData(const extVisionSample &evdata, int index)
 {
 	if (!_initialised) {
 		return;
 	}
 
 	// Allocate the required buffer size if not previously done
-	if (_ext_vision_buffer == nullptr) {
-		_ext_vision_buffer = new RingBuffer<extVisionSample>(_obs_buffer_length);
+	if (_external_vision[0].buffer == nullptr) {
+		_external_vision[0].buffer = new RingBuffer<extVisionSample>(_obs_buffer_length);
 
-		if (_ext_vision_buffer == nullptr || !_ext_vision_buffer->valid()) {
-			delete _ext_vision_buffer;
-			_ext_vision_buffer = nullptr;
+		if (_external_vision[0].buffer == nullptr || !_external_vision[0].buffer->valid()) {
+			delete _external_vision[0].buffer;
+			_external_vision[0].buffer = nullptr;
 			printBufferAllocationFailed("vision");
 			return;
 		}
 	}
 
 	// limit data rate to prevent data being lost
-	if ((evdata.time_us - _time_last_ext_vision) > _min_obs_interval_us) {
-		_time_last_ext_vision = evdata.time_us;
+	if ((evdata.time_us - _external_vision[0].time_last_measurement) > _min_obs_interval_us) {
 
-		extVisionSample ev_sample_new = evdata;
-		// calculate the system time-stamp for the mid point of the integration period
-		ev_sample_new.time_us -= static_cast<uint64_t>(_params.ev_delay_ms * 1000);
-		ev_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
-
-		_ext_vision_buffer->push(ev_sample_new);
+		_external_vision[0].setData(evdata, _dt_ekf_avg);
 	}
 }
 
@@ -568,9 +562,9 @@ void EstimatorInterface::print_status()
 		printf("flow buffer: %d/%d (%d Bytes)\n", _flow_buffer->entries(), _flow_buffer->get_length(), _flow_buffer->get_total_size());
 	}
 
-	if (_ext_vision_buffer) {
-		printf("vision buffer: %d/%d (%d Bytes)\n", _ext_vision_buffer->entries(), _ext_vision_buffer->get_length(), _ext_vision_buffer->get_total_size());
-	}
+	// if (_ext_vision_buffer) {
+	// 	printf("vision buffer: %d/%d (%d Bytes)\n", _ext_vision_buffer->entries(), _ext_vision_buffer->get_length(), _ext_vision_buffer->get_total_size());
+	// }
 
 	if (_drag_buffer) {
 		printf("drag buffer: %d/%d (%d Bytes)\n", _drag_buffer->entries(), _drag_buffer->get_length(), _drag_buffer->get_total_size());

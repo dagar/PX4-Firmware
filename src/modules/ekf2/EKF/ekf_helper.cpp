@@ -207,17 +207,18 @@ void Ekf::resetHorizontalPositionToVision()
 {
 	_information_events.flags.reset_pos_to_vision = true;
 	ECL_INFO("reset position to ev position");
-	Vector3f _ev_pos = _ev_sample_delayed.pos;
+	Vector3f ev_pos = _external_vision[0].sample_delayed.pos;
 
 	if (_params.fusion_mode & MASK_ROTATE_EV) {
-		_ev_pos = _R_ev_to_ekf * _ev_sample_delayed.pos;
+		ev_pos = _external_vision[0].R_ev_to_ekf * _external_vision[0].sample_delayed.pos;
 	}
 
-	resetHorizontalPositionTo(Vector2f(_ev_pos));
-	P.uncorrelateCovarianceSetVariance<2>(7, _ev_sample_delayed.posVar.slice<2, 1>(0, 0));
+	resetHorizontalPositionTo(Vector2f(ev_pos));
+	P.uncorrelateCovarianceSetVariance<2>(7, _external_vision[0].sample_delayed.posVar.slice<2, 1>(0, 0));
 
+	// TODO:
 	// let the next odometry update know that the previous value of states cannot be used to calculate the change in position
-	_hpos_prev_available = false;
+	//_hpos_prev_available = false;
 }
 
 void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
@@ -310,10 +311,12 @@ void Ekf::resetHeightToRng()
 void Ekf::resetHeightToEv()
 {
 	const float z_pos_before_reset = _state.pos(2);
-	resetVerticalPositionTo(_ev_sample_delayed.pos(2));
+
+	const auto& ev_sample_delayed = _external_vision[0].sample_delayed;
+	resetVerticalPositionTo(ev_sample_delayed.pos(2));
 
 	// the state variance is the same as the observation
-	P.uncorrelateCovarianceSetVariance<1>(9, fmaxf(_ev_sample_delayed.posVar(2), sq(0.01f)));
+	P.uncorrelateCovarianceSetVariance<1>(9, fmaxf(ev_sample_delayed.posVar(2), sq(0.01f)));
 
 	// adjust the baro offset
 	_baro_hgt_offset += _state.pos(2) - z_pos_before_reset;
@@ -527,11 +530,11 @@ bool Ekf::resetMagHeading(bool increase_yaw_var, bool update_buffer)
 
 bool Ekf::resetYawToEv()
 {
-	const float yaw_new = getEulerYaw(_ev_sample_delayed.quat);
-	const float yaw_new_variance = fmaxf(_ev_sample_delayed.angVar, sq(1.0e-2f));
+	const float yaw_new = getEulerYaw(_external_vision[0].sample_delayed.quat);
+	const float yaw_new_variance = fmaxf(_external_vision[0].sample_delayed.angVar, sq(1.0e-2f));
 
 	resetQuatStateYaw(yaw_new, yaw_new_variance, true);
-	_R_ev_to_ekf.setIdentity();
+	_external_vision[0].R_ev_to_ekf.setIdentity();
 
 	return true;
 }
@@ -643,30 +646,33 @@ void Ekf::getGpsVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &v
 
 void Ekf::getEvVelPosInnov(float hvel[2], float &vvel, float hpos[2], float &vpos) const
 {
-	hvel[0] = _ev_vel_innov(0);
-	hvel[1] = _ev_vel_innov(1);
-	vvel    = _ev_vel_innov(2);
-	hpos[0] = _ev_pos_innov(0);
-	hpos[1] = _ev_pos_innov(1);
-	vpos    = _ev_pos_innov(2);
+	hvel[0] = _external_vision[0].status_ev_vel.innov[0];
+	hvel[1] = _external_vision[0].status_ev_vel.innov[1];
+	vvel    = _external_vision[0].status_ev_vel.innov[2];
+
+	hpos[0] = _external_vision[0].status_ev_pos.innov[0];
+	hpos[1] = _external_vision[0].status_ev_pos.innov[1];
+	vpos    = _external_vision[0].status_ev_pos.innov[2];
 }
 
 void Ekf::getEvVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const
 {
-	hvel[0] = _ev_vel_innov_var(0);
-	hvel[1] = _ev_vel_innov_var(1);
-	vvel    = _ev_vel_innov_var(2);
-	hpos[0] = _ev_pos_innov_var(0);
-	hpos[1] = _ev_pos_innov_var(1);
-	vpos    = _ev_pos_innov_var(2);
+	hvel[0] = _external_vision[0].status_ev_vel.innov_var[0];
+	hvel[1] = _external_vision[0].status_ev_vel.innov_var[1];
+	vvel    = _external_vision[0].status_ev_vel.innov_var[2];
+
+	hpos[0] = _external_vision[0].status_ev_pos.innov_var[0];
+	hpos[1] = _external_vision[0].status_ev_pos.innov_var[1];
+	vpos    = _external_vision[0].status_ev_pos.innov_var[2];
 }
 
 void Ekf::getEvVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const
 {
-	hvel = _ev_vel_test_ratio(0);
-	vvel = _ev_vel_test_ratio(1);
-	hpos = _ev_pos_test_ratio(0);
-	vpos = _ev_pos_test_ratio(1);
+	hvel = fmaxf(_external_vision[0].status_ev_vel.test_ratio[0], _external_vision[0].status_ev_vel.test_ratio[1]);
+	vvel = _external_vision[0].status_ev_vel.test_ratio[2];
+
+	hpos = fmaxf(_external_vision[0].status_ev_pos.test_ratio[0], _external_vision[0].status_ev_pos.test_ratio[1]);
+	vpos = _external_vision[0].status_ev_pos.test_ratio[2];
 }
 
 void Ekf::getAuxVelInnov(float aux_vel_innov[2]) const
@@ -754,7 +760,8 @@ void Ekf::get_ekf_gpos_accuracy(float *ekf_eph, float *ekf_epv) const
 		}
 
 		if (_control_status.flags.ev_pos) {
-			hpos_err = math::max(hpos_err, sqrtf(sq(_ev_pos_innov(0)) + sq(_ev_pos_innov(1))));
+			auto &ev = _external_vision[0];
+			hpos_err = math::max(hpos_err, sqrtf(sq(ev.status_ev_pos.innov[0]) + sq(ev.status_ev_pos.innov[1])));
 		}
 	}
 
@@ -799,11 +806,13 @@ void Ekf::get_ekf_vel_accuracy(float *ekf_evh, float *ekf_evv) const
 			vel_err_conservative = math::max(vel_err_conservative, sqrtf(sq(_gps_pos_innov(0)) + sq(_gps_pos_innov(1))));
 
 		} else if (_control_status.flags.ev_pos) {
-			vel_err_conservative = math::max(vel_err_conservative, sqrtf(sq(_ev_pos_innov(0)) + sq(_ev_pos_innov(1))));
+			Vector3f innov{_external_vision[0].status_ev_pos.innov};
+			vel_err_conservative = math::max(vel_err_conservative, sqrtf(sq(innov(0)) + sq(innov(1))));
 		}
 
 		if (_control_status.flags.ev_vel) {
-			vel_err_conservative = math::max(vel_err_conservative, sqrtf(sq(_ev_vel_innov(0)) + sq(_ev_vel_innov(1))));
+			Vector3f innov{_external_vision[0].status_ev_vel.innov};
+			vel_err_conservative = math::max(vel_err_conservative, sqrtf(sq(innov(0)) + sq(innov(1))));
 		}
 
 		hvel_err = math::max(hvel_err, vel_err_conservative);
@@ -912,7 +921,7 @@ void Ekf::resetMagBias()
 // Innovation Test Ratios - these are the ratio of the innovation to the acceptance threshold.
 // A value > 1 indicates that the sensor measurement has exceeded the maximum acceptable level and has been rejected by the EKF
 // Where a measurement type is a vector quantity, eg magnetometer, GPS position, etc, the maximum value is returned.
-void Ekf::get_innovation_test_status(uint16_t &status, float &mag, float &vel, float &pos, float &hgt, float &tas,
+void Ekf::get_innovation_test_status(uint32_t &status, float &mag, float &vel, float &pos, float &hgt, float &tas,
 				     float &hagl, float &beta) const
 {
 	// return the integer bitmask containing the consistency check pass/fail status
@@ -934,12 +943,12 @@ void Ekf::get_innovation_test_status(uint16_t &status, float &mag, float &vel, f
 	}
 
 	if (_control_status.flags.ev_vel) {
-		float ev_vel = sqrtf(math::max(_ev_vel_test_ratio(0), _ev_vel_test_ratio(1)));
+		float ev_vel = sqrtf(math::max(_external_vision[0].status_ev_vel.test_ratio[0], _external_vision[0].status_ev_vel.test_ratio[1]));
 		vel = math::max(vel, ev_vel, FLT_MIN);
 	}
 
 	if (_control_status.flags.ev_pos) {
-		float ev_pos = sqrtf(_ev_pos_test_ratio(0));
+		float ev_pos = sqrtf(math::max(_external_vision[0].status_ev_pos.test_ratio[0], _external_vision[0].status_ev_pos.test_ratio[1]));
 		pos = math::max(pos, ev_pos, FLT_MIN);
 	}
 
@@ -959,7 +968,7 @@ void Ekf::get_innovation_test_status(uint16_t &status, float &mag, float &vel, f
 		hgt = math::max(sqrtf(_rng_hgt_test_ratio), FLT_MIN);
 
 	} else if (_control_status.flags.ev_hgt) {
-		hgt = math::max(sqrtf(_ev_pos_test_ratio(1)), FLT_MIN);
+		hgt = math::max(sqrtf(_external_vision[0].status_ev_pos.test_ratio[2]), FLT_MIN);
 
 	} else {
 		hgt = NAN;
@@ -1025,6 +1034,7 @@ void Ekf::update_deadreckoning_status()
 				      || isRecent(_time_last_hor_vel_fuse, _params.no_aid_timeout_max));
 
 	const bool optFlowAiding = _control_status.flags.opt_flow && isRecent(_time_last_of_fuse, _params.no_aid_timeout_max);
+
 	const bool airDataAiding = _control_status.flags.wind &&
 				   isRecent(_time_last_arsp_fuse, _params.no_aid_timeout_max) &&
 				   isRecent(_time_last_beta_fuse, _params.no_aid_timeout_max);
@@ -1235,6 +1245,7 @@ void Ekf::stopMag3DFusion()
 	if (_control_status.flags.mag_3D) {
 		saveMagCovData();
 		_control_status.flags.mag_3D = false;
+		_control_status.flags.mag_dec = false;
 	}
 }
 
@@ -1245,8 +1256,10 @@ void Ekf::stopMagHdgFusion()
 
 void Ekf::startMagHdgFusion()
 {
-	stopMag3DFusion();
-	_control_status.flags.mag_hdg = true;
+	if (!_control_status.flags.mag_hdg) {
+		stopMag3DFusion();
+		_control_status.flags.mag_hdg = true;
+	}
 }
 
 void Ekf::startMag3DFusion()
@@ -1542,9 +1555,8 @@ void Ekf::startGpsFusion()
 {
 	resetHorizontalPositionToGps();
 
-	// when using optical flow,
-	// velocity reset is not necessary
-	if (!_control_status.flags.opt_flow) {
+	// when using optical flow of vision velocity velocity reset is not necessary
+	if (!_control_status.flags.opt_flow && !_control_status.flags.ev_vel) {
 		resetVelocityToGps();
 	}
 
@@ -1563,10 +1575,6 @@ void Ekf::stopGpsFusion()
 	if (_control_status.flags.gps_yaw) {
 		stopGpsYawFusion();
 	}
-
-	// We do not need to know the true North anymore
-	// EV yaw can start again
-	_inhibit_ev_yaw_use = false;
 }
 
 void Ekf::stopGpsPosFusion()
@@ -1605,63 +1613,6 @@ void Ekf::startGpsYawFusion()
 void Ekf::stopGpsYawFusion()
 {
 	_control_status.flags.gps_yaw = false;
-}
-
-void Ekf::startEvPosFusion()
-{
-	_control_status.flags.ev_pos = true;
-	resetHorizontalPosition();
-	_information_events.flags.starting_vision_pos_fusion = true;
-	ECL_INFO("starting vision pos fusion");
-}
-
-void Ekf::startEvVelFusion()
-{
-	_control_status.flags.ev_vel = true;
-	resetVelocity();
-	_information_events.flags.starting_vision_vel_fusion = true;
-	ECL_INFO("starting vision vel fusion");
-}
-
-void Ekf::startEvYawFusion()
-{
-	// turn on fusion of external vision yaw measurements and disable all magnetometer fusion
-	_control_status.flags.ev_yaw = true;
-	_control_status.flags.mag_dec = false;
-
-	stopMagHdgFusion();
-	stopMag3DFusion();
-
-	_information_events.flags.starting_vision_yaw_fusion = true;
-	ECL_INFO("starting vision yaw fusion");
-}
-
-void Ekf::stopEvFusion()
-{
-	stopEvPosFusion();
-	stopEvVelFusion();
-	stopEvYawFusion();
-}
-
-void Ekf::stopEvPosFusion()
-{
-	_control_status.flags.ev_pos = false;
-	_ev_pos_innov.setZero();
-	_ev_pos_innov_var.setZero();
-	_ev_pos_test_ratio.setZero();
-}
-
-void Ekf::stopEvVelFusion()
-{
-	_control_status.flags.ev_vel = false;
-	_ev_vel_innov.setZero();
-	_ev_vel_innov_var.setZero();
-	_ev_vel_test_ratio.setZero();
-}
-
-void Ekf::stopEvYawFusion()
-{
-	_control_status.flags.ev_yaw = false;
 }
 
 void Ekf::stopAuxVelFusion()
@@ -1763,7 +1714,7 @@ bool Ekf::resetYawToEKFGSF()
 			_warning_events.flags.emergency_yaw_reset_gps_yaw_stopped = true;
 
 		} else if (_control_status.flags.ev_yaw) {
-			_inhibit_ev_yaw_use = true;
+			stopEvYawFusion();
 		}
 
 		ECL_WARN("Emergency yaw reset");

@@ -102,19 +102,3 @@ void Ekf::fuseRngHgt()
 	fuseVerticalPosition(_rng_hgt_innov, innov_gate, obs_var,
 			     _rng_hgt_innov_var, _rng_hgt_test_ratio);
 }
-
-void Ekf::fuseEvHgt()
-{
-	// calculate the innovation assuming the external vision observation is in local NED frame
-	_ev_pos_innov(2) = _state.pos(2) - _ev_sample_delayed.pos(2);
-
-	// innovation gate size
-	float innov_gate = fmaxf(_params.ev_pos_innov_gate, 1.f);
-
-	// observation variance - defined externally
-	float obs_var = fmaxf(_ev_sample_delayed.posVar(2), sq(0.01f));
-
-	// _ev_pos_test_ratio(1) is the vertical test ratio
-	fuseVerticalPosition(_ev_pos_innov(2), innov_gate, obs_var,
-			     _ev_pos_innov_var(2), _ev_pos_test_ratio(1));
-}

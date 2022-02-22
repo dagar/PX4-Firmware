@@ -137,10 +137,6 @@ void Ekf::controlFusionModes()
 		}
 	}
 
-	if (_ext_vision_buffer) {
-		_ev_data_ready = _ext_vision_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_ev_sample_delayed);
-	}
-
 	if (_airspeed_buffer) {
 		_tas_data_ready = _airspeed_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_airspeed_sample_delayed);
 	}
@@ -168,190 +164,6 @@ void Ekf::controlFusionModes()
 
 	// check if we are no longer fusing measurements that directly constrain velocity drift
 	update_deadreckoning_status();
-}
-
-void Ekf::controlExternalVisionFusion()
-{
-	// Check for new external vision data
-	if (_ev_data_ready) {
-
-		bool reset = false;
-
-		if (_ev_sample_delayed.reset_counter != _ev_sample_delayed_prev.reset_counter) {
-			reset = true;
-		}
-
-		if (_inhibit_ev_yaw_use) {
-			stopEvYawFusion();
-		}
-
-		// if the ev data is not in a NED reference frame, then the transformation between EV and EKF navigation frames
-		// needs to be calculated and the observations rotated into the EKF frame of reference
-		if ((_params.fusion_mode & MASK_ROTATE_EV) && ((_params.fusion_mode & MASK_USE_EVPOS)
-				|| (_params.fusion_mode & MASK_USE_EVVEL)) && !_control_status.flags.ev_yaw) {
-
-			// rotate EV measurements into the EKF Navigation frame
-			calcExtVisRotMat();
-		}
-
-		// external vision aiding selection logic
-		if (_control_status.flags.tilt_align && _control_status.flags.yaw_align) {
-
-			// check for a external vision measurement that has fallen behind the fusion time horizon
-			if (isRecent(_time_last_ext_vision, 2 * EV_MAX_INTERVAL)) {
-				// turn on use of external vision measurements for position
-				if (_params.fusion_mode & MASK_USE_EVPOS && !_control_status.flags.ev_pos) {
-					startEvPosFusion();
-				}
-
-				// turn on use of external vision measurements for velocity
-				if (_params.fusion_mode & MASK_USE_EVVEL && !_control_status.flags.ev_vel) {
-					startEvVelFusion();
-				}
-			}
-		}
-
-		// external vision yaw aiding selection logic
-		if (!_inhibit_ev_yaw_use && (_params.fusion_mode & MASK_USE_EVYAW) && !_control_status.flags.ev_yaw
-		    && _control_status.flags.tilt_align) {
-
-			// don't start using EV data unless data is arriving frequently
-			if (isRecent(_time_last_ext_vision, 2 * EV_MAX_INTERVAL)) {
-				if (resetYawToEv()) {
-					_control_status.flags.yaw_align = true;
-					startEvYawFusion();
-				}
-			}
-		}
-
-		// determine if we should use the horizontal position observations
-		if (_control_status.flags.ev_pos) {
-			if (reset && _control_status_prev.flags.ev_pos) {
-				resetHorizontalPosition();
-			}
-
-			Vector3f ev_pos_obs_var;
-
-			// correct position and height for offset relative to IMU
-			const Vector3f pos_offset_body = _params.ev_pos_body - _params.imu_pos_body;
-			const Vector3f pos_offset_earth = _R_to_earth * pos_offset_body;
-			_ev_sample_delayed.pos -= pos_offset_earth;
-
-			// Use an incremental position fusion method for EV position data if GPS is also used
-			if (_params.fusion_mode & MASK_USE_GPS) {
-				_fuse_hpos_as_odom = true;
-
-			} else {
-				_fuse_hpos_as_odom = false;
-			}
-
-			if (_fuse_hpos_as_odom) {
-				if (!_hpos_prev_available) {
-					// no previous observation available to calculate position change
-					_hpos_prev_available = true;
-
-				} else {
-					// calculate the change in position since the last measurement
-					// rotate measurement into body frame is required when fusing with GPS
-					Vector3f ev_delta_pos = _R_ev_to_ekf * Vector3f(_ev_sample_delayed.pos - _ev_sample_delayed_prev.pos);
-
-					// use the change in position since the last measurement
-					_ev_pos_innov(0) = _state.pos(0) - _hpos_pred_prev(0) - ev_delta_pos(0);
-					_ev_pos_innov(1) = _state.pos(1) - _hpos_pred_prev(1) - ev_delta_pos(1);
-
-					// observation 1-STD error, incremental pos observation is expected to have more uncertainty
-					Matrix3f ev_pos_var = matrix::diag(_ev_sample_delayed.posVar);
-					ev_pos_var = _R_ev_to_ekf * ev_pos_var * _R_ev_to_ekf.transpose();
-					ev_pos_obs_var(0) = fmaxf(ev_pos_var(0, 0), sq(0.5f));
-					ev_pos_obs_var(1) = fmaxf(ev_pos_var(1, 1), sq(0.5f));
-				}
-			} else {
-				// use the absolute position
-				Vector3f ev_pos_meas = _ev_sample_delayed.pos;
-				Matrix3f ev_pos_var = matrix::diag(_ev_sample_delayed.posVar);
-
-				if (_params.fusion_mode & MASK_ROTATE_EV) {
-					ev_pos_meas = _R_ev_to_ekf * ev_pos_meas;
-					ev_pos_var = _R_ev_to_ekf * ev_pos_var * _R_ev_to_ekf.transpose();
-				}
-
-				_ev_pos_innov(0) = _state.pos(0) - ev_pos_meas(0);
-				_ev_pos_innov(1) = _state.pos(1) - ev_pos_meas(1);
-
-				ev_pos_obs_var(0) = fmaxf(ev_pos_var(0, 0), sq(0.01f));
-				ev_pos_obs_var(1) = fmaxf(ev_pos_var(1, 1), sq(0.01f));
-
-				// check if we have been deadreckoning too long
-				if (isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)) {
-					// only reset velocity if we have no another source of aiding constraining it
-					if (isTimedOut(_time_last_of_fuse, (uint64_t)1E6) &&
-					    isTimedOut(_time_last_hor_vel_fuse, (uint64_t)1E6)) {
-						resetVelocity();
-					}
-
-					resetHorizontalPositionToVision();
-				}
-			}
-
-			// innovation gate size
-			const float ev_pos_innov_gate = fmaxf(_params.ev_pos_innov_gate, 1.0f);
-
-			fuseHorizontalPosition(_ev_pos_innov, ev_pos_innov_gate, ev_pos_obs_var, _ev_pos_innov_var, _ev_pos_test_ratio);
-		}
-
-		// determine if we should use the velocity observations
-		if (_control_status.flags.ev_vel) {
-			if (reset && _control_status_prev.flags.ev_vel) {
-				resetVelocity();
-			}
-
-			_ev_vel_innov = _state.vel - getVisionVelocityInEkfFrame();
-
-			// check if we have been deadreckoning too long
-			if (isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)) {
-				// only reset velocity if we have no another source of aiding constraining it
-				if (isTimedOut(_time_last_of_fuse, (uint64_t)1E6) &&
-				    isTimedOut(_time_last_hor_pos_fuse, (uint64_t)1E6)) {
-					resetVelocity();
-				}
-			}
-
-			const Vector3f obs_var = matrix::max(getVisionVelocityVarianceInEkfFrame(), sq(0.05f));
-
-			const float innov_gate = fmaxf(_params.ev_vel_innov_gate, 1.f);
-
-			fuseHorizontalVelocity(_ev_vel_innov, innov_gate, obs_var, _ev_vel_innov_var, _ev_vel_test_ratio);
-			fuseVerticalVelocity(_ev_vel_innov, innov_gate, obs_var, _ev_vel_innov_var, _ev_vel_test_ratio);
-		}
-
-		// determine if we should use the yaw observation
-		if (_control_status.flags.ev_yaw) {
-			if (reset && _control_status_prev.flags.ev_yaw) {
-				resetYawToEv();
-			}
-
-			if (shouldUse321RotationSequence(_R_to_earth)) {
-				float measured_hdg = getEuler321Yaw(_ev_sample_delayed.quat);
-				fuseYaw321(measured_hdg, _ev_sample_delayed.angVar);
-
-			} else {
-				float measured_hdg = getEuler312Yaw(_ev_sample_delayed.quat);
-				fuseYaw312(measured_hdg, _ev_sample_delayed.angVar);
-			}
-		}
-
-		// record observation and estimate for use next time
-		_ev_sample_delayed_prev = _ev_sample_delayed;
-		_hpos_pred_prev = _state.pos.xy();
-
-	} else if ((_control_status.flags.ev_pos || _control_status.flags.ev_vel ||  _control_status.flags.ev_yaw)
-		   && isTimedOut(_time_last_ext_vision, (uint64_t)_params.reset_timeout_max)) {
-
-		// Turn off EV fusion mode if no data has been received
-		stopEvFusion();
-		_warning_events.flags.vision_data_stopped = true;
-		ECL_WARN("vision data stopped");
-	}
 }
 
 void Ekf::controlOpticalFlowFusion()
@@ -693,8 +505,8 @@ void Ekf::controlHeightSensorTimeouts()
 			// check if vision data is available
 			bool ev_data_available = false;
 
-			if (_ext_vision_buffer) {
-				const extVisionSample &ev_init = _ext_vision_buffer->get_newest();
+			if (_external_vision[0].buffer) {
+				const extVisionSample &ev_init = _external_vision[0].buffer->get_newest();
 				ev_data_available = isRecent(ev_init.time_us, 2 * EV_MAX_INTERVAL);
 			}
 
@@ -876,11 +688,11 @@ void Ekf::controlHeightFusion()
 		break;
 
 	case VDIST_SENSOR_EV:
-
+		// TODO:
 		// don't start using EV data unless data is arriving frequently
-		if (!_control_status.flags.ev_hgt && isRecent(_time_last_ext_vision, 2 * EV_MAX_INTERVAL)) {
-			startEvHgtFusion();
-		}
+		// if (!_control_status.flags.ev_hgt && isRecent(_time_last_ext_vision, 2 * EV_MAX_INTERVAL)) {
+		// 	startEvHgtFusion();
+		// }
 
 		break;
 	}
@@ -908,10 +720,7 @@ void Ekf::controlHeightFusion()
 		}
 
 	} else if (_control_status.flags.ev_hgt) {
-
-		if (_control_status.flags.ev_hgt && _ev_data_ready) {
-			fuseEvHgt();
-		}
+		// handled by external vision
 	}
 }
 

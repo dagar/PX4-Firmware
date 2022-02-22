@@ -76,6 +76,8 @@ set(msg_files
 	estimator_states.msg
 	estimator_status.msg
 	estimator_status_flags.msg
+	estimator_aid_source_status_1d.msg
+	estimator_aid_source_status_3d.msg
 	event.msg
 	follow_target.msg
 	failure_detector_status.msg

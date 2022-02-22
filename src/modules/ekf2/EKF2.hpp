@@ -145,7 +145,6 @@ private:
 	void PublishInnovationVariances(const hrt_abstime &timestamp);
 	void PublishLocalPosition(const hrt_abstime &timestamp);
 	void PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu);
-	void PublishOdometryAligned(const hrt_abstime &timestamp, const vehicle_odometry_s &ev_odom);
 	void PublishOpticalFlowVel(const hrt_abstime &timestamp);
 	void PublishSensorBias(const hrt_abstime &timestamp);
 	void PublishStates(const hrt_abstime &timestamp);
@@ -157,7 +156,7 @@ private:
 	void UpdateAirspeedSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateAuxVelSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateBaroSample(ekf2_timestamps_s &ekf2_timestamps);
-	bool UpdateExtVisionSample(ekf2_timestamps_s &ekf2_timestamps, vehicle_odometry_s &ev_odom);
+	bool UpdateExtVisionSample(ekf2_timestamps_s &ekf2_timestamps);
 	bool UpdateFlowSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateGpsSample(ekf2_timestamps_s &ekf2_timestamps);
 	void UpdateMagSample(ekf2_timestamps_s &ekf2_timestamps);
@@ -295,6 +294,10 @@ private:
 	uORB::PublicationMulti<vehicle_odometry_s>           _estimator_visual_odometry_aligned_pub{ORB_ID(estimator_visual_odometry_aligned)};
 	uORB::PublicationMulti<yaw_estimator_status_s>       _yaw_est_pub{ORB_ID(yaw_estimator_status)};
 
+	uORB::PublicationMulti<estimator_aid_source_status_3d_s> _estimator_status_ev_pos_pub{ORB_ID(estimator_status_ev_pos)};
+	uORB::PublicationMulti<estimator_aid_source_status_3d_s> _estimator_status_ev_vel_pub{ORB_ID(estimator_status_ev_vel)};
+	uORB::PublicationMulti<estimator_aid_source_status_1d_s> _estimator_status_ev_yaw_pub{ORB_ID(estimator_status_ev_yaw)};
+
 	// publications with topic dependent on multi-mode
 	uORB::PublicationMulti<vehicle_attitude_s>           _attitude_pub;
 	uORB::PublicationMulti<vehicle_local_position_s>     _local_position_pub;
@@ -323,8 +326,9 @@ private:
 		_param_ekf2_rng_delay,	///< range finder measurement delay relative to the IMU (mSec)
 		(ParamExtFloat<px4::params::EKF2_ASP_DELAY>)
 		_param_ekf2_asp_delay,	///< airspeed measurement delay relative to the IMU (mSec)
-		(ParamExtFloat<px4::params::EKF2_EV_DELAY>)
-		_param_ekf2_ev_delay,	///< off-board vision measurement delay relative to the IMU (mSec)
+
+		(ParamFloat<px4::params::EKF2_EV_DELAY>) _param_ekf2_ev_delay,
+
 		(ParamExtFloat<px4::params::EKF2_AVEL_DELAY>)
 		_param_ekf2_avel_delay,	///< auxillary velocity measurement delay relative to the IMU (mSec)
 
@@ -434,18 +438,12 @@ private:
 		_param_ekf2_rng_qlty_t, ///< Minimum duration during which the reported range finder signal quality needs to be non-zero in order to be declared valid (s)
 
 		// vision estimate fusion
-		(ParamInt<px4::params::EKF2_EV_NOISE_MD>)
-		_param_ekf2_ev_noise_md,	///< determine source of vision observation noise
-		(ParamFloat<px4::params::EKF2_EVP_NOISE>)
-		_param_ekf2_evp_noise,	///< default position observation noise for exernal vision measurements (m)
-		(ParamFloat<px4::params::EKF2_EVV_NOISE>)
-		_param_ekf2_evv_noise,	///< default velocity observation noise for exernal vision measurements (m/s)
-		(ParamFloat<px4::params::EKF2_EVA_NOISE>)
-		_param_ekf2_eva_noise,	///< default angular observation noise for exernal vision measurements (rad)
-		(ParamExtFloat<px4::params::EKF2_EVV_GATE>)
-		_param_ekf2_evv_gate,	///< external vision velocity innovation consistency gate size (STD)
-		(ParamExtFloat<px4::params::EKF2_EVP_GATE>)
-		_param_ekf2_evp_gate,	///< external vision position innovation consistency gate size (STD)
+		(ParamInt<px4::params::EKF2_EV_NOISE_MD>) _param_ekf2_ev_noise_md,
+		(ParamFloat<px4::params::EKF2_EVP_NOISE>) _param_ekf2_evp_noise,
+		(ParamFloat<px4::params::EKF2_EVV_NOISE>) _param_ekf2_evv_noise,
+		(ParamFloat<px4::params::EKF2_EVA_NOISE>) _param_ekf2_eva_noise,
+		(ParamFloat<px4::params::EKF2_EVV_GATE>) _param_ekf2_evv_gate,
+		(ParamFloat<px4::params::EKF2_EVP_GATE>) _param_ekf2_evp_gate,
 
 		// optical flow fusion
 		(ParamExtFloat<px4::params::EKF2_OF_N_MIN>)
@@ -473,12 +471,10 @@ private:
 		_param_ekf2_of_pos_y,	///< Y position of optical flow sensor focal point in body frame (m)
 		(ParamExtFloat<px4::params::EKF2_OF_POS_Z>)
 		_param_ekf2_of_pos_z,	///< Z position of optical flow sensor focal point in body frame (m)
-		(ParamExtFloat<px4::params::EKF2_EV_POS_X>)
-		_param_ekf2_ev_pos_x,		///< X position of VI sensor focal point in body frame (m)
-		(ParamExtFloat<px4::params::EKF2_EV_POS_Y>)
-		_param_ekf2_ev_pos_y,		///< Y position of VI sensor focal point in body frame (m)
-		(ParamExtFloat<px4::params::EKF2_EV_POS_Z>)
-		_param_ekf2_ev_pos_z,		///< Z position of VI sensor focal point in body frame (m)
+
+		(ParamFloat<px4::params::EKF2_EV_POS_X>) _param_ekf2_ev_pos_x,
+		(ParamFloat<px4::params::EKF2_EV_POS_Y>) _param_ekf2_ev_pos_y,
+		(ParamFloat<px4::params::EKF2_EV_POS_Z>) _param_ekf2_ev_pos_z,
 
 		// control of airspeed and sideslip fusion
 		(ParamExtFloat<px4::params::EKF2_ARSP_THR>)

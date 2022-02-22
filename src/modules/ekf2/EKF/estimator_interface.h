@@ -71,6 +71,9 @@
 #include <mathlib/mathlib.h>
 #include <mathlib/math/filter/AlphaFilter.hpp>
 
+#include <uORB/topics/estimator_aid_source_status_1d.h>
+#include <uORB/topics/estimator_aid_source_status_3d.h>
+
 using namespace estimator;
 
 class EstimatorInterface
@@ -95,7 +98,7 @@ public:
 	void setOpticalFlowData(const flowSample &flow);
 
 	// set external vision position and attitude data
-	void setExtVisionData(const extVisionSample &evdata);
+	void setExtVisionData(const extVisionSample &evdata, int index = 0);
 
 	void setAuxVelData(const auxVelSample &auxvel_sample);
 
@@ -298,8 +301,6 @@ protected:
 	sensor::SensorRangeFinder _range_sensor{};
 	airspeedSample _airspeed_sample_delayed{};
 	flowSample _flow_sample_delayed{};
-	extVisionSample _ev_sample_delayed{};
-	extVisionSample _ev_sample_delayed_prev{};
 	dragSample _drag_down_sampled{};	// down sampled drag specific force data (filter prediction rate -> observation rate)
 
 	float _air_density{CONSTANTS_AIR_DENSITY_SEA_LEVEL_15C};		// air density (kg/m**3)
@@ -335,8 +336,6 @@ protected:
 	Vector3f _mag_test_ratio{};		// magnetometer XYZ innovation consistency check ratios
 	Vector2f _gps_vel_test_ratio{};		// GPS velocity innovation consistency check ratios
 	Vector2f _gps_pos_test_ratio{};		// GPS position innovation consistency check ratios
-	Vector2f _ev_vel_test_ratio{};		// EV velocity innovation consistency check ratios
-	Vector2f _ev_pos_test_ratio{};		// EV position innovation consistency check ratios
 	Vector2f _aux_vel_test_ratio{};		// Auxiliary horizontal velocity innovation consistency check ratio
 	float _baro_hgt_test_ratio{};	// baro height innovation consistency check ratios
 	float _rng_hgt_test_ratio{};		// range finder height innovation consistency check ratios
@@ -367,7 +366,6 @@ protected:
 	RingBuffer<rangeSample> *_range_buffer{nullptr};
 	RingBuffer<airspeedSample> *_airspeed_buffer{nullptr};
 	RingBuffer<flowSample> 	*_flow_buffer{nullptr};
-	RingBuffer<extVisionSample> *_ext_vision_buffer{nullptr};
 	RingBuffer<dragSample> *_drag_buffer{nullptr};
 	RingBuffer<auxVelSample> *_auxvel_buffer{nullptr};
 
@@ -378,7 +376,6 @@ protected:
 	uint64_t _time_last_baro{0};
 	uint64_t _time_last_range{0};
 	uint64_t _time_last_airspeed{0};
-	uint64_t _time_last_ext_vision{0};
 	uint64_t _time_last_optflow{0};
 	uint64_t _time_last_auxvel{0};
 	//last time the baro ground effect compensation was turned on externally (uSec)
@@ -405,6 +402,104 @@ protected:
 	// state logic becasue they will be cleared externally after being read.
 	warning_event_status_u _warning_events{};
 	information_event_status_u _information_events{};
+
+struct AidSourceVision
+	{
+	public:
+		bool setData(const extVisionSample &sample, float dt_ekf_avg)
+		{
+			// // Allocate the required buffer size if not previously done
+			// if (_buffer == nullptr) {
+			// 	_buffer = new RingBuffer<extVisionSample>(_obs_buffer_length);
+
+			// 	if (_buffer == nullptr || !_buffer->valid()) {
+			// 		delete _buffer;
+			// 		_buffer = nullptr;
+			// 		//printBufferAllocationFailed("airspeed");
+			// 		return false;
+			// 	}
+			// }
+
+			// limit data rate to prevent data being lost
+			time_last_measurement = sample.time_us;
+
+			extVisionSample sample_new{sample};
+			sample_new.time_us -= delay_us - static_cast<uint64_t>(dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
+			buffer->push(sample_new);
+
+			return true;
+		}
+
+
+		estimator_aid_source_status_3d_s status_ev_pos{};
+		estimator_aid_source_status_3d_s status_ev_vel{};
+		estimator_aid_source_status_1d_s status_ev_yaw{};
+
+		RingBuffer<extVisionSample> *buffer{nullptr};
+		extVisionSample sample_delayed{};
+		extVisionSample sample_delayed_prev{};
+
+		Dcmf R_ev_to_ekf;///< transformation matrix that rotates observations from the EV to the EKF navigation frame, initialized with Identity
+
+		uint64_t time_last_measurement{0};
+		uint64_t time_last_fuse{0};
+
+		bool data_ready{false};
+
+		Vector3f pos_body{0, 0, 0}; ///< xyz position of sensor focal point in body frame (m)
+
+		int32_t delay_us{0};   // measurement delay relative to the IMU (microseconds)
+
+		float noise{1.f};      // measurement noise standard deviation used for fusion
+		float innov_gate{5.f}; // innovation consistency gate size (STD)
+
+		float pitch{0.0f}; ///< Pitch offset of the sensor (rad). Sensor points out along Z axis when offset is zero. Positive rotation is RH about Y axis.
+
+		// vision position fusion
+		float vel_innov_gate{3.0f}; ///< vision velocity fusion innovation consistency gate size (STD)
+		float pos_innov_gate{5.0f}; ///< vision position fusion innovation consistency gate size (STD)
+
+
+		// variables used when position data is being fused using a relative position odometry model
+		Vector3f pos_pred_prev{};		///< previous value of NE position state used by odometry fusion (m)
+		bool hpos_prev_available{false};	///< true when previous values of the estimate and measurement are available for use
+
+		// set flag if data being lost?
+		// if ((airspeed_sample.time_us - _time_last_airspeed) > _min_obs_interval_us) {
+
+		// compensated data?
+		//   EV aligned to body
+		//   OF compensated
+
+		// #define GPS_MAX_INTERVAL  (uint64_t)5e5	///< Maximum allowable time interval between GPS measurements (uSec)
+		// #define BARO_MAX_INTERVAL (uint64_t)2e5	///< Maximum allowable time interval between pressure altitude measurements (uSec)
+
+		// _gps_hgt_intermittent = !isRecent(gps_init.time_us, 2 * GPS_MAX_INTERVAL);
+		// is_gps_yaw_data_intermittent = !isRecent(_time_last_gps_yaw_data, 2 * GPS_MAX_INTERVAL);
+		// _baro_hgt_faulty = !isRecent(baro_init.time_us, 2 * BARO_MAX_INTERVAL);
+
+		// bool isDataContinuous() const { return _dt_data_lpf < 2e6f; }
+
+		// isSampleOutOfDate(uint64_t current_time_us) const { return (current_time_us - _sample.time_us) > 2 * RNG_MAX_INTERVAL };
+
+		// stuck check?
+
+		// updateSensorToEarthRotation
+
+		// count enable, disable
+		// count numerical faults
+		// count innovations rejected?
+
+		// _delta_time_baro_us = _baro_sample_delayed.time_us - baro_time_prev;
+
+		// if quality available, require valid time
+		//  _time_bad_quality_us = current_time_us;
+
+		// uint64_t _time_last_valid_us{};	///< time the last range finder measurement was ready (uSec)
+
+	};
+
+	AidSourceVision _external_vision[1]{};
 
 private:
 
