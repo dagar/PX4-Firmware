@@ -104,8 +104,8 @@ void Ekf::resetVelocityToVision()
 {
 	_information_events.flags.reset_vel_to_vision = true;
 	ECL_INFO("reset to vision velocity");
-	resetVelocityTo(getVisionVelocityInEkfFrame());
-	P.uncorrelateCovarianceSetVariance<3>(4, getVisionVelocityVarianceInEkfFrame());
+	//resetVelocityTo(getVisionVelocityInEkfFrame());
+	//P.uncorrelateCovarianceSetVariance<3>(4, getVisionVelocityVarianceInEkfFrame());
 }
 
 void Ekf::resetHorizontalVelocityToZero()

@@ -9,18 +9,21 @@ uint64 time_last_measurement
 
 uint64[3] time_last_fuse
 
-float32[3] innov
-float32[3] innov_var
+float32[3] observation
+float32[3] observation_variance
+
+float32[3] innovation
+float32[3] innovation_var
 float32[3] test_ratio
 
-bool[3] filter_control_status_fuse       # true when measurements are being fused
-bool[3] fault_status_numerical_error     # true if fusion has encountered a numerical error
-bool[3] innovation_fault_status_rejected # true if the observation has been rejected
+bool[3] fusion_enabled         # true when measurements are being fused
+bool[3] innovation_rejected    # true if the observation has been rejected
+bool[3] fusion_numerical_error # true if fusion has encountered a numerical error
 
 uint8 num_resets_available
 
-# measurement?
-float32[3] measurement_adjusted
-float32[3] measurement_variance
-
-# TOPICS estimator_aid_source_status_3d estimator_status_ev_pos estimator_status_ev_vel
+# TOPICS estimator_aid_source_status_3d
+# TOPICS estimator_status_gnss_pos estimator_status_gnss_vel
+# TOPICS estimator_status_ev_pos estimator_status_ev_vel
+# TOPICS estimator_status_aux_vel
+# TOPICS estimator_status_mag
