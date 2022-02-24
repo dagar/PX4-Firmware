@@ -35,20 +35,7 @@
 
 #include "board_dma_map.h"
 
-/************************************************************************************
- * Included Files
- ************************************************************************************/
-
 #include <nuttx/config.h>
-#ifndef __ASSEMBLY__
-# include <stdint.h>
-#endif
-
-#include <stm32.h>
-
-/************************************************************************************
- * Definitions
- ************************************************************************************/
 
 /* HSI - 16 MHz RC factory-trimmed
  * LSI - 32 KHz RC
@@ -63,66 +50,115 @@
 #define STM32_HSI_FREQUENCY     16000000ul
 #define STM32_LSI_FREQUENCY     32000
 
-/* Main PLL Configuration */
-#define STM32_PLLCFG_PLLM       RCC_PLLCFG_PLLM(16)
-#define STM32_PLLCFG_PLLN       RCC_PLLCFG_PLLN(384)
-#define STM32_PLLCFG_PLLP       RCC_PLLCFG_PLLP_4
-#define STM32_PLLCFG_PLLQ       RCC_PLLCFG_PLLQ(8)
-#define STM32_PLLCFG_PLLR       RCC_PLLCFG_PLLR(2)
+/* Main PLL Configuration.
+ *
+ * PLL source is HSI = 16MHz
+ * PLLN = 85, PLLM = 4, PLLP = 10, PLLQ = 2, PLLR = 2
+ *
+ * f(VCO Clock) = f(PLL Clock Input) x (PLLN / PLLM)
+ * f(PLL_P) = f(VCO Clock) / PLLP
+ * f(PLL_Q) = f(VCO Clock) / PLLQ
+ * f(PLL_R) = f(VCO Clock) / PLLR
+ *
+ * Where:
+ * 8 <= PLLN <= 127
+ * 1 <= PLLM <= 16
+ * PLLP = 2 through 31
+ * PLLQ = 2, 4, 6, or 8
+ * PLLR = 2, 4, 6, or 8
+ *
+ * Do not exceed 170MHz on f(PLL_P), f(PLL_Q), or f(PLL_R).
+ * 64MHz <= f(VCO Clock) <= 344MHz.
+ *
+ * Given the above:
+ *
+ * f(VCO Clock) = HSI   x PLLN / PLLM
+ *              = 16MHz x 85   / 4
+ *              = 340MHz
+ *
+ * PLLPCLK      = f(VCO Clock) / PLLP
+ *              = 340MHz       / 10
+ *              = 34MHz
+ *                (May be used for ADC)
+ *
+ * PLLQCLK      = f(VCO Clock) / PLLQ
+ *              = 340MHz       / 2
+ *              = 170MHz
+ *                (May be used for QUADSPI, FDCAN, SAI1, I2S3. If set to
+ *                48MHz, may be used for USB, RNG.)
+ *
+ * PLLRCLK      = f(VCO Clock) / PLLR
+ *              = 340MHz       / 2
+ *              = 170MHz
+ *                (May be used for SYSCLK and most peripherals.)
+ */
 
-#define STM32_RCC_PLLI2SCFGR_PLLI2SM RCC_PLLI2SCFGR_PLLI2SM(16)
-#define STM32_RCC_PLLI2SCFGR_PLLI2SN RCC_PLLI2SCFGR_PLLI2SN(192)
-#define STM32_RCC_PLLI2SCFGR_PLLI2SQ RCC_PLLI2SCFGR_PLLI2SQ(2)
-#define STM32_RCC_PLLI2SCFGR_PLLI2SR RCC_PLLI2SCFGR_PLLI2SR(2)
-#define STM32_RCC_PLLI2SCFGR_PLLI2SSRC RCC_PLLI2SCFGR_PLLI2SSRC(0) /* HSE or HSI depending on PLLSRC of PLLCFGR*/
+#define STM32_PLLCFGR_PLLSRC     RCC_PLLCFGR_PLLSRC_HSI
+#define STM32_PLLCFGR_PLLCFG       (RCC_PLLCFGR_PLLPEN|RCC_PLLCFGR_PLLQEN|RCC_PLLCFGR_PLLREN)
 
-#define STM32_RCC_DCKCFGR2_CK48MSEL RCC_DCKCFGR2_CK48MSEL_PLL
-#define STM32_RCC_DCKCFGR2_FMPI2C1SEL RCC_DCKCFGR2_FMPI2C1SEL_APB
-#define STM32_RCC_DCKCFGR2_SDIOSEL RCC_DCKCFGR2_SDIOSEL_48MHZ
+#define STM32_PLLCFGR_PLLN             RCC_PLLCFGR_PLLN(85)
+#define STM32_PLLCFGR_PLLM             RCC_PLLCFGR_PLLM(4)
+#define STM32_PLLCFGR_PLLP             RCC_PLLCFGR_PLLPDIV(10)
+#define STM32_PLLCFGR_PLLQ             RCC_PLLCFGR_PLLQ_2
+#define STM32_PLLCFGR_PLLR             RCC_PLLCFGR_PLLR_2
 
-#define STM32_SYSCLK_FREQUENCY  96000000ul
+#define STM32_VCO_FREQUENCY            ((STM32_HSI_FREQUENCY / 4) * 85)
+#define STM32_PLLP_FREQUENCY           (STM32_VCO_FREQUENCY / 10)
+#define STM32_PLLQ_FREQUENCY           (STM32_VCO_FREQUENCY / 2)
+#define STM32_PLLR_FREQUENCY           (STM32_VCO_FREQUENCY / 2)
 
-/* AHB clock (HCLK) is SYSCLK (96MHz) */
-#define STM32_RCC_CFGR_HPRE     RCC_CFGR_HPRE_SYSCLK      /* HCLK  = SYSCLK / 1 */
-#define STM32_HCLK_FREQUENCY    STM32_SYSCLK_FREQUENCY
-#define STM32_BOARD_HCLK        STM32_HCLK_FREQUENCY      /* Same as above, to satisfy compiler */
+/* Use the PLL and set the SYSCLK source to be PLLR (170MHz) */
+#define STM32_SYSCLK_SW                RCC_CFGR_SW_PLL
+#define STM32_SYSCLK_SWS               RCC_CFGR_SWS_PLL
+#define STM32_SYSCLK_FREQUENCY         STM32_PLLR_FREQUENCY
 
-/* APB1 clock (PCLK1) is HCLK/2 (48MHz) */
-#define STM32_RCC_CFGR_PPRE1    RCC_CFGR_PPRE1_HCLKd2     /* PCLK1 = HCLK / 2 */
-#define STM32_PCLK1_FREQUENCY   (STM32_HCLK_FREQUENCY/2)
+/* AHB clock (HCLK) is SYSCLK (170MHz) */
+#define STM32_RCC_CFGR_HPRE            RCC_CFGR_HPRE_SYSCLK
+#define STM32_HCLK_FREQUENCY           STM32_SYSCLK_FREQUENCY
 
-/* Timers driven from APB1 will be twice PCLK1 (see page 112 of reference manual) */
-#define STM32_APB1_TIM2_CLKIN   (2*STM32_PCLK1_FREQUENCY)
-#define STM32_APB1_TIM3_CLKIN   (2*STM32_PCLK1_FREQUENCY)
-#define STM32_APB1_TIM4_CLKIN   (2*STM32_PCLK1_FREQUENCY)
-#define STM32_APB1_TIM5_CLKIN   (2*STM32_PCLK1_FREQUENCY)
-#define STM32_APB1_TIM12_CLKIN  (2*STM32_PCLK1_FREQUENCY)
-#define STM32_APB1_TIM13_CLKIN  (2*STM32_PCLK1_FREQUENCY)
-#define STM32_APB1_TIM14_CLKIN  (2*STM32_PCLK1_FREQUENCY)
+/* APB1 clock (PCLK1) is HCLK (170MHz) */
+#define STM32_RCC_CFGR_PPRE1           RCC_CFGR_PPRE1_HCLK
+#define STM32_PCLK1_FREQUENCY          STM32_HCLK_FREQUENCY
 
-/* APB2 clock (PCLK2) is HCLK (96MHz) */
-#define STM32_RCC_CFGR_PPRE2    RCC_CFGR_PPRE2_HCLK       /* PCLK2 = HCLK */
-#define STM32_PCLK2_FREQUENCY   (STM32_HCLK_FREQUENCY)
+/* APB2 clock (PCLK2) is HCLK (170MHz) */
+#define STM32_RCC_CFGR_PPRE2           RCC_CFGR_PPRE2_HCLK
+#define STM32_PCLK2_FREQUENCY          STM32_HCLK_FREQUENCY
 
-/* Timers driven from APB2 will be PCLK2 since no prescale division */
+/* APB2 timers 1, 8, 20 and 15-17 will receive PCLK2. */
+/* Timers driven from APB2 will be PCLK2 */
 #define STM32_APB2_TIM1_CLKIN   (STM32_PCLK2_FREQUENCY)
 #define STM32_APB2_TIM8_CLKIN   (STM32_PCLK2_FREQUENCY)
-#define STM32_APB2_TIM9_CLKIN   (STM32_PCLK2_FREQUENCY)
-#define STM32_APB2_TIM10_CLKIN  (STM32_PCLK2_FREQUENCY)
-#define STM32_APB2_TIM11_CLKIN  (STM32_PCLK2_FREQUENCY)
+#define STM32_APB1_TIM15_CLKIN  (STM32_PCLK2_FREQUENCY)
+#define STM32_APB1_TIM16_CLKIN  (STM32_PCLK2_FREQUENCY)
+#define STM32_APB1_TIM17_CLKIN  (STM32_PCLK2_FREQUENCY)
+
+/* APB1 timers 2-7 will be twice PCLK1 */
+
+#define STM32_APB1_TIM2_CLKIN   (STM32_PCLK1_FREQUENCY)
+#define STM32_APB1_TIM3_CLKIN   (STM32_PCLK1_FREQUENCY)
+#define STM32_APB1_TIM4_CLKIN   (STM32_PCLK1_FREQUENCY)
+#define STM32_APB1_TIM6_CLKIN   (STM32_PCLK1_FREQUENCY)
+#define STM32_APB1_TIM7_CLKIN   (STM32_PCLK1_FREQUENCY)
+
+/* USB divider -- Divide PLL clock by 1.5 */
+#define STM32_CFGR_USBPRE       0
 
 /* Timer Frequencies, if APBx is set to 1, frequency is same to APBx
  * otherwise frequency is 2xAPBx.
- * Note: TIM1,8 are on APB2, others on APB1
  */
+#define BOARD_TIM1_FREQUENCY   (STM32_PCLK2_FREQUENCY)
+#define BOARD_TIM2_FREQUENCY   (STM32_PCLK1_FREQUENCY)
+#define BOARD_TIM3_FREQUENCY   (STM32_PCLK1_FREQUENCY)
+#define BOARD_TIM4_FREQUENCY   (STM32_PCLK1_FREQUENCY)
+#define BOARD_TIM5_FREQUENCY   (STM32_PCLK1_FREQUENCY)
+#define BOARD_TIM6_FREQUENCY   (STM32_PCLK1_FREQUENCY)
+#define BOARD_TIM7_FREQUENCY   (STM32_PCLK1_FREQUENCY)
+#define BOARD_TIM8_FREQUENCY   (STM32_PCLK2_FREQUENCY)
+#define BOARD_TIM15_FREQUENCY  (STM32_PCLK2_FREQUENCY)
+#define BOARD_TIM16_FREQUENCY  (STM32_PCLK2_FREQUENCY)
+#define BOARD_TIM17_FREQUENCY  (STM32_PCLK2_FREQUENCY)
+#define BOARD_TIM20_FREQUENCY  (STM32_PCLK2_FREQUENCY)
 
-#define BOARD_TIM2_FREQUENCY    (2 * STM32_PCLK1_FREQUENCY)
-#define BOARD_TIM3_FREQUENCY    (2 * STM32_PCLK1_FREQUENCY)
-#define BOARD_TIM4_FREQUENCY    (2 * STM32_PCLK1_FREQUENCY)
-#define BOARD_TIM5_FREQUENCY    (2 * STM32_PCLK1_FREQUENCY)
-#define BOARD_TIM6_FREQUENCY    (2 * STM32_PCLK1_FREQUENCY)
-#define BOARD_TIM7_FREQUENCY    (2 * STM32_PCLK1_FREQUENCY)
-#define BOARD_TIM8_FREQUENCY    (2 * STM32_PCLK2_FREQUENCY)
 
 /* Alternate function pin selections ************************************************/
 
