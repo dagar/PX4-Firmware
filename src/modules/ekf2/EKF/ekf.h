@@ -48,6 +48,10 @@
 #include "EKFGSF_yaw.h"
 #include "baro_bias_estimator.hpp"
 
+#include <uORB/topics/estimator_aid_source_1d.h>
+#include <uORB/topics/estimator_aid_source_2d.h>
+#include <uORB/topics/estimator_aid_source_3d.h>
+
 class Ekf final : public EstimatorInterface
 {
 public:
@@ -78,13 +82,13 @@ public:
 	void getEvVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getEvVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const;
 
-	void getBaroHgtInnov(float &baro_hgt_innov) const { baro_hgt_innov = _baro_hgt_innov; }
-	void getBaroHgtInnovVar(float &baro_hgt_innov_var) const { baro_hgt_innov_var = _baro_hgt_innov_var; }
-	void getBaroHgtInnovRatio(float &baro_hgt_innov_ratio) const { baro_hgt_innov_ratio = _baro_hgt_test_ratio; }
+	void getBaroHgtInnov(float &baro_hgt_innov) const { baro_hgt_innov = _aid_src_baro_hgt.innovation; }
+	void getBaroHgtInnovVar(float &baro_hgt_innov_var) const { baro_hgt_innov_var = _aid_src_baro_hgt.innovation_variance; }
+	void getBaroHgtInnovRatio(float &baro_hgt_innov_ratio) const { baro_hgt_innov_ratio = _aid_src_baro_hgt.test_ratio; }
 
-	void getRngHgtInnov(float &rng_hgt_innov) const { rng_hgt_innov = _rng_hgt_innov; }
-	void getRngHgtInnovVar(float &rng_hgt_innov_var) const { rng_hgt_innov_var = _rng_hgt_innov_var; }
-	void getRngHgtInnovRatio(float &rng_hgt_innov_ratio) const { rng_hgt_innov_ratio = _rng_hgt_test_ratio; }
+	void getRngHgtInnov(float &rng_hgt_innov) const { rng_hgt_innov = _aid_src_rng_hgt.innovation; }
+	void getRngHgtInnovVar(float &rng_hgt_innov_var) const { rng_hgt_innov_var = _aid_src_rng_hgt.innovation_variance; }
+	void getRngHgtInnovRatio(float &rng_hgt_innov_ratio) const { rng_hgt_innov_ratio = _aid_src_rng_hgt.test_ratio; }
 
 	void getAuxVelInnov(float aux_vel_innov[2]) const;
 	void getAuxVelInnovVar(float aux_vel_innov[2]) const;
@@ -320,6 +324,18 @@ public:
 
 	const BaroBiasEstimator::status &getBaroBiasEstimatorStatus() const { return _baro_b_est.getStatus(); }
 
+	const auto &aid_src_gnss_vel() const { return _aid_src_gnss_vel; }
+	const auto &aid_src_gnss_pos() const { return _aid_src_gnss_pos; }
+
+	const auto &aid_src_ev_vel() const { return _aid_src_ev_vel; }
+	const auto &aid_src_ev_pos() const { return _aid_src_ev_pos; }
+	const auto &aid_src_ev_yaw() const { return _aid_src_ev_yaw; }
+
+	const auto &aid_src_fake_pos() const { return _aid_src_fake_pos; }
+
+	const auto &aid_src_baro_hgt() const { return _aid_src_baro_hgt; }
+	const auto &aid_src_rng_hgt() const { return _aid_src_rng_hgt; }
+
 private:
 
 	// set the internal states and status to their default value
@@ -352,11 +368,9 @@ private:
 	bool _filter_initialised{false};	///< true when the EKF sttes and covariances been initialised
 
 	// variables used when position data is being fused using a relative position odometry model
-	bool _fuse_hpos_as_odom{false};		///< true when the NE position data is being fused using an odometry assumption
-	Vector2f _hpos_pred_prev{};		///< previous value of NE position state used by odometry fusion (m)
+	Vector3f _hpos_pred_prev{};		///< previous value of NE position state used by odometry fusion (m)
 	bool _hpos_prev_available{false};	///< true when previous values of the estimate and measurement are available for use
 	Dcmf _R_ev_to_ekf;			///< transformation matrix that rotates observations from the EV to the EKF navigation frame, initialized with Identity
-	bool _inhibit_ev_yaw_use{false};	///< true when the vision yaw data should not be used (e.g.: NE fusion requires true North)
 
 	// booleans true when fresh sensor data is available at the fusion time horizon
 	bool _gps_data_ready{false};	///< true when new GPS data has fallen behind the fusion time horizon and is available to be fused
@@ -374,20 +388,26 @@ private:
 	uint64_t _time_last_hgt_fuse{0};	///< time the last fusion of vertical position measurements was performed (uSec)
 	uint64_t _time_last_hor_vel_fuse{0};	///< time the last fusion of horizontal velocity measurements was performed (uSec)
 	uint64_t _time_last_ver_vel_fuse{0};	///< time the last fusion of verticalvelocity measurements was performed (uSec)
+
 	uint64_t _time_last_of_fuse{0};		///< time the last fusion of optical flow measurements were performed (uSec)
 	uint64_t _time_last_flow_terrain_fuse{0}; ///< time the last fusion of optical flow measurements for terrain estimation were performed (uSec)
 	uint64_t _time_last_arsp_fuse{0};	///< time the last fusion of airspeed measurements were performed (uSec)
 	uint64_t _time_last_beta_fuse{0};	///< time the last fusion of synthetic sideslip measurements were performed (uSec)
-	uint64_t _time_last_fake_pos_fuse{0};	///< last time we faked position measurements to constrain tilt errors during operation without external aiding (uSec)
 	uint64_t _time_last_gps_yaw_fuse{0};	///< time the last fusion of GPS yaw measurements were performed (uSec)
+
 	uint64_t _time_last_gps_yaw_data{0};	///< time the last GPS yaw measurement was available (uSec)
 	uint64_t _time_last_healthy_rng_data{0};
+
 	uint8_t _nb_gps_yaw_reset_available{0}; ///< remaining number of resets allowed before switching to another aiding source
 
 	Vector2f _last_known_posNE{};		///< last known local NE position vector (m)
 
 	uint64_t _time_acc_bias_check{0};	///< last time the  accel bias check passed (uSec)
+
 	uint64_t _delta_time_baro_us{0};	///< delta time between two consecutive delayed baro samples from the buffer (uSec)
+	uint64_t _delta_time_gps_us{0};	///< delta time between two consecutive delayed baro samples from the buffer (uSec)
+	uint64_t _delta_time_rng_us{0};	///< delta time between two consecutive delayed baro samples from the buffer (uSec)
+	uint64_t _delta_time_ev_us{0};	///< delta time between two consecutive delayed baro samples from the buffer (uSec)
 
 	Vector3f _earth_rate_NED{};	///< earth rotation vector (NED) in rad/s
 
@@ -415,29 +435,6 @@ private:
 
 	Vector3f _delta_vel_bias_var_accum{};		///< kahan summation algorithm accumulator for delta velocity bias variance
 	Vector3f _delta_angle_bias_var_accum{};	///< kahan summation algorithm accumulator for delta angle bias variance
-
-	float _vert_pos_innov_ratio{0.f};	///< vertical position innovation divided by estimated standard deviation of innovation
-	uint64_t _vert_pos_fuse_attempt_time_us{0};	///< last system time in usec vertical position measurement fuson was attempted
-	float _vert_vel_innov_ratio{0.f};		///< standard deviation of vertical velocity innovation
-	uint64_t _vert_vel_fuse_time_us{0};	///< last system time in usec time vertical velocity measurement fuson was attempted
-
-	Vector3f _gps_vel_innov{};	///< GPS velocity innovations (m/sec)
-	Vector3f _gps_vel_innov_var{};	///< GPS velocity innovation variances ((m/sec)**2)
-
-	Vector3f _gps_pos_innov{};	///< GPS position innovations (m)
-	Vector3f _gps_pos_innov_var{};	///< GPS position innovation variances (m**2)
-
-	Vector3f _ev_vel_innov{};	///< external vision velocity innovations (m/sec)
-	Vector3f _ev_vel_innov_var{};	///< external vision velocity innovation variances ((m/sec)**2)
-
-	Vector3f _ev_pos_innov{};	///< external vision position innovations (m)
-	Vector3f _ev_pos_innov_var{};	///< external vision position innovation variances (m**2)
-
-	float _baro_hgt_innov{};		///< baro hgt innovations (m)
-	float _baro_hgt_innov_var{};	///< baro hgt innovation variances (m**2)
-
-	float _rng_hgt_innov{};	///< range hgt innovations (m)
-	float _rng_hgt_innov_var{};	///< range hgt innovation variances (m**2)
 
 	Vector3f _aux_vel_innov{};	///< horizontal auxiliary velocity innovations: (m/sec)
 	Vector3f _aux_vel_innov_var{};	///< horizontal auxiliary velocity innovation variances: ((m/sec)**2)
@@ -474,6 +471,21 @@ private:
 	bool _inhibit_flow_use{false};	///< true when use of optical flow and range finder is being inhibited
 	Vector2f _flow_compensated_XY_rad{};	///< measured delta angle of the image about the X and Y body axes after removal of body rotation (rad), RH rotation is positive
 
+
+	estimator_aid_source_3d_s _aid_src_gnss_vel{};
+	estimator_aid_source_3d_s _aid_src_gnss_pos{};
+
+	estimator_aid_source_3d_s _aid_src_ev_vel{};
+	estimator_aid_source_3d_s _aid_src_ev_pos{};
+	estimator_aid_source_1d_s _aid_src_ev_yaw{};
+
+	estimator_aid_source_2d_s _aid_src_fake_pos{};
+
+	estimator_aid_source_1d_s _aid_src_baro_hgt{};
+	estimator_aid_source_1d_s _aid_src_rng_hgt{};
+
+
+
 	// output predictor states
 	Vector3f _delta_angle_corr{};	///< delta angle correction vector (rad)
 	Vector3f _vel_err_integ{};	///< integral of velocity tracking error (m)
@@ -504,8 +516,12 @@ private:
 
 	// Variables used to perform in flight resets and switch between height sources
 	AlphaFilter<Vector3f> _mag_lpf{0.1f};	///< filtered magnetometer measurement for instant reset (Gauss)
-	float _hgt_sensor_offset{0.0f};		///< set as necessary if desired to maintain the same height after a height reset (m)
-	float _baro_hgt_offset{0.0f};		///< baro height reading at the local NED origin (m)
+
+	float _baro_hgt_offset{NAN};		///< baro height reading at the local NED origin (m)
+	float _gps_hgt_offset{NAN};		///< GPS height reading at the local NED origin (m)
+	float _rng_hgt_offset{NAN};		///< RNG height reading at the local NED origin (m)
+	float _ev_hgt_offset{NAN	};		///< EV height reading at the local NED origin (m)
+
 	float _baro_hgt_bias{0.0f};
 	float _baro_hgt_bias_var{1.f};
 
@@ -615,10 +631,8 @@ private:
 	// fuse body frame drag specific forces for multi-rotor wind estimation
 	void fuseDrag(const dragSample &drag_sample);
 
-	void fuseBaroHgt();
-	void fuseGpsHgt();
-	void fuseRngHgt();
-	void fuseEvHgt();
+	void updateBaroHgt();
+	void updateRngHgt();
 
 	// fuse single velocity and position measurement
 	bool fuseVelPosHeight(const float innov, const float innov_var, const int obs_index);
@@ -651,19 +665,9 @@ private:
 	// fuse optical flow line of sight rate measurements
 	void fuseOptFlow();
 
-	bool fuseHorizontalVelocity(const Vector3f &innov, float innov_gate, const Vector3f &obs_var,
-				    Vector3f &innov_var, Vector2f &test_ratio);
+	void updateGpsVel(const gpsSample &gps_sample);
+	void updateGpsPos(const gpsSample &gps_sample);
 
-	bool fuseVerticalVelocity(const Vector3f &innov, float innov_gate, const Vector3f &obs_var,
-				  Vector3f &innov_var, Vector2f &test_ratio);
-
-	bool fuseHorizontalPosition(const Vector3f &innov, float innov_gate, const Vector3f &obs_var,
-				    Vector3f &innov_var, Vector2f &test_ratiov, bool inhibit_gate = false);
-
-	bool fuseVerticalPosition(float innov, float innov_gate, float obs_var,
-				  float &innov_var, float &test_ratio);
-
-	void fuseGpsVelPos();
 
 	// calculate optical flow body angular rate compensation
 	// returns false if bias corrected body rate data is unavailable
@@ -711,9 +715,6 @@ private:
 
 	// modify output filter to match the the EKF state at the fusion time horizon
 	void alignOutputFilter();
-
-	// update the rotation matrix which transforms EV navigation frame measurements into NED
-	void calcExtVisRotMat();
 
 	Vector3f getVisionVelocityInEkfFrame() const;
 
@@ -807,6 +808,9 @@ private:
 
 	// control fusion of external vision observations
 	void controlExternalVisionFusion();
+	void controlEvPosFusion();
+	void controlEvVelFusion();
+	void controlEvYawFusion();
 
 	// control fusion of optical flow observations
 	void controlOpticalFlowFusion();
@@ -909,7 +913,6 @@ private:
 	void startRngAidHgtFusion();
 	void startEvHgtFusion();
 
-	void updateBaroHgtOffset();
 	void updateBaroHgtBias();
 
 	void updateGroundEffect();
@@ -989,10 +992,14 @@ private:
 	void startEvVelFusion();
 	void startEvYawFusion();
 
-	void stopEvFusion();
 	void stopEvPosFusion();
 	void stopEvVelFusion();
 	void stopEvYawFusion();
+
+	void fuseEvPosition();
+	void fuseEvPositionDelta();
+	void fuseEvVelocity();
+	void fuseEvYaw();
 
 	void stopAuxVelFusion();
 
@@ -1032,6 +1039,41 @@ private:
 	bool isYawEmergencyEstimateAvailable() const;
 
 	void resetGpsDriftCheckFilters();
+
+	void resetEstimatorAidStatus(estimator_aid_source_1d_s &status)
+	{
+		if (status.timestamp_sample != 0) {
+			status.timestamp_sample = 0;
+			status.fusion_enabled = false;
+			status.innovation_rejected = false;
+			status.fused = false;
+			// TODO: zero innovations, etc?
+		}
+	}
+
+	template <typename T>
+	void resetEstimatorAidStatus(T &status)
+	{
+		if (status.timestamp_sample != 0) {
+			status.timestamp_sample = 0;
+
+			for (auto &fusion_enabled : status.fusion_enabled) {
+				fusion_enabled = false;
+			}
+
+			for (auto &innovation_rejected : status.innovation_rejected) {
+				innovation_rejected = false;
+			}
+
+			for (auto &fused : status.fused) {
+				fused = false;
+			}
+
+			// TODO: zero innovations, etc?
+
+
+		}
+	}
 };
 
 #endif // !EKF_EKF_H

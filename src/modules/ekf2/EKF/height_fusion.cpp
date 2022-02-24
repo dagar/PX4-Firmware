@@ -38,12 +38,25 @@
 
 #include "ekf.h"
 
-void Ekf::fuseBaroHgt()
+void Ekf::updateBaroHgt()
 {
 	// vertical position innovation - baro measurement has opposite sign to earth z axis
 	const float unbiased_baro = _baro_sample_delayed.hgt - _baro_b_est.getBias();
 
-	_baro_hgt_innov = _state.pos(2) + unbiased_baro - _baro_hgt_offset;
+	if (!PX4_ISFINITE(_baro_hgt_offset)) {
+		_baro_hgt_offset = _state.pos(2) + unbiased_baro;
+	}
+
+	if (!_control_status.flags.baro_hgt) {
+		// apply a 10 second first order low pass filter to baro offset
+		const float local_time_step = math::constrain(1e-6f * _delta_time_baro_us, 0.f, 1.f);
+		const float offset_rate_correction = 0.1f * (_state.pos(2) + unbiased_baro - _baro_hgt_offset);
+		_baro_hgt_offset += local_time_step * math::constrain(offset_rate_correction, -0.1f, 0.1f);
+	}
+
+	auto &baro_hgt = _aid_src_baro_hgt;
+
+	baro_hgt.innovation = _state.pos(2) + unbiased_baro - _baro_hgt_offset;
 
 	// Compensate for positive static pressure transients (negative vertical position innovations)
 	// caused by rotor wash ground interaction by applying a temporary deadzone to baro innovations.
@@ -52,12 +65,12 @@ void Ekf::fuseBaroHgt()
 		const float deadzone_start = 0.0f;
 		const float deadzone_end = deadzone_start + _params.gnd_effect_deadzone;
 
-		if (_baro_hgt_innov < -deadzone_start) {
-			if (_baro_hgt_innov <= -deadzone_end) {
-				_baro_hgt_innov += deadzone_end;
+		if (baro_hgt.innovation < -deadzone_start) {
+			if (baro_hgt.innovation <= -deadzone_end) {
+				baro_hgt.innovation += deadzone_end;
 
 			} else {
-				_baro_hgt_innov = -deadzone_start;
+				baro_hgt.innovation = -deadzone_start;
 			}
 		}
 	}
@@ -68,30 +81,67 @@ void Ekf::fuseBaroHgt()
 	// observation variance - user parameter defined
 	float obs_var = sq(fmaxf(_params.baro_noise, 0.01f));
 
-	fuseVerticalPosition(_baro_hgt_innov, innov_gate, obs_var,
-			     _baro_hgt_innov_var, _baro_hgt_test_ratio);
+	baro_hgt.innovation_variance = P(9, 9) + obs_var;
+	baro_hgt.test_ratio = sq(baro_hgt.innovation) / (sq(innov_gate) * baro_hgt.innovation_variance);
+	baro_hgt.innovation_rejected = (baro_hgt.test_ratio <= 0.f || baro_hgt.test_ratio > 1.f);
+
+	baro_hgt.fused = false; // reset
+
+	if (_control_status.flags.baro_hgt) {
+
+		baro_hgt.fusion_enabled = true;
+
+		bool innov_check_pass = !baro_hgt.innovation_rejected;
+
+		// if there is bad vertical acceleration data, then don't reject measurement,
+		// but limit innovation to prevent spikes that could destabilise the filter
+		float innovation;
+
+		if (_fault_status.flags.bad_acc_vertical && !innov_check_pass) {
+			const float innov_limit = innov_gate * sqrtf(baro_hgt.innovation_variance);
+			innovation = math::constrain(baro_hgt.innovation, -innov_limit, innov_limit);
+			innov_check_pass = true;
+			baro_hgt.innovation_rejected = false;
+
+		} else {
+			innovation = baro_hgt.innovation;
+		}
+
+		if (innov_check_pass) {
+			if (fuseVelPosHeight(innovation, baro_hgt.innovation_variance, 5)) {
+				baro_hgt.fused = true;
+				baro_hgt.time_last_fuse = _time_last_imu;
+			}
+		}
+
+	} else {
+		baro_hgt.fusion_enabled = false;
+	}
+
+	baro_hgt.timestamp_sample = _baro_sample_delayed.time_us;
 }
 
-void Ekf::fuseGpsHgt()
+void Ekf::updateRngHgt()
 {
-	// vertical position innovation - gps measurement has opposite sign to earth z axis
-	_gps_pos_innov(2) = _state.pos(2) + _gps_sample_delayed.hgt - _gps_alt_ref - _hgt_sensor_offset;
+	if (!PX4_ISFINITE(_rng_hgt_offset)) {
+		_rng_hgt_offset = _state.pos(2) - (-math::max(_range_sensor.getDistBottom(), _params.rng_gnd_clearance));
+	}
 
-	// innovation gate size
-	float innov_gate = fmaxf(_params.baro_innov_gate, 1.f);
+	if (!_control_status.flags.rng_hgt) {
 
-	float obs_var = getGpsHeightVariance();
+		float innov = _state.pos(2) - (-math::max(_range_sensor.getDistBottom(), _params.rng_gnd_clearance)) - _rng_hgt_offset;
 
-	// _gps_pos_test_ratio(1) is the vertical test ratio
-	fuseVerticalPosition(_gps_pos_innov(2), innov_gate, obs_var,
-			     _gps_pos_innov_var(2), _gps_pos_test_ratio(1));
-}
+		// apply a 10 second first order low pass filter to offset
+		const float local_time_step = math::constrain(1e-6f * _delta_time_rng_us, 0.f, 1.f);
+		const float offset_rate_correction = 0.1f * innov;
+		_rng_hgt_offset += local_time_step * math::constrain(offset_rate_correction, -0.1f, 0.1f);
+	}
 
-void Ekf::fuseRngHgt()
-{
+	auto &rng_hgt = _aid_src_rng_hgt;
+
 	// use range finder with tilt correction
-	_rng_hgt_innov = _state.pos(2) - (-math::max(_range_sensor.getDistBottom(),
-					  _params.rng_gnd_clearance)) - _hgt_sensor_offset;
+	rng_hgt.innovation = _state.pos(2) - (-math::max(_range_sensor.getDistBottom(),
+					      _params.rng_gnd_clearance)) - _rng_hgt_offset;
 
 	// innovation gate size
 	float innov_gate = fmaxf(_params.range_innov_gate, 1.f);
@@ -99,22 +149,42 @@ void Ekf::fuseRngHgt()
 	// observation variance - user parameter defined
 	float obs_var = fmaxf(sq(_params.range_noise) + sq(_params.range_noise_scaler * _range_sensor.getDistBottom()), 0.01f);
 
-	fuseVerticalPosition(_rng_hgt_innov, innov_gate, obs_var,
-			     _rng_hgt_innov_var, _rng_hgt_test_ratio);
-}
+	rng_hgt.innovation_variance = P(9, 9) + obs_var;
+	rng_hgt.test_ratio = sq(rng_hgt.innovation) / (sq(innov_gate) * rng_hgt.innovation_variance);
+	rng_hgt.innovation_rejected = (rng_hgt.test_ratio <= 0.f || rng_hgt.test_ratio > 1.f);
 
-void Ekf::fuseEvHgt()
-{
-	// calculate the innovation assuming the external vision observation is in local NED frame
-	_ev_pos_innov(2) = _state.pos(2) - _ev_sample_delayed.pos(2);
+	rng_hgt.fused = false; // reset
 
-	// innovation gate size
-	float innov_gate = fmaxf(_params.ev_pos_innov_gate, 1.f);
+	if (_control_status.flags.baro_hgt) {
 
-	// observation variance - defined externally
-	float obs_var = fmaxf(_ev_sample_delayed.posVar(2), sq(0.01f));
+		rng_hgt.fusion_enabled = true;
 
-	// _ev_pos_test_ratio(1) is the vertical test ratio
-	fuseVerticalPosition(_ev_pos_innov(2), innov_gate, obs_var,
-			     _ev_pos_innov_var(2), _ev_pos_test_ratio(1));
+		bool innov_check_pass = !rng_hgt.innovation_rejected;
+
+		// if there is bad vertical acceleration data, then don't reject measurement,
+		// but limit innovation to prevent spikes that could destabilise the filter
+		float innovation;
+
+		if (_fault_status.flags.bad_acc_vertical && !innov_check_pass) {
+			const float innov_limit = innov_gate * sqrtf(rng_hgt.innovation_variance);
+			innovation = math::constrain(rng_hgt.innovation, -innov_limit, innov_limit);
+			innov_check_pass = true;
+			rng_hgt.innovation_rejected = false;
+
+		} else {
+			innovation = rng_hgt.innovation;
+		}
+
+		if (innov_check_pass) {
+			if (fuseVelPosHeight(innovation, rng_hgt.innovation_variance, 5)) {
+				rng_hgt.fused = true;
+				rng_hgt.time_last_fuse = _time_last_imu;
+			}
+		}
+
+	} else {
+		rng_hgt.fusion_enabled = false;
+	}
+
+	rng_hgt.timestamp_sample = _baro_sample_delayed.time_us;
 }

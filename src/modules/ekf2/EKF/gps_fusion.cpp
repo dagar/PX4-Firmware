@@ -39,39 +39,81 @@
 /* #include <mathlib/mathlib.h> */
 #include "ekf.h"
 
-void Ekf::fuseGpsVelPos()
+void Ekf::updateGpsVel(const gpsSample &gps_sample)
 {
-	Vector3f gps_pos_obs_var;
+	const float vel_var = sq(gps_sample.sacc);
+	const Vector3f observation_variance{vel_var, vel_var, vel_var * sq(1.5f)};
+
+	// innovation gate size
+	const float innov_gate = fmaxf(_params.gps_vel_innov_gate, 1.f);
+
+	auto &gps_vel = _aid_src_gnss_vel;
+
+	for (int i = 0; i < 3; i++) {
+		gps_vel.observation[i] = gps_sample.vel(i);
+		gps_vel.observation_variance[i] = observation_variance(i);
+
+		gps_vel.innovation[i] = _state.vel(i) - gps_sample.vel(i);
+		gps_vel.innovation_variance[i] = P(4 + i, 4 + i) + observation_variance(i);
+		gps_vel.test_ratio[i] = sq(gps_vel.innovation[i]) / (sq(innov_gate) * gps_vel.innovation_variance[i]);
+
+		gps_vel.innovation_rejected[i] = (gps_vel.test_ratio[i] <= 0.f || gps_vel.test_ratio[i] > 1.f);
+	}
+
+	gps_vel.timestamp_sample = gps_sample.time_us;
+}
+
+void Ekf::updateGpsPos(const gpsSample &gps_sample)
+{
+	if (!PX4_ISFINITE(_gps_hgt_offset)) {
+		_gps_hgt_offset = _state.pos(2) + _gps_sample_delayed.hgt;
+	}
+
+	if (!_control_status.flags.gps_hgt) {
+		// apply a 10 second first order low pass filter to offset
+		const float local_time_step = math::constrain(1e-6f * _delta_time_gps_us, 0.f, 1.f);
+		const float offset_rate_correction = 0.1f * (_state.pos(2) + _gps_sample_delayed.hgt);
+		_gps_hgt_offset += local_time_step * math::constrain(offset_rate_correction, -0.1f, 0.1f);
+	}
+
+	Vector3f position;
+	position(0) = gps_sample.pos(0);
+	position(1) = gps_sample.pos(1);
+	position(2) = gps_sample.hgt;
 
 	const float lower_limit = fmaxf(_params.gps_pos_noise, 0.01f);
+
+	Vector3f obs_var;
 
 	if (isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
 		// if we are using other sources of aiding, then relax the upper observation
 		// noise limit which prevents bad GPS perturbing the position estimate
-		gps_pos_obs_var(0) = gps_pos_obs_var(1) = sq(fmaxf(_gps_sample_delayed.hacc, lower_limit));
+		obs_var(0) = obs_var(1) = sq(fmaxf(_gps_sample_delayed.hacc, lower_limit));
 
 	} else {
 		// if we are not using another source of aiding, then we are reliant on the GPS
 		// observations to constrain attitude errors and must limit the observation noise value.
 		float upper_limit = fmaxf(_params.pos_noaid_noise, lower_limit);
-		gps_pos_obs_var(0) = gps_pos_obs_var(1) = sq(math::constrain(_gps_sample_delayed.hacc, lower_limit, upper_limit));
+		obs_var(0) = obs_var(1) = sq(math::constrain(_gps_sample_delayed.hacc, lower_limit, upper_limit));
 	}
 
+	obs_var(2) = getGpsHeightVariance();
 
+	// innovation gate size
+	float innov_gate = fmaxf(_params.baro_innov_gate, 1.f);
 
-	const float vel_var = sq(_gps_sample_delayed.sacc);
-	const Vector3f gps_vel_obs_var{vel_var, vel_var, vel_var * sq(1.5f)};
+	auto &gps_pos = _aid_src_gnss_pos;
 
-	// calculate innovations
-	_gps_vel_innov = _state.vel - _gps_sample_delayed.vel;
-	_gps_pos_innov.xy() = Vector2f(_state.pos) - _gps_sample_delayed.pos;
+	for (int i = 0; i < 3; i++) {
+		gps_pos.observation[i] = position(i);
+		gps_pos.observation_variance[i] = obs_var(i);
 
-	// set innovation gate size
-	const float pos_innov_gate = fmaxf(_params.gps_pos_innov_gate, 1.f);
-	const float vel_innov_gate = fmaxf(_params.gps_vel_innov_gate, 1.f);
+		gps_pos.innovation[i] = _state.pos(i) - position(i);
+		gps_pos.innovation_variance[i] = P(7 + i, 7 + i) + obs_var(i);
+		gps_pos.test_ratio[i] = sq(gps_pos.innovation[i]) / (sq(innov_gate) * gps_pos.innovation_variance[i]);
 
-	// fuse GPS measurement
-	fuseHorizontalVelocity(_gps_vel_innov, vel_innov_gate, gps_vel_obs_var, _gps_vel_innov_var, _gps_vel_test_ratio);
-	fuseVerticalVelocity(_gps_vel_innov, vel_innov_gate, gps_vel_obs_var, _gps_vel_innov_var, _gps_vel_test_ratio);
-	fuseHorizontalPosition(_gps_pos_innov, pos_innov_gate, gps_pos_obs_var, _gps_pos_innov_var, _gps_pos_test_ratio);
+		gps_pos.innovation_rejected[i] = (gps_pos.test_ratio[i] <= 0.f || gps_pos.test_ratio[i] > 1.f);
+	}
+
+	gps_pos.timestamp_sample = gps_sample.time_us;
 }

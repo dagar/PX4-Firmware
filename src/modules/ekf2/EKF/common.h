@@ -424,10 +424,10 @@ union fault_status_u {
 // define structure used to communicate innovation test failures
 union innovation_fault_status_u {
 	struct {
-		bool reject_hor_vel: 1;		///< 0 - true if horizontal velocity observations have been rejected
-		bool reject_ver_vel: 1;		///< 1 - true if vertical velocity observations have been rejected
-		bool reject_hor_pos: 1;		///< 2 - true if horizontal position observations have been rejected
-		bool reject_ver_pos: 1;		///< 3 - true if true if vertical position observations have been rejected
+		bool unused0: 1;		///< 0 -
+		bool unused1: 1;		///< 1 -
+		bool unused2: 1;		///< 2 -
+		bool unused3: 1;		///< 3 -
 		bool reject_mag_x: 1;		///< 4 - true if the X magnetometer observation has been rejected
 		bool reject_mag_y: 1;		///< 5 - true if the Y magnetometer observation has been rejected
 		bool reject_mag_z: 1;		///< 6 - true if the Z magnetometer observation has been rejected

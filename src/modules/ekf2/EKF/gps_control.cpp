@@ -41,6 +41,18 @@
 
 void Ekf::controlGpsFusion()
 {
+	auto &gps_vel = _aid_src_gnss_vel;
+	auto &gps_pos = _aid_src_gnss_pos;
+
+	// clear
+	resetEstimatorAidStatus(gps_vel);
+	resetEstimatorAidStatus(gps_pos);
+
+	if (_gps_data_ready) {
+		updateGpsVel(_gps_sample_delayed);
+		updateGpsPos(_gps_sample_delayed);
+	}
+
 	if (!(_params.fusion_mode & MASK_USE_GPS)) {
 		stopGpsFusion();
 		return;
@@ -67,7 +79,33 @@ void Ekf::controlGpsFusion()
 				if (continuing_conditions_passing
 				    || !isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
 
-					fuseGpsVelPos();
+					for (int i = 0; i < 3; i++) {
+						// velocity
+						gps_vel.fusion_enabled[i] = true;
+
+						if (gps_vel.fusion_enabled[i] && !gps_vel.innovation_rejected[i]) {
+							if (fuseVelPosHeight(gps_vel.innovation[i], gps_vel.innovation_variance[i], i)) {
+								gps_vel.fused[i] = true;
+								gps_vel.time_last_fuse[i] = _time_last_imu;
+							}
+						}
+
+
+						// position
+						if (i == 0 || i == 1) {
+							gps_pos.fusion_enabled[i] = true;
+
+						} else {
+							gps_pos.fusion_enabled[i] = _control_status.flags.gps_hgt;
+						}
+
+						if (gps_pos.fusion_enabled[i] && !gps_pos.innovation_rejected[i]) {
+							if (fuseVelPosHeight(gps_pos.innovation[i], gps_pos.innovation_variance[i], 3 + i)) {
+								gps_pos.fused[i] = true;
+								gps_pos.time_last_fuse[i] = _time_last_imu;
+							}
+						}
+					}
 
 					if (shouldResetGpsFusion()) {
 						const bool was_gps_signal_lost = isTimedOut(_time_prev_gps_us, 1000000);
@@ -106,12 +144,6 @@ void Ekf::controlGpsFusion()
 					stopGpsFusion();
 					_warning_events.flags.gps_quality_poor = true;
 					ECL_WARN("GPS quality poor - stopping use");
-
-					// TODO: move this to EV control logic
-					// Reset position state to external vision if we are going to use absolute values
-					if (_control_status.flags.ev_pos && !(_params.fusion_mode & MASK_ROTATE_EV)) {
-						resetHorizontalPositionToVision();
-					}
 				}
 
 			} else { // mandatory conditions are not passing
@@ -130,7 +162,6 @@ void Ekf::controlGpsFusion()
 
 					// Stop the vision for yaw fusion and do not allow it to start again
 					stopEvYawFusion();
-					_inhibit_ev_yaw_use = true;
 
 				} else {
 					startGpsFusion();
