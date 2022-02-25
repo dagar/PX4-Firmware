@@ -1,0 +1,43 @@
+uint64 timestamp			# time since system start (microseconds)
+
+uint32 device_id          # unique device ID for the sensor that does not change between power cycles
+
+int8 cell_count			# Number of cells
+
+uint8 BATTERY_SOURCE_POWER_MODULE = 0
+uint8 BATTERY_SOURCE_EXTERNAL = 1
+uint8 BATTERY_SOURCE_ESCS = 2
+uint8 source				# Battery source
+
+uint8 priority				# Zero based priority is the connection on the Power Controller V1..Vn AKA BrickN-1
+uint16 capacity				# actual capacity of the battery
+uint16 cycle_count			# number of discharge cycles the battery has experienced
+uint16 run_time_to_empty	# predicted remaining battery capacity based on the present rate of discharge in min
+uint16 average_time_to_empty	# predicted remaining battery capacity based on the average rate of discharge in min
+uint16 serial_number		# serial number of the battery pack
+uint16 manufacture_date		# manufacture date, part of serial number of the battery pack. formated as: Day + Month×32 + (Year–1980)×512
+uint16 state_of_health		# state of health. FullChargeCapacity/DesignCapacity.
+uint16 max_error			# max error, expected margin of error in % in the state-of-charge calculation with a range of 1 to 100%
+uint8 id					# ID number of a battery. Should be unique and consistent for the lifetime of a vehicle. 1-indexed.
+uint16 interface_error		# interface error counter
+
+float32 max_cell_voltage_delta	# Max difference between individual cell voltages
+
+bool is_powering_off			# Power off event imminent indication, false if unknown
+
+
+uint8 BATTERY_WARNING_NONE = 0		# no battery low voltage warning active
+uint8 BATTERY_WARNING_LOW = 1		# warning of low voltage
+uint8 BATTERY_WARNING_CRITICAL = 2	# critical voltage, return / abort immediately
+uint8 BATTERY_WARNING_EMERGENCY = 3	# immediate landing required
+uint8 BATTERY_WARNING_FAILED = 4	# the battery has failed completely
+
+uint8 warning						# current battery warning
+
+
+uint8 MAX_INSTANCES = 4
+
+float32 design_capacity             # The design capacity of the battery
+uint16 average_time_to_full         # The predicted remaining time until the battery reaches full charge, in minutes
+uint16 over_discharge_count         # Number of battery overdischarge
+float32 nominal_voltage             # Nominal voltage of the battery pack

@@ -126,9 +126,7 @@ void Batmon::RunImpl()
 	uint16_t result;
 
 	// Read data from sensor.
-	battery_status_s new_report = {};
-
-	new_report.id = 1;
+	battery_status_s new_report{};
 
 	// Set time of reading.
 	new_report.timestamp = hrt_absolute_time();

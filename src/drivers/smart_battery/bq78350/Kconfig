@@ -1,0 +1,5 @@
+menuconfig DRIVERS_SMART_BATTERY_BQ78350
+	bool "bq78350"
+	default n
+	---help---
+		Enable support for bq78350

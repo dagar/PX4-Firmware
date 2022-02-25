@@ -13,6 +13,16 @@ then
 	batt_smbus start -X
 fi
 
+if param compare -s SENS_EN_BQ40ZXY 1
+then
+	bq40zxy start -X
+fi
+
+if param compare -s SENS_EN_BQ78350 1
+then
+	bq78350 start -X
+fi
+
 # Start batmon driver if enabled using BATMON_DRIVER_EN
 if param compare -s BATMON_DRIVER_EN 1
 then

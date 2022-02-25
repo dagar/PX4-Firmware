@@ -1,5 +1,9 @@
 uint64 timestamp			# time since system start (microseconds)
+
+uint32 device_id          # unique device ID for the sensor that does not change between power cycles
+
 bool connected				# Whether or not a battery is connected, based on a voltage threshold
+
 float32 voltage_v			# Battery voltage in volts, 0 if unknown
 float32 voltage_filtered_v	# Battery voltage in volts, filtered, 0 if unknown
 float32 current_a			# Battery current in amperes, -1 if unknown
@@ -16,6 +20,7 @@ uint8 BATTERY_SOURCE_POWER_MODULE = 0
 uint8 BATTERY_SOURCE_EXTERNAL = 1
 uint8 BATTERY_SOURCE_ESCS = 2
 uint8 source				# Battery source
+
 uint8 priority				# Zero based priority is the connection on the Power Controller V1..Vn AKA BrickN-1
 uint16 capacity				# actual capacity of the battery
 uint16 cycle_count			# number of discharge cycles the battery has experienced
