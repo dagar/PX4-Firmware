@@ -1128,6 +1128,7 @@ void Ekf::zeroMagCov()
 
 void Ekf::resetZDeltaAngBiasCov()
 {
+	PX4_INFO("resetZDeltaAngBiasCov");
 	const float init_delta_ang_bias_var = sq(_params.switch_on_gyro_bias * _dt_ekf_avg);
 
 	P.uncorrelateCovarianceSetVariance<1>(12, init_delta_ang_bias_var);

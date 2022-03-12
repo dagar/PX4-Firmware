@@ -107,9 +107,14 @@ void LandDetector::Run()
 	if (_vehicle_angular_velocity_sub.update(&vehicle_angular_velocity)) {
 		_angular_velocity = matrix::Vector3f{vehicle_angular_velocity.xyz};
 
-		static constexpr float GYRO_NORM_MAX = math::radians(3.f); // 3 degrees/second
+		static constexpr float GYRO_NORM_MAX = math::radians(4.f); // 3 degrees/second
 
 		if (_angular_velocity.norm() > GYRO_NORM_MAX) {
+			if (_at_rest) {
+				PX4_INFO("angular velocity norm %.6f > %.6f", (double)_angular_velocity.norm(), (double)GYRO_NORM_MAX);
+				_angular_velocity.print();
+			}
+
 			_time_last_move_detect_us = vehicle_angular_velocity.timestamp_sample;
 		}
 	}
@@ -244,9 +249,21 @@ void LandDetector::UpdateVehicleAtRest()
 		static constexpr float GYRO_VIBE_METRIC_MAX = 0.02f; // gyro_vibration_metric * dt * 4.0e4f > is_moving_scaler)
 		static constexpr float ACCEL_VIBE_METRIC_MAX = 1.2f; // accel_vibration_metric * dt * 2.1e2f > is_moving_scaler
 
-		if ((imu_status.gyro_vibration_metric > GYRO_VIBE_METRIC_MAX)
-		    || (imu_status.accel_vibration_metric > ACCEL_VIBE_METRIC_MAX)) {
+		bool gyro_exceeded = imu_status.gyro_vibration_metric > GYRO_VIBE_METRIC_MAX;
+		bool accel_exceeded = imu_status.accel_vibration_metric > ACCEL_VIBE_METRIC_MAX;
 
+		if (_at_rest) {
+			if (gyro_exceeded) {
+				PX4_INFO("gyro vibration metric %.6f > %.6f", (double)imu_status.gyro_vibration_metric, (double)GYRO_VIBE_METRIC_MAX);
+			}
+
+			if (accel_exceeded) {
+				PX4_INFO("accel vibration metric %.6f > %.6f", (double)imu_status.accel_vibration_metric,
+					 (double)ACCEL_VIBE_METRIC_MAX);
+			}
+		}
+
+		if (gyro_exceeded || accel_exceeded) {
 			_time_last_move_detect_us = imu_status.timestamp;
 		}
 	}

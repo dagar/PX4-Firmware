@@ -669,7 +669,7 @@ bool Ekf::updateQuaternion(const float innovation, const float variance, const f
 
 			// also reset the yaw gyro variance to converge faster and avoid
 			// being stuck on a previous bad estimate
-			resetZDeltaAngBiasCov();
+			//resetZDeltaAngBiasCov();
 
 		} else {
 			return false;

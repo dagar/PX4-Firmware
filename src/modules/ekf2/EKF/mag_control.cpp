@@ -172,6 +172,7 @@ void Ekf::runOnGroundYawReset()
 		const bool has_realigned_yaw = canResetMagHeading() ? resetMagHeading() : false;
 
 		if (has_realigned_yaw) {
+			PX4_INFO("yaw align (on ground yaw reset");
 			_mag_yaw_reset_req = false;
 			_control_status.flags.yaw_align = true;
 
@@ -204,6 +205,7 @@ void Ekf::runInAirYawReset(const Vector3f &mag_sample)
 		}
 
 		if (has_realigned_yaw) {
+			PX4_INFO("yaw re-align in air");
 			_mag_yaw_reset_req = false;
 			_control_status.flags.yaw_align = true;
 			_control_status.flags.mag_aligned_in_flight = true;

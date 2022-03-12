@@ -869,7 +869,7 @@ void Ekf::resetAccelBias()
 	_prev_dvel_bias_var = P.slice<3, 3>(13, 13).diag();
 }
 
-void Ekf::resetMagBias()
+void Ekf::resetMagnetometer()
 {
 	// Zero the magnetometer bias states
 	_state.mag_B.zero();
@@ -883,6 +883,12 @@ void Ekf::resetMagBias()
 	_saved_mag_bf_variance[1] = 0;
 	_saved_mag_bf_variance[2] = 0;
 	_saved_mag_bf_variance[3] = 0;
+
+	if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D) {
+		_mag_yaw_reset_req = true;
+	}
+
+	_control_status.flags.mag_fault = false;
 }
 
 // get EKF innovation consistency check status information comprising of:
