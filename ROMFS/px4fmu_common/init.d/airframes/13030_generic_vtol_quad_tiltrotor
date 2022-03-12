@@ -57,7 +57,7 @@ param set-default CA_SV_CS3_TRQ_Y 1.0
 param set-default CA_SV_CS3_TYPE 4
 param set-default CA_SV_TL_COUNT 4
 
-set MAV_TYPE 21
+param set-default MAV_TYPE 21
 
 set MIXER quad_x
 set MIXER_AUX vtol_TTTTAAER

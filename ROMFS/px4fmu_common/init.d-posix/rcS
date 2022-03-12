@@ -24,7 +24,6 @@ fi
 
 # initialize script variables
 set IO_PRESENT                  no
-set MAV_TYPE                    none
 set MIXER                       none
 set MIXER_AUX                   none
 set MIXER_FILE                  none
@@ -217,6 +216,10 @@ if ! replay tryapplyparams
 then
   . px4-rc.simulator
 fi
+
+# Load mixer and configure outputs.
+. ${R}etc/init.d/rc.interface
+
 load_mon start
 battery_simulator start
 tone_alarm start
@@ -254,7 +257,7 @@ then
 fi
 
 # Configure vehicle type specific parameters.
-# Note: rc.vehicle_setup is the entry point for rc.interface,
+# Note: rc.vehicle_setup is the entry point
 #       rc.fw_apps, rc.mc_apps, rc.rover_apps, and rc.vtol_apps.
 #
 . ${R}etc/init.d/rc.vehicle_setup

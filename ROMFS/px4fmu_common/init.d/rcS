@@ -29,7 +29,6 @@ set IOFW "/etc/extras/px4_io-v2_default.bin"
 set IO_PRESENT no
 set LOGGER_ARGS ""
 set LOGGER_BUF 8
-set MAV_TYPE none
 set MIXER none
 set MIXER_AUX none
 set MIXER_FILE none
@@ -409,6 +408,9 @@ else
 		commander start
 	fi
 
+	# Load mixer and configure outputs.
+	. ${R}etc/init.d/rc.interface
+
 	# Pre-takeoff continuous magnetometer calibration
 	if param compare -s MBE_ENABLE 1
 	then
@@ -461,8 +463,7 @@ else
 
 	#
 	# Configure vehicle type specific parameters.
-	# Note: rc.vehicle_setup is the entry point for rc.interface,
-	#       rc.fw_apps, rc.mc_apps, rc.rover_apps, and rc.vtol_apps.
+	# Note: rc.vehicle_setup is the entry point for rc.fw_apps, rc.mc_apps, rc.rover_apps, rc.vtol_apps, etc
 	#
 	. ${R}etc/init.d/rc.vehicle_setup
 
@@ -573,7 +574,6 @@ unset IO_PRESENT
 unset IOFW
 unset LOGGER_ARGS
 unset LOGGER_BUF
-unset MAV_TYPE
 unset MIXER
 unset MIXER_AUX
 unset MIXER_FILE

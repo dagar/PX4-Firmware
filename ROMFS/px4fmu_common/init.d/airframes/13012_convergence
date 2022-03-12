@@ -64,7 +64,8 @@ param set-default VT_TRANS_MIN_TM 1.2
 param set-default VT_TRANS_P2_DUR 1.3
 param set-default VT_ELEV_MC_LOCK 0
 param set-default VT_TYPE 1
-set MAV_TYPE 21
+
+param set-default MAV_TYPE 21
 
 set MIXER vtol_convergence
 

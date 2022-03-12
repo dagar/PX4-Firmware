@@ -75,7 +75,7 @@ PARAM_DEFINE_INT32(MAV_SIK_RADIO_ID, 0);
 /**
  * MAVLink airframe type
  *
- * @min 1
+ * @min 0
  * @max 27
  * @value 0 Generic micro air vehicle
  * @value 1 Fixed wing aircraft
@@ -107,7 +107,7 @@ PARAM_DEFINE_INT32(MAV_SIK_RADIO_ID, 0);
  * @value 27 Onboard ADSB peripheral
  * @group MAVLink
  */
-PARAM_DEFINE_INT32(MAV_TYPE, 2);
+PARAM_DEFINE_INT32(MAV_TYPE, 0);
 
 /**
  * Use/Accept HIL GPS message even if not in HIL mode

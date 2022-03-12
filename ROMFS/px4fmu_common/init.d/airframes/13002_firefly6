@@ -45,7 +45,8 @@ param set-default VT_TILT_TRANS 0.5
 param set-default VT_TILT_FW 0.9
 param set-default VT_ELEV_MC_LOCK 0
 param set-default VT_TYPE 1
-set MAV_TYPE 21
+
+param set-default MAV_TYPE 21
 
 set MIXER firefly6
 set MIXER_AUX firefly6
