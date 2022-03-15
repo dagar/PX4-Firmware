@@ -239,10 +239,13 @@ private:
 	hrt_abstime _last_sensor_bias_published{0};
 	hrt_abstime _last_gps_status_published{0};
 
+	hrt_abstime _status_fake_pos_pub_last{0};
+
 	hrt_abstime _status_gnss_vel_pub_last{0};
 	hrt_abstime _status_gnss_pos_pub_last{0};
 
-	hrt_abstime _status_fake_pos_pub_last{0};
+	hrt_abstime _status_mag_pub_last{0};
+	hrt_abstime _status_mag_heading_pub_last{0};
 
 	float _last_baro_bias_published{};
 
@@ -305,6 +308,9 @@ private:
 	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_gnss_pos_pub{ORB_ID(estimator_aid_src_gnss_pos)};
 
 	uORB::PublicationMulti<estimator_aid_source_2d_s> _estimator_aid_src_fake_pos_pub{ORB_ID(estimator_aid_src_fake_pos)};
+
+	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_mag_pub{ORB_ID(estimator_aid_src_mag)};
+	uORB::PublicationMulti<estimator_aid_source_1d_s> _estimator_aid_src_mag_heading_pub{ORB_ID(estimator_aid_src_mag_heading)};
 
 	// publications with topic dependent on multi-mode
 	uORB::PublicationMulti<vehicle_attitude_s>           _attitude_pub;

@@ -599,6 +599,15 @@ void EKF2::Run()
 
 void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 {
+	// fake position
+	if (_ekf.aid_src_fake_pos().timestamp_sample > _status_fake_pos_pub_last) {
+		auto status{_ekf.aid_src_fake_pos()};
+		status.estimator_instance = _instance;
+		status.timestamp = hrt_absolute_time();
+		_estimator_aid_src_fake_pos_pub.publish(status);
+		_status_fake_pos_pub_last = status.timestamp_sample;
+	}
+
 	// GPS velocity
 	if (_ekf.aid_src_gnss_vel().timestamp_sample > _status_gnss_vel_pub_last) {
 		auto status{_ekf.aid_src_gnss_vel()};
@@ -617,13 +626,24 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 		_status_gnss_pos_pub_last = status.timestamp_sample;
 	}
 
-	// fake position
-	if (_ekf.aid_src_fake_pos().timestamp_sample > _status_fake_pos_pub_last) {
-		auto status{_ekf.aid_src_fake_pos()};
+
+
+	// mag 3d
+	if (_ekf.aid_src_mag().timestamp_sample > _status_mag_pub_last) {
+		auto status{_ekf.aid_src_mag()};
 		status.estimator_instance = _instance;
 		status.timestamp = hrt_absolute_time();
-		_estimator_aid_src_fake_pos_pub.publish(status);
-		_status_fake_pos_pub_last = status.timestamp_sample;
+		_estimator_aid_src_mag_pub.publish(status);
+		_status_mag_pub_last = status.timestamp_sample;
+	}
+
+	// mag heading
+	if (_ekf.aid_src_mag_heading().timestamp_sample > _status_mag_heading_pub_last) {
+		auto status{_ekf.aid_src_mag_heading()};
+		status.estimator_instance = _instance;
+		status.timestamp = hrt_absolute_time();
+		_estimator_aid_src_mag_heading_pub.publish(status);
+		_status_mag_heading_pub_last = status.timestamp_sample;
 	}
 }
 
@@ -1315,9 +1335,6 @@ void EKF2::PublishStatusFlags(const hrt_abstime &timestamp)
 		status_flags.reject_ver_vel                  = _ekf.innov_check_fail_status_flags().reject_ver_vel;
 		status_flags.reject_hor_pos                  = _ekf.innov_check_fail_status_flags().reject_hor_pos;
 		status_flags.reject_ver_pos                  = _ekf.innov_check_fail_status_flags().reject_ver_pos;
-		status_flags.reject_mag_x                    = _ekf.innov_check_fail_status_flags().reject_mag_x;
-		status_flags.reject_mag_y                    = _ekf.innov_check_fail_status_flags().reject_mag_y;
-		status_flags.reject_mag_z                    = _ekf.innov_check_fail_status_flags().reject_mag_z;
 		status_flags.reject_yaw                      = _ekf.innov_check_fail_status_flags().reject_yaw;
 		status_flags.reject_airspeed                 = _ekf.innov_check_fail_status_flags().reject_airspeed;
 		status_flags.reject_sideslip                 = _ekf.innov_check_fail_status_flags().reject_sideslip;

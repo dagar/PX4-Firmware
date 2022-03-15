@@ -104,6 +104,9 @@ void Ekf::controlMagFusion()
 	_mag_yaw_reset_req |= !_control_status.flags.yaw_align;
 	_mag_yaw_reset_req |= _mag_inhibit_yaw_reset_req;
 
+	resetEstimatorAidStatusFlags(_aid_src_mag);
+	resetEstimatorAidStatusFlags(_aid_src_mag_heading);
+
 	if (noOtherYawAidingThanMag() && mag_data_ready) {
 		// Determine if we should use simple magnetic heading fusion which works better when
 		// there are large external disturbances or the more accurate 3-axis fusion
@@ -144,6 +147,9 @@ void Ekf::controlMagFusion()
 		checkMagInhibition();
 
 		runMagAndMagDeclFusions(mag_sample.mag);
+
+		_aid_src_mag.timestamp_sample = mag_sample.time_us;
+		_aid_src_mag_heading.timestamp_sample = mag_sample.time_us;
 	}
 }
 
@@ -369,13 +375,13 @@ void Ekf::run3DMagAndDeclFusions(const Vector3f &mag)
 		// states for the first few observations.
 		fuseDeclination(0.02f);
 		_mag_decl_cov_reset = true;
-		fuseMag(mag);
+		fuseMag(_aid_src_mag, mag);
 
 	} else {
 		// The normal sequence is to fuse the magnetometer data first before fusing
 		// declination angle at a higher uncertainty to allow some learning of
 		// declination angle over time.
-		fuseMag(mag);
+		fuseMag(_aid_src_mag, mag);
 
 		if (_control_status.flags.mag_dec) {
 			fuseDeclination(0.5f);
