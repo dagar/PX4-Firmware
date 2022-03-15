@@ -38,12 +38,20 @@
 
 #include "ekf.h"
 
-void Ekf::fuseBaroHgt()
+void Ekf::updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s &baro_hgt)
 {
-	// vertical position innovation - baro measurement has opposite sign to earth z axis
-	const float unbiased_baro = _baro_sample_delayed.hgt - _baro_b_est.getBias();
+	// innovation gate size
+	float innov_gate = fmaxf(_params.baro_innov_gate, 1.f);
 
-	_baro_hgt_innov = _state.pos(2) + unbiased_baro - _baro_hgt_offset;
+	// observation variance - user parameter defined
+	float obs_var = sq(fmaxf(_params.baro_noise, 0.01f));
+
+	// vertical position innovation - baro measurement has opposite sign to earth z axis
+	baro_hgt.observation = -(_baro_sample_delayed.hgt - _baro_b_est.getBias() - _baro_hgt_offset);
+	baro_hgt.observation_variance = obs_var;
+
+	baro_hgt.innovation = _state.pos(2) - baro_hgt.observation;
+	baro_hgt.innovation_variance = P(9, 9) + obs_var;
 
 	// Compensate for positive static pressure transients (negative vertical position innovations)
 	// caused by rotor wash ground interaction by applying a temporary deadzone to baro innovations.
@@ -52,24 +60,44 @@ void Ekf::fuseBaroHgt()
 		const float deadzone_start = 0.0f;
 		const float deadzone_end = deadzone_start + _params.gnd_effect_deadzone;
 
-		if (_baro_hgt_innov < -deadzone_start) {
-			if (_baro_hgt_innov <= -deadzone_end) {
-				_baro_hgt_innov += deadzone_end;
+		if (baro_hgt.innovation < -deadzone_start) {
+			if (baro_hgt.innovation <= -deadzone_end) {
+				baro_hgt.innovation += deadzone_end;
 
 			} else {
-				_baro_hgt_innov = -deadzone_start;
+				baro_hgt.innovation = -deadzone_start;
 			}
 		}
 	}
 
-	// innovation gate size
-	float innov_gate = fmaxf(_params.baro_innov_gate, 1.f);
+	baro_hgt.test_ratio = sq(baro_hgt.innovation) / (sq(innov_gate) * baro_hgt.innovation_variance);
 
-	// observation variance - user parameter defined
-	float obs_var = sq(fmaxf(_params.baro_noise, 0.01f));
+	baro_hgt.innovation_rejected = (baro_hgt.test_ratio > 1.f);
 
-	fuseVerticalPosition(_baro_hgt_innov, innov_gate, obs_var,
-			     _baro_hgt_innov_var, _baro_hgt_test_ratio);
+	// special case if there is bad vertical acceleration data, then don't reject measurement,
+	// but limit innovation to prevent spikes that could destabilise the filter
+	if (_fault_status.flags.bad_acc_vertical && baro_hgt.innovation_rejected) {
+		const float innov_limit = innov_gate * sqrtf(baro_hgt.innovation_variance);
+		baro_hgt.innovation = math::constrain(baro_hgt.innovation, -innov_limit, innov_limit);
+		baro_hgt.innovation_rejected = false;
+	}
+
+	baro_hgt.fusion_enabled = _control_status.flags.baro_hgt;
+
+	baro_hgt.timestamp_sample = baro_sample.time_us;
+
+	baro_hgt.fused = false; // reset
+}
+
+void Ekf::fuseBaroHgt(estimator_aid_source_1d_s &baro_hgt)
+{
+	if (baro_hgt.fusion_enabled
+	    && !baro_hgt.innovation_rejected
+	    && fuseVelPosHeight(baro_hgt.innovation, baro_hgt.innovation_variance, 5)) {
+
+		baro_hgt.fused = true;
+		baro_hgt.time_last_fuse = _time_last_imu;
+	}
 }
 
 void Ekf::fuseRngHgt()

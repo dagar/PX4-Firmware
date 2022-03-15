@@ -788,6 +788,16 @@ void Ekf::checkVerticalAccelerationHealth()
 		}
 	}
 
+	if (_control_status.flags.baro_hgt) {
+		// position
+		auto &baro_hgt = _aid_src_baro_hgt;
+
+		if (baro_hgt.time_last_fuse > _vert_pos_fuse_attempt_time_us) {
+			_vert_pos_fuse_attempt_time_us = baro_hgt.time_last_fuse;
+			_vert_pos_innov_ratio = baro_hgt.innovation / sqrtf(baro_hgt.innovation_variance);
+		}
+	}
+
 	if (isRecent(_vert_pos_fuse_attempt_time_us, 1000000)) {
 		if (isRecent(_vert_vel_fuse_time_us, 1000000)) {
 			// If vertical position and velocity come from independent sensors then we can
@@ -933,15 +943,15 @@ void Ekf::controlHeightFusion()
 	updateBaroHgtOffset();
 	updateGroundEffect();
 
-	if (_control_status.flags.baro_hgt) {
+	if (_baro_data_ready) {
+		updateBaroHgt(_baro_sample_delayed, _aid_src_baro_hgt);
 
-		if (_baro_data_ready && !_baro_hgt_faulty) {
-			fuseBaroHgt();
+		if (_control_status.flags.baro_hgt && !_baro_hgt_faulty) {
+			fuseBaroHgt(_aid_src_baro_hgt);
 		}
+	}
 
-	} else if (_control_status.flags.gps_hgt) {
-		// handled by gps fusion
-	} else if (_control_status.flags.rng_hgt) {
+	if (_control_status.flags.rng_hgt) {
 
 		if (_range_sensor.isDataHealthy()) {
 			fuseRngHgt();

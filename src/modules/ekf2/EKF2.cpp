@@ -599,6 +599,15 @@ void EKF2::Run()
 
 void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 {
+	// Baro height
+	if (_ekf.aid_src_baro_hgt().timestamp_sample > _status_baro_hgt_pub_last) {
+		auto status{_ekf.aid_src_baro_hgt()};
+		status.estimator_instance = _instance;
+		status.timestamp = hrt_absolute_time();
+		_estimator_aid_src_baro_hgt_pub.publish(status);
+		_status_baro_hgt_pub_last = status.timestamp_sample;
+	}
+
 	// GPS velocity
 	if (_ekf.aid_src_gnss_vel().timestamp_sample > _status_gnss_vel_pub_last) {
 		auto status{_ekf.aid_src_gnss_vel()};
