@@ -108,9 +108,9 @@ public:
 	const Vector2f &getFlowUncompensated() const { return _flow_sample_delayed.flow_xy_rad; }
 	const Vector3f &getFlowGyro() const { return _flow_sample_delayed.gyro_xyz; }
 
-	void getHeadingInnov(float &heading_innov) const { heading_innov = _heading_innov; }
-	void getHeadingInnovVar(float &heading_innov_var) const { heading_innov_var = _heading_innov_var; }
-	void getHeadingInnovRatio(float &heading_innov_ratio) const { heading_innov_ratio = _yaw_test_ratio; }
+	void getHeadingInnov(float &heading_innov) const { heading_innov = _aid_src_mag_heading.innovation; }
+	void getHeadingInnovVar(float &heading_innov_var) const { heading_innov_var = _aid_src_mag_heading.innovation_variance; }
+	void getHeadingInnovRatio(float &heading_innov_ratio) const { heading_innov_ratio = _aid_src_mag_heading.test_ratio; }
 
 	void getMagInnov(float mag_innov[3]) const { memcpy(mag_innov, _aid_src_mag.innovation, sizeof(_aid_src_mag.innovation)); }
 	void getMagInnovVar(float mag_innov_var[3]) const { memcpy(mag_innov_var, _aid_src_mag.innovation_variance, sizeof(_aid_src_mag.innovation_variance)); }
@@ -336,8 +336,9 @@ public:
 
 	const BaroBiasEstimator::status &getBaroBiasEstimatorStatus() const { return _baro_b_est.getStatus(); }
 
-	const auto &aid_src_gnss_vel() const { return _aid_src_gnss_vel; }
 	const auto &aid_src_gnss_pos() const { return _aid_src_gnss_pos; }
+	const auto &aid_src_gnss_vel() const { return _aid_src_gnss_vel; }
+	const auto &aid_src_gnss_heading() const { return _aid_src_gnss_heading; }
 
 	const auto &aid_src_fake_pos() const { return _aid_src_fake_pos; }
 
@@ -460,9 +461,6 @@ private:
 	Vector3f _aux_vel_innov{};	///< horizontal auxiliary velocity innovations: (m/sec)
 	Vector3f _aux_vel_innov_var{};	///< horizontal auxiliary velocity innovation variances: ((m/sec)**2)
 
-	float _heading_innov{0.0f};	///< heading measurement innovation (rad)
-	float _heading_innov_var{0.0f};	///< heading measurement innovation variance (rad**2)
-
 	Vector2f _drag_innov{};		///< multirotor drag measurement innovation (m/sec**2)
 	Vector2f _drag_innov_var{};	///< multirotor drag measurement innovation variance ((m/sec**2)**2)
 
@@ -491,11 +489,15 @@ private:
 
 	estimator_aid_source_3d_s _aid_src_gnss_vel{};
 	estimator_aid_source_3d_s _aid_src_gnss_pos{};
+	estimator_aid_source_1d_s _aid_src_gnss_heading{};
 
 	estimator_aid_source_2d_s _aid_src_fake_pos{};
 
 	estimator_aid_source_3d_s _aid_src_mag{};
 	estimator_aid_source_1d_s _aid_src_mag_heading{};
+
+	estimator_aid_source_1d_s _aid_src_ev_yaw{};
+
 
 	// output predictor states
 	Vector3f _delta_angle_corr{};	///< delta angle correction vector (rad)
@@ -604,21 +606,20 @@ private:
 	// yaw : angle observation defined as the first rotation in a 321 Tait-Bryan rotation sequence (rad)
 	// yaw_variance : variance of the yaw angle observation (rad^2)
 	// zero_innovation : Fuse data with innovation set to zero
-	bool fuseYaw321(const float yaw, const float yaw_variance, bool zero_innovation = false);
+	bool fuseYaw321(estimator_aid_source_1d_s& aid_source);
 
 	// fuse the yaw angle defined as the first rotation in a 312 Tait-Bryan rotation sequence
 	// yaw : angle observation defined as the first rotation in a 312 Tait-Bryan rotation sequence (rad)
 	// yaw_variance : variance of the yaw angle observation (rad^2)
 	// zero_innovation : Fuse data with innovation set to zero
-	bool fuseYaw312(const float yaw, const float yaw_variance, bool zero_innovation = false);
+	bool fuseYaw312(estimator_aid_source_1d_s& aid_source);
 
 	// update quaternion states and covariances using an innovation, observation variance and Jacobian vector
 	// innovation : prediction - measurement
 	// variance : observaton variance
 	// gate_sigma : innovation consistency check gate size (Sigma)
 	// jacobian : 4x1 vector of partial derivatives of observation wrt each quaternion state
-	bool updateQuaternion(const float innovation, const float variance, const float gate_sigma,
-			      const Vector4f &yaw_jacobian);
+	bool updateQuaternion(estimator_aid_source_1d_s& aid_source, const float gate_sigma, const Vector4f &yaw_jacobian);
 
 	// fuse the yaw angle obtained from a dual antenna GPS unit
 	void fuseGpsYaw();

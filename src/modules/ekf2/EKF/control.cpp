@@ -355,9 +355,16 @@ void Ekf::controlExternalVisionFusion()
 				resetYawToEv();
 			}
 
+			// define the innovation gate size
+			float innov_gate = math::max(_params.heading_innov_gate, 1.f);
+			_aid_src_ev_yaw.observation_variance = _ev_sample_delayed.angVar;
+
 			if (shouldUse321RotationSequence(_R_to_earth)) {
-				float measured_hdg = getEuler321Yaw(_ev_sample_delayed.quat);
-				fuseYaw321(measured_hdg, _ev_sample_delayed.angVar);
+				// calculate the the innovation and wrap to the interval between +-pi
+				_aid_src_ev_yaw.observation = wrap_pi(getEuler321Yaw(_ev_sample_delayed.quat));
+				_aid_src_ev_yaw.innovation = wrap_pi(atan2f(_R_to_earth(1, 0), _R_to_earth(0, 0)) - _aid_src_ev_yaw.observation);
+
+				fuseYaw321(_aid_src_ev_yaw, innov_gate);
 
 			} else {
 				float measured_hdg = getEuler312Yaw(_ev_sample_delayed.quat);

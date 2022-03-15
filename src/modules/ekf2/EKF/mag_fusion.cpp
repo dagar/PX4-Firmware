@@ -190,9 +190,6 @@ void Ekf::fuseMag(estimator_aid_source_3d_s &aid_src_mag, const Vector3f &mag)
 		aid_src_mag.innovation_rejected[2] = false;
 	}
 
-	// we are no longer using heading fusion so set the reported test level to zero
-	_yaw_test_ratio = 0.0f;
-
 	// if any axis fails, abort the mag fusion
 	if (_control_status.flags.mag_3D) {
 		for (auto& innovation_rejected : aid_src_mag.innovation_rejected) {
@@ -460,16 +457,13 @@ void Ekf::fuseMag(estimator_aid_source_3d_s &aid_src_mag, const Vector3f &mag)
 	}
 }
 
-bool Ekf::fuseYaw321(float yaw, float yaw_variance, bool zero_innovation)
+bool Ekf::fuseYaw321(estimator_aid_source_1d_s& aid_source)
 {
 	// assign intermediate state variables
 	const float &q0 = _state.quat_nominal(0);
 	const float &q1 = _state.quat_nominal(1);
 	const float &q2 = _state.quat_nominal(2);
 	const float &q3 = _state.quat_nominal(3);
-
-	const float R_YAW = fmaxf(yaw_variance, 1.0e-4f);
-	const float measurement = wrap_pi(yaw);
 
 	// calculate 321 yaw observation matrix
 	// choose A or B computational paths to avoid singularity in derivation at +-90 degrees yaw
@@ -512,6 +506,7 @@ bool Ekf::fuseYaw321(float yaw, float yaw_variance, bool zero_innovation)
 		H_YAW(1) = SA5*(SA1*SA6 - SA8*q1);
 		H_YAW(2) = SA5*(SA1*SA7 + SA9*q1);
 		H_YAW(3) = SA5*(SA0*SA7 + SA9*q0);
+
 	} else if (canUseB && (!canUseA || fabsf(SB5_inv) > fabsf(SA5_inv))) {
 		const float SB5 = 1.0F/SB5_inv;
 		const float SB6 = 1.0F/SB2;
@@ -523,25 +518,15 @@ bool Ekf::fuseYaw321(float yaw, float yaw_variance, bool zero_innovation)
 		H_YAW(1) = -SB5*(SB1*SB6 - SB8*q2);
 		H_YAW(2) = -SB5*(-SB1*SB7 - SB9*q2);
 		H_YAW(3) = -SB5*(-SB0*SB7 - SB9*q3);
+
 	} else {
 		return false;
 	}
 
-	// calculate the yaw innovation and wrap to the interval between +-pi
-	float innovation;
-
-	if (zero_innovation) {
-		innovation = 0.0f;
-
-	} else {
-		innovation = wrap_pi(atan2f(_R_to_earth(1, 0), _R_to_earth(0, 0)) - measurement);
-	}
-
 	// define the innovation gate size
-	float innov_gate = math::max(_params.heading_innov_gate, 1.0f);
+	float innov_gate = math::max(_params.heading_innov_gate, 1.f);
 
-	// Update the quaternion states and covariance matrix
-	return updateQuaternion(innovation, R_YAW, innov_gate, H_YAW);
+	return updateQuaternion(aid_source, innov_gate, H_YAW);
 }
 
 bool Ekf::fuseYaw312(float yaw, float yaw_variance, bool zero_innovation)
@@ -551,9 +536,6 @@ bool Ekf::fuseYaw312(float yaw, float yaw_variance, bool zero_innovation)
 	const float q1 = _state.quat_nominal(1);
 	const float q2 = _state.quat_nominal(2);
 	const float q3 = _state.quat_nominal(3);
-
-	const float R_YAW = fmaxf(yaw_variance, 1.0e-4f);
-	const float measurement = wrap_pi(yaw);
 
 	// calculate 312 yaw observation matrix
 	// choose A or B computational paths to avoid singularity in derivation at +-90 degrees yaw
@@ -596,6 +578,7 @@ bool Ekf::fuseYaw312(float yaw, float yaw_variance, bool zero_innovation)
 		H_YAW(1) = SA5*(-SA1*SA6 + SA8*q1);
 		H_YAW(2) = SA5*(-SA1*SA7 - SA9*q1);
 		H_YAW(3) = SA5*(SA0*SA7 + SA9*q0);
+
 	} else if (canUseB && (!canUseA || fabsf(SB5_inv) > fabsf(SA5_inv))) {
 		const float SB5 = 1.0F/SB5_inv;
 		const float SB6 = 1.0F/SB2;
@@ -607,34 +590,23 @@ bool Ekf::fuseYaw312(float yaw, float yaw_variance, bool zero_innovation)
 		H_YAW(1) = -SB5*(SB1*SB6 - SB8*q2);
 		H_YAW(2) = -SB5*(-SB1*SB7 - SB9*q2);
 		H_YAW(3) = -SB5*(SB0*SB7 + SB9*q3);
+
 	} else {
 		return false;
 	}
 
-	float innovation;
-
-	if (zero_innovation) {
-		innovation = 0.0f;
-
-	} else {
-		// calculate the the innovation and wrap to the interval between +-pi
-		innovation = wrap_pi(atan2f(-_R_to_earth(0, 1), _R_to_earth(1, 1)) - measurement);
-	}
-
 	// define the innovation gate size
-	float innov_gate = math::max(_params.heading_innov_gate, 1.0f);
+	float innov_gate = math::max(_params.heading_innov_gate, 1.f);
 
-	// Update the quaternion states and covariance matrix
-	return updateQuaternion(innovation, R_YAW, innov_gate, H_YAW);
+	return updateQuaternion(aid_source, innov_gate, H_YAW);
 }
 
 // update quaternion states and covariances using the yaw innovation, yaw observation variance and yaw Jacobian
-bool Ekf::updateQuaternion(const float innovation, const float variance, const float gate_sigma,
-			   const Vector4f &yaw_jacobian)
+bool Ekf::updateQuaternion(estimator_aid_source_1d_s& aid_source, const float gate_sigma, const Vector4f &yaw_jacobian)
 {
 	// Calculate innovation variance and Kalman gains, taking advantage of the fact that only the first 4 elements in H are non zero
 	// calculate the innovation variance
-	_heading_innov_var = variance;
+	//_heading_innov_var = variance;
 
 	for (unsigned row = 0; row <= 3; row++) {
 		float tmp = 0.0f;
@@ -643,16 +615,16 @@ bool Ekf::updateQuaternion(const float innovation, const float variance, const f
 			tmp += P(row, col) * yaw_jacobian(col);
 		}
 
-		_heading_innov_var += yaw_jacobian(row) * tmp;
+		aid_source.innovation_variance += yaw_jacobian(row) * tmp;
 	}
 
 	float heading_innov_var_inv;
 
 	// check if the innovation variance calculation is badly conditioned
-	if (_heading_innov_var >= variance) {
+	if (aid_source.innovation_variance >= aid_source.observation_variance) {
 		// the innovation variance contribution from the state covariances is not negative, no fault
 		_fault_status.flags.bad_hdg = false;
-		heading_innov_var_inv = 1.0f / _heading_innov_var;
+		heading_innov_var_inv = 1.f / aid_source.innovation_variance;
 
 	} else {
 		// the innovation variance contribution from the state covariances is negative which means the covariance matrix is badly conditioned
@@ -687,13 +659,11 @@ bool Ekf::updateQuaternion(const float innovation, const float variance, const f
 	}
 
 	// innovation test ratio
-	_yaw_test_ratio = sq(innovation) / (sq(gate_sigma) * _heading_innov_var);
-
-	// we are no longer using 3-axis fusion so set the reported test levels to zero
-	memset(_aid_src_mag.test_ratio, 0, sizeof(_aid_src_mag.test_ratio)); // TODO
+	aid_source.test_ratio = sq(aid_source.innovation) / (sq(gate_sigma) * aid_source.innovation_variance);
+	aid_source.innovation_rejected = (aid_source.test_ratio > 1.f);
 
 	// set the magnetometer unhealthy if the test fails
-	if (_yaw_test_ratio > 1.0f) {
+	if (aid_source.test_ratio > 1.f) {
 		_innov_check_fail_status.flags.reject_yaw = true;
 
 		// if we are in air we don't want to fuse the measurement
@@ -703,8 +673,8 @@ bool Ekf::updateQuaternion(const float innovation, const float variance, const f
 			// constrain the innovation to the maximum set by the gate
 			// we need to delay this forced fusion to avoid starting it
 			// immediately after touchdown, when the drone is still armed
-			float gate_limit = sqrtf((sq(gate_sigma) * _heading_innov_var));
-			_heading_innov = math::constrain(innovation, -gate_limit, gate_limit);
+			float gate_limit = sqrtf((sq(gate_sigma) * aid_source.innovation_variance));
+			aid_source.innovation = math::constrain(aid_source.innovation, -gate_limit, gate_limit);
 
 			// also reset the yaw gyro variance to converge faster and avoid
 			// being stuck on a previous bad estimate
@@ -716,7 +686,6 @@ bool Ekf::updateQuaternion(const float innovation, const float variance, const f
 
 	} else {
 		_innov_check_fail_status.flags.reject_yaw = false;
-		_heading_innov = innovation;
 	}
 
 	// apply covariance correction via P_new = (I -K*H)*P
@@ -752,9 +721,15 @@ bool Ekf::updateQuaternion(const float innovation, const float variance, const f
 		fixCovarianceErrors(true);
 
 		// apply the state corrections
-		fuse(Kfusion, _heading_innov);
+		fuse(Kfusion, aid_source.innovation);
+
+		aid_source.fused = true;
+		aid_source.time_last_fuse = _time_last_imu;
 
 		return true;
+
+	} else {
+		aid_source.fused = false;
 	}
 
 	return false;
@@ -808,10 +783,40 @@ void Ekf::fuseHeading(float measured_hdg, float obs_var)
 	}
 
 	if (shouldUse321RotationSequence(_R_to_earth)) {
-		fuseYaw321(measured_hdg, R_YAW, fuse_zero_innov);
+		if (fuse_zero_innov) {
+			_aid_src_mag_heading.observation = atan2f(_R_to_earth(1, 0), _R_to_earth(0, 0));
+			_aid_src_mag_heading.innovation = 0;
+
+		} else {
+			// calculate the the innovation and wrap to the interval between +-pi
+			_aid_src_mag_heading.observation = wrap_pi(measured_hdg);
+			_aid_src_mag_heading.innovation = wrap_pi(atan2f(_R_to_earth(1, 0), _R_to_earth(0, 0)) - _aid_src_mag_heading.observation);
+		}
+
+		// define the innovation gate size
+		float innov_gate = math::max(_params.heading_innov_gate, 1.0f);
+
+		// Update the quaternion states and covariance matrix
+		_aid_src_mag_heading.observation_variance = fmaxf(yaw_variance, 1.e-4f);
+
+		fuseYaw321(_aid_src_mag_heading);
 
 	} else {
-		fuseYaw312(measured_hdg, R_YAW, fuse_zero_innov);
+
+		if (fuse_zero_innov) {
+			_aid_src_mag_heading.observation = atan2f(-_R_to_earth(0, 1), _R_to_earth(1, 1));
+			_aid_src_mag_heading.innovation = 0;
+
+		} else {
+			// calculate the the innovation and wrap to the interval between +-pi
+			_aid_src_mag_heading.observation = wrap_pi(measured_hdg);
+			_aid_src_mag_heading.innovation = wrap_pi(atan2f(-_R_to_earth(0, 1), _R_to_earth(1, 1)) - _aid_src_mag_heading.observation);
+		}
+
+		// Update the quaternion states and covariance matrix
+		_aid_src_mag_heading.observation_variance = fmaxf(R_YAW, 1.e-4f);
+
+		fuseYaw312(_aid_src_mag_heading);
 	}
 }
 

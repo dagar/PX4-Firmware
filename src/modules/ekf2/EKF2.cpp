@@ -608,16 +608,8 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 		_status_fake_pos_pub_last = status.timestamp_sample;
 	}
 
-	// GPS velocity
-	if (_ekf.aid_src_gnss_vel().timestamp_sample > _status_gnss_vel_pub_last) {
-		auto status{_ekf.aid_src_gnss_vel()};
-		status.estimator_instance = _instance;
-		status.timestamp = hrt_absolute_time();
-		_estimator_aid_src_gnss_vel_pub.publish(status);
-		_status_gnss_vel_pub_last = status.timestamp_sample;
-	}
 
-	// GPS position
+	// GNSS position
 	if (_ekf.aid_src_gnss_pos().timestamp_sample > _status_gnss_pos_pub_last) {
 		auto status{_ekf.aid_src_gnss_pos()};
 		status.estimator_instance = _instance;
@@ -626,6 +618,23 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 		_status_gnss_pos_pub_last = status.timestamp_sample;
 	}
 
+	// GNSS velocity
+	if (_ekf.aid_src_gnss_vel().timestamp_sample > _status_gnss_vel_pub_last) {
+		auto status{_ekf.aid_src_gnss_vel()};
+		status.estimator_instance = _instance;
+		status.timestamp = hrt_absolute_time();
+		_estimator_aid_src_gnss_vel_pub.publish(status);
+		_status_gnss_vel_pub_last = status.timestamp_sample;
+	}
+
+	// GNSS yaw
+	if (_ekf.aid_src_gnss_heading().timestamp_sample > _status_gnss_heading_pub_last) {
+		auto status{_ekf.aid_src_gnss_heading()};
+		status.estimator_instance = _instance;
+		status.timestamp = hrt_absolute_time();
+		_estimator_aid_src_gnss_heading_pub.publish(status);
+		_status_gnss_heading_pub_last = status.timestamp_sample;
+	}
 
 
 	// mag 3d
