@@ -517,21 +517,6 @@ private:
 		(ParamExtFloat<px4::params::EKF2_BCOEF_Y>) _param_ekf2_bcoef_y,		///< ballistic coefficient along the Y-axis (kg/m**2)
 		(ParamExtFloat<px4::params::EKF2_MCOEF>) _param_ekf2_mcoef,		///< propeller momentum drag coefficient (1/s)
 
-		// Corrections for static pressure position error where Ps_error = Ps_meas - Ps_truth
-		// Coef = Ps_error / Pdynamic, where Pdynamic = 1/2 * density * TAS**2
-		(ParamExtFloat<px4::params::EKF2_ASPD_MAX>)
-		_param_ekf2_aspd_max,		///< upper limit on airspeed used for correction  (m/s**2)
-		(ParamExtFloat<px4::params::EKF2_PCOEF_XP>)
-		_param_ekf2_pcoef_xp,	///< static pressure position error coefficient along the positive X body axis
-		(ParamExtFloat<px4::params::EKF2_PCOEF_XN>)
-		_param_ekf2_pcoef_xn,	///< static pressure position error coefficient along the negative X body axis
-		(ParamExtFloat<px4::params::EKF2_PCOEF_YP>)
-		_param_ekf2_pcoef_yp,	///< static pressure position error coefficient along the positive Y body axis
-		(ParamExtFloat<px4::params::EKF2_PCOEF_YN>)
-		_param_ekf2_pcoef_yn,	///< static pressure position error coefficient along the negative Y body axis
-		(ParamExtFloat<px4::params::EKF2_PCOEF_Z>)
-		_param_ekf2_pcoef_z,	///< static pressure position error coefficient along the Z body axis
-
 		(ParamFloat<px4::params::EKF2_REQ_GPS_H>) _param_ekf2_req_gps_h, ///< Required GPS health time
 		(ParamExtInt<px4::params::EKF2_MAG_CHECK>) _param_ekf2_mag_check, ///< Mag field strength check
 		(ParamExtInt<px4::params::EKF2_SYNT_MAG_Z>)

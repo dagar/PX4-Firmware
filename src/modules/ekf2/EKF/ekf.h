@@ -799,8 +799,6 @@ private:
 	// and a scalar innovation value
 	void fuse(const Vector24f &K, float innovation);
 
-	float compensateBaroForDynamicPressure(float baro_alt_uncompensated) const override;
-
 	// calculate the earth rotation vector from a given latitude
 	Vector3f calcEarthRateNED(float lat_rad) const;
 

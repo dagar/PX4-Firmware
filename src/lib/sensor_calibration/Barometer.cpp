@@ -174,6 +174,13 @@ bool Barometer::ParametersLoad()
 		// CAL_BAROx_OFF
 		set_offset(GetCalibrationParamFloat(SensorString(), "OFF", _calibration_index));
 
+		// CAL_BAROx_PCO_XP
+		_static_pressure_coef_xp = GetCalibrationParamFloat(SensorString(), "PCO_XP", _calibration_index);
+		_static_pressure_coef_xn = GetCalibrationParamFloat(SensorString(), "PCO_XN", _calibration_index);
+		_static_pressure_coef_yp = GetCalibrationParamFloat(SensorString(), "PCO_YP", _calibration_index);
+		_static_pressure_coef_yn = GetCalibrationParamFloat(SensorString(), "PCO_YN", _calibration_index);
+		_static_pressure_coef_z = GetCalibrationParamFloat(SensorString(), "PCO_Z", _calibration_index);
+
 		return true;
 	}
 

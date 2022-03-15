@@ -351,15 +351,6 @@ struct parameters {
 
 	int32_t valid_timeout_max{5000000};	///< amount of time spent inertial dead reckoning before the estimator reports the state estimates as invalid (uSec)
 
-	// static barometer pressure position error coefficient along body axes
-	float static_pressure_coef_xp {0.0f};	// (-)
-	float static_pressure_coef_xn {0.0f};	// (-)
-	float static_pressure_coef_yp {0.0f};	// (-)
-	float static_pressure_coef_yn {0.0f};	// (-)
-	float static_pressure_coef_z {0.0f};	// (-)
-	// upper limit on airspeed used for correction  (m/s**2)
-	float max_correction_airspeed {20.0f};
-
 	// multi-rotor drag specific force fusion
 	float drag_noise{2.5f};			///< observation noise variance for drag specific force measurements (m/sec**2)**2
 	float bcoef_x{100.0f};			///< bluff body drag ballistic coefficient for the X-axis (kg/m**2)

@@ -74,6 +74,32 @@ public:
 	// apply offsets
 	inline float Correct(const float &data) const
 	{
+#if 0
+		// Corrections for static pressure position error where Ps_error = Ps_meas - Ps_truth
+		// Coef = Ps_error / Pdynamic, where Pdynamic = 1/2 * density * TAS**2
+
+		// calculate static pressure error = Pmeas - Ptruth
+		// model position error sensitivity as a body fixed ellipse with a different scale in the positive and
+		// negative X and Y directions. Used to correct baro data for positional errors
+		const matrix::Dcmf R_to_body{};//_output_new.quat_nominal.inversed());
+
+		// Calculate airspeed in body frame
+		const matrix::Vector3f velocity_earth{};// = _output_new.vel - _vel_imu_rel_body_ned;
+		const matrix::Vector3f wind_velocity_earth{};//(_state.wind_vel(0), _state.wind_vel(1), 0.0f);
+		const matrix::Vector3f airspeed_earth = velocity_earth - wind_velocity_earth;
+		const matrix::Vector3f airspeed_body = R_to_body * airspeed_earth;
+
+		const matrix::Vector3f K_pstatic_coef(airspeed_body(0) >= 0 ? _static_pressure_coef_xp : _static_pressure_coef_xn,
+						      airspeed_body(1) >= 0 ? _static_pressure_coef_yp : _static_pressure_coef_yn,
+						      _static_pressure_coef_z);
+
+		const matrix::Vector3f airspeed_squared = airspeed_body.emult(airspeed_body); // TODO: constrain max_correction_airspeed
+
+		const float pstatic_err = 0.5f * _air_density * (airspeed_squared.dot(K_pstatic_coef));
+
+		// correct baro measurement using pressure error estimate and assuming sea level gravity
+		return baro_alt_uncompensated + pstatic_err / (_air_density * CONSTANTS_ONE_G);
+#endif
 		return data - _thermal_offset - _offset;
 	}
 
@@ -101,6 +127,13 @@ private:
 
 	float _offset{0};
 	float _thermal_offset{0};
+
+	float _static_pressure_coef_xp{0.0f};	// (-)
+	float _static_pressure_coef_xn{0.0f};	// (-)
+	float _static_pressure_coef_yp{0.0f};	// (-)
+	float _static_pressure_coef_yn{0.0f};	// (-)
+	float _static_pressure_coef_z{0.0f};	// (-)
+	float _air_density{1.2f};
 
 	int8_t _calibration_index{-1};
 	uint32_t _device_id{0};
