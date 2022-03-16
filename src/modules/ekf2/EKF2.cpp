@@ -634,6 +634,15 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 		_estimator_aid_src_fake_pos_pub.publish(status);
 		_status_fake_pos_pub_last = status.timestamp_sample;
 	}
+
+	// Range height
+	if (_ekf.aid_src_range_hgt().timestamp_sample > _status_range_hgt_pub_last) {
+		auto status{_ekf.aid_src_range_hgt()};
+		status.estimator_instance = _instance;
+		status.timestamp = hrt_absolute_time();
+		_estimator_aid_src_range_hgt_pub.publish(status);
+		_status_range_hgt_pub_last = status.timestamp_sample;
+	}
 }
 
 void EKF2::PublishAttitude(const hrt_abstime &timestamp)

@@ -100,20 +100,49 @@ void Ekf::fuseBaroHgt(estimator_aid_source_1d_s &baro_hgt)
 	}
 }
 
-void Ekf::fuseRngHgt()
+void Ekf::updateRngHgt(estimator_aid_source_1d_s &range_hgt)
 {
-	// use range finder with tilt correction
-	_rng_hgt_innov = _state.pos(2) - (-math::max(_range_sensor.getDistBottom(),
-					  _params.rng_gnd_clearance)) - _rng_hgt_offset;
+	// observation variance - user parameter defined
+	float obs_var = fmaxf(sq(_params.range_noise) + sq(_params.range_noise_scaler * _range_sensor.getDistBottom()), 0.01f);
 
 	// innovation gate size
 	float innov_gate = fmaxf(_params.range_innov_gate, 1.f);
 
-	// observation variance - user parameter defined
-	float obs_var = fmaxf(sq(_params.range_noise) + sq(_params.range_noise_scaler * _range_sensor.getDistBottom()), 0.01f);
+	// vertical position innovation, use range finder with tilt correction
+	range_hgt.observation = (-math::max(_range_sensor.getDistBottom(), _params.rng_gnd_clearance)) + _rng_hgt_offset;
+	range_hgt.observation_variance = obs_var;
 
-	fuseVerticalPosition(_rng_hgt_innov, innov_gate, obs_var,
-			     _rng_hgt_innov_var, _rng_hgt_test_ratio);
+	range_hgt.innovation = _state.pos(2) - range_hgt.observation;
+	range_hgt.innovation_variance = P(9, 9) + obs_var;
+
+	range_hgt.test_ratio = sq(range_hgt.innovation) / (sq(innov_gate) * range_hgt.innovation_variance);
+
+	range_hgt.innovation_rejected = (range_hgt.test_ratio > 1.f);
+
+	// special case if there is bad vertical acceleration data, then don't reject measurement,
+	// but limit innovation to prevent spikes that could destabilise the filter
+	if (_fault_status.flags.bad_acc_vertical && range_hgt.innovation_rejected) {
+		const float innov_limit = innov_gate * sqrtf(range_hgt.innovation_variance);
+		range_hgt.innovation = math::constrain(range_hgt.innovation, -innov_limit, innov_limit);
+		range_hgt.innovation_rejected = false;
+	}
+
+	range_hgt.fusion_enabled = _control_status.flags.rng_hgt;
+
+	range_hgt.timestamp_sample = _range_sensor.getSampleAddress()->time_us;
+
+	range_hgt.fused = false; // reset
+}
+
+void Ekf::fuseRngHgt(estimator_aid_source_1d_s &range_hgt)
+{
+	if (range_hgt.fusion_enabled
+	    && !range_hgt.innovation_rejected
+	    && fuseVelPosHeight(range_hgt.innovation, range_hgt.innovation_variance, 5)) {
+
+		range_hgt.fused = true;
+		range_hgt.time_last_fuse = _time_last_imu;
+	}
 }
 
 void Ekf::fuseEvHgt()

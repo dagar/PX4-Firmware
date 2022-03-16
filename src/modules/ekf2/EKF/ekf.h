@@ -90,9 +90,9 @@ public:
 	void getBaroHgtInnovVar(float &baro_hgt_innov_var) const { baro_hgt_innov_var = _aid_src_baro_hgt.innovation_variance; }
 	void getBaroHgtInnovRatio(float &baro_hgt_innov_ratio) const { baro_hgt_innov_ratio = _aid_src_baro_hgt.test_ratio; }
 
-	void getRngHgtInnov(float &rng_hgt_innov) const { rng_hgt_innov = _rng_hgt_innov; }
-	void getRngHgtInnovVar(float &rng_hgt_innov_var) const { rng_hgt_innov_var = _rng_hgt_innov_var; }
-	void getRngHgtInnovRatio(float &rng_hgt_innov_ratio) const { rng_hgt_innov_ratio = _rng_hgt_test_ratio; }
+	void getRngHgtInnov(float &rng_hgt_innov) const { rng_hgt_innov = _aid_src_range_hgt.innovation; }
+	void getRngHgtInnovVar(float &rng_hgt_innov_var) const { rng_hgt_innov_var = _aid_src_range_hgt.innovation_variance; }
+	void getRngHgtInnovRatio(float &rng_hgt_innov_ratio) const { rng_hgt_innov_ratio = _aid_src_range_hgt.test_ratio; }
 
 	void getAuxVelInnov(float aux_vel_innov[2]) const;
 	void getAuxVelInnovVar(float aux_vel_innov[2]) const;
@@ -337,6 +337,7 @@ public:
 	const BaroBiasEstimator::status &getBaroBiasEstimatorStatus() const { return _baro_b_est.getStatus(); }
 
 	const auto &aid_src_baro_hgt() const { return _aid_src_baro_hgt; }
+	const auto &aid_src_range_hgt() const { return _aid_src_range_hgt; }
 
 	const auto &aid_src_fake_pos() const { return _aid_src_fake_pos; }
 
@@ -450,9 +451,6 @@ private:
 	Vector3f _ev_pos_innov{};	///< external vision position innovations (m)
 	Vector3f _ev_pos_innov_var{};	///< external vision position innovation variances (m**2)
 
-	float _rng_hgt_innov{};	///< range hgt innovations (m)
-	float _rng_hgt_innov_var{};	///< range hgt innovation variances (m**2)
-
 	Vector3f _aux_vel_innov{};	///< horizontal auxiliary velocity innovations: (m/sec)
 	Vector3f _aux_vel_innov_var{};	///< horizontal auxiliary velocity innovation variances: ((m/sec)**2)
 
@@ -489,6 +487,7 @@ private:
 	Vector2f _flow_compensated_XY_rad{};	///< measured delta angle of the image about the X and Y body axes after removal of body rotation (rad), RH rotation is positive
 
 	estimator_aid_source_1d_s _aid_src_baro_hgt{};
+	estimator_aid_source_1d_s _aid_src_range_hgt{};
 
 	estimator_aid_source_3d_s _aid_src_gnss_vel{};
 	estimator_aid_source_3d_s _aid_src_gnss_pos{};
@@ -642,10 +641,10 @@ private:
 	void fuseDrag(const dragSample &drag_sample);
 
 	void fuseBaroHgt(estimator_aid_source_1d_s &baro_hgt);
-	void fuseRngHgt();
+	void fuseRngHgt(estimator_aid_source_1d_s &range_hgt);
 	void fuseEvHgt();
 
-	void updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s &baro_hgt);
+	void updateRngHgt(estimator_aid_source_1d_s &range_hgt);
 
 	// fuse single velocity and position measurement
 	bool fuseVelPosHeight(const float innov, const float innov_var, const int obs_index);
@@ -944,6 +943,7 @@ private:
 
 	void updateBaroHgtOffset();
 	void updateBaroHgtBias();
+	void updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s &baro_hgt);
 
 	void updateGroundEffect();
 

@@ -951,10 +951,11 @@ void Ekf::controlHeightFusion()
 		}
 	}
 
-	if (_control_status.flags.rng_hgt) {
+	if (_range_sensor.isDataHealthy()) {
+		updateRngHgt(_aid_src_range_hgt);
 
-		if (_range_sensor.isDataHealthy()) {
-			fuseRngHgt();
+		if (_control_status.flags.rng_hgt) {
+			fuseRngHgt(_aid_src_range_hgt);
 		}
 
 	} else if (_control_status.flags.ev_hgt) {
