@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (C) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2019-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,6 @@
  */
 
 #pragma once
-
 
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/getopt.h>
@@ -117,28 +116,13 @@ using namespace time_literals;
 #define INA226_AVERAGES_512                   (6 << INA226_AVERAGES_SHIFTS)
 #define INA226_AVERAGES_1024                  (7 << INA226_AVERAGES_SHIFTS)
 
-#define INA226_CONFIG (INA226_MODE_SHUNT_BUS_CONT | INA226_VSHCT_588US | INA226_VBUSCT_588US | INA226_AVERAGES_64)
+#define INA226_CONFIG (INA226_MODE_SHUNT_BUS_CONT | INA226_VSHCT_8244US | INA226_VBUSCT_8244US | INA226_AVERAGES_4)
 
 #define INA226_RST                            (1 << 15)
 
-/* INA226 Enable / Mask Register */
-
-#define INA226_LEN                           (1 << 0)
-#define INA226_APOL                          (1 << 1)
-#define INA226_OVF                           (1 << 2)
-#define INA226_CVRF                          (1 << 3)
-#define INA226_AFF                           (1 << 4)
-
-#define INA226_CNVR                          (1 << 10)
-#define INA226_POL                           (1 << 11)
-#define INA226_BUL                           (1 << 12)
-#define INA226_BOL                           (1 << 13)
-#define INA226_SUL                           (1 << 14)
-#define INA226_SOL                           (1 << 15)
-
-#define INA226_SAMPLE_FREQUENCY_HZ            10
+#define INA226_SAMPLE_FREQUENCY_HZ            50
 #define INA226_SAMPLE_INTERVAL_US             (1_s / INA226_SAMPLE_FREQUENCY_HZ)
-#define INA226_CONVERSION_INTERVAL            (INA226_SAMPLE_INTERVAL_US - 7)
+
 #define MAX_CURRENT                           164.0f    /* 164 Amps */
 #define DN_MAX                                32768.0f  /* 2^15 */
 #define INA226_CONST                          0.00512f  /* is an internal fixed value used to ensure scaling is maintained properly  */
@@ -156,9 +140,9 @@ public:
 	static I2CSPIDriverBase *instantiate(const I2CSPIDriverConfig &config, int runtime_instance);
 	static void print_usage();
 
-	void	RunImpl();
+	void RunImpl();
 
-	int 		  init() override;
+	int init() override;
 
 	/**
 	 * Tries to call the init() function. If it fails, then it will schedule to retry again in
@@ -171,37 +155,10 @@ public:
 	/**
 	* Diagnostics - print some basic information about the driver.
 	*/
-	void				      print_status() override;
-
-protected:
-	int	  		probe() override;
+	void print_status() override;
 
 private:
-	bool			        _sensor_ok{false};
-	unsigned                        _measure_interval{0};
-	bool			        _collect_phase{false};
-	bool 					_initialized{false};
-
-	perf_counter_t		_sample_perf;
-	perf_counter_t		_comms_errors;
-	perf_counter_t 		_collection_errors;
-	perf_counter_t 		_measure_errors;
-
-	int16_t           _bus_voltage{0};
-	int16_t           _power{0};
-	int16_t           _current{0};
-	int16_t           _shunt{0};
-	int16_t           _cal{0};
-	bool              _mode_triggered{false};
-
-	float             _max_current{MAX_CURRENT};
-	float             _rshunt{INA226_SHUNT};
-	uint16_t          _config{INA226_CONFIG};
-	float             _current_lsb{_max_current / DN_MAX};
-	float             _power_lsb{25.0f * _current_lsb};
-
-	Battery 		  _battery;
-	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+	int probe() override;
 
 	int read(uint8_t address, int16_t &data);
 	int write(uint8_t address, uint16_t data);
@@ -212,9 +169,18 @@ private:
 	* @note This function is called at open and error time.  It might make sense
 	*       to make it more aggressive about resetting the bus in case of errors.
 	*/
-	void				      start();
+	void start();
 
-	int					     measure();
-	int					     collect();
+	bool _initialized{false};
 
+	perf_counter_t _comms_errors{perf_alloc(PC_COUNT, MODULE_NAME": communication error")};
+	perf_counter_t _measure_errors{perf_alloc(PC_COUNT, MODULE_NAME": measurement error")};
+
+	float _max_current{MAX_CURRENT};
+	float _rshunt{INA226_SHUNT};
+	float _current_lsb{_max_current / DN_MAX};
+	float _power_lsb{25.f * _current_lsb};
+
+	Battery _battery;
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 };

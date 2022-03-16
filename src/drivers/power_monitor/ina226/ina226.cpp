@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,15 +40,10 @@
 
 #include "ina226.h"
 
-
 INA226::INA226(const I2CSPIDriverConfig &config, int battery_index) :
 	I2C(config),
 	ModuleParams(nullptr),
 	I2CSPIDriver(config),
-	_sample_perf(perf_alloc(PC_ELAPSED, "ina226_read")),
-	_comms_errors(perf_alloc(PC_COUNT, "ina226_com_err")),
-	_collection_errors(perf_alloc(PC_COUNT, "ina226_collection_err")),
-	_measure_errors(perf_alloc(PC_COUNT, "ina226_measurement_err")),
 	_battery(battery_index, this, INA226_SAMPLE_INTERVAL_US, battery_status_s::BATTERY_SOURCE_POWER_MODULE)
 {
 	float fvalue = MAX_CURRENT;
@@ -67,18 +62,6 @@ INA226::INA226(const I2CSPIDriverConfig &config, int battery_index) :
 		_rshunt = fvalue;
 	}
 
-	ph = param_find("INA226_CONFIG");
-	int32_t value = INA226_CONFIG;
-	_config = (uint16_t)value;
-
-	if (ph != PARAM_INVALID && param_get(ph, &value) == PX4_OK) {
-		_config = (uint16_t)value;
-	}
-
-	_mode_triggered = ((_config & INA226_MODE_MASK) >> INA226_MODE_SHIFTS) <=
-			  ((INA226_MODE_SHUNT_BUS_TRIG & INA226_MODE_MASK) >>
-			   INA226_MODE_SHIFTS);
-
 	_current_lsb = _max_current / DN_MAX;
 	_power_lsb = 25 * _current_lsb;
 
@@ -91,10 +74,7 @@ INA226::INA226(const I2CSPIDriverConfig &config, int battery_index) :
 
 INA226::~INA226()
 {
-	/* free perf counters */
-	perf_free(_sample_perf);
 	perf_free(_comms_errors);
-	perf_free(_collection_errors);
 	perf_free(_measure_errors);
 }
 
@@ -109,7 +89,6 @@ int INA226::read(uint8_t address, int16_t &data)
 
 	} else {
 		perf_count(_comms_errors);
-		PX4_DEBUG("i2c::transfer returned %d", ret);
 	}
 
 	return ret;
@@ -117,61 +96,54 @@ int INA226::read(uint8_t address, int16_t &data)
 
 int INA226::write(uint8_t address, uint16_t value)
 {
-	uint8_t data[3] = {address, ((uint8_t)((value & 0xff00) >> 8)), (uint8_t)(value & 0xff)};
-	return transfer(data, sizeof(data), nullptr, 0);
+	uint8_t data[3] = {address, ((uint8_t)((value & 0xFF00) >> 8)), (uint8_t)(value & 0xFF)};
+	int ret = transfer(data, sizeof(data), nullptr, 0);
+
+	if (ret != 0) {
+		perf_count(_comms_errors);
+	}
+
+	return ret;
 }
 
-int
-INA226::init()
+int INA226::init()
 {
-	int ret = PX4_ERROR;
-
-	/* do I2C init (and probe) first */
+	// do I2C init (and probe) first
 	if (I2C::init() != PX4_OK) {
-		return ret;
+		return PX4_ERROR;
 	}
 
 	write(INA226_REG_CONFIGURATION, INA226_RST);
 
-	_cal = INA226_CONST / (_current_lsb * _rshunt);
+	int16_t cal = INA226_CONST / (_current_lsb * _rshunt);
 
-	if (write(INA226_REG_CALIBRATION, _cal) < 0) {
-		return -3;
+	if (write(INA226_REG_CALIBRATION, cal) < 0) {
+		return PX4_ERROR;
 	}
 
 	// If we run in continuous mode then start it here
-
-	if (!_mode_triggered) {
-		ret = write(INA226_REG_CONFIGURATION, _config);
-
-	} else {
-		ret = PX4_OK;
+	if (write(INA226_REG_CONFIGURATION, INA226_CONFIG) == 0) {
+		_initialized = true;
 	}
 
-	start();
-	_sensor_ok = true;
+	ScheduleOnInterval(INA226_SAMPLE_INTERVAL_US, INA226_SAMPLE_INTERVAL_US);
 
-	_initialized = ret == PX4_OK;
-	return ret;
+	return PX4_OK;
 }
 
-int
-INA226::force_init()
+int INA226::force_init()
 {
 	int ret = init();
-
-	start();
-
+	ScheduleOnInterval(INA226_SAMPLE_INTERVAL_US, INA226_SAMPLE_INTERVAL_US);
 	return ret;
 }
 
-int
-INA226::probe()
+int INA226::probe()
 {
-	int16_t value{0};
+	int16_t value = 0;
 
 	if (read(INA226_MFG_ID, value) != PX4_OK || value != INA226_MFG_ID_TI) {
-		PX4_DEBUG("probe mfgid %d", value);
+		PX4_DEBUG("probe mfg ID %d", value);
 		return -1;
 	}
 
@@ -183,28 +155,8 @@ INA226::probe()
 	return PX4_OK;
 }
 
-int
-INA226::measure()
+void INA226::RunImpl()
 {
-	int ret = PX4_OK;
-
-	if (_mode_triggered) {
-		ret = write(INA226_REG_CONFIGURATION, _config);
-
-		if (ret < 0) {
-			perf_count(_comms_errors);
-			PX4_DEBUG("i2c::transfer returned %d", ret);
-		}
-	}
-
-	return ret;
-}
-
-int
-INA226::collect()
-{
-	perf_begin(_sample_perf);
-
 	if (_parameter_update_sub.updated()) {
 		// Read from topic to clear updated flag
 		parameter_update_s parameter_update;
@@ -214,105 +166,31 @@ INA226::collect()
 	}
 
 	// read from the sensor
-	// Note: If the power module is connected backwards, then the values of _power, _current, and _shunt will be negative but otherwise valid.
-	bool success{true};
-	success = success && (read(INA226_REG_BUSVOLTAGE, _bus_voltage) == PX4_OK);
-	// success = success && (read(INA226_REG_POWER, _power) == PX4_OK);
-	success = success && (read(INA226_REG_CURRENT, _current) == PX4_OK);
-	// success = success && (read(INA226_REG_SHUNTVOLTAGE, _shunt) == PX4_OK);
+	// Note: If the power module is connected backwards, then the values of power, current, and shunt will be negative but otherwise valid.
+	int16_t bus_voltage = 0;
+	int16_t current = 0;
 
-	if (!success) {
-		PX4_DEBUG("error reading from sensor");
-		_bus_voltage = _power = _current = _shunt = 0;
-	}
-
-	_battery.setConnected(success);
-	_battery.updateVoltage(static_cast<float>(_bus_voltage * INA226_VSCALE));
-	_battery.updateCurrent(static_cast<float>(_current * _current_lsb));
-	_battery.updateAndPublishBatteryStatus(hrt_absolute_time());
-
-	perf_end(_sample_perf);
-
-	if (success) {
-		return PX4_OK;
-
-	} else {
-		return PX4_ERROR;
-	}
-}
-
-void
-INA226::start()
-{
-	ScheduleClear();
-
-	/* reset the report ring and state machine */
-	_collect_phase = false;
-
-	_measure_interval = INA226_CONVERSION_INTERVAL;
-
-	/* schedule a cycle to start things */
-	ScheduleDelayed(5);
-}
-
-void
-INA226::RunImpl()
-{
-	if (_initialized) {
-		if (_collect_phase) {
-			/* perform collection */
-			if (collect() != PX4_OK) {
-				perf_count(_collection_errors);
-				/* if error restart the measurement state machine */
-				start();
-				return;
-			}
-
-			/* next phase is measurement */
-			_collect_phase = !_mode_triggered;
-
-			if (_measure_interval > INA226_CONVERSION_INTERVAL) {
-				/* schedule a fresh cycle call when we are ready to measure again */
-				ScheduleDelayed(_measure_interval - INA226_CONVERSION_INTERVAL);
-				return;
-			}
-		}
-
-		/* Measurement  phase */
-
-		/* Perform measurement */
-		if (measure() != PX4_OK) {
-			perf_count(_measure_errors);
-		}
-
-		/* next phase is collection */
-		_collect_phase = true;
-
-		/* schedule a fresh cycle call when the measurement is done */
-		ScheduleDelayed(INA226_CONVERSION_INTERVAL);
+	if ((read(INA226_REG_BUSVOLTAGE, bus_voltage) == PX4_OK) && (read(INA226_REG_CURRENT, current) == PX4_OK)) {
+		_battery.setConnected(true);
+		_battery.updateVoltage(static_cast<float>(bus_voltage * INA226_VSCALE));
+		_battery.updateCurrent(static_cast<float>(current * _current_lsb));
+		_battery.updateAndPublishBatteryStatus(hrt_absolute_time());
 
 	} else {
 		_battery.setConnected(false);
-		_battery.updateVoltage(0.f);
-		_battery.updateCurrent(0.f);
-		_battery.updateAndPublishBatteryStatus(hrt_absolute_time());
-
-		if (init() != PX4_OK) {
-			ScheduleDelayed(INA226_INIT_RETRY_INTERVAL_US);
-		}
+		perf_count(_measure_errors);
 	}
+
+	// TODO: force reconfigure if there hasn't been a successful read
 }
 
-void
-INA226::print_status()
+void INA226::print_status()
 {
 	I2CSPIDriverBase::print_status();
 
 	if (_initialized) {
-		perf_print_counter(_sample_perf);
 		perf_print_counter(_comms_errors);
-
-		printf("poll interval:  %u \n", _measure_interval);
+		perf_print_counter(_measure_errors);
 
 	} else {
 		PX4_INFO("Device not initialized. Retrying every %d ms until battery is plugged in.",

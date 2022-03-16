@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019, 2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,17 +41,6 @@
  * @reboot_required true
 */
 PARAM_DEFINE_INT32(SENS_EN_INA226, 0);
-
-/**
- * INA226 Power Monitor Config
- *
- * @group Sensors
- * @min 0
- * @max 65535
- * @decimal 1
- * @increment 1
-*/
-PARAM_DEFINE_INT32(INA226_CONFIG, 18139);
 
 /**
  * INA226 Power Monitor Max Current
