@@ -94,7 +94,6 @@ void Ekf::initialiseCovariance()
 	// wind
 	P(22,22) = sq(_params.initial_wind_uncertainty);
 	P(23,23) = P(22,22);
-
 }
 
 void Ekf::predictCovariance()

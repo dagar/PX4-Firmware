@@ -210,10 +210,16 @@ bool Ekf::resetYawToGps()
 	const float measured_yaw = _gps_sample_delayed.yaw;
 
 	const float yaw_variance = sq(fmaxf(_params.gps_heading_noise, 1.0e-2f));
-	resetQuatStateYaw(measured_yaw, yaw_variance, true);
+	resetQuatStateYaw(measured_yaw, yaw_variance);
 
 	_time_last_gps_yaw_fuse = _time_last_imu;
 	_yaw_signed_test_ratio_lpf.reset(0.f);
+
+	if (resetMagStates()) {
+		// record the start time for the magnetic field alignment
+		_flt_mag_align_start_time = _imu_sample_delayed.time_us;
+		_control_status.flags.mag_aligned_in_flight = true;
+	}
 
 	return true;
 }

@@ -14,7 +14,6 @@ EKFGSF_yaw::EKFGSF_yaw()
 }
 
 void EKFGSF_yaw::update(const imuSample &imu_sample,
-			bool run_EKF,			// set to true when flying or movement is suitable for yaw estimation
 			float airspeed,			// true airspeed used for centripetal accel compensation - set to 0 when not required.
 			const Vector3f &imu_gyro_bias)  // estimated rate gyro bias (rad/sec)
 {
@@ -23,7 +22,6 @@ void EKFGSF_yaw::update(const imuSample &imu_sample,
 	_delta_vel = imu_sample.delta_vel;
 	_delta_ang_dt = imu_sample.delta_ang_dt;
 	_delta_vel_dt = imu_sample.delta_vel_dt;
-	_run_ekf_gsf = run_EKF;
 	_true_airspeed = airspeed;
 
 	// to reduce effect of vibration, filter using an LPF whose time constant is 1/10 of the AHRS tilt correction time constant
