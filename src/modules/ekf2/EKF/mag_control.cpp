@@ -84,16 +84,13 @@ void Ekf::controlMagFusion()
 	    || _control_status.flags.mag_fault
 	    || !_control_status.flags.tilt_align) {
 
-		stopMagFusion();
-		//stopMagHdgFusion();
 
-		if (!_control_status.flags.ev_yaw && !_control_status.flags.gps_yaw) {
-			// TODO: setting _is_yaw_fusion_inhibited to true is required to tell
+		//stopMagHdgFusion();
+		stopMagFusion();
+
+		if (isTimedOut(_time_last_heading_fuse, (uint64_t)2e5)) {
 			// fuseHeading to perform a "zero innovation heading fusion"
-			// We should refactor it to avoid using this flag here
-			_is_yaw_fusion_inhibited = true;
-			fuseHeading();
-			_is_yaw_fusion_inhibited = false;
+			fuseHeadingZeroInnovation();
 		}
 
 		return;
@@ -133,26 +130,22 @@ void Ekf::controlMagFusion()
 
 		const bool mag_enabled = _control_status.flags.mag_hdg || _control_status.flags.mag_3D;
 
-		_is_yaw_fusion_inhibited = shouldInhibitMag();
 
-		if (!_is_yaw_fusion_inhibited) {
-			_mag_use_not_inhibit_us = _imu_sample_delayed.time_us;
-		}
+		// If the user has selected auto protection against indoor magnetic field errors, only use the magnetometer
+		// if a yaw angle relative to true North is required for navigation. If no GPS or other earth frame aiding
+		// is available, assume that we are operating indoors and the magnetometer should not be used.
+		// Also inhibit mag fusion when a strong magnetic field interference is detected or the user
+		// has explicitly stopped magnetometer use.
+		const bool user_selected_indoor = (_params.mag_fusion_type == MAG_FUSE_TYPE_INDOOR);
+		const bool heading_not_required_for_navigation = !_control_status.flags.gps;
+		bool inhibit_mag = (user_selected_indoor && heading_not_required_for_navigation) || _control_status.flags.mag_field_disturbed;
 
-		// If magnetometer use has been inhibited continuously then a yaw reset is required for a valid heading
-		if (uint32_t(_imu_sample_delayed.time_us - _mag_use_not_inhibit_us) > (uint32_t)5e6) {
-			_mag_inhibit_yaw_reset_req = true;
-		}
 
+		bool no_recent_mag_fuse = isTimedOut(_time_last_mag_heading_fuse, (uint64_t)5e6) && isTimedOut(_time_last_mag_3d_fuse, (uint64_t)5e6);
 		const bool declination_changed = (fabsf(_mag_last_declination - getMagDeclination()) > 0.01f);
 
-		bool mag_yaw_reset_req = !_control_status.flags.yaw_align || _mag_inhibit_yaw_reset_req || haglYawResetReq() || declination_changed;
+		if (!inhibit_mag && (!_control_status.flags.yaw_align || no_recent_mag_fuse || haglYawResetReq() || declination_changed || (!mag_enabled_previously && mag_enabled))) {
 
-		if (!mag_enabled_previously && mag_enabled) {
-			mag_yaw_reset_req = true;
-		}
-
-		if (mag_yaw_reset_req) {
 			bool has_realigned_yaw = false;
 
 			if (_control_status.flags.fixed_wing && _control_status.flags.in_air && _control_status.flags.gps) {
@@ -175,8 +168,7 @@ void Ekf::controlMagFusion()
 
 				// Handle the special case where we have not been constraining yaw drift or learning yaw bias due
 				// to assumed invalid mag field associated with indoor operation with a downwards looking flow sensor.
-				if (_mag_inhibit_yaw_reset_req) {
-					_mag_inhibit_yaw_reset_req = false;
+				if (no_recent_mag_fuse) {
 					// Zero the yaw bias covariance and set the variance to the initial alignment uncertainty
 					P.uncorrelateCovarianceSetVariance<1>(12, sq(_params.switch_on_gyro_bias * _dt_ekf_avg));
 				}
@@ -188,7 +180,15 @@ void Ekf::controlMagFusion()
 			return;
 		}
 
-		checkMagDeclRequired();
+
+		// if we are using 3-axis magnetometer fusion, but without external NE aiding,
+		// then the declination must be fused as an observation to prevent long term heading drift
+		// fusing declination when gps aiding is available is optional, but recommended to prevent
+		// problem if the vehicle is static for extended periods of time
+		const bool user_selected_decl = (_params.mag_declination_source & MASK_FUSE_DECL);
+		const bool not_using_ne_aiding = !_control_status.flags.gps;
+		_control_status.flags.mag_dec = (_control_status.flags.mag_3D && (not_using_ne_aiding || user_selected_decl));
+
 
 		// TODO: trigger heading reset if getMagDeclination changed
 		if (_control_status.flags.mag_3D) {
@@ -198,6 +198,8 @@ void Ekf::controlMagFusion()
 			const bool update_all_states = !_control_status.flags.mag_fault && _control_status.flags.mag_aligned_in_flight &&
 			((_imu_sample_delayed.time_us - _flt_mag_align_start_time) > (uint64_t)5e6);
 
+			bool mag_fuse_success = false;
+
 			if (!_mag_decl_cov_reset) {
 				// After any magnetic field covariance reset event the earth field state
 				// covariances need to be corrected to incorporate knowledge of the declination
@@ -205,38 +207,44 @@ void Ekf::controlMagFusion()
 				// states for the first few observations.
 				fuseDeclination(0.02f);
 				_mag_decl_cov_reset = true;
-				fuseMag(mag_sample.mag, update_all_states);
+				mag_fuse_success = fuseMag(mag_sample.mag, update_all_states);
 
 			} else {
 				// The normal sequence is to fuse the magnetometer data first before fusing
 				// declination angle at a higher uncertainty to allow some learning of
 				// declination angle over time.
-				bool mag_fuse_success = fuseMag(mag_sample.mag, update_all_states);
+				mag_fuse_success = fuseMag(mag_sample.mag, update_all_states);
 
 				if (_control_status.flags.mag_dec) {
 					fuseDeclination(0.5f);
 				}
+			}
 
-				if (mag_fuse_success && update_all_states) {
-					// clear any pending mag yaw reset requests
-					_mag_inhibit_yaw_reset_req = false;
-				}
+			if (mag_fuse_success) {
+				_time_last_mag_3d_fuse = _time_last_imu;
 			}
 
 		} else if (_control_status.flags.mag_hdg) {
 			// Rotate the measurements into earth frame using the zero yaw angle
-			Dcmf R_to_earth = shouldUse321RotationSequence(_R_to_earth) ? updateEuler321YawInRotMat(0.f, _R_to_earth) : updateEuler312YawInRotMat(0.f, _R_to_earth);
-
-			Vector3f mag_earth_pred = R_to_earth * (mag_sample.mag - _state.mag_B);
+			Vector3f mag_earth_pred = updateYawInRotMat(0.f, _R_to_earth) * (mag_sample.mag - _state.mag_B);
 
 			// the angle of the projection onto the horizontal gives the yaw angle
 			_mag_last_declination = getMagDeclination();
 			float measured_hdg = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + _mag_last_declination;
 
-			fuseHeading(measured_hdg, sq(_params.mag_heading_noise));
+			float obs_var = sq(_params.mag_heading_noise);
+
+			if (shouldUse321RotationSequence(_R_to_earth)) {
+				if (fuseYaw321(measured_hdg, obs_var)) {
+					_time_last_mag_heading_fuse = _time_last_imu;
+				}
+
+			} else {
+				if (fuseYaw312(measured_hdg, obs_var)) {
+					_time_last_mag_heading_fuse = _time_last_imu;
+				}
+			}
 		}
-
-
 	}
 }
 
@@ -313,31 +321,6 @@ void Ekf::checkMagBiasObservability()
 	_time_yaw_started = _imu_sample_delayed.time_us;
 }
 
-void Ekf::checkMagDeclRequired()
-{
-	// if we are using 3-axis magnetometer fusion, but without external NE aiding,
-	// then the declination must be fused as an observation to prevent long term heading drift
-	// fusing declination when gps aiding is available is optional, but recommended to prevent
-	// problem if the vehicle is static for extended periods of time
-	const bool user_selected = (_params.mag_declination_source & MASK_FUSE_DECL);
-	const bool not_using_ne_aiding = !_control_status.flags.gps;
-	_control_status.flags.mag_dec = (_control_status.flags.mag_3D && (not_using_ne_aiding || user_selected));
-}
-
-bool Ekf::shouldInhibitMag() const
-{
-	// If the user has selected auto protection against indoor magnetic field errors, only use the magnetometer
-	// if a yaw angle relative to true North is required for navigation. If no GPS or other earth frame aiding
-	// is available, assume that we are operating indoors and the magnetometer should not be used.
-	// Also inhibit mag fusion when a strong magnetic field interference is detected or the user
-	// has explicitly stopped magnetometer use.
-	const bool user_selected = (_params.mag_fusion_type == MAG_FUSE_TYPE_INDOOR);
-
-	const bool heading_not_required_for_navigation = !_control_status.flags.gps;
-
-	return (user_selected && heading_not_required_for_navigation) || _control_status.flags.mag_field_disturbed;
-}
-
 bool Ekf::magFieldStrengthDisturbed(const Vector3f &mag_sample) const
 {
 	if (_params.check_mag_strength
@@ -404,9 +387,7 @@ bool Ekf::resetMagStates()
 
 	if (reset) {
 		resetMagCov();
-
-		_mag_inhibit_yaw_reset_req = false;
-
+		_time_last_mag_3d_fuse = _time_last_imu;
 		return true;
 	}
 

@@ -725,64 +725,55 @@ bool Ekf::updateQuaternion(const float innovation, const float variance, const f
 		// apply the state corrections
 		fuse(Kfusion, _heading_innov);
 
+		_time_last_heading_fuse = _time_last_imu;
+
 		return true;
 	}
 
 	return false;
 }
 
-void Ekf::fuseHeading(float measured_hdg, float obs_var)
+bool Ekf::fuseHeadingZeroInnovation()
 {
 	// observation variance
-	float R_YAW = PX4_ISFINITE(obs_var) ? obs_var : 0.01f;
+	float R_YAW = 0.01f;
 
 	// update transformation matrix from body to world frame using the current state estimate
 	const float predicted_hdg = getEulerYaw(_R_to_earth);
 
-	if (!PX4_ISFINITE(measured_hdg)) {
-		measured_hdg = predicted_hdg;
-	}
+	float measured_hdg = predicted_hdg;
 
-	// handle special case where yaw measurement is unavailable
-	bool fuse_zero_innov = false;
+	// The yaw measurement cannot be trusted but we need to fuse something to prevent a badly
+	// conditioned covariance matrix developing over time.
+	if (!_control_status.flags.vehicle_at_rest) {
+		// Vehicle is not at rest so fuse a zero innovation if necessary to prevent
+		// unconstrained quaternion variance growth and record the predicted heading
+		// to use as an observation when movement ceases.
+		// TODO a better way of determining when this is necessary
+		const float sumQuatVar = P(0, 0) + P(1, 1) + P(2, 2) + P(3, 3);
 
-	if (_is_yaw_fusion_inhibited) {
-		// The yaw measurement cannot be trusted but we need to fuse something to prevent a badly
-		// conditioned covariance matrix developing over time.
-		if (!_control_status.flags.vehicle_at_rest) {
-			// Vehicle is not at rest so fuse a zero innovation if necessary to prevent
-			// unconstrained quaternion variance growth and record the predicted heading
-			// to use as an observation when movement ceases.
-			// TODO a better way of determining when this is necessary
-			const float sumQuatVar = P(0, 0) + P(1, 1) + P(2, 2) + P(3, 3);
-
-			if (sumQuatVar > _params.quat_max_variance) {
-				fuse_zero_innov = true;
-				R_YAW = 0.25f;
-			}
-
-			_last_static_yaw = predicted_hdg;
-
-		} else {
-			// Vehicle is at rest so use the last moving prediction as an observation
-			// to prevent the heading from drifting and to enable yaw gyro bias learning
-			// before takeoff.
-			if (!PX4_ISFINITE(_last_static_yaw)) {
-				_last_static_yaw = predicted_hdg;
-			}
-
-			measured_hdg = _last_static_yaw;
+		if (sumQuatVar > _params.quat_max_variance) {
+			R_YAW = 0.25f;
 		}
 
-	} else {
 		_last_static_yaw = predicted_hdg;
+
+	} else {
+		// Vehicle is at rest so use the last moving prediction as an observation
+		// to prevent the heading from drifting and to enable yaw gyro bias learning
+		// before takeoff.
+		if (!PX4_ISFINITE(_last_static_yaw)) {
+			_last_static_yaw = predicted_hdg;
+		}
+
+		measured_hdg = _last_static_yaw;
 	}
 
 	if (shouldUse321RotationSequence(_R_to_earth)) {
-		fuseYaw321(measured_hdg, R_YAW, fuse_zero_innov);
+		return fuseYaw321(measured_hdg, R_YAW, true);
 
 	} else {
-		fuseYaw312(measured_hdg, R_YAW, fuse_zero_innov);
+		return fuseYaw312(measured_hdg, R_YAW, true);
 	}
 }
 

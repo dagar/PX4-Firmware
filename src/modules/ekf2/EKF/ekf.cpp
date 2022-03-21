@@ -198,10 +198,8 @@ bool Ekf::initialiseFilter()
 	// reset once the leveling phase is done
 	if (_mag_counter != 0) {
 		// rotate the magnetometer measurements into earth frame using a zero yaw angle
-		const Dcmf R_to_earth = updateYawInRotMat(0.f, _R_to_earth);
-
 		// the angle of the projection onto the horizontal gives the yaw angle
-		const Vector3f mag_earth_pred = R_to_earth * _mag_lpf.getState();
+		const Vector3f mag_earth_pred = updateYawInRotMat(0.f, _R_to_earth) * _mag_lpf.getState();
 		float yaw_new = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + getMagDeclination();
 
 		// update quaternion states and corresponding covarainces

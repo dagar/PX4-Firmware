@@ -481,7 +481,6 @@ bool Ekf::resetMagHeading()
 
 		// record the time for the magnetic field alignment event
 		_flt_mag_align_start_time = _imu_sample_delayed.time_us;
-		_mag_inhibit_yaw_reset_req = false;
 
 		return true;
 	}
@@ -1527,10 +1526,7 @@ void Ekf::startGpsFusion()
 
 		// Do not use external vision for yaw if using GPS because yaw needs to be
 		// defined relative to an NED reference frame
-		if (_control_status.flags.ev_yaw
-		|| _mag_inhibit_yaw_reset_req
-		|| isYawError(math::radians(5.f))
-		) {
+		if (_control_status.flags.ev_yaw || isYawError(math::radians(5.f))) {
 			// Stop the vision for yaw fusion and do not allow it to start again
 			stopEvYawFusion();
 

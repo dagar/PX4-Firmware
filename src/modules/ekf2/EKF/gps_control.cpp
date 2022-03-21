@@ -54,8 +54,8 @@ void Ekf::controlGpsFusion()
 		controlGpsYawFusion(gps_checks_passing, gps_checks_failing);
 
 		if (!_control_status.flags.yaw_align && _control_status.flags.tilt_align
-		&& gps_checks_passing && !gps_checks_failing
-		&& isYawEmergencyEstimateAvailable()) {
+		    && gps_checks_passing && !gps_checks_failing
+		    && isYawEmergencyEstimateAvailable()) {
 
 			if (resetYawToEKFGSF()) {
 				ECL_INFO("Yaw aligned using IMU and GPS");
@@ -91,9 +91,9 @@ void Ekf::controlGpsFusion()
 							* The total number of resets allowed per boot cycle is limited.
 							*/
 							if (isYawEmergencyEstimateAvailable() && isYawFailure()
-							&& !was_gps_signal_lost
-							&& _ekfgsf_yaw_reset_count < _params.EKFGSF_reset_count_limit
-							&& isTimedOut(_ekfgsf_yaw_reset_time, 5000000)) {
+							    && !was_gps_signal_lost
+							    && _ekfgsf_yaw_reset_count < _params.EKFGSF_reset_count_limit
+							    && isTimedOut(_ekfgsf_yaw_reset_time, 5000000)) {
 
 								// The minimum time interval between resets to the EKF-GSF estimate is limited to allow the EKF-GSF time
 								// to improve its estimate if the previous reset was not successful.
