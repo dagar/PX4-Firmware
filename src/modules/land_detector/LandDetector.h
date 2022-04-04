@@ -46,6 +46,7 @@
 #include <math.h>
 
 #include <lib/hysteresis/hysteresis.h>
+#include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
@@ -57,11 +58,12 @@
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
+#include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_acceleration.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/vehicle_imu.h>
 #include <uORB/topics/vehicle_imu_status.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
@@ -160,13 +162,14 @@ protected:
 private:
 	void Run() override;
 
-	void UpdateVehicleAtRest();
+	void UpdateVehicleAtRest(const hrt_abstime &now_us);
 
 	vehicle_land_detected_s _land_detected{};
 	hrt_abstime _takeoff_time{0};
 	hrt_abstime _total_flight_time{0};	///< total vehicle flight time in microseconds
 
 	hrt_abstime _time_last_move_detect_us{0};	// timestamp of last movement detection event in microseconds
+	hrt_abstime _time_last_still_detect_us{0};
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
@@ -175,15 +178,22 @@ private:
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::Subscription _actuator_armed_sub{ORB_ID(actuator_armed)};
-	uORB::Subscription _sensor_selection_sub{ORB_ID(sensor_selection)};
 	uORB::Subscription _vehicle_acceleration_sub{ORB_ID(vehicle_acceleration)};
 	uORB::Subscription _vehicle_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
-	uORB::Subscription _vehicle_imu_status_sub{ORB_ID(vehicle_imu_status)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+
+	static constexpr int MAX_NUM_IMUS = 4;
+
+	uORB::SubscriptionMultiArray<vehicle_imu_s, MAX_NUM_IMUS>        _vehicle_imu_subs{ORB_ID::vehicle_imu};
+	uORB::SubscriptionMultiArray<vehicle_imu_status_s, MAX_NUM_IMUS> _vehicle_imu_status_subs{ORB_ID::vehicle_imu_status};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_local_position_sub{this, ORB_ID(vehicle_local_position)};
 
-	uint32_t _device_id_gyro{0};
+	AlphaFilter<matrix::Vector3f> _imu_gyro_lpf[MAX_NUM_IMUS] {};
+	AlphaFilter<matrix::Vector3f> _imu_accel_lpf[MAX_NUM_IMUS] {};
+	matrix::Vector3f _imu_accel_last_still[MAX_NUM_IMUS] {};
+	uint8_t _imu_accel_calibration_count[MAX_NUM_IMUS] {};
+	bool _imu_accel_last_still_set[MAX_NUM_IMUS] {};
 
 	bool _at_rest{true};
 

@@ -35,6 +35,7 @@
 
 #include "Integrator.hpp"
 
+#include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/mathlib/math/WelfordMean.hpp>
 #include <lib/matrix/matrix/math.hpp>
@@ -116,8 +117,18 @@ private:
 	hrt_abstime _gyro_timestamp_sample_last{0};
 	hrt_abstime _gyro_timestamp_last{0};
 
+	math::WelfordMean<matrix::Vector3f> _raw_accel_mean_publish{};
+	math::WelfordMean<matrix::Vector3f> _raw_gyro_mean_publish{};
+
 	math::WelfordMean<matrix::Vector3f> _raw_accel_mean{};
 	math::WelfordMean<matrix::Vector3f> _raw_gyro_mean{};
+
+	AlphaFilter<matrix::Vector3f> _accel_lpf{0.1f};
+	AlphaFilter<matrix::Vector3f> _gyro_lpf{0.1f};
+	matrix::Vector3f _accel_raw_still{};
+	bool _accel_raw_still_set{false};
+
+	bool _still{true};
 
 	math::WelfordMean<matrix::Vector2f> _accel_interval_mean{};
 	math::WelfordMean<matrix::Vector2f> _gyro_interval_mean{};

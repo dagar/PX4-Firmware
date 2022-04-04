@@ -375,6 +375,7 @@ bool VehicleIMU::UpdateAccel()
 
 		const Vector3f accel_raw{accel.x, accel.y, accel.z};
 		_raw_accel_mean.update(accel_raw);
+		_raw_accel_mean_publish.update(accel_raw);
 		_accel_integrator.put(accel_raw, dt);
 
 		updated = true;
@@ -531,6 +532,7 @@ bool VehicleIMU::UpdateGyro()
 
 		const Vector3f gyro_raw{gyro.x, gyro.y, gyro.z};
 		_raw_gyro_mean.update(gyro_raw);
+		_raw_gyro_mean_publish.update(gyro_raw);
 		_gyro_integrator.put(gyro_raw, dt);
 
 		updated = true;
@@ -555,28 +557,69 @@ bool VehicleIMU::Publish()
 			// delta angle: apply offsets, scale, and board rotation
 			_gyro_calibration.SensorCorrectionsUpdate();
 			const float gyro_dt_inv = 1.e6f / imu.delta_angle_dt;
-			const Vector3f angular_velocity{_gyro_calibration.Correct(delta_angle * gyro_dt_inv)};
+			const Vector3f gyro_raw{delta_angle * gyro_dt_inv};
+			_gyro_lpf.update(gyro_raw);
+			const Vector3f angular_velocity{_gyro_calibration.Correct(gyro_raw)};
 			UpdateGyroVibrationMetrics(angular_velocity);
 			const Vector3f delta_angle_corrected{angular_velocity / gyro_dt_inv};
 
 			// delta velocity: apply offsets, scale, and board rotation
 			_accel_calibration.SensorCorrectionsUpdate();
 			const float accel_dt_inv = 1.e6f / imu.delta_velocity_dt;
-			const Vector3f acceleration{_accel_calibration.Correct(delta_velocity * accel_dt_inv)};
+			const Vector3f acceleration_raw{delta_velocity * accel_dt_inv};
+			_accel_lpf.update(acceleration_raw);
+			const Vector3f acceleration{_accel_calibration.Correct(acceleration_raw)};
 			UpdateAccelVibrationMetrics(acceleration);
 			const Vector3f delta_velocity_corrected{acceleration / accel_dt_inv};
 
+			if ((_raw_accel_mean.count() > 10) && !_raw_accel_mean.variance().longerThan(0.001f)
+			) {
+
+				_accel_raw_still = _accel_lpf.getState();
+				_accel_raw_still_set = true;
+
+				_still = true;
+			}
+
+			if ((_raw_gyro_mean.count() > 1000) && _raw_gyro_mean.variance().longerThan(0.01f)) {
+				_still = false;
+				PX4_INFO("IMU gyro %d not still", _instance);
+				_raw_gyro_mean.mean().print();
+				_raw_gyro_mean.variance().print();
+
+
+				_still = false;
+				_accel_raw_still_set = false;
+			}
+
+			if (_still && _accel_raw_still_set && Vector3f(_accel_lpf.getState() - _accel_raw_still).longerThan(0.5f)) {
+				if (_instance == 0) {
+					PX4_INFO("IMU %d not still", _instance);
+					_accel_lpf.getState().print();
+					_accel_raw_still.print();
+					Vector3f(_accel_lpf.getState() - _accel_raw_still).print();
+				}
+
+				_still = false;
+				_accel_raw_still_set = false;
+			}
+
+			if (_raw_accel_mean.count() > 10000 || _raw_gyro_mean.count() > 10000) {
+				_raw_accel_mean.reset();
+				_raw_gyro_mean.reset();
+			}
+
 			// vehicle_imu_status
 			//  publish before vehicle_imu so that error counts are available synchronously if needed
-			if (_raw_accel_mean.valid() && _raw_gyro_mean.valid()
-			    && (_publish_status || (hrt_elapsed_time(&_status.timestamp) >= 100_ms))) {
+			if (_raw_accel_mean_publish.valid() && _raw_gyro_mean_publish.valid()
+			    && (_publish_status || (_still != _status.still) || (hrt_elapsed_time(&_status.timestamp) >= 1000_ms))) {
 
 				_status.accel_device_id = _accel_calibration.device_id();
 
 				// accel mean and variance
-				Vector3f(_accel_calibration.rotation() * _raw_accel_mean.mean()).copyTo(_status.mean_accel);
-				Vector3f(_accel_calibration.rotation() * _raw_accel_mean.variance()).copyTo(_status.var_accel);
-				_raw_accel_mean.reset();
+				Vector3f(_accel_calibration.rotation() * _raw_accel_mean_publish.mean()).copyTo(_status.mean_accel);
+				Vector3f(_accel_calibration.rotation() * _raw_accel_mean_publish.variance()).copyTo(_status.var_accel);
+				_raw_accel_mean_publish.reset();
 
 				// accel temperature
 				_status.temperature_accel = _accel_temperature_sum / _accel_temperature_sum_count;
@@ -587,15 +630,16 @@ bool VehicleIMU::Publish()
 				_status.gyro_device_id = _gyro_calibration.device_id();
 
 				// gyro mean and variance
-				Vector3f(_gyro_calibration.rotation() * _raw_gyro_mean.mean()).copyTo(_status.mean_gyro);
-				Vector3f(_gyro_calibration.rotation() * _raw_gyro_mean.variance()).copyTo(_status.var_gyro);
-				_raw_gyro_mean.reset();
+				Vector3f(_gyro_calibration.rotation() * _raw_gyro_mean_publish.mean()).copyTo(_status.mean_gyro);
+				Vector3f(_gyro_calibration.rotation() * _raw_gyro_mean_publish.variance()).copyTo(_status.var_gyro);
+				_raw_gyro_mean_publish.reset();
 
 				// gyro temperature
 				_status.temperature_gyro = _gyro_temperature_sum / _gyro_temperature_sum_count;
 				_gyro_temperature_sum = NAN;
 				_gyro_temperature_sum_count = 0;
 
+				_status.still = _still;
 
 				_status.timestamp = hrt_absolute_time();
 				_vehicle_imu_status_pub.publish(_status);
