@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019, 2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,20 +31,14 @@
  *
  ****************************************************************************/
 
-/**
- * @file lsm303d_main.cpp
- * Driver for the ST LSM303D MEMS accelerometer / magnetometer connected via SPI.
- */
-
-#include "LSM303D.hpp"
+#include "L3GD20.hpp"
 
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
 
-void
-LSM303D::print_usage()
+void L3GD20::print_usage()
 {
-	PRINT_MODULE_USAGE_NAME("lsm303d", "driver");
+	PRINT_MODULE_USAGE_NAME("l3gd20", "driver");
 	PRINT_MODULE_USAGE_SUBCATEGORY("imu");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_PARAMS_I2C_SPI_DRIVER(false, true);
@@ -52,12 +46,12 @@ LSM303D::print_usage()
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
-extern "C" int lsm303d_main(int argc, char *argv[])
+extern "C" int l3gd20_main(int argc, char *argv[])
 {
 	int ch;
-	using ThisDriver = LSM303D;
+	using ThisDriver = L3GD20;
 	BusCLIArguments cli{false, true};
-	cli.default_spi_frequency = 11 * 1000 * 1000;
+	cli.default_spi_frequency = ST_L3GD20::SPI_SPEED;
 
 	while ((ch = cli.getOpt(argc, argv, "R:")) != EOF) {
 		switch (ch) {
@@ -74,17 +68,15 @@ extern "C" int lsm303d_main(int argc, char *argv[])
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_IMU_DEVTYPE_LSM303D);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_GYR_DEVTYPE_L3GD20);
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);
-	}
 
-	if (!strcmp(verb, "stop")) {
+	} else if (!strcmp(verb, "stop")) {
 		return ThisDriver::module_stop(iterator);
-	}
 
-	if (!strcmp(verb, "status")) {
+	} else if (!strcmp(verb, "status")) {
 		return ThisDriver::module_status(iterator);
 	}
 

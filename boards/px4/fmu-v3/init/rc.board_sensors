@@ -65,12 +65,6 @@ then
 	# sensor heating is available, but we disable it for now
 	param set-default SENS_EN_THERMAL 0
 
-	# l3gd20 (external/isolated SPI4)
-	l3gd20 -s -b 4 -R 4 start
-
-	# lsm303d (external/isolated SPI4)
-	lsm303d -s -b 4 -R 6 start
-
 	# ms5611 (external/isolated SPI4)
 	ms5611 -s -b 4 start
 
@@ -89,6 +83,12 @@ then
 		mpu9250 -s -b 1 start
 	fi
 
+	# l3gd20 (external/isolated SPI4)
+	l3gd20 -s -b 4 -R 14 start
+
+	# lsm303d (external/isolated SPI4)
+	lsm303d -s -b 4 -R 14 start
+
 else
 	# $BOARD_FMUV3 = 0 -> FMUv2
 
@@ -103,8 +103,8 @@ else
 	# else: On the PixhawkMini the mpu9250 has been disabled due to HW errata
 	fi
 
-	l3gd20 -s -b 1 start
-	lsm303d -s -b 1 start
+	l3gd20 -s -b 1 -R 8 start
+	lsm303d -s -b 1 -R 8 start
 fi
 
 unset BOARD_FMUV3
