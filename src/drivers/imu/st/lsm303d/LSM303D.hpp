@@ -114,6 +114,7 @@ private:
 	void FIFOReset();
 
 	void ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
+	bool UpdateTemperatureAndMagnetometer();
 
 	const spi_drdy_gpio_t _drdy_gpio;
 
@@ -129,6 +130,7 @@ private:
 
 	hrt_abstime _reset_timestamp{0};
 	hrt_abstime _last_config_check_timestamp{0};
+	hrt_abstime _temperature_and_magnetometer_update_timestamp{0};
 	int _failure_count{0};
 
 	px4::atomic<hrt_abstime> _drdy_timestamp_sample{0};
@@ -148,14 +150,13 @@ private:
 	static constexpr uint8_t size_register_cfg{8};
 	register_config_t _register_cfg[size_register_cfg] {
 		// Register                | Set bits, Clear bits
-		{ Register::CTRL0,         CTRL0_BIT::FIFO_EN, 0 },
-		{ Register::CTRL1,         CTRL1_BIT::AODR_1600Hz | CTRL1_BIT::BDU, 0 },
-		{ Register::CTRL2,         CTRL2_BIT::AFS_16G, 0 },
-		{ Register::CTRL3,         CTRL3_BIT::INT1_DRDY_A, 0 },
-		//{ Register::CTRL4,         CTRL4_BIT::INT2_FTH | CTRL4_BIT::INT2_Overrun, 0 },
-		{ Register::CTRL5,         CTRL5_BIT::TEMP_EN | CTRL5_BIT::M_RES_HIGH | CTRL5_BIT::M_ODR_50_HZ, Bit3 },
+		{ Register::CTRL0,         CTRL0_BIT::FIFO_EN, CTRL0_BIT::BOOT | CTRL0_BIT::BIT4_MUST_BE_CLEARED | CTRL0_BIT::BIT3_MUST_BE_CLEARED },
+		{ Register::CTRL1,         CTRL1_BIT::AODR_1600HZ_SET | CTRL1_BIT::BDU | CTRL1_BIT::AZEN | CTRL1_BIT::AYEN | CTRL1_BIT::AXEN, CTRL1_BIT::AODR_1600HZ_CLEAR },
+		{ Register::CTRL2,         CTRL2_BIT::AFS_16G_SET, CTRL2_BIT::ABW_773_HZ | CTRL2_BIT::AFS_16G_CLEAR | CTRL2_BIT::BIT2_MUST_BE_CLEARED },
+		{ Register::CTRL4,         0, 0 }, // CTRL4_BIT::INT2_FTH
+		{ Register::CTRL5,         CTRL5_BIT::TEMP_EN | CTRL5_BIT::M_RES_HIGH | CTRL5_BIT::M_ODR_50_HZ_SET, CTRL5_BIT::M_ODR_50_HZ_CLEAR },
 		{ Register::CTRL6,         CTRL6_BIT::MFS_12_GAUSS, 0 },
 		{ Register::CTRL7,         0, CTRL7_BIT::MD },
-		{ Register::FIFO_CTRL,     FIFO_CTRL_BIT::FIFO_mode, 0 },
+		{ Register::FIFO_CTRL,     FIFO_CTRL_BIT::FIFO_MODE_SET, FIFO_CTRL_BIT::FIFO_MODE_CLEAR },
 	};
 };

@@ -207,18 +207,27 @@ void LSM303D::RunImpl()
 
 			// always check FIFO status and count
 			const uint8_t FIFO_SRC = RegisterRead(Register::FIFO_SRC);
-			const uint8_t samples = (FIFO_SRC & 0b11111); // FSS4-FSS0 FIFO stored data level
+			const uint8_t samples = (FIFO_SRC & FIFO_SRC_BIT::FSS); // FSS4-FSS0 FIFO stored data level
 
-			if ((FIFO_SRC & FIFO_SRC_BIT::OVRN) || (samples > FIFO_MAX_SAMPLES)) {
-				// not necessarily an overflow, but more samples than we expected or can publish
+			if (FIFO_SRC & FIFO_SRC_BIT::OVRN) {
 				perf_count(_fifo_overflow_perf);
 				FIFOReset();
 
-			} else if (samples == 0) {
+			} else if ((FIFO_SRC & FIFO_SRC_BIT::EMPTY) || (samples == 0)) {
 				perf_count(_fifo_empty_perf);
 
 			} else {
-				if (FIFORead(timestamp_sample, samples)) {
+
+				uint8_t transfer_samples = samples;
+
+				if (samples > FIFO_MAX_SAMPLES) {
+					transfer_samples = FIFO_MAX_SAMPLES;
+					// TODO
+					ScheduleOnInterval(_fifo_empty_interval_us, _fifo_empty_interval_us / 2);
+				}
+
+
+				if (FIFORead(timestamp_sample, transfer_samples)) {
 					success = true;
 
 					if (_failure_count > 0) {
@@ -247,6 +256,13 @@ void LSM303D::RunImpl()
 					// register check failed, force reset
 					perf_count(_bad_register_perf);
 					Reset();
+				}
+
+			} else {
+				// periodically update temperature (50 Hz)
+				if (now >= _temperature_and_magnetometer_update_timestamp + 20_ms) {
+					//UpdateTemperatureAndMagnetometer();
+					_temperature_and_magnetometer_update_timestamp = now;
 				}
 			}
 		}
@@ -285,15 +301,19 @@ void LSM303D::ConfigureFIFOWatermark(uint8_t samples)
 		}
 
 	} else {
-		const uint16_t fifo_watermark_threshold = samples;
-
 		for (auto &r : _register_cfg) {
 			if (r.reg == Register::FIFO_CTRL) {
-				// FTH [4:0]
-				r.set_bits |= (fifo_watermark_threshold & 0b11111);
+				// FIFO_CTRL FTH [4:0]: FIFO threshold level.
+				const uint16_t fifo_watermark_threshold = samples;
+				r.set_bits |= (fifo_watermark_threshold & FIFO_CTRL_BIT::FIFO_THRESHOLD);
+
+			} else if (r.reg == Register::CTRL0) {
+				// CTRL0 FTH_EN: FIFO programmable threshold enable
+				r.set_bits |= CTRL0_BIT::FTH_EN;
+				break;
 
 			} else if (r.reg == Register::CTRL4) {
-				// enable FIFO threshold interrupt
+				// CTRL4 INT2_FTH: enable FIFO threshold interrupt
 				r.set_bits |= CTRL4_BIT::INT2_FTH;
 			}
 		}
@@ -316,12 +336,12 @@ bool LSM303D::Configure()
 		}
 	}
 
-	_px4_accel.set_scale(CONSTANTS_ONE_G / (0.732f * 1000.f)); // 0.732 mg/LSB
+	// Linear acceleration sensitivity ±16g (0.732 mg/LSB)
+	_px4_accel.set_scale(CONSTANTS_ONE_G * 0.732f * 1e-3f);
 	_px4_accel.set_range(16.f * CONSTANTS_ONE_G);
 
-	// TODO: mgauss/LSB
-	//_px4_mag.set_scale();
-	//_px4_mag.set_range();
+	// Magnetic sensitivity ±12gauss (0.479 mgauss/LSB)
+	_px4_mag.set_scale(0.479f * 1e-3f);
 
 	return success;
 }
@@ -430,7 +450,11 @@ void LSM303D::FIFOReset()
 	_drdy_timestamp_sample.store(0);
 
 	// FIFO_CTRL_REG: mode + watermark
-	RegisterSetBits(Register::FIFO_CTRL, FIFO_CTRL_BIT::FIFO_mode);
+	for (auto &r : _register_cfg) {
+		if (r.reg == Register::FIFO_CTRL) {
+			RegisterSetAndClearBits(Register::FIFO_CTRL, r.set_bits, r.clear_bits);
+		}
+	}
 }
 
 void LSM303D::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples)
@@ -441,19 +465,84 @@ void LSM303D::ProcessAccel(const hrt_abstime &timestamp_sample, const FIFO::DATA
 	accel.dt = FIFO_SAMPLE_DT;
 
 	for (int i = 0; i < samples; i++) {
-		const int16_t accel_x = combine(fifo[i].OUT_X_H_A, fifo[i].OUT_X_L_A);
-		const int16_t accel_y = combine(fifo[i].OUT_Y_H_A, fifo[i].OUT_Y_L_A);
-		const int16_t accel_z = combine(fifo[i].OUT_Z_H_A, fifo[i].OUT_Z_L_A);
+		int16_t accel_x = combine(fifo[i].OUT_X_H_A, fifo[i].OUT_X_L_A);
+		int16_t accel_y = combine(fifo[i].OUT_Y_H_A, fifo[i].OUT_Y_L_A);
+		int16_t accel_z = combine(fifo[i].OUT_Z_H_A, fifo[i].OUT_Z_L_A);
 
 		// sensor's frame is +x forward, +y left, +z up
 		//  flip y & z to publish right handed with z down (x forward, y right, z down)
 		accel.x[i] = accel_x;
-		accel.y[i] = (accel_y == INT16_MIN) ? INT16_MAX : -accel_y;
-		accel.z[i] = (accel_z == INT16_MIN) ? INT16_MAX : -accel_z;
+		accel.y[i] = math::negate(accel_y);
+		accel.z[i] = math::negate(accel_z);
 	}
 
 	_px4_accel.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
 				   perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
 
 	_px4_accel.updateFIFO(accel);
+}
+
+bool LSM303D::UpdateTemperatureAndMagnetometer()
+{
+	const hrt_abstime time_now_us = hrt_absolute_time();
+
+	// read current temperature
+	struct TransferBuffer {
+		uint8_t cmd;
+		uint8_t TEMP_OUT_L; // 0x05
+		uint8_t TEMP_OUT_H; // 0x06
+		uint8_t STATUS_M;   // 0x07
+		uint8_t OUT_X_L_M;  // 0x08
+		uint8_t OUT_X_H_M;  // 0x09
+		uint8_t OUT_Y_L_M;  // 0x0A
+		uint8_t OUT_Y_H_M;  // 0x0B
+		uint8_t OUT_Z_L_M;  // 0x0C
+		uint8_t OUT_Z_H_M;  // 0x0D
+	} buffer{};
+
+	buffer.cmd = static_cast<uint8_t>(Register::TEMP_OUT_L) | DIR_READ | AUTO_INCREMENT;
+
+	if (transfer((uint8_t *)&buffer, (uint8_t *)&buffer, sizeof(buffer)) != PX4_OK) {
+		perf_count(_bad_transfer_perf);
+		return false;
+	}
+
+	if (buffer.STATUS_M & STATUS_M_BIT::ZYXMDA) {
+		// 8 LSB/°C, 25 °C offset
+		// Temperature data is stored inside TEMP_OUT_L (05h), TEMP_OUT_H (06h) as 2’s
+		// complement data in 12-bit format, right justified.
+		uint16_t TEMP_OUT = combine(buffer.TEMP_OUT_H, buffer.TEMP_OUT_L);
+
+		// shift to align sign bit, cast to int16_t, then shift back
+		int16_t temperature_raw = static_cast<int16_t>(TEMP_OUT << 4) >> 4;
+
+		const float temperature_c = (temperature_raw / TEMPERATURE_SENSITIVITY) + TEMPERATURE_OFFSET;
+
+		if (PX4_ISFINITE(temperature_c)
+		    && (temperature_c >= TEMPERATURE_SENSOR_MIN)
+		    && (temperature_c <= TEMPERATURE_SENSOR_MAX)) {
+
+			_px4_accel.set_temperature(temperature_c);
+			_px4_mag.set_temperature(temperature_c);
+
+		} else {
+			return false;
+		}
+
+		int16_t mag_x = combine(buffer.OUT_X_H_M, buffer.OUT_X_L_M);
+		int16_t mag_y = combine(buffer.OUT_Y_H_M, buffer.OUT_Y_L_M);
+		int16_t mag_z = combine(buffer.OUT_Z_H_M, buffer.OUT_Z_L_M);
+
+		// sensor's frame is +x forward, +y left, +z up
+		//  flip y & z to publish right handed with z down (x forward, y right, z down)
+		mag_y = math::negate(mag_y);
+		mag_z = math::negate(mag_z);
+
+		_px4_mag.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf));
+		_px4_mag.update(time_now_us, mag_x, mag_y, mag_z);
+
+		return true;
+	}
+
+	return false;
 }
