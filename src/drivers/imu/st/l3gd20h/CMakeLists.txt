@@ -36,6 +36,7 @@ px4_add_module(
 	MAIN l3gd20h
 	COMPILE_FLAGS
 		#-DDEBUG_BUILD
+		-Wno-error
 	SRCS
 		l3gd20h_main.cpp
 		L3GD20H.cpp

@@ -61,7 +61,12 @@ static constexpr uint8_t AUTO_INCREMENT = Bit6;
 
 static constexpr uint8_t WHOAMI = 0b11010111; // Who I am ID
 
-static constexpr uint32_t ODR  = 758; // 757.6 Hz Angular rate output data rate
+static constexpr float ODR = 757.6; // 757.6 Hz Angular rate output data rate
+
+static constexpr float TEMPERATURE_SENSITIVITY = -1.f; // LSB/C
+static constexpr float TEMPERATURE_OFFSET = 25.f; // C
+static constexpr float TEMPERATURE_SENSOR_MIN = -40.f; // °C
+static constexpr float TEMPERATURE_SENSOR_MAX = 85.f; // °C
 
 enum class Register : uint8_t {
 	WHO_AM_I      = 0x0F,
@@ -88,28 +93,32 @@ enum class Register : uint8_t {
 
 // CTRL1
 enum CTRL1_BIT : uint8_t {
+	// DR1 DR0 BW1 BW0
 	ODR_800HZ_CUTOFF_100HZ = Bit7 | Bit6 | Bit5 | Bit4,
-	PD                     = Bit3,                       // Power-down mode enable
+	PD                     = Bit3,                       // Power-down mode enable (1=Normal Mode)
+	Zen                    = Bit2, // Z axis enable
+	Yen                    = Bit1, // Y axis enable
+	Xen                    = Bit0, // X axis enable
 };
 
 // CTRL3
 enum CTRL3_BIT : uint8_t {
 	H_Lactive = Bit5, // Interrupt active configuration on INT. Default value 0. (0: high; 1:low)
 
-	INT2_DRDY = Bit3, // Date Ready on DRDY/INT2 pin.
 	INT2_FTH  = Bit2, // FIFO Threshold interrupt on DRDY/INT2 pin.
-	INT2_ORun = Bit1, // FIFO Overrun interrupt on DRDY/INT2 pin.
 };
 
 // CTRL4
 enum CTRL4_BIT : uint8_t {
 	BDU        = Bit7,        // Block data update
+
+	// FS1-FS0
 	FS_2000DPS = Bit5 | Bit4, // Full scale selection 2000 dps
 };
 
 // CTRL5
 enum CTRL5_BIT : uint8_t {
-	BOOT    = Bit7,
+	BOOT    = Bit7, // Reboot memory content
 	FIFO_EN = Bit6,
 };
 
@@ -117,8 +126,11 @@ enum CTRL5_BIT : uint8_t {
 enum FIFO_CTRL_BIT : uint8_t {
 	// FM2-FM0
 	Bypass_mode         = Bit7 | Bit6 | Bit5, // 000 Bypass mode
-	FIFO_mode           = Bit5,               // 001 FIFO mode
-	Dynamic_stream_mode = Bit7 | Bit6,        // 110 Dynamic stream mode
+	FIFO_MODE_SET       = Bit5,               // 001 FIFO mode
+	FIFO_MODE_CLEAR     = Bit7 | Bit6,        // 001 FIFO mode
+
+	Dynamic_stream_mode_SET   = Bit7 | Bit6, // Dynamic stream mode
+	Dynamic_stream_mode_CLEAR = Bit5, // Dynamic stream mode
 
 	// FTH4-FTH0: FIFO threshold setting.
 	FTH40               = Bit4 | Bit3 | Bit2 | Bit1 | Bit0,
@@ -138,6 +150,8 @@ enum LOW_ODR_BIT : uint8_t {
 
 	I2C_dis = Bit3, // 1 = SPI only
 	SW_RES  = Bit2, // 1 = Reset Device
+
+	Low_ODR = Bit0, // 0 = Low Speed ODR disabled
 };
 
 namespace FIFO

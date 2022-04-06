@@ -112,6 +112,7 @@ private:
 	void FIFOReset();
 
 	void ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA fifo[], const uint8_t samples);
+	void UpdateTemperature();
 
 	const spi_drdy_gpio_t _drdy_gpio;
 
@@ -126,6 +127,7 @@ private:
 
 	hrt_abstime _reset_timestamp{0};
 	hrt_abstime _last_config_check_timestamp{0};
+	hrt_abstime _temperature_update_timestamp{0};
 	int _failure_count{0};
 
 	px4::atomic<hrt_abstime> _drdy_timestamp_sample{0};
@@ -146,10 +148,10 @@ private:
 	register_config_t _register_cfg[size_register_cfg] {
 		// Register            | Set bits, Clear bits
 		{ Register::CTRL1,     CTRL1_BIT::ODR_800HZ_CUTOFF_100HZ | CTRL1_BIT::PD, 0 },
-		{ Register::CTRL3,     CTRL3_BIT::H_Lactive, 0 },
+		{ Register::CTRL3,     CTRL3_BIT::H_Lactive | CTRL3_BIT::INT2_FTH, 0 },
 		{ Register::CTRL4,     CTRL4_BIT::BDU | CTRL4_BIT::FS_2000DPS, 0 },
 		{ Register::CTRL5,     CTRL5_BIT::FIFO_EN, 0 },
-		{ Register::FIFO_CTRL, FIFO_CTRL_BIT::FIFO_mode, 0 },
-		{ Register::LOW_ODR,   LOW_ODR_BIT::DRDY_HL | LOW_ODR_BIT::I2C_dis, LOW_ODR_BIT::SW_RES },
+		{ Register::FIFO_CTRL, FIFO_CTRL_BIT::Dynamic_stream_mode_SET, FIFO_CTRL_BIT::Dynamic_stream_mode_CLEAR },
+		{ Register::LOW_ODR,   LOW_ODR_BIT::DRDY_HL | LOW_ODR_BIT::I2C_dis, LOW_ODR_BIT::SW_RES | LOW_ODR_BIT::Low_ODR },
 	};
 };

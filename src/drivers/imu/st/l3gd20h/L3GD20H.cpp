@@ -122,8 +122,8 @@ void L3GD20H::RunImpl()
 
 	switch (_state) {
 	case STATE::RESET:
-		// LOW_ODR
-		RegisterSetBits(Register::LOW_ODR, LOW_ODR_BIT::SW_RES);
+		// LOW_ODR SW_RES
+		RegisterWrite(Register::LOW_ODR, LOW_ODR_BIT::SW_RES);
 		_reset_timestamp = now;
 		_failure_count = 0;
 		_state = STATE::WAIT_FOR_RESET;
@@ -131,9 +131,11 @@ void L3GD20H::RunImpl()
 		break;
 
 	case STATE::WAIT_FOR_RESET:
-		if (RegisterRead(Register::WHO_AM_I) == WHOAMI) {
+		if ((RegisterRead(Register::WHO_AM_I) == WHOAMI)
+		    && ((RegisterRead(Register::LOW_ODR) & LOW_ODR_BIT::SW_RES) == 0)) {
+
 			// if reset succeeded then configure
-			RegisterWrite(Register::CTRL1, CTRL1_BIT::ODR_800HZ_CUTOFF_100HZ | CTRL1_BIT::PD);
+			RegisterSetBits(Register::CTRL1, CTRL1_BIT::PD);
 			_state = STATE::CONFIGURE;
 			ScheduleDelayed(50_ms); // Turn-on time 50 ms
 
@@ -187,6 +189,7 @@ void L3GD20H::RunImpl()
 
 	case STATE::FIFO_READ: {
 			hrt_abstime timestamp_sample = now;
+			uint8_t samples = 0;
 
 			if (_data_ready_interrupt_enabled) {
 				// scheduled from interrupt if _drdy_timestamp_sample was set as expected
@@ -194,6 +197,7 @@ void L3GD20H::RunImpl()
 
 				if ((now - drdy_timestamp_sample) < _fifo_empty_interval_us) {
 					timestamp_sample = drdy_timestamp_sample;
+					samples = _fifo_samples;
 
 				} else {
 					perf_count(_drdy_missed_perf);
@@ -203,21 +207,46 @@ void L3GD20H::RunImpl()
 				ScheduleDelayed(_fifo_empty_interval_us * 2);
 			}
 
+			if (samples == 0) {
+				// always check FIFO status and count
+				const uint8_t FIFO_SRC_REG = RegisterRead(Register::FIFO_SRC);
+				samples = (FIFO_SRC_REG & FIFO_SRC_BIT::FSS) + 1; // FSS4-FSS0 FIFO stored data level
+
+				if ((FIFO_SRC_REG & FIFO_SRC_BIT::OVRN) || (samples > FIFO_MAX_SAMPLES)) {
+					// not necessarily an overflow, but more samples than we expected or can publish
+					perf_count(_fifo_overflow_perf);
+					FIFOReset();
+
+				} else if (samples == 0) {
+					perf_count(_fifo_empty_perf);
+
+				} else {
+					// // FIFO count (size in bytes) should be a multiple of the FIFO::DATA structure
+					// if (samples > _fifo_samples) {
+					// 	// grab desired number of samples, but reschedule next cycle sooner
+					// 	int extra_samples = samples - _fifo_samples;
+					// 	samples = _fifo_samples;
+
+					// 	if ((int)_fifo_samples > extra_samples) {
+					// 		// reschedule to run when a total of _fifo_samples should be available in the FIFO
+					// 		const uint32_t reschedule_delay_us = (_fifo_samples - extra_samples) * static_cast<int>(FIFO_SAMPLE_DT);
+					// 		ScheduleOnInterval(_fifo_empty_interval_us, reschedule_delay_us);
+
+					// 	} else {
+					// 		// otherwise reschedule to run immediately
+					// 		ScheduleOnInterval(_fifo_empty_interval_us);
+					// 	}
+
+					// } else if (samples < _fifo_samples) {
+					// 	// reschedule next cycle to catch the desired number of samples
+					// 	ScheduleOnInterval(_fifo_empty_interval_us, (_fifo_samples - samples) * static_cast<int>(FIFO_SAMPLE_DT));
+					// }
+				}
+			}
+
 			bool success = false;
 
-			// always check FIFO status and count
-			const uint8_t FIFO_SRC_REG = RegisterRead(Register::FIFO_SRC);
-			const uint8_t samples = FIFO_SRC_REG & 0b11111; // FSS4-FSS0 FIFO stored data level
-
-			if ((FIFO_SRC_REG & FIFO_SRC_BIT::OVRN) || (samples > FIFO_MAX_SAMPLES)) {
-				// not necessarily an overflow, but more samples than we expected or can publish
-				perf_count(_fifo_overflow_perf);
-				FIFOReset();
-
-			} else if (samples == 0) {
-				perf_count(_fifo_empty_perf);
-
-			} else {
+			if (samples == _fifo_samples) {
 				if (FIFORead(timestamp_sample, samples)) {
 					success = true;
 
@@ -248,6 +277,13 @@ void L3GD20H::RunImpl()
 					perf_count(_bad_register_perf);
 					Reset();
 				}
+
+			} else {
+				// periodically update temperature (~1 Hz)
+				if (hrt_elapsed_time(&_temperature_update_timestamp) >= 1_s) {
+					UpdateTemperature();
+					_temperature_update_timestamp = now;
+				}
 			}
 		}
 
@@ -270,32 +306,19 @@ void L3GD20H::ConfigureSampleRate(int sample_rate)
 	// recompute FIFO empty interval (us) with actual gyro sample limit
 	_fifo_empty_interval_us = _fifo_samples * (1e6f / GYRO_RATE);
 
-	//ConfigureFIFOWatermark(_fifo_samples);
+	PX4_INFO("empty interval %.6f, samples: %d", (double)_fifo_empty_interval_us, _fifo_samples);
+
+	ConfigureFIFOWatermark(_fifo_samples);
 }
 
 void L3GD20H::ConfigureFIFOWatermark(uint8_t samples)
 {
-	if (samples == 1) {
-		// enable data ready interrupt if only 1 sample
-		for (auto &r : _register_cfg) {
-			if (r.reg == Register::CTRL3) {
-				r.set_bits |= CTRL3_BIT::INT2_DRDY;
-				break;
-			}
-		}
+	uint8_t fifo_threshold = math::constrain(samples, (uint8_t)1, (uint8_t)30);
 
-	} else {
-		uint8_t fifo_threshold = samples; // TOOD: math::constrain(samples - 1, 1, 32);
-
-		for (auto &r : _register_cfg) {
-			if (r.reg == Register::FIFO_CTRL) {
-				// FIFO_CTRL FTH4-FTH0: FIFO threshold setting.
-				r.set_bits |= (fifo_threshold & FIFO_CTRL_BIT::FTH40);
-
-			} else if (r.reg == Register::CTRL3) {
-				// enable FIFO threshold interrupt
-				r.set_bits |= CTRL3_BIT::INT2_ORun;
-			}
+	for (auto &r : _register_cfg) {
+		if (r.reg == Register::FIFO_CTRL) {
+			// FIFO_CTRL FTH4-FTH0: FIFO threshold setting.
+			r.set_bits |= (fifo_threshold & FIFO_CTRL_BIT::FTH40);
 		}
 	}
 }
@@ -316,8 +339,8 @@ bool L3GD20H::Configure()
 		}
 	}
 
-	_px4_gyro.set_scale(math::radians(70.f / 1000.f)); // 70 mdps/LSB
-	_px4_gyro.set_range(math::radians(2000.f));
+	_px4_gyro.set_scale(math::radians(70.f * 1e-3f)); // 70 mdps/LSB
+	_px4_gyro.set_range(math::radians(2000.f));       // ±2000 dps
 
 	return success;
 }
@@ -336,15 +359,12 @@ void L3GD20H::DataReady()
 
 bool L3GD20H::DataReadyInterruptConfigure()
 {
-	// TODO: data ready disabled for now
-	return false;
-
 	if (_drdy_gpio == 0) {
 		return false;
 	}
 
-	// Setup data ready on rising edge
-	return px4_arch_gpiosetevent(_drdy_gpio, true, false, true, &DataReadyInterruptCallback, this) == 0;
+	// Setup data ready on falling edge
+	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
 }
 
 bool L3GD20H::DataReadyInterruptDisable()
@@ -419,7 +439,7 @@ void L3GD20H::FIFOReset()
 {
 	perf_count(_fifo_reset_perf);
 
-	// FIFO_CTRL: switch to bypass mode to restart data collection
+	// To reset FIFO content Bypass mode should be written in FIFO_CTRL
 	RegisterClearBits(Register::FIFO_CTRL, FIFO_CTRL_BIT::Bypass_mode);
 
 	// reset while FIFO is disabled
@@ -456,4 +476,20 @@ void L3GD20H::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA 
 				  perf_event_count(_fifo_empty_perf) + perf_event_count(_fifo_overflow_perf));
 
 	_px4_gyro.updateFIFO(gyro);
+}
+
+void L3GD20H::UpdateTemperature()
+{
+	// Temperature data (-1LSB/deg with 8 bit resolution). The value is expressed as two’s complement.
+	const int8_t OUT_TEMP = RegisterRead(Register::OUT_TEMP);
+
+	const float temperature_c = (OUT_TEMP / TEMPERATURE_SENSITIVITY) + TEMPERATURE_OFFSET;
+
+	if (PX4_ISFINITE(temperature_c)
+	    && (temperature_c >= TEMPERATURE_SENSOR_MIN)
+	    && (temperature_c <= TEMPERATURE_SENSOR_MAX)) {
+
+		_px4_gyro.set_temperature(temperature_c);
+	}
+
 }
