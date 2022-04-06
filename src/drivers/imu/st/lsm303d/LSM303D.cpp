@@ -261,7 +261,7 @@ void LSM303D::RunImpl()
 			} else {
 				// periodically update temperature (50 Hz)
 				if (now >= _temperature_and_magnetometer_update_timestamp + 20_ms) {
-					//UpdateTemperatureAndMagnetometer();
+					UpdateTemperatureAndMagnetometer();
 					_temperature_and_magnetometer_update_timestamp = now;
 				}
 			}

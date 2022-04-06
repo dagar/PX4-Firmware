@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2022 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,12 +35,12 @@ px4_add_module(
 	MODULE drivers__imu__st__l3gd20h
 	MAIN l3gd20h
 	COMPILE_FLAGS
-		-DDEBUG_BUILD
+		#-DDEBUG_BUILD
 	SRCS
 		l3gd20h_main.cpp
 		L3GD20H.cpp
 		L3GD20H.hpp
-		ST_L3GD20H_Registers.hpp
+		ST_L3GD20H_registers.hpp
 	DEPENDS
 		drivers_gyroscope
 		px4_work_queue

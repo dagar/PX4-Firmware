@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,25 +46,6 @@ void L3GD20H::print_usage()
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 }
 
-I2CSPIDriverBase *L3GD20H::instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
-				       int runtime_instance)
-{
-	L3GD20H *instance = new L3GD20H(iterator.configuredBusOption(), iterator.bus(), iterator.devid(), cli.rotation,
-					cli.bus_frequency, cli.spi_mode, iterator.DRDYGPIO());
-
-	if (!instance) {
-		PX4_ERR("alloc failed");
-		return nullptr;
-	}
-
-	if (OK != instance->init()) {
-		delete instance;
-		return nullptr;
-	}
-
-	return instance;
-}
-
 extern "C" int l3gd20h_main(int argc, char *argv[])
 {
 	int ch;
@@ -72,32 +53,30 @@ extern "C" int l3gd20h_main(int argc, char *argv[])
 	BusCLIArguments cli{false, true};
 	cli.default_spi_frequency = ST_L3GD20H::SPI_SPEED;
 
-	while ((ch = cli.getopt(argc, argv, "R:")) != EOF) {
+	while ((ch = cli.getOpt(argc, argv, "R:")) != EOF) {
 		switch (ch) {
 		case 'R':
-			cli.rotation = (enum Rotation)atoi(cli.optarg());
+			cli.rotation = (enum Rotation)atoi(cli.optArg());
 			break;
 		}
 	}
 
-	const char *verb = cli.optarg();
+	const char *verb = cli.optArg();
 
 	if (!verb) {
 		ThisDriver::print_usage();
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_GYR_DEVTYPE_L3GD20H);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_GYR_DEVTYPE_L3GD20); // DRV_GYR_DEVTYPE_L3GD20H
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);
-	}
 
-	if (!strcmp(verb, "stop")) {
+	} else if (!strcmp(verb, "stop")) {
 		return ThisDriver::module_stop(iterator);
-	}
 
-	if (!strcmp(verb, "status")) {
+	} else if (!strcmp(verb, "status")) {
 		return ThisDriver::module_status(iterator);
 	}
 

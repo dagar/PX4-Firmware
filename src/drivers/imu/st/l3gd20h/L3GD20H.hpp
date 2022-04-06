@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,12 +40,11 @@
 
 #pragma once
 
-#include "ST_L3GD20H_Registers.hpp"
+#include "ST_L3GD20H_registers.hpp"
 
 #include <drivers/drv_hrt.h>
 #include <lib/drivers/device/spi.h>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
-#include <lib/ecl/geo/geo.h>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/atomic.h>
 #include <px4_platform_common/i2c_spi_buses.h>
@@ -55,12 +54,9 @@ using namespace ST_L3GD20H;
 class L3GD20H : public device::SPI, public I2CSPIDriver<L3GD20H>
 {
 public:
-	L3GD20H(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
-		spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio);
+	L3GD20H(const I2CSPIDriverConfig &config);
 	~L3GD20H() override;
 
-	static I2CSPIDriverBase *instantiate(const BusCLIArguments &cli, const BusInstanceIterator &iterator,
-					     int runtime_instance);
 	static void print_usage();
 
 	void RunImpl();
@@ -132,7 +128,7 @@ private:
 	hrt_abstime _last_config_check_timestamp{0};
 	int _failure_count{0};
 
-	px4::atomic<uint32_t> _drdy_fifo_read_samples{0};
+	px4::atomic<hrt_abstime> _drdy_timestamp_sample{0};
 	bool _data_ready_interrupt_enabled{false};
 
 	enum class STATE : uint8_t {
@@ -140,9 +136,7 @@ private:
 		WAIT_FOR_RESET,
 		CONFIGURE,
 		FIFO_READ,
-	};
-
-	STATE _state{STATE::RESET};
+	} _state{STATE::RESET};
 
 	uint16_t _fifo_empty_interval_us{1000};
 	uint32_t _fifo_samples{static_cast<uint32_t>(_fifo_empty_interval_us / (1000000 / GYRO_RATE))};

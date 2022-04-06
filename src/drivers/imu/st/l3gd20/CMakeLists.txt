@@ -35,6 +35,7 @@ px4_add_module(
 	MODULE drivers__imu__st__l3gd20
 	MAIN l3gd20
 	COMPILE_FLAGS
+		#-DDEBUG_BUILD
 	SRCS
 		l3gd20_main.cpp
 		L3GD20.cpp

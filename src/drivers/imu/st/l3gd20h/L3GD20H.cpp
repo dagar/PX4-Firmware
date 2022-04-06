@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,20 +40,17 @@ static constexpr int16_t combine(uint8_t msb, uint8_t lsb)
 	return (msb << 8u) | lsb;
 }
 
-L3GD20H::L3GD20H(I2CSPIBusOption bus_option, int bus, uint32_t device, enum Rotation rotation, int bus_frequency,
-		 spi_mode_e spi_mode, spi_drdy_gpio_t drdy_gpio) :
-	SPI(DRV_GYR_DEVTYPE_L3GD20H, MODULE_NAME, bus, device, spi_mode, bus_frequency),
-	I2CSPIDriver(MODULE_NAME, px4::device_bus_to_wq(get_device_id()), bus_option, bus),
-	_drdy_gpio(drdy_gpio),
-	_px4_gyro(get_device_id(), ORB_PRIO_DEFAULT, rotation)
+L3GD20H::L3GD20H(const I2CSPIDriverConfig &config) :
+	SPI(config),
+	I2CSPIDriver(config),
+	_drdy_gpio(config.drdy_gpio),
+	_px4_gyro(get_device_id(), config.rotation)
 {
-	if (drdy_gpio != 0) {
+	if (_drdy_gpio != 0) {
 		_drdy_missed_perf = perf_alloc(PC_COUNT, MODULE_NAME": DRDY missed");
 	}
 
 	ConfigureSampleRate(_px4_gyro.get_max_rate_hz());
-
-	_debug_enabled = true;
 }
 
 L3GD20H::~L3GD20H()
@@ -130,7 +127,7 @@ void L3GD20H::RunImpl()
 		_reset_timestamp = now;
 		_failure_count = 0;
 		_state = STATE::WAIT_FOR_RESET;
-		ScheduleDelayed(15_ms);
+		ScheduleDelayed(150_ms);
 		break;
 
 	case STATE::WAIT_FOR_RESET:
@@ -189,9 +186,16 @@ void L3GD20H::RunImpl()
 		break;
 
 	case STATE::FIFO_READ: {
+			hrt_abstime timestamp_sample = now;
+
 			if (_data_ready_interrupt_enabled) {
-				// scheduled from interrupt if _drdy_fifo_read_samples was set as expected
-				if (_drdy_fifo_read_samples.fetch_and(0) != _fifo_samples) {
+				// scheduled from interrupt if _drdy_timestamp_sample was set as expected
+				const hrt_abstime drdy_timestamp_sample = _drdy_timestamp_sample.fetch_and(0);
+
+				if ((now - drdy_timestamp_sample) < _fifo_empty_interval_us) {
+					timestamp_sample = drdy_timestamp_sample;
+
+				} else {
 					perf_count(_drdy_missed_perf);
 				}
 
@@ -214,7 +218,7 @@ void L3GD20H::RunImpl()
 				perf_count(_fifo_empty_perf);
 
 			} else {
-				if (FIFORead(now, samples)) {
+				if (FIFORead(timestamp_sample, samples)) {
 					success = true;
 
 					if (_failure_count > 0) {
@@ -266,7 +270,7 @@ void L3GD20H::ConfigureSampleRate(int sample_rate)
 	// recompute FIFO empty interval (us) with actual gyro sample limit
 	_fifo_empty_interval_us = _fifo_samples * (1e6f / GYRO_RATE);
 
-	ConfigureFIFOWatermark(_fifo_samples);
+	//ConfigureFIFOWatermark(_fifo_samples);
 }
 
 void L3GD20H::ConfigureFIFOWatermark(uint8_t samples)
@@ -326,15 +330,15 @@ int L3GD20H::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void L3GD20H::DataReady()
 {
-	uint32_t expected = 0;
-
-	if (_drdy_fifo_read_samples.compare_exchange(&expected, _fifo_samples)) {
-		ScheduleNow();
-	}
+	_drdy_timestamp_sample.store(hrt_absolute_time());
+	ScheduleNow();
 }
 
 bool L3GD20H::DataReadyInterruptConfigure()
 {
+	// TODO: data ready disabled for now
+	return false;
+
 	if (_drdy_gpio == 0) {
 		return false;
 	}
@@ -381,7 +385,7 @@ uint8_t L3GD20H::RegisterRead(Register reg)
 
 void L3GD20H::RegisterWrite(Register reg, uint8_t value)
 {
-	uint8_t cmd[2] {(uint8_t)reg, value};
+	uint8_t cmd[2] { (uint8_t)reg, value };
 	transfer(cmd, cmd, sizeof(cmd));
 }
 
@@ -419,7 +423,7 @@ void L3GD20H::FIFOReset()
 	RegisterClearBits(Register::FIFO_CTRL, FIFO_CTRL_BIT::Bypass_mode);
 
 	// reset while FIFO is disabled
-	_drdy_fifo_read_samples.store(0);
+	_drdy_timestamp_sample.store(0);
 
 	// FIFO_CTRL: mode + watermark
 	for (auto &r : _register_cfg) {
@@ -437,15 +441,15 @@ void L3GD20H::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA 
 	gyro.dt = FIFO_SAMPLE_DT;
 
 	for (int i = 0; i < samples; i++) {
-		const int16_t gyro_x = combine(fifo[i].OUT_X_H, fifo[i].OUT_X_L);
-		const int16_t gyro_y = combine(fifo[i].OUT_Y_H, fifo[i].OUT_Y_L);
-		const int16_t gyro_z = combine(fifo[i].OUT_Z_H, fifo[i].OUT_Z_L);
+		int16_t gyro_x = combine(fifo[i].OUT_X_H, fifo[i].OUT_X_L);
+		int16_t gyro_y = combine(fifo[i].OUT_Y_H, fifo[i].OUT_Y_L);
+		int16_t gyro_z = combine(fifo[i].OUT_Z_H, fifo[i].OUT_Z_L);
 
 		// sensor's frame is +x forward, +y left, +z up
 		//  flip y & z to publish right handed with z down (x forward, y right, z down)
 		gyro.x[i] = gyro_x;
-		gyro.y[i] = (gyro_y == INT16_MIN) ? INT16_MAX : -gyro_y;
-		gyro.z[i] = (gyro_z == INT16_MIN) ? INT16_MAX : -gyro_z;
+		gyro.y[i] = math::negate(gyro_y);
+		gyro.z[i] = math::negate(gyro_z);
 	}
 
 	_px4_gyro.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +

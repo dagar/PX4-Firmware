@@ -228,7 +228,7 @@ void GyroCalibration::Run()
 
 
 	// update calibrations for all available gyros
-	if (sufficient_samples && (hrt_elapsed_time(&_last_calibration_update) > 10_s)) {
+	if (sufficient_samples && (hrt_elapsed_time(&_last_calibration_update) > 30_s)) {
 		bool calibration_updated = false;
 
 		for (int gyro = 0; gyro < _sensor_gyro_subs.size(); gyro++) {

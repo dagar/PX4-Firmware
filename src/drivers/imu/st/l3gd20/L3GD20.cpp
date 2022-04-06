@@ -440,15 +440,15 @@ void L3GD20::ProcessGyro(const hrt_abstime &timestamp_sample, const FIFO::DATA f
 	gyro.dt = FIFO_SAMPLE_DT;
 
 	for (int i = 0; i < samples; i++) {
-		const int16_t gyro_x = combine(fifo[i].OUT_X_H, fifo[i].OUT_X_L);
-		const int16_t gyro_y = combine(fifo[i].OUT_Y_H, fifo[i].OUT_Y_L);
-		const int16_t gyro_z = combine(fifo[i].OUT_Z_H, fifo[i].OUT_Z_L);
+		int16_t gyro_x = combine(fifo[i].OUT_X_H, fifo[i].OUT_X_L);
+		int16_t gyro_y = combine(fifo[i].OUT_Y_H, fifo[i].OUT_Y_L);
+		int16_t gyro_z = combine(fifo[i].OUT_Z_H, fifo[i].OUT_Z_L);
 
 		// sensor's frame is +x forward, +y left, +z up
 		//  flip y & z to publish right handed with z down (x forward, y right, z down)
 		gyro.x[i] = gyro_x;
-		gyro.y[i] = (gyro_y == INT16_MIN) ? INT16_MAX : -gyro_y;
-		gyro.z[i] = (gyro_z == INT16_MIN) ? INT16_MAX : -gyro_z;
+		gyro.y[i] = math::negate(gyro_y);
+		gyro.z[i] = math::negate(gyro_z);
 	}
 
 	_px4_gyro.set_error_count(perf_event_count(_bad_register_perf) + perf_event_count(_bad_transfer_perf) +
