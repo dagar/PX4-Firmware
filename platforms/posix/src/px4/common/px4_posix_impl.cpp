@@ -47,7 +47,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <parameters/param.h>
-#include "hrt_work.h"
 #include <drivers/drv_hrt.h>
 #include <pthread.h>
 #include <px4_platform_common/init.h>
@@ -70,7 +69,6 @@ void init_once()
 	_shell_task_id = pthread_self();
 
 	work_queues_init();
-	hrt_work_queue_init();
 
 	px4_platform_init();
 }

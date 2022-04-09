@@ -38,9 +38,6 @@ if (NOT "${PX4_PLATFORM}" MATCHES "nuttx")
 		dq_addlast.c
 		dq_rem.c
 		dq_remfirst.c
-		hrt_queue.c
-		hrt_thread.c
-		hrt_work_cancel.c
 		queue.c
 		sq_addafter.c
 		sq_addlast.c

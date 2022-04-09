@@ -1043,6 +1043,7 @@ Commander::handle_command(const vehicle_command_s &cmd)
 				if (!_lockdown_triggered) {
 					_armed.lockdown = true;
 					_lockdown_triggered = true;
+					_status_changed = true;
 					PX4_WARN("forcing lockdown (motors off)");
 				}
 
@@ -1051,6 +1052,7 @@ Commander::handle_command(const vehicle_command_s &cmd)
 				if (!_flight_termination_triggered) {
 					_armed.force_failsafe = true;
 					_flight_termination_triggered = true;
+					_status_changed = true;
 					PX4_WARN("forcing failsafe (termination)");
 					send_parachute_command();
 				}
@@ -1058,6 +1060,8 @@ Commander::handle_command(const vehicle_command_s &cmd)
 			} else {
 				_armed.force_failsafe = false;
 				_armed.lockdown = false;
+
+				_status_changed = true;
 
 				_lockdown_triggered = false;
 				_flight_termination_triggered = false;
@@ -2782,6 +2786,7 @@ Commander::run()
 						// This handles the case where something fails during the early takeoff phase
 						_armed.lockdown = true;
 						_lockdown_triggered = true;
+						_status_changed = true;
 						mavlink_log_emergency(&_mavlink_log_pub, "Critical failure detected: lockdown\t");
 						/* EVENT
 						 * @description
@@ -2800,6 +2805,7 @@ Commander::run()
 
 						_armed.force_failsafe = true;
 						_flight_termination_triggered = true;
+						_status_changed = true;
 						mavlink_log_emergency(&_mavlink_log_pub, "Critical failure detected: terminate flight\t");
 						/* EVENT
 						 * @description
