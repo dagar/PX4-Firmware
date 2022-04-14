@@ -40,7 +40,6 @@
 #include <drivers/drv_pwm_output.h>
 #include <lib/mixer/MixerGroup.hpp>
 #include <lib/perf/perf_counter.h>
-#include <px4_platform_common/atomic.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
@@ -156,21 +155,12 @@ public:
 
 	void setMaxTopicUpdateRate(unsigned max_topic_update_interval_us);
 
-	/**
-	 * Reset (unload) the complete mixer, called from another thread.
-	 * This is thread-safe, as long as only one other thread at a time calls this.
-	 */
-	void resetMixerThreadSafe();
-
 	void resetMixer();
 
 	/**
 	 * Load (append) a new mixer from a buffer, called from another thread.
-	 * This is thread-safe, as long as only one other thread at a time calls this.
 	 * @return 0 on success, <0 error otherwise
 	 */
-	int loadMixerThreadSafe(const char *buf, unsigned len);
-
 	int loadMixer(const char *buf, unsigned len);
 
 	const actuator_armed_s &armed() const { return _armed; }
@@ -230,8 +220,6 @@ private:
 	bool updateStaticMixer();
 	bool updateDynamicMixer();
 
-	void handleCommands();
-
 	bool armNoThrottle() const
 	{
 		return (_armed.prearmed && !_armed.armed) || _armed.in_esc_calibration_mode;
@@ -269,19 +257,6 @@ private:
 		PX4 = 0,
 		Betaflight = 1
 	};
-
-	struct Command {
-		enum class Type : int {
-			None,
-			resetMixer,
-			loadMixer
-		};
-		px4::atomic<int> command{(int)Type::None};
-		const char *mixer_buf;
-		unsigned mixer_buf_length;
-		int result;
-	};
-	Command _command; ///< incoming commands (from another thread)
 
 	/**
 	 * Reorder outputs according to _param_mot_ordering

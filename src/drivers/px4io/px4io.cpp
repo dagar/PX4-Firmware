@@ -1698,7 +1698,7 @@ int PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 
 	case MIXERIOCRESET:
 		PX4_DEBUG("MIXERIOCRESET");
-		_mixing_output.resetMixerThreadSafe();
+		_mixing_output.resetMixer();
 		break;
 
 	case MIXERIOCLOADBUF: {
@@ -1706,7 +1706,7 @@ int PX4IO::ioctl(file *filep, int cmd, unsigned long arg)
 
 			const char *buf = (const char *)arg;
 			unsigned buflen = strlen(buf);
-			ret = _mixing_output.loadMixerThreadSafe(buf, buflen);
+			ret = _mixing_output.loadMixer(buf, buflen);
 
 			break;
 		}

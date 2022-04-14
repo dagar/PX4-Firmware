@@ -956,14 +956,14 @@ UavcanNode::ioctl(file *filp, int cmd, unsigned long arg)
 		break;
 
 	case MIXERIOCRESET:
-		_mixing_interface_esc.mixingOutput().resetMixerThreadSafe();
+		_mixing_interface_esc.mixingOutput().resetMixer();
 
 		break;
 
 	case MIXERIOCLOADBUF: {
 			const char *buf = (const char *)arg;
 			unsigned buflen = strlen(buf);
-			ret = _mixing_interface_esc.mixingOutput().loadMixerThreadSafe(buf, buflen);
+			ret = _mixing_interface_esc.mixingOutput().loadMixer(buf, buflen);
 		}
 		break;
 

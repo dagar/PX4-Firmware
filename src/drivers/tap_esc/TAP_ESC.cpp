@@ -415,13 +415,13 @@ int TAP_ESC::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case MIXERIOCRESET:
-		_mixing_output.resetMixerThreadSafe();
+		_mixing_output.resetMixer();
 		break;
 
 	case MIXERIOCLOADBUF: {
 			const char *buf = (const char *)arg;
 			unsigned buflen = strlen(buf);
-			ret = _mixing_output.loadMixerThreadSafe(buf, buflen);
+			ret = _mixing_output.loadMixer(buf, buflen);
 			break;
 		}
 

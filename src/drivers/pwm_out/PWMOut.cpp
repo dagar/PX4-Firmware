@@ -912,14 +912,14 @@ int PWMOut::pwm_ioctl(device::file_t *filp, int cmd, unsigned long arg)
 		break;
 
 	case MIXERIOCRESET:
-		_mixing_output.resetMixerThreadSafe();
+		_mixing_output.resetMixer();
 
 		break;
 
 	case MIXERIOCLOADBUF: {
 			const char *buf = (const char *)arg;
 			unsigned buflen = strlen(buf);
-			ret = _mixing_output.loadMixerThreadSafe(buf, buflen);
+			ret = _mixing_output.loadMixer(buf, buflen);
 			update_params();
 
 			break;
