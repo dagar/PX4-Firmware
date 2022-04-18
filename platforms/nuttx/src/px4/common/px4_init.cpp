@@ -125,7 +125,7 @@ int px4_platform_init()
 	param_init();
 
 	/* configure CPU load estimation */
-#ifdef CONFIG_SCHED_INSTRUMENTATION
+#ifdef CONFIG_SCHED_INSTRUMENTATION_EXTERNAL
 	cpuload_initialize_once();
 #endif
 

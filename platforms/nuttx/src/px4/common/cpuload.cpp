@@ -108,6 +108,8 @@ void cpuload_initialize_once()
 	system_load.initialized = true;
 }
 
+#if defined(CONFIG_SCHED_INSTRUMENTATION_EXTERNAL)
+
 void sched_note_start(FAR struct tcb_s *tcb)
 {
 	// find first free slot
@@ -191,5 +193,8 @@ void sched_note_resume(FAR struct tcb_s *tcb)
 		}
 	}
 }
+
+#endif // CONFIG_SCHED_INSTRUMENTATION_EXTERNAL
+
 __END_DECLS
 #endif // PX4_NUTTX && CONFIG_SCHED_INSTRUMENTATION
