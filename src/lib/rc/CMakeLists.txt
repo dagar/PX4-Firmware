@@ -42,8 +42,9 @@ add_library(rc
 )
 target_compile_options(rc
 	PRIVATE
-		#-DDEBUG_BUILD
+		-DDEBUG_BUILD
 		-Wno-unused-result
+		-Wno-error
 )
 target_link_libraries(rc PRIVATE prebuild_targets)
 

@@ -34,6 +34,7 @@ px4_add_module(
 	MODULE drivers__rc_input
 	MAIN rc_input
 	COMPILE_FLAGS
+		-Wno-error
 	SRCS
 		RCInput.cpp
 		crsf_telemetry.cpp
