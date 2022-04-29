@@ -167,13 +167,12 @@ bool Ekf::fuseVerticalPosition(const float innov, const float innov_gate, const 
 // Helper function that fuses a single velocity or position measurement
 bool Ekf::fuseVelPosHeight(const float innov, const float innov_var, const int obs_index)
 {
-	Vector24f Kfusion;  // Kalman gain vector for any single observation - sequential fusion is used.
 	const unsigned state_index = obs_index + 4;  // we start with vx and this is the 4. state
 
+	// Kalman gain vector for any single observation - sequential fusion is used.
 	// calculate kalman gain K = PHS, where S = 1/innovation variance
-	for (int row = 0; row < _k_num_states; row++) {
-		Kfusion(row) = P(row, state_index) / innov_var;
-	}
+	const float s = 1 / innov_var;
+	const Vector24f Kfusion{(P.row(state_index) * s).transpose()};
 
 	SquareMatrix24f KHP;
 
@@ -185,20 +184,11 @@ bool Ekf::fuseVelPosHeight(const float innov, const float innov_var, const int o
 
 	// if the covariance correction will result in a negative variance, then
 	// the covariance matrix is unhealthy and must be corrected
-	bool healthy = true;
+	const bool is_healthy = checkAndFixCovarianceUpdate(KHP);
 
-	for (int i = 0; i < _k_num_states; i++) {
-		if (P(i, i) < KHP(i, i)) {
-			// zero rows and columns
-			P.uncorrelateCovarianceSetVariance<1>(i, 0.0f);
+	setVelPosStatus(obs_index, is_healthy);
 
-			healthy = false;
-		}
-	}
-
-	setVelPosStatus(obs_index, healthy);
-
-	if (healthy) {
+	if (is_healthy) {
 		// apply the covariance corrections
 		P -= KHP;
 
