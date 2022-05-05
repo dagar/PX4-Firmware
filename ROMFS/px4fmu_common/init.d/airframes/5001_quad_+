@@ -24,5 +24,3 @@
 #
 
 . ${R}etc/init.d/rc.mc_defaults
-
-set MIXER quad_+

@@ -38,7 +38,3 @@ param set-default CA_SV_CS0_TYPE 5
 param set-default CA_SV_CS1_TRQ_P 0.5
 param set-default CA_SV_CS1_TRQ_Y -0.5
 param set-default CA_SV_CS1_TYPE 6
-
-set MIXER vtol_tailsitter_duo
-
-set PWM_OUT 1234

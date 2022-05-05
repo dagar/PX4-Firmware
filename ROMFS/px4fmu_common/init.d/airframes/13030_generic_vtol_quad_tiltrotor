@@ -58,8 +58,3 @@ param set-default CA_SV_CS2_TYPE 3
 param set-default CA_SV_CS3_TRQ_Y 1.0
 param set-default CA_SV_CS3_TYPE 4
 param set-default CA_SV_TL_COUNT 4
-
-set MIXER quad_x
-set MIXER_AUX vtol_TTTTAAER
-
-set PWM_OUT 1234

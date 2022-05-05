@@ -38,7 +38,6 @@ param set-default IMU_GYRO_CUTOFF 100
 
 # System
 param set-default PWM_MAIN_MIN 1100
-param set-default PWM_MAIN_RATE 0
 
 param set-default SENS_BOARD_ROT 10
 

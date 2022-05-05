@@ -22,8 +22,6 @@
 
 . ${R}etc/init.d/rc.mc_defaults
 
-set MIXER quad_s250aq
-
 param set-default ATT_BIAS_MAX 0
 
 param set-default CBRK_IO_SAFETY 22027

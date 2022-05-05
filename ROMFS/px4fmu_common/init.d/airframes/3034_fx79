@@ -25,5 +25,3 @@ param set-default FW_AIRSPD_MAX 30
 param set-default FW_AIRSPD_MIN 13
 
 param set-default NAV_LOITER_RAD 150
-
-set MIXER fw_generic_wing

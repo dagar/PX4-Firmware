@@ -82,5 +82,3 @@ param set-default RC5_TRIM          1500
 param set-default MAV_0_RATE 80000
 param set-default MAV_0_MODE 2
 param set-default SER_TEL1_BAUD 921600
-
-set MIXER_AUX none

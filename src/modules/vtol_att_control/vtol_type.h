@@ -52,9 +52,6 @@ static constexpr float kFlapSlewRateVtol = 1.f; // minimum time from none to ful
 static constexpr float kSpoilerSlewRateVtol = 1.f; // minimum time from none to full spoiler deflection [s]
 
 struct Params {
-	int32_t ctrl_alloc;
-	int32_t idle_pwm_mc;			// pwm value for idle in mc mode
-	int32_t vtol_motor_id;
 	int32_t vtol_type;
 	bool elevons_mc_lock;		// lock elevons in multicopter mode
 	float fw_min_alt;			// minimum relative altitude for FW mode (QuadChute)
@@ -72,7 +69,6 @@ struct Params {
 	bool airspeed_disabled;
 	float front_trans_timeout;
 	float mpc_xy_cruise;
-	int32_t fw_motors_off;			/**< bitmask of all motors that should be off in fixed wing mode */
 	int32_t diff_thrust;
 	float diff_thrust_scale;
 	float pitch_min_rad;
@@ -81,7 +77,6 @@ struct Params {
 	float dec_to_pitch_ff;
 	float dec_to_pitch_i;
 	float back_trans_dec_sp;
-	bool vt_mc_on_fmu;
 	int32_t vt_forward_thrust_enable_mode;
 	float mpc_land_alt1;
 	float mpc_land_alt2;
@@ -280,29 +275,6 @@ protected:
 
 	bool _quadchute_command_treated{false};
 
-
-	/**
-	 * @brief      Sets mc motor minimum pwm to VT_IDLE_PWM_MC which ensures
-	 *             that they are spinning in mc mode.
-	 *
-	 * @return     true on success
-	 */
-	bool set_idle_mc();
-
-	/**
-	 * @brief      Sets mc motor minimum pwm to PWM_MIN which ensures that the
-	 *             motors stop spinning on zero throttle in fw mode.
-	 *
-	 * @return     true on success
-	 */
-	bool set_idle_fw();
-
-	void set_all_motor_state(motor_state target_state, int value = 0);
-
-	void set_main_motor_state(motor_state target_state, int value = 0);
-
-	void set_alternate_motor_state(motor_state target_state, int value = 0);
-
 	float update_and_get_backtransition_pitch_sp();
 
 	SlewRate<float> _spoiler_setpoint_with_slewrate;
@@ -311,8 +283,6 @@ protected:
 	float _dt{0.0025f}; // time step [s]
 
 private:
-
-
 	hrt_abstime _throttle_blend_start_ts{0};	// time at which we start blending between transition throttle and fixed wing throttle
 
 	/**
@@ -328,16 +298,6 @@ private:
 	int32_t _alternate_motor_channel_bitmap = 0;
 
 	/**
-	 * @brief      Adjust minimum/maximum pwm values for the output channels.
-	 *
-	 * @param      pwm_output_values  Struct containing the limit values for each channel
-	 * @param[in]  type               Specifies if min or max limits are adjusted.
-	 *
-	 * @return     True on success.
-	 */
-	bool apply_pwm_limits(struct pwm_output_values &pwm_values, pwm_limit_type type);
-
-	/**
 	 * @brief      Determines if channel is set in a bitmap.
 	 *
 	 * @param[in]  channel  The channel
@@ -349,8 +309,6 @@ private:
 
 	// generates a bitmap from a number format, e.g. 1235 -> first, second, third and fifth bits should be set.
 	int generate_bitmap_from_channel_numbers(const int channels);
-
-	bool set_motor_state(const motor_state target_state, const int32_t channel_bitmap,  const int value);
 
 	void resetAccelToPitchPitchIntegrator() { _accel_to_pitch_integ = 0.f; }
 	bool shouldBlendThrottleAfterFrontTransition() { return _throttle_blend_start_ts != 0; };

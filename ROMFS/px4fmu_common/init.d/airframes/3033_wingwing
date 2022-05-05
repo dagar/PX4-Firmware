@@ -40,9 +40,3 @@ param set-default FW_RR_FF 0.6
 param set-default FW_RR_P 0.04
 
 param set-default PWM_MAIN_DISARM 1000
-
-# Set mixer.
-set MIXER fw_generic_wing
-
-# Provide ESC a constant 1000 us pulse.
-set PWM_OUT 4

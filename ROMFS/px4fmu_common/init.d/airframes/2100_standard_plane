@@ -35,10 +35,5 @@ param set-default CA_SV_CS2_TYPE 3
 param set-default CA_SV_CS3_TRQ_Y 1.0
 param set-default CA_SV_CS3_TYPE 4
 
-param set-default PWM_AUX_RATE 50
-param set-default PWM_MAIN_RATE 50
-
-set MIXER AETRFG
-
 # Rate must be set by group (see pwm info).
 # Throttle is in the same group as servos.

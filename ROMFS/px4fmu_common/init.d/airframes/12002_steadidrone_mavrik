@@ -42,7 +42,3 @@ param set-default MPC_THR_MIN 0.15
 param set-default MPC_Z_VEL_MAX_DN 2
 
 param set-default BAT1_N_CELLS 4
-
-set MIXER octo_cox_w
-
-set PWM_OUT 12345678

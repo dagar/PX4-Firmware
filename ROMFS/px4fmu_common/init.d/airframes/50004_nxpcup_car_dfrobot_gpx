@@ -64,8 +64,3 @@ param set-default PWM_MAIN_MIN4 970
 
 # Enable Airspeed check circuit breaker because Rovers will have no airspeed sensor
 param set-default CBRK_AIRSPD_CHK 162128
-
-# Set mixer
-set MIXER rover_diff_and_servo
-
-set PWM_MAIN_REV2 1

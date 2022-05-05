@@ -52,17 +52,6 @@
 
 __BEGIN_DECLS
 
-/**
- * Path for the default PWM output device.
- *
- * Note that on systems with more than one PWM output path (e.g.
- * PX4FMU with PX4IO connected) there may be other devices that
- * respond to this protocol.
- */
-#define PWM_OUTPUT_BASE_DEVICE_PATH "/dev/pwm_output"
-#define PWM_OUTPUT0_DEVICE_PATH	"/dev/pwm_output0"
-#define PWM_OUTPUT1_DEVICE_PATH	"/dev/pwm_output1"
-
 #define PWM_OUTPUT_MAX_CHANNELS 16
 
 struct pwm_output_values {
@@ -137,78 +126,8 @@ typedef uint16_t	servo_position_t;
  */
 #define _PWM_SERVO_BASE		0x2a00
 
-/** arm all servo outputs handle by this driver */
-#define PWM_SERVO_ARM		_PX4_IOC(_PWM_SERVO_BASE, 0)
-
-/** disarm all servo outputs (stop generating pulses) */
-#define PWM_SERVO_DISARM	_PX4_IOC(_PWM_SERVO_BASE, 1)
-
-/** get default servo update rate */
-#define PWM_SERVO_GET_DEFAULT_UPDATE_RATE _PX4_IOC(_PWM_SERVO_BASE, 2)
-
-/** set alternate servo update rate */
-#define PWM_SERVO_SET_UPDATE_RATE _PX4_IOC(_PWM_SERVO_BASE, 3)
-
-/** get alternate servo update rate */
-#define PWM_SERVO_GET_UPDATE_RATE _PX4_IOC(_PWM_SERVO_BASE, 4)
-
-/** get the number of servos in *(unsigned *)arg */
-#define PWM_SERVO_GET_COUNT	_PX4_IOC(_PWM_SERVO_BASE, 5)
-
-/** selects servo update rates, one bit per servo. 0 = default (50Hz), 1 = alternate */
-#define PWM_SERVO_SET_SELECT_UPDATE_RATE _PX4_IOC(_PWM_SERVO_BASE, 6)
-
-/** check the selected update rates */
-#define PWM_SERVO_GET_SELECT_UPDATE_RATE _PX4_IOC(_PWM_SERVO_BASE, 7)
-
-/** set the 'ARM ok' bit, which activates the safety switch */
-#define PWM_SERVO_SET_ARM_OK	_PX4_IOC(_PWM_SERVO_BASE, 8)
-
-/** clear the 'ARM ok' bit, which deactivates the safety switch */
-#define PWM_SERVO_CLEAR_ARM_OK	_PX4_IOC(_PWM_SERVO_BASE, 9)
-
 /** start DSM bind */
 #define DSM_BIND_START	_PX4_IOC(_PWM_SERVO_BASE, 10)
-
-/** get the PWM value for failsafe */
-#define PWM_SERVO_GET_FAILSAFE_PWM	_PX4_IOC(_PWM_SERVO_BASE, 13)
-
-/** get the PWM value when disarmed */
-#define PWM_SERVO_GET_DISARMED_PWM	_PX4_IOC(_PWM_SERVO_BASE, 15)
-
-/** set the minimum PWM value the output will send */
-#define PWM_SERVO_SET_MIN_PWM	_PX4_IOC(_PWM_SERVO_BASE, 16)
-
-/** get the minimum PWM value the output will send */
-#define PWM_SERVO_GET_MIN_PWM	_PX4_IOC(_PWM_SERVO_BASE, 17)
-
-/** set the maximum PWM value the output will send */
-#define PWM_SERVO_SET_MAX_PWM	_PX4_IOC(_PWM_SERVO_BASE, 18)
-
-/** get the maximum PWM value the output will send */
-#define PWM_SERVO_GET_MAX_PWM	_PX4_IOC(_PWM_SERVO_BASE, 19)
-
-/** force safety switch off (to disable use of safety switch) */
-#define PWM_SERVO_SET_FORCE_SAFETY_OFF		_PX4_IOC(_PWM_SERVO_BASE, 25)
-
-/** force safety switch on (to enable use of safety switch) */
-#define PWM_SERVO_SET_FORCE_SAFETY_ON		_PX4_IOC(_PWM_SERVO_BASE, 28)
-
-/*
- *
- *
- * WARNING WARNING WARNING! DO NOT EXCEED 47 IN IOC INDICES HERE!
- *
- *
- */
-
-/** get a single specific servo value */
-#define PWM_SERVO_GET(_servo)	_PX4_IOC(_PWM_SERVO_BASE, 0x50 + _servo)
-
-/** get the _n'th rate group's channels; *(uint32_t *)arg returns a bitmap of channels
- *  whose update rates must be the same.
- */
-#define PWM_SERVO_GET_RATEGROUP(_n) _PX4_IOC(_PWM_SERVO_BASE, 0x70 + _n)
 
 /** specific rates for configuring the timer for OneShot or PWM */
 #define	PWM_RATE_ONESHOT			0u

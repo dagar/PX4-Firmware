@@ -22,10 +22,6 @@
 # Configure as helicopter (number 4 defined in commander_helper.cpp)
 param set-default MAV_TYPE 4
 
-set MIXER blade130
-
-set PWM_OUT none
-
 param set-default ATT_BIAS_MAX 0
 
 param set-default CBRK_IO_SAFETY 22027

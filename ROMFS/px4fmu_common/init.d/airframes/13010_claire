@@ -30,8 +30,3 @@ param set-default VT_TILT_MC 0.08
 param set-default VT_TILT_TRANS 0.5
 param set-default VT_ELEV_MC_LOCK 0
 param set-default VT_TYPE 1
-
-set MIXER claire
-set MIXER_AUX claire
-
-set PWM_OUT 1234

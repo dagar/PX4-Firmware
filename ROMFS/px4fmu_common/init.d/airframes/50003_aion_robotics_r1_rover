@@ -73,10 +73,3 @@ param set-default RBCLW_COUNTS_REV 1200
 param set-default RBCLW_ADDRESS 128
 # 104 corresponds to Telem 4
 param set-default RBCLW_SER_CFG 104
-# Start this driver after setting parameters, because the driver uses some of those parameters.
-# roboclaw start /dev/ttyS3
-
-# Set mixer
-set MIXER generic_diff_rover
-
-set PWM_MAIN_REV2 1

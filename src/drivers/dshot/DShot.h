@@ -34,7 +34,6 @@
 
 #include <drivers/device/device.h>
 #include <drivers/drv_input_capture.h>
-#include <drivers/drv_mixer.h>
 #include <lib/mixer_module/mixer_module.hpp>
 #include <px4_platform_common/getopt.h>
 #include <px4_platform_common/module.h>
@@ -60,20 +59,16 @@ static constexpr int DSHOT_DISARM_VALUE = 0;
 static constexpr int DSHOT_MIN_THROTTLE = 1;
 static constexpr int DSHOT_MAX_THROTTLE = 1999;
 
-class DShot : public cdev::CDev, public ModuleBase<DShot>, public OutputModuleInterface
+class DShot final : public ModuleBase<DShot>, public OutputModuleInterface
 {
 public:
 	DShot();
-	virtual ~DShot();
+	~DShot() override;
 
 	/** @see ModuleBase */
 	static int custom_command(int argc, char *argv[]);
 
-	virtual int init();
-
-	virtual int ioctl(file *filp, int cmd, unsigned long arg);
-
-	void mixerChanged() override;
+	int init();
 
 	/** @see ModuleBase::print_status() */
 	int print_status() override;
@@ -163,8 +158,6 @@ private:
 
 	static constexpr unsigned _num_outputs{DIRECT_PWM_OUTPUT_CHANNELS};
 	uint32_t _output_mask{0};
-
-	int _class_instance{-1};
 
 	perf_counter_t	_cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 

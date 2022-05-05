@@ -54,5 +54,3 @@ param set-default SYS_HAS_BARO 0
 param set-default SYS_HAS_MAG 0
 
 param set-default BAT1_N_CELLS 2
-# The Whoop uses reversed props
-set MIXER quad_h

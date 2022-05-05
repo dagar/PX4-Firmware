@@ -95,10 +95,3 @@ param set-default VT_MOT_ID 5678
 param set-default VT_PSHER_RMP_DT 2
 param set-default VT_TRANS_MIN_TM 4
 param set-default VT_TYPE 2
-
-set MIXER babyshark
-set MIXER_AUX pass
-
-# Mark outputs for the alternate rate
-# or D-Shot
-set PWM_OUT 5678

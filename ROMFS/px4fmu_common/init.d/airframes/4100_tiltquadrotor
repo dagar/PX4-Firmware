@@ -23,7 +23,3 @@
 #
 
 . ${R}etc/init.d/rc.mc_defaults
-
-# Set mixer
-set MIXER tilt_quad
-set MIXER_AUX tilt_quad

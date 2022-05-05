@@ -37,9 +37,3 @@ param set-default FW_W_RMAX 0
 
 # set disarmed value for the ESC
 param set-default PWM_MAIN_DISARM 1000
-
-
-set MIXER AAERTWF
-
-# use PWM parameters for throttle channel
-set PWM_OUT 5

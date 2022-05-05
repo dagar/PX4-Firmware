@@ -70,14 +70,9 @@ param set-default PWM_AUX_DIS5 950
 
 param set-default VT_ARSP_TRANS   15
 param set-default VT_F_TRANS_THR    0.6
-param set-default VT_IDLE_PWM_MC 1180
+#TODO param set-default VT_IDLE_PWM_MC 1180
 param set-default VT_MOT_ID 1234
 param set-default VT_FW_MOT_OFFID 1234
 param set-default VT_TRANS_MIN_TM 5
 param set-default VT_TRANS_TIMEOUT    30
 param set-default VT_TYPE 2
-
-set MIXER quad_x
-set MIXER_AUX vtol_AAERT
-
-set PWM_OUT 1234
