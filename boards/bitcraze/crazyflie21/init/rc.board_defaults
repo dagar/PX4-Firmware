@@ -10,3 +10,5 @@ param set-default SYS_AUTOSTART 4901
 
 # don't probe external I2C
 param set-default SENS_EXT_I2C_PRB 0
+
+sercon

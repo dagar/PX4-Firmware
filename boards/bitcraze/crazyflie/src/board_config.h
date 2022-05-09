@@ -193,16 +193,6 @@ __BEGIN_DECLS
 
 extern void stm32_usbinitialize(void);
 
-/****************************************************************************
- * Name: board_i2c_initialize
- *
- * Description:
- *   Called to set I2C bus frequencies.
- *
- ****************************************************************************/
-
-int board_i2c_initialize(void);
-
 /****************************************************************************************************
  * Name: stm32_spiinitialize
  *

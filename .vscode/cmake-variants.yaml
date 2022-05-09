@@ -146,6 +146,11 @@ CONFIG:
       buildType: MinSizeRel
       settings:
         CONFIG: bitcraze_crazyflie_default
+    bitcraze_crazyflie21_default:
+      short: bitcraze_crazyflie21
+      buildType: MinSizeRel
+      settings:
+        CONFIG: bitcraze_crazyflie21_default
     cuav_can-gps-v1_default:
       short: cuav_can-gps-v1_default
       buildType: MinSizeRel
