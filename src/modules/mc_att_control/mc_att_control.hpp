@@ -97,7 +97,7 @@ private:
 	/**
 	 * Generate & publish an attitude setpoint from stick inputs
 	 */
-	void		generate_attitude_setpoint(const matrix::Quatf &q, float dt, bool reset_yaw_sp);
+	void		generate_attitude_setpoint(const matrix::Quatf &q, float dt, bool reset_yaw_sp, bool yaw_good_for_control = true);
 
 	AttitudeControl _attitude_control; ///< class for attitude control calculations
 

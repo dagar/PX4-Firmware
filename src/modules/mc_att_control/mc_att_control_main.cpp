@@ -118,7 +118,8 @@ MulticopterAttitudeControl::throttle_curve(float throttle_stick_input)
 }
 
 void
-MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt, bool reset_yaw_sp)
+MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt, bool reset_yaw_sp,
+		bool yaw_good_for_control)
 {
 	vehicle_attitude_setpoint_s attitude_setpoint{};
 	const float yaw = Eulerf(q).psi();
@@ -132,7 +133,16 @@ MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt,
 
 		const float yaw_rate = math::radians(_param_mpc_man_y_max.get());
 		attitude_setpoint.yaw_sp_move_rate = _manual_control_setpoint.r * yaw_rate;
-		_man_yaw_sp = wrap_pi(_man_yaw_sp + attitude_setpoint.yaw_sp_move_rate * dt);
+
+		if (yaw_good_for_control) {
+			_man_yaw_sp = wrap_pi(_man_yaw_sp + attitude_setpoint.yaw_sp_move_rate * dt);
+
+		} else {
+			_man_yaw_sp = wrap_pi(yaw + attitude_setpoint.yaw_sp_move_rate * dt);
+		}
+
+	} else if (!yaw_good_for_control) {
+		_man_yaw_sp = yaw;
 	}
 
 	/*
@@ -321,7 +331,7 @@ MulticopterAttitudeControl::Run()
 			    !_v_control_mode.flag_control_velocity_enabled &&
 			    !_v_control_mode.flag_control_position_enabled) {
 
-				generate_attitude_setpoint(q, dt, _reset_yaw_sp);
+				generate_attitude_setpoint(q, dt, _reset_yaw_sp, v_att.yaw_good_for_control);
 				attitude_setpoint_generated = true;
 
 			} else {

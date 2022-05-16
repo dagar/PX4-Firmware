@@ -642,6 +642,8 @@ void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 		q.copyTo(att.q);
 
 		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
+		att.yaw_good_for_control = _ekf.isYawFinalAlignComplete();
+
 		att.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 		_attitude_pub.publish(att);
 
