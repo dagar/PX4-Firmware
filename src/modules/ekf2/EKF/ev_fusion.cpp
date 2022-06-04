@@ -40,9 +40,6 @@
 
 void Ekf::updateEvVel(const extVisionSample &ev_sample)
 {
-	// innovation gate size
-	const float innov_gate = fmaxf(_params.ev_vel_innov_gate, 1.f);
-
 	auto &ev_vel = _aid_src_ev_vel;
 
 	for (int i = 0; i < 3; i++) {
@@ -51,10 +48,12 @@ void Ekf::updateEvVel(const extVisionSample &ev_sample)
 
 		ev_vel.innovation[i] = _state.vel(i) - ev_sample.vel(i);
 		ev_vel.innovation_variance[i] = P(4 + i, 4 + i) + ev_vel.observation_variance[i];
-		ev_vel.test_ratio[i] = sq(ev_vel.innovation[i]) / (sq(innov_gate) * ev_vel.innovation_variance[i]);
-
-		ev_vel.innovation_rejected[i] = (ev_vel.test_ratio[i] > 1.f);
 	}
+
+	// innovation gate size
+	const float innov_gate = fmaxf(_params.ev_vel_innov_gate, 1.f);
+
+	setEstimatorAidStatusTestRatio(ev_vel, innov_gate);
 
 	// vz special case if there is bad vertical acceleration data, then don't reject measurement,
 	// but limit innovation to prevent spikes that could destabilise the filter
@@ -83,34 +82,29 @@ void Ekf::updateEvPos(const extVisionSample &ev_sample)
 			ev_pos.observation_variance[i] = fmaxf(_ev_sample_delayed.posVar(i), sq(0.01f));
 
 			ev_pos.innovation[i] = _state.pos(i) - _ev_sample_delayed.pos(i);
+			ev_pos.innovation_variance[i] = P(7 + i, 7 + i) + ev_pos.observation_variance[i];
 		}
 
 		updated = true;
 
-	} else if (_hpos_prev_available) {
+	} else if (_fuse_hpos_as_odom && _hpos_prev_available) {
 		// calculate the change in position since the last measurement
 		Vector3f delta_pos = _ev_sample_delayed.pos - _ev_sample_delayed_prev.pos;
 
 		for (int i = 0; i < 3; i++) {
 			ev_pos.observation[i] = delta_pos(i);
-
 			// observation 1-STD error, incremental pos observation is expected to have more uncertainty
 			ev_pos.observation_variance[i] = fmaxf(_ev_sample_delayed.posVar(i), sq(0.5f));
 
-			ev_pos.innovation[i] = _state.pos(i) - _hpos_pred_prev(i) - delta_pos(i);
+			ev_pos.innovation[i] = _state.pos(i) - (_hpos_pred_prev(i) - delta_pos(i));
+			ev_pos.innovation_variance[i] = P(7 + i, 7 + i) + ev_pos.observation_variance[i];
 		}
 
 		updated = true;
 	}
 
 	if (updated) {
-
-		for (int i = 0; i < 3; i++) {
-			ev_pos.innovation_variance[i] = P(7 + i, 7 + i) + ev_pos.observation_variance[i];
-			ev_pos.test_ratio[i] = sq(ev_pos.innovation[i]) / (sq(innov_gate) * ev_pos.innovation_variance[i]);
-
-			ev_pos.innovation_rejected[i] = (ev_pos.test_ratio[i] > 1.f);
-		}
+		setEstimatorAidStatusTestRatio(ev_pos, innov_gate);
 
 		// z special case if there is bad vertical acceleration data, then don't reject measurement,
 		// but limit innovation to prevent spikes that could destabilise the filter
@@ -174,7 +168,7 @@ void Ekf::fuseEvPos()
 	ev_pos.fusion_enabled[2] = _control_status.flags.ev_hgt;
 
 	if (ev_pos.fusion_enabled[2] && !ev_pos.innovation_rejected[2]) {
-		if (fuseVelPosHeight(ev_pos.innovation[2], ev_pos.innovation_variance[2], 2)) {
+		if (fuseVelPosHeight(ev_pos.innovation[2], ev_pos.innovation_variance[2], 5)) {
 			ev_pos.fused[2] = true;
 			ev_pos.time_last_fuse[2] = _time_last_imu;
 		}
