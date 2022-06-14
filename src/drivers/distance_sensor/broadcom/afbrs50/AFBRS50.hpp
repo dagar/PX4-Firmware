@@ -102,10 +102,13 @@ private:
 	perf_counter_t _sample_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": sample interval")};
 
 	uint32_t _measure_interval{1000000 / 50}; // 50Hz
+	static constexpr float SHORT_RANGE_THRESHOLD_M{4.f}; // meters
+	static constexpr float LONG_RANGE_THRESHOLD_M{6.f}; // meters
+
+	float _min_distance{0.08f};
+	float _max_distance{10.f};
+
+
 	float _current_distance{0};
 	int8_t _current_quality{0};
-	const float _short_range_threshold = 4.0; //meters
-	const float _long_range_threshold = 6.0; //meters
-	float _max_distance;
-	float _min_distance;
 };

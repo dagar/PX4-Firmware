@@ -41,8 +41,7 @@ typedef struct {
 
 	/*! The mapping of the GPIO blocks and pins for this device. */
 	const uint32_t GPIOs[ S2PI_IRQ + 1 ];
-}
-s2pi_handle_t;
+} s2pi_handle_t;
 
 s2pi_handle_t s2pi_ = { .GPIOs = { [ S2PI_CLK ]  = BROADCOM_AFBR_S50_S2PI_CLK,
 				   [ S2PI_CS ]   = BROADCOM_AFBR_S50_S2PI_CS,
@@ -121,9 +120,14 @@ status_t S2PI_GetStatus(void)
 *****************************************************************************/
 status_t S2PI_SetBaudRate(uint32_t baudRate_Bps)
 {
+	irqstate_t irqstate_flags = px4_enter_critical_section();
+
 	SPI_SETMODE(s2pi_.spidev, SPIDEV_MODE3);
 	SPI_SETBITS(s2pi_.spidev, 8);
 	SPI_SETFREQUENCY(s2pi_.spidev, baudRate_Bps);
+
+	px4_leave_critical_section(irqstate_flags);
+
 	return STATUS_OK;
 }
 
@@ -139,6 +143,7 @@ status_t S2PI_CaptureGpioControl(void)
 {
 	/* Check if something is ongoing. */
 	irqstate_t irqstate_flags = px4_enter_critical_section();
+
 	status_t status = s2pi_.Status;
 
 	if (status != STATUS_IDLE) {
@@ -147,12 +152,13 @@ status_t S2PI_CaptureGpioControl(void)
 	}
 
 	s2pi_.Status = STATUS_S2PI_GPIO_MODE;
-	px4_leave_critical_section(irqstate_flags);
 
 	// GPIO mode (output push pull)
 	px4_arch_configgpio(PX4_MAKE_GPIO_OUTPUT_SET(s2pi_.GPIOs[S2PI_CLK]));
-	px4_arch_configgpio(PX4_MAKE_GPIO_OUTPUT_SET(s2pi_.GPIOs[S2PI_MISO]));
+	px4_arch_configgpio(PX4_MAKE_GPIO_INPUT(s2pi_.GPIOs[S2PI_MISO]));
 	px4_arch_configgpio(PX4_MAKE_GPIO_OUTPUT_SET(s2pi_.GPIOs[S2PI_MOSI]));
+
+	px4_leave_critical_section(irqstate_flags);
 
 	return STATUS_OK;
 }
@@ -168,6 +174,7 @@ status_t S2PI_ReleaseGpioControl(void)
 {
 	/* Check if something is ongoing. */
 	irqstate_t irqstate_flags = px4_enter_critical_section();
+
 	status_t status = s2pi_.Status;
 
 	if (status != STATUS_S2PI_GPIO_MODE) {
@@ -176,7 +183,6 @@ status_t S2PI_ReleaseGpioControl(void)
 	}
 
 	s2pi_.Status = STATUS_IDLE;
-	px4_leave_critical_section(irqstate_flags);
 
 	// SPI alternate
 	stm32_configgpio(s2pi_.GPIOs[S2PI_CLK]);
@@ -185,6 +191,8 @@ status_t S2PI_ReleaseGpioControl(void)
 
 	// probably not necessary
 	stm32_spibus_initialize(BROADCOM_AFBR_S50_S2PI_SPI_BUS);
+
+	px4_leave_critical_section(irqstate_flags);
 
 	return STATUS_OK;
 }
@@ -211,6 +219,7 @@ status_t S2PI_WriteGpioPin(s2pi_slave_t slave, s2pi_pin_t pin, uint32_t value)
 	}
 
 	px4_arch_gpiowrite(s2pi_.GPIOs[pin], value);
+	up_udelay(10);
 
 	return STATUS_OK;
 }
@@ -255,6 +264,7 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 {
 	/* Check the driver status. */
 	irqstate_t irqstate_flags = px4_enter_critical_section();
+
 	status_t status = s2pi_.Status;
 
 	if (status != STATUS_IDLE) {
@@ -263,12 +273,13 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 	}
 
 	s2pi_.Status = STATUS_BUSY;
-	px4_leave_critical_section(irqstate_flags);
 
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
 
 	s2pi_.Status = STATUS_IDLE;
+
+	px4_leave_critical_section(irqstate_flags);
 
 	return STATUS_OK;
 }
@@ -309,18 +320,39 @@ status_t S2PI_CycleCsPin(s2pi_slave_t slave)
 static void broadcom_s2pi_transfer_callout(void *arg)
 {
 	perf_begin(s2pi_transfer_perf);
+
+	struct spi_dev_s *spidev = s2pi_.spidev;
+
+	SPI_LOCK(spidev, true);
+
+	irqstate_t irqstate_flags = px4_enter_critical_section();
+
+	s2pi_callback_t callback = s2pi_.Callback;
+	s2pi_.Callback = 0;
+
+	void *callback_data = s2pi_.CallbackData;
+	s2pi_.CallbackData = NULL;
+
+	px4_leave_critical_section(irqstate_flags);
+
+	SPI_SETMODE(spidev, SPIDEV_MODE3);
+	SPI_SETBITS(spidev, 8);
+	SPI_SETFREQUENCY(spidev, 5000000);
+
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 0);
 	SPI_EXCHANGE(s2pi_.spidev, s2pi_.spi_tx_data, s2pi_.spi_rx_data, s2pi_.spi_frame_size);
-	s2pi_.Status = STATUS_IDLE;
 	px4_arch_gpiowrite(s2pi_.GPIOs[S2PI_CS], 1);
+
+	s2pi_.Status = STATUS_IDLE;
+
+	SPI_LOCK(spidev, false);
+
 	perf_end(s2pi_transfer_perf);
 
 	/* Invoke callback if there is one */
-	if (s2pi_.Callback != 0) {
+	if (callback != 0) {
 		perf_begin(s2pi_transfer_callback_perf);
-		s2pi_callback_t callback = s2pi_.Callback;
-		s2pi_.Callback = 0;
-		callback(STATUS_OK, s2pi_.CallbackData);
+		callback(STATUS_OK, callback_data);
 		perf_end(s2pi_transfer_callback_perf);
 	}
 }
@@ -340,11 +372,16 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8
 
 	/* Check the driver status, lock if idle. */
 	irqstate_t irqstate_flags = px4_enter_critical_section();
+
 	status_t status = s2pi_.Status;
 
 	if (status != STATUS_IDLE) {
 		px4_leave_critical_section(irqstate_flags);
 		return status;
+	}
+
+	if (!up_interrupt_context()) {
+		SPI_LOCK(s2pi_.spidev, true);
 	}
 
 	s2pi_.Status = STATUS_BUSY;
@@ -357,6 +394,10 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8
 	s2pi_.spi_rx_data = rxData;
 	s2pi_.spi_frame_size = frameSize;
 	work_queue(HPWORK, &broadcom_s2pi_transfer_work, broadcom_s2pi_transfer_callout, NULL, 0);
+
+	if (!up_interrupt_context()) {
+		SPI_LOCK(s2pi_.spidev, false);
+	}
 
 	px4_leave_critical_section(irqstate_flags);
 
@@ -371,10 +412,13 @@ status_t S2PI_TransferFrame(s2pi_slave_t spi_slave, uint8_t const *txData, uint8
 *****************************************************************************/
 status_t S2PI_Abort(void)
 {
+	irqstate_t irqstate_flags = px4_enter_critical_section();
+
 	status_t status = s2pi_.Status;
 
 	/* Check if something is ongoing. */
 	if (status == STATUS_IDLE) {
+		px4_leave_critical_section(irqstate_flags);
 		return STATUS_OK;
 	}
 
@@ -382,6 +426,8 @@ status_t S2PI_Abort(void)
 	if (status == STATUS_BUSY) {
 		work_cancel(HPWORK, &broadcom_s2pi_transfer_work);
 	}
+
+	px4_leave_critical_section(irqstate_flags);
 
 	return STATUS_OK;
 }
@@ -402,8 +448,10 @@ status_t S2PI_Abort(void)
 *****************************************************************************/
 status_t S2PI_SetIrqCallback(s2pi_slave_t slave, s2pi_irq_callback_t callback, void *callbackData)
 {
+	irqstate_t irqstate_flags = px4_enter_critical_section();
 	s2pi_.IrqCallback = callback;
 	s2pi_.IrqCallbackData = callbackData;
+	px4_leave_critical_section(irqstate_flags);
 
 	return STATUS_OK;
 }

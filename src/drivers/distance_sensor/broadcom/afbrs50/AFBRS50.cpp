@@ -111,9 +111,11 @@ void AFBRS50::ProcessMeasurement(void *data)
 				quality = 0;
 			}
 
+			const hrt_abstime timestamp_sample = res.TimeStamp.sec * 1000000ULL + res.TimeStamp.usec;
+
 			_current_distance = result_m;
 			_current_quality = quality;
-			_px4_rangefinder.update(((res.TimeStamp.sec * 1000000ULL) + res.TimeStamp.usec), result_m, quality);
+			_px4_rangefinder.update(timestamp_sample, result_m, quality);
 		}
 	}
 }
@@ -145,7 +147,7 @@ int AFBRS50::init()
 		uint8_t a = (value >> 24) & 0xFFU;
 		uint8_t b = (value >> 16) & 0xFFU;
 		uint8_t c = value & 0xFFFFU;
-		PX4_INFO_RAW("AFBR-S50 Chip ID: %u, API Version: %u v%d.%d.%d\n", (uint)id, (uint)value, a, b, c);
+		PX4_INFO("AFBR-S50 Chip ID: %u, API Version: %u v%d.%d.%d\n", (uint)id, (uint)value, a, b, c);
 
 		argus_module_version_t mv = Argus_GetModuleVersion(_hnd);
 
@@ -210,6 +212,81 @@ int AFBRS50::init()
 
 		} else {
 			_state = STATE::CONFIGURE;
+
+			status = Argus_SetConfigurationFrameTime(_hnd, (1000000 / SHORT_RANGE_MODE_HZ));
+
+			if (status != STATUS_OK) {
+				PX4_ERR("Argus_SetConfigurationFrameTime status not okay: %i", (int)status);
+			}
+
+			uint32_t current_rate;
+			status = Argus_GetConfigurationFrameTime(_hnd, &current_rate);
+
+			if (status != STATUS_OK) {
+				PX4_ERR("Argus_GetConfigurationFrameTime status not okay: %i", (int)status);
+
+			} else {
+				_measure_interval = current_rate;
+			}
+
+
+			if (status != STATUS_OK) {
+				PX4_ERR("CONFIGURE status not okay: %i", (int)status);
+				_state = STATE::STOP;
+				ScheduleNow();
+			}
+
+			status = Argus_SetConfigurationDFMMode(_hnd, ARGUS_MODE_B, DFM_MODE_8X);
+
+			if (status != STATUS_OK) {
+				PX4_ERR("Argus_SetConfigurationDFMMode status not okay: %i", (int)status);
+			}
+
+			status = Argus_SetConfigurationDFMMode(_hnd, ARGUS_MODE_A, DFM_MODE_8X);
+
+			if (status != STATUS_OK) {
+				PX4_ERR("Argus_SetConfigurationDFMMode status not okay: %i", (int)status);
+			}
+
+			// start in short range mode
+			_mode = ARGUS_MODE_B;
+
+
+
+
+
+			status = Argus_SetConfigurationMeasurementMode(_hnd, _mode);
+
+			if (status != STATUS_OK) {
+				PX4_ERR("Argus_SetConfigurationMeasurementMode status not okay: %i", (int)status);
+				return status;
+			}
+
+			argus_mode_t current_mode;
+			status = Argus_GetConfigurationMeasurementMode(_hnd, &current_mode);
+
+			if (status != STATUS_OK) {
+				PX4_ERR("Argus_GetConfigurationMeasurementMode status not okay: %i", (int)status);
+
+			} else {
+				_mode = current_mode;
+			}
+
+
+
+			status = Argus_StartMeasurementTimer(_hnd, measurement_ready_callback);
+
+			if (status != STATUS_OK) {
+				PX4_ERR("CONFIGURE status not okay: %i", (int)status);
+				ScheduleNow();
+
+			} else {
+				_state = STATE::COLLECT;
+				ScheduleDelayed(_measure_interval);
+			}
+
+
+
 		}
 
 		ScheduleDelayed(_measure_interval);
@@ -234,41 +311,8 @@ void AFBRS50::Run()
 		break;
 
 	case STATE::CONFIGURE: {
-			//status_t status = Argus_SetConfigurationFrameTime(_hnd, _measure_interval);
-			status_t status = set_rate(SHORT_RANGE_MODE_HZ);
-
-			if (status != STATUS_OK) {
-				PX4_ERR("CONFIGURE status not okay: %i", (int)status);
-				_state = STATE::STOP;
-				ScheduleNow();
-			}
-
-			status = Argus_SetConfigurationDFMMode(_hnd, ARGUS_MODE_B, DFM_MODE_8X);
-
-			if (status != STATUS_OK) {
-				PX4_ERR("Argus_SetConfigurationDFMMode status not okay: %i", (int)status);
-			}
-
-			status = Argus_SetConfigurationDFMMode(_hnd, ARGUS_MODE_A, DFM_MODE_8X);
-
-			if (status != STATUS_OK) {
-				PX4_ERR("Argus_SetConfigurationDFMMode status not okay: %i", (int)status);
-			}
-
-			// start in short range mode
-			_mode = ARGUS_MODE_B;
-			set_mode(_mode);
-
-			status = Argus_StartMeasurementTimer(_hnd, measurement_ready_callback);
-
-			if (status != STATUS_OK) {
-				PX4_ERR("CONFIGURE status not okay: %i", (int)status);
-				ScheduleNow();
-
-			} else {
-				_state = STATE::COLLECT;
-				ScheduleDelayed(_measure_interval);
-			}
+			_state = STATE::COLLECT;
+			ScheduleDelayed(_measure_interval);
 		}
 		break;
 
@@ -299,7 +343,7 @@ void AFBRS50::UpdateMode()
 	// only update mode if _current_distance is a valid measurement
 	if ((_current_distance > 0) && (_current_quality > 0)) {
 
-		if ((_current_distance >= _long_range_threshold) && (_mode != ARGUS_MODE_A)) {
+		if ((_current_distance >= LONG_RANGE_THRESHOLD_M) && (_mode != ARGUS_MODE_A)) {
 			// change to long range mode
 			argus_mode_t mode = ARGUS_MODE_A;
 			status_t status = set_mode(mode);
@@ -320,7 +364,7 @@ void AFBRS50::UpdateMode()
 				PX4_ERR("set_rate status not okay: %i", (int)status);
 			}
 
-		} else if ((_current_distance <= _short_range_threshold) && (_mode != ARGUS_MODE_B)) {
+		} else if ((_current_distance <= SHORT_RANGE_THRESHOLD_M) && (_mode != ARGUS_MODE_B)) {
 			// change to short range mode
 			argus_mode_t mode = ARGUS_MODE_B;
 			status_t status = set_mode(mode);
@@ -364,7 +408,7 @@ void AFBRS50::print_info()
 status_t AFBRS50::set_mode(argus_mode_t mode)
 {
 	while (Argus_GetStatus(_hnd) != STATUS_IDLE) {
-		px4_usleep(1_ms);
+		px4_usleep(1000);
 	}
 
 	status_t status = Argus_SetConfigurationMeasurementMode(_hnd, mode);
@@ -422,7 +466,6 @@ void AFBRS50::get_info()
 	Argus_GetConfigurationMeasurementMode(_hnd, &current_mode);
 	Argus_GetConfigurationDFMMode(_hnd, current_mode, &dfm_mode);
 
-	PX4_INFO_RAW("distance: %.3fm\n", (double)_current_distance);
 	PX4_INFO_RAW("mode: %d\n", current_mode);
 	PX4_INFO_RAW("dfm mode: %d\n", dfm_mode);
 	PX4_INFO_RAW("rate: %u Hz\n", (uint)(1000000 / _measure_interval));
