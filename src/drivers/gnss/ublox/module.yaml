@@ -1,0 +1,9 @@
+module_name: UBX
+serial_config:
+    - command: gnss_ubx start -d ${SERIAL_DEV} -b p:${BAUD_PARAM}
+      port_config_param:
+        name: UBX_1_CONFIG
+        group: UBX
+        default: GPS1
+      label: Main GPS
+

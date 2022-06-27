@@ -1,0 +1,12 @@
+menuconfig DRIVERS_GNSS_UBX
+	bool "GNSS ublox"
+	default n
+	---help---
+		Enable support for ublox GNSS
+
+menuconfig USER_GNSS_UBX
+	bool "ublox GNSS running as userspace module"
+	default y
+	depends on BOARD_PROTECTED && DRIVERS_GNSS_UBX
+	---help---
+		Put ublox gnss in userspace memory
