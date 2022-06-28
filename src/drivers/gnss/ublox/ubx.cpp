@@ -56,23 +56,6 @@
 #define UBX_TRACE_RXMSG(...)  {/*PX4_INFO(__VA_ARGS__);*/}    // Rx msgs in payload_rx_done()
 #define UBX_TRACE_SVINFO(...) {/*PX4_INFO(__VA_ARGS__);*/}    // NAV-SVINFO processing (debug use only, will cause rx buffer overflows)
 
-GnssUblox::GPSDriverUBX(Interface gpsInterface, GPSCallbackPtr callback, void *callback_user,
-			sensor_gps_s *gps_position, satellite_info_s *satellite_info, uint8_t dynamic_model,
-			float heading_offset, UBXMode mode) :
-	_interface(gpsInterface),
-	_satellite_info(satellite_info),
-	_dyn_model(dynamic_model),
-	_mode(mode),
-	_heading_offset(heading_offset)
-{
-
-}
-
-GnssUblox::~GPSDriverUBX()
-{
-
-}
-
 int GnssUblox::configure(unsigned &baudrate, const GPSConfig &config)
 {
 	_configured = false;
@@ -268,162 +251,6 @@ int GnssUblox::configure(unsigned &baudrate, const GPSConfig &config)
 	}
 
 	_configured = true;
-	return 0;
-}
-
-
-int GnssUblox::configureDevicePreV27(const GNSSSystemsMask &gnssSystems)
-{
-	/* Send a CFG-RATE message to define update rate */
-	memset(&_buf.payload_tx_cfg_rate, 0, sizeof(_buf.payload_tx_cfg_rate));
-	_buf.payload_tx_cfg_rate.measRate	= UBX_TX_CFG_RATE_MEASINTERVAL;
-	_buf.payload_tx_cfg_rate.navRate	= UBX_TX_CFG_RATE_NAVRATE;
-	_buf.payload_tx_cfg_rate.timeRef	= UBX_TX_CFG_RATE_TIMEREF;
-
-	if (!sendMessage(UBX_MSG_CFG_RATE, (uint8_t *)&_buf, sizeof(_buf.payload_tx_cfg_rate))) {
-		return -1;
-	}
-
-	if (waitForAck(UBX_MSG_CFG_RATE, UBX_CONFIG_TIMEOUT, true) < 0) {
-		return -1;
-	}
-
-	/* send a NAV5 message to set the options for the internal filter */
-	memset(&_buf.payload_tx_cfg_nav5, 0, sizeof(_buf.payload_tx_cfg_nav5));
-	_buf.payload_tx_cfg_nav5.mask		= UBX_TX_CFG_NAV5_MASK;
-	_buf.payload_tx_cfg_nav5.dynModel	= _dyn_model;
-	_buf.payload_tx_cfg_nav5.fixMode	= UBX_TX_CFG_NAV5_FIXMODE;
-
-	if (!sendMessage(UBX_MSG_CFG_NAV5, (uint8_t *)&_buf, sizeof(_buf.payload_tx_cfg_nav5))) {
-		return -1;
-	}
-
-	if (waitForAck(UBX_MSG_CFG_NAV5, UBX_CONFIG_TIMEOUT, true) < 0) {
-		return -1;
-	}
-
-	/* configure active GNSS systems (number of channels and used signals taken from U-Center default) */
-	if (static_cast<int32_t>(gnssSystems) != 0) {
-		memset(&_buf.payload_tx_cfg_gnss, 0, sizeof(_buf.payload_tx_cfg_gnss));
-		_buf.payload_tx_cfg_gnss.msgVer = 0x00;
-		_buf.payload_tx_cfg_gnss.numTrkChHw = 0x00;  // read only
-		_buf.payload_tx_cfg_gnss.numTrkChUse = 0xFF;  // use max number of HW channels
-		_buf.payload_tx_cfg_gnss.numConfigBlocks = 7;  // always configure all systems
-
-		// GPS and QZSS should always be enabled and disabled together, according to uBlox
-		_buf.payload_tx_cfg_gnss.block[0].gnssId = UBX_TX_CFG_GNSS_GNSSID_GPS;
-		_buf.payload_tx_cfg_gnss.block[1].gnssId = UBX_TX_CFG_GNSS_GNSSID_QZSS;
-
-		if (gnssSystems & GNSSSystemsMask::ENABLE_GPS) {
-			PX4_DEBUG("GNSS Systems: Use GPS + QZSS");
-			_buf.payload_tx_cfg_gnss.block[0].resTrkCh = 8;
-			_buf.payload_tx_cfg_gnss.block[0].maxTrkCh = 16;
-			_buf.payload_tx_cfg_gnss.block[0].flags = UBX_TX_CFG_GNSS_FLAGS_GPS_L1CA | UBX_TX_CFG_GNSS_FLAGS_ENABLE;
-			_buf.payload_tx_cfg_gnss.block[1].resTrkCh = 0;
-			_buf.payload_tx_cfg_gnss.block[1].maxTrkCh = 3;
-			_buf.payload_tx_cfg_gnss.block[1].flags = UBX_TX_CFG_GNSS_FLAGS_QZSS_L1CA | UBX_TX_CFG_GNSS_FLAGS_ENABLE;
-		}
-
-		_buf.payload_tx_cfg_gnss.block[2].gnssId = UBX_TX_CFG_GNSS_GNSSID_SBAS;
-
-		if (gnssSystems & GNSSSystemsMask::ENABLE_SBAS) {
-			PX4_DEBUG("GNSS Systems: Use SBAS");
-			_buf.payload_tx_cfg_gnss.block[2].resTrkCh = 1;
-			_buf.payload_tx_cfg_gnss.block[2].maxTrkCh = 3;
-			_buf.payload_tx_cfg_gnss.block[2].flags = UBX_TX_CFG_GNSS_FLAGS_SBAS_L1CA | UBX_TX_CFG_GNSS_FLAGS_ENABLE;
-		}
-
-		_buf.payload_tx_cfg_gnss.block[3].gnssId = UBX_TX_CFG_GNSS_GNSSID_GALILEO;
-
-		if (gnssSystems & GNSSSystemsMask::ENABLE_GALILEO) {
-			PX4_DEBUG("GNSS Systems: Use Galileo");
-			_buf.payload_tx_cfg_gnss.block[3].resTrkCh = 4;
-			_buf.payload_tx_cfg_gnss.block[3].maxTrkCh = 8;
-			_buf.payload_tx_cfg_gnss.block[3].flags = UBX_TX_CFG_GNSS_FLAGS_GALILEO_E1 | UBX_TX_CFG_GNSS_FLAGS_ENABLE;
-		}
-
-		_buf.payload_tx_cfg_gnss.block[4].gnssId = UBX_TX_CFG_GNSS_GNSSID_BEIDOU;
-
-		if (gnssSystems & GNSSSystemsMask::ENABLE_BEIDOU) {
-			PX4_DEBUG("GNSS Systems: Use BeiDou");
-			_buf.payload_tx_cfg_gnss.block[4].resTrkCh = 8;
-			_buf.payload_tx_cfg_gnss.block[4].maxTrkCh = 16;
-			_buf.payload_tx_cfg_gnss.block[4].flags = UBX_TX_CFG_GNSS_FLAGS_BEIDOU_B1I | UBX_TX_CFG_GNSS_FLAGS_ENABLE;
-		}
-
-		_buf.payload_tx_cfg_gnss.block[5].gnssId = UBX_TX_CFG_GNSS_GNSSID_GLONASS;
-
-		if (gnssSystems & GNSSSystemsMask::ENABLE_GLONASS) {
-			PX4_DEBUG("GNSS Systems: Use GLONASS");
-			_buf.payload_tx_cfg_gnss.block[5].resTrkCh = 8;
-			_buf.payload_tx_cfg_gnss.block[5].maxTrkCh = 14;
-			_buf.payload_tx_cfg_gnss.block[5].flags = UBX_TX_CFG_GNSS_FLAGS_GLONASS_L1 | UBX_TX_CFG_GNSS_FLAGS_ENABLE;
-		}
-
-		// IMES always disabled
-		_buf.payload_tx_cfg_gnss.block[6].gnssId = UBX_TX_CFG_GNSS_GNSSID_IMES;
-		_buf.payload_tx_cfg_gnss.block[6].flags = 0;
-
-		// send message
-		if (!sendMessage(UBX_MSG_CFG_GNSS, (uint8_t *)&_buf, sizeof(_buf.payload_tx_cfg_gnss))) {
-			PX4_ERR("UBX CFG-GNSS message send failed");
-			return -1;
-		}
-
-		if (waitForAck(UBX_MSG_CFG_GNSS, UBX_CONFIG_TIMEOUT, true) < 0) {
-			PX4_ERR("UBX CFG-GNSS message ACK failed");
-			return -1;
-		}
-	}
-
-	/* configure message rates */
-	/* the last argument is divisor for measurement rate (set by CFG RATE), i.e. 1 means 5Hz */
-
-	/* try to set rate for NAV-PVT */
-	/* (implemented for ubx7+ modules only, use NAV-SOL, NAV-POSLLH, NAV-VELNED and NAV-TIMEUTC for ubx6) */
-	if (!configureMessageRate(UBX_MSG_NAV_PVT, 1)) {
-		return -1;
-	}
-
-	if (waitForAck(UBX_MSG_CFG_MSG, UBX_CONFIG_TIMEOUT, true) < 0) {
-		_use_nav_pvt = false;
-
-	} else {
-		_use_nav_pvt = true;
-	}
-
-	PX4_DEBUG("%susing NAV-PVT", _use_nav_pvt ? "" : "not ");
-
-	if (!_use_nav_pvt) {
-		if (!configureMessageRateAndAck(UBX_MSG_NAV_TIMEUTC, 5, true)) {
-			return -1;
-		}
-
-		if (!configureMessageRateAndAck(UBX_MSG_NAV_POSLLH, 1, true)) {
-			return -1;
-		}
-
-		if (!configureMessageRateAndAck(UBX_MSG_NAV_SOL, 1, true)) {
-			return -1;
-		}
-
-		if (!configureMessageRateAndAck(UBX_MSG_NAV_VELNED, 1, true)) {
-			return -1;
-		}
-	}
-
-	if (!configureMessageRateAndAck(UBX_MSG_NAV_DOP, 1, true)) {
-		return -1;
-	}
-
-	if (!configureMessageRateAndAck(UBX_MSG_NAV_SVINFO, (_satellite_info != nullptr) ? 5 : 0, true)) {
-		return -1;
-	}
-
-	if (!configureMessageRateAndAck(UBX_MSG_MON_HW, 1, true)) {
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -809,8 +636,8 @@ int GnssUblox::restartSurveyIn()
 	return 0;
 }
 
-int	// -1 = NAK, error or timeout, 0 = ACK
-GnssUblox::waitForAck(const uint16_t msg, const unsigned timeout, const bool report)
+// -1 = NAK, error or timeout, 0 = ACK
+int GnssUblox::waitForAck(const uint16_t msg, const unsigned timeout, const bool report)
 {
 	int ret = -1;
 
@@ -839,7 +666,6 @@ GnssUblox::waitForAck(const uint16_t msg, const unsigned timeout, const bool rep
 	return ret;
 }
 
-// -1 = error, 0 = no message handled, 1 = message handled, 2 = sat info message handled
 int GnssUblox::receive(unsigned timeout)
 {
 	uint8_t buf[150];
@@ -853,7 +679,63 @@ int GnssUblox::receive(unsigned timeout)
 		bool ready_to_return = _configured ? (_got_posllh && _got_velned) : handled;
 
 		/* Wait for only UBX_PACKET_TIMEOUT if something already received. */
-		int ret = pollOrRead(buf, sizeof(buf), ready_to_return ? UBX_PACKET_TIMEOUT : timeout);
+		if (ready_to_return) {
+			timeout = UBX_PACKET_TIMEOUT;
+		}
+
+
+		handleInjectDataTopic();
+
+
+		/* For non QURT, use the usual polling. */
+
+		//Poll only for the serial data. In the same thread we also need to handle orb messages,
+		//so ideally we would poll on both, the serial fd and orb subscription. Unfortunately the
+		//two pollings use different underlying mechanisms (at least under posix), which makes this
+		//impossible. Instead we limit the maximum polling interval and regularly check for new orb
+		//messages.
+		//FIXME: add a unified poll() API
+		const int max_timeout = 50;
+
+		pollfd fds[1]{};
+		fds[0].fd = _serial_fd;
+		fds[0].events = POLLIN;
+
+		int ret = ::poll(fds, sizeof(fds) / sizeof(fds[0]), math::min(max_timeout, timeout));
+
+		if (ret > 0) {
+			/* if we have new data from GPS, go handle it */
+			if (fds[0].revents & POLLIN) {
+				/*
+				 * We are here because poll says there is some data, so this
+				 * won't block even on a blocking device. But don't read immediately
+				 * by 1-2 bytes, wait for some more data to save expensive read() calls.
+				 * If we have all requested data available, read it without waiting.
+				 * If more bytes are available, we'll go back to poll() again.
+				 */
+				const unsigned character_count = 32; // minimum bytes that we want to read
+				unsigned baudrate = _baudrate == 0 ? 115200 : _baudrate;
+				const unsigned sleeptime = character_count * 1000000 / (baudrate / 10);
+
+				int err = 0;
+				int bytes_available = 0;
+				err = ::ioctl(_serial_fd, FIONREAD, (unsigned long)&bytes_available);
+
+				if (err != 0 || bytes_available < (int)character_count) {
+					px4_usleep(sleeptime);
+				}
+
+				ret = ::read(_serial_fd, buf, buf_length);
+
+				if (ret > 0) {
+					_num_bytes_read += ret;
+				}
+
+			} else {
+				ret = -1;
+			}
+		}
+
 
 		if (ret > 0) {
 			dumpGpsData((uint8_t *)data1, (size_t)num_read, gps_dump_comm_mode_t::Full, false);
@@ -900,8 +782,7 @@ int GnssUblox::receive(unsigned timeout)
 	}
 }
 
-int	// 0 = decoding, 1 = message handled, 2 = sat info message handled
-GnssUblox::parseChar(const uint8_t b)
+int GnssUblox::parseChar(const uint8_t b)
 {
 	int ret = 0;
 
@@ -1053,11 +934,7 @@ GnssUblox::parseChar(const uint8_t b)
 	return ret;
 }
 
-/**
- * Start payload rx
- */
-int	// -1 = abort, 0 = continue
-GnssUblox::payloadRxInit()
+int GnssUblox::payloadRxInit()
 {
 	int ret = 0;
 
@@ -1291,11 +1168,7 @@ GnssUblox::payloadRxInit()
 	return ret;
 }
 
-/**
- * Add payload rx byte
- */
-int	// -1 = error, 0 = ok, 1 = payload completed
-GnssUblox::payloadRxAdd(const uint8_t b)
+int GnssUblox::payloadRxAdd(const uint8_t b)
 {
 	int ret = 0;
 	uint8_t *p_buf = (uint8_t *)&_buf;
@@ -1309,8 +1182,7 @@ GnssUblox::payloadRxAdd(const uint8_t b)
 	return ret;
 }
 
-int	// -1 = error, 0 = ok, 1 = payload completed
-GnssUblox::payloadRxAddNavSat(const uint8_t b)
+int GnssUblox::payloadRxAddNavSat(const uint8_t b)
 {
 	int ret = 0;
 	uint8_t *p_buf = (uint8_t *)&_buf;
@@ -1323,8 +1195,7 @@ GnssUblox::payloadRxAddNavSat(const uint8_t b)
 		if (_rx_payload_index == sizeof(ubx_payload_rx_nav_sat_part1_t)) {
 			// Part 1 complete: decode Part 1 buffer
 			_satellite_info->count = MIN(_buf.payload_rx_nav_sat_part1.numSvs, satellite_info_s::SAT_INFO_MAX_SATELLITES);
-			UBX_TRACE_SVINFO("SAT len %u  numCh %u", (unsigned)_rx_payload_length,
-					 (unsigned)_buf.payload_rx_nav_sat_part1.numSvs);
+			UBX_TRACE_SVINFO("SAT len %u  numCh %u", (unsigned)_rx_payload_length, (unsigned)_buf.payload_rx_nav_sat_part1.numSvs);
 		}
 
 		if (_rx_payload_index < sizeof(ubx_payload_rx_nav_sat_part1_t) + _satellite_info->count * sizeof(
@@ -1401,9 +1272,8 @@ GnssUblox::payloadRxAddNavSat(const uint8_t b)
 
 				_satellite_info->svid[sat_index]	  = svinfo_svid;
 				_satellite_info->used[sat_index]	  = static_cast<uint8_t>(_buf.payload_rx_nav_sat_part2.flags & 0x01);
-				_satellite_info->elevation[sat_index] = static_cast<uint8_t>(_buf.payload_rx_nav_sat_part2.elev);
-				_satellite_info->azimuth[sat_index]	  = static_cast<uint8_t>(static_cast<float>(_buf.payload_rx_nav_sat_part2.azim) *
-						255.0f / 360.0f);
+				_satellite_info->elevation[sat_index]     = static_cast<uint8_t>(_buf.payload_rx_nav_sat_part2.elev);
+				_satellite_info->azimuth[sat_index]	  = static_cast<uint8_t>(static_cast<float>(_buf.payload_rx_nav_sat_part2.azim) * 255.0f / 360.0f);
 				_satellite_info->snr[sat_index]		  = static_cast<uint8_t>(_buf.payload_rx_nav_sat_part2.cno);
 				_satellite_info->prn[sat_index]		  = svinfo_svid;
 				UBX_TRACE_SVINFO("SAT #%02u  svid %3u  used %u  elevation %3u  azimuth %3u  snr %3u  prn %3u",
@@ -1426,11 +1296,7 @@ GnssUblox::payloadRxAddNavSat(const uint8_t b)
 	return ret;
 }
 
-/**
- * Add NAV-SVINFO payload rx byte
- */
-int	// -1 = error, 0 = ok, 1 = payload completed
-GnssUblox::payloadRxAddNavSvinfo(const uint8_t b)
+int GnssUblox::payloadRxAddNavSvinfo(const uint8_t b)
 {
 	int ret = 0;
 	uint8_t *p_buf = (uint8_t *)&_buf;
@@ -1456,8 +1322,8 @@ GnssUblox::payloadRxAddNavSvinfo(const uint8_t b)
 
 			if (buf_index == sizeof(ubx_payload_rx_nav_svinfo_part2_t) - 1) {
 				// Part 2 complete: decode Part 2 buffer
-				unsigned sat_index = (_rx_payload_index - sizeof(ubx_payload_rx_nav_svinfo_part1_t)) /
-						     sizeof(ubx_payload_rx_nav_svinfo_part2_t);
+				unsigned sat_index = (_rx_payload_index - sizeof(ubx_payload_rx_nav_svinfo_part1_t)) / sizeof(
+							     ubx_payload_rx_nav_svinfo_part2_t);
 				_satellite_info->svid[sat_index]      = static_cast<uint8_t>(_buf.payload_rx_nav_svinfo_part2.svid);
 				_satellite_info->used[sat_index]      = static_cast<uint8_t>(_buf.payload_rx_nav_svinfo_part2.flags & 0x01);
 				_satellite_info->elevation[sat_index] = static_cast<uint8_t>(_buf.payload_rx_nav_svinfo_part2.elev);
@@ -1480,17 +1346,13 @@ GnssUblox::payloadRxAddNavSvinfo(const uint8_t b)
 	}
 
 	if (++_rx_payload_index >= _rx_payload_length) {
-		ret = 1;	// payload received completely
+		ret = 1; // payload received completely
 	}
 
 	return ret;
 }
 
-/**
- * Add MON-VER payload rx byte
- */
-int	// -1 = error, 0 = ok, 1 = payload completed
-GnssUblox::payloadRxAddMonVer(const uint8_t b)
+int GnssUblox::payloadRxAddMonVer(const uint8_t b)
 {
 	int ret = 0;
 	uint8_t *p_buf = (uint8_t *)&_buf;
@@ -1583,13 +1445,7 @@ GnssUblox::payloadRxAddMonVer(const uint8_t b)
 	return ret;
 }
 
-
-
-/**
- * Finish payload rx
- */
-int	// 0 = no message handled, 1 = message handled, 2 = sat info message handled
-GnssUblox::payloadRxDone()
+int GnssUblox::payloadRxDone()
 {
 	int ret = 0;
 
@@ -1609,16 +1465,16 @@ GnssUblox::payloadRxDone()
 			_sensor_gps.fix_type = _buf.payload_rx_nav_pvt.fixType;
 
 			if (_buf.payload_rx_nav_pvt.flags & UBX_RX_NAV_PVT_FLAGS_DIFFSOLN) {
-				_sensor_gps.fix_type = 4; //DGPS
+				_sensor_gps.fix_type = 4; // DGPS
 			}
 
 			uint8_t carr_soln = _buf.payload_rx_nav_pvt.flags >> 6;
 
 			if (carr_soln == 1) {
-				_sensor_gps.fix_type = 5; //Float RTK
+				_sensor_gps.fix_type = 5; // Float RTK
 
 			} else if (carr_soln == 2) {
-				_sensor_gps.fix_type = 6; //Fixed RTK
+				_sensor_gps.fix_type = 6; // Fixed RTK
 			}
 
 			_sensor_gps.vel_ned_valid = true;
@@ -1633,7 +1489,7 @@ GnssUblox::payloadRxDone()
 		_sensor_gps.lat		= _buf.payload_rx_nav_pvt.lat;
 		_sensor_gps.lon		= _buf.payload_rx_nav_pvt.lon;
 		_sensor_gps.alt		= _buf.payload_rx_nav_pvt.hMSL;
-		_sensor_gps.alt_ellipsoid	= _buf.payload_rx_nav_pvt.height;
+		_sensor_gps.alt_ellipsoid = _buf.payload_rx_nav_pvt.height;
 
 		_sensor_gps.eph		= static_cast<float>(_buf.payload_rx_nav_pvt.hAcc) * 1e-3f;
 		_sensor_gps.epv		= static_cast<float>(_buf.payload_rx_nav_pvt.vAcc) * 1e-3f;
@@ -1661,7 +1517,6 @@ GnssUblox::payloadRxDone()
 			timeinfo.tm_min		= _buf.payload_rx_nav_pvt.min;
 			timeinfo.tm_sec		= _buf.payload_rx_nav_pvt.sec;
 
-#ifndef NO_MKTIME
 			time_t epoch = mktime(&timeinfo);
 
 			if (epoch > GPS_EPOCH_SECS) {
@@ -1690,10 +1545,6 @@ GnssUblox::payloadRxDone()
 			} else {
 				_sensor_gps.time_utc_usec = 0;
 			}
-
-#else
-			_sensor_gps.time_utc_usec = 0;
-#endif
 		}
 
 		_sensor_gps.timestamp = hrt_absolute_time();
@@ -1774,7 +1625,7 @@ GnssUblox::payloadRxDone()
 			timeinfo.tm_min		= _buf.payload_rx_nav_timeutc.min;
 			timeinfo.tm_sec		= _buf.payload_rx_nav_timeutc.sec;
 			timeinfo.tm_isdst	= 0;
-#ifndef NO_MKTIME
+
 			time_t epoch = mktime(&timeinfo);
 
 			// only set the time if it makes sense
@@ -1806,10 +1657,6 @@ GnssUblox::payloadRxDone()
 			} else {
 				_sensor_gps.time_utc_usec = 0;
 			}
-
-#else
-			_sensor_gps.time_utc_usec = 0;
-#endif
 		}
 
 		_last_timestamp_time = hrt_absolute_time();
@@ -1946,7 +1793,9 @@ GnssUblox::payloadRxDone()
 			gps_rel.heading_valid                = _buf.payload_rx_nav_relposned.flags & (1 << 8);
 			gps_rel.relative_position_normalized = _buf.payload_rx_nav_relposned.flags & (1 << 9);
 
-			publishRelativePosition(gps_rel);
+			gps_rel.device_id = get_device_id();
+			gps_rel.timestamp = hrt_absolute_time();
+			_sensor_gnss_relative_pub.publish(gps_rel);
 		}
 
 		break;

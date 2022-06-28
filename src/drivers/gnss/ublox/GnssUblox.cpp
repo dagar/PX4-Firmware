@@ -33,11 +33,9 @@
 
 #include "GnssUblox.hpp"
 
-GnssUblox::GnssUblox(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interface,
-		     unsigned configured_baudrate) :
+GnssUblox::GnssUblox(const char *path, GPSHelper::Interface interface, unsigned configured_baudrate) :
 	Device(MODULE_NAME),
 	_configured_baudrate(configured_baudrate),
-	_mode(mode),
 	_interface(interface)
 {
 	/* store port name */
@@ -45,17 +43,14 @@ GnssUblox::GnssUblox(const char *path, gps_driver_mode_t mode, GPSHelper::Interf
 	/* enforce null termination */
 	_port[sizeof(_port) - 1] = '\0';
 
-	_sensor_gps.heading = NAN;
-	_sensor_gps.heading_offset = NAN;
-
 	int32_t enable_sat_info = 0;
 	param_get(param_find("UBX_SAT_INFO"), &enable_sat_info);
 
 	/* create satellite info data object if requested */
 	if (enable_sat_info) {
 		_sat_info = new GPS_Sat_Info();
-		_p_report_sat_info = &_sat_info->_data;
-		memset(_p_report_sat_info, 0, sizeof(*_p_report_sat_info));
+		_satellite_info = &_sat_info->_data;
+		memset(_satellite_info, 0, sizeof(*_satellite_info));
 	}
 
 	set_device_bus_type(device::Device::DeviceBusType::DeviceBusType_SERIAL);
@@ -72,76 +67,6 @@ GnssUblox::~GnssUblox()
 	delete _dump_to_device;
 	delete _dump_from_device;
 	delete _rtcm_parsing;
-}
-
-int GnssUblox::pollOrRead(uint8_t *buf, size_t buf_length, int timeout)
-{
-	handleInjectDataTopic();
-
-#if !defined(__PX4_QURT)
-
-	/* For non QURT, use the usual polling. */
-
-	//Poll only for the serial data. In the same thread we also need to handle orb messages,
-	//so ideally we would poll on both, the serial fd and orb subscription. Unfortunately the
-	//two pollings use different underlying mechanisms (at least under posix), which makes this
-	//impossible. Instead we limit the maximum polling interval and regularly check for new orb
-	//messages.
-	//FIXME: add a unified poll() API
-	const int max_timeout = 50;
-
-	pollfd fds[1];
-	fds[0].fd = _serial_fd;
-	fds[0].events = POLLIN;
-
-	int ret = poll(fds, sizeof(fds) / sizeof(fds[0]), math::min(max_timeout, timeout));
-
-	if (ret > 0) {
-		/* if we have new data from GPS, go handle it */
-		if (fds[0].revents & POLLIN) {
-			/*
-			 * We are here because poll says there is some data, so this
-			 * won't block even on a blocking device. But don't read immediately
-			 * by 1-2 bytes, wait for some more data to save expensive read() calls.
-			 * If we have all requested data available, read it without waiting.
-			 * If more bytes are available, we'll go back to poll() again.
-			 */
-			const unsigned character_count = 32; // minimum bytes that we want to read
-			unsigned baudrate = _baudrate == 0 ? 115200 : _baudrate;
-			const unsigned sleeptime = character_count * 1000000 / (baudrate / 10);
-
-#ifdef __PX4_NUTTX
-			int err = 0;
-			int bytes_available = 0;
-			err = ::ioctl(_serial_fd, FIONREAD, (unsigned long)&bytes_available);
-
-			if (err != 0 || bytes_available < (int)character_count) {
-				px4_usleep(sleeptime);
-			}
-
-#else
-			px4_usleep(sleeptime);
-#endif
-
-			ret = ::read(_serial_fd, buf, buf_length);
-
-			if (ret > 0) {
-				_num_bytes_read += ret;
-			}
-
-		} else {
-			ret = -1;
-		}
-	}
-
-	return ret;
-
-#else
-	/* For QURT, just use read for now, since this doesn't block, we need to slow it down
-	 * just a bit. */
-	px4_usleep(10000);
-	return ::read(_serial_fd, buf, buf_length);
-#endif
 }
 
 void GnssUblox::handleInjectDataTopic()
@@ -414,7 +339,7 @@ void GnssUblox::run()
 			}
 		}
 
-		//_helper = new GPSDriverUBX(_interface, &GnssUblox::callback, this, &_report_gps_pos, _p_report_sat_info, gps_ubx_dynmodel, heading_offset, ubx_mode);
+		//_helper = new GPSDriverUBX(_interface, &GnssUblox::callback, this, &_report_gps_pos, _satellite_info, gps_ubx_dynmodel, heading_offset, ubx_mode);
 		set_device_type(DRV_GPS_DEVTYPE_UBX);
 
 		_baudrate = _configured_baudrate;
@@ -478,13 +403,18 @@ void GnssUblox::run()
 			while ((helper_ret = receive(receive_timeout)) > 0 && !should_exit()) {
 
 				if (helper_ret & 1) {
-					publish();
+					_sensor_gps.device_id = get_device_id();
+
+					_sensor_gps_pub.publish(_sensor_gps);
+					// Heading/yaw data can be updated at a lower rate than the other navigation data.
+					// The uORB message definition requires this data to be set to a NAN if no new valid data is available.
+					_sensor_gps.heading = NAN;
 
 					last_rate_count++;
 				}
 
-				if (_p_report_sat_info && (helper_ret & 2)) {
-					publishSatelliteInfo();
+				if (_satellite_info && (helper_ret & 2)) {
+					_satellite_info_pub.publish(*_satellite_info);
 				}
 
 				reset_if_scheduled();
@@ -527,12 +457,11 @@ void GnssUblox::run()
 	PX4_INFO("exiting");
 }
 
-int
-GnssUblox::print_status()
+int GnssUblox::print_status()
 {
 	PX4_INFO("protocol: UBX");
 	PX4_INFO("status: %s, port: %s, baudrate: %d", _healthy ? "OK" : "NOT OK", _port, _baudrate);
-	PX4_INFO("sat info: %s", (_p_report_sat_info != nullptr) ? "enabled" : "disabled");
+	PX4_INFO("sat info: %s", (_satellite_info != nullptr) ? "enabled" : "disabled");
 	PX4_INFO("rate reading: \t\t%6i B/s", _rate_reading);
 
 	if (_sensor_gps.timestamp != 0) {
@@ -573,23 +502,6 @@ void GnssUblox::reset_if_scheduled()
 	}
 }
 
-void GnssUblox::publish()
-{
-	_sensor_gps.device_id = get_device_id();
-
-	_sensor_gps_pub.publish(_sensor_gps);
-	// Heading/yaw data can be updated at a lower rate than the other navigation data.
-	// The uORB message definition requires this data to be set to a NAN if no new valid data is available.
-	_sensor_gps.heading = NAN;
-}
-
-void GnssUblox::publishSatelliteInfo()
-{
-	if (_p_report_sat_info != nullptr) {
-		_report_sat_info_pub.publish(*_p_report_sat_info);
-	}
-}
-
 void GnssUblox::publishRTCMCorrections(uint8_t *data, size_t len)
 {
 	gps_inject_data_s gps_inject_data{};
@@ -622,13 +534,6 @@ void GnssUblox::publishRTCMCorrections(uint8_t *data, size_t len)
 
 		written = written + gps_inject_data.len;
 	}
-}
-
-void GnssUblox::publishRelativePosition(sensor_gnss_relative_s &gnss_relative)
-{
-	gnss_relative.device_id = get_device_id();
-	gnss_relative.timestamp = hrt_absolute_time();
-	_sensor_gnss_relative_pub.publish(gnss_relative);
 }
 
 int GnssUblox::custom_command(int argc, char *argv[])

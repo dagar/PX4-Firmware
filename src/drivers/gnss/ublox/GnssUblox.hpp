@@ -38,14 +38,7 @@
 
 #pragma once
 
-#ifdef __PX4_NUTTX
-#include <nuttx/clock.h>
-#include <nuttx/arch.h>
-#endif
-
-#ifndef __PX4_QURT
 #include <poll.h>
-#endif
 
 #include <termios.h>
 #include <cstring>
@@ -67,7 +60,7 @@
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/sensor_gnss_relative.h>
 
-#include "devices/src/ubx.h"
+#include "ubx.h"
 
 #ifdef __PX4_LINUX
 #include <linux/spi/spidev.h>
@@ -103,7 +96,7 @@ public:
 	static int task_spawn(int argc, char *argv[], Instance instance);
 
 	/** @see ModuleBase */
-	static GPS *instantiate(int argc, char *argv[]);
+	static GnssUblox *instantiate(int argc, char *argv[]);
 
 	/** @see ModuleBase */
 	static int custom_command(int argc, char *argv[]);
@@ -118,8 +111,6 @@ public:
 	 * Diagnostics - print some basic information about the driver.
 	 */
 	int print_status() override;
-
-
 
 
 	enum class GPSRestartType {
@@ -148,8 +139,6 @@ public:
 		 */
 		Cold
 	};
-
-
 
 	/**
 	 * Schedule reset of the GPS device
@@ -208,37 +197,6 @@ public:
 		GNSSSystemsMask gnss_systems;
 	};
 
-
-	GPSHelper(GPSCallbackPtr callback, void *callback_user);
-	virtual ~GPSHelper() = default;
-
-	/**
-	 * configure the device
-	 * @param baud Input and output parameter: if set to 0, the baudrate will be automatically detected and set to
-	 *             the detected baudrate. If not 0, a fixed baudrate is used.
-	 * @param config GPS Config
-	 * @return 0 on success, <0 otherwise
-	 */
-	virtual int configure(unsigned &baud, const GPSConfig &config) = 0;
-
-	/**
-	 * receive & handle new data from the device
-	 * @param timeout [ms]
-	 * @return <0 on error, otherwise a bitset:
-	 *         bit 0 set: got gps position update
-	 *         bit 1 set: got satellite info update
-	 */
-	virtual int receive(unsigned timeout) = 0;
-
-	/**
-	 * Reset GPS device
-	 * @param restart_type
-	 * @return <0 failure
-	 *         -1 not implemented
-	 * 	    0 success
-	 */
-	virtual int reset(GPSRestartType restart_type)	{ (void)restart_type; return -1; }
-
 	float getPositionUpdateRate() { return _rate_lat_lon; }
 	float getVelocityUpdateRate() { return _rate_vel; }
 
@@ -253,12 +211,8 @@ public:
 	/**
 	 * Allow a driver to disable RTCM injection
 	 */
-	virtual bool shouldInjectRTCM() { return true; }
+	bool shouldInjectRTCM() override { return _mode != UBXMode::RoverWithMovingBase; }
 
-
-
-
-	// UBX
 	enum class UBXMode : uint8_t {
 		Normal,                    ///< all non-heading configurations
 		RoverWithMovingBase,       ///< expect RTCM input on UART2 from a moving base for heading output
@@ -268,10 +222,11 @@ public:
 	};
 
 	int configure(unsigned &baudrate, const GPSConfig &config) override;
-	int receive(unsigned timeout) override;
-	int reset(GPSRestartType restart_type) override;
 
-	bool shouldInjectRTCM() override { return _mode != UBXMode::RoverWithMovingBase; }
+	// -1 = error, 0 = no message handled, 1 = message handled, 2 = sat info message handled
+	int receive(unsigned timeout) override;
+
+	int reset(GPSRestartType restart_type) override;
 
 	enum class Board : uint8_t {
 		unknown = 0,
@@ -292,19 +247,18 @@ private:
 	char				_port[20] {};					///< device / serial port path
 
 	bool				_healthy{false};				///< flag to signal if the GPS is ok
-	bool				_mode_auto;					///< if true, auto-detect which GPS is attached
 
 	GPSHelper::Interface		_interface;   					///< interface
 
 	GPS_Sat_Info			*_sat_info{nullptr};				///< instance of GPS sat info data object
 
 	sensor_gps_s _sensor_gps{};
-	satellite_info_s		*_p_report_sat_info{nullptr};			///< pointer to uORB topic for satellite info
+	satellite_info_s		*_satellite_info{nullptr};			///< pointer to uORB topic for satellite info
 
 	uORB::PublicationMulti<sensor_gps_s> _sensor_gps_pub{ORB_ID(sensor_gps)};	///< uORB pub for gps position
 	uORB::PublicationMulti<sensor_gnss_relative_s> _sensor_gnss_relative_pub{ORB_ID(sensor_gnss_relative)};
 
-	uORB::PublicationMulti<satellite_info_s>	_report_sat_info_pub{ORB_ID(satellite_info)};		///< uORB pub for satellite info
+	uORB::PublicationMulti<satellite_info_s> _satellite_info_pub{ORB_ID(satellite_info)};		///< uORB pub for satellite info
 
 	float				_rate{0.0f};					///< position update rate
 	float				_rate_rtcm_injection{0.0f};			///< RTCM message injection rate
@@ -322,36 +276,9 @@ private:
 	px4::atomic<int> _scheduled_reset{(int)GPSRestartType::None};
 
 	/**
-	 * Publish the gps struct
-	 */
-	void 				publish();
-
-	/**
-	 * Publish the satellite info
-	 */
-	void 				publishSatelliteInfo();
-
-	/**
 	 * Publish RTCM corrections
 	 */
 	void 				publishRTCMCorrections(uint8_t *data, size_t len);
-
-	/**
-	 * Publish RTCM corrections
-	 */
-	void 				publishRelativePosition(sensor_gnss_relative_s &gnss_relative);
-
-	/**
-	 * This is an abstraction for the poll on serial used.
-	 *
-	 * @param buf: pointer to read buffer
-	 * @param buf_length: size of read buffer
-	 * @param timeout: timeout in ms
-	 * @return: 0 for nothing read, or poll timed out
-	 *	    < 0 for error
-	 *	    > 0 number of bytes read
-	 */
-	int pollOrRead(uint8_t *buf, size_t buf_length, int timeout);
 
 	/**
 	 * check for new messages on the inject data topic & handle them
@@ -482,20 +409,6 @@ private:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	enum class BaseSettingsType : uint8_t {
 		survey_in,
 		fixed_position
@@ -523,9 +436,6 @@ private:
 
 
 	// ubx
-
-
-
 	int activateRTCMOutput(bool reduce_update_rate);
 
 	/**
@@ -558,12 +468,6 @@ private:
 	 * @return 0 on success, <0 on error
 	 */
 	int configureDevice(const GNSSSystemsMask &gnssSystems);
-	/**
-	 * Send configuration values and desired message rates (for protocol version < 27)
-	 * @param gnssSystems Set of GNSS systems to use
-	 * @return 0 on success, <0 on error
-	 */
-	int configureDevicePreV27(const GNSSSystemsMask &gnssSystems);
 
 	/**
 	 * Add a configuration value to _buf and increase the message size msg_size as needed
@@ -613,24 +517,40 @@ private:
 
 	/**
 	 * Parse the binary UBX packet
+	 *  0 = decoding, 1 = message handled, 2 = sat info message handled
 	 */
 	int parseChar(const uint8_t b);
 
 	/**
 	 * Start payload rx
+	 * -1 = abort, 0 = continue
 	 */
 	int payloadRxInit(void);
 
 	/**
 	 * Add payload rx byte
+	 *  -1 = error, 0 = ok, 1 = payload completed
 	 */
 	int payloadRxAdd(const uint8_t b);
+
+	/**
+	 * Add MON-VER payload rx byte
+	 *  -1 = error, 0 = ok, 1 = payload completed
+	 */
 	int payloadRxAddMonVer(const uint8_t b);
+
+	// -1 = error, 0 = ok, 1 = payload completed
 	int payloadRxAddNavSat(const uint8_t b);
+
+	/**
+	 * Add NAV-SVINFO payload rx byte
+	 *  -1 = error, 0 = ok, 1 = payload completed
+	 */
 	int payloadRxAddNavSvinfo(const uint8_t b);
 
 	/**
 	 * Finish payload rx
+	 *  0 = no message handled, 1 = message handled, 2 = sat info message handled
 	 */
 	int payloadRxDone(void);
 
@@ -649,7 +569,6 @@ private:
 
 	hrt_abstime _disable_cmd_last{0};
 
-	satellite_info_s       *_satellite_info {nullptr};
 	ubx_ack_state_t         _ack_state{UBX_ACK_IDLE};
 	ubx_buf_t               _buf{};
 	ubx_decode_state_t      _decode_state{};
@@ -658,7 +577,6 @@ private:
 	bool _configured{false};
 	bool _got_posllh{false};
 	bool _got_velned{false};
-	bool _proto_ver_27_or_higher{false}; ///< true if protocol version 27 or higher detected
 	bool _use_nav_pvt{false};
 
 	uint8_t _rx_ck_a{0};
@@ -682,6 +600,4 @@ private:
 
 	const UBXMode _mode;
 	const float _heading_offset;
-
-
 };
