@@ -1353,13 +1353,88 @@ MavlinkReceiver::handle_message_vision_position_estimate(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 {
-	mavlink_odometry_t odom;
-	mavlink_msg_odometry_decode(msg, &odom);
+	mavlink_odometry_t mavlink_odometry;
+	mavlink_msg_odometry_decode(msg, &mavlink_odometry);
+
+	// only publish if valid data is populated
+	bool publish = false;
 
 	vehicle_odometry_s odometry{};
 
-	odometry.timestamp = hrt_absolute_time();
-	odometry.timestamp_sample = _mavlink_timesync.sync_stamp(odom.time_usec);
+	odometry.timestamp_sample = _mavlink_timesync.sync_stamp(mavlink_odometry.time_usec);
+
+	// MAV_FRAME_GLOBAL
+	// MAV_FRAME_LOCAL_NED
+	// MAV_FRAME_GLOBAL_RELATIVE_ALT
+	// MAV_FRAME_LOCAL_ENU
+	// MAV_FRAME_GLOBAL_INT
+	// MAV_FRAME_GLOBAL_RELATIVE_ALT_INT
+	// MAV_FRAME_LOCAL_OFFSET_NED
+	// MAV_FRAME_BODY_NED (MAV_FRAME_BODY_FRD)
+	// MAV_FRAME_BODY_OFFSET_NED (MAV_FRAME_BODY_FRD)
+	// MAV_FRAME_BODY_FRD
+	// MAV_FRAME_LOCAL_FRD
+	// MAV_FRAME_LOCAL_FLU
+
+
+	switch (mavlink_odometry.frame_id) {
+	case MAV_FRAME_LOCAL_NED:
+		break;
+
+	case MAV_FRAME_LOCAL_ENU:
+		break;
+
+	case MAV_FRAME_LOCAL_OFFSET_NED:
+		break;
+
+	case MAV_FRAME_BODY_NED:
+	// DEPRECATED: Replaced by MAV_FRAME_BODY_FRD (2019-08).
+	// FALLTHROUGH
+	case MAV_FRAME_BODY_OFFSET_NED:
+	// DEPRECATED: Replaced by MAV_FRAME_BODY_FRD (2019-08).
+	// FALLTHROUGH
+	case MAV_FRAME_BODY_FRD:
+		break;
+
+	case MAV_FRAME_LOCAL_FRD:
+		break;
+
+	case MAV_FRAME_LOCAL_FLU:
+		break;
+
+	default:
+		break;
+	}
+
+	if (mavlink_odometry.frame_id == MAV_FRAME_LOCAL_NED) {
+
+	} else if () {
+
+	}
+
+
+	// Supported local frame of reference is MAV_FRAME_LOCAL_NED or MAV_FRAME_LOCAL_FRD
+	// The supported sources of the data/tesimator type are MAV_ESTIMATOR_TYPE_VISION,
+	// MAV_ESTIMATOR_TYPE_VIO and MAV_ESTIMATOR_TYPE_MOCAP
+
+	// @note Regarding the local frames of reference, the appropriate EKF_AID_MASK
+	// should be set in order to match a frame aligned (NED) or not aligned (FRD)
+	// with true North
+	if (mavlink_odometry.frame_id == MAV_FRAME_LOCAL_NED || mavlink_odometry.frame_id == MAV_FRAME_LOCAL_FRD) {
+
+		if (mavlink_odometry.frame_id == MAV_FRAME_LOCAL_NED) {
+			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
+
+		} else {
+			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
+		}
+
+	} else {
+		PX4_ERR("Local frame %" PRIu8 " not supported. Unable to publish pose and velocity", odom.frame_id);
+	}
+
+
+
 
 	/* The position is in a local FRD frame */
 	odometry.x = odom.x;
@@ -1416,39 +1491,21 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 
 	odometry.reset_counter = odom.reset_counter;
 
-	/**
-	 * Supported local frame of reference is MAV_FRAME_LOCAL_NED or MAV_FRAME_LOCAL_FRD
-	 * The supported sources of the data/tesimator type are MAV_ESTIMATOR_TYPE_VISION,
-	 * MAV_ESTIMATOR_TYPE_VIO and MAV_ESTIMATOR_TYPE_MOCAP
-	 *
-	 * @note Regarding the local frames of reference, the appropriate EKF_AID_MASK
-	 * should be set in order to match a frame aligned (NED) or not aligned (FRD)
-	 * with true North
-	 */
-	if (odom.frame_id == MAV_FRAME_LOCAL_NED || odom.frame_id == MAV_FRAME_LOCAL_FRD) {
 
-		if (odom.frame_id == MAV_FRAME_LOCAL_NED) {
-			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
-		} else {
-			odometry.local_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
-		}
+	odometry.timestamp = hrt_absolute_time();
 
-		if ((odom.estimator_type == MAV_ESTIMATOR_TYPE_VISION)
-		    || (odom.estimator_type == MAV_ESTIMATOR_TYPE_VIO)
-		    || (odom.estimator_type == MAV_ESTIMATOR_TYPE_UNKNOWN)) {
-			// accept MAV_ESTIMATOR_TYPE_UNKNOWN for legacy support
-			_visual_odometry_pub.publish(odometry);
+	if ((odom.estimator_type == MAV_ESTIMATOR_TYPE_VISION)
+	    || (odom.estimator_type == MAV_ESTIMATOR_TYPE_VIO)
+	    || (odom.estimator_type == MAV_ESTIMATOR_TYPE_UNKNOWN)) {
+		// accept MAV_ESTIMATOR_TYPE_UNKNOWN for legacy support
+		_visual_odometry_pub.publish(odometry);
 
-		} else if (odom.estimator_type == MAV_ESTIMATOR_TYPE_MOCAP) {
-			_mocap_odometry_pub.publish(odometry);
-
-		} else {
-			PX4_ERR("Estimator source %" PRIu8 " not supported. Unable to publish pose and velocity", odom.estimator_type);
-		}
+	} else if (odom.estimator_type == MAV_ESTIMATOR_TYPE_MOCAP) {
+		_mocap_odometry_pub.publish(odometry);
 
 	} else {
-		PX4_ERR("Local frame %" PRIu8 " not supported. Unable to publish pose and velocity", odom.frame_id);
+		PX4_ERR("Estimator source %" PRIu8 " not supported. Unable to publish pose and velocity", odom.estimator_type);
 	}
 }
 
