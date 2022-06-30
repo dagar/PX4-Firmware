@@ -1444,31 +1444,24 @@ void Ekf::updateGroundEffect()
 
 Vector3f Ekf::getVisionVelocityInEkfFrame() const
 {
-	Vector3f vel;
 	// correct velocity for offset relative to IMU
 	const Vector3f pos_offset_body = _params.ev_pos_body - _params.imu_pos_body;
 	const Vector3f vel_offset_body = _ang_rate_delayed_raw % pos_offset_body;
+	const Vector3f vel_offset_earth = _R_to_earth * vel_offset_body;
 
 	// rotate measurement into correct earth frame if required
 	switch (_ev_sample_delayed.vel_frame) {
-	case VelocityFrame::BODY_FRAME_FRD:
-		vel = _R_to_earth * (_ev_sample_delayed.vel - vel_offset_body);
-		break;
+	case VelocityFrame::LOCAL_FRAME_NED:
+		return _ev_sample_delayed.vel - vel_offset_earth;
 
 	case VelocityFrame::LOCAL_FRAME_FRD:
-		const Vector3f vel_offset_earth = _R_to_earth * vel_offset_body;
+		return _R_ev_to_ekf * _ev_sample_delayed.vel - vel_offset_earth;
 
-		if (_params.fusion_mode & SensorFusionMask::ROTATE_EXT_VIS) {
-			vel = _R_ev_to_ekf * _ev_sample_delayed.vel - vel_offset_earth;
-
-		} else {
-			vel = _ev_sample_delayed.vel - vel_offset_earth;
-		}
-
-		break;
+	case VelocityFrame::BODY_FRAME_FRD:
+		return _R_to_earth * (_ev_sample_delayed.vel - vel_offset_body);
 	}
 
-	return vel;
+	return Vector3f{};
 }
 
 Vector3f Ekf::getVisionVelocityVarianceInEkfFrame() const
@@ -1477,15 +1470,16 @@ Vector3f Ekf::getVisionVelocityVarianceInEkfFrame() const
 
 	// rotate measurement into correct earth frame if required
 	switch (_ev_sample_delayed.vel_frame) {
-	case VelocityFrame::BODY_FRAME_FRD:
-		ev_vel_cov = _R_to_earth * ev_vel_cov * _R_to_earth.transpose();
+	case VelocityFrame::LOCAL_FRAME_NED:
+		ev_vel_cov = ev_vel_cov;
 		break;
 
 	case VelocityFrame::LOCAL_FRAME_FRD:
-		if (_params.fusion_mode & SensorFusionMask::ROTATE_EXT_VIS) {
-			ev_vel_cov = _R_ev_to_ekf * ev_vel_cov * _R_ev_to_ekf.transpose();
-		}
+		ev_vel_cov = _R_ev_to_ekf * ev_vel_cov * _R_ev_to_ekf.transpose();
+		break;
 
+	case VelocityFrame::BODY_FRAME_FRD:
+		ev_vel_cov = _R_to_earth * ev_vel_cov * _R_to_earth.transpose();
 		break;
 	}
 

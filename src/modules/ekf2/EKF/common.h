@@ -70,8 +70,9 @@ using matrix::wrap_pi;
 #define GNDEFFECT_TIMEOUT       10E6    ///< Maximum period of time that ground effect protection will be active after it was last turned on (uSec)
 
 enum class VelocityFrame : uint8_t {
-	LOCAL_FRAME_FRD = 0,
-	BODY_FRAME_FRD  = 1
+	LOCAL_FRAME_NED = 0,
+	LOCAL_FRAME_FRD = 1,
+	BODY_FRAME_FRD  = 2
 };
 
 enum GeoDeclinationMask : uint8_t {
