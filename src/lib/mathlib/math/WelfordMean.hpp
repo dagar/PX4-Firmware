@@ -74,6 +74,7 @@ public:
 	T mean() const { return _mean; }
 	T variance() const { return _M2 / _count; }
 	T sample_variance() const { return _M2 / (_count - 1); }
+
 private:
 	T _mean{};
 	T _M2{};

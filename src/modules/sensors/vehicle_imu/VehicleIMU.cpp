@@ -198,12 +198,10 @@ void VehicleIMU::Run()
 		bool consume_all_gyro = !_intervals_configured || _data_gap;
 
 		// monitor scheduling latency and force catch up with latest gyro if falling behind
-		if (_sensor_gyro_sub.updated() && (_gyro_update_latency_mean.count() > 100)
-		    && (_gyro_update_latency_mean.mean()(1) > _gyro_interval_us * 1e-6f)) {
+		if (_sensor_gyro_sub.updated() && (_gyro_publish_latency_mean.count() > 100)
+		    && (_gyro_publish_latency_mean.mean() > (double)(_gyro_interval_us * 1e-6f))) {
 
-			PX4_DEBUG("gyro update mean sample latency: %.6f, publish latency %.6f",
-				  (double)_gyro_update_latency_mean.mean()(0),
-				  (double)_gyro_update_latency_mean.mean()(1));
+			//PX4_DEBUG("gyro average publish latency %.6f", _gyro_publish_latency_mean.mean());
 
 			consume_all_gyro = true;
 		}
@@ -240,14 +238,14 @@ void VehicleIMU::Run()
 		if (_intervals_configured && _accel_integrator.integral_ready() && _gyro_integrator.integral_ready()) {
 			if (Publish()) {
 				// record gyro publication latency and integrated samples
-				if (_gyro_update_latency_mean.count() > 10000) {
+				if (_gyro_publish_latency_mean.count() > 10000) {
 					// reset periodically to avoid numerical issues
-					_gyro_update_latency_mean.reset();
+					_gyro_publish_latency_mean.reset();
 				}
 
-				const float time_run_s = now_us * 1e-6f;
+				const double time_run_s = now_us * 1e-6;
 
-				_gyro_update_latency_mean.update(Vector2f{time_run_s - _gyro_timestamp_sample_last * 1e-6f, time_run_s - _gyro_timestamp_last * 1e-6f});
+				_gyro_publish_latency_mean.update(time_run_s - _gyro_timestamp_last * 1e-6);
 
 				break;
 			}
@@ -286,14 +284,16 @@ bool VehicleIMU::UpdateAccel()
 			perf_count(_accel_generation_gap_perf);
 
 			// reset average sample measurement
-			_accel_interval_mean.reset();
+			_accel_mean_interval_us.reset();
+			_accel_fifo_mean_interval_us.reset();
 
 		} else {
 			// collect sample interval average for filters
 			if (accel.timestamp_sample > _accel_timestamp_sample_last) {
 				if ((_accel_timestamp_sample_last != 0) && (accel.samples > 0)) {
-					float interval_us = accel.timestamp_sample - _accel_timestamp_sample_last;
-					_accel_interval_mean.update(Vector2f{interval_us, interval_us / accel.samples});
+					const double interval_us = accel.timestamp_sample - _accel_timestamp_sample_last;
+					_accel_mean_interval_us.update(interval_us);
+					_accel_fifo_mean_interval_us.update(interval_us / accel.samples);
 				}
 
 			} else {
@@ -301,29 +301,24 @@ bool VehicleIMU::UpdateAccel()
 					_instance, accel.device_id, accel.timestamp_sample, _accel_timestamp_sample_last);
 			}
 
-			if (accel.timestamp < accel.timestamp_sample) {
-				PX4_ERR("%d - accel %" PRIu32 " timestamp (%" PRIu64 ") < timestamp_sample (%" PRIu64 ")",
-					_instance, accel.device_id, accel.timestamp, accel.timestamp_sample);
-			}
-
-			const int interval_count = _accel_interval_mean.count();
-			const float interval_variance = _accel_interval_mean.variance()(0);
-
 			// check measured interval periodically
-			if ((_accel_interval_mean.valid() && (interval_count % 10 == 0))
+			if ((_accel_mean_interval_us.valid() && (_accel_mean_interval_us.count() % 10 == 0))
 			    && (!PX4_ISFINITE(_accel_interval_best_variance)
-				|| (interval_variance < _accel_interval_best_variance)
-				|| (interval_count > 1000))) {
-
-				const float interval_mean = _accel_interval_mean.mean()(0);
-				const float interval_mean_fifo = _accel_interval_mean.mean()(1);
+				|| (_accel_mean_interval_us.count() > 1000)
+				|| (_accel_mean_interval_us.variance() < (double)_accel_interval_best_variance))
+			   ) {
 
 				// update sample rate if previously invalid or changed
+				const float interval_mean = _accel_mean_interval_us.mean();
 				const float interval_delta_us = fabsf(interval_mean - _accel_interval_us);
 				const float percent_changed = interval_delta_us / _accel_interval_us;
 
 				if (!PX4_ISFINITE(_accel_interval_us) || (percent_changed > 0.001f)) {
-					if (PX4_ISFINITE(interval_mean) && PX4_ISFINITE(interval_mean_fifo) && PX4_ISFINITE(interval_variance)) {
+
+					const float interval_variance = _accel_mean_interval_us.variance();
+					const float interval_mean_fifo = _accel_fifo_mean_interval_us.mean();
+
+					if (PX4_ISFINITE(interval_mean) && PX4_ISFINITE(interval_variance) && PX4_ISFINITE(interval_mean_fifo)) {
 						// update integrator configuration if interval has changed by more than 10%
 						if (interval_delta_us > 0.1f * _accel_interval_us) {
 							_update_integrator_config = true;
@@ -334,17 +329,20 @@ bool VehicleIMU::UpdateAccel()
 
 						_status.accel_rate_hz = 1e6f / interval_mean;
 						_status.accel_raw_rate_hz = 1e6f / interval_mean_fifo; // FIFO
+
 						_publish_status = true;
 
 					} else {
-						_accel_interval_mean.reset();
+						_accel_mean_interval_us.reset();
+						_accel_fifo_mean_interval_us.reset();
 					}
 				}
 			}
 
-			if (interval_count > 10000) {
+			if (_accel_mean_interval_us.count() > 100'000) {
 				// reset periodically to prevent numerical issues
-				_accel_interval_mean.reset();
+				_accel_mean_interval_us.reset();
+				_accel_fifo_mean_interval_us.reset();
 			}
 		}
 
@@ -442,13 +440,15 @@ bool VehicleIMU::UpdateGyro()
 
 			// reset average sample measurement
 			_gyro_interval_mean.reset();
+			_gyro_fifo_interval_mean.reset();
 
 		} else {
 			// collect sample interval average for filters
 			if (gyro.timestamp_sample > _gyro_timestamp_sample_last) {
 				if ((_gyro_timestamp_sample_last != 0) && (gyro.samples > 0)) {
 					float interval_us = gyro.timestamp_sample - _gyro_timestamp_sample_last;
-					_gyro_interval_mean.update(Vector2f{interval_us, interval_us / gyro.samples});
+					_gyro_interval_mean.update(interval_us);
+					_gyro_fifo_interval_mean.update(interval_us / gyro.samples);
 				}
 
 			} else {
@@ -462,7 +462,7 @@ bool VehicleIMU::UpdateGyro()
 			}
 
 			const int interval_count = _gyro_interval_mean.count();
-			const float interval_variance = _gyro_interval_mean.variance()(0);
+			const float interval_variance = _gyro_interval_mean.variance();
 
 			// check measured interval periodically
 			if ((_gyro_interval_mean.valid() && (interval_count % 10 == 0))
@@ -470,8 +470,8 @@ bool VehicleIMU::UpdateGyro()
 				|| (interval_variance < _gyro_interval_best_variance)
 				|| (interval_count > 1000))) {
 
-				const float interval_mean = _gyro_interval_mean.mean()(0);
-				const float interval_mean_fifo = _gyro_interval_mean.mean()(1);
+				const float interval_mean = _gyro_interval_mean.mean();
+				const float interval_mean_fifo = _gyro_fifo_interval_mean.mean();
 
 				// update sample rate if previously invalid or changed
 				const float interval_delta_us = fabsf(interval_mean - _gyro_interval_us);
@@ -493,6 +493,7 @@ bool VehicleIMU::UpdateGyro()
 
 					} else {
 						_gyro_interval_mean.reset();
+						_gyro_fifo_interval_mean.reset();
 					}
 				}
 			}
@@ -500,6 +501,7 @@ bool VehicleIMU::UpdateGyro()
 			if (interval_count > 10000) {
 				// reset periodically to prevent numerical issues
 				_gyro_interval_mean.reset();
+				_gyro_fifo_interval_mean.reset();
 			}
 		}
 
@@ -760,9 +762,8 @@ void VehicleIMU::PrintStatus()
 		     _accel_calibration.device_id(), (double)_accel_interval_us, (double)sqrtf(_accel_interval_best_variance),
 		     _gyro_calibration.device_id(), (double)_gyro_interval_us, (double)sqrtf(_gyro_interval_best_variance));
 
-	PX4_DEBUG("gyro update mean sample latency: %.6f s, publish latency %.6f s, gyro interval %.6f s",
-		  (double)_gyro_update_latency_mean.mean()(0), (double)_gyro_update_latency_mean.mean()(1),
-		  (double)(_gyro_interval_us * 1e-6f));
+	PX4_DEBUG("gyro average publish latency %.6f s, gyro interval %.6f s",
+		  _gyro_publish_latency_mean.mean(), (double)(_gyro_interval_us * 1e-6f));
 
 	perf_print_counter(_accel_generation_gap_perf);
 	perf_print_counter(_gyro_generation_gap_perf);

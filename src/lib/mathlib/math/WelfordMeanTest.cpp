@@ -34,20 +34,66 @@
 #include <gtest/gtest.h>
 #include <random>
 #include <lib/matrix/matrix/math.hpp>
+
 #include "WelfordMean.hpp"
+#include "WelfordMeanVector.hpp"
 
 using namespace math;
 using matrix::Vector3f;
 
-TEST(WelfordMeanTest, NoisySignal)
+TEST(WelfordMeanTest, NoisySignalFloat)
 {
 	const float std_dev = 3.f;
 	std::normal_distribution<float> standard_normal_distribution{0.f, std_dev};
 	std::default_random_engine random_generator{}; // Pseudo-random generator with constant seed
 	random_generator.seed(42);
-	WelfordMean<Vector3f> welford{};
+	WelfordMean<float> welford{};
 
-	for (int i = 0; i < 50; i++) {
+	for (int i = 0; i < 500; i++) {
+		const float noisy_value = standard_normal_distribution(random_generator);
+		welford.update(noisy_value);
+	}
+
+	EXPECT_TRUE(welford.valid());
+	const float mean = welford.mean();
+	const float var = welford.variance();
+	const float var_real = std_dev * std_dev;
+
+	EXPECT_NEAR(mean, 0.f, 0.7f);
+	EXPECT_NEAR(var, var_real, 0.1f);
+}
+
+TEST(WelfordMeanTest, NoisySignalDouble)
+{
+	const double std_dev = 3.0;
+	std::normal_distribution<double> standard_normal_distribution{0, std_dev};
+	std::default_random_engine random_generator{}; // Pseudo-random generator with constant seed
+	random_generator.seed(42);
+	WelfordMean<double> welford{};
+
+	for (int i = 0; i < 50000; i++) {
+		const double noisy_value = standard_normal_distribution(random_generator);
+		welford.update(noisy_value);
+	}
+
+	EXPECT_TRUE(welford.valid());
+	const double mean = welford.mean();
+	const double var = welford.variance();
+	const double var_real = std_dev * std_dev;
+
+	EXPECT_NEAR(mean, 0.f, 0.1f);
+	EXPECT_NEAR(var, var_real, 0.1f);
+}
+
+TEST(WelfordMeanTest, NoisySignalVector)
+{
+	const float std_dev = 3.f;
+	std::normal_distribution<float> standard_normal_distribution{0.f, std_dev};
+	std::default_random_engine random_generator{}; // Pseudo-random generator with constant seed
+	random_generator.seed(42);
+	WelfordMeanVector<float, 3> welford{};
+
+	for (int i = 0; i < 500; i++) {
 		const float noisy_value = standard_normal_distribution(random_generator);
 		welford.update(Vector3f(noisy_value, noisy_value - 1.f, noisy_value + 1.f));
 	}
