@@ -36,7 +36,7 @@
 #include <Integrator.hpp>
 
 #include <lib/mathlib/math/Limits.hpp>
-#include <lib/mathlib/math/WelfordMean.hpp>
+#include <lib/mathlib/math/WelfordMeanVector.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/sensor_calibration/Accelerometer.hpp>
@@ -117,13 +117,13 @@ private:
 	hrt_abstime _gyro_timestamp_sample_last{0};
 	hrt_abstime _gyro_timestamp_last{0};
 
-	math::WelfordMean<matrix::Vector3f> _raw_accel_mean{};
-	math::WelfordMean<matrix::Vector3f> _raw_gyro_mean{};
+	math::WelfordMeanVector<matrix::Vector3f> _raw_accel_mean{};
+	math::WelfordMeanVector<matrix::Vector3f> _raw_gyro_mean{};
 
-	math::WelfordMean<matrix::Vector2f> _accel_interval_mean{};
-	math::WelfordMean<matrix::Vector2f> _gyro_interval_mean{};
+	math::WelfordMeanVector<matrix::Vector2f> _accel_interval_mean{};
+	math::WelfordMeanVector<matrix::Vector2f> _gyro_interval_mean{};
 
-	math::WelfordMean<matrix::Vector2f> _gyro_update_latency_mean{};
+	math::WelfordMeanVector<matrix::Vector2f> _gyro_update_latency_mean{};
 
 	float _accel_interval_best_variance{(float)INFINITY};
 	float _gyro_interval_best_variance{(float)INFINITY};

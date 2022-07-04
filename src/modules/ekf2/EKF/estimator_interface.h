@@ -69,8 +69,9 @@
 
 #include <lib/geo/geo.h>
 #include <matrix/math.hpp>
-#include <mathlib/mathlib.h>
-#include <mathlib/math/filter/AlphaFilter.hpp>
+#include <lib/mathlib/mathlib.h>
+#include <lib/mathlib/math/filter/AlphaFilter.hpp>
+#include <lib/mathlib/math/WelfordMean.hpp>
 
 using namespace estimator;
 

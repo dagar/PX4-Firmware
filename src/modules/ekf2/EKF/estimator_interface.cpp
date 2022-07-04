@@ -124,6 +124,11 @@ void EstimatorInterface::setMagData(const magSample &mag_sample)
 		mag_sample_new.mag = mag_sample.mag;
 
 		_mag_buffer->push(mag_sample_new);
+
+		if (mag_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("mag sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - mag_sample_new.time_us);
+		}
+
 	} else {
 		ECL_ERR("mag data too fast %" PRIu64, mag_sample.time_us - _time_last_mag);
 	}
@@ -183,6 +188,11 @@ void EstimatorInterface::setGpsData(const gpsMessage &gps)
 		}
 
 		_gps_buffer->push(gps_sample_new);
+
+		if (gps_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("GPS sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - gps_sample_new.time_us);
+		}
+
 	} else {
 		ECL_ERR("GPS data too fast %" PRIu64, gps.time_usec - _time_last_gps);
 	}
@@ -218,6 +228,11 @@ void EstimatorInterface::setBaroData(const baroSample &baro_sample)
 		baro_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_baro_buffer->push(baro_sample_new);
+
+		if (baro_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("baro sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - baro_sample_new.time_us);
+		}
+
 	} else {
 		ECL_ERR("baro data too fast %" PRIu64, baro_sample.time_us - _time_last_baro);
 	}
@@ -251,6 +266,10 @@ void EstimatorInterface::setAirspeedData(const airspeedSample &airspeed_sample)
 		airspeed_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_airspeed_buffer->push(airspeed_sample_new);
+
+		if (airspeed_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("airspeed sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - airspeed_sample_new.time_us);
+		}
 	}
 }
 
@@ -281,6 +300,10 @@ void EstimatorInterface::setRangeData(const rangeSample &range_sample)
 		range_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_range_buffer->push(range_sample_new);
+
+		if (range_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("range sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - range_sample_new.time_us);
+		}
 	}
 }
 
@@ -312,6 +335,10 @@ void EstimatorInterface::setOpticalFlowData(const flowSample &flow)
 		optflow_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_flow_buffer->push(optflow_sample_new);
+
+		if (optflow_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("optical flow sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - optflow_sample_new.time_us);
+		}
 	}
 }
 
@@ -344,6 +371,10 @@ void EstimatorInterface::setExtVisionData(const extVisionSample &evdata)
 		ev_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_ext_vision_buffer->push(ev_sample_new);
+
+		if (ev_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("EV sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - ev_sample_new.time_us);
+		}
 	}
 }
 
@@ -375,6 +406,10 @@ void EstimatorInterface::setAuxVelData(const auxVelSample &auxvel_sample)
 		auxvel_sample_new.time_us -= static_cast<uint64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
 
 		_auxvel_buffer->push(auxvel_sample_new);
+
+		if (auxvel_sample_new.time_us < _imu_sample_delayed.time_us) {
+			ECL_WARN("AUX vel sample %" PRIu64 "us older than delayed time horizon", _imu_sample_delayed.time_us - auxvel_sample_new.time_us);
+		}
 	}
 }
 

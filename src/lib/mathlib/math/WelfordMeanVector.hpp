@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file WelfordMean.hpp
+ * @file WelfordMeanVector.hpp
  *
  * Welford's online algorithm for computing mean and variance.
  */
@@ -42,8 +42,8 @@
 namespace math
 {
 
-template<typename T = double>
-class WelfordMean
+template<typename T>
+class WelfordMeanVector
 {
 public:
 	// For a new value, compute the new count, new mean, the new M2.
@@ -57,7 +57,7 @@ public:
 
 		// M2 aggregates the squared distance from the mean
 		// count aggregates the number of samples seen so far
-		_M2 += delta * (new_value - _mean);
+		_M2 += delta.emult(new_value - _mean);
 	}
 
 	bool valid() const { return _count > 2; }
