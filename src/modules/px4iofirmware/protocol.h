@@ -100,21 +100,19 @@
 #define PX4IO_P_STATUS_CPULOAD			1
 
 #define PX4IO_P_STATUS_FLAGS			2	 /* monitoring flags */
-#define PX4IO_P_STATUS_FLAGS_OUTPUTS_ARMED	(1 << 0) /* arm-ok and locally armed */
-#define PX4IO_P_STATUS_FLAGS_RC_OK		(1 << 1) /* RC input is valid */
-#define PX4IO_P_STATUS_FLAGS_RC_PPM		(1 << 2) /* PPM input is valid */
-#define PX4IO_P_STATUS_FLAGS_RC_DSM		(1 << 3) /* DSM input is valid */
-#define PX4IO_P_STATUS_FLAGS_RC_SBUS		(1 << 4) /* SBUS input is valid */
-#define PX4IO_P_STATUS_FLAGS_FMU_OK		(1 << 5) /* controls from FMU are valid */
-#define PX4IO_P_STATUS_FLAGS_RAW_PWM		(1 << 6) /* raw PWM from FMU */
-#define PX4IO_P_STATUS_FLAGS_ARM_SYNC		(1 << 7) /* the arming state between IO and FMU is in sync */
+#define PX4IO_P_STATUS_FLAGS_RC_OK		(1 << 0) /* RC input is valid */
+#define PX4IO_P_STATUS_FLAGS_RC_PPM		(1 << 1) /* PPM input is valid */
+#define PX4IO_P_STATUS_FLAGS_RC_DSM		(1 << 2) /* DSM input is valid */
+#define PX4IO_P_STATUS_FLAGS_RC_SBUS		(1 << 3) /* SBUS input is valid */
+#define PX4IO_P_STATUS_FLAGS_RC_ST24		(1 << 4) /* ST24 input is valid */
+#define PX4IO_P_STATUS_FLAGS_RC_SUMD		(1 << 5) /* SUMD input is valid */
+
+#define PX4IO_P_STATUS_FLAGS_FMU_OK		(1 << 6) /* controls from FMU are valid */
+#define PX4IO_P_STATUS_FLAGS_RAW_PWM		(1 << 7) /* raw PWM from FMU */
 #define PX4IO_P_STATUS_FLAGS_INIT_OK		(1 << 8) /* initialisation of the IO completed without error */
-#define PX4IO_P_STATUS_FLAGS_FAILSAFE		(1 << 9) /* failsafe is active */
-#define PX4IO_P_STATUS_FLAGS_SAFETY_OFF         (1 << 10) /* safety is off */
-#define PX4IO_P_STATUS_FLAGS_FMU_INITIALIZED	(1 << 11) /* FMU was initialized and OK once */
-#define PX4IO_P_STATUS_FLAGS_RC_ST24		(1 << 12) /* ST24 input is valid */
-#define PX4IO_P_STATUS_FLAGS_RC_SUMD		(1 << 13) /* SUMD input is valid */
-#define PX4IO_P_STATUS_FLAGS_SAFETY_BUTTON_EVENT	(1 << 14) /* px4io safety button was pressed for longer than 1 second */
+#define PX4IO_P_STATUS_FLAGS_SAFETY_OFF         (1 << 9) /* safety is off */
+#define PX4IO_P_STATUS_FLAGS_FMU_INITIALIZED	(1 << 10) /* FMU was initialized and OK once */
+#define PX4IO_P_STATUS_FLAGS_SAFETY_BUTTON_EVENT (1 << 11) /* px4io safety button was pressed for longer than 1 second */
 
 #define PX4IO_P_STATUS_ALARMS			3	 /* alarm flags - alarms latch, write 1 to a bit to clear it */
 #define PX4IO_P_STATUS_ALARMS_RC_LOST           (1 << 0) /* timed out waiting for RC input */
@@ -152,23 +150,15 @@
 /* setup page */
 #define PX4IO_PAGE_SETUP			50
 #define PX4IO_P_SETUP_FEATURES			0
-#define PX4IO_P_SETUP_FEATURES_SBUS1_OUT	(1 << 0) /**< enable S.Bus v1 output */
-#define PX4IO_P_SETUP_FEATURES_SBUS2_OUT	(1 << 1) /**< enable S.Bus v2 output */
-#define PX4IO_P_SETUP_FEATURES_ADC_RSSI		(1 << 2) /**< enable ADC RSSI parsing */
+#define PX4IO_P_SETUP_FEATURES_ADC_RSSI		(1 << 0) /**< enable ADC RSSI parsing */
 
 #define PX4IO_P_SETUP_ARMING			1	 /* arming controls */
-#define PX4IO_P_SETUP_ARMING_IO_ARM_OK            (1 << 0) /* OK to arm the IO side */
-#define PX4IO_P_SETUP_ARMING_FMU_ARMED            (1 << 1) /* FMU is already armed */
-#define PX4IO_P_SETUP_ARMING_FMU_PREARMED         (1 << 2) /* FMU is already prearmed */
-#define PX4IO_P_SETUP_ARMING_FAILSAFE_CUSTOM      (1 << 3) /* use custom failsafe values */
-#define PX4IO_P_SETUP_ARMING_LOCKDOWN             (1 << 4) /* If set, the system operates normally, but won't actuate any servos */
-#define PX4IO_P_SETUP_ARMING_FORCE_FAILSAFE       (1 << 5) /* If set, the system will always output the failsafe values */
-#define PX4IO_P_SETUP_ARMING_TERMINATION_FAILSAFE (1 << 6) /* If set, the system will never return from a failsafe, but remain in failsafe once triggered. */
+#define PX4IO_P_SETUP_ARMING_FMU_ARMED            (1 << 0) /* FMU is already armed */
 
 #define PX4IO_P_SETUP_PWM_RATES                 2	/* bitmask, 0 = low rate, 1 = high rate */
 #define PX4IO_P_SETUP_PWM_DEFAULTRATE           3	/* 'low' PWM frame output rate in Hz */
 #define PX4IO_P_SETUP_PWM_ALTRATE               4	/* 'high' PWM frame output rate in Hz */
-#define PX4IO_P_SETUP_VSERVO_SCALE              5	/* hardware rev [2] servo voltage correction factor (float) */
+
 #define PX4IO_P_SETUP_DSM                       6	/* DSM bind state */
 enum {							/* DSM bind states */
 	dsm_bind_power_down = 0,
@@ -187,9 +177,9 @@ enum {							/* DSM bind states */
 /* storage space of 12 occupied by CRC */
 #define PX4IO_P_SETUP_SAFETY_BUTTON_ACK	14	/**< ACK from FMU when it gets safety button pressed status */
 #define PX4IO_P_SETUP_SAFETY_OFF		15	/**< FMU inform PX4IO about safety_off for LED indication*/
-#define PX4IO_P_SETUP_SBUS_RATE			16	/**< frame rate of SBUS1 output in Hz */
+
 #define PX4IO_P_SETUP_THERMAL			17	/**< thermal management */
-#define PX4IO_P_SETUP_ENABLE_FLIGHTTERMINATION	18	/**< flight termination; false if the circuit breaker (CBRK_FLIGHTTERM) is set */
+
 #define PX4IO_P_SETUP_PWM_RATE_GROUP0            19	/* Configure timer group 0 update rate in Hz */
 #define PX4IO_P_SETUP_PWM_RATE_GROUP1            20	/* Configure timer group 1 update rate in Hz */
 #define PX4IO_P_SETUP_PWM_RATE_GROUP2            21	/* Configure timer group 2 update rate in Hz */
@@ -202,15 +192,9 @@ enum {							/* DSM bind states */
 /* PWM output */
 #define PX4IO_PAGE_DIRECT_PWM			54		/**< 0..CONFIG_ACTUATOR_COUNT-1 */
 
-/* PWM failsafe values - zero disables the output */
-#define PX4IO_PAGE_FAILSAFE_PWM			55		/**< 0..CONFIG_ACTUATOR_COUNT-1 */
-
 /* Debug and test page - not used in normal operation */
 #define PX4IO_PAGE_TEST				127
 #define PX4IO_P_TEST_LED			0		/**< set the amber LED on/off */
-
-/* PWM disarmed values that are active */
-#define PX4IO_PAGE_DISARMED_PWM			109		/* 0..CONFIG_ACTUATOR_COUNT-1 */
 
 /**
  * Serial protocol encapsulation.

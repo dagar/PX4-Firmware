@@ -949,10 +949,6 @@ UavcanNode::ioctl(file *filp, int cmd, unsigned long arg)
 	pthread_mutex_lock(&_node_mutex);
 
 	switch (cmd) {
-	case PWM_SERVO_SET_ARM_OK:
-	case PWM_SERVO_CLEAR_ARM_OK:
-		break;
-
 	case MIXERIOCRESET:
 		_mixing_interface_esc.mixingOutput().resetMixer();
 

@@ -715,23 +715,6 @@ int PWMOut::pwm_ioctl(device::file_t *filp, int cmd, unsigned long arg)
 	PX4_DEBUG("pwm_out%u: ioctl cmd: %d, arg: %ld", _instance, cmd, arg);
 
 	switch (cmd) {
-	case PWM_SERVO_ARM:
-		update_pwm_out_state(true);
-		break;
-
-	case PWM_SERVO_SET_ARM_OK:
-	case PWM_SERVO_CLEAR_ARM_OK:
-		break;
-
-	case PWM_SERVO_DISARM:
-
-		/* Ignore disarm if disarmed PWM is set already. */
-		if (_num_disarmed_set == 0) {
-			update_pwm_out_state(false);
-		}
-
-		break;
-
 	case PWM_SERVO_GET_DEFAULT_UPDATE_RATE:
 		*(uint32_t *)arg = _pwm_default_rate;
 		break;

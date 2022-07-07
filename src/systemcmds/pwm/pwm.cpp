@@ -111,9 +111,6 @@ $ pwm min -c 13 -p 1200
 
 
 	PRINT_MODULE_USAGE_NAME("pwm", "command");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("arm", "Arm output");
-	PRINT_MODULE_USAGE_COMMAND_DESCR("disarm", "Disarm output");
-
 	PRINT_MODULE_USAGE_COMMAND_DESCR("status", "Print current configuration of all channels");
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("rate", "Configure PWM rates");
@@ -293,42 +290,7 @@ pwm_main(int argc, char *argv[])
 
 	oneshot = !strcmp(command, "oneshot");
 
-	if (!strcmp(command, "arm")) {
-		/* tell safety that its ok to disable it with the switch */
-		ret = px4_ioctl(fd, PWM_SERVO_SET_ARM_OK, 0);
-
-		if (ret != OK) {
-			err(1, "PWM_SERVO_SET_ARM_OK");
-		}
-
-		/* tell IO that the system is armed (it will output values if safety is off) */
-		ret = px4_ioctl(fd, PWM_SERVO_ARM, 0);
-
-		if (ret != OK) {
-			err(1, "PWM_SERVO_ARM");
-		}
-
-		if (print_verbose) {
-			PX4_INFO("Outputs armed");
-		}
-
-		return 0;
-
-	} else if (!strcmp(command, "disarm")) {
-		/* disarm, but do not revoke the SET_ARM_OK flag */
-		ret = px4_ioctl(fd, PWM_SERVO_DISARM, 0);
-
-		if (ret != OK) {
-			err(1, "PWM_SERVO_DISARM");
-		}
-
-		if (print_verbose) {
-			PX4_INFO("Outputs disarmed");
-		}
-
-		return 0;
-
-	} else if (oneshot || !strcmp(command, "rate")) {
+	if (oneshot || !strcmp(command, "rate")) {
 
 		/* Change alternate PWM rate or set oneshot
 		 * Either the "oneshot" command was used

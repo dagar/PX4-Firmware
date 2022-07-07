@@ -112,7 +112,7 @@ bool dsm_port_input(uint16_t *rssi, bool *dsm_updated, bool *st24_updated, bool 
 		if (spektrum_rssi >= 0 && spektrum_rssi <= 100) {
 
 			/* ensure ADC RSSI is disabled */
-			r_setup_features &= ~(PX4IO_P_SETUP_FEATURES_ADC_RSSI);
+			//r_setup_features &= ~(PX4IO_P_SETUP_FEATURES_ADC_RSSI);
 
 			*rssi = spektrum_rssi;
 		}
@@ -140,7 +140,7 @@ bool dsm_port_input(uint16_t *rssi, bool *dsm_updated, bool *st24_updated, bool 
 	if (*st24_updated && lost_count == 0) {
 
 		/* ensure ADC RSSI is disabled */
-		r_setup_features &= ~(PX4IO_P_SETUP_FEATURES_ADC_RSSI);
+		//r_setup_features &= ~(PX4IO_P_SETUP_FEATURES_ADC_RSSI);
 
 		*rssi = st24_rssi;
 		r_raw_rc_count = st24_channel_count;
@@ -219,24 +219,20 @@ controls_tick()
 	 */
 
 #ifdef ADC_RSSI
+	unsigned counts = adc_measure(ADC_RSSI);
 
-	if (r_setup_features & PX4IO_P_SETUP_FEATURES_ADC_RSSI) {
-		unsigned counts = adc_measure(ADC_RSSI);
+	if (counts != 0xffff) {
+		/* low pass*/
+		_rssi_adc_counts = (_rssi_adc_counts * 0.998f) + (counts * 0.002f);
+		/* use 1:1 scaling on 3.3V, 12-Bit ADC input */
+		unsigned mV = _rssi_adc_counts * 3300 / 4095;
+		/* scale to 0..100 (input_rc_s::RSSI_MAX == 100) */
+		_rssi = (mV * input_rc_s::RSSI_MAX / 3300);
 
-		if (counts != 0xffff) {
-			/* low pass*/
-			_rssi_adc_counts = (_rssi_adc_counts * 0.998f) + (counts * 0.002f);
-			/* use 1:1 scaling on 3.3V, 12-Bit ADC input */
-			unsigned mV = _rssi_adc_counts * 3300 / 4095;
-			/* scale to 0..100 (input_rc_s::RSSI_MAX == 100) */
-			_rssi = (mV * input_rc_s::RSSI_MAX / 3300);
-
-			if (_rssi > input_rc_s::RSSI_MAX) {
-				_rssi = input_rc_s::RSSI_MAX;
-			}
+		if (_rssi > input_rc_s::RSSI_MAX) {
+			_rssi = input_rc_s::RSSI_MAX;
 		}
 	}
-
 #endif
 
 	/* zero RSSI if signal is lost */
@@ -275,10 +271,6 @@ controls_tick()
 				r_raw_rc_flags &= ~(PX4IO_P_RAW_RC_FLAGS_FAILSAFE);
 			}
 
-			/* set RSSI to an emulated value if ADC RSSI is off */
-			if (!(r_setup_features & PX4IO_P_SETUP_FEATURES_ADC_RSSI)) {
-				_rssi = sbus_rssi;
-			}
 		}
 	}
 

@@ -61,8 +61,20 @@
 
 #include <stm32_uart.h>
 
+#include <drivers/drv_pwm_output.h>
+#include <drivers/drv_hrt.h>
+
 #define DEBUG
+
 #include "px4io.h"
+
+/*
+ * Maximum interval in us before FMU signal is considered lost
+ */
+#define FMU_INPUT_DROP_LIMIT_US		500000
+
+static bool new_fmu_data = false;
+static uint64_t last_fmu_update = 0;
 
 struct sys_state_s system_state;
 
@@ -113,8 +125,7 @@ void atomic_modify_and(volatile uint16_t *target, uint16_t modification)
 /*
  * add a debug message to be printed on the console
  */
-void
-isr_debug(uint8_t level, const char *fmt, ...)
+void isr_debug(uint8_t level, const char *fmt, ...)
 {
 	if (level > r_page_setup[PX4IO_P_SETUP_SET_DEBUG]) {
 		return;
@@ -131,8 +142,7 @@ isr_debug(uint8_t level, const char *fmt, ...)
 /*
  * show all pending debug messages
  */
-static void
-show_debug_messages(void)
+static void show_debug_messages(void)
 {
 	if (msg_counter != last_msg_counter) {
 		uint32_t n = msg_counter - last_msg_counter;
@@ -151,13 +161,8 @@ show_debug_messages(void)
 /*
  * Get the memory usage at 2 Hz while not armed
  */
-static void
-update_mem_usage(void)
+static void update_mem_usage(void)
 {
-	if (/* FMU is armed */ (r_setup_arming & PX4IO_P_SETUP_ARMING_FMU_ARMED)) {
-		return;
-	}
-
 	static uint64_t last_mem_time = 0;
 	uint64_t now = hrt_absolute_time();
 
@@ -168,8 +173,7 @@ update_mem_usage(void)
 	}
 }
 
-static void
-heartbeat_blink(void)
+static void heartbeat_blink(void)
 {
 #if defined(LED_BLUE)
 	static bool heartbeat = false;
@@ -307,11 +311,6 @@ extern "C" __EXPORT int user_start(int argc, char *argv[])
 	LED_GREEN(false);
 #endif /* LED_GREEN */
 
-	/* turn off S.Bus out (if supported) */
-#ifdef ENABLE_SBUS_OUT
-	ENABLE_SBUS_OUT(false);
-#endif
-
 	/* start the safety button handler */
 	safety_button_init();
 
@@ -362,7 +361,50 @@ extern "C" __EXPORT int user_start(int argc, char *argv[])
 		perf_begin(mixer_perf);
 #endif
 
-		mixer_tick();
+	/* check that we are receiving fresh data from the FMU */
+	irqstate_t irq_flags = enter_critical_section();
+	const hrt_abstime fmu_data_received_time = system_state.fmu_data_received_time;
+	leave_critical_section(irq_flags);
+
+	if ((fmu_data_received_time == 0) ||
+	    hrt_elapsed_time(&fmu_data_received_time) > FMU_INPUT_DROP_LIMIT_US) {
+
+		/* too long without FMU input, time to go to failsafe */
+		if (r_status_flags & PX4IO_P_STATUS_FLAGS_FMU_OK) {
+			isr_debug(1, "AP RX timeout");
+		}
+
+		atomic_modify_clear(&r_status_flags, PX4IO_P_STATUS_FLAGS_FMU_OK);
+
+	} else {
+		atomic_modify_or(&r_status_flags, PX4IO_P_STATUS_FLAGS_FMU_OK);
+
+		/* this flag is never cleared once OK */
+		atomic_modify_or(&r_status_flags, PX4IO_P_STATUS_FLAGS_FMU_INITIALIZED);
+
+		if (fmu_data_received_time > last_fmu_update) {
+			new_fmu_data = true;
+			last_fmu_update = fmu_data_received_time;
+		}
+	}
+
+	/* Do not mix if we have raw PWM and FMU is ok. */
+	if ((r_status_flags & PX4IO_P_STATUS_FLAGS_RAW_PWM) &&
+	    (r_status_flags & PX4IO_P_STATUS_FLAGS_FMU_OK)) {
+
+		/* don't actually mix anything - copy values from r_page_direct_pwm */
+		//memcpy(r_page_servos, r_page_direct_pwm, sizeof(uint16_t)*PX4IO_SERVO_COUNT);
+	} else {
+
+		memset(r_page_servos, 0, sizeof(r_page_servo));
+	}
+
+	if ((r_status_flags & PX4IO_P_STATUS_FLAGS_INIT_OK) ) {
+		/* update the servo outputs. */
+		for (unsigned i = 0; i < PX4IO_SERVO_COUNT; i++) {
+			up_pwm_servo_set(i, r_page_servos[i]);
+		}
+	}
 
 #if defined(PX4IO_PERF)
 		perf_end(mixer_perf);
@@ -420,11 +462,10 @@ extern "C" __EXPORT int user_start(int argc, char *argv[])
 		 */
 		if (hrt_absolute_time() - last_debug_time > (1000 * 1000)) {
 
-			isr_debug(1, "d:%u s=0x%x a=0x%x f=0x%x m=%u",
+			isr_debug(1, "d:%u s=0x%x a=0x%x m=%u",
 				  (unsigned)r_page_setup[PX4IO_P_SETUP_SET_DEBUG],
 				  (unsigned)r_status_flags,
 				  (unsigned)r_setup_arming,
-				  (unsigned)r_setup_features,
 				  (unsigned)mallinfo().mxordblk);
 			last_debug_time = hrt_absolute_time();
 		}

@@ -491,12 +491,6 @@ int PCA9685Wrapper::ioctl(cdev::file_t *filep, int cmd, unsigned long arg)
 
 		break;
 
-	case PWM_SERVO_SET_ARM_OK:
-	case PWM_SERVO_CLEAR_ARM_OK:
-	case PWM_SERVO_ARM:
-	case PWM_SERVO_DISARM:
-		break;
-
 	default:
 		ret = -ENOTTY;
 		break;

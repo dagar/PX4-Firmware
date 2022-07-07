@@ -805,14 +805,6 @@ int ModalaiEsc::ioctl(file *filp, int cmd, unsigned long arg)
 	PX4_DEBUG("modalai_esc ioctl cmd: %d, arg: %ld", cmd, arg);
 
 	switch (cmd) {
-	case PWM_SERVO_ARM:
-		PX4_INFO("PWM_SERVO_ARM");
-		break;
-
-	case PWM_SERVO_DISARM:
-		PX4_INFO("PWM_SERVO_DISARM");
-		break;
-
 	case MIXERIOCRESET:
 		_mixing_output.resetMixer();
 		break;

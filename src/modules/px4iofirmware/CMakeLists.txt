@@ -36,7 +36,6 @@ option(PX4IO_PERF "Enable px4io perf counters" OFF)
 add_library(px4iofirmware
 	adc.cpp
 	controls.cpp
-	mixer.cpp
 	px4io.cpp
 	registers.c
 	safety_button.cpp

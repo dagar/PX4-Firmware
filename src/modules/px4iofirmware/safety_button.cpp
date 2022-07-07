@@ -120,8 +120,8 @@ safety_button_check(void *arg)
 	} else if (r_setup_arming & PX4IO_P_SETUP_ARMING_FMU_ARMED) {
 		pattern = LED_PATTERN_FMU_ARMED;
 
-	} else if (r_setup_arming & PX4IO_P_SETUP_ARMING_IO_ARM_OK) {
-		pattern = LED_PATTERN_FMU_OK_TO_ARM;
+	//} else if (r_setup_arming & PX4IO_P_SETUP_ARMING_IO_ARM_OK) {
+	//	pattern = LED_PATTERN_FMU_OK_TO_ARM;
 
 	}
 

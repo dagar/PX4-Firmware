@@ -173,20 +173,6 @@ static int do_esc_calibration_ioctl(orb_advert_t *mavlink_log_pub)
 		goto Out;
 	}
 
-	/* tell IO/FMU that its ok to disable its safety with the switch */
-	if (px4_ioctl(fd, PWM_SERVO_SET_ARM_OK, 0) != PX4_OK) {
-		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Unable to disable safety switch");
-		return_code = PX4_ERROR;
-		goto Out;
-	}
-
-	/* tell IO/FMU that the system is armed (it will output values if safety is off) */
-	if (px4_ioctl(fd, PWM_SERVO_ARM, 0) != PX4_OK) {
-		calibration_log_critical(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Unable to arm system");
-		return_code = PX4_ERROR;
-		goto Out;
-	}
-
 	calibration_log_info(mavlink_log_pub, "[cal] Connect battery now");
 
 	timeout_start = hrt_absolute_time();
@@ -226,15 +212,6 @@ static int do_esc_calibration_ioctl(orb_advert_t *mavlink_log_pub)
 Out:
 
 	if (fd != -1) {
-
-		if (px4_ioctl(fd, PWM_SERVO_DISARM, 0) != PX4_OK) {
-			calibration_log_info(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Servos still armed");
-		}
-
-		if (px4_ioctl(fd, PWM_SERVO_CLEAR_ARM_OK, 0) != PX4_OK) {
-			calibration_log_info(mavlink_log_pub, CAL_QGC_FAILED_MSG, "Safety switch still deactivated");
-		}
-
 		px4_close(fd);
 	}
 
