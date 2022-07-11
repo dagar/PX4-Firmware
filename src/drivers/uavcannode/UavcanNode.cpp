@@ -47,6 +47,7 @@
 #include "Publishers/MovingBaselineData.hpp"
 #include "Publishers/RangeSensorMeasurement.hpp"
 #include "Publishers/RawAirData.hpp"
+#include "Publishers/RawIMU.hpp"
 #include "Publishers/RelPosHeading.hpp"
 #include "Publishers/SafetyButton.hpp"
 #include "Publishers/StaticPressure.hpp"
@@ -305,6 +306,15 @@ int UavcanNode::init(uavcan::NodeID node_id, UAVCAN_DRIVER::BusEvent &bus_events
 	_publisher_list.add(new MagneticFieldStrength2(this, _node));
 	_publisher_list.add(new RangeSensorMeasurement(this, _node));
 	_publisher_list.add(new RawAirData(this, _node));
+
+	int32_t enable_rawimu = 0;
+	param_get(param_find("CANNODE_RAWIMU"), &enable_rawimu);
+
+	if (enable_rawimu != 0) {
+		_publisher_list.add(new RawIMU(this, _node));
+
+	}
+
 	_publisher_list.add(new RelPosHeadingPub(this, _node));
 
 	int32_t enable_movingbaselinedata = 0;
@@ -527,6 +537,13 @@ void UavcanNode::PrintInfo()
 	printf("\tTransfer errors:   %llu\n", _node.getDispatcher().getTransferPerfCounter().getErrorCount());
 	printf("\tRX transfers:      %llu\n", _node.getDispatcher().getTransferPerfCounter().getRxTransferCount());
 	printf("\tTX transfers:      %llu\n", _node.getDispatcher().getTransferPerfCounter().getTxTransferCount());
+
+	printf("\n");
+
+	// UAVCAN Time
+	printf("UAVCAN Time:\n");
+	printf("\tMonotonic time: %llu\n", _node.getMonotonicTime().toUSec());
+	printf("\tUtc time:       %llu\n", _node.getUtcTime().toUSec());
 
 	printf("\n");
 

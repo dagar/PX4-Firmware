@@ -61,6 +61,12 @@ void UavcanGyroBridge::imu_sub_cb(const uavcan::ReceivedDataStructure<uavcan::eq
 {
 	uavcan_bridge::Channel *channel = get_channel_for_node(msg.getSrcNodeID().get());
 
+	hrt_abstime timestamp_sample = msg.timestamp.usec;
+
+	// if (timestamp_sample > hrt_absolute_time()) {
+	// 	timestamp_sample = hrt_absolute_time();
+	// }
+
 	if (channel == nullptr) {
 		// Something went wrong - no channel to publish on; return
 		return;
@@ -73,7 +79,7 @@ void UavcanGyroBridge::imu_sub_cb(const uavcan::ReceivedDataStructure<uavcan::eq
 		return;
 	}
 
-	gyro->update(hrt_absolute_time(),
+	gyro->update(timestamp_sample,
 		     msg.rate_gyro_latest[0],
 		     msg.rate_gyro_latest[1],
 		     msg.rate_gyro_latest[2]);

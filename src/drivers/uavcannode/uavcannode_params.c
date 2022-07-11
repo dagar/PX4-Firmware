@@ -68,3 +68,12 @@ PARAM_DEFINE_INT32(CANNODE_TERM, 0);
  * @group UAVCAN
  */
 PARAM_DEFINE_INT32(CANNODE_GPS_RTCM, 0);
+
+/**
+ * Enable RawIMU pub
+ *
+ * @boolean
+ * @max 1
+ * @group UAVCAN
+ */
+PARAM_DEFINE_INT32(CANNODE_RAWIMU, 0);

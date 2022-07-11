@@ -61,7 +61,11 @@ void UavcanAccelBridge::imu_sub_cb(const uavcan::ReceivedDataStructure<uavcan::e
 {
 	uavcan_bridge::Channel *channel = get_channel_for_node(msg.getSrcNodeID().get());
 
-	const hrt_abstime timestamp_sample = hrt_absolute_time();
+	hrt_abstime timestamp_sample = msg.timestamp.usec;
+
+	if (timestamp_sample > hrt_absolute_time()) {
+		timestamp_sample = hrt_absolute_time();
+	}
 
 	if (channel == nullptr) {
 		// Something went wrong - no channel to publish on; return
