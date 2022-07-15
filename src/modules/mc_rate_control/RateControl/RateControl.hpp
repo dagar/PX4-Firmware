@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -72,6 +72,13 @@ public:
 	void setFeedForwardGain(const matrix::Vector3f &FF) { _gain_ff = FF; };
 
 	/**
+	 * Set inertia matrix
+	 * @see _inertia
+	 * @param inertia inertia matrix
+	 */
+	void setInertiaMatrix(const matrix::Matrix3f &inertia) { _inertia = inertia; };
+
+	/**
 	 * Set saturation status
 	 * @param control saturation vector from control allocator
 	 */
@@ -85,8 +92,20 @@ public:
 	 * @param dt desired vehicle angular rate setpoint
 	 * @return [-1,1] normalized torque vector to apply to the vehicle
 	 */
-	matrix::Vector3f update(const matrix::Vector3f &rate, const matrix::Vector3f &rate_sp,
-				const matrix::Vector3f &angular_accel, const float dt, const bool landed);
+	void update(const matrix::Vector3f &rate, const matrix::Vector3f &rate_sp,
+		    const matrix::Vector3f &angular_accel, const float dt, const bool landed);
+
+	/**
+	 * Get the desired angular acceleration
+	 * @see _angular_accel_sp
+	 */
+	const matrix::Vector3f &angular_accel_setpoint() const { return _angular_accel_sp; }
+
+	/**
+	 * Get the torque vector to apply to the vehicle
+	 * @see _torque_sp
+	 */
+	const matrix::Vector3f &torque_setpoint() const { return _torque_sp; }
 
 	/**
 	 * Set the integral term to 0 to prevent windup
@@ -109,6 +128,7 @@ private:
 	matrix::Vector3f _gain_d; ///< rate control derivative gain
 	matrix::Vector3f _lim_int; ///< integrator term maximum absolute value
 	matrix::Vector3f _gain_ff; ///< direct rate to torque feed forward gain only useful for helicopters
+	matrix::Matrix3f _inertia{matrix::eye<float, 3>()}; ///< inertia matrix
 
 	// States
 	matrix::Vector3f _rate_int; ///< integral term of the rate controller
@@ -116,4 +136,8 @@ private:
 	// Feedback from control allocation
 	matrix::Vector<bool, 3> _control_allocator_saturation_negative;
 	matrix::Vector<bool, 3> _control_allocator_saturation_positive;
+
+	// Output
+	matrix::Vector3f _angular_accel_sp; 	//< Angular acceleration setpoint computed using P and D gains
+	matrix::Vector3f _torque_sp;		//< Torque setpoint to apply to the vehicle
 };

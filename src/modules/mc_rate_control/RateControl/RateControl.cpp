@@ -54,21 +54,33 @@ void RateControl::setSaturationStatus(const Vector<bool, 3> &saturation_positive
 	_control_allocator_saturation_negative = saturation_negative;
 }
 
-Vector3f RateControl::update(const Vector3f &rate, const Vector3f &rate_sp, const Vector3f &angular_accel,
-			     const float dt, const bool landed)
+void RateControl::update(const Vector3f &rate, const Vector3f &rate_sp, const Vector3f &angular_accel, const float dt,
+			 const bool landed)
 {
 	// angular rates error
 	Vector3f rate_error = rate_sp - rate;
 
-	// PID control with feed forward
-	const Vector3f torque = _gain_p.emult(rate_error) + _rate_int - _gain_d.emult(angular_accel) + _gain_ff.emult(rate_sp);
+	// P + D control
+	_angular_accel_sp = _gain_p.emult(rate_error) - _gain_d.emult(angular_accel);
+
+	// I + FF control
+	const Vector3f torque_feedforward = _rate_int + _gain_ff.emult(rate_sp);
+
+	// compute torque setpoint
+	// Note: this may go into a separate module for general usage with FW and VTOLs
+	// if so, TODO:
+	// - [x] publish accel sp
+	// - [ ] publish torque ff sp
+	// - [ ] add dynamic model module
+	// - [ ] move params for inertia to that module
+	// - [ ] poll vehicle_angular_velocity & vehicle_angular_acceleration_setpoint & vehicle_torque_feedforward_setpoint => compute and publish vehicle_torque_setpoint
+	// - [ ] (eventually) add param for mass, poll vehicle_linear_acceleration_setpoint + vehicle_attitude => compute and publish vehicle_thrust_setpoint
+	_torque_sp = _inertia * _angular_accel_sp + torque_feedforward + rate.cross(_inertia * rate);
 
 	// update integral only if we are not landed
 	if (!landed) {
 		updateIntegral(rate_error, dt);
 	}
-
-	return torque;
 }
 
 void RateControl::updateIntegral(Vector3f &rate_error, const float dt)

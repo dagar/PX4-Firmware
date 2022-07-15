@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -94,6 +94,14 @@ MulticopterRateControl::parameters_updated()
 	// manual rate control acro mode rate limits
 	_acro_rate_max = Vector3f(radians(_param_mc_acro_r_max.get()), radians(_param_mc_acro_p_max.get()),
 				  radians(_param_mc_acro_y_max.get()));
+
+	// inertia matrix
+	const float inertia[3][3] = {
+		{_param_vm_inertia_xx.get(), _param_vm_inertia_xy.get(), _param_vm_inertia_xz.get()},
+		{_param_vm_inertia_xy.get(), _param_vm_inertia_yy.get(), _param_vm_inertia_yz.get()},
+		{_param_vm_inertia_xz.get(), _param_vm_inertia_yz.get(), _param_vm_inertia_zz.get()}
+	};
+	_rate_control.setInertiaMatrix(matrix::Matrix3f(inertia));
 
 	_actuators_0_circuit_breaker_enabled = circuit_breaker_enabled_by_val(_param_cbrk_rate_ctrl.get(), CBRK_RATE_CTRL_KEY);
 }
@@ -237,7 +245,8 @@ MulticopterRateControl::Run()
 			}
 
 			// run rate controller
-			const Vector3f att_control = _rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+			_rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+			const Vector3f &att_control{_rate_control.torque_setpoint()};
 
 			// publish rate controller status
 			rate_ctrl_status_s rate_ctrl_status{};
@@ -256,7 +265,8 @@ MulticopterRateControl::Run()
 			actuators.timestamp_sample = angular_velocity.timestamp_sample;
 
 			if (!_vehicle_status.is_vtol) {
-				publishTorqueSetpoint(att_control, angular_velocity.timestamp_sample);
+				publishAngularAccelerationSetpoint(_rate_control.angular_accel_setpoint(), angular_velocity.timestamp_sample);
+				publishTorqueSetpoint(_rate_control.torque_setpoint(), angular_velocity.timestamp_sample);
 				publishThrustSetpoint(angular_velocity.timestamp_sample);
 			}
 
@@ -295,14 +305,27 @@ MulticopterRateControl::Run()
 	perf_end(_loop_perf);
 }
 
+void MulticopterRateControl::publishAngularAccelerationSetpoint(const Vector3f &angular_acceleration_sp,
+		const hrt_abstime &timestamp_sample)
+{
+	vehicle_angular_acceleration_setpoint_s sp{};
+	sp.timestamp_sample = timestamp_sample;
+	sp.xyz[0] = angular_acceleration_sp(0);
+	sp.xyz[1] = angular_acceleration_sp(1);
+	sp.xyz[2] = angular_acceleration_sp(2);
+	sp.timestamp = hrt_absolute_time();
+
+	_vehicle_angular_acceleration_setpoint_pub.publish(sp);
+}
+
 void MulticopterRateControl::publishTorqueSetpoint(const Vector3f &torque_sp, const hrt_abstime &timestamp_sample)
 {
 	vehicle_torque_setpoint_s vehicle_torque_setpoint{};
-	vehicle_torque_setpoint.timestamp = hrt_absolute_time();
 	vehicle_torque_setpoint.timestamp_sample = timestamp_sample;
 	vehicle_torque_setpoint.xyz[0] = (PX4_ISFINITE(torque_sp(0))) ? torque_sp(0) : 0.0f;
 	vehicle_torque_setpoint.xyz[1] = (PX4_ISFINITE(torque_sp(1))) ? torque_sp(1) : 0.0f;
 	vehicle_torque_setpoint.xyz[2] = (PX4_ISFINITE(torque_sp(2))) ? torque_sp(2) : 0.0f;
+	vehicle_torque_setpoint.timestamp = hrt_absolute_time();
 
 	_vehicle_torque_setpoint_pub.publish(vehicle_torque_setpoint);
 }
@@ -310,9 +333,9 @@ void MulticopterRateControl::publishTorqueSetpoint(const Vector3f &torque_sp, co
 void MulticopterRateControl::publishThrustSetpoint(const hrt_abstime &timestamp_sample)
 {
 	vehicle_thrust_setpoint_s vehicle_thrust_setpoint{};
-	vehicle_thrust_setpoint.timestamp = hrt_absolute_time();
 	vehicle_thrust_setpoint.timestamp_sample = timestamp_sample;
 	_thrust_setpoint.copyTo(vehicle_thrust_setpoint.xyz);
+	vehicle_thrust_setpoint.timestamp = hrt_absolute_time();
 
 	_vehicle_thrust_setpoint_pub.publish(vehicle_thrust_setpoint);
 }

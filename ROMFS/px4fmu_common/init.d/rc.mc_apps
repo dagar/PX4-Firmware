@@ -54,6 +54,8 @@ then
 	# Start Control Allocator
 	#
 	control_allocator start
+
+	vehicle_model_estimator start
 fi
 
 #
