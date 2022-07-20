@@ -73,18 +73,15 @@ void MulticopterRateControl::parameters_updated()
 	// rate control parameters
 	// The controller gain K is used to convert the parallel (P + I/s + sD) form
 	// to the ideal (K * [1 + 1/sTi + sTd]) form
-	const Vector3f rate_k = Vector3f(_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get());
+	const Vector3f rate_k{_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get()};
 
-	_rate_control.setGains(
-		rate_k.emult(Vector3f(_param_mc_rollrate_p.get(), _param_mc_pitchrate_p.get(), _param_mc_yawrate_p.get())),
-		rate_k.emult(Vector3f(_param_mc_rollrate_i.get(), _param_mc_pitchrate_i.get(), _param_mc_yawrate_i.get())),
-		rate_k.emult(Vector3f(_param_mc_rollrate_d.get(), _param_mc_pitchrate_d.get(), _param_mc_yawrate_d.get())));
+	_gain_p = rate_k.emult(Vector3f{_param_mc_rollrate_p.get(), _param_mc_pitchrate_p.get(), _param_mc_yawrate_p.get()});
+	_gain_i = rate_k.emult(Vector3f{_param_mc_rollrate_i.get(), _param_mc_pitchrate_i.get(), _param_mc_yawrate_i.get()});
+	_gain_d = rate_k.emult(Vector3f{_param_mc_rollrate_d.get(), _param_mc_pitchrate_d.get(), _param_mc_yawrate_d.get()});
 
-	_rate_control.setIntegratorLimit(
-		Vector3f(_param_mc_rr_int_lim.get(), _param_mc_pr_int_lim.get(), _param_mc_yr_int_lim.get()));
+	_lim_int = Vector3f{_param_mc_rr_int_lim.get(), _param_mc_pr_int_lim.get(), _param_mc_yr_int_lim.get()};
 
-	_rate_control.setFeedForwardGain(
-		Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
+	_gain_ff = Vector3f{_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()};
 }
 
 void MulticopterRateControl::Run()
@@ -152,24 +149,20 @@ void MulticopterRateControl::Run()
 
 			if (_control_allocator_status_sub.update(&control_allocator_status)) {
 				if (!control_allocator_status.torque_setpoint_achieved) {
-
-					Vector<bool, 3> saturation_positive{};
-					Vector<bool, 3> saturation_negative{};
-
 					for (size_t i = 0; i < 3; i++) {
 						if (control_allocator_status.unallocated_torque[i] > FLT_EPSILON) {
-							saturation_positive(i) = true;
+							_control_allocator_saturation_positive(i) = true;
 
 						} else if (control_allocator_status.unallocated_torque[i] < -FLT_EPSILON) {
-							saturation_negative(i) = true;
+							_control_allocator_saturation_negative(i) = true;
 						}
 					}
 
 					// TODO: send the unallocated value directly for better anti-windup
-					_rate_control.setSaturationStatus(saturation_positive, saturation_negative);
 
 				} else {
-					_rate_control.clearSaturationStatus();
+					_control_allocator_saturation_positive.zero();
+					_control_allocator_saturation_negative.zero();
 				}
 			}
 		}
@@ -228,13 +221,56 @@ void MulticopterRateControl::Run()
 		const float dt = math::constrain(((angular_velocity.timestamp_sample - _last_run) * 1e-6f), 0.000125f, 0.02f);
 		_last_run = angular_velocity.timestamp_sample;
 
-		// reset integral if disarmed
+		// run rate controller
+		const Vector3f rate{angular_velocity.xyz};
+		const Vector3f angular_accel{angular_acceleration.xyz};
+
+		// angular rates error
+		Vector3f rate_error = _rates_setpoint - rate;
+
+		// PID control with feed forward
+		Vector3f torque_sp = _gain_p.emult(rate_error) + _rate_int - _gain_d.emult(angular_accel) + _gain_ff.emult(
+					     _rates_setpoint);
+
+		// update integral only if we are flying
 		if (!_armed || !_rotary_wing) {
-			_rate_control.resetIntegral();
+			_rate_int.zero();
+
+		} else if (!_landed) {
+			for (int i = 0; i < 3; i++) {
+
+				if (_control_allocator_saturation_positive(i)) {
+					// prevent further positive control saturation
+					rate_error(i) = math::min(rate_error(i), 0.f);
+
+				} else if (_control_allocator_saturation_negative(i)) {
+					// prevent further negative control saturation
+					rate_error(i) = math::max(rate_error(i), 0.f);
+				}
+
+				// I term factor: reduce the I gain with increasing rate error.
+				// This counteracts a non-linear effect where the integral builds up quickly upon a large setpoint
+				// change (noticeable in a bounce-back effect after a flip).
+				// The formula leads to a gradual decrease w/o steps, while only affecting the cases where it should:
+				// with the parameter set to 400 degrees, up to 100 deg rate error, i_factor is almost 1 (having no effect),
+				// and up to 200 deg error leads to <25% reduction of I.
+				float i_factor = rate_error(i) / math::radians(400.f);
+				i_factor = math::max(0.0f, 1.f - i_factor * i_factor);
+
+				// Perform the integration using a first order method
+				float rate_i = _rate_int(i) + i_factor * _gain_i(i) * rate_error(i) * dt;
+
+				_rate_int(i) = math::constrain(rate_i, -_lim_int(i), _lim_int(i));
+			}
 		}
 
-		// run rate controller
-		const Vector3f torque_sp{_rate_control.update(Vector3f(angular_velocity.xyz), _rates_setpoint, Vector3f(angular_acceleration.xyz), dt, _landed)};
+		if (!math::isFinite(torque_sp)) {
+			// reset everything if something went wrong
+			torque_sp.zero();
+			_rates_setpoint.zero();
+			_thrust_setpoint.zero();
+			_rate_int.zero();
+		}
 
 		publishTorqueSetpoint(angular_velocity.timestamp_sample, torque_sp);
 		publishRateControllerStatus(angular_velocity.timestamp_sample);
@@ -273,9 +309,9 @@ void MulticopterRateControl::publishRateControllerStatus(const hrt_abstime &time
 {
 	rate_ctrl_status_s rate_ctrl_status;
 	rate_ctrl_status.timestamp_sample  = timestamp_sample;
-	rate_ctrl_status.rollspeed_integ   = _rate_control.getIntegral()(0);
-	rate_ctrl_status.pitchspeed_integ  = _rate_control.getIntegral()(1);
-	rate_ctrl_status.yawspeed_integ    = _rate_control.getIntegral()(2);
+	rate_ctrl_status.rollspeed_integ   = _rate_int(0);
+	rate_ctrl_status.pitchspeed_integ  = _rate_int(1);
+	rate_ctrl_status.yawspeed_integ    = _rate_int(2);
 	rate_ctrl_status.additional_integ1 = 0;
 	rate_ctrl_status.timestamp         = hrt_absolute_time();
 	_controller_status_pub.publish(rate_ctrl_status);

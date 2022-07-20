@@ -33,8 +33,6 @@
 
 #pragma once
 
-#include <RateControl.hpp>
-
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_platform_common/defines.h>
@@ -98,8 +96,6 @@ private:
 
 	void updateActuatorControlsStatus(const actuator_controls_s &actuators, float dt);
 
-	RateControl _rate_control{}; ///< class for rate control calculations
-
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
 	uORB::Subscription _control_allocator_status_sub{ORB_ID(control_allocator_status)};
 	uORB::Subscription _landing_gear_sub{ORB_ID(landing_gear)};
@@ -139,6 +135,20 @@ private:
 	matrix::Vector3f _rates_setpoint{};
 	matrix::Vector3f _thrust_setpoint{};
 
+	// Gains
+	matrix::Vector3f _gain_p; ///< rate control proportional gain for all axes x, y, z
+	matrix::Vector3f _gain_i; ///< rate control integral gain
+	matrix::Vector3f _gain_d; ///< rate control derivative gain
+	matrix::Vector3f _lim_int; ///< integrator term maximum absolute value
+	matrix::Vector3f _gain_ff; ///< direct rate to torque feed forward gain only useful for helicopters
+
+	// States
+	matrix::Vector3f _rate_int{}; ///< integral term of the rate controller
+
+	// Feedback from control allocation
+	matrix::Vector<bool, 3> _control_allocator_saturation_negative;
+	matrix::Vector<bool, 3> _control_allocator_saturation_positive;
+
 	float _battery_status_scale{1.f};
 
 	float _energy_integration_time{0.0f};
@@ -149,36 +159,34 @@ private:
 	perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")}; /**< loop duration performance counter */
 
 	DEFINE_PARAMETERS(
+		(ParamFloat<px4::params::MC_ROLLRATE_K>) _param_mc_rollrate_k,
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,
 		(ParamFloat<px4::params::MC_ROLLRATE_I>) _param_mc_rollrate_i,
-		(ParamFloat<px4::params::MC_RR_INT_LIM>) _param_mc_rr_int_lim,
 		(ParamFloat<px4::params::MC_ROLLRATE_D>) _param_mc_rollrate_d,
 		(ParamFloat<px4::params::MC_ROLLRATE_FF>) _param_mc_rollrate_ff,
-		(ParamFloat<px4::params::MC_ROLLRATE_K>) _param_mc_rollrate_k,
+		(ParamFloat<px4::params::MC_RR_INT_LIM>) _param_mc_rr_int_lim,
 
+		(ParamFloat<px4::params::MC_PITCHRATE_K>) _param_mc_pitchrate_k,
 		(ParamFloat<px4::params::MC_PITCHRATE_P>) _param_mc_pitchrate_p,
 		(ParamFloat<px4::params::MC_PITCHRATE_I>) _param_mc_pitchrate_i,
-		(ParamFloat<px4::params::MC_PR_INT_LIM>) _param_mc_pr_int_lim,
 		(ParamFloat<px4::params::MC_PITCHRATE_D>) _param_mc_pitchrate_d,
 		(ParamFloat<px4::params::MC_PITCHRATE_FF>) _param_mc_pitchrate_ff,
-		(ParamFloat<px4::params::MC_PITCHRATE_K>) _param_mc_pitchrate_k,
+		(ParamFloat<px4::params::MC_PR_INT_LIM>) _param_mc_pr_int_lim,
 
+		(ParamFloat<px4::params::MC_YAWRATE_K>) _param_mc_yawrate_k,
 		(ParamFloat<px4::params::MC_YAWRATE_P>) _param_mc_yawrate_p,
 		(ParamFloat<px4::params::MC_YAWRATE_I>) _param_mc_yawrate_i,
-		(ParamFloat<px4::params::MC_YR_INT_LIM>) _param_mc_yr_int_lim,
 		(ParamFloat<px4::params::MC_YAWRATE_D>) _param_mc_yawrate_d,
+		(ParamFloat<px4::params::MC_YR_INT_LIM>) _param_mc_yr_int_lim,
 		(ParamFloat<px4::params::MC_YAWRATE_FF>) _param_mc_yawrate_ff,
-		(ParamFloat<px4::params::MC_YAWRATE_K>) _param_mc_yawrate_k,
-
-		(ParamFloat<px4::params::MPC_MAN_Y_MAX>) _param_mpc_man_y_max,			/**< scaling factor from stick to yaw rate */
 
 		(ParamFloat<px4::params::MC_ACRO_R_MAX>) _param_mc_acro_r_max,
 		(ParamFloat<px4::params::MC_ACRO_P_MAX>) _param_mc_acro_p_max,
 		(ParamFloat<px4::params::MC_ACRO_Y_MAX>) _param_mc_acro_y_max,
-		(ParamFloat<px4::params::MC_ACRO_EXPO>) _param_mc_acro_expo,			/**< expo stick curve shape (roll & pitch) */
-		(ParamFloat<px4::params::MC_ACRO_EXPO_Y>) _param_mc_acro_expo_y,				/**< expo stick curve shape (yaw) */
-		(ParamFloat<px4::params::MC_ACRO_SUPEXPO>) _param_mc_acro_supexpo,		/**< superexpo stick curve shape (roll & pitch) */
-		(ParamFloat<px4::params::MC_ACRO_SUPEXPOY>) _param_mc_acro_supexpoy,		/**< superexpo stick curve shape (yaw) */
+		(ParamFloat<px4::params::MC_ACRO_EXPO>) _param_mc_acro_expo,
+		(ParamFloat<px4::params::MC_ACRO_EXPO_Y>) _param_mc_acro_expo_y,
+		(ParamFloat<px4::params::MC_ACRO_SUPEXPO>) _param_mc_acro_supexpo,
+		(ParamFloat<px4::params::MC_ACRO_SUPEXPOY>) _param_mc_acro_supexpoy,
 
 		(ParamBool<px4::params::MC_BAT_SCALE_EN>) _param_mc_bat_scale_en
 	)
