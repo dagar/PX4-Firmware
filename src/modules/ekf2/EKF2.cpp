@@ -658,7 +658,7 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 
 void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 {
-	const Quatf q{_ekf.calculate_quaternion()};
+	const Quatf q{_ekf.getQuaternion()};
 	const bool attitude_valid = PX4_ISFINITE(q(0));
 
 	if (attitude_valid) {

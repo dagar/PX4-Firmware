@@ -360,11 +360,7 @@ public:
 
 	// return an array containing the output predictor angular, velocity and position tracking
 	// error magnitudes (rad), (m/sec), (m)
-	const Vector3f &getOutputTrackingError() const { return _output_predictor.output_tracking_error(); }
-
-	// use the latest IMU data at the current time horizon.
-	Quatf calculate_quaternion() const { return _output_predictor.calculate_quaternion(_newest_high_rate_imu_sample, _state, _dt_ekf_avg); }
-
+	const Vector3f getOutputTrackingError() const { return _output_predictor.output_tracking_error(); }
 
 	const matrix::Quatf &getQuaternion() const { return _output_predictor.quat_nominal(); }
 

@@ -106,11 +106,9 @@ bool Ekf::update()
 		runTerrainEstimator();
 
 		updated = true;
-	}
 
-	// the output observer always runs
-	// Use full rate IMU data at the current time horizon
-	_output_predictor.calculateOutputStates(_time_imu_delayed, _newest_high_rate_imu_sample, _state, _dt_ekf_avg, _imu_updated);
+		_output_predictor.correctOutputStates(_time_imu_delayed, _state.quat_nominal, _state.vel, _state.pos, _dt_ekf_avg);
+	}
 
 	return updated;
 }
@@ -224,7 +222,7 @@ bool Ekf::initialiseFilter()
 	_time_last_of_fuse = _time_imu_delayed;
 
 	// reset the output predictor state history to match the EKF initial values
-	_output_predictor.alignOutputFilter(_state);
+	_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
 
 	return true;
 }

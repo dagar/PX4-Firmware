@@ -182,10 +182,6 @@ public:
 
 	int getNumberOfActiveHorizontalAidingSources() const;
 
-
-
-
-
 	// Get the value of magnetic declination in degrees to be saved for use at the next startup
 	// Returns true when the declination can be saved
 	// At the next startup, set param.mag_declination_deg to the value saved
@@ -275,8 +271,6 @@ protected:
 
 	OutputPredictor _output_predictor{};
 
-	imuSample _newest_high_rate_imu_sample{};		// imu sample capturing the newest imu data
-
 	// measurement samples capturing measurements on the delayed time horizon
 	baroSample _baro_sample_delayed{};
 	gpsSample _gps_sample_delayed{};
@@ -320,6 +314,9 @@ protected:
 	float _beta_test_ratio{};		// sideslip innovation consistency check ratio
 	Vector2f _drag_test_ratio{};		// drag innovation consistency check ratio
 	innovation_fault_status_u _innov_check_fail_status{};
+
+	float _yaw_delta_ef{0.0f};		///< Recent change in yaw angle measured about the earth frame D axis (rad)
+	float _yaw_rate_lpf_ef{0.0f};		///< Filtered angular rate about earth frame D axis (rad/sec)
 
 	bool _deadreckon_time_exceeded{true};	// true if the horizontal nav solution has been deadreckoning for too long and is invalid
 

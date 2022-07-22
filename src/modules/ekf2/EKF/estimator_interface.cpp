@@ -72,8 +72,6 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 		_dt_imu_avg = 0.8f * _dt_imu_avg + 0.2f * dt;
 	}
 
-	_newest_high_rate_imu_sample = imu_sample;
-
 	_imu_updated = _imu_down_sampler.update(imu_sample);
 
 	// accumulate and down-sample imu data and push to the buffer when new downsampled data becomes available
@@ -91,6 +89,21 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 
 		setDragData(imu_sample);
 	}
+
+	// the output observer always runs
+	// Use full rate IMU data at the current time horizon
+	_output_predictor.calculateOutputStates(imu_sample.time_us,
+						imu_sample.delta_ang, imu_sample.delta_ang_dt,
+						imu_sample.delta_vel, imu_sample.delta_vel_dt);
+
+	// calculate a yaw change about the earth frame vertical
+	//const float spin_del_ang_D = imu_sample.delta_ang.dot(Vector3f(Dcmf(_state.quat_nominal).row(2)));
+	//_yaw_delta_ef += spin_del_ang_D;
+	_yaw_delta_ef += Vector3f(imu_sample.delta_ang / imu_sample.delta_ang_dt).norm(); // TODO: dagar
+
+	// Calculate filtered yaw rate to be used by the magnetometer fusion type selection logic
+	// Note fixed coefficients are used to save operations. The exact time constant is not important.
+	_yaw_rate_lpf_ef = 0.95f * _yaw_rate_lpf_ef + 0.05f * Vector3f(imu_sample.delta_ang / imu_sample.delta_ang_dt)(2); // TODO: dagar
 }
 
 void EstimatorInterface::setMagData(const magSample &mag_sample)
