@@ -658,13 +658,14 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 
 void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 {
-	if (_ekf.attitude_valid()) {
+	const Quatf q{_ekf.calculate_quaternion()};
+	const bool attitude_valid = PX4_ISFINITE(q(0));
+
+	if (attitude_valid) {
 		// generate vehicle attitude quaternion data
 		vehicle_attitude_s att;
 		att.timestamp_sample = timestamp;
-		const Quatf q{_ekf.calculate_quaternion()};
 		q.copyTo(att.q);
-
 		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
 		att.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 		_attitude_pub.publish(att);

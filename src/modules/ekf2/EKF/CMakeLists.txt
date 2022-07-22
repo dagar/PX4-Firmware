@@ -59,6 +59,8 @@ add_library(ecl_EKF
 	vel_pos_fusion.cpp
 	zero_innovation_heading_update.cpp
 	zero_velocity_update.cpp
+
+	output_predictor.cpp
 )
 
 add_dependencies(ecl_EKF prebuild_targets)

@@ -236,19 +236,21 @@ void Ekf::checkYawAngleObservability()
 
 void Ekf::checkMagBiasObservability()
 {
+	const float yaw_delta_ef = _output_predictor.getYawDeltaEf();
+	const float yaw_rate_lpf_ef = _output_predictor.getYawRateLpf();
+
 	// check if there is enough yaw rotation to make the mag bias states observable
-	if (!_mag_bias_observable && (fabsf(_yaw_rate_lpf_ef) > _params.mag_yaw_rate_gate)) {
+	if (!_mag_bias_observable && (fabsf(yaw_rate_lpf_ef) > _params.mag_yaw_rate_gate)) {
 		// initial yaw motion is detected
 		_mag_bias_observable = true;
 
 	} else if (_mag_bias_observable) {
 		// require sustained yaw motion of 50% the initial yaw rate threshold
 		const float yaw_dt = 1e-6f * (float)(_time_imu_delayed - _time_yaw_started);
-		const float min_yaw_change_req =  0.5f * _params.mag_yaw_rate_gate * yaw_dt;
-		_mag_bias_observable = fabsf(_yaw_delta_ef) > min_yaw_change_req;
+		const float min_yaw_change_req = 0.5f * _params.mag_yaw_rate_gate * yaw_dt;
+		_mag_bias_observable = fabsf(yaw_delta_ef) > min_yaw_change_req;
 	}
 
-	_yaw_delta_ef = 0.0f;
 	_time_yaw_started = _time_imu_delayed;
 }
 

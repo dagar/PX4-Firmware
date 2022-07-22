@@ -203,10 +203,6 @@ public:
 
 	Vector3f getPositionVariance() const { return P.slice<3, 3>(7, 7).diag(); }
 
-	// return an array containing the output predictor angular, velocity and position tracking
-	// error magnitudes (rad), (m/sec), (m)
-	const Vector3f &getOutputTrackingError() const { return _output_tracking_error; }
-
 	// First argument returns GPS drift  metrics in the following array locations
 	// 0 : Horizontal position drift rate (m/s)
 	// 1 : Vertical position drift rate (m/s)
@@ -326,9 +322,6 @@ public:
 	// return the quaternion defining the rotation from the External Vision to the EKF reference frame
 	matrix::Quatf getVisionAlignmentQuaternion() const { return Quatf(_R_ev_to_ekf); };
 
-	// use the latest IMU data at the current time horizon.
-	Quatf calculate_quaternion() const;
-
 	// set minimum continuous period without GPS fail required to mark a healthy GPS status
 	void set_min_required_gps_health_time(uint32_t time_us) { _min_gps_health_time_us = time_us; }
 
@@ -356,6 +349,43 @@ public:
 
 	const auto &aid_src_gnss_vel() const { return _aid_src_gnss_vel; }
 	const auto &aid_src_gnss_pos() const { return _aid_src_gnss_pos; }
+
+
+
+
+
+
+	// output predictor
+
+
+	// return an array containing the output predictor angular, velocity and position tracking
+	// error magnitudes (rad), (m/sec), (m)
+	const Vector3f &getOutputTrackingError() const { return _output_predictor.output_tracking_error(); }
+
+	// use the latest IMU data at the current time horizon.
+	Quatf calculate_quaternion() const { return _output_predictor.calculate_quaternion(_newest_high_rate_imu_sample, _state, _dt_ekf_avg); }
+
+
+	const matrix::Quatf &getQuaternion() const { return _output_predictor.quat_nominal(); }
+
+	// get the velocity of the body frame origin in local NED earth frame
+	Vector3f getVelocity() const { return _output_predictor.velocity(); }
+
+	// get the velocity derivative in earth frame
+	const Vector3f &getVelocityDerivative() const { return _output_predictor.velocity_derivative(); }
+
+	// get the derivative of the vertical position of the body frame origin in local NED earth frame
+	float getVerticalPositionDerivative() const { return _output_predictor.vertical_position_derivative(); }
+
+	// get the position of the body frame origin in local earth frame
+	Vector3f getPosition() const { return _output_predictor.position(); }
+
+
+
+
+
+
+
 
 private:
 
@@ -435,8 +465,6 @@ private:
 
 	// used by magnetometer fusion mode selection
 	Vector2f _accel_lpf_NE{};			///< Low pass filtered horizontal earth frame acceleration (m/sec**2)
-	float _yaw_delta_ef{0.0f};		///< Recent change in yaw angle measured about the earth frame D axis (rad)
-	float _yaw_rate_lpf_ef{0.0f};		///< Filtered angular rate about earth frame D axis (rad/sec)
 	bool _mag_bias_observable{false};	///< true when there is enough rotation to make magnetometer bias errors observable
 	bool _yaw_angle_observable{false};	///< true when there is enough horizontal acceleration to make yaw observable
 	uint64_t _time_yaw_started{0};		///< last system time in usec that a yaw rotation manoeuvre was detected
@@ -506,12 +534,6 @@ private:
 
 	estimator_aid_source_3d_s _aid_src_gnss_vel{};
 	estimator_aid_source_3d_s _aid_src_gnss_pos{};
-
-	// output predictor states
-	Vector3f _delta_angle_corr{};	///< delta angle correction vector (rad)
-	Vector3f _vel_err_integ{};	///< integral of velocity tracking error (m)
-	Vector3f _pos_err_integ{};	///< integral of position tracking error (m.s)
-	Vector3f _output_tracking_error{}; ///< contains the magnitude of the angle, velocity and position track errors (rad, m/s, m)
 
 	// variables used for the GPS quality checks
 	Vector3f _gps_pos_deriv_filt{};	///< GPS NED position derivative (m/sec)
@@ -585,12 +607,6 @@ private:
 	bool _is_range_aid_suitable{false};	///< true when range finder can be used in flight as the height reference instead of the primary height sensor
 
 	float _height_rate_lpf{0.0f};
-
-	// update the real time complementary filter states. This includes the prediction
-	// and the correction step
-	void calculateOutputStates(const imuSample &imu);
-	void applyCorrectionToVerticalOutputBuffer(float vert_vel_correction);
-	void applyCorrectionToOutputBuffer(const Vector3f &vel_correction, const Vector3f &pos_correction);
 
 	// initialise filter states of both the delayed ekf and the real time complementary filter
 	bool initialiseFilter(void);
@@ -734,9 +750,6 @@ private:
 
 	// Return the magnetic declination in radians to be used by the alignment and fusion processing
 	float getMagDeclination();
-
-	// modify output filter to match the the EKF state at the fusion time horizon
-	void alignOutputFilter();
 
 	// update the rotation matrix which transforms EV navigation frame measurements into NED
 	void calcExtVisRotMat();

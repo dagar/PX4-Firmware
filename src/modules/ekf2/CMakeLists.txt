@@ -75,6 +75,8 @@ px4_add_module(
 		EKF/zero_innovation_heading_update.cpp
 		EKF/zero_velocity_update.cpp
 
+		EKF/output_predictor.cpp
+
 		EKF2.cpp
 		EKF2.hpp
 		EKF2Selector.cpp

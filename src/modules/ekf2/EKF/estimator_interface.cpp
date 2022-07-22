@@ -530,8 +530,7 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 
 	ECL_DEBUG("EKF max time delay %.1f ms, OBS length %d\n", (double)ekf_delay_ms, _obs_buffer_length);
 
-	if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_buffer.allocate(_imu_buffer_length)
-	    || !_output_vert_buffer.allocate(_imu_buffer_length)) {
+	if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_predictor.reset(_imu_buffer_length)) {
 
 		printBufferAllocationFailed("IMU and output");
 		return false;
@@ -622,7 +621,4 @@ void EstimatorInterface::print_status()
 	if (_drag_buffer) {
 		printf("drag buffer: %d/%d (%d Bytes)\n", _drag_buffer->entries(), _drag_buffer->get_length(), _drag_buffer->get_total_size());
 	}
-
-	printf("output buffer: %d/%d (%d Bytes)\n", _output_buffer.entries(), _output_buffer.get_length(), _output_buffer.get_total_size());
-	printf("output vert buffer: %d/%d (%d Bytes)\n", _output_vert_buffer.entries(), _output_vert_buffer.get_length(), _output_vert_buffer.get_total_size());
 }
