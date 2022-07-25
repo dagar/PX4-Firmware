@@ -126,7 +126,7 @@ TEST_F(EkfExternalVisionTest, visionVelocityReset)
 
 	// THEN: a reset to Vision velocity should be done
 	// Note: velocity will drift after reset due to INAV errors so the tolerance needs to allow for this
-	const Vector3f estimated_velocity = _ekf->getVelocity();
+	const Vector3f estimated_velocity = _ekf->getState().vel;
 	EXPECT_TRUE(isEqual(estimated_velocity, simulated_velocity, 0.01f));
 
 	// AND: the reset in velocity should be saved correctly
@@ -159,7 +159,7 @@ TEST_F(EkfExternalVisionTest, visionVelocityResetWithAlignment)
 	_sensor_simulator.runMicroseconds(2e5);
 
 	// THEN: a reset to Vision velocity should be done
-	const Vector3f estimated_velocity_in_ekf_frame = _ekf->getVelocity();
+	const Vector3f estimated_velocity_in_ekf_frame = _ekf->getState().vel;
 	EXPECT_TRUE(isEqual(estimated_velocity_in_ekf_frame, simulated_velocity_in_ekf_frame, 0.01f));
 	// And: the frame offset should be estimated correctly
 	Quatf estimatedExternalVisionFrameOffset = _ekf->getVisionAlignmentQuaternion();
@@ -184,7 +184,7 @@ TEST_F(EkfExternalVisionTest, visionHorizontalPositionReset)
 	_sensor_simulator.runMicroseconds(2e5);
 
 	// THEN: a reset to Vision velocity should be done
-	const Vector3f estimated_position = _ekf->getPosition();
+	const Vector3f estimated_position = _ekf->getState().pos;
 	EXPECT_TRUE(isEqual(estimated_position, simulated_position, 1e-5f));
 }
 
@@ -208,7 +208,7 @@ TEST_F(EkfExternalVisionTest, visionHorizontalPositionResetWithAlignment)
 	_sensor_simulator.runMicroseconds(2e5);
 
 	// THEN: a reset to Vision velocity should be done
-	const Vector3f estimated_position_in_ekf_frame = _ekf->getPosition();
+	const Vector3f estimated_position_in_ekf_frame = _ekf->getState().pos;
 	EXPECT_TRUE(isEqual(estimated_position_in_ekf_frame, simulated_position_in_ekf_frame, 1e-2f));
 }
 
@@ -293,7 +293,7 @@ TEST_F(EkfExternalVisionTest, velocityFrameBody)
 	const Vector3f velVar_new = _ekf->getVelocityVariance();
 	EXPECT_NEAR(velVar_new(1) / velVar_new(0), 40.f, 15.f);
 
-	const Vector3f vel_earth_est = _ekf->getVelocity();
+	const Vector3f vel_earth_est = _ekf->getState().vel;
 	EXPECT_NEAR(vel_earth_est(0), 0.0f, 0.1f);
 	EXPECT_NEAR(vel_earth_est(1), 1.0f, 0.1f);
 }
@@ -330,7 +330,7 @@ TEST_F(EkfExternalVisionTest, velocityFrameLocal)
 	const Vector3f velVar_new = _ekf->getVelocityVariance();
 	EXPECT_NEAR(velVar_new(0) / velVar_new(1), 40.f, 15.f);
 
-	const Vector3f vel_earth_est = _ekf->getVelocity();
+	const Vector3f vel_earth_est = _ekf->getState().vel;
 	EXPECT_NEAR(vel_earth_est(0), 1.0f, 0.1f);
 	EXPECT_NEAR(vel_earth_est(1), 0.0f, 0.1f);
 }
@@ -361,7 +361,7 @@ TEST_F(EkfExternalVisionTest, positionFrameLocal)
 
 	// THEN: the fusions should start and the position should not drift
 	EXPECT_TRUE(_ekf_wrapper.isIntendingExternalVisionHeadingFusion());
-	Vector3f pos_earth_est = _ekf->getPosition();
+	Vector3f pos_earth_est = _ekf->getState().pos;
 	EXPECT_NEAR(pos_earth_est(0), pos_earth(0), 0.01f);
 	EXPECT_NEAR(pos_earth_est(1), pos_earth(1), 0.01f);
 
@@ -374,7 +374,7 @@ TEST_F(EkfExternalVisionTest, positionFrameLocal)
 	// THEN: the position should converge to the EV position
 	// Note that the estimate is now in the EV frame because it is
 	// the reference frame
-	pos_earth_est = _ekf->getPosition();
+	pos_earth_est = _ekf->getState().pos;
 	EXPECT_NEAR(pos_earth_est(0), pos_earth(0), 0.1f);
 	EXPECT_NEAR(pos_earth_est(1), pos_earth(1), 0.1f);
 }

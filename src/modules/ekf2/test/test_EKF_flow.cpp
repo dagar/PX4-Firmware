@@ -139,7 +139,7 @@ TEST_F(EkfFlowTest, resetToFlowVelocityInAir)
 	_sensor_simulator.runTrajectorySeconds(0.14);
 
 	// THEN: estimated velocity should match simulated velocity
-	const Vector3f estimated_velocity = _ekf->getVelocity();
+	const Vector3f estimated_velocity = _ekf->getState().vel;
 	EXPECT_TRUE(isEqual(estimated_velocity, simulated_velocity))
 			<< "estimated vel = " << estimated_velocity(0) << ", "
 			<< estimated_velocity(1);
@@ -171,7 +171,7 @@ TEST_F(EkfFlowTest, resetToFlowVelocityOnGround)
 	_sensor_simulator.runSeconds(1.0);
 
 	// THEN: estimated velocity should match simulated velocity
-	const Vector2f estimated_horz_velocity = Vector2f(_ekf->getVelocity());
+	const Vector2f estimated_horz_velocity = Vector2f(_ekf->getState().vel);
 	EXPECT_TRUE(isEqual(estimated_horz_velocity, Vector2f(0.f, 0.f)))
 			<< estimated_horz_velocity(0) << ", " << estimated_horz_velocity(1);
 
@@ -207,7 +207,7 @@ TEST_F(EkfFlowTest, inAirConvergence)
 	_sensor_simulator.runTrajectorySeconds(0.14);
 
 	// THEN: estimated velocity should match simulated velocity
-	Vector3f estimated_velocity = _ekf->getVelocity();
+	Vector3f estimated_velocity = _ekf->getState().vel;
 	EXPECT_TRUE(isEqual(estimated_velocity, simulated_velocity))
 			<< "estimated vel = " << estimated_velocity(0) << ", "
 			<< estimated_velocity(1);
@@ -219,7 +219,7 @@ TEST_F(EkfFlowTest, inAirConvergence)
 
 	// THEN: estimated velocity should converge to the simulated velocity
 	// This takes a bit of time because the data is inconsistent with IMU measurements
-	estimated_velocity = _ekf->getVelocity();
+	estimated_velocity = _ekf->getState().vel;
 	EXPECT_NEAR(estimated_velocity(0), simulated_velocity(0), 0.05f)
 			<< "estimated vel = " << estimated_velocity(0);
 	EXPECT_NEAR(estimated_velocity(1), simulated_velocity(1), 0.05f)
@@ -256,7 +256,7 @@ TEST_F(EkfFlowTest, yawMotionCorrectionWithAutopilotGyroData)
 
 	// THEN: the flow due to the yaw rotation and the offsets is canceled
 	// and the velocity estimate stays 0
-	const Vector2f estimated_horz_velocity = Vector2f(_ekf->getVelocity());
+	const Vector2f estimated_horz_velocity = Vector2f(_ekf->getState().vel);
 	EXPECT_NEAR(estimated_horz_velocity(0), 0.f, 0.01f)
 			<< "estimated vel = " << estimated_horz_velocity(0);
 	EXPECT_NEAR(estimated_horz_velocity(1), 0.f, 0.01f)
@@ -294,7 +294,7 @@ TEST_F(EkfFlowTest, yawMotionCorrectionWithFlowGyroData)
 
 	// THEN: the flow due to the yaw rotation and the offsets is canceled
 	// and the velocity estimate stays 0
-	const Vector2f estimated_horz_velocity = Vector2f(_ekf->getVelocity());
+	const Vector2f estimated_horz_velocity = Vector2f(_ekf->getState().vel);
 	EXPECT_NEAR(estimated_horz_velocity(0), 0.f, 0.01f)
 			<< "estimated vel = " << estimated_horz_velocity(0);
 	EXPECT_NEAR(estimated_horz_velocity(1), 0.f, 0.01f)

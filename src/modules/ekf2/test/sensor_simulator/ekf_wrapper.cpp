@@ -211,12 +211,12 @@ bool EkfWrapper::isIntendingTerrainFlowFusion() const
 
 Eulerf EkfWrapper::getEulerAngles() const
 {
-	return Eulerf(_ekf->getQuaternion());
+	return Eulerf(_ekf->getState().quat_nominal);
 }
 
 float EkfWrapper::getYawAngle() const
 {
-	const Eulerf euler(_ekf->getQuaternion());
+	const Eulerf euler(_ekf->getState().quat_nominal);
 	return euler(2);
 }
 

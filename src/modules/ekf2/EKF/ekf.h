@@ -142,6 +142,8 @@ public:
 	// get the state vector at the delayed time horizon
 	matrix::Vector<float, 24> getStateAtFusionHorizonAsVector() const;
 
+	const stateSample& getState() const { return _state; }
+
 	// get the wind velocity in m/s
 	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
 
@@ -349,39 +351,6 @@ public:
 
 	const auto &aid_src_gnss_vel() const { return _aid_src_gnss_vel; }
 	const auto &aid_src_gnss_pos() const { return _aid_src_gnss_pos; }
-
-
-
-
-
-
-	// output predictor
-
-
-	// return an array containing the output predictor angular, velocity and position tracking
-	// error magnitudes (rad), (m/sec), (m)
-	const Vector3f getOutputTrackingError() const { return _output_predictor.output_tracking_error(); }
-
-	const matrix::Quatf &getQuaternion() const { return _output_predictor.quat_nominal(); }
-
-	// get the velocity of the body frame origin in local NED earth frame
-	Vector3f getVelocity() const { return _output_predictor.velocity(); }
-
-	// get the velocity derivative in earth frame
-	const Vector3f &getVelocityDerivative() const { return _output_predictor.velocity_derivative(); }
-
-	// get the derivative of the vertical position of the body frame origin in local NED earth frame
-	float getVerticalPositionDerivative() const { return _output_predictor.vertical_position_derivative(); }
-
-	// get the position of the body frame origin in local earth frame
-	Vector3f getPosition() const { return _output_predictor.position(); }
-
-
-
-
-
-
-
 
 private:
 
@@ -825,7 +794,7 @@ private:
 	// and a scalar innovation value
 	void fuse(const Vector24f &K, float innovation);
 
-	float compensateBaroForDynamicPressure(float baro_alt_uncompensated) const override;
+	float compensateBaroForDynamicPressure(float baro_alt_uncompensated) const;
 
 	// calculate the earth rotation vector from a given latitude
 	Vector3f calcEarthRateNED(float lat_rad) const;

@@ -35,7 +35,7 @@ public:
 				   const matrix::Vector3f &delta_vel, const float delta_vel_dt);
 
 	void correctOutputStates(const uint64_t &time_imu_delayed, const matrix::Quatf &quat_delayed,
-				 const matrix::Vector3f &velocity_delayed, const matrix::Vector3f &position_delayed, const float dt_ekf_avg);
+				 const matrix::Vector3f &velocity_delayed, const matrix::Vector3f &position_delayed);
 
 	void resetHorizontalVelocity(const matrix::Vector2f &delta_horz_vel);
 	void resetVerticalVelocity(const float delta_vert_vel);
@@ -122,7 +122,9 @@ private:
 	matrix::Vector3f _gyro_bias{};
 
 	uint64_t _time_newest_imu_sample{0};
-	float _dt_imu_avg{0.005f};	// average imu update period in s
+	uint64_t _time_delayed_imu_sample{0};
+	float _dt_imu_avg{0.005f};	// average IMU update period in s
+	float _dt_ekf_avg{0.010f};	// average EKF update period in s
 
 	RingBuffer<outputSample> _output_buffer{24};
 	RingBuffer<outputVert> _output_vert_buffer{24};

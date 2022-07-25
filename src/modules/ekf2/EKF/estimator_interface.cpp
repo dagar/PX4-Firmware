@@ -90,12 +90,6 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 		setDragData(imu_sample);
 	}
 
-	// the output observer always runs
-	// Use full rate IMU data at the current time horizon
-	_output_predictor.calculateOutputStates(imu_sample.time_us,
-						imu_sample.delta_ang, imu_sample.delta_ang_dt,
-						imu_sample.delta_vel, imu_sample.delta_vel_dt);
-
 	// calculate a yaw change about the earth frame vertical
 	//const float spin_del_ang_D = imu_sample.delta_ang.dot(Vector3f(Dcmf(_state.quat_nominal).row(2)));
 	//_yaw_delta_ef += spin_del_ang_D;
@@ -239,7 +233,7 @@ void EstimatorInterface::setBaroData(const baroSample &baro_sample)
 
 		baroSample baro_sample_new;
 		baro_sample_new.time_us = time_us;
-		baro_sample_new.hgt = compensateBaroForDynamicPressure(baro_sample.hgt);
+		baro_sample_new.hgt = baro_sample.hgt;
 
 		_baro_buffer->push(baro_sample_new);
 		_time_last_baro_buffer_push = _time_newest_imu_sample;
@@ -543,7 +537,8 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 
 	ECL_DEBUG("EKF max time delay %.1f ms, OBS length %d\n", (double)ekf_delay_ms, _obs_buffer_length);
 
-	if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_predictor.reset(_imu_buffer_length)) {
+	//if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_predictor.reset(_imu_buffer_length)) { // TODO: dagar
+	if (!_imu_buffer.allocate(_imu_buffer_length)) {
 
 		printBufferAllocationFailed("IMU and output");
 		return false;

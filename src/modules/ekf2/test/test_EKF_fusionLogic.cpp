@@ -141,16 +141,16 @@ TEST_F(EkfFusionLogicTest, rejectGpsSignalJump)
 	EXPECT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
 
 	// WHEN: Having a big horizontal position Gps jump coming from the Gps Receiver
-	const Vector3f pos_old = _ekf->getPosition();
-	const Vector3f vel_old = _ekf->getVelocity();
+	const Vector3f pos_old = _ekf->getState().pos;
+	const Vector3f vel_old = _ekf->getState().vel;
 	const Vector3f accel_bias_old = _ekf->getAccelBias();
 	const Vector3f pos_step{20.0f, 0.0f, 0.f};
 	_sensor_simulator._gps.stepHorizontalPositionByMeters(Vector2f(pos_step));
 	_sensor_simulator.runSeconds(2);
 
 	// THEN: The estimate should not change much in the short run
-	Vector3f pos_new = _ekf->getPosition();
-	Vector3f vel_new = _ekf->getVelocity();
+	Vector3f pos_new = _ekf->getState().pos;
+	Vector3f vel_new = _ekf->getState().vel;
 	Vector3f accel_bias_new = _ekf->getAccelBias();
 	EXPECT_TRUE(matrix::isEqual(pos_new, pos_old, 0.01f));
 	EXPECT_TRUE(matrix::isEqual(vel_new, vel_old, 0.01f));
@@ -159,8 +159,8 @@ TEST_F(EkfFusionLogicTest, rejectGpsSignalJump)
 	// BUT THEN: GPS fusion should reset after a while
 	// (it takes some time because vel fusion is still good)
 	_sensor_simulator.runSeconds(14);
-	pos_new = _ekf->getPosition();
-	vel_new = _ekf->getVelocity();
+	pos_new = _ekf->getState().pos;
+	vel_new = _ekf->getState().vel;
 	accel_bias_new = _ekf->getAccelBias();
 	EXPECT_TRUE(matrix::isEqual(pos_new, pos_old + pos_step, 0.01f));
 	EXPECT_TRUE(matrix::isEqual(vel_new, vel_old, 0.01f));

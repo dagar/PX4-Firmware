@@ -143,12 +143,19 @@ void OutputPredictor::calculateOutputStates(const uint64_t &time_us, const matri
 }
 
 void OutputPredictor::correctOutputStates(const uint64_t &time_imu_delayed, const matrix::Quatf &quat_delayed,
-		const matrix::Vector3f &velocity_delayed, const matrix::Vector3f &position_delayed, const float dt_ekf_avg)
+		const matrix::Vector3f &velocity_delayed, const matrix::Vector3f &position_delayed)
 {
 	// get the oldest INS state data from the ring buffer
 	// this data will be at the EKF fusion time horizon
 	// TODO: there is no guarantee that data is at delayed fusion horizon
 	//       Shouldnt we use pop_first_older_than?
+
+	const float dt = math::constrain((time_imu_delayed - _time_delayed_imu_sample) / 1e6f, 0.0001f, 0.02f);
+	_time_delayed_imu_sample = time_imu_delayed;
+
+	if (_time_delayed_imu_sample > 0) {
+		_dt_ekf_avg = 0.8f * _dt_ekf_avg + 0.2f * dt;
+	}
 
 	outputSample output_delayed;
 
@@ -189,8 +196,8 @@ void OutputPredictor::correctOutputStates(const uint64_t &time_imu_delayed, cons
 	 */
 
 	// Complementary filter gains
-	const float vel_gain = dt_ekf_avg / math::constrain(_vel_Tau, dt_ekf_avg, 10.0f);
-	const float pos_gain = dt_ekf_avg / math::constrain(_pos_Tau, dt_ekf_avg, 10.0f);
+	const float vel_gain = _dt_ekf_avg / math::constrain(_vel_Tau, _dt_ekf_avg, 10.f);
+	const float pos_gain = _dt_ekf_avg / math::constrain(_pos_Tau, _dt_ekf_avg, 10.f);
 
 	// calculate down velocity and position tracking errors
 	const float vert_vel_err = (velocity_delayed(2) - output_vert_delayed.vert_vel);

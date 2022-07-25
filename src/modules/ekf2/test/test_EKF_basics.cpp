@@ -133,8 +133,8 @@ TEST_F(EkfBasicsTest, convergesToZero)
 	// GIVEN: initialized EKF with default IMU, baro and mag input
 	_sensor_simulator.runSeconds(4);
 
-	const Vector3f pos = _ekf->getPosition();
-	const Vector3f vel = _ekf->getVelocity();
+	const Vector3f pos = _ekf->getState().pos;
+	const Vector3f vel = _ekf->getState().vel;
 	const Vector3f accel_bias = _ekf->getAccelBias();
 	const Vector3f gyro_bias = _ekf->getGyroBias();
 	const Vector3f ref{0.0f, 0.0f, 0.0f};
@@ -193,8 +193,8 @@ TEST_F(EkfBasicsTest, accelBiasEstimation)
 	_ekf->set_min_required_gps_health_time(1e6);
 	_sensor_simulator.runSeconds(30);
 
-	const Vector3f pos = _ekf->getPosition();
-	const Vector3f vel = _ekf->getVelocity();
+	const Vector3f pos = _ekf->getState().pos;
+	const Vector3f vel = _ekf->getState().vel;
 	const Vector3f accel_bias = _ekf->getAccelBias();
 	const Vector3f gyro_bias = _ekf->getGyroBias();
 	const Vector3f zero = {0.0f, 0.0f, 0.0f};

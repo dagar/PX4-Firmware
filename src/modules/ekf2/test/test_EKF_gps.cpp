@@ -115,7 +115,7 @@ TEST_F(EkfGpsTest, resetToGpsVelocity)
 	_sensor_simulator.runMicroseconds(dt_us);
 
 	// THEN: a reset to GPS velocity should be done
-	const Vector3f estimated_velocity = _ekf->getVelocity();
+	const Vector3f estimated_velocity = _ekf->getState().vel;
 	EXPECT_NEAR(estimated_velocity(0), simulated_velocity(0), 1e-3f);
 	EXPECT_NEAR(estimated_velocity(1), simulated_velocity(1), 1e-3f);
 	EXPECT_NEAR(estimated_velocity(2), simulated_velocity(2), 1e-3f);
@@ -131,7 +131,7 @@ TEST_F(EkfGpsTest, resetToGpsPosition)
 {
 	// GIVEN:EKF that fuses GPS
 	// and has gps checks already passed
-	const Vector3f previous_position = _ekf->getPosition();
+	const Vector3f previous_position = _ekf->getState().pos;
 
 	// WHEN: stopping GPS fusion
 	_sensor_simulator.stopGps();
@@ -145,7 +145,7 @@ TEST_F(EkfGpsTest, resetToGpsPosition)
 	_sensor_simulator.runMicroseconds(1e5);
 
 	// THEN: a reset to the new GPS position should be done
-	const Vector3f estimated_position = _ekf->getPosition();
+	const Vector3f estimated_position = _ekf->getState().pos;
 	EXPECT_TRUE(isEqual(estimated_position,
 			    previous_position + simulated_position_change, 1e-2f));
 }

@@ -106,8 +106,6 @@ bool Ekf::update()
 		runTerrainEstimator();
 
 		updated = true;
-
-		_output_predictor.correctOutputStates(_time_imu_delayed, _state.quat_nominal, _state.vel, _state.pos, _dt_ekf_avg);
 	}
 
 	return updated;
@@ -220,9 +218,6 @@ bool Ekf::initialiseFilter()
 	_time_last_hagl_fuse = _time_imu_delayed;
 	_time_last_flow_terrain_fuse = _time_imu_delayed;
 	_time_last_of_fuse = _time_imu_delayed;
-
-	// reset the output predictor state history to match the EKF initial values
-	_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
 
 	return true;
 }

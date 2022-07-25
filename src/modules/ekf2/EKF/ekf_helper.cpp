@@ -518,10 +518,18 @@ float Ekf::compensateBaroForDynamicPressure(const float baro_alt_uncompensated) 
 	// calculate static pressure error = Pmeas - Ptruth
 	// model position error sensitivity as a body fixed ellipse with a different scale in the positive and
 	// negative X and Y directions. Used to correct baro data for positional errors
-	const matrix::Dcmf R_to_body(_output_predictor.quat_nominal().inversed());
+	const matrix::Dcmf R_to_body(_state.quat_nominal.inversed());
 
 	// Calculate airspeed in body frame
-	const Vector3f velocity_earth = _output_predictor.velocity();
+
+
+	// calculate the velocity of the IMU relative to the body origin
+	const Vector3f vel_imu_rel_body = _ang_rate_delayed_raw % _params.imu_pos_body;
+
+	// rotate the relative velocity into earth frame
+	const Vector3f vel_imu_rel_body_ned = Dcmf{_state.quat_nominal} * vel_imu_rel_body;
+
+	const Vector3f velocity_earth = _state.vel - vel_imu_rel_body_ned;
 
 	const Vector3f wind_velocity_earth(_state.wind_vel(0), _state.wind_vel(1), 0.0f);
 

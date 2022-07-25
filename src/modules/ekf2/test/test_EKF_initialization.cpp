@@ -65,7 +65,7 @@ public:
 
 	void initializedOrienationIsMatchingGroundTruth(Quatf true_quaternion)
 	{
-		const Quatf quat_est = _ekf->getQuaternion();
+		const Quatf quat_est = _ekf->getState().quat_nominal;
 		const float precision = 0.0002f; // TODO: this is only required for the pitch90 test to pass
 		EXPECT_TRUE(matrix::isEqual(quat_est, true_quaternion, precision))
 				<< "quat est = " << quat_est(0) << ", " << quat_est(1) << ", "
@@ -92,8 +92,8 @@ public:
 
 	void velocityAndPositionCloseToZero()
 	{
-		const Vector3f pos = _ekf->getPosition();
-		const Vector3f vel = _ekf->getVelocity();
+		const Vector3f pos = _ekf->getState().pos;
+		const Vector3f vel = _ekf->getState().vel;
 
 		EXPECT_TRUE(matrix::isEqual(pos, Vector3f{}, 0.002f))
 				<< "pos = " << pos(0) << ", " << pos(1) << ", " << pos(2);
@@ -119,7 +119,7 @@ public:
 
 	void learningCorrectAccelBias()
 	{
-		const Dcmf R_to_earth = Dcmf(_ekf->getQuaternion());
+		const Dcmf R_to_earth = Dcmf(_ekf->getState().quat_nominal);
 		const Vector3f dvel_bias_var = _ekf_wrapper.getDeltaVelBiasVariance();
 		const Vector3f accel_bias = _ekf->getAccelBias();
 

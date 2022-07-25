@@ -505,6 +505,14 @@ void EKF2::Run()
 
 		// push imu data into estimator
 		_ekf.setIMUData(imu_sample_new);
+
+
+		// the output observer always runs
+		// Use full rate IMU data at the current time horizon
+		_output_predictor.calculateOutputStates(imu_sample_new.time_us,
+							imu_sample_new.delta_ang, imu_sample_new.delta_ang_dt,
+							imu_sample_new.delta_vel, imu_sample_new.delta_vel_dt);
+
 		PublishAttitude(now); // publish attitude immediately (uses quaternion from output predictor)
 
 		// integrate time to monitor time slippage
@@ -591,6 +599,48 @@ void EKF2::Run()
 		const hrt_abstime ekf_update_start = hrt_absolute_time();
 
 		if (_ekf.update()) {
+
+			if (!_output_predictor_aligned) {
+				// reset the output predictor state history to match the EKF initial values
+				_output_predictor.alignOutputFilter(_ekf.getState().quat_nominal, _ekf.getState().vel, _ekf.getState().pos);
+				_output_predictor_aligned = true;
+			}
+
+			_output_predictor.correctOutputStates(_ekf.get_imu_sample_delayed().time_us, _ekf.getState().quat_nominal, _ekf.getState().vel, _ekf.getState().pos);
+
+
+			if (_ekf.get_posNE_reset_count() != _xy_reset_counter) {
+				_xy_reset_counter = _ekf.get_posNE_reset_count();
+			}
+
+			if (_ekf.get_posD_reset_count() != _z_reset_counter) {
+				_z_reset_counter = _ekf.get_posD_reset_count();
+			}
+
+			if (_ekf.get_velNE_reset_count() != _vxy_reset_counter) {
+				_vxy_reset_counter = _ekf.get_velNE_reset_count();
+			}
+
+			if (_ekf.get_velD_reset_count() != _vz_reset_counter) {
+				_vz_reset_counter = _ekf.get_velD_reset_count();
+			}
+
+			// _output_predictor.resetQuatState(_state_reset_status.quat_change);
+
+			// _output_predictor.resetHorizontalVelocity(delta_horz_vel);
+			// _output_predictor.resetVerticalVelocity(delta_vert_vel);
+			// _output_predictor.resetHorizontalPosition(delta_horz_pos);
+			// _output_predictor.resetVerticalPosition(_state_reset_status.posD_change);
+
+			// // add the reset amount to the output observer vertical position state
+			// _output_predictor.resetVerticalVelocityIntegrator(_state.pos(2));
+
+			// get state reset information of position and velocity
+			_ekf.get_posD_reset(&lpos.delta_z, &lpos.z_reset_counter);
+			_ekf.get_velD_reset(&lpos.delta_vz, &lpos.vz_reset_counter);
+			_ekf.get_posNE_reset(&lpos.delta_xy[0], &lpos.xy_reset_counter);
+			_ekf.get_velNE_reset(&lpos.delta_vxy[0], &lpos.vxy_reset_counter);
+
 			perf_set_elapsed(_ecl_ekf_update_full_perf, hrt_elapsed_time(&ekf_update_start));
 
 			PublishLocalPosition(now);
@@ -658,7 +708,7 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 
 void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 {
-	const Quatf q{_ekf.getQuaternion()};
+	const Quatf q{_output_predictor.quat_nominal()};
 	const bool attitude_valid = PX4_ISFINITE(q(0));
 
 	if (attitude_valid) {
@@ -776,7 +826,7 @@ void EKF2::PublishEventFlags(const hrt_abstime &timestamp)
 void EKF2::PublishGlobalPosition(const hrt_abstime &timestamp)
 {
 	if (_ekf.global_position_is_valid()) {
-		const Vector3f position{_ekf.getPosition()};
+		const Vector3f position{_output_predictor.position()};
 
 		// generate and publish global position data
 		vehicle_global_position_s global_pos;
@@ -954,22 +1004,22 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 	lpos.timestamp_sample = timestamp;
 
 	// Position of body origin in local NED frame
-	const Vector3f position{_ekf.getPosition()};
+	const Vector3f position{_output_predictor.position()};
 	lpos.x = position(0);
 	lpos.y = position(1);
 	lpos.z = position(2);
 
 	// Velocity of body origin in local NED frame (m/s)
-	const Vector3f velocity{_ekf.getVelocity()};
+	const Vector3f velocity{_ekf.getState().vel};
 	lpos.vx = velocity(0);
 	lpos.vy = velocity(1);
 	lpos.vz = velocity(2);
 
 	// vertical position time derivative (m/s)
-	lpos.z_deriv = _ekf.getVerticalPositionDerivative();
+	lpos.z_deriv = _output_predictor.vertical_position_derivative();
 
 	// Acceleration of body origin in local frame
-	const Vector3f vel_deriv{_ekf.getVelocityDerivative()};
+	const Vector3f vel_deriv{_output_predictor.velocity_derivative()};
 	lpos.ax = vel_deriv(0);
 	lpos.ay = vel_deriv(1);
 	lpos.az = vel_deriv(2);
@@ -1001,7 +1051,7 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 	Quatf delta_q_reset;
 	_ekf.get_quat_reset(&delta_q_reset(0), &lpos.heading_reset_counter);
 
-	lpos.heading = Eulerf(_ekf.getQuaternion()).psi();
+	lpos.heading = Eulerf(_output_predictor.quat_nominal()).psi();
 	lpos.delta_heading = Eulerf(delta_q_reset).psi();
 	lpos.heading_good_for_control = _ekf.isYawFinalAlignComplete();
 
@@ -1057,20 +1107,20 @@ void EKF2::PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu)
 	odom.local_frame = vehicle_odometry_s::LOCAL_FRAME_NED;
 
 	// Vehicle odometry position
-	const Vector3f position{_ekf.getPosition()};
+	const Vector3f position{_output_predictor.position()};
 	odom.x = position(0);
 	odom.y = position(1);
 	odom.z = position(2);
 
 	// Vehicle odometry linear velocity
 	odom.velocity_frame = vehicle_odometry_s::LOCAL_FRAME_FRD;
-	const Vector3f velocity{_ekf.getVelocity()};
+	const Vector3f velocity{_output_predictor.velocity()};
 	odom.vx = velocity(0);
 	odom.vy = velocity(1);
 	odom.vz = velocity(2);
 
 	// Vehicle odometry quaternion
-	_ekf.getQuaternion().copyTo(odom.q);
+	_output_predictor.quat_nominal().copyTo(odom.q);
 
 	// Vehicle odometry angular rates
 	const Vector3f gyro_bias{_ekf.getGyroBias()};
@@ -1134,7 +1184,7 @@ void EKF2::PublishOdometryAligned(const hrt_abstime &timestamp, const vehicle_od
 
 	switch (ev_odom.velocity_frame) {
 	case vehicle_odometry_s::BODY_FRAME_FRD: {
-			const Vector3f aligned_vel = Dcmf(_ekf.getQuaternion()) * Vector3f(ev_odom.vx, ev_odom.vy, ev_odom.vz);
+			const Vector3f aligned_vel = Dcmf(_output_predictor.quat_nominal()) * Vector3f(ev_odom.vx, ev_odom.vy, ev_odom.vz);
 			aligned_ev_odom.vx = aligned_vel(0);
 			aligned_ev_odom.vy = aligned_vel(1);
 			aligned_ev_odom.vz = aligned_vel(2);
@@ -1234,7 +1284,8 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 	estimator_status_s status{};
 	status.timestamp_sample = _ekf.get_imu_sample_delayed().time_us;
 
-	_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
+	// return an array containing the output predictor angular, velocity and position tracking
+	_output_predictor.output_tracking_error().copyTo(status.output_tracking_error);
 
 	// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
 	// the GPS Fix bit, which is always checked)

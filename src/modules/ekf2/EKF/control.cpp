@@ -92,6 +92,10 @@ void Ekf::controlFusionModes()
 		const uint64_t baro_time_prev = _baro_sample_delayed.time_us;
 		_baro_data_ready = _baro_buffer->pop_first_older_than(_time_imu_delayed, &_baro_sample_delayed);
 
+		if (_baro_data_ready) {
+			_baro_sample_delayed.hgt = compensateBaroForDynamicPressure(_baro_sample_delayed.hgt);
+		}
+
 		// if we have a new baro sample save the delta time between this sample and the last sample which is
 		// used below for baro offset calculations
 		if (_baro_data_ready && baro_time_prev != 0) {

@@ -15,8 +15,8 @@ void ResetLoggingChecker::capturePreResetState()
 	_ekf->get_posD_reset(&b, &c);
 	vert_pos_reset_counter_before_reset = c;
 
-	velocity_before_reset = _ekf->getVelocity();
-	position_before_reset = _ekf->getPosition();
+	velocity_before_reset = _ekf->getState().vel;
+	position_before_reset = _ekf->getState().pos;
 }
 
 // call immediately after state reset
@@ -40,8 +40,8 @@ void ResetLoggingChecker::capturePostResetState()
 	logged_delta_position(2) = b;
 	vert_pos_reset_counter_after_reset = c;
 
-	velocity_after_reset = _ekf->getVelocity();
-	position_after_reset = _ekf->getPosition();
+	velocity_after_reset = _ekf->getState().vel;
+	position_after_reset = _ekf->getState().pos;
 }
 
 bool ResetLoggingChecker::isVelocityDeltaLoggedCorrectly(float accuracy)

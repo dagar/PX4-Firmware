@@ -341,6 +341,14 @@ private:
 
 	parameters *_params;	///< pointer to ekf parameter struct (located in _ekf class instance)
 
+	OutputPredictor _output_predictor{};
+	bool _output_predictor_aligned{false};
+
+	uint8_t _xy_reset_counter{0};
+	uint8_t _z_reset_counter{0};
+	uint8_t _vxy_reset_counter{0};
+	uint8_t _vz_reset_counter{0};
+
 	DEFINE_PARAMETERS(
 		(ParamExtInt<px4::params::EKF2_PREDICT_US>) _param_ekf2_predict_us,
 		(ParamExtFloat<px4::params::EKF2_MAG_DELAY>)
