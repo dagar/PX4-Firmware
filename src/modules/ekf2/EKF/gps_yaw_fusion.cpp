@@ -135,12 +135,14 @@ void Ekf::fuseGpsYaw()
 	_aid_src_gnss_yaw.innovation_variance = heading_innov_var;
 
 	if (heading_innov_var < R_YAW) {
-		// the innovation variance contribution from the state covariances is negative which means the covariance matrix is badly conditioned
-		_fault_status.flags.bad_hdg = true;
+		if (_aid_src_gnss_yaw.fusion_enabled) {
+			// the innovation variance contribution from the state covariances is negative which means the covariance matrix is badly conditioned
+			_fault_status.flags.bad_hdg = true;
 
-		// we reinitialise the covariance matrix and abort this fusion step
-		initialiseCovariance();
-		ECL_ERR("GPS yaw numerical error - covariance reset");
+			// we reinitialise the covariance matrix and abort this fusion step
+			initialiseCovariance();
+			ECL_ERR("GPS yaw numerical error - covariance reset");
+		}
 		return;
 	}
 
@@ -154,17 +156,23 @@ void Ekf::fuseGpsYaw()
 	setEstimatorAidStatusTestRatio(_aid_src_gnss_yaw, innov_gate);
 
 	if (_aid_src_gnss_yaw.innovation_rejected) {
-		_innov_check_fail_status.flags.reject_yaw = true;
+		if (_aid_src_gnss_yaw.fusion_enabled) {
+			_innov_check_fail_status.flags.reject_yaw = true;
+		}
+
 		return;
 
 	} else {
-		_innov_check_fail_status.flags.reject_yaw = false;
+		if (_aid_src_gnss_yaw.fusion_enabled) {
+			_innov_check_fail_status.flags.reject_yaw = false;
+		}
 	}
 
 	_gnss_yaw_signed_test_ratio_lpf.update(matrix::sign(heading_innov) * _aid_src_gnss_yaw.test_ratio);
 
 	if ((fabsf(_gnss_yaw_signed_test_ratio_lpf.getState()) > 0.2f)
-		&& !_control_status.flags.in_air && isTimedOut(_aid_src_gnss_yaw.time_last_fuse, (uint64_t)1e6)) {
+	    && !_control_status.flags.in_air && isTimedOut(_aid_src_gnss_yaw.time_last_fuse, (uint64_t)1e6)
+	    && _aid_src_gnss_yaw.fusion_enabled) {
 
 		// A constant large signed test ratio is a sign of wrong gyro bias
 		// Reset the yaw gyro variance to converge faster and avoid
@@ -191,17 +199,19 @@ void Ekf::fuseGpsYaw()
 		Kfusion(row) = HK32*(-HK16*P(0,row) - HK24*P(1,row) - HK25*P(2,row) + HK26*P(3,row));
 	}
 
-	const bool is_fused = measurementUpdate(Kfusion, Hfusion, heading_innov);
-	_fault_status.flags.bad_hdg = !is_fused;
-	_aid_src_gnss_yaw.fused = is_fused;
+	if (_aid_src_gnss_yaw.fusion_enabled) {
+		const bool is_fused = measurementUpdate(Kfusion, Hfusion, heading_innov);
+		_fault_status.flags.bad_hdg = !is_fused;
+		_aid_src_gnss_yaw.fused = is_fused;
 
-	if (is_fused) {
-		_time_last_heading_fuse = _time_last_imu;
-		_aid_src_gnss_yaw.time_last_fuse = _time_last_imu;
+		if (is_fused) {
+			_time_last_heading_fuse = _time_last_imu;
+			_aid_src_gnss_yaw.time_last_fuse = _time_last_imu;
+		}
 	}
 }
 
-bool Ekf::resetYawToGps()
+bool Ekf::resetYawToGps(const gpsSample &gps_sample)
 {
 	// define the predicted antenna array vector and rotate into earth frame
 	const Vector3f ant_vec_bf = {cosf(_gps_yaw_offset), sinf(_gps_yaw_offset), 0.0f};
@@ -213,13 +223,19 @@ bool Ekf::resetYawToGps()
 	}
 
 	// GPS yaw measurement is alreday compensated for antenna offset in the driver
-	const float measured_yaw = _gps_sample_delayed.yaw;
+	const float measured_yaw = gps_sample.yaw;
 
-	const float yaw_variance = sq(fmaxf(_params.gps_heading_noise, 1.e-2f));
-	resetQuatStateYaw(measured_yaw, yaw_variance, true);
+	if (PX4_ISFINITE(measured_yaw) && !_control_status.flags.gps_yaw_fault) {
+		const float yaw_variance = sq(fmaxf(_params.gps_heading_noise, 1.e-2f));
+		resetQuatStateYaw(measured_yaw, yaw_variance);
 
-	_aid_src_gnss_yaw.time_last_fuse = _time_last_imu;
-	_gnss_yaw_signed_test_ratio_lpf.reset(0.f);
+		_aid_src_gnss_yaw.time_last_fuse = _time_last_imu;
+		_gnss_yaw_signed_test_ratio_lpf.reset(0.f);
 
-	return true;
+		resetMagStates();
+
+		return true;
+	}
+
+	return false;
 }

@@ -388,7 +388,9 @@ void Ekf::controlExternalVisionFusion()
 				// calculate the change in yaw since the last measurement
 				const float ev_delta_yaw = wrap_pi(measured_hdg - measured_hdg_prev);
 
-				_aid_src_ev_yaw.innovation = wrap_pi(getEulerYaw(_R_to_earth) - _yaw_pred_prev - ev_delta_yaw);
+				const float innovation = wrap_pi(getEulerYaw(_R_to_earth) - _yaw_pred_prev - ev_delta_yaw);
+
+				fuseYaw(innovation, ev_yaw_obs_var, _aid_src_ev_yaw);
 			}
 		}
 
@@ -503,20 +505,17 @@ void Ekf::controlOpticalFlowFusion()
 		if ((_params.fusion_mode & SensorFusionMask::USE_OPT_FLOW) // optical flow has been selected by the user
 		    && !_control_status.flags.opt_flow // we are not yet using flow data
 		    && !_inhibit_flow_use) {
-			// If the heading is valid and use is not inhibited , start using optical flow aiding
-			if (_control_status.flags.yaw_align || _params.mag_fusion_type == MagFuseType::NONE) {
-				// set the flag and reset the fusion timeout
-				ECL_INFO("starting optical flow fusion");
-				_control_status.flags.opt_flow = true;
-				_time_last_of_fuse = _time_last_imu;
+			// set the flag and reset the fusion timeout
+			ECL_INFO("starting optical flow fusion");
+			_control_status.flags.opt_flow = true;
+			_time_last_of_fuse = _time_last_imu;
 
-				// if we are not using GPS or external vision aiding, then the velocity and position states and covariances need to be set
-				const bool flow_aid_only = !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow);
+			// if we are not using GPS or external vision aiding, then the velocity and position states and covariances need to be set
+			const bool flow_aid_only = !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow);
 
-				if (flow_aid_only) {
-					resetHorizontalVelocityToOpticalFlow();
-					resetHorizontalPositionToOpticalFlow();
-				}
+			if (flow_aid_only) {
+				resetHorizontalVelocityToOpticalFlow();
+				resetHorizontalPositionToOpticalFlow();
 			}
 		}
 
@@ -602,6 +601,8 @@ void Ekf::controlGpsYawFusion(bool gps_checks_passing, bool gps_checks_failing)
 
 			if (continuing_conditions_passing) {
 
+				_aid_src_gnss_yaw.fusion_enabled = _control_status.flags.gps_yaw;
+
 				fuseGpsYaw();
 
 				const bool is_fusion_failing = isTimedOut(_aid_src_gnss_yaw.time_last_fuse, _params.reset_timeout_max);
@@ -609,7 +610,7 @@ void Ekf::controlGpsYawFusion(bool gps_checks_passing, bool gps_checks_failing)
 				if (is_fusion_failing) {
 					if (_nb_gps_yaw_reset_available > 0) {
 						// Data seems good, attempt a reset
-						resetYawToGps();
+						resetYawToGps(_gps_sample_delayed);
 
 						if (_control_status.flags.in_air) {
 							_nb_gps_yaw_reset_available--;
@@ -638,9 +639,14 @@ void Ekf::controlGpsYawFusion(bool gps_checks_passing, bool gps_checks_failing)
 		} else {
 			if (starting_conditions_passing) {
 				// Try to activate GPS yaw fusion
-				startGpsYawFusion();
+				if (!_control_status.flags.gps_yaw && resetYawToGps(_gps_sample_delayed)) {
+					ECL_INFO("starting GPS yaw fusion");
+					_control_status.flags.yaw_align = true;
 
-				if (_control_status.flags.gps_yaw) {
+					stopEvYawFusion();
+
+					_control_status.flags.gps_yaw = true;
+
 					_nb_gps_yaw_reset_available = 1;
 				}
 			}
@@ -649,14 +655,6 @@ void Ekf::controlGpsYawFusion(bool gps_checks_passing, bool gps_checks_failing)
 	} else if (_control_status.flags.gps_yaw && isTimedOut(_time_last_gps_yaw_data, _params.reset_timeout_max)) {
 		// No yaw data in the message anymore. Stop until it comes back.
 		stopGpsYawFusion();
-	}
-
-	// Before takeoff, we do not want to continue to rely on the current heading
-	// if we had to stop the fusion
-	if (!_control_status.flags.in_air
-	    && !_control_status.flags.gps_yaw
-	    && _control_status_prev.flags.gps_yaw) {
-		_control_status.flags.yaw_align = false;
 	}
 }
 
@@ -1106,15 +1104,13 @@ void Ekf::controlBetaFusion()
 void Ekf::controlDragFusion()
 {
 	if ((_params.fusion_mode & SensorFusionMask::USE_DRAG) && _drag_buffer &&
-	    !_using_synthetic_position && _control_status.flags.in_air && !_mag_inhibit_yaw_reset_req) {
+	    !_using_synthetic_position && _control_status.flags.in_air) {
 
 		if (!_control_status.flags.wind) {
 			// reset the wind states and covariances when starting drag accel fusion
 			_control_status.flags.wind = true;
 			resetWind();
-
 		}
-
 
 		dragSample drag_sample;
 
@@ -1141,11 +1137,4 @@ void Ekf::controlAuxVelFusion()
 			}
 		}
 	}
-}
-
-bool Ekf::hasHorizontalAidingTimedOut() const
-{
-	return isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
-	       && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
-	       && isTimedOut(_time_last_of_fuse, _params.reset_timeout_max);
 }

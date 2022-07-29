@@ -1032,7 +1032,8 @@ void Ekf::fixCovarianceErrors(bool force_symmetry)
 
 	// magnetic field states
 	if (!_control_status.flags.mag_3D) {
-		zeroMagCov();
+		P.uncorrelateCovarianceSetVariance<3>(16, 0.0f);
+		P.uncorrelateCovarianceSetVariance<3>(19, 0.0f);
 
 	} else {
 		// constrain variances
@@ -1093,7 +1094,7 @@ void Ekf::resetMagRelatedCovariances()
 
 void Ekf::resetQuatCov()
 {
-	zeroQuatCov();
+	P.uncorrelateCovarianceSetVariance<4>(0, 0.0f);
 
 	// define the initial angle uncertainty as variances for a rotation vector
 	Vector3f rot_vec_var;
@@ -1102,39 +1103,25 @@ void Ekf::resetQuatCov()
 	initialiseQuatCovariances(rot_vec_var);
 }
 
-void Ekf::zeroQuatCov()
-{
-	P.uncorrelateCovarianceSetVariance<2>(0, 0.0f);
-	P.uncorrelateCovarianceSetVariance<2>(2, 0.0f);
-}
-
 void Ekf::resetMagCov()
 {
 	// reset the corresponding rows and columns in the covariance matrix and
 	// set the variances on the magnetic field states to the measurement variance
-	clearMagCov();
+	_mag_decl_cov_reset = false;
 
 	P.uncorrelateCovarianceSetVariance<3>(16, sq(_params.mag_noise));
 	P.uncorrelateCovarianceSetVariance<3>(19, sq(_params.mag_noise));
 
-	if (!_control_status.flags.mag_3D) {
-		// save covariance data for re-use when auto-switching between heading and 3-axis fusion
-		// if already in 3-axis fusion mode, the covariances are automatically saved when switching out
-		// of this mode
-		saveMagCovData();
-	}
+	_saved_mag_bf_cov.zero();
+	_saved_mag_ef_ned_cov.zero();
 }
 
 void Ekf::clearMagCov()
 {
-	zeroMagCov();
-	_mag_decl_cov_reset = false;
-}
-
-void Ekf::zeroMagCov()
-{
 	P.uncorrelateCovarianceSetVariance<3>(16, 0.0f);
 	P.uncorrelateCovarianceSetVariance<3>(19, 0.0f);
+
+	_mag_decl_cov_reset = false;
 }
 
 void Ekf::resetZDeltaAngBiasCov()
