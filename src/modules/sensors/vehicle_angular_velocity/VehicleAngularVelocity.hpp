@@ -172,6 +172,10 @@ private:
 	// angular acceleration filter
 	AlphaFilter<float> _lp_filter_acceleration[3] {};
 
+	float _gyro_sum[3] {};
+	float _gyro_squared_sum[3] {};
+	int _gyro_sum_count[3] {0};
+
 	uint32_t _selected_sensor_device_id{0};
 
 	bool _reset_filters{true};

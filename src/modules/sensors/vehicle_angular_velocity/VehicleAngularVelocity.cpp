@@ -806,7 +806,8 @@ void VehicleAngularVelocity::Run()
 		sensor_gyro_fifo_s sensor_fifo_data;
 
 		while (_sensor_gyro_fifo_sub.update(&sensor_fifo_data)) {
-			const float inverse_dt_s = 1e6f / sensor_fifo_data.dt;
+			const float dt_s = sensor_fifo_data.dt * 1e-6f;
+			const float inverse_dt_s = 1.f / dt_s;
 			const int N = sensor_fifo_data.samples;
 			static constexpr int FIFO_SIZE_MAX = sizeof(sensor_fifo_data.x) / sizeof(sensor_fifo_data.x[0]);
 
@@ -822,6 +823,10 @@ void VehicleAngularVelocity::Run()
 
 					for (int n = 0; n < N; n++) {
 						data[n] = sensor_fifo_data.scale * raw_data_array[axis][n];
+
+						_gyro_sum[axis] += data[n];
+						_gyro_squared_sum[axis] += data[n] * data[n];
+						_gyro_sum_count[axis] += 1;
 					}
 
 					// save last filtered sample
@@ -831,12 +836,43 @@ void VehicleAngularVelocity::Run()
 
 				// Publish
 				if (!_sensor_gyro_fifo_sub.updated()) {
-					if (CalibrateAndPublish(sensor_fifo_data.timestamp_sample,
-								angular_velocity_uncalibrated,
-								angular_acceleration_uncalibrated)) {
 
-						perf_end(_cycle_perf);
-						return;
+					if (sensor_fifo_data.timestamp_sample >= _last_publish + _publish_interval_min_us) {
+
+						for (int axis = 0; axis < 3; axis++) {
+
+							int n = _gyro_sum_count[axis];
+
+							float sum_x = (n * dt_s);
+							float sum_y = _gyro_sum[axis];
+							float sum_xy = (n * sensor_fifo_data.dt) * sum_y;
+
+							float sum_xx = _gyro_squared_sum[axis];
+
+
+							float m = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+							//float b = (sum_y - m * sum_x) / n;
+
+
+							// reset
+							_gyro_sum[axis] = 0;
+							_gyro_squared_sum[axis] = 0;
+							_gyro_sum_count[axis] = 0;
+
+
+							angular_acceleration_uncalibrated(axis) = m; // slope
+							// angular_acceleration_uncalibrated(axis) = _lp_filter_acceleration[axis].update(m);
+
+							// TODO: minimal number of samples
+						}
+
+						if (CalibrateAndPublish(sensor_fifo_data.timestamp_sample,
+									angular_velocity_uncalibrated,
+									angular_acceleration_uncalibrated)) {
+
+							perf_end(_cycle_perf);
+							return;
+						}
 					}
 				}
 			}
