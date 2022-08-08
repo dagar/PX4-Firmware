@@ -466,6 +466,7 @@ private:
 	uint64_t _time_prev_gps_us{0};	///< time stamp of previous GPS data retrieved from the buffer (uSec)
 	uint64_t _time_last_aiding{0};	///< amount of time we have been doing inertial only deadreckoning (uSec)
 	bool _using_synthetic_position{false};	///< true if we are using a synthetic position to constrain drift
+	bool _using_synthetic_hgt{false};	///< true if we are using a synthetic height to constrain drift
 
 	uint64_t _time_last_hor_pos_fuse{0};	///< time the last fusion of horizontal position measurements was performed (uSec)
 	uint64_t _time_last_hgt_fuse{0};	///< time the last fusion of vertical position measurements was performed (uSec)
@@ -481,7 +482,7 @@ private:
 	uint64_t _time_last_healthy_rng_data{0};
 	uint8_t _nb_gps_yaw_reset_available{0}; ///< remaining number of resets allowed before switching to another aiding source
 
-	Vector2f _last_known_posNE{};		///< last known local NE position vector (m)
+	Vector3f _last_known_pos{};		///< last known local position vector (m)
 
 	uint64_t _time_acc_bias_check{0};	///< last time the  accel bias check passed (uSec)
 	uint64_t _delta_time_baro_us{0};	///< delta time between two consecutive delayed baro samples from the buffer (uSec)
@@ -550,7 +551,7 @@ private:
 	estimator_aid_source_1d_s _aid_src_rng_hgt{};
 	estimator_aid_source_1d_s _aid_src_airspeed{};
 
-	estimator_aid_source_2d_s _aid_src_fake_pos{};
+	estimator_aid_source_3d_s _aid_src_fake_pos{};
 
 	estimator_aid_source_1d_s _aid_src_ev_yaw{};
 
@@ -932,6 +933,13 @@ private:
 
 	// control fusion of fake position observations to constrain drift
 	void controlFakePosFusion();
+
+	void controlFakeHgtFusion();
+	void startFakeHgtFusion();
+	void resetFakeHgtFusion();
+	void resetHeightToLastKnown();
+	void stopFakeHgtFusion();
+	void fuseFakeHgt();
 
 	void controlZeroVelocityUpdate();
 
