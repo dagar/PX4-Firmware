@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2021 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,8 @@
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <lib/drivers/accelerometer/PX4Accelerometer.hpp>
 #include <lib/drivers/gyroscope/PX4Gyroscope.hpp>
+#include <lib/geo/geo.h>
+#include <lib/mixer_module/mixer_module.hpp>
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionInterval.hpp>
@@ -57,7 +59,7 @@
 
 using namespace time_literals;
 
-class IgnitionSimulator : public ModuleBase<IgnitionSimulator>, public ModuleParams
+class IgnitionSimulator : public ModuleBase<IgnitionSimulator>, public ModuleParams, public OutputModuleInterface
 {
 public:
 	IgnitionSimulator();
@@ -81,6 +83,9 @@ public:
 	/** @see ModuleBase::print_status() */
 	int print_status() override;
 
+	bool updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
+			   unsigned num_outputs, unsigned num_control_groups_updated) override;
+
 private:
 	/**
 	 * Check for parameter changes and update them if needed.
@@ -92,12 +97,6 @@ private:
 	void ImuCallback(const ignition::msgs::IMU &imu);
 	void PoseInfoCallback(const ignition::msgs::Pose_V &pose);
 
-	DEFINE_PARAMETERS(
-		(ParamFloat<px4::params::SIM_HOME_LAT>) _param_sim_home_lat,
-		(ParamFloat<px4::params::SIM_HOME_LON>) _param_sim_home_lon,
-		(ParamFloat<px4::params::SIM_HOME_ALT>) _param_sim_home_alt
-	)
-
 	// Subscriptions
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
@@ -108,4 +107,22 @@ private:
 
 	PX4Accelerometer _px4_accel;
 	PX4Gyroscope _px4_gyro;
+
+	MapProjection _pos_ref{};
+
+	matrix::Vector3d _position_prev{};
+	matrix::Vector3d _velocity_prev{};
+	hrt_abstime _timestamp_prev{};
+
+	MixingOutput _mixing_output{"SIM_GZ", MAX_ACTUATORS, *this, MixingOutput::SchedulingPolicy::Auto, false, false};
+
+
+	// gazebo publication
+	// 	auto pub = node.Advertise<ignition::msgs::Actuators>(topic);
+
+	DEFINE_PARAMETERS(
+		(ParamFloat<px4::params::SIM_HOME_LAT>) _param_sim_home_lat,
+		(ParamFloat<px4::params::SIM_HOME_LON>) _param_sim_home_lon,
+		(ParamFloat<px4::params::SIM_HOME_ALT>) _param_sim_home_alt
+	)
 };
