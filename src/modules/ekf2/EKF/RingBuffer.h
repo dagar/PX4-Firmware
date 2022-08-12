@@ -81,7 +81,6 @@ public:
 		_head = 0;
 		_tail = 0;
 
-		_first_write = true;
 
 		return true;
 	}
@@ -90,21 +89,13 @@ public:
 
 	void push(const data_type &sample)
 	{
-		uint8_t head_new = _head;
-
-		if (!_first_write) {
-			head_new = (_head + 1) % _size;
-		}
-
-		_buffer[head_new] = sample;
-		_head = head_new;
-
-		// move tail if we overwrite it
-		if (_head == _tail && !_first_write) {
-			_tail = (_tail + 1) % _size;
+		if (_buffer[_head].time_us == 0) {
+			// current head slot is empty
+			_buffer[_head] = sample;
 
 		} else {
-			_first_write = false;
+			_head = (_head + 1) % _size;
+			_buffer[_head] = sample;
 		}
 	}
 
@@ -117,36 +108,22 @@ public:
 
 	uint8_t get_oldest_index() const { return _tail; }
 
-	bool pop_first_older_than(const uint64_t &timestamp, data_type *sample)
+	bool pop_sample_within(const uint64_t &timestamp_oldest, const uint64_t &timestamp_newest, data_type *sample)
 	{
-		// start looking from newest observation data
+		// start looking from oldest observation data (slot after current _head)
+		// oldest index is start = _head -1
+
 		for (uint8_t i = 0; i < _size; i++) {
-			int index = (_head - i);
-			index = index < 0 ? _size + index : index;
+			// oldest index is start = _head + 1
+			const int index = (_head + 1 + i) % _size;
 
-			if (timestamp >= _buffer[index].time_us && timestamp < _buffer[index].time_us + (uint64_t)1e5) {
+			if ((_buffer[index].time_us != 0)
+			&& (_buffer[index].time_us >= timestamp_oldest)
+			&& (_buffer[index].time_us <= timestamp_newest)
+			) {
 				*sample = _buffer[index];
-
-				// Now we can set the tail to the item which
-				// comes after the one we removed since we don't
-				// want to have any older data in the buffer
-				if (index == _head) {
-					_tail = _head;
-					_first_write = true;
-
-				} else {
-					_tail = (index + 1) % _size;
-				}
-
 				_buffer[index].time_us = 0;
-
 				return true;
-			}
-
-			if (index == _tail) {
-				// we have reached the tail and haven't got a
-				// match
-				return false;
 			}
 		}
 
@@ -174,6 +151,4 @@ private:
 	uint8_t _head{0};
 	uint8_t _tail{0};
 	uint8_t _size{0};
-
-	bool _first_write{true};
 };

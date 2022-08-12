@@ -39,6 +39,11 @@
 #include <iostream>
 #include <string>
 
+void IgnitionSimulator::AnnounceCallback(const ignition::msgs::Announce &announce)
+{
+}
+
+
 void IgnitionSimulator::ImuCallback(const ignition::msgs::IMU &imu)
 {
 	// FLU -> FRD
@@ -153,13 +158,65 @@ IgnitionSimulator::IgnitionSimulator() :
 	_px4_gyro.set_scale(math::radians(2000.f) / static_cast<float>(INT16_MAX - 1)); // 2000 degrees/second max
 }
 
+bool IgnitionSimulator::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS], unsigned num_outputs,
+		      unsigned num_control_groups_updated)
+{
+	// Only publish once we receive actuator_controls (important for lock-step to work correctly)
+	if (num_control_groups_updated > 0) {
+
+		ignition::msgs::Actuators rotor_velocity_message;
+		rotor_velocity_message.mutable_velocity()->Resize(num_outputs, 0);
+
+		for (int i = 0; i < num_outputs; i++) {
+			rotor_velocity_message.set_velocity(i, outputs[i]);
+		}
+
+		return pub.Publish(rotor_velocity_message);
+	}
+
+	return false;
+}
+
 void IgnitionSimulator::run()
 {
 	ignition::transport::Node node;
 
+
+
+	// TODO: spawn model?
+	// ign service -s /world/empty/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 1000 --req 'sdf_filename: "/path/to/model.urdf", name: "urdf_model"'
+
+
+	// specify model
+	// specify world (/world/NAME/model/MODEL/)
+
+
+
+	// Each peer will send an announcement in the /announce topic when it joins or leaves the network
+
+	// their affinities will be updated as part of the message sent on the /step topic
+
+	// Stepping
+	//  primary publishes a SimulationStep message on the /step topic
+	//  secondary publishes its updated performer states on the /step_ack topic.
+
+
+	node.Subscribe("/announce", &IgnitionSimulator::AnnounceCallback, this);
+
+
+	// /announce ignition.gazebo.private_msgs.PeerAnnounce
+	//   https://github.com/gazebosim/gz-sim/blob/ign-gazebo6/src/msgs/peer_info.proto
+
+	// /step ignition.gazebo.private_msgs.SimulationStep
+	//  https://github.com/gazebosim/gz-sim/blob/ign-gazebo6/src/msgs/simulation_step.proto
+
+	// /step_ack ignition.msgs.SerializedStateMap
+	//
+
+
+
 	// Subscribe to messages of other plugins.
-	node.Subscribe("/world/quadcopter/model/X4/link/base_link/sensor/imu_sensor/imu", &IgnitionSimulator::ImuCallback,
-		       this);
+	node.Subscribe("/world/quadcopter/model/X4/link/base_link/sensor/imu_sensor/imu", &IgnitionSimulator::ImuCallback, this);
 	node.Subscribe("/world/quadcopter/pose/info", &IgnitionSimulator::PoseInfoCallback, this);
 
 	std::string topic = "/X4/command/motor_speed";
