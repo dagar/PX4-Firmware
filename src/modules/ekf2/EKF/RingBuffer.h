@@ -77,10 +77,7 @@ public:
 		}
 
 		_size = size;
-
 		_head = 0;
-		_tail = 0;
-
 
 		return true;
 	}
@@ -97,6 +94,8 @@ public:
 			_head = (_head + 1) % _size;
 			_buffer[_head] = sample;
 		}
+
+		// TODO: debug error if valid sample is overwritten (indication of other error)
 	}
 
 	uint8_t get_length() const { return _size; }
@@ -104,23 +103,38 @@ public:
 	data_type &operator[](const uint8_t index) { return _buffer[index]; }
 
 	const data_type &get_newest() const { return _buffer[_head]; }
-	const data_type &get_oldest() const { return _buffer[_tail]; }
+	const data_type &get_oldest() const
+	{
+		for (uint8_t i = 0; i < _size; i++) {
+			int index = (_head + 1 + i) % _size;
+
+			if (_buffer[index].time_us != 0) {
+				return _buffer[index];
+			}
+		}
+
+		return _buffer[_head];
+	}
 
 	uint8_t get_oldest_index() const { return _tail; }
 
-	bool pop_sample_within(const uint64_t &timestamp_oldest, const uint64_t &timestamp_newest, data_type *sample)
+	bool pop_oldest_within(const uint64_t &timestamp_oldest, const uint64_t &timestamp_newest, data_type *sample)
 	{
-		// start looking from oldest observation data (slot after current _head)
-		// oldest index is start = _head -1
-
+		// start looking for acceptable sample from newest observation data
 		for (uint8_t i = 0; i < _size; i++) {
-			// oldest index is start = _head + 1
-			const int index = (_head + 1 + i) % _size;
+			int index = _head;
+
+			if (_head > i) {
+				index -= i;
+
+			} else {
+				index += _size - i;
+			}
 
 			if ((_buffer[index].time_us != 0)
-			&& (_buffer[index].time_us >= timestamp_oldest)
-			&& (_buffer[index].time_us <= timestamp_newest)
-			) {
+			    && (_buffer[index].time_us >= timestamp_oldest)
+			    && (_buffer[index].time_us <= timestamp_newest)
+			   ) {
 				*sample = _buffer[index];
 				_buffer[index].time_us = 0;
 				return true;
@@ -145,10 +159,68 @@ public:
 		return count;
 	}
 
+	void reset()
+	{
+		for (uint8_t i = 0; i < _size; i++) {
+			_buffer[i] = {};
+		}
+
+		_head = 0;
+	}
+
+
+	class iterator
+	{
+	public:
+		// Constructor
+		iterator(uint8 index, RingBuffer ringBuffer) : _index(index), _ringbuffer(ringBuffer)
+		{
+		}
+
+		// Overload Operator Postfix ++
+		iterator &operator++(int)
+		{
+			_index++;
+			return *this;
+		}
+
+		// Overload operator prefix ++
+		iterator &operator++()
+		{
+			_index++;
+			return *this;
+		}
+
+		// Overload Operator de-reference operator
+		T &operator*()
+		{
+			return _ringbuffer.get(m_Position);
+		}
+
+		// Overload operator !=
+		bool operator!=(const iterator &other) const
+		{
+			return (_index != other._index);
+		}
+	private:
+		RingBuffer &_ringbuffer;
+		uint8 _index;
+
+	};
+
+	iterator begin()
+	{
+		return iterator(0, *this);
+	}
+
+	iterator end()
+	{
+		return iterator(_size, *this);
+	}
+
 private:
 	data_type *_buffer{nullptr};
 
 	uint8_t _head{0};
-	uint8_t _tail{0};
 	uint8_t _size{0};
 };

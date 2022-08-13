@@ -149,10 +149,12 @@ struct outputSample {
 	Quatf       quat_nominal{};     ///< nominal quaternion describing vehicle attitude
 	Vector3f    vel{};              ///< NED velocity estimate in earth frame (m/sec)
 	Vector3f    pos{};              ///< NED position estimate in earth frame (m/sec)
-};
 
-struct outputVert {
-	uint64_t    time_us{};          ///< timestamp of the measurement (uSec)
+	Vector3f    vel_body{};         ///< velocity estimate in body fixed frame (m/sec)
+
+	Vector3f    vel_alt{};          ///< velocity calculated using alternative algorithm (m/sec)
+	Vector3f    vel_integ{};        ///< Integral of velocity (m)
+
 	float       vert_vel{};         ///< Vertical velocity calculated using alternative algorithm (m/sec)
 	float       vert_vel_integ{};   ///< Integral of vertical velocity (m)
 	float       dt{};               ///< delta time (sec)

@@ -115,8 +115,6 @@ void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
 		_output_buffer[index].vel.xy() += delta_horz_vel;
 	}
 
-	_output_new.vel.xy() += delta_horz_vel;
-
 	_state_reset_status.velNE_change = delta_horz_vel;
 	_state_reset_status.velNE_counter++;
 
@@ -131,11 +129,8 @@ void Ekf::resetVerticalVelocityTo(float new_vert_vel)
 
 	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
 		_output_buffer[index].vel(2) += delta_vert_vel;
-		_output_vert_buffer[index].vert_vel += delta_vert_vel;
+		_output_buffer[index].vert_vel += delta_vert_vel;
 	}
-
-	_output_new.vel(2) += delta_vert_vel;
-	_output_vert_new.vert_vel += delta_vert_vel;
 
 	_state_reset_status.velD_change = delta_vert_vel;
 	_state_reset_status.velD_counter++;
@@ -204,8 +199,6 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
 		_output_buffer[index].pos.xy() += delta_horz_pos;
 	}
 
-	_output_new.pos.xy() += delta_horz_pos;
-
 	_state_reset_status.posNE_change = delta_horz_pos;
 	_state_reset_status.posNE_counter++;
 
@@ -224,16 +217,11 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos)
 
 	// apply the change in height / height rate to our newest height / height rate estimate
 	// which have already been taken out from the output buffer
-	_output_new.pos(2) += _state_reset_status.posD_change;
-
 	// add the reset amount to the output observer buffered data
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 		_output_buffer[i].pos(2) += _state_reset_status.posD_change;
-		_output_vert_buffer[i].vert_vel_integ += _state_reset_status.posD_change;
+		_output_buffer[i].vert_vel_integ += _state_reset_status.posD_change;
 	}
-
-	// add the reset amount to the output observer vertical position state
-	_output_vert_new.vert_vel_integ = _state.pos(2);
 
 	// Reset the timout timer
 	_time_last_hgt_fuse = _time_last_imu;
@@ -327,6 +315,7 @@ void Ekf::resetVerticalVelocityToZero()
 // align output filter states to match EKF states at the fusion time horizon
 void Ekf::alignOutputFilter()
 {
+	// TODO: peak oldest that matches IMU?
 	const outputSample &output_delayed = _output_buffer.get_oldest();
 
 	// calculate the quaternion rotation delta from the EKF to output observer states at the EKF fusion time horizon
@@ -338,14 +327,88 @@ void Ekf::alignOutputFilter()
 	const Vector3f pos_delta = _state.pos - output_delayed.pos;
 
 	// loop through the output filter state history and add the deltas
+
+	// TODO: run output predictor from buffered IMU data?
+
+
+
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 		_output_buffer[i].quat_nominal = q_delta * _output_buffer[i].quat_nominal;
 		_output_buffer[i].quat_nominal.normalize();
 		_output_buffer[i].vel += vel_delta;
 		_output_buffer[i].pos += pos_delta;
+
+		// TODO:
+		_output_buffer[i].vert_vel = {};         ///< Vertical velocity calculated using alternative algorithm (m/sec)
+		_output_buffer[i].vert_vel_integ = {};   ///< Integral of vertical velocity (m)
+		_output_buffer[i].dt = {};               ///< delta time (sec)
 	}
 
-	_output_new = _output_buffer.get_newest();
+
+	// reset output predcitor
+	_output_buffer.reset();
+	_delta_angle_corr.zero();
+
+
+	// _output_buffer.get_newest().vel + delta_vel_earth;
+	const imuSample& imu = _imu_buffer.get_oldest();
+
+	// range best for loop, go through IMU starting with oldest
+	outputSample output_delayed{};
+	output_delayed.time_us = imu.time_us;
+	output_delayed.quat_nominal = _state.quat_nominal;
+	output_delayed.vel = _state.vel;
+	output_delayed.pos = _state.pos;
+	output_delayed.vert_vel = _state.vel(2);
+	output_delayed.vert_vel_integ = 0.f;
+	output_delayed.dt = imu.delta_vel_dt;
+
+	_output_buffer.push(output_delayed);
+
+	// TODO: delta angle bias and delta angle bias
+	// gyro bias scale to delta angle dt
+	// correct delta angles for bias offsets
+	const float dt_scale_correction = _dt_imu_avg / _dt_ekf_avg;
+
+	for (uint8_t i = 1; i < _output_buffer.get_length(); i++) {
+
+		const outputSample& output_sample_last{_output_buffer.get_newest()};
+
+		const imuSample& imu = _imu_buffer[i]; // TODO: range based for loop?
+		const Vector3f delta_angle(imu.delta_ang - _state.delta_ang_bias * dt_scale_correction);
+		const Vector3f delta_vel_body{imu.delta_vel - _state.delta_vel_bias * dt_scale_correction};
+
+		// Apply corrections to the delta angle required to track the quaternion states at the EKF fusion time horizon
+		outputSample output_sample{};
+		output_sample.time_us = imu.time_us;
+		output_sample.quat_nominal = output_sample_last.quat_nominal * Quatf(AxisAnglef(delta_angle));
+		output_sample.quat_nominal.normalize();
+
+		// rotate the delta velocity to earth frame
+		Vector3f delta_vel_earth{Dcmf(output_sample.quat_nominal) * delta_vel_body};
+		delta_vel_earth(2) += CONSTANTS_ONE_G * imu.delta_vel_dt; // correct for measured acceleration due to gravity
+
+		// increment the INS velocity states by the measurement plus corrections
+		output_sample.vel = output_sample_last.vel + delta_vel_earth;
+		output_sample.vel_alt = output_sample.vel;
+
+		// use trapezoidal integration to calculate the INS position states
+		const Vector3f delta_pos_NED = (output_sample.vel + output_sample_last.vel) * (imu.delta_vel_dt * 0.5f);
+		output_sample.pos = output_sample_last.pos + delta_pos_NED;
+		output_sample.vel_integ = output_sample.pos;
+
+		output_sample.dt = imu.delta_vel_dt;
+
+		_output_buffer.push(output_sample);
+
+		// save the previous for next iteration
+		output_sample_last = output_sample;
+	}
+
+
+	// TODO: when?
+	// calculate the rotation matrix from body to earth frame
+	_R_to_earth_now = Dcmf(_output_buffer.get_newest().quat_nominal);
 }
 
 // Do a forced re-alignment of the yaw angle to align with the horizontal velocity vector from the GPS.
@@ -564,10 +627,10 @@ float Ekf::compensateBaroForDynamicPressure(const float baro_alt_uncompensated) 
 	// calculate static pressure error = Pmeas - Ptruth
 	// model position error sensitivity as a body fixed ellipse with a different scale in the positive and
 	// negative X and Y directions. Used to correct baro data for positional errors
-	const matrix::Dcmf R_to_body(_output_new.quat_nominal.inversed());
+	const matrix::Dcmf R_to_body(_output_buffer.get_newest().quat_nominal.inversed());
 
 	// Calculate airspeed in body frame
-	const Vector3f velocity_earth = _output_new.vel - _vel_imu_rel_body_ned;
+	const Vector3f velocity_earth = _output_buffer.get_newest().vel - _vel_imu_rel_body_ned;
 
 	const Vector3f wind_velocity_earth(_state.wind_vel(0), _state.wind_vel(1), 0.0f);
 
@@ -1808,9 +1871,7 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance, bool update_buffer)
 			_output_buffer[i].quat_nominal = _state_reset_status.quat_change * _output_buffer[i].quat_nominal;
 		}
 
-		// apply the change in attitude quaternion to our newest quaternion estimate
-		// which was already taken out from the output buffer
-		_output_new.quat_nominal = _state_reset_status.quat_change * _output_new.quat_nominal;
+		// TODO: realign output buffer?
 	}
 
 	_last_static_yaw = NAN;
