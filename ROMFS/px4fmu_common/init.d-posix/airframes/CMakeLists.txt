@@ -70,6 +70,9 @@ px4_add_romfs_files(
 	1061_r1_rover
 	1062_tf-r1
 	1070_boat
+
+	2001_cessna_c172
+
 	3010_quadrotor_x
 	3011_hexarotor_x
 

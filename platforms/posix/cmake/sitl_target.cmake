@@ -408,6 +408,13 @@ add_custom_target(ignition_x4
 	DEPENDS logs_symlink
 )
 
+add_custom_target(ignition_cessna_c172
+	COMMAND ${PX4_SOURCE_DIR}/Tools/sitl_run.sh $<TARGET_FILE:px4> none ignition cessna_c172 empty ${PX4_SOURCE_DIR} ${PX4_BINARY_DIR}
+	WORKING_DIRECTORY ${SITL_WORKING_DIR}
+	USES_TERMINAL
+	DEPENDS logs_symlink
+)
+
 
 string(REPLACE ";" "," posix_vmd_make_target_list "${all_posix_vmd_make_targets}")
 
