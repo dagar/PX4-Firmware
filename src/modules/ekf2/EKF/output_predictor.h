@@ -81,7 +81,7 @@ public:
 	// TODO:
 	bool allocate(uint8_t size)
 	{
-		return _output_buffer.allocate(size) && _output_vert_buffer.allocate(size);
+		return _output_buffer.allocate(size);
 	}
 
 	// TODO: realign?
@@ -111,7 +111,7 @@ public:
 	const matrix::Vector3f &getVelocityDerivative() const { return _vel_deriv; }
 
 	// get the derivative of the vertical position of the body frame origin in local NED earth frame
-	float getVerticalPositionDerivative() const { return _output_vert_new.vert_vel - _vel_imu_rel_body_ned(2); }
+	float getVerticalPositionDerivative() const { return _output_new.vert_vel - _vel_imu_rel_body_ned(2); }
 
 	// get the position of the body frame origin in local earth frame
 	matrix::Vector3f getPosition() const
@@ -128,23 +128,6 @@ public:
 
 private:
 
-	/*
-	* Calculate a correction to be applied to vert_vel that casues vert_vel_integ to track the EKF
-	* down position state at the fusion time horizon using an alternative algorithm to what
-	* is used for the vel and pos state tracking. The algorithm applies a correction to the vert_vel
-	* state history and propagates vert_vel_integ forward in time using the corrected vert_vel history.
-	* This provides an alternative vertical velocity output that is closer to the first derivative
-	* of the position but does degrade tracking relative to the EKF state.
-	*/
-	void applyCorrectionToVerticalOutputBuffer(float vert_vel_correction);
-
-	/*
-	* Calculate corrections to be applied to vel and pos output state history.
-	* The vel and pos state history are corrected individually so they track the EKF states at
-	* the fusion time horizon. This option provides the most accurate tracking of EKF states.
-	*/
-	void applyCorrectionToOutputBuffer(const matrix::Vector3f &vel_correction, const matrix::Vector3f &pos_correction);
-
 	// return the square of two floating point numbers - used in auto coded sections
 	static constexpr float sq(float var) { return var * var; }
 
@@ -153,21 +136,16 @@ private:
 		matrix::Quatf    quat_nominal{};     ///< nominal quaternion describing vehicle attitude
 		matrix::Vector3f vel{};              ///< NED velocity estimate in earth frame (m/sec)
 		matrix::Vector3f pos{};              ///< NED position estimate in earth frame (m/sec)
-	};
 
-	struct outputVert {
-		uint64_t time_us{};          ///< timestamp of the measurement (uSec)
 		float    vert_vel{};         ///< Vertical velocity calculated using alternative algorithm (m/sec)
 		float    vert_vel_integ{};   ///< Integral of vertical velocity (m)
 		float    dt{};               ///< delta time (sec)
 	};
 
 	RingBuffer<outputSample> _output_buffer{12};
-	RingBuffer<outputVert> _output_vert_buffer{12};
 
 	// Output Predictor
 	outputSample _output_new{};		// filter output on the non-delayed time horizon
-	outputVert _output_vert_new{};		// vertical filter output on the non-delayed time horizon
 	matrix::Matrix3f _R_to_earth_now{};		// rotation matrix from body to earth frame at current time
 	matrix::Vector3f _vel_imu_rel_body_ned{};		// velocity of IMU relative to body origin in NED earth frame
 	matrix::Vector3f _vel_deriv{};		// velocity derivative at the IMU in NED earth frame (m/s/s)
