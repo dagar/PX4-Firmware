@@ -66,6 +66,7 @@
 #include "range_finder_consistency_check.hpp"
 #include "sensor_range_finder.hpp"
 #include "utils.hpp"
+#include "output_predictor.h"
 
 #include <lib/geo/geo.h>
 #include <matrix/math.hpp>
@@ -120,7 +121,7 @@ public:
 	void set_vehicle_at_rest(bool at_rest) { _control_status.flags.vehicle_at_rest = at_rest; }
 
 	// return true if the attitude is usable
-	bool attitude_valid() const { return PX4_ISFINITE(_output_new.quat_nominal(0)) && _control_status.flags.tilt_align; }
+	bool attitude_valid() const { return _control_status.flags.tilt_align; }
 
 	// get vehicle landed status data
 	bool get_in_air_status() const { return _control_status.flags.in_air; }
@@ -181,25 +182,12 @@ public:
 
 	int getNumberOfActiveHorizontalAidingSources() const;
 
-	const matrix::Quatf &getQuaternion() const { return _output_new.quat_nominal; }
-
-	// get the velocity of the body frame origin in local NED earth frame
-	Vector3f getVelocity() const { return _output_new.vel - _vel_imu_rel_body_ned; }
-
-	// get the velocity derivative in earth frame
-	const Vector3f &getVelocityDerivative() const { return _vel_deriv; }
-
-	// get the derivative of the vertical position of the body frame origin in local NED earth frame
-	float getVerticalPositionDerivative() const { return _output_vert_new.vert_vel - _vel_imu_rel_body_ned(2); }
-
-	// get the position of the body frame origin in local earth frame
-	Vector3f getPosition() const
-	{
-		// rotate the position of the IMU relative to the boy origin into earth frame
-		const Vector3f pos_offset_earth = _R_to_earth_now * _params.imu_pos_body;
-		// subtract from the EKF position (which is at the IMU) to get position at the body origin
-		return _output_new.pos - pos_offset_earth;
-	}
+	const matrix::Quatf &getQuaternion() const { return _output_predictor.getQuaternion(); }
+	Vector3f getVelocity() const { return _output_predictor.getVelocity(); }
+	const Vector3f &getVelocityDerivative() const { return _output_predictor.getVelocityDerivative(); }
+	float getVerticalPositionDerivative() const { return _output_predictor.getVerticalPositionDerivative(); }
+	Vector3f getPosition() const { return _output_predictor.getPosition(); }
+	const Vector3f &getOutputTrackingError() const { return _output_predictor.getOutputTrackingError(); }
 
 	// Get the value of magnetic declination in degrees to be saved for use at the next startup
 	// Returns true when the declination can be saved
@@ -289,6 +277,7 @@ protected:
 	float _dt_ekf_avg{0.010f}; ///< average update rate of the ekf in s
 
 	imuSample _imu_sample_delayed{};	// captures the imu sample on the delayed time horizon
+	imuSample _newest_high_rate_imu_sample{};		// imu sample capturing the newest imu data
 
 	// measurement samples capturing measurements on the delayed time horizon
 	baroSample _baro_sample_delayed{};
@@ -308,14 +297,6 @@ protected:
 	float _flow_max_rate{1.0f}; ///< maximum angular flow rate that the optical flow sensor can measure (rad/s)
 	float _flow_min_distance{0.0f};	///< minimum distance that the optical flow sensor can operate at (m)
 	float _flow_max_distance{10.f};	///< maximum distance that the optical flow sensor can operate at (m)
-
-	// Output Predictor
-	outputSample _output_new{};		// filter output on the non-delayed time horizon
-	outputVert _output_vert_new{};		// vertical filter output on the non-delayed time horizon
-	imuSample _newest_high_rate_imu_sample{};		// imu sample capturing the newest imu data
-	Matrix3f _R_to_earth_now{};		// rotation matrix from body to earth frame at current time
-	Vector3f _vel_imu_rel_body_ned{};		// velocity of IMU relative to body origin in NED earth frame
-	Vector3f _vel_deriv{};		// velocity derivative at the IMU in NED earth frame (m/s/s)
 
 	bool _imu_updated{false};      // true if the ekf should update (completed downsampling process)
 	bool _initialised{false};      // true if the ekf interface instance (data buffering) is initialized
@@ -350,8 +331,6 @@ protected:
 
 	// data buffer instances
 	RingBuffer<imuSample> _imu_buffer{12};           // buffer length 12 with default parameters
-	RingBuffer<outputSample> _output_buffer{12};
-	RingBuffer<outputVert> _output_vert_buffer{12};
 
 	RingBuffer<gpsSample> *_gps_buffer{nullptr};
 	RingBuffer<magSample> *_mag_buffer{nullptr};
@@ -395,6 +374,8 @@ protected:
 	// state logic becasue they will be cleared externally after being read.
 	warning_event_status_u _warning_events{};
 	information_event_status_u _information_events{};
+
+	OutputPredictor _output_predictor{};
 
 private:
 

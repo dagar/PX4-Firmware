@@ -144,20 +144,6 @@ struct gpsMessage {
 	float       pdop{};             ///< position dilution of precision
 };
 
-struct outputSample {
-	uint64_t    time_us{};          ///< timestamp of the measurement (uSec)
-	Quatf       quat_nominal{};     ///< nominal quaternion describing vehicle attitude
-	Vector3f    vel{};              ///< NED velocity estimate in earth frame (m/sec)
-	Vector3f    pos{};              ///< NED position estimate in earth frame (m/sec)
-};
-
-struct outputVert {
-	uint64_t    time_us{};          ///< timestamp of the measurement (uSec)
-	float       vert_vel{};         ///< Vertical velocity calculated using alternative algorithm (m/sec)
-	float       vert_vel_integ{};   ///< Integral of vertical velocity (m)
-	float       dt{};               ///< delta time (sec)
-};
-
 struct imuSample {
 	uint64_t    time_us{};                ///< timestamp of the measurement (uSec)
 	Vector3f    delta_ang{};              ///< delta angle in body frame (integrated gyro measurements) (rad)
