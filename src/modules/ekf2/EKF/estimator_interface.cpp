@@ -211,7 +211,7 @@ void EstimatorInterface::setBaroData(const baroSample &baro_sample)
 		_time_last_baro = baro_sample.time_us;
 
 		baroSample baro_sample_new;
-		baro_sample_new.hgt = compensateBaroForDynamicPressure(baro_sample.hgt);
+		baro_sample_new.hgt = baro_sample.hgt;
 
 		baro_sample_new.time_us = baro_sample.time_us;
 		baro_sample_new.time_us -= static_cast<uint64_t>(_params.baro_delay_ms * 1000);
