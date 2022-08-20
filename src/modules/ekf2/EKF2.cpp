@@ -142,8 +142,6 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 	_param_ekf2_ev_pos_y(_params->ev_pos_body(1)),
 	_param_ekf2_ev_pos_z(_params->ev_pos_body(2)),
 	_param_ekf2_arsp_thr(_params->arsp_thr),
-	_param_ekf2_tau_vel(_params->vel_Tau),
-	_param_ekf2_tau_pos(_params->pos_Tau),
 	_param_ekf2_gbias_init(_params->switch_on_gyro_bias),
 	_param_ekf2_abias_init(_params->switch_on_accel_bias),
 	_param_ekf2_angerr_init(_params->initial_tilt_err),
@@ -242,7 +240,7 @@ bool EKF2::multi_init(int imu, int mag)
 int EKF2::print_status()
 {
 	PX4_INFO_RAW("ekf2:%d EKF dt: %.4fs, IMU dt: %.4fs, attitude: %d, local position: %d, global position: %d\n",
-		     _instance, (double)_ekf.get_dt_ekf_avg(), (double)_ekf.get_dt_imu_avg(), _ekf.attitude_valid(),
+		     _instance, (double)_ekf.get_dt_ekf_avg(), (double)_output_predictor.get_dt_imu_avg(), _ekf.attitude_valid(),
 		     _ekf.local_position_is_valid(), _ekf.global_position_is_valid());
 
 	perf_print_counter(_ecl_ekf_update_perf);
@@ -324,6 +322,10 @@ void EKF2::Run()
 				}
 			}
 		}
+
+		_output_predictor.set_imu_pos_body(_params->imu_pos_body);
+		_output_predictor.set_velocity_state_time_constant(_param_ekf2_tau_vel.get());
+		_output_predictor.set_position_state_time_constant(_param_ekf2_tau_pos.get());
 	}
 
 	if (!_callback_registered) {
@@ -629,9 +631,7 @@ void EKF2::Run()
 			}
 
 			// TODO:  || !_output_predictor.allocate(_imu_buffer_length)
-			_output_predictor.correctOutputStates(imu_sample.time_us, _ekf.get_imu_sample_delayed().time_us,
-							      _ekf.get_dt_imu_avg(), _ekf.get_dt_ekf_avg(),
-							      _ekf.getQuaternion(), _ekf.getVelocity(), _ekf.getPosition());
+			_output_predictor.correctOutputStates(_ekf.get_imu_sample_delayed().time_us, _ekf.getQuaternion(), _ekf.getVelocity(), _ekf.getPosition());
 
 			PublishWindEstimate(now);
 
@@ -678,7 +678,7 @@ void EKF2::runOutputPredictor(const imuSample &imu)
 	// Use full rate IMU data at the current time horizon
 
 	// correct delta angles for bias offsets
-	const float dt_scale_correction = _ekf.get_dt_imu_avg() / _ekf.get_dt_ekf_avg();
+	const float dt_scale_correction = 0;// TODO:_ekf.get_dt_imu_avg() / _ekf.get_dt_ekf_avg();
 
 	// Apply corrections to the delta angle required to track the quaternion states at the EKF fusion time horizon
 	//_ekf.getGyroBias();
@@ -1151,7 +1151,7 @@ void EKF2::PublishOdometry(const hrt_abstime &timestamp, const Vector3f angular_
 			     + _ekf.get_velNE_reset_count() + _ekf.get_velD_reset_count()
 			     + _ekf.get_posNE_reset_count() + _ekf.get_posD_reset_count();
 
-	odom.quality = 0;
+	odom.quality = 1;
 
 	// publish vehicle odometry data
 	odom.timestamp = _replay_mode ? timestamp : hrt_absolute_time();

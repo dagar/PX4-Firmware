@@ -84,16 +84,10 @@ void Ekf::reset()
 bool Ekf::update(const imuSample &imu_sample)
 {
 	_imu_buffer.push(imu_sample);
-
-	const float dt = math::constrain((imu_sample.time_us - _time_last_imu) / 1e6f, 1.0e-4f, 0.02f);
 	_time_last_imu = imu_sample.time_us;
 
 	// get the oldest data from the buffer
 	_imu_sample_delayed = _imu_buffer.get_oldest();
-
-	if (_time_last_imu > 0) {
-		_dt_imu_avg = 0.8f * _dt_imu_avg + 0.2f * dt;
-	}
 
 	if (!_initialised) {
 		_initialised = init(imu_sample.time_us);

@@ -352,10 +352,6 @@ struct parameters {
 	Vector3f flow_pos_body{};               ///< xyz position of range sensor focal point in body frame (m)
 	Vector3f ev_pos_body{};                 ///< xyz position of VI-sensor focal point in body frame (m)
 
-	// output complementary filter tuning
-	float vel_Tau{0.25f};                   ///< velocity state correction time constant (1/sec)
-	float pos_Tau{0.25f};                   ///< position state correction time constant (1/sec)
-
 	// accel bias learning control
 	float acc_bias_lim{0.4f};               ///< maximum accel bias magnitude (m/sec**2)
 	float acc_bias_learn_acc_lim{25.0f};    ///< learning is disabled if the magnitude of the IMU acceleration vector is greater than this (m/sec**2)

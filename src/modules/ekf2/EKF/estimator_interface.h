@@ -214,9 +214,6 @@ public:
 	const decltype(information_event_status_u::flags) &information_event_flags() const { return _information_events.flags; }
 	void clear_information_events() { _information_events.value = 0; }
 
-	// Getter for the average imu update period in s
-	float get_dt_imu_avg() const { return _dt_imu_avg; }
-
 	// Getter for the average EKF update period in s
 	float get_dt_ekf_avg() const { return _dt_ekf_avg; }
 
@@ -261,7 +258,6 @@ protected:
 	*/
 	uint8_t _imu_buffer_length{12};
 
-	float _dt_imu_avg{0.005f};	// average imu update period in s
 	float _dt_ekf_avg{0.010f}; ///< average update rate of the ekf in s
 
 	imuSample _imu_sample_delayed{};	// captures the imu sample on the delayed time horizon

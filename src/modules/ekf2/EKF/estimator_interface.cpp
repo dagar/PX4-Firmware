@@ -497,7 +497,6 @@ void EstimatorInterface::printBufferAllocationFailed(const char *buffer_name)
 
 void EstimatorInterface::print_status()
 {
-	printf("IMU average dt: %.6f seconds\n", (double)_dt_imu_avg);
 	printf("EKF average dt: %.6f seconds\n", (double)_dt_ekf_avg);
 
 	printf("IMU buffer: %d (%d Bytes)\n", _imu_buffer.get_length(), _imu_buffer.get_total_size());

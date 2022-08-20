@@ -33,6 +33,8 @@
 
 #include "OutputPredictor.hpp"
 
+#include <lib/mathlib/mathlib.h>
+
 using matrix::AxisAnglef;
 using matrix::Dcmf;
 using matrix::Quatf;
@@ -43,6 +45,8 @@ void OutputPredictor::print_status()
 {
 	printf("output buffer: %d/%d (%d Bytes)\n", _output_buffer.entries(), _output_buffer.get_length(),
 	       _output_buffer.get_total_size());
+
+	printf("IMU average dt: %.6f seconds\n", (double)_dt_imu_avg);
 }
 
 void OutputPredictor::alignOutputFilter(const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state)
@@ -137,6 +141,11 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 {
 	// Use full rate IMU data at the current time horizon
 
+	const float dt = math::constrain((time_us - _time_calculate_output_last) * 1e-6f, 0.001f, 0.02f);
+	_time_calculate_output_last = time_us;
+
+	_dt_imu_avg = 0.9f * _dt_imu_avg + 0.1f * dt;
+
 	// Apply corrections to the delta angle required to track the quaternion states at the EKF fusion time horizon
 	const Vector3f delta_angle_corrected(delta_angle + _delta_angle_corr);
 
@@ -161,7 +170,7 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 
 	// calculate the earth frame velocity derivatives
 	if (delta_velocity_dt > 1e-4f) {
-		_vel_deriv = delta_vel_earth * (1.f / delta_velocity_dt);
+		_vel_deriv = delta_vel_earth / delta_velocity_dt;
 	}
 
 	// save the previous velocity so we can use trapezoidal integration
@@ -184,7 +193,7 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 	// correct velocity for IMU offset
 	if (delta_angle_dt > 1e-4f) {
 		// calculate the average angular rate across the last IMU update
-		const Vector3f ang_rate = delta_angle_corrected * (1.f / delta_angle_dt);
+		const Vector3f ang_rate = delta_angle_corrected / delta_angle_dt;
 
 		// calculate the velocity of the IMU relative to the body origin
 		const Vector3f vel_imu_rel_body = ang_rate % _imu_pos_body;
@@ -194,10 +203,14 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 	}
 }
 
-void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t time_delayed_us,
-		const float dt_imu_avg, const float dt_ekf_avg, const Quatf &quat_state, const Vector3f &vel_state,
-		const Vector3f &pos_state)
+void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us, const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state)
 {
+	const float dt = math::constrain((time_delayed_us - _time_correct_output_last) * 1e-6f, 0.001f, 0.02f);
+	_time_correct_output_last = time_delayed_us;
+
+	_dt_ekf_avg = 0.9f * _dt_ekf_avg + 0.1f * dt;
+
+
 	// TODO: check if first time and call align
 	if (_output_buffer.get_oldest().time_us == 0) {
 		// reset the output predictor state history to match the EKF initial values
@@ -215,6 +228,11 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 		return;
 	}
 
+	if (output_delayed.time_us != time_delayed_us) {
+		// ERROR
+		return;
+	}
+
 	// calculate the quaternion delta between the INS and EKF quaternions at the EKF fusion time horizon
 	const Quatf q_error((quat_state.inversed() * output_delayed.quat_nominal).normalized());
 
@@ -225,8 +243,8 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 
 	// calculate a gain that provides tight tracking of the estimator attitude states and
 	// adjust for changes in time delay to maintain consistent damping ratio of ~0.7
-	const float time_delay = fmaxf((time_us - time_delayed_us) * 1e-6f, dt_imu_avg);
-	const float att_gain = 0.5f * dt_imu_avg / time_delay;
+	const float time_delay = fmaxf((_output_new.time_us - time_delayed_us) * 1e-6f, _dt_imu_avg);
+	const float att_gain = 0.5f * _dt_imu_avg / time_delay;
 
 	// calculate a corrrection to the delta angle
 	// that will cause the INS to track the EKF quaternions
@@ -241,8 +259,8 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 	*/
 
 	// Complementary filter gains
-	const float vel_gain = dt_ekf_avg / math::constrain(_vel_tau, dt_ekf_avg, 10.f);
-	const float pos_gain = dt_ekf_avg / math::constrain(_pos_tau, dt_ekf_avg, 10.f);
+	const float vel_gain = _dt_ekf_avg / math::constrain(_vel_tau, _dt_ekf_avg, 10.f);
+	const float pos_gain = _dt_ekf_avg / math::constrain(_pos_tau, _dt_ekf_avg, 10.f);
 
 	// calculate velocity and position tracking errors
 	const Vector3f vel_err(vel_state - output_delayed.vel);
@@ -313,6 +331,7 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 		index = (index + 1) % size;
 	}
 
+	// TODO: review
 	// update output state to corrected values
 	_output_new = _output_buffer.get_newest();
 

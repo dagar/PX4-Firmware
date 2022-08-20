@@ -63,9 +63,7 @@ public:
 	void calculateOutputStates(const uint64_t time_us, const matrix::Vector3f delta_angle, const float delta_angle_dt,
 				   const matrix::Vector3f delta_velocity, const float delta_velocity_dt);
 
-	void correctOutputStates(const uint64_t time_us, const uint64_t time_delayed_us, const float dt_imu_avg,
-				 const float dt_ekf_avg, const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state,
-				 const matrix::Vector3f &pos_state);
+	void correctOutputStates(const uint64_t time_delayed_us, const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state, const matrix::Vector3f &pos_state);
 
 	void resetQuaternion(const matrix::Quatf &quat_change);
 
@@ -113,6 +111,9 @@ public:
 	// error magnitudes (rad), (m/sec), (m)
 	const matrix::Vector3f &getOutputTrackingError() const { return _output_tracking_error; }
 
+	// Getter for the average imu update period in s
+	float get_dt_imu_avg() const { return _dt_imu_avg; }
+
 private:
 
 	// return the square of two floating point numbers - used in auto coded sections
@@ -130,6 +131,11 @@ private:
 	};
 
 	RingBuffer<outputSample> _output_buffer{12};
+
+	uint64_t _time_calculate_output_last{0};
+	uint64_t _time_correct_output_last{0};
+	float _dt_imu_avg{0.005f};	// average imu update period in s
+	float _dt_ekf_avg{0.010f}; ///< average update rate of the ekf in s
 
 	// Output Predictor
 	outputSample _output_new{};		// filter output on the non-delayed time horizon
