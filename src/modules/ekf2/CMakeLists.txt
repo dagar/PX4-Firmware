@@ -62,11 +62,9 @@ px4_add_module(
 		EKF/gps_fusion.cpp
 		EKF/gps_yaw_fusion.cpp
 		EKF/height_fusion.cpp
-		EKF/imu_down_sampler.cpp
 		EKF/mag_control.cpp
 		EKF/mag_fusion.cpp
 		EKF/optflow_fusion.cpp
-		EKF/output_predictor.cpp
 		EKF/range_finder_consistency_check.cpp
 		EKF/sensor_range_finder.cpp
 		EKF/sideslip_fusion.cpp
@@ -79,6 +77,11 @@ px4_add_module(
 		EKF2.hpp
 		EKF2Selector.cpp
 		EKF2Selector.hpp
+
+		ImuDownSampler.cpp
+		ImuDownSampler.hpp
+		OutputPredictor.cpp
+		OutputPredictor.hpp
 
 	DEPENDS
 		geo

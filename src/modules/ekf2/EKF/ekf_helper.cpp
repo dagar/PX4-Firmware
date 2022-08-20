@@ -111,8 +111,6 @@ void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
 	const Vector2f delta_horz_vel = new_horz_vel - Vector2f(_state.vel);
 	_state.vel.xy() = new_horz_vel;
 
-	_output_predictor.resetHorizontalVelocityTo(delta_horz_vel);
-
 	_state_reset_status.velNE_change = delta_horz_vel;
 	_state_reset_status.velNE_counter++;
 
@@ -124,8 +122,6 @@ void Ekf::resetVerticalVelocityTo(float new_vert_vel)
 {
 	const float delta_vert_vel = new_vert_vel - _state.vel(2);
 	_state.vel(2) = new_vert_vel;
-
-	_output_predictor.resetVerticalVelocityTo(delta_vert_vel);
 
 	_state_reset_status.velD_change = delta_vert_vel;
 	_state_reset_status.velD_counter++;
@@ -190,8 +186,6 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
 	const Vector2f delta_horz_pos{new_horz_pos - Vector2f{_state.pos}};
 	_state.pos.xy() = new_horz_pos;
 
-	_output_predictor.resetHorizontalPositionTo(delta_horz_pos);
-
 	_state_reset_status.posNE_change = delta_horz_pos;
 	_state_reset_status.posNE_counter++;
 
@@ -207,8 +201,6 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos)
 	// store the reset amount and time to be published
 	_state_reset_status.posD_change = new_vert_pos - old_vert_pos;
 	_state_reset_status.posD_counter++;
-
-	_output_predictor.resetVerticalPositionTo(new_vert_pos, _state_reset_status.posD_change);
 
 	// Reset the timout timer
 	_time_last_hgt_fuse = _time_last_imu;
@@ -1769,8 +1761,6 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 	if (yaw_variance > FLT_EPSILON) {
 		increaseQuatYawErrVariance(yaw_variance);
 	}
-
-	_output_predictor.resetQuaternion(_state_reset_status.quat_change);
 
 	_last_static_yaw = NAN;
 

@@ -79,69 +79,58 @@ void Ekf::reset()
 	_prev_dvel_bias_var.zero();
 
 	resetGpsDriftCheckFilters();
-
-
-	// TODO:
-	_output_predictor.reset();
 }
 
-bool Ekf::update()
+bool Ekf::update(const imuSample &imu_sample)
 {
-	bool updated = false;
+	_imu_buffer.push(imu_sample);
+
+	const float dt = math::constrain((imu_sample.time_us - _time_last_imu) / 1e6f, 1.0e-4f, 0.02f);
+	_time_last_imu = imu_sample.time_us;
+
+	// get the oldest data from the buffer
+	_imu_sample_delayed = _imu_buffer.get_oldest();
+
+	if (_time_last_imu > 0) {
+		_dt_imu_avg = 0.8f * _dt_imu_avg + 0.2f * dt;
+	}
+
+	if (!_initialised) {
+		_initialised = init(imu_sample.time_us);
+	}
 
 	if (!_filter_initialised) {
-		_filter_initialised = initialiseFilter();
+		_filter_initialised = initialiseFilter(imu_sample);
 
 		if (!_filter_initialised) {
 			return false;
 		}
 	}
 
+	// calculate the minimum interval between observations required to guarantee no loss of data
+	// this will occur if data is overwritten before its time stamp falls behind the fusion time horizon
+	_min_obs_interval_us = (imu_sample.time_us - _imu_sample_delayed.time_us) / (_obs_buffer_length - 1);
+
+	setDragData(imu_sample);
+
+
 	// Only run the filter if IMU data in the buffer has been updated
-	if (_imu_updated) {
-		// perform state and covariance prediction for the main filter
-		predictState();
-		predictCovariance();
+	// perform state and covariance prediction for the main filter
+	predictState();
+	predictCovariance();
 
-		// control fusion of observation data
-		controlFusionModes();
+	// control fusion of observation data
+	controlFusionModes();
 
-		// run a separate filter for terrain estimation
-		runTerrainEstimator();
+	// run a separate filter for terrain estimation
+	runTerrainEstimator();
 
-		updated = true;
-	}
-
-	// the output observer always runs
-
-	{
-		// Use full rate IMU data at the current time horizon
-
-		// correct delta angles for bias offsets
-		const float dt_scale_correction = _dt_imu_avg / _dt_ekf_avg;
-
-		// Apply corrections to the delta angle required to track the quaternion states at the EKF fusion time horizon
-		const Vector3f delta_angle(_newest_high_rate_imu_sample.delta_ang - _state.delta_ang_bias * dt_scale_correction);
-		const float delta_angle_dt = _newest_high_rate_imu_sample.delta_ang_dt;
-
-		const Vector3f delta_velocity(_newest_high_rate_imu_sample.delta_vel - _state.delta_ang_bias * dt_scale_correction);
-		const float delta_velocity_dt = _newest_high_rate_imu_sample.delta_vel_dt;
-
-		_output_predictor.calculateOutputStates(_newest_high_rate_imu_sample.time_us, delta_angle, delta_angle_dt, delta_velocity, delta_velocity_dt);
-
-		if (_imu_updated) {
-			_output_predictor.correctOutputStates(_newest_high_rate_imu_sample.time_us, _imu_sample_delayed.time_us, _dt_imu_avg, _dt_ekf_avg,
-								_state.quat_nominal, _state.vel, _state.pos);
-		}
-	}
-
-	return updated;
+	return true;
 }
 
-bool Ekf::initialiseFilter()
+bool Ekf::initialiseFilter(const imuSample &imu_init)
 {
 	// Filter accel for tilt initialization
-	const imuSample &imu_init = _imu_buffer.get_newest();
 
 	// protect against zero data
 	if (imu_init.delta_vel_dt < 1e-4f || imu_init.delta_ang_dt < 1e-4f) {
@@ -247,9 +236,6 @@ bool Ekf::initialiseFilter()
 	_time_last_hagl_fuse = _time_last_imu;
 	_time_last_flow_terrain_fuse = _time_last_imu;
 	_time_last_of_fuse = _time_last_imu;
-
-	// reset the output predictor state history to match the EKF initial values
-	_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
 
 	return true;
 }

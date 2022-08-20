@@ -84,23 +84,10 @@ public:
 		return _output_buffer.allocate(size);
 	}
 
-	// TODO: realign?
-	void reset()
-	{
-		// TODO: who resets the output buffer content?
-		_output_new.vel.setZero();
-		_output_new.pos.setZero();
-		_output_new.quat_nominal.setIdentity();
 
-		_delta_angle_corr.setZero();
-	}
-
-
-
-	/*
-	* Predict the previous quaternion output state forward using the latest IMU delta angle data.
-	*/
-	matrix::Quatf calculate_quaternion(const matrix::Vector3f &delta_angle) const;
+	void set_imu_pos_body(const matrix::Vector3f imu_pos_body) { _imu_pos_body = imu_pos_body; }
+	void set_velocity_state_time_constant(const float vel_tau) { _vel_tau = vel_tau; }
+	void set_position_state_time_constant(const float pos_tau) { _pos_tau = pos_tau; }
 
 	const matrix::Quatf &getQuaternion() const { return _output_new.quat_nominal; }
 

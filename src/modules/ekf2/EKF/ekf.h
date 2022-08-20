@@ -70,13 +70,17 @@ public:
 		reset();
 	};
 
-	virtual ~Ekf() = default;
+	~Ekf() = default;
 
 	// initialise variables to sane values (also interface class)
-	bool init(uint64_t timestamp) override;
+	bool init(uint64_t timestamp);
 
 	// should be called every time new data is pushed into the filter
-	bool update();
+	bool update(const imuSample &imu_sample);
+
+	const matrix::Quatf &getQuaternion() const { return _state.quat_nominal; }
+	const Vector3f &getVelocity() const { return _state.vel; }
+	const Vector3f &getPosition() const { return _state.pos; }
 
 	void getGpsVelPosInnov(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getGpsVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
@@ -365,14 +369,6 @@ public:
 	// return the quaternion defining the rotation from the External Vision to the EKF reference frame
 	matrix::Quatf getVisionAlignmentQuaternion() const { return Quatf(_R_ev_to_ekf); };
 
-	// Output predictor
-	Quatf calculate_quaternion() const
-	{
-		// Correct delta angle data for bias errors using bias state estimates from the EKF
-		const matrix::Vector3f delta_angle{_newest_high_rate_imu_sample.delta_ang - _state.delta_ang_bias * (_dt_imu_avg / _dt_ekf_avg)};
-		return _output_predictor.calculate_quaternion(delta_angle);
-	}
-
 	// set minimum continuous period without GPS fail required to mark a healthy GPS status
 	void set_min_required_gps_health_time(uint32_t time_us) { _min_gps_health_time_us = time_us; }
 
@@ -631,10 +627,8 @@ private:
 
 	float _height_rate_lpf{0.0f};
 
-
-
 	// initialise filter states of both the delayed ekf and the real time complementary filter
-	bool initialiseFilter(void);
+	bool initialiseFilter(const imuSample &imu_init);
 
 	// initialise ekf covariance matrix
 	void initialiseCovariance();

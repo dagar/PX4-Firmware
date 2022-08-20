@@ -34,7 +34,8 @@
 #include <gtest/gtest.h>
 #include <math.h>
 #include "EKF/ekf.h"
-#include "EKF/imu_down_sampler.hpp"
+
+#include "ImuDownSampler.hpp"
 
 class EkfImuSamplingTest : public ::testing::TestWithParam<std::tuple<float, float, Vector3f, Vector3f>>
 {
@@ -81,7 +82,7 @@ TEST_P(EkfImuSamplingTest, imuSamplingAtMultipleRates)
 	for (int i = 0; i < (int)30 / std::get<0>(GetParam()); ++i) {
 		n_samples++;
 		imu_sample.time_us = _t_us;
-		_ekf.setIMUData(imu_sample);
+		_ekf.update(imu_sample);
 		_t_us += dt_us;
 	}
 

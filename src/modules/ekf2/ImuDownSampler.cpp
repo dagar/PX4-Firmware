@@ -1,4 +1,4 @@
-#include "imu_down_sampler.hpp"
+#include "ImuDownSampler.hpp"
 
 #include <lib/mathlib/mathlib.h>
 

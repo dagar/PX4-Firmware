@@ -41,7 +41,7 @@
 #include <mathlib/mathlib.h>
 #include <matrix/math.hpp>
 
-#include "common.h"
+#include "EKF/common.h"
 
 using namespace estimator;
 

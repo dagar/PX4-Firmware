@@ -62,11 +62,9 @@
 
 #include "common.h"
 #include "RingBuffer.h"
-#include "imu_down_sampler.hpp"
 #include "range_finder_consistency_check.hpp"
 #include "sensor_range_finder.hpp"
 #include "utils.hpp"
-#include "output_predictor.h"
 
 #include <lib/geo/geo.h>
 #include <matrix/math.hpp>
@@ -80,8 +78,6 @@ class EstimatorInterface
 public:
 	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
 	virtual bool collect_gps(const gpsMessage &gps) = 0;
-
-	void setIMUData(const imuSample &imu_sample);
 
 	void setMagData(const magSample &mag_sample);
 
@@ -182,13 +178,6 @@ public:
 
 	int getNumberOfActiveHorizontalAidingSources() const;
 
-	const matrix::Quatf &getQuaternion() const { return _output_predictor.getQuaternion(); }
-	Vector3f getVelocity() const { return _output_predictor.getVelocity(); }
-	const Vector3f &getVelocityDerivative() const { return _output_predictor.getVelocityDerivative(); }
-	float getVerticalPositionDerivative() const { return _output_predictor.getVerticalPositionDerivative(); }
-	Vector3f getPosition() const { return _output_predictor.getPosition(); }
-	const Vector3f &getOutputTrackingError() const { return _output_predictor.getOutputTrackingError(); }
-
 	// Get the value of magnetic declination in degrees to be saved for use at the next startup
 	// Returns true when the declination can be saved
 	// At the next startup, set param.mag_declination_deg to the value saved
@@ -233,7 +222,6 @@ public:
 
 	// Getters for samples on the delayed time horizon
 	const imuSample &get_imu_sample_delayed() const { return _imu_sample_delayed; }
-	const imuSample &get_imu_sample_newest() const { return _newest_high_rate_imu_sample; }
 
 	const baroSample &get_baro_sample_delayed() const { return _baro_sample_delayed; }
 	const gpsSample &get_gps_sample_delayed() const { return _gps_sample_delayed; }
@@ -250,9 +238,9 @@ public:
 protected:
 
 	EstimatorInterface() = default;
-	virtual ~EstimatorInterface();
+	~EstimatorInterface();
 
-	virtual bool init(uint64_t timestamp) = 0;
+	void setDragData(const imuSample &imu);
 
 	parameters _params{};		// filter parameters
 
@@ -263,7 +251,7 @@ protected:
 	 max freq (Hz) = (OBS_BUFFER_LENGTH - 1) / (IMU_BUFFER_LENGTH * FILTER_UPDATE_PERIOD_S)
 	 This can be adjusted to match the max sensor data rate plus some margin for jitter.
 	*/
-	uint8_t _obs_buffer_length{0};
+	uint8_t _obs_buffer_length{1};
 
 	/*
 	IMU_BUFFER_LENGTH defines how many IMU samples we buffer which sets the time delay from current time to the
@@ -271,13 +259,12 @@ protected:
 	max sensor time offet (msec) =  IMU_BUFFER_LENGTH * FILTER_UPDATE_PERIOD_MS
 	This can be adjusted to a value that is FILTER_UPDATE_PERIOD_MS longer than the maximum observation time delay.
 	*/
-	uint8_t _imu_buffer_length{0};
+	uint8_t _imu_buffer_length{12};
 
 	float _dt_imu_avg{0.005f};	// average imu update period in s
 	float _dt_ekf_avg{0.010f}; ///< average update rate of the ekf in s
 
 	imuSample _imu_sample_delayed{};	// captures the imu sample on the delayed time horizon
-	imuSample _newest_high_rate_imu_sample{};		// imu sample capturing the newest imu data
 
 	// measurement samples capturing measurements on the delayed time horizon
 	baroSample _baro_sample_delayed{};
@@ -298,7 +285,6 @@ protected:
 	float _flow_min_distance{0.0f};	///< minimum distance that the optical flow sensor can operate at (m)
 	float _flow_max_distance{10.f};	///< maximum distance that the optical flow sensor can operate at (m)
 
-	bool _imu_updated{false};      // true if the ekf should update (completed downsampling process)
 	bool _initialised{false};      // true if the ekf interface instance (data buffering) is initialized
 
 	bool _NED_origin_initialised{false};
@@ -375,17 +361,11 @@ protected:
 	warning_event_status_u _warning_events{};
 	information_event_status_u _information_events{};
 
-	OutputPredictor _output_predictor{};
+	unsigned _min_obs_interval_us{0}; // minimum time interval between observations that will guarantee data is not lost (usec)
 
 private:
 
-	inline void setDragData(const imuSample &imu);
-
 	void printBufferAllocationFailed(const char *buffer_name);
-
-	ImuDownSampler _imu_down_sampler{_params.filter_update_interval_us};
-
-	unsigned _min_obs_interval_us{0}; // minimum time interval between observations that will guarantee data is not lost (usec)
 
 	// Used by the multi-rotor specific drag force fusion
 	uint8_t _drag_sample_count{0};	// number of drag specific force samples assumulated at the filter prediction rate

@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "output_predictor.h"
+#include "OutputPredictor.hpp"
 
 using matrix::AxisAnglef;
 using matrix::Dcmf;
@@ -47,6 +47,17 @@ void OutputPredictor::print_status()
 
 void OutputPredictor::alignOutputFilter(const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state)
 {
+	// TODO: reset
+
+	// TODO: realign?
+	// // TODO: who resets the output buffer content?
+	// _output_new.vel.setZero();
+	// _output_new.pos.setZero();
+	// _output_new.quat_nominal.setIdentity();
+
+	// _delta_angle_corr.setZero();
+
+
 	const outputSample &output_delayed = _output_buffer.get_oldest();
 
 	// calculate the quaternion rotation delta from the EKF to output observer states at the EKF fusion time horizon
@@ -187,14 +198,22 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 		const float dt_imu_avg, const float dt_ekf_avg, const Quatf &quat_state, const Vector3f &vel_state,
 		const Vector3f &pos_state)
 {
+	// TODO: check if first time and call align
+	if (_output_buffer.get_oldest().time_us == 0) {
+		// reset the output predictor state history to match the EKF initial values
+		alignOutputFilter(quat_state, vel_state, pos_state);
+	}
+
 	// store the INS states in a ring buffer with the same length and time coordinates as the IMU data buffer
 	_output_buffer.push(_output_new);
 
 	// get the oldest INS state data from the ring buffer
 	// this data will be at the EKF fusion time horizon
-	// TODO: there is no guarantee that data is at delayed fusion horizon
-	//       Shouldnt we use pop_first_older_than?
-	const outputSample &output_delayed = _output_buffer.get_oldest();
+	outputSample output_delayed;
+
+	if (!_output_buffer.pop_first_older_than(time_delayed_us, &output_delayed)) {
+		return;
+	}
 
 	// calculate the quaternion delta between the INS and EKF quaternions at the EKF fusion time horizon
 	const Quatf q_error((quat_state.inversed() * output_delayed.quat_nominal).normalized());
@@ -273,6 +292,7 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 
 	const uint8_t size = _output_buffer.get_length();
 
+	// TODO: review now that oldest sample is popped
 	for (uint8_t counter = 0; counter < (size - 1); counter++) {
 		const uint8_t index_next = (index + 1) % size;
 		outputSample &current_state = _output_buffer[index];
@@ -286,7 +306,8 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 		next_state.vert_vel += vert_vel_correction;
 
 		// position is propagated forward using the corrected velocity and a trapezoidal integrator
-		next_state.vert_vel_integ = current_state.vert_vel_integ + (current_state.vert_vel + next_state.vert_vel) * 0.5f * next_state.dt;
+		next_state.vert_vel_integ = current_state.vert_vel_integ + (current_state.vert_vel + next_state.vert_vel) * 0.5f *
+					    next_state.dt;
 
 		// advance the index
 		index = (index + 1) % size;
@@ -297,14 +318,4 @@ void OutputPredictor::correctOutputStates(const uint64_t time_us, const uint64_t
 
 	// reset time delta to zero for the next accumulation of full rate IMU data
 	_output_new.dt = 0.0f;
-}
-
-Quatf OutputPredictor::calculate_quaternion(const Vector3f &delta_angle) const
-{
-	// apply corrections required to track the EKF quaternion states
-	const Vector3f delta_angle_corrected{delta_angle + _delta_angle_corr};
-
-	// increment the quaternions using the corrected delta angle vector
-	// the quaternions must always be normalised after modification
-	return Quatf{_output_new.quat_nominal * AxisAnglef{delta_angle_corrected}}.unit();
 }

@@ -45,6 +45,8 @@
 #include "Utility/PreFlightChecker.hpp"
 
 #include "EKF2Selector.hpp"
+#include "ImuDownSampler.hpp"
+#include "OutputPredictor.hpp"
 
 #include <float.h>
 
@@ -134,6 +136,8 @@ private:
 
 	void Run() override;
 
+	void runOutputPredictor(const imuSample &imu);
+
 	void PublishAidSourceStatus(const hrt_abstime &timestamp);
 	void PublishAttitude(const hrt_abstime &timestamp);
 	void PublishBaroBias(const hrt_abstime &timestamp);
@@ -144,7 +148,7 @@ private:
 	void PublishInnovationTestRatios(const hrt_abstime &timestamp);
 	void PublishInnovationVariances(const hrt_abstime &timestamp);
 	void PublishLocalPosition(const hrt_abstime &timestamp);
-	void PublishOdometry(const hrt_abstime &timestamp);
+	void PublishOdometry(const hrt_abstime &timestamp, const matrix::Vector3f angular_velocity);
 	void PublishOdometryAligned(const hrt_abstime &timestamp, const vehicle_odometry_s &ev_odom);
 	void PublishOpticalFlowVel(const hrt_abstime &timestamp);
 	void PublishSensorBias(const hrt_abstime &timestamp);
@@ -195,6 +199,15 @@ private:
 	int _instance{0};
 
 	px4::atomic_bool _task_should_exit{false};
+
+	ImuDownSampler _imu_down_sampler{_params->filter_update_interval_us};
+
+	OutputPredictor _output_predictor{};
+	uint8_t _quat_reset_counter{0};
+	uint8_t _xy_reset_counter{0};
+	uint8_t _z_reset_counter{0};
+	uint8_t _vxy_reset_counter{0};
+	uint8_t _vz_reset_counter{0};
 
 	// time slip monitoring
 	uint64_t _integrated_time_us = 0;	///< integral of gyro delta time from start (uSec)
