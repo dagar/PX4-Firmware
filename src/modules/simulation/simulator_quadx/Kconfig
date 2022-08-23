@@ -1,0 +1,5 @@
+menuconfig MODULES_SIMULATION_SIMULATOR_QUADX
+	bool "simulator_quadx"
+	default n
+	---help---
+		Enable support for simulator_quadx

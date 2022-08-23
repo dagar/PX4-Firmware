@@ -1,0 +1,5 @@
+menuconfig MODULES_SIMULATION_SIMULATOR_TAILSITTER
+	bool "simulator_tailsitter"
+	default n
+	---help---
+		Enable support for simulator_tailsitter

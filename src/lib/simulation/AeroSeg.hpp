@@ -32,7 +32,7 @@
 ****************************************************************************/
 
 /**
- * @file aero.hpp
+ * @file AeroSeg
  * Aerodynamic class for modeling wing, tailaplane, fin.
  * Captures the effect of partial stall, low aspect ratio, control surfaces deflection,
  * propeller slipstream.
@@ -56,8 +56,6 @@
  * - any dihedral angle, the fin is modeled as a wing with dihedral angle of 90 deg.
  * - slipstream velocity (velocity from the propeller) using momentum theory.
  */
-
-
 
 #pragma once
 

@@ -232,38 +232,6 @@ PARAM_DEFINE_FLOAT(SIH_KDV, 1.0f);
 PARAM_DEFINE_FLOAT(SIH_KDW, 0.025f);
 
 /**
- * Initial geodetic latitude
- *
- * This value represents the North-South location on Earth where the simulation begins.
- * A value of 45 deg should be written 450000000.
- *
- * LAT0, LON0, H0, MU_X, MU_Y, and MU_Z should ideally be consistent among each others
- * to represent a physical ground location on Earth.
- *
- * @unit deg*1e7
- * @min -850000000
- * @max  850000000
- * @group Simulation In Hardware
- */
-PARAM_DEFINE_INT32(SIH_LOC_LAT0, 454671160);
-
-/**
- * Initial geodetic longitude
- *
- * This value represents the East-West location on Earth where the simulation begins.
- * A value of 45 deg should be written 450000000.
- *
- * LAT0, LON0, H0, MU_X, MU_Y, and MU_Z should ideally be consistent among each others
- * to represent a physical ground location on Earth.
- *
- * @unit deg*1e7
- * @min -1800000000
- * @max  1800000000
- * @group Simulation In Hardware
- */
-PARAM_DEFINE_INT32(SIH_LOC_LON0, -737578370);
-
-/**
  * Initial AMSL ground altitude
  *
  * This value represents the Above Mean Sea Level (AMSL) altitude where the simulation begins.
@@ -283,15 +251,6 @@ PARAM_DEFINE_INT32(SIH_LOC_LON0, -737578370);
  * @group Simulation In Hardware
  */
 PARAM_DEFINE_FLOAT(SIH_LOC_H0, 32.34f);
-
-/**
- * Number of GPS satellites used
- *
- * @min 0
- * @max  50
- * @group Simulation In Hardware
- */
-PARAM_DEFINE_INT32(SIH_GPS_USED, 10);
 
 /**
  * distance sensor minimum range
@@ -336,14 +295,3 @@ PARAM_DEFINE_FLOAT(SIH_DISTSNSR_OVR, -1.0f);
  * @group Simulation In Hardware
  */
 PARAM_DEFINE_FLOAT(SIH_T_TAU, 0.05f);
-
-/**
- * Vehicle type
- *
- * @value 0 Multicopter
- * @value 1 Fixed-Wing
- * @value 2 Tailsitter
- * @reboot_required true
- * @group Simulation In Hardware
- */
-PARAM_DEFINE_INT32(SIH_VEHICLE_TYPE, 0);

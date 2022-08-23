@@ -71,12 +71,10 @@
 #include <uORB/SubscriptionInterval.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/actuator_outputs.h>
-#include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/vehicle_angular_velocity.h>   // to publish groundtruth
 #include <uORB/topics/vehicle_attitude.h>           // to publish groundtruth
 #include <uORB/topics/vehicle_global_position.h>    // to publish groundtruth
 #include <uORB/topics/distance_sensor.h>
-#include <uORB/topics/airspeed.h>
 
 #if defined(ENABLE_LOCKSTEP_SCHEDULER)
 #include <sys/time.h>
@@ -84,20 +82,18 @@
 
 using namespace time_literals;
 
-extern "C" __EXPORT int sih_main(int argc, char *argv[]);
-
-class Sih : public ModuleBase<Sih>, public ModuleParams
+class SimulatorQuadx : public ModuleBase<SimulatorQuadx>, public ModuleParams
 {
 public:
-	Sih();
+	SimulatorQuadx();
 
-	virtual ~Sih();
+	virtual ~SimulatorQuadx();
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
 
 	/** @see ModuleBase */
-	static Sih *instantiate(int argc, char *argv[]);
+	static SimulatorQuadx *instantiate(int argc, char *argv[]);
 
 	/** @see ModuleBase */
 	static int custom_command(int argc, char *argv[]);
@@ -126,57 +122,32 @@ private:
 	PX4Accelerometer _px4_accel{1310988}; // 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
 	PX4Gyroscope     _px4_gyro{1310988};  // 1310988: DRV_IMU_DEVTYPE_SIM, BUS: 1, ADDR: 1, TYPE: SIMULATION
 
-	// to publish the gps position
-	sensor_gps_s			_sensor_gps{};
-	uORB::Publication<sensor_gps_s>	_sensor_gps_pub{ORB_ID(sensor_gps)};
-
 	// to publish the distance sensor
 	distance_sensor_s                    _distance_snsr{};
 	uORB::Publication<distance_sensor_s> _distance_snsr_pub{ORB_ID(distance_sensor)};
 
 	// angular velocity groundtruth
-	vehicle_angular_velocity_s			_vehicle_angular_velocity_gt{};
 	uORB::Publication<vehicle_angular_velocity_s>	_vehicle_angular_velocity_gt_pub{ORB_ID(vehicle_angular_velocity_groundtruth)};
 
 	// attitude groundtruth
-	vehicle_attitude_s				_att_gt{};
-	uORB::Publication<vehicle_attitude_s>		_att_gt_pub{ORB_ID(vehicle_attitude_groundtruth)};
-
-	// global position groundtruth
-	vehicle_global_position_s			_gpos_gt{};
-	uORB::Publication<vehicle_global_position_s>	_gpos_gt_pub{ORB_ID(vehicle_global_position_groundtruth)};
-
-	// airspeed
-	uORB::Publication<airspeed_s>				_airspeed_pub{ORB_ID(airspeed)};
+	uORB::Publication<vehicle_attitude_s> _att_gt_pub{ORB_ID(vehicle_attitude_groundtruth)};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 	uORB::Subscription _actuator_out_sub{ORB_ID(actuator_outputs)};
 
 	// hard constants
-	static constexpr uint16_t NB_MOTORS = 6;
+	static constexpr uint16_t NB_MOTORS = 4;
 	static constexpr float T1_C = 15.0f;                        // ground temperature in Celsius
 	static constexpr float T1_K = T1_C - CONSTANTS_ABSOLUTE_NULL_CELSIUS;   // ground temperature in Kelvin
 	static constexpr float TEMP_GRADIENT  = -6.5f / 1000.0f;    // temperature gradient in degrees per metre
-	// Aerodynamic coefficients
-	static constexpr float RHO = 1.225f; 		// air density at sea level [kg/m^3]
-	static constexpr float SPAN = 0.86f; 	// wing span [m]
-	static constexpr float MAC = 0.21f; 	// wing mean aerodynamic chord [m]
-	static constexpr float RP = 0.1f; 	// radius of the propeller [m]
-	static constexpr float FLAP_MAX = M_PI_F / 12.0f; // 15 deg, maximum control surface deflection
 
 	void init_variables();
-	void gps_fix();
-	void gps_no_fix();
 	void read_motors();
 	void generate_force_and_torques();
 	void equations_of_motion();
 	void reconstruct_sensors_signals();
-	void send_gps();
-	void send_airspeed();
 	void send_dist_snsr();
 	void publish_sih();
-	void generate_fw_aerodynamics();
-	void generate_ts_aerodynamics();
 	void sensor_step();
 
 #if defined(ENABLE_LOCKSTEP_SCHEDULER)
@@ -194,9 +165,6 @@ private:
 
 	hrt_abstime _last_run{0};
 	hrt_abstime _last_actuator_output_time{0};
-	hrt_abstime _gps_time{0};
-	hrt_abstime _airspeed_time{0};
-	hrt_abstime _gt_time{0};
 	hrt_abstime _dist_snsr_time{0};
 	hrt_abstime _now{0};
 	float       _dt{0};         // sampling time [s]
@@ -218,99 +186,42 @@ private:
 	matrix::Vector3f    _w_B_dot;       // body rates differential
 	float       _u[NB_MOTORS];          // thruster signals
 
-	enum class VehicleType {MC, FW, TS};
-	VehicleType _vehicle = VehicleType::MC;
-
-	// aerodynamic segments for the fixedwing
-	AeroSeg _wing_l = AeroSeg(SPAN / 2.0f, MAC, -4.0f, matrix::Vector3f(0.0f, -SPAN / 4.0f, 0.0f), 3.0f,
-				  SPAN / MAC, MAC / 3.0f);
-	AeroSeg _wing_r = AeroSeg(SPAN / 2.0f, MAC, -4.0f, matrix::Vector3f(0.0f, SPAN / 4.0f, 0.0f), -3.0f,
-				  SPAN / MAC, MAC / 3.0f);
-	AeroSeg _tailplane = AeroSeg(0.3f, 0.1f, 0.0f, matrix::Vector3f(-0.4f, 0.0f, 0.0f), 0.0f, -1.0f, 0.05f, RP);
-	AeroSeg _fin = AeroSeg(0.25, 0.18, 0.0f, matrix::Vector3f(-0.45f, 0.0f, -0.1f), -90.0f, -1.0f, 0.12f, RP);
-	AeroSeg _fuselage = AeroSeg(0.2, 0.8, 0.0f, matrix::Vector3f(0.0f, 0.0f, 0.0f), -90.0f);
-
-	// aerodynamic segments for the tailsitter
-	static constexpr const int NB_TS_SEG = 11;
-	static constexpr const float TS_AR = 3.13f;
-	static constexpr const float TS_CM = 0.115f;	// longitudinal position of the CM from trailing edge
-	static constexpr const float TS_RP = 0.0625f;	// propeller radius [m]
-	static constexpr const float TS_DEF_MAX = math::radians(39.0f); 	// max deflection
-	matrix::Dcmf _C_BS = matrix::Dcmf(matrix::Eulerf(0.0f, math::radians(90.0f), 0.0f)); // segment to body 90 deg pitch
-	AeroSeg _ts[NB_TS_SEG] = {
-		AeroSeg(0.0225f, 0.110f, 0.0f, matrix::Vector3f(0.083f - TS_CM, -0.239f, 0.0f), 0.0f, TS_AR),
-		AeroSeg(0.0383f, 0.125f, 0.0f, matrix::Vector3f(0.094f - TS_CM, -0.208f, 0.0f), 0.0f, TS_AR, 0.063f),
-		// AeroSeg(0.0884f, 0.148f, 0.0f, matrix::Vector3f(0.111f-TS_CM, -0.143f, 0.0f), 0.0f, TS_AR, 0.063f, TS_RP),
-		AeroSeg(0.0884f, 0.085f, 0.0f, matrix::Vector3f(0.158f - TS_CM, -0.143f, 0.0f), 0.0f, TS_AR),
-		AeroSeg(0.0884f, 0.063f, 0.0f, matrix::Vector3f(0.047f - TS_CM, -0.143f, 0.0f), 0.0f, TS_AR, 0.063f, TS_RP),
-		AeroSeg(0.0633f, 0.176f, 0.0f, matrix::Vector3f(0.132f - TS_CM, -0.068f, 0.0f), 0.0f, TS_AR, 0.063f),
-		AeroSeg(0.0750f, 0.231f, 0.0f, matrix::Vector3f(0.173f - TS_CM,  0.000f, 0.0f), 0.0f, TS_AR),
-		AeroSeg(0.0633f, 0.176f, 0.0f, matrix::Vector3f(0.132f - TS_CM,  0.068f, 0.0f), 0.0f, TS_AR, 0.063f),
-		// AeroSeg(0.0884f, 0.148f, 0.0f, matrix::Vector3f(0.111f-TS_CM,  0.143f, 0.0f), 0.0f, TS_AR, 0.063f, TS_RP),
-		AeroSeg(0.0884f, 0.085f, 0.0f, matrix::Vector3f(0.158f - TS_CM,  0.143f, 0.0f), 0.0f, TS_AR),
-		AeroSeg(0.0884f, 0.063f, 0.0f, matrix::Vector3f(0.047f - TS_CM,  0.143f, 0.0f), 0.0f, TS_AR, 0.063f, TS_RP),
-		AeroSeg(0.0383f, 0.125f, 0.0f, matrix::Vector3f(0.094f - TS_CM,  0.208f, 0.0f), 0.0f, TS_AR, 0.063f),
-		AeroSeg(0.0225f, 0.110f, 0.0f, matrix::Vector3f(0.083f - TS_CM,  0.239f, 0.0f), 0.0f, TS_AR)
-	};
-
-	// AeroSeg _ts[NB_TS_SEG] = {
-	// 	AeroSeg(0.0225f, 0.110f, -90.0f, matrix::Vector3f(0.0f, -0.239f, TS_CM-0.083f), 0.0f, TS_AR),
-	// 	AeroSeg(0.0383f, 0.125f, -90.0f, matrix::Vector3f(0.0f, -0.208f, TS_CM-0.094f), 0.0f, TS_AR, 0.063f),
-	// 	AeroSeg(0.0884f, 0.148f, -90.0f, matrix::Vector3f(0.0f, -0.143f, TS_CM-0.111f), 0.0f, TS_AR, 0.063f, TS_RP),
-	// 	AeroSeg(0.0633f, 0.176f, -90.0f, matrix::Vector3f(0.0f, -0.068f, TS_CM-0.132f), 0.0f, TS_AR, 0.063f),
-	// 	AeroSeg(0.0750f, 0.231f, -90.0f, matrix::Vector3f(0.0f,  0.000f, TS_CM-0.173f), 0.0f, TS_AR),
-	// 	AeroSeg(0.0633f, 0.176f, -90.0f, matrix::Vector3f(0.0f,  0.068f, TS_CM-0.132f), 0.0f, TS_AR, 0.063f),
-	// 	AeroSeg(0.0884f, 0.148f, -90.0f, matrix::Vector3f(0.0f,  0.143f, TS_CM-0.111f), 0.0f, TS_AR, 0.063f, TS_RP),
-	// 	AeroSeg(0.0383f, 0.125f, -90.0f, matrix::Vector3f(0.0f,  0.208f, TS_CM-0.094f), 0.0f, TS_AR, 0.063f),
-	// 	AeroSeg(0.0225f, 0.110f, -90.0f, matrix::Vector3f(0.0f,  0.239f, TS_CM-0.083f), 0.0f, TS_AR)
-	// 	};
-
 	// sensors reconstruction
 	matrix::Vector3f    _acc;
 	matrix::Vector3f    _gyro;
-	matrix::Vector3f    _gps_vel;
-	double      _gps_lat, _gps_lat_noiseless;
-	double      _gps_lon, _gps_lon_noiseless;
-	float       _gps_alt, _gps_alt_noiseless;
 
 	float       _temp_c;   // reconstructed (simulated) barometer temperature in degrees Celsius
 
 	// parameters
 	float _MASS, _T_MAX, _Q_MAX, _L_ROLL, _L_PITCH, _KDV, _KDW, _H0, _T_TAU;
-	double _LAT0, _LON0, _COS_LAT0;
+
 	matrix::Vector3f _W_I;  // weight of the vehicle in inertial frame [N]
 	matrix::Matrix3f _I;    // vehicle inertia matrix
 	matrix::Matrix3f _Im1;  // inverse of the inertia matrix
 
-	int _gps_used;
 	float _distance_snsr_min, _distance_snsr_max, _distance_snsr_override;
 
 	// parameters defined in sih_params.c
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _imu_gyro_ratemax,
 		(ParamInt<px4::params::IMU_INTEG_RATE>) _imu_integration_rate,
-		(ParamFloat<px4::params::SIH_MASS>) _sih_mass,
-		(ParamFloat<px4::params::SIH_IXX>) _sih_ixx,
-		(ParamFloat<px4::params::SIH_IYY>) _sih_iyy,
-		(ParamFloat<px4::params::SIH_IZZ>) _sih_izz,
-		(ParamFloat<px4::params::SIH_IXY>) _sih_ixy,
-		(ParamFloat<px4::params::SIH_IXZ>) _sih_ixz,
-		(ParamFloat<px4::params::SIH_IYZ>) _sih_iyz,
-		(ParamFloat<px4::params::SIH_T_MAX>) _sih_t_max,
-		(ParamFloat<px4::params::SIH_Q_MAX>) _sih_q_max,
-		(ParamFloat<px4::params::SIH_L_ROLL>) _sih_l_roll,
-		(ParamFloat<px4::params::SIH_L_PITCH>) _sih_l_pitch,
-		(ParamFloat<px4::params::SIH_KDV>) _sih_kdv,
-		(ParamFloat<px4::params::SIH_KDW>) _sih_kdw,
-		(ParamInt<px4::params::SIH_LOC_LAT0>) _sih_lat0,
-		(ParamInt<px4::params::SIH_LOC_LON0>) _sih_lon0,
-		(ParamFloat<px4::params::SIH_LOC_H0>) _sih_h0,
-		(ParamInt<px4::params::SIH_GPS_USED>) _sih_gps_used,
-		(ParamFloat<px4::params::SIH_DISTSNSR_MIN>) _sih_distance_snsr_min,
-		(ParamFloat<px4::params::SIH_DISTSNSR_MAX>) _sih_distance_snsr_max,
-		(ParamFloat<px4::params::SIH_DISTSNSR_OVR>) _sih_distance_snsr_override,
-		(ParamFloat<px4::params::SIH_T_TAU>) _sih_thrust_tau,
-		(ParamInt<px4::params::SIH_VEHICLE_TYPE>) _sih_vtype,
-		(ParamBool<px4::params::SYS_CTRL_ALLOC>) _sys_ctrl_alloc
+		(ParamFloat<px4::params::SIM_QX_MASS>) _sih_mass,
+		(ParamFloat<px4::params::SIM_QX_IXX>) _sih_ixx,
+		(ParamFloat<px4::params::SIM_QX_IYY>) _sih_iyy,
+		(ParamFloat<px4::params::SIM_QX_IZZ>) _sih_izz,
+		(ParamFloat<px4::params::SIM_QX_IXY>) _sih_ixy,
+		(ParamFloat<px4::params::SIM_QX_IXZ>) _sih_ixz,
+		(ParamFloat<px4::params::SIM_QX_IYZ>) _sih_iyz,
+		(ParamFloat<px4::params::SIM_QX_T_MAX>) _sih_t_max,
+		(ParamFloat<px4::params::SIM_QX_Q_MAX>) _sih_q_max,
+		(ParamFloat<px4::params::SIM_QX_L_ROLL>) _sih_l_roll,
+		(ParamFloat<px4::params::SIM_QX_L_PITCH>) _sih_l_pitch,
+		(ParamFloat<px4::params::SIM_QX_KDV>) _sih_kdv,
+		(ParamFloat<px4::params::SIM_QX_KDW>) _sih_kdw,
+		(ParamFloat<px4::params::SIM_QX_LOC_H0>) _sih_h0,
+		(ParamFloat<px4::params::SIM_QX_DSNSR_MIN>) _sih_distance_snsr_min,
+		(ParamFloat<px4::params::SIM_QX_DSNSR_MAX>) _sih_distance_snsr_max,
+		(ParamFloat<px4::params::SIM_QX_DSNSR_OVR>) _sih_distance_snsr_override,
+		(ParamFloat<px4::params::SIM_QX_T_TAU>) _sih_thrust_tau
 	)
 };

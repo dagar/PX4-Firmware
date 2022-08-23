@@ -32,14 +32,13 @@
 ############################################################################
 
 px4_add_module(
-	MODULE modules__simulation__simulator_sih
-	MAIN simulator_sih
+	MODULE modules__simulation__simulator_tailsitter
+	MAIN simulator_tailsitter
 	COMPILE_FLAGS
 		${MAX_CUSTOM_OPT_LEVEL}
 	SRCS
-		aero.hpp
-		sih.cpp
-		sih.hpp
+		SimulatorTailsitter.cpp
+		SimulatorTailsitter.hpp
 	DEPENDS
 		mathlib
 		drivers_accelerometer
@@ -47,20 +46,12 @@ px4_add_module(
 	)
 
 if(PX4_PLATFORM MATCHES "posix")
-	# create targets for sihsim
-	set(models
-		airplane
-		quadx
-		xvert
-	)
 
-	foreach(model ${models})
-		add_custom_target(sihsim_${model}
-			COMMAND ${CMAKE_COMMAND} -E env PX4_SIM_MODEL=${model} PX4_SIMULATOR=sihsim $<TARGET_FILE:px4>
-			WORKING_DIRECTORY ${SITL_WORKING_DIR}
-			USES_TERMINAL
-			DEPENDS px4
-		)
-	endforeach()
+	add_custom_target(simulator_tailsitter
+		COMMAND ${CMAKE_COMMAND} -E env PX4_SIM_MODEL=xvert PX4_SIMULATOR=sihsim $<TARGET_FILE:px4>
+		WORKING_DIRECTORY ${SITL_WORKING_DIR}
+		USES_TERMINAL
+		DEPENDS px4
+	)
 
 endif()
