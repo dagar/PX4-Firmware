@@ -124,8 +124,8 @@ void FailureInjector::update()
 			ack.command = vehicle_command.command;
 			ack.from_external = false;
 			ack.result = supported ?
-				     vehicle_command_ack_s::VEHICLE_RESULT_ACCEPTED :
-				     vehicle_command_ack_s::VEHICLE_RESULT_UNSUPPORTED;
+				     vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED :
+				     vehicle_command_ack_s::VEHICLE_CMD_RESULT_UNSUPPORTED;
 			ack.timestamp = hrt_absolute_time();
 			_command_ack_pub.publish(ack);
 		}
@@ -269,7 +269,7 @@ void FailureDetector::updateEscsStatus(const vehicle_status_s &vehicle_status, c
 		bool is_esc_failure = !is_all_escs_armed;
 
 		for (int i = 0; i < limited_esc_count; i++) {
-			is_esc_failure = is_esc_failure | (esc_status.esc[i].failures > 0);
+			is_esc_failure = is_esc_failure || (esc_status.esc[i].failures > 0);
 		}
 
 		_esc_failure_hysteresis.set_hysteresis_time_from(false, 300_ms);

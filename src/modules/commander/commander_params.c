@@ -185,10 +185,11 @@ PARAM_DEFINE_INT32(COM_HOME_IN_AIR, 0);
 /**
  * RC control input mode
  *
- * The default value of 0 requires a valid RC transmitter setup.
- * Setting this to 1 allows joystick control and disables RC input handling and the associated checks. A value of
- * 2 will generate RC control data from manual input received via MAVLink instead
- * of directly forwarding the manual input data.
+ * A value of 0 enables RC transmitter control (only). A valid RC transmitter calibration is required.
+ * A value of 1 allows joystick control only. RC input handling and the associated checks are disabled.
+ * A value of 2 allows either RC Transmitter or Joystick input. The first valid input is used, will fallback to other sources if the input stream becomes invalid.
+ * A value of 3 allows either input from RC or joystick. The first available source is selected and used until reboot.
+ * A value of 4 ignores any stick input.
  *
  * @group Commander
  * @min 0
@@ -672,7 +673,6 @@ PARAM_DEFINE_INT32(COM_ARM_MIS_REQ, 0);
  * Position control navigation loss response.
  *
  * This sets the flight mode that will be used if navigation accuracy is no longer adequate for position control.
- * Navigation accuracy checks can be disabled using the CBRK_VELPOSERR parameter, but doing so will remove protection for all flight modes.
  *
  * @value 0 Altitude/Manual. Assume use of remote control after fallback. Switch to Altitude mode if a height estimate is available, else switch to MANUAL.
  * @value 1 Land/Terminate. Assume no use of remote control after fallback. Switch to Land mode if a height estimate is available, else switch to TERMINATION.
@@ -1024,6 +1024,22 @@ PARAM_DEFINE_INT32(COM_ARM_ARSP_EN, 1);
 PARAM_DEFINE_INT32(COM_ARM_SDCARD, 1);
 
 /**
+ * Enforced delay between arming and further navigation
+ *
+ * The minimal time from arming the motors until moving the vehicle is possible is COM_SPOOLUP_TIME seconds.
+ * Goal:
+ * - Motors and propellers spool up to idle speed before getting commanded to spin faster
+ * - Timeout for ESCs and smart batteries to successfulyy do failure checks
+ *   e.g. for stuck rotors before the vehicle is off the ground
+ *
+ * @group Commander
+ * @min 0
+ * @max 5
+ * @unit s
+ */
+PARAM_DEFINE_FLOAT(COM_SPOOLUP_TIME, 1.0f);
+
+/**
  * Wind speed warning threshold
  *
  * A warning is triggered if the currently estimated wind speed is above this value.
@@ -1047,7 +1063,7 @@ PARAM_DEFINE_FLOAT(COM_WIND_WARN, -1.f);
  * the time since takeoff is above this value. It is not possible to resume the
  * mission or switch to any mode other than RTL or Land.
  *
- * Set a nagative value to disable.
+ * Set a negative value to disable.
  *
  *
  * @unit s

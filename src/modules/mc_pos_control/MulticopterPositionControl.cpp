@@ -120,6 +120,8 @@ void MulticopterPositionControl::parameters_update(bool force)
 		if (_param_mpc_xy_vel_all.get() >= 0.f) {
 			float xy_vel = _param_mpc_xy_vel_all.get();
 			num_changed += _param_mpc_vel_manual.commit_no_notification(xy_vel);
+			num_changed += _param_mpc_vel_man_back.commit_no_notification(-1.f);
+			num_changed += _param_mpc_vel_man_side.commit_no_notification(-1.f);
 			num_changed += _param_mpc_xy_cruise.commit_no_notification(xy_vel);
 			num_changed += _param_mpc_xy_vel_max.commit_no_notification(xy_vel);
 		}
@@ -190,6 +192,28 @@ void MulticopterPositionControl::parameters_update(bool force)
 					    "Manual speed has been constrained by maximum speed", _param_mpc_xy_vel_max.get());
 		}
 
+		if (_param_mpc_vel_man_back.get() > _param_mpc_vel_manual.get()) {
+			_param_mpc_vel_man_back.set(_param_mpc_vel_manual.get());
+			_param_mpc_vel_man_back.commit();
+			mavlink_log_critical(&_mavlink_log_pub, "Manual backward speed has been constrained by forward speed\t");
+			/* EVENT
+			 * @description <param>MPC_VEL_MAN_BACK</param> is set to {1:.0}.
+			 */
+			events::send<float>(events::ID("mc_pos_ctrl_man_vel_back_set"), events::Log::Warning,
+					    "Manual backward speed has been constrained by forward speed", _param_mpc_vel_manual.get());
+		}
+
+		if (_param_mpc_vel_man_side.get() > _param_mpc_vel_manual.get()) {
+			_param_mpc_vel_man_side.set(_param_mpc_vel_manual.get());
+			_param_mpc_vel_man_side.commit();
+			mavlink_log_critical(&_mavlink_log_pub, "Manual sideways speed has been constrained by forward speed\t");
+			/* EVENT
+			 * @description <param>MPC_VEL_MAN_SIDE</param> is set to {1:.0}.
+			 */
+			events::send<float>(events::ID("mc_pos_ctrl_man_vel_side_set"), events::Log::Warning,
+					    "Manual sideways speed has been constrained by forward speed", _param_mpc_vel_manual.get());
+		}
+
 		if (_param_mpc_z_v_auto_up.get() > _param_mpc_z_vel_max_up.get()) {
 			_param_mpc_z_v_auto_up.set(_param_mpc_z_vel_max_up.get());
 			_param_mpc_z_v_auto_up.commit();
@@ -234,7 +258,7 @@ void MulticopterPositionControl::parameters_update(bool force)
 		_param_mpc_tko_speed.set(math::min(_param_mpc_tko_speed.get(), _param_mpc_z_vel_max_up.get()));
 		_param_mpc_land_speed.set(math::min(_param_mpc_land_speed.get(), _param_mpc_z_vel_max_dn.get()));
 
-		_takeoff.setSpoolupTime(_param_mpc_spoolup_time.get());
+		_takeoff.setSpoolupTime(_param_com_spoolup_time.get());
 		_takeoff.setTakeoffRampTime(_param_mpc_tko_ramp_t.get());
 		_takeoff.generateInitialRampValue(_param_mpc_z_vel_p_acc.get());
 	}

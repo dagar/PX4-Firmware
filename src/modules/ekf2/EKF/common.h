@@ -42,7 +42,10 @@
 #ifndef EKF_COMMON_H
 #define EKF_COMMON_H
 
+#include <cstdint>
+
 #include <matrix/math.hpp>
+#include <mathlib/math/Utilities.hpp>
 
 namespace estimator
 {
@@ -55,6 +58,12 @@ using matrix::Quatf;
 using matrix::Vector2f;
 using matrix::Vector3f;
 using matrix::wrap_pi;
+
+using math::Utilities::getEulerYaw;
+using math::Utilities::quatToInverseRotMat;
+using math::Utilities::shouldUse321RotationSequence;
+using math::Utilities::sq;
+using math::Utilities::updateYawInRotMat;
 
 // maximum sensor intervals in usec
 #define BARO_MAX_INTERVAL (uint64_t)2e5 ///< Maximum allowable time interval between pressure altitude measurements (uSec)
@@ -86,8 +95,9 @@ enum MagFuseType : uint8_t {
 	AUTO    = 0,   	///< The selection of either heading or 3D magnetometer fusion will be automatic
 	HEADING = 1,   	///< Simple yaw angle fusion will always be used. This is less accurate, but less affected by earth field distortions. It should not be used for pitch angles outside the range from -60 to +60 deg
 	MAG_3D  = 2,   	///< Magnetometer 3-axis fusion will always be used. This is more accurate, but more affected by localised earth field distortions
-	INDOOR  = 3,   	///< The same as option 0, but magnetometer or yaw fusion will not be used unless earth frame external aiding (GPS or External Vision) is being used. This prevents inconsistent magnetic fields associated with indoor operation degrading state estimates.
-	NONE    = 4    	///< Do not use magnetometer under any circumstance. Other sources of yaw may be used if selected via the EKF2_AID_MASK parameter.
+	UNUSED  = 3,    ///< Not implemented
+	INDOOR  = 4,   	///< The same as option 0, but magnetometer or yaw fusion will not be used unless earth frame external aiding (GPS or External Vision) is being used. This prevents inconsistent magnetic fields associated with indoor operation degrading state estimates.
+	NONE    = 5    	///< Do not use magnetometer under any circumstance. Other sources of yaw may be used if selected via the EKF2_AID_MASK parameter.
 };
 
 enum TerrainFusionMask : uint8_t {
@@ -95,25 +105,38 @@ enum TerrainFusionMask : uint8_t {
 	TerrainFuseOpticalFlow = (1 << 1)
 };
 
-enum VerticalHeightSensor : uint8_t {
-	// Integer definitions for vdist_sensor_type
-	BARO  = 0,   	///< Use baro height
-	GPS   = 1,   	///< Use GPS height
-	RANGE = 2,   	///< Use range finder height
-	EV    = 3    	///< Use external vision
+enum HeightSensor : uint8_t {
+	BARO  = 0,
+	GNSS  = 1,
+	RANGE = 2,
+	EV    = 3,
+	UNKNOWN  = 4
+};
+
+enum GnssCtrl : uint8_t {
+	HPOS  = (1<<0),
+	VPOS  = (1<<1),
+	VEL  = (1<<2),
+	YAW  = (1<<3)
+};
+
+enum RngCtrl : uint8_t {
+	DISABLED    = 0,
+	CONDITIONAL = 1,
+	ENABLED     = 2
 };
 
 enum SensorFusionMask : uint16_t {
 	// Bit locations for fusion_mode
-	USE_GPS          = (1<<0),      ///< set to true to use GPS data
+	DEPRECATED_USE_GPS = (1<<0),    ///< set to true to use GPS data (DEPRECATED, use gnss_ctrl)
 	USE_OPT_FLOW     = (1<<1),      ///< set to true to use optical flow data
 	INHIBIT_ACC_BIAS = (1<<2),      ///< set to true to inhibit estimation of accelerometer delta velocity bias
 	USE_EXT_VIS_POS  = (1<<3),      ///< set to true to use external vision position data
 	USE_EXT_VIS_YAW  = (1<<4),      ///< set to true to use external vision quaternion data for yaw
 	USE_DRAG         = (1<<5),      ///< set to true to use the multi-rotor drag model to estimate wind
 	ROTATE_EXT_VIS   = (1<<6),      ///< set to true to if the EV observations are in a non NED reference frame and need to be rotated before being used
-	USE_GPS_YAW      = (1<<7),      ///< set to true to use GPS yaw data if available
-	USE_EXT_VIS_VEL  = (1<<8)       ///< set to true to use external vision velocity data
+	DEPRECATED_USE_GPS_YAW = (1<<7),///< set to true to use GPS yaw data if available (DEPRECATED, use gnss_ctrl)
+	USE_EXT_VIS_VEL  = (1<<8),      ///< set to true to use external vision velocity data
 };
 
 struct gpsMessage {
@@ -204,7 +227,7 @@ struct extVisionSample {
 	Vector3f    vel{};         ///< FRD velocity in reference frame defined in vel_frame variable (m/sec) - Z must be aligned with down axis
 	Quatf       quat{};        ///< quaternion defining rotation from body to earth frame
 	Vector3f    posVar{};      ///< XYZ position variances (m**2)
-	Matrix3f    velCov{};      ///< XYZ velocity covariances ((m/sec)**2)
+	Vector3f    velVar{};      ///< XYZ velocity variances ((m/sec)**2)
 	float       angVar{};      ///< angular heading variance (rad**2)
 	VelocityFrame vel_frame = VelocityFrame::BODY_FRAME_FRD;
 	uint8_t     reset_counter{};
@@ -237,8 +260,11 @@ struct parameters {
 	int32_t filter_update_interval_us{10000}; ///< filter update interval in microseconds
 
 	// measurement source control
-	int32_t fusion_mode{SensorFusionMask::USE_GPS};         ///< bitmasked integer that selects which aiding sources will be used
-	int32_t vdist_sensor_type{VerticalHeightSensor::BARO};  ///< selects the primary source for height data
+	int32_t fusion_mode{};         ///< bitmasked integer that selects some aiding sources
+	int32_t height_sensor_ref{HeightSensor::BARO};
+	int32_t baro_ctrl{1};
+	int32_t gnss_ctrl{GnssCtrl::HPOS | GnssCtrl::VEL};
+	int32_t rng_ctrl{RngCtrl::CONDITIONAL};
 	int32_t terrain_fusion_mode{TerrainFusionMask::TerrainFuseRangeFinder |
 				    TerrainFusionMask::TerrainFuseOpticalFlow}; ///< aiding source(s) selection bitmask for the terrain estimator
 
@@ -279,9 +305,10 @@ struct parameters {
 	// position and velocity fusion
 	float gps_vel_noise{5.0e-1f};           ///< minimum allowed observation noise for gps velocity fusion (m/sec)
 	float gps_pos_noise{0.5f};              ///< minimum allowed observation noise for gps position fusion (m)
+	float gps_hgt_bias_nsd{0.13f};          ///< process noise for gnss height bias estimation (m/s/sqrt(Hz))
 	float pos_noaid_noise{10.0f};           ///< observation noise for non-aiding position fusion (m)
 	float baro_noise{2.0f};                 ///< observation noise for barometric height fusion (m)
-	float baro_drift_rate{0.005f};          ///< process noise for barometric height bias estimation (m/s)
+	float baro_bias_nsd{0.13f};             ///< process noise for barometric height bias estimation (m/s/sqrt(Hz))
 	float baro_innov_gate{5.0f};            ///< barometric and GPS height innovation consistency gate size (STD)
 	float gps_pos_innov_gate{5.0f};         ///< GPS horizontal position innovation consistency gate size (STD)
 	float gps_vel_innov_gate{5.0f};         ///< GPS velocity innovation consistency gate size (STD)
@@ -316,13 +343,13 @@ struct parameters {
 	// range finder fusion
 	float range_noise{0.1f};                ///< observation noise for range finder measurements (m)
 	float range_innov_gate{5.0f};           ///< range finder fusion innovation consistency gate size (STD)
+	float rng_hgt_bias_nsd{0.13f};          ///< process noise for range height bias estimation (m/s/sqrt(Hz))
 	float rng_gnd_clearance{0.1f};          ///< minimum valid value for range when on ground (m)
 	float rng_sens_pitch{0.0f};             ///< Pitch offset of the range sensor (rad). Sensor points out along Z axis when offset is zero. Positive rotation is RH about Y axis.
 	float range_noise_scaler{0.0f};         ///< scaling from range measurement to noise (m/m)
 	const float vehicle_variance_scaler{0.0f};      ///< gain applied to vehicle height variance used in calculation of height above ground observation variance
-	float max_hagl_for_range_aid{5.0f};     ///< maximum height above ground for which we allow to use the range finder as height source (if range_aid == 1)
-	float max_vel_for_range_aid{1.0f};      ///< maximum ground velocity for which we allow to use the range finder as height source (if range_aid == 1)
-	int32_t range_aid{0};                   ///< allow switching primary height source to range finder if certain conditions are met
+	float max_hagl_for_range_aid{5.0f};     ///< maximum height above ground for which we allow to use the range finder as height source (if rng_control == 1)
+	float max_vel_for_range_aid{1.0f};      ///< maximum ground velocity for which we allow to use the range finder as height source (if rng_control == 1)
 	float range_aid_innov_gate{1.0f};       ///< gate size used for innovation consistency checks for range aid fusion
 	float range_valid_quality_s{1.0f};      ///< minimum duration during which the reported range finder signal quality needs to be non-zero in order to be declared valid (s)
 	float range_cos_max_tilt{0.7071f};      ///< cosine of the maximum tilt angle from the vertical that permits use of range finder and flow data
@@ -331,6 +358,7 @@ struct parameters {
 	// vision position fusion
 	float ev_vel_innov_gate{3.0f};          ///< vision velocity fusion innovation consistency gate size (STD)
 	float ev_pos_innov_gate{5.0f};          ///< vision position fusion innovation consistency gate size (STD)
+	float ev_hgt_bias_nsd{0.13f};           ///< process noise for vision height bias estimation (m/s/sqrt(Hz))
 
 	// optical flow fusion
 	float flow_noise{0.15f};                ///< observation noise for optical flow LOS rate measurements (rad/sec)
@@ -368,6 +396,7 @@ struct parameters {
 
 	const unsigned reset_timeout_max{7000000};      ///< maximum time we allow horizontal inertial dead reckoning before attempting to reset the states to the measurement or change _control_status if the data is unavailable (uSec)
 	const unsigned no_aid_timeout_max{1000000};     ///< maximum lapsed time from last fusion of a measurement that constrains horizontal velocity drift before the EKF will determine that the sensor is no longer contributing to aiding (uSec)
+	const unsigned hgt_fusion_timeout_max{5'000'000}; ///< maximum time we allow height fusion to fail before attempting a reset or stopping the fusion aiding (uSec)
 
 	int32_t valid_timeout_max{5000000};     ///< amount of time spent inertial dead reckoning before the estimator reports the state estimates as invalid (uSec)
 
@@ -476,7 +505,7 @@ union filter_control_status_u {
 		uint32_t gps                     : 1; ///< 2 - true if GPS measurement fusion is intended
 		uint32_t opt_flow                : 1; ///< 3 - true if optical flow measurements fusion is intended
 		uint32_t mag_hdg                 : 1; ///< 4 - true if a simple magnetic yaw heading fusion is intended
-		uint32_t mag_3D                  : 1; ///< 5 - true if 3-axis magnetometer measurement fusion is inteded
+		uint32_t mag_3D                  : 1; ///< 5 - true if 3-axis magnetometer measurement fusion is intended
 		uint32_t mag_dec                 : 1; ///< 6 - true if synthetic magnetic declination measurements fusion is intended
 		uint32_t in_air                  : 1; ///< 7 - true when the vehicle is airborne
 		uint32_t wind                    : 1; ///< 8 - true when wind velocity is being estimated
@@ -568,7 +597,7 @@ union warning_event_status_u {
 		bool height_sensor_timeout              : 1; ///< 4 - true when the height sensor has not been used to correct the state estimates for a significant time period
 		bool stopping_navigation                : 1; ///< 5 - true when the filter has insufficient data to estimate velocity and position and is falling back to an attitude, height and height rate mode of operation
 		bool invalid_accel_bias_cov_reset       : 1; ///< 6 - true when the filter has detected bad acceerometer bias state estimates and has reset the corresponding covariance matrix elements
-		bool bad_yaw_using_gps_course           : 1; ///< 7 - true when the fiter has detected an invalid yaw esitmate and has reset the yaw angle to the GPS ground course
+		bool bad_yaw_using_gps_course           : 1; ///< 7 - true when the filter has detected an invalid yaw estimate and has reset the yaw angle to the GPS ground course
 		bool stopping_mag_use                   : 1; ///< 8 - true when the filter has detected bad magnetometer data and is stopping further use of the magnetomer data
 		bool vision_data_stopped                : 1; ///< 9 - true when the vision system data has stopped for a significant time period
 		bool emergency_yaw_reset_mag_stopped    : 1; ///< 10 - true when the filter has detected bad magnetometer data, has reset the yaw to anothter source of data and has stopped further use of the magnetomer data

@@ -255,6 +255,7 @@ parameters:
                 short: Control Surface ${i} type
             type: enum
             values:
+                0: (Not set)
                 1: Left Aileron
                 2: Right Aileron
                 3: Elevator
@@ -267,9 +268,13 @@ parameters:
                 10: Right Flap
                 11: Airbrakes
                 12: Custom
+                13: Left A-tail
+                14: Right A-tail
+                15: Single Channel Aileron
+                16: Steering Wheel
             num_instances: *max_num_servos
             instance_start: 0
-            default: 1
+            default: 0
 
         CA_SV_CS${i}_TRQ_R:
             description:
@@ -492,6 +497,10 @@ mixer:
         # Convention: horizontal surfaces: up=positive, vertical: right=positive, mixed: up=positive.
         # By default the scale is set to 1/N, where N is the amount of actuators with an effect on
         # the corresponding axis. With that we are using all the available servo moving range.
+            0: # Not set
+              - { 'disabled': True, 'default': 0.0 } # roll
+              - { 'disabled': True, 'default': 0.0 } # pitch
+              - { 'disabled': True, 'default': 0.0 } # yaw
             1: # Left Aileron
               - { 'min': -1.0, 'max': 0.0, 'default': -0.5 } # roll
               - { 'hidden': True, 'default': 0.0 } # pitch
@@ -524,6 +533,22 @@ mixer:
               - { 'hidden': True, 'default': 0.0 } # roll
               - { 'min': 0.0, 'max': 1.0, 'default': 0.5 } # pitch
               - { 'min': -1.0, 'max': 0.0, 'default': -0.5 } # yaw
+            13: # Left A Tail
+              - { 'hidden': True, 'default': 0.0 } # roll
+              - { 'min': 0.0, 'max': 1.0, 'default': 0.5 } # pitch
+              - { 'min': -1.0, 'max': 0.0, 'default': -0.5 } # yaw
+            14: # Right A Tail
+              - { 'hidden': True, 'default': 0.0 } # roll
+              - { 'min': 0.0, 'max': 1.0, 'default': 0.5 } # pitch
+              - { 'min': 0.0, 'max': 1.0, 'default': 0.5 } # yaw
+            15: # Single Channel Aileron
+              - { 'min': 0.0, 'max': 1.0, 'default': 1.0 } # roll
+              - { 'hidden': True, 'default': 0.0 } # pitch
+              - { 'hidden': True, 'default': 0.0 } # yaw
+            16: # Steering Wheel
+              - { 'hidden': True, 'default': 0.0 } # roll
+              - { 'hidden': True, 'default': 0.0 } # pitch
+              - { 'hidden': True, 'default': 0.0 } # yaw
 
       - select_identifier: 'servo-type-tailsitter' # restrict torque based on servo type for tailsitters
         apply_identifiers: ['servo-torque-roll-tailsitter', 'servo-torque-pitch-tailsitter', 'servo-torque-yaw-tailsitter']
@@ -575,9 +600,6 @@ mixer:
                   - actuator_type: 'motor'
                     group_label: 'Motors'
                     count: 'CA_ROTOR_COUNT'
-                    per_item_parameters:
-                        standard:
-                            position: [ 'CA_ROTOR${i}_PX', 'CA_ROTOR${i}_PY', 'CA_ROTOR${i}_PZ' ]
                   - actuator_type: 'servo'
                     group_label: 'Control Surfaces'
                     count: 'CA_SV_CS_COUNT'

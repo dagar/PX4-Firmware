@@ -57,7 +57,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_magnetometer.h>
 #include <uORB/topics/vehicle_odometry.h>
@@ -214,7 +214,7 @@ void AttitudeEstimatorQ::Run()
 void AttitudeEstimatorQ::update_gps_position()
 {
 	if (_vehicle_gps_position_sub.updated()) {
-		vehicle_gps_position_s gps;
+		sensor_gps_s gps;
 
 		if (_vehicle_gps_position_sub.update(&gps)) {
 			if (_param_att_mag_decl_a.get() && (gps.eph < 20.0f)) {
@@ -252,10 +252,10 @@ void AttitudeEstimatorQ::update_motion_capture_odometry()
 		if (_vehicle_mocap_odometry_sub.update(&mocap)) {
 			// validation check for mocap attitude data
 			bool mocap_att_valid = PX4_ISFINITE(mocap.q[0])
-					       && (PX4_ISFINITE(mocap.pose_covariance[mocap.COVARIANCE_MATRIX_ROLL_VARIANCE]) ? sqrtf(fmaxf(
-							       mocap.pose_covariance[mocap.COVARIANCE_MATRIX_ROLL_VARIANCE],
-							       fmaxf(mocap.pose_covariance[mocap.COVARIANCE_MATRIX_PITCH_VARIANCE],
-									       mocap.pose_covariance[mocap.COVARIANCE_MATRIX_YAW_VARIANCE]))) <= _eo_max_std_dev : true);
+					       && (PX4_ISFINITE(mocap.orientation_variance[0]) ? sqrtf(fmaxf(
+							       mocap.orientation_variance[0],
+							       fmaxf(mocap.orientation_variance[1],
+									       mocap.orientation_variance[2]))) <= _eo_max_std_dev : true);
 
 			if (mocap_att_valid) {
 				Dcmf Rmoc = Quatf(mocap.q);
@@ -361,10 +361,10 @@ void AttitudeEstimatorQ::update_visual_odometry()
 		if (_vehicle_visual_odometry_sub.update(&vision)) {
 			// validation check for vision attitude data
 			bool vision_att_valid = PX4_ISFINITE(vision.q[0])
-						&& (PX4_ISFINITE(vision.pose_covariance[vision.COVARIANCE_MATRIX_ROLL_VARIANCE]) ? sqrtf(fmaxf(
-								vision.pose_covariance[vision.COVARIANCE_MATRIX_ROLL_VARIANCE],
-								fmaxf(vision.pose_covariance[vision.COVARIANCE_MATRIX_PITCH_VARIANCE],
-										vision.pose_covariance[vision.COVARIANCE_MATRIX_YAW_VARIANCE]))) <= _eo_max_std_dev : true);
+						&& (PX4_ISFINITE(vision.orientation_variance[0]) ? sqrtf(fmaxf(
+								vision.orientation_variance[0],
+								fmaxf(vision.orientation_variance[1],
+										vision.orientation_variance[2]))) <= _eo_max_std_dev : true);
 
 			if (vision_att_valid) {
 				Dcmf Rvis = Quatf(vision.q);

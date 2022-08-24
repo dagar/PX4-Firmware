@@ -437,7 +437,7 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 	float max_time_delay_ms = math::max((float)_params.sensor_interval_max_ms, _params.auxvel_delay_ms);
 
 	// using baro
-	if (_params.vdist_sensor_type == 0) {
+	if (_params.baro_ctrl > 0) {
 		max_time_delay_ms = math::max(_params.baro_delay_ms, max_time_delay_ms);
 	}
 
@@ -451,12 +451,12 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 		max_time_delay_ms = math::max(_params.mag_delay_ms, max_time_delay_ms);
 	}
 
-	// range aid or range height
-	if (_params.range_aid || (_params.vdist_sensor_type == VerticalHeightSensor::RANGE)) {
+	// using range finder
+	if ((_params.rng_ctrl != RngCtrl::DISABLED)) {
 		max_time_delay_ms = math::max(_params.range_delay_ms, max_time_delay_ms);
 	}
 
-	if (_params.fusion_mode & SensorFusionMask::USE_GPS) {
+	if (_params.gnss_ctrl > 0) {
 		max_time_delay_ms = math::max(_params.gps_delay_ms, max_time_delay_ms);
 	}
 
@@ -526,6 +526,41 @@ int EstimatorInterface::getNumberOfActiveHorizontalAidingSources() const
 bool EstimatorInterface::isHorizontalAidingActive() const
 {
 	return getNumberOfActiveHorizontalAidingSources() > 0;
+}
+
+bool EstimatorInterface::isOtherSourceOfVerticalPositionAidingThan(const bool aiding_flag) const
+{
+	const int nb_sources = getNumberOfActiveVerticalPositionAidingSources();
+	return aiding_flag ? nb_sources > 1 : nb_sources > 0;
+}
+
+bool EstimatorInterface::isVerticalPositionAidingActive() const
+{
+	return getNumberOfActiveVerticalPositionAidingSources() > 0;
+}
+
+bool EstimatorInterface::isOnlyActiveSourceOfVerticalPositionAiding(const bool aiding_flag) const
+{
+	return aiding_flag && !isOtherSourceOfVerticalPositionAidingThan(aiding_flag);
+}
+
+int EstimatorInterface::getNumberOfActiveVerticalPositionAidingSources() const
+{
+	return int(_control_status.flags.gps_hgt)
+	       + int(_control_status.flags.baro_hgt)
+	       + int(_control_status.flags.rng_hgt)
+	       + int(_control_status.flags.ev_hgt);
+}
+
+bool EstimatorInterface::isVerticalVelocityAidingActive() const
+{
+	return getNumberOfActiveVerticalVelocityAidingSources() > 0;
+}
+
+int EstimatorInterface::getNumberOfActiveVerticalVelocityAidingSources() const
+{
+	return int(_control_status.flags.gps)
+	       + int(_control_status.flags.ev_vel);
 }
 
 void EstimatorInterface::printBufferAllocationFailed(const char *buffer_name)

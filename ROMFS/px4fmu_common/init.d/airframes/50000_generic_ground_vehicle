@@ -1,14 +1,16 @@
 #!/bin/sh
 #
-# @name Generic Ground Vehicle
+# @name Generic Ground Vehicle (Ackermann)
 #
 # @type Rover
 # @class Rover
 #
-# @output MAIN2 steering
-# @output MAIN4 throttle
+# @output Motor1 throttle
+# @output Servo1 steering
 #
 # @maintainer
+#
+# @board bitcraze_crazyflie exclude
 #
 
 . ${R}etc/init.d/rc.rover_defaults
@@ -41,3 +43,13 @@ param set-default MIS_LTRMIN_ALT 0.01
 param set-default MIS_TAKEOFF_ALT 0.01
 
 param set-default NAV_ACC_RAD 0.5
+
+param set-default CA_AIRFRAME 5
+
+param set-default CA_R_REV 1
+param set-default PWM_MAIN_FUNC1 201
+param set-default PWM_MAIN_FUNC2 201
+param set-default PWM_MAIN_FUNC6 101
+param set-default PWM_MAIN_FUNC7 101
+
+

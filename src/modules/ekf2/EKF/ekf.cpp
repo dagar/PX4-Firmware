@@ -164,10 +164,12 @@ bool Ekf::initialiseFilter()
 	if (_baro_buffer && _baro_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_baro_sample_delayed)) {
 		if (_baro_sample_delayed.time_us != 0) {
 			if (_baro_counter == 0) {
-				_baro_hgt_offset = _baro_sample_delayed.hgt;
+				_baro_lpf.reset(_baro_sample_delayed.hgt);
 
 			} else {
-				_baro_hgt_offset = 0.9f * _baro_hgt_offset + 0.1f * _baro_sample_delayed.hgt;
+				_baro_lpf.update(_baro_sample_delayed.hgt);
+
+				_baro_b_est.setBias(_baro_lpf.getState());
 			}
 
 			_baro_counter++;
@@ -187,7 +189,7 @@ bool Ekf::initialiseFilter()
 	}
 
 	// we use baro height initially and switch to GPS/range/EV finder later when it passes checks.
-	setControlBaroHeight();
+	_control_status.flags.baro_hgt = false;
 
 	if (!initialiseTilt()) {
 		return false;
@@ -196,7 +198,19 @@ bool Ekf::initialiseFilter()
 	// calculate the initial magnetic field and yaw alignment
 	// but do not mark the yaw alignement complete as it needs to be
 	// reset once the leveling phase is done
-	resetMagHeading(false, false);
+	if ((_params.mag_fusion_type <= MagFuseType::MAG_3D) && (_mag_counter != 0)) {
+		// rotate the magnetometer measurements into earth frame using a zero yaw angle
+		// the angle of the projection onto the horizontal gives the yaw angle
+		const Vector3f mag_earth_pred = updateYawInRotMat(0.f, _R_to_earth) * _mag_lpf.getState();
+		float yaw_new = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + getMagDeclination();
+
+		// update quaternion states and corresponding covarainces
+		resetQuatStateYaw(yaw_new, 0.f, false);
+
+		// set the earth magnetic field states using the updated rotation
+		_state.mag_I = _R_to_earth * _mag_lpf.getState();
+		_state.mag_B.zero();
+	}
 
 	// initialise the state covariance matrix now we have starting values for all the states
 	initialiseCovariance();
@@ -249,7 +263,8 @@ bool Ekf::initialiseTilt()
 void Ekf::predictState()
 {
 	// apply imu bias corrections
-	Vector3f corrected_delta_ang = _imu_sample_delayed.delta_ang - _state.delta_ang_bias;
+	const Vector3f delta_ang_bias_scaled = (_state.delta_ang_bias / _dt_ekf_avg) * _imu_sample_delayed.delta_ang_dt;
+	Vector3f corrected_delta_ang = _imu_sample_delayed.delta_ang - delta_ang_bias_scaled;
 
 	// subtract component of angular rate due to earth rotation
 	corrected_delta_ang -= _R_to_earth.transpose() * _earth_rate_NED * _imu_sample_delayed.delta_ang_dt;
@@ -261,7 +276,8 @@ void Ekf::predictState()
 	_R_to_earth = Dcmf(_state.quat_nominal);
 
 	// Calculate an earth frame delta velocity
-	const Vector3f corrected_delta_vel = _imu_sample_delayed.delta_vel - _state.delta_vel_bias;
+	const Vector3f delta_vel_bias_scaled = (_state.delta_vel_bias / _dt_ekf_avg) * _imu_sample_delayed.delta_vel_dt;
+	const Vector3f corrected_delta_vel = _imu_sample_delayed.delta_vel - delta_vel_bias_scaled;
 	const Vector3f corrected_delta_vel_ef = _R_to_earth * corrected_delta_vel;
 
 	// calculate a filtered horizontal acceleration with a 1 sec time constant
@@ -314,10 +330,10 @@ void Ekf::calculateOutputStates(const imuSample &imu)
 	// Use full rate IMU data at the current time horizon
 
 	// correct delta angles for bias offsets
-	const float dt_scale_correction = _dt_imu_avg / _dt_ekf_avg;
+	const Vector3f delta_ang_bias_scaled = (_state.delta_ang_bias / _dt_ekf_avg) * imu.delta_ang_dt;
 
 	// Apply corrections to the delta angle required to track the quaternion states at the EKF fusion time horizon
-	const Vector3f delta_angle(imu.delta_ang - _state.delta_ang_bias * dt_scale_correction + _delta_angle_corr);
+	const Vector3f delta_angle(imu.delta_ang - delta_ang_bias_scaled + _delta_angle_corr);
 
 	// calculate a yaw change about the earth frame vertical
 	const float spin_del_ang_D = delta_angle.dot(Vector3f(_R_to_earth_now.row(2)));
@@ -343,7 +359,8 @@ void Ekf::calculateOutputStates(const imuSample &imu)
 	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
 
 	// correct delta velocity for bias offsets
-	const Vector3f delta_vel_body{imu.delta_vel - _state.delta_vel_bias * dt_scale_correction};
+	const Vector3f delta_vel_bias_scaled = (_state.delta_vel_bias / _dt_ekf_avg) * _imu_sample_delayed.delta_vel_dt;
+	const Vector3f delta_vel_body{imu.delta_vel - delta_vel_bias_scaled};
 
 	// rotate the delta velocity to earth frame
 	Vector3f delta_vel_earth{_R_to_earth_now * delta_vel_body};
@@ -524,7 +541,9 @@ Quatf Ekf::calculate_quaternion() const
 {
 	// Correct delta angle data for bias errors using bias state estimates from the EKF and also apply
 	// corrections required to track the EKF quaternion states
-	const Vector3f delta_angle{_newest_high_rate_imu_sample.delta_ang - _state.delta_ang_bias * (_dt_imu_avg / _dt_ekf_avg) + _delta_angle_corr};
+	const Vector3f delta_ang_bias_scaled = (_state.delta_ang_bias / _dt_ekf_avg) * _newest_high_rate_imu_sample.delta_ang_dt;
+
+	const Vector3f delta_angle{_newest_high_rate_imu_sample.delta_ang - delta_ang_bias_scaled + _delta_angle_corr};
 
 	// increment the quaternions using the corrected delta angle vector
 	// the quaternions must always be normalised after modification

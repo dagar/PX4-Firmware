@@ -70,7 +70,7 @@ set(msg_files
 	estimator_aid_source_1d.msg
 	estimator_aid_source_2d.msg
 	estimator_aid_source_3d.msg
-	estimator_baro_bias.msg
+	estimator_bias.msg
 	estimator_event_flags.msg
 	estimator_gps_status.msg
 	estimator_innovations.msg
@@ -188,7 +188,6 @@ set(msg_files
 	vehicle_constraints.msg
 	vehicle_control_mode.msg
 	vehicle_global_position.msg
-	vehicle_gps_position.msg
 	vehicle_imu.msg
 	vehicle_imu_status.msg
 	vehicle_land_detected.msg

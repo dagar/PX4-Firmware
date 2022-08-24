@@ -42,6 +42,15 @@
 
 bool param_modify_on_import(bson_node_t node)
 {
+	// migrate MPC_SPOOLUP_TIME -> COM_SPOOLUP_TIME (2020-12-03). This can be removed after the next release (current release=1.11)
+	if (node->type == BSON_DOUBLE) {
+		if (strcmp("MPC_SPOOLUP_TIME", node->name) == 0) {
+			strcpy(node->name, "COM_SPOOLUP_TIME");
+			PX4_INFO("param migrating MPC_SPOOLUP_TIME (removed) -> COM_SPOOLUP_TIME: value=%.3f", node->d);
+			return true;
+		}
+	}
+
 	// migrate COM_ARM_AUTH -> COM_ARM_AUTH_ID, COM_ARM_AUTH_MET and COM_ARM_AUTH_TO (2020-11-06). This can be removed after the next release (current release=1.11)
 	if (node->type == BSON_INT32) {
 		if (strcmp("COM_ARM_AUTH", node->name) == 0) {
@@ -206,6 +215,37 @@ bool param_modify_on_import(bson_node_t node)
 		if (strcmp("ASPD_W_P_NOISE", node->name) == 0) {
 			strcpy(node->name, "ASPD_WIND_NSD");
 			PX4_INFO("copying %s -> %s", "ASPD_W_P_NOISE", "ASPD_WIND_NSD");
+			return true;
+		}
+	}
+
+	// 2022-07-07: translate FW_THR_CRUISE->FW_THR_TRIM
+	{
+		if (strcmp("FW_THR_CRUISE", node->name) == 0) {
+			strcpy(node->name, "FW_THR_TRIM");
+			PX4_INFO("copying %s -> %s", "FW_THR_CRUISE", "FW_THR_TRIM");
+			return true;
+		}
+	}
+
+	// 2022-08-04: migrate EKF2_RNG_AID->EKF2_RNG_CTRL and EKF2_HGT_MODE->EKF2_HGT_REF
+	{
+		if (strcmp("EKF2_RNG_AID", node->name) == 0) {
+			strcpy(node->name, "EKF2_RNG_CTRL");
+			PX4_INFO("param migrating EKF2_RNG_AID (removed) -> EKF2_RNG_CTRL: value=%" PRId32, node->i32);
+			return true;
+		}
+
+		if (strcmp("EKF2_HGT_MODE", node->name) == 0) {
+			strcpy(node->name, "EKF2_HGT_REF");
+
+			// If was in range height mode, set range aiding to "always"
+			if (node->i32 == 2) {
+				int32_t rng_mode = 2;
+				param_set_no_notification(param_find("EKF2_RNG_CTRL"), &rng_mode);
+			}
+
+			PX4_INFO("param migrating EKF2_HGT_MODE (removed) -> EKF2_HGT_REF: value=%" PRId32, node->i32);
 			return true;
 		}
 	}

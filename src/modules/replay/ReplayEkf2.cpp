@@ -35,6 +35,8 @@
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/posix.h>
 
+#include <lib/parameters/param.h>
+
 // for ekf2 replay
 #include <uORB/topics/airspeed.h>
 #include <uORB/topics/distance_sensor.h>
@@ -42,7 +44,7 @@
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_magnetometer.h>
@@ -183,6 +185,9 @@ void
 ReplayEkf2::onEnterMainLoop()
 {
 	_speed_factor = 0.f; // iterate as fast as possible
+
+	// disable parameter auto save
+	param_control_autosave(false);
 }
 
 void
