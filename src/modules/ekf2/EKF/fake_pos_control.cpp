@@ -115,17 +115,21 @@ void Ekf::stopFakePosFusion()
 
 void Ekf::fuseFakePosition()
 {
+	Vector2f obs;
 	Vector2f obs_var;
 
 	if (_control_status.flags.in_air && _control_status.flags.tilt_align) {
+		obs = _state.pos.xy();
 		obs_var(0) = obs_var(1) = sq(fmaxf(_params.pos_noaid_noise, _params.gps_pos_noise));
 
 	} else if (!_control_status.flags.in_air && _control_status.flags.vehicle_at_rest) {
 		// Accelerate tilt fine alignment by fusing more
 		// aggressively when the vehicle is at rest
+		obs = _last_known_posNE;
 		obs_var(0) = obs_var(1) = sq(0.01f);
 
 	} else {
+		obs = _state.pos.xy();
 		obs_var(0) = obs_var(1) = sq(0.5f);
 	}
 
@@ -134,7 +138,7 @@ void Ekf::fuseFakePosition()
 	auto &fake_pos = _aid_src_fake_pos;
 
 	for (int i = 0; i < 2; i++) {
-		fake_pos.observation[i] = _last_known_posNE(i);
+		fake_pos.observation[i] = obs(i);
 		fake_pos.observation_variance[i] = obs_var(i);
 
 		fake_pos.innovation[i] = _state.pos(i) - _last_known_posNE(i);
@@ -142,6 +146,13 @@ void Ekf::fuseFakePosition()
 	}
 
 	setEstimatorAidStatusTestRatio(fake_pos, innov_gate);
+
+	if (_control_status.flags.in_air) {
+		if ((P(7, 7) + P(8, 8)) < 1.f) {
+			// skip if in air and position variance is still acceptable
+			return;
+		}
+	}
 
 	// fuse
 	for (int i = 0; i < 2; i++) {
