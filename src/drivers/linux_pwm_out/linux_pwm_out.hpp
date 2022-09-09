@@ -77,7 +77,7 @@ public:
 private:
 	static constexpr int MAX_ACTUATORS = 8;
 
-	MixingOutput _mixing_output{"PWM_MAIN", MAX_ACTUATORS, *this, MixingOutput::SchedulingPolicy::Auto, false};
+	MixingOutput _mixing_output{"PWM_MAIN", MAX_ACTUATORS, *this};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 

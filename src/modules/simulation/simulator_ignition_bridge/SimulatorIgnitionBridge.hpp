@@ -118,7 +118,7 @@ private:
 	const std::string _model_name;
 	const std::string _model_pose;
 
-	MixingOutput _mixing_output{"SIM_IGN", 8, *this, MixingOutput::SchedulingPolicy::Auto, false, false};
+	MixingOutput _mixing_output{"SIM_IGN", 8, *this};
 
 	ignition::transport::Node _node;
 	ignition::transport::Node::Publisher _actuators_pub;

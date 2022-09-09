@@ -103,7 +103,7 @@ protected:
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
-	MixingOutput _mixing_output{"PCA9685", PCA9685_PWM_CHANNEL_COUNT, *this, MixingOutput::SchedulingPolicy::Disabled, true};
+	MixingOutput _mixing_output{"PCA9685", PCA9685_PWM_CHANNEL_COUNT, *this, MixingOutput::SchedulingPolicy::Disabled};
 };
 
 PCA9685Wrapper::PCA9685Wrapper(int schd_rate_limit) :

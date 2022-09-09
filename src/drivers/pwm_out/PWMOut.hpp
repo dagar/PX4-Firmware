@@ -41,7 +41,7 @@
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_pwm_output.h>
 #include <lib/mathlib/mathlib.h>
-#include <lib/mixer_module/mixer_module.hpp>
+#include <lib/mixer_module/pwm_mixer_module.hpp>
 #include <lib/perf/perf_counter.h>
 #include <px4_arch/io_timer.h>
 #include <px4_platform_common/px4_config.h>
@@ -80,7 +80,7 @@ private:
 	void update_params();
 	bool update_pwm_out_state(bool on);
 
-	MixingOutput _mixing_output{PARAM_PREFIX, DIRECT_PWM_OUTPUT_CHANNELS, *this, MixingOutput::SchedulingPolicy::Auto, true};
+	PWMMixingOutput _mixing_output{PARAM_PREFIX, DIRECT_PWM_OUTPUT_CHANNELS, *this};
 
 	int _timer_rates[MAX_IO_TIMERS] {};
 

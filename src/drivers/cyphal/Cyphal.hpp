@@ -105,7 +105,7 @@ private:
 	pthread_mutex_t &_node_mutex;
 	UavcanEscController &_esc_controller;
 	// UavcanServoController &_servo_controller;
-	MixingOutput _mixing_output{"UCAN1_ESC", MAX_ACTUATORS, *this, MixingOutput::SchedulingPolicy::Auto, false, false};
+	MixingOutput _mixing_output{"UCAN1_ESC", MAX_ACTUATORS, *this, MixingOutput::SchedulingPolicy::Auto};
 };
 
 class CyphalNode : public ModuleParams, public px4::ScheduledWorkItem

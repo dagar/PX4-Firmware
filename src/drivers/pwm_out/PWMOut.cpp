@@ -140,16 +140,18 @@ bool PWMOut::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 				up_pwm_servo_set(i, outputs[i]);
 			}
 		}
+
+		/* Trigger all timer's channels in Oneshot mode to fire
+		* the oneshots with updated values.
+		*/
+		if (num_control_groups_updated > 0) {
+			up_pwm_update(_pwm_mask);
+		}
+
+		return true;
 	}
 
-	/* Trigger all timer's channels in Oneshot mode to fire
-	 * the oneshots with updated values.
-	 */
-	if (num_control_groups_updated > 0) {
-		up_pwm_update(_pwm_mask);
-	}
-
-	return true;
+	return false;
 }
 
 void PWMOut::Run()

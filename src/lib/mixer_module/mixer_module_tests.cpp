@@ -185,7 +185,7 @@ TEST_F(MixerModuleTest, basic)
 {
 	OutputModuleTest test_module;
 	test_module.configureFunctions({});
-	MixingOutput mixing_output{PARAM_PREFIX, max_num_outputs, test_module, MixingOutput::SchedulingPolicy::Disabled, false, false};
+	MixingOutput mixing_output{PARAM_PREFIX, max_num_outputs, test_module, MixingOutput::SchedulingPolicy::Disabled};
 	mixing_output.setAllDisarmedValues(disarmed_value);
 	mixing_output.setAllFailsafeValues(failsafe_value);
 	mixing_output.setAllMinValues(min_value);
@@ -274,7 +274,7 @@ TEST_F(MixerModuleTest, arming)
 		(int)OutputFunction::Motor1,
 		(int)OutputFunction::Motor5,
 		(int)OutputFunction::Servo3});
-	MixingOutput mixing_output{PARAM_PREFIX, max_num_outputs, test_module, MixingOutput::SchedulingPolicy::Disabled, false, false};
+	MixingOutput mixing_output{PARAM_PREFIX, max_num_outputs, test_module, MixingOutput::SchedulingPolicy::Disabled};
 	mixing_output.setAllDisarmedValues(disarmed_value);
 	mixing_output.setAllFailsafeValues(failsafe_value);
 	mixing_output.setAllMinValues(min_value);
@@ -437,7 +437,7 @@ TEST_F(MixerModuleTest, prearm)
 	test_module.configureFunctions({
 		(int)OutputFunction::Motor1,
 		(int)OutputFunction::Servo1});
-	MixingOutput mixing_output{PARAM_PREFIX, max_num_outputs, test_module, MixingOutput::SchedulingPolicy::Disabled, false, false};
+	MixingOutput mixing_output{PARAM_PREFIX, max_num_outputs, test_module, MixingOutput::SchedulingPolicy::Disabled};
 	mixing_output.setAllDisarmedValues(disarmed_value);
 	mixing_output.setAllFailsafeValues(failsafe_value);
 	mixing_output.setAllMinValues(min_value);

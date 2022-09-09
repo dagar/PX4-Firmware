@@ -114,12 +114,9 @@ public:
 	 * @param max_num_outputs maximum number of supported outputs
 	 * @param interface Parent module for scheduling, parameter updates and callbacks
 	 * @param scheduling_policy
-	 * @param support_esc_calibration true if the output module supports ESC calibration via max, then min setting
-	 * @param ramp_up true if motor ramp up from disarmed to min upon arming is wanted
 	 */
 	MixingOutput(const char *param_prefix, uint8_t max_num_outputs, OutputModuleInterface &interface,
-		     SchedulingPolicy scheduling_policy,
-		     bool support_esc_calibration, bool ramp_up = true);
+		     SchedulingPolicy scheduling_policy = MixingOutput::SchedulingPolicy::Auto);
 
 	~MixingOutput();
 
@@ -169,6 +166,8 @@ public:
 	void setAllDisarmedValues(uint16_t value);
 	void setAllMinValues(uint16_t value);
 	void setAllMaxValues(uint16_t value);
+
+	bool escCalibrationEnabled() const { return _armed.in_esc_calibration_mode && (motorCount() > 0); }
 
 	uint16_t &reverseOutputMask() { return _reverse_output_mask; }
 	uint16_t &failsafeValue(int index) { return _failsafe_value[index]; }
@@ -224,7 +223,7 @@ private:
 
 	uint16_t output_limit_calc_single(int i, float value) const;
 
-	void output_limit_calc(const bool armed, const int num_channels, const float outputs[MAX_ACTUATORS]);
+	uint8_t motorCount() const;
 
 	struct ParamHandles {
 		param_t function{PARAM_INVALID};
@@ -246,16 +245,6 @@ private:
 	uint16_t _current_output_value[MAX_ACTUATORS] {}; ///< current output values (reordered)
 	uint16_t _reverse_output_mask{0}; ///< reverses the interval [min, max] -> [max, min], NOT motor direction
 
-	enum class OutputLimitState {
-		OFF = 0,
-		INIT,
-		RAMP,
-		ON
-	} _output_state{OutputLimitState::INIT};
-
-	hrt_abstime _output_time_armed{0};
-	const bool _output_ramp_up; ///< if true, motors will ramp up from disarmed to min_output after arming
-
 	uORB::Subscription _armed_sub{ORB_ID(actuator_armed)};
 
 	uORB::PublicationMulti<actuator_outputs_s> _outputs_pub{ORB_ID(actuator_outputs)};
@@ -268,7 +257,6 @@ private:
 	bool _ignore_lockdown{false}; ///< if true, ignore the _armed.lockdown flag (for HIL outputs)
 
 	const SchedulingPolicy _scheduling_policy;
-	const bool _support_esc_calibration;
 
 	bool _wq_switched{false};
 	uint8_t _max_num_outputs;

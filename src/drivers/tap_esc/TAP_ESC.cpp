@@ -37,7 +37,7 @@
 
 TAP_ESC::TAP_ESC(char const *const device, uint8_t channels_count):
 	OutputModuleInterface(MODULE_NAME, px4::serial_port_to_wq(device)),
-	_mixing_output{"TAP_ESC", channels_count, *this, MixingOutput::SchedulingPolicy::Auto, true},
+	_mixing_output{"TAP_ESC", channels_count, *this},
 	_channels_count(channels_count)
 {
 	strncpy(_device, device, sizeof(_device) - 1);

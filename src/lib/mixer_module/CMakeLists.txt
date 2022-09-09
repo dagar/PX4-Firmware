@@ -58,6 +58,8 @@ px4_add_library(mixer_module
 	actuator_test.hpp
 	mixer_module.cpp
 	mixer_module.hpp
+	pwm_mixer_module.cpp
+	pwm_mixer_module.hpp
 	)
 
 add_dependencies(mixer_module output_functions_header)
