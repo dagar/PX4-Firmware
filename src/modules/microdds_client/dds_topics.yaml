@@ -37,6 +37,23 @@ publications:
   - topic: /fmu/out/vehicle_local_position
     type: px4_msgs::msg::VehicleLocalPosition
 
+  - topic: /fmu/out/vehicle_global_position
+    type: px4_msgs::msg::VehicleGlobalPosition
+
+    # vehicle_status_flags
+    # angular_velocity
+    # angular_acceleration
+    # vehicle_acceleration
+    # vehicle_command_ack
+    # vehicle_imu
+    # vehicle_gps_position
+
+    # vehicle_visual_odometry
+    #   - test with t265?
+
+
+    # action_result
+
 subscriptions:
   - topic: /fmu/in/debug_array
     type: px4_msgs::msg::DebugArray
@@ -55,9 +72,6 @@ subscriptions:
 
   - topic: /fmu/in/sensor_optical_flow
     type: px4_msgs::msg::SensorOpticalFlow
-
-  - topic: /fmu/in/position_setpoint
-    type: px4_msgs::msg::PositionSetpoint
 
   - topic: /fmu/in/position_setpoint_triplet
     type: px4_msgs::msg::PositionSetpointTriplet

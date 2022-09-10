@@ -237,8 +237,12 @@ def convert_type(spec_type, use_short_type=False):
         c_type = type_map_short[msg_type]
     elif msg_type in type_map:
         c_type = type_map[msg_type]
+    else:
+        c_type = re.sub(r'(?<!^)(?=[A-Z])', '_', c_type).lower() # PascalCase to snake_case
+
     if is_array:
         return c_type + "[" + str(array_length) + "]"
+
     return c_type
 
 
