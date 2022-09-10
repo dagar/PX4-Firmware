@@ -45,7 +45,7 @@
 
 #include <mathlib/mathlib.h>
 
-bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source_3d_s &aid_src_mag, bool update_all_states)
+bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bool update_all_states)
 {
 	// assign intermediate variables
 	const float q0 = _state.quat_nominal(0);
@@ -431,7 +431,7 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source_3d_s &aid_src_mag, b
 }
 
 // update quaternion states and covariances using the yaw innovation and yaw observation variance
-bool Ekf::fuseYaw(const float innovation, const float variance, estimator_aid_source_1d_s& aid_src_status)
+bool Ekf::fuseYaw(const float innovation, const float variance, estimator_aid_source1d_s& aid_src_status)
 {
 	aid_src_status.innovation = innovation;
 

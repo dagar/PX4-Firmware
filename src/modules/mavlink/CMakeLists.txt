@@ -45,20 +45,23 @@ file(RELATIVE_PATH MAVLINK_GIT_DIR_RELATIVE ${CMAKE_SOURCE_DIR} ${MAVLINK_GIT_DI
 px4_add_git_submodule(TARGET git_mavlink_v2 PATH "${MAVLINK_GIT_DIR}")
 
 add_custom_command(
-	OUTPUT ${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT}/${MAVLINK_DIALECT}.h
+	OUTPUT
+		${MAVLINK_LIBRARY_DIR}/mavlink_types.h
+		${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT}/mavlink.h
+		${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT}/${MAVLINK_DIALECT}.h
 	COMMAND
 		${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 			--lang C --wire-protocol 2.0
 			#--no-validate
-			#--strict-units
+			--strict-units
 			--output ${MAVLINK_LIBRARY_DIR}
-			${MAVLINK_GIT_DIR}/message_definitions/v1.0/${MAVLINK_DIALECT}.xml
+			${MAVLINK_GIT_DIR}/message_definitions/v1.0/${MAVLINK_DIALECT}.xml > mavlink_generation.log
 	DEPENDS
 		git_mavlink_v2
 		${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 		${MAVLINK_GIT_DIR}/message_definitions/v1.0/${MAVLINK_DIALECT}.xml
 	COMMENT "Generating Mavlink ${MAVLINK_DIALECT}: ${MAVLINK_GIT_DIR_RELATIVE}/message_definitions/v1.0/${MAVLINK_DIALECT}.xml"
-	USES_TERMINAL
+	#USES_TERMINAL
 )
 add_custom_target(mavlink_c_generate DEPENDS ${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT}/${MAVLINK_DIALECT}.h)
 

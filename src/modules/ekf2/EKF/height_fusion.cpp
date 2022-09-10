@@ -38,7 +38,7 @@
 
 #include "ekf.h"
 
-void Ekf::updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s &baro_hgt)
+void Ekf::updateBaroHgt(const baroSample &baro_sample, estimator_aid_source1d_s &baro_hgt)
 {
 	// reset flags
 	resetEstimatorAidStatusFlags(baro_hgt);
@@ -95,7 +95,7 @@ void Ekf::updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s
 	_baro_b_est.fuseBias(measurement - (-_state.pos(2)) , measurement_var + P(9, 9));
 }
 
-void Ekf::fuseBaroHgt(estimator_aid_source_1d_s &baro_hgt)
+void Ekf::fuseBaroHgt(estimator_aid_source1d_s &baro_hgt)
 {
 	if (baro_hgt.fusion_enabled
 	    && !baro_hgt.innovation_rejected
@@ -106,7 +106,7 @@ void Ekf::fuseBaroHgt(estimator_aid_source_1d_s &baro_hgt)
 	}
 }
 
-void Ekf::updateRngHgt(estimator_aid_source_1d_s &rng_hgt)
+void Ekf::updateRngHgt(estimator_aid_source1d_s &rng_hgt)
 {
 	// reset flags
 	resetEstimatorAidStatusFlags(rng_hgt);
@@ -148,7 +148,7 @@ void Ekf::updateRngHgt(estimator_aid_source_1d_s &rng_hgt)
 	_rng_hgt_b_est.fuseBias(measurement - (-_state.pos(2)) , measurement_var + P(9, 9));
 }
 
-void Ekf::fuseRngHgt(estimator_aid_source_1d_s &rng_hgt)
+void Ekf::fuseRngHgt(estimator_aid_source1d_s &rng_hgt)
 {
 	if (rng_hgt.fusion_enabled
 	    && !rng_hgt.innovation_rejected

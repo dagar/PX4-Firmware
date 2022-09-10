@@ -49,9 +49,9 @@
 #include "bias_estimator.hpp"
 #include "height_bias_estimator.hpp"
 
-#include <uORB/topics/estimator_aid_source_1d.h>
-#include <uORB/topics/estimator_aid_source_2d.h>
-#include <uORB/topics/estimator_aid_source_3d.h>
+#include <uORB/topics/estimator_aid_source1d.h>
+#include <uORB/topics/estimator_aid_source2d.h>
+#include <uORB/topics/estimator_aid_source3d.h>
 
 enum class Likelihood { LOW, MEDIUM, HIGH };
 
@@ -543,23 +543,23 @@ private:
 	bool _inhibit_flow_use{false};	///< true when use of optical flow and range finder is being inhibited
 	Vector2f _flow_compensated_XY_rad{};	///< measured delta angle of the image about the X and Y body axes after removal of body rotation (rad), RH rotation is positive
 
-	estimator_aid_source_1d_s _aid_src_baro_hgt{};
-	estimator_aid_source_1d_s _aid_src_rng_hgt{};
-	estimator_aid_source_1d_s _aid_src_airspeed{};
+	estimator_aid_source1d_s _aid_src_baro_hgt{};
+	estimator_aid_source1d_s _aid_src_rng_hgt{};
+	estimator_aid_source1d_s _aid_src_airspeed{};
 
-	estimator_aid_source_2d_s _aid_src_fake_pos{};
-	estimator_aid_source_1d_s _aid_src_fake_hgt{};
+	estimator_aid_source2d_s _aid_src_fake_pos{};
+	estimator_aid_source1d_s _aid_src_fake_hgt{};
 
-	estimator_aid_source_1d_s _aid_src_ev_yaw{};
+	estimator_aid_source1d_s _aid_src_ev_yaw{};
 
-	estimator_aid_source_1d_s _aid_src_gnss_yaw{};
-	estimator_aid_source_3d_s _aid_src_gnss_vel{};
-	estimator_aid_source_3d_s _aid_src_gnss_pos{};
+	estimator_aid_source1d_s _aid_src_gnss_yaw{};
+	estimator_aid_source3d_s _aid_src_gnss_vel{};
+	estimator_aid_source3d_s _aid_src_gnss_pos{};
 
-	estimator_aid_source_1d_s _aid_src_mag_heading{};
-	estimator_aid_source_3d_s _aid_src_mag{};
+	estimator_aid_source1d_s _aid_src_mag_heading{};
+	estimator_aid_source3d_s _aid_src_mag{};
 
-	estimator_aid_source_3d_s _aid_src_aux_vel{};
+	estimator_aid_source3d_s _aid_src_aux_vel{};
 
 	// output predictor states
 	Vector3f _delta_angle_corr{};	///< delta angle correction vector (rad)
@@ -647,12 +647,12 @@ private:
 	void predictCovariance();
 
 	// ekf sequential fusion of magnetometer measurements
-	bool fuseMag(const Vector3f &mag, estimator_aid_source_3d_s &aid_src_mag, bool update_all_states = true);
+	bool fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bool update_all_states = true);
 
 	// update quaternion states and covariances using an innovation, observation variance and Jacobian vector
 	// innovation : prediction - measurement
 	// variance : observaton variance
-	bool fuseYaw(const float innovation, const float variance, estimator_aid_source_1d_s &aid_src_status);
+	bool fuseYaw(const float innovation, const float variance, estimator_aid_source1d_s& aid_src_status);
 
 	// fuse the yaw angle obtained from a dual antenna GPS unit
 	void fuseGpsYaw(const gpsSample &gps_sample);
@@ -668,8 +668,8 @@ private:
 	// apply sensible limits to the declination and length of the NE mag field states estimates
 	void limitDeclination();
 
-	void updateAirspeed(const airspeedSample &airspeed_sample, estimator_aid_source_1d_s &airspeed) const;
-	void fuseAirspeed(estimator_aid_source_1d_s &airspeed);
+	void updateAirspeed(const airspeedSample &airspeed_sample, estimator_aid_source1d_s &airspeed) const;
+	void fuseAirspeed(estimator_aid_source1d_s &airspeed);
 
 	// fuse synthetic zero sideslip measurement
 	void fuseSideslip();
@@ -677,12 +677,12 @@ private:
 	// fuse body frame drag specific forces for multi-rotor wind estimation
 	void fuseDrag(const dragSample &drag_sample);
 
-	void fuseBaroHgt(estimator_aid_source_1d_s &baro_hgt);
-	void fuseRngHgt(estimator_aid_source_1d_s &range_hgt);
+	void fuseBaroHgt(estimator_aid_source1d_s &baro_hgt);
+	void fuseRngHgt(estimator_aid_source1d_s &range_hgt);
 	void fuseEvHgt();
 
-	void updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s &baro_hgt);
-	void updateRngHgt(estimator_aid_source_1d_s &rng_hgt);
+	void updateBaroHgt(const baroSample &baro_sample, estimator_aid_source1d_s &baro_hgt);
+	void updateRngHgt(estimator_aid_source1d_s &rng_hgt);
 
 	// fuse single velocity and position measurement
 	bool fuseVelPosHeight(const float innov, const float innov_var, const int obs_index);
@@ -717,13 +717,11 @@ private:
 	// fuse optical flow line of sight rate measurements
 	void fuseOptFlow();
 
-	void updateVelocityAidSrcStatus(const uint64_t &sample_time_us, const Vector3f &velocity, const Vector3f &obs_var,
-					const float innov_gate, estimator_aid_source_3d_s &vel_aid_src) const;
-	void updatePositionAidSrcStatus(const uint64_t &sample_time_us, const Vector3f &position, const Vector3f &obs_var,
-					const float innov_gate, estimator_aid_source_3d_s &pos_aid_src) const;
+	void updateVelocityAidSrcStatus(const uint64_t& sample_time_us, const Vector3f& velocity, const Vector3f& obs_var, const float innov_gate, estimator_aid_source3d_s& vel_aid_src) const;
+	void updatePositionAidSrcStatus(const uint64_t& sample_time_us, const Vector3f& position, const Vector3f& obs_var, const float innov_gate, estimator_aid_source3d_s& pos_aid_src) const;
 
-	void fuseVelocity(estimator_aid_source_3d_s &vel_aid_src);
-	void fusePosition(estimator_aid_source_3d_s &pos_aid_src);
+	void fuseVelocity(estimator_aid_source3d_s& vel_aid_src);
+	void fusePosition(estimator_aid_source3d_s& pos_aid_src);
 
 	bool fuseHorizontalVelocity(const Vector3f &innov, float innov_gate, const Vector3f &obs_var,
 				    Vector3f &innov_var, Vector2f &test_ratio);
@@ -1105,7 +1103,7 @@ private:
 
 	void resetGpsDriftCheckFilters();
 
-	bool resetEstimatorAidStatusFlags(estimator_aid_source_1d_s &status) const
+	bool resetEstimatorAidStatusFlags(estimator_aid_source1d_s &status) const
 	{
 		if (status.timestamp_sample != 0) {
 			status.timestamp_sample = 0;
@@ -1119,7 +1117,7 @@ private:
 		return false;
 	}
 
-	void resetEstimatorAidStatus(estimator_aid_source_1d_s &status) const
+	void resetEstimatorAidStatus(estimator_aid_source1d_s &status) const
 	{
 		if (resetEstimatorAidStatusFlags(status)) {
 			status.observation = 0;
@@ -1164,7 +1162,7 @@ private:
 		}
 	}
 
-	void setEstimatorAidStatusTestRatio(estimator_aid_source_1d_s &status, float innovation_gate) const
+	void setEstimatorAidStatusTestRatio(estimator_aid_source1d_s &status, float innovation_gate) const
 	{
 		if (PX4_ISFINITE(status.innovation) && PX4_ISFINITE(status.innovation_variance)) {
 			status.test_ratio = sq(status.innovation) / (sq(innovation_gate) * status.innovation_variance);
