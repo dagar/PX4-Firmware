@@ -130,10 +130,11 @@ add_custom_target(topic_bridge_files DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/dds_top
 px4_add_module(
 	MODULE modules__microdds_client
 	MAIN microdds_client
-	STACK_MAIN 8000
+	STACK_MAIN 16000
 	INCLUDES
 		${CMAKE_CURRENT_SOURCE_DIR}
 	COMPILE_FLAGS
+		#-O0
 		${MAX_CUSTOM_OPT_LEVEL}
 		-Wno-error # TODO: format errors
 	SRCS

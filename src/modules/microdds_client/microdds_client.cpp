@@ -45,6 +45,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#if defined(CONFIG_NET) || defined(__PX4_POSIX)
+# define MICRODDS_CLIENT_UDP 1
+#endif
+
 #define STREAM_HISTORY  4
 #define BUFFER_SIZE (UXR_CONFIG_SERIAL_TRANSPORT_MTU * STREAM_HISTORY) // MTU==512 by default
 
@@ -78,10 +82,19 @@ MicroddsClient::MicroddsClient(Transport transport, const char *device, int baud
 {
 	if (transport == Transport::Serial) {
 
-		int fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+		int fd = -1;
 
-		if (fd < 0) {
-			PX4_ERR("open %s failed (%i)", device, errno);
+		for (int attempt = 0; attempt < 3; attempt++) {
+			fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+
+			if (fd < 0) {
+				PX4_ERR("open %s failed (%i)", device, errno);
+				// sleep before trying again
+				usleep(1'000'000);
+
+			} else {
+				break;
+			}
 		}
 
 		_transport_serial = new uxrSerialTransport();
@@ -102,7 +115,7 @@ MicroddsClient::MicroddsClient(Transport transport, const char *device, int baud
 
 	} else if (transport == Transport::Udp) {
 
-#if defined(CONFIG_NET) || defined(__PX4_POSIX)
+#if defined(MICRODDS_CLIENT_UDP)
 		_transport_udp = new uxrUDPTransport();
 
 		if (_transport_udp) {
@@ -370,20 +383,17 @@ void MicroddsClient::run()
 
 		while (!should_exit() && _connected) {
 
+			_subs->update(&session, reliable_out, data_out, participant_id, _client_namespace);
+
+			uxr_run_session_timeout(&session, 0);
+
 			// time sync session
 			if (hrt_elapsed_time(&last_sync_session) > 1_s) {
-				if (uxr_sync_session(&session, 1000)) {
+				if (uxr_sync_session(&session, 100)) {
 					//PX4_INFO("synchronized with time offset %-5" PRId64 "ns", session.time_offset);
 					last_sync_session = hrt_absolute_time();
 				}
 			}
-
-
-			_subs->update(&session, reliable_out, data_out, participant_id, _client_namespace);
-
-
-			int timeout_ms = 1;
-			uxr_run_session_timeout(&session, timeout_ms);
 
 			// Check for a ping response
 			/* PONG_IN_SESSION_STATUS */
@@ -414,6 +424,7 @@ void MicroddsClient::run()
 				}
 
 				uxr_ping_agent_session(&session, 0, 1);
+
 				had_ping_reply = false;
 			}
 
@@ -421,6 +432,8 @@ void MicroddsClient::run()
 				PX4_INFO("No ping response, disconnecting");
 				_connected = false;
 			}
+
+			px4_usleep(1000);
 		}
 
 		uxr_delete_session_retries(&session, _connected ? 1 : 0);
@@ -571,8 +584,8 @@ int MicroddsClient::task_spawn(int argc, char *argv[])
 {
 	_task_id = px4_task_spawn_cmd("microdds_client",
 				      SCHED_DEFAULT,
-				      SCHED_PRIORITY_DEFAULT - 4,
-				      PX4_STACK_ADJUSTED(8000),
+				      SCHED_PRIORITY_DEFAULT,
+				      PX4_STACK_ADJUSTED(10000),
 				      (px4_main_t)&run_trampoline,
 				      (char *const *)argv);
 
@@ -599,13 +612,25 @@ MicroddsClient *MicroddsClient::instantiate(int argc, char *argv[])
 	int ch;
 	const char *myoptarg = nullptr;
 
+#if defined(MICRODDS_CLIENT_UDP)
 	Transport transport = Transport::Udp;
+#else
+	Transport transport = Transport::Serial;
+#endif
 	const char *device = nullptr;
 	const char *ip = "127.0.0.1";
 	int baudrate = 921600;
 	const char *port = "15555";
 	bool localhost_only = false;
 	const char *client_namespace = nullptr;//"px4";
+
+	if (argc > 0) {
+		for (int i = 0; i < argc; i++) {
+			printf("%s ", argv[i]);
+		}
+
+		printf("\n");
+	}
 
 	while ((ch = px4_getopt(argc, argv, "t:d:b:h:p:l:n", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {

@@ -280,3 +280,19 @@ PARAM_DEFINE_INT32(SYS_BL_UPDATE, 0);
  * @group System
  */
 PARAM_DEFINE_INT32(SYS_FAILURE_EN, 0);
+
+/**
+ * USB mode
+ *
+ * USB mode auto detect
+ *
+ * @reboot_required true
+ *
+ * @group System
+ * @value 0 disabled
+ * @value 1 automatic
+ * @value 2 mavlink (if available)
+ * @value 3 microdds (if available)
+ * @value 4 ublox (if available)
+ */
+PARAM_DEFINE_INT32(SYS_USB_MODE, 1);

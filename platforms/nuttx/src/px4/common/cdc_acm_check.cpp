@@ -48,6 +48,7 @@ extern int serdis_main(int c, char **argv);
 __END_DECLS
 
 #include <px4_platform_common/shutdown.h>
+#include <lib/parameters/param.h>
 
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/actuator_armed.h>
@@ -83,6 +84,8 @@ enum class UsbAutoStartState {
 	disconnecting,
 } usb_auto_start_state{UsbAutoStartState::disconnected};
 
+static int32_t sys_usb_mode = 1;
+
 
 static void mavlink_usb_check(void *arg)
 {
@@ -116,6 +119,10 @@ static void mavlink_usb_check(void *arg)
 			if (vbus_present && vbus_present_prev) {
 				if (sercon_main(0, nullptr) == EXIT_SUCCESS) {
 					usb_auto_start_state = UsbAutoStartState::connecting;
+
+					param_get(param_find("SYS_USB_MODE"), &sys_usb_mode);
+					syslog(LOG_INFO, "%s: SYS_USB_MODE %" PRIi32 "\n", USB_DEVICE_PATH, sys_usb_mode);
+
 					rescheduled = work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, nullptr, USEC2TICK(100000));
 				}
 
@@ -127,212 +134,259 @@ static void mavlink_usb_check(void *arg)
 			break;
 
 		case UsbAutoStartState::connecting:
+
+			{
+				int32_t sys_usb_mode_current = 0;
+				param_get(param_find("SYS_USB_MODE"), &sys_usb_mode_current);
+
+				if (sys_usb_mode_current != sys_usb_mode) {
+					sys_usb_mode = sys_usb_mode_current;
+					syslog(LOG_INFO, "%s: SYS_USB_MODE %" PRIi32 "\n", USB_DEVICE_PATH, sys_usb_mode);
+
+					// cleanup
+					if (ttyacm_fd >= 0) {
+						close(ttyacm_fd);
+						ttyacm_fd = -1;
+					}
+				}
+			}
+
 			if (vbus_present && vbus_present_prev) {
-				if (ttyacm_fd < 0) {
-					ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
+
+				const bool auto_detect = (sys_usb_mode == 1);
+
+				if (sys_usb_mode == 2) {
+					// microdds_client
+					sched_lock();
+
+					syslog(LOG_INFO, "%s: launching microdds_client\n", USB_DEVICE_PATH);
+
+					// microdds_client start -t serial -b 115200 -d /dev/ttyACM0
+					// microdds_client start -t serial -b 115200 -d /dev/ttyACM0
+					static const char *microdds_argv[] {"microdds_client", "start", "-t", "serial", "-b", "921600", "-d", USB_DEVICE_PATH, nullptr};
+
+					char **exec_argv = (char **)microdds_argv;
+
+					if (exec_builtin(exec_argv[0], exec_argv, nullptr, 0) > 0) {
+						usb_auto_start_state = UsbAutoStartState::connected;
+
+					} else {
+						usb_auto_start_state = UsbAutoStartState::disconnecting;
+
+						// wait a bit longer before trying again
+						rescheduled = work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, nullptr, USEC2TICK(4'000'000));
+					}
+
+					sched_unlock();
+
+					break;
 				}
 
-				if (ttyacm_fd >= 0) {
-					int bytes_available = 0;
-					int retval = ::ioctl(ttyacm_fd, FIONREAD, &bytes_available);
+				if (auto_detect) {
+					if (ttyacm_fd < 0) {
+						ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
+					}
 
-					if ((retval == OK) && (bytes_available >= 3)) {
-						char buffer[80];
+					if (ttyacm_fd >= 0) {
+						int bytes_available = 0;
+						int retval = ::ioctl(ttyacm_fd, FIONREAD, &bytes_available);
 
-						// non-blocking read
-						int nread = ::read(ttyacm_fd, buffer, sizeof(buffer));
+						if ((retval == OK) && (bytes_available >= 3)) {
+							char buffer[80];
 
-#if defined(DEBUG_BUILD)
+							// non-blocking read
+							int nread = ::read(ttyacm_fd, buffer, sizeof(buffer));
 
-						if (nread > 0) {
-							fprintf(stderr, "%d bytes\n", nread);
 
-							for (int i = 0; i < nread; i++) {
-								fprintf(stderr, "|%X", buffer[i]);
+
+							if (nread > 0) {
+								fprintf(stderr, "%d bytes\n", nread);
+
+								for (int i = 0; i < nread; i++) {
+									fprintf(stderr, "|%X", buffer[i]);
+								}
+
+								fprintf(stderr, "\n");
 							}
 
-							fprintf(stderr, "\n");
-						}
 
-#endif // DEBUG_BUILD
+							if (nread > 0) {
+								// Mavlink reboot/shutdown command
+								// COMMAND_LONG (#76) with command MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN (246)
+								static constexpr int MAVLINK_COMMAND_LONG_MIN_LENGTH = 41;
 
+								if (nread >= MAVLINK_COMMAND_LONG_MIN_LENGTH) {
+									// scan buffer for mavlink COMMAND_LONG
+									for (int i = 0; i < nread - MAVLINK_COMMAND_LONG_MIN_LENGTH; i++) {
+										if ((buffer[i] == 0xFE)        // Mavlink v1 start byte
+										    && (buffer[i + 5] == 76)   //  76=0x4C COMMAND_LONG
+										    && (buffer[i + 34] == 246) // 246=0xF6 MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN
+										   ) {
+											// mavlink v1 COMMAND_LONG
+											//  buffer[0]: start byte (0xFE for mavlink v1)
+											//  buffer[3]: SYSID
+											//  buffer[4]: COMPID
+											//  buffer[5]: message id (COMMAND_LONG 76=0x4C)
+											//  buffer[6-10]: COMMAND_LONG param 1 (little endian float)
+											//  buffer[34]: COMMAND_LONG command MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN (246/0xF6)
+											float param1_raw = 0;
+											memcpy(&param1_raw, &buffer[i + 6], 4);
+											int param1 = roundf(param1_raw);
 
-						if (nread > 0) {
-							// Mavlink reboot/shutdown command
-							// COMMAND_LONG (#76) with command MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN (246)
-							static constexpr int MAVLINK_COMMAND_LONG_MIN_LENGTH = 41;
+											syslog(LOG_INFO, "%s: Mavlink MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN param 1: %d (SYSID:%d COMPID:%d)\n",
+											       USB_DEVICE_PATH, param1, buffer[i + 3], buffer[i + 4]);
 
-							if (nread >= MAVLINK_COMMAND_LONG_MIN_LENGTH) {
-								// scan buffer for mavlink COMMAND_LONG
-								for (int i = 0; i < nread - MAVLINK_COMMAND_LONG_MIN_LENGTH; i++) {
-									if ((buffer[i] == 0xFE)        // Mavlink v1 start byte
-									    && (buffer[i + 5] == 76)   //  76=0x4C COMMAND_LONG
-									    && (buffer[i + 34] == 246) // 246=0xF6 MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN
-									   ) {
-										// mavlink v1 COMMAND_LONG
-										//  buffer[0]: start byte (0xFE for mavlink v1)
-										//  buffer[3]: SYSID
-										//  buffer[4]: COMPID
-										//  buffer[5]: message id (COMMAND_LONG 76=0x4C)
-										//  buffer[6-10]: COMMAND_LONG param 1 (little endian float)
-										//  buffer[34]: COMMAND_LONG command MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN (246/0xF6)
-										float param1_raw = 0;
-										memcpy(&param1_raw, &buffer[i + 6], 4);
-										int param1 = roundf(param1_raw);
+											if (param1 == 1) {
+												// 1: Reboot autopilot
+												px4_reboot_request(false, 0);
 
-										syslog(LOG_INFO, "%s: Mavlink MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN param 1: %d (SYSID:%d COMPID:%d)\n",
-										       USB_DEVICE_PATH, param1, buffer[i + 3], buffer[i + 4]);
-
-										if (param1 == 1) {
-											// 1: Reboot autopilot
-											px4_reboot_request(false, 0);
-
-										} else if (param1 == 2) {
-											// 2: Shutdown autopilot
+											} else if (param1 == 2) {
+												// 2: Shutdown autopilot
 #if defined(BOARD_HAS_POWER_CONTROL)
-											px4_shutdown_request(0);
+												px4_shutdown_request(0);
 #endif // BOARD_HAS_POWER_CONTROL
 
-										} else if (param1 == 3) {
-											// 3: Reboot autopilot and keep it in the bootloader until upgraded.
-											px4_reboot_request(true, 0);
+											} else if (param1 == 3) {
+												// 3: Reboot autopilot and keep it in the bootloader until upgraded.
+												px4_reboot_request(true, 0);
+											}
 										}
 									}
 								}
-							}
 
 
-							bool launch_mavlink = false;
-							bool launch_nshterm = false;
-							bool launch_passthru = false;
-							struct termios uart_config;
-							static constexpr int MAVLINK_HEARTBEAT_MIN_LENGTH = 9;
+								bool launch_mavlink = false;
+								bool launch_nshterm = false;
+								bool launch_passthru = false;
+								struct termios uart_config;
+								static constexpr int MAVLINK_HEARTBEAT_MIN_LENGTH = 9;
 
-							if (nread >= MAVLINK_HEARTBEAT_MIN_LENGTH) {
-								// scan buffer for mavlink HEARTBEAT (v1 & v2)
-								for (int i = 0; i < nread - MAVLINK_HEARTBEAT_MIN_LENGTH; i++) {
-									if ((buffer[i] == 0xFE) && (buffer[i + 1] == 9) && (buffer[i + 5] == 0)) {
-										// mavlink v1 HEARTBEAT
-										//  buffer[0]: start byte (0xFE for mavlink v1)
-										//  buffer[1]: length (9 for HEARTBEAT)
-										//  buffer[3]: SYSID
-										//  buffer[4]: COMPID
-										//  buffer[5]: mavlink message id (0 for HEARTBEAT)
-										syslog(LOG_INFO, "%s: launching mavlink (HEARTBEAT v1 from SYSID:%d COMPID:%d)\n",
-										       USB_DEVICE_PATH, buffer[i + 3], buffer[i + 4]);
-										launch_mavlink = true;
-										break;
+								if (nread >= MAVLINK_HEARTBEAT_MIN_LENGTH) {
+									// scan buffer for mavlink HEARTBEAT (v1 & v2)
+									for (int i = 0; i < nread - MAVLINK_HEARTBEAT_MIN_LENGTH; i++) {
+										if ((buffer[i] == 0xFE) && (buffer[i + 1] == 9) && (buffer[i + 5] == 0)) {
+											// mavlink v1 HEARTBEAT
+											//  buffer[0]: start byte (0xFE for mavlink v1)
+											//  buffer[1]: length (9 for HEARTBEAT)
+											//  buffer[3]: SYSID
+											//  buffer[4]: COMPID
+											//  buffer[5]: mavlink message id (0 for HEARTBEAT)
+											syslog(LOG_INFO, "%s: launching mavlink (HEARTBEAT v1 from SYSID:%d COMPID:%d)\n",
+											       USB_DEVICE_PATH, buffer[i + 3], buffer[i + 4]);
+											launch_mavlink = true;
+											break;
 
-									} else if ((buffer[i] == 0xFD) && (buffer[i + 1] == 9)
-										   && (buffer[i + 7] == 0) && (buffer[i + 8] == 0) && (buffer[i + 9] == 0)) {
-										// mavlink v2 HEARTBEAT
-										//  buffer[0]: start byte (0xFD for mavlink v2)
-										//  buffer[1]: length (9 for HEARTBEAT)
-										//  buffer[5]: SYSID
-										//  buffer[6]: COMPID
-										//  buffer[7:9]: mavlink message id (0 for HEARTBEAT)
-										syslog(LOG_INFO, "%s: launching mavlink (HEARTBEAT v2 from SYSID:%d COMPID:%d)\n",
-										       USB_DEVICE_PATH, buffer[i + 5], buffer[i + 6]);
-										launch_mavlink = true;
-										break;
+										} else if ((buffer[i] == 0xFD) && (buffer[i + 1] == 9)
+											   && (buffer[i + 7] == 0) && (buffer[i + 8] == 0) && (buffer[i + 9] == 0)) {
+											// mavlink v2 HEARTBEAT
+											//  buffer[0]: start byte (0xFD for mavlink v2)
+											//  buffer[1]: length (9 for HEARTBEAT)
+											//  buffer[5]: SYSID
+											//  buffer[6]: COMPID
+											//  buffer[7:9]: mavlink message id (0 for HEARTBEAT)
+											syslog(LOG_INFO, "%s: launching mavlink (HEARTBEAT v2 from SYSID:%d COMPID:%d)\n",
+											       USB_DEVICE_PATH, buffer[i + 5], buffer[i + 6]);
+											launch_mavlink = true;
+											break;
+										}
 									}
 								}
-							}
 
-							if (!launch_mavlink && (nread >= 3)) {
-								// nshterm (3 carriage returns)
-								// scan buffer looking for 3 consecutive carriage returns (0xD)
-								for (int i = 1; i < nread - 1; i++) {
-									if (buffer[i - 1] == 0xD && buffer[i] == 0xD && buffer[i + 1] == 0xD) {
-										syslog(LOG_INFO, "%s: launching nshterm\n", USB_DEVICE_PATH);
-										launch_nshterm = true;
-										break;
+								if (!launch_mavlink && (nread >= 3)) {
+									// nshterm (3 carriage returns)
+									// scan buffer looking for 3 consecutive carriage returns (0xD)
+									for (int i = 1; i < nread - 1; i++) {
+										if (buffer[i - 1] == 0xD && buffer[i] == 0xD && buffer[i + 1] == 0xD) {
+											syslog(LOG_INFO, "%s: launching nshterm\n", USB_DEVICE_PATH);
+											launch_nshterm = true;
+											break;
+										}
 									}
 								}
-							}
 
 #if defined(CONFIG_SERIAL_PASSTHRU_UBLOX)
 
-							if (!launch_mavlink && !launch_nshterm && (nread >= 4)) {
-								// passthru Ublox
-								// scan buffer looking for 0xb5 0x62
-								for (int i = 0; i < nread; i++) {
-									bool ub = buffer[i] == 0xb5 && buffer[i + 1] == 0x62;
+								if (!launch_mavlink && !launch_nshterm && (nread >= 4)) {
+									// passthru Ublox
+									// scan buffer looking for 0xb5 0x62
+									for (int i = 0; i < nread; i++) {
+										bool ub = buffer[i] == 0xb5 && buffer[i + 1] == 0x62;
 
-									if (ub && ((buffer[i + 2 ] == 0x6 && (buffer[i + 3 ] == 0xb8 || buffer[i + 3 ] == 0x13)) ||
-										   (buffer[i + 2 ] == 0xa && buffer[i + 3 ] == 0x4))) {
-										syslog(LOG_INFO, "%s: launching serial_passthru\n", USB_DEVICE_PATH);
-										launch_passthru = true;
-										break;
+										if (ub && ((buffer[i + 2 ] == 0x6 && (buffer[i + 3 ] == 0xb8 || buffer[i + 3 ] == 0x13)) ||
+											   (buffer[i + 2 ] == 0xa && buffer[i + 3 ] == 0x4))) {
+											syslog(LOG_INFO, "%s: launching serial_passthru\n", USB_DEVICE_PATH);
+											launch_passthru = true;
+											break;
+										}
 									}
 								}
-							}
 
 #endif
 
-							if (launch_mavlink || launch_nshterm || launch_passthru) {
+								if (launch_mavlink || launch_nshterm || launch_passthru) {
 
-								// Get the current settings
-								tcgetattr(ttyacm_fd, &uart_config);
+									// Get the current settings
+									tcgetattr(ttyacm_fd, &uart_config);
 
-								// cleanup serial port
-								close(ttyacm_fd);
-								ttyacm_fd = -1;
+									// cleanup serial port
+									close(ttyacm_fd);
+									ttyacm_fd = -1;
 
-								static const char *mavlink_argv[] {"mavlink", "start", "-d", USB_DEVICE_PATH, nullptr};
-								static const char *nshterm_argv[] {"nshterm", USB_DEVICE_PATH, nullptr};
+									static const char *mavlink_argv[] {"mavlink", "start", "-d", USB_DEVICE_PATH, nullptr};
+									static const char *nshterm_argv[] {"nshterm", USB_DEVICE_PATH, nullptr};
 #if defined(CONFIG_SERIAL_PASSTHRU_UBLOX)
-								speed_t baudrate = cfgetspeed(&uart_config);
-								char baudstring[16];
-								snprintf(baudstring, sizeof(baudstring), "%d", baudrate);
-								static const char *gps_argv[] {"gps", "stop", nullptr};
+									speed_t baudrate = cfgetspeed(&uart_config);
+									char baudstring[16];
+									snprintf(baudstring, sizeof(baudstring), "%d", baudrate);
+									static const char *gps_argv[] {"gps", "stop", nullptr};
 
-								static const char *passthru_argv[] {"serial_passthru", "start", "-t", "-b", baudstring, "-e", USB_DEVICE_PATH, "-d", SERIAL_PASSTHRU_UBLOX_DEV,   nullptr};
+									static const char *passthru_argv[] {"serial_passthru", "start", "-t", "-b", baudstring, "-e", USB_DEVICE_PATH, "-d", SERIAL_PASSTHRU_UBLOX_DEV,   nullptr};
 #endif
-								char **exec_argv = nullptr;
+									char **exec_argv = nullptr;
 
-								if (launch_nshterm) {
-									exec_argv = (char **)nshterm_argv;
+									if (launch_nshterm) {
+										exec_argv = (char **)nshterm_argv;
 
-								} else if (launch_mavlink) {
-									exec_argv = (char **)mavlink_argv;
-								}
+									} else if (launch_mavlink) {
+										exec_argv = (char **)mavlink_argv;
+									}
 
 #if defined(CONFIG_SERIAL_PASSTHRU_UBLOX)
 
-								else if (launch_passthru) {
+									else if (launch_passthru) {
+										sched_lock();
+										exec_argv = (char **)gps_argv;
+										exec_builtin(exec_argv[0], exec_argv, nullptr, 0);
+										sched_unlock();
+										exec_argv = (char **)passthru_argv;
+									}
+
+#endif
+
 									sched_lock();
-									exec_argv = (char **)gps_argv;
-									exec_builtin(exec_argv[0], exec_argv, nullptr, 0);
+
+									if (exec_builtin(exec_argv[0], exec_argv, nullptr, 0) > 0) {
+										usb_auto_start_state = UsbAutoStartState::connected;
+
+									} else {
+										usb_auto_start_state = UsbAutoStartState::disconnecting;
+									}
+
 									sched_unlock();
-									exec_argv = (char **)passthru_argv;
 								}
-
-#endif
-
-								sched_lock();
-
-								if (exec_builtin(exec_argv[0], exec_argv, nullptr, 0) > 0) {
-									usb_auto_start_state = UsbAutoStartState::connected;
-
-								} else {
-									usb_auto_start_state = UsbAutoStartState::disconnecting;
-								}
-
-								sched_unlock();
 							}
 						}
 					}
-				}
 
-			} else {
-				// cleanup
-				if (ttyacm_fd >= 0) {
-					close(ttyacm_fd);
-					ttyacm_fd = -1;
-				}
+				} else {
+					// cleanup
+					if (ttyacm_fd >= 0) {
+						close(ttyacm_fd);
+						ttyacm_fd = -1;
+					}
 
-				usb_auto_start_state = UsbAutoStartState::disconnecting;
+					usb_auto_start_state = UsbAutoStartState::disconnecting;
+				}
 			}
 
 			break;
