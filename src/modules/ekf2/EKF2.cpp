@@ -959,6 +959,10 @@ void EKF2::PublishGpsStatus(const hrt_abstime &timestamp)
 
 	estimator_gps_status.checks_passed = _ekf.gps_checks_passed();
 
+	estimator_gps_status.position_fusion_enabled = _ekf.control_status_flags().gps;
+	estimator_gps_status.height_fusion_enabled = _ekf.control_status_flags().gps_hgt;
+	estimator_gps_status.yaw_fusion_enabled = _ekf.control_status_flags().gps_yaw;
+
 	estimator_gps_status.check_fail_gps_fix          = _ekf.gps_check_fail_status_flags().fix;
 	estimator_gps_status.check_fail_min_sat_count    = _ekf.gps_check_fail_status_flags().nsats;
 	estimator_gps_status.check_fail_max_pdop         = _ekf.gps_check_fail_status_flags().pdop;

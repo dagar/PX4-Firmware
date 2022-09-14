@@ -3,6 +3,10 @@ uint64 timestamp_sample                   # the timestamp of the raw data (micro
 
 bool checks_passed
 
+bool position_fusion_enabled # true if GPS measurement fusion is intended
+bool height_fusion_enabled   # true when GPS height is being fused
+bool yaw_fusion_enabled      # true when yaw (not ground course) data fusion from a GPS receiver is intended
+
 bool check_fail_gps_fix          # 0 : insufficient fix type (no 3D solution)
 bool check_fail_min_sat_count    # 1 : minimum required sat count fail
 bool check_fail_max_pdop         # 2 : maximum allowed PDOP fail

@@ -36,6 +36,7 @@
 #include "../Common.hpp"
 
 #include <uORB/Subscription.hpp>
+#include <uORB/topics/estimator_gps_status.h>
 #include <uORB/topics/estimator_selector_status.h>
 #include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/estimator_status.h>
@@ -65,11 +66,10 @@ private:
 	void checkEstimatorStatusFlags(const Context &context, Report &reporter,
 				       const estimator_status_flags_s &estimator_status_flags, NavModes required_groups);
 
-	void checkGps(const Context &context, Report &reporter, const sensor_gps_s &vehicle_gps_position) const;
-	void gpsNoLongerValid(const Context &context, Report &reporter) const;
+	void checkGps(const Context &context, Report &reporter, NavModes required_groups,
+		      vehicle_status_flags_s &failsafe_flags);
 	void setModeRequirementFlags(const Context &context, bool pre_flt_fail_innov_heading, bool pre_flt_fail_innov_vel_horiz,
-				     const vehicle_local_position_s &lpos, const sensor_gps_s &vehicle_gps_position,
-				     vehicle_status_flags_s &failsafe_flags);
+				     const vehicle_local_position_s &lpos, vehicle_status_flags_s &failsafe_flags);
 
 	bool checkPosVelValidity(const hrt_abstime &now, const bool data_valid, const float data_accuracy,
 				 const float required_accuracy,
@@ -81,6 +81,7 @@ private:
 	uORB::Subscription _estimator_status_sub{ORB_ID(estimator_status)};
 	uORB::Subscription _estimator_status_flags_sub{ORB_ID(estimator_status_flags)};
 	uORB::Subscription _estimator_sensor_bias_sub{ORB_ID(estimator_sensor_bias)};
+	uORB::Subscription _estimator_gps_status_sub{ORB_ID(estimator_gps_status)};
 
 	uORB::Subscription _vehicle_global_position_sub{ORB_ID(vehicle_global_position)};
 	uORB::Subscription _vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
@@ -105,7 +106,6 @@ private:
 	bool _position_reliant_on_optical_flow{false};
 
 	DEFINE_PARAMETERS_CUSTOM_PARENT(HealthAndArmingCheckBase,
-					(ParamInt<px4::params::SENS_IMU_MODE>) _param_sens_imu_mode,
 					(ParamInt<px4::params::COM_ARM_MAG_STR>) _param_com_arm_mag_str,
 					(ParamFloat<px4::params::COM_ARM_EKF_HGT>) _param_com_arm_ekf_hgt,
 					(ParamFloat<px4::params::COM_ARM_EKF_VEL>) _param_com_arm_ekf_vel,
