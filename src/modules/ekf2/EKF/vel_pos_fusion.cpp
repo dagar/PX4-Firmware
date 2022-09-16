@@ -159,7 +159,7 @@ bool Ekf::fuseVerticalPosition(const float innov, const float innov_gate, const 
 	}
 }
 
-void Ekf::updateVelocityAidSrcStatus(const uint64_t& sample_time_us, const Vector3f& velocity, const Vector3f& obs_var, const float innov_gate, estimator_aid_source_3d_s& vel_aid_src) const
+void Ekf::updateVelocityAidSrcStatus(const uint64_t& sample_time_us, const Vector3f& velocity, const Vector3f& obs_var, const float innov_gate, estimator_aid_source3d_s& vel_aid_src) const
 {
 	resetEstimatorAidStatus(vel_aid_src);
 
@@ -184,7 +184,7 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t& sample_time_us, const Vecto
 	vel_aid_src.timestamp_sample = sample_time_us;
 }
 
-void Ekf::updatePositionAidSrcStatus(const uint64_t& sample_time_us, const Vector3f& position, const Vector3f& obs_var, const float innov_gate, estimator_aid_source_3d_s& pos_aid_src) const
+void Ekf::updatePositionAidSrcStatus(const uint64_t& sample_time_us, const Vector3f& position, const Vector3f& obs_var, const float innov_gate, estimator_aid_source3d_s& pos_aid_src) const
 {
 	resetEstimatorAidStatus(pos_aid_src);
 
@@ -209,7 +209,7 @@ void Ekf::updatePositionAidSrcStatus(const uint64_t& sample_time_us, const Vecto
 	pos_aid_src.timestamp_sample = sample_time_us;
 }
 
-void Ekf::fuseVelocity(estimator_aid_source_3d_s& vel_aid_src)
+void Ekf::fuseVelocity(estimator_aid_source3d_s& vel_aid_src)
 {
 	// vx & vy
 	if (vel_aid_src.fusion_enabled[0] && !vel_aid_src.innovation_rejected[0]
@@ -232,7 +232,7 @@ void Ekf::fuseVelocity(estimator_aid_source_3d_s& vel_aid_src)
 	}
 }
 
-void Ekf::fusePosition(estimator_aid_source_3d_s& pos_aid_src)
+void Ekf::fusePosition(estimator_aid_source3d_s& pos_aid_src)
 {
 	// x & y
 	if (pos_aid_src.fusion_enabled[0] && !pos_aid_src.innovation_rejected[0]

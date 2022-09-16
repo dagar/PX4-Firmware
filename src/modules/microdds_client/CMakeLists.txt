@@ -76,7 +76,9 @@ ExternalProject_Add(
 		-DUCLIENT_PROFILE_UDP:BOOL=ON
 		-DUCLIENT_PROFILE_SERIAL:BOOL=ON
 		-DUCLIENT_PROFILE_DISCOVERY:BOOL=OFF
-		-DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=ON
+		-DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=OFF
+		-DUCLIENT_PROFILE_MULTITHREAD:BOOL=OFF
+		-DUCLIENT_PROFILE_SHARED_MEMORY:BOOL=OFF
 		-DUCLIENT_PLATFORM_POSIX:BOOL=ON
 		-DUCLIENT_BUILD_MICROCDR:BOOL=ON
 		-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}
@@ -85,6 +87,10 @@ ExternalProject_Add(
 	BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${lib_dir}/libmicroxrcedds_client.a
 	BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${lib_dir}/libmicrocdr.a
 	DEPENDS prebuild_targets git_micro_xrce_dds_client
+	LOG_CONFIGURE true
+	LOG_BUILD true
+	LOG_INSTALL true
+	LOG_OUTPUT_ON_FAILURE true
     )
 
 add_library(libmicroxrceddsclient STATIC IMPORTED GLOBAL)
@@ -103,17 +109,43 @@ add_dependencies(microxrceddsclient libmicrocdr)
 add_dependencies(microxrceddsclient libmicroxrceddsclient_project)
 target_include_directories(microxrceddsclient INTERFACE ${microxrceddsclient_build_dir}/include)
 
+
+
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/dds_topics.h
+	COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate_dds_topics.py
+		--topic-msg-dir ${PX4_SOURCE_DIR}/msg
+		--client-outdir ${CMAKE_CURRENT_BINARY_DIR}
+		--rtps-ids-file ${CMAKE_CURRENT_SOURCE_DIR}/dds_topics.yaml
+		--template_file ${CMAKE_CURRENT_SOURCE_DIR}/dds_topics.h.em
+		#>micrortps_bridge.log 2>&1 || cat micrortps_bridge.log
+	DEPENDS
+		${CMAKE_CURRENT_SOURCE_DIR}/generate_dds_topics.py
+		${CMAKE_CURRENT_SOURCE_DIR}/dds_topics.yaml
+		${CMAKE_CURRENT_SOURCE_DIR}/dds_topics.h.em
+	COMMENT "Generating XRCE-DDS topic bridge"
+	#USES_TERMINAL
+)
+add_custom_target(topic_bridge_files DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/dds_topics.h)
+
 px4_add_module(
 	MODULE modules__microdds_client
 	MAIN microdds_client
-	STACK_MAIN 8000
+	STACK_MAIN 9000
+	INCLUDES
+		${CMAKE_CURRENT_SOURCE_DIR}
+	COMPILE_FLAGS
+		#-O0
+		${MAX_CUSTOM_OPT_LEVEL}
+		-Wno-error # TODO: format errors
 	SRCS
+		${CMAKE_CURRENT_BINARY_DIR}/dds_topics.h
 		microdds_client.cpp
+		microdds_client.h
 	DEPENDS
 		microxrceddsclient
 		libmicroxrceddsclient
 		libmicrocdr
+		timesync
+		topic_bridge_files
 		uorb_ucdr_headers
 	)
-
-add_dependencies(modules__microdds_client topic_bridge_files)

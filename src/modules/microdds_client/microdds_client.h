@@ -35,10 +35,9 @@
 
 #include <px4_platform_common/module.h>
 
-#include <src/modules/micrortps_bridge/micrortps_client/dds_topics.h>
+#include <src/modules/microdds_client/dds_topics.h>
 
-extern "C" __EXPORT int microdds_client_main(int argc, char *argv[]);
-
+#include <lib/timesync/Timesync.hpp>
 
 class MicroddsClient : public ModuleBase<MicroddsClient>
 {
@@ -49,7 +48,7 @@ public:
 	};
 
 	MicroddsClient(Transport transport, const char *device, int baudrate, const char *host, const char *port,
-		       bool localhost_only);
+		       bool localhost_only, const char *client_namespace);
 
 	~MicroddsClient();
 
@@ -75,6 +74,7 @@ private:
 	int setBaudrate(int fd, unsigned baud);
 
 	const bool _localhost_only;
+	const char *_client_namespace;
 
 	SendTopicsSubs *_subs{nullptr};
 	RcvTopicsPubs *_pubs{nullptr};
@@ -87,5 +87,7 @@ private:
 	int _last_payload_tx_rate{}; ///< in B/s
 	int _last_payload_rx_rate{}; ///< in B/s
 	bool _connected{false};
+
+	Timesync _timesync{};
 };
 

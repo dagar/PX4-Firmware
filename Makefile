@@ -172,11 +172,6 @@ ifdef PYTHON_EXECUTABLE
 	override CMAKE_ARGS += -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
 endif
 
-# Check if the microRTPS agent is to be built
-ifdef BUILD_MICRORTPS_AGENT
-  override CMAKE_ARGS += -DBUILD_MICRORTPS_AGENT=ON
-endif
-
 # Functions
 # --------------------------------------------------------------------
 # describe how to build a cmake config
@@ -253,7 +248,7 @@ endef
 # Other targets
 # --------------------------------------------------------------------
 
-.PHONY: qgc_firmware px4fmu_firmware misc_qgc_extra_firmware check_rtps
+.PHONY: qgc_firmware px4fmu_firmware misc_qgc_extra_firmware
 
 # QGroundControl flashable NuttX firmware
 qgc_firmware: px4fmu_firmware misc_qgc_extra_firmware
@@ -278,15 +273,7 @@ misc_qgc_extra_firmware: \
 	check_airmind_mindpx-v2_default \
 	sizes
 
-# builds with RTPS
-check_rtps: \
-	check_px4_fmu-v3_rtps \
-	check_px4_fmu-v4_rtps \
-	check_px4_fmu-v4pro_rtps \
-	check_px4_sitl_rtps \
-	sizes
-
-.PHONY: sizes check quick_check check_rtps uorb_graphs
+.PHONY: sizes check quick_check uorb_graphs
 
 sizes:
 	@-find build -name *.elf -type f | xargs size 2> /dev/null || :
