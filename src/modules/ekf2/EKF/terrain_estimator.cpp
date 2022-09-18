@@ -322,7 +322,7 @@ void Ekf::fuseFlowForTerrain()
 	const float q3 = _state.quat_nominal(3);
 
 	// calculate the optical flow observation variance
-	const float R_LOS = calcOptFlowMeasVar();
+	const float R_LOS = calcOptFlowMeasVar(_flow_sample_delayed);
 
 	// get rotation matrix from earth to body
 	const Dcmf earth_to_body = quatToInverseRotMat(_state.quat_nominal);
@@ -352,28 +352,28 @@ void Ekf::fuseFlowForTerrain()
 	// Constrain terrain variance to be non-negative
 	_terrain_var = fmaxf(_terrain_var, 0.0f);
 
+
 	// Cacluate innovation variance
-	_flow_innov_var(0) = Hx * Hx * _terrain_var + R_LOS;
+	_aid_src_optical_flow.innovation_variance[0] = Hx * Hx * _terrain_var + R_LOS;
 
 	// calculate the kalman gain for the flow x measurement
-	const float Kx = _terrain_var * Hx / _flow_innov_var(0);
+	const float Kx = _terrain_var * Hx / _aid_src_optical_flow.innovation_variance[0];
 
 	// calculate prediced optical flow about x axis
 	const float pred_flow_x = vel_body(1) * earth_to_body(2, 2) * pred_hagl_inv;
 
 	// calculate flow innovation (x axis)
-	_flow_innov(0) = pred_flow_x - opt_flow_rate(0);
+	_aid_src_optical_flow.innovation[0] = pred_flow_x - opt_flow_rate(0);
 
 	// calculate correction term for terrain variance
-	const float KxHxP =  Kx * Hx * _terrain_var;
+	const float KxHxP = Kx * Hx * _terrain_var;
 
 	// innovation consistency check
-	const float gate_size = fmaxf(_params.flow_innov_gate, 1.0f);
-	float flow_test_ratio = sq(_flow_innov(0)) / (sq(gate_size) * _flow_innov_var(0));
+	setEstimatorAidStatusTestRatio(_aid_src_optical_flow, math::max(_params.flow_innov_gate, 1.f));
 
 	// do not perform measurement update if badly conditioned
-	if (flow_test_ratio <= 1.0f) {
-		_terrain_vpos += Kx * _flow_innov(0);
+	if (!_aid_src_optical_flow.innovation_rejected[0]) {
+		_terrain_vpos += Kx * _aid_src_optical_flow.innovation[0];
 		// guard against negative variance
 		_terrain_var = fmaxf(_terrain_var - KxHxP, 0.0f);
 		_time_last_flow_terrain_fuse = _imu_sample_delayed.time_us;
@@ -383,29 +383,40 @@ void Ekf::fuseFlowForTerrain()
 	const float Hy = -vel_body(0) * t0 * pred_hagl_inv * pred_hagl_inv;
 
 	// Calculuate innovation variance
-	_flow_innov_var(1) = Hy * Hy * _terrain_var + R_LOS;
+	_aid_src_optical_flow.innovation_variance[1] = Hy * Hy * _terrain_var + R_LOS;
 
 	// calculate the kalman gain for the flow y measurement
-	const float Ky = _terrain_var * Hy / _flow_innov_var(1);
+	const float Ky = _terrain_var * Hy / _aid_src_optical_flow.innovation_variance[1];
 
 	// calculate prediced optical flow about y axis
 	const float pred_flow_y = -vel_body(0) * earth_to_body(2, 2) * pred_hagl_inv;
 
 	// calculate flow innovation (y axis)
-	_flow_innov(1) = pred_flow_y - opt_flow_rate(1);
+	_aid_src_optical_flow.innovation[1] = pred_flow_y - opt_flow_rate(1);
 
 	// calculate correction term for terrain variance
-	const float KyHyP =  Ky * Hy * _terrain_var;
+	const float KyHyP = Ky * Hy * _terrain_var;
 
 	// innovation consistency check
-	flow_test_ratio = sq(_flow_innov(1)) / (sq(gate_size) * _flow_innov_var(1));
-
-	if (flow_test_ratio <= 1.0f) {
-		_terrain_vpos += Ky * _flow_innov(1);
+	if (!_aid_src_optical_flow.innovation_rejected[1]) {
+		_terrain_vpos += Ky * _aid_src_optical_flow.innovation[1];
 		// guard against negative variance
 		_terrain_var = fmaxf(_terrain_var - KyHyP, 0.0f);
 		_time_last_flow_terrain_fuse = _imu_sample_delayed.time_us;
 	}
+
+	resetEstimatorAidStatus(_aid_src_optical_flow);
+	_aid_src_optical_flow.fusion_enabled[0] = _hagl_sensor_status.flags.flow;
+	_aid_src_optical_flow.fusion_enabled[1] = _hagl_sensor_status.flags.flow;
+
+	// log observations and innovations as NE velocity for comparison
+	_aid_src_optical_flow.observation[0] = flow_vel_ne(0);
+	_aid_src_optical_flow.observation[1] = flow_vel_ne(1);
+	_aid_src_optical_flow.observation_variance[0] = R_LOS;
+	_aid_src_optical_flow.observation_variance[1] = R_LOS;
+	_aid_src_optical_flow.innovation[0] = _state.vel(0) - flow_vel_ne(0);
+	_aid_src_optical_flow.innovation[1] = _state.vel(1) - flow_vel_ne(1);
+
 }
 
 void Ekf::controlHaglFakeFusion()

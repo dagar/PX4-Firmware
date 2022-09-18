@@ -738,6 +738,9 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 	// mag 3d
 	PublishAidSourceStatus(_ekf.aid_src_mag(), _status_mag_pub_last, _estimator_aid_src_mag_pub);
 
+	// optical flow
+	PublishAidSourceStatus(_ekf.aid_src_optical_flow(), _status_optical_flow_pub_last, _estimator_aid_src_optical_flow_pub);
+
 	// aux velocity
 	PublishAidSourceStatus(_ekf.aid_src_aux_vel(), _status_aux_vel_pub_last, _estimator_aid_src_aux_vel_pub);
 }

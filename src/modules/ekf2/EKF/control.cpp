@@ -300,7 +300,7 @@ void Ekf::controlExternalVisionFusion()
 				// check if we have been deadreckoning too long
 				if (isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)) {
 					// only reset velocity if we have no another source of aiding constraining it
-					if (isTimedOut(_time_last_of_fuse, (uint64_t)1E6) &&
+					if (isTimedOut(_aid_src_optical_flow.time_last_fuse[0], (uint64_t)1E6) &&
 					    isTimedOut(_time_last_hor_vel_fuse, (uint64_t)1E6)) {
 
 						if (_control_status.flags.ev_vel) {
@@ -329,7 +329,7 @@ void Ekf::controlExternalVisionFusion()
 			// check if we have been deadreckoning too long
 			if (isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)) {
 				// only reset velocity if we have no another source of aiding constraining it
-				if (isTimedOut(_time_last_of_fuse, (uint64_t)1E6) &&
+				if (isTimedOut(_aid_src_optical_flow.time_last_fuse[0], (uint64_t)1E6) &&
 				    isTimedOut(_time_last_hor_pos_fuse, (uint64_t)1E6)) {
 					resetVelocityToVision();
 				}
@@ -462,20 +462,19 @@ void Ekf::controlOpticalFlowFusion()
 						  || isOnlyActiveSourceOfHorizontalAiding(_control_status.flags.opt_flow)
 						  || (_control_status.flags.gps && (_gps_error_norm > gps_err_norm_lim))); // is using GPS, but GPS is bad
 
-
 		// inhibit use of optical flow if motion is unsuitable and we are not reliant on it for flight navigation
 		const bool preflight_motion_not_ok = !_control_status.flags.in_air
 						     && ((_imu_sample_delayed.time_us > (_time_good_motion_us + (uint64_t)1E5))
 								     || (_imu_sample_delayed.time_us < (_time_bad_motion_us + (uint64_t)5E6)));
 		const bool flight_condition_not_ok = _control_status.flags.in_air && !isTerrainEstimateValid();
 
-		_inhibit_flow_use = ((preflight_motion_not_ok || flight_condition_not_ok) && !is_flow_required)
+		const bool inhibit_flow_use = ((preflight_motion_not_ok || flight_condition_not_ok) && !is_flow_required)
 				    || !_control_status.flags.tilt_align;
 
 		// Handle cases where we are using optical flow but we should not use it anymore
 		if (_control_status.flags.opt_flow) {
 			if (!(_params.fusion_mode & SensorFusionMask::USE_OPT_FLOW)
-			    || _inhibit_flow_use) {
+			    || inhibit_flow_use) {
 
 				stopFlowFusion();
 				return;
@@ -485,21 +484,17 @@ void Ekf::controlOpticalFlowFusion()
 		// optical flow fusion mode selection logic
 		if ((_params.fusion_mode & SensorFusionMask::USE_OPT_FLOW) // optical flow has been selected by the user
 		    && !_control_status.flags.opt_flow // we are not yet using flow data
-		    && !_inhibit_flow_use) {
-			// If the heading is valid and use is not inhibited , start using optical flow aiding
-			if (_control_status.flags.yaw_align || _params.mag_fusion_type == MagFuseType::NONE) {
-				// set the flag and reset the fusion timeout
-				ECL_INFO("starting optical flow fusion");
-				_control_status.flags.opt_flow = true;
-				_time_last_of_fuse = _imu_sample_delayed.time_us;
+		    && !inhibit_flow_use) {
+			// set the flag and reset the fusion timeout
+			ECL_INFO("starting optical flow fusion");
+			_control_status.flags.opt_flow = true;
 
-				// if we are not using GPS or external vision aiding, then the velocity and position states and covariances need to be set
-				const bool flow_aid_only = !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow);
+			// if we are not using GPS or external vision aiding, then the velocity and position states and covariances need to be set
+			const bool flow_aid_only = !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow);
 
-				if (flow_aid_only) {
-					resetHorizontalVelocityToOpticalFlow();
-					resetHorizontalPositionToOpticalFlow();
-				}
+			if (flow_aid_only) {
+				resetHorizontalVelocityToOpticalFlow(_flow_compensated_XY_rad, _flow_sample_delayed);
+				resetHorizontalPositionToOpticalFlow();
 			}
 		}
 
@@ -517,10 +512,10 @@ void Ekf::controlOpticalFlowFusion()
 			}
 
 			// handle the case when we have optical flow, are reliant on it, but have not been using it for an extended period
-			if (isTimedOut(_time_last_of_fuse, _params.reset_timeout_max)
+			if (isTimedOut(_aid_src_optical_flow.time_last_fuse[0], _params.reset_timeout_max)
 			    && !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow)) {
 
-				resetHorizontalVelocityToOpticalFlow();
+				resetHorizontalVelocityToOpticalFlow(_flow_compensated_XY_rad, _flow_sample_delayed);
 				resetHorizontalPositionToOpticalFlow();
 			}
 		}
@@ -763,5 +758,5 @@ bool Ekf::hasHorizontalAidingTimedOut() const
 {
 	return isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
 	       && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
-	       && isTimedOut(_time_last_of_fuse, _params.reset_timeout_max);
+	       && isTimedOut(_aid_src_optical_flow.time_last_fuse[0], _params.reset_timeout_max);
 }

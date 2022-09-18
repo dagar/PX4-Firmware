@@ -275,6 +275,8 @@ private:
 	hrt_abstime _status_mag_pub_last{0};
 	hrt_abstime _status_mag_heading_pub_last{0};
 
+	hrt_abstime _status_optical_flow_pub_last{0};
+
 	hrt_abstime _status_aux_vel_pub_last{0};
 
 	float _last_baro_bias_published{};
@@ -358,6 +360,8 @@ private:
 	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_mag_pub{ORB_ID(estimator_aid_src_mag)};
 
 	uORB::PublicationMulti<estimator_aid_source_1d_s> _estimator_aid_src_ev_yaw_pub{ORB_ID(estimator_aid_src_ev_yaw)};
+
+	uORB::PublicationMulti<estimator_aid_source_2d_s> _estimator_aid_src_optical_flow_pub{ORB_ID(estimator_aid_src_optical_flow)};
 
 	uORB::PublicationMulti<estimator_aid_source_3d_s> _estimator_aid_src_aux_vel_pub{ORB_ID(estimator_aid_src_aux_vel)};
 
