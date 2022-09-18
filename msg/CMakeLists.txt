@@ -41,6 +41,7 @@ set(msg_files
 	actuator_armed.msg
 	actuator_controls.msg
 	actuator_controls_status.msg
+	actuator_effectiveness.msg
 	actuator_motors.msg
 	actuator_outputs.msg
 	actuator_servos.msg
@@ -61,6 +62,7 @@ set(msg_files
 	collision_report.msg
 	commander_state.msg
 	control_allocator_status.msg
+	control_effectiveness.msg
 	cpuload.msg
 	differential_pressure.msg
 	distance_sensor.msg

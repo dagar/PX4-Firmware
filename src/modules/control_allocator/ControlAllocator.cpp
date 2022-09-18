@@ -543,6 +543,9 @@ ControlAllocator::update_effectiveness_matrix_if_needed(EffectivenessUpdateReaso
 		}
 
 		for (int i = 0; i < _num_control_allocation; ++i) {
+
+
+
 			_control_allocation[i]->setActuatorMin(minimum[i]);
 			_control_allocation[i]->setActuatorMax(maximum[i]);
 			_control_allocation[i]->setSlewRateLimit(slew_rate[i]);
@@ -571,6 +574,27 @@ ControlAllocator::update_effectiveness_matrix_if_needed(EffectivenessUpdateReaso
 			int total_num_actuators = config.num_actuators_matrix[i];
 			_control_allocation[i]->setEffectivenessMatrix(config.effectiveness_matrices[i], config.trim[i],
 					config.linearization_point[i], total_num_actuators, reason == EffectivenessUpdateReason::CONFIGURATION_UPDATE);
+
+
+			control_effectiveness_s control_effectiveness{};
+
+			control_effectiveness.number_actuators = total_num_actuators;
+
+			for (int n = 0; n < NUM_ACTUATORS; n++) {
+				control_effectiveness.actuator[n].torque_effectiveness[0] = matrix(0, n);
+				control_effectiveness.actuator[n].torque_effectiveness[1] = matrix(1, n);
+				control_effectiveness.actuator[n].torque_effectiveness[2] = matrix(2, n);
+
+				control_effectiveness.actuator[n].thrust_effectiveness[0] = matrix(3, n);
+				control_effectiveness.actuator[n].thrust_effectiveness[1] = matrix(4, n);
+				control_effectiveness.actuator[n].thrust_effectiveness[2] = matrix(5, n);
+
+				control_effectiveness.actuator[n].actuator_min = minimum[i](n);
+				control_effectiveness.actuator[n].actuator_max = maximum[i](n);
+			}
+
+			control_effectiveness.timestamp = hrt_absolute_time();
+			_control_effectiveness_pub[i].publish(control_effectiveness);
 		}
 
 		trims.timestamp = hrt_absolute_time();

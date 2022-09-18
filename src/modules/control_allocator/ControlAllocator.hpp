@@ -71,6 +71,7 @@
 #include <uORB/topics/actuator_servos.h>
 #include <uORB/topics/actuator_servos_trim.h>
 #include <uORB/topics/control_allocator_status.h>
+#include <uORB/topics/control_effectiveness.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_torque_setpoint.h>
 #include <uORB/topics/vehicle_thrust_setpoint.h>
@@ -176,6 +177,7 @@ private:
 
 	// Outputs
 	uORB::PublicationMulti<control_allocator_status_s> _control_allocator_status_pub[2] {ORB_ID(control_allocator_status), ORB_ID(control_allocator_status)};
+	uORB::PublicationMulti<control_effectiveness_s> _control_effectiveness_pub[2] {ORB_ID(control_effectiveness), ORB_ID(control_effectiveness)};
 
 	uORB::Publication<actuator_motors_s>	_actuator_motors_pub{ORB_ID(actuator_motors)};
 	uORB::Publication<actuator_servos_s>	_actuator_servos_pub{ORB_ID(actuator_servos)};
