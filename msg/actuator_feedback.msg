@@ -1,16 +1,12 @@
-uint64 timestamp				# time since system start (microseconds)
+uint64 timestamp                   # time since system start (microseconds)
+uint64 timestamp_sample            # the timestamp the data this control response is based on was sampled
 
-uint8 NUM_ACTUATOR_OUTPUTS = 16
-
-
-
-uint8 noutputs				# valid outputs
-
-float32[16] output				# output data, in natural output units
-
-
+uint8 NUM_ACTUATORS = 8
 
 char[8] prefix
+
+float32[8] actuator
+
 
 uint8 FUNCTION_DISABLED     = 0
 uint8 FUNCTION_CONSTANT_MIN = 1
@@ -34,19 +30,17 @@ uint8 FUNCTION_SERVO6       = 206
 uint8 FUNCTION_SERVO7       = 207
 uint8 FUNCTION_SERVO8       = 208
 
-uint8[16] function
+
+uint8 function
+
+float32[8] min
+float32[8] max
+
+float32[8] current
+
+float32[8] setpoint
+float32[8] setpoint_adjusted # battery scale thrust etc
 
 
-float32[16] min
-float32[16] max
-
-float32[16] current
-
-float32[16] setpoint
-float32[16] setpoint_adjusted # battery scale thrust etc
-
-bool[16] enabled
-bool[16] healthy
-
-# actuator_outputs_sim is used for SITL, HITL & SIH (with an output range of [-1, 1])
-# TOPICS actuator_outputs actuator_outputs_sim
+bool[8] enabled
+bool[8] healthy

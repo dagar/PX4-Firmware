@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -431,6 +431,8 @@ bool MixingOutput::update()
 	// check for actuator test
 	_actuator_test.update(_max_num_outputs, _param_thr_mdl_fac.get());
 
+	actuator_feedback_s actuator_feedback{};
+
 	// get output values
 	float outputs[MAX_ACTUATORS];
 	bool all_disabled = true;
@@ -449,6 +451,11 @@ bool MixingOutput::update()
 
 			_reversible_mask |= (uint32_t)_functions[i]->reversible(_function_assignment[i]) << i;
 
+			//actuator_feedback.function[i] = 0; // TODO
+
+			actuator_feedback.min[i] = _min_value[i]; // TODO: scale
+			actuator_feedback.max[i] = _max_value[i]; // TODO: scale
+
 		} else {
 			outputs[i] = NAN;
 		}
@@ -461,6 +468,16 @@ bool MixingOutput::update()
 
 		limitAndUpdateOutputs(outputs, has_updates);
 	}
+
+
+
+
+	strncpy(actuator_feedback.prefix, _param_prefix, sizeof(actuator_feedback.prefix));
+
+	actuator_feedback.timestamp = hrt_absolute_time();
+	_actuator_feedback_pub.publish(actuator_feedback);
+
+
 
 	return true;
 }
@@ -492,9 +509,54 @@ MixingOutput::limitAndUpdateOutputs(float outputs[MAX_ACTUATORS], bool has_updat
 	/* now return the outputs to the driver */
 	if (_interface.updateOutputs(stop_motors, _current_output_value, _max_num_outputs, has_updates)) {
 		actuator_outputs_s actuator_outputs{};
-		setAndPublishActuatorOutputs(_max_num_outputs, actuator_outputs);
+		actuator_outputs.noutputs = _max_num_outputs;
 
-		updateLatencyPerfCounter(actuator_outputs);
+		for (size_t i = 0; i < _max_num_outputs; ++i) {
+			//actuator_outputs.output[i] = _current_output_value[i];
+
+			actuator_outputs.function[i] = (int)_function_assignment[i];
+
+
+			// uint16_t effective_output = value * (_max_value[i] - _min_value[i]) / 2 + (_max_value[i] + _min_value[i]) / 2;
+
+
+			actuator_outputs.output[i] = static_cast<float>(_current_output_value[i]) / static_cast<float>(_max_value[i] - _min_value[i]);
+
+
+			// handle if disarmed eg 900 us disarmed
+
+			//reversed(i)
+
+			// [1, -1], [0, 1], [-1, 0], etc
+
+			// TODO: dshot 3d mode?
+			//  - auto dshot 3d mode
+
+			actuator_outputs.min[i] = _min_value[i];
+			actuator_outputs.max[i] = _max_value[i];
+
+			// _current_output_value
+
+			actuator_outputs.enabled[i] = _function_allocated[i];
+		}
+
+		strncpy(actuator_outputs.prefix, _param_prefix, sizeof(actuator_outputs.prefix));
+
+		actuator_outputs.timestamp = hrt_absolute_time();
+		_outputs_pub.publish(actuator_outputs);
+
+		// Just check the first function. It means we only get the latency if motors are assigned first, which is the default
+		for (size_t i = 0; i < _max_num_outputs; ++i) {
+			if (_function_allocated[i]) {
+				hrt_abstime timestamp_sample;
+
+				if (_function_allocated[i]->getLatestSampleTimestamp(timestamp_sample)) {
+					perf_set_elapsed(_control_latency_perf, actuator_outputs.timestamp - timestamp_sample);
+					break;
+				}
+			}
+		}
+
 	}
 }
 
@@ -505,7 +567,7 @@ uint16_t MixingOutput::output_limit_calc_single(int i, float value) const
 		return _disarmed_value[i];
 	}
 
-	if (_reverse_output_mask & (1 << i)) {
+	if (reversed(i)) {
 		value = -1.f * value;
 	}
 
@@ -635,7 +697,7 @@ MixingOutput::output_limit_calc(const bool armed, const int num_channels, const 
 					ramp_min_output = _min_value[i];
 				}
 
-				if (_reverse_output_mask & (1 << i)) {
+				if (reversed(i)) {
 					control_value = -1.f * control_value;
 				}
 
@@ -654,32 +716,6 @@ MixingOutput::output_limit_calc(const bool armed, const int num_channels, const 
 		}
 
 		break;
-	}
-}
-
-void
-MixingOutput::setAndPublishActuatorOutputs(unsigned num_outputs, actuator_outputs_s &actuator_outputs)
-{
-	actuator_outputs.noutputs = num_outputs;
-
-	for (size_t i = 0; i < num_outputs; ++i) {
-		actuator_outputs.output[i] = _current_output_value[i];
-	}
-
-	actuator_outputs.timestamp = hrt_absolute_time();
-	_outputs_pub.publish(actuator_outputs);
-}
-
-void
-MixingOutput::updateLatencyPerfCounter(const actuator_outputs_s &actuator_outputs)
-{
-	// Just check the first function. It means we only get the latency if motors are assigned first, which is the default
-	if (_function_allocated[0]) {
-		hrt_abstime timestamp_sample;
-
-		if (_function_allocated[0]->getLatestSampleTimestamp(timestamp_sample)) {
-			perf_set_elapsed(_control_latency_perf, actuator_outputs.timestamp - timestamp_sample);
-		}
 	}
 }
 

@@ -56,6 +56,7 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_armed.h>
+#include <uORB/topics/actuator_feedback.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/parameter_update.h>
 
@@ -139,6 +140,8 @@ public:
 	 */
 	bool isFunctionSet(int index) const { return _functions[index] != nullptr; }
 
+	bool reversed(int index) const { return _reverse_output_mask & (1 << index); }
+
 	OutputFunction outputFunction(int index) const { return _function_assignment[index]; }
 
 	/**
@@ -212,9 +215,7 @@ private:
 		return (_armed.prearmed && !_armed.armed) || _armed.in_esc_calibration_mode;
 	}
 
-	void setAndPublishActuatorOutputs(unsigned num_outputs, actuator_outputs_s &actuator_outputs);
 	void publishMixerStatus(const actuator_outputs_s &actuator_outputs);
-	void updateLatencyPerfCounter(const actuator_outputs_s &actuator_outputs);
 
 	void cleanupFunctions();
 
@@ -259,6 +260,7 @@ private:
 	uORB::Subscription _armed_sub{ORB_ID(actuator_armed)};
 
 	uORB::PublicationMulti<actuator_outputs_s> _outputs_pub{ORB_ID(actuator_outputs)};
+	uORB::PublicationMulti<actuator_feedback_s> _actuator_feedback_pub{ORB_ID(actuator_feedback)};
 
 	actuator_armed_s _armed{};
 
