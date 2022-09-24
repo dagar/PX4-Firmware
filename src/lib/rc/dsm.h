@@ -53,8 +53,6 @@ __BEGIN_DECLS
 #define DSM_MAX_CHANNEL_COUNT   20  /**< Max channel count of any DSM RC */
 #define DSM_BUFFER_SIZE		(DSM_FRAME_SIZE + DSM_FRAME_SIZE / 2)
 
-
-#pragma pack(push, 1)
 typedef   uint8_t dsm_frame_t[DSM_BUFFER_SIZE]; /**< DSM dsm frame receive buffer */
 typedef   uint8_t dsm_buf_t[DSM_FRAME_SIZE * 2]; // Define working buffer
 
@@ -62,8 +60,6 @@ typedef  struct dsm_decode_t {
 	dsm_frame_t frame;
 	dsm_buf_t buf;
 } dsm_decode_t;
-
-#pragma pack(pop)
 
 __EXPORT int	dsm_init(const char *device);
 __EXPORT void	dsm_deinit(void);

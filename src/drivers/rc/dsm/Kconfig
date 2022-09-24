@@ -1,0 +1,5 @@
+menuconfig DRIVERS_RC_DSM
+	bool "rc_dsm"
+	default n
+	---help---
+		Enable support for rc_dsm

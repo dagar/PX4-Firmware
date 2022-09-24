@@ -42,7 +42,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "sumd.h"
-#include "common_rc.h"
 
 enum SUMD_DECODE_STATE {
 	SUMD_DECODE_STATE_UNSYNCED = 0,
@@ -67,12 +66,11 @@ const char *decode_states[] = {"UNSYNCED",
 			      };
 */
 
-uint8_t 	_crc8 	= 0x00;
+uint8_t 	_crc8 = 0x00;
 uint16_t 	_crc16 = 0x0000;
-bool 		_sumd 		= true;
-bool		_crcOK		= false;
-bool		_debug		= false;
-
+bool 		_sumd = true;
+bool		_crcOK = false;
+bool		_debug = false;
 
 /* define range mapping here, -+100% -> 1000..2000 */
 #define SUMD_RANGE_MIN 0.0f
@@ -88,8 +86,15 @@ bool		_debug		= false;
 static enum SUMD_DECODE_STATE _decode_state = SUMD_DECODE_STATE_UNSYNCED;
 static uint8_t _rxlen;
 
-static ReceiverFcPacketHoTT &_rxpacket = rc_decode_buf._hottrxpacket;
+static ReceiverFcPacketHoTT _rxpacket;
 
+/**
+ * CRC16 implementation for SUMD protocol
+ *
+ * @param crc Initial CRC Value
+ * @param value to accumulate in the checksum
+ * @return the checksum
+ */
 uint16_t sumd_crc16(uint16_t crc, uint8_t value)
 {
 	int i;
@@ -102,7 +107,14 @@ uint16_t sumd_crc16(uint16_t crc, uint8_t value)
 	return crc;
 }
 
-uint8_t sumd_crc8(uint8_t crc, uint8_t value)
+/**
+ * CRC8 implementation for SUMH protocol
+ *
+ * @param crc Initial CRC Value
+ * @param value to accumulate in the checksum
+ * @return the checksum
+ */
+static uint8_t sumd_crc8(uint8_t crc, uint8_t value)
 {
 	crc += value;
 	return crc;

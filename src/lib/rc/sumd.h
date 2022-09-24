@@ -52,9 +52,6 @@ __BEGIN_DECLS
 #define SUMD_ID_SUMD		0x01
 #define SUMD_ID_FAILSAFE	0x81
 
-
-
-
 #pragma pack(push, 1)
 typedef struct {
 	uint8_t	header;							///< 0xA8 for a valid packet
@@ -68,25 +65,6 @@ typedef struct {
 } ReceiverFcPacketHoTT;
 #pragma pack(pop)
 
-
-/**
- * CRC16 implementation for SUMD protocol
- *
- * @param crc Initial CRC Value
- * @param value to accumulate in the checksum
- * @return the checksum
- */
-uint16_t sumd_crc16(uint16_t crc, uint8_t value);
-
-/**
- * CRC8 implementation for SUMH protocol
- *
- * @param crc Initial CRC Value
- * @param value to accumulate in the checksum
- * @return the checksum
- */
-uint8_t sumd_crc8(uint8_t crc, uint8_t value);
-
 /**
  * Decoder for SUMD/SUMH protocol
  *
@@ -98,10 +76,6 @@ uint8_t sumd_crc8(uint8_t crc, uint8_t value);
  * @param failsafe pointer to a boolean where the decoded failsafe flag is written back to
  * @return 0 for success (a decoded packet), 1 for no packet yet (accumulating), 2 for unknown packet, 3 for out of sync, 4 for checksum error
  */
-/*
-__EXPORT int sumd_decode(uint8_t byte, uint8_t *rssi, uint8_t *rx_count, uint16_t *channel_count,
-				 uint16_t *channels, uint16_t max_chan_count, bool *failsafe);
-*/
 __EXPORT int sumd_decode(uint8_t byte, uint8_t *rssi, uint8_t *rx_count, uint16_t *channel_count,
 			 uint16_t *channels, uint16_t max_chan_count, bool *failsafe);
 

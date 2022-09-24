@@ -148,15 +148,6 @@ typedef struct {
 #pragma pack(pop)
 
 /**
- * CRC8 implementation for ST24 protocol
- *
- * @param prt Pointer to the data to CRC
- * @param len number of bytes to accumulate in the checksum
- * @return the checksum of these bytes over len
- */
-uint8_t st24_common_crc8(uint8_t *ptr, uint8_t len);
-
-/**
  * Decoder for ST24 protocol
  *
  * @param byte current char to read

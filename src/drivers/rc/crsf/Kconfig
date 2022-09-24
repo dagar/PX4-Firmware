@@ -1,0 +1,5 @@
+menuconfig DRIVERS_RC_CRSF
+	bool "rc_crsf"
+	default n
+	---help---
+		Enable support for rc_crsf

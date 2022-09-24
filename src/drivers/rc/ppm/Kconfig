@@ -1,0 +1,5 @@
+menuconfig DRIVERS_RC_PPM
+	bool "rc_ppm"
+	default n
+	---help---
+		Enable support for rc_ppm

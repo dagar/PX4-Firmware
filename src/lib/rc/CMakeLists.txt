@@ -32,14 +32,16 @@
 ############################################################################
 
 add_library(rc
-	crsf.cpp
-	ghst.cpp
-	st24.cpp
-	sumd.cpp
-	sbus.cpp
 	dsm.cpp
-	common_rc.cpp
+	dsm.h
+	sbus.cpp
+	sbus.h
+	st24.cpp
+	st24.h
+	sumd.cpp
+	sumd.h
 )
+
 target_compile_options(rc
 	PRIVATE
 		#-DDEBUG_BUILD

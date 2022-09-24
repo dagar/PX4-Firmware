@@ -1,0 +1,11 @@
+module_name: RC PPM input driver
+
+parameters:
+    - group: RC
+      definitions:
+        RC_PPM_EN:
+            description:
+                short: RC PPM enable
+                long: |
+                    RC PPM enable.
+            type: boolean

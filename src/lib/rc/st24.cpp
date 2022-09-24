@@ -42,7 +42,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "st24.h"
-#include "common_rc.h"
 
 const char *decode_states[] = {"UNSYNCED",
 			       "GOT_STX1",
@@ -66,8 +65,15 @@ const char *decode_states[] = {"UNSYNCED",
 static enum ST24_DECODE_STATE _decode_state = ST24_DECODE_STATE_UNSYNCED;
 static uint8_t _rxlen;
 
-static ReceiverFcPacket &_rxpacket = rc_decode_buf._strxpacket;
+static ReceiverFcPacket _rxpacket;
 
+/**
+ * CRC8 implementation for ST24 protocol
+ *
+ * @param prt Pointer to the data to CRC
+ * @param len number of bytes to accumulate in the checksum
+ * @return the checksum of these bytes over len
+ */
 uint8_t st24_common_crc8(uint8_t *ptr, uint8_t len)
 {
 	uint8_t i, crc ;
