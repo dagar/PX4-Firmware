@@ -136,7 +136,7 @@ static const px4_hw_mft_item_t hw_mft_list_v0640[] = {
 	},
 };
 
-static const px4_hw_mft_item_t hw_mft_list_v0650[] = {
+static const px4_hw_mft_item_t hw_mft_list_v0605[] = {
 	{
 		//  PX4_MFT_PX4IO
 		.present     = 1,
@@ -160,23 +160,15 @@ static const px4_hw_mft_item_t hw_mft_list_v0650[] = {
 
 static px4_hw_mft_list_entry_t mft_lists[] = {
 //  ver_rev
-	{ARKV6X00, hw_mft_list_v0600, arraySize(hw_mft_list_v0600)},
-	{ARKV6X01, hw_mft_list_v0600, arraySize(hw_mft_list_v0600)}, // BMP388 moved to I2C2
-	{ARKV6X03, hw_mft_list_v0600, arraySize(hw_mft_list_v0600)}, // BMP388 moved to I2C2, Sensor Set 3
-	//{ARKV6X40, hw_mft_list_v0640, arraySize(hw_mft_list_v0640)}, //                       HB CM4 base           // never shipped
-	//{ARKV6X41, hw_mft_list_v0640, arraySize(hw_mft_list_v0640)}, // BMP388 moved to I2C2  HB CM4 base           // never shipped
-	{ARKV6X43, hw_mft_list_v0640, arraySize(hw_mft_list_v0640)}, // BMP388 moved to I2C2, HB CM4 base Sensor Set 3
-	{ARKV6X44, hw_mft_list_v0640, arraySize(hw_mft_list_v0640)}, // BMP388 moved to I2C2, HB CM4 base Sensor Set 4
-	{ARKV6X50, hw_mft_list_v0650, arraySize(hw_mft_list_v0650)}, // ARKV6X Rev 0 with HB Mini Rev 5
-	//{ARKV6X51, hw_mft_list_v0650, arraySize(hw_mft_list_v0650)}, // BMP388 moved to I2C2  HB Mini               // never shipped
-	{ARKV6X53, hw_mft_list_v0650, arraySize(hw_mft_list_v0650)}, // BMP388 moved to I2C2, HB Mini Sensor Set 3
-	{ARKV6X54, hw_mft_list_v0650, arraySize(hw_mft_list_v0650)}, // BMP388 moved to I2C2, HB Mini Sensor Set 4
-	{ARKV6X10, hw_mft_list_v0610, arraySize(hw_mft_list_v0610)}, // No PX4IO
-	{ARKV6X13, hw_mft_list_v0610, arraySize(hw_mft_list_v0610)}, // No PX4IO BMP388 moved to I2C2, Sensor Set 3
-	{ARKV6X04, hw_mft_list_v0600, arraySize(hw_mft_list_v0600)}, // BMP388 moved to I2C2, Sensor Set 4
-	{ARKV6X14, hw_mft_list_v0610, arraySize(hw_mft_list_v0610)}, // No PX4IO BMP388 moved to I2C2, Sensor Set 4
+	{ARKV6X00, hw_mft_list_v0605, arraySize(hw_mft_list_v0605)}, // ARKV6X Rev 0
 };
 
+// baseboard versions
+// {V6X_0, hw_mft_list_v06_0, arraySize(hw_mft_list_v06_0)}, // Holybro v6x
+// {V6X_1, hw_mft_list_v06_1, arraySize(hw_mft_list_v06_1)}, //   no PX4_MFT_PX4IO
+// {V6X_4, hw_mft_list_v06_4, arraySize(hw_mft_list_v06_4)}, // HB CM4 base
+// {V6X_5, hw_mft_list_v06_5, arraySize(hw_mft_list_v06_5)}, // HB Mini, no PX4_MFT_CAN2
+// {ARKV6X50, hw_mft_list_v0650, arraySize(hw_mft_list_v0650)}, // ARKV6X Rev 0 with HB Mini Rev 5
 /************************************************************************************
  * Name: board_query_manifest
  *

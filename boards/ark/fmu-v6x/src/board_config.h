@@ -182,8 +182,8 @@
 #define ADC_ADC3_6V6_CHANNEL                    /* PC2  */  ADC3_CH(12)
 #define ADC_ADC3_3V3_CHANNEL                    /* PC3  */  ADC3_CH(13)
 #define ADC_SCALED_VDD_3V3_SENSORS4_CHANNEL     /* PF12 */  ADC1_CH(6)
-#define ADC_HW_VER_SENSE_CHANNEL                /* PH3  */  ADC3_CH(14)
-#define ADC_HW_REV_SENSE_CHANNEL                /* PH4  */  ADC3_CH(15)
+#define ADC_HW_BASEBOARD_VER_SENSE_CHANNEL      /* PH3  */  ADC3_CH(14) // base version: PH3 (officially ADC_HW_VER_SENSE_CHANNEL)
+#define ADC_HW_VER_SENSE_CHANNEL                /* PH4  */  ADC3_CH(15) // FMUM version: PH4 (officially ADC_HW_REV_SENSE_CHANNEL)
 
 #define ADC_CHANNELS \
 	((1 << ADC_SCALED_VDD_3V3_SENSORS1_CHANNEL) | \
@@ -206,28 +206,14 @@
 /* HW Version and Revision drive signals Default to 1 to detect */
 #define BOARD_HAS_HW_VERSIONING
 
-#define GPIO_HW_VER_REV_DRIVE  /* PG0 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTG|GPIO_PIN0)
-#define GPIO_HW_REV_SENSE      /* PH4 */  GPIO_ADC3_INP15
-#define GPIO_HW_VER_SENSE      /* PH3 */  GPIO_ADC3_INP14
+#define GPIO_HW_VER_REV_DRIVE       /* PG0 */ (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_OUTPUT_SET|GPIO_PORTG|GPIO_PIN0)
+#define GPIO_HW_VER_SENSE                /* PH4 */  GPIO_ADC3_INP15
+#define GPIO_HW_BASEBOARD_VER_SENSE      /* PH3 */  GPIO_ADC3_INP14
 #define HW_INFO_INIT_PREFIX    "ARKV6X"
 
-#define BOARD_NUM_SPI_CFG_HW_VERSIONS 2 // Rev 0 and Rev 3,4 Sensor sets
-//                 Base/FMUM
-#define ARKV6X00   HW_VER_REV(0x0,0x0) // ARKV6X,                 Rev 0
-#define ARKV6X01   HW_VER_REV(0x0,0x1) // ARKV6X,     BMI388 I2C2 Rev 1
-#define ARKV6X03   HW_VER_REV(0x0,0x3) // ARKV6X,     Sensor Set  Rev 3
-#define ARKV6X04   HW_VER_REV(0x0,0x4) // ARKV6X,     Sensor Set  Rev 4
-#define ARKV6X10   HW_VER_REV(0x1,0x0) // NO PX4IO,               Rev 0
-#define ARKV6X13   HW_VER_REV(0x1,0x3) // NO PX4IO,   Sensor Set  Rev 3
-#define ARKV6X14   HW_VER_REV(0x1,0x4) // NO PX4IO,   Sensor Set  Rev 4
-//#define ARKV6X40   HW_VER_REV(0x4,0x0) // ARKV6X,                    HB CM4 base Rev 0 // never shipped
-//#define ARKV6X41   HW_VER_REV(0x4,0x1) // ARKV6X,     BMI388 I2C2    HB CM4 base Rev 1 // never shipped
-#define ARKV6X43   HW_VER_REV(0x4,0x3) // ARKV6X,     Sensor Set     HB CM4 base Rev 3
-#define ARKV6X44   HW_VER_REV(0x4,0x4) // ARKV6X,     Sensor Set     HB CM4 base Rev 4
-#define ARKV6X50   HW_VER_REV(0x5,0x0) // ARKV6X, ARKV6X Rev 0 with HB Mini Rev 5
-//#define ARKV6X51   HW_VER_REV(0x5,0x1) // ARKV6X,     BMI388 I2C2    HB Mini Rev 1 // never shipped
-#define ARKV6X53   HW_VER_REV(0x5,0x3) // ARKV6X,     Sensor Set     HB Mini Rev 3
-#define ARKV6X54   HW_VER_REV(0x5,0x4) // ARKV6X,     Sensor Set     HB Mini Rev 4
+#define BOARD_NUM_SPI_CFG_HW_VERSIONS 1 // Rev 0
+//                 FMUM
+#define ARKV6X00   HW_VER(0x0) // ARKV6X,                 Rev 0
 
 #define UAVCAN_NUM_IFACES_RUNTIME  1
 

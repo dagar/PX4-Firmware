@@ -49,68 +49,78 @@ then
 	fi
 fi
 
-if ver hwtypecmp V5X000000 V5X000001 V5X000002 V5X001000 V5X004000 V5X004001 V5X004002 V5X005001 V5X005002
+# V5X00
+if ver hwtypecmp V5X000000
 then
-	#FMUv5Xbase board orientation
+	# SPI1
+	icm20602 -s -b 1 -R 10 start
 
-	if ver hwtypecmp V5X000000 V5X000001 V5X004000 V5X004001 V5X005001
-	then
-		# Internal SPI BMI088
-		bmi088 -A -R 4 -s start
-		bmi088 -G -R 4 -s start
-	else
-		# Internal SPI bus ICM20649
-		icm20649 -s -R 6 start
-	fi
+	# SPI2
+	icm42688p -s -b 2 -R 6 start
 
-	# Internal SPI bus ICM42688p
-	icm42688p -R 6 -s start
+	# SPI3
+	bmi088 -s -b 3 -A -R 4 start
+	bmi088 -s -b 3 -G -R 4 start
 
-	# Internal SPI bus ICM-20602 (hard-mounted)
-	icm20602 -R 10 -s start
+	# I2Cx TODO: which bus and address?
+	bmp388 -X -b 1 start
 
-	# Internal magnetometer on I2c
-	bmm150 -I start
+	# I2C3 (TODO: verify who actually has this and bus/address)
+	ms5611 -X -b 3 start
 
-else
-	#SKYNODE base fmu board orientation
-
-	if ver hwtypecmp V5X009000 V5X009001 V5X00a000 V5X00a001 V5X008000 V5X008001 V5X010001
-	then
-		# Internal SPI BMI088
-		bmi088 -A -R 2 -s start
-		bmi088 -G -R 2 -s start
-	else
-		# Internal SPI bus ICM20649
-		icm20649 -s -R 4 start
-	fi
-
-	# Internal SPI bus ICM42688p
-	icm42688p -R 4 -s start
-
-	# Internal SPI bus ICM-20602 (hard-mounted)
-	icm20602 -R 8 -s start
-
-	# Internal magnetometer on I2c
-	bmm150 -I -R 6 start
-
+	# I2C4 TODO: verify bus and address
+	bmm150 -I -b 4 start
+	bmp388 -I -b 4 -a 0x77 start
+	bmp388 -I -b 4 start
 fi
 
-# External compass on GPS1/I2C1 (the 3rd external bus): standard Holybro Pixhawk 4 or CUAV V5 GPS/compass puck (with lights, safety button, and buzzer)
-ist8310 -X -b 1 -R 10 start
-
-# Possible internal Baro
-
-# Disable startup of internal baros if param is set to false
-if param compare SENS_INT_BARO_EN 1
+# V5X10
+if ver hwtypecmp V5X001000
 then
-	bmp388 -I -a 0x77 start
-	if ver hwtypecmp V5X000000 V5X001000 V5X008000 V5X009000 V5X00a000
-	then
-		bmp388 -I start
-	else
-		bmp388 -X -b 2 start
-	fi
+	# SPI1
+	icm20602 -s -b 1 -R 10 start
 
+	# SPI2
+	icm42688p -s -b 2 -R 6 start
+
+	# SPI3
+	bmi088 -s -b 3 -A -R 4 start
+	bmi088 -s -b 3 -G -R 4 start
+
+	# I2Cx TODO: which bus and address?
+	bmp388 -X -b 1 start
+
+	# I2C3 (TODO: verify who actually has this and bus/address)
+	ms5611 -X -b 3 start
+
+	# I2C4 TODO: verify bus and address
+	bmm150 -I -b 4 start
+	bmp388 -I -b 4 -a 0x77 start
+	bmp388 -I -b 4 start
 fi
+
+# V5X20
+if ver hwtypecmp V5X002000
+then
+	# SPI1
+	icm20602 -s -b 1 -R 10 start
+
+	# SPI2
+	icm42688p -s -b 2 -R 6 start
+
+	# SPI3
+	icm20649 -s -b 3 -R 6 start
+
+	# I2Cx TODO: which bus and address?
+	bmp388 -X -b 1 start
+
+	# I2C3 (TODO: verify who actually has this and bus/address)
+	ms5611 -X -b 3 start
+
+	# I2C4 TODO: verify bus and address
+	bmm150 -I -b 4 start
+	bmp388 -I -b 4 -a 0x77 start
+	bmp388 -I -b 4 start
+fi
+
 unset HAVE_PM2

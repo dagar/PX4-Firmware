@@ -263,6 +263,7 @@
 #if defined(BOARD_HAS_HW_VERSIONING)
 #  define BOARD_HAS_VERSIONING 1
 #  define HW_VER_REV(v,r)       ((uint32_t)((v) & 0xffff) << 16) | ((uint32_t)(r) & 0xffff)
+#  define HW_VER(v) HW_VER_REV(v,0)
 #endif
 
 #define HW_INFO_REV_DIGITS    3

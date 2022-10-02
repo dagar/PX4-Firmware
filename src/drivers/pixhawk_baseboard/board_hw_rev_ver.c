@@ -43,9 +43,11 @@
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/px4_manifest.h>
 #include <px4_platform/board_determine_hw_info.h>
+#include "board_hw_eeprom_rev_ver.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <board_config.h>
+#include <syslog.h>
 
 #include <systemlib/crc.h>
 #include <systemlib/px4_macros.h>
@@ -65,6 +67,7 @@
  ****************************************************************************/
 static int hw_version = 0;
 static int hw_revision = 0;
+static int hw_baseboard_version = -1;
 static char hw_info[HW_INFO_SIZE] = {0};
 
 /****************************************************************************
@@ -172,54 +175,41 @@ static int read_id_dn(int *id, uint32_t gpio_drive, uint32_t gpio_sense, int adc
 	 */
 
 	/*  Turn the drive lines to digital inputs with No pull up */
-
 	stm32_configgpio(PX4_MAKE_GPIO_INPUT(gpio_drive) & ~GPIO_PUPD_MASK);
 
 	/*  Turn the sense lines to digital outputs LOW */
-
 	stm32_configgpio(PX4_MAKE_GPIO_OUTPUT_CLEAR(gpio_sense));
 
 
 	up_udelay(100); /* About 10 TC assuming 485 K */
 
 	/*  Read Drive lines while sense are driven low */
-
 	int low = stm32_gpioread(PX4_MAKE_GPIO_INPUT(gpio_drive));
 
-
 	/*  Write the sense lines HIGH */
-
 	stm32_gpiowrite(PX4_MAKE_GPIO_OUTPUT_CLEAR(gpio_sense), 1);
 
 	up_udelay(100); /* About 10 TC assuming 485 K */
 
 	/*  Read Drive lines while sense are driven high */
-
 	int high = stm32_gpioread(PX4_MAKE_GPIO_INPUT(gpio_drive));
 
 	/* restore the pins to ANALOG */
-
 	stm32_configgpio(gpio_sense);
 
 	/*  Turn the drive lines to digital outputs LOW */
-
 	stm32_configgpio(gpio_drive ^ GPIO_OUTPUT_SET);
 
 	up_udelay(100); /* About 10 TC assuming 485 K */
 
 	/* Are Resistors in place ?*/
-
 	uint32_t dn_sum = 0;
 	uint32_t dn = 0;
 
 	if ((high ^ low) && low == 0) {
-
 		/* Yes - Fire up the ADC (it has once control) */
-
 		if (px4_arch_adc_init(HW_REV_VER_ADC_BASE) == OK) {
-
 			/* Read the value */
-
 			for (unsigned av = 0; av < samples; av++) {
 				dn = px4_arch_adc_sample(HW_REV_VER_ADC_BASE, adc_channel);
 
@@ -276,7 +266,6 @@ static int read_id_dn(int *id, uint32_t gpio_drive, uint32_t gpio_sense, int adc
 	uint32_t low = 0;
 
 	/*  Turn the drive lines to digital outputs High */
-
 	stm32_configgpio(gpio_drive);
 
 	up_udelay(100); /* About 10 TC assuming 485 K */
@@ -298,7 +287,6 @@ static int read_id_dn(int *id, uint32_t gpio_drive, uint32_t gpio_sense, int adc
 	}
 
 	/*  Turn the drive lines to digital outputs LOW */
-
 	stm32_configgpio(gpio_drive ^ GPIO_OUTPUT_SET);
 
 	up_udelay(100); /* About 10 TC assuming 485 K */
@@ -339,77 +327,11 @@ static int read_id_dn(int *id, uint32_t gpio_drive, uint32_t gpio_sense, int adc
 	return rv;
 }
 
-static int determine_hw_info(int *revision, int *version)
-{
-	int rev_id = 0;
-	int ver_id = 0;
-
-#if defined(GPIO_HW_REV_SENSE)
-	int ret_rev_sense = read_id_dn(&rev_id, GPIO_HW_REV_DRIVE, GPIO_HW_REV_SENSE, ADC_HW_REV_SENSE_CHANNEL);
-#else
-	int ret_rev_sense = OK;
-#endif // GPIO_HW_REV_SENSE
-
-	int ret_ver_sense = read_id_dn(&ver_id, GPIO_HW_VER_DRIVE, GPIO_HW_VER_SENSE, ADC_HW_VER_SENSE_CHANNEL);
-
-	if ((ret_rev_sense == OK) && (ret_ver_sense == OK)) {
-		*revision = dn_to_ordinal(rev_id);
-		*version = dn_to_ordinal(ver_id);
-
-		return OK;
-	}
-
-	return -1;
-}
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
 /************************************************************************************
- * Name: board_get_hw_type
+ * Name: board_get_hw_baseboard_version
  *
  * Description:
- *   Optional returns a 0 terminated string defining the HW type.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   a 0 terminated string defining the HW type. This my be a 0 length string ""
- *
- ************************************************************************************/
-
-__EXPORT const char *board_get_hw_type_name()
-{
-	return (const char *) hw_info;
-}
-
-/************************************************************************************
- * Name: board_get_hw_version
- *
- * Description:
- *   Optional returns a integer HW version
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   An integer value of this boards hardware version.
- *   A value of -1 is the default for boards not supporting the BOARD_HAS_VERSIONING API.
- *   A value of 0 is the default for boards supporting the API but not having version.
- *
- ************************************************************************************/
-
-__EXPORT int board_get_hw_version()
-{
-	return hw_version;
-}
-
-/************************************************************************************
- * Name: board_get_hw_revision
- *
- * Description:
- *   Optional returns a integer HW revision
+ *   Optional returns a integer HW baseboard version
  *
  * Input Parameters:
  *   None
@@ -421,9 +343,9 @@ __EXPORT int board_get_hw_version()
  *
  ************************************************************************************/
 
-__EXPORT int board_get_hw_revision()
+__EXPORT int board_get_hw_baseboard_version()
 {
-	return hw_revision;
+	return hw_baseboard_version;
 }
 
 /************************************************************************************
@@ -451,13 +373,177 @@ __EXPORT int board_get_hw_revision()
 int board_determine_hw_info()
 {
 	// Read ADC jumpering hw_info
-	int rv = determine_hw_info(&hw_revision, &hw_version);
+	int rv = determine_hw_info(&hw_revision, &hw_version, &hw_baseboard_version);
+
+	int baseboard_ver_id = 0;
+
+	if (read_id_dn(&baseboard_ver_id, GPIO_HW_REV_DRIVE, GPIO_HW_BASEBOARD_VER_SENSE,
+		       ADC_HW_BASEBOARD_VER_SENSE_CHANNEL) == OK) {
+		*hw_baseboard_version = dn_to_ordinal(baseboard_ver_id);
+
+		// MFT supported?
+		const char *path = NULL;
+		int rvmft = px4_mtd_query("MTD_MFT", NULL, &path);
+
+		if (rvmft == OK && path != NULL && hw_baseboard_version == HW_VERSION_EEPROM) {
+
+			mtd_mft_v0_t mtd_mft = {MTD_MFT_v0};
+			rv = board_get_eeprom_hw_info(path, (mtd_mft_t *)&mtd_mft);
+
+			if (rv == OK) {
+				hw_version = mtd_mft.hw_extended_ver;
+			}
+		}
+
+
+	} else {
+		syslog(LOG_ERR, "ERROR: Failed to read baseboard version sense");
+	}
 
 	if (rv == OK) {
 		snprintf(hw_info, sizeof(hw_info), HW_INFO_INIT_PREFIX HW_INFO_SUFFIX, hw_version, hw_revision);
 	}
 
 	return rv;
+}
+
+/************************************************************************************
+  * Name: board_set_eeprom_hw_info
+ *
+ * Description:
+ * Function for writing hardware info to EEPROM
+ *
+ * Input Parameters:
+ *   *mtd_mft_unk - pointer to mtd_mft to write hw_info
+ *
+ * Returned Value:
+ *    0    - Successful storing to EEPROM
+ *   -1    - Error while storing to EEPROM
+ *
+ ************************************************************************************/
+
+int board_set_eeprom_hw_info(const char *path, mtd_mft_t *mtd_mft_unk)
+{
+	if (mtd_mft_unk == NULL || path == NULL) {
+		return -EINVAL;
+	}
+
+	// Later this will be a demux on type
+	if (mtd_mft_unk->id != MTD_MFT_v0) {
+		printf("Verson is: %d, Only mft version %d is supported\n", mtd_mft_unk->id, MTD_MFT_v0);
+		return -EINVAL;
+	}
+
+	mtd_mft_v0_t *mtd_mft = (mtd_mft_v0_t *)mtd_mft_unk;
+
+	if (mtd_mft->hw_extended_ver < HW_EEPROM_VERSION_MIN) {
+		printf("hardware version for EEPROM must be greater than %x\n", HW_EEPROM_VERSION_MIN);
+		return -EINVAL;
+	}
+
+	int fd = open(path, O_WRONLY);
+
+	if (fd < 0) {
+		return -errno;
+	}
+
+	int ret_val = OK;
+
+	mtd_mft->crc = crc16_signature(CRC16_INITIAL, sizeof(*mtd_mft) - sizeof(mtd_mft->crc), (uint8_t *) mtd_mft);
+
+	if (
+		(MTD_MFT_OFFSET != lseek(fd, MTD_MFT_OFFSET, SEEK_SET)) ||
+		(sizeof(*mtd_mft) != write(fd, mtd_mft, sizeof(*mtd_mft)))
+	) {
+		ret_val = -errno;
+	}
+
+	close(fd);
+
+	return ret_val;
+}
+
+/************************************************************************************
+  * Name: board_get_eeprom_hw_info
+ *
+ * Description:
+ * Function for reading hardware info from EEPROM
+ *
+ * Output Parameters:
+ *   *mtd_mft - pointer to mtd_mft to read hw_info
+ *
+ * Returned Value:
+ *    0    - Successful reading from EEPROM
+ *   -1    - Error while reading from EEPROM
+ *
+ ************************************************************************************/
+__EXPORT int board_get_eeprom_hw_info(const char *path, mtd_mft_t *mtd_mft)
+{
+	if (mtd_mft == NULL || path == NULL) {
+		return -EINVAL;
+	}
+
+	int fd = open(path, O_RDONLY);
+
+	if (fd < 0) {
+		return -errno;
+	}
+
+	int ret_val = OK;
+	mtd_mft_t format_version = {-1};
+
+	if (
+		(MTD_MFT_OFFSET != lseek(fd, MTD_MFT_OFFSET, SEEK_SET)) ||
+		(sizeof(format_version) != read(fd, &format_version, sizeof(format_version)))
+	) {
+		ret_val = -errno;
+
+	} else if (format_version.id != mtd_mft->id) {
+		ret_val = -EPROTO;
+
+	} else {
+
+		uint16_t mft_size = 0;
+
+		switch (format_version.id) {
+		case MTD_MFT_v0: mft_size = sizeof(mtd_mft_v0_t); break;
+
+		case MTD_MFT_v1: mft_size = sizeof(mtd_mft_v1_t); break;
+
+		default:
+			printf("[boot] Error, unknown version %d of mtd_mft in EEPROM\n", format_version.id);
+			ret_val = -1;
+			break;
+		}
+
+		if (ret_val == OK) {
+
+			if (
+				(MTD_MFT_OFFSET != lseek(fd, MTD_MFT_OFFSET, SEEK_SET)) ||
+				(mft_size != read(fd, mtd_mft, mft_size))
+			) {
+				ret_val = -errno;
+
+			} else {
+
+				union {
+					uint16_t w;
+					uint8_t  b[2];
+				} crc;
+
+				uint8_t *bytes = (uint8_t *) mtd_mft;
+				crc.w = crc16_signature(CRC16_INITIAL, mft_size - sizeof(crc), bytes);
+				uint8_t *eeprom_crc = &bytes[mft_size - sizeof(crc)];
+
+				if (!(crc.b[0] == eeprom_crc[0] && crc.b[1] == eeprom_crc[1])) {
+					ret_val = -1;
+				}
+			}
+		}
+	}
+
+	close(fd);
+	return ret_val;
 }
 
 #endif
