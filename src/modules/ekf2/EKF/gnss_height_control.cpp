@@ -57,8 +57,19 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 
 		const float innov_gate = fmaxf(_params.gps_pos_innov_gate, 1.f);
 
+		// relax the upper observation noise limit which prevents bad GPS perturbing the position estimate
+		float noise = math::max(0.01f, gps_sample.vacc, 1.5f * _params.gps_pos_noise); // use 1.5 as a typical ratio of vacc/hacc
+
+		if (!isOnlyActiveSourceOfVerticalPositionAiding(_control_status.flags.gps_hgt)) {
+			// if we are not using another source of aiding, then we are reliant on the GPS
+			// observations to constrain attitude errors and must limit the observation noise value.
+			if (noise > _params.pos_noaid_noise) {
+				noise = _params.pos_noaid_noise;
+			}
+		}
+
 		const float measurement = gps_sample.hgt - getEkfGlobalOriginAltitude();
-		const float measurement_var = getGpsHeightVariance(gps_sample);
+		const float measurement_var = sq(math::max(0.01f, noise));
 
 		// GNSS position, vertical position GNSS measurement has opposite sign to earth z axis
 		updateVerticalPositionAidSrcStatus(gps_sample.time_us,
@@ -72,8 +83,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 		if (gps_checks_passing && !gps_checks_failing
 		    && PX4_ISFINITE(measurement) && PX4_ISFINITE(measurement_var)
 		   ) {
-			const float noise = sqrtf(measurement_var);
-			bias_est.setMaxStateNoise(noise);
+			bias_est.setMaxStateNoise(sqrtf(measurement_var));
 			bias_est.setProcessNoiseSpectralDensity(_params.gps_hgt_bias_nsd);
 			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
 		}
@@ -101,8 +111,11 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 
 				if (isHeightResetRequired()) {
 					// All height sources are failing
-					resetHeightToGps(gps_sample);
-					resetVerticalVelocityToGps(gps_sample);
+					resetHeightToGps(gps_sample.hgt, measurement_var);
+
+					// reset vertical velocity to GPS
+					resetVerticalVelocityTo(gps_sample.vel(2));
+					P.uncorrelateCovarianceSetVariance<1>(6, sq(math::max(0.01f, 1.5f * gps_sample.sacc)));
 
 				} else if (is_fusion_failing) {
 					// Some other height source is still working
@@ -115,7 +128,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 
 		} else {
 			if (starting_conditions_passing) {
-				startGpsHgtFusion(gps_sample);
+				startGpsHgtFusion(gps_sample.hgt, measurement_var);
 			}
 		}
 
@@ -124,17 +137,17 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 	}
 }
 
-void Ekf::startGpsHgtFusion(const gpsSample &gps_sample)
+void Ekf::startGpsHgtFusion(const float gps_sample_height, const float obs_var)
 {
 	if (!_control_status.flags.gps_hgt) {
 
 		if (_params.height_sensor_ref == HeightSensor::GNSS) {
 			_gps_hgt_b_est.reset();
 			_height_sensor_ref = HeightSensor::GNSS;
-			resetHeightToGps(gps_sample);
+			resetHeightToGps(gps_sample_height, obs_var);
 
 		} else {
-			_gps_hgt_b_est.setBias(_state.pos(2) + (gps_sample.hgt - getEkfGlobalOriginAltitude()));
+			_gps_hgt_b_est.setBias(_state.pos(2) + (gps_sample_height - getEkfGlobalOriginAltitude()));
 
 			// Reset the timeout value here because the fusion isn't done at the same place and would immediately trigger a timeout
 			_aid_src_gnss_hgt.time_last_fuse = _imu_sample_delayed.time_us;
@@ -146,15 +159,15 @@ void Ekf::startGpsHgtFusion(const gpsSample &gps_sample)
 	}
 }
 
-void Ekf::resetHeightToGps(const gpsSample &gps_sample)
+void Ekf::resetHeightToGps(const float gps_sample_height, const float obs_var)
 {
 	ECL_INFO("reset height to GPS");
 	_information_events.flags.reset_hgt_to_gps = true;
 
-	resetVerticalPositionTo(-(gps_sample.hgt - getEkfGlobalOriginAltitude() - _gps_hgt_b_est.getBias()));
+	resetVerticalPositionTo(-(gps_sample_height - getEkfGlobalOriginAltitude() - _gps_hgt_b_est.getBias()));
 
 	// the state variance is the same as the observation
-	P.uncorrelateCovarianceSetVariance<1>(9, getGpsHeightVariance(gps_sample));
+	P.uncorrelateCovarianceSetVariance<1>(9, obs_var);
 
 	_baro_b_est.setBias(_baro_b_est.getBias() + _state_reset_status.posD_change);
 	_rng_hgt_b_est.setBias(_rng_hgt_b_est.getBias() + _state_reset_status.posD_change);

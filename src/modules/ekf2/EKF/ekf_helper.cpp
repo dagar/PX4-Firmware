@@ -251,14 +251,6 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos)
 	_time_last_hgt_fuse = _imu_sample_delayed.time_us;
 }
 
-void Ekf::resetVerticalVelocityToGps(const gpsSample &gps_sample)
-{
-	resetVerticalVelocityTo(gps_sample.vel(2));
-
-	// the state variance is the same as the observation
-	P.uncorrelateCovarianceSetVariance<1>(6, sq(1.5f * gps_sample.sacc));
-}
-
 void Ekf::resetVerticalVelocityToEv(const extVisionSample &ev_sample)
 {
 	resetVerticalVelocityTo(ev_sample.vel(2));

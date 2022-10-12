@@ -723,11 +723,10 @@ private:
 	void resetVerticalPositionTo(float new_vert_pos);
 
 	void resetHeightToBaro(const baroSample &baro_sample);
-	void resetHeightToGps(const gpsSample &gps_sample);
+	void resetHeightToGps(const float gps_sample_height, const float obs_var);
 	void resetHeightToRng();
 	void resetHeightToEv();
 
-	void resetVerticalVelocityToGps(const gpsSample &gps_sample);
 	void resetVerticalVelocityToEv(const extVisionSample &ev_sample);
 	void resetVerticalVelocityToZero();
 
@@ -976,7 +975,7 @@ private:
 	void startBaroHgtFusion(const baroSample &baro_sample);
 	void stopBaroHgtFusion();
 
-	void startGpsHgtFusion(const gpsSample &gps_sample);
+	void startGpsHgtFusion(const float gps_sample_height, const float obs_var);
 	void stopGpsHgtFusion();
 
 	void startRngHgtFusion();
