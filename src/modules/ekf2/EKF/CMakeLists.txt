@@ -42,7 +42,7 @@ add_library(ecl_EKF
 	ekf_helper.cpp
 	EKFGSF_yaw.cpp
 	estimator_interface.cpp
-	ev_height_control.cpp
+	ev_hgt_control.cpp
 	fake_height_control.cpp
 	fake_pos_control.cpp
 	gnss_height_control.cpp
@@ -51,7 +51,6 @@ add_library(ecl_EKF
 	gps_fusion.cpp
 	gps_yaw_fusion.cpp
 	height_control.cpp
-	height_fusion.cpp
 	imu_down_sampler.cpp
 	mag_control.cpp
 	mag_fusion.cpp
