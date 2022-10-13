@@ -693,13 +693,6 @@ private:
 	// fuse body frame drag specific forces for multi-rotor wind estimation
 	void fuseDrag(const dragSample &drag_sample);
 
-	void fuseBaroHgt(estimator_aid_source_1d_s &baro_hgt);
-	void fuseRngHgt(estimator_aid_source_1d_s &range_hgt);
-	void fuseEvHgt();
-
-	void updateBaroHgt(const baroSample &baro_sample, estimator_aid_source_1d_s &baro_hgt);
-	void updateRngHgt(estimator_aid_source_1d_s &rng_hgt);
-
 	// fuse single velocity and position measurement
 	bool fuseVelPosHeight(const float innov, const float innov_var, const int obs_index);
 
@@ -722,12 +715,11 @@ private:
 
 	void resetVerticalPositionTo(float new_vert_pos);
 
-	void resetHeightToBaro(const baroSample &baro_sample);
+	void resetHeightToBaro(const float baro_sample_height, const float obs_var);
 	void resetHeightToGps(const float gps_sample_height, const float obs_var);
-	void resetHeightToRng();
-	void resetHeightToEv();
+	void resetHeightToRng(const float obs, const float obs_var);
+	void resetHeightToEv(const float obs, const float obs_var);
 
-	void resetVerticalVelocityToEv(const extVisionSample &ev_sample);
 	void resetVerticalVelocityToZero();
 
 	// fuse optical flow line of sight rate measurements
@@ -940,11 +932,9 @@ private:
 	void controlFakePosFusion();
 
 	void controlFakeHgtFusion();
-	void startFakeHgtFusion();
 	void resetFakeHgtFusion();
 	void resetHeightToLastKnown();
 	void stopFakeHgtFusion();
-	void fuseFakeHgt();
 
 	void controlZeroVelocityUpdate();
 
@@ -962,7 +952,7 @@ private:
 	void controlBaroHeightFusion();
 	void controlGnssHeightFusion(const gpsSample &gps_sample);
 	void controlRangeHeightFusion();
-	void controlEvHeightFusion();
+	void controlEvHeightFusion(const extVisionSample &ev_sample);
 
 	bool isConditionalRangeAidSuitable();
 
@@ -972,23 +962,12 @@ private:
 	void startMagHdgFusion();
 	void startMag3DFusion();
 
-	void startBaroHgtFusion(const baroSample &baro_sample);
 	void stopBaroHgtFusion();
-
-	void startGpsHgtFusion(const float gps_sample_height, const float obs_var);
 	void stopGpsHgtFusion();
-
-	void startRngHgtFusion();
 	void stopRngHgtFusion();
-	void startRngAidHgtFusion();
-	void startEvHgtFusion();
 	void stopEvHgtFusion();
 
 	void updateGroundEffect();
-
-	// return an estimation of the sensor altitude variance
-	float getGpsHeightVariance(const gpsSample &gps_sample);
-	float getRngHeightVariance() const;
 
 	// calculate the measurement variance for the optical flow sensor
 	float calcOptFlowMeasVar();
@@ -1076,10 +1055,8 @@ private:
 
 	void stopFlowFusion();
 
-	void startFakePosFusion();
 	void resetFakePosFusion();
 	void stopFakePosFusion();
-	void fuseFakePosition();
 
 	void setVelPosStatus(const int index, const bool healthy);
 

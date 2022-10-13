@@ -40,22 +40,12 @@
 
 void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 {
-	if (!(_params.gnss_ctrl & GnssCtrl::VPOS)) {
-		stopGpsHgtFusion();
-		return;
-	}
-
 	auto &aid_src = _aid_src_gnss_hgt;
 	HeightBiasEstimator &bias_est = _gps_hgt_b_est;
 
 	bias_est.predict(_dt_ekf_avg);
 
 	if (_gps_data_ready) {
-
-		const bool gps_checks_passing = isTimedOut(_last_gps_fail_us, (uint64_t)5e6);
-		const bool gps_checks_failing = isTimedOut(_last_gps_pass_us, (uint64_t)5e6);
-
-		const float innov_gate = fmaxf(_params.gps_pos_innov_gate, 1.f);
 
 		// relax the upper observation noise limit which prevents bad GPS perturbing the position estimate
 		float noise = math::max(0.01f, gps_sample.vacc, 1.5f * _params.gps_pos_noise); // use 1.5 as a typical ratio of vacc/hacc
@@ -69,7 +59,9 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 		}
 
 		const float measurement = gps_sample.hgt - getEkfGlobalOriginAltitude();
-		const float measurement_var = sq(math::max(0.01f, noise));
+		const float measurement_var = sq(math::max(noise, 0.01f));
+
+		const float innov_gate = math::max(_params.gps_pos_innov_gate, 1.f);
 
 		// GNSS position, vertical position GNSS measurement has opposite sign to earth z axis
 		updateVerticalPositionAidSrcStatus(gps_sample.time_us,
@@ -77,6 +69,9 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 						   measurement_var + bias_est.getBiasVar(),
 						   innov_gate,
 						   aid_src);
+
+		const bool gps_checks_passing = isTimedOut(_last_gps_fail_us, (uint64_t)5e6);
+		const bool gps_checks_failing = isTimedOut(_last_gps_pass_us, (uint64_t)5e6);
 
 		// update the bias estimator before updating the main filter but after
 		// using its current state to compute the vertical position innovation
@@ -90,7 +85,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 
 		// determine if we should use GNSS height aiding
 		const bool continuing_conditions_passing = (_params.gnss_ctrl & GnssCtrl::VPOS)
-				&& PX4_ISFINITE(gps_sample.hgt)
+				&& PX4_ISFINITE(measurement)
 				&& _NED_origin_initialised
 				&& _gps_checks_passed;
 
@@ -111,67 +106,69 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 
 				if (isHeightResetRequired()) {
 					// All height sources are failing
-					resetHeightToGps(gps_sample.hgt, measurement_var);
+					ECL_INFO("GPS height fusion reset required, all height sources failing");
+					resetHeightToGps(measurement, measurement_var);
 
-					// reset vertical velocity to GPS
-					resetVerticalVelocityTo(gps_sample.vel(2));
-					P.uncorrelateCovarianceSetVariance<1>(6, sq(math::max(0.01f, 1.5f * gps_sample.sacc)));
+					// reset vertical velocity
+					if (PX4_ISFINITE(gps_sample.vel(2)) && (_params.gnss_ctrl & GnssCtrl::VEL)) {
+						resetVerticalVelocityTo(gps_sample.vel(2));
+						P.uncorrelateCovarianceSetVariance<1>(6, sq(math::max(0.01f, 1.5f * gps_sample.sacc)));
+
+					} else {
+						resetVerticalVelocityToZero();
+					}
 
 				} else if (is_fusion_failing) {
 					// Some other height source is still working
+					ECL_INFO("stopping GPS height fusion, fusion failing");
 					stopGpsHgtFusion();
 				}
 
 			} else {
+				ECL_INFO("stopping GPS height fusion, continuing conditions not passing");
 				stopGpsHgtFusion();
 			}
 
 		} else {
 			if (starting_conditions_passing) {
-				startGpsHgtFusion(gps_sample.hgt, measurement_var);
+				if (_params.height_sensor_ref == HeightSensor::GNSS) {
+					ECL_INFO("starting GPS height fusion, resetting height to GPS");
+					bias_est.reset();
+					_height_sensor_ref = HeightSensor::GNSS;
+					resetHeightToGps(measurement, measurement_var);
+
+				} else {
+					ECL_INFO("starting GPS height fusion");
+					bias_est.setBias(_state.pos(2) + measurement);
+				}
+
+				aid_src.time_last_fuse = _imu_sample_delayed.time_us;
+
+				_control_status.flags.gps_hgt = true;
+				bias_est.setFusionActive();
 			}
 		}
 
-	} else if (_control_status.flags.gps_hgt && _gps_intermittent) {
+	} else if (_control_status.flags.gps_hgt && !isNewestSampleRecent(_time_last_gps_buffer_push, 2 * GPS_MAX_INTERVAL)) {
+		// No data anymore. Stop until it comes back.
+		ECL_INFO("stopping GPS height fusion, no data");
 		stopGpsHgtFusion();
-	}
-}
-
-void Ekf::startGpsHgtFusion(const float gps_sample_height, const float obs_var)
-{
-	if (!_control_status.flags.gps_hgt) {
-
-		if (_params.height_sensor_ref == HeightSensor::GNSS) {
-			_gps_hgt_b_est.reset();
-			_height_sensor_ref = HeightSensor::GNSS;
-			resetHeightToGps(gps_sample_height, obs_var);
-
-		} else {
-			_gps_hgt_b_est.setBias(_state.pos(2) + (gps_sample_height - getEkfGlobalOriginAltitude()));
-
-			// Reset the timeout value here because the fusion isn't done at the same place and would immediately trigger a timeout
-			_aid_src_gnss_hgt.time_last_fuse = _imu_sample_delayed.time_us;
-		}
-
-		_control_status.flags.gps_hgt = true;
-		_gps_hgt_b_est.setFusionActive();
-		ECL_INFO("starting GPS height fusion");
 	}
 }
 
 void Ekf::resetHeightToGps(const float gps_sample_height, const float obs_var)
 {
-	ECL_INFO("reset height to GPS");
 	_information_events.flags.reset_hgt_to_gps = true;
 
-	resetVerticalPositionTo(-(gps_sample_height - getEkfGlobalOriginAltitude() - _gps_hgt_b_est.getBias()));
+	resetVerticalPositionTo(-(gps_sample_height - _gps_hgt_b_est.getBias()));
 
 	// the state variance is the same as the observation
 	P.uncorrelateCovarianceSetVariance<1>(9, obs_var);
 
 	_baro_b_est.setBias(_baro_b_est.getBias() + _state_reset_status.posD_change);
-	_rng_hgt_b_est.setBias(_rng_hgt_b_est.getBias() + _state_reset_status.posD_change);
+	//_gps_hgt_b_est.setBias(_gps_hgt_b_est.getBias() + _state_reset_status.posD_change);
 	_ev_hgt_b_est.setBias(_ev_hgt_b_est.getBias() - _state_reset_status.posD_change);
+	_rng_hgt_b_est.setBias(_rng_hgt_b_est.getBias() + _state_reset_status.posD_change);
 
 	_aid_src_gnss_hgt.time_last_fuse = _imu_sample_delayed.time_us;
 }
@@ -186,6 +183,6 @@ void Ekf::stopGpsHgtFusion()
 
 		_control_status.flags.gps_hgt = false;
 		_gps_hgt_b_est.setFusionInactive();
-		ECL_INFO("stopping GPS height fusion");
+		resetEstimatorAidStatus(_aid_src_gnss_hgt);
 	}
 }

@@ -46,7 +46,7 @@ void Ekf::controlHeightFusion()
 	controlBaroHeightFusion();
 	controlGnssHeightFusion(_gps_sample_delayed);
 	controlRangeHeightFusion();
-	controlEvHeightFusion();
+	controlEvHeightFusion(_ev_sample_delayed);
 
 	checkHeightSensorRefFallback();
 }

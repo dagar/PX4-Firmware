@@ -251,14 +251,6 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos)
 	_time_last_hgt_fuse = _imu_sample_delayed.time_us;
 }
 
-void Ekf::resetVerticalVelocityToEv(const extVisionSample &ev_sample)
-{
-	resetVerticalVelocityTo(ev_sample.vel(2));
-
-	// the state variance is the same as the observation
-	P.uncorrelateCovarianceSetVariance<1>(6, ev_sample.velVar(2));
-}
-
 void Ekf::resetVerticalVelocityToZero()
 {
 	// we don't know what the vertical velocity is, so set it to zero
@@ -1276,24 +1268,6 @@ void Ekf::startMag3DFusion()
 		loadMagCovData();
 		_control_status.flags.mag_3D = true;
 	}
-}
-
-float Ekf::getGpsHeightVariance(const gpsSample &gps_sample)
-{
-	// observation variance - receiver defined and parameter limited
-	// use 1.5 as a typical ratio of vacc/hacc
-	const float lower_limit = fmaxf(1.5f * _params.gps_pos_noise, 0.01f);
-	const float upper_limit = fmaxf(1.5f * _params.pos_noaid_noise, lower_limit);
-	const float gps_alt_var = sq(math::constrain(gps_sample.vacc, lower_limit, upper_limit));
-	return gps_alt_var;
-}
-
-float Ekf::getRngHeightVariance() const
-{
-	const float dist_dependant_var = sq(_params.range_noise_scaler * _range_sensor.getDistBottom());
-	const float var = sq(_params.range_noise) + dist_dependant_var;
-	const float var_sat = fmaxf(var, 0.001f);
-	return var_sat;
 }
 
 void Ekf::updateGroundEffect()
