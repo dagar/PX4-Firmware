@@ -105,8 +105,7 @@ void Ekf::resetHeightToLastKnown()
 {
 	_information_events.flags.reset_pos_to_last_known = true;
 	ECL_INFO("reset height to last known");
-	resetVerticalPositionTo(_last_known_pos(2));
-	P.uncorrelateCovarianceSetVariance<1>(9, sq(_params.pos_noaid_noise));
+	resetVerticalPositionTo(_last_known_pos(2), sq(_params.pos_noaid_noise));
 }
 
 void Ekf::stopFakeHgtFusion()

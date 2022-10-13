@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file gps_control.cpp
+ * @file range_height_control.cpp
  * Control functions for ekf range finder height fusion
  */
 
@@ -40,20 +40,43 @@
 
 void Ekf::controlRangeHeightFusion()
 {
-	auto &aid_src = _aid_src_rng_hgt;
+	static constexpr char HGT_SRC_NAME[]{"RNG"};
+
 	HeightBiasEstimator &bias_est = _rng_hgt_b_est;
 
 	bias_est.predict(_dt_ekf_avg);
 
-	if (_rng_data_ready) {
+	if (_rng_data_ready && _range_sensor.getSampleAddress()) {
 
+		auto &aid_src = _aid_src_rng_hgt;
+
+		const bool hgt_src_enabled = (_params.rng_ctrl == RngCtrl::ENABLED);
+
+		const uint64_t time_us = _range_sensor.getSampleAddress()->time_us;
 		const float measurement = math::max(_range_sensor.getDistBottom(), _params.rng_gnd_clearance);
 		const float measurement_var = math::max(sq(0.01f), sq(_params.range_noise) + sq(_params.range_noise_scaler * _range_sensor.getDistBottom()));
-
 		const float innov_gate = math::max(_params.range_innov_gate, 1.f);
 
-		// vertical position innovation - baro measurement has opposite sign to earth z axis
-		updateVerticalPositionAidSrcStatus(_range_sensor.getSampleAddress()->time_us,
+		const bool measurement_valid = PX4_ISFINITE(measurement) && PX4_ISFINITE(measurement_var);
+
+		if (measurement_valid) {
+
+			if (_rng_counter == 0) {
+				_rng_lpf.reset(measurement);
+
+			} else {
+				_rng_lpf.update(measurement);
+			}
+
+			if (_rng_counter <= _obs_buffer_length) {
+				// Initialize the offset
+				bias_est.setBias(_state.pos(2) + _rng_lpf.getState());
+				_rng_counter++;
+			}
+		}
+
+		// vertical position - measurement has opposite sign of earth z axis
+		updateVerticalPositionAidSrcStatus(time_us,
 						   -(measurement - bias_est.getBias()),
 						   measurement_var + bias_est.getBiasVar(),
 						   innov_gate,
@@ -61,23 +84,33 @@ void Ekf::controlRangeHeightFusion()
 
 		// update the bias estimator before updating the main filter but after
 		// using its current state to compute the vertical position innovation
-		if (_range_sensor.isDataHealthy()
-		    && PX4_ISFINITE(measurement) && PX4_ISFINITE(measurement_var)
-		   ) {
+		if (measurement_valid && _range_sensor.isDataHealthy()) {
 			bias_est.setMaxStateNoise(sqrtf(measurement_var));
 			bias_est.setProcessNoiseSpectralDensity(_params.rng_hgt_bias_nsd);
 			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
 		}
 
-		// determine if we should use baro height aiding
+		// clear fault if test_ratio very good
+		if (_control_status.flags.rng_fault) {
+			if (aid_src.test_ratio < 0.01f) {
+				_control_status.flags.rng_fault = false;
+				_range_sensor.setFaulty(false);
+			}
+		}
+
+		// determine if we should use height aiding
 		const bool do_conditional_range_aid = (_params.rng_ctrl == RngCtrl::CONDITIONAL) && isConditionalRangeAidSuitable();
-		const bool continuing_conditions_passing = ((_params.rng_ctrl == RngCtrl::ENABLED) || do_conditional_range_aid)
-				&& PX4_ISFINITE(_range_sensor.getDistBottom())
+		const bool continuing_conditions_passing = (hgt_src_enabled || do_conditional_range_aid)
+				&& measurement_valid
+				&& !_control_status.flags.rng_fault
 				&& _range_sensor.isDataHealthy();
 
 		const bool starting_conditions_passing = continuing_conditions_passing
-				&& _range_sensor.isRegularlySendingData()
-				&& isNewestSampleRecent(_time_last_range_buffer_push, 2 * RNG_MAX_INTERVAL);
+				&& (_rng_counter > _obs_buffer_length)
+				&& isNewestSampleRecent(_time_last_range_buffer_push, 2 * RNG_MAX_INTERVAL)
+				&& _range_sensor.isRegularlySendingData();
+
+		const float measurement_lpf = _rng_lpf.getState();
 
 		if (_control_status.flags.rng_hgt) {
 			aid_src.fusion_enabled = true;
@@ -90,22 +123,24 @@ void Ekf::controlRangeHeightFusion()
 
 				if (isHeightResetRequired()) {
 					// All height sources are failing
-					ECL_INFO("RNG height fusion reset required, all height sources failing");
-					resetHeightToRng(measurement, measurement_var);
+					ECL_WARN("%s height fusion reset required, all height sources failing", HGT_SRC_NAME);
+					_information_events.flags.reset_hgt_to_rng = true;
+					resetVerticalPositionTo(-(measurement_lpf - _rng_hgt_b_est.getBias()));
+					bias_est.setBias(_state.pos(2) + measurement_lpf);
 
 					// reset vertical velocity
 					resetVerticalVelocityToZero();
 
 				} else if (is_fusion_failing) {
 					// Some other height source is still working
-					ECL_INFO("stopping RNG height fusion, fusion failing");
+					ECL_WARN("stopping %s height fusion, fusion failing", HGT_SRC_NAME);
 					stopRngHgtFusion();
 					_control_status.flags.rng_fault = true;
-					_range_sensor.setFaulty();
+					_range_sensor.setFaulty(true);
 				}
 
 			} else {
-				ECL_INFO("stopping RNG height fusion, continuing conditions not passing");
+				ECL_WARN("stopping %s height fusion, continuing conditions failing", HGT_SRC_NAME);
 				stopRngHgtFusion();
 			}
 
@@ -113,21 +148,22 @@ void Ekf::controlRangeHeightFusion()
 			if (starting_conditions_passing) {
 				if ((_params.height_sensor_ref == HeightSensor::RANGE) && (_params.rng_ctrl == RngCtrl::CONDITIONAL)) {
 					// Range finder is used while hovering to stabilize the height estimate. Don't reset but use it as height reference.
-					ECL_INFO("starting RNG height fusion, resetting height to RNG");
-					bias_est.setBias(_state.pos(2) + _range_sensor.getDistBottom());
+					ECL_INFO("starting conditional %s height fusion", HGT_SRC_NAME);
+					bias_est.setBias(_state.pos(2) + measurement_lpf);
 					_height_sensor_ref = HeightSensor::RANGE;
 
 				} else if ((_params.height_sensor_ref == HeightSensor::RANGE) && (_params.rng_ctrl != RngCtrl::CONDITIONAL)) {
 					// Range finder is the primary height source, the ground is now the datum used
 					// to compute the local vertical position
-					ECL_INFO("starting RNG height fusion, resetting height to RNG");
-					bias_est.reset();
+					ECL_INFO("starting %s height fusion, resetting height to %s", HGT_SRC_NAME);
+					_information_events.flags.reset_hgt_to_rng = true;
 					_height_sensor_ref = HeightSensor::RANGE;
-					resetHeightToRng(measurement, measurement_var);
+					resetVerticalPositionTo(-measurement_lpf, measurement_var);
+					bias_est.reset();
 
 				} else {
-					ECL_INFO("starting RNG height fusion");
-					bias_est.setBias(_state.pos(2) + _range_sensor.getDistBottom());
+					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
+					bias_est.setBias(_state.pos(2) + measurement_lpf);
 				}
 
 				aid_src.time_last_fuse = _imu_sample_delayed.time_us;
@@ -137,28 +173,12 @@ void Ekf::controlRangeHeightFusion()
 			}
 		}
 
-	} else if (_control_status.flags.rng_hgt && !isNewestSampleRecent(_time_last_range_buffer_push, 2 * RNG_MAX_INTERVAL)) {
+	} else if (_control_status.flags.rng_hgt
+		   && !isNewestSampleRecent(_time_last_range_buffer_push, 2 * RNG_MAX_INTERVAL)) {
 		// No data anymore. Stop until it comes back.
-		ECL_INFO("stopping RNG height fusion, no data");
+		ECL_WARN("stopping %s height fusion, no data", HGT_SRC_NAME);
 		stopRngHgtFusion();
 	}
-}
-
-void Ekf::resetHeightToRng(const float obs, const float obs_var)
-{
-	_information_events.flags.reset_hgt_to_rng = true;
-
-	resetVerticalPositionTo(-(obs - _rng_hgt_b_est.getBias()));
-
-	// the state variance is the same as the observation
-	P.uncorrelateCovarianceSetVariance<1>(9, obs_var);
-
-	_baro_b_est.setBias(_baro_b_est.getBias() + _state_reset_status.posD_change);
-	_ev_hgt_b_est.setBias(_ev_hgt_b_est.getBias() - _state_reset_status.posD_change);
-	_gps_hgt_b_est.setBias(_gps_hgt_b_est.getBias() + _state_reset_status.posD_change);
-	//_rng_hgt_b_est.setBias(_rng_hgt_b_est.getBias() + _state_reset_status.posD_change);
-
-	_aid_src_rng_hgt.time_last_fuse = _imu_sample_delayed.time_us;
 }
 
 void Ekf::stopRngHgtFusion()
@@ -169,9 +189,15 @@ void Ekf::stopRngHgtFusion()
 			_height_sensor_ref = HeightSensor::UNKNOWN;
 		}
 
-		_control_status.flags.rng_hgt = false;
 		_rng_hgt_b_est.setFusionInactive();
+		_rng_hgt_b_est.reset();
+
+		_rng_lpf.reset(0.f);
+		_rng_counter = 0;
+
 		resetEstimatorAidStatus(_aid_src_rng_hgt);
+
+		_control_status.flags.rng_hgt = false;
 	}
 }
 

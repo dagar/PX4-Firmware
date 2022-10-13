@@ -40,19 +40,43 @@
 
 void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample)
 {
-	auto &aid_src = _aid_src_ev_hgt;
+	static constexpr char HGT_SRC_NAME[]{"EV"};
+
 	HeightBiasEstimator &bias_est = _ev_hgt_b_est;
 
 	bias_est.predict(_dt_ekf_avg);
 
 	if (_ev_data_ready) {
 
-		const float measurement = ev_sample.pos(2);
-		const float measurement_var = math::max(ev_sample.posVar(2), sq(0.01f));
+		auto &aid_src = _aid_src_ev_hgt;
 
+		const bool hgt_src_enabled = ((_params.fusion_mode & SensorFusionMask::USE_EXT_VIS_POS) || (_params.height_sensor_ref == HeightSensor::EV)); // TODO: (_params.ev_ctrl & EvCtrl::VPOS)
+
+		const uint64_t time_us = ev_sample.time_us;
+		const float measurement = ev_sample.pos(2);
+		const float measurement_var = math::max(sq(0.01f), ev_sample.posVar(2));
 		const float innov_gate = math::max(_params.ev_pos_innov_gate, 1.f);
 
-		updateVerticalPositionAidSrcStatus(ev_sample.time_us,
+		const bool measurement_valid = PX4_ISFINITE(measurement) && PX4_ISFINITE(measurement_var);
+
+		if (measurement_valid) {
+
+			if (_ev_hgt_counter == 0) {
+				_ev_hgt_lpf.reset(measurement);
+
+			} else {
+				_ev_hgt_lpf.update(measurement);
+			}
+
+			if (_ev_hgt_counter <= _obs_buffer_length) {
+				// Initialize the offset
+				bias_est.setBias(-_state.pos(2) + _ev_hgt_lpf.getState());
+				_ev_hgt_counter++;
+			}
+		}
+
+		// vertical position - measurement has same sign of earth z axis
+		updateVerticalPositionAidSrcStatus(time_us,
 						   measurement - bias_est.getBias(),
 						   measurement_var + bias_est.getBiasVar(),
 						   innov_gate,
@@ -60,18 +84,29 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample)
 
 		// update the bias estimator before updating the main filter but after
 		// using its current state to compute the vertical position innovation
-		if (PX4_ISFINITE(measurement) && PX4_ISFINITE(measurement_var)
-		   ) {
+		if (measurement_valid) {
 			bias_est.setMaxStateNoise(sqrtf(measurement_var));
 			bias_est.setProcessNoiseSpectralDensity(_params.ev_hgt_bias_nsd);
 			bias_est.fuseBias(measurement - _state.pos(2), measurement_var + P(9, 9));
 		}
 
-		const bool continuing_conditions_passing = ((_params.fusion_mode & SensorFusionMask::USE_EXT_VIS_POS) || (_params.height_sensor_ref == HeightSensor::EV)) // TODO: (_params.ev_ctrl & EvCtrl::VPOS)
-				&& PX4_ISFINITE(measurement);
+		// clear fault if test_ratio very good
+		if (_control_status.flags.ev_hgt_fault) {
+			if (aid_src.test_ratio < 0.01f) {
+				_control_status.flags.ev_hgt_fault = false;
+			}
+		}
+
+		// determine if we should use height aiding
+		const bool continuing_conditions_passing = hgt_src_enabled
+				&& measurement_valid
+				&& !_control_status.flags.ev_hgt_fault;
 
 		const bool starting_conditions_passing = continuing_conditions_passing
+				&& (_ev_hgt_counter > _obs_buffer_length)
 				&& isNewestSampleRecent(_time_last_ext_vision_buffer_push, 2 * EV_MAX_INTERVAL);
+
+		const float measurement_lpf = _ev_hgt_lpf.getState();
 
 		if (_control_status.flags.ev_hgt) {
 			aid_src.fusion_enabled = true;
@@ -84,8 +119,10 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample)
 
 				if (isHeightResetRequired()) {
 					// All height sources are failing
-					ECL_INFO("EV height fusion reset required, all height sources failing");
-					resetHeightToEv(measurement, measurement_var);
+					ECL_WARN("%s height fusion reset required, all height sources failing", HGT_SRC_NAME);
+					_information_events.flags.reset_hgt_to_ev = true;
+					resetVerticalPositionTo(measurement_lpf - _ev_hgt_b_est.getBias(), measurement_var);
+					bias_est.setBias(-_state.pos(2) + measurement_lpf);
 
 					// reset vertical velocity
 					if (PX4_ISFINITE(ev_sample.vel(2)) && (_params.fusion_mode & SensorFusionMask::USE_EXT_VIS_POS)) {
@@ -96,28 +133,43 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample)
 						resetVerticalVelocityToZero();
 					}
 
+				} else if (!aid_src.fused && (_ev_sample_delayed.reset_counter != _ev_sample_delayed_prev.reset_counter)) {
+					// fusion failed and EV sample indicates reset
+					ECL_INFO("%s height reset", HGT_SRC_NAME);
+
+					if (_height_sensor_ref == HeightSensor::EV) {
+						_information_events.flags.reset_hgt_to_ev = true;
+						resetVerticalPositionTo(measurement, measurement_var);
+						bias_est.reset();
+
+					} else {
+						bias_est.setBias(-_state.pos(2) + measurement_lpf);
+					}
+
 				} else if (is_fusion_failing) {
 					// Some other height source is still working
-					ECL_INFO("stopping EV height fusion, fusion failing");
+					ECL_WARN("stopping %s height fusion, fusion failing", HGT_SRC_NAME);
 					stopEvHgtFusion();
+					_control_status.flags.ev_hgt_fault = true;
 				}
 
 			} else {
-				ECL_INFO("stopping EV height fusion, continuing conditions not passing");
+				ECL_WARN("stopping %s height fusion, continuing conditions failing", HGT_SRC_NAME);
 				stopEvHgtFusion();
 			}
 
 		} else {
 			if (starting_conditions_passing) {
 				if (_params.height_sensor_ref == HeightSensor::EV) {
-					ECL_INFO("starting EV height fusion, resetting height to EV");
-					bias_est.reset();
+					ECL_INFO("starting %s height fusion, resetting height to %s", HGT_SRC_NAME);
+					_information_events.flags.reset_hgt_to_ev = true;
 					_height_sensor_ref = HeightSensor::EV;
-					resetHeightToEv(measurement, measurement_var);
+					resetVerticalPositionTo(measurement_lpf, measurement_var);
+					bias_est.reset();
 
 				} else {
-					ECL_INFO("starting EV height fusion");
-					bias_est.setBias(-_state.pos(2) + measurement);
+					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
+					bias_est.setBias(-_state.pos(2) + measurement_lpf);
 				}
 
 				aid_src.time_last_fuse = _imu_sample_delayed.time_us;
@@ -130,26 +182,9 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample)
 	} else if (_control_status.flags.ev_hgt
 		   && !isNewestSampleRecent(_time_last_ext_vision_buffer_push, 2 * EV_MAX_INTERVAL)) {
 		// No data anymore. Stop until it comes back.
-		ECL_INFO("stopping EV height fusion, no data");
+		ECL_WARN("stopping %s height fusion, no data", HGT_SRC_NAME);
 		stopEvHgtFusion();
 	}
-}
-
-void Ekf::resetHeightToEv(const float obs, const float obs_var)
-{
-	_information_events.flags.reset_hgt_to_ev = true;
-
-	resetVerticalPositionTo(obs - _ev_hgt_b_est.getBias());
-
-	// the state variance is the same as the observation
-	P.uncorrelateCovarianceSetVariance<1>(9, math::max(sq(0.01f), obs_var));
-
-	_baro_b_est.setBias(_baro_b_est.getBias() + _state_reset_status.posD_change);
-	//_ev_hgt_b_est.setBias(_ev_hgt_b_est.getBias() - _state_reset_status.posD_change);
-	_gps_hgt_b_est.setBias(_gps_hgt_b_est.getBias() + _state_reset_status.posD_change);
-	_rng_hgt_b_est.setBias(_rng_hgt_b_est.getBias() + _state_reset_status.posD_change);
-
-	_aid_src_ev_hgt.time_last_fuse = _imu_sample_delayed.time_us;
 }
 
 void Ekf::stopEvHgtFusion()
@@ -160,8 +195,14 @@ void Ekf::stopEvHgtFusion()
 			_height_sensor_ref = HeightSensor::UNKNOWN;
 		}
 
-		_control_status.flags.ev_hgt = false;
 		_ev_hgt_b_est.setFusionInactive();
+		_ev_hgt_b_est.reset();
+
+		_ev_hgt_lpf.reset(0.f);
+		_ev_hgt_counter = 0;
+
 		resetEstimatorAidStatus(_aid_src_ev_hgt);
+
+		_control_status.flags.ev_hgt = false;
 	}
 }

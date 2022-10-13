@@ -598,7 +598,11 @@ private:
 
 	// Variables used by the initial filter alignment
 	bool _is_first_imu_sample{true};
-	uint32_t _baro_counter{0};		///< number of baro samples read during initialisation
+	uint32_t _baro_counter{0};		///< number of baro samples filtered
+	uint32_t _gnss_hgt_counter{0};		///< number of GNSS hgt samples filtered
+	uint32_t _rng_counter{0};		///< number of RNG hgt samples filtered
+	uint32_t _ev_hgt_counter{0};		///< number of EV hgt samples filtered
+
 	uint32_t _mag_counter{0};		///< number of magnetometer samples read during initialisation
 	AlphaFilter<Vector3f> _accel_lpf{0.1f};	///< filtered accelerometer measurement used to align tilt (m/s/s)
 	AlphaFilter<Vector3f> _gyro_lpf{0.1f};	///< filtered gyro measurement used for alignment excessive movement check (rad/sec)
@@ -606,6 +610,9 @@ private:
 	// Variables used to perform in flight resets and switch between height sources
 	AlphaFilter<Vector3f> _mag_lpf{0.1f};	///< filtered magnetometer measurement for instant reset (Gauss)
 	AlphaFilter<float> _baro_lpf{0.1f};	///< filtered barometric height measurement (m)
+	AlphaFilter<float> _gnss_hgt_lpf{0.1f};	///< filtered GNSS height measurement (m)
+	AlphaFilter<float> _rng_lpf{0.1f};	///< filtered range height measurement (m)
+	AlphaFilter<float> _ev_hgt_lpf{0.1f};	///< filtered EV hgt height measurement (m)
 
 	// Variables used to control activation of post takeoff functionality
 	float _last_on_ground_posD{0.0f};	///< last vertical position when the in_air status was false (m)
@@ -633,7 +640,6 @@ private:
 	terrain_fusion_status_u _hagl_sensor_status{}; ///< Struct indicating type of sensor used to estimate height above ground
 
 	// height sensor status
-	bool _baro_hgt_faulty{false};		///< true if baro data have been declared faulty TODO: move to fault flags
 	bool _gps_intermittent{true};           ///< true if data into the buffer is intermittent
 
 	// imu fault status
@@ -713,12 +719,7 @@ private:
 
 	bool isHeightResetRequired() const;
 
-	void resetVerticalPositionTo(float new_vert_pos);
-
-	void resetHeightToBaro(const float baro_sample_height, const float obs_var);
-	void resetHeightToGps(const float gps_sample_height, const float obs_var);
-	void resetHeightToRng(const float obs, const float obs_var);
-	void resetHeightToEv(const float obs, const float obs_var);
+	void resetVerticalPositionTo(float new_vert_pos, float obs_var = NAN);
 
 	void resetVerticalVelocityToZero();
 

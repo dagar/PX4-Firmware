@@ -534,6 +534,9 @@ union filter_control_status_u {
 		uint64_t rng_kin_consistent      : 1; ///< 31 - true when the range finder kinematic consistency check is passing
 		uint64_t fake_pos                : 1; ///< 32 - true when fake position measurements are being fused
 		uint64_t fake_hgt                : 1; ///< 33 - true when fake height measurements are being fused
+		uint64_t baro_fault              : 1; ///< 34 - true when baro has been declared faulty and is no longer being used
+		uint64_t ev_hgt_fault            : 1; ///< 35 - true when EV height has been declared faulty and is no longer being used
+		uint64_t gps_hgt_fault           : 1; ///< 36 - true when GPS height has been declared faulty and is no longer being used
 	} flags;
 	uint64_t value;
 };

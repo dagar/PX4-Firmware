@@ -225,10 +225,15 @@ bool Ekf::isHeightResetRequired() const
 }
 
 
-void Ekf::resetVerticalPositionTo(const float new_vert_pos)
+void Ekf::resetVerticalPositionTo(const float new_vert_pos, float obs_var)
 {
 	const float old_vert_pos = _state.pos(2);
 	_state.pos(2) = new_vert_pos;
+
+	if (PX4_ISFINITE(obs_var)) {
+		// the state variance is the same as the observation
+		P.uncorrelateCovarianceSetVariance<1>(9, obs_var);
+	}
 
 	// store the reset amount and time to be published
 	_state_reset_status.posD_change = new_vert_pos - old_vert_pos;
@@ -246,6 +251,11 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos)
 
 	// add the reset amount to the output observer vertical position state
 	_output_vert_new.vert_vel_integ = _state.pos(2);
+
+	_baro_b_est.setBias(_baro_b_est.getBias() + _state_reset_status.posD_change);
+	_ev_hgt_b_est.setBias(_ev_hgt_b_est.getBias() - _state_reset_status.posD_change);
+	_gps_hgt_b_est.setBias(_gps_hgt_b_est.getBias() + _state_reset_status.posD_change);
+	_rng_hgt_b_est.setBias(_rng_hgt_b_est.getBias() + _state_reset_status.posD_change);
 
 	// Reset the timout timer
 	_time_last_hgt_fuse = _imu_sample_delayed.time_us;
@@ -672,10 +682,7 @@ bool Ekf::setEkfGlobalOrigin(const double latitude, const double longitude, cons
 			float current_alt = -_state.pos(2) + gps_alt_ref_prev;
 
 			resetVerticalPositionTo(_gps_alt_ref - current_alt);
-
-			_baro_b_est.setBias(_baro_b_est.getBias() + _state_reset_status.posD_change);
-			_rng_hgt_b_est.setBias(_rng_hgt_b_est.getBias() + _state_reset_status.posD_change);
-			_ev_hgt_b_est.setBias(_ev_hgt_b_est.getBias() - _state_reset_status.posD_change);
+			_gps_hgt_b_est.setBias(_state.pos(2) + _gps_alt_ref - current_alt);
 		}
 
 		return true;
