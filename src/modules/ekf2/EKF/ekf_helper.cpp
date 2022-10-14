@@ -854,9 +854,6 @@ void Ekf::resetAccelBias()
 	// Zero the corresponding covariances and set
 	// variances to the values use for initial alignment
 	P.uncorrelateCovarianceSetVariance<3>(13, sq(_params.switch_on_accel_bias * _dt_ekf_avg));
-
-	// Set previous frame values
-	_prev_dvel_bias_var = P.slice<3, 3>(13, 13).diag();
 }
 
 void Ekf::resetMagBiasAndYaw()
@@ -867,9 +864,6 @@ void Ekf::resetMagBiasAndYaw()
 	// Zero the corresponding covariances and set
 	// variances to the values use for initial alignment
 	P.uncorrelateCovarianceSetVariance<3>(19, sq(_params.mag_noise));
-
-	// reset any saved covariance data for re-use when auto-switching between heading and 3-axis fusion
-	_saved_mag_bf_variance.zero();
 
 	if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D) {
 		_mag_yaw_reset_req = true;
@@ -1011,15 +1005,70 @@ void Ekf::get_ekf_soln_status(uint16_t *status) const
 
 void Ekf::fuse(const Vector24f &K, float innovation)
 {
-	_state.quat_nominal -= K.slice<4, 1>(0, 0) * innovation;
+	// quaternion (0,1,2,3)
+	for (int i = 0; i < 4; i++) {
+		if (!_state_inhibited[i]) {
+			_state.quat_nominal(0) -= K(i) * innovation;
+		}
+	}
+
 	_state.quat_nominal.normalize();
-	_state.vel -= K.slice<3, 1>(4, 0) * innovation;
-	_state.pos -= K.slice<3, 1>(7, 0) * innovation;
-	_state.delta_ang_bias -= K.slice<3, 1>(10, 0) * innovation;
-	_state.delta_vel_bias -= K.slice<3, 1>(13, 0) * innovation;
-	_state.mag_I -= K.slice<3, 1>(16, 0) * innovation;
-	_state.mag_B -= K.slice<3, 1>(19, 0) * innovation;
-	_state.wind_vel -= K.slice<2, 1>(22, 0) * innovation;
+
+	// velocity (4,5,6)
+	for (int i = 0; i < 3; i++) {
+		int state_index = i + 4;
+		if (!_state_inhibited[state_index]) {
+			_state.vel(0) -= K(state_index) * innovation;
+		}
+	}
+
+	// position (7,8,9)
+	for (int i = 0; i < 3; i++) {
+		int state_index = i + 7;
+		if (!_state_inhibited[state_index]) {
+			_state.pos(0) -= K(state_index) * innovation;
+		}
+	}
+
+	// delta angle bias (10,11,12)
+	for (int i = 0; i < 3; i++) {
+		int state_index = i + 10;
+		if (!_state_inhibited[state_index]) {
+			_state.delta_ang_bias(0) -= K(state_index) * innovation;
+		}
+	}
+
+	// delta velocity bias (13,14,15)
+	for (int i = 0; i < 3; i++) {
+		int state_index = i + 13;
+		if (!_state_inhibited[state_index]) {
+			_state.delta_vel_bias(0) -= K(state_index) * innovation;
+		}
+	}
+
+	// mag earth (16,17,18)
+	for (int i = 0; i < 3; i++) {
+		int state_index = i + 16;
+		if (!_state_inhibited[state_index]) {
+			_state.mag_I(0) -= K(state_index) * innovation;
+		}
+	}
+
+	// mag body (19,20,21)
+	for (int i = 0; i < 3; i++) {
+		int state_index = i + 19;
+		if (!_state_inhibited[state_index]) {
+			_state.mag_B(0) -= K(state_index) * innovation;
+		}
+	}
+
+	// wind (22,23)
+	for (int i = 0; i < 2; i++) {
+		int state_index = i + 22;
+		if (!_state_inhibited[state_index]) {
+			_state.wind_vel(0) -= K(state_index) * innovation;
+		}
+	}
 }
 
 void Ekf::uncorrelateQuatFromOtherStates()
@@ -1236,14 +1285,12 @@ void Ekf::stopMagFusion()
 {
 	stopMag3DFusion();
 	stopMagHdgFusion();
-	clearMagCov();
 }
 
 void Ekf::stopMag3DFusion()
 {
 	// save covariance data for re-use if currently doing 3-axis fusion
 	if (_control_status.flags.mag_3D) {
-		saveMagCovData();
 
 		_control_status.flags.mag_3D = false;
 		_control_status.flags.mag_dec = false;
@@ -1280,8 +1327,6 @@ void Ekf::startMag3DFusion()
 
 		stopMagHdgFusion();
 
-		zeroMagCov();
-		loadMagCovData();
 		_control_status.flags.mag_3D = true;
 	}
 }
@@ -1422,35 +1467,6 @@ void Ekf::increaseQuatYawErrVariance(float yaw_variance)
 	P(3,0) -= yaw_variance*SQ[2]*SQ[3];
 	P(3,1) -= yaw_variance*SQ[1]*SQ[3];
 	P(3,2) -= yaw_variance*SQ[0]*SQ[3];
-}
-
-// save covariance data for re-use when auto-switching between heading and 3-axis fusion
-void Ekf::saveMagCovData()
-{
-	// save variances for XYZ body axis field
-	_saved_mag_bf_variance(0) = P(19, 19);
-	_saved_mag_bf_variance(1) = P(20, 20);
-	_saved_mag_bf_variance(2) = P(21, 21);
-
-	// save the NE axis covariance sub-matrix
-	_saved_mag_ef_ne_covmat = P.slice<2, 2>(16, 16);
-
-	// save variance for the D earth axis
-	_saved_mag_ef_d_variance = P(18, 18);
-}
-
-void Ekf::loadMagCovData()
-{
-	// re-instate variances for the XYZ body axis field
-	P(19, 19) = _saved_mag_bf_variance(0);
-	P(20, 20) = _saved_mag_bf_variance(1);
-	P(21, 21) = _saved_mag_bf_variance(2);
-
-	// re-instate the NE axis covariance sub-matrix
-	P.slice<2, 2>(16, 16) = _saved_mag_ef_ne_covmat;
-
-	// re-instate the D earth axis variance
-	P(18, 18) = _saved_mag_ef_d_variance;
 }
 
 void Ekf::startAirspeedFusion()
