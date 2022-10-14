@@ -51,7 +51,6 @@
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/control_allocator_status.h>
 #include <uORB/topics/landing_gear.h>
-#include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/rate_ctrl_status.h>
 #include <uORB/topics/vehicle_angular_acceleration.h>
@@ -100,7 +99,6 @@ private:
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
 	uORB::Subscription _control_allocator_status_sub{ORB_ID(control_allocator_status)};
 	uORB::Subscription _landing_gear_sub{ORB_ID(landing_gear)};
-	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _vehicle_angular_acceleration_sub{ORB_ID(vehicle_angular_acceleration)};
 	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
@@ -163,16 +161,6 @@ private:
 		(ParamFloat<px4::params::MC_YAWRATE_D>) _param_mc_yawrate_d,
 		(ParamFloat<px4::params::MC_YAWRATE_FF>) _param_mc_yawrate_ff,
 		(ParamFloat<px4::params::MC_YAWRATE_K>) _param_mc_yawrate_k,
-
-		(ParamFloat<px4::params::MPC_MAN_Y_MAX>) _param_mpc_man_y_max,			/**< scaling factor from stick to yaw rate */
-
-		(ParamFloat<px4::params::MC_ACRO_R_MAX>) _param_mc_acro_r_max,
-		(ParamFloat<px4::params::MC_ACRO_P_MAX>) _param_mc_acro_p_max,
-		(ParamFloat<px4::params::MC_ACRO_Y_MAX>) _param_mc_acro_y_max,
-		(ParamFloat<px4::params::MC_ACRO_EXPO>) _param_mc_acro_expo,			/**< expo stick curve shape (roll & pitch) */
-		(ParamFloat<px4::params::MC_ACRO_EXPO_Y>) _param_mc_acro_expo_y,				/**< expo stick curve shape (yaw) */
-		(ParamFloat<px4::params::MC_ACRO_SUPEXPO>) _param_mc_acro_supexpo,		/**< superexpo stick curve shape (roll & pitch) */
-		(ParamFloat<px4::params::MC_ACRO_SUPEXPOY>) _param_mc_acro_supexpoy,		/**< superexpo stick curve shape (yaw) */
 
 		(ParamBool<px4::params::MC_BAT_SCALE_EN>) _param_mc_bat_scale_en
 	)
