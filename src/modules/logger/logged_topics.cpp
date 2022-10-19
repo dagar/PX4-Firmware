@@ -202,7 +202,7 @@ void LoggedTopics::add_default_topics()
 	add_optional_topic_multi("sensor_baro", 1000, 4);
 	add_topic_multi("sensor_gps", 1000, 2);
 	add_topic_multi("sensor_gnss_relative", 1000, 1);
-	add_optional_topic_multi("sensor_gyro", 1000, 4);
+	add_optional_topic_multi("sensor_gyro", 0, 4);
 	add_topic_multi("sensor_mag", 1000, 4);
 	add_topic_multi("sensor_optical_flow", 1000, 2);
 
@@ -237,8 +237,9 @@ void LoggedTopics::add_default_topics()
 	add_topic("fw_virtual_attitude_setpoint");
 	add_topic("mc_virtual_attitude_setpoint");
 	add_topic("time_offset");
-	add_topic("vehicle_angular_acceleration", 10);
-	add_topic("vehicle_angular_velocity", 10);
+	add_topic("vehicle_angular_acceleration", 0);
+	add_topic("vehicle_angular_velocity", 0);
+	add_topic("sensor_gyro", 0);
 	add_topic("vehicle_angular_velocity_groundtruth", 10);
 	add_topic("vehicle_attitude_groundtruth", 10);
 	add_topic("vehicle_global_position_groundtruth", 100);
@@ -340,14 +341,14 @@ void LoggedTopics::add_thermal_calibration_topics()
 {
 	add_topic_multi("sensor_accel", 100, 3);
 	add_topic_multi("sensor_baro", 100, 3);
-	add_topic_multi("sensor_gyro", 100, 3);
+	add_topic_multi("sensor_gyro", 0, 3);
 }
 
 void LoggedTopics::add_sensor_comparison_topics()
 {
 	add_topic_multi("sensor_accel", 100, 3);
 	add_topic_multi("sensor_baro", 100, 3);
-	add_topic_multi("sensor_gyro", 100, 3);
+	add_topic_multi("sensor_gyro", 0, 3);
 	add_topic_multi("sensor_mag", 100, 4);
 }
 

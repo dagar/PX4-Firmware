@@ -59,6 +59,17 @@ public:
 
 	bool setParameters(float sample_freq, float notch_freq, float bandwidth);
 
+	void moveNotch(float notch_freq)
+	{
+		// only notch frequency has changed
+		_notch_freq = notch_freq;
+
+		const float beta = -cosf(2.f * M_PI_F * _notch_freq / _sample_freq);
+
+		_b1 = 2.f * beta * _b0;
+		_a1 = _b1;
+	}
+
 	/**
 	 * Add a new raw value to the filter using the Direct Form I
 	 *
@@ -69,6 +80,9 @@ public:
 		if (!_initialized) {
 			reset(sample);
 			_initialized = true;
+
+		} else {
+			_weight = math::min(_weight + 0.001f, 1.f);
 		}
 
 		return applyInternal(sample);
@@ -83,6 +97,7 @@ public:
 		}
 
 		for (int n = 0; n < num_samples; n++) {
+			_weight = math::min(_weight + 0.0001f, 1.f);
 			samples[n] = applyInternal(samples[n]);
 		}
 	}
@@ -144,6 +159,7 @@ public:
 		}
 
 		_initialized = true;
+		_weight = 0.f;
 	}
 
 	void disable()
@@ -161,6 +177,8 @@ public:
 		_a2 = 0.f;
 
 		_initialized = false;
+
+		_weight = 0.f;
 	}
 
 protected:
@@ -184,7 +202,7 @@ protected:
 		_delay_element_output_2 = _delay_element_output_1;
 		_delay_element_output_1 = output;
 
-		return output;
+		return output * _weight + sample * (1.f - _weight);
 	}
 
 	T _delay_element_1{};
@@ -203,6 +221,8 @@ protected:
 	float _notch_freq{};
 	float _bandwidth{};
 	float _sample_freq{};
+
+	float _weight{1.f};
 
 	bool _initialized{false};
 };

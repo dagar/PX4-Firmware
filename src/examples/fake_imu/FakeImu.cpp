@@ -105,9 +105,9 @@ void FakeImu::Run()
 		const double y_F = y_f0 + (y_f1 - y_f0) * t / (2 * T);
 		const double z_F = z_f0 + (z_f1 - z_f0) * t / (2 * T);
 
-		gyro.x[n] = roundf(A * sin(2 * M_PI * x_F * t));
-		gyro.y[n] = roundf(A * sin(2 * M_PI * y_F * t));
-		gyro.z[n] = roundf(A * sin(2 * M_PI * z_F * t));
+		gyro.x[n] = round(A * sin(2 * M_PI * x_F * t));
+		gyro.y[n] = round(A * sin(2 * M_PI * y_F * t));
+		gyro.z[n] = round(A * sin(2 * M_PI * z_F * t));
 
 		if (n == 0) {
 			x_freq = (x_f1 - x_f0) * (t / T) + x_f0;
@@ -123,36 +123,36 @@ void FakeImu::Run()
 #if defined(FAKE_IMU_FAKE_ESC_STATUS)
 
 	// publish fake esc status at ~10 Hz
-	if (hrt_elapsed_time(&_esc_status_pub.get().timestamp) > 100_ms) {
+	if (hrt_elapsed_time(&_esc_status_pub.get().timestamp) > 10_ms) {
 		auto &esc_status = _esc_status_pub.get();
 
 		esc_status.esc_count = 3;
 
 		// ESC 0 follow X axis RPM
-		if (!(timestamp_sample_s > 1.5 && timestamp_sample_s < 2.0)) {
+		if (true || !(timestamp_sample_s > 1.5 && timestamp_sample_s < 2.0)) {
 			// simulate drop out at 1.5 to 2 seconds
 			esc_status.esc[0].timestamp = hrt_absolute_time();
 			esc_status.esc[0].esc_rpm = x_freq * 60;
 		}
 
 		// ESC 1 follow Y axis RPM
-		if (!(timestamp_sample_s > 2.5 && timestamp_sample_s < 3.0)) {
+		if (true || !(timestamp_sample_s > 2.5 && timestamp_sample_s < 3.0)) {
 			// simulate drop out at 2.5 to 3 seconds
 			esc_status.esc[1].timestamp = hrt_absolute_time();
 			esc_status.esc[1].esc_rpm = y_freq * 60;
 		}
 
 		// ESC 2 follow Z axis RPM
-		if (!(timestamp_sample_s > 3.5 && timestamp_sample_s < 4.0)) {
+		if (true || !(timestamp_sample_s > 3.5 && timestamp_sample_s < 4.0)) {
 			// simulate drop out at 3.5 to 4 seconds
 			esc_status.esc[2].timestamp = hrt_absolute_time();
 			esc_status.esc[2].esc_rpm = z_freq * 60;
 		}
 
 		// simulate brief dropout of all data
-		if (timestamp_sample_s > 5.5 && timestamp_sample_s < 5.6) {
-			esc_status.esc[0].esc_rpm = 0;
-			esc_status.esc[1].esc_rpm = 0;
+		if (true || (timestamp_sample_s > 5.5 && timestamp_sample_s < 5.6)) {
+			//esc_status.esc[0].esc_rpm = 0;
+			//esc_status.esc[1].esc_rpm = 0;
 			esc_status.esc[2].esc_rpm = 0;
 		}
 

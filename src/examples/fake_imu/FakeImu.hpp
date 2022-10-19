@@ -45,7 +45,7 @@
 #include <uORB/topics/sensor_gyro_fifo.h>
 
 // fake ESC RPM for testing dynamic notch filtering
-//#define FAKE_IMU_FAKE_ESC_STATUS
+#define FAKE_IMU_FAKE_ESC_STATUS
 
 #if defined(FAKE_IMU_FAKE_ESC_STATUS)
 # include <uORB/topics/esc_status.h>
