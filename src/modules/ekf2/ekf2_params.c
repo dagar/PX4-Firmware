@@ -603,12 +603,12 @@ PARAM_DEFINE_FLOAT(EKF2_TAS_GATE, 3.0f);
  * 0 : Deprecated, use EKF2_GPS_CTRL instead
  * 1 : Set to true to use optical flow data if available
  * 2 : Set to true to inhibit IMU delta velocity bias estimation
- * 3 : Set to true to enable vision position fusion
- * 4 : Set to true to enable vision yaw fusion. Cannot be used if bit position 7 is true.
+ * 3 : Deprecated, use EKF2_EV_CTRL instead
+ * 4 : Deprecated, use EKF2_EV_CTRL instead
  * 5 : Set to true to enable multi-rotor drag specific force fusion
- * 6 : set to true if the EV observations are in a non NED reference frame and need to be rotated before being used
+ * 6 : Deprecated, use EKF2_EV_CTRL instead
  * 7 : Deprecated, use EKF2_GPS_CTRL instead
- * 8 : Set to true to enable vision velocity fusion
+ * 3 : Deprecated, use EKF2_EV_CTRL instead
  *
  * @group EKF2
  * @min 0
@@ -616,12 +616,9 @@ PARAM_DEFINE_FLOAT(EKF2_TAS_GATE, 3.0f);
  * @bit 0 unused
  * @bit 1 use optical flow
  * @bit 2 inhibit IMU bias estimation
- * @bit 3 vision position fusion
- * @bit 4 vision yaw fusion
+ * @bit 3 unused
+ * @bit 4 unused
  * @bit 5 multi-rotor drag fusion
- * @bit 6 rotate external vision
- * @bit 7 unused
- * @bit 8 vision velocity fusion
  * @reboot_required true
  */
 PARAM_DEFINE_INT32(EKF2_AID_MASK, 0);
@@ -653,6 +650,25 @@ PARAM_DEFINE_INT32(EKF2_HGT_REF, 1);
  * @boolean
  */
 PARAM_DEFINE_INT32(EKF2_BARO_CTRL, 1);
+
+/**
+ * External vision (EV) sensor aiding
+ *
+ * Set bits in the following positions to enable:
+ * 0 : Horizontal position fusion
+ * 1 : Vertical position fusion
+ * 2 : 3D velocity fusion
+ * 3 : Yaw
+ *
+ * @group EKF2
+ * @min 0
+ * @max 15
+ * @bit 0 Horizontal position
+ * @bit 1 Vertical position
+ * @bit 2 3D velocity
+ * @bit 3 Yaw
+ */
+PARAM_DEFINE_INT32(EKF2_EV_CTRL, 15);
 
 /**
  * GNSS sensor aiding
@@ -778,6 +794,16 @@ PARAM_DEFINE_FLOAT(EKF2_MIN_RNG, 0.1f);
  * @group EKF2
  */
 PARAM_DEFINE_INT32(EKF2_EV_NOISE_MD, 0);
+
+/**
+ * Vision minimum quality
+ *
+ * @group EKF2
+ * @min 0
+ * @max 100
+ * @decimal 1
+ */
+PARAM_DEFINE_INT32(EKF2_EV_QMIN, 0);
 
 /**
  * Measurement noise for vision position observations used to lower bound or replace the uncertainty included in the message

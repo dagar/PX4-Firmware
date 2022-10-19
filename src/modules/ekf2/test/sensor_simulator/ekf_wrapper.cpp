@@ -77,6 +77,7 @@ void EkfWrapper::setExternalVisionHeightRef()
 
 void EkfWrapper::enableExternalVisionHeightFusion()
 {
+	_ekf_params->ev_ctrl |= static_cast<int32_t>(EvCtrl::VPOS);
 	setExternalVisionHeightRef(); // TODO: replace by EV control parameter
 }
 
@@ -137,12 +138,12 @@ void EkfWrapper::setFlowOffset(const Vector3f &offset)
 
 void EkfWrapper::enableExternalVisionPositionFusion()
 {
-	_ekf_params->fusion_mode |= SensorFusionMask::USE_EXT_VIS_POS;
+	_ekf_params->ev_ctrl |= static_cast<int32_t>(EvCtrl::HPOS);
 }
 
 void EkfWrapper::disableExternalVisionPositionFusion()
 {
-	_ekf_params->fusion_mode &= ~SensorFusionMask::USE_EXT_VIS_POS;
+	_ekf_params->ev_ctrl &= ~static_cast<int32_t>(EvCtrl::HPOS);
 }
 
 bool EkfWrapper::isIntendingExternalVisionPositionFusion() const
@@ -152,12 +153,12 @@ bool EkfWrapper::isIntendingExternalVisionPositionFusion() const
 
 void EkfWrapper::enableExternalVisionVelocityFusion()
 {
-	_ekf_params->fusion_mode |= SensorFusionMask::USE_EXT_VIS_VEL;
+	_ekf_params->ev_ctrl |= static_cast<int32_t>(EvCtrl::VEL);
 }
 
 void EkfWrapper::disableExternalVisionVelocityFusion()
 {
-	_ekf_params->fusion_mode &= ~SensorFusionMask::USE_EXT_VIS_VEL;
+	_ekf_params->ev_ctrl &= ~static_cast<int32_t>(EvCtrl::VEL);
 }
 
 bool EkfWrapper::isIntendingExternalVisionVelocityFusion() const
@@ -167,27 +168,17 @@ bool EkfWrapper::isIntendingExternalVisionVelocityFusion() const
 
 void EkfWrapper::enableExternalVisionHeadingFusion()
 {
-	_ekf_params->fusion_mode |= SensorFusionMask::USE_EXT_VIS_YAW;
+	_ekf_params->ev_ctrl |= static_cast<int32_t>(EvCtrl::YAW);
 }
 
 void EkfWrapper::disableExternalVisionHeadingFusion()
 {
-	_ekf_params->fusion_mode &= ~SensorFusionMask::USE_EXT_VIS_YAW;
+	_ekf_params->ev_ctrl &= ~static_cast<int32_t>(EvCtrl::YAW);
 }
 
 bool EkfWrapper::isIntendingExternalVisionHeadingFusion() const
 {
 	return _ekf->control_status_flags().ev_yaw;
-}
-
-void EkfWrapper::enableExternalVisionAlignment()
-{
-	_ekf_params->fusion_mode |= SensorFusionMask::ROTATE_EXT_VIS;
-}
-
-void EkfWrapper::disableExternalVisionAlignment()
-{
-	_ekf_params->fusion_mode &= ~SensorFusionMask::ROTATE_EXT_VIS;
 }
 
 bool EkfWrapper::isIntendingMagHeadingFusion() const

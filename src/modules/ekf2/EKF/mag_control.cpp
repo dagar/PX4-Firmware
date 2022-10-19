@@ -284,7 +284,7 @@ void Ekf::checkYawAngleObservability()
 				: _accel_lpf_NE.norm() > 2.0f * _params.mag_acc_gate;
 
 	_yaw_angle_observable = _yaw_angle_observable
-				&& (_control_status.flags.gps || _control_status.flags.ev_pos); // Do we have to add ev_vel here?
+				&& (_control_status.flags.gps || (_control_status.flags.ev_pos && _control_status.flags.yaw_align));
 }
 
 void Ekf::checkMagBiasObservability()
@@ -347,9 +347,7 @@ bool Ekf::shouldInhibitMag() const
 	// has explicitly stopped magnetometer use.
 	const bool user_selected = (_params.mag_fusion_type == MagFuseType::INDOOR);
 
-	const bool heading_not_required_for_navigation = !_control_status.flags.gps
-			&& !_control_status.flags.ev_pos
-			&& !_control_status.flags.ev_vel;
+	const bool heading_not_required_for_navigation = !_control_status.flags.gps;
 
 	return (user_selected && heading_not_required_for_navigation) || _control_status.flags.mag_field_disturbed;
 }
