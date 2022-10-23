@@ -472,8 +472,6 @@ private:
 
 	bool _filter_initialised{false};	///< true when the EKF sttes and covariances been initialised
 
-	bool _inhibit_ev_yaw_use{false};	///< true when the vision yaw data should not be used (e.g.: NE fusion requires true North)
-
 	// booleans true when fresh sensor data is available at the fusion time horizon
 	bool _gps_data_ready{false};	///< true when new GPS data has fallen behind the fusion time horizon and is available to be fused
 	bool _rng_data_ready{false};
@@ -692,18 +690,18 @@ private:
 	// fuse single velocity and position measurement
 	bool fuseVelPosHeight(const float innov, const float innov_var, const int obs_index);
 
-	void resetVelocityTo(const Vector3f &vel, const Vector3f new_vel_var = Vector3f(NAN, NAN, NAN));
-	void resetHorizontalVelocityTo(const Vector2f &new_horz_vel, const Vector2f new_horz_vel_var = Vector2f(NAN, NAN));
-	void resetVerticalVelocityTo(float new_vert_vel, float new_vert_vel_var = NAN);
+	void resetVelocityTo(const Vector3f &vel, const Vector3f &new_vel_var);
 
-	void resetVelocityToGps(const gpsSample &gps_sample);
-	void resetHorizontalVelocityToOpticalFlow(const flowSample &flow_sample);
+	void resetHorizontalVelocityTo(const Vector2f &new_horz_vel, const Vector2f &new_horz_vel_var);
+	void resetHorizontalVelocityTo(const Vector2f &new_horz_vel, float vel_var) { resetHorizontalVelocityTo(new_horz_vel, Vector2f(vel_var, vel_var)); }
 	void resetHorizontalVelocityToZero();
 
-	void resetHorizontalPositionToGps(const gpsSample &gps_sample);
-	void resetHorizontalPositionToOpticalFlow();
+	void resetVerticalVelocityTo(float new_vert_vel, float new_vert_vel_var);
+
 	void resetHorizontalPositionToLastKnown();
-	void resetHorizontalPositionTo(const Vector2f &new_horz_pos);
+
+	void resetHorizontalPositionTo(const Vector2f &new_horz_pos, const Vector2f &new_horz_pos_var);
+	void resetHorizontalPositionTo(const Vector2f &new_horz_pos, const float pos_var = NAN) { resetHorizontalPositionTo(new_horz_pos, Vector2f(pos_var, pos_var)); }
 
 	bool isHeightResetRequired() const;
 
@@ -1012,7 +1010,6 @@ private:
 	void startAirspeedFusion();
 	void stopAirspeedFusion();
 
-	void startGpsFusion(const gpsSample &gps_sample);
 	void stopGpsFusion();
 
 	void startGpsYawFusion(const gpsSample &gps_sample);

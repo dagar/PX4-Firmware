@@ -66,7 +66,7 @@ void Ekf::controlRangeHeightFusion()
 		// update the bias estimator before updating the main filter but after
 		// using its current state to compute the vertical position innovation
 		if (measurement_valid && _range_sensor.isDataHealthy()) {
-			bias_est.setMaxStateNoise(sqrtf(measurement_var));
+			bias_est.setMaxStateVar(measurement_var);
 			bias_est.setProcessNoiseSpectralDensity(_params.rng_hgt_bias_nsd);
 			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
 		}

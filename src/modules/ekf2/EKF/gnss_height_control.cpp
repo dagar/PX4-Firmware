@@ -80,7 +80,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 		// update the bias estimator before updating the main filter but after
 		// using its current state to compute the vertical position innovation
 		if (measurement_valid && gps_checks_passing && !gps_checks_failing) {
-			bias_est.setMaxStateNoise(sqrtf(measurement_var));
+			bias_est.setMaxStateVar(measurement_var);
 			bias_est.setProcessNoiseSpectralDensity(_params.gps_hgt_bias_nsd);
 			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
 		}

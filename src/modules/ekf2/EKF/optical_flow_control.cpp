@@ -50,6 +50,7 @@ void Ekf::controlOpticalFlowFusion()
 
 	// Accumulate autopilot gyro data across the same time interval as the flow sensor
 	const Vector3f delta_angle(_imu_sample_delayed.delta_ang - (getGyroBias() * _imu_sample_delayed.delta_ang_dt));
+
 	if (_delta_time_of < 0.1f) {
 		_imu_del_ang_of += delta_angle;
 		_delta_time_of += _imu_sample_delayed.delta_ang_dt;
@@ -77,11 +78,12 @@ void Ekf::controlOpticalFlowFusion()
 				_delta_time_of = _imu_sample_delayed.delta_ang_dt;
 
 				is_delta_time_good = true;
-			 }
+			}
 
 			if (is_quality_good && !is_delta_time_good) {
 				ECL_DEBUG("Optical flow: bad delta time: OF dt %.6f s (min: %.3f, max: %.3f), IMU dt %.6f s",
-					(double)_flow_sample_delayed.dt, (double)delta_time_min, (double)delta_time_max, (double)_imu_sample_delayed.delta_ang_dt);
+					  (double)_flow_sample_delayed.dt, (double)delta_time_min, (double)delta_time_max,
+					  (double)_imu_sample_delayed.delta_ang_dt);
 			}
 		}
 
@@ -144,7 +146,7 @@ void Ekf::controlOpticalFlowFusion()
 		const bool flight_condition_not_ok = _control_status.flags.in_air && !isTerrainEstimateValid();
 
 		const bool inhibit_flow_use = ((preflight_motion_not_ok || flight_condition_not_ok) && !is_flow_required)
-				    || !_control_status.flags.tilt_align;
+					      || !_control_status.flags.tilt_align;
 
 		// Handle cases where we are using optical flow but we should not use it anymore
 		if (_control_status.flags.opt_flow) {
@@ -166,12 +168,28 @@ void Ekf::controlOpticalFlowFusion()
 
 			// if we are not using GPS or external vision aiding, then the velocity and position states and covariances need to be set
 			if (!isHorizontalAidingActive()) {
-				resetHorizontalVelocityToOpticalFlow(_flow_sample_delayed);
-				resetHorizontalPositionToOpticalFlow();
+				// reset velocity
+				_information_events.flags.reset_vel_to_flow = true;
+				ECL_INFO("reset velocity to flow");
+				resetHorizontalVelocityTo(_flow_vel_ne, calcOptFlowMeasVar(_flow_sample_delayed));
+
+				// reset position
+				// estimate is relative to initial position in this mode, so we start with zero error.
+				if (!_control_status.flags.in_air) {
+					// starting OF for the first time so reset the horizontal position
+					ECL_INFO("reset position to zero");
+					resetHorizontalPositionTo(Vector2f(0.f, 0.f), 0.f);
+					_last_known_pos.xy() = _state.pos.xy();
+
+				} else {
+					_information_events.flags.reset_pos_to_last_known = true;
+					ECL_INFO("reset position to last known position");
+					resetHorizontalPositionTo(_last_known_pos.xy(), 0.f);
+				}
 			}
 
-			_control_status.flags.opt_flow = true;
 			_aid_src_optical_flow.time_last_fuse = _imu_sample_delayed.time_us;
+			_control_status.flags.opt_flow = true;
 
 			return;
 		}
@@ -190,11 +208,20 @@ void Ekf::controlOpticalFlowFusion()
 			}
 
 			// handle the case when we have optical flow, are reliant on it, but have not been using it for an extended period
-			if (isTimedOut(_aid_src_optical_flow.time_last_fuse, _params.reset_timeout_max)
+			if (isTimedOut(_aid_src_optical_flow.time_last_fuse, _params.no_aid_timeout_max)
 			    && !isOtherSourceOfHorizontalAidingThan(_control_status.flags.opt_flow)) {
 
-				resetHorizontalVelocityToOpticalFlow(_flow_sample_delayed);
-				resetHorizontalPositionToOpticalFlow();
+				// reset velocity
+				_information_events.flags.reset_vel_to_flow = true;
+				ECL_INFO("reset velocity to flow");
+				resetHorizontalVelocityTo(_flow_vel_ne, calcOptFlowMeasVar(_flow_sample_delayed));
+
+				// reset position, estimate is relative to initial position in this mode, so we start with zero error
+				_information_events.flags.reset_pos_to_last_known = true;
+				ECL_INFO("reset position to last known position");
+				resetHorizontalPositionTo(_last_known_pos.xy(), 0.f);
+
+				_aid_src_optical_flow.time_last_fuse = _imu_sample_delayed.time_us;
 			}
 		}
 

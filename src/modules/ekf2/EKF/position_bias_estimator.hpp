@@ -48,6 +48,8 @@ public:
 	{}
 	virtual ~PositionBiasEstimator() = default;
 
+	bool fusionActive() const { return _is_sensor_fusion_active; }
+
 	void setFusionActive() { _is_sensor_fusion_active = true; }
 	void setFusionInactive() { _is_sensor_fusion_active = false; }
 
@@ -81,10 +83,10 @@ public:
 	// void setBiasStdDev(float state_noise) { _state_var = state_noise * state_noise; }
 	// void setInnovGate(float gate_size) { _gate_size = gate_size; }
 
-	void setMaxStateNoise(const Vector2f &max_noise)
+	void setMaxStateVar(const Vector2f &max_variance)
 	{
-		_bias[0].setMaxStateNoise(max_noise(0));
-		_bias[1].setMaxStateNoise(max_noise(1));
+		_bias[0].setMaxStateVar(max_variance(0));
+		_bias[1].setMaxStateVar(max_variance(1));
 	}
 
 	Vector2f getBias() const { return Vector2f(_bias[0].getBias(), _bias[1].getBias()); }

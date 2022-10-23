@@ -94,8 +94,10 @@ void Ekf::controlFakePosFusion()
 		} else {
 			if (starting_conditions_passing) {
 				ECL_INFO("start fake position fusion");
-				_control_status.flags.fake_pos = true;
+
 				resetFakePosFusion();
+
+				_control_status.flags.fake_pos = true;
 
 				if (_control_status.flags.tilt_align) {
 					// The fake position fusion is not started for initial alignement

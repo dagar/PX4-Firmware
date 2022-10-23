@@ -554,10 +554,11 @@ union filter_control_status_u {
 		uint64_t gps_yaw_fault           : 1; ///< 27 - true when the GNSS heading has been declared faulty and is no longer being used
 		uint64_t rng_fault               : 1; ///< 28 - true when the range finder has been declared faulty and is no longer being used
 		uint64_t inertial_dead_reckoning : 1; ///< 29 - true if we are no longer fusing measurements that constrain horizontal velocity drift
-		uint64_t wind_dead_reckoning     : 1; ///< 30 - true if we are navigationg reliant on wind relative measurements
+		uint64_t wind_dead_reckoning     : 1; ///< 30 - true if we are navigation reliant on wind relative measurements
 		uint64_t rng_kin_consistent      : 1; ///< 31 - true when the range finder kinematic consistency check is passing
 		uint64_t fake_pos                : 1; ///< 32 - true when fake position measurements are being fused
 		uint64_t fake_hgt                : 1; ///< 33 - true when fake height measurements are being fused
+		uint64_t ev_yaw_fault            : 1; ///< 34 - true when the EV heading has been declared faulty and is no longer being used
 	} flags;
 	uint64_t value;
 };
@@ -628,6 +629,7 @@ union warning_event_status_u {
 		bool vision_data_stopped                : 1; ///< 9 - true when the vision system data has stopped for a significant time period
 		bool emergency_yaw_reset_mag_stopped    : 1; ///< 10 - true when the filter has detected bad magnetometer data, has reset the yaw to anothter source of data and has stopped further use of the magnetomer data
 		bool emergency_yaw_reset_gps_yaw_stopped: 1; ///< 11 - true when the filter has detected bad GNSS yaw data, has reset the yaw to anothter source of data and has stopped further use of the GNSS yaw data
+		bool emergency_yaw_reset_ev_yaw_stopped: 1; ///< 12 - true when the filter has detected bad EV yaw data, has reset the yaw to another source of data and has stopped further use of the EV yaw data
 	} flags;
 	uint32_t value;
 };

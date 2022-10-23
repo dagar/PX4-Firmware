@@ -112,6 +112,12 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, bool starting_con
 		break;
 	}
 
+	// increase minimum variance if GPS active (position reference)
+	if (_control_status.flags.gps) {
+		pos_cov(0, 0) = math::max(pos_cov(0, 0), _params.gps_pos_noise);
+		pos_cov(1, 1) = math::max(pos_cov(1, 1), _params.gps_pos_noise);
+	}
+
 	const Vector2f measurement{pos(0), pos(1)};
 
 	const Vector2f measurement_var{
@@ -130,7 +136,7 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, bool starting_con
 	// update the bias estimator before updating the main filter but after
 	// using its current state to compute the vertical position innovation
 	if (measurement_valid && quality_sufficient) {
-		_ev_pos_b_est.setMaxStateNoise(Vector2f(sqrtf(measurement_var(0)), sqrtf(measurement_var(1))));
+		_ev_pos_b_est.setMaxStateVar(measurement_var);
 		_ev_pos_b_est.setProcessNoiseSpectralDensity(_params.ev_hgt_bias_nsd); // TODO
 		_ev_pos_b_est.fuseBias(measurement - Vector2f(_state.pos.xy()), measurement_var + Vector2f(P(7, 7), P(8, 8)));
 	}
@@ -155,8 +161,7 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, bool starting_con
 					// reset count changed in EV sample, reset vision position unless GPS is active
 					_information_events.flags.reset_pos_to_vision = true;
 					ECL_INFO("reset horizontal position to EV");
-					resetHorizontalPositionTo(measurement);
-					P.uncorrelateCovarianceSetVariance<2>(7, measurement_var);
+					resetHorizontalPositionTo(measurement, measurement_var);
 
 					_ev_pos_b_est.reset();
 
@@ -190,15 +195,11 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, bool starting_con
 						ECL_WARN("reset horiztonal position to EV (fusion failing)");
 
 						if (_control_status.flags.gps) {
-							resetHorizontalPositionTo(measurement - _ev_pos_b_est.getBias());
-							P.uncorrelateCovarianceSetVariance<2>(7, measurement_var + _ev_pos_b_est.getBiasVar());
-
+							resetHorizontalPositionTo(measurement - _ev_pos_b_est.getBias(), measurement_var + _ev_pos_b_est.getBiasVar());
 							_ev_pos_b_est.setBias(-Vector2f(_state.pos.xy()) + measurement);
 
 						} else {
-							resetHorizontalPositionTo(measurement);
-							P.uncorrelateCovarianceSetVariance<2>(7, measurement_var);
-
+							resetHorizontalPositionTo(measurement, measurement_var);
 							_ev_pos_b_est.reset();
 						}
 					}
@@ -244,8 +245,7 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, bool starting_con
 				//_position_sensor_ref = PositionSensor::EV;
 
 				_information_events.flags.reset_pos_to_vision = true;
-				resetHorizontalPositionTo(measurement);
-				P.uncorrelateCovarianceSetVariance<2>(7, measurement_var);
+				resetHorizontalPositionTo(measurement, measurement_var);
 
 				_ev_pos_b_est.reset();
 			}

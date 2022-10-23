@@ -87,8 +87,25 @@ void Ekf::controlGpsFusion()
 		_aid_src_gnss_pos.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::HPOS);
 
 		// update GSF yaw estimator velocity (basic sanity check on GNSS velocity data)
-		if ((gps_sample.sacc > FLT_EPSILON) && (gps_sample.sacc <= _params.req_sacc)) {
-			_yawEstimator.setVelocity(velocity.xy(), gps_sample.sacc);
+		if ((gps_sample.sacc > 0.f) && (gps_sample.sacc <= _params.req_sacc)) {
+			_yawEstimator.setVelocity(velocity.xy(), math::max(gps_sample.sacc, _params.gps_vel_noise));
+		}
+
+		// allow GPS to perform yaw align or in flight mag alignment
+		if (_control_status.flags.tilt_align
+		    && gps_checks_passing && !gps_checks_failing) {
+
+			if (!_control_status.flags.yaw_align
+			    || (_control_status.flags.mag_hdg && !_control_status.flags.mag_aligned_in_flight)
+			   ) {
+				if (resetYawToEKFGSF()) {
+					_information_events.flags.yaw_aligned_to_imu_gps = true;
+					ECL_INFO("Yaw aligned using IMU and GPS");
+
+				} else if (resetYawToGps(gps_sample.yaw)) {
+					ECL_INFO("Yaw aligned using GPS yaw");
+				}
+			}
 		}
 
 		// Determine if we should use GPS aiding for velocity and horizontal position
@@ -99,7 +116,12 @@ void Ekf::controlGpsFusion()
 				&& _NED_origin_initialised;
 
 		const bool continuing_conditions_passing = mandatory_conditions_passing && !gps_checks_failing;
-		const bool starting_conditions_passing = continuing_conditions_passing && gps_checks_passing;
+
+		const bool starting_conditions_passing = continuing_conditions_passing
+				&& isNewestSampleRecent(_time_last_gps_buffer_push, 2 * GPS_MAX_INTERVAL)
+				&& _gps_checks_passed
+				&& gps_checks_passing
+				&& !gps_checks_failing;
 
 		if (_control_status.flags.gps) {
 			if (mandatory_conditions_passing) {
@@ -123,23 +145,43 @@ void Ekf::controlGpsFusion()
 						    && _control_status.flags.in_air
 						    && !was_gps_signal_lost
 						    && _ekfgsf_yaw_reset_count < _params.EKFGSF_reset_count_limit
-						    && isTimedOut(_ekfgsf_yaw_reset_time, 5'000'000)) {
+						    && resetYawToEKFGSF()) {
 							// The minimum time interval between resets to the EKF-GSF estimate is limited to allow the EKF-GSF time
 							// to improve its estimate if the previous reset was not successful.
-							if (resetYawToEKFGSF()) {
-								ECL_WARN("GPS emergency yaw reset");
+							ECL_WARN("GPS emergency yaw reset");
+							_ekfgsf_yaw_reset_count++;
+
+							if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D) {
+								// stop using the magnetometer in the main EKF otherwise it's fusion could drag the yaw around
+								// and cause another navigation failure
+								_control_status.flags.mag_fault = true;
+								_warning_events.flags.emergency_yaw_reset_mag_stopped = true;
+							}
+
+							if (_control_status.flags.gps_yaw) {
+								_control_status.flags.gps_yaw_fault = true;
+								_warning_events.flags.emergency_yaw_reset_gps_yaw_stopped = true;
+							}
+
+							if (_control_status.flags.ev_yaw) {
+								_control_status.flags.ev_yaw_fault = true;
+								_warning_events.flags.emergency_yaw_reset_ev_yaw_stopped = true;
 							}
 						}
 
 						ECL_WARN("GPS fusion timeout - resetting");
 
 						// reset velocity to GPS
-						_information_events.flags.reset_vel_to_gps = true;
 						ECL_INFO("reset velocity to GPS");
+						_information_events.flags.reset_vel_to_gps = true;
 						resetVelocityTo(gps_sample.vel, vel_obs_var);
+						_aid_src_gnss_vel.time_last_fuse = _imu_sample_delayed.time_us;
 
 						// reset horizontal position to GPS
-						resetHorizontalPositionToGps(gps_sample);
+						ECL_INFO("reset position to GPS");
+						_information_events.flags.reset_pos_to_gps = true;
+						resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+						_aid_src_gnss_pos.time_last_fuse = _imu_sample_delayed.time_us;
 					}
 
 				} else {
@@ -154,35 +196,29 @@ void Ekf::controlGpsFusion()
 
 		} else {
 			if (starting_conditions_passing) {
-				// Do not use external vision for yaw if using GPS because yaw needs to be
-				// defined relative to an NED reference frame
-				if (_control_status.flags.ev_yaw
-				    || _mag_inhibit_yaw_reset_req
-				    || _mag_yaw_reset_req) {
 
-					_mag_yaw_reset_req = true;
-
-					// Stop the vision for yaw fusion and do not allow it to start again
-					stopEvYawFusion();
-					_inhibit_ev_yaw_use = true;
-
-				} else {
-					startGpsFusion(gps_sample);
+				// reset heading proactively if yaw estimate is available and there's a large error
+				if (isYawEmergencyEstimateAvailable() && isYawFailure()) {
+					resetYawToEKFGSF();
 				}
 
-			} else if (gps_checks_passing && (_params.gnss_ctrl & GnssCtrl::HPOS)
-				   && !_control_status.flags.yaw_align && isYawEmergencyEstimateAvailable()) {
+				// reset horizontal position to GPS
+				_information_events.flags.reset_pos_to_gps = true;
+				ECL_INFO("reset position to GPS");
+				resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+				_aid_src_gnss_pos.time_last_fuse = _imu_sample_delayed.time_us;
 
-				// align using the yaw estimator (if available)
-				if (resetYawToEKFGSF()) {
-
-					stopEvYawFusion();
-
-					_information_events.flags.yaw_aligned_to_imu_gps = true;
-					ECL_INFO("Yaw aligned using IMU and GPS");
-
-					startGpsFusion(gps_sample);
+				// reset velocity to GPS if not currently using another velocity source
+				if (!isHorizontalAidingActive()) {
+					_information_events.flags.reset_vel_to_gps = true;
+					ECL_INFO("reset velocity to GPS");
+					resetVelocityTo(gps_sample.vel, vel_obs_var);
+					_aid_src_gnss_vel.time_last_fuse = _imu_sample_delayed.time_us;
 				}
+
+				_information_events.flags.starting_gps_fusion = true;
+				ECL_INFO("starting GPS fusion");
+				_control_status.flags.gps = true;
 			}
 		}
 
