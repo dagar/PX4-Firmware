@@ -21,3 +21,5 @@ bool[3] fused                # true if the sample was successfully fused
 # TOPICS estimator_aid_source_3d
 # TOPICS estimator_aid_src_gnss_pos estimator_aid_src_gnss_vel
 # TOPICS estimator_aid_src_mag estimator_aid_src_aux_vel
+# TOPICS target_estimator_aid_gps_pos target_estimator_aid_gps_vel
+# TOPICS target_estimator_aid_vision target_estimator_aid_range_z target_estimator_aid_irlock target_estimator_aid_uwb
