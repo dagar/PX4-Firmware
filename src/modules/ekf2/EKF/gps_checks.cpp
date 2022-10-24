@@ -94,8 +94,7 @@ bool Ekf::collect_gps(const gpsMessage &gps)
 		_mag_strength_gps = get_mag_strength_gauss(lat, lon);
 
 		// request a reset of the yaw using the new declination
-		if ((_params.mag_fusion_type != MagFuseType::NONE)
-		     && !declination_was_valid) {
+		if (_control_status.flags.mag_hdg && !declination_was_valid) {
 			_mag_yaw_reset_req = true;
 		}
 
@@ -122,7 +121,7 @@ bool Ekf::collect_gps(const gpsMessage &gps)
 			_mag_strength_gps = get_mag_strength_gauss(lat, lon);
 
 			// request mag yaw reset if there's a mag declination for the first time
-			if (_params.mag_fusion_type != MagFuseType::NONE) {
+			if (_control_status.flags.mag_hdg) {
 				if (!declination_was_valid && PX4_ISFINITE(_mag_declination_gps)) {
 					_mag_yaw_reset_req = true;
 				}
