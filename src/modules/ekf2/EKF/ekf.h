@@ -118,7 +118,7 @@ public:
 		if (_control_status.flags.mag_hdg) {
 			heading_innov = _aid_src_mag_heading.innovation;
 
-		} else if (_control_status.flags.mag_3D) {
+		} else if (_control_status.flags.mag_3D_orientation) {
 			heading_innov = Vector3f(_aid_src_mag.innovation).max();
 
 		} else if (_control_status.flags.gps_yaw) {
@@ -133,7 +133,7 @@ public:
 		if (_control_status.flags.mag_hdg) {
 			heading_innov_var = _aid_src_mag_heading.innovation_variance;
 
-		} else if (_control_status.flags.mag_3D) {
+		} else if (_control_status.flags.mag_3D_orientation) {
 			heading_innov_var = Vector3f(_aid_src_mag.innovation_variance).max();
 
 		} else if (_control_status.flags.gps_yaw) {
@@ -148,7 +148,7 @@ public:
 		if (_control_status.flags.mag_hdg) {
 			heading_innov_ratio = _aid_src_mag_heading.test_ratio;
 
-		} else if (_control_status.flags.mag_3D) {
+		} else if (_control_status.flags.mag_3D_orientation) {
 			heading_innov_ratio = Vector3f(_aid_src_mag.test_ratio).max();
 
 		} else if (_control_status.flags.gps_yaw) {
@@ -289,10 +289,10 @@ public:
 
 	bool isYawFinalAlignComplete() const
 	{
-		const bool is_using_mag = (_control_status.flags.mag_3D || _control_status.flags.mag_hdg);
+		const bool is_using_mag = (_control_status.flags.mag_3D_orientation || _control_status.flags.mag_hdg);
 		const bool is_mag_alignment_in_flight_complete = is_using_mag
-				&& _control_status.flags.mag_aligned_in_flight
-				&& ((_imu_sample_delayed.time_us - _flt_mag_align_start_time) > (uint64_t)1e6);
+				&& _control_status.flags.mag_aligned_in_flight;
+
 		return _control_status.flags.yaw_align
 		       && (is_mag_alignment_in_flight_complete || !is_using_mag);
 	}
@@ -520,9 +520,7 @@ private:
 	uint64_t _time_yaw_started{0};		///< last system time in usec that a yaw rotation manoeuvre was detected
 	float _last_static_yaw{NAN};		///< last yaw angle recorded when on ground motion checks were passing (rad)
 
-	bool _mag_yaw_reset_req{false};		///< true when a reset of the yaw using the magnetometer data has been requested
 	bool _mag_decl_cov_reset{false};	///< true after the fuseDeclination() function has been used to modify the earth field covariances after a magnetic field reset event.
-	bool _synthetic_mag_z_active{false};	///< true if we are generating synthetic magnetometer Z measurements
 
 	SquareMatrix24f P{};	///< state covariance matrix
 
@@ -604,7 +602,6 @@ private:
 
 	// Variables used to control activation of post takeoff functionality
 	float _last_on_ground_posD{0.0f};	///< last vertical position when the in_air status was false (m)
-	uint64_t _flt_mag_align_start_time{0};	///< time that inflight magnetic field alignment started (uSec)
 	uint64_t _time_last_mov_3d_mag_suitable{0};	///< last system time that sufficient movement to use 3-axis magnetometer fusion was detected (uSec)
 	Vector3f _saved_mag_bf_variance {}; ///< magnetic field state variances that have been saved for use at the next initialisation (Gauss**2)
 	Matrix2f _saved_mag_ef_ne_covmat{}; ///< NE magnetic field state covariance sub-matrix saved for use at the next initialisation (Gauss**2)
@@ -764,7 +761,7 @@ private:
 
 	// reset the heading and magnetic field states using the declination and magnetometer measurements
 	// return true if successful
-	bool resetMagHeading();
+	bool resetMagHeading(const Vector3f &mag);
 
 	// reset the heading using the external vision measurements
 	// return true if successful
@@ -954,11 +951,7 @@ private:
 	// do not call before quaternion states are initialised
 	void initialiseQuatCovariances(Vector3f &rot_vec_var);
 
-	// perform a limited reset of the magnetic field related state covariances
-	void resetMagRelatedCovariances();
-
 	void resetQuatCov();
-	void zeroQuatCov();
 	void resetMagCov();
 
 	// perform a limited reset of the wind state covariances
@@ -979,8 +972,6 @@ private:
 	// load and save mag field state covariance data for re-use
 	void loadMagCovData();
 	void saveMagCovData();
-	void clearMagCov();
-	void zeroMagCov();
 
 	void resetZDeltaAngBiasCov();
 

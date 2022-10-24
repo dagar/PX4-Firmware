@@ -41,153 +41,123 @@
 
 void Ekf::controlMagFusion()
 {
-	bool mag_data_ready = false;
-
-	magSample mag_sample;
-
-	if (_mag_buffer) {
-		mag_data_ready = _mag_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &mag_sample);
-
-		if (mag_data_ready) {
-			_mag_lpf.update(mag_sample.mag);
-			_mag_counter++;
-
-			// if enabled, use knowledge of theoretical magnetic field vector to calculate a synthetic magnetomter Z component value.
-			// this is useful if there is a lot of interference on the sensor measurement.
-			if (_params.synthesize_mag_z && (_params.mag_declination_source & GeoDeclinationMask::USE_GEO_DECL)
-			    && (_NED_origin_initialised || PX4_ISFINITE(_mag_declination_gps))
-			   ) {
-				const Vector3f mag_earth_pred = Dcmf(Eulerf(0, -_mag_inclination_gps,
-								     _mag_declination_gps)) * Vector3f(_mag_strength_gps, 0, 0);
-				mag_sample.mag(2) = calculate_synthetic_mag_z_measurement(mag_sample.mag, mag_earth_pred);
-				_control_status.flags.synthetic_mag_z = true;
-
-			} else {
-				_control_status.flags.synthetic_mag_z = false;
-			}
-
-			_control_status.flags.mag_field_disturbed = magFieldStrengthDisturbed(mag_sample.mag);
-
-
-			// compute mag heading innovation (for estimator_aid_src_mag_heading logging)
-			const Vector3f mag_observation = mag_sample.mag - _state.mag_B;
-			const Dcmf R_to_earth = updateYawInRotMat(0.f, _R_to_earth);
-			const Vector3f mag_earth_pred = R_to_earth * mag_observation;
-
-			resetEstimatorAidStatus(_aid_src_mag_heading);
-			_aid_src_mag_heading.timestamp_sample = mag_sample.time_us;
-			_aid_src_mag_heading.observation = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + getMagDeclination();;
-			_aid_src_mag_heading.innovation = wrap_pi(getEulerYaw(_R_to_earth) - _aid_src_mag_heading.observation);
-
-			// compute magnetometer innovations (for estimator_aid_src_mag logging)
-			//  rotate magnetometer earth field state into body frame
-			const Vector3f mag_I_body = _state.quat_nominal.rotateVectorInverse(_state.mag_I);
-			const Vector3f mag_innov = mag_I_body - mag_observation;
-
-			resetEstimatorAidStatus(_aid_src_mag);
-			_aid_src_mag.timestamp_sample = mag_sample.time_us;
-			mag_observation.copyTo(_aid_src_mag.observation);
-			mag_innov.copyTo(_aid_src_mag.innovation);
-		}
-	}
-
-	// If we are on ground, reset the flight alignment flag so that the mag fields will be
-	// re-initialised next time we achieve flight altitude
-	if (!_control_status.flags.in_air) {
-		_control_status.flags.mag_aligned_in_flight = false;
-	}
-
-	yawAngleObservable();
-	checkMagBiasObservability();
-
-	if (_mag_bias_observable || _yaw_angle_observable) {
-		_time_last_mov_3d_mag_suitable = _imu_sample_delayed.time_us;
-	}
-
-	if (_params.mag_fusion_type >= MagFuseType::NONE
-	    || _control_status.flags.mag_fault
-	    || !_control_status.flags.tilt_align) {
-
+	if (_params.mag_fusion_type >= MagFuseType::NONE) {
 		stopMagFusion();
 		return;
 	}
 
-	if (mag_data_ready && !_control_status.flags.ev_yaw && !_control_status.flags.gps_yaw) {
+	// If we are on ground, reset the flight alignment flag so that the mag fields will be
+	// re-initialised next time we achieve flight altitude
+	if (!_control_status_prev.flags.in_air && _control_status.flags.in_air) {
+		_control_status.flags.mag_aligned_in_flight = false;
+	}
 
-		const bool mag_enabled_previously = (_control_status_prev.flags.mag_hdg || _control_status_prev.flags.mag_3D);
+	magSample mag_sample;
 
-		// Determine if we should use simple magnetic heading fusion which works better when
-		// there are large external disturbances or the more accurate 3-axis fusion
-		switch (_params.mag_fusion_type) {
-		default:
+	if (_mag_buffer && _mag_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &mag_sample)) {
 
-		// FALLTHROUGH
-		case MagFuseType::AUTO:
+		_mag_lpf.update(mag_sample.mag);
+		_mag_counter++;
 
-			// Use of 3D fusion requires an in-air heading alignment but it should not
-			// be used when the heading and mag biases are not observable for more than 2 seconds
-			if (_control_status.flags.mag_aligned_in_flight && isRecent(_time_last_mov_3d_mag_suitable, (uint64_t)2e6)) {
-				startMag3DFusion();
+		// if enabled, use knowledge of theoretical magnetic field vector to calculate a synthetic magnetomter Z component value.
+		// this is useful if there is a lot of interference on the sensor measurement.
+		if (_params.synthesize_mag_z && (_params.mag_declination_source & GeoDeclinationMask::USE_GEO_DECL)
+		    && (_NED_origin_initialised || PX4_ISFINITE(_mag_declination_gps))
+		   ) {
+			const Vector3f mag_earth_pred = Dcmf(Eulerf(0, -_mag_inclination_gps,
+							     _mag_declination_gps)) * Vector3f(_mag_strength_gps, 0, 0);
+			mag_sample.mag(2) = calculate_synthetic_mag_z_measurement(mag_sample.mag, mag_earth_pred);
+			_control_status.flags.synthetic_mag_z = true;
 
-			} else {
+		} else {
+			_control_status.flags.synthetic_mag_z = false;
+		}
+
+		yawAngleObservable();
+		checkMagBiasObservability();
+
+		if (_mag_bias_observable || _yaw_angle_observable) {
+			_time_last_mov_3d_mag_suitable = _imu_sample_delayed.time_us;
+		}
+
+		if (_control_status.flags.tilt_align && !_control_status.flags.ev_yaw && !_control_status.flags.gps_yaw) {
+			// Determine if we should use simple magnetic heading fusion which works better when
+			// there are large external disturbances or the more accurate 3-axis fusion
+			switch (_params.mag_fusion_type) {
+			default:
+
+			// FALLTHROUGH
+			case MagFuseType::AUTO:
+
+				// Use of 3D fusion requires an in-air heading alignment but it should not
+				// be used when the heading and mag biases are not observable for more than 2 seconds
+				if (_control_status.flags.mag_aligned_in_flight && isRecent(_time_last_mov_3d_mag_suitable, (uint64_t)2e6)) {
+					startMag3DFusion();
+
+				} else {
+					startMagHdgFusion();
+				}
+
+				break;
+
+			/* fallthrough */
+			case MagFuseType::HEADING:
 				startMagHdgFusion();
+				break;
+
+			case MagFuseType::MAG_3D:
+				startMag3DFusion();
+				break;
 			}
-
-			break;
-
-		case MagFuseType::INDOOR:
-
-		/* fallthrough */
-		case MagFuseType::HEADING:
-			startMagHdgFusion();
-			break;
-
-		case MagFuseType::MAG_3D:
-			startMag3DFusion();
-			break;
 		}
 
-		bool mag_yaw_reset_req = _mag_yaw_reset_req;
+		bool mag_yaw_reset_req = false;
 
-		const bool mag_enabled = (_control_status.flags.mag_hdg || _control_status.flags.mag_3D);
-
-		if (mag_enabled && (!mag_enabled_previously && !_control_status.flags.mag_aligned_in_flight)) {
-			mag_yaw_reset_req = true;
-		}
+		const bool mag_enabled = (_control_status.flags.mag_hdg || _control_status.flags.mag_3D_orientation);
 
 		// We need to reset the yaw angle after climbing away from the ground to enable
 		// recovery from ground level magnetic interference.
-		if (!_control_status.flags.mag_aligned_in_flight && _control_status.flags.in_air && isTerrainEstimateValid()) {
+		if (mag_enabled
+		    && _control_status.flags.in_air
+		    && !_control_status.flags.mag_aligned_in_flight
+		    && isTerrainEstimateValid()
+		   ) {
 			// Check if height has increased sufficiently to be away from ground magnetic anomalies
 			// and request a yaw reset if not already requested.
 			static constexpr float mag_anomalies_max_hagl = 1.5f;
 			mag_yaw_reset_req = (getTerrainVPos() - _state.pos(2)) > mag_anomalies_max_hagl;
 		}
 
-		// TODO:
-		//  - inhibit of effective mag heading is disturbed, although standalone mag bias estimation to re-enable (uninhibit)
+		if (mag_enabled && (!_control_status.flags.yaw_align || mag_yaw_reset_req)) {
 
-		// If the user has selected auto protection against indoor magnetic field errors, only use the magnetometer
-		// if a yaw angle relative to true North is required for navigation. If no GPS or other earth frame aiding
-		// is available, assume that we are operating indoors and the magnetometer should not be used.
-		// Also inhibit mag fusion when a strong magnetic field interference is detected or the user
-		// has explicitly stopped magnetometer use.
-		const bool user_selected = (_params.mag_fusion_type == MagFuseType::INDOOR);
+			const Vector3f mag_init_bias_corrected = _mag_lpf.getState() - _state.mag_B;
 
-		const bool heading_not_required_for_navigation = !_control_status.flags.gps
-				&& !_control_status.flags.ev_pos
-				&& !_control_status.flags.ev_vel;
+			if (!magFieldStrengthDisturbed(mag_init_bias_corrected)) {
+				resetMagHeading(mag_init_bias_corrected);
 
-		const bool should_inhibit_mag = (user_selected && heading_not_required_for_navigation) || _control_status.flags.mag_field_disturbed;
-
-		if (!_control_status.flags.yaw_align || mag_yaw_reset_req) {
-			if (!should_inhibit_mag) {
-				if (resetMagHeading()) {
-					_mag_yaw_reset_req = false;
-				}
+			} else if (!magFieldStrengthDisturbed(_mag_lpf.getState())) {
+				resetMagHeading(_mag_lpf.getState());
+				_state.mag_B.zero();
 			}
+		}
 
-		} else if (_control_status.flags.mag_3D) {
+
+		{
+			resetEstimatorAidStatus(_aid_src_mag);
+			_aid_src_mag.timestamp_sample = mag_sample.time_us;
+			_aid_src_mag.fusion_enabled = _control_status.flags.mag_3D_orientation;
+
+			// compute magnetometer innovations (for estimator_aid_src_mag logging)
+			//  rotate magnetometer earth field state into body frame
+			const Vector3f mag_observation = mag_sample.mag - _state.mag_B;
+			const Vector3f mag_I_body = _state.quat_nominal.rotateVectorInverse(_state.mag_I);
+			const Vector3f mag_innov = mag_I_body - mag_observation;
+
+			mag_observation.copyTo(_aid_src_mag.observation);
+			mag_innov.copyTo(_aid_src_mag.innovation);
+		}
+
+		if (_control_status.flags.yaw_align && isRecent(_time_last_mov_3d_mag_suitable, (uint64_t)2e6)) {
 
 			// if we are using 3-axis magnetometer fusion, but without external NE aiding,
 			// then the declination must be fused as an observation to prevent long term heading drift
@@ -199,8 +169,11 @@ void Ekf::controlMagFusion()
 
 			// For the first few seconds after in-flight alignment we allow the magnetic field state estimates to stabilise
 			// before they are used to constrain heading drift
-			const bool update_all_states = ((_imu_sample_delayed.time_us - _flt_mag_align_start_time) > (uint64_t)5e6)
-						       && !_control_status.flags.mag_fault && !_control_status.flags.mag_field_disturbed;
+			const bool update_all_states = _control_status.flags.mag_3D
+						       && (P(19, 19) < 0.001f) && (P(20, 20) < 0.001f) && (P(21, 21) < 0.001f)
+						       && _control_status.flags.mag_aligned_in_flight
+						       && !_control_status.flags.mag_fault
+						       && !magFieldStrengthDisturbed(mag_sample.mag - _state.mag_B);
 
 			if (!_mag_decl_cov_reset) {
 				// After any magnetic field covariance reset event the earth field state
@@ -220,30 +193,57 @@ void Ekf::controlMagFusion()
 				if (_control_status.flags.mag_dec) {
 					fuseDeclination(0.5f);
 				}
+
+				if (_control_status.flags.mag_fault && magFieldStrengthDisturbed(mag_sample.mag - _state.mag_B)) {
+
+					if ((P(16, 16) < sq(0.01f)) && (P(17, 17) < sq(0.01f)) && (P(18, 18) < sq(0.01f))
+					 && (P(19, 19) < sq(0.01f)) && (P(20, 20) < sq(0.01f)) && (P(21, 21) < sq(0.01f))
+					) {
+						if ((_aid_src_mag.test_ratio[0] < 0.1f)
+						&& (_aid_src_mag.test_ratio[1] < 0.1f)
+						&& (_aid_src_mag.test_ratio[2] < 0.1f)
+						) {
+							// clear mag fault
+							_control_status.flags.mag_fault = false;
+						}
+
+					}
+				}
 			}
-
-		} else if (_control_status.flags.mag_hdg) {
-			// Rotate the measurements into earth frame using the zero yaw angle
-			Dcmf R_to_earth = updateYawInRotMat(0.f, _R_to_earth);
-
-			Vector3f mag_earth_pred = R_to_earth * (mag_sample.mag - _state.mag_B);
-
-			// the angle of the projection onto the horizontal gives the yaw angle
-			// calculate the yaw innovation and wrap to the interval between +-pi
-			float measured_hdg = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + getMagDeclination();
-
-			float innovation = wrap_pi(getEulerYaw(_R_to_earth) - measured_hdg);
-			float obs_var = fmaxf(sq(_params.mag_heading_noise), 1.e-4f);
-
-			_aid_src_mag_heading.fusion_enabled = _control_status.flags.mag_hdg;
-
-			fuseYaw(innovation, obs_var, _aid_src_mag_heading);
 		}
 
 
-		// TODO: always update _aid_src_mag_heading, _aid_src_mag
-		// update_all_states check varianceor let always run
+		// mag heading
+		resetEstimatorAidStatus(_aid_src_mag_heading);
+		_aid_src_mag_heading.timestamp_sample = mag_sample.time_us;
+		_aid_src_mag_heading.fusion_enabled = _control_status.flags.mag_hdg;
 
+		// compute mag heading innovation (for estimator_aid_src_mag_heading logging)
+		const Vector3f mag_observation = mag_sample.mag - _state.mag_B;
+
+		// Rotate the measurements into earth frame using the zero yaw angle
+		const Dcmf R_to_earth = updateYawInRotMat(0.f, _R_to_earth);
+		const Vector3f mag_earth_pred = R_to_earth * mag_observation;
+
+		//  the angle of the projection onto the horizontal gives the yaw angle
+		//  calculate the yaw innovation and wrap to the interval between +-pi
+		float measured_hdg = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + getMagDeclination();
+		float innovation = wrap_pi(getEulerYaw(_R_to_earth) - measured_hdg);
+		float heading_obs_var = fmaxf(sq(_params.mag_heading_noise), sq(0.01f));
+
+		_control_status.flags.mag_field_disturbed = magFieldStrengthDisturbed(mag_observation);
+
+		_aid_src_mag_heading.observation = measured_hdg;
+		_aid_src_mag_heading.observation_variance = heading_obs_var;
+		_aid_src_mag_heading.innovation = innovation;
+
+		if (_control_status.flags.yaw_align
+		    && _control_status.flags.mag_hdg
+		    && !_control_status.flags.mag_fault
+		    && !_control_status.flags.mag_field_disturbed
+		   ) {
+			fuseYaw(innovation, heading_obs_var, _aid_src_mag_heading);
+		}
 	}
 }
 
@@ -309,58 +309,49 @@ bool Ekf::isMeasuredMatchingExpected(const float measured, const float expected,
 	       && (measured <= expected + gate);
 }
 
-bool Ekf::resetMagHeading()
+bool Ekf::resetMagHeading(const Vector3f &mag)
 {
-	// low pass filtered mag required
-	const Vector3f mag_init = _mag_lpf.getState();
+	ECL_INFO("reset mag heading resetting yaw");
 
-	const bool mag_lpf_available = (_mag_counter != 0) && isNewestSampleRecent(_time_last_mag_buffer_push, 500'000);
+	// rotate the magnetometer measurements into earth frame using a zero yaw angle
+	const Dcmf R_to_earth = updateYawInRotMat(0.f, _R_to_earth);
 
-	if (mag_lpf_available) {
-		ECL_INFO("reset mag heading resetting yaw");
+	// the angle of the projection onto the horizontal gives the yaw angle
+	const Vector3f mag_earth_pred = R_to_earth * mag;
 
-		// rotate the magnetometer measurements into earth frame using a zero yaw angle
-		const Dcmf R_to_earth = updateYawInRotMat(0.f, _R_to_earth);
+	// calculate the observed yaw angle and yaw variance
+	float yaw_new = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + getMagDeclination();
+	float yaw_new_variance = math::max(sq(_params.mag_heading_noise), sq(0.01f));
 
-		// the angle of the projection onto the horizontal gives the yaw angle
-		const Vector3f mag_earth_pred = R_to_earth * mag_init;
+	// update quaternion states and corresponding covarainces
+	resetQuatStateYaw(yaw_new, yaw_new_variance);
 
-		// calculate the observed yaw angle and yaw variance
-		float yaw_new = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + getMagDeclination();
-		float yaw_new_variance = sq(fmaxf(_params.mag_heading_noise, 1.e-2f));
+	// set the earth magnetic field states using the updated rotation
+	_state.mag_I = _R_to_earth * mag;
 
-		// update quaternion states and corresponding covarainces
-		resetQuatStateYaw(yaw_new, yaw_new_variance);
+	resetMagCov();
 
-		// set the earth magnetic field states using the updated rotation
-		_state.mag_I = _R_to_earth * mag_init;
-
-		resetMagCov();
-
-		// Handle the special case where we have not been constraining yaw drift or learning yaw bias due
-		// to assumed invalid mag field associated with indoor operation with a downwards looking flow sensor.
-		if (isTimedOut(_aid_src_mag_heading.time_last_fuse, 5e6)
-		    && isTimedOut(_aid_src_gnss_yaw.time_last_fuse, 5e6)
-		    && isTimedOut(_aid_src_ev_yaw.time_last_fuse, 5e6)
-		   ) {
-			// Zero the gyro yaw bias covariance and set the variance to the initial alignment uncertainty
-			P.uncorrelateCovarianceSetVariance<1>(12, sq(_params.switch_on_gyro_bias * _dt_ekf_avg));
-		}
-
-		_aid_src_mag_heading.time_last_fuse = _imu_sample_delayed.time_us;
-
-		_control_status.flags.yaw_align = true;
-
-		if (_control_status.flags.in_air) {
-			// record the time for the magnetic field alignment event
-			_flt_mag_align_start_time = _imu_sample_delayed.time_us;
-			_control_status.flags.mag_aligned_in_flight = true;
-		}
-
-		return true;
+	// Handle the special case where we have not been constraining yaw drift or learning yaw bias due
+	// to assumed invalid mag field associated with indoor operation with a downwards looking flow sensor.
+	if (isTimedOut(_aid_src_mag_heading.time_last_fuse, 5e6)
+	    && isTimedOut(_aid_src_mag.time_last_fuse, 5e6)
+	    && isTimedOut(_aid_src_gnss_yaw.time_last_fuse, 5e6)
+	    && isTimedOut(_aid_src_ev_yaw.time_last_fuse, 5e6)
+	   ) {
+		// Zero the gyro yaw bias covariance and set the variance to the initial alignment uncertainty
+		resetZDeltaAngBiasCov();
 	}
 
-	return false;
+	_aid_src_mag_heading.time_last_fuse = _imu_sample_delayed.time_us;
+
+	_control_status.flags.yaw_align = true;
+
+	if (_control_status.flags.in_air) {
+		// record the time for the magnetic field alignment event
+		_control_status.flags.mag_aligned_in_flight = true;
+	}
+
+	return true;
 }
 
 bool Ekf::resetMagStates()
@@ -415,12 +406,8 @@ bool Ekf::resetMagStates()
 		if (mag_available) {
 			if (_control_status.flags.in_air) {
 				// record the start time for the magnetic field alignment
-				_flt_mag_align_start_time = _imu_sample_delayed.time_us;
 				_control_status.flags.mag_aligned_in_flight = true;
 			}
-
-			// clear any pending resets
-			_mag_yaw_reset_req = false;
 		}
 
 		return true;

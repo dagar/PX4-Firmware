@@ -176,7 +176,6 @@ bool Ekf::isHeightResetRequired() const
 	return (continuous_bad_accel_hgt || hgt_fusion_timeout);
 }
 
-
 void Ekf::resetVerticalPositionTo(const float new_vert_pos, float new_vert_pos_var)
 {
 	const float old_vert_pos = _state.pos(2);
@@ -672,10 +671,6 @@ void Ekf::resetMagBiasAndYaw()
 	// reset any saved covariance data for re-use when auto-switching between heading and 3-axis fusion
 	_saved_mag_bf_variance.zero();
 
-	if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D) {
-		_mag_yaw_reset_req = true;
-	}
-
 	_control_status.flags.mag_fault = false;
 
 	_mag_counter = 0;
@@ -696,11 +691,12 @@ void Ekf::get_innovation_test_status(uint16_t &status, float &mag, float &vel, f
 	if (_control_status.flags.mag_hdg) {
 		mag = sqrtf(_aid_src_mag_heading.test_ratio);
 
-	} else if (_control_status.flags.mag_3D) {
+	} else if (_control_status.flags.mag_3D_orientation) {
 		mag = sqrtf(Vector3f(_aid_src_mag.test_ratio).max());
 
 	} else if (_control_status.flags.gps_yaw) {
 		mag = sqrtf(_aid_src_gnss_yaw.test_ratio);
+
 	} else {
 		mag = NAN;
 	}
@@ -796,7 +792,7 @@ void Ekf::get_ekf_soln_status(uint16_t *status) const
 			mag_innov_good = false;
 		}
 
-	} else if (_control_status.flags.mag_3D) {
+	} else if (_control_status.flags.mag_3D_orientation) {
 		if (Vector3f(_aid_src_mag.test_ratio).max() < 1.f) {
 			mag_innov_good = false;
 		}
@@ -1035,18 +1031,20 @@ void Ekf::initialiseQuatCovariances(Vector3f &rot_vec_var)
 
 void Ekf::stopMagFusion()
 {
-	stopMag3DFusion();
-	stopMagHdgFusion();
-	clearMagCov();
+	if (_control_status.flags.mag_3D_orientation || _control_status.flags.mag_hdg) {
+		stopMag3DFusion();
+		stopMagHdgFusion();
+		_mag_decl_cov_reset = false;
+	}
 }
 
 void Ekf::stopMag3DFusion()
 {
 	// save covariance data for re-use if currently doing 3-axis fusion
-	if (_control_status.flags.mag_3D) {
+	if (_control_status.flags.mag_3D_orientation) {
 		saveMagCovData();
 
-		_control_status.flags.mag_3D = false;
+		_control_status.flags.mag_3D_orientation = false;
 		_control_status.flags.mag_dec = false;
 
 		_fault_status.flags.bad_mag_x = false;
@@ -1077,13 +1075,12 @@ void Ekf::startMagHdgFusion()
 
 void Ekf::startMag3DFusion()
 {
-	if (!_control_status.flags.mag_3D) {
+	if (!_control_status.flags.mag_3D_orientation) {
 
 		stopMagHdgFusion();
 
-		zeroMagCov();
 		loadMagCovData();
-		_control_status.flags.mag_3D = true;
+		_control_status.flags.mag_3D_orientation = true;
 	}
 }
 

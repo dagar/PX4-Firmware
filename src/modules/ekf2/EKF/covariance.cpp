@@ -59,7 +59,7 @@ void Ekf::initialiseCovariance()
 
 	const float dt = _dt_ekf_avg;
 
-	resetQuatCov();
+	P.uncorrelateCovarianceSetVariance<4>(0, 0.0f);
 
 	// velocity
 	P(4,4) = sq(fmaxf(_params.gps_vel_noise, 0.01f));
@@ -90,7 +90,9 @@ void Ekf::initialiseCovariance()
 	_prev_dvel_bias_var(1) = P(14,14) = P(13,13);
 	_prev_dvel_bias_var(2) = P(15,15) = P(13,13);
 
-	resetMagCov();
+	// mag
+	P.uncorrelateCovarianceSetVariance<3>(16, sq(_params.mag_noise));
+	P.uncorrelateCovarianceSetVariance<3>(19, sq(_params.mag_noise));
 
 	// wind
 	P(22,22) = sq(_params.initial_wind_uncertainty);
@@ -160,23 +162,17 @@ void Ekf::predictCovariance()
 	}
 
 	// Don't continue to grow the earth field variances if they are becoming too large or we are not doing 3-axis fusion as this can make the covariance matrix badly conditioned
-	float mag_I_sig;
+	float mag_I_sig = 0.0f;
 
 	if (_control_status.flags.mag_3D && (P(16, 16) + P(17, 17) + P(18, 18)) < 0.1f) {
-		mag_I_sig = dt * math::constrain(_params.mage_p_noise, 0.0f, 1.0f);
-
-	} else {
-		mag_I_sig = 0.0f;
+		mag_I_sig = dt * math::constrain(_params.mage_p_noise, 0.f, 1.f);
 	}
 
 	// Don't continue to grow the body field variances if they is becoming too large or we are not doing 3-axis fusion as this can make the covariance matrix badly conditioned
-	float mag_B_sig;
+	float mag_B_sig = 0.0f;
 
 	if (_control_status.flags.mag_3D && (P(19, 19) + P(20, 20) + P(21, 21)) < 0.1f) {
-		mag_B_sig = dt * math::constrain(_params.magb_p_noise, 0.0f, 1.0f);
-
-	} else {
-		mag_B_sig = 0.0f;
+		mag_B_sig = dt * math::constrain(_params.magb_p_noise, 0.f, 1.f);
 	}
 
 	float wind_vel_nsd_scaled;
@@ -448,10 +444,7 @@ void Ekf::fixCovarianceErrors(bool force_symmetry)
 	}
 
 	// magnetic field states
-	if (!_control_status.flags.mag_3D) {
-		zeroMagCov();
-
-	} else {
+	if (_control_status.flags.mag_3D) {
 		// constrain variances
 		for (int i = 16; i <= 18; i++) {
 			P(i, i) = math::constrain(P(i, i), 0.0f, P_lim[5]);
@@ -467,6 +460,9 @@ void Ekf::fixCovarianceErrors(bool force_symmetry)
 			P.makeRowColSymmetric<3>(19);
 		}
 
+	} else {
+		P.uncorrelateCovarianceSetVariance<3>(16, 0.0f);
+		P.uncorrelateCovarianceSetVariance<3>(19, 0.0f);
 	}
 
 	// wind velocity states
@@ -502,15 +498,10 @@ bool Ekf::checkAndFixCovarianceUpdate(const SquareMatrix24f &KHP)
 	return healthy;
 }
 
-void Ekf::resetMagRelatedCovariances()
-{
-	resetQuatCov();
-	resetMagCov();
-}
-
 void Ekf::resetQuatCov()
 {
-	zeroQuatCov();
+	P.uncorrelateCovarianceSetVariance<2>(0, 0.0f);
+	P.uncorrelateCovarianceSetVariance<2>(2, 0.0f);
 
 	// define the initial angle uncertainty as variances for a rotation vector
 	Vector3f rot_vec_var;
@@ -519,17 +510,11 @@ void Ekf::resetQuatCov()
 	initialiseQuatCovariances(rot_vec_var);
 }
 
-void Ekf::zeroQuatCov()
-{
-	P.uncorrelateCovarianceSetVariance<2>(0, 0.0f);
-	P.uncorrelateCovarianceSetVariance<2>(2, 0.0f);
-}
-
 void Ekf::resetMagCov()
 {
 	// reset the corresponding rows and columns in the covariance matrix and
 	// set the variances on the magnetic field states to the measurement variance
-	clearMagCov();
+	_mag_decl_cov_reset = false;
 
 	P.uncorrelateCovarianceSetVariance<3>(16, sq(_params.mag_noise));
 	P.uncorrelateCovarianceSetVariance<3>(19, sq(_params.mag_noise));
@@ -540,18 +525,6 @@ void Ekf::resetMagCov()
 		// of this mode
 		saveMagCovData();
 	}
-}
-
-void Ekf::clearMagCov()
-{
-	zeroMagCov();
-	_mag_decl_cov_reset = false;
-}
-
-void Ekf::zeroMagCov()
-{
-	P.uncorrelateCovarianceSetVariance<3>(16, 0.0f);
-	P.uncorrelateCovarianceSetVariance<3>(19, 0.0f);
 }
 
 void Ekf::resetZDeltaAngBiasCov()

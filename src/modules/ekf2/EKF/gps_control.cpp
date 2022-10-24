@@ -158,7 +158,7 @@ void Ekf::controlGpsFusion()
 
 							ECL_WARN("GPS emergency yaw reset");
 
-							if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D) {
+							if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D_orientation) {
 								// stop using the magnetometer in the main EKF otherwise it's fusion could drag the yaw around
 								// and cause another navigation failure
 								_control_status.flags.mag_fault = true;

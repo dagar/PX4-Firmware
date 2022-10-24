@@ -86,17 +86,10 @@ bool Ekf::collect_gps(const gpsMessage &gps)
 
 		_earth_rate_NED = calcEarthRateNED((float)math::radians(_pos_ref.getProjectionReferenceLat()));
 
-		const bool declination_was_valid = PX4_ISFINITE(_mag_declination_gps);
-
 		// set the magnetic field data returned by the geo library using the current GPS position
 		_mag_declination_gps = get_mag_declination_radians(lat, lon);
 		_mag_inclination_gps = get_mag_inclination_radians(lat, lon);
 		_mag_strength_gps = get_mag_strength_gauss(lat, lon);
-
-		// request a reset of the yaw using the new declination
-		if (_control_status.flags.mag_hdg && !declination_was_valid) {
-			_mag_yaw_reset_req = true;
-		}
 
 		// save the horizontal and vertical position uncertainty of the origin
 		_gps_origin_eph = gps.eph;
@@ -109,8 +102,6 @@ bool Ekf::collect_gps(const gpsMessage &gps)
 		// a rough 2D fix is still sufficient to lookup declination
 		if ((gps.fix_type >= 2) && (gps.eph < 1000)) {
 
-			const bool declination_was_valid = PX4_ISFINITE(_mag_declination_gps);
-
 			// If we have good GPS data set the origin's WGS-84 position to the last gps fix
 			const double lat = gps.lat * 1.0e-7;
 			const double lon = gps.lon * 1.0e-7;
@@ -119,13 +110,6 @@ bool Ekf::collect_gps(const gpsMessage &gps)
 			_mag_declination_gps = get_mag_declination_radians(lat, lon);
 			_mag_inclination_gps = get_mag_inclination_radians(lat, lon);
 			_mag_strength_gps = get_mag_strength_gauss(lat, lon);
-
-			// request mag yaw reset if there's a mag declination for the first time
-			if (_control_status.flags.mag_hdg) {
-				if (!declination_was_valid && PX4_ISFINITE(_mag_declination_gps)) {
-					_mag_yaw_reset_req = true;
-				}
-			}
 
 			_earth_rate_NED = calcEarthRateNED((float)math::radians(lat));
 		}

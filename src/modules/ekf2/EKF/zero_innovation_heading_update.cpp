@@ -40,7 +40,7 @@
 
 void Ekf::controlZeroInnovationHeadingUpdate()
 {
-	const bool yaw_aiding = _control_status.flags.mag_hdg || _control_status.flags.mag_3D
+	const bool yaw_aiding = _control_status.flags.mag_hdg || _control_status.flags.mag_3D_orientation
 				|| _control_status.flags.ev_yaw || _control_status.flags.gps_yaw;
 
 	if (!_control_status.flags.tilt_align) {

@@ -106,7 +106,7 @@ TEST_F(EkfBasicsTest, initialControlMode)
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().gps);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().opt_flow);
 	EXPECT_EQ(1, (int) _ekf->control_status_flags().mag_hdg);
-	EXPECT_EQ(0, (int) _ekf->control_status_flags().mag_3D);
+	EXPECT_EQ(0, (int) _ekf->control_status_flags().mag_3D_orientation);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().mag_dec);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().in_air);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().wind);
@@ -160,7 +160,7 @@ TEST_F(EkfBasicsTest, gpsFusion)
 	EXPECT_EQ(1, (int) _ekf->control_status_flags().gps);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().opt_flow);
 	EXPECT_EQ(1, (int) _ekf->control_status_flags().mag_hdg);
-	EXPECT_EQ(0, (int) _ekf->control_status_flags().mag_3D);
+	EXPECT_EQ(0, (int) _ekf->control_status_flags().mag_3D_orientation);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().mag_dec);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().in_air);
 	EXPECT_EQ(0, (int) _ekf->control_status_flags().wind);

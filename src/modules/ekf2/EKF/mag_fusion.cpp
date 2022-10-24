@@ -75,7 +75,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 		_fault_status.flags.bad_mag_x = true;
 
 		// we need to re-initialise covariances and abort this fusion step
-		resetMagRelatedCovariances();
+		resetMagCov();
+		if (update_all_states) {
+			resetQuatCov();
+		}
 		ECL_ERR("magX %s", numerical_error_covariance_reset_string);
 		return false;
 	}
@@ -88,7 +91,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 		_fault_status.flags.bad_mag_y = true;
 
 		// we need to re-initialise covariances and abort this fusion step
-		resetMagRelatedCovariances();
+		resetMagCov();
+		if (update_all_states) {
+			resetQuatCov();
+		}
 		ECL_ERR("magY %s", numerical_error_covariance_reset_string);
 		return false;
 	}
@@ -100,7 +106,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 		_fault_status.flags.bad_mag_z = true;
 
 		// we need to re-initialise covariances and abort this fusion step
-		resetMagRelatedCovariances();
+		resetMagCov();
+		if (update_all_states) {
+			resetQuatCov();
+		}
 		ECL_ERR("magZ %s", numerical_error_covariance_reset_string);
 		return false;
 	}
@@ -159,7 +168,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 				_fault_status.flags.bad_mag_y = true;
 
 				// we need to re-initialise covariances and abort this fusion step
-				resetMagRelatedCovariances();
+				resetMagCov();
+				if (update_all_states) {
+					resetQuatCov();
+				}
 				ECL_ERR("magY %s", numerical_error_covariance_reset_string);
 				return false;
 			}
@@ -182,7 +194,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 				_fault_status.flags.bad_mag_z = true;
 
 				// we need to re-initialise covariances and abort this fusion step
-				resetMagRelatedCovariances();
+				resetMagCov();
+				if (update_all_states) {
+					resetQuatCov();
+				}
 				ECL_ERR("magZ %s", numerical_error_covariance_reset_string);
 				return false;
 			}

@@ -197,7 +197,7 @@ bool EkfWrapper::isIntendingMagHeadingFusion() const
 
 bool EkfWrapper::isIntendingMag3DFusion() const
 {
-	return _ekf->control_status_flags().mag_3D;
+	return _ekf->control_status_flags().mag_3D_orientation;
 }
 
 void EkfWrapper::setMagFuseTypeNone()
