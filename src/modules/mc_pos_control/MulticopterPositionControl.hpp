@@ -38,10 +38,10 @@
 #pragma once
 
 #include "PositionControl/PositionControl.hpp"
-#include "Takeoff/Takeoff.hpp"
 
 #include <drivers/drv_hrt.h>
 #include <lib/controllib/blocks.hpp>
+#include <lib/hysteresis/hysteresis.h>
 #include <lib/perf/perf_counter.h>
 #include <lib/slew_rate/SlewRateYaw.hpp>
 #include <lib/systemlib/mavlink_log.h>
@@ -57,6 +57,7 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/hover_thrust_estimate.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/takeoff_status.h>
 #include <uORB/topics/trajectory_setpoint.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_constraints.h>
@@ -87,8 +88,6 @@ public:
 
 private:
 	void Run() override;
-
-	TakeoffHandling _takeoff; /**< state machine and ramp to bring the vehicle off the ground without jumps */
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 
@@ -224,4 +223,19 @@ private:
 	 * This should only happen briefly when transitioning and never during mode operation or by design.
 	 */
 	trajectory_setpoint_s generateFailsafeSetpoint(const hrt_abstime &now, const PositionControlStates &states);
+
+
+	enum class TakeoffState {
+		disarmed = takeoff_status_s::TAKEOFF_STATE_DISARMED,
+		spoolup = takeoff_status_s::TAKEOFF_STATE_SPOOLUP,
+		ready_for_takeoff = takeoff_status_s::TAKEOFF_STATE_READY_FOR_TAKEOFF,
+		rampup = takeoff_status_s::TAKEOFF_STATE_RAMPUP,
+		flight = takeoff_status_s::TAKEOFF_STATE_FLIGHT
+	} _takeoff_state{TakeoffState::disarmed};
+
+	systemlib::Hysteresis _spoolup_time_hysteresis{false}; ///< becomes true COM_SPOOLUP_TIME seconds after the vehicle was armed
+
+	float _takeoff_ramp_time{0.f};
+	float _takeoff_ramp_vz_init{0.f}; ///< verticval velocity resulting in zero thrust
+	float _takeoff_ramp_progress{0.f}; ///< asecnding from 0 to 1
 };
