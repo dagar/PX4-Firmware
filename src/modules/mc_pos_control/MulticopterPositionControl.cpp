@@ -467,6 +467,13 @@ void MulticopterPositionControl::Run()
 				_vehicle_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
 			}
 
+			// Update the velocity constraint ramp value during takeoff.
+			// By ramping up _takeoff_ramp_vz during the takeoff and using it to constain the maximum climb rate a smooth takeoff behavior is achieved.
+			const float takeoff_desired_vz = PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up :
+							 _param_mpc_z_vel_max_up.get();
+
+			float upwards_velocity_limit = _takeoff_ramp_vz_init;
+
 			// handle smooth takeoff
 			_spoolup_time_hysteresis.set_state_and_update(_vehicle_control_mode.flag_armed,
 					vehicle_local_position.timestamp_sample);
@@ -485,6 +492,8 @@ void MulticopterPositionControl::Run()
 				if (_spoolup_time_hysteresis.get_state()) {
 					_takeoff_state = TakeoffState::ready_for_takeoff;
 
+					upwards_velocity_limit = _takeoff_ramp_vz_init;
+
 				} else {
 					break;
 				}
@@ -495,12 +504,26 @@ void MulticopterPositionControl::Run()
 					_takeoff_state = TakeoffState::rampup;
 					_takeoff_ramp_progress = 0.f;
 
+					upwards_velocity_limit = _takeoff_ramp_vz_init;
+
 				} else {
 					break;
 				}
 
 			// FALLTHROUGH
-			case TakeoffState::rampup:
+			case TakeoffState::rampup: {
+					if (_takeoff_ramp_time > dt) {
+						_takeoff_ramp_progress += dt / _takeoff_ramp_time;
+
+					} else {
+						_takeoff_ramp_progress = 1.f;
+					}
+
+					if (_takeoff_ramp_progress < 1.f) {
+						upwards_velocity_limit = _takeoff_ramp_vz_init + _takeoff_ramp_progress * (takeoff_desired_vz - _takeoff_ramp_vz_init);
+					}
+				}
+
 				if (_takeoff_ramp_progress >= 1.f) {
 					_takeoff_state = TakeoffState::flight;
 
@@ -552,30 +575,6 @@ void MulticopterPositionControl::Run()
 			const float tilt_limit_deg = (_takeoff_state < TakeoffState::flight)
 						     ? _param_mpc_tiltmax_lnd.get() : _param_mpc_tiltmax_air.get();
 			_control.setTiltLimit(_tilt_limit_slew_rate.update(math::radians(tilt_limit_deg), dt));
-
-			// Update the velocity constraint ramp value during takeoff.
-			// By ramping up _takeoff_ramp_vz during the takeoff and using it to constain the maximum climb rate a smooth takeoff behavior is achieved.
-			const float takeoff_desired_vz = PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up :
-							 _param_mpc_z_vel_max_up.get();
-
-			float upwards_velocity_limit = takeoff_desired_vz;
-
-			if (_takeoff_state < TakeoffState::rampup) {
-				upwards_velocity_limit = _takeoff_ramp_vz_init;
-			}
-
-			if (_takeoff_state == TakeoffState::rampup) {
-				if (_takeoff_ramp_time > dt) {
-					_takeoff_ramp_progress += dt / _takeoff_ramp_time;
-
-				} else {
-					_takeoff_ramp_progress = 1.f;
-				}
-
-				if (_takeoff_ramp_progress < 1.f) {
-					upwards_velocity_limit = _takeoff_ramp_vz_init + _takeoff_ramp_progress * (takeoff_desired_vz - _takeoff_ramp_vz_init);
-				}
-			}
 
 			const float speed_up = upwards_velocity_limit;
 			const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
