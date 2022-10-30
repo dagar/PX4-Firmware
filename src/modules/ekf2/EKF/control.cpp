@@ -86,20 +86,15 @@ void Ekf::controlFusionModes()
 	}
 
 	if (_gps_buffer) {
-		_gps_intermittent = !isNewestSampleRecent(_time_last_gps_buffer_push, 2 * GPS_MAX_INTERVAL);
-
 		// check for arrival of new sensor data at the fusion time horizon
-		_time_prev_gps_us = _gps_sample_delayed.time_us;
 		_gps_data_ready = _gps_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_gps_sample_delayed);
 
 		if (_gps_data_ready) {
 
 			// update GSF yaw estimator velocity (basic sanity check on GNSS velocity data)
-			if ((_gps_sample_delayed.fix_type >= 3)
+			if ((_gps_sample_delayed.fix_type >= 3) && _gps_sample_delayed.velocity.isAllFinite()
 			    && (_gps_sample_delayed.speed_accuracy > 0.f) && (_gps_sample_delayed.speed_accuracy < _params.req_sacc)
-			    && _gps_sample_delayed.velocity.isAllFinite()
 			   ) {
-
 				// correct velocity for offset relative to IMU
 				const Vector3f pos_offset_body = _params.gps_pos_body - _params.imu_pos_body;
 				const Vector3f vel_offset_body = _ang_rate_delayed_raw % pos_offset_body;
@@ -179,6 +174,7 @@ void Ekf::controlFusionModes()
 	// control use of observations for aiding
 	controlMagFusion();
 	controlOpticalFlowFusion();
+	controlGpsYawFusion();
 	controlGpsFusion();
 	controlAirDataFusion();
 	controlBetaFusion();
@@ -430,91 +426,6 @@ void Ekf::controlExternalVisionFusion()
 		stopEvFusion();
 		_warning_events.flags.vision_data_stopped = true;
 		ECL_WARN("vision data stopped");
-	}
-}
-
-void Ekf::controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passing, bool gps_checks_failing)
-{
-	if (!(_params.gnss_ctrl & GnssCtrl::YAW)
-	    || _control_status.flags.gps_yaw_fault) {
-
-		stopGpsYawFusion();
-		return;
-	}
-
-	const bool is_new_data_available = PX4_ISFINITE(gps_sample.yaw);
-
-	if (is_new_data_available) {
-
-		const bool continuing_conditions_passing = !gps_checks_failing;
-
-		const bool is_gps_yaw_data_intermittent = !isNewestSampleRecent(_time_last_gps_yaw_buffer_push, 2 * GPS_MAX_INTERVAL);
-
-		const bool starting_conditions_passing = continuing_conditions_passing
-				&& _control_status.flags.tilt_align
-				&& gps_checks_passing
-				&& !is_gps_yaw_data_intermittent
-				&& !_gps_intermittent;
-
-		if (_control_status.flags.gps_yaw) {
-
-			if (continuing_conditions_passing) {
-
-				fuseGpsYaw(gps_sample);
-
-				const bool is_fusion_failing = isTimedOut(_aid_src_gnss_yaw.time_last_fuse, _params.reset_timeout_max);
-
-				if (is_fusion_failing) {
-					if (_nb_gps_yaw_reset_available > 0) {
-						// Data seems good, attempt a reset
-						resetYawToGps(gps_sample.yaw, gps_sample.yaw_offset, gps_sample.yaw_accuracy);
-
-						if (_control_status.flags.in_air) {
-							_nb_gps_yaw_reset_available--;
-						}
-
-					} else if (starting_conditions_passing) {
-						// Data seems good, but previous reset did not fix the issue
-						// something else must be wrong, declare the sensor faulty and stop the fusion
-						_control_status.flags.gps_yaw_fault = true;
-						stopGpsYawFusion();
-
-					} else {
-						// A reset did not fix the issue but all the starting checks are not passing
-						// This could be a temporary issue, stop the fusion without declaring the sensor faulty
-						stopGpsYawFusion();
-					}
-
-					// TODO: should we give a new reset credit when the fusion does not fail for some time?
-				}
-
-			} else {
-				// Stop GPS yaw fusion but do not declare it faulty
-				stopGpsYawFusion();
-			}
-
-		} else {
-			if (starting_conditions_passing) {
-				// Try to activate GPS yaw fusion
-				startGpsYawFusion(gps_sample);
-
-				if (_control_status.flags.gps_yaw) {
-					_nb_gps_yaw_reset_available = 1;
-				}
-			}
-		}
-
-	} else if (_control_status.flags.gps_yaw && !isNewestSampleRecent(_time_last_gps_yaw_buffer_push, _params.reset_timeout_max)) {
-		// No yaw data in the message anymore. Stop until it comes back.
-		stopGpsYawFusion();
-	}
-
-	// Before takeoff, we do not want to continue to rely on the current heading
-	// if we had to stop the fusion
-	if (!_control_status.flags.in_air
-	    && !_control_status.flags.gps_yaw
-	    && _control_status_prev.flags.gps_yaw) {
-		_control_status.flags.yaw_align = false;
 	}
 }
 

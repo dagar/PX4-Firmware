@@ -37,36 +37,45 @@
  */
 
 #include "ekf.h"
-#include <mathlib/mathlib.h>
+
+#include <lib/mathlib/mathlib.h>
+#include <lib/world_magnetic_model/geo_mag_declination.h>
 
 void Ekf::controlGpsFusion()
 {
-	if (!((_params.gnss_ctrl & GnssCtrl::HPOS) || (_params.gnss_ctrl & GnssCtrl::VEL))) {
-		stopGpsFusion();
-		return;
-	}
+	_gps_hgt_b_est.predict(_dt_ekf_avg);
 
 	// Check for new GPS data that has fallen behind the fusion time horizon
 	if (_gps_data_ready) {
 
 		const gpsSample &gps_sample{_gps_sample_delayed};
 
-		// Only calculate the relative position if the WGS-84 location of the origin is set
-		collect_gps(gps_sample);
+		const bool gps_checks_passed = gps_is_good(gps_sample);
 
-		if (gps_sample.fix_type >= 3) {
-			controlGnssHeightFusion(gps_sample.time_us, gps_sample.altitude, gps_sample.vertical_accuracy, gps_sample.velocity(2), gps_sample.speed_accuracy);
+		if (!_NED_origin_initialised && gps_checks_passed) {
+
+			if (setGnssPositionOrigin(gps_sample) && setGnssAltitudeOrigin(gps_sample)) {
+				updateWorldMagneticField(gps_sample);
+				updateEarthRateNED(gps_sample);
+
+				_NED_origin_initialised = true;
+				_information_events.flags.gps_checks_passed = true;
+				ECL_INFO("GPS checks passed");
+			}
 
 		} else {
-			stopGpsHgtFusion();
+			if (!PX4_ISFINITE(_mag_declination_gps) || (!_gps_checks_passed && gps_checks_passed)) {
+				updateWorldMagneticField(gps_sample);
+			}
+
+			// calculate the earth rotation vector
+			updateEarthRateNED(gps_sample);
 		}
 
-		updateGpsYaw(gps_sample);
+		_gps_checks_passed = gps_checks_passed;
 
 		const bool gps_checks_passing = isTimedOut(_last_gps_fail_us, (uint64_t)5e6);
 		const bool gps_checks_failing = isTimedOut(_last_gps_pass_us, (uint64_t)5e6);
-
-		controlGpsYawFusion(gps_sample, gps_checks_passing, gps_checks_failing);
 
 		// GNSS velocity
 
@@ -102,12 +111,11 @@ void Ekf::controlGpsFusion()
 		const float pos_var = sq(pos_noise);
 		const Vector2f pos_obs_var(pos_var, pos_var);
 
+		// correct position for offset relative to IMU
+		const Vector3f pos_offset_earth = _R_to_earth * pos_offset_body;
 		Vector2f position{0.f, 0.f};
 
 		if (_pos_ref.isInitialized() && (gps_sample.fix_type >= 2)) {
-			// correct position and height for offset relative to IMU
-			const Vector3f pos_offset_earth = _R_to_earth * pos_offset_body;
-
 			position = _pos_ref.project(gps_sample.latitude, gps_sample.longitude) - pos_offset_earth.xy();
 		}
 
@@ -120,16 +128,32 @@ void Ekf::controlGpsFusion()
 						   && (gps_sample.fix_type >= 2)
 						   && _pos_ref.isInitialized();
 
+		// GNSS height
+		if (gps_sample.fix_type >= 3) {
+			// correct height for offset relative to IMU
+			const float gnss_altitude = gps_sample.altitude + pos_offset_earth(2);
+
+			// relax the upper observation noise limit which prevents bad GPS perturbing the estimate
+			const float gnss_altitude_noise = math::max(gps_sample.vertical_accuracy * 1.5f,
+							  _params.gps_pos_noise); // use 1.5 as a typical ratio of vacc/hacc
+
+			controlGnssHeightFusion(gps_sample.time_us, gnss_altitude, sq(gnss_altitude_noise), velocity(2), vel_obs_var(2));
+
+		} else {
+			stopGpsHgtFusion();
+		}
+
 		// Determine if we should use GPS aiding for velocity and horizontal position
 		// To start using GPS we need angular alignment completed, the local NED origin set and GPS data that has not failed checks recently
 		const bool mandatory_conditions_passing = ((_params.gnss_ctrl & GnssCtrl::HPOS) || (_params.gnss_ctrl & GnssCtrl::VEL))
-				&& (gps_sample.fix_type >= 2)
+				&& (gps_sample.fix_type >= 3)
 				&& _control_status.flags.tilt_align
 				&& _control_status.flags.yaw_align
 				&& _NED_origin_initialised;
 
 		const bool continuing_conditions_passing = mandatory_conditions_passing && !gps_checks_failing;
-		const bool starting_conditions_passing = continuing_conditions_passing && gps_checks_passing;
+
+		const bool starting_conditions_passing = continuing_conditions_passing && gps_checks_passed;
 
 		if (_control_status.flags.gps) {
 			if (mandatory_conditions_passing) {
@@ -227,19 +251,123 @@ void Ekf::controlGpsFusion()
 			}
 		}
 
-	} else if (_control_status.flags.gps && !isNewestSampleRecent(_time_last_gps_buffer_push, (uint64_t)10e6)) {
+		_time_prev_gps_us = gps_sample.time_us;
+
+	} else if (_control_status.flags.gps && isTimedOut(_time_prev_gps_us, (uint64_t)10e6)) {
 		stopGpsFusion();
 		_warning_events.flags.gps_data_stopped = true;
 		ECL_WARN("GPS data stopped");
 
-	}  else if (_control_status.flags.gps && !isNewestSampleRecent(_time_last_gps_buffer_push, (uint64_t)1e6)
-		    && isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
+	} else if (_control_status.flags.gps && isTimedOut(_time_prev_gps_us, 2 * GPS_MAX_INTERVAL)
+		   && isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
 
 		// Handle the case where we are fusing another position source along GPS,
 		// stop waiting for GPS after 1 s of lost signal
 		stopGpsFusion();
 		_warning_events.flags.gps_data_stopped_using_alternate = true;
 		ECL_WARN("GPS data stopped, using only EV, OF or air data");
+	}
+
+	if (isTimedOut(_time_prev_gps_us, 2 * GPS_MAX_INTERVAL)) {
+		stopGpsHgtFusion();
+	}
+}
+
+bool Ekf::setGnssPositionOrigin(const gpsSample &gps)
+{
+	if (gps.fix_type >= 2 && (gps.horizontal_accuracy < _params.req_hacc)) {
+
+		// If we have good GPS data set the origin's WGS-84 position to the last gps fix
+		if (_pos_ref.isInitialized()) {
+			ECL_INFO("updating GNSS origin LAT, LON (%.5f, %.5f) -> (%.5f, %.5f)",
+				_pos_ref.getProjectionReferenceLat(), _pos_ref.getProjectionReferenceLon(),
+				gps.latitude, gps.longitude);
+
+			_pos_ref.initReference(gps.latitude, gps.longitude, gps.time_us);
+
+		} else {
+			_pos_ref.initReference(gps.latitude, gps.longitude, gps.time_us);
+			ECL_INFO("initializing GNSS origin LAT: %.6f deg, LON: %.6f deg", _pos_ref.getProjectionReferenceLat(), _pos_ref.getProjectionReferenceLon());
+		}
+
+		// if we are already doing aiding, correct for the change in position since the EKF started navigating
+		if (isHorizontalAidingActive()) {
+			double est_lat;
+			double est_lon;
+			_pos_ref.reproject(-_state.pos(0), -_state.pos(1), est_lat, est_lon);
+			_pos_ref.initReference(est_lat, est_lon, gps.time_us);
+		}
+
+		// save the horizontal position uncertainty of the origin
+		_gps_origin_eph = gps.horizontal_accuracy;
+
+		return _pos_ref.isInitialized();
+	}
+
+	return false;
+}
+
+bool Ekf::setGnssAltitudeOrigin(const gpsSample &gps)
+{
+	if (gps.fix_type >= 3 && (gps.vertical_accuracy < _params.req_vacc)) {
+		// Take the current GPS height and subtract the filter height above origin to estimate the GPS height of the origin
+		const float gps_alt_ref = gps.altitude + _state.pos(2);
+
+		if (PX4_ISFINITE(_gps_alt_ref)) {
+			ECL_INFO("updating GNSS origin altitude %.3f m -> %.3f m", (double)_gps_alt_ref, (double)gps_alt_ref);
+
+		} else {
+			ECL_INFO("initializing GNSS origin altitude: %.3f m (accuracy: %.3f m)", (double)gps_alt_ref, (double)gps.vertical_accuracy);
+		}
+
+		_gps_alt_ref = gps_alt_ref;
+
+		// save the vertical position uncertainty of the origin
+		_gps_origin_epv = gps.vertical_accuracy;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Ekf::updateWorldMagneticField(const gpsSample &gps)
+{
+	if ((gps.fix_type >= 2) && (gps.horizontal_accuracy < 1000)) {
+
+		// set the magnetic field data returned by the geo library using the current GPS position
+		const float mag_declination_gps = get_mag_declination_radians(gps.latitude, gps.longitude);
+		const float mag_inclination_gps = get_mag_inclination_radians(gps.latitude, gps.longitude);
+		const float mag_strength_gps = get_mag_strength_gauss(gps.latitude, gps.longitude);
+
+		if ((fabsf(mag_declination_gps - _mag_declination_gps) > math::radians(1.f))
+		    || (fabsf(mag_inclination_gps - _mag_inclination_gps) > math::radians(1.f))
+		    || (fabsf(mag_strength_gps - _mag_strength_gps) > 0.1f)
+		   ) {
+			if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D) {
+				// request a reset of the yaw using the new declination
+				_mag_yaw_reset_req = true;
+			}
+		}
+
+		_mag_declination_gps = mag_declination_gps;
+		_mag_inclination_gps = mag_inclination_gps;
+		_mag_strength_gps = mag_strength_gps;
+	}
+
+	return false;
+}
+
+void Ekf::updateEarthRateNED(const gpsSample &gps)
+{
+	if ((gps.fix_type >= 2) && (gps.horizontal_accuracy < 1000)) {
+
+		// calculate the earth rotation vector from a given latitude
+		const double lat_rad = math::radians(gps.latitude);
+
+		_earth_rate_NED = Vector3f(static_cast<float>(CONSTANTS_EARTH_SPIN_RATE * cos(lat_rad)),
+					   0.f,
+					   static_cast<float>(-CONSTANTS_EARTH_SPIN_RATE * sin(lat_rad)));
 	}
 }
 

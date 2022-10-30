@@ -157,12 +157,43 @@ void EstimatorInterface::setGpsData(const gpsSample &gps)
 		_gps_buffer->push(gps_sample_new);
 		_time_last_gps_buffer_push = _newest_high_rate_imu_sample.time_us;
 
-		if (PX4_ISFINITE(gps.yaw)) {
-			_time_last_gps_yaw_buffer_push = _newest_high_rate_imu_sample.time_us;
-		}
-
 	} else {
 		ECL_WARN("GPS data too fast %" PRIi64 " < %" PRIu64 " + %d", time_us, _gps_buffer->get_newest().time_us, _min_obs_interval_us);
+	}
+}
+
+void EstimatorInterface::setGpsYawData(const gpsYawSample &gps_yaw)
+{
+	if (!_initialised || !PX4_ISFINITE(gps_yaw.yaw)) {
+		return;
+	}
+
+	// Allocate the required buffer size if not previously done
+	if (_gps_yaw_buffer == nullptr) {
+		_gps_yaw_buffer = new RingBuffer<gpsYawSample>(_obs_buffer_length);
+
+		if (_gps_yaw_buffer == nullptr || !_gps_yaw_buffer->valid()) {
+			delete _gps_yaw_buffer;
+			_gps_yaw_buffer = nullptr;
+			printBufferAllocationFailed("GPS yaw");
+			return;
+		}
+	}
+
+	const int64_t time_us = gps_yaw.time_us
+				- static_cast<int64_t>(_params.gps_delay_ms * 1000)
+				- static_cast<int64_t>(_dt_ekf_avg * 5e5f); // seconds to microseconds divided by 2
+
+	if (time_us >= static_cast<int64_t>(_gps_yaw_buffer->get_newest().time_us + _min_obs_interval_us)) {
+
+		gpsYawSample gps_yaw_sample_new{gps_yaw};
+		gps_yaw_sample_new.time_us = time_us;
+
+		_gps_yaw_buffer->push(gps_yaw_sample_new);
+		_time_last_gps_yaw_buffer_push = _newest_high_rate_imu_sample.time_us;
+
+	} else {
+		ECL_WARN("GPS yaw data too fast %" PRIi64 " < %" PRIu64 " + %d", time_us, _gps_yaw_buffer->get_newest().time_us, _min_obs_interval_us);
 	}
 }
 

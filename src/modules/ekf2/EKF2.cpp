@@ -1953,14 +1953,22 @@ void EKF2::UpdateGpsSample(ekf2_timestamps_s &ekf2_timestamps)
 			.speed_accuracy = vehicle_gps_position.s_variance_m_s,
 			.pdop = sqrtf(vehicle_gps_position.hdop *vehicle_gps_position.hdop
 				      + vehicle_gps_position.vdop * vehicle_gps_position.vdop),
-			.yaw = vehicle_gps_position.heading,
-			.yaw_offset = vehicle_gps_position.heading_offset,
-			.yaw_accuracy = vehicle_gps_position.heading_accuracy,
 			.fix_type = vehicle_gps_position.fix_type,
 			.nsats = vehicle_gps_position.satellites_used
 		};
 
 		_ekf.setGpsData(gps_msg);
+
+		if (PX4_ISFINITE(vehicle_gps_position.heading)) {
+			gpsYawSample gps_yaw{
+				.time_us = vehicle_gps_position.timestamp, // TODO: timestamp_sample
+				.yaw = vehicle_gps_position.heading,
+				.yaw_offset = vehicle_gps_position.heading_offset,
+				.yaw_accuracy = vehicle_gps_position.heading_accuracy,
+			};
+
+			_ekf.setGpsYawData(gps_yaw);
+		}
 
 		_gps_time_usec = gps_msg.time_us;
 		_gps_alttitude_ellipsoid = vehicle_gps_position.alt_ellipsoid;

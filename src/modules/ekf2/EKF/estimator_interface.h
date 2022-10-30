@@ -83,6 +83,7 @@ public:
 	void setMagData(const magSample &mag_sample);
 
 	void setGpsData(const gpsSample &gps);
+	void setGpsYawData(const gpsYawSample &gps_yaw);
 
 	void setBaroData(const baroSample &baro_sample);
 
@@ -213,7 +214,7 @@ public:
 	// At the next startup, set param.mag_declination_deg to the value saved
 	bool get_mag_decl_deg(float *val) const
 	{
-		if (_NED_origin_initialised && (_params.mag_declination_source & GeoDeclinationMask::SAVE_GEO_DECL)) {
+		if (PX4_ISFINITE(_mag_declination_gps) && (_params.mag_declination_source & GeoDeclinationMask::SAVE_GEO_DECL)) {
 			*val = math::degrees(_mag_declination_gps);
 			return true;
 
@@ -258,7 +259,7 @@ public:
 	const rangeSample &get_rng_sample_delayed() { return *(_range_sensor.getSampleAddress()); }
 	const extVisionSample &get_ev_sample_delayed() const { return _ev_sample_delayed; }
 
-	const bool &global_origin_valid() const { return _NED_origin_initialised; }
+	bool global_origin_valid() const { return _pos_ref.isInitialized(); }
 	const MapProjection &global_origin() const { return _pos_ref; }
 
 	void print_status();
@@ -358,6 +359,7 @@ protected:
 	RingBuffer<outputVert> _output_vert_buffer{12};
 
 	RingBuffer<gpsSample> *_gps_buffer{nullptr};
+	RingBuffer<gpsYawSample> *_gps_yaw_buffer{nullptr};
 	RingBuffer<magSample> *_mag_buffer{nullptr};
 	RingBuffer<baroSample> *_baro_buffer{nullptr};
 	RingBuffer<rangeSample> *_range_buffer{nullptr};

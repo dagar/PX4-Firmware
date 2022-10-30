@@ -95,9 +95,9 @@ px4_add_module(
 		EKF/fake_height_control.cpp
 		EKF/fake_pos_control.cpp
 		EKF/gnss_height_control.cpp
+		EKF/gnss_yaw_control.cpp
 		EKF/gps_checks.cpp
 		EKF/gps_control.cpp
-		EKF/gps_fusion.cpp
 		EKF/gps_yaw_fusion.cpp
 		EKF/height_control.cpp
 		EKF/imu_down_sampler.cpp

@@ -111,14 +111,14 @@ enum STATUS_BIT : uint8_t {
 
 // REPXY
 enum REPXY_BIT : uint8_t {
-	// high accurary preset nXY = 47, REPXY = 0x17 = 0b0001'0111
+	// high accuracy preset nXY = 47, REPXY = 0x17 = 0b0001'0111
 	XY_HA_SET   = Bit4 | Bit2 | Bit1 | Bit0,
 	XY_HA_CLEAR = Bit7 | Bit6 | Bit5 | Bit3,
 };
 
 // REPZ
 enum REPZ_BIT : uint8_t {
-	// high accurary preset nZ = 83, REPZ = 0x52 = 0b0101'0010
+	// high accuracy preset nZ = 83, REPZ = 0x52 = 0b0101'0010
 	Z_HA_SET   = Bit6 | Bit4 | Bit1,
 	Z_HA_CLEAR = Bit7 | Bit5 | Bit3 | Bit2 | Bit0,
 };

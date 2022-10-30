@@ -172,13 +172,15 @@ struct gpsSample {
 	float       vertical_accuracy{INFINITY};   ///< 1-std vertical position error (m)
 	float       speed_accuracy{INFINITY};      ///< 1-std speed error (m/sec)
 	float       pdop{INFINITY};                ///< position dilution of precision
+	uint8_t     fix_type{0};                   ///< 0-1: no fix, 2: 2D fix, 3: 3D fix, 4: RTCM code differential, 5: Real-Time Kinematic
+	uint8_t     nsats{0};                      ///< number of satellites used
+};
 
+struct gpsYawSample {
+	uint64_t    time_us{};                     ///< timestamp of the measurement (uSec)
 	float       yaw{NAN};                      ///< yaw angle. NaN if not set (used for dual antenna GPS), (rad, [-PI, PI])
 	float       yaw_offset{NAN};               ///< Heading/Yaw offset for dual antenna GPS - refer to description for GPS_YAW_OFFSET
 	float       yaw_accuracy{NAN};
-
-	uint8_t     fix_type{0};                   ///< 0-1: no fix, 2: 2D fix, 3: 3D fix, 4: RTCM code differential, 5: Real-Time Kinematic
-	uint8_t     nsats{0};                      ///< number of satellites used
 };
 
 struct magSample {

@@ -315,7 +315,7 @@ float Ekf::getMagDeclination()
 
 	} else if (_params.mag_declination_source & GeoDeclinationMask::USE_GEO_DECL) {
 		// use parameter value until GPS is available, then use value returned by geo library
-		if (_NED_origin_initialised || PX4_ISFINITE(_mag_declination_gps)) {
+		if (PX4_ISFINITE(_mag_declination_gps)) {
 			return _mag_declination_gps;
 
 		} else {
@@ -377,14 +377,6 @@ float Ekf::compensateBaroForDynamicPressure(const float baro_alt_uncompensated) 
 
 	// otherwise return the uncorrected baro measurement
 	return baro_alt_uncompensated;
-}
-
-// calculate the earth rotation vector
-Vector3f Ekf::calcEarthRateNED(float lat_rad) const
-{
-	return Vector3f(CONSTANTS_EARTH_SPIN_RATE * cosf(lat_rad),
-			0.0f,
-			-CONSTANTS_EARTH_SPIN_RATE * sinf(lat_rad));
 }
 
 void Ekf::getGpsVelPosInnov(float hvel[2], float &vvel, float hpos[2],  float &vpos) const
@@ -494,7 +486,7 @@ bool Ekf::getEkfGlobalOrigin(uint64_t &origin_time, double &latitude, double &lo
 	latitude = _pos_ref.getProjectionReferenceLat();
 	longitude = _pos_ref.getProjectionReferenceLon();
 	origin_alt  = getEkfGlobalOriginAltitude();
-	return _NED_origin_initialised;
+	return _pos_ref.isInitialized() && PX4_ISFINITE(_gps_alt_ref);
 }
 
 bool Ekf::setEkfGlobalOrigin(const double latitude, const double longitude, const float altitude)
@@ -1312,10 +1304,6 @@ void Ekf::stopGpsFusion()
 		_control_status.flags.gps = false;
 	}
 
-	if (_control_status.flags.gps_yaw) {
-		stopGpsYawFusion();
-	}
-
 	// We do not need to know the true North anymore
 	// EV yaw can start again
 	_inhibit_ev_yaw_use = false;
@@ -1336,28 +1324,6 @@ void Ekf::stopGpsVelFusion()
 	ECL_INFO("stopping GPS velocity fusion");
 
 	resetEstimatorAidStatus(_aid_src_gnss_vel);
-}
-
-void Ekf::startGpsYawFusion(const gpsSample &gps_sample)
-{
-	if (!_control_status.flags.gps_yaw && resetYawToGps(gps_sample.yaw, gps_sample.yaw_offset, gps_sample.yaw_accuracy)) {
-		ECL_INFO("starting GPS yaw fusion");
-		_control_status.flags.yaw_align = true;
-		_control_status.flags.mag_dec = false;
-		stopEvYawFusion();
-		stopMagHdgFusion();
-		stopMag3DFusion();
-		_control_status.flags.gps_yaw = true;
-	}
-}
-
-void Ekf::stopGpsYawFusion()
-{
-	if (_control_status.flags.gps_yaw) {
-		ECL_INFO("stopping GPS yaw fusion");
-		_control_status.flags.gps_yaw = false;
-		resetEstimatorAidStatus(_aid_src_gnss_yaw);
-	}
 }
 
 void Ekf::startEvPosFusion()

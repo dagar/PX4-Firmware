@@ -213,7 +213,12 @@ public:
 	matrix::SquareMatrix<float, 3> position_covariances() const { return P.slice<3, 3>(7, 7); }
 
 	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
-	bool collect_gps(const gpsSample &gps);
+	bool setGnssPositionOrigin(const gpsSample &gps);
+	bool setGnssAltitudeOrigin(const gpsSample &gps);
+	bool updateWorldMagneticField(const gpsSample &gps);
+
+	// calculate the earth rotation vector
+	void updateEarthRateNED(const gpsSample &gps);
 
 	// get the ekf WGS-84 origin position and height and the system time it was last set
 	// return true if the origin is valid
@@ -266,7 +271,7 @@ public:
 	// and have not started using synthetic position observations to constrain drift
 	bool global_position_is_valid() const
 	{
-		return (_NED_origin_initialised && local_position_is_valid());
+		return _pos_ref.isInitialized() && PX4_ISFINITE(_gps_alt_ref) && local_position_is_valid();
 	}
 
 	// return true if the local position estimate is valid
@@ -589,7 +594,7 @@ private:
 	uint64_t _last_gps_fail_us{0};		///< last system time in usec that the GPS failed it's checks
 	uint64_t _last_gps_pass_us{0};		///< last system time in usec that the GPS passed it's checks
 	float _gps_error_norm{1.0f};		///< normalised gps error
-	uint32_t _min_gps_health_time_us{10000000}; ///< GPS is marked as healthy only after this amount of time
+	uint32_t _min_gps_health_time_us{10'000'000}; ///< GPS is marked as healthy only after this amount of time
 	bool _gps_checks_passed{false};		///> true when all active GPS checks have passed
 
 	// Variables used to publish the WGS-84 location of the EKF local NED origin
@@ -633,7 +638,6 @@ private:
 
 	// height sensor status
 	bool _baro_hgt_faulty{false};		///< true if baro data have been declared faulty TODO: move to fault flags
-	bool _gps_intermittent{true};           ///< true if data into the buffer is intermittent
 
 	// imu fault status
 	uint64_t _time_bad_vert_accel{0};	///< last time a bad vertical accel was detected (uSec)
@@ -669,11 +673,11 @@ private:
 	bool fuseYaw(const float innovation, const float variance, estimator_aid_source1d_s &aid_src_status);
 
 	// fuse the yaw angle obtained from a dual antenna GPS unit
-	void fuseGpsYaw(const gpsSample &gps_sample);
+	void fuseGpsYaw(const uint64_t &time_us, const float gnss_yaw, const float yaw_offset, const float observation_variance);
 
 	// reset the quaternions states using the yaw angle obtained from a dual antenna GPS unit
 	// return true if the reset was successful
-	bool resetYawToGps(const float gnss_yaw, const float gnss_yaw_offset, const float gnss_yaw_accuracy);
+	bool resetYawToGps(const float gnss_yaw, const float gnss_yaw_offset, const float observation_variance);
 
 	// fuse magnetometer declination measurement
 	// argument passed in is the declination uncertainty in radians
@@ -735,8 +739,6 @@ private:
 	// 2d & 3d velocity fusion
 	void fuseVelocity(estimator_aid_source2d_s &vel_aid_src);
 	void fuseVelocity(estimator_aid_source3d_s &vel_aid_src);
-
-	void updateGpsYaw(const gpsSample &gps_sample);
 
 	// calculate optical flow body angular rate compensation
 	// returns false if bias corrected body rate data is unavailable
@@ -861,9 +863,6 @@ private:
 
 	float compensateBaroForDynamicPressure(float baro_alt_uncompensated) const;
 
-	// calculate the earth rotation vector from a given latitude
-	Vector3f calcEarthRateNED(float lat_rad) const;
-
 	// return true id the GPS quality is good enough to set an origin and start aiding
 	bool gps_is_good(const gpsSample &gps);
 
@@ -884,7 +883,7 @@ private:
 	bool hasHorizontalAidingTimedOut() const;
 	bool isYawFailure() const;
 
-	void controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passing, bool gps_checks_failing);
+	void controlGpsYawFusion();
 
 	// control fusion of magnetometer observations
 	void controlMagFusion();
@@ -941,7 +940,7 @@ private:
 	void controlHeightFusion();
 	void checkHeightSensorRefFallback();
 	void controlBaroHeightFusion();
-	void controlGnssHeightFusion(const uint64_t& time_us, const float gps_altitude, const float gps_vertical_accuracy, const float gps_vertical_speed, const float gps_vertical_speed_accuracy);
+	void controlGnssHeightFusion(const uint64_t &time_us, const float gps_altitude, const float gps_vertical_accuracy_var, const float gps_vertical_speed, const float gps_vertical_speed_var);
 	void controlRangeHeightFusion();
 	void controlEvHeightFusion(const extVisionSample &ev_sample);
 
@@ -1029,7 +1028,6 @@ private:
 	void stopGpsPosFusion();
 	void stopGpsVelFusion();
 
-	void startGpsYawFusion(const gpsSample &gps_sample);
 	void stopGpsYawFusion();
 
 	void startEvPosFusion();

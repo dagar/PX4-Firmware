@@ -53,7 +53,7 @@ void Ekf::controlZeroVelocityUpdate()
 
 			// Set a low variance initially for faster accel bias learning and higher
 			// later to let the states follow the measurements
-			const float obs_var = _NED_origin_initialised ? sq(0.2f) : sq(0.001f);
+			const float obs_var = _pos_ref.isInitialized() ? sq(0.2f) : sq(0.001f);
 			Vector3f innov_var{
 				P(4, 4) + obs_var,
 				P(5, 5) + obs_var,

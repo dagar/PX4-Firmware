@@ -123,6 +123,7 @@ public:
 	Baro        _baro;
 	Flow        _flow;
 	Gps         _gps;
+	GpsYaw      _gps_yaw;
 	Imu         _imu;
 	Mag         _mag;
 	RangeFinder _rng;

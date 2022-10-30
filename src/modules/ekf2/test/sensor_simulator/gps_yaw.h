@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2021-2022 PX4. All rights reserved.
+ *   Copyright (c) 2019-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,36 +32,47 @@
  ****************************************************************************/
 
 /**
- * @file gps_fusion.cpp
- * Function for fusing gps measurements
+ * Feeds Ekf with Gps yaw data
  */
+#ifndef EKF_GPS_YAW_H
+#define EKF_GPS_YAW_H
 
-/* #include <mathlib/mathlib.h> */
-#include "ekf.h"
+#include "sensor.h"
 
-void Ekf::updateGpsYaw(const gpsSample &gps_sample)
+namespace sensor_simulator
 {
-	auto &gps_yaw = _aid_src_gnss_yaw;
-	resetEstimatorAidStatus(gps_yaw);
+namespace sensor
+{
 
-	if (PX4_ISFINITE(gps_sample.yaw)) {
-		// initially populate for estimator_aid_src_gnss_yaw logging
+class GpsYaw: public Sensor
+{
+public:
+	GpsYaw(std::shared_ptr<Ekf> ekf);
+	~GpsYaw();
 
-		// calculate the observed yaw angle of antenna array, converting a from body to antenna yaw measurement
-		float gps_yaw_offset = PX4_ISFINITE(gps_sample.yaw_offset) ? gps_sample.yaw_offset : 0.f;
-		const float measured_hdg = wrap_pi(gps_sample.yaw + gps_yaw_offset);
+	void setData(const gpsYawSample &gps);
+	void stepHeightByMeters(const float hgt_change);
+	void stepHorizontalPositionByMeters(const Vector2f hpos_change);
+	void setPositionRateNED(const Vector3f &rate);
 
-		gps_yaw.observation = measured_hdg;
-		gps_yaw.observation_variance = sq(fmaxf(_params.gps_heading_noise, 1.0e-2f));
+	void setLatitude(const double lat);
+	void setLongitude(const double lon);
+	void setAltitude(const float alt);
 
-		// define the predicted antenna array vector and rotate into earth frame
-		const Vector3f ant_vec_bf = {cosf(gps_yaw_offset), sinf(gps_yaw_offset), 0.0f};
-		const Vector3f ant_vec_ef = _R_to_earth * ant_vec_bf;
-		const float predicted_hdg = atan2f(ant_vec_ef(1), ant_vec_ef(0));
-		gps_yaw.innovation = wrap_pi(predicted_hdg - gps_yaw.observation);
+	void setVelocity(const Vector3f &vel);
 
-		gps_yaw.fusion_enabled = _control_status.flags.gps_yaw;
+	void setYaw(const float yaw) { _gps_yaw_data.yaw = yaw; }
+	void setYawOffset(const float yaw) { _gps_yaw_data.yaw_offset = yaw_offset; }
 
-		gps_yaw.timestamp_sample = gps_sample.time_us;
-	}
-}
+	gpsYawSample getDefaultGpsData();
+
+private:
+	void send(uint64_t time) override;
+
+	gpsYawSample _gps_yaw_data{};
+	Vector3f _gps_pos_rate{};
+};
+
+} // namespace sensor
+} // namespace sensor_simulator
+#endif // EKF_GPS_YAW_H
