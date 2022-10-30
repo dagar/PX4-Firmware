@@ -38,7 +38,8 @@
 
 #include "ekf.h"
 
-void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
+void Ekf::controlGnssHeightFusion(const uint64_t &time_us, const float gps_altitude, const float gps_vertical_accuracy,
+				  const float gps_vertical_speed, const float gps_speed_accuracy)
 {
 	static constexpr const char *HGT_SRC_NAME = "GNSS";
 
@@ -50,7 +51,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 	if (_gps_data_ready) {
 
 		// relax the upper observation noise limit which prevents bad GPS perturbing the position estimate
-		float noise = math::max(gps_sample.vacc, 1.5f * _params.gps_pos_noise); // use 1.5 as a typical ratio of vacc/hacc
+		float noise = math::max(gps_vertical_accuracy * 1.5f, _params.gps_pos_noise); // use 1.5 as a typical ratio of vacc/hacc
 
 		if (!isOnlyActiveSourceOfVerticalPositionAiding(_control_status.flags.gps_hgt)) {
 			// if we are not using another source of aiding, then we are reliant on the GPS
@@ -60,7 +61,12 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 			}
 		}
 
-		const float measurement = gps_sample.hgt - getEkfGlobalOriginAltitude();
+		// correct position and height for offset relative to IMU
+		const Vector3f pos_offset_body = _params.gps_pos_body - _params.imu_pos_body;
+		const Vector3f pos_offset_earth = _R_to_earth * pos_offset_body;
+		float gps_height = gps_altitude + pos_offset_earth(2);
+
+		const float measurement = gps_height - getEkfGlobalOriginAltitude();
 		const float measurement_var = sq(noise);
 
 		const float innov_gate = math::max(_params.gps_pos_innov_gate, 1.f);
@@ -68,7 +74,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 		const bool measurement_valid = PX4_ISFINITE(measurement) && PX4_ISFINITE(measurement_var);
 
 		// GNSS position, vertical position GNSS measurement has opposite sign to earth z axis
-		updateVerticalPositionAidSrcStatus(gps_sample.time_us,
+		updateVerticalPositionAidSrcStatus(time_us,
 						   -(measurement - bias_est.getBias()),
 						   measurement_var + bias_est.getBiasVar(),
 						   innov_gate,
@@ -115,9 +121,9 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 					bias_est.setBias(_state.pos(2) + measurement);
 
 					// reset vertical velocity
-					if (PX4_ISFINITE(gps_sample.vel(2)) && (_params.gnss_ctrl & GnssCtrl::VEL)) {
+					if (PX4_ISFINITE(gps_vertical_speed) && (_params.gnss_ctrl & GnssCtrl::VEL)) {
 						// use 1.5 as a typical ratio of vacc/hacc
-						resetVerticalVelocityTo(gps_sample.vel(2), sq(math::max(1.5f * gps_sample.sacc, _params.gps_vel_noise)));
+						resetVerticalVelocityTo(gps_vertical_speed, sq(math::max(1.5f * gps_speed_accuracy, _params.gps_vel_noise)));
 
 					} else {
 						resetVerticalVelocityToZero();

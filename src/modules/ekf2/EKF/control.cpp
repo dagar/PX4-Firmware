@@ -93,22 +93,21 @@ void Ekf::controlFusionModes()
 		_gps_data_ready = _gps_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_gps_sample_delayed);
 
 		if (_gps_data_ready) {
-			// correct velocity for offset relative to IMU
-			const Vector3f pos_offset_body = _params.gps_pos_body - _params.imu_pos_body;
-			const Vector3f vel_offset_body = _ang_rate_delayed_raw % pos_offset_body;
-			const Vector3f vel_offset_earth = _R_to_earth * vel_offset_body;
-			_gps_sample_delayed.vel -= vel_offset_earth;
-
-			// correct position and height for offset relative to IMU
-			const Vector3f pos_offset_earth = _R_to_earth * pos_offset_body;
-			_gps_sample_delayed.pos -= pos_offset_earth.xy();
-			_gps_sample_delayed.hgt += pos_offset_earth(2);
 
 			// update GSF yaw estimator velocity (basic sanity check on GNSS velocity data)
-			if ((_gps_sample_delayed.sacc > 0.f) && (_gps_sample_delayed.sacc < _params.req_sacc)
-			    && _gps_speed_valid && _gps_sample_delayed.vel.isAllFinite()
+			if ((_gps_sample_delayed.fix_type >= 3)
+			    && (_gps_sample_delayed.speed_accuracy > 0.f) && (_gps_sample_delayed.speed_accuracy < _params.req_sacc)
+			    && _gps_sample_delayed.velocity.isAllFinite()
 			   ) {
-				_yawEstimator.setVelocity(_gps_sample_delayed.vel.xy(), math::max(_gps_sample_delayed.sacc, _params.gps_vel_noise));
+
+				// correct velocity for offset relative to IMU
+				const Vector3f pos_offset_body = _params.gps_pos_body - _params.imu_pos_body;
+				const Vector3f vel_offset_body = _ang_rate_delayed_raw % pos_offset_body;
+				const Vector3f vel_offset_earth = _R_to_earth * vel_offset_body;
+
+				Vector3f velocity = _gps_sample_delayed.velocity - vel_offset_earth;
+
+				_yawEstimator.setVelocity(velocity.xy(), math::max(_gps_sample_delayed.speed_accuracy, _params.gps_vel_noise));
 			}
 		}
 	}
@@ -468,7 +467,7 @@ void Ekf::controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passi
 				if (is_fusion_failing) {
 					if (_nb_gps_yaw_reset_available > 0) {
 						// Data seems good, attempt a reset
-						resetYawToGps(gps_sample.yaw);
+						resetYawToGps(gps_sample.yaw, gps_sample.yaw_offset, gps_sample.yaw_accuracy);
 
 						if (_control_status.flags.in_air) {
 							_nb_gps_yaw_reset_available--;

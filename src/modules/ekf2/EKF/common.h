@@ -139,24 +139,6 @@ enum SensorFusionMask : uint16_t {
 	USE_EXT_VIS_VEL  = (1<<8),      ///< set to true to use external vision velocity data
 };
 
-struct gpsMessage {
-	uint64_t    time_usec{};
-	int32_t     lat{};              ///< Latitude in 1E-7 degrees
-	int32_t     lon{};              ///< Longitude in 1E-7 degrees
-	int32_t     alt{};              ///< Altitude in 1E-3 meters (millimeters) above MSL
-	float       yaw{};              ///< yaw angle. NaN if not set (used for dual antenna GPS), (rad, [-PI, PI])
-	float       yaw_offset{};       ///< Heading/Yaw offset for dual antenna GPS - refer to description for GPS_YAW_OFFSET
-	uint8_t     fix_type{};         ///< 0-1: no fix, 2: 2D fix, 3: 3D fix, 4: RTCM code differential, 5: Real-Time Kinematic
-	float       eph{};              ///< GPS horizontal position accuracy in m
-	float       epv{};              ///< GPS vertical position accuracy in m
-	float       sacc{};             ///< GPS speed accuracy in m/s
-	float       vel_m_s{};          ///< GPS ground speed (m/sec)
-	Vector3f    vel_ned{};          ///< GPS ground speed NED
-	bool        vel_ned_valid{};    ///< GPS ground speed is valid
-	uint8_t     nsats{};            ///< number of satellites used
-	float       pdop{};             ///< position dilution of precision
-};
-
 struct outputSample {
 	uint64_t    time_us{};          ///< timestamp of the measurement (uSec)
 	Quatf       quat_nominal{};     ///< nominal quaternion describing vehicle attitude
@@ -181,14 +163,22 @@ struct imuSample {
 };
 
 struct gpsSample {
-	uint64_t    time_us{};  ///< timestamp of the measurement (uSec)
-	Vector2f    pos{};      ///< NE earth frame gps horizontal position measurement (m)
-	float       hgt{};      ///< gps height measurement (m)
-	Vector3f    vel{};      ///< NED earth frame gps velocity measurement (m/sec)
-	float       yaw{};      ///< yaw angle. NaN if not set (used for dual antenna GPS), (rad, [-PI, PI])
-	float       hacc{};     ///< 1-std horizontal position error (m)
-	float       vacc{};     ///< 1-std vertical position error (m)
-	float       sacc{};     ///< 1-std speed error (m/sec)
+	uint64_t    time_us{};                     ///< timestamp of the measurement (uSec)
+	double      latitude{};                    ///< Latitude in degrees
+	double      longitude{};                   ///< Longitude in degrees
+	float       altitude{};                    ///< Altitude in 1E-3 meters (millimeters) above MSL
+	Vector3f    velocity{};                    ///< NED earth frame gps velocity measurement (m/sec)
+	float       horizontal_accuracy{INFINITY}; ///< 1-std horizontal position error (m)
+	float       vertical_accuracy{INFINITY};   ///< 1-std vertical position error (m)
+	float       speed_accuracy{INFINITY};      ///< 1-std speed error (m/sec)
+	float       pdop{INFINITY};                ///< position dilution of precision
+
+	float       yaw{NAN};                      ///< yaw angle. NaN if not set (used for dual antenna GPS), (rad, [-PI, PI])
+	float       yaw_offset{NAN};               ///< Heading/Yaw offset for dual antenna GPS - refer to description for GPS_YAW_OFFSET
+	float       yaw_accuracy{NAN};
+
+	uint8_t     fix_type{0};                   ///< 0-1: no fix, 2: 2D fix, 3: 3D fix, 4: RTCM code differential, 5: Real-Time Kinematic
+	uint8_t     nsats{0};                      ///< number of satellites used
 };
 
 struct magSample {

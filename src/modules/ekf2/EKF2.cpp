@@ -1934,31 +1934,35 @@ void EKF2::UpdateGpsSample(ekf2_timestamps_s &ekf2_timestamps)
 			perf_count(_msg_missed_gps_perf);
 		}
 
-		gpsMessage gps_msg{
-			.time_usec = vehicle_gps_position.timestamp,
-			.lat = vehicle_gps_position.lat,
-			.lon = vehicle_gps_position.lon,
-			.alt = vehicle_gps_position.alt,
-			.yaw = vehicle_gps_position.heading,
-			.yaw_offset = vehicle_gps_position.heading_offset,
-			.fix_type = vehicle_gps_position.fix_type,
-			.eph = vehicle_gps_position.eph,
-			.epv = vehicle_gps_position.epv,
-			.sacc = vehicle_gps_position.s_variance_m_s,
-			.vel_m_s = vehicle_gps_position.vel_m_s,
-			.vel_ned = Vector3f{
-				vehicle_gps_position.vel_n_m_s,
-				vehicle_gps_position.vel_e_m_s,
-				vehicle_gps_position.vel_d_m_s
-			},
-			.vel_ned_valid = vehicle_gps_position.vel_ned_valid,
-			.nsats = vehicle_gps_position.satellites_used,
+		Vector3f gps_vel{vehicle_gps_position.vel_n_m_s,
+				 vehicle_gps_position.vel_e_m_s,
+				 vehicle_gps_position.vel_d_m_s};
+
+		if (!vehicle_gps_position.vel_ned_valid) {
+			gps_vel = Vector3f{NAN, NAN, NAN};
+		}
+
+		gpsSample gps_msg{
+			.time_us = vehicle_gps_position.timestamp, // TODO: timestamp_sample
+			.latitude = vehicle_gps_position.lat * 1.e-7,
+			.longitude = vehicle_gps_position.lon * 1.e-7,
+			.altitude = vehicle_gps_position.alt * 1e-3f,
+			.velocity = gps_vel,
+			.horizontal_accuracy = vehicle_gps_position.eph,
+			.vertical_accuracy = vehicle_gps_position.epv,
+			.speed_accuracy = vehicle_gps_position.s_variance_m_s,
 			.pdop = sqrtf(vehicle_gps_position.hdop *vehicle_gps_position.hdop
 				      + vehicle_gps_position.vdop * vehicle_gps_position.vdop),
+			.yaw = vehicle_gps_position.heading,
+			.yaw_offset = vehicle_gps_position.heading_offset,
+			.yaw_accuracy = vehicle_gps_position.heading_accuracy,
+			.fix_type = vehicle_gps_position.fix_type,
+			.nsats = vehicle_gps_position.satellites_used
 		};
+
 		_ekf.setGpsData(gps_msg);
 
-		_gps_time_usec = gps_msg.time_usec;
+		_gps_time_usec = gps_msg.time_us;
 		_gps_alttitude_ellipsoid = vehicle_gps_position.alt_ellipsoid;
 	}
 }

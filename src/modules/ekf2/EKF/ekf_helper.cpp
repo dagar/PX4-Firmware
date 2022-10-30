@@ -1340,7 +1340,7 @@ void Ekf::stopGpsVelFusion()
 
 void Ekf::startGpsYawFusion(const gpsSample &gps_sample)
 {
-	if (!_control_status.flags.gps_yaw && resetYawToGps(gps_sample.yaw)) {
+	if (!_control_status.flags.gps_yaw && resetYawToGps(gps_sample.yaw, gps_sample.yaw_offset, gps_sample.yaw_accuracy)) {
 		ECL_INFO("starting GPS yaw fusion");
 		_control_status.flags.yaw_align = true;
 		_control_status.flags.mag_dec = false;

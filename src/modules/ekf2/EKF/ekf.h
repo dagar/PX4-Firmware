@@ -213,7 +213,7 @@ public:
 	matrix::SquareMatrix<float, 3> position_covariances() const { return P.slice<3, 3>(7, 7); }
 
 	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
-	bool collect_gps(const gpsMessage &gps) override;
+	bool collect_gps(const gpsSample &gps);
 
 	// get the ekf WGS-84 origin position and height and the system time it was last set
 	// return true if the origin is valid
@@ -673,7 +673,7 @@ private:
 
 	// reset the quaternions states using the yaw angle obtained from a dual antenna GPS unit
 	// return true if the reset was successful
-	bool resetYawToGps(const float gnss_yaw);
+	bool resetYawToGps(const float gnss_yaw, const float gnss_yaw_offset, const float gnss_yaw_accuracy);
 
 	// fuse magnetometer declination measurement
 	// argument passed in is the declination uncertainty in radians
@@ -865,7 +865,7 @@ private:
 	Vector3f calcEarthRateNED(float lat_rad) const;
 
 	// return true id the GPS quality is good enough to set an origin and start aiding
-	bool gps_is_good(const gpsMessage &gps);
+	bool gps_is_good(const gpsSample &gps);
 
 	// Control the filter fusion modes
 	void controlFusionModes();
@@ -941,7 +941,7 @@ private:
 	void controlHeightFusion();
 	void checkHeightSensorRefFallback();
 	void controlBaroHeightFusion();
-	void controlGnssHeightFusion(const gpsSample &gps_sample);
+	void controlGnssHeightFusion(const uint64_t& time_us, const float gps_altitude, const float gps_vertical_accuracy, const float gps_vertical_speed, const float gps_vertical_speed_accuracy);
 	void controlRangeHeightFusion();
 	void controlEvHeightFusion(const extVisionSample &ev_sample);
 

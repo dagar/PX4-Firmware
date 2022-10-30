@@ -51,6 +51,16 @@ void Ekf::controlGpsFusion()
 
 		const gpsSample &gps_sample{_gps_sample_delayed};
 
+		// Only calculate the relative position if the WGS-84 location of the origin is set
+		collect_gps(gps_sample);
+
+		if (gps_sample.fix_type >= 3) {
+			controlGnssHeightFusion(gps_sample.time_us, gps_sample.altitude, gps_sample.vertical_accuracy, gps_sample.velocity(2), gps_sample.speed_accuracy);
+
+		} else {
+			stopGpsHgtFusion();
+		}
+
 		updateGpsYaw(gps_sample);
 
 		const bool gps_checks_passing = isTimedOut(_last_gps_fail_us, (uint64_t)5e6);
@@ -59,18 +69,27 @@ void Ekf::controlGpsFusion()
 		controlGpsYawFusion(gps_sample, gps_checks_passing, gps_checks_failing);
 
 		// GNSS velocity
-		const float vel_var = sq(math::max(gps_sample.sacc, _params.gps_vel_noise));
+
+		// correct velocity for offset relative to IMU
+		const Vector3f pos_offset_body = _params.gps_pos_body - _params.imu_pos_body;
+		const Vector3f vel_offset_body = _ang_rate_delayed_raw % pos_offset_body;
+		const Vector3f vel_offset_earth = _R_to_earth * vel_offset_body;
+
+		const Vector3f velocity = gps_sample.velocity - vel_offset_earth;
+		const float vel_var = sq(math::max(gps_sample.speed_accuracy, _params.gps_vel_noise));
 		const Vector3f vel_obs_var(vel_var, vel_var, vel_var * sq(1.5f));
 		updateVelocityAidSrcStatus(gps_sample.time_us,
-					   gps_sample.vel,                                             // observation
+					   velocity,                                             // observation
 					   vel_obs_var,                                                // observation variance
 					   math::max(_params.gps_vel_innov_gate, 1.f),                 // innovation gate
 					   _aid_src_gnss_vel);
-		_aid_src_gnss_vel.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::VEL);
+		_aid_src_gnss_vel.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::VEL)
+						   && (gps_sample.fix_type >= 3)
+						   && gps_sample.velocity.isAllFinite();
 
 		// GNSS position
 		// relax the upper observation noise limit which prevents bad GPS perturbing the position estimate
-		float pos_noise = math::max(gps_sample.hacc, _params.gps_pos_noise);
+		float pos_noise = math::max(gps_sample.horizontal_accuracy, _params.gps_pos_noise);
 
 		if (!isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
 			// if we are not using another source of aiding, then we are reliant on the GPS
@@ -82,16 +101,29 @@ void Ekf::controlGpsFusion()
 
 		const float pos_var = sq(pos_noise);
 		const Vector2f pos_obs_var(pos_var, pos_var);
+
+		Vector2f position{0.f, 0.f};
+
+		if (_pos_ref.isInitialized() && (gps_sample.fix_type >= 2)) {
+			// correct position and height for offset relative to IMU
+			const Vector3f pos_offset_earth = _R_to_earth * pos_offset_body;
+
+			position = _pos_ref.project(gps_sample.latitude, gps_sample.longitude) - pos_offset_earth.xy();
+		}
+
 		updateHorizontalPositionAidSrcStatus(gps_sample.time_us,
-						     gps_sample.pos,                             // observation
+						     position,                                   // observation
 						     pos_obs_var,                                // observation variance
 						     math::max(_params.gps_pos_innov_gate, 1.f), // innovation gate
 						     _aid_src_gnss_pos);
-		_aid_src_gnss_pos.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::HPOS);
+		_aid_src_gnss_pos.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::HPOS)
+						   && (gps_sample.fix_type >= 2)
+						   && _pos_ref.isInitialized();
 
 		// Determine if we should use GPS aiding for velocity and horizontal position
 		// To start using GPS we need angular alignment completed, the local NED origin set and GPS data that has not failed checks recently
 		const bool mandatory_conditions_passing = ((_params.gnss_ctrl & GnssCtrl::HPOS) || (_params.gnss_ctrl & GnssCtrl::VEL))
+				&& (gps_sample.fix_type >= 2)
 				&& _control_status.flags.tilt_align
 				&& _control_status.flags.yaw_align
 				&& _NED_origin_initialised;
@@ -129,8 +161,8 @@ void Ekf::controlGpsFusion()
 						ECL_WARN("GPS fusion timeout, resetting velocity and position");
 						_information_events.flags.reset_vel_to_gps = true;
 						_information_events.flags.reset_pos_to_gps = true;
-						resetVelocityTo(gps_sample.vel, vel_obs_var);
-						resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+						resetVelocityTo(velocity, vel_obs_var);
+						resetHorizontalPositionTo(position, pos_obs_var);
 					}
 
 				} else {
@@ -169,12 +201,12 @@ void Ekf::controlGpsFusion()
 
 					// reset position
 					_information_events.flags.reset_pos_to_gps = true;
-					resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+					resetHorizontalPositionTo(position, pos_obs_var);
 
 					// when already using another velocity source velocity reset is not necessary
 					if (!isHorizontalAidingActive()) {
 						_information_events.flags.reset_vel_to_gps = true;
-						resetVelocityTo(gps_sample.vel, vel_obs_var);
+						resetVelocityTo(velocity, vel_obs_var);
 					}
 
 					_control_status.flags.gps = true;
@@ -189,8 +221,8 @@ void Ekf::controlGpsFusion()
 					ECL_INFO("reset velocity and position to GPS");
 					_information_events.flags.reset_vel_to_gps = true;
 					_information_events.flags.reset_pos_to_gps = true;
-					resetVelocityTo(gps_sample.vel, vel_obs_var);
-					resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+					resetVelocityTo(velocity, vel_obs_var);
+					resetHorizontalPositionTo(position, pos_obs_var);
 				}
 			}
 		}

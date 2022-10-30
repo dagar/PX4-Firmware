@@ -53,11 +53,13 @@ void Ekf::fuseGpsYaw(const gpsSample& gps_sample)
 	const float q2 = _state.quat_nominal(2);
 	const float q3 = _state.quat_nominal(3);
 
+	float gps_yaw_offset = PX4_ISFINITE(gps_sample.yaw_offset) ? gps_sample.yaw_offset : 0.f;
+
 	// calculate the observed yaw angle of antenna array, converting a from body to antenna yaw measurement
-	const float measured_hdg = wrap_pi(gps_sample.yaw + _gps_yaw_offset);
+	const float measured_hdg = wrap_pi(gps_sample.yaw + gps_yaw_offset);
 
 	// define the predicted antenna array vector and rotate into earth frame
-	const Vector3f ant_vec_bf = {cosf(_gps_yaw_offset), sinf(_gps_yaw_offset), 0.0f};
+	const Vector3f ant_vec_bf = {cosf(gps_yaw_offset), sinf(gps_yaw_offset), 0.0f};
 	const Vector3f ant_vec_ef = _R_to_earth * ant_vec_bf;
 
 	// calculate predicted antenna yaw angle
@@ -82,11 +84,11 @@ void Ekf::fuseGpsYaw(const gpsSample& gps_sample)
 	}
 
 	// calculate intermediate variables
-	const float HK0 = sinf(_gps_yaw_offset);
+	const float HK0 = sinf(gps_yaw_offset);
 	const float HK1 = q0*q3;
 	const float HK2 = q1*q2;
 	const float HK3 = 2*HK0*(HK1 - HK2);
-	const float HK4 = cosf(_gps_yaw_offset);
+	const float HK4 = cosf(gps_yaw_offset);
 	const float HK5 = ecl::powf(q1, 2);
 	const float HK6 = ecl::powf(q2, 2);
 	const float HK7 = ecl::powf(q0, 2) - ecl::powf(q3, 2);
@@ -201,10 +203,10 @@ void Ekf::fuseGpsYaw(const gpsSample& gps_sample)
 	}
 }
 
-bool Ekf::resetYawToGps(const float gnss_yaw)
+bool Ekf::resetYawToGps(const float gnss_yaw, const float gnss_yaw_offset, const float gnss_yaw_accuracy)
 {
 	// define the predicted antenna array vector and rotate into earth frame
-	const Vector3f ant_vec_bf = {cosf(_gps_yaw_offset), sinf(_gps_yaw_offset), 0.0f};
+	const Vector3f ant_vec_bf = {cosf(gnss_yaw_offset), sinf(gnss_yaw_offset), 0.0f};
 	const Vector3f ant_vec_ef = _R_to_earth * ant_vec_bf;
 
 	// check if antenna array vector is within 30 degrees of vertical and therefore unable to provide a reliable heading
@@ -215,6 +217,7 @@ bool Ekf::resetYawToGps(const float gnss_yaw)
 	// GPS yaw measurement is alreday compensated for antenna offset in the driver
 	const float measured_yaw = gnss_yaw;
 
+	// TODO: gnss_yaw_accuracy
 	const float yaw_variance = sq(fmaxf(_params.gps_heading_noise, 1.e-2f));
 	resetQuatStateYaw(measured_yaw, yaw_variance);
 

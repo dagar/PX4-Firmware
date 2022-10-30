@@ -48,13 +48,14 @@ void Ekf::updateGpsYaw(const gpsSample &gps_sample)
 		// initially populate for estimator_aid_src_gnss_yaw logging
 
 		// calculate the observed yaw angle of antenna array, converting a from body to antenna yaw measurement
-		const float measured_hdg = wrap_pi(gps_sample.yaw + _gps_yaw_offset);
+		float gps_yaw_offset = PX4_ISFINITE(gps_sample.yaw_offset) ? gps_sample.yaw_offset : 0.f;
+		const float measured_hdg = wrap_pi(gps_sample.yaw + gps_yaw_offset);
 
 		gps_yaw.observation = measured_hdg;
 		gps_yaw.observation_variance = sq(fmaxf(_params.gps_heading_noise, 1.0e-2f));
 
 		// define the predicted antenna array vector and rotate into earth frame
-		const Vector3f ant_vec_bf = {cosf(_gps_yaw_offset), sinf(_gps_yaw_offset), 0.0f};
+		const Vector3f ant_vec_bf = {cosf(gps_yaw_offset), sinf(gps_yaw_offset), 0.0f};
 		const Vector3f ant_vec_ef = _R_to_earth * ant_vec_bf;
 		const float predicted_hdg = atan2f(ant_vec_ef(1), ant_vec_ef(0));
 		gps_yaw.innovation = wrap_pi(predicted_hdg - gps_yaw.observation);
