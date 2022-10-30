@@ -47,30 +47,32 @@ namespace sensor
 class GpsYaw: public Sensor
 {
 public:
-	GpsYaw(std::shared_ptr<Ekf> ekf);
-	~GpsYaw();
+	GpsYaw(std::shared_ptr<Ekf> ekf) : Sensor(ekf) {}
+	~GpsYaw() = default;
 
-	void setData(const gpsYawSample &gps);
-	void stepHeightByMeters(const float hgt_change);
-	void stepHorizontalPositionByMeters(const Vector2f hpos_change);
-	void setPositionRateNED(const Vector3f &rate);
-
-	void setLatitude(const double lat);
-	void setLongitude(const double lon);
-	void setAltitude(const float alt);
-
-	void setVelocity(const Vector3f &vel);
+	void setData(const gpsYawSample &gps_yaw) { _gps_yaw_data = gps_yaw; }
 
 	void setYaw(const float yaw) { _gps_yaw_data.yaw = yaw; }
-	void setYawOffset(const float yaw) { _gps_yaw_data.yaw_offset = yaw_offset; }
+	void setYawOffset(const float yaw_offset) { _gps_yaw_data.yaw_offset = yaw_offset; }
 
-	gpsYawSample getDefaultGpsData();
+	gpsYawSample getDefaultGpsData()
+	{
+		gpsYawSample gps_yaw_data{};
+		gps_yaw_data.time_us = 0;
+		gps_yaw_data.yaw = NAN;
+		gps_yaw_data.yaw_offset = NAN;
+		gps_yaw_data.yaw_accuracy = NAN;
+		return gps_yaw_data;
+	}
 
 private:
-	void send(uint64_t time) override;
+	void send(uint64_t time) override
+	{
+		_gps_yaw_data.time_us = time;
+		_ekf->setGpsYawData(_gps_yaw_data);
+	}
 
 	gpsYawSample _gps_yaw_data{};
-	Vector3f _gps_pos_rate{};
 };
 
 } // namespace sensor

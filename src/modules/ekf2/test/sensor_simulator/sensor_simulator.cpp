@@ -6,6 +6,7 @@ SensorSimulator::SensorSimulator(std::shared_ptr<Ekf> ekf):
 	_baro(ekf),
 	_flow(ekf),
 	_gps(ekf),
+	_gps_yaw(ekf),
 	_imu(ekf),
 	_mag(ekf),
 	_rng(ekf),
@@ -113,6 +114,7 @@ void SensorSimulator::setSensorRateToDefault()
 	_mag.setRateHz(80);
 	_baro.setRateHz(80);
 	_gps.setRateHz(5);
+	_gps_yaw.setRateHz(1);
 	_flow.setRateHz(50);
 	_rng.setRateHz(30);
 	_vio.setRateHz(30);
@@ -125,6 +127,7 @@ void SensorSimulator::setSensorDataToDefault()
 	_baro.setData(122.2f);
 	_flow.setData(_flow.dataAtRest());
 	_gps.setData(_gps.getDefaultGpsData());
+	_gps_yaw.setData(_gps_yaw.getDefaultGpsData());
 	_imu.setData(Vector3f{0.0f, 0.0f, -CONSTANTS_ONE_G}, Vector3f{0.0f, 0.0f, 0.0f});
 	_mag.setData(Vector3f{0.2f, 0.0f, 0.4f});
 	_rng.setData(0.2f, 100);
@@ -169,6 +172,7 @@ void SensorSimulator::updateSensors()
 	_mag.update(_time);
 	_baro.update(_time);
 	_gps.update(_time);
+	_gps_yaw.update(_time);
 	_flow.update(_time);
 	_rng.update(_time);
 	_vio.update(_time);
@@ -257,6 +261,9 @@ void SensorSimulator::setSingleReplaySample(const sensor_info &sample)
 		_gps.setVelocity(Vector3f((float) sample.sensor_data[3],
 					  (float) sample.sensor_data[4],
 					  (float) sample.sensor_data[5]));
+
+	} else if (sample.sensor_type == sensor_info::measurement_t::GPS_YAW) {
+		_gps_yaw.setYaw(sample.sensor_data[0]);
 
 	} else if (sample.sensor_type == sensor_info::measurement_t::AIRSPEED) {
 		_airspeed.setData((float) sample.sensor_data[0], (float) sample.sensor_data[1]);
@@ -384,6 +391,10 @@ void SensorSimulator::setSensorDataFromTrajectory()
 		/* _gps.setLatitude(); */
 		/* _gps.setLongitude(); */
 		_gps.setVelocity(vel_world);
+	}
+
+	if (_gps_yaw.isRunning()) {
+		//_gps_yaw.setYaw(R_world_to_body);
 	}
 }
 
