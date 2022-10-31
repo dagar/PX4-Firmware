@@ -101,6 +101,8 @@ public:
 
 	void setAuxVelData(const auxVelSample &auxvel_sample);
 
+	void setSystemFlagData(const systemFlagUpdate &system_flags);
+
 	// return a address to the parameters struct
 	// in order to give access to the application
 	parameters *getParamHandle() { return &_params; }
@@ -131,9 +133,6 @@ public:
 
 	// set vehicle is fixed wing status
 	void set_is_fixed_wing(bool is_fixed_wing) { _control_status.flags.fixed_wing = is_fixed_wing; }
-
-	// set flag if synthetic sideslip measurement should be fused
-	void set_fuse_beta_flag(bool fuse_beta) { _control_status.flags.fuse_beta = (fuse_beta && _control_status.flags.in_air); }
 
 	// set flag if static pressure rise due to ground effect is expected
 	// use _params.gnd_effect_deadzone to adjust for expected rise in static pressure
@@ -371,6 +370,7 @@ protected:
 	RingBuffer<extVisionSample> *_ext_vision_buffer{nullptr};
 	RingBuffer<dragSample> *_drag_buffer{nullptr};
 	RingBuffer<auxVelSample> *_auxvel_buffer{nullptr};
+	RingBuffer<systemFlagUpdate> *_system_flag_buffer{nullptr};
 
 	uint64_t _time_last_gps_buffer_push{0};
 	uint64_t _time_last_gps_yaw_buffer_push{0};

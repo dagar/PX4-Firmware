@@ -48,6 +48,21 @@ void Ekf::controlFusionModes()
 	// Store the status to enable change detection
 	_control_status_prev.value = _control_status.value;
 
+	if (_system_flag_buffer) {
+		systemFlagUpdate system_flags_delayed;
+
+		if (_system_flag_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &system_flags_delayed)) {
+
+			_control_status.flags.vehicle_at_rest = system_flags_delayed.at_rest;
+			_control_status.flags.in_air = system_flags_delayed.in_air;
+			_control_status.flags.fixed_wing = system_flags_delayed.is_fixed_wing;
+
+			if (system_flags_delayed.gnd_effect) {
+				set_gnd_effect();
+			}
+		}
+	}
+
 	// monitor the tilt alignment
 	if (!_control_status.flags.tilt_align) {
 		// whilst we are aligning the tilt, monitor the variances
@@ -571,29 +586,34 @@ void Ekf::controlAirDataFusion()
 void Ekf::controlBetaFusion()
 {
 	if (_control_status.flags.fake_pos) {
+		_control_status.flags.fuse_beta = false;
 		return;
 	}
 
-	// Perform synthetic sideslip fusion at regular intervals when in-air and sideslip fuson had been enabled externally:
-	const bool beta_fusion_time_triggered = isTimedOut(_aid_src_sideslip.time_last_fuse, _params.beta_avg_ft_us);
+	_control_status.flags.fuse_beta = _params.beta_fusion_enabled && _control_status.flags.fixed_wing && _control_status.flags.in_air;
 
-	if (beta_fusion_time_triggered &&
-	    _control_status.flags.fuse_beta &&
-	    _control_status.flags.in_air) {
-		updateSideslip(_aid_src_sideslip);
-		_innov_check_fail_status.flags.reject_sideslip = _aid_src_sideslip.innovation_rejected;
+	if (_control_status.flags.fuse_beta) {
 
-		// If starting wind state estimation, reset the wind states and covariances before fusing any data
-		if (!_control_status.flags.wind) {
-			// activate the wind states
-			_control_status.flags.wind = true;
-			// reset the timeout timers to prevent repeated resets
-			_aid_src_sideslip.time_last_fuse = _imu_sample_delayed.time_us;
-			resetWind();
-		}
+		// Perform synthetic sideslip fusion at regular intervals when in-air and sideslip fusion had been enabled externally:
+		const bool beta_fusion_time_triggered = isTimedOut(_aid_src_sideslip.time_last_fuse, _params.beta_avg_ft_us);
 
-		if (Vector2f(Vector2f(_state.vel) - _state.wind_vel).longerThan(7.f)) {
-			fuseSideslip(_aid_src_sideslip);
+		if (beta_fusion_time_triggered) {
+
+			updateSideslip(_aid_src_sideslip);
+			_innov_check_fail_status.flags.reject_sideslip = _aid_src_sideslip.innovation_rejected;
+
+			// If starting wind state estimation, reset the wind states and covariances before fusing any data
+			if (!_control_status.flags.wind) {
+				// activate the wind states
+				_control_status.flags.wind = true;
+				// reset the timeout timers to prevent repeated resets
+				_aid_src_sideslip.time_last_fuse = _imu_sample_delayed.time_us;
+				resetWind();
+			}
+
+			if (Vector2f(Vector2f(_state.vel) - _state.wind_vel).longerThan(7.f)) {
+				fuseSideslip(_aid_src_sideslip);
+			}
 		}
 	}
 }

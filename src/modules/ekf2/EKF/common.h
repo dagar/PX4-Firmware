@@ -244,6 +244,14 @@ struct auxVelSample {
 	Vector2f    velVar{};      ///< estimated error variance of the NE velocity (m/sec)**2
 };
 
+struct systemFlagUpdate {
+	uint64_t time_us{};
+	bool at_rest{false};
+	bool in_air{false};
+	bool is_fixed_wing{false};
+	bool gnd_effect{false};
+};
+
 struct stateSample {
 	Quatf    quat_nominal{};        ///< quaternion defining the rotation from body to earth frame
 	Vector3f vel{};                 ///< NED velocity in earth frame in m/s
@@ -336,6 +344,7 @@ struct parameters {
 	float arsp_thr{2.0f};                   ///< Airspeed fusion threshold. A value of zero will deactivate airspeed fusion
 
 	// synthetic sideslip fusion
+	int32_t beta_fusion_enabled{0};
 	float beta_innov_gate{5.0f};            ///< synthetic sideslip innovation consistency gate size in standard deviation (STD)
 	float beta_noise{0.3f};                 ///< synthetic sideslip noise (rad)
 	const float beta_avg_ft_us{150000.0f};  ///< The average time between synthetic sideslip measurements (uSec)

@@ -145,6 +145,7 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 	_param_ekf2_ev_pos_y(_params->ev_pos_body(1)),
 	_param_ekf2_ev_pos_z(_params->ev_pos_body(2)),
 	_param_ekf2_arsp_thr(_params->arsp_thr),
+	_param_ekf2_fuse_beta(_params->beta_fusion_enabled),
 	_param_ekf2_tau_vel(_params->vel_Tau),
 	_param_ekf2_tau_pos(_params->pos_Tau),
 	_param_ekf2_gbias_init(_params->switch_on_gyro_bias),
@@ -526,53 +527,38 @@ void EKF2::Run()
 		}
 
 		// update all other topics if they have new data
-		if (_status_sub.updated()) {
-			vehicle_status_s vehicle_status;
+		if (_status_sub.updated() || _vehicle_land_detected_sub.updated()) {
+			vehicle_status_s vehicle_status{};
+			_status_sub.copy(&vehicle_status);
 
-			if (_status_sub.copy(&vehicle_status)) {
-				const bool is_fixed_wing = (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING);
+			vehicle_land_detected_s vehicle_land_detected{};
+			_vehicle_land_detected_sub.copy(&vehicle_land_detected);
 
-				// only fuse synthetic sideslip measurements if conditions are met
-				_ekf.set_fuse_beta_flag(is_fixed_wing && (_param_ekf2_fuse_beta.get() == 1));
+			// let the EKF know if the vehicle motion is that of a fixed wing (forward flight only relative to wind)
+			const bool is_fixed_wing = (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING);
 
-				// let the EKF know if the vehicle motion is that of a fixed wing (forward flight only relative to wind)
-				_ekf.set_is_fixed_wing(is_fixed_wing);
+			systemFlagUpdate flags{};
+			flags.time_us = math::max(vehicle_status.timestamp, vehicle_land_detected.timestamp);
+			flags.at_rest = vehicle_land_detected.at_rest;
+			flags.is_fixed_wing = is_fixed_wing;
+			flags.in_air = !vehicle_land_detected.landed;
+			flags.gnd_effect = vehicle_land_detected.in_ground_effect;
 
-				_preflt_checker.setVehicleCanObserveHeadingInFlight(vehicle_status.vehicle_type !=
-						vehicle_status_s::VEHICLE_TYPE_ROTARY_WING);
+			_ekf.setSystemFlagData(flags);
+
+			if (!vehicle_land_detected.landed) {
+				_preflt_checker.reset();
+
+			} else {
+				_preflt_checker.setVehicleCanObserveHeadingInFlight(is_fixed_wing);
 			}
 		}
 
-		if (_vehicle_land_detected_sub.updated()) {
-			vehicle_land_detected_s vehicle_land_detected;
-
-			if (_vehicle_land_detected_sub.copy(&vehicle_land_detected)) {
-
-				_ekf.set_vehicle_at_rest(vehicle_land_detected.at_rest);
-
-				if (vehicle_land_detected.in_ground_effect) {
-					_ekf.set_gnd_effect();
-				}
-
-				const bool was_in_air = _ekf.control_status_flags().in_air;
-				const bool in_air = !vehicle_land_detected.landed;
-
-				if (!was_in_air && in_air) {
-					// takeoff
-					_ekf.set_in_air_status(true);
-
-					// reset learned sensor calibrations on takeoff
-					_accel_cal = {};
-					_gyro_cal = {};
-					_mag_cal = {};
-
-					_preflt_checker.reset();
-
-				} else if (was_in_air && !in_air) {
-					// landed
-					_ekf.set_in_air_status(false);
-				}
-			}
+		if (!_ekf.control_status_prev_flags().in_air && _ekf.control_status_flags().in_air) {
+			// takeoff, reset learned sensor calibrations
+			_accel_cal = {};
+			_gyro_cal = {};
+			_mag_cal = {};
 		}
 
 		// ekf2_timestamps (using 0.1 ms relative timestamps)
