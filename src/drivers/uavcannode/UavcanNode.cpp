@@ -205,6 +205,7 @@ int UavcanNode::start(uavcan::NodeID node_id, uint32_t bitrate)
 void UavcanNode::fill_node_info()
 {
 	// software version
+	// TODO:
 	uavcan::protocol::SoftwareVersion swver;
 
 	// Extracting the first 8 hex digits of the git hash and converting them to int
@@ -219,10 +220,24 @@ void UavcanNode::fill_node_info()
 
 	_node.setSoftwareVersion(swver);
 
-	/* hardware version */
+	// hardware version
+	// TODO:
 	uavcan::protocol::HardwareVersion hwver;
 	getHardwareVersion(hwver);
 	_node.setHardwareVersion(hwver);
+
+	// TODO:
+	// _node.setHealthOk()
+	// _node.setModeOperational()
+
+
+	// ?
+	// setVendorSpecificStatusCode
+
+	// getName()
+	// setName()
+
+	// publish once at init?
 }
 
 void UavcanNode::busevent_signal_trampoline()

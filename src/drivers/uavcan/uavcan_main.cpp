@@ -88,6 +88,7 @@ UavcanNode::UavcanNode(uavcan::ICanDriver &can_driver, uavcan::ISystemClock &sys
 	_time_sync_master(_node),
 	_time_sync_slave(_node),
 	_node_status_monitor(_node),
+	_node_info_print(_node),
 	_node_info_retriever(_node),
 	_master_timer(_node),
 	_param_getset_client(_node),
@@ -542,6 +543,8 @@ UavcanNode::init(uavcan::NodeID node_id, UAVCAN_DRIVER::BusEvent &bus_events)
 		PX4_ERR("NodeInfoRetriever init: %d", ret);
 		return ret;
 	}
+
+	_node_info_retriever.addListener(&_node_info_print);
 
 	// Sensor bridges
 	IUavcanSensorBridge::make_all(_node, _sensor_bridges);
@@ -1010,6 +1013,10 @@ UavcanNode::print_info()
 	_node_status_monitor.forEachNode([](uavcan::NodeID nid, uavcan::NodeStatusMonitor::NodeStatus ns) {
 		static constexpr const char *HEALTH[] = {"OK", "WARN", "ERR", "CRIT"};
 		static constexpr const char *MODES[] = {"OPERAT", "INIT", "MAINT", "SW_UPD", "?", "?", "?", "OFFLN"};
+
+
+
+
 		printf("\t% 3d %-10s %-10s\n", int(nid.get()), HEALTH[ns.health], MODES[ns.mode]);
 	});
 

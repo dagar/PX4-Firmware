@@ -58,6 +58,8 @@
 #include "uavcan_driver.hpp"
 #include "uavcan_servers.hpp"
 
+#include "node_info_print.hpp"
+
 #include <lib/drivers/device/Device.hpp>
 #include <lib/mixer_module/mixer_module.hpp>
 #include <lib/perf/perf_counter.h>
@@ -236,6 +238,8 @@ private:
 	uavcan::GlobalTimeSyncMaster	_time_sync_master;
 	uavcan::GlobalTimeSyncSlave	_time_sync_slave;
 	uavcan::NodeStatusMonitor	_node_status_monitor;
+
+	NodeInfoPrint _node_info_print;
 
 	uavcan::NodeInfoRetriever   _node_info_retriever;
 
