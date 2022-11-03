@@ -42,13 +42,10 @@
 #pragma once
 
 #include <lib/actuator_effectiveness/ActuatorEffectiveness.hpp>
-#include <ActuatorEffectivenessMultirotor.hpp>
-#include <ActuatorEffectivenessRoverAckermann.hpp>
-#include <ActuatorEffectivenessRoverDifferential.hpp>
-#include <ActuatorEffectivenessFixedWing.hpp>
-#include <ActuatorEffectivenessMCTilt.hpp>
-#include <ActuatorEffectivenessCustom.hpp>
-#include <ActuatorEffectivenessHelicopter.hpp>
+
+#include <ActuatorEffectiveness/ActuatorEffectivenessStandardVTOL.hpp>
+#include <ActuatorEffectiveness/ActuatorEffectivenessTiltrotorVTOL.hpp>
+#include <ActuatorEffectiveness/ActuatorEffectivenessTailsitterVTOL.hpp>
 
 #include <ControlAllocation.hpp>
 #include <ControlAllocationPseudoInverse.hpp>
@@ -71,9 +68,10 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_torque_setpoint.h>
 #include <uORB/topics/vehicle_thrust_setpoint.h>
+#include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/failure_detector_status.h>
 
-class ControlAllocator : public ModuleBase<ControlAllocator>, public ModuleParams, public px4::ScheduledWorkItem
+class VtolControlAllocator : public ModuleBase<VtolControlAllocator>, public ModuleParams, public px4::ScheduledWorkItem
 {
 public:
 	static constexpr int NUM_ACTUATORS = ControlAllocation::NUM_ACTUATORS;
@@ -84,9 +82,9 @@ public:
 
 	using ActuatorVector = ActuatorEffectiveness::ActuatorVector;
 
-	ControlAllocator();
+	VtolControlAllocator();
 
-	virtual ~ControlAllocator();
+	virtual ~VtolControlAllocator();
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -128,13 +126,13 @@ private:
 
 	void check_for_motor_failures();
 
-	void publish_control_allocator_status();
+	void publish_control_allocator_status(int matrix_index);
 
 	void publish_actuator_controls();
 
 	AllocationMethod _allocation_method_id{AllocationMethod::NONE};
-	ControlAllocation *_control_allocation{nullptr}; 	///< class for control allocation calculations
-
+	ControlAllocation *_control_allocation[ActuatorEffectiveness::MAX_NUM_MATRICES] {}; 	///< class for control allocation calculations
+	int _num_control_allocation{0};
 	hrt_abstime _last_effectiveness_update{0};
 
 	enum class EffectivenessSource {
@@ -167,8 +165,11 @@ private:
 	uORB::SubscriptionCallbackWorkItem _vehicle_torque_setpoint_sub{this, ORB_ID(vehicle_torque_setpoint)};  /**< vehicle torque setpoint subscription */
 	uORB::SubscriptionCallbackWorkItem _vehicle_thrust_setpoint_sub{this, ORB_ID(vehicle_thrust_setpoint)};	 /**< vehicle thrust setpoint subscription */
 
+	uORB::Subscription _vehicle_torque_setpoint1_sub{ORB_ID(vehicle_torque_setpoint), 1};  /**< vehicle torque setpoint subscription (2. instance) */
+	uORB::Subscription _vehicle_thrust_setpoint1_sub{ORB_ID(vehicle_thrust_setpoint), 1};	 /**< vehicle thrust setpoint subscription (2. instance) */
+
 	// Outputs
-	uORB::PublicationMulti<control_allocator_status_s> _control_allocator_status_pub{ORB_ID(control_allocator_status)};
+	uORB::PublicationMulti<control_allocator_status_s> _control_allocator_status_pub[2] {ORB_ID(control_allocator_status), ORB_ID(control_allocator_status)};
 
 	uORB::Publication<actuator_motors_s>	_actuator_motors_pub{ORB_ID(actuator_motors)};
 	uORB::Publication<actuator_servos_s>	_actuator_servos_pub{ORB_ID(actuator_servos)};
@@ -176,6 +177,7 @@ private:
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
+	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::Subscription _failure_detector_status_sub{ORB_ID(failure_detector_status)};
 
 	matrix::Vector3f _torque_sp;

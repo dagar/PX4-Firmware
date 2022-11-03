@@ -31,29 +31,31 @@
 #
 ############################################################################
 
-px4_add_library(ActuatorEffectiveness
-	ActuatorEffectivenessCustom.cpp
-	ActuatorEffectivenessCustom.hpp
-	ActuatorEffectivenessFixedWing.cpp
-	ActuatorEffectivenessFixedWing.hpp
-	ActuatorEffectivenessHelicopter.cpp
-	ActuatorEffectivenessHelicopter.hpp
-	ActuatorEffectivenessMCTilt.cpp
-	ActuatorEffectivenessMCTilt.hpp
-	ActuatorEffectivenessMultirotor.cpp
-	ActuatorEffectivenessMultirotor.hpp
-	ActuatorEffectivenessRoverAckermann.hpp
-	ActuatorEffectivenessRoverAckermann.cpp
-	ActuatorEffectivenessRoverDifferential.hpp
-	ActuatorEffectivenessRoverDifferential.cpp
-)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-target_compile_options(ActuatorEffectiveness PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
-target_include_directories(ActuatorEffectiveness PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(ActuatorEffectiveness
-	PRIVATE
+px4_add_module(
+	MODULE modules__vtol_control_allocator
+	MAIN vtol_control_allocator
+	COMPILE_FLAGS
+		${MAX_CUSTOM_OPT_LEVEL}
+	STACK_MAIN
+		3000
+	SRCS
+		ControlAllocator.cpp
+		ControlAllocator.hpp
+
+		ActuatorEffectiveness/ActuatorEffectivenessStandardVTOL.cpp
+		ActuatorEffectiveness/ActuatorEffectivenessStandardVTOL.hpp
+		ActuatorEffectiveness/ActuatorEffectivenessTiltrotorVTOL.cpp
+		ActuatorEffectiveness/ActuatorEffectivenessTiltrotorVTOL.hpp
+		ActuatorEffectiveness/ActuatorEffectivenessTailsitterVTOL.cpp
+		ActuatorEffectiveness/ActuatorEffectivenessTailsitterVTOL.hpp
+
+	MODULE_CONFIG
+		#module.yaml
+	DEPENDS
 		actuator_effectiveness
 		mathlib
+		ControlAllocation
+		px4_work_queue
 )
-
-px4_add_functional_gtest(SRC ActuatorEffectivenessHelicopterTest.cpp LINKLIBS ActuatorEffectiveness)
