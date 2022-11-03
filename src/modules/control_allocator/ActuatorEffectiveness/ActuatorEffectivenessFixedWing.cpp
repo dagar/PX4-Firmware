@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 #include "ActuatorEffectivenessFixedWing.hpp"
-#include <ControlAllocation/ControlAllocation.hpp>
+#include <lib/control_allocation/ControlAllocation.hpp>
 
 using namespace matrix;
 

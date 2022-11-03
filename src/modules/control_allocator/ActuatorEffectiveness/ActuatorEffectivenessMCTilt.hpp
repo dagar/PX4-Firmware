@@ -33,9 +33,9 @@
 
 #pragma once
 
-#include "ActuatorEffectiveness.hpp"
-#include "ActuatorEffectivenessRotors.hpp"
-#include "ActuatorEffectivenessTilts.hpp"
+#include <lib/actuator_effectiveness/ActuatorEffectiveness.hpp>
+#include <lib/actuator_effectiveness/ActuatorEffectivenessRotors.hpp>
+#include <lib/actuator_effectiveness/ActuatorEffectivenessTilts.hpp>
 
 class ActuatorEffectivenessMCTilt : public ModuleParams, public ActuatorEffectiveness
 {

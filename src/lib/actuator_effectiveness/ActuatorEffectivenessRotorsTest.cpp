@@ -40,6 +40,7 @@
  */
 
 #include <gtest/gtest.h>
+
 #include "ActuatorEffectivenessRotors.hpp"
 
 using namespace matrix;

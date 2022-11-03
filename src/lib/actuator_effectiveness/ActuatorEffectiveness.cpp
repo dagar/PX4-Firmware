@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 #include "ActuatorEffectiveness.hpp"
-#include "../ControlAllocation/ControlAllocation.hpp"
+#include "lib/control_allocation/ControlAllocation.hpp"
 
 #include <px4_platform_common/log.h>
 

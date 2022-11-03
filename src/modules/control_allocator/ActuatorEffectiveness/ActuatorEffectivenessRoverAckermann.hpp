@@ -33,7 +33,7 @@
 
 #pragma once
 
-#include "ActuatorEffectiveness.hpp"
+#include <lib/actuator_effectiveness/ActuatorEffectiveness.hpp>
 
 class ActuatorEffectivenessRoverAckermann : public ActuatorEffectiveness
 {

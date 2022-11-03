@@ -41,7 +41,7 @@
 
 #pragma once
 
-#include <ActuatorEffectiveness.hpp>
+#include <lib/actuator_effectiveness/ActuatorEffectiveness.hpp>
 #include <ActuatorEffectivenessMultirotor.hpp>
 #include <ActuatorEffectivenessStandardVTOL.hpp>
 #include <ActuatorEffectivenessTiltrotorVTOL.hpp>

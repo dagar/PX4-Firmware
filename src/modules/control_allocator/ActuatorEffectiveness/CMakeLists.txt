@@ -32,10 +32,6 @@
 ############################################################################
 
 px4_add_library(ActuatorEffectiveness
-	ActuatorEffectiveness.cpp
-	ActuatorEffectiveness.hpp
-	ActuatorEffectivenessControlSurfaces.cpp
-	ActuatorEffectivenessControlSurfaces.hpp
 	ActuatorEffectivenessCustom.cpp
 	ActuatorEffectivenessCustom.hpp
 	ActuatorEffectivenessFixedWing.cpp
@@ -46,10 +42,6 @@ px4_add_library(ActuatorEffectiveness
 	ActuatorEffectivenessMCTilt.hpp
 	ActuatorEffectivenessMultirotor.cpp
 	ActuatorEffectivenessMultirotor.hpp
-	ActuatorEffectivenessTilts.cpp
-	ActuatorEffectivenessTilts.hpp
-	ActuatorEffectivenessRotors.cpp
-	ActuatorEffectivenessRotors.hpp
 	ActuatorEffectivenessStandardVTOL.cpp
 	ActuatorEffectivenessStandardVTOL.hpp
 	ActuatorEffectivenessTiltrotorVTOL.cpp
@@ -66,8 +58,8 @@ target_compile_options(ActuatorEffectiveness PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
 target_include_directories(ActuatorEffectiveness PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(ActuatorEffectiveness
 	PRIVATE
+		actuator_effectiveness
 		mathlib
 )
 
 px4_add_functional_gtest(SRC ActuatorEffectivenessHelicopterTest.cpp LINKLIBS ActuatorEffectiveness)
-px4_add_functional_gtest(SRC ActuatorEffectivenessRotorsTest.cpp LINKLIBS ActuatorEffectiveness)

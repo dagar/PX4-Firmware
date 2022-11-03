@@ -33,7 +33,7 @@
 
 #include <px4_platform_common/log.h>
 
-#include "ActuatorEffectivenessControlSurfaces.hpp"
+#include <lib/actuator_effectiveness/ActuatorEffectivenessControlSurfaces.hpp>
 
 using namespace matrix;
 

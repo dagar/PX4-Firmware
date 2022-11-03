@@ -33,8 +33,8 @@
 
 #pragma once
 
-#include "ActuatorEffectiveness.hpp"
-#include "ActuatorEffectivenessRotors.hpp"
+#include <lib/actuator_effectiveness/ActuatorEffectiveness.hpp>
+#include <lib/actuator_effectiveness/ActuatorEffectivenessRotors.hpp>
 
 class ActuatorEffectivenessMultirotor : public ModuleParams, public ActuatorEffectiveness
 {

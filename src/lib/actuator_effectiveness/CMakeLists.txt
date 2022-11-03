@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2022 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,16 +31,15 @@
 #
 ############################################################################
 
-px4_add_library(ControlAllocation
-	ControlAllocation.cpp
-	ControlAllocation.hpp
-	ControlAllocationPseudoInverse.cpp
-	ControlAllocationPseudoInverse.hpp
-	ControlAllocationSequentialDesaturation.cpp
-	ControlAllocationSequentialDesaturation.hpp
+px4_add_library(actuator_effectiveness
+	ActuatorEffectiveness.cpp
+	ActuatorEffectiveness.hpp
+	ActuatorEffectivenessControlSurfaces.cpp
+	ActuatorEffectivenessControlSurfaces.hpp
+	ActuatorEffectivenessRotors.cpp
+	ActuatorEffectivenessRotors.hpp
+	ActuatorEffectivenessTilts.cpp
+	ActuatorEffectivenessTilts.hpp
 )
-target_compile_options(ControlAllocation PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
-target_include_directories(ControlAllocation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(ControlAllocation PRIVATE mathlib)
 
-px4_add_unit_gtest(SRC ControlAllocationPseudoInverseTest.cpp LINKLIBS ControlAllocation)
+px4_add_functional_gtest(SRC ActuatorEffectivenessRotorsTest.cpp LINKLIBS actuator_effectiveness)

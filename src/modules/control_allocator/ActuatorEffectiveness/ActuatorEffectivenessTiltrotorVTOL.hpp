@@ -41,10 +41,10 @@
 
 #pragma once
 
-#include "ActuatorEffectiveness.hpp"
-#include "ActuatorEffectivenessRotors.hpp"
-#include "ActuatorEffectivenessControlSurfaces.hpp"
-#include "ActuatorEffectivenessTilts.hpp"
+#include <lib/actuator_effectiveness/ActuatorEffectiveness.hpp>
+#include <lib/actuator_effectiveness/ActuatorEffectivenessRotors.hpp>
+#include <lib/actuator_effectiveness/ActuatorEffectivenessControlSurfaces.hpp>
+#include <lib/actuator_effectiveness/ActuatorEffectivenessTilts.hpp>
 
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/Subscription.hpp>
