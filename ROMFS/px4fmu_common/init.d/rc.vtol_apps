@@ -35,6 +35,15 @@ then
 	mc_autotune_attitude_control start
 fi
 
+#
+# Start Landing Target Estimator.
+#
+
+if param greater -s LTEST_EN 0
+then
+	landing_target_estimator start
+fi
+
 fw_att_control start vtol
 fw_pos_control_l1 start vtol
 fw_autotune_attitude_control start vtol
