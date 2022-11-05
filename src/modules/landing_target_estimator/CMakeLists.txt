@@ -35,14 +35,22 @@ px4_add_module(
 	MODULE modules__landing_target_estimator
 	MAIN landing_target_estimator
 	COMPILE_FLAGS
+		-Wno-return-std-move
 	SRCS
+		KalmanFilter.cpp
+		KalmanFilter.h
+		KFxyzCoupledMoving.cpp
+		KFxyzCoupledMoving.h
+		KFxyzCoupledStatic.cpp
+		KFxyzCoupledStatic.h
+		KFxyzDecoupledMoving.cpp
+		KFxyzDecoupledMoving.h
+		KFxyzDecoupledStatic.cpp
+		KFxyzDecoupledStatic.h
 		landing_target_estimator_main.cpp
 		LandingTargetEstimator.cpp
-		KalmanFilter.cpp
-		KFxyzCoupledMoving.cpp
-		KFxyzDecoupledMoving.cpp
-		KFxyzDecoupledStatic.cpp
-		KFxyzCoupledStatic.cpp
+		LandingTargetEstimator.h
+		target_estimator.h
+		target_estimator_coupled.h
 	DEPENDS
 	)
-

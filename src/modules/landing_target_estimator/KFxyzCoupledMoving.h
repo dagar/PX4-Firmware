@@ -41,14 +41,14 @@
  *
  */
 
+#pragma once
+
 #include <matrix/math.hpp>
 #include <mathlib/mathlib.h>
 #include <matrix/Matrix.hpp>
 #include <matrix/Vector.hpp>
 
 #include "target_estimator_coupled.h"
-
-#pragma once
 
 namespace landing_target_estimator
 {
@@ -91,7 +91,11 @@ public:
 	void setStateAccVar(matrix::Vector<float, 3> accVect) override { _covariance(9, 9) = accVect(0); _covariance(10, 10) = accVect(1); _covariance(11, 11) = accVect(2);};
 
 	// Retreive output of filter
-	matrix::Vector<float, 3> getPositionVect() override {matrix::Vector3f pos_vect(_state(0, 0), _state(1, 0), _state(2, 0)); return pos_vect;};
+	matrix::Vector<float, 3> getPositionVect() override {
+		matrix::Vector3f pos_vect(_state(0, 0), _state(1, 0), _state(2, 0));
+		return pos_vect;
+	};
+
 	matrix::Vector<float, 3> getVelocityVect() override {matrix::Vector3f vel_vect(_state(3, 0), _state(4, 0), _state(5, 0)); return vel_vect;};
 	matrix::Vector<float, 3> getAccelerationVect() override {matrix::Vector3f acc_vect(_state(9, 0), _state(10, 0), _state(11, 0)); return acc_vect;};
 	matrix::Vector<float, 3> getPosVarVect() override {matrix::Vector3f pos_var_vect(_covariance(0, 0), _covariance(1, 1), _covariance(2, 2)); return pos_var_vect;};

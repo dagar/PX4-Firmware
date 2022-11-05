@@ -58,12 +58,12 @@ public:
 	/**
 	 * Default constructor, state not initialized
 	 */
-	KFxyzDecoupledStatic() {};
+	KFxyzDecoupledStatic() = default;
 
 	/**
 	 * Default desctructor
 	 */
-	virtual ~KFxyzDecoupledStatic() {};
+	virtual ~KFxyzDecoupledStatic() = default;
 
 	//Prediction step:
 	void predictState(float dt, float acc) override;

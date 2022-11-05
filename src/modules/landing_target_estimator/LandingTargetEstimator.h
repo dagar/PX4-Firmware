@@ -69,11 +69,12 @@
 #include <matrix/Matrix.hpp>
 #include <lib/conversion/rotation.h>
 #include <lib/geo/geo.h>
-#include "KalmanFilter.h"
-#include "KFxyzDecoupledStatic.h"
-#include "KFxyzDecoupledMoving.h"
-#include "KFxyzCoupledMoving.h"
-#include "KFxyzCoupledStatic.h"
+
+#include "target_estimator.h"
+#include "target_estimator_coupled.h"
+
+//class TargetEstimator;
+//class TargetEstimatorCoupled;
 
 using namespace time_literals;
 
@@ -255,8 +256,8 @@ private:
 
 	matrix::Quaternion<float> _q_att; //Quaternion orientation of the body frame
 	TargetEstimator *_target_estimator[nb_directions] {nullptr, nullptr, nullptr};
-	TargetEstimator *_target_estimator_orientation {nullptr};
-	TargetEstimatorCoupled *_target_estimator_coupled {nullptr};
+	TargetEstimator *_target_estimator_orientation{nullptr};
+	TargetEstimatorCoupled *_target_estimator_coupled{nullptr};
 	hrt_abstime _last_predict{0}; // timestamp of last filter prediction
 	hrt_abstime _last_update{0}; // timestamp of last filter update (used to check timeout)
 

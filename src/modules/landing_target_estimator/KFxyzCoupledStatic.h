@@ -41,14 +41,14 @@
  *
  */
 
+#pragma once
+
 #include <matrix/math.hpp>
 #include <mathlib/mathlib.h>
 #include <matrix/Matrix.hpp>
 #include <matrix/Vector.hpp>
 
 #include "target_estimator_coupled.h"
-
-#pragma once
 
 namespace landing_target_estimator
 {

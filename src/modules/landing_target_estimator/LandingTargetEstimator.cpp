@@ -46,6 +46,13 @@
 
 #include "LandingTargetEstimator.h"
 
+#include "KalmanFilter.h"
+
+#include "KFxyzDecoupledStatic.h"
+#include "KFxyzDecoupledMoving.h"
+#include "KFxyzCoupledMoving.h"
+#include "KFxyzCoupledStatic.h"
+
 #define SEC2USEC 1000000.0f
 
 /*
@@ -1188,15 +1195,15 @@ void LandingTargetEstimator::selectTargetEstimator()
 	case TargetModel::FullPoseDecoupled:
 
 		if (_target_mode == TargetMode::Moving) {
-			tmp_x = new KFxyzDecoupledMoving;
-			tmp_y = new KFxyzDecoupledMoving;
-			tmp_z = new KFxyzDecoupledMoving;
+			tmp_x = new KFxyzDecoupledMoving();
+			tmp_y = new KFxyzDecoupledMoving();
+			tmp_z = new KFxyzDecoupledMoving();
 			PX4_INFO("LTE estimator: Moving target, full pose with x,y,z decoupled.");
 
 		} else {
-			tmp_x = new KFxyzDecoupledStatic;
-			tmp_y = new KFxyzDecoupledStatic;
-			tmp_z = new KFxyzDecoupledStatic;
+			tmp_x = new KFxyzDecoupledStatic();
+			tmp_y = new KFxyzDecoupledStatic();
+			tmp_z = new KFxyzDecoupledStatic();
 			PX4_INFO("LTE estimator: Static target, full pose with x,y,z decoupled.");
 		}
 
@@ -1207,11 +1214,11 @@ void LandingTargetEstimator::selectTargetEstimator()
 	case TargetModel::FullPoseCoupled:
 
 		if (_target_mode == TargetMode::Moving) {
-			tmp_xyz = new KFxyzCoupledMoving;
+			tmp_xyz = new KFxyzCoupledMoving();
 			PX4_INFO("LTE estimator: Moving target, full pose with x,y,z coupled in one filter.");
 
 		} else {
-			tmp_xyz = new KFxyzCoupledStatic;
+			tmp_xyz = new KFxyzCoupledStatic();
 			PX4_INFO("LTE estimator: Static target, full pose with x,y,z coupled in one filter.");
 		}
 
