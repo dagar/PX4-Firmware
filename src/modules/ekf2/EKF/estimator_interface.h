@@ -298,6 +298,11 @@ protected:
 
 	imuSample _imu_sample_delayed{};	// captures the imu sample on the delayed time horizon
 
+	AlphaFilter<Vector3f> _accel_lpf{0.1f};	///< filtered accelerometer measurement used to align tilt (m/s/s)
+	AlphaFilter<Vector3f> _gyro_lpf{0.1f};	///< filtered gyro measurement used for alignment excessive movement check (rad/sec)
+	uint32_t _imu_accel_counter{0};		///< number of IMU samples read and filtered
+	uint32_t _imu_gyro_counter{0};		///< number of IMU samples read and filtered
+
 	// measurement samples capturing measurements on the delayed time horizon
 	gpsSample _gps_sample_delayed{};
 	sensor::SensorRangeFinder _range_sensor{};

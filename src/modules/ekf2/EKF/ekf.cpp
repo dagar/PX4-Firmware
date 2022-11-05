@@ -124,24 +124,6 @@ bool Ekf::update()
 
 bool Ekf::initialiseFilter()
 {
-	// Filter accel for tilt initialization
-	const imuSample &imu_init = _imu_buffer.get_newest();
-
-	// protect against zero data
-	if (imu_init.delta_vel_dt < 1e-4f || imu_init.delta_ang_dt < 1e-4f) {
-		return false;
-	}
-
-	if (_is_first_imu_sample) {
-		_accel_lpf.reset(imu_init.delta_vel / imu_init.delta_vel_dt);
-		_gyro_lpf.reset(imu_init.delta_ang / imu_init.delta_ang_dt);
-		_is_first_imu_sample = false;
-
-	} else {
-		_accel_lpf.update(imu_init.delta_vel / imu_init.delta_vel_dt);
-		_gyro_lpf.update(imu_init.delta_ang / imu_init.delta_ang_dt);
-	}
-
 	// Sum the magnetometer measurements
 	if (_mag_buffer) {
 		magSample mag_sample;
@@ -252,21 +234,57 @@ void Ekf::predictState()
 
 	// Calculate an earth frame delta velocity
 	const Vector3f delta_vel_bias_scaled = getAccelBias() * _imu_sample_delayed.delta_vel_dt;
-	const Vector3f corrected_delta_vel = _imu_sample_delayed.delta_vel - delta_vel_bias_scaled;
-	const Vector3f corrected_delta_vel_ef = _R_to_earth * corrected_delta_vel;
+	Vector3f corrected_delta_vel = _imu_sample_delayed.delta_vel - delta_vel_bias_scaled;
+
+	if (_imu_sample_delayed.delta_vel_clipping[0] || _imu_sample_delayed.delta_vel_clipping[1] || _imu_sample_delayed.delta_vel_clipping[2]) {
+
+		// default to filtered (non-clipped) acceleration
+		Vector3f delta_vel_backup = (_accel_lpf.getState() * _imu_sample_delayed.delta_vel_dt) - delta_vel_bias_scaled;
+
+		// use GPS velocity if available
+		if (_control_status.flags.gps) {
+			// find first available good GPS velocity sample
+			gpsSample gps_sample_delayed;
+
+			if (_gps_buffer && _gps_buffer->peak_first_older_than(_imu_sample_delayed.time_us, &gps_sample_delayed)) {
+				if ((gps_sample_delayed.sacc > 0) && (gps_sample_delayed.sacc < _params.req_sacc)) {
+
+					Vector3f delta_vel_gps_ef = (gps_sample_delayed.vel - _state.vel);
+
+					delta_vel_backup = _state.quat_nominal.rotateVectorInverse(delta_vel_gps_ef);
+
+					// TODO: rotate GPS vel?
+
+					// interpolate between previous velocity state and current GPS velocity?
+				}
+			}
+		}
+
+		// replace corrected_delta_vel with backup value (good GPS vel or non-clipped filtered accel)
+		for (int axis = 0; axis < 3; axis++) {
+			if (_imu_sample_delayed.delta_vel_clipping[axis]) {
+				corrected_delta_vel(axis) = delta_vel_backup(axis);
+			}
+		}
+	}
+
+	Vector3f corrected_delta_vel_ef = _R_to_earth * corrected_delta_vel;
+
+	// compensate for acceleration due to gravity
+	corrected_delta_vel_ef(2) += CONSTANTS_ONE_G * _imu_sample_delayed.delta_vel_dt;
 
 	// calculate a filtered horizontal acceleration with a 1 sec time constant
 	// this are used for manoeuvre detection elsewhere
 	const float alpha = 1.0f - _imu_sample_delayed.delta_vel_dt;
 	_accel_lpf_NE = _accel_lpf_NE * alpha + corrected_delta_vel_ef.xy();
 
-	// save the previous value of velocity so we can use trapzoidal integration
+	// save the previous value of velocity so we can use trapezoidal integration
 	const Vector3f vel_last = _state.vel;
 
 	// calculate the increment in velocity using the current orientation
 	_state.vel += corrected_delta_vel_ef;
 
-	// compensate for acceleration due to gravity
+
 	_state.vel(2) += CONSTANTS_ONE_G * _imu_sample_delayed.delta_vel_dt;
 
 	// predict position states via trapezoidal integration of velocity

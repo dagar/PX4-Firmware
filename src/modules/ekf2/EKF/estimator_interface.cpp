@@ -60,6 +60,36 @@ EstimatorInterface::~EstimatorInterface()
 // Accumulate imu data and store to buffer at desired rate
 void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 {
+	// Filter accel for tilt initialization
+	if ((imu_sample.delta_vel_dt > 0.001f)
+	&& !imu_sample.delta_vel_clipping[0] && !imu_sample.delta_vel_clipping[1] && !imu_sample.delta_vel_clipping[2]
+	) {
+		const Vector3f accel = imu_sample.delta_vel / imu_sample.delta_vel_dt;
+
+		if (_imu_accel_counter == 0) {
+			_accel_lpf.reset(accel);
+
+		} else {
+			_accel_lpf.update(accel);
+		}
+
+		_imu_accel_counter++;
+	}
+
+	if (imu_sample.delta_ang_dt > 0.001f) {
+
+		const Vector3f gyro = imu_sample.delta_ang / imu_sample.delta_ang_dt;
+
+		if (_imu_gyro_counter == 0) {
+			_gyro_lpf.reset(gyro);
+
+		} else {
+			_gyro_lpf.update(gyro);
+		}
+
+		_imu_gyro_counter++;
+	}
+
 	// TODO: resolve misplaced responsibility
 	if (!_initialised) {
 		_initialised = init(imu_sample.time_us);
@@ -78,10 +108,56 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 	// accumulate and down-sample imu data and push to the buffer when new downsampled data becomes available
 	if (_imu_updated) {
 
+		const imuSample &imu_sample_prev = _imu_sample_delayed;
+
 		_imu_buffer.push(_imu_down_sampler.getDownSampledImuAndTriggerReset());
 
 		// get the oldest data from the buffer
-		_imu_sample_delayed = _imu_buffer.get_oldest();
+		imuSample imu_sample_curr = _imu_buffer.get_oldest();
+
+		// if an axis has started clipping, but previous sample is clean
+		if ((imu_sample_curr.delta_vel_clipping[0] && !imu_sample_prev.delta_vel_clipping[0])
+		 || (imu_sample_curr.delta_vel_clipping[1] && !imu_sample_prev.delta_vel_clipping[1])
+		 || (imu_sample_curr.delta_vel_clipping[2] && !imu_sample_prev.delta_vel_clipping[2])
+		) {
+			uint8_t index = _imu_buffer.get_oldest_index();
+			const uint8_t size = _output_vert_buffer.get_length();
+
+			for (uint8_t counter = 0; counter < (size - 1); counter++) {
+				imuSample &imu_sample_next = _imu_buffer[index];
+
+				for (int axis = 0; axis < 3; axis++) {
+					// axis has started clipping, but previous and future samples are clean
+					if (!imu_sample_prev.delta_vel_clipping[axis] // prev clean
+					&&   imu_sample_curr.delta_vel_clipping[axis] // curr dirty
+					&&  !imu_sample_next.delta_vel_clipping[axis] // next clean
+					) {
+						// replace sample with linear interpolation between clean samples
+						uint64_t x0 = imu_sample_prev.time_us;
+						uint64_t x1 = imu_sample_next.time_us;
+
+						float y0 = imu_sample_prev.delta_vel(axis) * imu_sample_prev.delta_vel_dt;
+						float y1 = imu_sample_next.delta_vel(axis) * imu_sample_next.delta_vel_dt;
+
+						uint64_t x = imu_sample.time_us;
+
+						// sanity check timestamps x0 < x < x1
+						if (x0 < x && x < x1) {
+							// linear interpolation between previous accel and next
+							float y = y0 * (x1 - x) / (x1-x0) + y1 * (x-x0) / (x1-x0);
+							// replace delta_vel with interpolated accel
+							imu_sample_curr.delta_vel(axis) = y / imu_sample_curr.delta_vel_dt;
+							imu_sample_curr.delta_vel_clipping[axis] = false;
+						}
+					}
+				}
+
+				// advance the index
+				index = (index + 1) % size;
+			}
+		}
+
+		_imu_sample_delayed = imu_sample_curr;
 
 		// calculate the minimum interval between observations required to guarantee no loss of data
 		// this will occur if data is overwritten before its time stamp falls behind the fusion time horizon

@@ -61,12 +61,6 @@ void Ekf::controlGpsFusion()
 		// GNSS velocity
 		const float vel_var = sq(math::max(gps_sample.sacc, _params.gps_vel_noise));
 		const Vector3f vel_obs_var(vel_var, vel_var, vel_var * sq(1.5f));
-		updateVelocityAidSrcStatus(gps_sample.time_us,
-					   gps_sample.vel,                                             // observation
-					   vel_obs_var,                                                // observation variance
-					   math::max(_params.gps_vel_innov_gate, 1.f),                 // innovation gate
-					   _aid_src_gnss_vel);
-		_aid_src_gnss_vel.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::VEL);
 
 		// GNSS position
 		// relax the upper observation noise limit which prevents bad GPS perturbing the position estimate
@@ -82,6 +76,21 @@ void Ekf::controlGpsFusion()
 
 		const float pos_var = sq(pos_noise);
 		const Vector2f pos_obs_var(pos_var, pos_var);
+
+		if ((gps_sample.sacc > 0) && (gps_sample.sacc < _params.req_sacc)
+		 && (gps_sample.hacc > 0) && (gps_sample.hacc < _params.req_hacc)
+		) {
+			GpsCheckDeltaVelocityClipping(gps_sample.vel, vel_obs_var, gps_sample.pos, pos_obs_var);
+		}
+
+		updateVelocityAidSrcStatus(gps_sample.time_us,
+					   gps_sample.vel,                                             // observation
+					   vel_obs_var,                                                // observation variance
+					   math::max(_params.gps_vel_innov_gate, 1.f),                 // innovation gate
+					   _aid_src_gnss_vel);
+		_aid_src_gnss_vel.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::VEL);
+
+
 		updateHorizontalPositionAidSrcStatus(gps_sample.time_us,
 						     gps_sample.pos,                             // observation
 						     pos_obs_var,                                // observation variance
@@ -245,6 +254,41 @@ bool Ekf::shouldResetGpsFusion() const
 					     && (_time_last_hor_pos_fuse > _time_last_on_ground_us);
 
 	return (is_reset_required || is_recent_takeoff_nav_failure || is_inflight_nav_failure);
+}
+
+void Ekf::GpsCheckDeltaVelocityClipping(const Vector3f &vel, const Vector3f &vel_obs_var, const Vector2f &pos, const Vector2f &pos_obs_var)
+{
+	if (_imu_sample_delayed.delta_vel_clipping[0] || _imu_sample_delayed.delta_vel_clipping[1] || _imu_sample_delayed.delta_vel_clipping[2]) {
+
+		// delta velocity clipping in body fixed frame
+		const Vector3f clipping_bf {
+			_imu_sample_delayed.delta_vel_clipping[0] ? 1.f : 0.f,
+			_imu_sample_delayed.delta_vel_clipping[1] ? 1.f : 0.f,
+			_imu_sample_delayed.delta_vel_clipping[2] ? 1.f : 0.f
+		};
+
+		// delta velocity clipping in earth frame
+		const Vector3f clipping_ef = _R_to_earth * clipping_bf;
+
+		const bool clipping_N = clipping_ef(0) > 0.5f;
+		const bool clipping_E = clipping_ef(1) > 0.5f;
+		const bool clipping_D = clipping_ef(2) > 0.5f;
+
+		if (_control_status.flags.yaw_align && (clipping_N || clipping_E)) {
+			// reset velocity
+			_information_events.flags.reset_vel_to_gps = true;
+			resetVelocityTo(vel, vel_obs_var);
+			_aid_src_gnss_vel.time_last_fuse = _imu_sample_delayed.time_us;
+
+			// reset position
+			_information_events.flags.reset_pos_to_gps = true;
+			resetHorizontalPositionTo(pos, pos_obs_var);
+			_aid_src_gnss_pos.time_last_fuse = _imu_sample_delayed.time_us;
+
+		} else if (clipping_D) {
+			resetVerticalVelocityTo(vel(2), vel_obs_var(2));
+		}
+	}
 }
 
 bool Ekf::isYawFailure() const
