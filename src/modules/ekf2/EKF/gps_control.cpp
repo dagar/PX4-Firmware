@@ -117,25 +117,27 @@ void Ekf::controlGpsFusion()
 
 						/* A reset is not performed when getting GPS back after a significant period of no data
 						 * because the timeout could have been caused by bad GPS.
-						 * The total number of resets allowed per boot cycle is limited.
 						 */
 						if (isYawFailure()
 						    && _control_status.flags.in_air
 						    && !was_gps_signal_lost
-						    && _ekfgsf_yaw_reset_count < _params.EKFGSF_reset_count_limit
-						    && isTimedOut(_ekfgsf_yaw_reset_time, 5'000'000)) {
+						    && isTimedOut(_bad_gnss_fusion_yaw_reset_time, _params.reset_interval_min)) {
 							// The minimum time interval between resets to the EKF-GSF estimate is limited to allow the EKF-GSF time
 							// to improve its estimate if the previous reset was not successful.
 							if (resetYawToEKFGSF()) {
 								ECL_WARN("GPS emergency yaw reset");
+								_bad_gnss_fusion_yaw_reset_time = _imu_sample_delayed.time_us;
 							}
 						}
 
-						ECL_WARN("GPS fusion timeout, resetting velocity and position");
-						_information_events.flags.reset_vel_to_gps = true;
-						_information_events.flags.reset_pos_to_gps = true;
-						resetVelocityTo(gps_sample.vel, vel_obs_var);
-						resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+						if (isTimedOut(_bad_gnss_fusion_gnss_reset_time, _params.reset_interval_min)) {
+							ECL_WARN("GPS fusion timeout, resetting velocity and position");
+							_information_events.flags.reset_vel_to_gps = true;
+							_information_events.flags.reset_pos_to_gps = true;
+							resetVelocityTo(gps_sample.vel, vel_obs_var);
+							resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+							_bad_gnss_fusion_gnss_reset_time = _imu_sample_delayed.time_us;
+						}
 					}
 
 				} else {
@@ -221,7 +223,11 @@ bool Ekf::shouldResetGpsFusion() const
 	/* We are relying on aiding to constrain drift so after a specified time
 	 * with no aiding we need to do something
 	 */
-	const bool is_reset_required = hasHorizontalAidingTimedOut()
+	const bool has_horizontal_aiding_timed_out = isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
+						     && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
+						     && isTimedOut(_aid_src_optical_flow.time_last_fuse, _params.reset_timeout_max);
+
+	const bool is_reset_required = has_horizontal_aiding_timed_out
 				       || isTimedOut(_time_last_hor_pos_fuse, 2 * _params.reset_timeout_max);
 
 	/* Logic controlling the reset of navigation filter yaw to the EKF-GSF estimate to recover from loss of
