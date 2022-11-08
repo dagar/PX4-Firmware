@@ -880,7 +880,6 @@ private:
 
 	// control fusion of GPS observations
 	void controlGpsFusion();
-	bool shouldResetGpsFusion() const;
 	bool isYawFailure() const;
 
 	void controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passing, bool gps_checks_failing);
@@ -1067,7 +1066,6 @@ private:
 	HeightBiasEstimator _ev_hgt_b_est{HeightSensor::EV, _height_sensor_ref};
 
 	int64_t _bad_gnss_fusion_yaw_reset_time{0};  ///< timestamp of last emergency yaw reset due to a bad GNSS fusion (uSec)
-	int64_t _bad_gnss_fusion_gnss_reset_time{0}; ///< timestamp of last GNSS reset due to a bad GNSS fusion (uSec)
 
 	void runYawEKFGSF();
 

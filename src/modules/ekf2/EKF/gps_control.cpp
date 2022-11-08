@@ -112,12 +112,19 @@ void Ekf::controlGpsFusion()
 					fuseVelocity(_aid_src_gnss_vel);
 					fuseHorizontalPosition(_aid_src_gnss_pos);
 
-					if (shouldResetGpsFusion()) {
+					// recent takeoff, check velocity fusion timeout more aggressively
+					const bool recent_takeoff = _control_status.flags.in_air && isRecent(_time_last_on_ground_us, 30'000'000);
+					const uint64_t vel_fusion_timeout = recent_takeoff ? _params.EKFGSF_reset_delay : _params.reset_timeout_max;
+
+					const bool vel_fusion_failing = isTimedOut(_aid_src_gnss_vel.time_last_fuse, vel_fusion_timeout);
+					const bool pos_fusion_failing = isTimedOut(_aid_src_gnss_pos.time_last_fuse, _params.reset_timeout_max);
+
+					if (vel_fusion_failing || pos_fusion_failing) {
+
+						// A reset is not performed when getting GPS back after a significant period of no data
+						// because the timeout could have been caused by bad GPS.
 						const bool was_gps_signal_lost = isTimedOut(_time_prev_gps_us, 1'000'000);
 
-						/* A reset is not performed when getting GPS back after a significant period of no data
-						 * because the timeout could have been caused by bad GPS.
-						 */
 						if (isYawFailure()
 						    && _control_status.flags.in_air
 						    && !was_gps_signal_lost
@@ -125,18 +132,29 @@ void Ekf::controlGpsFusion()
 							// The minimum time interval between resets to the EKF-GSF estimate is limited to allow the EKF-GSF time
 							// to improve its estimate if the previous reset was not successful.
 							if (resetYawToEKFGSF()) {
-								ECL_WARN("GPS emergency yaw reset");
+								ECL_WARN("GNSS emergency yaw reset");
 								_bad_gnss_fusion_yaw_reset_time = _imu_sample_delayed.time_us;
 							}
 						}
 
-						if (isTimedOut(_bad_gnss_fusion_gnss_reset_time, _params.reset_interval_min)) {
-							ECL_WARN("GPS fusion timeout, resetting velocity and position");
+						// if complete inflight nav failure fully reset GNSS vel/pos
+						const bool inflight_nav_failure = _control_status.flags.in_air
+							&& (_time_last_hor_vel_fuse > _time_last_on_ground_us) && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
+							&& (_time_last_hor_pos_fuse > _time_last_on_ground_us) && isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max);
+
+						// reset on fusion timeout (if data acceptable) or complete in flight nav failure
+						if (inflight_nav_failure || (vel_fusion_failing && (gps_sample.sacc < _params.req_sacc))) {
+							ECL_WARN("GNSS vel fusion timeout, resetting");
 							_information_events.flags.reset_vel_to_gps = true;
-							_information_events.flags.reset_pos_to_gps = true;
 							resetVelocityTo(gps_sample.vel, vel_obs_var);
+							_aid_src_gnss_vel.time_last_fuse = _imu_sample_delayed.time_us;
+						}
+
+						if (inflight_nav_failure || (pos_fusion_failing && (gps_sample.hacc < _params.req_hacc))) {
+							ECL_WARN("GNSS pos fusion timeout, resetting");
+							_information_events.flags.reset_pos_to_gps = true;
 							resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
-							_bad_gnss_fusion_gnss_reset_time = _imu_sample_delayed.time_us;
+							_aid_src_gnss_pos.time_last_fuse = _imu_sample_delayed.time_us;
 						}
 					}
 
@@ -177,11 +195,13 @@ void Ekf::controlGpsFusion()
 					// reset position
 					_information_events.flags.reset_pos_to_gps = true;
 					resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+					_aid_src_gnss_pos.time_last_fuse = _imu_sample_delayed.time_us;
 
 					// when already using another velocity source velocity reset is not necessary
 					if (!isHorizontalAidingActive()) {
 						_information_events.flags.reset_vel_to_gps = true;
 						resetVelocityTo(gps_sample.vel, vel_obs_var);
+						_aid_src_gnss_vel.time_last_fuse = _imu_sample_delayed.time_us;
 					}
 
 					_control_status.flags.gps = true;
@@ -194,10 +214,14 @@ void Ekf::controlGpsFusion()
 					ECL_INFO("Yaw aligned using IMU and GPS");
 
 					ECL_INFO("reset velocity and position to GPS");
+
 					_information_events.flags.reset_vel_to_gps = true;
-					_information_events.flags.reset_pos_to_gps = true;
 					resetVelocityTo(gps_sample.vel, vel_obs_var);
+					_aid_src_gnss_vel.time_last_fuse = _imu_sample_delayed.time_us;
+
+					_information_events.flags.reset_pos_to_gps = true;
 					resetHorizontalPositionTo(gps_sample.pos, pos_obs_var);
+					_aid_src_gnss_pos.time_last_fuse = _imu_sample_delayed.time_us;
 				}
 			}
 		}
@@ -216,41 +240,6 @@ void Ekf::controlGpsFusion()
 		_warning_events.flags.gps_data_stopped_using_alternate = true;
 		ECL_WARN("GPS data stopped, using only EV, OF or air data");
 	}
-}
-
-bool Ekf::shouldResetGpsFusion() const
-{
-	/* We are relying on aiding to constrain drift so after a specified time
-	 * with no aiding we need to do something
-	 */
-	const bool has_horizontal_aiding_timed_out = isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
-						     && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
-						     && isTimedOut(_aid_src_optical_flow.time_last_fuse, _params.reset_timeout_max);
-
-	const bool is_reset_required = has_horizontal_aiding_timed_out
-				       || isTimedOut(_time_last_hor_pos_fuse, 2 * _params.reset_timeout_max);
-
-	/* Logic controlling the reset of navigation filter yaw to the EKF-GSF estimate to recover from loss of
-	 * navigation casued by a bad yaw estimate.
-
-	 * A rapid reset to the EKF-GSF estimate is performed after a recent takeoff if horizontal velocity
-	 * innovation checks fail. This enables recovery from a bad yaw estimate. After 30 seconds from takeoff,
-	 * different test criteria are used that take longer to trigger and reduce false positives. A reset is
-	 * not performed if the fault condition was present before flight to prevent triggering due to GPS glitches
-	 * or other sensor errors.
-	 */
-	const bool is_recent_takeoff_nav_failure = _control_status.flags.in_air
-			&& isRecent(_time_last_on_ground_us, 30000000)
-			&& isTimedOut(_time_last_hor_vel_fuse, _params.EKFGSF_reset_delay)
-			&& (_time_last_hor_vel_fuse > _time_last_on_ground_us);
-
-	const bool is_inflight_nav_failure = _control_status.flags.in_air
-					     && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
-					     && isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
-					     && (_time_last_hor_vel_fuse > _time_last_on_ground_us)
-					     && (_time_last_hor_pos_fuse > _time_last_on_ground_us);
-
-	return (is_reset_required || is_recent_takeoff_nav_failure || is_inflight_nav_failure);
 }
 
 bool Ekf::isYawFailure() const
