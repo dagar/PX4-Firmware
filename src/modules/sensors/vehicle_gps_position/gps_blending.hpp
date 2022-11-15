@@ -63,7 +63,7 @@ public:
 	~GpsBlending() = default;
 
 	// define max number of GPS receivers supported for blending
-	static constexpr int GPS_MAX_RECEIVERS_BLEND = 3;
+	static constexpr int GPS_MAX_RECEIVERS_BLEND = 2;
 
 	void setGpsData(const sensor_gps_s &gps_data, int instance)
 	{

@@ -109,7 +109,7 @@ bool GpsBlending::blend_gps_data(uint64_t hrt_now_us)
 		float raw_dt = 0.f;
 
 		if (_gps_state[i].timestamp > _time_prev_us[i]) {
-			raw_dt = 1e-6f * (_gps_state[i].timestamp - _time_prev_us[i]);
+			raw_dt = 1e-6f * ((int64_t)_gps_state[i].timestamp - (int64_t)_time_prev_us[i]);
 		}
 
 		float present_dt = 0.f;
@@ -372,6 +372,14 @@ sensor_gps_s GpsBlending::gps_blend_states(float blend_weights[GPS_MAX_RECEIVERS
 	gps_blended_state.hdop = FLT_MAX;
 	gps_blended_state.vdop = FLT_MAX;
 
+	// these will be a sum of weighted values and must start from zero.
+	gps_blended_state.timestamp = 0;
+	gps_blended_state.timestamp_sample = 0;
+	gps_blended_state.vel_m_s = 0;
+	gps_blended_state.vel_n_m_s = 0;
+	gps_blended_state.vel_e_m_s = 0;
+	gps_blended_state.vel_d_m_s = 0;
+
 	// combine the the GPS states into a blended solution using the weights calculated in calc_blend_weights()
 	for (uint8_t i = 0; i < GPS_MAX_RECEIVERS_BLEND; i++) {
 		// blend the timing data
@@ -497,8 +505,8 @@ void GpsBlending::update_gps_offsets(const sensor_gps_s &gps_blended_state)
 	for (uint8_t i = 0; i < GPS_MAX_RECEIVERS_BLEND; i++) {
 		if (_gps_state[i].timestamp - _time_prev_us[i] > 0) {
 			// calculate the filter coefficient that achieves the time constant specified by the user adjustable parameter
-			alpha[i] = constrain(omega_lpf * 1e-6f * (float)(_gps_state[i].timestamp - _time_prev_us[i]),
-					     0.0f, 1.0f);
+			alpha[i] = constrain(omega_lpf * 1e-6f * (float)((int64_t)_gps_state[i].timestamp - (int64_t)_time_prev_us[i]), 0.f,
+					     1.f);
 
 			_time_prev_us[i] = _gps_state[i].timestamp;
 		}

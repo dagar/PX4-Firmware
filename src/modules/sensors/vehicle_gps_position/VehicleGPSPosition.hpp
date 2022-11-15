@@ -46,7 +46,6 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_gps.h>
-#include <uORB/topics/vehicle_attitude.h>
 
 #include "gps_blending.hpp"
 
@@ -76,19 +75,17 @@ private:
 	static constexpr uint8_t BLEND_MASK_USE_VPOS_ACC = 4;
 
 	// define max number of GPS receivers supported
-	static constexpr int GPS_MAX_RECEIVERS = 3;
+	static constexpr int GPS_MAX_RECEIVERS = 2;
 	static_assert(GPS_MAX_RECEIVERS == GpsBlending::GPS_MAX_RECEIVERS_BLEND,
 		      "GPS_MAX_RECEIVERS must match to GPS_MAX_RECEIVERS_BLEND");
 
 	uORB::Publication<sensor_gps_s> _vehicle_gps_position_pub{ORB_ID(vehicle_gps_position)};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
-	uORB::Subscription _vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_gps_sub[GPS_MAX_RECEIVERS] {	/**< sensor data subscription */
 		{this, ORB_ID(sensor_gps), 0},
 		{this, ORB_ID(sensor_gps), 1},
-		{this, ORB_ID(sensor_gps), 2},
 	};
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};

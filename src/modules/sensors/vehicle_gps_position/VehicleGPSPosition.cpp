@@ -94,7 +94,7 @@ void VehicleGPSPosition::ParametersUpdate(bool force)
 		for (int instance = 0; instance < GPS_MAX_RECEIVERS; instance++) {
 			_configuration[instance].ParametersUpdate();
 
-			_gps_blending.setAntennaOffset(_configuration[instance].position(), instance);
+			//_gps_blending.setAntennaOffset(_configuration[instance].position(), instance);
 		}
 
 		_gps_blending.setBlendingUseSpeedAccuracy(_param_sens_gps_mask.get() & BLEND_MASK_USE_SPD_ACC);
@@ -123,17 +123,6 @@ void VehicleGPSPosition::Run()
 {
 	perf_begin(_cycle_perf);
 	ParametersUpdate();
-
-	// update attitude
-	if (_vehicle_attitude_sub.updated()) {
-		// Transform offset from NED to body frame
-		vehicle_attitude_s attitude;
-
-		if (_vehicle_attitude_sub.update(&attitude)) {
-			// Quaternion rotation from the FRD body frame to the NED earth frame
-			_gps_blending.setAttitude(matrix::Quatf{attitude.q});
-		}
-	}
 
 	// Check all GPS instance
 	bool any_gps_updated = false;
