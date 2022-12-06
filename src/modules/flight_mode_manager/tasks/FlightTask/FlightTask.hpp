@@ -91,9 +91,10 @@ public:
 	/**
 	 * To be called to adopt parameters from an arrived vehicle command
 	 * @param command received command message containing the parameters
-	 * @return true if accepted, false if declined
+	 * @param success set to true if it was successfully applied, false on error
+	 * @return true if handled
 	 */
-	virtual bool applyCommandParameters(const vehicle_command_s &command) { return false; }
+	virtual bool applyCommandParameters(const vehicle_command_s &command, bool &success) { return false; }
 
 	/**
 	 * Call before activate() or update()
@@ -138,10 +139,9 @@ public:
 	const vehicle_trajectory_waypoint_s &getAvoidanceWaypoint() { return _desired_waypoint; }
 
 	/**
-	 * Empty setpoint.
-	 * All setpoints are set to NAN.
+	 * All setpoints are set to NAN (uncontrolled). Timestampt zero.
 	 */
-	static const trajectory_setpoint_s empty_setpoint;
+	static const trajectory_setpoint_s empty_trajectory_setpoint;
 
 	/**
 	 * Empty constraints.

@@ -1061,6 +1061,7 @@ Mavlink::send_autopilot_capabilities()
 		msg.capabilities |= MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET;
 		msg.capabilities |= MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED;
 		msg.capabilities |= MAV_PROTOCOL_CAPABILITY_SET_ACTUATOR_TARGET;
+		msg.capabilities |= MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION;
 		msg.capabilities |= MAV_PROTOCOL_CAPABILITY_MAVLINK2;
 		msg.capabilities |= MAV_PROTOCOL_CAPABILITY_MISSION_FENCE;
 		msg.capabilities |= MAV_PROTOCOL_CAPABILITY_MISSION_RALLY;
@@ -1490,8 +1491,8 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("ADSB_VEHICLE", unlimited_rate);
 		configure_stream_local("ALTITUDE", 1.0f);
 		configure_stream_local("ATTITUDE", 15.0f);
-		configure_stream_local("ATTITUDE_TARGET", 2.0f);
 		configure_stream_local("ATTITUDE_QUATERNION", 10.0f);
+		configure_stream_local("ATTITUDE_TARGET", 2.0f);
 		configure_stream_local("BATTERY_STATUS", 0.5f);
 		configure_stream_local("CAMERA_IMAGE_CAPTURED", unlimited_rate);
 		configure_stream_local("COLLISION", unlimited_rate);
@@ -1511,16 +1512,17 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("GPS_STATUS", 1.0f);
 		configure_stream_local("HOME_POSITION", 0.5f);
 		configure_stream_local("HYGROMETER_SENSOR", 0.1f);
-		configure_stream_local("SCALED_PRESSURE", 1.0f);
 		configure_stream_local("LOCAL_POSITION_NED", 1.0f);
 		configure_stream_local("NAV_CONTROLLER_OUTPUT", 1.0f);
 		configure_stream_local("OBSTACLE_DISTANCE", 1.0f);
+		configure_stream_local("OPEN_DRONE_ID_LOCATION", 0.1f);
 		configure_stream_local("ORBIT_EXECUTION_STATUS", 2.0f);
 		configure_stream_local("PING", 0.1f);
 		configure_stream_local("POSITION_TARGET_GLOBAL_INT", 1.0f);
 		configure_stream_local("POSITION_TARGET_LOCAL_NED", 1.5f);
 		configure_stream_local("RAW_RPM", 2.0f);
 		configure_stream_local("RC_CHANNELS", 5.0f);
+		configure_stream_local("SCALED_PRESSURE", 1.0f);
 		configure_stream_local("SERVO_OUTPUT_RAW_0", 1.0f);
 		configure_stream_local("SYS_STATUS", 1.0f);
 		configure_stream_local("TIME_ESTIMATE_TO_TARGET", 1.0f);
@@ -1574,8 +1576,8 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("GPS_STATUS", 1.0f);
 		configure_stream_local("HOME_POSITION", 0.5f);
 		configure_stream_local("HYGROMETER_SENSOR", 1.0f);
-		configure_stream_local("SCALED_PRESSURE", 1.0f);
 		configure_stream_local("NAV_CONTROLLER_OUTPUT", 10.0f);
+		configure_stream_local("OPEN_DRONE_ID_LOCATION", 1.f);
 		configure_stream_local("OPTICAL_FLOW_RAD", 10.0f);
 		configure_stream_local("ORBIT_EXECUTION_STATUS", 5.0f);
 		configure_stream_local("PING", 1.0f);
@@ -1583,6 +1585,7 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("POSITION_TARGET_LOCAL_NED", 10.0f);
 		configure_stream_local("RAW_RPM", 5.0f);
 		configure_stream_local("RC_CHANNELS", 20.0f);
+		configure_stream_local("SCALED_PRESSURE", 1.0f);
 		configure_stream_local("SERVO_OUTPUT_RAW_0", 10.0f);
 		configure_stream_local("SYS_STATUS", 5.0f);
 		configure_stream_local("SYSTEM_TIME", 1.0f);
@@ -1723,10 +1726,10 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("HIGHRES_IMU", 50.0f);
 		configure_stream_local("HOME_POSITION", 0.5f);
 		configure_stream_local("HYGROMETER_SENSOR", 1.0f);
-		configure_stream_local("SCALED_PRESSURE", 1.0f);
 		configure_stream_local("MAG_CAL_REPORT", 1.0f);
 		configure_stream_local("MANUAL_CONTROL", 5.0f);
 		configure_stream_local("NAV_CONTROLLER_OUTPUT", 10.0f);
+		configure_stream_local("OPEN_DRONE_ID_LOCATION", 1.f);
 		configure_stream_local("OPTICAL_FLOW_RAD", 10.0f);
 		configure_stream_local("ORBIT_EXECUTION_STATUS", 5.0f);
 		configure_stream_local("PING", 1.0f);
@@ -1736,6 +1739,7 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("SCALED_IMU", 25.0f);
 		configure_stream_local("SCALED_IMU2", 25.0f);
 		configure_stream_local("SCALED_IMU3", 25.0f);
+		configure_stream_local("SCALED_PRESSURE", 1.0f);
 		configure_stream_local("SERVO_OUTPUT_RAW_0", 20.0f);
 		configure_stream_local("SERVO_OUTPUT_RAW_1", 20.0f);
 		configure_stream_local("SYS_STATUS", 1.0f);
@@ -1806,6 +1810,7 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("GPS_RAW_INT", unlimited_rate);
 		configure_stream_local("HOME_POSITION", 0.5f);
 		configure_stream_local("NAV_CONTROLLER_OUTPUT", 1.5f);
+		configure_stream_local("OPEN_DRONE_ID_LOCATION", 1.f);
 		configure_stream_local("OPTICAL_FLOW_RAD", 1.0f);
 		configure_stream_local("ORBIT_EXECUTION_STATUS", 5.0f);
 		configure_stream_local("PING", 0.1f);
@@ -1827,6 +1832,11 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("DEBUG_VECT", 1.0f);
 		configure_stream_local("NAMED_VALUE_FLOAT", 1.0f);
 #endif // !CONSTRAINED_FLASH
+		break;
+
+	case MAVLINK_MODE_UAVIONIX:
+		configure_stream_local("UAVIONIX_ADSB_OUT_CFG", 0.1f);
+		configure_stream_local("UAVIONIX_ADSB_OUT_DYNAMIC", 5.0f);
 		break;
 
 	default:
@@ -2041,6 +2051,9 @@ Mavlink::task_main(int argc, char *argv[])
 
 					} else if (strcmp(myoptarg, "onboard_low_bandwidth") == 0) {
 						_mode = MAVLINK_MODE_ONBOARD_LOW_BANDWIDTH;
+
+					} else if (strcmp(myoptarg, "uavionix") == 0) {
+						_mode = MAVLINK_MODE_UAVIONIX;
 
 					} else {
 						PX4_ERR("invalid mode");
@@ -2309,9 +2322,12 @@ Mavlink::task_main(int argc, char *argv[])
 		}
 
 
-		// vehicle_command
+		// MAVLINK_MODE_IRIDIUM: handle VEHICLE_CMD_CONTROL_HIGH_LATENCY
 		if (_mode == MAVLINK_MODE_IRIDIUM) {
-			while (_vehicle_command_sub.updated()) {
+			int vehicle_command_updates = 0;
+
+			while (_vehicle_command_sub.updated() && (vehicle_command_updates < vehicle_command_s::ORB_QUEUE_LENGTH)) {
+				vehicle_command_updates++;
 				const unsigned last_generation = _vehicle_command_sub.get_last_generation();
 				vehicle_command_s vehicle_cmd;
 
@@ -2730,26 +2746,27 @@ void Mavlink::configure_sik_radio()
 		if (fs) {
 			/* switch to AT command mode */
 			px4_usleep(1200000);
-			fprintf(fs, "+++\n");
+			fprintf(fs, "+++");
+			fflush(fs);
 			px4_usleep(1200000);
 
 			if (_param_sik_radio_id.get() > 0) {
 				/* set channel */
-				fprintf(fs, "ATS3=%" PRIu32 "\n", _param_sik_radio_id.get());
+				fprintf(fs, "ATS3=%" PRIu32 "\r\n", _param_sik_radio_id.get());
 				px4_usleep(200000);
 
 			} else {
 				/* reset to factory defaults */
-				fprintf(fs, "AT&F\n");
+				fprintf(fs, "AT&F\r\n");
 				px4_usleep(200000);
 			}
 
 			/* write config */
-			fprintf(fs, "AT&W");
+			fprintf(fs, "AT&W\r\n");
 			px4_usleep(200000);
 
 			/* reboot */
-			fprintf(fs, "ATZ");
+			fprintf(fs, "ATZ\r\n");
 			px4_usleep(200000);
 
 			// XXX NuttX suffers from a bug where
@@ -3300,7 +3317,7 @@ $ mavlink stream -u 14556 -s HIGHRES_IMU -r 50
 	PRINT_MODULE_USAGE_PARAM_INT('o', 14550, 0, 65536, "Select UDP Network Port (remote)", true);
 	PRINT_MODULE_USAGE_PARAM_STRING('t', "127.0.0.1", nullptr, "Partner IP (broadcasting can be enabled via -p flag)", true);
 #endif
-	PRINT_MODULE_USAGE_PARAM_STRING('m', "normal", "custom|camera|onboard|osd|magic|config|iridium|minimal|extvision|extvisionmin|gimbal",
+	PRINT_MODULE_USAGE_PARAM_STRING('m', "normal", "custom|camera|onboard|osd|magic|config|iridium|minimal|extvision|extvisionmin|gimbal|uavionix",
 					"Mode: sets default streams and rates", true);
 	PRINT_MODULE_USAGE_PARAM_STRING('n', nullptr, "<interface_name>", "wifi/ethernet interface name", true);
 #if defined(CONFIG_NET_IGMP) && defined(CONFIG_NET_ROUTE)

@@ -160,8 +160,8 @@ const T interpolate(const T &value, const T &x_low, const T &x_high, const T &y_
 	} else {
 		/* linear function between the two points */
 		T a = (y_high - y_low) / (x_high - x_low);
-		T b = y_low - a * x_low;
-		return  a * value + b;
+		T b = y_low - (a * x_low);
+		return (a * value) + b;
 	}
 }
 
@@ -292,7 +292,7 @@ inline bool isFinite(const float &value)
 
 inline bool isFinite(const matrix::Vector3f &value)
 {
-	return PX4_ISFINITE(value(0)) && PX4_ISFINITE(value(1)) && PX4_ISFINITE(value(2));
+	return value.isAllFinite();
 }
 
 } /* namespace math */

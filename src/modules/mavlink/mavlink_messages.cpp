@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2022 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -95,6 +95,8 @@
 #include "streams/MOUNT_ORIENTATION.hpp"
 #include "streams/NAV_CONTROLLER_OUTPUT.hpp"
 #include "streams/OBSTACLE_DISTANCE.hpp"
+#include "streams/OPEN_DRONE_ID_BASIC_ID.hpp"
+#include "streams/OPEN_DRONE_ID_LOCATION.hpp"
 #include "streams/OPTICAL_FLOW_RAD.hpp"
 #include "streams/ORBIT_EXECUTION_STATUS.hpp"
 #include "streams/PING.hpp"
@@ -137,6 +139,8 @@
 # include "streams/SCALED_PRESSURE2.hpp"
 # include "streams/SCALED_PRESSURE3.hpp"
 # include "streams/SMART_BATTERY_INFO.hpp"
+# include "streams/UAVIONIX_ADSB_OUT_CFG.hpp"
+# include "streams/UAVIONIX_ADSB_OUT_DYNAMIC.hpp"
 # include "streams/UTM_GLOBAL_POSITION.hpp"
 #endif // !CONSTRAINED_FLASH
 
@@ -226,94 +230,6 @@ static_assert(MAV_SENSOR_ROTATION_ROLL_90_PITCH_315 == static_cast<MAV_SENSOR_OR
 	      "Roll: 90, Pitch: 315");
 static_assert(41 == ROTATION_MAX, "Keep MAV_SENSOR_ROTATION and PX4 Rotation in sync");
 
-
-union px4_custom_mode get_px4_custom_mode(uint8_t nav_state)
-{
-	union px4_custom_mode custom_mode;
-	custom_mode.data = 0;
-
-	switch (nav_state) {
-	case vehicle_status_s::NAVIGATION_STATE_MANUAL:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_MANUAL;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_ALTCTL:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_ALTCTL;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_POSCTL:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_POSCTL;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_MISSION;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_LOITER;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_RTL:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_RTL;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_ACRO:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_ACRO;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_DESCEND:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_LAND;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_TERMINATION:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_MANUAL;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_OFFBOARD:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_OFFBOARD;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_STAB:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_STABILIZED;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_LAND:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_LAND;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_FOLLOW_TARGET;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_PRECLAND:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_PRECLAND;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_ORBIT:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_POSCTL;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_POSCTL_ORBIT;
-		break;
-
-	case vehicle_status_s::NAVIGATION_STATE_AUTO_VTOL_TAKEOFF:
-		custom_mode.main_mode = PX4_CUSTOM_MAIN_MODE_AUTO;
-		custom_mode.sub_mode = PX4_CUSTOM_SUB_MODE_AUTO_VTOL_TAKEOFF;
-		break;
-	}
-
-	return custom_mode;
-}
 
 static const StreamListItem streams_list[] = {
 #if defined(HEARTBEAT_HPP)
@@ -517,6 +433,12 @@ static const StreamListItem streams_list[] = {
 #if defined(OBSTACLE_DISTANCE_HPP)
 	create_stream_list_item<MavlinkStreamObstacleDistance>(),
 #endif // OBSTACLE_DISTANCE_HPP
+#if defined(OPEN_DRONE_ID_BASIC_ID_HPP)
+	create_stream_list_item<MavlinkStreamOpenDroneIdBasicId>(),
+#endif // OPEN_DRONE_ID_BASIC_ID_HPP
+#if defined(OPEN_DRONE_ID_LOCATION)
+	create_stream_list_item<MavlinkStreamOpenDroneIdLocation>(),
+#endif // OPEN_DRONE_ID_LOCATION
 #if defined(ESC_INFO_HPP)
 	create_stream_list_item<MavlinkStreamESCInfo>(),
 #endif // ESC_INFO_HPP
@@ -554,8 +476,14 @@ static const StreamListItem streams_list[] = {
 	create_stream_list_item<MavlinkStreamEfiStatus>(),
 #endif // EFI_STATUS_HPP
 #if defined(GPS_RTCM_DATA_HPP)
-	create_stream_list_item<MavlinkStreamGPSRTCMData>()
+	create_stream_list_item<MavlinkStreamGPSRTCMData>(),
 #endif // GPS_RTCM_DATA_HPP
+#if defined(UAVIONIX_ADSB_OUT_CFG_HPP)
+	create_stream_list_item<MavlinkStreamUavionixADSBOutCfg>(),
+#endif // UAVIONIX_ADSB_OUT_CFG_HPP
+#if defined(UAVIONIX_ADSB_OUT_DYNAMIC_HPP)
+	create_stream_list_item<MavlinkStreamUavionixADSBOutDynamic>()
+#endif // UAVIONIX_ADSB_OUT_DYNAMIC_HPP
 };
 
 const char *get_stream_name(const uint16_t msg_id)

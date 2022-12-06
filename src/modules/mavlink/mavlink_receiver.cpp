@@ -790,10 +790,10 @@ MavlinkReceiver::handle_message_optical_flow_rad(mavlink_message_t *msg)
 	sensor_optical_flow.integration_timespan_us = flow.integration_time_us;
 	sensor_optical_flow.quality = flow.quality;
 
-	if (PX4_ISFINITE(flow.integrated_xgyro) && PX4_ISFINITE(flow.integrated_ygyro) && PX4_ISFINITE(flow.integrated_zgyro)) {
-		sensor_optical_flow.delta_angle[0] = flow.integrated_xgyro;
-		sensor_optical_flow.delta_angle[1] = flow.integrated_ygyro;
-		sensor_optical_flow.delta_angle[2] = flow.integrated_zgyro;
+	const matrix::Vector3f integrated_gyro(flow.integrated_xgyro, flow.integrated_ygyro, flow.integrated_zgyro);
+
+	if (integrated_gyro.isAllFinite()) {
+		integrated_gyro.copyTo(sensor_optical_flow.delta_angle);
 		sensor_optical_flow.delta_angle_available = true;
 	}
 
@@ -836,10 +836,10 @@ MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 	sensor_optical_flow.integration_timespan_us = flow.integration_time_us;
 	sensor_optical_flow.quality = flow.quality;
 
-	if (PX4_ISFINITE(flow.integrated_xgyro) && PX4_ISFINITE(flow.integrated_ygyro) && PX4_ISFINITE(flow.integrated_zgyro)) {
-		sensor_optical_flow.delta_angle[0] = flow.integrated_xgyro;
-		sensor_optical_flow.delta_angle[1] = flow.integrated_ygyro;
-		sensor_optical_flow.delta_angle[2] = flow.integrated_zgyro;
+	const matrix::Vector3f integrated_gyro(flow.integrated_xgyro, flow.integrated_ygyro, flow.integrated_zgyro);
+
+	if (integrated_gyro.isAllFinite()) {
+		integrated_gyro.copyTo(sensor_optical_flow.delta_angle);
 		sensor_optical_flow.delta_angle_available = true;
 	}
 
@@ -1338,16 +1338,16 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 
 	odom.timestamp_sample = _mavlink_timesync.sync_stamp(odom_in.time_usec);
 
+	const matrix::Vector3f odom_in_p(odom_in.x, odom_in.y, odom_in.z);
+
 	// position x/y/z (m)
-	if (PX4_ISFINITE(odom_in.x) && PX4_ISFINITE(odom_in.y) && PX4_ISFINITE(odom_in.z)) {
+	if (odom_in_p.isAllFinite()) {
 		// frame_id: Coordinate frame of reference for the pose data.
 		switch (odom_in.frame_id) {
 		case MAV_FRAME_LOCAL_NED:
 			// NED local tangent frame (x: North, y: East, z: Down) with origin fixed relative to earth.
 			odom.pose_frame = vehicle_odometry_s::POSE_FRAME_NED;
-			odom.position[0] = odom_in.x;
-			odom.position[1] = odom_in.y;
-			odom.position[2] = odom_in.z;
+			odom_in_p.copyTo(odom.position);
 			break;
 
 		case MAV_FRAME_LOCAL_ENU:
@@ -1361,9 +1361,7 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 		case MAV_FRAME_LOCAL_FRD:
 			// FRD local tangent frame (x: Forward, y: Right, z: Down) with origin fixed relative to earth.
 			odom.pose_frame = vehicle_odometry_s::POSE_FRAME_FRD;
-			odom.position[0] = odom_in.x;
-			odom.position[1] = odom_in.y;
-			odom.position[2] = odom_in.z;
+			odom_in_p.copyTo(odom.position);
 			break;
 
 		case MAV_FRAME_LOCAL_FLU:
@@ -1406,10 +1404,7 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 	}
 
 	// q: the quaternion of the ODOMETRY msg represents a rotation from body frame to a local frame
-	if (PX4_ISFINITE(odom_in.q[0])
-	    && PX4_ISFINITE(odom_in.q[1])
-	    && PX4_ISFINITE(odom_in.q[2])
-	    && PX4_ISFINITE(odom_in.q[3])) {
+	if (matrix::Quatf(odom_in.q).isAllFinite()) {
 
 		odom.q[0] = odom_in.q[0];
 		odom.q[1] = odom_in.q[1];
@@ -1426,16 +1421,16 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 		}
 	}
 
+	const matrix::Vector3f odom_in_v(odom_in.vx, odom_in.vy, odom_in.vz);
+
 	// velocity vx/vy/vz (m/s)
-	if (PX4_ISFINITE(odom_in.vx) && PX4_ISFINITE(odom_in.vy) && PX4_ISFINITE(odom_in.vz)) {
+	if (odom_in_v.isAllFinite()) {
 		// child_frame_id: Coordinate frame of reference for the velocity in free space (twist) data.
 		switch (odom_in.child_frame_id) {
 		case MAV_FRAME_LOCAL_NED:
 			// NED local tangent frame (x: North, y: East, z: Down) with origin fixed relative to earth.
 			odom.velocity_frame = vehicle_odometry_s::VELOCITY_FRAME_NED;
-			odom.velocity[0] = odom_in.vx;
-			odom.velocity[1] = odom_in.vy;
-			odom.velocity[2] = odom_in.vz;
+			odom_in_v.copyTo(odom.velocity);
 			break;
 
 		case MAV_FRAME_LOCAL_ENU:
@@ -1449,9 +1444,7 @@ MavlinkReceiver::handle_message_odometry(mavlink_message_t *msg)
 		case MAV_FRAME_LOCAL_FRD:
 			// FRD local tangent frame (x: Forward, y: Right, z: Down) with origin fixed relative to earth.
 			odom.velocity_frame = vehicle_odometry_s::VELOCITY_FRAME_FRD;
-			odom.velocity[0] = odom_in.vx;
-			odom.velocity[1] = odom_in.vy;
-			odom.velocity[2] = odom_in.vz;
+			odom_in_v.copyTo(odom.velocity);
 			break;
 
 		case MAV_FRAME_LOCAL_FLU:
@@ -2124,6 +2117,9 @@ MavlinkReceiver::handle_message_rc_channels_override(mavlink_message_t *msg)
 		}
 	}
 
+	rc.link_quality = -1;
+	rc.rssi_dbm = NAN;
+
 	// publish uORB message
 	_rc_pub.publish(rc);
 }
@@ -2131,22 +2127,23 @@ MavlinkReceiver::handle_message_rc_channels_override(mavlink_message_t *msg)
 void
 MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 {
-	mavlink_manual_control_t man;
-	mavlink_msg_manual_control_decode(msg, &man);
+	mavlink_manual_control_t mavlink_manual_control;
+	mavlink_msg_manual_control_decode(msg, &mavlink_manual_control);
 
 	// Check target
-	if (man.target != 0 && man.target != _mavlink->get_system_id()) {
+	if (mavlink_manual_control.target != 0 && mavlink_manual_control.target != _mavlink->get_system_id()) {
 		return;
 	}
 
-	manual_control_setpoint_s manual{};
-	manual.x = man.x / 1000.0f;
-	manual.y = man.y / 1000.0f;
-	manual.r = man.r / 1000.0f;
-	manual.z = man.z / 1000.0f;
-	manual.data_source = manual_control_setpoint_s::SOURCE_MAVLINK_0 + _mavlink->get_instance_id();
-	manual.timestamp = manual.timestamp_sample = hrt_absolute_time();
-	_manual_control_input_pub.publish(manual);
+	manual_control_setpoint_s manual_control_setpoint{};
+	manual_control_setpoint.pitch = mavlink_manual_control.x / 1000.f;
+	manual_control_setpoint.roll = mavlink_manual_control.y / 1000.f;
+	// For backwards compatibility at the moment interpret throttle in range [0,1000]
+	manual_control_setpoint.throttle = ((mavlink_manual_control.z / 1000.f) * 2.f) - 1.f;
+	manual_control_setpoint.yaw = mavlink_manual_control.r / 1000.f;
+	manual_control_setpoint.data_source = manual_control_setpoint_s::SOURCE_MAVLINK_0 + _mavlink->get_instance_id();
+	manual_control_setpoint.timestamp = manual_control_setpoint.timestamp_sample = hrt_absolute_time();
+	_manual_control_input_pub.publish(manual_control_setpoint);
 }
 
 void
@@ -2198,6 +2195,12 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 			case MAV_TYPE_PARACHUTE:
 				_heartbeat_type_parachute = now;
 				_mavlink->telemetry_status().parachute_system_healthy =
+					(hb.system_status == MAV_STATE_STANDBY) || (hb.system_status == MAV_STATE_ACTIVE);
+				break;
+
+			case MAV_TYPE_ODID:
+				_heartbeat_type_open_drone_id = now;
+				_mavlink->telemetry_status().open_drone_id_system_healthy =
 					(hb.system_status == MAV_STATE_STANDBY) || (hb.system_status == MAV_STATE_ACTIVE);
 				break;
 
@@ -2998,6 +3001,7 @@ void MavlinkReceiver::CheckHeartbeats(const hrt_abstime &t, bool force)
 		tstatus.heartbeat_type_adsb                    = (t <= TIMEOUT + _heartbeat_type_adsb);
 		tstatus.heartbeat_type_camera                  = (t <= TIMEOUT + _heartbeat_type_camera);
 		tstatus.heartbeat_type_parachute               = (t <= TIMEOUT + _heartbeat_type_parachute);
+		tstatus.heartbeat_type_open_drone_id           = (t <= TIMEOUT + _heartbeat_type_open_drone_id);
 
 		tstatus.heartbeat_component_telemetry_radio    = (t <= TIMEOUT + _heartbeat_component_telemetry_radio);
 		tstatus.heartbeat_component_log                = (t <= TIMEOUT + _heartbeat_component_log);
@@ -3113,7 +3117,7 @@ MavlinkReceiver::handle_message_gimbal_device_attitude_status(mavlink_message_t 
 	mavlink_msg_gimbal_device_attitude_status_decode(msg, &gimbal_device_attitude_status_msg);
 
 	gimbal_device_attitude_status_s gimbal_attitude_status{};
-	gimbal_attitude_status.timestamp = static_cast<uint64_t>(gimbal_device_attitude_status_msg.time_boot_ms) * 1000;
+	gimbal_attitude_status.timestamp = hrt_absolute_time();
 	gimbal_attitude_status.target_system = gimbal_device_attitude_status_msg.target_system;
 	gimbal_attitude_status.target_component = gimbal_device_attitude_status_msg.target_component;
 	gimbal_attitude_status.device_flags = gimbal_device_attitude_status_msg.flags;

@@ -58,6 +58,7 @@ param set-default FW_T_SINK_MAX 2.7
 param set-default FW_T_SINK_MIN 2.2
 param set-default FW_T_TAS_TC 2
 
+param set-default MC_AIRMODE 1
 param set-default MC_ROLLRATE_P 0.3
 
 param set-default MPC_ACC_HOR_MAX 2
@@ -69,7 +70,7 @@ param set-default MPC_XY_VEL_D_ACC 0.1
 param set-default NAV_ACC_RAD 5
 
 param set-default VT_FW_DIFTHR_EN 1
-param set-default VT_FW_DIFTHR_SC 0.5
+param set-default VT_FW_DIFTHR_S_Y 0.5
 param set-default VT_F_TRANS_DUR 1.5
 param set-default VT_F_TRANS_THR 0.7
 param set-default VT_TYPE 0

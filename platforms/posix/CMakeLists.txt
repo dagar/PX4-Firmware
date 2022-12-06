@@ -97,6 +97,10 @@ if(EXISTS "${PX4_BOARD_DIR}/cmake/upload.cmake")
 	include(${PX4_BOARD_DIR}/cmake/upload.cmake)
 endif()
 
+# board defined link libraries
+if(EXISTS "${PX4_BOARD_DIR}/cmake/link_libraries.cmake")
+	include(${PX4_BOARD_DIR}/cmake/link_libraries.cmake)
+endif()
 
 if("${PX4_BOARD}" MATCHES "beaglebone_blue")
 	target_link_libraries(px4 PRIVATE robotics_cape)
@@ -125,6 +129,14 @@ elseif("${PX4_BOARD}" MATCHES "sitl")
 	if(BUILD_TESTING)
 		include(sitl_tests)
 	endif()
+
+	# "none" legacy SITL helper target
+	add_custom_target(none
+		COMMAND $<TARGET_FILE:px4>
+		WORKING_DIRECTORY ${SITL_WORKING_DIR}
+		USES_TERMINAL
+		DEPENDS px4
+	)
 
 	# install
 

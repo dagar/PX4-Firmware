@@ -9,19 +9,15 @@
 [submodule "Tools/simulation/jmavsim/jMAVSim"]
 	path = Tools/simulation/jmavsim/jMAVSim
 	url = https://github.com/PX4/jMAVSim.git
-	branch = master
+	branch = main
 [submodule "Tools/simulation/gazebo/sitl_gazebo"]
 	path = Tools/simulation/gazebo/sitl_gazebo
 	url = https://github.com/PX4/PX4-SITL_gazebo.git
-	branch = master
+	branch = main
 [submodule "src/drivers/gps/devices"]
 	path = src/drivers/gps/devices
 	url = https://github.com/PX4/PX4-GPSDrivers.git
-	branch = master
-[submodule "src/modules/micrortps_bridge/micro-CDR"]
-	path = src/modules/micrortps_bridge/micro-CDR
-	url = https://github.com/PX4/Micro-CDR.git
-	branch = master
+	branch = main
 [submodule "platforms/nuttx/NuttX/nuttx"]
 	path = platforms/nuttx/NuttX/nuttx
 	url = https://github.com/PX4/NuttX.git
@@ -53,6 +49,7 @@
 [submodule "src/lib/events/libevents"]
 	path = src/lib/events/libevents
 	url = https://github.com/mavlink/libevents.git
+	branch = main
 [submodule "src/lib/crypto/libtomcrypt"]
 	path = src/lib/crypto/libtomcrypt
 	url = https://github.com/PX4/libtomcrypt.git
@@ -63,4 +60,5 @@
 	branch = px4
 [submodule "src/modules/microdds_client/Micro-XRCE-DDS-Client"]
 	path = src/modules/microdds_client/Micro-XRCE-DDS-Client
-	url = https://github.com/eProsima/Micro-XRCE-DDS-Client.git
+	url = https://github.com/PX4/Micro-XRCE-DDS-Client.git
+	branch = px4

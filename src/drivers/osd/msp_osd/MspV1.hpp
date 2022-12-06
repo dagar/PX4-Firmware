@@ -41,6 +41,6 @@ public:
 	bool Send(const uint8_t message_id, const void *payload);
 
 private:
-	int _fd;
+	int _fd{-1};
 };
 

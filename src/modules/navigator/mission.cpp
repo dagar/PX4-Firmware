@@ -443,7 +443,9 @@ Mission::find_mission_land_start()
 			_landing_start_lon = missionitem.lon;
 			_landing_start_alt = missionitem.altitude_is_relative ?	missionitem.altitude +
 					     _navigator->get_home_position()->alt : missionitem.altitude;
-			_landing_loiter_radius = missionitem.loiter_radius;
+			_landing_loiter_radius = (PX4_ISFINITE(missionitem.loiter_radius)
+						  && fabsf(missionitem.loiter_radius) > FLT_EPSILON) ? fabsf(missionitem.loiter_radius) :
+						 _navigator->get_loiter_radius();
 			_land_start_available = true;
 		}
 
@@ -1434,18 +1436,15 @@ Mission::cruising_speed_sp_update()
 void
 Mission::do_abort_landing()
 {
-	// Abort FW landing
-	//  first climb out then loiter over intended landing location
+	// Abort FW landing, loiter above landing site in at least MIS_LND_ABRT_ALT
 
 	if (_mission_item.nav_cmd != NAV_CMD_LAND) {
 		return;
 	}
 
-	// loiter at the larger of MIS_LTRMIN_ALT above the landing point
-	//  or 2 * FW_CLMBOUT_DIFF above the current altitude
 	const float alt_landing = get_absolute_altitude_for_item(_mission_item);
-	const float alt_sp = math::max(alt_landing + _navigator->get_loiter_min_alt(),
-				       _navigator->get_global_position()->alt + 20.0f);
+	const float alt_sp = math::max(alt_landing + _navigator->get_landing_abort_min_alt(),
+				       _navigator->get_global_position()->alt);
 
 	// turn current landing waypoint into an indefinite loiter
 	_mission_item.nav_cmd = NAV_CMD_LOITER_UNLIMITED;
@@ -1458,13 +1457,21 @@ Mission::do_abort_landing()
 
 	mission_apply_limitation(_mission_item);
 	mission_item_to_position_setpoint(_mission_item, &_navigator->get_position_setpoint_triplet()->current);
+
+	// XXX: this is a hack to invalidate the "next" position setpoint for the fixed-wing position controller during
+	// the landing abort hold. otherwise, the "next" setpoint would still register as a "LAND" point, and trigger
+	// the early landing configuration (flaps and landing airspeed) during the hold.
+	_navigator->get_position_setpoint_triplet()->next.lat = (double)NAN;
+	_navigator->get_position_setpoint_triplet()->next.lon = (double)NAN;
+	_navigator->get_position_setpoint_triplet()->next.alt = NAN;
+
 	publish_navigator_mission_item(); // for logging
 	_navigator->set_position_setpoint_triplet_updated();
 
-	mavlink_log_info(_navigator->get_mavlink_log_pub(), "Holding at %d m above landing.\t",
+	mavlink_log_info(_navigator->get_mavlink_log_pub(), "Holding at %d m above landing waypoint.\t",
 			 (int)(alt_sp - alt_landing));
 	events::send<float>(events::ID("mission_holding_above_landing"), events::Log::Info,
-			    "Holding at {1:.0m_v} above landing", alt_sp - alt_landing);
+			    "Holding at {1:.0m_v} above landing waypoint", alt_sp - alt_landing);
 
 	// reset mission index to start of landing
 	if (_land_start_available) {
@@ -1741,8 +1748,7 @@ Mission::check_mission_valid(bool force)
 		_navigator->get_mission_result()->valid =
 			_missionFeasibilityChecker.checkMissionFeasible(_mission,
 					_param_mis_dist_1wp.get(),
-					_param_mis_dist_wps.get(),
-					_navigator->mission_landing_required());
+					_param_mis_dist_wps.get());
 
 		_navigator->get_mission_result()->seq_total = _mission.count;
 		_navigator->increment_mission_instance_count();
@@ -1882,9 +1888,6 @@ bool Mission::position_setpoint_equal(const position_setpoint_s *p1, const posit
 		(fabsf(p1->vx - p2->vx) < FLT_EPSILON) &&
 		(fabsf(p1->vy - p2->vy) < FLT_EPSILON) &&
 		(fabsf(p1->vz - p2->vz) < FLT_EPSILON) &&
-		(p1->velocity_valid == p2->velocity_valid) &&
-		(p1->velocity_frame == p2->velocity_frame) &&
-		(p1->alt_valid == p2->alt_valid) &&
 		(fabs(p1->lat - p2->lat) < DBL_EPSILON) &&
 		(fabs(p1->lon - p2->lon) < DBL_EPSILON) &&
 		(fabsf(p1->alt - p2->alt) < FLT_EPSILON) &&
@@ -1893,7 +1896,7 @@ bool Mission::position_setpoint_equal(const position_setpoint_s *p1, const posit
 		(fabsf(p1->yawspeed - p2->yawspeed) < FLT_EPSILON) &&
 		(p1->yawspeed_valid == p2->yawspeed_valid) &&
 		(fabsf(p1->loiter_radius - p2->loiter_radius) < FLT_EPSILON) &&
-		(p1->loiter_direction == p2->loiter_direction) &&
+		(p1->loiter_direction_counter_clockwise == p2->loiter_direction_counter_clockwise) &&
 		(fabsf(p1->acceptance_radius - p2->acceptance_radius) < FLT_EPSILON) &&
 		(fabsf(p1->cruising_speed - p2->cruising_speed) < FLT_EPSILON) &&
 		((fabsf(p1->cruising_throttle - p2->cruising_throttle) < FLT_EPSILON) || (!PX4_ISFINITE(p1->cruising_throttle)

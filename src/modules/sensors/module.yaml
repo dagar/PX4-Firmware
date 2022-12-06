@@ -14,6 +14,7 @@ parameters:
             category: System
             type: int32
             default: 0
+            decimal: 3
             num_instances: *max_num_sensor_instances
             instance_start: 0
 
@@ -31,6 +32,7 @@ parameters:
                 75: High
                 100: Max
             default: -1
+            decimal: 3
             num_instances: *max_num_sensor_instances
             instance_start: 0
 
@@ -96,7 +98,8 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: m/s^2
+            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -107,7 +110,8 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: m/s^2
+            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -118,7 +122,8 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: m/s^2
+            decimal: 3
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -129,6 +134,7 @@ parameters:
             category: System
             type: float
             default: 1.0
+            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -141,6 +147,7 @@ parameters:
             category: System
             type: float
             default: 1.0
+            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -153,6 +160,7 @@ parameters:
             category: System
             type: float
             default: 1.0
+            decimal: 3
             min: 0.1
             max: 3.0
             volatile: true
@@ -288,7 +296,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: rad/s
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -299,7 +307,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: rad/s
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -310,7 +318,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: rad/s
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -405,7 +413,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: gauss
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -416,7 +424,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: gauss
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0
@@ -427,7 +435,7 @@ parameters:
             category: System
             type: float
             default: 0.0
-            unit: m
+            unit: gauss
             volatile: true
             num_instances: *max_num_sensor_instances
             instance_start: 0

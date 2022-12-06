@@ -180,6 +180,8 @@ public:
 	 */
 	float getHeadingRef() const { return atan2f(air_vel_ref_(1), air_vel_ref_(0)); }
 
+	matrix::Vector2f getClosestPoint() const { return closest_point_on_path_;}
+
 	/*
 	 * @return Bearing angle [rad]
 	 */
@@ -240,12 +242,12 @@ public:
 	 * @param[in] loiter_center The position of the center of the loiter circle [m]
 	 * @param[in] vehicle_pos Vehicle position in WGS84 coordinates (lat,lon) [deg]
 	 * @param[in] radius Loiter radius [m]
-	 * @param[in] loiter_direction Loiter direction: -1=counter-clockwise, 1=clockwise
+	 * @param[in] loiter_direction_counter_clockwise Specifies loiter direction
 	 * @param[in] ground_vel Vehicle ground velocity vector [m/s]
 	 * @param[in] wind_vel Wind velocity vector [m/s]
 	 */
 	void navigateLoiter(const matrix::Vector2f &loiter_center, const matrix::Vector2f &vehicle_pos,
-			    float radius, int8_t loiter_direction, const matrix::Vector2f &ground_vel,
+			    float radius, bool loiter_direction_counter_clockwise, const matrix::Vector2f &ground_vel,
 			    const matrix::Vector2f &wind_vel);
 
 	/*
@@ -422,6 +424,7 @@ private:
 	matrix::Vector2f unit_path_tangent_{matrix::Vector2f{1.0f, 0.0f}}; // unit path tangent vector
 	float signed_track_error_{0.0f}; // signed track error [m]
 	matrix::Vector2f bearing_vec_{matrix::Vector2f{1.0f, 0.0f}}; // bearing unit vector
+	matrix::Vector2f closest_point_on_path_{matrix::Vector2f{NAN, NAN}}; // instantaneous position setpoint [m]
 
 	/*
 	 * guidance outputs

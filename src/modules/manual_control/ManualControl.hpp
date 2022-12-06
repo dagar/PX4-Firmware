@@ -80,6 +80,8 @@ private:
 	void Run() override;
 	void processStickArming(const manual_control_setpoint_s &input);
 
+	static int8_t navStateFromParam(int32_t param_value);
+
 	void evaluateModeSlot(uint8_t mode_slot);
 	void sendActionRequest(int8_t action, int8_t source, int8_t mode = 0);
 	void publishLandingGear(int8_t action);
@@ -115,10 +117,10 @@ private:
 	ManualControlSelector _selector;
 	bool _published_invalid_once{false};
 
-	MovingDiff _x_diff{};
-	MovingDiff _y_diff{};
-	MovingDiff _z_diff{};
-	MovingDiff _r_diff{};
+	MovingDiff _roll_diff{};
+	MovingDiff _pitch_diff{};
+	MovingDiff _yaw_diff{};
+	MovingDiff _throttle_diff{};
 
 	manual_control_switches_s _previous_switches{};
 	bool _previous_switches_initialized{false};

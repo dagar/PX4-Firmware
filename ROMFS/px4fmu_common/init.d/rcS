@@ -162,7 +162,7 @@ else
 		param select-backup $PARAM_BACKUP_FILE
 	fi
 
-	if ver hwcmp PX4_FMU_V5X PX4_FMU_V6X
+	if ver hwcmp PX4_FMU_V5X PX4_FMU_V6X ARK_FMU_V6X
 	then
 		netman update -i eth0
 	fi
@@ -265,23 +265,6 @@ else
 	fi
 
 	#
-	# Check if UAVCAN is enabled, default to it for ESCs.
-	#
-	if param greater -s UAVCAN_ENABLE 0
-	then
-		# Start core UAVCAN module.
-		if ! uavcan start
-		then
-			tune_control play error
-		fi
-	else
-		if param greater -s CYPHAL_ENABLE 0
-		then
-			cyphal start
-		fi
-	fi
-
-	#
 	# Start IO for PWM output or RC input if enabled
 	#
 	if param compare -s SYS_USE_IO 1
@@ -323,6 +306,27 @@ else
 	#
 	rc_update start
 	manual_control start
+
+	# Start camera trigger, capture and PPS before pwm_out as they might access
+	# pwm pins
+	if param greater -s TRIG_MODE 0
+	then
+		camera_trigger start
+		camera_feedback start
+	fi
+	# PPS capture driver
+	if param greater -s PPS_CAP_ENABLE 0
+	then
+		pps_capture start
+	fi
+	# Camera capture driver
+	if param greater -s CAM_CAP_FBACK 0
+	then
+		if camera_capture start
+		then
+			camera_capture on
+		fi
+	fi
 
 	#
 	# Sensors System (start before Commander so Preflight checks are properly run).
@@ -390,12 +394,6 @@ else
 		mag_bias_estimator start
 	fi
 
-	if param greater -s TRIG_MODE 0
-	then
-		camera_trigger start
-		camera_feedback start
-	fi
-
 	#
 	# Optional board mavlink streams: rc.board_mavlink
 	#
@@ -415,21 +413,6 @@ else
 
 	# Must be started after the serial config is read
 	rc_input start $RC_INPUT_ARGS
-
-	# PPS capture driver (before pwm_out)
-	if param greater -s PPS_CAP_ENABLE 0
-	then
-		pps_capture start
-	fi
-
-	# Camera capture driver (before pwm_out)
-	if param greater -s CAM_CAP_FBACK 0
-	then
-		if camera_capture start
-		then
-			camera_capture on
-		fi
-	fi
 
 	#
 	# Play the startup tune (if not disabled or there is an error)
@@ -526,6 +509,23 @@ else
 		sh $BOARD_BOOTLOADER_UPGRADE
 	fi
 	unset BOARD_BOOTLOADER_UPGRADE
+
+	#
+	# Check if UAVCAN is enabled, default to it for ESCs.
+	#
+	if param greater -s UAVCAN_ENABLE 0
+	then
+		# Start core UAVCAN module.
+		if ! uavcan start
+		then
+			tune_control play error
+		fi
+	else
+		if param greater -s CYPHAL_ENABLE 0
+		then
+			cyphal start
+		fi
+	fi
 
 #
 # End of autostart.

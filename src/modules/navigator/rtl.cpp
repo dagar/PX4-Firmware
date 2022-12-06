@@ -228,7 +228,8 @@ void RTL::find_RTL_destination()
 		}
 	}
 
-	if (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
+	if (_param_rtl_cone_half_angle_deg.get() > 0
+	    && _navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
 		_rtl_alt = calculate_return_alt_from_cone_half_angle((float)_param_rtl_cone_half_angle_deg.get());
 
 	} else {
@@ -335,14 +336,7 @@ void RTL::set_rtl_item()
 	switch (_rtl_state) {
 	case RTL_STATE_CLIMB: {
 
-			// do not use LOITER_TO_ALT for rotary wing mode as it would then always climb to at least MIS_LTRMIN_ALT,
-			// even if current climb altitude is below (e.g. RTL immediately after take off)
-			if (_navigator->get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
-				_mission_item.nav_cmd = NAV_CMD_WAYPOINT;
-
-			} else {
-				_mission_item.nav_cmd = NAV_CMD_LOITER_TO_ALT;
-			}
+			_mission_item.nav_cmd = NAV_CMD_LOITER_TO_ALT;
 
 			_mission_item.lat = gpos.lat;
 			_mission_item.lon = gpos.lon;
@@ -701,7 +695,7 @@ float RTL::calculate_return_alt_from_cone_half_angle(float cone_half_angle_deg)
 
 	} else {
 
-		if (cone_half_angle_deg > 0.0f && destination_dist <= _param_rtl_min_dist.get()) {
+		if (destination_dist <= _param_rtl_min_dist.get()) {
 
 			// constrain cone half angle to meaningful values. All other cases are already handled above.
 			const float cone_half_angle_rad = radians(constrain(cone_half_angle_deg, 1.0f, 89.0f));

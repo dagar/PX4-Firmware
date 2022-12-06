@@ -119,7 +119,7 @@ private:
 	hrt_abstime _timestamp_sample_last{0};
 	hrt_abstime _timestamp_last{0};
 
-	math::WelfordMean<matrix::Vector2f> _interval_mean{};
+	math::WelfordMean<float> _interval_mean_us{};
 
 	math::WelfordMean<matrix::Vector2f> _update_latency_mean{};
 

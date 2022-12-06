@@ -59,14 +59,7 @@ using matrix::wrap_pi;
 MissionBlock::MissionBlock(Navigator *navigator) :
 	NavigatorMode(navigator)
 {
-	_mission_item.lat = (double)NAN;
-	_mission_item.lon = (double)NAN;
-	_mission_item.yaw = NAN;
-	_mission_item.loiter_radius = _navigator->get_loiter_radius();
-	_mission_item.acceptance_radius = _navigator->get_acceptance_radius();
-	_mission_item.time_inside = 0.0f;
-	_mission_item.autocontinue = true;
-	_mission_item.origin = ORIGIN_ONBOARD;
+
 }
 
 bool
@@ -79,6 +72,7 @@ MissionBlock::is_mission_item_reached_or_completed()
 
 	// Action Commands that doesn't have timeout completes instantaneously
 	case NAV_CMD_DO_SET_SERVO:
+	case NAV_CMD_DO_SET_ACTUATOR:
 	case NAV_CMD_DO_LAND_START:
 	case NAV_CMD_DO_TRIGGER_CONTROL:
 	case NAV_CMD_DO_DIGICAM_CONTROL:
@@ -197,6 +191,11 @@ MissionBlock::is_mission_item_reached_or_completed()
 
 		const float mission_item_altitude_amsl = get_absolute_altitude_for_item(_mission_item);
 
+		// consider mission_item.loiter_radius invalid if NAN or 0, use default value in this case.
+		const float mission_item_loiter_radius_abs = (PX4_ISFINITE(_mission_item.loiter_radius)
+				&& fabsf(_mission_item.loiter_radius) > FLT_EPSILON) ? fabsf(_mission_item.loiter_radius) :
+				_navigator->get_loiter_radius();
+
 		dist = get_distance_to_point_global_wgs84(_mission_item.lat, _mission_item.lon, mission_item_altitude_amsl,
 				_navigator->get_global_position()->lat,
 				_navigator->get_global_position()->lon,
@@ -260,7 +259,7 @@ MissionBlock::is_mission_item_reached_or_completed()
 			 */
 
 			// check if within loiter radius around wp, if yes then set altitude sp to mission item
-			if (dist >= 0.0f && dist_xy <= (_navigator->get_acceptance_radius() + fabsf(_mission_item.loiter_radius))
+			if (dist >= 0.0f && dist_xy <= (_navigator->get_acceptance_radius() + mission_item_loiter_radius_abs)
 			    && dist_z <= _navigator->get_altitude_acceptance_radius()) {
 
 				_waypoint_position_reached = true;
@@ -282,15 +281,15 @@ MissionBlock::is_mission_item_reached_or_completed()
 						&dist_xy, &dist_z);
 
 				// check if within loiter radius around wp, if yes then set altitude sp to mission item
-				if (dist >= 0.0f && dist_xy <= (_navigator->get_acceptance_radius() + fabsf(_mission_item.loiter_radius))
-				    && dist_z <= _navigator->get_default_altitude_acceptance_radius()) {
+				if (dist >= 0.0f && dist_xy <= (_navigator->get_acceptance_radius() + mission_item_loiter_radius_abs)
+				    && dist_z <= _navigator->get_altitude_acceptance_radius()) {
 
 					curr_sp->alt = mission_item_altitude_amsl;
 					curr_sp->type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 					_navigator->set_position_setpoint_triplet_updated();
 				}
 
-			} else if (dist >= 0.f && dist_xy <= (_navigator->get_acceptance_radius() + fabsf(_mission_item.loiter_radius))
+			} else if (dist >= 0.f && dist_xy <= (_navigator->get_acceptance_radius() + mission_item_loiter_radius_abs)
 				   && dist_z <= _navigator->get_altitude_acceptance_radius()) {
 				// loitering, check if new altitude is reached, while still also having check on position
 
@@ -515,15 +514,15 @@ MissionBlock::is_mission_item_reached_or_completed()
 				float bearing = get_bearing_to_next_waypoint(curr_sp.lat, curr_sp.lon, next_sp.lat, next_sp.lon);
 
 				// calculate (positive) angle between current bearing vector (orbit center to next waypoint) and vector pointing to tangent exit location
-				const float ratio = math::min(fabsf(_mission_item.loiter_radius / range), 1.0f);
+				const float ratio = math::min(fabsf(curr_sp.loiter_radius / range), 1.0f);
 				float inner_angle = acosf(ratio);
 
 				// Compute "ideal" tangent origin
-				if (curr_sp.loiter_direction > 0) {
-					bearing -= inner_angle;
+				if (curr_sp.loiter_direction_counter_clockwise) {
+					bearing += inner_angle;
 
 				} else {
-					bearing += inner_angle;
+					bearing -= inner_angle;
 				}
 
 				// set typ to position, will get set to loiter in the fw position controller once close
@@ -687,7 +686,7 @@ MissionBlock::mission_item_to_position_setpoint(const mission_item_s &item, posi
 	sp->yaw_valid = PX4_ISFINITE(item.yaw);
 	sp->loiter_radius = (fabsf(item.loiter_radius) > NAV_EPSILON_POSITION) ? fabsf(item.loiter_radius) :
 			    _navigator->get_loiter_radius();
-	sp->loiter_direction = math::signNoZero(item.loiter_radius);
+	sp->loiter_direction_counter_clockwise = item.loiter_radius < 0;
 
 	if (item.acceptance_radius > 0.001f && PX4_ISFINITE(item.acceptance_radius)) {
 		// if the mission item has a specified acceptance radius, overwrite the default one from parameters
@@ -733,15 +732,7 @@ MissionBlock::mission_item_to_position_setpoint(const mission_item_s &item, posi
 		break;
 
 	case NAV_CMD_LOITER_TO_ALT:
-
-		// initially use current altitude, and switch to mission item altitude once in loiter position
-		if (_navigator->get_loiter_min_alt() > 0.f) { // ignore _param_loiter_min_alt if smaller than 0
-			sp->alt = math::max(_navigator->get_global_position()->alt,
-					    _navigator->get_home_position()->alt + _navigator->get_loiter_min_alt());
-
-		} else {
-			sp->alt = _navigator->get_global_position()->alt;
-		}
+		sp->alt = _navigator->get_global_position()->alt;
 
 	// FALLTHROUGH
 	case NAV_CMD_LOITER_TIME_LIMIT:
@@ -781,7 +772,17 @@ MissionBlock::setLoiterItemFromCurrentPosition(struct mission_item_s *item)
 
 	item->lat = _navigator->get_global_position()->lat;
 	item->lon = _navigator->get_global_position()->lon;
-	item->altitude = _navigator->get_global_position()->alt;
+
+	// check if minimum loiter altitude is specified, and enforce it if so
+	float loiter_altitude_amsl = _navigator->get_global_position()->alt;
+
+	if (_navigator->get_loiter_min_alt() > FLT_EPSILON) {
+		loiter_altitude_amsl = math::max(loiter_altitude_amsl,
+						 _navigator->get_home_position()->alt + _navigator->get_loiter_min_alt());
+	}
+
+	item->altitude = loiter_altitude_amsl;
+
 	item->loiter_radius = _navigator->get_loiter_radius();
 }
 
@@ -930,4 +931,17 @@ MissionBlock::get_absolute_altitude_for_item(const mission_item_s &mission_item)
 	} else {
 		return mission_item.altitude;
 	}
+}
+
+void
+MissionBlock::initialize()
+{
+	_mission_item.lat = (double)NAN;
+	_mission_item.lon = (double)NAN;
+	_mission_item.yaw = NAN;
+	_mission_item.loiter_radius = _navigator->get_loiter_radius();
+	_mission_item.acceptance_radius = _navigator->get_acceptance_radius();
+	_mission_item.time_inside = 0.0f;
+	_mission_item.autocontinue = true;
+	_mission_item.origin = ORIGIN_ONBOARD;
 }

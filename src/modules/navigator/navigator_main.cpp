@@ -88,6 +88,13 @@ Navigator::Navigator() :
 	_navigation_mode_array[5] = &_precland;
 	_navigation_mode_array[6] = &_vtol_takeoff;
 
+	/* iterate through navigation modes and initialize _mission_item for each */
+	for (unsigned int i = 0; i < NAVIGATOR_MODE_ARRAY_SIZE; i++) {
+		if (_navigation_mode_array[i]) {
+			_navigation_mode_array[i]->initialize();
+		}
+	}
+
 	_handle_back_trans_dec_mss = param_find("VT_B_DEC_MSS");
 	_handle_reverse_delay = param_find("VT_B_REV_DEL");
 
@@ -223,7 +230,10 @@ void Navigator::run()
 		_home_pos_sub.update(&_home_pos);
 
 		// Handle Vehicle commands
-		while (_vehicle_command_sub.updated()) {
+		int vehicle_command_updates = 0;
+
+		while (_vehicle_command_sub.updated() && (vehicle_command_updates < vehicle_command_s::ORB_QUEUE_LENGTH)) {
+			vehicle_command_updates++;
 			const unsigned last_generation = _vehicle_command_sub.get_last_generation();
 
 			vehicle_command_s cmd{};
@@ -334,7 +344,7 @@ void Navigator::run()
 					}
 
 					if (only_alt_change_requested) {
-						if (PX4_ISFINITE(curr->current.loiter_radius) && curr->current.loiter_radius > 0) {
+						if (PX4_ISFINITE(curr->current.loiter_radius) && curr->current.loiter_radius > FLT_EPSILON) {
 							rep->current.loiter_radius = curr->current.loiter_radius;
 
 
@@ -342,12 +352,7 @@ void Navigator::run()
 							rep->current.loiter_radius = get_loiter_radius();
 						}
 
-						if (curr->current.loiter_direction == 1 || curr->current.loiter_direction == -1) {
-							rep->current.loiter_direction = curr->current.loiter_direction;
-
-						} else {
-							rep->current.loiter_direction = 1;
-						}
+						rep->current.loiter_direction_counter_clockwise = curr->current.loiter_direction_counter_clockwise;
 					}
 
 					rep->previous.timestamp = hrt_absolute_time();
@@ -385,12 +390,12 @@ void Navigator::run()
 					position_setpoint_triplet_s *rep = get_reposition_triplet();
 					rep->current.type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 					rep->current.loiter_radius = get_loiter_radius();
-					rep->current.loiter_direction = 1;
+					rep->current.loiter_direction_counter_clockwise = false;
 					rep->current.cruising_throttle = get_cruising_throttle();
 
 					if (PX4_ISFINITE(cmd.param1)) {
 						rep->current.loiter_radius = fabsf(cmd.param1);
-						rep->current.loiter_direction = math::signNoZero(cmd.param1);
+						rep->current.loiter_direction_counter_clockwise = cmd.param1 < 0;
 					}
 
 					rep->current.lat = position_setpoint.lat;
@@ -414,7 +419,7 @@ void Navigator::run()
 				rep->previous.alt = get_global_position()->alt;
 
 				rep->current.loiter_radius = get_loiter_radius();
-				rep->current.loiter_direction = 1;
+				rep->current.loiter_direction_counter_clockwise = false;
 				rep->current.type = position_setpoint_s::SETPOINT_TYPE_TAKEOFF;
 
 				if (home_global_position_valid()) {
@@ -554,12 +559,6 @@ void Navigator::run()
 				// reset cruise speed and throttle to default when transitioning (VTOL Takeoff handles it separately)
 				reset_cruising_speed();
 				set_cruising_throttle();
-
-				// need to update current setpooint with reset cruise speed and throttle
-				position_setpoint_triplet_s *rep = get_reposition_triplet();
-				*rep = *(get_position_setpoint_triplet());
-				rep->current.cruising_speed = get_cruising_speed();
-				rep->current.cruising_throttle = get_cruising_throttle();
 			}
 		}
 
@@ -813,7 +812,6 @@ void Navigator::geofence_breach_check(bool &have_geofence_position_data)
 		float test_point_bearing;
 		float test_point_distance;
 		float vertical_test_point_distance;
-		char geofence_violation_warning[50];
 
 		if (_vstatus.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
 			test_point_bearing = atan2f(_local_pos.vy, _local_pos.vx);
@@ -848,12 +846,10 @@ void Navigator::geofence_breach_check(bool &have_geofence_position_data)
 
 		if (_geofence.getPredict()) {
 			fence_violation_test_point = _gf_breach_avoidance.getFenceViolationTestPoint();
-			snprintf(geofence_violation_warning, sizeof(geofence_violation_warning), "Approaching on geofence");
 
 		} else {
 			fence_violation_test_point = matrix::Vector2d(_global_pos.lat, _global_pos.lon);
 			vertical_test_point_distance = 0;
-			snprintf(geofence_violation_warning, sizeof(geofence_violation_warning), "Geofence exceeded");
 		}
 
 		gf_violation_type.flags.dist_to_home_exceeded = !_geofence.isCloserThanMaxDistToHome(fence_violation_test_point(0),
@@ -871,18 +867,28 @@ void Navigator::geofence_breach_check(bool &have_geofence_position_data)
 		have_geofence_position_data = false;
 
 		_geofence_result.timestamp = hrt_absolute_time();
-		_geofence_result.geofence_action = _geofence.getGeofenceAction();
+		_geofence_result.primary_geofence_action = _geofence.getGeofenceAction();
 		_geofence_result.home_required = _geofence.isHomeRequired();
 
 		if (gf_violation_type.value) {
 			/* inform other apps via the mission result */
-			_geofence_result.geofence_violated = true;
+			_geofence_result.primary_geofence_breached = true;
+
+			using geofence_violation_reason_t = events::px4::enums::geofence_violation_reason_t;
+
+			if (gf_violation_type.flags.fence_violation) {
+				_geofence_result.geofence_violation_reason = (uint8_t)geofence_violation_reason_t::fence_violation;
+
+			} else if (gf_violation_type.flags.max_altitude_exceeded) {
+				_geofence_result.geofence_violation_reason = (uint8_t)geofence_violation_reason_t::max_altitude_exceeded;
+
+			} else if (gf_violation_type.flags.dist_to_home_exceeded) {
+				_geofence_result.geofence_violation_reason = (uint8_t)geofence_violation_reason_t::dist_to_home_exceeded;
+
+			}
 
 			/* Issue a warning about the geofence violation once and only if we are armed */
 			if (!_geofence_violation_warning_sent && _vstatus.arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
-				mavlink_log_critical(&_mavlink_log_pub, "%s", geofence_violation_warning);
-				events::send(events::ID("navigator_geofence_violation"), {events::Log::Warning, events::LogInternal::Info},
-					     geofence_violation_warning);
 
 				// we have predicted a geofence violation and if the action is to loiter then
 				// demand a reposition to a location which is inside the geofence
@@ -916,9 +922,7 @@ void Navigator::geofence_breach_check(bool &have_geofence_position_data)
 					rep->current.alt = loiter_altitude_amsl;
 					rep->current.valid = true;
 					rep->current.loiter_radius = get_loiter_radius();
-					rep->current.alt_valid = true;
 					rep->current.type = position_setpoint_s::SETPOINT_TYPE_LOITER;
-					rep->current.loiter_direction = 1;
 					rep->current.cruising_throttle = get_cruising_throttle();
 					rep->current.acceptance_radius = get_acceptance_radius();
 					rep->current.cruising_speed = get_cruising_speed();
@@ -930,7 +934,7 @@ void Navigator::geofence_breach_check(bool &have_geofence_position_data)
 
 		} else {
 			/* inform other apps via the mission result */
-			_geofence_result.geofence_violated = false;
+			_geofence_result.primary_geofence_breached = false;
 
 			/* Reset the _geofence_violation_warning_sent field */
 			_geofence_violation_warning_sent = false;
@@ -988,10 +992,18 @@ float Navigator::get_default_acceptance_radius()
 	return _param_nav_acc_rad.get();
 }
 
-float Navigator::get_default_altitude_acceptance_radius()
+float Navigator::get_altitude_acceptance_radius()
 {
 	if (get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING) {
-		return _param_nav_fw_alt_rad.get();
+		const position_setpoint_s &next_sp = get_position_setpoint_triplet()->next;
+
+		if (!force_vtol() && next_sp.type == position_setpoint_s::SETPOINT_TYPE_LAND && next_sp.valid) {
+			// Use separate (tighter) altitude acceptance for clean altitude starting point before FW landing
+			return _param_nav_fw_altl_rad.get();
+
+		} else {
+			return _param_nav_fw_alt_rad.get();
+		}
 
 	} else if (get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROVER) {
 		return INFINITY;
@@ -1008,20 +1020,6 @@ float Navigator::get_default_altitude_acceptance_radius()
 
 		return alt_acceptance_radius;
 	}
-}
-
-float Navigator::get_altitude_acceptance_radius()
-{
-	if (get_vstatus()->vehicle_type == vehicle_status_s::VEHICLE_TYPE_FIXED_WING) {
-		const position_setpoint_s &next_sp = get_position_setpoint_triplet()->next;
-
-		if (next_sp.type == position_setpoint_s::SETPOINT_TYPE_LAND && next_sp.valid) {
-			// Use separate (tighter) altitude acceptance for clean altitude starting point before landing
-			return _param_nav_fw_altl_rad.get();
-		}
-	}
-
-	return get_default_altitude_acceptance_radius();
 }
 
 float Navigator::get_cruising_speed()
@@ -1083,6 +1081,7 @@ void Navigator::reset_position_setpoint(position_setpoint_s &sp)
 	sp.valid = false;
 	sp.type = position_setpoint_s::SETPOINT_TYPE_IDLE;
 	sp.disable_weather_vane = false;
+	sp.loiter_direction_counter_clockwise = false;
 }
 
 float Navigator::get_cruising_throttle()

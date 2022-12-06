@@ -33,6 +33,39 @@
 
 add_subdirectory(Utility)
 
+# Symforce code generation TODO:fixme
+# execute_process(
+#     COMMAND ${PYTHON_EXECUTABLE} -m symforce.symbolic
+#     RESULT_VARIABLE PYTHON_SYMFORCE_EXIT_CODE
+#     OUTPUT_QUIET
+# )
+# if(${PYTHON_SYMFORCE_EXIT_CODE} EQUAL 0)
+
+# 	set(EKF_DERIVATION_DIR ${CMAKE_CURRENT_SOURCE_DIR}/EKF/python/ekf_derivation)
+
+# 	set(EKF_GENERATED_SRC_FILES
+# 		${EKF_DERIVATION_DIR}/generated/compute_airspeed_h_and_k.h
+# 		${EKF_DERIVATION_DIR}/generated/compute_airspeed_innov_and_innov_var.h
+# 		${EKF_DERIVATION_DIR}/generated/compute_sideslip_h_and_k.h
+# 		${EKF_DERIVATION_DIR}/generated/compute_sideslip_innov_and_innov_var.h
+# 		${EKF_DERIVATION_DIR}/generated/covariance_prediction.h
+# 	)
+
+# 	add_custom_command(
+# 		OUTPUT ${EKF_GENERATED_SRC_FILES}
+# 		COMMAND ${PYTHON_EXECUTABLE} derivation.py
+# 		DEPENDS
+# 			${EKF_DERIVATION_DIR}/derivation.py
+# 			${EKF_DERIVATION_DIR}/derivation_utils.py
+
+# 		WORKING_DIRECTORY ${EKF_DERIVATION_DIR}
+# 		COMMENT "Symforce code generation"
+# 		USES_TERMINAL
+# 	)
+
+# 	add_custom_target(ekf2_symforce_generate DEPENDS ${EKF_GENERATED_SRC_FILES})
+# endif()
+
 px4_add_module(
 	MODULE modules__ekf2
 	MAIN ekf2
@@ -59,18 +92,18 @@ px4_add_module(
 		EKF/EKFGSF_yaw.cpp
 		EKF/estimator_interface.cpp
 		EKF/ev_height_control.cpp
+		EKF/ev_vel_control.cpp
 		EKF/fake_height_control.cpp
 		EKF/fake_pos_control.cpp
 		EKF/gnss_height_control.cpp
 		EKF/gps_checks.cpp
 		EKF/gps_control.cpp
-		EKF/gps_fusion.cpp
 		EKF/gps_yaw_fusion.cpp
 		EKF/height_control.cpp
-		EKF/height_fusion.cpp
 		EKF/imu_down_sampler.cpp
 		EKF/mag_control.cpp
 		EKF/mag_fusion.cpp
+		EKF/optical_flow_control.cpp
 		EKF/optflow_fusion.cpp
 		EKF/range_finder_consistency_check.cpp
 		EKF/range_height_control.cpp

@@ -43,6 +43,7 @@
 #define EKF_ESTIMATOR_INTERFACE_H
 
 #if defined(MODULE_NAME)
+#include <px4_platform_common/log.h>
 # define ECL_INFO PX4_DEBUG
 # define ECL_WARN PX4_DEBUG
 # define ECL_ERR  PX4_DEBUG
@@ -100,6 +101,8 @@ public:
 
 	void setAuxVelData(const auxVelSample &auxvel_sample);
 
+	void setSystemFlagData(const systemFlagUpdate &system_flags);
+
 	// return a address to the parameters struct
 	// in order to give access to the application
 	parameters *getParamHandle() { return &_params; }
@@ -120,7 +123,7 @@ public:
 	void set_vehicle_at_rest(bool at_rest) { _control_status.flags.vehicle_at_rest = at_rest; }
 
 	// return true if the attitude is usable
-	bool attitude_valid() const { return PX4_ISFINITE(_output_new.quat_nominal(0)) && _control_status.flags.tilt_align; }
+	bool attitude_valid() const { return _output_new.quat_nominal.isAllFinite() && _control_status.flags.tilt_align; }
 
 	// get vehicle landed status data
 	bool get_in_air_status() const { return _control_status.flags.in_air; }
@@ -130,9 +133,6 @@ public:
 
 	// set vehicle is fixed wing status
 	void set_is_fixed_wing(bool is_fixed_wing) { _control_status.flags.fixed_wing = is_fixed_wing; }
-
-	// set flag if synthetic sideslip measurement should be fused
-	void set_fuse_beta_flag(bool fuse_beta) { _control_status.flags.fuse_beta = (fuse_beta && _control_status.flags.in_air); }
 
 	// set flag if static pressure rise due to ground effect is expected
 	// use _params.gnd_effect_deadzone to adjust for expected rise in static pressure
@@ -330,7 +330,6 @@ protected:
 	bool _initialised{false};      // true if the ekf interface instance (data buffering) is initialized
 
 	bool _NED_origin_initialised{false};
-	bool _gps_speed_valid{false};
 	float _gps_origin_eph{0.0f}; // horizontal position uncertainty of the GPS origin
 	float _gps_origin_epv{0.0f}; // vertical position uncertainty of the GPS origin
 	MapProjection _pos_ref{}; // Contains WGS-84 position latitude and longitude of the EKF origin
@@ -340,15 +339,14 @@ protected:
 
 	// innovation consistency check monitoring ratios
 	AlphaFilter<float> _gnss_yaw_signed_test_ratio_lpf{0.1f}; // average signed test ratio used to detect a bias in the state
-	Vector2f _ev_vel_test_ratio{};		// EV velocity innovation consistency check ratios
-	Vector2f _ev_pos_test_ratio{};		// EV position innovation consistency check ratios
-	float _optflow_test_ratio{};		// Optical flow innovation consistency check ratio
+
 	float _hagl_test_ratio{};		// height above terrain measurement innovation consistency check ratio
-	float _beta_test_ratio{};		// sideslip innovation consistency check ratio
 	Vector2f _drag_test_ratio{};		// drag innovation consistency check ratio
 	innovation_fault_status_u _innov_check_fail_status{};
 
-	bool _deadreckon_time_exceeded{true};	// true if the horizontal nav solution has been deadreckoning for too long and is invalid
+	bool _horizontal_deadreckon_time_exceeded{true};
+	bool _vertical_position_deadreckon_time_exceeded{true};
+	bool _vertical_velocity_deadreckon_time_exceeded{true};
 
 	float _gps_horizontal_position_drift_rate_m_s{NAN}; // Horizontal position drift rate (m/s)
 	float _gps_vertical_position_drift_rate_m_s{NAN};   // Vertical position drift rate (m/s)
@@ -358,9 +356,10 @@ protected:
 	uint64_t _time_last_in_air{0};		///< last time we were in air (uSec)
 
 	// data buffer instances
-	RingBuffer<imuSample> _imu_buffer{12};           // buffer length 12 with default parameters
-	RingBuffer<outputSample> _output_buffer{12};
-	RingBuffer<outputVert> _output_vert_buffer{12};
+	static constexpr uint8_t kBufferLengthDefault = 12;
+	RingBuffer<imuSample> _imu_buffer{kBufferLengthDefault};
+	RingBuffer<outputSample> _output_buffer{kBufferLengthDefault};
+	RingBuffer<outputVert> _output_vert_buffer{kBufferLengthDefault};
 
 	RingBuffer<gpsSample> *_gps_buffer{nullptr};
 	RingBuffer<magSample> *_mag_buffer{nullptr};
@@ -371,6 +370,7 @@ protected:
 	RingBuffer<extVisionSample> *_ext_vision_buffer{nullptr};
 	RingBuffer<dragSample> *_drag_buffer{nullptr};
 	RingBuffer<auxVelSample> *_auxvel_buffer{nullptr};
+	RingBuffer<systemFlagUpdate> *_system_flag_buffer{nullptr};
 
 	uint64_t _time_last_gps_buffer_push{0};
 	uint64_t _time_last_gps_yaw_buffer_push{0};
@@ -395,8 +395,6 @@ protected:
 
 	// this is the previous status of the filter control modes - used to detect mode transitions
 	filter_control_status_u _control_status_prev{};
-
-	virtual float compensateBaroForDynamicPressure(const float baro_alt_uncompensated) const = 0;
 
 	// these are used to record single frame events for external monitoring and should NOT be used for
 	// state logic becasue they will be cleared externally after being read.
