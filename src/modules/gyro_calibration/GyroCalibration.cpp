@@ -87,6 +87,12 @@ void GyroCalibration::Run()
 				Reset();
 				return;
 			}
+
+			if (_system_calibrating != vehicle_status.calibration_enabled) {
+				_system_calibrating = vehicle_status.calibration_enabled;
+				Reset();
+				return;
+			}
 		}
 	}
 
@@ -120,8 +126,14 @@ void GyroCalibration::Run()
 		return;
 	}
 
-	int total_accels = 0;
-	int total_gyros = 0;
+	updateSensors();
+	updateCalibration();
+}
+
+void GyroCalibration::updateSensors()
+{
+	int accel = 0;
+	int gyro = 0;
 
 	// collect raw data from all available gyroscopes (sensor_gyro)
 	for (int imu_fifo_instance = 0; imu_fifo_instance < _sensor_imu_fifo_subs.size(); imu_fifo_instance++) {
@@ -129,61 +141,58 @@ void GyroCalibration::Run()
 
 		while (_sensor_imu_fifo_subs[imu_fifo_instance].update(&sensor_imu_fifo)) {
 			if (PX4_ISFINITE(sensor_imu_fifo.temperature)) {
-				if ((fabsf(_temperature[total_gyros] - sensor_imu_fifo.temperature) > 1.f)
-				    || !PX4_ISFINITE(_temperature[total_gyros])) {
-					PX4_DEBUG("IMU %d temperature change, resetting all %.6f -> %.6f", total_gyros, (double)_temperature[total_gyros],
+				if ((fabsf(_temperature[gyro] - sensor_imu_fifo.temperature) > 1.f)
+				    || !PX4_ISFINITE(_temperature[gyro])) {
+					PX4_DEBUG("IMU %d temperature change, resetting all %.6f -> %.6f", gyro, (double)_temperature[gyro],
 						  (double)sensor_imu_fifo.temperature);
 
-					_temperature[total_gyros] = sensor_imu_fifo.temperature;
+					_temperature[gyro] = sensor_imu_fifo.temperature;
 
 					// reset all on any temperature change
 					Reset();
 				}
 
 			} else {
-				_temperature[total_gyros] = NAN;
+				_temperature[gyro] = NAN;
 			}
 
-			if (_gyro_calibration[total_gyros].device_id() == sensor_imu_fifo.device_id && sensor_imu_fifo.samples > 0) {
+			if (_gyro_calibration[gyro].device_id() == sensor_imu_fifo.device_id && sensor_imu_fifo.samples > 0) {
 
 				Vector3f accel_val = calibration::AverageFifoAccel(sensor_imu_fifo);
 				Vector3f gyro_val = calibration::AverageFifoGyro(sensor_imu_fifo);
 
-				_gyro_mean[total_gyros].update(gyro_val);
-				_gyro_last_update[total_gyros] = sensor_imu_fifo.timestamp;
+				_gyro_mean[gyro].update(gyro_val);
+				_gyro_last_update[gyro] = sensor_imu_fifo.timestamp;
 
 				// check accelerometer for possible movement
-				if ((accel_val - _acceleration[total_accels]).longerThan(0.5f)) {
+				if ((accel_val - _acceleration[accel]).longerThan(0.5f)) {
 					// reset all on any change
-					PX4_DEBUG("accel %d changed, resetting all %.5f", total_accels,
-						  (double)(accel_val - _acceleration[total_accels]).length());
+					PX4_DEBUG("accel %d changed, resetting all %.5f", accel,
+						  (double)(accel_val - _acceleration[accel]).length());
 
-					_acceleration[total_accels] = accel_val;
+					_acceleration[accel] = accel_val;
 					Reset();
-					return;
 
 				} else if (accel_val.longerThan(CONSTANTS_ONE_G * 1.3f)) {
 					Reset();
-					return;
 				}
 
 			} else {
 				// setting device id, reset all
-				_gyro_calibration[total_gyros].set_device_id(sensor_imu_fifo.device_id);
+				_gyro_calibration[gyro].set_device_id(sensor_imu_fifo.device_id);
 				Reset();
 			}
 		}
 
-		if ((_gyro_last_update[total_gyros] != 0) && (hrt_elapsed_time(&_gyro_last_update[total_gyros]) > 100_ms)) {
+		if ((_gyro_last_update[gyro] != 0) && (hrt_elapsed_time(&_gyro_last_update[gyro]) > 100_ms)) {
 			// reset on any timeout
 			Reset();
-			_gyro_last_update[total_gyros] = 0;
-			return;
+			_gyro_last_update[gyro] = 0;
 		}
 
 		if (_sensor_imu_fifo_subs[imu_fifo_instance].advertised()) {
-			total_accels++;
-			total_gyros++;
+			accel++;
+			gyro++;
 		}
 	}
 
@@ -192,43 +201,45 @@ void GyroCalibration::Run()
 	for (int gyro_instance = 0; gyro_instance < _sensor_gyro_subs.size(); gyro_instance++) {
 		sensor_gyro_s sensor_gyro;
 
-		while (_sensor_gyro_subs[gyro_instance].update(&sensor_gyro)) {
+		if (_sensor_gyro_subs[gyro].update(&sensor_gyro)) {
 			if (PX4_ISFINITE(sensor_gyro.temperature)) {
-				if ((fabsf(_temperature[total_gyros] - sensor_gyro.temperature) > 1.f) || !PX4_ISFINITE(_temperature[total_gyros])) {
-					PX4_DEBUG("gyro %d temperature change, resetting all %.6f -> %.6f", total_gyros, (double)_temperature[total_gyros],
+				if ((fabsf(_temperature[gyro] - sensor_gyro.temperature) > 1.f) || !PX4_ISFINITE(_temperature[gyro])) {
+					PX4_DEBUG("gyro %d temperature change, resetting all %.6f -> %.6f", gyro, (double)_temperature[gyro],
 						  (double)sensor_gyro.temperature);
 
-					_temperature[total_gyros] = sensor_gyro.temperature;
+					_temperature[gyro] = sensor_gyro.temperature;
 
 					// reset all on any temperature change
 					Reset();
 				}
 
 			} else {
-				_temperature[total_gyros] = NAN;
+				_temperature[gyro] = NAN;
 			}
 
-			if (_gyro_calibration[total_gyros].device_id() == sensor_gyro.device_id) {
-				const Vector3f val{Vector3f{sensor_gyro.x, sensor_gyro.y, sensor_gyro.z} - _gyro_calibration[total_gyros].thermal_offset()};
-				_gyro_mean[total_gyros].update(val);
-				_gyro_last_update[total_gyros] = sensor_gyro.timestamp;
+			if (_gyro_calibration[gyro].device_id() == sensor_gyro.device_id) {
+				_gyro_calibration[gyro].SensorCorrectionsUpdate();
+				const Vector3f val{Vector3f{sensor_gyro.x, sensor_gyro.y, sensor_gyro.z} - _gyro_calibration[gyro].thermal_offset()};
+				_gyro_mean[gyro].update(val);
+				_gyro_last_update[gyro] = sensor_gyro.timestamp;
 
 			} else {
 				// setting device id, reset all
-				_gyro_calibration[total_gyros].set_device_id(sensor_gyro.device_id);
+				_gyro_calibration[gyro].set_device_id(sensor_gyro.device_id);
 				Reset();
 			}
 		}
 
-		if ((_gyro_last_update[total_gyros] != 0) && (hrt_elapsed_time(&_gyro_last_update[total_gyros]) > 100_ms)) {
-			// reset on any timeout
+		if ((_gyro_last_update[gyro] != 0) && (hrt_elapsed_time(&_gyro_last_update[gyro]) > 100_ms)) {
+			// remove sensor and reset on any timeout
+			_gyro_calibration[gyro].set_device_id(0);
+			_gyro_calibration[gyro].Reset();
+
 			Reset();
-			_gyro_last_update[total_gyros] = 0;
-			return;
 		}
 
 		if (_sensor_gyro_subs[gyro_instance].advertised()) {
-			total_gyros++;
+			gyro++;
 		}
 	}
 
@@ -240,82 +251,87 @@ void GyroCalibration::Run()
 		if (_sensor_accel_subs[accel_instance].update(&sensor_accel)) {
 			const Vector3f acceleration{sensor_accel.x, sensor_accel.y, sensor_accel.z};
 
-			if ((acceleration - _acceleration[total_accels]).longerThan(0.5f)) {
+			if ((acceleration - _acceleration[accel]).longerThan(0.5f)) {
 				// reset all on any change
-				PX4_DEBUG("accel %d changed, resetting all %.5f", total_accels,
-					  (double)(acceleration - _acceleration[total_accels]).length());
+				PX4_DEBUG("accel %d changed, resetting all %.5f", accel, (double)(acceleration - _acceleration[accel]).length());
 
-				_acceleration[total_accels] = acceleration;
+				_acceleration[accel] = acceleration;
 				Reset();
-				return;
 
 			} else if (acceleration.longerThan(CONSTANTS_ONE_G * 1.3f)) {
 				Reset();
-				return;
 			}
 		}
 
 		if (_sensor_accel_subs[accel_instance].advertised()) {
-			total_accels++;
+			accel++;
 		}
 	}
+}
 
-	// check if sufficient data has been gathered to update calibration
-	bool sufficient_samples = false;
+void GyroCalibration::updateCalibration()
+{
+	// update calibrations for all available gyros
+	if (hrt_elapsed_time(&_last_calibration_update) > 5_s) {
 
-	for (int i = 0; i < total_gyros; i++) {
-		if ((_gyro_calibration[i].device_id() != 0) && _gyro_mean[i].valid()) {
-			// periodically check variance
-			if (_gyro_mean[i].count() % 100 == 0) {
-				PX4_DEBUG("gyro %d (%" PRIu32 ") variance, [%.9f, %.9f, %.9f] %.9f", i, _gyro_calibration[i].device_id(),
-					  (double)_gyro_mean[i].variance()(0), (double)_gyro_mean[i].variance()(1), (double)_gyro_mean[i].variance()(2),
-					  (double)_gyro_mean[i].variance().length());
+		// check variance again before saving
+		for (int gyro = 0; gyro < _sensor_gyro_subs.size(); gyro++) {
+			if (_gyro_calibration[gyro].device_id() != 0) {
 
-				if (_gyro_mean[i].variance().longerThan(0.001f)) {
+				if (!_gyro_mean[gyro].valid() || _gyro_mean[gyro].variance().longerThan(0.001f)) {
 					// reset all
-					PX4_DEBUG("gyro %d variance longer than 0.001f (%.3f), resetting all", i, (double)_gyro_mean[i].variance().length());
+					PX4_DEBUG("gyro %d variance longer than 0.001f (%.3f), resetting all",
+						  gyro, (double)_gyro_mean[gyro].variance().length());
 					Reset();
 					return;
 				}
 			}
-
-			if (_gyro_mean[i].count() > 5000) {
-				sufficient_samples = true;
-
-			} else {
-				sufficient_samples = false;
-				return;
-			}
 		}
-	}
 
-
-	// update calibrations for all available gyros
-	if (sufficient_samples && (hrt_elapsed_time(&_last_calibration_update) > 10_s)) {
 		bool calibration_updated = false;
 
-		for (int gyro = 0; gyro < total_gyros; gyro++) {
-			if (_gyro_calibration[gyro].device_id() != 0 && _gyro_mean[gyro].valid()) {
+		for (int gyro = 0; gyro < _sensor_gyro_subs.size(); gyro++) {
 
-				// check variance again before saving
-				if (_gyro_mean[gyro].variance().longerThan(0.001f)) {
-					// reset all
-					PX4_DEBUG("gyro %d variance longer than 0.001f (%.6f), resetting all",
-						  gyro, (double)_gyro_mean[gyro].variance().length());
-					break;
-				}
+			if ((_gyro_calibration[gyro].device_id() != 0)
+			    && _gyro_mean[gyro].valid() && (_gyro_mean[gyro].count() > 100)
+			   ) {
 
 				const Vector3f old_offset{_gyro_calibration[gyro].offset()};
+				const Vector3f new_offset{_gyro_mean[gyro].mean()};
 
-				if (_gyro_calibration[gyro].set_offset(_gyro_mean[gyro].mean()) || !_gyro_calibration[gyro].calibrated()) {
+				bool change_exceeds_stddev = false;
+				bool variance_significantly_better = false;
+
+				const Vector3f variance = _gyro_mean[gyro].variance();
+
+				for (int i = 0; i < 3; i++) {
+					// check if offset changed by more than 1 standard deviation
+					if (sq(new_offset(i) - old_offset(i)) > variance(i)) {
+						change_exceeds_stddev = true;
+					}
+
+					// check if current variance is significantly better than previous cal
+					if (variance(i) < 0.1f * _gyro_cal_variance[gyro](i)) {
+						variance_significantly_better = true;
+					}
+				}
+
+				// update if offset changed by more than 1 standard deviation or currently uncalibrated
+				if ((change_exceeds_stddev || variance_significantly_better || !_gyro_calibration[gyro].calibrated())
+				    && _gyro_calibration[gyro].set_offset(new_offset)
+				   ) {
 
 					calibration_updated = true;
+
+					_gyro_cal_variance[gyro] = variance;
 
 					PX4_INFO("gyro %d (%" PRIu32 ") updating offsets [%.3f, %.3f, %.3f]->[%.3f, %.3f, %.3f] %.1f degC",
 						 gyro, _gyro_calibration[gyro].device_id(),
 						 (double)old_offset(0), (double)old_offset(1), (double)old_offset(2),
-						 (double)_gyro_mean[gyro].mean()(0), (double)_gyro_mean[gyro].mean()(1), (double)_gyro_mean[gyro].mean()(2),
+						 (double)new_offset(0), (double)new_offset(1), (double)new_offset(2),
 						 (double)_temperature[gyro]);
+
+					perf_count(_calibration_updated_perf);
 				}
 			}
 		}
@@ -324,7 +340,7 @@ void GyroCalibration::Run()
 		if (calibration_updated) {
 			bool param_save = false;
 
-			for (int gyro = 0; gyro < total_gyros; gyro++) {
+			for (int gyro = 0; gyro < _sensor_gyro_subs.size(); gyro++) {
 				if (_gyro_calibration[gyro].device_id() != 0) {
 					if (_gyro_calibration[gyro].ParametersSave(gyro)) {
 						param_save = true;
@@ -334,12 +350,10 @@ void GyroCalibration::Run()
 
 			if (param_save) {
 				param_notify_changes();
-				_last_calibration_update = hrt_absolute_time();
-				perf_count(_calibration_updated_perf);
 			}
-		}
 
-		Reset();
+			Reset();
+		}
 	}
 }
 
