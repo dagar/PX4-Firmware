@@ -245,6 +245,33 @@ bool EKF2Selector::UpdateErrorScores()
 					}
 				}
 			}
+
+			// find highest priority IMU and record which estimator instances are using it
+			uint8_t highest_priority = 0;
+
+			for (unsigned i = 0; i < IMU_STATUS_SIZE; i++) {
+				if ((sensors_status_imu.accel_device_ids[i] != 0)
+				    && (sensors_status_imu.accel_priority[i] > highest_priority)
+				   ) {
+					highest_priority = sensors_status_imu.accel_priority[i];
+				}
+			}
+
+			for (auto &inst : _instance) {
+				inst.imu_highest_priority = false; // clear
+
+				if ((inst.accel_device_id != 0) && (inst.gyro_device_id != 0)) {
+
+					for (unsigned i = 0; i < IMU_STATUS_SIZE; i++) {
+						if (sensors_status_imu.accel_device_ids[i] == inst.accel_device_id) {
+
+							if (sensors_status_imu.accel_priority[i] == highest_priority) {
+								inst.imu_highest_priority = true;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -737,9 +764,15 @@ void EKF2Selector::Run()
 					alternative_error = relative_error;
 
 					// relative error less than selected instance and has not been the selected instance for at least 10 seconds
-					if ((relative_error <= -_rel_err_thresh) && hrt_elapsed_time(&_instance[i].time_last_selected) > 10_s) {
-						lower_error_available = true;
+					if (hrt_elapsed_time(&_instance[i].time_last_selected) > 10_s) {
+						if (relative_error <= -_rel_err_thresh) {
+							lower_error_available = true;
+
+						} else if (_instance[i].imu_highest_priority && (relative_error < 0.1f)) {
+							lower_error_available = true;
+						}
 					}
+
 				}
 
 				if ((test_ratio > 0) && (test_ratio < best_test_ratio)) {
@@ -761,14 +794,15 @@ void EKF2Selector::Run()
 				SelectInstance(best_ekf);
 			}
 
-		} else if (lower_error_available
-			   && ((hrt_elapsed_time(&_last_instance_change) > 10_s)
-			       || (_instance[_selected_instance].warning
-				   && (hrt_elapsed_time(&_instance[_selected_instance].time_last_no_warning) > 1_s)))) {
+		} else if ((hrt_elapsed_time(&_instance[_selected_instance].time_last_no_warning) > 1_s)
+			   && ((hrt_elapsed_time(&_last_instance_change) > 10_s) || _instance[_selected_instance].warning)
+			  ) {
 
-			// if this instance has a significantly lower relative error to the active primary, we consider it as a
-			// better instance and would like to switch to it even if the current primary is healthy
-			SelectInstance(best_ekf_alternate);
+			if (lower_error_available) {
+				// if this instance has a significantly lower relative error to the active primary, we consider it as a
+				// better instance and would like to switch to it even if the current primary is healthy
+				SelectInstance(best_ekf_alternate);
+			}
 
 		} else if (_request_instance.load() != INVALID_INSTANCE) {
 
