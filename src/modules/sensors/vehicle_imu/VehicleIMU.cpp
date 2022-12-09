@@ -286,7 +286,6 @@ bool VehicleIMU::UpdateAccel()
 					const float interval_us = accel.timestamp_sample - _accel_timestamp_sample_last;
 
 					_accel_mean_interval_us.update(interval_us);
-					_accel_fifo_mean_interval_us.update(interval_us / math::max(accel.samples, (uint8_t)1));
 
 					// check measured interval periodically
 					if (_accel_mean_interval_us.valid() && (_accel_mean_interval_us.count() % 10 == 0)) {
@@ -414,7 +413,6 @@ bool VehicleIMU::UpdateGyro()
 					const float interval_us = gyro.timestamp_sample - _gyro_timestamp_sample_last;
 
 					_gyro_mean_interval_us.update(interval_us);
-					_gyro_fifo_mean_interval_us.update(interval_us / math::max(gyro.samples, (uint8_t)1));
 
 					// check measured interval periodically
 					if (_gyro_mean_interval_us.valid() && (_gyro_mean_interval_us.count() % 10 == 0)) {
@@ -571,7 +569,7 @@ bool VehicleIMU::Publish()
 					_status.accel_device_id = _accel_calibration.device_id();
 
 					_status.accel_rate_hz = 1e6f / _accel_mean_interval_us.mean();
-					_status.accel_raw_rate_hz = 1e6f / _accel_fifo_mean_interval_us.mean(); // FIFO
+					_status.accel_raw_rate_hz = _status.accel_rate_hz;
 
 					// accel mean and variance
 					const Dcmf &R = _accel_calibration.rotation();
@@ -595,7 +593,7 @@ bool VehicleIMU::Publish()
 					_status.gyro_device_id = _gyro_calibration.device_id();
 
 					_status.gyro_rate_hz = 1e6f / _gyro_mean_interval_us.mean();
-					_status.gyro_raw_rate_hz = 1e6f / _gyro_fifo_mean_interval_us.mean(); // FIFO
+					_status.gyro_raw_rate_hz = _status.gyro_rate_hz;
 
 					// gyro mean and variance
 					const Dcmf &R = _gyro_calibration.rotation();

@@ -127,10 +127,7 @@ private:
 	math::WelfordMeanVector<float, 3> _raw_gyro_mean{};
 
 	math::WelfordMean<float> _accel_mean_interval_us{};
-	math::WelfordMean<float> _accel_fifo_mean_interval_us{};
-
 	math::WelfordMean<float> _gyro_mean_interval_us{};
-	math::WelfordMean<float> _gyro_fifo_mean_interval_us{};
 
 	math::WelfordMean<float> _gyro_update_latency_mean_us{};
 	math::WelfordMean<float> _gyro_publish_latency_mean_us{};

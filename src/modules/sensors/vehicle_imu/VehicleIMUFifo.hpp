@@ -33,7 +33,7 @@
 
 #pragma once
 
-#include "Integrator.hpp"
+#include <Integrator.hpp>
 
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/mathlib/math/WelfordMean.hpp>
@@ -93,8 +93,13 @@ private:
 	void SensorCalibrationSaveAccel();
 	void SensorCalibrationSaveGyro();
 
+	// return the square of two floating point numbers
+	static constexpr float sq(float var) { return var * var; }
+
 	uORB::PublicationMulti<vehicle_imu_s> _vehicle_imu_pub{ORB_ID(vehicle_imu)};
 	uORB::PublicationMulti<vehicle_imu_status_s> _vehicle_imu_status_pub{ORB_ID(vehicle_imu_status)};
+
+	static constexpr hrt_abstime kIMUStatusPublishingInterval{100_ms};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
