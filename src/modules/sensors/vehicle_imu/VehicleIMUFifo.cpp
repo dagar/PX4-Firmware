@@ -239,7 +239,7 @@ void VehicleIMUFifo::Run()
 			if (sensor_imu_fifo.timestamp_sample > _timestamp_sample_last) {
 				if ((_timestamp_sample_last != 0) && (sensor_imu_fifo.samples > 0)) {
 					float interval_us = sensor_imu_fifo.timestamp_sample - _timestamp_sample_last;
-					_interval_mean_us.update(Vector2f{interval_us, (float)sensor_imu_fifo.samples});
+					_interval_mean.update(Vector2f{interval_us, (float)sensor_imu_fifo.samples});
 				}
 
 			} else {

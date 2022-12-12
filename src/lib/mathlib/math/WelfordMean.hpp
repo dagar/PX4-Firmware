@@ -97,7 +97,7 @@ public:
 	void reset()
 	{
 		_count = 0;
-		_mean = 0;
+		_mean = {};
 		_M2 = 0;
 
 		_mean_accum = 0;

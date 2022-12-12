@@ -37,6 +37,7 @@
 
 #include <lib/mathlib/math/Limits.hpp>
 #include <lib/mathlib/math/WelfordMean.hpp>
+#include <lib/mathlib/math/WelfordMeanVector.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/sensor_calibration/Accelerometer.hpp>
@@ -125,8 +126,9 @@ private:
 	hrt_abstime _timestamp_last{0};
 
 	math::WelfordMean<float> _interval_mean_us{};
+	math::WelfordMeanVector<float, 2> _interval_mean{};
 
-	math::WelfordMean<matrix::Vector2f> _update_latency_mean{};
+	math::WelfordMeanVector<float, 2>  _update_latency_mean{};
 
 	float _interval_best_variance{(float)INFINITY};
 
