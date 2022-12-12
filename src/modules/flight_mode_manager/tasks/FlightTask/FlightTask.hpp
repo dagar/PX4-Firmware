@@ -159,6 +159,7 @@ public:
 	 */
 	void handleParameterUpdate()
 	{
+		PX4_INFO("handleParameterUpdate()");
 		updateParams();
 	}
 

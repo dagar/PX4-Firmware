@@ -50,7 +50,7 @@ FlightTaskTransition::FlightTaskTransition()
 
 bool FlightTaskTransition::updateInitialize()
 {
-
+	PX4_INFO("FlightTaskTransition::updateInitialize()e");
 	updateParameters();
 	return FlightTask::updateInitialize();
 }
@@ -59,6 +59,7 @@ void FlightTaskTransition::updateParameters()
 {
 // check for parameter updates
 	if (_parameter_update_sub.updated()) {
+		PX4_INFO("FlightTaskTransition::updateParameters()");
 		// clear update
 		parameter_update_s pupdate;
 		_parameter_update_sub.copy(&pupdate);

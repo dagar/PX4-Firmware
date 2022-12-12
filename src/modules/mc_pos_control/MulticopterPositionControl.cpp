@@ -85,6 +85,8 @@ void MulticopterPositionControl::parameters_update(bool force)
 		ModuleParams::updateParams();
 		SuperBlock::updateParams();
 
+		PX4_INFO("parameter update");
+
 		int num_changed = 0;
 
 		if (_param_sys_vehicle_resp.get() >= 0.f) {

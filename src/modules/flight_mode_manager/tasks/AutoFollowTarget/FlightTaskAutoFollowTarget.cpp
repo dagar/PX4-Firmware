@@ -99,6 +99,8 @@ bool FlightTaskAutoFollowTarget::activate(const trajectory_setpoint_s &last_setp
 
 void FlightTaskAutoFollowTarget::updateParams()
 {
+	PX4_INFO("FlightTaskAutoFollowTarget::updateParams()");
+
 	// Copy previous param values to check if it changes after param update
 	const float follow_distance_prev = _param_flw_tgt_dst.get();
 	const float follow_height_prev = _param_flw_tgt_ht.get();

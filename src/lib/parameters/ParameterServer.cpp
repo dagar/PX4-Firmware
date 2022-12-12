@@ -431,6 +431,13 @@ int ParameterServer::getParameterValue(param_t param, void *val)
 		PX4_DEBUG("get: param %" PRId16 " (%s) not active", param, getParameterName(param));
 	}
 
+	static hrt_abstime last_debug_print = 0;
+
+	if (hrt_elapsed_time(&last_debug_print) > 500_ms) {
+		PX4_INFO("param_get %s", getParameterName(param));
+		last_debug_print = hrt_absolute_time();
+	}
+
 	int result = PX4_ERROR;
 
 	if (val) {

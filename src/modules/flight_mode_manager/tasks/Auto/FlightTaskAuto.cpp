@@ -824,6 +824,7 @@ bool FlightTaskAuto::_highEnoughForLandingGear()
 
 void FlightTaskAuto::updateParams()
 {
+	PX4_INFO("FlightTaskAuto::updateParams()");
 	FlightTask::updateParams();
 
 	// make sure that alt1 is above alt2

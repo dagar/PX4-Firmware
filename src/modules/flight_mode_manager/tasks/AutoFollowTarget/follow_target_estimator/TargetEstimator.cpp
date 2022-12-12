@@ -103,6 +103,7 @@ void TargetEstimator::parameters_update(bool force)
 		_parameter_update_sub.copy(&update);
 
 		// update parameters from storage
+		PX4_INFO("TargetEstimator::parameters_update");
 		updateParams();
 	}
 }

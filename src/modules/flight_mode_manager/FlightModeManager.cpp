@@ -42,6 +42,7 @@ FlightModeManager::FlightModeManager() :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers)
 {
+	PX4_INFO("FlightModeManager()");
 	updateParams();
 
 	// initialize all flight-tasks
@@ -91,6 +92,8 @@ void FlightModeManager::Run()
 		// clear update
 		parameter_update_s param_update;
 		_parameter_update_sub.copy(&param_update);
+
+		PX4_INFO("FlightModeManager::Run()");
 		updateParams();
 	}
 
@@ -127,6 +130,7 @@ void FlightModeManager::Run()
 
 void FlightModeManager::updateParams()
 {
+	PX4_INFO("FlightModeManager::updateParams()");
 	ModuleParams::updateParams();
 
 	if (isAnyTaskActive()) {
