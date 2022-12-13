@@ -37,6 +37,8 @@
 #include <lib/sensor_calibration/Accelerometer.hpp>
 #include <lib/sensor_calibration/Gyroscope.hpp>
 #include <lib/mathlib/math/Limits.hpp>
+#include <lib/mathlib/math/WelfordMean.hpp>
+#include <lib/mathlib/math/WelfordMeanVector.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
@@ -46,6 +48,7 @@
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/esc_status.h>
@@ -57,8 +60,15 @@
 #include <uORB/topics/sensor_gyro_fft.h>
 #include <uORB/topics/sensor_imu_fifo.h>
 #include <uORB/topics/sensor_selection.h>
+
+// publications
+#include <uORB/topics/sensor_combined.h> // legacy
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_acceleration.h>
+#include <uORB/topics/vehicle_imu.h>
+#include <uORB/topics/vehicle_imu_status.h>
+
+#include <Integrator.hpp>
 
 using namespace time_literals;
 
@@ -93,16 +103,27 @@ private:
 	void ParametersUpdate(bool force = false);
 
 	void ResetFilters(const hrt_abstime &time_now_us);
+
 	void SensorBiasUpdate(bool force = false);
+
 	bool SensorSelectionUpdate(const hrt_abstime &time_now_us, bool force = false);
+
 	void UpdateDynamicNotchEscRpm(const hrt_abstime &time_now_us, bool force = false);
 	void UpdateDynamicNotchFFT(const hrt_abstime &time_now_us, bool force = false);
+
 	bool UpdateSampleRate();
+
+	void UpdateSensorImuFifo(uint8_t sensor_instance);
+	void UpdateSensorAccel(uint8_t sensor_instance);
+	void UpdateSensorGyro(uint8_t sensor_instance);
 
 	// scaled appropriately for current sensor
 	matrix::Vector3f GetResetAcceleration() const;
 	matrix::Vector3f GetResetAngularVelocity() const;
 	matrix::Vector3f GetResetAngularAcceleration() const;
+
+	// return the square of two floating point numbers
+	static constexpr float sq(float var) { return var * var; }
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
@@ -119,9 +140,82 @@ private:
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_selection_sub{this, ORB_ID(sensor_selection)};
+
 	uORB::SubscriptionCallbackWorkItem _sensor_accel_sub{this, ORB_ID(sensor_accel)};
 	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub{this, ORB_ID(sensor_gyro)};
-	uORB::SubscriptionCallbackWorkItem _sensor_fifo_sub{this, ORB_ID(sensor_imu_fifo)};
+	uORB::SubscriptionCallbackWorkItem _sensor_imu_fifo_sub{this, ORB_ID(sensor_imu_fifo)};
+
+	uORB::Subscription _sensor_accel_subs[MAX_SENSOR_COUNT] {ORB_ID(sensor_accel), ORB_ID(sensor_accel), ORB_ID(sensor_accel), ORB_ID(sensor_accel)};
+	uORB::Subscription _sensor_gyro_subs[MAX_SENSOR_COUNT] {ORB_ID(sensor_gyro), ORB_ID(sensor_gyro), ORB_ID(sensor_gyro), ORB_ID(sensor_gyro)};
+
+
+	math::WelfordMeanVector<float, 3> _raw_accel_mean[MAX_SENSOR_COUNT] {};
+	math::WelfordMeanVector<float, 3> _raw_gyro_mean[MAX_SENSOR_COUNT] {};
+
+	struct SensorSubscription {
+		SensorSubscription(px4::WorkItem *work_item, ORB_ID orb_id, uint8_t instance) :
+			sub(work_item, orb_id, instance)
+		{}
+
+		~SensorSubscription() = default;
+
+		uORB::SubscriptionCallbackWorkItem sub;
+		unsigned last_generation{0};
+
+		hrt_abstime timestamp_last{0};
+		hrt_abstime timestamp_sample_last{0};
+
+		math::WelfordMean<float> mean_interval_us{};
+	};
+
+	SensorSubscription _sensor_imu_fifo_subs[MAX_SENSOR_COUNT] {
+		{this, ORB_ID::sensor_imu_fifo, 0},
+		{this, ORB_ID::sensor_imu_fifo, 1},
+		{this, ORB_ID::sensor_imu_fifo, 2},
+		{this, ORB_ID::sensor_imu_fifo, 3}
+	};
+
+	struct IMU {
+
+		// struct InFlightCalibration {
+		// 	matrix::Vector3f offset{};
+		// 	matrix::Vector3f bias_variance{};
+		// 	bool valid{false};
+		// };
+
+		struct {
+			uint32_t device_id{0};
+			calibration::Accelerometer calibration{};
+			math::WelfordMeanVector<float, 3> raw_mean{};
+			math::WelfordMean<float> temperature{};
+			float scale{1.f};
+			uint32_t error_count{0};
+			sensors::Integrator integrator{};
+			matrix::Vector3f estimated_bias{};
+
+			uint32_t clipping_total[3] {}; // clipping
+		} accel{};
+
+		struct {
+			uint32_t device_id{0};
+			calibration::Gyroscope calibration{};
+			math::WelfordMeanVector<float, 3> raw_mean{};
+			math::WelfordMean<float> temperature{};
+			float scale{1.f};
+			uint32_t error_count{0};
+			sensors::IntegratorConing integrator{};
+			matrix::Vector3f estimated_bias{};
+
+			uint32_t clipping_total[3] {}; // clipping
+		} gyro{};
+
+		bool primary{false};
+
+		uORB::PublicationMulti<vehicle_imu_s> vehicle_imu_pub{ORB_ID(vehicle_imu)};
+		uORB::PublicationMulti<vehicle_imu_status_s> vehicle_imu_status_pub{ORB_ID(vehicle_imu_status)};
+	} _imus[MAX_SENSOR_COUNT] {};
+
+	bool PublishImu(IMU &imu);
 
 	calibration::Accelerometer _accel_calibration{};
 	calibration::Gyroscope _gyro_calibration{};

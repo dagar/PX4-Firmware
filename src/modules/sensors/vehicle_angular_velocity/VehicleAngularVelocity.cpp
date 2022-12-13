@@ -42,6 +42,21 @@ using namespace matrix;
 namespace sensors
 {
 
+static constexpr int clipping(const int16_t sample) { return (sample == INT16_MIN) || (sample == INT16_MAX); }
+
+static constexpr int clipping(const int16_t samples[], int length)
+{
+	int clip_count = 0;
+
+	for (int n = 0; n < length; n++) {
+		if ((samples[n] == INT16_MIN) || (samples[n] == INT16_MAX)) {
+			clip_count++;
+		}
+	}
+
+	return clip_count;
+}
+
 VehicleAngularVelocity::VehicleAngularVelocity() :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl)
@@ -90,7 +105,7 @@ void VehicleAngularVelocity::Stop()
 {
 	// clear all registered callbacks
 	_sensor_gyro_sub.unregisterCallback();
-	_sensor_fifo_sub.unregisterCallback();
+	_sensor_imu_fifo_sub.unregisterCallback();
 	_sensor_selection_sub.unregisterCallback();
 
 	Deinit();
@@ -138,7 +153,7 @@ bool VehicleAngularVelocity::UpdateSampleRate()
 				const uint8_t samples = roundf(configured_interval_us / publish_interval_us);
 
 				if (_fifo_available) {
-					_sensor_fifo_sub.set_required_updates(math::constrain(samples, (uint8_t)1, sensor_imu_fifo_s::ORB_QUEUE_LENGTH));
+					_sensor_imu_fifo_sub.set_required_updates(math::constrain(samples, (uint8_t)1, sensor_imu_fifo_s::ORB_QUEUE_LENGTH));
 
 				} else {
 					_sensor_gyro_sub.set_required_updates(math::constrain(samples, (uint8_t)1, sensor_gyro_s::ORB_QUEUE_LENGTH));
@@ -150,7 +165,7 @@ bool VehicleAngularVelocity::UpdateSampleRate()
 
 			} else {
 				_sensor_gyro_sub.set_required_updates(1);
-				_sensor_fifo_sub.set_required_updates(1);
+				_sensor_imu_fifo_sub.set_required_updates(1);
 				_publish_interval_min_us = 0;
 			}
 		}
@@ -163,6 +178,19 @@ void VehicleAngularVelocity::ResetFilters(const hrt_abstime &time_now_us)
 {
 	if ((_filter_sample_rate_hz > 0) && PX4_ISFINITE(_filter_sample_rate_hz)) {
 
+		// accel filters
+		const Vector3f acceleration_uncalibrated{GetResetAcceleration()};
+
+		PX4_INFO("reset acceleration [%.5f, %.5f, %.5f]", (double)acceleration_uncalibrated(0),
+			 (double)acceleration_uncalibrated(1), (double)acceleration_uncalibrated(2));
+
+		for (int axis = 0; axis < 3; axis++) {
+			// acceleration low pass
+			_accel_lp_filter[axis].set_cutoff_frequency(_filter_sample_rate_hz, _param_imu_accel_cutoff.get());
+			_accel_lp_filter[axis].reset(acceleration_uncalibrated(axis));
+		}
+
+		// gyro filters
 		const Vector3f angular_velocity_uncalibrated{GetResetAngularVelocity()};
 		const Vector3f angular_acceleration_uncalibrated{GetResetAngularAcceleration()};
 
@@ -291,7 +319,7 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(const hrt_abstime &time_now_u
 					}
 
 					if (sensor_imu_fifo_sub.get().device_id == device_id) {
-						if (_sensor_fifo_sub.ChangeInstance(i) && _sensor_fifo_sub.registerCallback()) {
+						if (_sensor_imu_fifo_sub.ChangeInstance(i) && _sensor_imu_fifo_sub.registerCallback()) {
 							// make sure non-FIFO sub is unregistered
 							_sensor_gyro_sub.unregisterCallback();
 
@@ -335,7 +363,7 @@ bool VehicleAngularVelocity::SensorSelectionUpdate(const hrt_abstime &time_now_u
 					if (sensor_gyro_sub.get().device_id == device_id) {
 						if (_sensor_gyro_sub.ChangeInstance(i) && _sensor_gyro_sub.registerCallback()) {
 							// make sure FIFO sub is unregistered
-							_sensor_fifo_sub.unregisterCallback();
+							_sensor_imu_fifo_sub.unregisterCallback();
 
 							_gyro_calibration.set_device_id(sensor_gyro_sub.get().device_id);
 
@@ -384,6 +412,18 @@ void VehicleAngularVelocity::ParametersUpdate(bool force)
 
 		updateParams();
 
+
+		// accel
+		_accel_calibration.ParametersUpdate();
+
+		// accel low pass cutoff frequency changed
+		for (auto &lp : _accel_lp_filter) {
+			if (fabsf(lp.get_cutoff_freq() - _param_imu_accel_cutoff.get()) > 0.01f) {
+				break;
+			}
+		}
+
+		// gyro
 		const bool nf0_enabled = (_param_imu_gyro_nf0_frq.get() > 0.f) && (_param_imu_gyro_nf0_bw.get() > 0.f);
 		const bool nf1_enabled = (_param_imu_gyro_nf1_frq.get() > 0.f) && (_param_imu_gyro_nf1_bw.get() > 0.f);
 
@@ -856,153 +896,17 @@ void VehicleAngularVelocity::Run()
 	UpdateDynamicNotchEscRpm(time_now_us);
 	UpdateDynamicNotchFFT(time_now_us);
 
-	if (_fifo_available) {
-		// process all outstanding fifo messages
-		sensor_imu_fifo_s sensor_fifo_data;
-
-		while (_sensor_fifo_sub.update(&sensor_fifo_data)) {
-			const float inverse_dt_s = 1e6f / sensor_fifo_data.dt;
-			const int N = sensor_fifo_data.samples;
-			static constexpr int FIFO_SIZE_MAX = sizeof(sensor_fifo_data.gyro_x) / sizeof(sensor_fifo_data.gyro_x[0]);
-
-			if ((sensor_fifo_data.dt > 0) && (N > 0) && (N <= FIFO_SIZE_MAX)) {
-				Vector3f acceleration_uncalibrated;
-				Vector3f angular_velocity_uncalibrated;
-				Vector3f angular_acceleration_uncalibrated;
-
-				// accel
-				{
-					int16_t *raw_data_array[] {sensor_fifo_data.accel_x, sensor_fifo_data.accel_y, sensor_fifo_data.accel_z};
-
-					for (int axis = 0; axis < 3; axis++) {
-						// copy raw int16 sensor samples to float array for filtering
-						float data[FIFO_SIZE_MAX];
-
-						for (int n = 0; n < N; n++) {
-							data[n] = sensor_fifo_data.accel_scale * raw_data_array[axis][n];
-						}
-
-						// save last filtered sample
-						acceleration_uncalibrated(axis) = FilterAcceleration(axis, data, N);
-					}
-				}
-
-				// gyro
-				{
-					int16_t *raw_data_array[] {sensor_fifo_data.gyro_x, sensor_fifo_data.gyro_y, sensor_fifo_data.gyro_z};
-
-					for (int axis = 0; axis < 3; axis++) {
-						// copy raw int16 sensor samples to float array for filtering
-						float data[FIFO_SIZE_MAX];
-
-						for (int n = 0; n < N; n++) {
-							data[n] = sensor_fifo_data.gyro_scale * raw_data_array[axis][n];
-						}
-
-						// save last filtered sample
-						angular_velocity_uncalibrated(axis) = FilterAngularVelocity(axis, data, N);
-						angular_acceleration_uncalibrated(axis) = FilterAngularAcceleration(axis, inverse_dt_s, data, N);
-					}
-				}
-
-				// Publish
-				if (!_sensor_fifo_sub.updated()) {
-
-					if (sensor_fifo_data.timestamp_sample >= _last_publish + _publish_interval_min_us) {
-
-						if (CalibrateAndPublishAcceleration(sensor_fifo_data.timestamp_sample, acceleration_uncalibrated)) {
-
-							//perf_end(_cycle_perf);
-							//return;
-						}
-
-						if (CalibrateAndPublishAngularVelocity(sensor_fifo_data.timestamp_sample,
-										       angular_velocity_uncalibrated, angular_acceleration_uncalibrated)) {
-
-							perf_end(_cycle_perf);
-							return;
-						}
-
-						// shift last publish time forward, but don't let it get further behind than the interval
-						_last_publish = math::constrain(_last_publish + _publish_interval_min_us,
-										sensor_fifo_data.timestamp_sample - _publish_interval_min_us, sensor_fifo_data.timestamp_sample);
-
-					}
-				}
-			}
-		}
-
-	} else {
-
-		// process all outstanding messages
-		sensor_accel_s sensor_data;
-
-		while (_sensor_accel_sub.update(&sensor_data)) {
-			if (PX4_ISFINITE(sensor_data.x) && PX4_ISFINITE(sensor_data.y) && PX4_ISFINITE(sensor_data.z)) {
-
-				Vector3f acceleration_uncalibrated;
-
-				float raw_data_array[] {sensor_data.x, sensor_data.y, sensor_data.z};
-
-				for (int axis = 0; axis < 3; axis++) {
-					// copy sensor sample to float array for filtering
-					float data[1] {raw_data_array[axis]};
-
-					// save last filtered sample
-					acceleration_uncalibrated(axis) = FilterAcceleration(axis, data);
-				}
-
-				// Publish
-				if (!_sensor_accel_sub.updated()) {
-					if (CalibrateAndPublishAcceleration(sensor_data.timestamp_sample, acceleration_uncalibrated)) {
-
-						//perf_end(_cycle_perf);
-						//return;
-					}
-				}
-			}
-		}
-
-		// process all outstanding messages
-		sensor_gyro_s sensor_data;
-
-		while (_sensor_gyro_sub.update(&sensor_data)) {
-			if (Vector3f(sensor_data.x, sensor_data.y, sensor_data.z).isAllFinite()) {
-
-				if (_timestamp_sample_last == 0 || (sensor_data.timestamp_sample <= _timestamp_sample_last)) {
-					_timestamp_sample_last = sensor_data.timestamp_sample - 1e6f / _filter_sample_rate_hz;
-				}
-
-				const float inverse_dt_s = 1.f / math::constrain(((sensor_data.timestamp_sample - _timestamp_sample_last) * 1e-6f),
-							   0.00002f, 0.02f);
-				_timestamp_sample_last = sensor_data.timestamp_sample;
-
-				Vector3f angular_velocity_uncalibrated;
-				Vector3f angular_acceleration_uncalibrated;
-
-				float raw_data_array[] {sensor_data.x, sensor_data.y, sensor_data.z};
-
-				for (int axis = 0; axis < 3; axis++) {
-					// copy sensor sample to float array for filtering
-					float data[1] {raw_data_array[axis]};
-
-					// save last filtered sample
-					angular_velocity_uncalibrated(axis) = FilterAngularVelocity(axis, data);
-					angular_acceleration_uncalibrated(axis) = FilterAngularAcceleration(axis, inverse_dt_s, data);
-				}
-
-				// Publish
-				if (!_sensor_gyro_sub.updated()) {
-					if (CalibrateAndPublishAngularVelocity(sensor_data.timestamp_sample,
-									       angular_velocity_uncalibrated, angular_acceleration_uncalibrated)) {
-
-						perf_end(_cycle_perf);
-						return;
-					}
-				}
-			}
-		}
+	for (int sensor_instance = 0; sensor_instance < MAX_SENSOR_COUNT; sensor_instance++) {
+		UpdateSensorImuFifo(sensor_instance);
+		// UpdateSensorAccel(sensor_instance);
+		// UpdateSensorGyro(sensor_instance);
 	}
+
+
+
+
+	// process all outstanding messages
+
 
 	// force reselection on timeout
 	if (time_now_us > _last_publish + 500_ms) {
@@ -1012,46 +916,460 @@ void VehicleAngularVelocity::Run()
 	perf_end(_cycle_perf);
 }
 
+void VehicleAngularVelocity::UpdateSensorImuFifo(uint8_t sensor_instance)
+{
+
+	// sensor_imu_fifo
+	sensor_imu_fifo_s sensor_imu_fifo;
+	auto &s = _sensor_imu_fifo_subs[sensor_instance];
+
+	if (s.sub.update(&sensor_imu_fifo)) {
+
+		if (s.sub.get_last_generation() == s.last_generation + 1) {
+
+			if ((s.timestamp_sample_last != 0)
+			    && (sensor_imu_fifo.timestamp_sample > s.timestamp_sample_last)) {
+
+				const float interval_us = sensor_imu_fifo.timestamp_sample - s.timestamp_sample_last;
+				s.mean_interval_us.update(interval_us);
+			}
+
+		}
+
+
+		s.last_generation = s.sub.get_last_generation();
+
+
+		// TODO: find corresponding IMU slot
+		IMU &imu = _imus[sensor_instance];
+
+		imu.accel.calibration.set_device_id(sensor_imu_fifo.device_id);
+		imu.gyro.calibration.set_device_id(sensor_imu_fifo.device_id);
+
+		imu.accel.error_count = sensor_imu_fifo.error_count;
+		imu.gyro.error_count = sensor_imu_fifo.error_count;
+
+		// _status.accel_error_count = imu.accel.error_count;
+		// _status.gyro_error_count = imu.gyro.error_count;
+
+		// temperature average
+		if (PX4_ISFINITE(sensor_imu_fifo.temperature)) {
+			imu.accel.temperature.update(sensor_imu_fifo.temperature);
+			imu.gyro.temperature.update(sensor_imu_fifo.temperature);
+		}
+
+		const int N = sensor_imu_fifo.samples;
+
+		const float dt_s = sensor_imu_fifo.dt * 1e-6f;
+		const float inverse_dt_s = 1e6f / sensor_imu_fifo.dt;
+
+
+		// integrate accel
+		for (int n = 0; n < N; n++) {
+			const Vector3f accel_raw{
+				static_cast<float>(sensor_imu_fifo.accel_x[n]) *sensor_imu_fifo.accel_scale,
+				static_cast<float>(sensor_imu_fifo.accel_y[n]) *sensor_imu_fifo.accel_scale,
+				static_cast<float>(sensor_imu_fifo.accel_z[n]) *sensor_imu_fifo.accel_scale
+			};
+			imu.accel.integrator.put(accel_raw, dt_s);
+			imu.accel.raw_mean.update(accel_raw);
+		}
+
+		{
+			int clip_counter[3] {
+				clipping(sensor_imu_fifo.accel_x, sensor_imu_fifo.samples),
+				clipping(sensor_imu_fifo.accel_y, sensor_imu_fifo.samples),
+				clipping(sensor_imu_fifo.accel_z, sensor_imu_fifo.samples),
+			};
+
+			if (clip_counter[0] > 0 || clip_counter[1] > 0 || clip_counter[2] > 0) {
+				// rotate sensor clip counts into vehicle body frame
+				const Vector3f clipping{imu.accel.calibration.rotation() *Vector3f{(float)clip_counter[0], (float)clip_counter[1], (float)clip_counter[2]}};
+
+				// round to get reasonble clip counts per axis (after board rotation)
+				const uint8_t clip_x = roundf(fabsf(clipping(0)));
+
+				if (clip_x > 0) {
+					imu.accel.clipping_total[0] += clip_x;
+					//_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_X;
+				}
+
+				const uint8_t clip_y = roundf(fabsf(clipping(1)));
+
+				if (clip_y > 0) {
+					imu.accel.clipping_total[1] += clip_y;
+					//_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Y;
+				}
+
+				const uint8_t clip_z = roundf(fabsf(clipping(2)));
+
+				if (clip_z > 0) {
+					imu.accel.clipping_total[2] += clip_z;
+					//_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Z;
+				}
+			}
+		}
+
+
+
+		// integrate gyro
+		for (int n = 0; n < N; n++) {
+			const Vector3f gyro_raw{
+				static_cast<float>(sensor_imu_fifo.gyro_x[n]) *sensor_imu_fifo.gyro_scale,
+				static_cast<float>(sensor_imu_fifo.gyro_y[n]) *sensor_imu_fifo.gyro_scale,
+				static_cast<float>(sensor_imu_fifo.gyro_z[n]) *sensor_imu_fifo.gyro_scale
+			};
+			imu.gyro.integrator.put(gyro_raw, dt_s);
+			imu.gyro.raw_mean.update(gyro_raw);
+		}
+
+
+
+		if (imu.accel.integrator.integral_ready() && imu.gyro.integrator.integral_ready()) {
+			PublishImu(imu);
+		}
+
+		// TODO: call to filter data
+		if (imu.primary) {
+
+			static constexpr int FIFO_SIZE_MAX = sizeof(sensor_imu_fifo.gyro_x) / sizeof(sensor_imu_fifo.gyro_x[0]);
+
+			if ((sensor_imu_fifo.dt > 0) && (N > 0) && (N <= FIFO_SIZE_MAX)) {
+				Vector3f acceleration_uncalibrated;
+				Vector3f angular_velocity_uncalibrated;
+				Vector3f angular_acceleration_uncalibrated;
+
+				// accel
+				{
+					int16_t *raw_data_array[] {sensor_imu_fifo.accel_x, sensor_imu_fifo.accel_y, sensor_imu_fifo.accel_z};
+
+					for (int axis = 0; axis < 3; axis++) {
+						// copy raw int16 sensor samples to float array for filtering
+						float data[FIFO_SIZE_MAX];
+
+						for (int n = 0; n < N; n++) {
+							data[n] = sensor_imu_fifo.accel_scale * raw_data_array[axis][n];
+						}
+
+						// save last filtered sample
+						acceleration_uncalibrated(axis) = FilterAcceleration(axis, data, N);
+					}
+				}
+
+				// gyro
+				{
+					int16_t *raw_data_array[] {sensor_imu_fifo.gyro_x, sensor_imu_fifo.gyro_y, sensor_imu_fifo.gyro_z};
+
+					for (int axis = 0; axis < 3; axis++) {
+						// copy raw int16 sensor samples to float array for filtering
+						float data[FIFO_SIZE_MAX];
+
+						for (int n = 0; n < N; n++) {
+							data[n] = sensor_imu_fifo.gyro_scale * raw_data_array[axis][n];
+						}
+
+						// save last filtered sample
+						angular_velocity_uncalibrated(axis) = FilterAngularVelocity(axis, data, N);
+						angular_acceleration_uncalibrated(axis) = FilterAngularAcceleration(axis, inverse_dt_s, data, N);
+					}
+				}
+
+				// Publish
+				if (!s.sub.updated()) {
+
+					if (sensor_imu_fifo.timestamp_sample >= _last_publish + _publish_interval_min_us) {
+
+						if (CalibrateAndPublishAcceleration(sensor_imu_fifo.timestamp_sample, acceleration_uncalibrated)) {
+
+							//perf_end(_cycle_perf);
+							//return;
+						}
+
+						if (CalibrateAndPublishAngularVelocity(sensor_imu_fifo.timestamp_sample,
+										       angular_velocity_uncalibrated, angular_acceleration_uncalibrated)) {
+
+							//perf_end(_cycle_perf);
+							//return;
+						}
+
+						// shift last publish time forward, but don't let it get further behind than the interval
+						// _last_publish = math::constrain(_last_publish + _publish_interval_min_us,
+						// 				sensor_imu_fifo.timestamp_sample - _publish_interval_min_us, sensor_imu_fifo.timestamp_sample);
+
+					}
+				}
+			}
+		}
+	}
+}
+
+void VehicleAngularVelocity::UpdateSensorAccel(uint8_t sensor_instance)
+{
+	// process all outstanding messages
+	sensor_accel_s sensor_accel;
+
+	while (_sensor_accel_sub.update(&sensor_accel)) {
+		if (PX4_ISFINITE(sensor_accel.x) && PX4_ISFINITE(sensor_accel.y) && PX4_ISFINITE(sensor_accel.z)) {
+
+			Vector3f acceleration_uncalibrated;
+
+			float raw_data_array[] {sensor_accel.x, sensor_accel.y, sensor_accel.z};
+
+			for (int axis = 0; axis < 3; axis++) {
+				// copy sensor sample to float array for filtering
+				float data[1] {raw_data_array[axis]};
+
+				// save last filtered sample
+				acceleration_uncalibrated(axis) = FilterAcceleration(axis, data);
+			}
+
+			// Publish
+			if (!_sensor_accel_sub.updated()) {
+				if (CalibrateAndPublishAcceleration(sensor_accel.timestamp_sample, acceleration_uncalibrated)) {
+
+					//perf_end(_cycle_perf);
+					//return;
+				}
+			}
+		}
+	}
+}
+
+void VehicleAngularVelocity::UpdateSensorGyro(uint8_t sensor_instance)
+{
+	sensor_gyro_s sensor_gyro;
+
+	while (_sensor_gyro_sub.update(&sensor_gyro)) {
+		if (Vector3f(sensor_gyro.x, sensor_gyro.y, sensor_gyro.z).isAllFinite()) {
+
+			if (_timestamp_sample_last == 0 || (sensor_gyro.timestamp_sample <= _timestamp_sample_last)) {
+				_timestamp_sample_last = sensor_gyro.timestamp_sample - 1e6f / _filter_sample_rate_hz;
+			}
+
+			const float inverse_dt_s = 1.f / math::constrain(((sensor_gyro.timestamp_sample - _timestamp_sample_last) * 1e-6f),
+						   0.00002f, 0.02f);
+			_timestamp_sample_last = sensor_gyro.timestamp_sample;
+
+			Vector3f angular_velocity_uncalibrated;
+			Vector3f angular_acceleration_uncalibrated;
+
+			float raw_data_array[] {sensor_gyro.x, sensor_gyro.y, sensor_gyro.z};
+
+			for (int axis = 0; axis < 3; axis++) {
+				// copy sensor sample to float array for filtering
+				float data[1] {raw_data_array[axis]};
+
+				// save last filtered sample
+				angular_velocity_uncalibrated(axis) = FilterAngularVelocity(axis, data);
+				angular_acceleration_uncalibrated(axis) = FilterAngularAcceleration(axis, inverse_dt_s, data);
+			}
+
+			// Publish
+			if (!_sensor_gyro_sub.updated()) {
+				if (CalibrateAndPublishAngularVelocity(sensor_gyro.timestamp_sample,
+								       angular_velocity_uncalibrated, angular_acceleration_uncalibrated)) {
+
+
+					// shift last publish time forward, but don't let it get further behind than the interval
+					_last_publish = math::constrain(_last_publish + _publish_interval_min_us,
+									sensor_gyro.timestamp_sample - _publish_interval_min_us, sensor_gyro.timestamp_sample);
+
+					perf_end(_cycle_perf);
+					return;
+				}
+			}
+		}
+	}
+
+}
+
+bool VehicleAngularVelocity::PublishImu(VehicleAngularVelocity::IMU &imu)
+{
+	bool updated = false;
+
+	vehicle_imu_s vehicle_imu;
+	Vector3f delta_angle;
+	Vector3f delta_velocity;
+
+	//const Vector3f accumulated_coning_corrections = imu.gyro.integrator.accumulated_coning_corrections();
+
+	if (imu.accel.integrator.reset(delta_velocity, vehicle_imu.delta_velocity_dt)
+	    && imu.gyro.integrator.reset(delta_angle, vehicle_imu.delta_angle_dt)) {
+
+		if (imu.accel.calibration.enabled() && imu.gyro.calibration.enabled()) {
+
+			// delta angle: apply offsets, scale, and board rotation
+			imu.gyro.calibration.SensorCorrectionsUpdate();
+			const float gyro_dt_s = 1.e-6f * vehicle_imu.delta_angle_dt;
+			const Vector3f angular_velocity{_gyro_calibration.Correct(delta_angle / gyro_dt_s)};
+			//UpdateGyroVibrationMetrics(angular_velocity);
+			const Vector3f delta_angle_corrected{angular_velocity * gyro_dt_s};
+
+			// accumulate delta angle coning corrections
+			//_coning_norm_accum += accumulated_coning_corrections.norm() * gyro_dt_s;
+			//_coning_norm_accum_total_time_s += gyro_dt_s;
+
+
+			// delta velocity: apply offsets, scale, and board rotation
+			imu.accel.calibration.SensorCorrectionsUpdate();
+			const float accel_dt_s = 1.e-6f * vehicle_imu.delta_velocity_dt;
+			const Vector3f acceleration{imu.accel.calibration.Correct(delta_velocity / accel_dt_s)};
+			//UpdateAccelVibrationMetrics(acceleration);
+			const Vector3f delta_velocity_corrected{acceleration * accel_dt_s};
+
+#if 0
+			// vehicle_imu_status
+			//  publish before vehicle_imu so that error counts are available synchronously if needed
+			const bool status_publish_interval_exceeded = (hrt_elapsed_time(&_status.timestamp) >= kIMUStatusPublishingInterval);
+
+			if (_raw_accel_mean.valid() && _raw_gyro_mean.valid()
+			    && _accel_mean_interval_us.valid() && _gyro_mean_interval_us.valid()
+			    && (_publish_status || status_publish_interval_exceeded)
+			   ) {
+
+				// Accel
+				{
+					_status.accel_device_id = _accel_calibration.device_id();
+
+					_status.accel_rate_hz = 1e6f / _accel_mean_interval_us.mean();
+					_status.accel_raw_rate_hz = _status.accel_rate_hz;
+
+					// accel mean and variance
+					const Dcmf &R = _accel_calibration.rotation();
+					Vector3f(R * _raw_accel_mean.mean()).copyTo(_status.mean_accel);
+
+					// variance from R * COV * R^T
+					const Matrix3f cov = R * _raw_accel_mean.covariance() * R.transpose();
+					cov.diag().copyTo(_status.var_accel);
+
+					// temperature
+					if ((_accel_temperature_sum_count > 0) && PX4_ISFINITE(_accel_temperature_sum)) {
+						_status.temperature_accel = _accel_temperature_sum / _accel_temperature_sum_count;
+
+					} else {
+						_status.temperature_accel = NAN;
+					}
+				}
+
+				// Gyro
+				{
+					_status.gyro_device_id = _gyro_calibration.device_id();
+
+					_status.gyro_rate_hz = 1e6f / _gyro_mean_interval_us.mean();
+					_status.gyro_raw_rate_hz = _status.gyro_rate_hz;
+
+					// gyro mean and variance
+					const Dcmf &R = _gyro_calibration.rotation();
+					Vector3f(R * _raw_gyro_mean.mean()).copyTo(_status.mean_gyro);
+
+					// variance from R * COV * R^T
+					const Matrix3f cov = R * _raw_gyro_mean.covariance() * R.transpose();
+					cov.diag().copyTo(_status.var_gyro);
+
+
+					// Gyro delta angle coning metric = length of coning corrections averaged since last status publication
+					_status.delta_angle_coning_metric = _coning_norm_accum / _coning_norm_accum_total_time_s;
+					_coning_norm_accum = 0;
+					_coning_norm_accum_total_time_s = 0;
+
+					// temperature
+					if ((_gyro_temperature_sum_count > 0) && PX4_ISFINITE(_gyro_temperature_sum)) {
+						_status.temperature_gyro = _gyro_temperature_sum / _gyro_temperature_sum_count;
+
+					} else {
+						_status.temperature_gyro = NAN;
+					}
+				}
+
+				// publish
+				_status.timestamp = hrt_absolute_time();
+				_vehicle_imu_status_pub.publish(_status);
+
+				_publish_status = false;
+
+				if (status_publish_interval_exceeded) {
+					_raw_accel_mean.reset();
+					_accel_temperature_sum = NAN;
+					_accel_temperature_sum_count = 0;
+
+					_raw_gyro_mean.reset();
+					_gyro_temperature_sum = NAN;
+					_gyro_temperature_sum_count = 0;
+				}
+			}
+
+#endif
+
+			// publish vehicle_imu
+			//vehicle_imu.timestamp_sample = _gyro_timestamp_sample_last;
+			vehicle_imu.accel_device_id = imu.accel.calibration.device_id();
+			vehicle_imu.gyro_device_id = imu.gyro.calibration.device_id();
+			delta_angle_corrected.copyTo(vehicle_imu.delta_angle);
+			delta_velocity_corrected.copyTo(vehicle_imu.delta_velocity);
+			//vehicle_imu.delta_velocity_clipping = _delta_velocity_clipping;
+			vehicle_imu.accel_calibration_count = imu.accel.calibration.calibration_count();
+			vehicle_imu.gyro_calibration_count = imu.gyro.calibration.calibration_count();
+			vehicle_imu.timestamp = hrt_absolute_time();
+			imu.vehicle_imu_pub.publish(vehicle_imu);
+
+			// reset clip counts
+			//_delta_velocity_clipping = 0;
+
+			// record gyro publication latency and integrated samples
+			//_gyro_publish_latency_mean_us.update(imu.timestamp - _gyro_timestamp_last);
+			//_gyro_update_latency_mean_us.update(imu.timestamp - _gyro_timestamp_sample_last);
+
+			updated = true;
+		}
+	}
+
+	return updated;
+}
+
 bool VehicleAngularVelocity::CalibrateAndPublishAcceleration(const hrt_abstime &timestamp_sample,
 		const Vector3f &acceleration_uncalibrated)
 {
-	// Publish vehicle_acceleration
-	vehicle_acceleration_s v_acceleration;
-	v_acceleration.timestamp_sample = timestamp_sample;
+	if (timestamp_sample >= _last_publish + _publish_interval_min_us) {
+		// Publish vehicle_acceleration
+		vehicle_acceleration_s v_acceleration;
+		v_acceleration.timestamp_sample = timestamp_sample;
 
-	// Acceleration: rotate sensor frame to board, scale raw data to SI, apply calibration, and remove in-run estimated bias
-	_acceleration = _accel_calibration.Correct(acceleration_uncalibrated) - _accel_bias;
-	_acceleration.copyTo(v_acceleration.xyz);
+		// Acceleration: rotate sensor frame to board, scale raw data to SI, apply calibration, and remove in-run estimated bias
+		_acceleration = _accel_calibration.Correct(acceleration_uncalibrated) - _accel_bias;
+		_acceleration.copyTo(v_acceleration.xyz);
 
-	v_acceleration.timestamp = hrt_absolute_time();
-	_vehicle_acceleration_pub.publish(v_acceleration);
+		v_acceleration.timestamp = hrt_absolute_time();
+		_vehicle_acceleration_pub.publish(v_acceleration);
 
-	return true;
+		return true;
+	}
+
+	return false;
 }
 
 bool VehicleAngularVelocity::CalibrateAndPublishAngularVelocity(const hrt_abstime &timestamp_sample,
 		const Vector3f &angular_velocity_uncalibrated, const Vector3f &angular_acceleration_uncalibrated)
 {
-	// Publish vehicle_angular_velocity
-	vehicle_angular_velocity_s angular_velocity;
-	angular_velocity.timestamp_sample = timestamp_sample;
+	if (timestamp_sample >= _last_publish + _publish_interval_min_us) {
+		// Publish vehicle_angular_velocity
+		vehicle_angular_velocity_s angular_velocity;
+		angular_velocity.timestamp_sample = timestamp_sample;
 
-	// Angular velocity: rotate sensor frame to board, scale raw data to SI, apply calibration, and remove in-run estimated bias
-	_angular_velocity = _gyro_calibration.Correct(angular_velocity_uncalibrated) - _gyro_bias;
-	_angular_velocity.copyTo(angular_velocity.xyz);
+		// Angular velocity: rotate sensor frame to board, scale raw data to SI, apply calibration, and remove in-run estimated bias
+		_angular_velocity = _gyro_calibration.Correct(angular_velocity_uncalibrated) - _gyro_bias;
+		_angular_velocity.copyTo(angular_velocity.xyz);
 
-	// Angular acceleration: rotate sensor frame to board, scale raw data to SI, apply any additional configured rotation
-	_angular_acceleration = _gyro_calibration.rotation() * angular_acceleration_uncalibrated;
-	_angular_acceleration.copyTo(angular_velocity.xyz_derivative);
+		// Angular acceleration: rotate sensor frame to board, scale raw data to SI, apply any additional configured rotation
+		_angular_acceleration = _gyro_calibration.rotation() * angular_acceleration_uncalibrated;
+		_angular_acceleration.copyTo(angular_velocity.xyz_derivative);
 
-	angular_velocity.timestamp = hrt_absolute_time();
-	_vehicle_angular_velocity_pub.publish(angular_velocity);
+		angular_velocity.timestamp = hrt_absolute_time();
+		_vehicle_angular_velocity_pub.publish(angular_velocity);
 
-	// shift last publish time forward, but don't let it get further behind than the interval
-	_last_publish = math::constrain(_last_publish + _publish_interval_min_us,
-					timestamp_sample - _publish_interval_min_us, timestamp_sample);
+		return true;
+	}
 
-	return true;
+	return false;
 }
 
 void VehicleAngularVelocity::PrintStatus()
