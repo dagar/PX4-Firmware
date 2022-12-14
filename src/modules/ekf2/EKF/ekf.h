@@ -316,11 +316,11 @@ public:
 	const Vector3f &getMagBias() const { return _state.mag_B; }
 	Vector3f getMagBiasVariance() const
 	{
-		if (_control_status.flags.mag_3D) {
+		if (_control_status.flags.mag) {
 			return Vector3f{P(19, 19), P(20, 20), P(21, 21)};
 		}
 
-		return _saved_mag_bf_variance;
+		return _saved_mag_bf_covmat.diag();
 	}
 	float getMagBiasLimit() const { return 0.5f; } // 0.5 Gauss
 
@@ -510,6 +510,9 @@ private:
 
 	uint8_t _nb_ev_vel_reset_available{0};
 
+	uint8_t _nb_mag_reset_available{0};
+	uint8_t _nb_mag_heading_reset_available{0};
+
 	Vector3f _last_known_pos{};		///< last known local position vector (m)
 
 	uint64_t _time_acc_bias_check{0};	///< last time the  accel bias check passed (uSec)
@@ -613,9 +616,8 @@ private:
 	float _last_on_ground_posD{0.0f};	///< last vertical position when the in_air status was false (m)
 	uint64_t _flt_mag_align_start_time{0};	///< time that inflight magnetic field alignment started (uSec)
 	uint64_t _time_last_mov_3d_mag_suitable{0};	///< last system time that sufficient movement to use 3-axis magnetometer fusion was detected (uSec)
-	Vector3f _saved_mag_bf_variance {}; ///< magnetic field state variances that have been saved for use at the next initialisation (Gauss**2)
-	Matrix2f _saved_mag_ef_ne_covmat{}; ///< NE magnetic field state covariance sub-matrix saved for use at the next initialisation (Gauss**2)
-	float _saved_mag_ef_d_variance{};   ///< D magnetic field state variance saved for use at the next initialisation (Gauss**2)
+	Matrix3f _saved_mag_ef_ned_covmat{}; ///< NED magnetic field state covariance sub-matrix saved for use at the next initialisation (Gauss**2)
+	Matrix3f _saved_mag_bf_covmat {}; ///< magnetic field state variances that have been saved for use at the next initialisation (Gauss**2)
 
 	gps_check_fail_status_u _gps_check_fail_status{};
 
@@ -767,10 +769,6 @@ private:
 
 	void controlHaglFakeFusion();
 
-	// reset the heading and magnetic field states using the declination and magnetometer measurements
-	// return true if successful
-	bool resetMagHeading(const Vector3f &mag);
-
 	// reset the heading using the external vision measurements
 	// return true if successful
 	bool resetYawToEv();
@@ -863,19 +861,17 @@ private:
 
 	// control fusion of magnetometer observations
 	void controlMagFusion();
+	void controlMag3dFusion(const magSample &mag_sample, estimator_aid_source3d_s& aid_src);
+	void controlMagHeadingFusion(const magSample &mag_sample, estimator_aid_source1d_s& aid_src);
+
+	void checkYawAngleObservability();
+	void checkMagBiasObservability();
 
 	bool haglYawResetReq() const;
 	float getTerrainVPos() const { return isTerrainEstimateValid() ? _terrain_vpos : _last_on_ground_posD; }
 
 	bool magYawReset(const Vector3f &mag);
 
-	void check3DMagFusionSuitability();
-	void checkYawAngleObservability();
-	void checkMagBiasObservability();
-	bool canUse3DMagFusion() const;
-
-	void checkMagDeclRequired();
-	bool shouldInhibitMag() const;
 	bool magFieldStrengthDisturbed(const Vector3f &mag) const;
 	static bool isMeasuredMatchingExpected(float measured, float expected, float gate);
 
@@ -916,10 +912,7 @@ private:
 	bool isConditionalRangeAidSuitable();
 
 	void stopMagFusion();
-	void stopMag3DFusion();
 	void stopMagHdgFusion();
-	void startMagHdgFusion();
-	void startMag3DFusion();
 
 	void stopBaroHgtFusion();
 	void stopGpsHgtFusion();
@@ -937,6 +930,7 @@ private:
 
 	void resetQuatCov();
 	void zeroQuatCov();
+
 	void resetMagCov();
 
 	// perform a limited reset of the wind state covariances
@@ -957,8 +951,6 @@ private:
 	// load and save mag field state covariance data for re-use
 	void loadMagCovData();
 	void saveMagCovData();
-	void clearMagCov();
-	void zeroMagCov();
 
 	void resetZDeltaAngBiasCov();
 

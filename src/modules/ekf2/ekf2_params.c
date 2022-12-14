@@ -488,12 +488,25 @@ PARAM_DEFINE_INT32(EKF2_DECL_TYPE, 7);
  * @value 0 Automatic
  * @value 1 Magnetic heading
  * @value 2 3-axis
- * @value 3 VTOL custom
- * @value 4 MC custom
+ * @value 3 None
+ * @value 4 None
  * @value 5 None
  * @reboot_required true
  */
 PARAM_DEFINE_INT32(EKF2_MAG_TYPE, 0);
+
+/**
+ * Type of magnetometer fusion
+ *
+ *
+ *
+ * @group EKF2
+ * @min 0
+ * @max 3
+ * @bit 0 Magnetic heading
+ * @bit 1 3-axis
+ */
+PARAM_DEFINE_INT32(EKF2_MAG_CTRL, 2);
 
 /**
  * Horizontal acceleration threshold used by automatic selection of magnetometer fusion method.

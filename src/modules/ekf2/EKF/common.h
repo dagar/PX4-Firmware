@@ -92,16 +92,6 @@ enum GeoDeclinationMask : uint8_t {
 	FUSE_DECL     = (1<<2)  ///< set to true if the declination is always fused as an observation to constrain drift when 3-axis fusion is performed
 };
 
-enum MagFuseType : uint8_t {
-	// Integer definitions for mag_fusion_type
-	AUTO    = 0,   	///< The selection of either heading or 3D magnetometer fusion will be automatic
-	HEADING = 1,   	///< Simple yaw angle fusion will always be used. This is less accurate, but less affected by earth field distortions. It should not be used for pitch angles outside the range from -60 to +60 deg
-	MAG_3D  = 2,   	///< Magnetometer 3-axis fusion will always be used. This is more accurate, but more affected by localised earth field distortions
-	UNUSED  = 3,    ///< Not implemented
-	INDOOR  = 4,   	///< The same as option 0, but magnetometer or yaw fusion will not be used unless earth frame external aiding (GPS or External Vision) is being used. This prevents inconsistent magnetic fields associated with indoor operation degrading state estimates.
-	NONE    = 5    	///< Do not use magnetometer under any circumstance. Other sources of yaw may be used if selected via the EKF2_AID_MASK parameter.
-};
-
 enum TerrainFusionMask : uint8_t {
 	TerrainFuseRangeFinder = (1 << 0),
 	TerrainFuseOpticalFlow = (1 << 1)
@@ -120,6 +110,11 @@ enum GnssCtrl : uint8_t {
 	VPOS  = (1<<1),
 	VEL  = (1<<2),
 	YAW  = (1<<3)
+};
+
+enum class MagCtrl : uint8_t {
+	heading = (1<<0),
+	3D      = (1<<1),
 };
 
 enum RngCtrl : uint8_t {
@@ -287,6 +282,7 @@ struct parameters {
 	int32_t gnss_ctrl{GnssCtrl::HPOS | GnssCtrl::VEL};
 	int32_t rng_ctrl{RngCtrl::CONDITIONAL};
 	int32_t ev_ctrl{0};
+	int32_t mag_ctrl{0};
 	int32_t terrain_fusion_mode{TerrainFusionMask::TerrainFuseRangeFinder |
 				    TerrainFusionMask::TerrainFuseOpticalFlow}; ///< aiding source(s) selection bitmask for the terrain estimator
 
@@ -560,6 +556,8 @@ union filter_control_status_u {
 		uint64_t rng_kin_consistent      : 1; ///< 31 - true when the range finder kinematic consistency check is passing
 		uint64_t fake_pos                : 1; ///< 32 - true when fake position measurements are being fused
 		uint64_t fake_hgt                : 1; ///< 33 - true when fake height measurements are being fused
+		uint64_t mag                     : 1; ///< 34 - true if 3-axis magnetometer measurement fusion is intended (mag states only)
+
 	} flags;
 	uint64_t value;
 };

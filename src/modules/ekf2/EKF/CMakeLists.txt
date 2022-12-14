@@ -52,8 +52,10 @@ add_library(ecl_EKF
 	gps_yaw_fusion.cpp
 	height_control.cpp
 	imu_down_sampler.cpp
+	mag_3d_control.cpp
 	mag_control.cpp
 	mag_fusion.cpp
+	mag_heading_control.cpp
 	optical_flow_control.cpp
 	optflow_fusion.cpp
 	range_finder_consistency_check.cpp

@@ -271,38 +271,6 @@ void Ekf::alignOutputFilter()
 	_output_new = _output_buffer.get_newest();
 }
 
-// Reset heading and magnetic field states
-bool Ekf::resetMagHeading(const Vector3f &mag)
-{
-	const bool heading_required_for_navigation = _control_status.flags.gps;
-
-	if ((_params.mag_fusion_type <= MagFuseType::MAG_3D) || ((_params.mag_fusion_type == MagFuseType::INDOOR) && heading_required_for_navigation)) {
-
-		// rotate the magnetometer measurements into earth frame using a zero yaw angle
-		const Dcmf R_to_earth = updateYawInRotMat(0.f, _R_to_earth);
-
-		// the angle of the projection onto the horizontal gives the yaw angle
-		const Vector3f mag_earth_pred = R_to_earth * mag;
-
-		// calculate the observed yaw angle and yaw variance
-		_mag_declination = getMagDeclination();
-		float yaw_new = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + _mag_declination;
-		float yaw_new_variance = sq(fmaxf(_params.mag_heading_noise, 1.e-2f));
-
-		// update quaternion states and corresponding covarainces
-		resetQuatStateYaw(yaw_new, yaw_new_variance);
-
-		// set the earth magnetic field states using the updated rotation
-		_state.mag_I = _R_to_earth * mag;
-
-		resetMagCov();
-
-		return true;
-	}
-
-	return false;
-}
-
 bool Ekf::resetYawToEv()
 {
 	const float yaw_new = getEulerYaw(_ev_sample_delayed.quat);
@@ -1072,63 +1040,6 @@ void Ekf::initialiseQuatCovariances(Vector3f &rot_vec_var)
 	}
 }
 
-void Ekf::stopMagFusion()
-{
-	if (_control_status.flags.mag_hdg || _control_status.flags.mag_3D) {
-		ECL_INFO("stopping mag fusion");
-		stopMag3DFusion();
-		stopMagHdgFusion();
-		clearMagCov();
-	}
-}
-
-void Ekf::stopMag3DFusion()
-{
-	// save covariance data for re-use if currently doing 3-axis fusion
-	if (_control_status.flags.mag_3D) {
-		saveMagCovData();
-
-		_control_status.flags.mag_3D = false;
-		_control_status.flags.mag_dec = false;
-
-		_fault_status.flags.bad_mag_x = false;
-		_fault_status.flags.bad_mag_y = false;
-		_fault_status.flags.bad_mag_z = false;
-
-		_fault_status.flags.bad_mag_decl = false;
-	}
-}
-
-void Ekf::stopMagHdgFusion()
-{
-	if (_control_status.flags.mag_hdg) {
-		_control_status.flags.mag_hdg = false;
-
-		_fault_status.flags.bad_hdg = false;
-	}
-}
-
-void Ekf::startMagHdgFusion()
-{
-	if (!_control_status.flags.mag_hdg) {
-		stopMag3DFusion();
-		ECL_INFO("starting mag heading fusion");
-		_control_status.flags.mag_hdg = true;
-	}
-}
-
-void Ekf::startMag3DFusion()
-{
-	if (!_control_status.flags.mag_3D) {
-
-		stopMagHdgFusion();
-
-		zeroMagCov();
-		loadMagCovData();
-		_control_status.flags.mag_3D = true;
-	}
-}
-
 void Ekf::updateGroundEffect()
 {
 	if (_control_status.flags.in_air && !_control_status.flags.fixed_wing) {
@@ -1202,30 +1113,23 @@ void Ekf::increaseQuatYawErrVariance(float yaw_variance)
 // save covariance data for re-use when auto-switching between heading and 3-axis fusion
 void Ekf::saveMagCovData()
 {
-	// save variances for XYZ body axis field
-	_saved_mag_bf_variance(0) = P(19, 19);
-	_saved_mag_bf_variance(1) = P(20, 20);
-	_saved_mag_bf_variance(2) = P(21, 21);
+	// save the NED axis covariance sub-matrix
+	_saved_mag_ef_ned_covmat = P.slice<3, 3>(16, 16);
 
-	// save the NE axis covariance sub-matrix
-	_saved_mag_ef_ne_covmat = P.slice<2, 2>(16, 16);
-
-	// save variance for the D earth axis
-	_saved_mag_ef_d_variance = P(18, 18);
+	// save the XYZ body axis field covariance sub-matrix
+	_saved_mag_bf_covmat = P.slice<3, 3>(19, 19);
 }
 
 void Ekf::loadMagCovData()
 {
-	// re-instate variances for the XYZ body axis field
-	P(19, 19) = _saved_mag_bf_variance(0);
-	P(20, 20) = _saved_mag_bf_variance(1);
-	P(21, 21) = _saved_mag_bf_variance(2);
+	P.uncorrelateCovarianceSetVariance<3>(16, 0.f);
+	P.uncorrelateCovarianceSetVariance<3>(19, 0.f);
 
-	// re-instate the NE axis covariance sub-matrix
-	P.slice<2, 2>(16, 16) = _saved_mag_ef_ne_covmat;
+	// re-instate the NED axis covariance sub-matrix
+	P.slice<3, 3>(16, 16) = _saved_mag_ef_ned_covmat;
 
-	// re-instate the D earth axis variance
-	P(18, 18) = _saved_mag_ef_d_variance;
+	// re-instate the XYZ body axis field covariance sub-matrix
+	P.slice<3, 3>(19, 19) = _saved_mag_bf_covmat;
 }
 
 void Ekf::startAirspeedFusion()
@@ -1289,7 +1193,7 @@ void Ekf::startGpsYawFusion(const gpsSample &gps_sample)
 		_control_status.flags.mag_dec = false;
 		stopEvYawFusion();
 		stopMagHdgFusion();
-		stopMag3DFusion();
+		stopMagFusion();
 		_control_status.flags.gps_yaw = true;
 	}
 }
@@ -1318,7 +1222,7 @@ void Ekf::startEvYawFusion()
 	_control_status.flags.mag_dec = false;
 
 	stopMagHdgFusion();
-	stopMag3DFusion();
+	stopMagFusion();
 
 	_information_events.flags.starting_vision_yaw_fusion = true;
 	ECL_INFO("starting vision yaw fusion");
