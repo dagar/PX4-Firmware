@@ -25,6 +25,6 @@ uint8 type                # parameter type
 int64 int64_value               # current value if param_type is int-like
 float64 float64_value           # current value if param_type is float-like
 
-uint8 ORB_QUEUE_LENGTH = 4
+uint8 ORB_QUEUE_LENGTH = 8
 
 # TOPICS parameter_request uavcan_parameter_request

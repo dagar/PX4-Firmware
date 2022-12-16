@@ -50,13 +50,15 @@
 // #endif
 
 ParameterServer::ParameterServer() :
-	ScheduledWorkItem("parameter_server", px4::wq_configurations::hp_default)
+	ScheduledWorkItem("parameter_server", px4::wq_configurations::parameter_server)
 {
 	px4_sem_init(&_param_sem, 0, 1);
 	px4_sem_init(&_param_sem_save, 0, 1);
 	px4_sem_init(&_reader_lock_holders_lock, 0, 1);
 
 	_param_request_sub.registerCallback();
+
+	ScheduleOnInterval(100_ms);
 }
 
 ParameterServer::~ParameterServer()
@@ -1049,7 +1051,7 @@ int ParameterServer::verifyBsonExportCallback(bson_decoder_t decoder, bson_node_
 
 			int32_t value;
 
-			if (param_get(param, &value) == 0) {
+			if (getParameterValue(param, &value) == 0) {
 				if (value == node->i32) {
 					return 1; // valid
 
@@ -1068,7 +1070,7 @@ int ParameterServer::verifyBsonExportCallback(bson_decoder_t decoder, bson_node_
 
 			float value;
 
-			if (param_get(param, &value) == 0) {
+			if (getParameterValue(param, &value) == 0) {
 				if (fabsf(value - (float)node->d) <= FLT_EPSILON) {
 					return 1; // valid
 
@@ -1432,7 +1434,7 @@ uint32_t ParameterServer::hashCheck()
 
 void ParameterServer::printStatus()
 {
-	PX4_INFO("summary: %d/%d (used/total)", param_count_used(), param_count());
+	PX4_INFO("summary: %d/%d (used/total)", countUsed(), count());
 
 #ifndef FLASH_BASED_PARAMS
 	const char *filename = getDefaultFile();
@@ -1614,23 +1616,40 @@ out:
 
 void ParameterServer::Run()
 {
-
 	// Check for parameter requests (get/set/list)
-	if (_param_request_sub.updated()) {
+	while (_param_request_sub.updated()) {
+		const unsigned last_generation = _param_request_sub.get_last_generation();
+
 		parameter_request_s request;
 
 		if (_param_request_sub.copy(&request)) {
 
+			if (_param_request_sub.get_last_generation() != last_generation + 1) {
+				PX4_ERR("missed parameter_request, generation %d -> %d", last_generation, _param_request_sub.get_last_generation());
+			}
+
 			if (request.message_type == parameter_request_s::MESSAGE_TYPE_PARAM_REQUEST_READ) {
+
+
+				param_t param = PARAM_INVALID;
+
+				if (handle_in_range(request.param_index) && (strlen(request.name) == 0)) {
+					param = request.param_index;
+					//fprintf(stderr, "PARAM_REQUEST_READ: id: %d (%s)\n", param, param_name(param));
+
+				} else {
+					param = findParameter(request.name);
+					//fprintf(stderr, "PARAM_REQUEST_READ: name: %s (%d)\n", param_name(param), param);
+				}
 
 				parameter_value_s parameter_value{};
 				parameter_value.param_count = countUsed();
-
-				param_t param = findParameter(request.name);
+				parameter_value.timestamp_requested = request.timestamp;
 
 				if (param != PARAM_INVALID) {
 
 					parameter_value.param_index = param;
+					memcpy(parameter_value.param_name, param_name(param), 16);
 
 					switch (getParameterType(param)) {
 					case PARAM_TYPE_INT32: {

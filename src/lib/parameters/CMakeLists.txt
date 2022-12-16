@@ -175,6 +175,7 @@ if(NOT "${PX4_BOARD}" MATCHES "px4_io")
 		PRIVATE
 			#-DDEBUG_BUILD
 			#${MAX_CUSTOM_OPT_LEVEL}
+			-O0
 			-Wno-cast-align		# TODO: fix and enable
 			-Wno-sign-compare	# TODO: fix and enable
 	)
