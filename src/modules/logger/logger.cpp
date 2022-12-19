@@ -412,11 +412,11 @@ void Logger::update_params()
 	// check for parameter updates
 	if (_parameter_update_sub.updated()) {
 		// clear update
-		parameter_update_s pupdate;
+		parameter_update_s pupdate{};
 		_parameter_update_sub.copy(&pupdate);
 
 		// update parameters from storage
-		ModuleParams::updateParams();
+		ModuleParams::updateParams(pupdate);
 	}
 }
 

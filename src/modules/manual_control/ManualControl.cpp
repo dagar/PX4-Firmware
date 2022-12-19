@@ -79,10 +79,10 @@ void ManualControl::Run()
 	// Check if parameters have changed
 	if (_parameter_update_sub.updated()) {
 		// clear update
-		parameter_update_s param_update;
+		parameter_update_s param_update{};
 		_parameter_update_sub.copy(&param_update);
 
-		updateParams();
+		updateParams(param_update);
 
 		_stick_arm_hysteresis.set_hysteresis_time_from(false, _param_com_rc_arm_hyst.get() * 1_ms);
 		_stick_disarm_hysteresis.set_hysteresis_time_from(false, _param_com_rc_arm_hyst.get() * 1_ms);

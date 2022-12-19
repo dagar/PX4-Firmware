@@ -103,11 +103,11 @@ void SimulatorMavlink::parameters_update(bool force)
 	// check for parameter updates
 	if (_parameter_update_sub.updated() || force) {
 		// clear update
-		parameter_update_s pupdate;
+		parameter_update_s pupdate{};
 		_parameter_update_sub.copy(&pupdate);
 
 		// update parameters from storage
-		updateParams();
+		updateParams(pupdate);
 	}
 }
 

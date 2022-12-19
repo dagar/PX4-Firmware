@@ -111,9 +111,9 @@ void PWMSim::Run()
 
 	// check for parameter updates
 	if (_parameter_update_sub.updated()) {
-		parameter_update_s pupdate;
+		parameter_update_s pupdate{};
 		_parameter_update_sub.copy(&pupdate);
-		updateParams();
+		updateParams(pupdate);
 	}
 
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)

@@ -288,11 +288,11 @@ void EKF2::Run()
 	// check for parameter updates
 	if (_parameter_update_sub.updated() || !_callback_registered) {
 		// clear update
-		parameter_update_s pupdate;
+		parameter_update_s pupdate{};
 		_parameter_update_sub.copy(&pupdate);
 
 		// update parameters from storage
-		updateParams();
+		updateParams(pupdate);
 
 		VerifyParams();
 

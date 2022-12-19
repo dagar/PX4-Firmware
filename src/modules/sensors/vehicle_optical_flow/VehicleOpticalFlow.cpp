@@ -86,10 +86,10 @@ void VehicleOpticalFlow::ParametersUpdate()
 	// Check if parameters have changed
 	if (_params_sub.updated()) {
 		// clear update
-		parameter_update_s param_update;
+		parameter_update_s param_update{};
 		_params_sub.copy(&param_update);
 
-		updateParams();
+		updateParams(param_update);
 
 		_flow_rotation = get_rot_matrix((enum Rotation)_param_sens_flow_rot.get());
 	}

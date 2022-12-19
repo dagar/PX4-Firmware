@@ -45,10 +45,10 @@ int LedController::update(LedControlData &control_data)
 	// check for parameter updates
 	if (_parameter_update_sub.updated()) {
 		// clear update
-		parameter_update_s pupdate;
+		parameter_update_s pupdate{};
 		_parameter_update_sub.copy(&pupdate);
 
-		updateParams();
+		updateParams(pupdate);
 
 		const uint8_t max_brightness_prev = _max_brightness;
 

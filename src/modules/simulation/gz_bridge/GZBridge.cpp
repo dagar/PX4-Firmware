@@ -599,10 +599,10 @@ void GZBridge::Run()
 	pthread_mutex_lock(&_mutex);
 
 	if (_parameter_update_sub.updated()) {
-		parameter_update_s pupdate;
+		parameter_update_s pupdate{};
 		_parameter_update_sub.copy(&pupdate);
 
-		updateParams();
+		updateParams(pupdate);
 	}
 
 	_mixing_output.update();

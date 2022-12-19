@@ -81,10 +81,10 @@ void LandDetector::Run()
 	perf_begin(_cycle_perf);
 
 	if (_parameter_update_sub.updated() || (_land_detected.timestamp == 0)) {
-		parameter_update_s param_update;
+		parameter_update_s param_update{};
 		_parameter_update_sub.copy(&param_update);
 
-		updateParams();
+		updateParams(param_update);
 		_update_params();
 
 		_total_flight_time = static_cast<uint64_t>(_param_total_flight_time_high.get()) << 32;

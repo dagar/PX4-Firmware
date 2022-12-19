@@ -272,11 +272,11 @@ void FixedwingAttitudeControl::Run()
 		// check for parameter updates
 		if (params_updated) {
 			// clear update
-			parameter_update_s pupdate;
+			parameter_update_s pupdate{};
 			_parameter_update_sub.copy(&pupdate);
 
 			// update parameters from storage
-			updateParams();
+			updateParams(pupdate);
 			parameters_update();
 		}
 

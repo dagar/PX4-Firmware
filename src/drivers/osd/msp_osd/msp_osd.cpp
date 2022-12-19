@@ -230,9 +230,9 @@ void MspOsd::Run()
 	// Check if parameters have changed
 	if (_parameter_update_sub.updated()) {
 		// clear update
-		parameter_update_s param_update;
+		parameter_update_s param_update{};
 		_parameter_update_sub.copy(&param_update);
-		updateParams(); // update module parameters (in DEFINE_PARAMETERS)
+		updateParams(param_update); // update module parameters (in DEFINE_PARAMETERS)
 		parameters_update();
 	}
 

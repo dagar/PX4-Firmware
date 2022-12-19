@@ -589,10 +589,10 @@ void DShot::handle_vehicle_commands()
 
 void DShot::update_params()
 {
-	parameter_update_s pupdate;
+	parameter_update_s pupdate{};
 	_parameter_update_sub.copy(&pupdate);
 
-	updateParams();
+	updateParams(pupdate);
 
 	// we use a minimum value of 1, since 0 is for disarmed
 	_mixing_output.setAllMinValues(math::constrain(static_cast<int>((_param_dshot_min.get() *

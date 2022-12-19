@@ -178,10 +178,10 @@ int INA238::collect()
 
 	if (_parameter_update_sub.updated()) {
 		// Read from topic to clear updated flag
-		parameter_update_s parameter_update;
+		parameter_update_s parameter_update{};
 		_parameter_update_sub.copy(&parameter_update);
 
-		updateParams();
+		updateParams(parameter_update);
 	}
 
 	// read from the sensor

@@ -308,13 +308,13 @@ ControlAllocator::Run()
 	// Check if parameters have changed
 	if (_parameter_update_sub.updated() && !_armed) {
 		// clear update
-		parameter_update_s param_update;
+		parameter_update_s param_update{};
 		_parameter_update_sub.copy(&param_update);
 
 		if (_handled_motor_failure_bitmask == 0) {
 			// We don't update the geometry after an actuator failure, as it could lead to unexpected results
 			// (e.g. a user could add/remove motors, such that the bitmask isn't correct anymore)
-			updateParams();
+			updateParams(param_update);
 			parameters_updated();
 		}
 	}

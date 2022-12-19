@@ -390,11 +390,11 @@ void AttitudeEstimatorQ::update_parameters(bool force)
 	// check for parameter updates
 	if (_parameter_update_sub.updated() || force) {
 		// clear update
-		parameter_update_s pupdate;
+		parameter_update_s pupdate{};
 		_parameter_update_sub.copy(&pupdate);
 
 		// update parameters from storage
-		updateParams();
+		updateParams(pupdate);
 
 		// disable mag fusion if the system does not have a mag
 		if (_param_sys_has_mag.get() == 0) {

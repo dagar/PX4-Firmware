@@ -99,11 +99,11 @@ void TargetEstimator::parameters_update(bool force)
 	// check for parameter updates
 	if (_parameter_update_sub.updated() || force) {
 		// clear update
-		parameter_update_s update;
+		parameter_update_s update{};
 		_parameter_update_sub.copy(&update);
 
 		// update parameters from storage
-		updateParams();
+		updateParams(update);
 	}
 }
 

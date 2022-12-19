@@ -77,10 +77,10 @@ void VehicleGPSPosition::ParametersUpdate(bool force)
 	// Check if parameters have changed
 	if (_parameter_update_sub.updated() || force) {
 		// clear update
-		parameter_update_s param_update;
+		parameter_update_s param_update{};
 		_parameter_update_sub.copy(&param_update);
 
-		updateParams();
+		updateParams(param_update);
 
 		if (_param_sens_gps_mask.get() == 0) {
 			_sensor_gps_sub[0].registerCallback();

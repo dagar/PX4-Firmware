@@ -241,11 +241,11 @@ VtolAttitudeControl::parameters_update()
 	// check for parameter updates
 	if (_parameter_update_sub.updated()) {
 		// clear update
-		parameter_update_s param_update;
+		parameter_update_s param_update{};
 		_parameter_update_sub.copy(&param_update);
 
 		// update parameters from storage
-		updateParams();
+		updateParams(param_update);
 
 		if (_vtol_type != nullptr) {
 			_vtol_type->parameters_update();
