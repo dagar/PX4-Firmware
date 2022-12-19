@@ -48,11 +48,6 @@ static ParameterServer *parameter_server {nullptr};
 
 #include "param.h"
 
-#include <uORB/SubscriptionBlocking.hpp>
-#include <uORB/Publication.hpp>
-#include <uORB/topics/parameter_request.h>
-#include <uORB/topics/parameter_value.h>
-
 void param_init()
 {
 	if (parameter_server == nullptr) {
@@ -68,6 +63,7 @@ void param_notify_changes()
 	}
 }
 
+#if !defined(PX4_PARAM_CLIENT_SRV)
 param_t param_find(const char *name)
 {
 	if (parameter_server) {
@@ -85,6 +81,7 @@ param_t param_find_no_notification(const char *name)
 
 	return PARAM_INVALID;
 }
+#endif // !PX4_PARAM_CLIENT_SRV
 
 size_t param_size(param_t param)
 {
@@ -176,7 +173,6 @@ bool param_is_volatile(param_t param)
 	return false;
 }
 
-
 bool param_value_unsaved(param_t param)
 {
 	if (parameter_server) {
@@ -186,66 +182,16 @@ bool param_value_unsaved(param_t param)
 	return true;
 }
 
+#if !defined(PX4_PARAM_CLIENT_SRV)
 int param_get(param_t param, void *val)
 {
-#if 0
-
 	if (parameter_server) {
 		return parameter_server->getParameterValue(param, val);
 	}
 
 	return -1;
-#else
-	uORB::Publication<parameter_request_s> param_request_pub {ORB_ID(parameter_request)};
-	uORB::SubscriptionBlocking<parameter_value_s> param_value_sub{ORB_ID(parameter_value)};
-
-	// publish request
-	parameter_request_s request{};
-	request.message_type = parameter_request_s::MESSAGE_TYPE_PARAM_REQUEST_READ;
-	request.param_index = param;
-	request.timestamp = hrt_absolute_time();
-	param_request_pub.publish(request);
-
-	// response
-	while ((hrt_elapsed_time(&request.timestamp) < 50_ms) || param_value_sub.updated()) {
-		const unsigned last_generation = param_value_sub.get_last_generation();
-		parameter_value_s parameter_value{};
-
-		if (param_value_sub.updateBlocking(parameter_value, 1'000)) {
-
-			if (param_value_sub.get_last_generation() != last_generation + 1) {
-				PX4_ERR("param_get: missed parameter_value, generation %d -> %d",
-					last_generation, param_value_sub.get_last_generation());
-			}
-
-			if ((parameter_value.timestamp_requested == request.timestamp)
-			    && (parameter_value.param_index == request.param_index)) {
-				switch (parameter_value.type) {
-				case parameter_request_s::TYPE_INT32: {
-						int32_t v = parameter_value.int64_value;
-						//fprintf(stderr, "param_get: ParameterValue: %s (%d)=%d\n", parameter_value.param_name, parameter_value.param_index, v);
-						memcpy(val, &v, sizeof(int32_t));
-						return 0;
-					}
-					break;
-
-				case parameter_request_s::TYPE_FLOAT32: {
-						float f = (float)parameter_value.float64_value;
-						//fprintf(stderr, "param_get: ParameterValue: %s (%d)=%.3f\n", parameter_value.param_name, parameter_value.param_index, (double)f);
-						memcpy(val, &f, sizeof(float));
-						return 0;
-					}
-					break;
-
-				}
-			}
-		}
-	}
-
-	PX4_ERR("param_get %d failed", param);
-	return -1;
-#endif
 }
+#endif // !PX4_PARAM_CLIENT_SRV
 
 int param_get_default_value(param_t param, void *default_val)
 {
@@ -281,6 +227,7 @@ void param_control_autosave(bool enable)
 	}
 }
 
+#if !defined(PX4_PARAM_CLIENT_SRV)
 int param_set(param_t param, const void *val)
 {
 	if (parameter_server) {
@@ -298,6 +245,7 @@ int param_set_no_notification(param_t param, const void *val)
 
 	return -1;
 }
+#endif // !PX4_PARAM_CLIENT_SRV
 
 bool param_used(param_t param)
 {

@@ -90,10 +90,31 @@ protected:
 		updateParamsImpl();
 	}
 
+	virtual void updateParams(const parameter_update_s &parameter_update)
+	{
+		if ((parameter_update.timestamp != 0) && (_parameter_update_instance > 0)
+		    && (parameter_update.instance == _parameter_update_instance + 1)
+		   ) {
+			for (const auto &child : _children) {
+				child->updateParams(parameter_update);
+			}
+
+			updateParamsImpl(parameter_update);
+
+		} else {
+			updateParams();
+		}
+
+		_parameter_update_instance = parameter_update.instance;
+	}
+
 	/**
 	 * @brief The implementation for this is generated with the macro DEFINE_PARAMETERS()
 	 */
 	virtual void updateParamsImpl() {}
+	virtual void updateParamsImpl(const parameter_update_s &parameter_update) {}
+
+	uint32_t _parameter_update_instance{0}; \
 
 private:
 	/** @list _children The module parameter list of inheriting classes. */

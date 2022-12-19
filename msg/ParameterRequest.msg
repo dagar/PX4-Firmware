@@ -15,15 +15,12 @@ int16 param_index		# -1 if the param_id field should be used as identifier
 
 uint8 TYPE_INVALID = 0
 uint8 TYPE_BOOL    = 1
-uint8 TYPE_UINT8   = 2
-uint8 TYPE_INT32   = 3
-uint8 TYPE_INT64   = 4
-uint8 TYPE_FLOAT32 = 5
-uint8 TYPE_FLOAT64 = 6
+uint8 TYPE_INT32   = 2
+uint8 TYPE_FLOAT32 = 3
 uint8 type                # parameter type
 
-int64 int64_value               # current value if param_type is int-like
-float64 float64_value           # current value if param_type is float-like
+int32 int32_value               # current value if param_type is int-like
+float32 float32_value           # current value if param_type is float-like
 
 uint8 ORB_QUEUE_LENGTH = 8
 

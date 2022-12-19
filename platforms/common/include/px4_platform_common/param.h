@@ -44,11 +44,13 @@
 #include <math.h>
 
 #include <parameters/px4_parameters.hpp>
+#include <uORB/topics/parameter.h>
+#include <uORB/topics/parameter_update.h>
 
 /**
  * get the parameter handle from a parameter enum
  */
-inline static param_t param_handle(px4::params p)
+inline static constexpr param_t param_handle(px4::params p)
 {
 	return (param_t)p;
 }
@@ -62,12 +64,21 @@ inline static param_t param_handle(px4::params p)
 #define _CALL_UPDATE(x) \
 	STRIP(x).update();
 
+#define _SET_PARAMETER_UPDATE(x) \
+	case STRIP(x).handle(): STRIP(x).setValue(parameter_update.changed_param); return;
+
+
 // define the parameter update method, which will update all parameters.
 // It is marked as 'final', so that wrong usages lead to a compile error (see below)
 #define _DEFINE_PARAMETER_UPDATE_METHOD(...) \
 	protected: \
 	void updateParamsImpl() final { \
 		APPLY_ALL(_CALL_UPDATE, __VA_ARGS__) \
+	} \
+	void updateParamsImpl(const parameter_update_s &parameter_update) { \
+		switch(parameter_update.changed_param.index) { \
+			APPLY_ALL(_SET_PARAMETER_UPDATE, __VA_ARGS__) \
+		} \
 	} \
 	private:
 
@@ -87,6 +98,12 @@ inline static param_t param_handle(px4::params p)
 	void updateParamsImpl() override { \
 		parent_class::updateParamsImpl(); \
 		APPLY_ALL(_CALL_UPDATE, __VA_ARGS__) \
+	} \
+	void updateParamsImpl(const parameter_update_s &parameter_update) { \
+		parent_class::updateParamsImpl(parameter_update); \
+		switch(parameter_update.changed_param.index) { \
+			APPLY_ALL(_SET_PARAMETER_UPDATE, __VA_ARGS__) \
+		} \
 	} \
 	private:
 
@@ -154,7 +171,9 @@ public:
 
 	bool update() { return param_get(handle(), &_val) == 0; }
 
-	param_t handle() const { return param_handle(p); }
+	void setValue(const parameter_s &parameter_update) { _val = parameter_update.float32_value; }
+
+	static constexpr param_t handle() { return param_handle(p); }
 private:
 	float _val;
 };
@@ -206,7 +225,9 @@ public:
 
 	bool update() { return param_get(handle(), &_val) == 0; }
 
-	param_t handle() const { return param_handle(p); }
+	void setValue(const parameter_s &parameter_update) { _val = parameter_update.float32_value; }
+
+	static constexpr param_t handle() { return param_handle(p); }
 private:
 	float &_val;
 };
@@ -256,7 +277,9 @@ public:
 
 	bool update() { return param_get(handle(), &_val) == 0; }
 
-	param_t handle() const { return param_handle(p); }
+	void setValue(const parameter_s &parameter_update) { _val = parameter_update.int32_value; }
+
+	static constexpr param_t handle() { return param_handle(p); }
 private:
 	int32_t _val;
 };
@@ -308,7 +331,9 @@ public:
 
 	bool update() { return param_get(handle(), &_val) == 0; }
 
-	param_t handle() const { return param_handle(p); }
+	void setValue(const parameter_s &parameter_update) { _val = parameter_update.int32_value; }
+
+	static constexpr param_t handle() { return param_handle(p); }
 private:
 	int32_t &_val;
 };
@@ -377,7 +402,9 @@ public:
 		return false;
 	}
 
-	param_t handle() const { return param_handle(p); }
+	void setValue(const parameter_s &parameter_update) { _val = parameter_update.int32_value; }
+
+	static constexpr param_t handle() { return param_handle(p); }
 private:
 	bool _val;
 };

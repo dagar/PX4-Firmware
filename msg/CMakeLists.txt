@@ -219,6 +219,14 @@ set(msg_files
 	WheelEncoders.msg
 	Wind.msg
 	YawEstimatorStatus.msg
+
+        Parameter.msg
+
+        SrvParameterGetRequest.msg
+        SrvParameterGetResponse.msg
+
+        SrvParameterSetRequest.msg
+        SrvParameterSetResponse.msg
 )
 list(SORT msg_files)
 

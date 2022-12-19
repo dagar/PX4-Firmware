@@ -151,6 +151,12 @@ add_custom_target(parameters_header DEPENDS px4_parameters.hpp)
 
 set(SRCS)
 
+set(PX4_PARAM_CLIENT_SRV 1)
+if(PX4_PARAM_CLIENT_SRV)
+	add_compile_definitions(PX4_PARAM_CLIENT_SRV)
+	list(APPEND SRCS parameters_srv.cpp)
+endif()
+
 list(APPEND SRCS parameters.cpp)
 
 if(BUILD_TESTING)

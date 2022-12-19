@@ -51,9 +51,12 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_armed.h>
-#include <uORB/topics/parameter_request.h>
-#include <uORB/topics/parameter_value.h>
 #include <uORB/topics/parameter_update.h>
+
+#include <uORB/topics/srv_parameter_get_request.h>
+#include <uORB/topics/srv_parameter_get_response.h>
+#include <uORB/topics/srv_parameter_set_request.h>
+#include <uORB/topics/srv_parameter_set_response.h>
 
 #include "param.h"
 #include <parameters/px4_parameters.hpp>
@@ -507,10 +510,15 @@ private:
 
 	void Run() override;
 
-	uORB::Publication<parameter_value_s> _param_response_pub{ORB_ID(parameter_value)};
 	uORB::Publication<parameter_update_s> _parameter_update_pub{ORB_ID(parameter_update)};
 
-	uORB::SubscriptionCallbackWorkItem _param_request_sub{this, ORB_ID(parameter_request)};
+	// srv: parameter_get
+	uORB::SubscriptionCallbackWorkItem _srv_parameter_get_request_sub{this, ORB_ID(srv_parameter_get_request)};
+	uORB::Publication<srv_parameter_get_response_s> _srv_parameter_get_response_pub{ORB_ID(srv_parameter_get_response)};
+
+	// srv: parameter_set
+	uORB::SubscriptionCallbackWorkItem _srv_parameter_set_request_sub{this, ORB_ID(srv_parameter_set_request)};
+	uORB::Publication<srv_parameter_set_response_s> _srv_parameter_set_response_pub{ORB_ID(srv_parameter_set_response)};
 
 	uORB::SubscriptionData<actuator_armed_s> _armed_sub{ORB_ID(actuator_armed)};
 

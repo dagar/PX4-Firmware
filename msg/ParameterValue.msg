@@ -11,8 +11,8 @@ uint16 param_count		# number of parameters exposed by the node
 
 uint8 type                      # parameter type
 
-int64 int64_value               # current value if param_type is int-like
-float64 float64_value           # current value if param_type is float-like
+int32 int32_value               # current value if param_type is int-like
+float32 float32_value           # current value if param_type is float-like
 
 
 uint64 timestamp_requested

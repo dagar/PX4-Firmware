@@ -56,7 +56,8 @@ ParameterServer::ParameterServer() :
 	px4_sem_init(&_param_sem_save, 0, 1);
 	px4_sem_init(&_reader_lock_holders_lock, 0, 1);
 
-	_param_request_sub.registerCallback();
+	_srv_parameter_get_request_sub.registerCallback();
+	_srv_parameter_set_request_sub.registerCallback();
 
 	ScheduleOnInterval(100_ms);
 }
@@ -1616,105 +1617,140 @@ out:
 
 void ParameterServer::Run()
 {
-	// Check for parameter requests (get/set/list)
-	while (_param_request_sub.updated()) {
-		const unsigned last_generation = _param_request_sub.get_last_generation();
+	// srv: parameter_set
+	while (_srv_parameter_set_request_sub.updated()) {
+		const unsigned last_generation = _srv_parameter_set_request_sub.get_last_generation();
 
-		parameter_request_s request;
+		srv_parameter_set_request_s request;
 
-		if (_param_request_sub.copy(&request)) {
+		if (_srv_parameter_set_request_sub.copy(&request)) {
 
-			if (_param_request_sub.get_last_generation() != last_generation + 1) {
-				PX4_ERR("missed parameter_request, generation %d -> %d", last_generation, _param_request_sub.get_last_generation());
+			if (_srv_parameter_set_request_sub.get_last_generation() != last_generation + 1) {
+				PX4_ERR("missed srv_parameter_set_request, generation %d -> %d", last_generation,
+					_srv_parameter_set_request_sub.get_last_generation());
 			}
 
-			if (request.message_type == parameter_request_s::MESSAGE_TYPE_PARAM_REQUEST_READ) {
+			srv_parameter_set_response_s response{};
+			response.timestamp_requested = request.timestamp;
 
+			// defaults
+			response.result = srv_parameter_set_response_s::RESULT_SET_FAILED;
+			response.parameter.index = PARAM_INVALID;
+			response.parameter.type = parameter_s::TYPE_INVALID;
 
-				param_t param = PARAM_INVALID;
+			param_t param = PARAM_INVALID;
 
-				if (handle_in_range(request.param_index) && (strlen(request.name) == 0)) {
-					param = request.param_index;
-					//fprintf(stderr, "PARAM_REQUEST_READ: id: %d (%s)\n", param, param_name(param));
+			if (handle_in_range(request.parameter.index) && (strlen(request.parameter.name) == 0)) {
+				param = request.parameter.index;
 
-				} else {
-					param = findParameter(request.name);
-					//fprintf(stderr, "PARAM_REQUEST_READ: name: %s (%d)\n", param_name(param), param);
-				}
-
-				parameter_value_s parameter_value{};
-				parameter_value.param_count = countUsed();
-				parameter_value.timestamp_requested = request.timestamp;
-
-				if (param != PARAM_INVALID) {
-
-					parameter_value.param_index = param;
-					memcpy(parameter_value.param_name, param_name(param), 16);
-
-					switch (getParameterType(param)) {
-					case PARAM_TYPE_INT32: {
-							int32_t v;
-
-							if (getParameterDefaultValue(param, &v) == 0) {
-								parameter_value.type = parameter_request_s::TYPE_INT32;
-								parameter_value.int64_value = v;
-								parameter_value.timestamp = hrt_absolute_time();
-								_param_response_pub.publish(parameter_value);
-							}
-						}
-						break;
-
-					case PARAM_TYPE_FLOAT: {
-							float v;
-
-							if (getParameterDefaultValue(param, &v) == 0) {
-								parameter_value.type = parameter_request_s::TYPE_FLOAT32;
-								parameter_value.float64_value = (double)v;
-								parameter_value.timestamp = hrt_absolute_time();
-								_param_response_pub.publish(parameter_value);
-							}
-						}
-						break;
-					}
-				}
-
-			} else if (request.message_type == parameter_request_s::MESSAGE_TYPE_PARAM_SET) {
-
-				param_t param = findParameter(request.name);
-
-				if (param != PARAM_INVALID) {
-					switch (request.type) {
-					case parameter_request_s::TYPE_BOOL:
-
-					case parameter_request_s::TYPE_UINT8:
-					case parameter_request_s::TYPE_INT32:
-					case parameter_request_s::TYPE_INT64: {
-							int32_t i32_value = request.int64_value;
-							setParameter(param, &i32_value);
-						}
-						break;
-
-					case parameter_request_s::TYPE_FLOAT32:
-					case parameter_request_s::TYPE_FLOAT64: {
-							float float32_value = request.float64_value;
-							setParameter(param, &float32_value);
-						}
-					}
-				}
-
-			} else if (request.message_type == parameter_request_s::MESSAGE_TYPE_PARAM_REQUEST_LIST) {
-
-				// TODO:
-
-
-			} else if (request.node_id == parameter_request_s::NODE_ID_ALL) {
-				if (request.message_type == parameter_request_s::MESSAGE_TYPE_PARAM_REQUEST_LIST) {
-
-					// TODO:
-
-				}
+			} else {
+				param = findParameter(request.parameter.name);
 			}
+
+			response.parameter.index = param;
+
+			if (param != PARAM_INVALID) {
+				memcpy(response.parameter.name, param_name(param), 16);
+
+				switch (getParameterType(param)) {
+				case PARAM_TYPE_INT32:
+					response.parameter.type = parameter_s::TYPE_INT32;
+
+					if (setParameter(param, &request.parameter.int32_value) == 0) {
+						response.parameter.int32_value = request.parameter.int32_value;
+						response.result = srv_parameter_set_response_s::RESULT_SET_SUCCESS;
+					}
+
+					break;
+
+				case PARAM_TYPE_FLOAT:
+					response.parameter.type = parameter_s::TYPE_FLOAT32;
+
+					if (setParameter(param, &request.parameter.float32_value) == 0) {
+						response.parameter.float32_value = request.parameter.float32_value;
+						response.result = srv_parameter_set_response_s::RESULT_SET_SUCCESS;
+					}
+
+					break;
+				}
+
+			} else {
+				response.result = srv_parameter_set_response_s::RESULT_ERROR_INVALID_PARAMETER;
+			}
+
+			response.timestamp = hrt_absolute_time();
+			_srv_parameter_set_response_pub.publish(response);
 		}
+	}
+
+	// srv: parameter_get
+	while (_srv_parameter_get_request_sub.updated()) {
+		const unsigned last_generation = _srv_parameter_get_request_sub.get_last_generation();
+
+		srv_parameter_get_request_s request;
+
+		if (_srv_parameter_get_request_sub.copy(&request)) {
+
+			if (_srv_parameter_get_request_sub.get_last_generation() != last_generation + 1) {
+				PX4_ERR("missed srv_parameter_get_request, generation %d -> %d", last_generation,
+					_srv_parameter_get_request_sub.get_last_generation());
+			}
+
+			srv_parameter_get_response_s response{};
+			response.timestamp_requested = request.timestamp;
+
+			// defaults
+			response.result = srv_parameter_get_response_s::RESULT_GET_FAILED;
+			response.parameter.index = PARAM_INVALID;
+			response.parameter.type = parameter_s::TYPE_INVALID;
+
+			param_t param = PARAM_INVALID;
+
+			if (handle_in_range(request.index) && (strlen(request.name) == 0)) {
+				param = request.index;
+
+			} else {
+				param = findParameter(request.name);
+			}
+
+			response.parameter.index = param;
+
+			if (param != PARAM_INVALID) {
+				memcpy(response.parameter.name, param_name(param), 16);
+
+				switch (getParameterType(param)) {
+				case PARAM_TYPE_INT32:
+					response.parameter.type = parameter_s::TYPE_INT32;
+
+					if (getParameterDefaultValue(param, &response.parameter.int32_value) == 0) {
+						response.result = srv_parameter_get_response_s::RESULT_GET_SUCCESS;
+					}
+
+					break;
+
+				case PARAM_TYPE_FLOAT:
+					response.parameter.type = parameter_s::TYPE_FLOAT32;
+
+					if (getParameterDefaultValue(param, &response.parameter.float32_value) == 0) {
+						response.result = srv_parameter_get_response_s::RESULT_GET_SUCCESS;
+					}
+
+					break;
+				}
+
+			} else {
+				response.result = srv_parameter_get_response_s::RESULT_ERROR_INVALID_PARAMETER;
+			}
+
+			response.timestamp = hrt_absolute_time();
+			_srv_parameter_get_response_pub.publish(response);
+		}
+	}
+
+	// schedule to run again immediately if there are pending updates
+	if (_srv_parameter_set_request_sub.updated() || _srv_parameter_get_request_sub.updated()) {
+		ScheduleNow();
+		return;
 	}
 
 	// autosave worker, run last
@@ -1771,5 +1807,4 @@ void ParameterServer::Run()
 
 		unlockReader();
 	}
-
 }

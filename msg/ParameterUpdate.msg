@@ -12,3 +12,5 @@ uint32 export_count
 uint16 active
 uint16 changed
 uint16 custom_default
+
+Parameter changed_param

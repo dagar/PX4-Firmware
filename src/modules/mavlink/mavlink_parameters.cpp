@@ -150,13 +150,11 @@ MavlinkParametersManager::handle_message(const mavlink_message_t *msg)
 
 				if (set.param_type == MAV_PARAM_TYPE_REAL32) {
 					parameter_request.type = parameter_request_s::TYPE_FLOAT32;
-					parameter_request.float64_value = set.param_value;
+					parameter_request.float32_value = set.param_value;
 
 				} else {
-					int32_t val;
-					memcpy(&val, &set.param_value, sizeof(int32_t));
-					parameter_request.type = parameter_request_s::TYPE_INT64;
-					parameter_request.int64_value = val;
+					memcpy(&parameter_request.int32_value, &set.param_value, sizeof(int32_t));
+					parameter_request.type = parameter_request_s::TYPE_INT32;
 				}
 
 				parameter_request.timestamp = hrt_absolute_time();
@@ -431,10 +429,10 @@ MavlinkParametersManager::send_uavcan()
 
 		if (value.type == parameter_request_s::TYPE_FLOAT32) {
 			msg.param_type = MAVLINK_TYPE_FLOAT;
-			msg.param_value = value.float64_value;
+			msg.param_value = value.float32_value;
 
 		} else {
-			int32_t val = value.int64_value;
+			int32_t val = value.int32_value;
 			memcpy(&msg.param_value, &val, sizeof(int32_t));
 			msg.param_type = MAVLINK_TYPE_INT32_T;
 		}

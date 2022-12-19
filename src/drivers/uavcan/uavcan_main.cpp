@@ -742,16 +742,15 @@ UavcanNode::Run()
 
 				switch (request.type) {
 				case parameter_request_s::TYPE_BOOL:
-					req.value.to<uavcan::protocol::param::Value::Tag::boolean_value>() = request.int64_value;
+					req.value.to<uavcan::protocol::param::Value::Tag::boolean_value>() = request.int32_value;
 					break;
 
 				case parameter_request_s::TYPE_FLOAT32:
-				case parameter_request_s::TYPE_FLOAT64:
-					req.value.to<uavcan::protocol::param::Value::Tag::real_value>() = request.float64_value;
+					req.value.to<uavcan::protocol::param::Value::Tag::real_value>() = request.float32_value;
 					break;
 
 				default:
-					req.value.to<uavcan::protocol::param::Value::Tag::integer_value>() = request.int64_value;
+					req.value.to<uavcan::protocol::param::Value::Tag::integer_value>() = request.int32_value;
 					break;
 				}
 
@@ -1105,16 +1104,16 @@ UavcanNode::cb_getset(const uavcan::ServiceCallResult<uavcan::protocol::param::G
 			response.param_count = _param_counts[response.node_id];
 
 			if (param.value.is(uavcan::protocol::param::Value::Tag::integer_value)) {
-				response.type = parameter_request_s::TYPE_INT64;
-				response.int64_value = param.value.to<uavcan::protocol::param::Value::Tag::integer_value>();
+				response.type = parameter_request_s::TYPE_INT32;
+				response.int32_value = param.value.to<uavcan::protocol::param::Value::Tag::integer_value>();
 
 			} else if (param.value.is(uavcan::protocol::param::Value::Tag::real_value)) {
 				response.type = parameter_request_s::TYPE_FLOAT32;
-				response.float64_value = param.value.to<uavcan::protocol::param::Value::Tag::real_value>();
+				response.float32_value = param.value.to<uavcan::protocol::param::Value::Tag::real_value>();
 
 			} else if (param.value.is(uavcan::protocol::param::Value::Tag::boolean_value)) {
 				response.type = parameter_request_s::TYPE_BOOL;
-				response.int64_value = param.value.to<uavcan::protocol::param::Value::Tag::boolean_value>();
+				response.int32_value = param.value.to<uavcan::protocol::param::Value::Tag::boolean_value>();
 			}
 
 			_param_response_pub.publish(response);
