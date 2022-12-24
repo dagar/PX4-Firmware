@@ -35,12 +35,6 @@ add_subdirectory(data_validator)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-if(CONFIG_SENSORS_VEHICLE_ACCELERATION)
-	add_subdirectory(vehicle_acceleration)
-endif()
-
-add_subdirectory(vehicle_imu)
-
 if(CONFIG_SENSORS_VEHICLE_AIR_DATA)
 	add_subdirectory(vehicle_air_data)
 endif()
@@ -78,12 +72,7 @@ px4_add_module(
 		data_validator
 		mathlib
 		sensor_calibration
-		vehicle_imu
 	)
-
-if(CONFIG_SENSORS_VEHICLE_ACCELERATION)
-	target_link_libraries(modules__sensors PRIVATE vehicle_acceleration)
-endif()
 
 if(CONFIG_SENSORS_VEHICLE_AIR_DATA)
 	target_link_libraries(modules__sensors PRIVATE vehicle_air_data)

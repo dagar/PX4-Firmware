@@ -50,12 +50,6 @@
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
 #include "voted_sensors_update.h"
-#include "vehicle_imu/VehicleIMU.hpp"
-#include "vehicle_imu/VehicleIMUFifo.hpp"
-
-#if defined(CONFIG_SENSORS_VEHICLE_ACCELERATION)
-# include "vehicle_acceleration/VehicleAcceleration.hpp"
-#endif // CONFIG_SENSORS_VEHICLE_ACCELERATION
 
 #if defined(CONFIG_SENSORS_VEHICLE_AIRSPEED)
 # include <drivers/drv_sensor.h>
@@ -127,9 +121,6 @@ private:
 
 	void		InitializeVehicleGPSPosition();
 
-	void		InitializeVehicleIMU();
-	void		InitializeVehicleIMUFifo();
-
 	void		InitializeVehicleMagnetometer();
 
 	void		InitializeVehicleOpticalFlow();
@@ -137,9 +128,6 @@ private:
 	const bool _hil_enabled;	/**< if true, HIL is active */
 
 	perf_counter_t	_loop_perf;	/**< loop performance counter */
-
-	VehicleIMU *_vehicle_imu_list[MAX_SENSOR_COUNT] {};
-	VehicleIMUFifo  *_vehicle_imu_fifo_list[MAX_SENSOR_COUNT] {};
 
 	int _total_imu_count{0};
 
@@ -227,10 +215,6 @@ private:
 		param_t air_tube_diameter_mm;
 	} _parameter_handles{};		/**< handles for interesting parameters */
 #endif // CONFIG_SENSORS_VEHICLE_AIRSPEED
-
-#if defined(CONFIG_SENSORS_VEHICLE_ACCELERATION)
-	VehicleAcceleration _vehicle_acceleration;
-#endif // CONFIG_SENSORS_VEHICLE_ACCELERATION
 
 #if defined(CONFIG_SENSORS_VEHICLE_AIR_DATA)
 	VehicleAirData *_vehicle_air_data {nullptr};

@@ -51,6 +51,7 @@
 #include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
+#include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/topics/esc_status.h>
 #include <uORB/topics/estimator_selector_status.h>
 #include <uORB/topics/estimator_sensor_bias.h>
@@ -131,7 +132,9 @@ private:
 	uORB::Publication<vehicle_angular_velocity_s> _vehicle_angular_velocity_pub{ORB_ID(vehicle_angular_velocity)};
 
 	uORB::Subscription _estimator_selector_status_sub{ORB_ID(estimator_selector_status)};
-	uORB::Subscription _estimator_sensor_bias_sub{ORB_ID(estimator_sensor_bias)};
+
+	uORB::SubscriptionMultiArray<estimator_sensor_bias_s> _estimator_sensor_bias_subs{ORB_ID::estimator_sensor_bias};
+
 #if !defined(CONSTRAINED_FLASH)
 	uORB::Subscription _esc_status_sub {ORB_ID(esc_status)};
 	uORB::Subscription _sensor_gyro_fft_sub {ORB_ID(sensor_gyro_fft)};
@@ -144,13 +147,6 @@ private:
 	uORB::SubscriptionCallbackWorkItem _sensor_accel_sub{this, ORB_ID(sensor_accel)};
 	uORB::SubscriptionCallbackWorkItem _sensor_gyro_sub{this, ORB_ID(sensor_gyro)};
 	uORB::SubscriptionCallbackWorkItem _sensor_imu_fifo_sub{this, ORB_ID(sensor_imu_fifo)};
-
-	uORB::Subscription _sensor_accel_subs[MAX_SENSOR_COUNT] {ORB_ID(sensor_accel), ORB_ID(sensor_accel), ORB_ID(sensor_accel), ORB_ID(sensor_accel)};
-	uORB::Subscription _sensor_gyro_subs[MAX_SENSOR_COUNT] {ORB_ID(sensor_gyro), ORB_ID(sensor_gyro), ORB_ID(sensor_gyro), ORB_ID(sensor_gyro)};
-
-
-	math::WelfordMeanVector<float, 3> _raw_accel_mean[MAX_SENSOR_COUNT] {};
-	math::WelfordMeanVector<float, 3> _raw_gyro_mean[MAX_SENSOR_COUNT] {};
 
 	struct SensorSubscription {
 		SensorSubscription(px4::WorkItem *work_item, ORB_ID orb_id, uint8_t instance) :
@@ -231,7 +227,9 @@ private:
 	hrt_abstime _timestamp_sample_last{0};
 
 	hrt_abstime _publish_interval_min_us{0};
-	hrt_abstime _last_publish{0};
+	hrt_abstime _angular_velocity_last_publish{0};
+
+	hrt_abstime _acceleration_last_publish{0};
 
 	float _filter_sample_rate_hz{NAN};
 
