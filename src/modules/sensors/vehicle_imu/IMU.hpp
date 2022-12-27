@@ -1,0 +1,85 @@
+
+
+#pragma once
+
+#include <Integrator.hpp>
+
+#include <lib/sensor_calibration/Accelerometer.hpp>
+#include <lib/sensor_calibration/Gyroscope.hpp>
+#include <lib/mathlib/math/WelfordMean.hpp>
+#include <lib/mathlib/math/WelfordMeanVector.hpp>
+
+#include <uORB/PublicationMulti.hpp>
+#include <uORB/topics/vehicle_imu.h>
+#include <uORB/topics/vehicle_imu_status.h>
+
+namespace sensors
+{
+
+struct IMU {
+
+	// struct InFlightCalibration {
+	// 	matrix::Vector3f offset{};
+	// 	matrix::Vector3f bias_variance{};
+	// 	bool valid{false};
+	// };
+
+	struct {
+		hrt_abstime timestamp_sample_last{0};
+		uint32_t device_id{0};
+		calibration::Accelerometer calibration{};
+		math::WelfordMean<float> mean_interval_us{};
+		math::WelfordMeanVector<float, 3> raw_mean{};
+		math::WelfordMean<float> temperature{};
+		float scale{1.f};
+		uint32_t error_count{0};
+		sensors::Integrator integrator{};
+
+		matrix::Vector3f estimated_bias{};
+		matrix::Vector3f estimated_bias_variance{};
+
+		uint32_t clipping_total[3] {}; // clipping
+		uint8_t clipping_flags{0};
+
+		matrix::Vector3f acceleration_prev{}; // acceleration from the previous IMU measurement for vibration metrics
+
+		float vibration_metric{0.f}; // high frequency vibration level in the accelerometer data (m/s/s)
+	} accel{};
+
+	struct {
+		hrt_abstime timestamp_sample_last{0};
+		uint32_t device_id{0};
+		calibration::Gyroscope calibration{};
+		math::WelfordMean<float> mean_interval_us{};
+		math::WelfordMeanVector<float, 3> raw_mean{};
+		math::WelfordMean<float> temperature{};
+		float scale{1.f};
+		uint32_t error_count{0};
+		sensors::IntegratorConing integrator{};
+
+		matrix::Vector3f estimated_bias{};
+		matrix::Vector3f estimated_bias_variance{};
+
+		uint32_t clipping_total[3] {}; // clipping
+		uint8_t clipping_flags{0};
+
+		matrix::Vector3f angular_velocity_prev{}; // angular velocity from the previous IMU measurement for vibration metrics
+
+		float vibration_metric{0.f}; // high frequency vibration level in the gyro data (rad/s)
+
+		float coning_norm_accum{0}; // average IMU delta angle coning correction (rad^2)
+		float coning_norm_accum_total_time_s{0};
+
+	} gyro{};
+
+	bool primary{false};
+
+	uORB::PublicationMulti<vehicle_imu_s> vehicle_imu_pub{ORB_ID(vehicle_imu)};
+	uORB::PublicationMulti<vehicle_imu_status_s> vehicle_imu_status_pub{ORB_ID(vehicle_imu_status)};
+
+	hrt_abstime time_last_status_publication{0};
+	bool publish_status{true};
+
+};
+
+} // namespace sensors

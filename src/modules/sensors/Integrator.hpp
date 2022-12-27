@@ -81,6 +81,7 @@ public:
 	 * @param reset_interval	New reset time interval for the integrator in microseconds.
 	 */
 	void set_reset_interval(uint32_t reset_interval_us) { _reset_interval_min = reset_interval_us * 1e-6f; }
+	uint32_t reset_interval_us() const { return _reset_interval_min * 1e6f; }
 
 	/**
 	 * Set required samples for reset. This won't reset the integrator.

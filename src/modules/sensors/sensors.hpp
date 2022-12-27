@@ -65,9 +65,9 @@
 # include "vehicle_air_data/VehicleAirData.hpp"
 #endif // CONFIG_SENSORS_VEHICLE_AIR_DATA
 
-#if defined(CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY)
-# include "vehicle_angular_velocity/VehicleAngularVelocity.hpp"
-#endif // CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY
+#if defined(CONFIG_SENSORS_VEHICLE_IMU)
+# include "vehicle_imu/VehicleIMU.hpp"
+#endif // CONFIG_SENSORS_VEHICLE_IMU
 
 #if defined(CONFIG_SENSORS_VEHICLE_GPS_POSITION)
 # include "vehicle_gps_position/VehicleGPSPosition.hpp"
@@ -221,9 +221,9 @@ private:
 	uint8_t _n_baro{0};
 #endif // CONFIG_SENSORS_VEHICLE_AIR_DATA
 
-#if defined(CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY)
-	VehicleAngularVelocity	_vehicle_angular_velocity;
-#endif // CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY
+#if defined(CONFIG_SENSORS_VEHICLE_IMU)
+	VehicleIMU _vehicle_imu {};
+#endif // CONFIG_SENSORS_VEHICLE_IMU
 
 #if defined(CONFIG_SENSORS_VEHICLE_MAGNETOMETER)
 	VehicleMagnetometer *_vehicle_magnetometer {nullptr};

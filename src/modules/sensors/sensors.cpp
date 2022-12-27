@@ -43,6 +43,9 @@
 
 #include "sensors.hpp"
 
+#include <lib/sensor_calibration/Accelerometer.hpp>
+#include <lib/sensor_calibration/Gyroscope.hpp>
+
 Sensors::Sensors(bool hil_enabled) :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
@@ -59,9 +62,9 @@ Sensors::Sensors(bool hil_enabled) :
 	_parameter_handles.diff_pres_analog_scale = param_find("SENS_DPRES_ANSC");
 #endif /* ADC_AIRSPEED_VOLTAGE_CHANNEL */
 
-#if defined(CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY)
-	_vehicle_angular_velocity.Start();
-#endif // CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY
+#if defined(CONFIG_SENSORS_VEHICLE_IMU)
+	_vehicle_imu.Start();
+#endif // CONFIG_SENSORS_VEHICLE_IMU
 
 	_parameter_handles.air_cmodel = param_find("CAL_AIR_CMODEL");
 	_parameter_handles.air_tube_length = param_find("CAL_AIR_TUBELEN");
@@ -90,9 +93,9 @@ Sensors::~Sensors()
 		sub.unregisterCallback();
 	}
 
-#if defined(CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY)
-	_vehicle_angular_velocity.Stop();
-#endif // CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY
+#if defined(CONFIG_SENSORS_VEHICLE_IMU)
+	_vehicle_imu.Stop();
+#endif // CONFIG_SENSORS_VEHICLE_IMU
 
 #if defined(CONFIG_SENSORS_VEHICLE_AIR_DATA)
 
@@ -669,10 +672,10 @@ int Sensors::print_status()
 
 #endif // CONFIG_SENSORS_VEHICLE_OPTICAL_FLOW
 
-#if defined(CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY)
+#if defined(CONFIG_SENSORS_VEHICLE_IMU)
 	PX4_INFO_RAW("\n");
-	_vehicle_angular_velocity.PrintStatus();
-#endif // CONFIG_SENSORS_VEHICLE_ANGULAR_VELOCITY
+	_vehicle_imu.PrintStatus();
+#endif // CONFIG_SENSORS_VEHICLE_IMU
 
 #if defined(CONFIG_SENSORS_VEHICLE_GPS_POSITION)
 
