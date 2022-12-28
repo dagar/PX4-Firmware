@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2022 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@
 #pragma once
 
 #include "IMU.hpp"
-//#include "VehicleAcceleration.hpp"
+#include "VehicleAcceleration.hpp"
 #include "VehicleAngularVelocity.hpp"
 
 #include <include/containers/Bitset.hpp>
@@ -56,7 +56,6 @@
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/sensors_status_imu.h>
 #include <uORB/topics/sensor_selection.h>
-
 
 // subscriptions
 #include <uORB/Subscription.hpp>
@@ -129,6 +128,13 @@ private:
 		{this, ORB_ID::sensor_imu_fifo, 3}
 	};
 
+	SensorSubscription _sensor_accel_subs[MAX_SENSOR_COUNT] {
+		{this, ORB_ID::sensor_accel, 0},
+		{this, ORB_ID::sensor_accel, 1},
+		{this, ORB_ID::sensor_accel, 2},
+		{this, ORB_ID::sensor_accel, 3}
+	};
+
 	IMU _imus[MAX_SENSOR_COUNT] {};
 
 
@@ -139,23 +145,18 @@ private:
 	uORB::Publication<sensor_selection_s>   _sensor_selection_pub{ORB_ID(sensor_selection)};
 	uORB::Publication<sensors_status_imu_s> _sensors_status_imu_pub{ORB_ID(sensors_status_imu)};
 
-	//VehicleAcceleration _vehicle_acceleration{};
+	VehicleAcceleration _vehicle_acceleration{};
 	VehicleAngularVelocity _vehicle_angular_velocity{};
 
 	uint32_t _selected_accel_device_id{0};
 	uint32_t _selected_gyro_device_id{0};
 
-	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": IMU filter")};
-	perf_counter_t _filter_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": IMU filter reset")};
+	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": IMU update")};
 	perf_counter_t _selection_changed_perf{perf_alloc(PC_COUNT, MODULE_NAME": IMU selection changed")};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::IMU_INTEG_RATE>) _param_imu_integ_rate,
-
-		(ParamFloat<px4::params::IMU_GYRO_CUTOFF>) _param_imu_gyro_cutoff,
-
-		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_ratemax,
-		(ParamFloat<px4::params::IMU_DGYRO_CUTOFF>) _param_imu_dgyro_cutoff
+		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_ratemax
 	)
 };
 

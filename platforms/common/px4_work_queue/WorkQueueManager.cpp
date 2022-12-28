@@ -379,7 +379,7 @@ WorkQueueManagerStart()
 
 		int task_id = px4_task_spawn_cmd("wq:manager",
 						 SCHED_DEFAULT,
-						 SCHED_PRIORITY_MAX,
+						 SCHED_PRIORITY_MAX - 1,
 						 PX4_STACK_ADJUSTED(1280),
 						 (px4_main_t)&WorkQueueManagerRun,
 						 nullptr);

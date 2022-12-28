@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019-2022 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,15 +41,13 @@
 #include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/mathlib/math/filter/LowPassFilter2p.hpp>
 #include <lib/mathlib/math/filter/NotchFilter.hpp>
+#include <lib/perf/perf_counter.h>
 #include <px4_platform_common/log.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/esc_status.h>
-#include <uORB/topics/parameter_update.h>
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/sensor_gyro_fft.h>
 #include <uORB/topics/sensor_imu_fifo.h>
@@ -68,6 +66,8 @@ public:
 
 	void PrintStatus();
 
+	void ParametersUpdate();
+
 	// IMU& ?
 	void updateSensorGyro(IMU &imu, const sensor_gyro_s &sensor_data);
 	void updateSensorImuFifo(IMU &imu, const sensor_imu_fifo_s &sensor_fifo_data);
@@ -82,7 +82,6 @@ private:
 
 	void DisableDynamicNotchEscRpm();
 	void DisableDynamicNotchFFT();
-	void ParametersUpdate(bool force = false);
 
 	void ResetFilters(const hrt_abstime &time_now_us, const IMU &imu);
 	void UpdateDynamicNotchEscRpm(const hrt_abstime &time_now_us, bool force = false);
@@ -99,8 +98,6 @@ private:
 	uORB::Subscription _esc_status_sub {ORB_ID(esc_status)};
 	uORB::Subscription _sensor_gyro_fft_sub {ORB_ID(sensor_gyro_fft)};
 #endif // !CONSTRAINED_FLASH
-
-	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	matrix::Vector3f _angular_velocity{};
 	matrix::Vector3f _angular_acceleration{};
@@ -164,7 +161,6 @@ private:
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": gyro filter")};
 	perf_counter_t _filter_reset_perf{perf_alloc(PC_COUNT, MODULE_NAME": gyro filter reset")};
-	perf_counter_t _selection_changed_perf{perf_alloc(PC_COUNT, MODULE_NAME": gyro selection changed")};
 
 	DEFINE_PARAMETERS(
 #if !defined(CONSTRAINED_FLASH)
