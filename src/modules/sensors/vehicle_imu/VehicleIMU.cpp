@@ -359,32 +359,30 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 
 		// accel clipping
 		{
-			int clip_counter[3] {
-				clipping(sensor_imu_fifo.accel_x, sensor_imu_fifo.samples),
-				clipping(sensor_imu_fifo.accel_y, sensor_imu_fifo.samples),
-				clipping(sensor_imu_fifo.accel_z, sensor_imu_fifo.samples),
+			const Vector3f clip_counter{
+				(float)clipping(sensor_imu_fifo.accel_x, sensor_imu_fifo.samples),
+				(float)clipping(sensor_imu_fifo.accel_y, sensor_imu_fifo.samples),
+				(float)clipping(sensor_imu_fifo.accel_z, sensor_imu_fifo.samples),
 			};
 
-			if (clip_counter[0] > 0 || clip_counter[1] > 0 || clip_counter[2] > 0) {
+			if (clip_counter(0) > 0 || clip_counter(1) > 0 || clip_counter(2) > 0) {
 				// rotate sensor clip counts into vehicle body frame
-				const Vector3f clipping{imu.accel.calibration.rotation() *Vector3f{(float)clip_counter[0], (float)clip_counter[1], (float)clip_counter[2]}};
+				const Vector3f clipping{imu.accel.calibration.rotation() *clip_counter};
 
 				// round to get reasonble clip counts per axis (after board rotation)
 				const uint8_t clip_x = roundf(fabsf(clipping(0)));
+				const uint8_t clip_y = roundf(fabsf(clipping(1)));
+				const uint8_t clip_z = roundf(fabsf(clipping(2)));
 
 				if (clip_x > 0) {
 					imu.accel.clipping_total[0] += clip_x;
 					imu.accel.clipping_flags |= vehicle_imu_s::CLIPPING_X;
 				}
 
-				const uint8_t clip_y = roundf(fabsf(clipping(1)));
-
 				if (clip_y > 0) {
 					imu.accel.clipping_total[1] += clip_y;
 					imu.accel.clipping_flags |= vehicle_imu_s::CLIPPING_Y;
 				}
-
-				const uint8_t clip_z = roundf(fabsf(clipping(2)));
 
 				if (clip_z > 0) {
 					imu.accel.clipping_total[2] += clip_z;
