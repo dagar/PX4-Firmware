@@ -145,7 +145,7 @@ protected:
 	matrix::Vector3f _last_val{0.f, 0.f, 0.f}; /**< previous input */
 	float _integral_dt{0};
 
-	float _reset_interval_min{0.001f}; /**< the interval after which the content will be published and the integrator reset */
+	float _reset_interval_min{0.01f}; /**< the interval after which the content will be published and the integrator reset */
 	uint8_t _reset_samples_min{1};
 
 	uint8_t _integrated_samples{0};

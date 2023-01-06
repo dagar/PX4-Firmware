@@ -115,10 +115,6 @@ private:
 
 		uORB::SubscriptionCallbackWorkItem sub;
 		unsigned last_generation{0};
-
-		hrt_abstime timestamp_last{0};
-
-		math::WelfordMean<float> mean_interval_us{};
 	};
 
 	SensorSubscription _sensor_imu_fifo_subs[MAX_SENSOR_COUNT] {

@@ -59,7 +59,7 @@ void VehicleAcceleration::updateAccel(IMU &imu, const matrix::Vector3f &accel_ra
 
 		bool sample_rate_changed = false;
 
-		if (imu.accel.mean_interval_us.valid() && PX4_ISFINITE(sample_rate_hz) && (sample_rate_hz > 0)) {
+		if (imu.accel.mean_publish_interval_us.valid() && PX4_ISFINITE(sample_rate_hz) && (sample_rate_hz > 0)) {
 			// check if sample rate error is greater than 1%
 			if (!PX4_ISFINITE(_filter_sample_rate) || (fabsf(sample_rate_hz - _filter_sample_rate) / _filter_sample_rate) > 0.01f) {
 				PX4_WARN("sample rate changed: %.3f Hz -> %.3f Hz", (double)_filter_sample_rate, (double)sample_rate_hz);

@@ -28,11 +28,17 @@ struct IMU {
 		hrt_abstime timestamp_sample_last{0};
 		uint32_t device_id{0};
 		calibration::Accelerometer calibration{};
-		math::WelfordMean<float> mean_interval_us{};
+		math::WelfordMean<float> mean_publish_interval_us{};
+		math::WelfordMean<float> mean_sample_interval_us{};
 		math::WelfordMeanVector<float, 3> raw_mean{};
 		math::WelfordMean<float> temperature{};
 		float scale{1.f};
 		uint32_t error_count{0};
+
+		matrix::Vector3f integral{};
+		int16_t last_fifo_sample[3] {};
+		float fifo_scale{1.f};
+
 		sensors::Integrator integrator{};
 
 		matrix::Vector3f estimated_bias{};
@@ -44,13 +50,16 @@ struct IMU {
 		matrix::Vector3f acceleration_prev{}; // acceleration from the previous IMU measurement for vibration metrics
 
 		float vibration_metric{0.f}; // high frequency vibration level in the accelerometer data (m/s/s)
+
+		bool interval_configured{false};
 	} accel{};
 
 	struct {
 		hrt_abstime timestamp_sample_last{0};
 		uint32_t device_id{0};
 		calibration::Gyroscope calibration{};
-		math::WelfordMean<float> mean_interval_us{};
+		math::WelfordMean<float> mean_publish_interval_us{};
+		math::WelfordMean<float> mean_sample_interval_us{};
 		math::WelfordMeanVector<float, 3> raw_mean{};
 		math::WelfordMean<float> temperature{};
 		float scale{1.f};
@@ -70,6 +79,7 @@ struct IMU {
 		float coning_norm_accum{0}; // average IMU delta angle coning correction (rad^2)
 		float coning_norm_accum_total_time_s{0};
 
+		bool interval_configured{false};
 	} gyro{};
 
 	bool primary{false};

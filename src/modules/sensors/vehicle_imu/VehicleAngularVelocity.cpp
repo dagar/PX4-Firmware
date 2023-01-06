@@ -594,7 +594,8 @@ void VehicleAngularVelocity::updateSensorImuFifo(IMU &imu, const sensor_imu_fifo
 			PX4_DEBUG("selecting sensor_imu_fifo:%" PRIu8 " %" PRIu32, 0, _selected_sensor_device_id);
 		}
 
-		if (!UpdateSampleRate(imu.gyro.mean_interval_us.mean(), imu.gyro.mean_interval_us.mean())) {
+		if (!UpdateSampleRate(1e6f / imu.gyro.mean_sample_interval_us.mean(),
+				      1e6f / imu.gyro.mean_publish_interval_us.mean())) {
 			// sensor sample rate required to run
 			perf_end(_cycle_perf);
 			return;

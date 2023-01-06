@@ -55,6 +55,17 @@ static constexpr int clipping(const int16_t samples[], int length)
 	return clip_count;
 }
 
+static constexpr int32_t sum(const int16_t samples[], int length)
+{
+	int32_t sum = 0;
+
+	for (int n = 0; n < length; n++) {
+		sum += samples[n];
+	}
+
+	return sum;
+}
+
 static matrix::Vector3f AverageFifoAccel(const sensor_imu_fifo_s &sensor_imu_fifo)
 {
 	// X axis
@@ -130,6 +141,10 @@ bool VehicleIMU::Start()
 
 	_imus[0].primary = true;
 
+	for (auto &imu_fifo_sub : _sensor_imu_fifo_subs) {
+		imu_fifo_sub.sub.set_required_updates(sensor_imu_fifo_s::ORB_QUEUE_LENGTH);
+		imu_fifo_sub.sub.registerCallback();
+	}
 
 	ScheduleNow();
 
@@ -250,7 +265,7 @@ void VehicleIMU::Run()
 	perf_begin(_cycle_perf);
 
 	// backup schedule
-	ScheduleDelayed(10_ms);
+	ScheduleDelayed(1.5e6 / _param_imu_gyro_ratemax.get()); // backup 150% of expected/desired interval
 
 	//const hrt_abstime time_now_us = hrt_absolute_time();
 
@@ -310,82 +325,75 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 		//  sensor output data rate or interval
 		if (s.sub.get_last_generation() == s.last_generation + 1) {
 
-			if ((s.timestamp_last != 0)
-			    && (sensor_imu_fifo.timestamp > s.timestamp_last)
-			    && (sensor_imu_fifo.timestamp_sample > imu.accel.timestamp_sample_last)
+			if ((sensor_imu_fifo.timestamp_sample > imu.accel.timestamp_sample_last)
 			    && (sensor_imu_fifo.timestamp_sample > imu.gyro.timestamp_sample_last)
 			   ) {
 
-				const float interval_us = sensor_imu_fifo.timestamp - s.timestamp_last;
-				s.mean_interval_us.update(interval_us);
+				const float interval_us = sensor_imu_fifo.timestamp_sample - imu.accel.timestamp_sample_last;
+				const float sample_interval_us = interval_us / sensor_imu_fifo.samples;
 
-				const float accel_interval_sample_us = sensor_imu_fifo.timestamp_sample - imu.accel.timestamp_sample_last;
-				imu.accel.mean_interval_us.update(accel_interval_sample_us / sensor_imu_fifo.samples);
+				imu.accel.mean_publish_interval_us.update(interval_us);
+				imu.accel.mean_sample_interval_us.update(sample_interval_us);
 
-				const float gyro_interval_sample_us = sensor_imu_fifo.timestamp_sample - imu.gyro.timestamp_sample_last;
-				imu.gyro.mean_interval_us.update(gyro_interval_sample_us / sensor_imu_fifo.samples);
+				imu.gyro.mean_publish_interval_us.update(interval_us);
+				imu.gyro.mean_sample_interval_us.update(sample_interval_us);
 
 				// check and update sensor rate
-				if (s.mean_interval_us.valid()
-				    && imu.gyro.mean_interval_us.valid()
+				if (imu.gyro.mean_publish_interval_us.valid() &&
+				    (imu.gyro.mean_publish_interval_us.count() > 1000 || imu.gyro.mean_publish_interval_us.standard_deviation() < 100)
 				   ) {
 
 					// determine number of sensor samples that will get closest to the desired integration interval
 					const float imu_integration_interval_us = 1e6f / _param_imu_integ_rate.get();
-					const float pub_interval_avg_us = s.mean_interval_us.mean();
-					uint8_t imu_publications = math::max(1, (int)roundf(imu_integration_interval_us / pub_interval_avg_us));
+					const float pub_interval_avg_us = imu.gyro.mean_publish_interval_us.mean();
 
-					// if samples exceeds queue depth, instead round to nearest even integer to improve scheduling options
-					if (imu_publications > sensor_imu_fifo_s::ORB_QUEUE_LENGTH) {
-						imu_publications = math::max(1, (int)roundf(imu_integration_interval_us / pub_interval_avg_us / 2) * 2);
-					}
+					const uint8_t imu_publications = roundf(imu_integration_interval_us / pub_interval_avg_us);
 
-					uint32_t integration_interval_us = roundf(imu_publications * pub_interval_avg_us);
+					const float integration_interval_us = roundf(imu_publications * pub_interval_avg_us);
 
-					if ((imu.gyro.integrator.reset_interval_us() - integration_interval_us) / integration_interval_us > 0.1f) {
+					// TODO: variance
+					if ((static_cast<float>(imu.gyro.integrator.reset_interval_us()) - integration_interval_us) >
+					    imu.gyro.mean_publish_interval_us.standard_deviation()
+					    // || primary_changed
+					   ) {
+
+						const auto accel_reset_samples_prev = imu.accel.integrator.get_reset_samples();
+						const auto gyro_reset_samples_prev = imu.gyro.integrator.get_reset_samples();
 
 						imu.gyro.integrator.set_reset_interval(integration_interval_us);
 						imu.accel.integrator.set_reset_interval(integration_interval_us / 2.f);
 
 						// number of samples per publication
-						const float imu_sample_interval_avg_us = imu.gyro.mean_interval_us.mean();
-						int interval_samples = roundf(integration_interval_us / imu_sample_interval_avg_us);
+						int interval_samples = roundf(integration_interval_us / imu.gyro.mean_sample_interval_us.mean());
 						imu.gyro.integrator.set_reset_samples(math::max(interval_samples, 1));
-
 						imu.accel.integrator.set_reset_samples(1);
 
-						//_backup_schedule_timeout_us = sensor_imu_fifo_s::ORB_QUEUE_LENGTH * interval_avg_us;
+						if (accel_reset_samples_prev != imu.accel.integrator.get_reset_samples()
+						    || gyro_reset_samples_prev != imu.gyro.integrator.get_reset_samples()
+						    || (static_cast<float>(imu.gyro.integrator.reset_interval_us()) - integration_interval_us > 100)
+						   ) {
 
-						// gyro: find largest integer multiple of gyro_integral_samples
-						for (int n = sensor_imu_fifo_s::ORB_QUEUE_LENGTH; n > 0; n--) {
-							if (imu_publications > sensor_imu_fifo_s::ORB_QUEUE_LENGTH) {
-								imu_publications /= 2;
+							if (imu.primary) {
+								s.sub.set_required_updates(1);
+
+							} else {
+								// avg samples per publication
+								float samples_per_pub = imu.gyro.mean_publish_interval_us.mean() / imu.gyro.mean_sample_interval_us.mean();
+								uint8_t pubs_per_integrator_reset = floorf(imu.gyro.integrator.get_reset_samples() / samples_per_pub);
+
+								s.sub.set_required_updates(math::constrain(pubs_per_integrator_reset, (uint8_t)1, sensor_imu_fifo_s::ORB_QUEUE_LENGTH));
 							}
 
-							if (imu_publications % n == 0) {
+							s.sub.registerCallback();
 
-								if (imu.primary) {
-									s.sub.set_required_updates(1);
+							imu.accel.interval_configured = true;
+							imu.gyro.interval_configured = true;
 
-								} else {
-									s.sub.set_required_updates(n);
-								}
-
-								s.sub.registerCallback();
-
-								//_intervals_configured = true;
-								//_update_integrator_config = false;
-
-								PX4_INFO("IMU FIFO (%" PRIu32 "), FIFO samples: %" PRIu8 ", interval: %.1f",
-									 imu.accel.calibration.device_id(), imu_publications, (double)integration_interval_us);
-
-								PX4_INFO("IMU FIFO (%" PRIu32 "), publish interval: %.1f us (STD: %.1f us), sample interval: %.1f us (STD: %.1f us)",
-									 imu.accel.calibration.device_id(),
-									 (double)s.mean_interval_us.mean(), (double)s.mean_interval_us.standard_deviation(),
-									 (double)imu.accel.mean_interval_us.mean(), (double)imu.accel.mean_interval_us.standard_deviation());
-
-								break;
-							}
+							PX4_INFO("IMU FIFO (%" PRIu32 "), publish interval: %.1f us (STD:%.1f us), integrator: %.1f us, %d samples",
+								 imu.gyro.calibration.device_id(),
+								 (double)imu.gyro.mean_publish_interval_us.mean(), (double)imu.gyro.mean_publish_interval_us.standard_deviation(),
+								 (double)imu.gyro.integrator.reset_interval_us(), imu.gyro.integrator.get_reset_samples()
+								);
 						}
 
 					}
@@ -394,8 +402,6 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 		}
 
 		s.last_generation = s.sub.get_last_generation();
-
-		s.timestamp_last = sensor_imu_fifo.timestamp;
 
 		imu.accel.timestamp_sample_last = sensor_imu_fifo.timestamp_sample;
 		imu.gyro.timestamp_sample_last = sensor_imu_fifo.timestamp_sample;
@@ -427,12 +433,31 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 			//imu.accel.raw_mean.update(accel_raw);
 		}
 
+
+		// integrate accel
+		// trapezoidal integration (equally spaced)
+		imu.accel.integral(0) += (0.5f * (imu.accel.last_fifo_sample[0] + sensor_imu_fifo.accel_x[N - 2]) + sum(
+						  sensor_imu_fifo.accel_x, N));
+		imu.accel.last_fifo_sample[0] = sensor_imu_fifo.accel_x[N - 1];
+
+		imu.accel.integral(1) += (0.5f * (imu.accel.last_fifo_sample[1] + sensor_imu_fifo.accel_y[N - 2]) + sum(
+						  sensor_imu_fifo.accel_y, N));
+		imu.accel.last_fifo_sample[1] = sensor_imu_fifo.accel_y[N - 1];
+
+		imu.accel.integral(2) += (0.5f * (imu.accel.last_fifo_sample[2] + sensor_imu_fifo.accel_z[N - 2]) + sum(
+						  sensor_imu_fifo.accel_z, N));
+		imu.accel.last_fifo_sample[2] = sensor_imu_fifo.accel_z[N - 1];
+
+
+
+
+
 		const Vector3f accel_raw_avg{AverageFifoAccel(sensor_imu_fifo)};
 
 		imu.accel.raw_mean.update(accel_raw_avg);
 
-		if (imu.primary && s.mean_interval_us.valid()) {
-			float sample_rate_hz = 1e6f / s.mean_interval_us.mean();
+		if (imu.primary && imu.accel.interval_configured && imu.accel.mean_publish_interval_us.valid()) {
+			float sample_rate_hz = 1e6f / imu.accel.mean_publish_interval_us.mean();
 			_vehicle_acceleration.updateAccel(imu, accel_raw_avg, sample_rate_hz);
 		}
 
@@ -520,11 +545,21 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 		}
 
 		if (imu.accel.integrator.integral_ready() && imu.gyro.integrator.integral_ready()) {
+
+
+			// Vector3f delta_velocity{imu.accel.integral * imu.accel.fifo_scale * dt_s};
+			// imu.accel.integral.zero();
+			// uint16_t delta_velocity_dt = delta_angle_dt;
+
+			// TODO: rescale if changed?
+
+
+
 			PublishImu(imu);
 		}
 
 		// TODO: call to filter data
-		if (imu.primary) {
+		if (imu.primary && imu.gyro.interval_configured) {
 
 			// TODO: generic update?
 			//_vehicle_angular_velocity.update(imu)?
@@ -569,16 +604,16 @@ void VehicleIMU::UpdateSensorAccel(uint8_t sensor_instance)
 				if (_accel_timestamp_sample_last != 0) {
 					const float interval_us = sensor_accel.timestamp_sample - _accel_timestamp_sample_last;
 
-					_accel_mean_interval_us.update(interval_us);
-					_accel_fifo_mean_interval_us.update(interval_us / math::max(sensor_accel.samples, (uint8_t)1));
+					_accel_mean_sample_interval_us.update(interval_us);
+					_accel_fifo_mean_sample_interval_us.update(interval_us / math::max(sensor_accel.samples, (uint8_t)1));
 
 					// check measured interval periodically
-					if (_accel_mean_interval_us.valid() && (_accel_mean_interval_us.count() % 10 == 0)) {
+					if (_accel_mean_sample_interval_us.valid() && (_accel_mean_sample_interval_us.count() % 10 == 0)) {
 
-						const float interval_mean = _accel_mean_interval_us.mean();
+						const float interval_mean = _accel_mean_sample_interval_us.mean();
 
 						// update sample rate if previously invalid or changed by more than 1 standard deviation
-						const bool diff_exceeds_stddev = sq(interval_mean - _accel_interval_us) > _accel_mean_interval_us.variance();
+						const bool diff_exceeds_stddev = sq(interval_mean - _accel_interval_us) > _accel_mean_sample_interval_us.variance();
 
 						if (!PX4_ISFINITE(_accel_interval_us) || diff_exceeds_stddev) {
 							// update integrator configuration if interval has changed by more than 10%
@@ -777,7 +812,7 @@ bool VehicleIMU::PublishImu(sensors::IMU &imu)
 			const bool status_publish_interval_exceeded = (hrt_elapsed_time(&imu.time_last_status_publication) >= 100_ms);
 
 			if (imu.accel.raw_mean.valid() && imu.gyro.raw_mean.valid()
-			    && imu.accel.mean_interval_us.valid() && imu.gyro.mean_interval_us.valid()
+			    && imu.accel.mean_sample_interval_us.valid() && imu.gyro.mean_sample_interval_us.valid()
 			    && (imu.publish_status || status_publish_interval_exceeded)
 			   ) {
 
@@ -793,8 +828,8 @@ bool VehicleIMU::PublishImu(sensors::IMU &imu)
 					imu_status.accel_clipping[1] = imu.accel.clipping_total[1];
 					imu_status.accel_clipping[2] = imu.accel.clipping_total[2];
 
-					imu_status.accel_rate_hz = 1e6f / imu.accel.mean_interval_us.mean(); // TODO: should be for actual publication
-					imu_status.accel_raw_rate_hz = 1e6f / imu.accel.mean_interval_us.mean();
+					imu_status.accel_rate_hz = 1e6f / imu.accel.mean_publish_interval_us.mean();
+					imu_status.accel_raw_rate_hz = 1e6f / imu.accel.mean_sample_interval_us.mean();
 
 					// accel mean and variance
 					const Dcmf &R = imu.accel.calibration.rotation();
@@ -825,8 +860,8 @@ bool VehicleIMU::PublishImu(sensors::IMU &imu)
 					imu_status.gyro_clipping[1] = imu.gyro.clipping_total[1];
 					imu_status.gyro_clipping[2] = imu.gyro.clipping_total[2];
 
-					imu_status.gyro_rate_hz = 1e6f / imu.gyro.mean_interval_us.mean(); // TODO: should be for actual publication
-					imu_status.gyro_raw_rate_hz = 1e6f / imu.gyro.mean_interval_us.mean();
+					imu_status.gyro_rate_hz = 1e6f / imu.gyro.mean_publish_interval_us.mean();
+					imu_status.gyro_raw_rate_hz = 1e6f / imu.gyro.mean_sample_interval_us.mean();
 
 					// gyro mean and variance
 					const Dcmf &R = imu.gyro.calibration.rotation();
@@ -902,20 +937,21 @@ void VehicleIMU::PrintStatus()
 
 	// _gyro_calibration.PrintStatus();
 
-	uint32_t imu_fifo_index = 0;
+	// uint32_t imu_fifo_index = 0;
 
-	for (auto &s : _sensor_imu_fifo_subs) {
-		if (s.mean_interval_us.mean() > 0.f) {
-			PX4_INFO_RAW("[vehicle_imu] IMU FIFO (%" PRIu32 "), publish interval: %.1f us (STD: %.1f us)\n",
-				     imu_fifo_index++, (double)s.mean_interval_us.mean(), (double)s.mean_interval_us.standard_deviation());
-		}
-	}
+	// for (auto &s : _sensor_imu_fifo_subs) {
+	// 	if (s.mean_sample_interval_us.mean() > 0.f) {
+	// 		PX4_INFO_RAW("[vehicle_imu] IMU FIFO (%" PRIu32 "), publish interval: %.1f us (STD:%.1f us)\n",
+	// 			     imu_fifo_index++, (double)s.mean_sample_interval_us.mean(), (double)s.mean_sample_interval_us.standard_deviation());
+	// 	}
+	// }
 
 	for (auto &imu : _imus) {
 		if (imu.accel.calibration.device_id() != 0) {
-			PX4_INFO_RAW("[vehicle_imu] IMU (%" PRIu32 "), sample interval: %.1f us (STD: %.1f us) %s\n",
+			PX4_INFO_RAW("[vehicle_imu] IMU (%" PRIu32 "), pub:%.1f us (STD:%.1f us), sample:%.1f us (STD:%.1f us) %s\n",
 				     imu.accel.calibration.device_id(),
-				     (double)imu.accel.mean_interval_us.mean(), (double)imu.accel.mean_interval_us.standard_deviation(),
+				     (double)imu.accel.mean_publish_interval_us.mean(), (double)imu.accel.mean_publish_interval_us.standard_deviation(),
+				     (double)imu.accel.mean_sample_interval_us.mean(), (double)imu.accel.mean_sample_interval_us.standard_deviation(),
 				     imu.primary ? "*" : "");
 		}
 	}
