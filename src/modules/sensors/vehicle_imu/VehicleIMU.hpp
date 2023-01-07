@@ -106,25 +106,14 @@ private:
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 	uORB::SubscriptionCallbackWorkItem _sensor_selection_sub{this, ORB_ID(sensor_selection)};
 
-	struct SensorSubscription {
-		SensorSubscription(px4::WorkItem *work_item, ORB_ID orb_id, uint8_t instance) :
-			sub(work_item, orb_id, instance)
-		{}
-
-		~SensorSubscription() = default;
-
-		uORB::SubscriptionCallbackWorkItem sub;
-		unsigned last_generation{0};
-	};
-
-	SensorSubscription _sensor_imu_fifo_subs[MAX_SENSOR_COUNT] {
+	uORB::SubscriptionCallbackWorkItem _sensor_imu_fifo_subs[MAX_SENSOR_COUNT] {
 		{this, ORB_ID::sensor_imu_fifo, 0},
 		{this, ORB_ID::sensor_imu_fifo, 1},
 		{this, ORB_ID::sensor_imu_fifo, 2},
 		{this, ORB_ID::sensor_imu_fifo, 3}
 	};
 
-	SensorSubscription _sensor_accel_subs[MAX_SENSOR_COUNT] {
+	uORB::SubscriptionCallbackWorkItem _sensor_accel_subs[MAX_SENSOR_COUNT] {
 		{this, ORB_ID::sensor_accel, 0},
 		{this, ORB_ID::sensor_accel, 1},
 		{this, ORB_ID::sensor_accel, 2},

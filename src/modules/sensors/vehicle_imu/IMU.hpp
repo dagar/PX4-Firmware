@@ -25,21 +25,36 @@ struct IMU {
 	// };
 
 	struct {
-		hrt_abstime timestamp_sample_last{0};
-		uint32_t device_id{0};
-		calibration::Accelerometer calibration{};
-		math::WelfordMean<float> mean_publish_interval_us{};
-		math::WelfordMean<float> mean_sample_interval_us{};
-		math::WelfordMeanVector<float, 3> raw_mean{};
-		math::WelfordMean<float> temperature{};
-		float scale{1.f};
-		uint32_t error_count{0};
 
+		calibration::Accelerometer calibration{};
+		math::WelfordMeanVector<float, 3> raw_mean{};
+
+
+
+
+		// FIFO only
 		matrix::Vector3f integral{};
 		int16_t last_fifo_sample[3] {};
 		float fifo_scale{1.f};
 
+		math::WelfordMean<float> mean_publish_interval_us{}; // only needed for FIFO
+
+
+		// redundant for FIFO case
+		hrt_abstime timestamp_sample_last{0};
+		uint32_t device_id{0};
+		unsigned last_generation{0};
+		uint32_t error_count{0};
+		math::WelfordMean<float> temperature{};              // redundant for FIFO case
+		math::WelfordMean<float> mean_sample_interval_us{};
+		bool interval_configured{false};
+
+
+		// non-FIFO only
 		sensors::Integrator integrator{};
+
+
+
 
 		matrix::Vector3f estimated_bias{};
 		matrix::Vector3f estimated_bias_variance{};
@@ -51,18 +66,19 @@ struct IMU {
 
 		float vibration_metric{0.f}; // high frequency vibration level in the accelerometer data (m/s/s)
 
-		bool interval_configured{false};
+
 	} accel{};
 
 	struct {
 		hrt_abstime timestamp_sample_last{0};
 		uint32_t device_id{0};
+		unsigned last_generation{0};
 		calibration::Gyroscope calibration{};
 		math::WelfordMean<float> mean_publish_interval_us{};
 		math::WelfordMean<float> mean_sample_interval_us{};
 		math::WelfordMeanVector<float, 3> raw_mean{};
 		math::WelfordMean<float> temperature{};
-		float scale{1.f};
+
 		uint32_t error_count{0};
 		sensors::IntegratorConing integrator{};
 

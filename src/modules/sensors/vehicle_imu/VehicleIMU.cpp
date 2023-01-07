@@ -141,9 +141,9 @@ bool VehicleIMU::Start()
 
 	_imus[0].primary = true;
 
-	for (auto &imu_fifo_sub : _sensor_imu_fifo_subs) {
-		imu_fifo_sub.sub.set_required_updates(sensor_imu_fifo_s::ORB_QUEUE_LENGTH);
-		imu_fifo_sub.sub.registerCallback();
+	for (auto &sub : _sensor_imu_fifo_subs) {
+		sub.set_required_updates(sensor_imu_fifo_s::ORB_QUEUE_LENGTH);
+		sub.registerCallback();
 	}
 
 	ScheduleNow();
@@ -154,8 +154,8 @@ bool VehicleIMU::Start()
 void VehicleIMU::Stop()
 {
 	// clear all registered callbacks
-	for (auto &imu_sub : _sensor_imu_fifo_subs) {
-		imu_sub.sub.unregisterCallback();
+	for (auto &sub : _sensor_imu_fifo_subs) {
+		sub.unregisterCallback();
 	}
 
 	Deinit();
@@ -314,16 +314,16 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 {
 	// sensor_imu_fifo
 	sensor_imu_fifo_s sensor_imu_fifo;
-	auto &s = _sensor_imu_fifo_subs[sensor_instance];
+	auto &sub = _sensor_imu_fifo_subs[sensor_instance];
 
-	while (s.sub.update(&sensor_imu_fifo)) {
+	while (sub.update(&sensor_imu_fifo)) {
 
 		// TODO: find corresponding IMU slot
 		IMU &imu = _imus[sensor_instance];
 
 		// publication interval
 		//  sensor output data rate or interval
-		if (s.sub.get_last_generation() == s.last_generation + 1) {
+		if (sub.get_last_generation() == imu.accel.last_generation + 1) {
 
 			if ((sensor_imu_fifo.timestamp_sample > imu.accel.timestamp_sample_last)
 			    && (sensor_imu_fifo.timestamp_sample > imu.gyro.timestamp_sample_last)
@@ -374,17 +374,17 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 						   ) {
 
 							if (imu.primary) {
-								s.sub.set_required_updates(1);
+								sub.set_required_updates(1);
 
 							} else {
 								// avg samples per publication
 								float samples_per_pub = imu.gyro.mean_publish_interval_us.mean() / imu.gyro.mean_sample_interval_us.mean();
 								uint8_t pubs_per_integrator_reset = floorf(imu.gyro.integrator.get_reset_samples() / samples_per_pub);
 
-								s.sub.set_required_updates(math::constrain(pubs_per_integrator_reset, (uint8_t)1, sensor_imu_fifo_s::ORB_QUEUE_LENGTH));
+								sub.set_required_updates(math::constrain(pubs_per_integrator_reset, (uint8_t)1, sensor_imu_fifo_s::ORB_QUEUE_LENGTH));
 							}
 
-							s.sub.registerCallback();
+							sub.registerCallback();
 
 							imu.accel.interval_configured = true;
 							imu.gyro.interval_configured = true;
@@ -401,7 +401,7 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 			}
 		}
 
-		s.last_generation = s.sub.get_last_generation();
+		imu.accel.last_generation = sub.get_last_generation();
 
 		imu.accel.timestamp_sample_last = sensor_imu_fifo.timestamp_sample;
 		imu.gyro.timestamp_sample_last = sensor_imu_fifo.timestamp_sample;
@@ -435,17 +435,32 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 
 
 		// integrate accel
+
+		// check for scale change
+		if (fabsf(sensor_imu_fifo.accel_scale - imu.accel.fifo_scale) > FLT_EPSILON) {
+			// rescale last sample on scale change
+			const float rescale = imu.accel.fifo_scale / sensor_imu_fifo.accel_scale;
+
+			imu.accel.last_fifo_sample[0] = roundf(imu.accel.last_fifo_sample[0] * rescale);
+			imu.accel.last_fifo_sample[1] = roundf(imu.accel.last_fifo_sample[1] * rescale);
+			imu.accel.last_fifo_sample[2] = roundf(imu.accel.last_fifo_sample[2] * rescale);
+
+			imu.accel.fifo_scale = sensor_imu_fifo.accel_scale;
+		}
+
+
 		// trapezoidal integration (equally spaced)
-		imu.accel.integral(0) += (0.5f * (imu.accel.last_fifo_sample[0] + sensor_imu_fifo.accel_x[N - 2]) + sum(
-						  sensor_imu_fifo.accel_x, N));
+		const float scale = dt_s * sensor_imu_fifo.accel_scale;
+		imu.accel.integral(0) += (0.5f * (imu.accel.last_fifo_sample[0] + sensor_imu_fifo.accel_x[N - 2])
+					  + sum(sensor_imu_fifo.accel_x, N - 1)) * scale;
 		imu.accel.last_fifo_sample[0] = sensor_imu_fifo.accel_x[N - 1];
 
-		imu.accel.integral(1) += (0.5f * (imu.accel.last_fifo_sample[1] + sensor_imu_fifo.accel_y[N - 2]) + sum(
-						  sensor_imu_fifo.accel_y, N));
+		imu.accel.integral(1) += (0.5f * (imu.accel.last_fifo_sample[1] + sensor_imu_fifo.accel_y[N - 2])
+					  + sum(sensor_imu_fifo.accel_y, N - 1)) * scale;
 		imu.accel.last_fifo_sample[1] = sensor_imu_fifo.accel_y[N - 1];
 
-		imu.accel.integral(2) += (0.5f * (imu.accel.last_fifo_sample[2] + sensor_imu_fifo.accel_z[N - 2]) + sum(
-						  sensor_imu_fifo.accel_z, N));
+		imu.accel.integral(2) += (0.5f * (imu.accel.last_fifo_sample[2] + sensor_imu_fifo.accel_z[N - 2])
+					  + sum(sensor_imu_fifo.accel_z, N - 1)) * scale;
 		imu.accel.last_fifo_sample[2] = sensor_imu_fifo.accel_z[N - 1];
 
 
@@ -556,6 +571,8 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 
 
 			PublishImu(imu);
+
+			imu.accel.integral.zero();
 		}
 
 		// TODO: call to filter data
@@ -574,7 +591,7 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 
 			// update per axis?
 			// publish when
-			if (!s.sub.updated()) {
+			if (!sub.updated()) {
 				// _vehicle_angular_velocity.publish()?
 			}
 		}
@@ -589,12 +606,12 @@ void VehicleIMU::UpdateSensorAccel(uint8_t sensor_instance)
 	// integrate queued accel
 	sensor_accel_s sensor_accel;
 
-	if (s.sub.update(&sensor_accel)) {
+	if (sub.update(&sensor_accel)) {
 
 		// TODO: find corresponding IMU slot
 		IMU &imu = _imus[sensor_instance];
 
-		if (s.sub.get_last_generation() != s.last_generation + 1) {
+		if (sub.get_last_generation() != s.last_generation + 1) {
 			//_data_gap = true;
 			//perf_count(_accel_generation_gap_perf);
 
@@ -797,6 +814,7 @@ bool VehicleIMU::PublishImu(sensors::IMU &imu)
 			// delta velocity: apply offsets, scale, and board rotation
 			imu.accel.calibration.SensorCorrectionsUpdate();
 			const float accel_dt_s = 1.e-6f * vehicle_imu.delta_velocity_dt;
+			delta_velocity = imu.accel.integral; // TODO
 			const Vector3f acceleration{imu.accel.calibration.Correct(delta_velocity / accel_dt_s)};
 
 			// Accel high frequency vibe = filtered length of (acceleration - acceleration_prev)
