@@ -310,20 +310,50 @@ void VehicleIMU::Run()
 	perf_end(_cycle_perf);
 }
 
+int8_t VehicleIMU::findAccelInstance(uint32_t device_id)
+{
+	if (device_id == 0) {
+		return -1;
+	}
+
+	// look for existing matching
+	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+		if (_imus[i].accel.device_id == device_id) {
+			return i;
+		}
+	}
+
+	// look for empty slot
+	for (int i = 0; i < MAX_SENSOR_COUNT; i++) {
+		if (_imus[i].accel.device_id == 0) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 {
 	// sensor_imu_fifo
-	sensor_imu_fifo_s sensor_imu_fifo;
 	auto &sub = _sensor_imu_fifo_subs[sensor_instance];
 
-	while (sub.update(&sensor_imu_fifo)) {
+	while (sub.updated()) {
+		unsigned last_generation = sub.get_last_generation();
+		sensor_imu_fifo_s sensor_imu_fifo;
+		sub.copy(&sensor_imu_fifo);
 
-		// TODO: find corresponding IMU slot
-		IMU &imu = _imus[sensor_instance];
+		int8_t imu_instance = findAccelInstance(sensor_imu_fifo.device_id);
+
+		if (imu_instance == -1) {
+			return;
+		}
+
+		IMU &imu = _imus[imu_instance];
 
 		// publication interval
 		//  sensor output data rate or interval
-		if (sub.get_last_generation() == imu.accel.last_generation + 1) {
+		if (sub.get_last_generation() == last_generation + 1) {
 
 			if ((sensor_imu_fifo.timestamp_sample > imu.accel.timestamp_sample_last)
 			    && (sensor_imu_fifo.timestamp_sample > imu.gyro.timestamp_sample_last)
@@ -400,8 +430,6 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 				}
 			}
 		}
-
-		imu.accel.last_generation = sub.get_last_generation();
 
 		imu.accel.timestamp_sample_last = sensor_imu_fifo.timestamp_sample;
 		imu.gyro.timestamp_sample_last = sensor_imu_fifo.timestamp_sample;
@@ -600,183 +628,13 @@ void VehicleIMU::UpdateSensorImuFifo(uint8_t sensor_instance)
 
 void VehicleIMU::UpdateSensorAccel(uint8_t sensor_instance)
 {
-#if 0
-	auto &s = _sensor_accel_subs[sensor_instance];
-
-	// integrate queued accel
-	sensor_accel_s sensor_accel;
-
-	if (sub.update(&sensor_accel)) {
-
-		// TODO: find corresponding IMU slot
-		IMU &imu = _imus[sensor_instance];
-
-		if (sub.get_last_generation() != s.last_generation + 1) {
-			//_data_gap = true;
-			//perf_count(_accel_generation_gap_perf);
-
-		} else {
-			// collect sample interval average for filters
-			if (sensor_accel.timestamp_sample > _accel_timestamp_sample_last) {
-				if (_accel_timestamp_sample_last != 0) {
-					const float interval_us = sensor_accel.timestamp_sample - _accel_timestamp_sample_last;
-
-					_accel_mean_sample_interval_us.update(interval_us);
-					_accel_fifo_mean_sample_interval_us.update(interval_us / math::max(sensor_accel.samples, (uint8_t)1));
-
-					// check measured interval periodically
-					if (_accel_mean_sample_interval_us.valid() && (_accel_mean_sample_interval_us.count() % 10 == 0)) {
-
-						const float interval_mean = _accel_mean_sample_interval_us.mean();
-
-						// update sample rate if previously invalid or changed by more than 1 standard deviation
-						const bool diff_exceeds_stddev = sq(interval_mean - _accel_interval_us) > _accel_mean_sample_interval_us.variance();
-
-						if (!PX4_ISFINITE(_accel_interval_us) || diff_exceeds_stddev) {
-							// update integrator configuration if interval has changed by more than 10%
-							_update_integrator_config = true;
-						}
-					}
-				}
-
-			} else {
-				PX4_ERR("%d - accel %" PRIu32 " timestamp error timestamp_sample: %" PRIu64 ", previous timestamp_sample: %" PRIu64,
-					_instance, sensor_accel.device_id, sensor_accel.timestamp_sample, _accel_timestamp_sample_last);
-			}
-
-			if (sensor_accel.timestamp < sensor_accel.timestamp_sample) {
-				PX4_ERR("%d - accel %" PRIu32 " timestamp (%" PRIu64 ") < timestamp_sample (%" PRIu64 ")",
-					_instance, sensor_accel.device_id, sensor_accel.timestamp, sensor_accel.timestamp_sample);
-			}
-		}
-
-		_accel_last_generation = _sensor_accel_sub.get_last_generation();
-
-		_accel_calibration.set_device_id(sensor_accel.device_id);
-
-		if (sensor_accel.error_count != _status.accel_error_count) {
-			_publish_status = true;
-			_status.accel_error_count = sensor_accel.error_count;
-		}
 
 
-		// temperature average
-		if (PX4_ISFINITE(sensor_accel.temperature)) {
-			if ((_accel_temperature_sum_count == 0) || !PX4_ISFINITE(_accel_temperature_sum)) {
-				_accel_temperature_sum = sensor_accel.temperature;
-				_accel_temperature_sum_count = 1;
-
-			} else {
-				_accel_temperature_sum += sensor_accel.temperature;
-				_accel_temperature_sum_count += 1;
-			}
-		}
-
-
-		const float dt = (sensor_accel.timestamp_sample - _accel_timestamp_sample_last) * 1e-6f;
-		_accel_timestamp_sample_last = sensor_accel.timestamp_sample;
-
-		const Vector3f accel_raw{sensor_accel.x, sensor_accel.y, sensor_accel.z};
-		_raw_accel_mean.update(accel_raw);
-		_accel_integrator.put(accel_raw, dt);
-
-		updated = true;
-
-		if (sensor_accel.clip_counter[0] > 0 || sensor_accel.clip_counter[1] > 0 || sensor_accel.clip_counter[2] > 0) {
-			// rotate sensor clip counts into vehicle body frame
-			const Vector3f clipping{_accel_calibration.rotation() *
-						Vector3f{(float)sensor_accel.clip_counter[0], (float)sensor_accel.clip_counter[1], (float)sensor_accel.clip_counter[2]}};
-
-			// round to get reasonble clip counts per axis (after board rotation)
-			const uint8_t clip_x = roundf(fabsf(clipping(0)));
-			const uint8_t clip_y = roundf(fabsf(clipping(1)));
-			const uint8_t clip_z = roundf(fabsf(clipping(2)));
-
-			_status.accel_clipping[0] += clip_x;
-			_status.accel_clipping[1] += clip_y;
-			_status.accel_clipping[2] += clip_z;
-
-			if (clip_x > 0) {
-				_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_X;
-			}
-
-			if (clip_y > 0) {
-				_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Y;
-			}
-
-			if (clip_z > 0) {
-				_delta_velocity_clipping |= vehicle_imu_s::CLIPPING_Z;
-			}
-
-			_publish_status = true;
-
-			if (_accel_calibration.enabled() && (hrt_elapsed_time(&_last_accel_clipping_notify_time) > 3_s)) {
-				// start notifying the user periodically if there's significant continuous clipping
-				const uint64_t clipping_total = _status.accel_clipping[0] + _status.accel_clipping[1] + _status.accel_clipping[2];
-
-				if (clipping_total > _last_accel_clipping_notify_total_count + 1000) {
-					mavlink_log_critical(&_mavlink_log_pub, "Accel %" PRIu8 " clipping, not safe to fly!\t", _instance);
-					/* EVENT
-					 * @description Land now, and check the vehicle setup.
-					 * Clipping can lead to fly-aways.
-					 */
-					events::send<uint8_t>(events::ID("vehicle_imu_accel_clipping"), events::Log::Critical,
-							      "Accel {1} clipping, not safe to fly!", _instance);
-					_last_accel_clipping_notify_time = sensor_accel.timestamp_sample;
-					_last_accel_clipping_notify_total_count = clipping_total;
-				}
-			}
-		}
-	}
-
-#endif
 }
 
 void VehicleIMU::UpdateSensorGyro(uint8_t sensor_instance)
 {
-	// sensor_gyro_s sensor_gyro;
 
-	// while (_sensor_gyro_sub.update(&sensor_gyro)) {
-	// 	if (Vector3f(sensor_gyro.x, sensor_gyro.y, sensor_gyro.z).isAllFinite()) {
-
-	// 		if (_timestamp_sample_last == 0 || (sensor_gyro.timestamp_sample <= _timestamp_sample_last)) {
-	// 			_timestamp_sample_last = sensor_gyro.timestamp_sample - 1e6f / _filter_sample_rate_hz;
-	// 		}
-
-	// 		const float inverse_dt_s = 1.f / math::constrain(((sensor_gyro.timestamp_sample - _timestamp_sample_last) * 1e-6f),
-	// 					   0.00002f, 0.02f);
-	// 		_timestamp_sample_last = sensor_gyro.timestamp_sample;
-
-	// 		Vector3f angular_velocity_uncalibrated;
-	// 		Vector3f angular_acceleration_uncalibrated;
-
-	// 		float raw_data_array[] {sensor_gyro.x, sensor_gyro.y, sensor_gyro.z};
-
-	// 		for (int axis = 0; axis < 3; axis++) {
-	// 			// copy sensor sample to float array for filtering
-	// 			float data[1] {raw_data_array[axis]};
-
-	// 			// save last filtered sample
-	// 			angular_velocity_uncalibrated(axis) = FilterAngularVelocity(axis, data);
-	// 			angular_acceleration_uncalibrated(axis) = FilterAngularAcceleration(axis, inverse_dt_s, data);
-	// 		}
-
-	// 		// Publish
-	// 		if (!_sensor_gyro_sub.updated()) {
-	// 			if (CalibrateAndPublishAngularVelocity(sensor_gyro.timestamp_sample,
-	// 							       angular_velocity_uncalibrated, angular_acceleration_uncalibrated)) {
-
-
-	// 				// shift last publish time forward, but don't let it get further behind than the interval
-	// 				_angular_velocity_last_publish = math::constrain(_angular_velocity_last_publish + _publish_interval_min_us,
-	// 								 sensor_gyro.timestamp_sample - _publish_interval_min_us, sensor_gyro.timestamp_sample);
-
-	// 				perf_end(_cycle_perf);
-	// 				return;
-	// 			}
-	// 		}
-	// 	}
-	// }
 
 }
 
@@ -930,6 +788,30 @@ bool VehicleIMU::PublishImu(sensors::IMU &imu)
 			vehicle_imu.gyro_calibration_count = imu.gyro.calibration.calibration_count();
 			vehicle_imu.timestamp = hrt_absolute_time();
 			imu.vehicle_imu_pub.publish(vehicle_imu);
+
+			if (imu.primary) {
+
+				sensor_combined_s sensor_combined{};
+
+				sensor_combined.timestamp = vehicle_imu.timestamp_sample;
+				sensor_combined.accelerometer_m_s2[0] = acceleration(0);
+				sensor_combined.accelerometer_m_s2[1] = acceleration(1);
+				sensor_combined.accelerometer_m_s2[2] = acceleration(2);
+				sensor_combined.accelerometer_integral_dt = vehicle_imu.delta_velocity_dt;
+				sensor_combined.accelerometer_clipping = vehicle_imu.delta_velocity_clipping;
+				sensor_combined.gyro_rad[0] = angular_velocity(0);
+				sensor_combined.gyro_rad[1] = angular_velocity(1);
+				sensor_combined.gyro_rad[2] = angular_velocity(2);
+				sensor_combined.gyro_integral_dt = vehicle_imu.delta_angle_dt;
+				sensor_combined.gyro_clipping = vehicle_imu.delta_angle_clipping;
+				sensor_combined.accel_calibration_count = vehicle_imu.accel_calibration_count;
+				sensor_combined.gyro_calibration_count = vehicle_imu.gyro_calibration_count;
+
+				sensor_combined.accelerometer_timestamp_relative = (int32_t)((int64_t)imu.accel.timestamp_sample_last -
+						(int64_t)imu.gyro.timestamp_sample_last);
+
+				_sensor_combined_pub.publish(sensor_combined);
+			}
 
 			// reset clipping flags
 			imu.gyro.clipping_flags = 0;

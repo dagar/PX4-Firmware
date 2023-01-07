@@ -43,7 +43,6 @@ struct IMU {
 		// redundant for FIFO case
 		hrt_abstime timestamp_sample_last{0};
 		uint32_t device_id{0};
-		unsigned last_generation{0};
 		uint32_t error_count{0};
 		math::WelfordMean<float> temperature{};              // redundant for FIFO case
 		math::WelfordMean<float> mean_sample_interval_us{};
@@ -72,7 +71,6 @@ struct IMU {
 	struct {
 		hrt_abstime timestamp_sample_last{0};
 		uint32_t device_id{0};
-		unsigned last_generation{0};
 		calibration::Gyroscope calibration{};
 		math::WelfordMean<float> mean_publish_interval_us{};
 		math::WelfordMean<float> mean_sample_interval_us{};

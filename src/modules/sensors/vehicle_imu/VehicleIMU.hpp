@@ -88,6 +88,8 @@ private:
 
 	void ParametersUpdate(bool force = false);
 
+	int8_t findAccelInstance(uint32_t device_id);
+
 	bool PublishImu(sensors::IMU &imu);
 
 	void SensorBiasUpdate();
