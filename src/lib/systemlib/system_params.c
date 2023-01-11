@@ -190,6 +190,18 @@ PARAM_DEFINE_INT32(SYS_CAL_TMAX, 10);
 PARAM_DEFINE_INT32(SYS_HAS_GPS, 1);
 
 /**
+ * Control if the vehicle has an IMU
+ *
+ * Set this to 0 if the board has no IMU.
+ * If set to 0, the preflight checks will not check for the presence of a
+ * IMU, otherwise N sensors are required.
+ *
+ * @reboot_required true
+ * @group System
+ */
+PARAM_DEFINE_INT32(SYS_HAS_IMU, 1);
+
+/**
  * Control if the vehicle has a magnetometer
  *
  * Set this to 0 if the board has no magnetometer.
