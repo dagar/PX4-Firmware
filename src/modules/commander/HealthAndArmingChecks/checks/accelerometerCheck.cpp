@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2019 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2019-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,8 +39,17 @@ using namespace time_literals;
 
 void AccelerometerChecks::checkAndReport(const Context &context, Report &reporter)
 {
+	if (_param_sys_has_imu.get() == 0) {
+		return;
+	}
+
+	bool had_failure = false;
+	int num_enabled_and_valid_calibration = 0;
+
 	for (int instance = 0; instance < _sensor_accel_sub.size(); instance++) {
-		const bool is_required = instance == 0 || isAccelRequired(instance);
+
+		bool is_sensor_fault = false;
+		const bool is_required = instance == 0 || isSensorRequired(instance, is_sensor_fault);
 
 		if (!is_required) {
 			continue;
@@ -51,21 +60,30 @@ void AccelerometerChecks::checkAndReport(const Context &context, Report &reporte
 		bool is_calibration_valid = false;
 
 		if (exists) {
-			sensor_accel_s accel_data;
-			is_valid = _sensor_accel_sub[instance].copy(&accel_data) && (accel_data.device_id != 0) && (accel_data.timestamp != 0)
-				   && (hrt_elapsed_time(&accel_data.timestamp) < 1_s);
+			sensor_accel_s sensor_data;
+			is_valid = _sensor_accel_sub[instance].copy(&sensor_data) && (sensor_data.device_id != 0) && (sensor_data.timestamp != 0)
+				   && (hrt_elapsed_time(&sensor_data.timestamp) < 1_s);
 
 			if (context.status().hil_state == vehicle_status_s::HIL_STATE_ON) {
 				is_calibration_valid = true;
 
 			} else {
-				is_calibration_valid = (calibration::FindCurrentCalibrationIndex("ACC", accel_data.device_id) >= 0);
+				int calibration_index = calibration::FindCurrentCalibrationIndex("ACC", mag_data.device_id);
+				is_calibration_valid = (calibration_index >= 0);
+
+				if (is_calibration_valid) {
+					int priority = calibration::GetCalibrationParamInt32("ACC", "PRIO", calibration_index);
+
+					if (priority > 0) {
+						++num_enabled_and_valid_calibration;
+					}
+				}
 			}
 
-			reporter.setIsPresent(health_component_t::gyro);
+			reporter.setIsPresent(health_component_t::accel);
 		}
 
-		const bool is_sensor_ok = is_valid && is_calibration_valid;
+		const bool is_sensor_ok = is_valid && is_calibration_valid && !is_sensor_fault;
 
 		if (!is_sensor_ok) {
 			if (!exists) {
@@ -102,7 +120,7 @@ void AccelerometerChecks::checkAndReport(const Context &context, Report &reporte
 	}
 }
 
-bool AccelerometerChecks::isAccelRequired(int instance)
+bool AccelerometerChecks::isAccelRequired(int instance, bool &sensor_fault)
 {
 	sensor_accel_s sensor_accel;
 

@@ -47,8 +47,9 @@ void MagnetometerChecks::checkAndReport(const Context &context, Report &reporter
 	int num_enabled_and_valid_calibration = 0;
 
 	for (int instance = 0; instance < _sensor_mag_sub.size(); instance++) {
-		bool is_mag_fault = false;
-		const bool is_required = instance == 0 || isMagRequired(instance, is_mag_fault);
+
+		bool is_sensor_fault = false;
+		const bool is_required = instance == 0 || isSensorRequired(instance, is_sensor_fault);
 
 		if (!is_required) {
 			continue;
@@ -59,15 +60,15 @@ void MagnetometerChecks::checkAndReport(const Context &context, Report &reporter
 		bool is_calibration_valid = false;
 
 		if (exists) {
-			sensor_mag_s mag_data;
-			is_valid = _sensor_mag_sub[instance].copy(&mag_data) && (mag_data.device_id != 0) && (mag_data.timestamp != 0)
-				   && (hrt_elapsed_time(&mag_data.timestamp) < 1_s);
+			sensor_mag_s sensor_data;
+			is_valid = _sensor_mag_sub[instance].copy(&sensor_data) && (sensor_data.device_id != 0) && (sensor_data.timestamp != 0)
+				   && (hrt_elapsed_time(&sensor_data.timestamp) < 1_s);
 
 			if (context.status().hil_state == vehicle_status_s::HIL_STATE_ON) {
 				is_calibration_valid = true;
 
 			} else {
-				int calibration_index = calibration::FindCurrentCalibrationIndex("MAG", mag_data.device_id);
+				int calibration_index = calibration::FindCurrentCalibrationIndex("MAG", sensor_data.device_id);
 				is_calibration_valid = (calibration_index >= 0);
 
 				if (is_calibration_valid) {
@@ -82,7 +83,7 @@ void MagnetometerChecks::checkAndReport(const Context &context, Report &reporter
 			reporter.setIsPresent(health_component_t::magnetometer);
 		}
 
-		const bool is_sensor_ok = is_valid && is_calibration_valid && !is_mag_fault;
+		const bool is_sensor_ok = is_valid && is_calibration_valid && !is_sensor_fault;
 
 		if (!is_sensor_ok) {
 			if (!exists) {
@@ -116,7 +117,7 @@ void MagnetometerChecks::checkAndReport(const Context &context, Report &reporter
 					mavlink_log_critical(reporter.mavlink_log_pub(), "Preflight Fail: Compass %u uncalibrated", instance);
 				}
 
-			} else if (is_mag_fault) {
+			} else if (is_sensor_fault) {
 				/* EVENT
 				 * @description
 				 * Recalibrate the compass and check the orientation.
@@ -157,7 +158,7 @@ void MagnetometerChecks::checkAndReport(const Context &context, Report &reporter
 	}
 }
 
-bool MagnetometerChecks::isMagRequired(int instance, bool &mag_fault)
+bool MagnetometerChecks::isMagRequired(int instance, bool &sensor_fault)
 {
 	sensor_mag_s sensor_mag;
 

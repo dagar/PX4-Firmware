@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,9 +37,9 @@
 
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionMultiArray.hpp>
-#include <uORB/topics/sensor_preflight_mag.h>
-#include <uORB/topics/sensor_mag.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/sensor_mag.h>
+#include <uORB/topics/sensor_preflight_mag.h>
 #include <lib/sensor_calibration/Magnetometer.hpp>
 
 class MagnetometerChecks : public HealthAndArmingCheckBase
@@ -51,7 +51,7 @@ public:
 	void checkAndReport(const Context &context, Report &reporter) override;
 
 private:
-	bool isMagRequired(int instance, bool &mag_fault);
+	bool isSensorRequired(int instance, bool &sensor_fault);
 	void consistencyCheck(const Context &context, Report &reporter);
 
 	uORB::SubscriptionMultiArray<sensor_mag_s, calibration::Magnetometer::MAX_SENSOR_COUNT> _sensor_mag_sub{ORB_ID::sensor_mag};

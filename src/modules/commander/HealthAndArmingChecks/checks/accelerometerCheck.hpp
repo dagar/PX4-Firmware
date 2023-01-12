@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2022 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2022-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,6 +39,7 @@
 #include <uORB/SubscriptionMultiArray.hpp>
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/sensor_accel.h>
+#include <uORB/topics/sensors_status_imu.h>
 #include <lib/sensor_calibration/Accelerometer.hpp>
 
 class AccelerometerChecks : public HealthAndArmingCheckBase
@@ -50,8 +51,15 @@ public:
 	void checkAndReport(const Context &context, Report &reporter) override;
 
 private:
-	bool isAccelRequired(int instance);
+	bool isSensorRequired(int instance, bool &sensor_fault);
+	void consistencyCheck(const Context &context, Report &reporter);
 
 	uORB::SubscriptionMultiArray<sensor_accel_s, calibration::Accelerometer::MAX_SENSOR_COUNT> _sensor_accel_sub{ORB_ID::sensor_accel};
 	uORB::SubscriptionMultiArray<estimator_status_s> _estimator_status_sub{ORB_ID::estimator_status};
+
+	uORB::Subscription _sensors_status_imu_sub{ORB_ID(sensors_status_imu)};
+
+	DEFINE_PARAMETERS_CUSTOM_PARENT(HealthAndArmingCheckBase,
+					(ParamInt<px4::params::SYS_HAS_IMU>) _param_sys_has_imu
+				       )
 };
