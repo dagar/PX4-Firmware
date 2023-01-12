@@ -62,8 +62,7 @@ px4_add_module(
 		${CMAKE_CURRENT_SOURCE_DIR}
 	SRCS
 		sensors.cpp
-		voted_sensors_update.cpp
-		voted_sensors_update.h
+		sensors.hpp
 		Integrator.hpp
 	MODULE_CONFIG
 		module.yaml

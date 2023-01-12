@@ -102,7 +102,20 @@ struct IMU {
 	uORB::PublicationMulti<vehicle_imu_status_s> vehicle_imu_status_pub{ORB_ID(vehicle_imu_status)};
 
 	hrt_abstime time_last_status_publication{0};
-	bool publish_status{true};
+
+	hrt_abstime time_last_valid{0};
+	hrt_abstime time_last_invalid{0};
+
+	// last valid
+	// last invalid
+
+
+	hrt_abstime time_last_move_detect_us{0};
+	hrt_abstime time_still_detect_us{0};
+	bool at_rest{false};
+
+
+	// noise when still?
 
 };
 

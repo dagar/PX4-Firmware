@@ -91,12 +91,15 @@ private:
 	int8_t findAccelInstance(uint32_t device_id);
 
 	bool PublishImu(sensors::IMU &imu);
+	void PublishSensorsStatusIMU();
 
 	void SensorBiasUpdate();
-	bool SensorSelectionUpdate(const hrt_abstime &time_now_us, bool force = false);
+	bool SensorSelectionUpdate(bool force = false);
 	void UpdateSensorImuFifo(uint8_t sensor_instance);
 	void UpdateSensorAccel(uint8_t sensor_instance);
 	void UpdateSensorGyro(uint8_t sensor_instance);
+
+	void updateGyroCalibration();
 
 	// return the square of two floating point numbers
 	static constexpr float sq(float var) { return var * var; }
@@ -126,6 +129,26 @@ private:
 
 
 
+	// struct SensorData {
+	// 	DataValidatorGroup voter{1};
+	// 	unsigned int last_failover_count{0};
+	// 	int32_t priority[MAX_SENSOR_COUNT] {};
+	// 	int32_t priority_configured[MAX_SENSOR_COUNT] {};
+	// 	uint8_t last_best_vote{0}; /**< index of the latest best vote */
+	// 	uint8_t subscription_count{0};
+	// 	bool advertised[MAX_SENSOR_COUNT] {false, false, false};
+	// };
+
+	// SensorData _accel{};
+	// SensorData _gyro{};
+
+	hrt_abstime _last_error_message{0};
+	orb_advert_t _mavlink_log_pub{nullptr};
+
+	matrix::Vector3f _accel_diff[MAX_SENSOR_COUNT] {};		/**< filtered accel differences between IMU units (m/s/s) */
+	matrix::Vector3f _gyro_diff[MAX_SENSOR_COUNT] {};			/**< filtered gyro differences between IMU uinits (rad/s) */
+
+
 
 	// TODO:
 	uORB::Publication<sensor_combined_s>    _sensor_combined_pub{ORB_ID(sensor_combined)}; // legacy
@@ -137,11 +160,18 @@ private:
 
 	uint32_t _selected_accel_device_id{0};
 	uint32_t _selected_gyro_device_id{0};
+	int8_t _selected_imu_index{-1};
+
+
+	// calibration
+	hrt_abstime _last_calibration_update{0};
+
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": IMU update")};
 	perf_counter_t _selection_changed_perf{perf_alloc(PC_COUNT, MODULE_NAME": IMU selection changed")};
 
 	DEFINE_PARAMETERS(
+		(ParamBool<px4::params::SENS_IMU_MODE>) _param_sens_imu_mode,
 		(ParamInt<px4::params::IMU_INTEG_RATE>) _param_imu_integ_rate,
 		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_ratemax
 	)

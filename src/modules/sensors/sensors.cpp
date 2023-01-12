@@ -43,17 +43,12 @@
 
 #include "sensors.hpp"
 
-#include <lib/sensor_calibration/Accelerometer.hpp>
-#include <lib/sensor_calibration/Gyroscope.hpp>
-
-Sensors::Sensors(bool hil_enabled) :
+Sensors::Sensors() :
 	ModuleParams(nullptr),
 	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
-	_hil_enabled(hil_enabled),
-	_loop_perf(perf_alloc(PC_ELAPSED, "sensors")),
-	_voted_sensors_update(hil_enabled, _vehicle_imu_sub)
+	_loop_perf(perf_alloc(PC_ELAPSED, "sensors"))
 {
-	_sensor_pub.advertise();
+
 
 #if defined(CONFIG_SENSORS_VEHICLE_AIRSPEED)
 	/* Differential pressure offset */
@@ -81,17 +76,11 @@ Sensors::Sensors(bool hil_enabled) :
 	param_find("SYS_CAL_TMAX");
 	param_find("SYS_CAL_TMIN");
 
-	_sensor_combined.accelerometer_timestamp_relative = sensor_combined_s::RELATIVE_TIMESTAMP_INVALID;
-
 	parameters_update();
 }
 
 Sensors::~Sensors()
 {
-	// clear all registered callbacks
-	for (auto &sub : _vehicle_imu_sub) {
-		sub.unregisterCallback();
-	}
 
 #if defined(CONFIG_SENSORS_VEHICLE_IMU)
 	_vehicle_imu.Stop();
@@ -138,17 +127,12 @@ Sensors::~Sensors()
 
 bool Sensors::init()
 {
-	_vehicle_imu_sub[0].registerCallback();
-	ScheduleNow();
+	ScheduleDelayed(100_ms);
 	return true;
 }
 
 int Sensors::parameters_update()
 {
-	if (_armed) {
-		return 0;
-	}
-
 #if defined(CONFIG_SENSORS_VEHICLE_AIRSPEED)
 	/* Airspeed offset */
 	param_get(_parameter_handles.diff_pres_offset_pa, &(_parameters.diff_pres_offset_pa));
@@ -160,69 +144,6 @@ int Sensors::parameters_update()
 	param_get(_parameter_handles.air_tube_length, &_parameters.air_tube_length);
 	param_get(_parameter_handles.air_tube_diameter_mm, &_parameters.air_tube_diameter_mm);
 #endif // CONFIG_SENSORS_VEHICLE_AIRSPEED
-
-	_voted_sensors_update.parametersUpdate();
-
-	// 1. mark all existing sensor calibrations active even if sensor is missing
-	//    this preserves the calibration in the event of a parameter export while the sensor is missing
-	// 2. ensure calibration slots are active for the number of sensors currently available
-	//    this to done to eliminate differences in the active set of parameters before and after sensor calibration
-	for (uint8_t i = 0; i < MAX_SENSOR_COUNT; i++) {
-		// sensor_accel
-		{
-			const uint32_t device_id_accel = calibration::GetCalibrationParamInt32("ACC",  "ID", i);
-
-			if (device_id_accel != 0) {
-				calibration::Accelerometer accel_cal(device_id_accel);
-			}
-
-			uORB::SubscriptionData<sensor_accel_s> sensor_accel_sub{ORB_ID(sensor_accel), i};
-
-			if (sensor_accel_sub.advertised() && (sensor_accel_sub.get().device_id != 0)) {
-				calibration::Accelerometer cal;
-				cal.set_calibration_index(i);
-				cal.ParametersLoad();
-			}
-		}
-
-
-		// sensor_gyro
-		{
-			const uint32_t device_id_gyro = calibration::GetCalibrationParamInt32("GYRO", "ID", i);
-
-			if (device_id_gyro != 0) {
-				calibration::Gyroscope gyro_cal(device_id_gyro);
-			}
-
-			uORB::SubscriptionData<sensor_gyro_s> sensor_gyro_sub{ORB_ID(sensor_gyro), i};
-
-			if (sensor_gyro_sub.advertised() && (sensor_gyro_sub.get().device_id != 0)) {
-				calibration::Gyroscope cal;
-				cal.set_calibration_index(i);
-				cal.ParametersLoad();
-			}
-		}
-
-
-#if defined(CONFIG_SENSORS_VEHICLE_MAGNETOMETER)
-		// sensor_mag
-		{
-			uint32_t device_id_mag = calibration::GetCalibrationParamInt32("MAG",  "ID", i);
-
-			if (device_id_mag != 0) {
-				calibration::Magnetometer mag_cal(device_id_mag);
-			}
-
-			uORB::SubscriptionData<sensor_mag_s> sensor_mag_sub{ORB_ID(sensor_mag), i};
-
-			if (sensor_mag_sub.advertised() && (sensor_mag_sub.get().device_id != 0)) {
-				calibration::Magnetometer cal;
-				cal.set_calibration_index(i);
-				cal.ParametersLoad();
-			}
-		}
-#endif // CONFIG_SENSORS_VEHICLE_MAGNETOMETER
-	}
 
 #if defined(CONFIG_SENSORS_VEHICLE_AIR_DATA)
 	InitializeVehicleAirData();
@@ -353,11 +274,6 @@ void Sensors::diff_pres_poll()
 
 void Sensors::adc_poll()
 {
-	/* only read if not in HIL mode */
-	if (_hil_enabled) {
-		return;
-	}
-
 #ifdef ADC_AIRSPEED_VOLTAGE_CHANNEL
 
 	if (_parameters.diff_pres_analog_scale > 0.0f) {
@@ -468,108 +384,21 @@ void Sensors::InitializeVehicleOpticalFlow()
 void Sensors::Run()
 {
 	if (should_exit()) {
-		// clear all registered callbacks
-		for (auto &sub : _vehicle_imu_sub) {
-			sub.unregisterCallback();
-		}
-
 		exit_and_cleanup();
 		return;
 	}
 
 	perf_begin(_loop_perf);
 
-	// check vehicle status for changes to publication state
-	if (_vcontrol_mode_sub.updated()) {
-		vehicle_control_mode_s vcontrol_mode{};
+	// check for parameter updates
+	if (_parameter_update_sub.updated()) {
+		// clear update
+		parameter_update_s pupdate;
+		_parameter_update_sub.copy(&pupdate);
 
-		if (_vcontrol_mode_sub.copy(&vcontrol_mode)) {
-			_armed = vcontrol_mode.flag_armed;
-		}
-	}
-
-	// keep adding sensors as long as we are not armed,
-	// when not adding sensors poll for param updates
-	if ((!_armed && hrt_elapsed_time(&_last_config_update) > 500_ms) || (_last_config_update == 0)) {
-
-		bool updated = false;
-
-#if defined(CONFIG_SENSORS_VEHICLE_AIR_DATA)
-		const int n_baro = orb_group_count(ORB_ID(sensor_baro));
-
-		if (n_baro != _n_baro) {
-			_n_baro = n_baro;
-			updated = true;
-		}
-
-#endif // CONFIG_SENSORS_VEHICLE_AIR_DATA
-
-#if defined(CONFIG_SENSORS_VEHICLE_GPS_POSITION)
-		const int n_gps = orb_group_count(ORB_ID(sensor_gps));
-
-		if (n_gps != _n_gps) {
-			_n_gps = n_gps;
-			updated = true;
-		}
-
-#endif // CONFIG_SENSORS_VEHICLE_GPS_POSITION
-
-#if defined(CONFIG_SENSORS_VEHICLE_MAGNETOMETER)
-		const int n_mag = orb_group_count(ORB_ID(sensor_mag));
-
-		if (n_mag != _n_mag) {
-			_n_mag = n_mag;
-			updated = true;
-		}
-
-#endif // CONFIG_SENSORS_VEHICLE_MAGNETOMETER
-
-#if defined(CONFIG_SENSORS_VEHICLE_OPTICAL_FLOW)
-		const int n_optical_flow = orb_group_count(ORB_ID(sensor_optical_flow));
-
-		if (n_optical_flow != _n_optical_flow) {
-			_n_optical_flow = n_optical_flow;
-			updated = true;
-		}
-
-#endif // CONFIG_SENSORS_VEHICLE_OPTICAL_FLOW
-
-
-		const int n_accel = orb_group_count(ORB_ID(sensor_accel));
-		const int n_gyro  = orb_group_count(ORB_ID(sensor_gyro));
-
-		if ((n_accel != _n_accel) || (n_gyro != _n_gyro) || updated) {
-			_n_accel = n_accel;
-			_n_gyro = n_gyro;
-
-			parameters_update();
-		}
-
-		// sensor device id (not just orb_group_count) must be populated before IMU init can succeed
-		_voted_sensors_update.initializeSensors();
-
-		_last_config_update = hrt_absolute_time();
-
-	} else {
-		// check for parameter updates
-		if (_parameter_update_sub.updated()) {
-			// clear update
-			parameter_update_s pupdate;
-			_parameter_update_sub.copy(&pupdate);
-
-			// update parameters from storage
-			parameters_update();
-			updateParams();
-		}
-	}
-
-	_voted_sensors_update.sensorsPoll(_sensor_combined);
-
-	if (_sensor_combined.timestamp != _sensor_combined_prev_timestamp) {
-
-		_voted_sensors_update.setRelativeTimestamps(_sensor_combined);
-		_sensor_pub.publish(_sensor_combined);
-		_sensor_combined_prev_timestamp = _sensor_combined.timestamp;
+		// update parameters from storage
+		updateParams();
+		parameters_update();
 	}
 
 #if defined(CONFIG_SENSORS_VEHICLE_AIRSPEED)
@@ -578,43 +407,12 @@ void Sensors::Run()
 	diff_pres_poll();
 #endif // CONFIG_SENSORS_VEHICLE_AIRSPEED
 
-	// backup schedule as a watchdog timeout
-	ScheduleDelayed(10_ms);
-
 	perf_end(_loop_perf);
 }
 
 int Sensors::task_spawn(int argc, char *argv[])
 {
-	bool hil_enabled = false;
-	bool error_flag = false;
-
-	int myoptind = 1;
-	int ch;
-	const char *myoptarg = nullptr;
-
-	while ((ch = px4_getopt(argc, argv, "h", &myoptind, &myoptarg)) != EOF) {
-		switch (ch) {
-		case 'h':
-			hil_enabled = true;
-			break;
-
-		case '?':
-			error_flag = true;
-			break;
-
-		default:
-			PX4_WARN("unrecognized flag");
-			error_flag = true;
-			break;
-		}
-	}
-
-	if (error_flag) {
-		return PX4_ERROR;
-	}
-
-	Sensors *instance = new Sensors(hil_enabled);
+	Sensors *instance = new Sensors();
 
 	if (instance) {
 		_object.store(instance);
@@ -637,7 +435,10 @@ int Sensors::task_spawn(int argc, char *argv[])
 
 int Sensors::print_status()
 {
-	_voted_sensors_update.printStatus();
+#if defined(CONFIG_SENSORS_VEHICLE_IMU)
+	PX4_INFO_RAW("\n");
+	_vehicle_imu.PrintStatus();
+#endif // CONFIG_SENSORS_VEHICLE_IMU
 
 #if defined(CONFIG_SENSORS_VEHICLE_MAGNETOMETER)
 
@@ -671,11 +472,6 @@ int Sensors::print_status()
 	}
 
 #endif // CONFIG_SENSORS_VEHICLE_OPTICAL_FLOW
-
-#if defined(CONFIG_SENSORS_VEHICLE_IMU)
-	PX4_INFO_RAW("\n");
-	_vehicle_imu.PrintStatus();
-#endif // CONFIG_SENSORS_VEHICLE_IMU
 
 #if defined(CONFIG_SENSORS_VEHICLE_GPS_POSITION)
 
@@ -723,7 +519,6 @@ It runs in its own thread and polls on the currently selected gyro topic.
 
 	PRINT_MODULE_USAGE_NAME("sensors", "system");
 	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_PARAM_FLAG('h', "Start in HIL mode", true);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
 	return 0;

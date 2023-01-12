@@ -310,7 +310,7 @@ matrix::Vector3f AverageFifoGyro(const sensor_imu_fifo_s &sensor_imu_fifo)
 			z += sensor_imu_fifo.gyro_z[i];
 		}
 
-		return (matrix::Vector3f{(float)x, (float)y, (float)z} * sensor_imu_fifo.accel_scale) / sensor_imu_fifo.samples;
+		return (matrix::Vector3f{(float)x, (float)y, (float)z} * sensor_imu_fifo.gyro_scale) / sensor_imu_fifo.samples;
 	}
 
 	return matrix::Vector3f{0, 0, 0};
@@ -340,7 +340,7 @@ matrix::Vector3f AverageFifoAccel(const sensor_imu_fifo_s &sensor_imu_fifo)
 			z += sensor_imu_fifo.accel_z[i];
 		}
 
-		return (matrix::Vector3f{(float)x, (float)y, (float)z} * sensor_imu_fifo.gyro_scale) / sensor_imu_fifo.samples;
+		return (matrix::Vector3f{(float)x, (float)y, (float)z} * sensor_imu_fifo.accel_scale) / sensor_imu_fifo.samples;
 	}
 
 	return matrix::Vector3f{0, 0, 0};
