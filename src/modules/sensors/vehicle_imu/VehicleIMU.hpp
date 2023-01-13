@@ -67,6 +67,7 @@
 #include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/sensor_gyro.h>
 #include <uORB/topics/sensor_imu_fifo.h>
+#include <uORB/topics/vehicle_control_mode.h>
 
 using namespace time_literals;
 
@@ -86,7 +87,7 @@ public:
 private:
 	void Run() override;
 
-	void ParametersUpdate(bool force = false);
+	bool ParametersUpdate(bool force = false);
 
 	int8_t findAccelInstance(uint32_t device_id);
 
@@ -99,6 +100,10 @@ private:
 	void UpdateSensorAccel(uint8_t sensor_instance);
 	void UpdateSensorGyro(uint8_t sensor_instance);
 
+	void SensorCalibrationUpdate();
+	void SensorCalibrationSaveAccel();
+	void SensorCalibrationSaveGyro();
+
 	void updateGyroCalibration();
 
 	// return the square of two floating point numbers
@@ -110,6 +115,7 @@ private:
 	uORB::SubscriptionMultiArray<estimator_sensor_bias_s> _estimator_sensor_bias_subs{ORB_ID::estimator_sensor_bias};
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 	uORB::SubscriptionCallbackWorkItem _sensor_selection_sub{this, ORB_ID(sensor_selection)};
+	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_imu_fifo_subs[MAX_SENSOR_COUNT] {
 		{this, ORB_ID::sensor_imu_fifo, 0},
@@ -123,6 +129,13 @@ private:
 		{this, ORB_ID::sensor_accel, 1},
 		{this, ORB_ID::sensor_accel, 2},
 		{this, ORB_ID::sensor_accel, 3}
+	};
+
+	uORB::SubscriptionCallbackWorkItem _sensor_gyro_subs[MAX_SENSOR_COUNT] {
+		{this, ORB_ID::sensor_gyro, 0},
+		{this, ORB_ID::sensor_gyro, 1},
+		{this, ORB_ID::sensor_gyro, 2},
+		{this, ORB_ID::sensor_gyro, 3}
 	};
 
 	IMU _imus[MAX_SENSOR_COUNT] {};
@@ -166,15 +179,26 @@ private:
 	// calibration
 	hrt_abstime _last_calibration_update{0};
 
+	static constexpr hrt_abstime INFLIGHT_CALIBRATION_QUIET_PERIOD_US{30_s};
+
+	hrt_abstime _in_flight_calibration_check_timestamp_last{0};
+	bool _accel_cal_available{false};
+	bool _gyro_cal_available{false};
+
+
+	bool _armed{false};
+
 
 	perf_counter_t _cycle_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": IMU update")};
 	perf_counter_t _selection_changed_perf{perf_alloc(PC_COUNT, MODULE_NAME": IMU selection changed")};
 
 	DEFINE_PARAMETERS(
+		(ParamBool<px4::params::SENS_IMU_AUTOCAL>) _param_sens_imu_autocal,
 		(ParamBool<px4::params::SENS_IMU_MODE>) _param_sens_imu_mode,
 		(ParamInt<px4::params::IMU_INTEG_RATE>) _param_imu_integ_rate,
 		(ParamInt<px4::params::IMU_GYRO_RATEMAX>) _param_imu_gyro_ratemax
 	)
+
 };
 
 } // namespace sensors

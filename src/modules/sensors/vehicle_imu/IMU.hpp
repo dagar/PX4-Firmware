@@ -18,11 +18,12 @@ namespace sensors
 
 struct IMU {
 
-	// struct InFlightCalibration {
-	// 	matrix::Vector3f offset{};
-	// 	matrix::Vector3f bias_variance{};
-	// 	bool valid{false};
-	// };
+	struct InFlightCalibration {
+		uint8_t instance{0};
+		matrix::Vector3f offset{};
+		matrix::Vector3f bias_variance{};
+		bool valid{false};
+	};
 
 	struct {
 
@@ -34,7 +35,7 @@ struct IMU {
 
 		// FIFO only
 		matrix::Vector3f integral{};
-		int16_t last_fifo_sample[3] {};
+		int16_t last_raw_sample[3] {};
 		float fifo_scale{1.f};
 
 		math::WelfordMean<float> mean_publish_interval_us{}; // only needed for FIFO
@@ -66,6 +67,8 @@ struct IMU {
 		float vibration_metric{0.f}; // high frequency vibration level in the accelerometer data (m/s/s)
 
 
+		InFlightCalibration learned_calibration[3] {};
+
 	} accel{};
 
 	struct {
@@ -94,6 +97,8 @@ struct IMU {
 		float coning_norm_accum_total_time_s{0};
 
 		bool interval_configured{false};
+
+		InFlightCalibration learned_calibration[3] {};
 	} gyro{};
 
 	bool primary{false};
