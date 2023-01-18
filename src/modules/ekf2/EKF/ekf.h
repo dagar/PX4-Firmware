@@ -76,11 +76,61 @@ public:
 
 	virtual ~Ekf() = default;
 
-	// initialise variables to sane values (also interface class)
-	bool init(uint64_t timestamp) override;
+	bool initialized() const { return _initialised && _filter_initialised; }
+
+	// set the internal states and status to their default value
+	void reset();
 
 	// should be called every time new data is pushed into the filter
-	bool update();
+	bool update(const imuSample &imu_sample);
+
+	// get the state vector at the delayed time horizon
+	matrix::Vector<float, 24> getStateAtFusionHorizonAsVector() const;
+	// get the full covariance matrix
+	const matrix::SquareMatrix<float, 24> &covariances() const { return P; }
+	// get the diagonal elements of the covariance matrix
+	matrix::Vector<float, 24> covariances_diagonal() const { return P.diag(); }
+
+	// orientation (states 0, 1, 2, 3)
+	const matrix::Quatf &getQuaternion() const { return _state.quat_nominal; }
+	matrix::SquareMatrix<float, 4> orientation_covariances() const { return P.slice<4, 4>(0, 0); }
+
+	// velocity (states 4, 5, 6)
+	const Vector3f &getVelocity() const { return _state.vel; }
+	Vector3f getVelocityVariance() const { return P.slice<3, 3>(4, 4).diag(); };
+	matrix::SquareMatrix<float, 3> velocity_covariances() const { return P.slice<3, 3>(4, 4); }
+
+	// position (states 7, 8, 9)
+	const Vector3f &getPosition() const { return _state.pos; }
+	Vector3f getPositionVariance() const { return P.slice<3, 3>(7, 7).diag(); }
+	matrix::SquareMatrix<float, 3> position_covariances() const { return P.slice<3, 3>(7, 7); }
+
+	// gyro bias (states 10, 11, 12)
+	Vector3f getGyroBias() const { return _state.delta_ang_bias / _dt_ekf_avg; } // get the gyroscope bias in rad/s
+	Vector3f getGyroBiasVariance() const { return Vector3f{P(10, 10), P(11, 11), P(12, 12)} / sq(_dt_ekf_avg); } // get the gyroscope bias variance in rad/s
+	float getGyroBiasLimit() const { return _params.gyro_bias_lim; }
+
+	// accel bias (states 13, 14, 15)
+	Vector3f getAccelBias() const { return _state.delta_vel_bias / _dt_ekf_avg; } // get the accelerometer bias in m/s**2
+	Vector3f getAccelBiasVariance() const { return Vector3f{P(13, 13), P(14, 14), P(15, 15)} / sq(_dt_ekf_avg); } // get the accelerometer bias variance in m/s**2
+	float getAccelBiasLimit() const { return _params.acc_bias_lim; }
+
+	// mag bias (states 19, 20, 21)
+	const Vector3f &getMagBias() const { return _state.mag_B; }
+	Vector3f getMagBiasVariance() const
+	{
+		if (_control_status.flags.mag_3D) {
+			return Vector3f{P(19, 19), P(20, 20), P(21, 21)};
+		}
+
+		return _saved_mag_bf_variance;
+	}
+	float getMagBiasLimit() const { return 0.5f; } // 0.5 Gauss
+
+	// wind: (states 22, 34)
+	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
+	Vector2f getWindVelocityVariance() const { return P.slice<2, 2>(22, 22).diag(); }
+
 
 	void getGpsVelPosInnov(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getGpsVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
@@ -187,32 +237,8 @@ public:
 	void getHaglRateInnovVar(float &hagl_rate_innov_var) const { hagl_rate_innov_var = _rng_consistency_check.getInnovVar(); }
 	void getHaglRateInnovRatio(float &hagl_rate_innov_ratio) const { hagl_rate_innov_ratio = _rng_consistency_check.getSignedTestRatioLpf(); }
 
-	// get the state vector at the delayed time horizon
-	matrix::Vector<float, 24> getStateAtFusionHorizonAsVector() const;
-
-	// get the wind velocity in m/s
-	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
-
-	// get the wind velocity var
-	Vector2f getWindVelocityVariance() const { return P.slice<2, 2>(22, 22).diag(); }
-
 	// get the true airspeed in m/s
 	float getTrueAirspeed() const;
-
-	// get the full covariance matrix
-	const matrix::SquareMatrix<float, 24> &covariances() const { return P; }
-
-	// get the diagonal elements of the covariance matrix
-	matrix::Vector<float, 24> covariances_diagonal() const { return P.diag(); }
-
-	// get the orientation (quaterion) covariances
-	matrix::SquareMatrix<float, 4> orientation_covariances() const { return P.slice<4, 4>(0, 0); }
-
-	// get the linear velocity covariances
-	matrix::SquareMatrix<float, 3> velocity_covariances() const { return P.slice<3, 3>(4, 4); }
-
-	// get the position covariances
-	matrix::SquareMatrix<float, 3> position_covariances() const { return P.slice<3, 3>(7, 7); }
 
 	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
 	bool collect_gps(const gpsMessage &gps) override;
@@ -242,10 +268,6 @@ public:
 	void resetImuBias();
 	void resetGyroBias();
 	void resetAccelBias();
-
-	Vector3f getVelocityVariance() const { return P.slice<3, 3>(4, 4).diag(); };
-
-	Vector3f getPositionVariance() const { return P.slice<3, 3>(7, 7).diag(); }
 
 	// First argument returns GPS drift  metrics in the following array locations
 	// 0 : Horizontal position drift rate (m/s)
@@ -302,33 +324,12 @@ public:
 	// get the terrain variance
 	float get_terrain_var() const { return _terrain_var; }
 
-	// gyro bias (states 10, 11, 12)
-	Vector3f getGyroBias() const { return _state.delta_ang_bias / _dt_ekf_avg; } // get the gyroscope bias in rad/s
-	Vector3f getGyroBiasVariance() const { return Vector3f{P(10, 10), P(11, 11), P(12, 12)} / sq(_dt_ekf_avg); } // get the gyroscope bias variance in rad/s
-	float getGyroBiasLimit() const { return _params.gyro_bias_lim; }
-
-	// accel bias (states 13, 14, 15)
-	Vector3f getAccelBias() const { return _state.delta_vel_bias / _dt_ekf_avg; } // get the accelerometer bias in m/s**2
-	Vector3f getAccelBiasVariance() const { return Vector3f{P(13, 13), P(14, 14), P(15, 15)} / sq(_dt_ekf_avg); } // get the accelerometer bias variance in m/s**2
-	float getAccelBiasLimit() const { return _params.acc_bias_lim; }
-
-	// mag bias (states 19, 20, 21)
-	const Vector3f &getMagBias() const { return _state.mag_B; }
-	Vector3f getMagBiasVariance() const
-	{
-		if (_control_status.flags.mag_3D) {
-			return Vector3f{P(19, 19), P(20, 20), P(21, 21)};
-		}
-
-		return _saved_mag_bf_variance;
-	}
-	float getMagBiasLimit() const { return 0.5f; } // 0.5 Gauss
-
 	bool accel_bias_inhibited() const { return _accel_bias_inhibit[0] || _accel_bias_inhibit[1] || _accel_bias_inhibit[2]; }
 
 	const auto &state_reset_status() const { return _state_reset_status; }
 
 	// return the amount the local vertical position changed in the last reset and the number of reset events
+	bool posD_reset() const { return _state_reset_status.reset_count.posD != _state_reset_count_prev.posD; }
 	uint8_t get_posD_reset_count() const { return _state_reset_status.reset_count.posD; }
 	void get_posD_reset(float *delta, uint8_t *counter) const
 	{
@@ -337,6 +338,7 @@ public:
 	}
 
 	// return the amount the local vertical velocity changed in the last reset and the number of reset events
+	bool velD_reset() const { return _state_reset_status.reset_count.velD != _state_reset_count_prev.velD; }
 	uint8_t get_velD_reset_count() const { return _state_reset_status.reset_count.velD; }
 	void get_velD_reset(float *delta, uint8_t *counter) const
 	{
@@ -345,6 +347,7 @@ public:
 	}
 
 	// return the amount the local horizontal position changed in the last reset and the number of reset events
+	bool posNE_reset() const { return _state_reset_status.reset_count.posNE != _state_reset_count_prev.posNE; }
 	uint8_t get_posNE_reset_count() const { return _state_reset_status.reset_count.posNE; }
 	void get_posNE_reset(float delta[2], uint8_t *counter) const
 	{
@@ -353,6 +356,7 @@ public:
 	}
 
 	// return the amount the local horizontal velocity changed in the last reset and the number of reset events
+	bool velNE_reset() const { return _state_reset_status.reset_count.velNE != _state_reset_count_prev.velNE; }
 	uint8_t get_velNE_reset_count() const { return _state_reset_status.reset_count.velNE; }
 	void get_velNE_reset(float delta[2], uint8_t *counter) const
 	{
@@ -361,6 +365,7 @@ public:
 	}
 
 	// return the amount the quaternion has changed in the last reset and the number of reset events
+	bool quat_reset() const { return _state_reset_status.reset_count.quat != _state_reset_count_prev.quat; }
 	uint8_t get_quat_reset_count() const { return _state_reset_status.reset_count.quat; }
 	void get_quat_reset(float delta_quat[4], uint8_t *counter) const
 	{
@@ -434,9 +439,6 @@ public:
 
 private:
 
-	// set the internal states and status to their default value
-	void reset();
-
 	bool initialiseTilt();
 
 	// check if the EKF is dead reckoning horizontal velocity using inertial data only
@@ -509,6 +511,12 @@ private:
 	Vector3f _earth_rate_NED{};	///< earth rotation vector (NED) in rad/s
 
 	Dcmf _R_to_earth{};	///< transformation matrix from body frame to earth frame from last EKF prediction
+
+	unsigned _min_obs_interval_us{0}; // minimum time interval between observations that will guarantee data is not lost (usec)
+
+	// Used by the multi-rotor specific drag force fusion
+	uint8_t _drag_sample_count{0};	// number of drag specific force samples assumulated at the filter prediction rate
+	float _drag_sample_time_dt{0.0f};	// time integral across all samples used to form _drag_down_sampled (sec)
 
 	// used by magnetometer fusion mode selection
 	Vector2f _accel_lpf_NE{};			///< Low pass filtered horizontal earth frame acceleration (m/sec**2)
@@ -632,7 +640,7 @@ private:
 	float _height_rate_lpf{0.0f};
 
 	// initialise filter states of both the delayed ekf and the real time complementary filter
-	bool initialiseFilter(void);
+	bool initialiseFilter(const imuSample &imu_sample);
 
 	// initialise ekf covariance matrix
 	void initialiseCovariance();
@@ -958,17 +966,17 @@ private:
 
 	bool isTimedOut(uint64_t last_sensor_timestamp, uint64_t timeout_period) const
 	{
-		return last_sensor_timestamp + timeout_period < _time_delayed_us;
+		return (last_sensor_timestamp == 0) || (last_sensor_timestamp + timeout_period < _time_delayed_us);
 	}
 
 	bool isRecent(uint64_t sensor_timestamp, uint64_t acceptance_interval) const
 	{
-		return sensor_timestamp + acceptance_interval > _time_delayed_us;
+		return (sensor_timestamp != 0) && (sensor_timestamp + acceptance_interval > _time_delayed_us);
 	}
 
 	bool isNewestSampleRecent(uint64_t sensor_timestamp, uint64_t acceptance_interval) const
 	{
-		return sensor_timestamp + acceptance_interval > _time_latest_us;
+		return (sensor_timestamp != 0) && (sensor_timestamp + acceptance_interval > _time_latest_us);
 	}
 
 	void startAirspeedFusion();

@@ -64,7 +64,7 @@ public:
 	* “Recursive Attitude Estimation in the Presence of Multi-rate and Multi-delay Vector Measurements”
 	* A Khosravian, J Trumpf, R Mahony, T Hamel, Australian National University
 	*/
-	void calculateOutputStates(const uint64_t time_us, const matrix::Vector3f &delta_angle, const float delta_angle_dt,
+	bool calculateOutputStates(const uint64_t time_us, const matrix::Vector3f &delta_angle, const float delta_angle_dt,
 				   const matrix::Vector3f &delta_velocity, const float delta_velocity_dt);
 
 	void correctOutputStates(const uint64_t time_delayed_us,
@@ -95,8 +95,35 @@ public:
 
 	const matrix::Quatf &getQuaternion() const { return _output_new.quat_nominal; }
 
+	void fillQuaternionAndResetDelta(float q[4], float delta_q_reset[4], uint8_t &quat_reset_counter)
+	{
+		_output_new.quat_nominal.copyTo(q);
+		_state_reset_status.quat_change.copyTo(delta_q_reset);
+		quat_reset_counter = _state_reset_status.reset_count.quat;
+
+		// reset
+		_state_reset_count_prev.quat = _state_reset_status.reset_count.quat;
+	}
+
 	// get the velocity of the body frame origin in local NED earth frame
 	matrix::Vector3f getVelocity() const { return _output_new.vel - _vel_imu_rel_body_ned; }
+
+	void fillVelocityResetNE(float delta[2], uint8_t &counter)
+	{
+		_state_reset_status.velNE_change.copyTo(delta);
+		counter = _state_reset_status.reset_count.velNE;
+
+		// reset
+		_state_reset_count_prev.velNE = _state_reset_status.reset_count.velNE;
+	}
+	void fillVelocityResetD(float &delta, uint8_t &counter)
+	{
+		delta = _state_reset_status.velD_change;
+		counter = _state_reset_status.reset_count.velD;
+
+		// reset
+		_state_reset_count_prev.velD = _state_reset_status.reset_count.velD;
+	}
 
 	// get the velocity derivative in earth frame
 	const matrix::Vector3f &getVelocityDerivative() const { return _vel_deriv; }
@@ -113,9 +140,37 @@ public:
 		return _output_new.pos - pos_offset_earth;
 	}
 
+	void fillPositionResetNE(float delta[2], uint8_t &counter)
+	{
+		_state_reset_status.posNE_change.copyTo(delta);
+		counter = _state_reset_status.reset_count.posNE;
+
+		// reset
+		_state_reset_count_prev.posNE = _state_reset_status.reset_count.posNE;
+	}
+	void fillPositionResetD(float &delta, uint8_t &counter)
+	{
+		delta = _state_reset_status.posD_change;
+		counter = _state_reset_status.reset_count.posD;
+
+		// reset
+		_state_reset_count_prev.posD = _state_reset_status.reset_count.posD;
+	}
+
+	void fillHeadingReset(float &delta, uint8_t &counter)
+	{
+		delta = _state_reset_status.heading_change;
+		counter = _state_reset_status.reset_count.heading;
+
+		// reset
+		_state_reset_count_prev.heading = _state_reset_status.reset_count.heading;
+	}
+
 	// return an array containing the output predictor angular, velocity and position tracking
 	// error magnitudes (rad), (m/sec), (m)
 	const matrix::Vector3f &getOutputTrackingError() const { return _output_tracking_error; }
+
+	bool aligned() const { return _output_filter_aligned; }
 
 	void set_imu_offset(const matrix::Vector3f &offset) { _imu_pos_body = offset; }
 	void set_pos_correction_tc(const float tau) { _pos_tau = tau; }
@@ -183,11 +238,42 @@ private:
 
 	matrix::Vector3f _output_tracking_error{}; ///< contains the magnitude of the angle, velocity and position track errors (rad, m/s, m)
 
+	bool _output_filter_aligned{false};
+
 	matrix::Vector3f _imu_pos_body{};                ///< xyz position of IMU in body frame (m)
 
 	// output complementary filter tuning
 	float _vel_tau{0.25f};                   ///< velocity state correction time constant (1/sec)
 	float _pos_tau{0.25f};                   ///< position state correction time constant (1/sec)
+
+
+	struct StateResetCounts {
+		uint8_t quat{0};  ///< number of quaternion reset events (allow to wrap if count exceeds 255)
+
+		uint8_t heading{0};
+
+		uint8_t velNE{0}; ///< number of horizontal position reset events (allow to wrap if count exceeds 255)
+		uint8_t velD{0};  ///< number of vertical velocity reset events (allow to wrap if count exceeds 255)
+
+		uint8_t posNE{0}; ///< number of horizontal position reset events (allow to wrap if count exceeds 255)
+		uint8_t posD{0};  ///< number of vertical position reset events (allow to wrap if count exceeds 255)
+	};
+
+	struct StateResets {
+		matrix::Vector2f velNE_change{};       ///< North East velocity change due to last reset (m)
+		float velD_change{};                   ///< Down velocity change due to last reset (m/sec)
+
+		matrix::Vector2f posNE_change{};       ///< North, East position change due to last reset (m)
+		float posD_change{};                   ///< Down position change due to last reset (m)
+
+		matrix::Quatf quat_change{1.f, 0.f, 0.f, 0.f}; ///< quaternion delta due to last reset - multiply pre-reset quaternion by this to get post-reset quaternion
+
+		float heading_change{0.f};
+
+		StateResetCounts reset_count{};
+	} _state_reset_status{}; ///< reset event monitoring structure containing velocity, position, height and yaw reset information
+
+	StateResetCounts _state_reset_count_prev{};
 };
 
 #endif // !EKF_OUTPUT_PREDICTOR_H

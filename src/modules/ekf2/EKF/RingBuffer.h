@@ -62,6 +62,7 @@ public:
 	{
 		if (valid() && (size == _size)) {
 			// no change
+			reset();
 			return true;
 		}
 
@@ -169,6 +170,13 @@ public:
 		}
 
 		return count;
+	}
+
+	void reset()
+	{
+		for (uint8_t i = 0; i < _size; i++) {
+			_buffer[i] = {};
+		}
 	}
 
 private:

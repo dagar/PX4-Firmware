@@ -43,15 +43,14 @@
 
 #include <mathlib/mathlib.h>
 
-bool Ekf::init(uint64_t timestamp)
-{
-	bool ret = initialise_interface(timestamp);
-	reset();
-	return ret;
-}
-
 void Ekf::reset()
 {
+	ECL_INFO("reset");
+
+	_initialised = false;
+	_filter_initialised = false;
+
+	_state.quat_nominal.setIdentity();
 	_state.vel.setZero();
 	_state.pos.setZero();
 	_state.delta_ang_bias.setZero();
@@ -59,7 +58,6 @@ void Ekf::reset()
 	_state.mag_I.setZero();
 	_state.mag_B.setZero();
 	_state.wind_vel.setZero();
-	_state.quat_nominal.setIdentity();
 
 	_range_sensor.setPitchOffset(_params.rng_sens_pitch);
 	_range_sensor.setCosMaxTilt(_params.range_cos_max_tilt);
@@ -80,32 +78,55 @@ void Ekf::reset()
 
 	resetGpsDriftCheckFilters();
 
-	_output_predictor.reset();
+	_horizontal_deadreckon_time_exceeded = true;
+	_vertical_position_deadreckon_time_exceeded = true;
+	_vertical_velocity_deadreckon_time_exceeded = true;
 
-	_filter_initialised = false;
+	_imu_buffer.reset();
 }
 
-bool Ekf::update()
+bool Ekf::update(const imuSample &imu_sample)
 {
-	if (!_filter_initialised) {
-		if (initialiseFilter()) {
-			_filter_initialised = true;
+	if (!_initialised) {
+		reset();
+		_initialised = initialise_interface();
+	}
 
-			// reset the output predictor state history to match the EKF initial values
-			_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
+	const uint64_t time_delayed_prev_us = _time_delayed_us;
+
+	_imu_buffer.push(imu_sample);
+	_time_latest_us = _imu_buffer.get_newest().time_us;
+	_time_delayed_us = _imu_buffer.get_oldest().time_us;
+
+	// calculate the minimum interval between observations required to guarantee no loss of data
+	// this will occur if data is overwritten before its time stamp falls behind the fusion time horizon
+	if (_time_latest_us > _time_delayed_us) {
+		_min_obs_interval_us = (_time_latest_us - _time_delayed_us) / (_obs_buffer_length - 1);
+	}
+
+	if (!_filter_initialised) {
+		if (initialiseFilter(_imu_buffer.get_newest())) {
+			_filter_initialised = true;
 
 		} else {
 			return false;
 		}
 	}
 
-	// Only run the filter if IMU data in the buffer has been updated
-	if (_imu_updated) {
-		_imu_updated = false;
+	setDragData(imu_sample);
 
-		// get the oldest IMU data from the buffer
-		// TODO: explicitly pop at desired time horizon
-		const imuSample imu_sample_delayed = _imu_buffer.get_oldest();
+	// get the oldest IMU data from the buffer
+	// TODO: explicitly pop at desired time horizon
+	const imuSample imu_sample_delayed = _imu_buffer.get_oldest();
+
+	if (imu_sample_delayed.time_us > time_delayed_prev_us) {
+
+		// calculate an average filter update time
+		// filter and limit input between -50% and +100% of nominal value
+		float input = 0.5f * (imu_sample_delayed.delta_vel_dt + imu_sample_delayed.delta_ang_dt);
+		const float filter_update_s = 1e-6f * _params.filter_update_interval_us;
+		input = math::constrain(input, 0.5f * filter_update_s, 2.f * filter_update_s);
+		_dt_ekf_avg = 0.99f * _dt_ekf_avg + 0.01f * input;
 
 		// perform state and covariance prediction for the main filter
 		predictCovariance(imu_sample_delayed);
@@ -117,33 +138,29 @@ bool Ekf::update()
 		// run a separate filter for terrain estimation
 		runTerrainEstimator(imu_sample_delayed);
 
-		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, getGyroBias(), getAccelBias(),
-						      _state.quat_nominal, _state.vel, _state.pos);
-
 		return true;
 	}
 
 	return false;
 }
 
-bool Ekf::initialiseFilter()
+bool Ekf::initialiseFilter(const imuSample &imu_sample)
 {
 	// Filter accel for tilt initialization
-	const imuSample &imu_init = _imu_buffer.get_newest();
 
 	// protect against zero data
-	if (imu_init.delta_vel_dt < 1e-4f || imu_init.delta_ang_dt < 1e-4f) {
+	if (imu_sample.delta_vel_dt < 1e-4f || imu_sample.delta_ang_dt < 1e-4f) {
 		return false;
 	}
 
 	if (_is_first_imu_sample) {
-		_accel_lpf.reset(imu_init.delta_vel / imu_init.delta_vel_dt);
-		_gyro_lpf.reset(imu_init.delta_ang / imu_init.delta_ang_dt);
+		_accel_lpf.reset(imu_sample.delta_vel / imu_sample.delta_vel_dt);
+		_gyro_lpf.reset(imu_sample.delta_ang / imu_sample.delta_ang_dt);
 		_is_first_imu_sample = false;
 
 	} else {
-		_accel_lpf.update(imu_init.delta_vel / imu_init.delta_vel_dt);
-		_gyro_lpf.update(imu_init.delta_ang / imu_init.delta_ang_dt);
+		_accel_lpf.update(imu_sample.delta_vel / imu_sample.delta_vel_dt);
+		_gyro_lpf.update(imu_sample.delta_ang / imu_sample.delta_ang_dt);
 	}
 
 	// Sum the magnetometer measurements
@@ -267,14 +284,6 @@ void Ekf::predictState(const imuSample &imu_delayed)
 	_state.pos += (vel_last + _state.vel) * imu_delayed.delta_vel_dt * 0.5f;
 
 	constrainStates();
-
-	// calculate an average filter update time
-	float input = 0.5f * (imu_delayed.delta_vel_dt + imu_delayed.delta_ang_dt);
-
-	// filter and limit input between -50% and +100% of nominal value
-	const float filter_update_s = 1e-6f * _params.filter_update_interval_us;
-	input = math::constrain(input, 0.5f * filter_update_s, 2.f * filter_update_s);
-	_dt_ekf_avg = 0.99f * _dt_ekf_avg + 0.01f * input;
 
 	// some calculations elsewhere in code require a raw angular rate vector so calculate here to avoid duplication
 	// protect against possible small timesteps resulting from timing slip on previous frame that can drive spikes into the rate

@@ -56,6 +56,8 @@ public:
 	void setGyroData(const Vector3f &gyro);
 	void setAccelClipping(bool x, bool y, bool z);
 
+	auto &latestSample() const { return _imu_sample_latest; }
+
 	bool moving()
 	{
 		return ((fabsf(_accel_data.norm() - CONSTANTS_ONE_G) > 0.01f) || (_gyro_data.norm() > 0.01f));
@@ -67,6 +69,8 @@ private:
 	bool _is_accel_clipping[3] {};
 
 	void send(uint64_t time) override;
+
+	imuSample _imu_sample_latest{};
 
 };
 

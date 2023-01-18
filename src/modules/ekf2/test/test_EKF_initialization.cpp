@@ -55,7 +55,7 @@ public:
 	// GTests is calling this
 	void SetUp() override
 	{
-		_ekf->init(0);
+		_ekf->reset();
 	}
 
 	// Use this method to clean up any memory, network etc. after each test

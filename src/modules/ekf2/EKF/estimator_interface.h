@@ -63,11 +63,10 @@
 
 #include "common.h"
 #include "RingBuffer.h"
-#include "imu_down_sampler.hpp"
+
 #include "range_finder_consistency_check.hpp"
 #include "sensor_range_finder.hpp"
 #include "utils.hpp"
-#include "output_predictor.h"
 
 #include <lib/geo/geo.h>
 #include <matrix/math.hpp>
@@ -81,8 +80,6 @@ class EstimatorInterface
 public:
 	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
 	virtual bool collect_gps(const gpsMessage &gps) = 0;
-
-	void setIMUData(const imuSample &imu_sample);
 
 	void setMagData(const magSample &mag_sample);
 
@@ -191,13 +188,6 @@ public:
 	bool isVerticalVelocityAidingActive() const;
 	int getNumberOfActiveVerticalVelocityAidingSources() const;
 
-	const matrix::Quatf &getQuaternion() const { return _output_predictor.getQuaternion(); }
-	Vector3f getVelocity() const { return _output_predictor.getVelocity(); }
-	const Vector3f &getVelocityDerivative() const { return _output_predictor.getVelocityDerivative(); }
-	float getVerticalPositionDerivative() const { return _output_predictor.getVerticalPositionDerivative(); }
-	Vector3f getPosition() const { return _output_predictor.getPosition(); }
-	const Vector3f &getOutputTrackingError() const { return _output_predictor.getOutputTrackingError(); }
-
 	// Get the value of magnetic declination in degrees to be saved for use at the next startup
 	// Returns true when the declination can be saved
 	// At the next startup, set param.mag_declination_deg to the value saved
@@ -253,14 +243,10 @@ public:
 	float gps_vertical_position_drift_rate_m_s() const { return _gps_vertical_position_drift_rate_m_s; }
 	float gps_filtered_horizontal_velocity_m_s() const { return _gps_filtered_horizontal_velocity_m_s; }
 
-	OutputPredictor &output_predictor() { return _output_predictor; };
-
 protected:
 
 	EstimatorInterface() = default;
 	virtual ~EstimatorInterface();
-
-	virtual bool init(uint64_t timestamp) = 0;
 
 	parameters _params{};		// filter parameters
 
@@ -286,8 +272,6 @@ protected:
 	uint64_t _time_delayed_us{0}; // captures the imu sample on the delayed time horizon
 	uint64_t _time_latest_us{0}; // imu sample capturing the newest imu data
 
-	OutputPredictor _output_predictor{};
-
 	// measurement samples capturing measurements on the delayed time horizon
 	gpsSample _gps_sample_delayed{};
 	sensor::SensorRangeFinder _range_sensor{};
@@ -305,7 +289,6 @@ protected:
 	float _flow_min_distance{0.0f};	///< minimum distance that the optical flow sensor can operate at (m)
 	float _flow_max_distance{10.f};	///< maximum distance that the optical flow sensor can operate at (m)
 
-	bool _imu_updated{false};      // true if the ekf should update (completed downsampling process)
 	bool _initialised{false};      // true if the ekf interface instance (data buffering) is initialized
 
 	bool _NED_origin_initialised{false};
@@ -361,7 +344,7 @@ protected:
 	fault_status_u _fault_status{};
 
 	// allocate data buffers and initialize interface variables
-	bool initialise_interface(uint64_t timestamp);
+	bool initialise_interface();
 
 	float _mag_declination_gps{NAN};         // magnetic declination returned by the geo library using the last valid GPS position (rad)
 	float _mag_inclination_gps{NAN};	  // magnetic inclination returned by the geo library using the last valid GPS position (rad)
@@ -378,13 +361,9 @@ protected:
 	warning_event_status_u _warning_events{};
 	information_event_status_u _information_events{};
 
-private:
-
-	inline void setDragData(const imuSample &imu);
+	void setDragData(const imuSample &imu);
 
 	void printBufferAllocationFailed(const char *buffer_name);
-
-	ImuDownSampler _imu_down_sampler{_params.filter_update_interval_us};
 
 	unsigned _min_obs_interval_us{0}; // minimum time interval between observations that will guarantee data is not lost (usec)
 

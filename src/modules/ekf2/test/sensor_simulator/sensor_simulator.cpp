@@ -109,7 +109,7 @@ void SensorSimulator::loadSensorDataFromFile(std::string file_name)
 
 void SensorSimulator::setSensorRateToDefault()
 {
-	_imu.setRateHz(200);
+	_imu.setRateHz(100);
 	_mag.setRateHz(80);
 	_baro.setRateHz(80);
 	_gps.setRateHz(5);
@@ -158,7 +158,7 @@ void SensorSimulator::runMicroseconds(uint32_t duration)
 			}
 
 			// Update at IMU rate
-			_ekf->update();
+			_ekf->update(_imu.latestSample());
 		}
 	}
 }
@@ -201,7 +201,7 @@ void SensorSimulator::runReplayMicroseconds(uint32_t duration)
 				_ekf->set_vehicle_at_rest(false);
 			}
 
-			_ekf->update();
+			_ekf->update(_imu.latestSample());
 		}
 	}
 }
@@ -328,7 +328,7 @@ void SensorSimulator::runTrajectoryMicroseconds(uint32_t duration)
 				_ekf->set_vehicle_at_rest(false);
 			}
 
-			_ekf->update();
+			_ekf->update(_imu.latestSample());
 		}
 	}
 }

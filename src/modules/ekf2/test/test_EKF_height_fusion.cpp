@@ -58,7 +58,7 @@ public:
 	// Setup the Ekf with synthetic measurements
 	void SetUp() override
 	{
-		_ekf->init(0);
+		_ekf->reset();
 		_ekf_wrapper.disableBaroHeightFusion();
 		_sensor_simulator.runSeconds(0.1);
 		_ekf->set_in_air_status(false);

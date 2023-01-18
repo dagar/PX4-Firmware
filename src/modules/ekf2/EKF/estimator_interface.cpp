@@ -57,37 +57,6 @@ EstimatorInterface::~EstimatorInterface()
 	delete _auxvel_buffer;
 }
 
-// Accumulate imu data and store to buffer at desired rate
-void EstimatorInterface::setIMUData(const imuSample &imu_sample)
-{
-	// TODO: resolve misplaced responsibility
-	if (!_initialised) {
-		_initialised = init(imu_sample.time_us);
-	}
-
-	_time_latest_us = imu_sample.time_us;
-
-	// the output observer always runs
-	_output_predictor.calculateOutputStates(imu_sample.time_us, imu_sample.delta_ang, imu_sample.delta_ang_dt, imu_sample.delta_vel, imu_sample.delta_vel_dt);
-
-	// accumulate and down-sample imu data and push to the buffer when new downsampled data becomes available
-	if (_imu_down_sampler.update(imu_sample)) {
-
-		_imu_updated = true;
-
-		_imu_buffer.push(_imu_down_sampler.getDownSampledImuAndTriggerReset());
-
-		// get the oldest data from the buffer
-		_time_delayed_us = _imu_buffer.get_oldest().time_us;
-
-		// calculate the minimum interval between observations required to guarantee no loss of data
-		// this will occur if data is overwritten before its time stamp falls behind the fusion time horizon
-		_min_obs_interval_us = (imu_sample.time_us - _time_delayed_us) / (_obs_buffer_length - 1);
-	}
-
-	setDragData(imu_sample);
-}
-
 void EstimatorInterface::setMagData(const magSample &mag_sample)
 {
 	if (!_initialised) {
@@ -503,7 +472,7 @@ void EstimatorInterface::setDragData(const imuSample &imu)
 	}
 }
 
-bool EstimatorInterface::initialise_interface(uint64_t timestamp)
+bool EstimatorInterface::initialise_interface()
 {
 	// find the maximum time delay the buffers are required to handle
 
@@ -558,16 +527,12 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 
 	ECL_DEBUG("EKF max time delay %.1f ms, OBS length %d\n", (double)ekf_delay_ms, _obs_buffer_length);
 
-	if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_predictor.allocate(_imu_buffer_length)) {
+	//if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_predictor.allocate(_imu_buffer_length)) {
+	if (!_imu_buffer.allocate(_imu_buffer_length)) {
 
 		printBufferAllocationFailed("IMU and output");
 		return false;
 	}
-
-	_time_delayed_us = timestamp;
-	_time_latest_us = timestamp;
-
-	_fault_status.value = 0;
 
 	return true;
 }
@@ -685,6 +650,4 @@ void EstimatorInterface::print_status()
 	if (_drag_buffer) {
 		printf("drag buffer: %d/%d (%d Bytes)\n", _drag_buffer->entries(), _drag_buffer->get_length(), _drag_buffer->get_total_size());
 	}
-
-	_output_predictor.print_status();
 }

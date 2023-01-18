@@ -82,6 +82,8 @@ void OutputPredictor::alignOutputFilter(const Quatf &quat_state, const Vector3f 
 
 	_output_vert_new = _output_vert_buffer.get_newest();
 	_output_vert_new.dt = 0.0f;
+
+	_output_filter_aligned = true;
 }
 
 void OutputPredictor::reset()
@@ -111,6 +113,8 @@ void OutputPredictor::reset()
 	_pos_err_integ.zero();
 
 	_output_tracking_error.zero();
+
+	_output_filter_aligned = false;
 }
 
 void OutputPredictor::resetQuaternion(const Quatf &quat_change)
@@ -123,6 +127,30 @@ void OutputPredictor::resetQuaternion(const Quatf &quat_change)
 	// apply the change in attitude quaternion to our newest quaternion estimate
 	// which was already taken out from the output buffer
 	_output_new.quat_nominal = (quat_change * _output_new.quat_nominal).normalized();
+
+
+	// record the state change (quat_change)
+	if (_state_reset_status.reset_count.quat == _state_reset_count_prev.quat) {
+		_state_reset_status.quat_change = quat_change;
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.quat_change = (quat_change * _state_reset_status.quat_change).normalized();
+	}
+
+	_state_reset_status.reset_count.quat++;
+
+
+	// record the state change (heading)
+	if (_state_reset_status.reset_count.heading == _state_reset_count_prev.heading) {
+		_state_reset_status.heading_change = matrix::Eulerf(quat_change).psi();
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.heading_change = matrix::wrap_pi(matrix::Eulerf(quat_change).psi() - _state_reset_status.heading_change);
+	}
+
+	_state_reset_status.reset_count.heading++;
 }
 
 void OutputPredictor::resetHorizontalVelocityTo(const Vector2f &delta_horz_vel)
@@ -132,6 +160,17 @@ void OutputPredictor::resetHorizontalVelocityTo(const Vector2f &delta_horz_vel)
 	}
 
 	_output_new.vel.xy() += delta_horz_vel;
+
+	// record the state change
+	if (_state_reset_status.reset_count.velNE == _state_reset_count_prev.velNE) {
+		_state_reset_status.velNE_change = delta_horz_vel;
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.velNE_change += delta_horz_vel;
+	}
+
+	_state_reset_status.reset_count.velNE++;
 }
 
 void OutputPredictor::resetVerticalVelocityTo(float delta_vert_vel)
@@ -143,6 +182,17 @@ void OutputPredictor::resetVerticalVelocityTo(float delta_vert_vel)
 
 	_output_new.vel(2) += delta_vert_vel;
 	_output_vert_new.vert_vel += delta_vert_vel;
+
+	// record the state change
+	if (_state_reset_status.reset_count.velD == _state_reset_count_prev.velD) {
+		_state_reset_status.velD_change = delta_vert_vel;
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.velD_change += delta_vert_vel;
+	}
+
+	_state_reset_status.reset_count.velD++;
 }
 
 void OutputPredictor::resetHorizontalPositionTo(const Vector2f &delta_horz_pos)
@@ -152,29 +202,51 @@ void OutputPredictor::resetHorizontalPositionTo(const Vector2f &delta_horz_pos)
 	}
 
 	_output_new.pos.xy() += delta_horz_pos;
+
+	// record the state change
+	if (_state_reset_status.reset_count.posNE == _state_reset_count_prev.posNE) {
+		_state_reset_status.posNE_change = delta_horz_pos;
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.posNE_change += delta_horz_pos;
+	}
+
+	_state_reset_status.reset_count.posNE++;
 }
 
-void OutputPredictor::resetVerticalPositionTo(const float new_vert_pos, const float vert_pos_change)
+void OutputPredictor::resetVerticalPositionTo(const float new_vert_pos, const float delta_z)
 {
 	// apply the change in height / height rate to our newest height / height rate estimate
 	// which have already been taken out from the output buffer
-	_output_new.pos(2) += vert_pos_change;
+	_output_new.pos(2) += delta_z;
 
 	// add the reset amount to the output observer buffered data
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].pos(2) += vert_pos_change;
-		_output_vert_buffer[i].vert_vel_integ += vert_pos_change;
+		_output_buffer[i].pos(2) += delta_z;
+		_output_vert_buffer[i].vert_vel_integ += delta_z;
 	}
 
 	// add the reset amount to the output observer vertical position state
 	_output_vert_new.vert_vel_integ = new_vert_pos;
+
+	// record the state change
+	if (_state_reset_status.reset_count.posD == _state_reset_count_prev.posD) {
+		_state_reset_status.posD_change = delta_z;
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.posD_change += delta_z;
+	}
+
+	_state_reset_status.reset_count.posD++;
 }
 
-void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector3f &delta_angle,
+bool OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector3f &delta_angle,
 		const float delta_angle_dt, const Vector3f &delta_velocity, const float delta_velocity_dt)
 {
 	if (time_us <= _time_last_update_states_us) {
-		return;
+		return false;
 	}
 
 	// Use full rate IMU data at the current time horizon
@@ -243,6 +315,8 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 		// rotate the relative velocity into earth frame
 		_vel_imu_rel_body_ned = _R_to_earth_now * vel_imu_rel_body;
 	}
+
+	return true;
 }
 
 void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
@@ -284,7 +358,9 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 	// this data will be at the EKF fusion time horizon
 	outputSample output_delayed;
 
-	if (_output_buffer.pop_first_older_than(time_delayed_us, &output_delayed) && (output_delayed.time_us != 0)) {
+	if ((output_delayed.time_us != 0) && _output_filter_aligned
+	    && _output_buffer.pop_first_older_than(time_delayed_us, &output_delayed)
+	) {
 		// calculate the quaternion delta between the INS and EKF quaternions at the EKF fusion time horizon
 		const Quatf q_error((quat_state.inversed() * output_delayed.quat_nominal).normalized());
 

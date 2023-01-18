@@ -26,7 +26,7 @@ void Imu::send(uint64_t time)
 	imu_sample.delta_vel_clipping[1] = _is_accel_clipping[1];
 	imu_sample.delta_vel_clipping[2] = _is_accel_clipping[2];
 
-	_ekf->setIMUData(imu_sample);
+	_imu_sample_latest = imu_sample;
 }
 
 void Imu::setData(const Vector3f &accel, const Vector3f &gyro)
