@@ -81,14 +81,20 @@ void Ekf::reset()
 	resetGpsDriftCheckFilters();
 
 	_output_predictor.reset();
+
+	_filter_initialised = false;
 }
 
 bool Ekf::update()
 {
 	if (!_filter_initialised) {
-		_filter_initialised = initialiseFilter();
+		if (initialiseFilter()) {
+			_filter_initialised = true;
 
-		if (!_filter_initialised) {
+			// reset the output predictor state history to match the EKF initial values
+			_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
+
+		} else {
 			return false;
 		}
 	}
@@ -112,7 +118,7 @@ bool Ekf::update()
 		runTerrainEstimator(imu_sample_delayed);
 
 		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, getGyroBias(), getAccelBias(),
-							_state.quat_nominal, _state.vel, _state.pos);
+						      _state.quat_nominal, _state.vel, _state.pos);
 
 		return true;
 	}
@@ -202,9 +208,6 @@ bool Ekf::initialiseFilter()
 	_time_last_hgt_fuse = _time_delayed_us;
 	_time_last_hor_pos_fuse = _time_delayed_us;
 	_time_last_hor_vel_fuse = _time_delayed_us;
-
-	// reset the output predictor state history to match the EKF initial values
-	_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
 
 	return true;
 }
