@@ -86,7 +86,7 @@ enum class UsbAutoStartState {
 } usb_auto_start_state{UsbAutoStartState::disconnected};
 
 
-static void mavlink_usb_check(void *arg)
+static void board_usb_cdcacm_check(void *arg)
 {
 	int rescheduled = -1;
 
@@ -118,12 +118,12 @@ static void mavlink_usb_check(void *arg)
 			if (vbus_present && vbus_present_prev) {
 				if (sercon_main(0, nullptr) == EXIT_SUCCESS) {
 					usb_auto_start_state = UsbAutoStartState::connecting;
-					rescheduled = work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, nullptr, USEC2TICK(100000));
+					rescheduled = work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, nullptr, USEC2TICK(100000));
 				}
 
 			} else if (vbus_present && !vbus_present_prev) {
 				// check again sooner if USB just connected
-				rescheduled = work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, nullptr, USEC2TICK(100000));
+				rescheduled = work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, nullptr, USEC2TICK(100000));
 			}
 
 			break;
@@ -363,14 +363,14 @@ static void mavlink_usb_check(void *arg)
 	vbus_present_prev = vbus_present;
 
 	if (rescheduled != PX4_OK) {
-		work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, NULL, USEC2TICK(1000000));
+		work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, NULL, USEC2TICK(1000000));
 	}
 }
 
 
 void cdcacm_init(void)
 {
-	work_queue(LPWORK, &usb_serial_work, mavlink_usb_check, nullptr, 0);
+	work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, nullptr, 0);
 }
 
 #endif // CONFIG_SYSTEM_CDCACM
