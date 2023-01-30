@@ -150,13 +150,13 @@ __EXPORT void board_on_reset(int status)
  *   digital input on a GPIO. Or something more complicated like a Analong input
  *   or reading a bit from a USB controller register.
  *
- * Returns -  0 if connected.
+ * Returns -  1 if connected.
  *
  ************************************************************************************/
 
 int board_read_VBUS_state(void)
 {
-	return BOARD_ADC_USB_CONNECTED ? 0 : 1;
+	return BOARD_ADC_USB_CONNECTED ? 1 : 0;
 }
 
 /****************************************************************************

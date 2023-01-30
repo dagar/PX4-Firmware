@@ -58,8 +58,12 @@ extern "C" __EXPORT int usb_connected_main(int argc, char *argv[])
 {
 	if (argc > 1) {
 		print_usage();
-		return 0;
+		return PX4_ERROR;
 	}
 
-	return board_read_VBUS_state();
+	if (board_read_VBUS_state() == 1) {
+		return PX4_OK;
+	}
+
+	return PX4_ERROR;
 }

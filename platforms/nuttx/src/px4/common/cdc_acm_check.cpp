@@ -77,6 +77,7 @@ __END_DECLS
 static struct work_s usb_serial_work;
 static bool vbus_present_prev = false;
 static int ttyacm_fd = -1;
+static bool sercon_started = false;
 
 enum class UsbAutoStartState {
 	disconnected,
@@ -93,7 +94,11 @@ static void board_usb_cdcacm_check(void *arg)
 	uORB::SubscriptionData<actuator_armed_s> actuator_armed_sub{ORB_ID(actuator_armed)};
 
 	const bool armed = actuator_armed_sub.get().armed;
-	bool vbus_present = (board_read_VBUS_state() == PX4_OK);
+
+	const int vbus_state = board_read_VBUS_state();
+	bool vbus_present = (vbus_state == 0);
+	const bool vbus_unavailable = (vbus_state == -1);
+
 	bool locked_out = false;
 
 	// If the hardware support RESET lockout that has nArmed ANDed with VBUS
@@ -109,14 +114,19 @@ static void board_usb_cdcacm_check(void *arg)
 		vbus_present = vbus_present_prev;
 	}
 
-#endif
+#endif // BOARD_GET_EXTERNAL_LOCKOUT_STATE
 
 
 	if (!armed && !locked_out) {
 		switch (usb_auto_start_state) {
 		case UsbAutoStartState::disconnected:
-			if (vbus_present && vbus_present_prev) {
+			if (::access(USB_DEVICE_PATH, R_OK) == 0) {
+				// USB device already exists, no need to start sercon
+				usb_auto_start_state = UsbAutoStartState::connecting;
+
+			} else if ((vbus_present && vbus_present_prev) || vbus_unavailable) {
 				if (sercon_main(0, nullptr) == EXIT_SUCCESS) {
+					sercon_started = true;
 					usb_auto_start_state = UsbAutoStartState::connecting;
 					rescheduled = work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, nullptr, USEC2TICK(100000));
 				}
@@ -129,7 +139,7 @@ static void board_usb_cdcacm_check(void *arg)
 			break;
 
 		case UsbAutoStartState::connecting:
-			if (vbus_present && vbus_present_prev) {
+			if ((vbus_present && vbus_present_prev) || vbus_unavailable) {
 				if (ttyacm_fd < 0) {
 					ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
 				}
@@ -340,7 +350,7 @@ static void board_usb_cdcacm_check(void *arg)
 			break;
 
 		case UsbAutoStartState::connected:
-			if (!vbus_present && !vbus_present_prev) {
+			if (!vbus_present && !vbus_present_prev && !vbus_unavailable) {
 				sched_lock();
 				static const char app[] {"mavlink"};
 				static const char *stop_argv[] {"mavlink", "stop", "-d", USB_DEVICE_PATH, NULL};
@@ -353,8 +363,13 @@ static void board_usb_cdcacm_check(void *arg)
 			break;
 
 		case UsbAutoStartState::disconnecting:
+
 			// serial disconnect if unused
-			serdis_main(0, NULL);
+			if (sercon_started) {
+				serdis_main(0, NULL);
+				sercon_started = false;
+			}
+
 			usb_auto_start_state = UsbAutoStartState::disconnected;
 			break;
 		}

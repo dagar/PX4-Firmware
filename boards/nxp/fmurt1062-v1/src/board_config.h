@@ -378,7 +378,7 @@
  */
 
 #define BOARD_ADC_USB_VALID     (!px4_arch_gpioread(GPIO_nVDD_USB_VALID))
-#define BOARD_ADC_USB_CONNECTED (board_read_VBUS_state() == 0)
+#define BOARD_ADC_USB_CONNECTED (board_read_VBUS_state() == 1)
 
 /* FMUv5 never powers odd the Servo rail */
 

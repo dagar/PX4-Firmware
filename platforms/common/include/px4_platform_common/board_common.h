@@ -508,7 +508,9 @@ static inline bool board_rc_invert_input(const char *device, bool invert) { retu
  *   None
  *
  * Returned Value:
- *   0 if connected.
+ *  -1 if not supported
+ *   0 if disconnected
+ *   1 if connected
  *
  ************************************************************************************/
 

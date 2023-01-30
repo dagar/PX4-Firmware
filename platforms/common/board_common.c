@@ -43,12 +43,16 @@
  * Public Functions
  ****************************************************************************/
 
-#if defined(GPIO_OTGFS_VBUS) && \
-    (defined(CONFIG_BUILD_FLAT) || !defined(__PX4_NUTTX))
+#if defined(__PX4_NUTTX) && defined(CONFIG_BUILD_FLAT)
 
-/* Default implementation for POSIX and flat NUTTX if the VBUS pin exists */
 int board_read_VBUS_state(void)
 {
-	return (px4_arch_gpioread(GPIO_OTGFS_VBUS) ? 0 : 1);
+# if defined(GPIO_OTGFS_VBUS)
+	/* Default implementation for flat NuttX if the VBUS pin exists */
+	return px4_arch_gpioread(GPIO_OTGFS_VBUS);
+# else
+	return -1;
+# endif /* GPIO_OTGFS_VBUS */
 }
-#endif
+
+#endif /* NUTTX && CONFIG_BUILD_FLAT */
