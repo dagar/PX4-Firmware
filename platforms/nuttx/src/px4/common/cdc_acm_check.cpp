@@ -77,6 +77,11 @@ __END_DECLS
 static struct work_s usb_serial_work;
 static bool vbus_present_prev = false;
 static int ttyacm_fd = -1;
+
+static uint64_t ttyacm_fd_open_time = 0;
+static uint64_t time_last_0_bytes_available = 0;
+static int total_bytes_read = 0;
+
 static bool sercon_started = false;
 
 enum class UsbAutoStartState {
@@ -90,13 +95,14 @@ enum class UsbAutoStartState {
 static void board_usb_cdcacm_check(void *arg)
 {
 	int rescheduled = -1;
+	clock_t reschedule_delay = USEC2TICK(1000000);
 
 	uORB::SubscriptionData<actuator_armed_s> actuator_armed_sub{ORB_ID(actuator_armed)};
 
 	const bool armed = actuator_armed_sub.get().armed;
 
 	const int vbus_state = board_read_VBUS_state();
-	bool vbus_present = (vbus_state == 0);
+	bool vbus_present = (vbus_state == 1);
 	const bool vbus_unavailable = (vbus_state == -1);
 
 	bool locked_out = false;
@@ -120,20 +126,20 @@ static void board_usb_cdcacm_check(void *arg)
 	if (!armed && !locked_out) {
 		switch (usb_auto_start_state) {
 		case UsbAutoStartState::disconnected:
-			if (::access(USB_DEVICE_PATH, R_OK) == 0) {
-				// USB device already exists, no need to start sercon
+			if (!sercon_started && (::access(USB_DEVICE_PATH, R_OK) == 0)) {
+				// USB device already exists (sercon started externally), no need to start sercon
 				usb_auto_start_state = UsbAutoStartState::connecting;
 
 			} else if ((vbus_present && vbus_present_prev) || vbus_unavailable) {
 				if (sercon_main(0, nullptr) == EXIT_SUCCESS) {
 					sercon_started = true;
 					usb_auto_start_state = UsbAutoStartState::connecting;
-					rescheduled = work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, nullptr, USEC2TICK(100000));
+					reschedule_delay = USEC2TICK(100000);
 				}
 
 			} else if (vbus_present && !vbus_present_prev) {
 				// check again sooner if USB just connected
-				rescheduled = work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, nullptr, USEC2TICK(100000));
+				reschedule_delay = USEC2TICK(100000);
 			}
 
 			break;
@@ -142,11 +148,78 @@ static void board_usb_cdcacm_check(void *arg)
 			if ((vbus_present && vbus_present_prev) || vbus_unavailable) {
 				if (ttyacm_fd < 0) {
 					ttyacm_fd = ::open(USB_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
+
+					if (ttyacm_fd >= 0) {
+						ttyacm_fd_open_time = hrt_absolute_time();
+						total_bytes_read = 0;
+					}
 				}
 
 				if (ttyacm_fd >= 0) {
 					int bytes_available = 0;
 					int retval = ::ioctl(ttyacm_fd, FIONREAD, &bytes_available);
+
+
+					// TODO: FIONREAD >= MAVLINK_COMMAND_LONG_MIN_LENGTH
+
+					// TODO: FIONREAD >= MAVLINK_HEARTBEAT_MIN_LENGTH
+
+					// TODO: FIONREAD, 3 newlines, or 4 bytes for ubx?
+					//    - ONLY 3 new lines in 1 second
+
+					// TODO: IF NO TRAFFIC AT ALL
+
+
+					if (retval == OK) {
+						if (bytes_available == 0) {
+							if (time_last_0_bytes_available == 0) {
+								time_last_0_bytes_available = hrt_absolute_time();
+
+							} else {
+								if (hrt_elapsed_time(&time_last_0_bytes_available) > 6'000'000) {
+									syslog(LOG_INFO, "USB: no traffic for 6 seconds\n");
+									time_last_0_bytes_available = 0;
+
+
+									// cleanup serial port
+									close(ttyacm_fd);
+									ttyacm_fd = -1;
+
+									syslog(LOG_INFO, "%s: launching microdds_client\n", USB_DEVICE_PATH);
+
+									// microdds_client start -t serial -d /dev/ttyACM0
+									static const char *microdds_argv[] {"microdds_client", "start", "-t", "serial", "-d", USB_DEVICE_PATH, nullptr};
+
+									char **exec_argv = (char **)microdds_argv;
+
+									sched_lock();
+
+									if (exec_builtin(exec_argv[0], exec_argv, nullptr, 0) > 0) {
+										usb_auto_start_state = UsbAutoStartState::connected;
+
+									} else {
+										usb_auto_start_state = UsbAutoStartState::disconnecting;
+									}
+
+									sched_unlock();
+
+								}
+							}
+
+						} else {
+							time_last_0_bytes_available = 0;
+						}
+
+					} else {
+						// cleanup, try again next time
+						if (ttyacm_fd >= 0) {
+							close(ttyacm_fd);
+							ttyacm_fd = -1;
+						}
+					}
+
+
+
 
 					if ((retval == OK) && (bytes_available >= 3)) {
 						char buffer[80];
@@ -154,7 +227,7 @@ static void board_usb_cdcacm_check(void *arg)
 						// non-blocking read
 						int nread = ::read(ttyacm_fd, buffer, sizeof(buffer));
 
-#if defined(DEBUG_BUILD)
+#if 1 || defined(DEBUG_BUILD)
 
 						if (nread > 0) {
 							fprintf(stderr, "%d bytes\n", nread);
@@ -170,6 +243,8 @@ static void board_usb_cdcacm_check(void *arg)
 
 
 						if (nread > 0) {
+							total_bytes_read += nread;
+
 							// Mavlink reboot/shutdown command
 							// COMMAND_LONG (#76) with command MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN (246)
 							static constexpr int MAVLINK_COMMAND_LONG_MIN_LENGTH = 41;
@@ -280,7 +355,7 @@ static void board_usb_cdcacm_check(void *arg)
 								}
 							}
 
-#endif
+#endif // CONFIG_SERIAL_PASSTHRU_UBLOX
 
 							if (launch_mavlink || launch_nshterm || launch_passthru) {
 
@@ -300,7 +375,7 @@ static void board_usb_cdcacm_check(void *arg)
 								static const char *gps_argv[] {"gps", "stop", nullptr};
 
 								static const char *passthru_argv[] {"serial_passthru", "start", "-t", "-b", baudstring, "-e", USB_DEVICE_PATH, "-d", SERIAL_PASSTHRU_UBLOX_DEV,   nullptr};
-#endif
+#endif // CONFIG_SERIAL_PASSTHRU_UBLOX
 								char **exec_argv = nullptr;
 
 								if (launch_nshterm) {
@@ -320,7 +395,7 @@ static void board_usb_cdcacm_check(void *arg)
 									exec_argv = (char **)passthru_argv;
 								}
 
-#endif
+#endif // CONFIG_SERIAL_PASSTHRU_UBLOX
 
 								sched_lock();
 
@@ -350,6 +425,8 @@ static void board_usb_cdcacm_check(void *arg)
 			break;
 
 		case UsbAutoStartState::connected:
+
+			// check if device exists?
 			if (!vbus_present && !vbus_present_prev && !vbus_unavailable) {
 				sched_lock();
 				static const char app[] {"mavlink"};
@@ -378,10 +455,9 @@ static void board_usb_cdcacm_check(void *arg)
 	vbus_present_prev = vbus_present;
 
 	if (rescheduled != PX4_OK) {
-		work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, NULL, USEC2TICK(1000000));
+		work_queue(LPWORK, &usb_serial_work, board_usb_cdcacm_check, NULL, reschedule_delay);
 	}
 }
-
 
 void cdcacm_init(void)
 {

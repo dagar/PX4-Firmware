@@ -578,6 +578,8 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const FLOW_CON
 	/* open uart */
 	_uart_fd = ::open(uart_name, O_RDWR | O_NOCTTY);
 
+	// TODO: ENOTCONN for USB?
+
 	/*
 	 * Return here in the iridium mode since the iridium driver does not
 	 * support the subsequent function calls.
