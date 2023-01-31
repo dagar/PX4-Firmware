@@ -95,7 +95,7 @@ int PCA9685::init()
 	return PX4_OK;
 }
 
-int PCA9685::updatePWM(const uint16_t *outputs, unsigned num_outputs)
+int PCA9685::updatePWM(const float outputs[PCA9685_PWM_CHANNEL_COUNT], unsigned num_outputs)
 {
 	if (num_outputs > PCA9685_PWM_CHANNEL_COUNT) {
 		num_outputs = PCA9685_PWM_CHANNEL_COUNT;
@@ -103,7 +103,10 @@ int PCA9685::updatePWM(const uint16_t *outputs, unsigned num_outputs)
 	}
 
 	uint16_t out[PCA9685_PWM_CHANNEL_COUNT];
-	memcpy(out, outputs, sizeof(uint16_t) * num_outputs);
+
+	for (unsigned i = 0; i < num_outputs; ++i) {
+		out[i] = (uint16_t)roundl((outputs[i] * _Freq * PCA9685_PWM_RES / (float)1e6)); // convert us to 12 bit resolution
+	}
 
 	for (unsigned i = 0; i < num_outputs; ++i) {
 		out[i] = calcRawFromPulse(out[i]);

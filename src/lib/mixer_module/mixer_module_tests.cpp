@@ -87,7 +87,7 @@ public:
 		was_scheduled = true;
 	}
 
-	bool updateOutputs(bool stop_motors, uint16_t outputs_[MAX_ACTUATORS],
+	bool updateOutputs(bool stop_motors, float outputs_[MAX_ACTUATORS],
 			   unsigned num_outputs_, unsigned num_control_groups_updated) override
 	{
 		memcpy(outputs, outputs_, sizeof(outputs));
@@ -168,7 +168,7 @@ public:
 		mixer_changed = false;
 	}
 
-	uint16_t outputs[MAX_ACTUATORS] {};
+	float outputs[MAX_ACTUATORS] {};
 	int num_outputs{0};
 	int num_updates{0};
 	bool was_scheduled{false};
@@ -454,10 +454,10 @@ TEST_F(MixerModuleTest, prearm)
 
 	for (int i = 0; i < max_num_outputs; ++i) {
 		if (i == 1) {
-			EXPECT_EQ(test_module.outputs[i], max_value);
+			EXPECT_FLOAT_EQ(test_module.outputs[i], max_value);
 
 		} else {
-			EXPECT_EQ(test_module.outputs[i], disarmed_value);
+			EXPECT_FLOAT_EQ(test_module.outputs[i], disarmed_value);
 		}
 	}
 
