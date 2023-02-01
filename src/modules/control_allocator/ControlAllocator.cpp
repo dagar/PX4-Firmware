@@ -388,6 +388,29 @@ ControlAllocator::Run()
 
 		check_for_motor_failures();
 
+
+		for (auto &sub : _actuator_outputs_subs) {
+			actuator_outputs_s actuator_outputs;
+
+			if (sub.update(&actuator_outputs)) {
+
+
+				//_control_allocation[i]->setActuatorMin(minimum[i]);
+				//_control_allocation[i]->setActuatorMax(maximum[i]);
+
+				// actuator_outputs.function to motors and servos
+
+				// treat like motor failure
+
+				// check time of last actuator update? -handle timeout
+
+			}
+		}
+
+
+
+
+
 		update_effectiveness_matrix_if_needed(EffectivenessUpdateReason::NO_EXTERNAL_UPDATE);
 
 		// Set control setpoint vector(s)
@@ -637,11 +660,9 @@ void
 ControlAllocator::publish_actuator_controls()
 {
 	actuator_motors_s actuator_motors;
-	actuator_motors.timestamp = hrt_absolute_time();
 	actuator_motors.timestamp_sample = _timestamp_sample;
 
 	actuator_servos_s actuator_servos;
-	actuator_servos.timestamp = actuator_motors.timestamp;
 	actuator_servos.timestamp_sample = _timestamp_sample;
 
 	actuator_motors.reversible_flags = _param_r_rev.get();
@@ -671,6 +692,7 @@ ControlAllocator::publish_actuator_controls()
 		actuator_motors.control[i] = NAN;
 	}
 
+	actuator_motors.timestamp = hrt_absolute_time();
 	_actuator_motors_pub.publish(actuator_motors);
 
 	// servos
@@ -689,6 +711,7 @@ ControlAllocator::publish_actuator_controls()
 			actuator_servos.control[i] = NAN;
 		}
 
+		actuator_servos.timestamp = hrt_absolute_time();
 		_actuator_servos_pub.publish(actuator_servos);
 	}
 }

@@ -667,6 +667,41 @@ MixingOutput::setAndPublishActuatorOutputs(unsigned num_outputs, actuator_output
 		actuator_outputs.output[i] = _current_output_value[i];
 	}
 
+	strcpy(actuator_outputs.prefix, _param_prefix);
+
+	for (size_t i = 0; i < num_outputs; ++i) {
+		actuator_outputs.function[i] = static_cast<uint16_t>(_function_assignment[i]);
+
+		float range = _max_value[i] - _min_value[i];
+
+		if (_reversible_mask & (1 << i)) {
+			// per-output bits. If set, the output is configured to be reversible (motors only)
+			actuator_outputs.min[i] = -1.f;
+
+			actuator_outputs.setpoint[i] = _current_output_value[i] / (range * 0.5f);
+
+		} else {
+			actuator_outputs.min[i] = 0.f;
+
+			actuator_outputs.setpoint[i] = _current_output_value[i] / range;
+		}
+
+		actuator_outputs.max[i] = 1.f;
+	}
+
+#if 0
+
+	if (_reverse_output_mask & (1 << i)) {
+		value = -1.f * value;
+	}
+
+	uint16_t effective_output = value * (_max_value[i] - _min_value[i]) / 2 + (_max_value[i] + _min_value[i]) / 2;
+
+	// last line of defense against invalid inputs
+	return math::constrain(effective_output, _min_value[i], _max_value[i]);
+#endif
+
+
 	actuator_outputs.timestamp = hrt_absolute_time();
 	_outputs_pub.publish(actuator_outputs);
 }

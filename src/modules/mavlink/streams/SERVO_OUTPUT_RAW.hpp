@@ -77,8 +77,6 @@ private:
 		if (_act_sub.update(&act)) {
 			mavlink_servo_output_raw_t msg{};
 
-			static_assert(sizeof(act.output) / sizeof(act.output[0]) >= 16, "mavlink message requires at least 16 outputs");
-
 			msg.time_usec = act.timestamp;
 			msg.port = N;
 			msg.servo1_raw = act.output[0];
@@ -93,10 +91,11 @@ private:
 			msg.servo10_raw = act.output[9];
 			msg.servo11_raw = act.output[10];
 			msg.servo12_raw = act.output[11];
-			msg.servo13_raw = act.output[12];
-			msg.servo14_raw = act.output[13];
-			msg.servo15_raw = act.output[14];
-			msg.servo16_raw = act.output[15];
+			// msg.servo13_raw = act.output[12];
+			// msg.servo14_raw = act.output[13];
+			// msg.servo15_raw = act.output[14];
+			// msg.servo16_raw = act.output[15];
+			//static_assert(sizeof(act.output) / sizeof(act.output[0]) >= 16, "mavlink message requires at least 16 outputs");
 
 			mavlink_msg_servo_output_raw_send_struct(_mavlink->get_channel(), &msg);
 
