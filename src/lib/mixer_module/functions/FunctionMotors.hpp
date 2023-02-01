@@ -62,7 +62,7 @@ public:
 	void update() override
 	{
 		if (_topic.update(&_data)) {
-			updateValues(_data.reversible_flags, _thrust_factor, _data.control, actuator_motors_s::NUM_CONTROLS);
+			updateValues(_thrust_factor, _data.control, actuator_motors_s::NUM_CONTROLS);
 		}
 	}
 
@@ -74,7 +74,7 @@ public:
 
 	bool getLatestSampleTimestamp(hrt_abstime &t) const override { t = _data.timestamp_sample; return t != 0; }
 
-	static inline void updateValues(uint32_t reversible, float thrust_factor, float *values, int num_values)
+	static inline void updateValues(float thrust_factor, float *values, int num_values)
 	{
 		if (thrust_factor > 0.f && thrust_factor <= 1.f) {
 			// thrust factor
@@ -101,20 +101,19 @@ public:
 			}
 		}
 
-		for (int i = 0; i < num_values; ++i) {
-			if ((reversible & (1u << i)) == 0) {
-				if (values[i] < -FLT_EPSILON) {
-					values[i] = NAN;
+		// TODO: [0, 1] vs [-1, 1]
+		// for (int i = 0; i < num_values; ++i) {
+		// 	if ((reversible & (1u << i)) == 0) {
+		// 		if (values[i] < -FLT_EPSILON) {
+		// 			values[i] = NAN;
 
-				} else {
-					// remap from [0, 1] to [-1, 1]
-					values[i] = values[i] * 2.f - 1.f;
-				}
-			}
-		}
+		// 		} else {
+		// 			// remap from [0, 1] to [-1, 1]
+		// 			values[i] = values[i] * 2.f - 1.f;
+		// 		}
+		// 	}
+		// }
 	}
-
-	bool reversible(OutputFunction func) const override { return _data.reversible_flags & (1u << ((int)func - (int)OutputFunction::Motor1)); }
 
 private:
 	uORB::SubscriptionCallbackWorkItem _topic;

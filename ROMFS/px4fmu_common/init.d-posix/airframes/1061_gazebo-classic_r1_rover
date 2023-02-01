@@ -29,7 +29,6 @@ param set-default GND_WHEEL_BASE 2.0
 
 param set-default CA_AIRFRAME 6
 
-param set-default CA_R_REV 3
 param set-default PWM_MAIN_FUNC1 101
 param set-default PWM_MAIN_FUNC2 101
 param set-default PWM_MAIN_FUNC6 102

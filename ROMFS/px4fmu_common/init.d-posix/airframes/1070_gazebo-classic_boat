@@ -40,7 +40,6 @@ param set-default CA_ROTOR1_AZ 0
 param set-default CA_ROTOR1_KM 0
 param set-default CA_ROTOR1_PX -2
 param set-default CA_ROTOR1_PY 1
-param set-default CA_R_REV 3
 
 param set-default PWM_MAIN_FUNC1 101
 param set-default PWM_MAIN_FUNC2 102

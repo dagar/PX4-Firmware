@@ -448,7 +448,8 @@ bool MixingOutput::update()
 				outputs[i] = NAN;
 			}
 
-			_reversible_mask |= (uint32_t)_functions[i]->reversible(_function_assignment[i]) << i;
+			// TODO: reversible
+			//_reversible_mask |= (uint32_t)_functions[i]->reversible(_function_assignment[i]) << i;
 
 		} else {
 			outputs[i] = NAN;

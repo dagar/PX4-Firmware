@@ -2,8 +2,6 @@
 uint64 timestamp			# time since system start (microseconds)
 uint64 timestamp_sample	    # the timestamp the data this control response is based on was sampled
 
-uint16 reversible_flags     # bitset which motors are configured to be reversible
-
 uint8 ACTUATOR_FUNCTION_MOTOR1 = 101
 
 uint8 NUM_CONTROLS = 12

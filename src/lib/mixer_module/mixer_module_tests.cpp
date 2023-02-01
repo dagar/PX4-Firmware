@@ -116,13 +116,12 @@ public:
 	void sendMotors(const std::array<float, actuator_motors_s::NUM_CONTROLS> &motors, uint16_t reversible = 0)
 	{
 		actuator_motors_s actuator_motors{};
-		actuator_motors.timestamp = hrt_absolute_time();
-		actuator_motors.reversible_flags = reversible;
 
 		for (unsigned i = 0; i < motors.size(); ++i) {
 			actuator_motors.control[i] = motors[i];
 		}
 
+		actuator_motors.timestamp = hrt_absolute_time();
 		_actuator_motors_pub.publish(actuator_motors);
 	}
 

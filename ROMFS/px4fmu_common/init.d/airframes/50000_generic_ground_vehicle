@@ -45,10 +45,7 @@ param set-default NAV_ACC_RAD 0.5
 
 param set-default CA_AIRFRAME 5
 
-param set-default CA_R_REV 1
 param set-default PWM_MAIN_FUNC1 201
 param set-default PWM_MAIN_FUNC2 201
 param set-default PWM_MAIN_FUNC6 101
 param set-default PWM_MAIN_FUNC7 101
-
-

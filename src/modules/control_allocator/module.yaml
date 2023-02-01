@@ -44,26 +44,6 @@ parameters:
             default: 2
 
         # Motor parameters
-        CA_R_REV:
-            description:
-                short: Bidirectional/Reversible motors
-                long: |
-                  Configure motors to be bidirectional/reversible. Note that the output driver needs to support this as well.
-            type: bitmask
-            bit:
-                0: Motor 1
-                1: Motor 2
-                2: Motor 3
-                3: Motor 4
-                4: Motor 5
-                5: Motor 6
-                6: Motor 7
-                7: Motor 8
-                8: Motor 9
-                9: Motor 10
-                10: Motor 11
-                11: Motor 12
-            default: 0
         CA_R${i}_SLEW:
             description:
                 short: Motor ${i} slew rate limit
@@ -506,11 +486,6 @@ mixer:
                 max: 1
                 default_is_nan: true
             per_item_parameters:
-              - name: 'CA_R_REV'
-                label: 'Bidirectional'
-                show_as: 'bitset'
-                index_offset: 0
-                advanced: true
               - name: 'CA_R${i}_SLEW'
                 label: 'Slew Rate'
                 index_offset: 0

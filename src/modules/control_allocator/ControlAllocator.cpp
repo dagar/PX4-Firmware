@@ -516,12 +516,14 @@ ControlAllocator::update_effectiveness_matrix_if_needed(EffectivenessUpdateReaso
 						break;
 					}
 
-					if (_param_r_rev.get() & (1u << actuator_type_idx)) {
-						minimum[selected_matrix](actuator_idx_matrix[selected_matrix]) = -1.f;
+					// TODO: from actuator_outputs
+					// if (_param_r_rev.get() & (1u << actuator_type_idx)) {
+					// 	minimum[selected_matrix](actuator_idx_matrix[selected_matrix]) = -1.f;
 
-					} else {
-						minimum[selected_matrix](actuator_idx_matrix[selected_matrix]) = 0.f;
-					}
+					// } else {
+					// 	minimum[selected_matrix](actuator_idx_matrix[selected_matrix]) = 0.f;
+					// }
+					minimum[selected_matrix](actuator_idx_matrix[selected_matrix]) = 0.f;
 
 					slew_rate[selected_matrix](actuator_idx_matrix[selected_matrix]) = _params.slew_rate_motors[actuator_type_idx];
 
@@ -664,8 +666,6 @@ ControlAllocator::publish_actuator_controls()
 
 	actuator_servos_s actuator_servos;
 	actuator_servos.timestamp_sample = _timestamp_sample;
-
-	actuator_motors.reversible_flags = _param_r_rev.get();
 
 	int actuator_idx = 0;
 	int actuator_idx_matrix[ActuatorEffectiveness::MAX_NUM_MATRICES] {};
