@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@
 #include "MulticopterPositionControl.hpp"
 
 #include <float.h>
+#include <lib/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
 #include <lib/matrix/matrix/math.hpp>
 #include <px4_platform_common/events.h>
@@ -257,9 +258,11 @@ void MulticopterPositionControl::parameters_update(bool force)
 		_param_mpc_tko_speed.set(math::min(_param_mpc_tko_speed.get(), _param_mpc_z_vel_max_up.get()));
 		_param_mpc_land_speed.set(math::min(_param_mpc_land_speed.get(), _param_mpc_z_vel_max_dn.get()));
 
-		_takeoff.setSpoolupTime(_param_com_spoolup_time.get());
-		_takeoff.setTakeoffRampTime(_param_mpc_tko_ramp_t.get());
-		_takeoff.generateInitialRampValue(_param_mpc_z_vel_p_acc.get());
+		_spoolup_time_hysteresis.set_hysteresis_time_from(false, _param_com_spoolup_time.get() * 1_s);
+		_takeoff_ramp_time = _param_mpc_tko_ramp_t.get();
+
+		// generate initial ramp value
+		_takeoff_ramp_vz_init = -CONSTANTS_ONE_G / math::max(_param_mpc_z_vel_p_acc.get(), 0.01f);
 	}
 }
 
@@ -467,12 +470,65 @@ void MulticopterPositionControl::Run()
 			}
 
 			// handle smooth takeoff
-			_takeoff.updateTakeoffState(_vehicle_control_mode.flag_armed, _vehicle_land_detected.landed,
-						    _vehicle_constraints.want_takeoff,
-						    _vehicle_constraints.speed_up, false, vehicle_local_position.timestamp_sample);
+			_spoolup_time_hysteresis.set_state_and_update(_vehicle_control_mode.flag_armed,
+					vehicle_local_position.timestamp_sample);
 
-			const bool not_taken_off             = (_takeoff.getTakeoffState() < TakeoffState::rampup);
-			const bool flying                    = (_takeoff.getTakeoffState() >= TakeoffState::flight);
+			switch (_takeoff_state) {
+			case TakeoffState::disarmed:
+				if (_vehicle_control_mode.flag_armed) {
+					_takeoff_state = TakeoffState::spoolup;
+
+				} else {
+					break;
+				}
+
+			// FALLTHROUGH
+			case TakeoffState::spoolup:
+				if (_spoolup_time_hysteresis.get_state()) {
+					_takeoff_state = TakeoffState::ready_for_takeoff;
+
+				} else {
+					break;
+				}
+
+			// FALLTHROUGH
+			case TakeoffState::ready_for_takeoff:
+				if (_vehicle_constraints.want_takeoff) {
+					_takeoff_state = TakeoffState::rampup;
+					_takeoff_ramp_progress = 0.f;
+
+				} else {
+					break;
+				}
+
+			// FALLTHROUGH
+			case TakeoffState::rampup:
+				if (_takeoff_ramp_progress >= 1.f) {
+					_takeoff_state = TakeoffState::flight;
+
+				} else {
+					break;
+				}
+
+			// FALLTHROUGH
+			case TakeoffState::flight:
+				if (_vehicle_land_detected.landed) {
+					_takeoff_state = TakeoffState::ready_for_takeoff;
+				}
+
+				break;
+
+			default:
+				break;
+			}
+
+			// TODO: need to consider free fall here
+			if (!_vehicle_control_mode.flag_armed) {
+				_takeoff_state = TakeoffState::disarmed;
+			}
+
+			const bool not_taken_off             = (_takeoff_state < TakeoffState::rampup);
+			const bool flying                    = (_takeoff_state >= TakeoffState::flight);
 			const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
 
 			if (!flying) {
@@ -480,7 +536,7 @@ void MulticopterPositionControl::Run()
 			}
 
 			// make sure takeoff ramp is not amended by acceleration feed-forward
-			if (_takeoff.getTakeoffState() == TakeoffState::rampup && PX4_ISFINITE(_setpoint.velocity[2])) {
+			if (_takeoff_state == TakeoffState::rampup && PX4_ISFINITE(_setpoint.velocity[2])) {
 				_setpoint.acceleration[2] = NAN;
 			}
 
@@ -495,12 +551,39 @@ void MulticopterPositionControl::Run()
 			}
 
 			// limit tilt during takeoff ramupup
-			const float tilt_limit_deg = (_takeoff.getTakeoffState() < TakeoffState::flight)
+			const float tilt_limit_deg = (_takeoff_state < TakeoffState::flight)
 						     ? _param_mpc_tiltmax_lnd.get() : _param_mpc_tiltmax_air.get();
 			_control.setTiltLimit(_tilt_limit_slew_rate.update(math::radians(tilt_limit_deg), dt));
 
-			const float speed_up = _takeoff.updateRamp(dt,
-					       PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up : _param_mpc_z_vel_max_up.get());
+
+			const float takeoff_desired_vz = PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up :
+							 _param_mpc_z_vel_max_up.get();
+
+			float upwards_velocity_limit = takeoff_desired_vz;
+
+			if (_takeoff_state < TakeoffState::rampup) {
+				upwards_velocity_limit = _takeoff_ramp_vz_init;
+			}
+
+			if (_takeoff_state == TakeoffState::rampup) {
+				if (_takeoff_ramp_time > dt) {
+					_takeoff_ramp_progress += dt / _takeoff_ramp_time;
+
+				} else {
+					_takeoff_ramp_progress = 1.f;
+				}
+
+				if (_takeoff_ramp_progress < 1.f) {
+					upwards_velocity_limit = _takeoff_ramp_vz_init + _takeoff_ramp_progress * (takeoff_desired_vz - _takeoff_ramp_vz_init);
+				}
+			}
+
+			const float speed_up = upwards_velocity_limit;
+
+
+
+
+
 			const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
 						 _param_mpc_z_vel_max_dn.get();
 
@@ -563,12 +646,16 @@ void MulticopterPositionControl::Run()
 
 		} else {
 			// an update is necessary here because otherwise the takeoff state doesn't get skipped with non-altitude-controlled modes
-			_takeoff.updateTakeoffState(_vehicle_control_mode.flag_armed, _vehicle_land_detected.landed, false, 10.f, true,
-						    vehicle_local_position.timestamp_sample);
+			if (_vehicle_control_mode.flag_armed) {
+				_takeoff_state = TakeoffState::flight;
+
+			} else {
+				_takeoff_state = TakeoffState::disarmed;
+			}
 		}
 
 		// Publish takeoff status
-		const uint8_t takeoff_state = static_cast<uint8_t>(_takeoff.getTakeoffState());
+		const uint8_t takeoff_state = static_cast<uint8_t>(_takeoff_state);
 
 		if (takeoff_state != _takeoff_status_pub.get().takeoff_state
 		    || !isEqualF(_tilt_limit_slew_rate.getState(), _takeoff_status_pub.get().tilt_limit)) {

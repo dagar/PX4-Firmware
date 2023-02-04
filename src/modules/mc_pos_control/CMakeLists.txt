@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015-2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2015-2023 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@
 ############################################################################
 
 add_subdirectory(PositionControl)
-add_subdirectory(Takeoff)
 
 px4_add_module(
 	MODULE modules__mc_pos_control
@@ -43,7 +42,6 @@ px4_add_module(
 		MulticopterPositionControl.hpp
 	DEPENDS
 		PositionControl
-		Takeoff
 		controllib
 		geo
 		SlewRate
