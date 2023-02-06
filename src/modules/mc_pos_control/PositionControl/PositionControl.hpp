@@ -184,6 +184,8 @@ public:
 	 */
 	static const trajectory_setpoint_s empty_trajectory_setpoint;
 
+	const matrix::Vector3f &throttleSetpoint() const { return _thr_sp; }
+
 private:
 	bool _inputValid();
 

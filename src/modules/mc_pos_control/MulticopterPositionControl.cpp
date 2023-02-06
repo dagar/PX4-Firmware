@@ -469,12 +469,23 @@ void MulticopterPositionControl::Run()
 				_vehicle_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
 			}
 
+			const float takeoff_desired_vz = PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up :
+							 _param_mpc_z_vel_max_up.get();
+
+			float upwards_velocity_limit = takeoff_desired_vz;
+
+
 			// handle smooth takeoff
 			_spoolup_time_hysteresis.set_state_and_update(_vehicle_control_mode.flag_armed,
 					vehicle_local_position.timestamp_sample);
 
 			switch (_takeoff_state) {
 			case TakeoffState::disarmed:
+				_control.setHoverThrust(_param_mpc_thr_hover.get());
+				_control.setThrustLimits(0.f, _param_mpc_thr_max.get());
+
+				upwards_velocity_limit = _takeoff_ramp_vz_init;
+
 				if (_vehicle_control_mode.flag_armed) {
 					_takeoff_state = TakeoffState::spoolup;
 
@@ -484,6 +495,11 @@ void MulticopterPositionControl::Run()
 
 			// FALLTHROUGH
 			case TakeoffState::spoolup:
+				_control.setHoverThrust(_param_mpc_thr_hover.get());
+				_control.setThrustLimits(0.f, _param_mpc_thr_max.get());
+
+				upwards_velocity_limit = _takeoff_ramp_vz_init;
+
 				if (_spoolup_time_hysteresis.get_state()) {
 					_takeoff_state = TakeoffState::ready_for_takeoff;
 
@@ -493,6 +509,11 @@ void MulticopterPositionControl::Run()
 
 			// FALLTHROUGH
 			case TakeoffState::ready_for_takeoff:
+				_control.setHoverThrust(_param_mpc_thr_hover.get());
+				_control.setThrustLimits(0.f, _param_mpc_thr_max.get());
+
+				upwards_velocity_limit = _takeoff_ramp_vz_init;
+
 				if (_vehicle_constraints.want_takeoff) {
 					_takeoff_state = TakeoffState::rampup;
 					_takeoff_ramp_progress = 0.f;
@@ -503,6 +524,28 @@ void MulticopterPositionControl::Run()
 
 			// FALLTHROUGH
 			case TakeoffState::rampup:
+				_control.setHoverThrust(_param_mpc_thr_hover.get());
+				_control.setThrustLimits(0.f, _param_mpc_thr_max.get());
+
+				// make sure takeoff ramp is not amended by acceleration feed-forward
+				if (PX4_ISFINITE(_setpoint.velocity[2])) {
+					_setpoint.acceleration[2] = NAN;
+				}
+
+				if (_takeoff_ramp_time > dt) {
+					_takeoff_ramp_progress += dt / _takeoff_ramp_time;
+
+				} else {
+					_takeoff_ramp_progress = 1.f;
+				}
+
+				if (_takeoff_ramp_progress < 1.f) {
+					upwards_velocity_limit = _takeoff_ramp_vz_init + _takeoff_ramp_progress * (takeoff_desired_vz - _takeoff_ramp_vz_init);
+
+				} else {
+					upwards_velocity_limit = _takeoff_ramp_vz_init;
+				}
+
 				if (_takeoff_ramp_progress >= 1.f) {
 					_takeoff_state = TakeoffState::flight;
 
@@ -511,10 +554,35 @@ void MulticopterPositionControl::Run()
 				}
 
 			// FALLTHROUGH
-			case TakeoffState::flight:
-				if (_vehicle_land_detected.landed) {
-					_takeoff_state = TakeoffState::ready_for_takeoff;
+			case TakeoffState::flight: {
+					_control.setThrustLimits(_param_mpc_thr_min.get(), _param_mpc_thr_max.get());
+
+
+					const float vertical_velocity_threshold = 1.f;
+					const bool vertical_movement = (fabsf(vehicle_local_position.vz) > vertical_velocity_threshold);
+					const Vector2f v_xy{vehicle_local_position.vx, vehicle_local_position.vy};
+					const float lndmc_xy_vel_max = 3.f;
+					const bool horizontal_movement = v_xy.longerThan(lndmc_xy_vel_max);
+
+					//const float lndmc_z_vel_max = 1.f;
+					//const bool in_descend = PX4_ISFINITE(_setpoint.velocity[2]) && (_setpoint.velocity[2] >= 1.1f * lndmc_z_vel_max);
+
+					// TODO: hover thrust estimate
+					const bool has_low_throttle = (_control.throttleSetpoint().norm() < _param_mpc_thr_hover.get());
+
+					if (has_low_throttle && !horizontal_movement && !vertical_movement) {
+						_takeoff_state = TakeoffState::ground_contact;
+					}
+
+
+					if (_vehicle_land_detected.landed) {
+						_takeoff_state = TakeoffState::ready_for_takeoff;
+					}
 				}
+
+				break;
+
+			case TakeoffState::ground_contact:
 
 				break;
 
@@ -531,14 +599,6 @@ void MulticopterPositionControl::Run()
 			const bool flying                    = (_takeoff_state >= TakeoffState::flight);
 			const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
 
-			if (!flying) {
-				_control.setHoverThrust(_param_mpc_thr_hover.get());
-			}
-
-			// make sure takeoff ramp is not amended by acceleration feed-forward
-			if (_takeoff_state == TakeoffState::rampup && PX4_ISFINITE(_setpoint.velocity[2])) {
-				_setpoint.acceleration[2] = NAN;
-			}
 
 			if (not_taken_off || flying_but_ground_contact) {
 				// we are not flying yet and need to avoid any corrections
@@ -555,42 +615,9 @@ void MulticopterPositionControl::Run()
 						     ? _param_mpc_tiltmax_lnd.get() : _param_mpc_tiltmax_air.get();
 			_control.setTiltLimit(_tilt_limit_slew_rate.update(math::radians(tilt_limit_deg), dt));
 
-
-			const float takeoff_desired_vz = PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up :
-							 _param_mpc_z_vel_max_up.get();
-
-			float upwards_velocity_limit = takeoff_desired_vz;
-
-			if (_takeoff_state < TakeoffState::rampup) {
-				upwards_velocity_limit = _takeoff_ramp_vz_init;
-			}
-
-			if (_takeoff_state == TakeoffState::rampup) {
-				if (_takeoff_ramp_time > dt) {
-					_takeoff_ramp_progress += dt / _takeoff_ramp_time;
-
-				} else {
-					_takeoff_ramp_progress = 1.f;
-				}
-
-				if (_takeoff_ramp_progress < 1.f) {
-					upwards_velocity_limit = _takeoff_ramp_vz_init + _takeoff_ramp_progress * (takeoff_desired_vz - _takeoff_ramp_vz_init);
-				}
-			}
-
 			const float speed_up = upwards_velocity_limit;
-
-
-
-
-
 			const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
 						 _param_mpc_z_vel_max_dn.get();
-
-			// Allow ramping from zero thrust on takeoff
-			const float minimum_thrust = flying ? _param_mpc_thr_min.get() : 0.f;
-
-			_control.setThrustLimits(minimum_thrust, _param_mpc_thr_max.get());
 
 			float max_speed_xy = _param_mpc_xy_vel_max.get();
 

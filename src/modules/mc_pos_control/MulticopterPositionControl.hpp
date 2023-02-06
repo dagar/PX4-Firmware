@@ -90,11 +90,12 @@ private:
 	void Run() override;
 
 	enum class TakeoffState {
-		disarmed = takeoff_status_s::TAKEOFF_STATE_DISARMED,
-		spoolup = takeoff_status_s::TAKEOFF_STATE_SPOOLUP,
+		disarmed          = takeoff_status_s::TAKEOFF_STATE_DISARMED,
+		spoolup           = takeoff_status_s::TAKEOFF_STATE_SPOOLUP,
 		ready_for_takeoff = takeoff_status_s::TAKEOFF_STATE_READY_FOR_TAKEOFF,
-		rampup = takeoff_status_s::TAKEOFF_STATE_RAMPUP,
-		flight = takeoff_status_s::TAKEOFF_STATE_FLIGHT
+		rampup            = takeoff_status_s::TAKEOFF_STATE_RAMPUP,
+		flight            = takeoff_status_s::TAKEOFF_STATE_FLIGHT,
+		ground_contact    = takeoff_status_s::TAKEOFF_STATE_GROUND_CONTACT,
 	};
 
 	orb_advert_t _mavlink_log_pub{nullptr};
