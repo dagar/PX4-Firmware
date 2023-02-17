@@ -90,6 +90,8 @@ public:
 
 	void reset();
 
+	void resetAlignment() { _output_filter_aligned = false; }
+
 	const matrix::Quatf &getQuaternion() const { return _output_new.quat_nominal; }
 
 	// get the velocity of the body frame origin in local NED earth frame
@@ -109,6 +111,71 @@ public:
 		// subtract from the EKF position (which is at the IMU) to get position at the body origin
 		return _output_new.pos - pos_offset_earth;
 	}
+
+
+
+
+
+	void fillQuaternionAndResetDelta(float q[4], float delta_q_reset[4], uint8_t &quat_reset_counter)
+	{
+		_output_new.quat_nominal.copyTo(q);
+		_state_reset_status.quat_change.copyTo(delta_q_reset);
+		quat_reset_counter = _state_reset_status.reset_count.quat;
+
+		// reset
+		_state_reset_count_prev.quat = _state_reset_status.reset_count.quat;
+	}
+
+
+
+	void fillVelocityResetNE(float delta[2], uint8_t &counter)
+	{
+		_state_reset_status.velNE_change.copyTo(delta);
+		counter = _state_reset_status.reset_count.velNE;
+
+		// reset
+		_state_reset_count_prev.velNE = _state_reset_status.reset_count.velNE;
+	}
+	void fillVelocityResetD(float &delta, uint8_t &counter)
+	{
+		delta = _state_reset_status.velD_change;
+		counter = _state_reset_status.reset_count.velD;
+
+		// reset
+		_state_reset_count_prev.velD = _state_reset_status.reset_count.velD;
+	}
+
+
+
+
+	void fillPositionResetNE(float delta[2], uint8_t &counter)
+	{
+		_state_reset_status.posNE_change.copyTo(delta);
+		counter = _state_reset_status.reset_count.posNE;
+
+		// reset
+		_state_reset_count_prev.posNE = _state_reset_status.reset_count.posNE;
+	}
+	void fillPositionResetD(float &delta, uint8_t &counter)
+	{
+		delta = _state_reset_status.posD_change;
+		counter = _state_reset_status.reset_count.posD;
+
+		// reset
+		_state_reset_count_prev.posD = _state_reset_status.reset_count.posD;
+	}
+
+	void fillHeadingReset(float &delta, uint8_t &counter)
+	{
+		delta = _state_reset_status.heading_change;
+		counter = _state_reset_status.reset_count.heading;
+
+		// reset
+		_state_reset_count_prev.heading = _state_reset_status.reset_count.heading;
+	}
+
+
+
 
 	// return an array containing the output predictor angular, velocity and position tracking
 	// error magnitudes (rad), (m/sec), (m)
@@ -170,6 +237,35 @@ private:
 	// output complementary filter tuning
 	float _vel_tau{0.25f};                   ///< velocity state correction time constant (1/sec)
 	float _pos_tau{0.25f};                   ///< position state correction time constant (1/sec)
+
+
+	struct StateResetCounts {
+		uint8_t quat{0};  ///< number of quaternion reset events (allow to wrap if count exceeds 255)
+
+		uint8_t heading{0};
+
+		uint8_t velNE{0}; ///< number of horizontal position reset events (allow to wrap if count exceeds 255)
+		uint8_t velD{0};  ///< number of vertical velocity reset events (allow to wrap if count exceeds 255)
+
+		uint8_t posNE{0}; ///< number of horizontal position reset events (allow to wrap if count exceeds 255)
+		uint8_t posD{0};  ///< number of vertical position reset events (allow to wrap if count exceeds 255)
+	};
+
+	struct StateResets {
+		matrix::Vector2f velNE_change{};       ///< North East velocity change due to last reset (m)
+		float velD_change{};                   ///< Down velocity change due to last reset (m/sec)
+
+		matrix::Vector2f posNE_change{};       ///< North, East position change due to last reset (m)
+		float posD_change{};                   ///< Down position change due to last reset (m)
+
+		matrix::Quatf quat_change{1.f, 0.f, 0.f, 0.f}; ///< quaternion delta due to last reset - multiply pre-reset quaternion by this to get post-reset quaternion
+
+		float heading_change{0.f};
+
+		StateResetCounts reset_count{};
+	} _state_reset_status{}; ///< reset event monitoring structure containing velocity, position, height and yaw reset information
+
+	StateResetCounts _state_reset_count_prev{};
 };
 
 #endif // !EKF_OUTPUT_PREDICTOR_H

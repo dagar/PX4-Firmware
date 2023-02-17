@@ -97,6 +97,34 @@ void OutputPredictor::resetQuaternion(const Quatf &new_quat)
 	_output_new.vel_alternative = quat_change.rotateVector(_output_new.vel_alternative);
 
 	propagateVelocityUpdateToPosition();
+
+
+
+
+	// record the state change (quat_change)
+	if (_state_reset_status.reset_count.quat == _state_reset_count_prev.quat) {
+		_state_reset_status.quat_change = quat_change;
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.quat_change = (quat_change * _state_reset_status.quat_change).normalized();
+	}
+
+	_state_reset_status.reset_count.quat++;
+
+
+	// record the state change (heading)
+	if (_state_reset_status.reset_count.heading == _state_reset_count_prev.heading) {
+		_state_reset_status.heading_change = matrix::Eulerf(quat_change).psi();
+
+	} else {
+		// there's already a reset this update, accumulate total delta
+		_state_reset_status.heading_change = matrix::wrap_pi(matrix::Eulerf(quat_change).psi() -
+						     _state_reset_status.heading_change);
+	}
+
+	_state_reset_status.reset_count.heading++;
+
 }
 
 void OutputPredictor::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
@@ -112,6 +140,17 @@ void OutputPredictor::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
 		}
 
 		_output_new.vel.xy() += delta_vxy;
+
+		// record the state change
+		if (_state_reset_status.reset_count.velNE == _state_reset_count_prev.velNE) {
+			_state_reset_status.velNE_change = delta_vxy;
+
+		} else {
+			// there's already a reset this update, accumulate total delta
+			_state_reset_status.velNE_change += delta_vxy;
+		}
+
+		_state_reset_status.reset_count.velNE++;
 	}
 
 	// horizontal velocity (alternative)
@@ -135,24 +174,35 @@ void OutputPredictor::resetVerticalVelocityTo(const float new_vert_vel)
 
 	// vertical velocity
 	{
-		const float delta_z = new_vert_vel - output_delayed.vel(2);
+		const float delta_vz = new_vert_vel - output_delayed.vel(2);
 
 		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].vel(2) += delta_z;
+			_output_buffer[index].vel(2) += delta_vz;
 		}
 
-		_output_new.vel(2) += delta_z;
+		_output_new.vel(2) += delta_vz;
+
+		// record the state change
+		if (_state_reset_status.reset_count.velD == _state_reset_count_prev.velD) {
+			_state_reset_status.velD_change = delta_vz;
+
+		} else {
+			// there's already a reset this update, accumulate total delta
+			_state_reset_status.velD_change += delta_vz;
+		}
+
+		_state_reset_status.reset_count.velD++;
 	}
 
 	// vertical velocity (alternative)
 	{
-		const float delta_z = new_vert_vel - output_delayed.vel_alternative(2);
+		const float delta_vz = new_vert_vel - output_delayed.vel_alternative(2);
 
 		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].vel_alternative(2) += delta_z;
+			_output_buffer[index].vel_alternative(2) += delta_vz;
 		}
 
-		_output_new.vel_alternative(2) += delta_z;
+		_output_new.vel_alternative(2) += delta_vz;
 	}
 
 	// propagate vertical position forward using the reset velocity
@@ -172,6 +222,17 @@ void OutputPredictor::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
 		}
 
 		_output_new.pos.xy() += delta_xy;
+
+		// record the state change
+		if (_state_reset_status.reset_count.posNE == _state_reset_count_prev.posNE) {
+			_state_reset_status.posNE_change = delta_xy;
+
+		} else {
+			// there's already a reset this update, accumulate total delta
+			_state_reset_status.posNE_change += delta_xy;
+		}
+
+		_state_reset_status.reset_count.posNE++;
 	}
 
 	// horizontal velocity (alternative)
@@ -202,6 +263,17 @@ void OutputPredictor::resetVerticalPositionTo(const float new_vert_pos)
 		// apply the change in height / height rate to our newest height / height rate estimate
 		// which have already been taken out from the output buffer
 		_output_new.pos(2) += delta_z;
+
+		// record the state change
+		if (_state_reset_status.reset_count.posD == _state_reset_count_prev.posD) {
+			_state_reset_status.posD_change = delta_z;
+
+		} else {
+			// there's already a reset this update, accumulate total delta
+			_state_reset_status.posD_change += delta_z;
+		}
+
+		_state_reset_status.reset_count.posD++;
 	}
 
 	// vertical position (alternative)

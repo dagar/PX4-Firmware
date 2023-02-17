@@ -46,6 +46,9 @@
 
 #include "EKF2Selector.hpp"
 
+#include "imu_down_sampler.hpp"
+#include "output_predictor.h"
+
 #include <float.h>
 
 #include <containers/LockGuard.hpp>
@@ -209,6 +212,9 @@ private:
 	float filter_altitude_ellipsoid(float amsl_hgt);
 
 	static constexpr float sq(float x) { return x * x; };
+
+	ImuDownSampler _imu_down_sampler{};
+	OutputPredictor _output_predictor{};
 
 	const bool _replay_mode{false};			///< true when we use replay data from a log
 	const bool _multi_mode;

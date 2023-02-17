@@ -42,12 +42,14 @@ public:
 
 	Ekf _ekf{};
 
+	ImuDownSampler _imu_down_sampler{};
+
 	uint32_t _t_us{0};
 
 	// Setup the Ekf with synthetic measurements
 	void SetUp() override
 	{
-		_ekf.init(0);
+		_ekf.reset();
 
 	}
 
@@ -55,6 +57,9 @@ public:
 	{
 
 	}
+private:
+
+	int32_t filter_update_interval_us{10000};
 };
 
 TEST_P(EkfImuSamplingTest, imuSamplingAtMultipleRates)
@@ -69,11 +74,13 @@ TEST_P(EkfImuSamplingTest, imuSamplingAtMultipleRates)
 
 	Vector3f ang_vel = std::get<2>(GetParam());
 	Vector3f accel = std::get<3>(GetParam());
-	imuSample imu_sample;
+	imuSample imu_sample{};
 	imu_sample.delta_ang_dt = dt_us * 1.0e-6f;
 	imu_sample.delta_ang = ang_vel * imu_sample.delta_ang_dt;
 	imu_sample.delta_vel_dt = dt_us * 1.0e-6f;
 	imu_sample.delta_vel = accel * imu_sample.delta_vel_dt;
+
+	imuSample imu_sample_buffered{};
 
 	// The higher the imu rate is the more measurements we have to set before reaching the FILTER_UPDATE_PERIOD
 	int n_samples = 0;
@@ -81,12 +88,16 @@ TEST_P(EkfImuSamplingTest, imuSamplingAtMultipleRates)
 	for (int i = 0; i < (int)30 / std::get<0>(GetParam()); ++i) {
 		n_samples++;
 		imu_sample.time_us = _t_us;
-		_ekf.setIMUData(imu_sample);
+
+		if (_imu_down_sampler.update(imu_sample)) {
+			imu_sample_buffered = _imu_down_sampler.getDownSampledImuAndTriggerReset();
+		}
+
 		_t_us += dt_us;
 	}
 
 	// Get the imu sample that was put into the buffer
-	imuSample imu_sample_buffered = _ekf.get_imu_sample_delayed();
+
 	EXPECT_NEAR(expected_dt_us / 1e6f, imu_sample_buffered.delta_ang_dt, 1e-5f);
 	EXPECT_NEAR(expected_dt_us / 1e6f, imu_sample_buffered.delta_vel_dt, 1e-5f);
 
@@ -123,7 +134,8 @@ INSTANTIATE_TEST_SUITE_P(imuSamplingAtMultipleRates,
 TEST_F(EkfImuSamplingTest, accelDownSampling)
 {
 	int32_t target_dt_us = 8000;
-	ImuDownSampler sampler(target_dt_us);
+	ImuDownSampler sampler;
+	sampler.set_target_dt_us(target_dt_us);
 
 	Vector3f ang_vel{0.0f, 0.0f, 0.0f};
 	Vector3f accel{-0.46f, 0.87f, 0.0f};
@@ -152,7 +164,8 @@ TEST_F(EkfImuSamplingTest, accelDownSampling)
 TEST_F(EkfImuSamplingTest, gyroDownSampling)
 {
 	int32_t target_dt_us = 8000;
-	ImuDownSampler sampler(target_dt_us);
+	ImuDownSampler sampler;
+	sampler.set_target_dt_us(target_dt_us);
 
 	Vector3f ang_vel{0.0f, 0.0f, 1.0f};
 	Vector3f accel{0.0f, 0.0f, 0.0f};

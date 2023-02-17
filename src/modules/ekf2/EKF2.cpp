@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2015-2022 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2015-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -316,6 +316,7 @@ int EKF2::print_status()
 
 #if defined(DEBUG_BUILD)
 	_ekf.print_status();
+	_output_predictor.print_status();
 #endif // DEBUG_BUILD
 
 	return 0;
@@ -343,12 +344,14 @@ void EKF2::Run()
 
 		_ekf.set_min_required_gps_health_time(_param_ekf2_req_gps_h.get() * 1_s);
 
+		_imu_down_sampler.set_target_dt_us(_param_ekf2_predict_us.get());
+
 		const matrix::Vector3f imu_pos_body(_param_ekf2_imu_pos_x.get(),
 						    _param_ekf2_imu_pos_y.get(),
 						    _param_ekf2_imu_pos_z.get());
-		_ekf.output_predictor().set_imu_offset(imu_pos_body);
-		_ekf.output_predictor().set_pos_correction_tc(_param_ekf2_tau_pos.get());
-		_ekf.output_predictor().set_vel_correction_tc(_param_ekf2_tau_vel.get());
+		_output_predictor.set_imu_offset(imu_pos_body);
+		_output_predictor.set_pos_correction_tc(_param_ekf2_tau_pos.get());
+		_output_predictor.set_vel_correction_tc(_param_ekf2_tau_vel.get());
 
 		// The airspeed scale factor correcton is only available via parameter as used by the airspeed module
 		param_t param_aspd_scale = param_find("ASPD_SCALE_1");
@@ -429,7 +432,7 @@ void EKF2::Run()
 	}
 
 	bool imu_updated = false;
-	imuSample imu_sample_new {};
+	imuSample imu_sample{};
 
 	hrt_abstime imu_dt = 0; // for tracking time slip later
 
@@ -443,17 +446,14 @@ void EKF2::Run()
 		}
 
 		if (imu_updated) {
-			imu_sample_new.time_us = imu.timestamp_sample;
-			imu_sample_new.delta_ang_dt = imu.delta_angle_dt * 1.e-6f;
-			imu_sample_new.delta_ang = Vector3f{imu.delta_angle};
-			imu_sample_new.delta_vel_dt = imu.delta_velocity_dt * 1.e-6f;
-			imu_sample_new.delta_vel = Vector3f{imu.delta_velocity};
-
-			if (imu.delta_velocity_clipping > 0) {
-				imu_sample_new.delta_vel_clipping[0] = imu.delta_velocity_clipping & vehicle_imu_s::CLIPPING_X;
-				imu_sample_new.delta_vel_clipping[1] = imu.delta_velocity_clipping & vehicle_imu_s::CLIPPING_Y;
-				imu_sample_new.delta_vel_clipping[2] = imu.delta_velocity_clipping & vehicle_imu_s::CLIPPING_Z;
-			}
+			imu_sample.time_us = imu.timestamp_sample;
+			imu_sample.delta_ang_dt = imu.delta_angle_dt * 1.e-6f;
+			imu_sample.delta_ang = Vector3f{imu.delta_angle};
+			imu_sample.delta_vel_dt = imu.delta_velocity_dt * 1.e-6f;
+			imu_sample.delta_vel = Vector3f{imu.delta_velocity};
+			imu_sample.delta_vel_clipping[0] = imu.delta_velocity_clipping & vehicle_imu_s::CLIPPING_X;
+			imu_sample.delta_vel_clipping[1] = imu.delta_velocity_clipping & vehicle_imu_s::CLIPPING_Y;
+			imu_sample.delta_vel_clipping[2] = imu.delta_velocity_clipping & vehicle_imu_s::CLIPPING_Z;
 
 			imu_dt = imu.delta_angle_dt;
 
@@ -502,17 +502,14 @@ void EKF2::Run()
 		}
 
 		if (imu_updated) {
-			imu_sample_new.time_us = sensor_combined.timestamp;
-			imu_sample_new.delta_ang_dt = sensor_combined.gyro_integral_dt * 1.e-6f;
-			imu_sample_new.delta_ang = Vector3f{sensor_combined.gyro_rad} * imu_sample_new.delta_ang_dt;
-			imu_sample_new.delta_vel_dt = sensor_combined.accelerometer_integral_dt * 1.e-6f;
-			imu_sample_new.delta_vel = Vector3f{sensor_combined.accelerometer_m_s2} * imu_sample_new.delta_vel_dt;
-
-			if (sensor_combined.accelerometer_clipping > 0) {
-				imu_sample_new.delta_vel_clipping[0] = sensor_combined.accelerometer_clipping & sensor_combined_s::CLIPPING_X;
-				imu_sample_new.delta_vel_clipping[1] = sensor_combined.accelerometer_clipping & sensor_combined_s::CLIPPING_Y;
-				imu_sample_new.delta_vel_clipping[2] = sensor_combined.accelerometer_clipping & sensor_combined_s::CLIPPING_Z;
-			}
+			imu_sample.time_us = sensor_combined.timestamp;
+			imu_sample.delta_ang_dt = sensor_combined.gyro_integral_dt * 1.e-6f;
+			imu_sample.delta_ang = Vector3f{sensor_combined.gyro_rad} * imu_sample.delta_ang_dt;
+			imu_sample.delta_vel_dt = sensor_combined.accelerometer_integral_dt * 1.e-6f;
+			imu_sample.delta_vel = Vector3f{sensor_combined.accelerometer_m_s2} * imu_sample.delta_vel_dt;
+			imu_sample.delta_vel_clipping[0] = sensor_combined.accelerometer_clipping & sensor_combined_s::CLIPPING_X;
+			imu_sample.delta_vel_clipping[1] = sensor_combined.accelerometer_clipping & sensor_combined_s::CLIPPING_Y;
+			imu_sample.delta_vel_clipping[2] = sensor_combined.accelerometer_clipping & sensor_combined_s::CLIPPING_Z;
 
 			imu_dt = sensor_combined.gyro_integral_dt;
 
@@ -567,19 +564,32 @@ void EKF2::Run()
 	}
 
 	if (imu_updated) {
-		const hrt_abstime now = imu_sample_new.time_us;
+		const hrt_abstime now = imu_sample.time_us;
 
-		// push imu data into estimator
-		_ekf.setIMUData(imu_sample_new);
-		PublishAttitude(now); // publish attitude immediately (uses quaternion from output predictor)
+		// the output observer always runs
+		if (_output_predictor.calculateOutputStates(imu_sample.time_us, imu_sample.delta_ang, imu_sample.delta_ang_dt,
+				imu_sample.delta_vel, imu_sample.delta_vel_dt) && _output_predictor.aligned()
+		   ) {
+
+			PublishAttitude(imu_sample.time_us);
+			PublishLocalPosition(imu_sample.time_us);
+			PublishOdometry(imu_sample.time_us, imu_sample);
+			PublishGlobalPosition(imu_sample.time_us);
+
+		} else if (_replay_mode) {
+			// in replay mode we have to tell the replay module not to wait for an update
+			// we do this by publishing an attitude with zero timestamp
+			vehicle_attitude_s att{};
+			_attitude_pub.publish(att);
+		}
 
 		// integrate time to monitor time slippage
 		if (_start_time_us > 0) {
 			_integrated_time_us += imu_dt;
-			_last_time_slip_us = (imu_sample_new.time_us - _start_time_us) - _integrated_time_us;
+			_last_time_slip_us = (imu_sample.time_us - _start_time_us) - _integrated_time_us;
 
 		} else {
-			_start_time_us = imu_sample_new.time_us;
+			_start_time_us = imu_sample.time_us;
 			_last_time_slip_us = 0;
 		}
 
@@ -607,15 +617,63 @@ void EKF2::Run()
 		// run the EKF update and output
 		const hrt_abstime ekf_update_start = hrt_absolute_time();
 
-		if (_ekf.update()) {
+		if (_imu_down_sampler.update(imu_sample) && _ekf.update(_imu_down_sampler.getDownSampledImuAndTriggerReset())) {
 			perf_set_elapsed(_ecl_ekf_update_full_perf, hrt_elapsed_time(&ekf_update_start));
 
-			if (_ekf.attitude_valid() && _ekf.output_predictor().aligned()) {
-				// publish output predictor output
-				PublishLocalPosition(now);
-				PublishOdometry(now, imu_sample_new);
-				PublishGlobalPosition(now);
+			if (!_output_predictor.aligned() && _ekf.initialized()) {
+				// _output_predictor.alloc to same as IMU buffer?
+
 			}
+
+
+			if (_ekf.initialized() && _output_predictor.aligned()) {
+
+
+				// quaternion reset
+				if (_ekf.quat_reset()) {
+					float delta_quat[4] {};
+					uint8_t quat_reset_counter = 0;
+					_ekf.get_quat_reset(delta_quat, &quat_reset_counter);
+					_output_predictor.resetQuaternion(_ekf.getQuaternion());
+				}
+
+				// velocity xy reset
+				if (_ekf.velNE_reset()) {
+					float delta_vxy[2] {};
+					uint8_t vxy_reset_counter = 0;
+					_ekf.get_velNE_reset(delta_vxy, &vxy_reset_counter);
+					_output_predictor.resetHorizontalVelocityTo(_ekf.getVelocity().xy());
+				}
+
+				// velocity z reset
+				if (_ekf.velD_reset()) {
+					float delta_vz{};
+					uint8_t vz_reset_counter = 0;
+					_ekf.get_velD_reset(&delta_vz, &vz_reset_counter);
+					_output_predictor.resetVerticalVelocityTo(_ekf.getVelocity()(2));
+				}
+
+				// position xy reset
+				if (_ekf.posNE_reset()) {
+					float delta_xy[2] {};
+					uint8_t xy_reset_counter = 0;
+					_ekf.get_posNE_reset(delta_xy, &xy_reset_counter);
+					_output_predictor.resetHorizontalPositionTo(_ekf.getPosition().xy());
+				}
+
+				// position z reset
+				if (_ekf.posD_reset()) {
+					float delta_z{};
+					uint8_t z_reset_counter = 0;
+					_ekf.get_posD_reset(&delta_z, &z_reset_counter);
+					_output_predictor.resetVerticalPositionTo(_ekf.getPosition()(2));
+				}
+			}
+
+
+			_output_predictor.correctOutputStates(_ekf.get_imu_sample_delayed().time_us,
+							      _ekf.getGyroBias(), _ekf.getAccelBias(), _ekf.getQuaternion(), _ekf.getVelocity(), _ekf.getPosition());
+
 
 			// publish other state output used by the system not dependent on output predictor
 			PublishSensorBias(now);
@@ -824,22 +882,16 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 
 void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 {
-	if (_ekf.attitude_valid() && _ekf.output_predictor().aligned()) {
-		// generate vehicle attitude quaternion data
-		vehicle_attitude_s att;
-		att.timestamp_sample = timestamp;
-		_ekf.getQuaternion().copyTo(att.q);
+	// generate vehicle attitude quaternion data
+	vehicle_attitude_s att;
+	att.timestamp_sample = timestamp;
 
-		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
-		att.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
-		_attitude_pub.publish(att);
+	// 	_output_predictor.fillQuaternionAndResetDelta(att.q, att.delta_q_reset, att.quat_reset_counter);
 
-	} else if (_replay_mode) {
-		// in replay mode we have to tell the replay module not to wait for an update
-		// we do this by publishing an attitude with zero timestamp
-		vehicle_attitude_s att{};
-		_attitude_pub.publish(att);
-	}
+	_ekf.getQuaternion().copyTo(att.q);
+	_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
+	att.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
+	_attitude_pub.publish(att);
 }
 
 void EKF2::PublishBaroBias(const hrt_abstime &timestamp)
@@ -1007,7 +1059,7 @@ void EKF2::PublishEventFlags(const hrt_abstime &timestamp)
 void EKF2::PublishGlobalPosition(const hrt_abstime &timestamp)
 {
 	if (_ekf.global_position_is_valid()) {
-		const Vector3f position{_ekf.getPosition()};
+		const Vector3f position{_output_predictor.getPosition()};
 
 		// generate and publish global position data
 		vehicle_global_position_s global_pos;
@@ -1030,7 +1082,7 @@ void EKF2::PublishGlobalPosition(const hrt_abstime &timestamp)
 		// lat_lon_reset_counter
 		float delta_xy[2] {};
 		uint8_t xy_reset_counter = 0;
-		_ekf.get_posNE_reset(delta_xy, &xy_reset_counter);
+		_ekf.get_posNE_reset(delta_xy, &xy_reset_counter); // TODO: fix for output predictor
 		global_pos.lat_lon_reset_counter = xy_reset_counter;
 
 		_ekf.get_ekf_gpos_accuracy(&global_pos.eph, &global_pos.epv);
@@ -1200,22 +1252,22 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 	lpos.timestamp_sample = timestamp;
 
 	// Position of body origin in local NED frame
-	const Vector3f position{_ekf.getPosition()};
+	const Vector3f position{_output_predictor.getPosition()};
 	lpos.x = position(0);
 	lpos.y = position(1);
 	lpos.z = position(2);
 
 	// Velocity of body origin in local NED frame (m/s)
-	const Vector3f velocity{_ekf.getVelocity()};
+	const Vector3f velocity{_output_predictor.getVelocity()};
 	lpos.vx = velocity(0);
 	lpos.vy = velocity(1);
 	lpos.vz = velocity(2);
 
 	// vertical position time derivative (m/s)
-	lpos.z_deriv = _ekf.getVerticalPositionDerivative();
+	lpos.z_deriv = _output_predictor.getVerticalPositionDerivative();
 
 	// Acceleration of body origin in local frame
-	const Vector3f vel_deriv{_ekf.getVelocityDerivative()};
+	const Vector3f vel_deriv{_output_predictor.getVelocityDerivative()};
 	lpos.ax = vel_deriv(0);
 	lpos.ay = vel_deriv(1);
 	lpos.az = vel_deriv(2);
@@ -1248,7 +1300,7 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 	Quatf delta_q_reset;
 	_ekf.get_quat_reset(&delta_q_reset(0), &lpos.heading_reset_counter);
 
-	lpos.heading = Eulerf(_ekf.getQuaternion()).psi();
+	lpos.heading = Eulerf(_output_predictor.getQuaternion()).psi();
 	lpos.delta_heading = Eulerf(delta_q_reset).psi();
 	lpos.heading_good_for_control = _ekf.isYawFinalAlignComplete();
 
@@ -1266,6 +1318,17 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 	_ekf.get_velD_reset(&lpos.delta_vz, &lpos.vz_reset_counter);
 	_ekf.get_posNE_reset(&lpos.delta_xy[0], &lpos.xy_reset_counter);
 	_ekf.get_velNE_reset(&lpos.delta_vxy[0], &lpos.vxy_reset_counter);
+
+#if 0
+	_output_predictor.fillVelocityResetNE(lpos.delta_vxy, lpos.vxy_reset_counter);
+	_output_predictor.fillVelocityResetD(lpos.delta_vz, lpos.vz_reset_counter);
+
+	_output_predictor.fillPositionResetNE(lpos.delta_xy, lpos.xy_reset_counter);
+	_output_predictor.fillPositionResetD(lpos.delta_z, lpos.z_reset_counter);
+
+	_output_predictor.fillHeadingReset(lpos.delta_heading, lpos.heading_reset_counter);
+#endif
+
 
 	lpos.dead_reckoning = _ekf.control_status_flags().inertial_dead_reckoning
 			      || _ekf.control_status_flags().wind_dead_reckoning;
@@ -1303,14 +1366,14 @@ void EKF2::PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu_sa
 
 	// position
 	odom.pose_frame = vehicle_odometry_s::POSE_FRAME_NED;
-	_ekf.getPosition().copyTo(odom.position);
+	_output_predictor.getPosition().copyTo(odom.position);
 
 	// orientation quaternion
-	_ekf.getQuaternion().copyTo(odom.q);
+	_output_predictor.getQuaternion().copyTo(odom.q);
 
 	// velocity
 	odom.velocity_frame = vehicle_odometry_s::VELOCITY_FRAME_NED;
-	_ekf.getVelocity().copyTo(odom.velocity);
+	_output_predictor.getVelocity().copyTo(odom.velocity);
 
 	// angular_velocity
 	const Vector3f rates{imu_sample.delta_ang / imu_sample.delta_ang_dt};
@@ -1330,7 +1393,7 @@ void EKF2::PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu_sa
 			     + _ekf.get_velNE_reset_count() + _ekf.get_velD_reset_count()
 			     + _ekf.get_posNE_reset_count() + _ekf.get_posD_reset_count();
 
-	odom.quality = 0;
+	odom.quality = 100;
 
 	// publish vehicle odometry data
 	odom.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
@@ -1408,7 +1471,7 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 	estimator_status_s status{};
 	status.timestamp_sample = _ekf.time_delayed_us();
 
-	_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
+	_output_predictor.getOutputTrackingError().copyTo(status.output_tracking_error);
 
 	// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include
 	// the GPS Fix bit, which is always checked)

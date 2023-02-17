@@ -2,11 +2,6 @@
 
 #include <lib/mathlib/mathlib.h>
 
-ImuDownSampler::ImuDownSampler(int32_t &target_dt_us) : _target_dt_us(target_dt_us)
-{
-	reset();
-}
-
 // integrate imu samples until target dt reached
 // assumes that dt of the gyroscope is close to the dt of the accelerometer
 // returns true if target dt is reached

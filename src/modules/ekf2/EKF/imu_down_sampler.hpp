@@ -48,7 +48,10 @@ using namespace estimator;
 class ImuDownSampler
 {
 public:
-	explicit ImuDownSampler(int32_t &target_dt_us);
+	ImuDownSampler()
+	{
+		reset();
+	}
 	~ImuDownSampler() = default;
 
 	bool update(const imuSample &imu_sample_new);
@@ -60,6 +63,8 @@ public:
 		return imu;
 	}
 
+	void set_target_dt_us(int32_t target_dt_us) { _target_dt_us = target_dt_us; }
+
 private:
 	void reset();
 
@@ -69,7 +74,7 @@ private:
 	int _accumulated_samples{0};
 	int _required_samples{1};
 
-	int32_t &_target_dt_us;
+	int32_t _target_dt_us{10'000};
 
 	float _target_dt_s{0.010f};
 	float _min_dt_s{0.005f};
