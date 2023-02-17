@@ -127,7 +127,7 @@ public:
 	}
 	float getMagBiasLimit() const { return 0.5f; } // 0.5 Gauss
 
-	// wind: (states 22, 34)
+	// wind: (states 22, 23)
 	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
 	Vector2f getWindVelocityVariance() const { return P.slice<2, 2>(22, 22).diag(); }
 

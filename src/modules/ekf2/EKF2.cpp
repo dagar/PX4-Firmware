@@ -634,7 +634,7 @@ void EKF2::Run()
 					float delta_quat[4] {};
 					uint8_t quat_reset_counter = 0;
 					_ekf.get_quat_reset(delta_quat, &quat_reset_counter);
-					_output_predictor.resetQuaternion(_ekf.getQuaternion());
+					//_output_predictor.resetQuaternion(_ekf.getQuaternion());
 				}
 
 				// velocity xy reset
@@ -642,7 +642,7 @@ void EKF2::Run()
 					float delta_vxy[2] {};
 					uint8_t vxy_reset_counter = 0;
 					_ekf.get_velNE_reset(delta_vxy, &vxy_reset_counter);
-					_output_predictor.resetHorizontalVelocityTo(_ekf.getVelocity().xy());
+					//_output_predictor.resetHorizontalVelocityTo(_ekf.getVelocity().xy());
 				}
 
 				// velocity z reset
@@ -650,7 +650,7 @@ void EKF2::Run()
 					float delta_vz{};
 					uint8_t vz_reset_counter = 0;
 					_ekf.get_velD_reset(&delta_vz, &vz_reset_counter);
-					_output_predictor.resetVerticalVelocityTo(_ekf.getVelocity()(2));
+					//_output_predictor.resetVerticalVelocityTo(_ekf.getVelocity()(2));
 				}
 
 				// position xy reset
@@ -658,7 +658,7 @@ void EKF2::Run()
 					float delta_xy[2] {};
 					uint8_t xy_reset_counter = 0;
 					_ekf.get_posNE_reset(delta_xy, &xy_reset_counter);
-					_output_predictor.resetHorizontalPositionTo(_ekf.getPosition().xy());
+					//_output_predictor.resetHorizontalPositionTo(_ekf.getPosition().xy());
 				}
 
 				// position z reset
@@ -666,13 +666,16 @@ void EKF2::Run()
 					float delta_z{};
 					uint8_t z_reset_counter = 0;
 					_ekf.get_posD_reset(&delta_z, &z_reset_counter);
-					_output_predictor.resetVerticalPositionTo(_ekf.getPosition()(2));
+					//_output_predictor.resetVerticalPositionTo(_ekf.getPosition()(2));
 				}
 			}
 
 
-			_output_predictor.correctOutputStates(_ekf.get_imu_sample_delayed().time_us,
-							      _ekf.getGyroBias(), _ekf.getAccelBias(), _ekf.getQuaternion(), _ekf.getVelocity(), _ekf.getPosition());
+			if (!_output_predictor.correctOutputStates(_ekf.get_imu_sample_delayed().time_us,
+							      _ekf.getGyroBias(), _ekf.getAccelBias(), _ekf.getQuaternion(), _ekf.getVelocity(), _ekf.getPosition())
+			) {
+				PX4_ERR("output predictor correct failed");
+			}
 
 
 			// publish other state output used by the system not dependent on output predictor

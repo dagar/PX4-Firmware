@@ -74,7 +74,31 @@ void OutputPredictor::reset()
 	_output_filter_aligned = false;
 }
 
-void OutputPredictor::resetQuaternion(const Quatf &new_quat)
+void OutputPredictor::applyQuaternionChange(const Quatf &quat_change)
+{
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us != 0) {
+			_output_buffer[i].quat_nominal = (quat_change * _output_buffer[i].quat_nominal).normalized();
+
+			// apply change to velocity
+			_output_buffer[i].vel = quat_change.rotateVector(_output_buffer[i].vel);
+			_output_buffer[i].vel_alternative = quat_change.rotateVector(_output_buffer[i].vel_alternative);
+		}
+	}
+
+	// apply the change in attitude quaternion to our newest quaternion estimate
+	_output_new.quat_nominal = (quat_change * _output_new.quat_nominal).normalized();
+	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
+
+	// apply change to velocity
+	_output_new.vel = quat_change.rotateVector(_output_new.vel);
+	_output_new.vel_alternative = quat_change.rotateVector(_output_new.vel_alternative);
+
+	propagateVelocityUpdateToPosition();
+}
+
+void OutputPredictor::resetQuaternion(const uint64_t time_delayed_us, const Quatf &new_quat)
 {
 	const outputSample &output_delayed = _output_buffer.get_oldest();
 	const Quatf quat_change{(new_quat * output_delayed.quat_nominal.inversed()).normalized()};
@@ -97,6 +121,9 @@ void OutputPredictor::resetQuaternion(const Quatf &new_quat)
 	_output_new.vel_alternative = quat_change.rotateVector(_output_new.vel_alternative);
 
 	propagateVelocityUpdateToPosition();
+
+
+
 
 
 
@@ -127,7 +154,7 @@ void OutputPredictor::resetQuaternion(const Quatf &new_quat)
 
 }
 
-void OutputPredictor::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
+void OutputPredictor::resetHorizontalVelocityTo(const uint64_t time_delayed_us, const Vector2f &new_horz_vel)
 {
 	const outputSample &output_delayed = _output_buffer.get_oldest();
 
@@ -168,7 +195,7 @@ void OutputPredictor::resetHorizontalVelocityTo(const Vector2f &new_horz_vel)
 	propagateVelocityUpdateToPosition();
 }
 
-void OutputPredictor::resetVerticalVelocityTo(const float new_vert_vel)
+void OutputPredictor::resetVerticalVelocityTo(const uint64_t time_delayed_us, const float new_vert_vel)
 {
 	const outputSample &output_delayed = _output_buffer.get_oldest();
 
@@ -209,7 +236,7 @@ void OutputPredictor::resetVerticalVelocityTo(const float new_vert_vel)
 	propagateVelocityUpdateToPosition();
 }
 
-void OutputPredictor::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
+void OutputPredictor::resetHorizontalPositionTo(const uint64_t time_delayed_us, const Vector2f &new_horz_pos)
 {
 	const outputSample &output_delayed = _output_buffer.get_oldest();
 
@@ -247,9 +274,13 @@ void OutputPredictor::resetHorizontalPositionTo(const Vector2f &new_horz_pos)
 	}
 }
 
-void OutputPredictor::resetVerticalPositionTo(const float new_vert_pos)
+void OutputPredictor::resetVerticalPositionTo(const uint64_t time_delayed_us, const float new_vert_pos)
 {
 	const outputSample &output_delayed = _output_buffer.get_oldest();
+
+	if (output_delayed.time_us == 0) {
+
+	}
 
 	// vertical position
 	{
@@ -288,6 +319,144 @@ void OutputPredictor::resetVerticalPositionTo(const float new_vert_pos)
 		// add the reset amount to the output observer vertical position state
 		_output_new.vel_alternative_integ(2) += delta_z;
 	}
+}
+
+bool OutputPredictor::reset(const uint64_t time_delayed_us, const Quatf &quat_state, const Vector3f &vel_state,
+			    const Vector3f &pos_state)
+{
+	const outputSample output_latest_before_reset{_output_new};
+
+	// find corresponding sample in the output buffer
+	uint8_t oldest_index;
+	bool delayed_sample_found = false;
+	{
+		uint8_t index = _output_buffer.get_oldest_index();
+		const uint8_t size = _output_buffer.get_length();
+
+		for (uint8_t counter = 0; counter < (size - 1); counter++) {
+
+			const outputSample &current_state = _output_buffer[index];
+
+			if (current_state.time_us == time_delayed_us) {
+				// found the delayed sample
+				oldest_index = index;
+				delayed_sample_found = true;
+				break;
+			}
+
+			// advance the index
+			index = (index + 1) % size;
+		}
+	}
+
+	if (!delayed_sample_found) {
+		return false;
+	}
+
+	outputSample &output_delayed = _output_buffer[oldest_index];
+
+	// reset orientation
+	const Quatf quat_change{(quat_state * output_delayed.quat_nominal.inversed()).normalized()};
+
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us != 0) {
+			_output_buffer[i].quat_nominal = (quat_change * _output_buffer[i].quat_nominal).normalized();
+
+			// apply change to velocity
+			_output_buffer[i].vel = quat_change.rotateVector(_output_buffer[i].vel);
+			_output_buffer[i].vel_alternative = quat_change.rotateVector(_output_buffer[i].vel_alternative);
+		}
+	}
+
+	// apply change to velocity
+	_output_new.vel = quat_change.rotateVector(_output_new.vel);
+	_output_new.vel_alternative = quat_change.rotateVector(_output_new.vel_alternative);
+
+	// apply the change in attitude quaternion to our newest quaternion estimate
+	_output_new.quat_nominal = (quat_change * _output_new.quat_nominal).normalized();
+	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
+
+
+	//propagateVelocityUpdateToPosition();
+
+	// reset velocity
+	const Vector3f vel_err = vel_state - output_delayed.vel;
+	const Vector3f vel_alt_err = vel_state - output_delayed.vel_alternative;
+
+	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
+		_output_buffer[index].vel += vel_err;
+		_output_buffer[index].vel_alternative += vel_alt_err;
+	}
+
+	_output_new.vel += vel_err;
+	_output_new.vel_alternative += vel_alt_err;
+
+	// reset position
+	output_delayed.pos = pos_state;
+
+	{
+		// propagate position forward using the reset velocity
+		uint8_t index = _output_buffer.get_oldest_index();
+		const uint8_t size = _output_buffer.get_length();
+
+		for (uint8_t counter = 0; counter < (size - 1); counter++) {
+
+			const outputSample &current_state = _output_buffer[index];
+
+			// next state
+			const uint8_t index_next = (index + 1) % size;
+			outputSample &next_state = _output_buffer[index_next];
+
+			if ((next_state.time_us > current_state.time_us) && (next_state.dt > 0.f)) {
+				// position is propagated forward using the corrected velocity and a trapezoidal integrator
+				next_state.pos = current_state.pos + (current_state.vel + next_state.vel) * 0.5f * next_state.dt;
+				next_state.vel_alternative_integ = current_state.vel_alternative_integ + (current_state.vel_alternative +
+								   next_state.vel_alternative) * 0.5f * next_state.dt;
+			}
+
+			// advance the index
+			index = (index + 1) % size;
+		}
+	}
+
+	// update latest position
+	if ((_output_new.time_us > _output_buffer.get_newest().time_us) && (_output_new.dt > 0.f)) {
+		// position is propagated forward using the corrected velocity and a trapezoidal integrator
+		_output_new.pos = _output_buffer.get_newest().pos
+				  + (_output_buffer.get_newest().vel + _output_new.vel) * 0.5f * _output_new.dt;
+
+		_output_new.vel_alternative_integ = _output_buffer.get_newest().vel_alternative_integ +
+						    (_output_buffer.get_newest().vel_alternative + _output_new.vel_alternative) * 0.5f * _output_new.dt;
+
+	} else {
+		// update output state to corrected values
+		_output_new = _output_buffer.get_newest();
+
+		// reset time delta to zero for the next accumulation of full rate IMU data
+		_output_new.dt = 0.0f;
+	}
+
+
+	const outputSample output_latest_after_reset{_output_new};
+
+	const Vector3f vel_delta = output_latest_after_reset.pos - output_latest_before_reset.pos;
+	const Vector3f pos_delta = output_latest_after_reset.pos - output_latest_before_reset.pos;
+
+
+	printf("output predictor: vel reset [%.3f, %.3f, %.3f] pos reset [%.3f, %.3f, %.3f]\n",
+
+	       (double)vel_delta(0), (double)vel_delta(1), (double)vel_delta(2),
+	       (double)pos_delta(0), (double)pos_delta(1), (double)pos_delta(2)
+	      );
+
+	// reset tracking error, integral, etc
+	_output_tracking_error.zero();
+	_delta_angle_corr.zero();
+	_vel_err_integ.zero();
+	_pos_err_integ.zero();
+
+	return true;
 }
 
 bool OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector3f &delta_angle,
@@ -363,14 +532,15 @@ bool OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 	return true;
 }
 
-void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
+bool OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 		const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias,
-		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state)
+		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state,
+		const bool reset)
 {
 	const uint64_t time_latest_us = _time_last_update_states_us;
 
 	if (time_latest_us <= time_delayed_us) {
-		return;
+		return false;
 	}
 
 	// store the INS states in a ring buffer with the same length and time coordinates as the IMU data buffer
@@ -389,22 +559,25 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 		_dt_correct_states_avg = 0.8f * _dt_correct_states_avg + 0.2f * dt;
 
 	} else {
-		if (!_output_filter_aligned) {
-			resetQuaternion(quat_state);
-			resetHorizontalVelocityTo(vel_state.xy());
-			resetVerticalVelocityTo(vel_state(2));
-			resetHorizontalPositionTo(pos_state.xy());
-			resetVerticalPositionTo(pos_state(2));
+		if (!_output_filter_aligned || reset) {
+			resetQuaternion(time_delayed_us, quat_state);
+
+			resetHorizontalVelocityTo(time_delayed_us, vel_state.xy());
+			resetVerticalVelocityTo(time_delayed_us, vel_state(2));
+
+			resetHorizontalPositionTo(time_delayed_us, pos_state.xy());
+			resetVerticalPositionTo(time_delayed_us, pos_state(2));
 		}
 
 		_time_last_correct_states_us = time_delayed_us;
-		return;
+		return false;
 	}
 
 	_time_last_correct_states_us = time_delayed_us;
 
 	// get the oldest INS state data from the ring buffer
 	// this data will be at the EKF fusion time horizon
+	bool corrected = false;
 	outputSample output_delayed;
 
 	while (_output_buffer.pop_first_older_than(time_delayed_us, &output_delayed)) {
@@ -476,6 +649,8 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 			_pos_err_integ.zero();
 
 			_output_filter_aligned = true;
+
+			corrected = true;
 
 		} else {
 
@@ -563,6 +738,8 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 
 			// recompute position by integrating velocity
 			propagateVelocityUpdateToPosition();
+
+			corrected = true;
 		}
 	}
 
@@ -570,6 +747,8 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 	_output_new.dt = 0.f;
 
 	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
+
+	return corrected;
 }
 
 void OutputPredictor::propagateVelocityUpdateToPosition()

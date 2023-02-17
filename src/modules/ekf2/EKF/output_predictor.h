@@ -64,17 +64,18 @@ public:
 	bool calculateOutputStates(const uint64_t time_us, const matrix::Vector3f &delta_angle, const float delta_angle_dt,
 				   const matrix::Vector3f &delta_velocity, const float delta_velocity_dt);
 
-	void correctOutputStates(const uint64_t time_delayed_us,
+	bool correctOutputStates(const uint64_t time_delayed_us,
 				 const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias,
-				 const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state, const matrix::Vector3f &pos_state);
+				 const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state, const matrix::Vector3f &pos_state,
+				 const bool reset = false);
 
-	void resetQuaternion(const matrix::Quatf &new_quat);
+	void resetQuaternion(const uint64_t time_delayed_us, const matrix::Quatf &new_quat);
 
-	void resetHorizontalVelocityTo(const matrix::Vector2f &new_horz_vel);
-	void resetVerticalVelocityTo(const float new_vert_vel);
+	void resetHorizontalVelocityTo(const uint64_t time_delayed_us, const matrix::Vector2f &new_horz_vel);
+	void resetVerticalVelocityTo(const uint64_t time_delayed_us, const float new_vert_vel);
 
-	void resetHorizontalPositionTo(const matrix::Vector2f &new_horz_pos);
-	void resetVerticalPositionTo(const float new_vert_pos);
+	void resetHorizontalPositionTo(const uint64_t time_delayed_us, const matrix::Vector2f &new_horz_pos);
+	void resetVerticalPositionTo(const uint64_t time_delayed_us, const float new_vert_pos);
 
 	void print_status();
 
@@ -113,8 +114,34 @@ public:
 	}
 
 
+	struct outputSample {
+		uint64_t         time_us{0};                           ///< timestamp of the measurement (uSec)
+		matrix::Quatf    quat_nominal{1.f, 0.f, 0.f, 0.f};     ///< nominal quaternion describing vehicle attitude
+		matrix::Vector3f vel{0.f, 0.f, 0.f};                   ///< NED velocity estimate in earth frame (m/sec)
+		matrix::Vector3f pos{0.f, 0.f, 0.f};                   ///< NED position estimate in earth frame (m/sec)
 
+		matrix::Vector3f vel_alternative{0.f, 0.f, 0.f};       ///< NED velocity calculated using alternative algorithm (m/sec)
+		matrix::Vector3f vel_alternative_integ{0.f, 0.f, 0.f}; ///< NED integral of velocity (m)
 
+		float            dt{0.f};                              ///< delta time (sec)
+	};
+
+	outputSample getLatest() const
+	{
+		outputSample output;
+
+		output.time_us = _output_new.time_us;
+		output.quat_nominal = _output_new.quat_nominal;
+		output.vel = _output_new.vel - _vel_imu_rel_body_ned;
+		output.pos = _output_new.pos - matrix::Vector3f(_R_to_earth_now * _imu_pos_body);
+
+		output.vel_alternative = _output_new.vel_alternative - _vel_imu_rel_body_ned;
+		output.vel_alternative_integ = _output_new.vel_alternative_integ - matrix::Vector3f(_R_to_earth_now * _imu_pos_body);
+
+		output.dt = _output_new.dt;
+
+		return output;
+	}
 
 	void fillQuaternionAndResetDelta(float q[4], float delta_q_reset[4], uint8_t &quat_reset_counter)
 	{
@@ -189,22 +216,18 @@ public:
 
 private:
 
+	void applyQuaternionChange(const matrix::Quatf &quat_change);
+
+	bool reset(const uint64_t time_delayed_us, const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state,
+		   const matrix::Vector3f &pos_state);
+
+
 	void propagateVelocityUpdateToPosition();
 
 	// return the square of two floating point numbers - used in auto coded sections
 	static constexpr float sq(float var) { return var * var; }
 
-	struct outputSample {
-		uint64_t         time_us{0};                           ///< timestamp of the measurement (uSec)
-		matrix::Quatf    quat_nominal{1.f, 0.f, 0.f, 0.f};     ///< nominal quaternion describing vehicle attitude
-		matrix::Vector3f vel{0.f, 0.f, 0.f};                   ///< NED velocity estimate in earth frame (m/sec)
-		matrix::Vector3f pos{0.f, 0.f, 0.f};                   ///< NED position estimate in earth frame (m/sec)
 
-		matrix::Vector3f vel_alternative{0.f, 0.f, 0.f};       ///< NED velocity calculated using alternative algorithm (m/sec)
-		matrix::Vector3f vel_alternative_integ{0.f, 0.f, 0.f}; ///< NED integral of velocity (m)
-
-		float            dt{0.f};                              ///< delta time (sec)
-	};
 
 	RingBuffer<outputSample> _output_buffer{12};
 
