@@ -217,6 +217,7 @@ public:
 private:
 
 	void applyQuaternionChange(const matrix::Quatf &quat_change);
+	void applyVelocityChange(const matrix::Vector3f &velocity_change);
 
 	bool reset(const uint64_t time_delayed_us, const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state,
 		   const matrix::Vector3f &pos_state);
@@ -289,6 +290,18 @@ private:
 	} _state_reset_status{}; ///< reset event monitoring structure containing velocity, position, height and yaw reset information
 
 	StateResetCounts _state_reset_count_prev{};
+
+
+	bool _quat_reset{false};
+	bool _vel_reset{false};
+	bool _pos_reset{false};
+
+	// filtered angular velocity
+	// filtered acceleration (with and without gravity?)
+	//  -adjust with angular acceleration?
+
+	// angular acceleration
+	// jerk
 };
 
 #endif // !EKF_OUTPUT_PREDICTOR_H

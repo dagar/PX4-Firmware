@@ -98,6 +98,22 @@ void OutputPredictor::applyQuaternionChange(const Quatf &quat_change)
 	propagateVelocityUpdateToPosition();
 }
 
+void OutputPredictor::applyVelocityChange(const Vector3f &velocity_change)
+{
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us != 0) {
+			_output_buffer[i].vel += velocity_change;
+			_output_buffer[i].vel_alternative += velocity_change;
+		}
+	}
+
+	_output_new.vel += velocity_change;
+	_output_new.vel_alternative += velocity_change;
+
+	// propagate position forward using the reset velocity
+	propagateVelocityUpdateToPosition();
+}
+
 void OutputPredictor::resetQuaternion(const uint64_t time_delayed_us, const Quatf &new_quat)
 {
 	const outputSample &output_delayed = _output_buffer.get_oldest();
@@ -575,172 +591,182 @@ bool OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 
 	_time_last_correct_states_us = time_delayed_us;
 
-	// get the oldest INS state data from the ring buffer
-	// this data will be at the EKF fusion time horizon
-	bool corrected = false;
-	outputSample output_delayed;
+	// find corresponding sample in the output buffer
+	uint8_t oldest_index;
+	bool delayed_sample_found = false;
+	{
+		uint8_t index = _output_buffer.get_oldest_index();
+		const uint8_t size = _output_buffer.get_length();
 
-	while (_output_buffer.pop_first_older_than(time_delayed_us, &output_delayed)) {
+		for (uint8_t counter = 0; counter < (size - 1); counter++) {
 
-		if (output_delayed.time_us != time_delayed_us) {
-			continue;
+			const outputSample &current_state = _output_buffer[index];
+
+			if (current_state.time_us == time_delayed_us) {
+				// found the delayed sample
+				oldest_index = index;
+				delayed_sample_found = true;
+				break;
+			}
+
+			// advance the index
+			index = (index + 1) % size;
 		}
+	}
 
-		if (!_output_filter_aligned) {
+	if (!delayed_sample_found) {
+		return false;
+	}
 
-			// calculate the quaternion rotation delta from the EKF to output observer states at the EKF fusion time horizon
-			const Quatf q_delta((quat_state * output_delayed.quat_nominal.inversed()).normalized());
 
-			// add the reset amount to the output observer buffered data
-			for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+	const bool quat_reset = reset;
+	const bool vel_reset = reset;
+	const bool pos_reset = reset;
 
-				_output_buffer[i].quat_nominal = (q_delta * _output_buffer[i].quat_nominal).normalized();
+	const outputSample &output_delayed = _output_buffer[oldest_index];
+
+	/*
+	* Loop through the output filter state history and apply the corrections to the velocity and position states.
+	* This method is too expensive to use for the attitude states due to the quaternion operations required
+	* but because it eliminates the time delay in the 'correction loop' it allows higher tracking gains
+	* to be used and reduces tracking error relative to EKF states.
+	*/
+
+	// calculate the quaternion delta between the INS and EKF quaternions at the EKF fusion time horizon
+	const Quatf q_error((quat_state.inversed() * output_delayed.quat_nominal).normalized());
+
+	if (quat_reset || !_output_filter_aligned) {
+
+		// add the reset amount to the output observer buffered data
+		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+			if (_output_buffer[i].time_us != 0) {
+				_output_buffer[i].quat_nominal = (q_error * _output_buffer[i].quat_nominal).normalized();
 
 				// apply change to velocity
-				_output_buffer[i].vel = q_delta.rotateVector(_output_buffer[i].vel);
-				_output_buffer[i].vel_alternative = q_delta.rotateVector(_output_buffer[i].vel_alternative);
+				_output_buffer[i].vel = q_error.rotateVector(_output_buffer[i].vel);
+				_output_buffer[i].vel_alternative = q_error.rotateVector(_output_buffer[i].vel_alternative);
 			}
-
-			// apply the change in attitude quaternion to our newest quaternion estimate
-			_output_new.quat_nominal = (q_delta * _output_new.quat_nominal).normalized();
-
-
-			// apply change to velocity
-			_output_new.vel = q_delta.rotateVector(_output_new.vel);
-			_output_new.vel_alternative = q_delta.rotateVector(_output_new.vel_alternative);
-
-			propagateVelocityUpdateToPosition();
-
-
-			// calculate the velocity and position deltas between the output and EKF at the EKF fusion time horizon
-			output_delayed.vel = q_delta.rotateVectorInverse(output_delayed.vel);
-			const Vector3f vel_err = vel_state - output_delayed.vel;
-
-			output_delayed.vel_alternative = q_delta.rotateVectorInverse(output_delayed.vel_alternative);
-			const Vector3f vel_alternative_err = vel_state - output_delayed.vel_alternative;
-
-			for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-				// a constant velocity correction is applied
-				_output_buffer[index].vel += vel_err;
-				_output_buffer[index].vel_alternative += vel_alternative_err;
-			}
-
-			// manually correct next oldest state
-			//  position is propagated forward using the corrected velocity and a trapezoidal integrator
-			uint8_t index = _output_buffer.get_oldest_index();
-			outputSample &next_oldest_state = _output_buffer[index];
-
-			if ((next_oldest_state.time_us > output_delayed.time_us) && (next_oldest_state.dt > 0.f)) {
-
-				next_oldest_state.pos = pos_state + (vel_state + next_oldest_state.vel) * 0.5f * next_oldest_state.dt;
-				next_oldest_state.vel_alternative_integ = pos_state + (vel_state + next_oldest_state.vel_alternative) * 0.5f *
-						next_oldest_state.dt;
-
-				propagateVelocityUpdateToPosition();
-			}
-
-			_output_new = _output_buffer.get_newest();
-			_output_new.dt = 0.0f;
-
-			// reset tracking error, integral, etc
-			_output_tracking_error.zero();
-			_delta_angle_corr.zero();
-			_vel_err_integ.zero();
-			_pos_err_integ.zero();
-
-			_output_filter_aligned = true;
-
-			corrected = true;
-
-		} else {
-
-			/*
-			* Loop through the output filter state history and apply the corrections to the velocity and position states.
-			* This method is too expensive to use for the attitude states due to the quaternion operations required
-			* but because it eliminates the time delay in the 'correction loop' it allows higher tracking gains
-			* to be used and reduces tracking error relative to EKF states.
-			*/
-
-			// calculate the quaternion delta between the INS and EKF quaternions at the EKF fusion time horizon
-			const Quatf q_error((quat_state.inversed() * output_delayed.quat_nominal).normalized());
-
-			// convert the quaternion delta to a delta angle
-			const float scalar = (q_error(0) >= 0.0f) ? -2.f : 2.f;
-
-			const Vector3f delta_ang_error{scalar * q_error(1), scalar * q_error(2), scalar * q_error(3)};
-
-			// calculate a gain that provides tight tracking of the estimator attitude states and
-			// adjust for changes in time delay to maintain consistent damping ratio of ~0.7
-
-			const float time_delay = fmaxf((time_latest_us - time_delayed_us) * 1e-6f, _dt_update_states_avg);
-			const float att_gain = 0.5f * _dt_update_states_avg / time_delay;
-
-			// calculate a corrrection to the delta angle
-			// that will cause the INS to track the EKF quaternions
-			_delta_angle_corr = delta_ang_error * att_gain;
-			_output_tracking_error(0) = delta_ang_error.norm();
-
-
-			/*
-			* Calculate corrections to be applied to vel and pos output state history.
-			* The vel and pos state history are corrected individually so they track the EKF states at
-			* the fusion time horizon. This option provides the most accurate tracking of EKF states.
-			*/
-
-			// calculate velocity tracking errors
-			const Vector3f vel_err = vel_state - output_delayed.vel;
-			_output_tracking_error(1) = vel_err.norm();
-			// calculate a velocity correction that will be applied to the output state history
-			const float vel_gain = _dt_correct_states_avg / math::constrain(_vel_tau, _dt_correct_states_avg,
-					       10.f); // Complementary filter gains
-			_vel_err_integ += vel_err;
-			const Vector3f vel_correction = vel_err * vel_gain + _vel_err_integ * sq(vel_gain) * 0.1f;
-
-			// calculate position tracking errors
-			const Vector3f pos_err = pos_state - output_delayed.pos;
-			_output_tracking_error(2) = pos_err.norm();
-			// calculate a position correction that will be applied to the output state history
-			const float pos_gain = _dt_correct_states_avg / math::constrain(_pos_tau, _dt_correct_states_avg,
-					       10.f); // Complementary filter gains
-			_pos_err_integ += pos_err;
-			const Vector3f pos_correction = pos_err * pos_gain + _pos_err_integ * sq(pos_gain) * 0.1f;
-
-			for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-				// a constant velocity correction is applied
-				_output_buffer[index].vel += vel_correction;
-				_output_buffer[index].pos += pos_correction;
-			}
-
-
-			/*
-			* Calculate a correction to be applied to vel_alternative that casues vel_alternative_integ to track the EKF
-			* position state at the fusion time horizon using an alternative algorithm to what
-			* is used for the vel and pos state tracking. The algorithm applies a correction to the vel_alternative
-			* state history and propagates vel_alternative_integ forward in time using the corrected vel_alternative history.
-			* This provides an alternative velocity output that is closer to the first derivative
-			* of the position but does degrade tracking relative to the EKF state.
-			*/
-
-			// vel alternative: calculate velocity and position tracking errors
-			const Vector3f vel_alternative_err = (vel_state - output_delayed.vel_alternative);
-			const Vector3f vel_alternative_integ_err = (pos_state - output_delayed.vel_alternative_integ);
-
-			// calculate a velocity correction that will be applied to the output state history
-			// using a PD feedback tuned to a 5% overshoot
-			const Vector3f vel_alternative_correction = vel_alternative_integ_err * pos_gain + vel_alternative_err * vel_gain *
-					1.1f;
-
-			for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-				// a constant velocity correction is applied
-				_output_buffer[index].vel_alternative += vel_alternative_correction;
-				_output_buffer[index].vel_alternative_integ += vel_alternative_integ_err;
-			}
-
-			// recompute position by integrating velocity
-			propagateVelocityUpdateToPosition();
-
-			corrected = true;
 		}
+
+		propagateVelocityUpdateToPosition(); // TODO: absorb?
+
+		_delta_angle_corr.zero();
+		_output_tracking_error(0) = 0.f;
+
+	} else {
+		// convert the quaternion delta to a delta angle
+		const float scalar = (q_error(0) >= 0.f) ? -2.f : 2.f;
+
+		const Vector3f delta_ang_error{scalar * q_error(1), scalar * q_error(2), scalar * q_error(3)};
+
+		// calculate a gain that provides tight tracking of the estimator attitude states and
+		// adjust for changes in time delay to maintain consistent damping ratio of ~0.7
+
+		const float time_delay = fmaxf((time_latest_us - time_delayed_us) * 1e-6f, _dt_update_states_avg);
+		const float att_gain = 0.5f * _dt_update_states_avg / time_delay;
+
+		// calculate a corrrection to the delta angle
+		// that will cause the INS to track the EKF quaternions
+		_delta_angle_corr = delta_ang_error * att_gain;
+		_output_tracking_error(0) = delta_ang_error.norm();
+	}
+
+	/*
+	* Calculate corrections to be applied to vel and pos output state history.
+	* The vel and pos state history are corrected individually so they track the EKF states at
+	* the fusion time horizon. This option provides the most accurate tracking of EKF states.
+	*/
+	const Vector3f vel_err = vel_state - output_delayed.vel; // TODO: vel err before or after quat reset?
+
+	// complementary filter gain
+	const float vel_gain = _dt_correct_states_avg / math::constrain(_vel_tau, _dt_correct_states_avg, 10.f);
+
+	if (vel_reset || !_output_filter_aligned) {
+
+		const Vector3f vel_alternative_err = (vel_state - output_delayed.vel_alternative);
+
+		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+			if (_output_buffer[i].time_us != 0) {
+				_output_buffer[i].vel += vel_err;
+				_output_buffer[i].vel_alternative += vel_alternative_err;
+			}
+		}
+
+		_output_tracking_error(1) = 0.f;
+		//_vel_err_integ.zero();
+
+	} else {
+		// calculate velocity tracking errors
+		_output_tracking_error(1) = vel_err.norm();
+
+		_vel_err_integ += vel_err;
+		const Vector3f vel_correction = vel_err * vel_gain + _vel_err_integ * sq(vel_gain) * 0.1f;
+
+		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+			// a constant velocity correction is applied
+			_output_buffer[i].vel += vel_correction;
+		}
+	}
+
+	// position
+	const Vector3f pos_err = pos_state - output_delayed.pos;
+
+	// complementary filter gain
+	const float pos_gain = _dt_correct_states_avg / math::constrain(_pos_tau, _dt_correct_states_avg, 10.f);
+
+	if (pos_reset || !_output_filter_aligned) {
+		const Vector3f vel_alternative_integ_err = (pos_state - output_delayed.vel_alternative_integ);
+
+		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+			if (_output_buffer[i].time_us != 0) {
+				_output_buffer[i].pos += pos_err;
+				_output_buffer[i].vel_alternative_integ += vel_alternative_integ_err;
+			}
+		}
+
+		_output_tracking_error(2) = 0.f;
+		//_pos_err_integ.zero();
+
+	} else {
+		// calculate position tracking errors
+		_output_tracking_error(2) = pos_err.norm();
+
+		_pos_err_integ += pos_err;
+		const Vector3f pos_correction = pos_err * pos_gain + _pos_err_integ * sq(pos_gain) * 0.1f;
+
+		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+			// a constant velocity correction is applied
+			_output_buffer[i].pos += pos_correction;
+		}
+	}
+
+	/*
+	* Calculate a correction to be applied to vel_alternative that casues vel_alternative_integ to track the EKF
+	* position state at the fusion time horizon using an alternative algorithm to what
+	* is used for the vel and pos state tracking. The algorithm applies a correction to the vel_alternative
+	* state history and propagates vel_alternative_integ forward in time using the corrected vel_alternative history.
+	* This provides an alternative velocity output that is closer to the first derivative
+	* of the position but does degrade tracking relative to the EKF state.
+	*/
+	// vel alternative: calculate velocity and position tracking errors
+	const Vector3f vel_alternative_err = (vel_state - output_delayed.vel_alternative);
+	const Vector3f vel_alternative_integ_err = (pos_state - output_delayed.vel_alternative_integ);
+
+	// calculate a velocity correction that will be applied to the output state history
+	// using a PD feedback tuned to a 5% overshoot
+	const Vector3f vel_alternative_correction = vel_alternative_integ_err * pos_gain + vel_alternative_err * vel_gain * 1.1f;
+
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		// a constant velocity correction is applied
+		_output_buffer[i].vel_alternative += vel_alternative_correction;
+		_output_buffer[i].vel_alternative_integ += vel_alternative_integ_err;
+	}
+
+	// recompute position by integrating velocity
+	propagateVelocityUpdateToPosition();
+
+	if (!_output_filter_aligned) {
+		_output_filter_aligned = true;
 	}
 
 	_output_new = _output_buffer.get_newest();
@@ -748,7 +774,7 @@ bool OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 
 	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
 
-	return corrected;
+	return true;
 }
 
 void OutputPredictor::propagateVelocityUpdateToPosition()
@@ -774,21 +800,5 @@ void OutputPredictor::propagateVelocityUpdateToPosition()
 
 		// advance the index
 		index = (index + 1) % size;
-	}
-
-	if ((_output_new.time_us > _output_buffer.get_newest().time_us) && (_output_new.dt > 0.f)) {
-		// position is propagated forward using the corrected velocity and a trapezoidal integrator
-		_output_new.pos = _output_buffer.get_newest().pos
-				  + (_output_buffer.get_newest().vel + _output_new.vel) * 0.5f * _output_new.dt;
-
-		_output_new.vel_alternative_integ = _output_buffer.get_newest().vel_alternative_integ +
-						    (_output_buffer.get_newest().vel_alternative + _output_new.vel_alternative) * 0.5f * _output_new.dt;
-
-	} else {
-		// update output state to corrected values
-		_output_new = _output_buffer.get_newest();
-
-		// reset time delta to zero for the next accumulation of full rate IMU data
-		_output_new.dt = 0.0f;
 	}
 }
