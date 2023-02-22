@@ -259,9 +259,9 @@ void VehicleMagnetometer::UpdateMagCalibration()
 	// State variance assumed for magnetometer bias storage.
 	// This is a reference variance used to calculate the fraction of learned magnetometer bias that will be used to update the stored value.
 	// Larger values cause a larger fraction of the learned biases to be used.
-	static constexpr float magb_vref = 2.5e-7f;
+	static constexpr float magb_vref = 1.e-6f;
 	static constexpr float min_var_allowed = magb_vref * 0.01f;
-	static constexpr float max_var_allowed = magb_vref * 500.f;
+	static constexpr float max_var_allowed = magb_vref * 1000.f;
 
 	if (_armed) {
 		static constexpr uint8_t mag_cal_size = sizeof(_mag_cal) / sizeof(_mag_cal[0]);
@@ -275,21 +275,32 @@ void VehicleMagnetometer::UpdateMagCalibration()
 				const Vector3f bias_variance{estimator_sensor_bias.mag_bias_variance};
 
 				const bool valid = (hrt_elapsed_time(&estimator_sensor_bias.timestamp) < 1_s)
-						   && (estimator_sensor_bias.mag_device_id != 0) &&
-						   estimator_sensor_bias.mag_bias_valid &&
-						   estimator_sensor_bias.mag_bias_stable &&
-						   (bias_variance.min() > min_var_allowed) && (bias_variance.max() < max_var_allowed);
+						   && (estimator_sensor_bias.mag_device_id != 0)
+						   && estimator_sensor_bias.mag_bias_valid
+						   && estimator_sensor_bias.mag_bias_stable
+						   && (bias_variance.min() > min_var_allowed) && (bias_variance.max() < max_var_allowed);
 
 				if (valid) {
 					// find corresponding mag calibration
 					for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
 						if (_calibration[mag_index].device_id() == estimator_sensor_bias.mag_device_id) {
 
-							_mag_cal[i].device_id = estimator_sensor_bias.mag_device_id;
-
 							// readd estimated bias that was removed before publishing vehicle_magnetometer (_calibration_estimator_bias)
-							_mag_cal[i].offset = _calibration[mag_index].BiasCorrectedSensorOffset(bias + _calibration_estimator_bias[mag_index]);
+							const Vector3f mag_cal_offset = _calibration[mag_index].BiasCorrectedSensorOffset(bias +
+											_calibration_estimator_bias[mag_index]);
 
+							if ((mag_cal_offset - _mag_cal[i].offset).longerThan(0.001f)) {
+								const Vector3f mag_cal_orig{_calibration[mag_index].offset()};
+
+								PX4_DEBUG("%d (%" PRIu32 ") EST:%d offset: [%.2f, %.2f, %.2f]->[%.2f, %.2f, %.2f] (full [%.3f, %.3f, %.3f])",
+									  mag_index, _calibration[mag_index].device_id(), i,
+									  (double)mag_cal_orig(0), (double)mag_cal_orig(1), (double)mag_cal_orig(2),
+									  (double)mag_cal_offset(0), (double)mag_cal_offset(1), (double)mag_cal_offset(2),
+									  (double)_mag_cal[i].offset(0), (double)_mag_cal[i].offset(1), (double)_mag_cal[i].offset(2));
+							}
+
+							_mag_cal[i].device_id = estimator_sensor_bias.mag_device_id;
+							_mag_cal[i].offset = mag_cal_offset;
 							_mag_cal[i].variance = bias_variance;
 
 							_in_flight_mag_cal_available = true;

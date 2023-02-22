@@ -263,6 +263,16 @@ bool EKF2::multi_init(int imu, int mag)
 		_estimator_aid_src_gnss_yaw_pub.advertise();
 	}
 
+	// mag: auto
+	if (_param_ekf2_mag_type.get() == 0) {
+		_estimator_aid_src_mag_pub.advertise();
+	}
+
+	// mag heading: !none
+	if (_param_ekf2_mag_type.get() != 5) {
+		_estimator_aid_src_mag_heading_pub.advertise();
+	}
+
 	// RNG advertise
 	if (_param_ekf2_rng_ctrl.get()) {
 		_estimator_aid_src_rng_hgt_pub.advertise();
@@ -2208,7 +2218,7 @@ void EKF2::UpdateCalibration(const hrt_abstime &timestamp, InFlightCalibration &
 	// Check if conditions are OK for learning of accelerometer bias values
 	// the EKF is operating in the correct mode and there are no filter faults
 	static constexpr float max_var_allowed = 1e-3f;
-	static constexpr float max_var_ratio = 1e2f;
+	static constexpr float max_var_ratio = 1e3f;
 
 	const bool valid = bias_valid
 			   && (bias_variance.max() < max_var_allowed)
@@ -2278,10 +2288,15 @@ void EKF2::UpdateGyroCalibration(const hrt_abstime &timestamp)
 
 void EKF2::UpdateMagCalibration(const hrt_abstime &timestamp)
 {
-	const bool bias_valid = (_ekf.control_status_flags().mag_hdg || _ekf.control_status_flags().mag)
+	const bool bias_valid = (_param_ekf2_mag_type.get() == static_cast<int32_t>(MagFuseType::AUTO))
+				&& _ekf.control_status_flags().tilt_align
+				&& _ekf.control_status_flags().yaw_align
 				&& _ekf.control_status_flags().mag_aligned_in_flight
+				&& (_ekf.fault_status().value == 0)
 				&& !_ekf.control_status_flags().mag_fault
-				&& !_ekf.control_status_flags().mag_field_disturbed;
+				&& !_ekf.control_status_flags().mag_field_disturbed
+				&& !_ekf.warning_event_flags().stopping_mag_use
+				&& !_ekf.warning_event_flags().emergency_yaw_reset_mag_stopped;
 
 	const bool learning_valid = bias_valid && _ekf.control_status_flags().mag;
 

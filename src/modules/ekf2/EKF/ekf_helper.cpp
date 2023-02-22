@@ -1029,18 +1029,26 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 
 	// update transformation matrix from body to world frame using the current estimate
 	// update the rotation matrix using the new yaw value
-	_R_to_earth = updateYawInRotMat(yaw, Dcmf(_state.quat_nominal));
+	const Dcmf R_to_earth = updateYawInRotMat(yaw, Dcmf(_state.quat_nominal));
 
 	// calculate the amount that the quaternion has changed by
-	const Quatf quat_after_reset(_R_to_earth);
+	const Quatf quat_after_reset(R_to_earth);
 	const Quatf q_error((quat_after_reset * quat_before_reset.inversed()).normalized());
 
+	const float angle_error = AxisAnglef(q_error).angle();
+
+	if (angle_error < math::radians(1.f)) {
+		ECL_DEBUG("resetQuatStateYaw, skip reset (angle error %.1f deg)", (double)math::degrees(angle_error));
+		return;
+	}
+
 	// update quaternion states
+	_R_to_earth = R_to_earth;
 	_state.quat_nominal = quat_after_reset;
 	uncorrelateQuatFromOtherStates();
 
 	// update the yaw angle variance
-	if (yaw_variance > FLT_EPSILON) {
+	if (PX4_ISFINITE(yaw_variance) && (yaw_variance > FLT_EPSILON)) {
 		increaseQuatYawErrVariance(yaw_variance);
 	}
 
@@ -1077,6 +1085,9 @@ bool Ekf::resetYawToEKFGSF()
 	if (yaw_alignment_changed || quat_reset) {
 		return false;
 	}
+
+	ECL_INFO("yaw estimator reset heading %.3f -> %.3f rad",
+		 (double)getEulerYaw(_R_to_earth), (double)_yawEstimator.getYaw());
 
 	resetQuatStateYaw(_yawEstimator.getYaw(), _yawEstimator.getYawVar());
 

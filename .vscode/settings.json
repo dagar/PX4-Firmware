@@ -16,6 +16,9 @@
         "cmake.configureOnOpen": true,
         "cmake.ctest.parallelJobs": 1,
         "cmake.skipConfigureIfCachePresent": true,
+        "cmake.testEnvironment": {
+                "GTEST_COLOR": "1"
+        },
         "cmakeExplorer.buildDir": "${workspaceFolder}/build/px4_sitl_test",
         "cmakeExplorer.parallelJobs": 1,
         "cmakeExplorer.suiteDelimiter": "-",

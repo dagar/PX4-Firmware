@@ -84,10 +84,10 @@ public:
 	void quaternionVarianceBigEnoughAfterOrientationInitialization()
 	{
 		const matrix::Vector<float, 4> quat_variance = _ekf_wrapper.getQuaternionVariance();
-		const float quat_variance_limit = 0.0001f;
-		EXPECT_TRUE(quat_variance(1) > quat_variance_limit) << "quat_variance(1)" << quat_variance(1);
-		EXPECT_TRUE(quat_variance(2) > quat_variance_limit) << "quat_variance(2)" << quat_variance(2);
-		EXPECT_TRUE(quat_variance(3) > quat_variance_limit) << "quat_variance(3)" << quat_variance(3);
+		const float quat_variance_limit = 0.00001f;
+		EXPECT_TRUE(quat_variance(1) > quat_variance_limit) << "quat_variance(1): " << quat_variance(1);
+		EXPECT_TRUE(quat_variance(2) > quat_variance_limit) << "quat_variance(2): " << quat_variance(2);
+		EXPECT_TRUE(quat_variance(3) > quat_variance_limit) << "quat_variance(3): " << quat_variance(3);
 	}
 
 	void velocityAndPositionCloseToZero()
@@ -107,14 +107,14 @@ public:
 		const Vector3f vel_var = _ekf->getVelocityVariance();
 
 		const float pos_variance_limit = 0.01f; // Fake fusion obs var when at rest
-		EXPECT_TRUE(pos_var(0) > pos_variance_limit) << "pos_var(0)" << pos_var(0);
-		EXPECT_TRUE(pos_var(1) > pos_variance_limit) << "pos_var(1)" << pos_var(1);
-		EXPECT_TRUE(pos_var(2) > pos_variance_limit) << "pos_var(2)" << pos_var(2);
+		EXPECT_TRUE(pos_var(0) > pos_variance_limit) << "pos_var(0): " << pos_var(0);
+		EXPECT_TRUE(pos_var(1) > pos_variance_limit) << "pos_var(1): " << pos_var(1);
+		EXPECT_TRUE(pos_var(2) > pos_variance_limit) << "pos_var(2): " << pos_var(2);
 
 		const float vel_variance_limit = 0.0001f; // zero velocity update obs var when at rest
-		EXPECT_TRUE(vel_var(0) > vel_variance_limit) << "vel_var(0)" << vel_var(0);
-		EXPECT_TRUE(vel_var(1) > vel_variance_limit) << "vel_var(1)" << vel_var(1);
-		EXPECT_TRUE(vel_var(2) > vel_variance_limit) << "vel_var(2)" << vel_var(2);
+		EXPECT_TRUE(vel_var(0) > vel_variance_limit) << "vel_var(0): " << vel_var(0);
+		EXPECT_TRUE(vel_var(1) > vel_variance_limit) << "vel_var(1): " << vel_var(1);
+		EXPECT_TRUE(vel_var(2) > vel_variance_limit) << "vel_var(2): " << vel_var(2);
 	}
 
 	void learningCorrectAccelBias()
@@ -142,7 +142,9 @@ TEST_F(EkfInitializationTest, initializeWithZeroTilt)
 	const Quatf quat_sim(euler_angles_sim);
 
 	_sensor_simulator.simulateOrientation(quat_sim);
-	_sensor_simulator.runSeconds(_init_tilt_period);
+	_sensor_simulator.runSeconds(7.f);
+
+	EXPECT_TRUE(_ekf->control_status_flags().tilt_align);
 
 	initializedOrienationIsMatchingGroundTruth(quat_sim);
 	validStateAfterOrientationInitialization();
@@ -220,7 +222,9 @@ TEST_F(EkfInitializationTest, initializeHeadingWithZeroTilt)
 	const Quatf quat_sim(euler_angles_sim);
 
 	_sensor_simulator.simulateOrientation(quat_sim);
-	_sensor_simulator.runSeconds(_init_tilt_period);
+	_sensor_simulator.runSeconds(7.f);
+
+	EXPECT_TRUE(_ekf->control_status_flags().tilt_align);
 
 	initializedOrienationIsMatchingGroundTruth(quat_sim);
 	validStateAfterOrientationInitialization();
@@ -237,7 +241,9 @@ TEST_F(EkfInitializationTest, initializeWithTilt)
 	const Quatf quat_sim(euler_angles_sim);
 
 	_sensor_simulator.simulateOrientation(quat_sim);
-	_sensor_simulator.runSeconds(_init_tilt_period);
+	_sensor_simulator.runSeconds(7.f);
+
+	EXPECT_TRUE(_ekf->control_status_flags().tilt_align);
 
 	initializedOrienationIsMatchingGroundTruth(quat_sim);
 	validStateAfterOrientationInitialization();
@@ -254,7 +260,9 @@ TEST_F(EkfInitializationTest, initializeWithPitch90)
 	const Quatf quat_sim(euler_angles_sim);
 
 	_sensor_simulator.simulateOrientation(quat_sim);
-	_sensor_simulator.runSeconds(_init_tilt_period);
+	_sensor_simulator.runSeconds(8.f);
+
+	EXPECT_TRUE(_ekf->control_status_flags().tilt_align);
 
 	initializedOrienationIsMatchingGroundTruth(quat_sim);
 	// TODO: Quaternion Variance is smaller and vel x is larger
@@ -273,7 +281,9 @@ TEST_F(EkfInitializationTest, initializeWithRoll90)
 	const Quatf quat_sim(euler_angles_sim);
 
 	_sensor_simulator.simulateOrientation(quat_sim);
-	_sensor_simulator.runSeconds(_init_tilt_period);
+	_sensor_simulator.runSeconds(7.f);
+
+	EXPECT_TRUE(_ekf->control_status_flags().tilt_align);
 
 	initializedOrienationIsMatchingGroundTruth(quat_sim);
 	validStateAfterOrientationInitialization();

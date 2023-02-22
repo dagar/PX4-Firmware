@@ -99,6 +99,12 @@ void Ekf::controlFusionModes(const imuSample &imu_delayed)
 				ECL_INFO("%llu: EKF aligned, (%s hgt, IMU buf: %i, OBS buf: %i)",
 					 (unsigned long long)imu_delayed.time_us, height_source, (int)_imu_buffer_length, (int)_obs_buffer_length);
 			}
+
+			ECL_DEBUG("tilt aligned, roll: %.3f, pitch %.3f, yaw: %.3f",
+				  (double)matrix::Eulerf(_state.quat_nominal).phi(),
+				  (double)matrix::Eulerf(_state.quat_nominal).theta(),
+				  (double)matrix::Eulerf(_state.quat_nominal).psi()
+				 );
 		}
 	}
 

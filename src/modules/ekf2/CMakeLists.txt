@@ -106,8 +106,10 @@ px4_add_module(
 		EKF/gravity_fusion.cpp
 		EKF/height_control.cpp
 		EKF/imu_down_sampler.cpp
+		EKF/mag_3d_control.cpp
 		EKF/mag_control.cpp
 		EKF/mag_fusion.cpp
+		EKF/mag_heading_control.cpp
 		EKF/optical_flow_control.cpp
 		EKF/optflow_fusion.cpp
 		EKF/output_predictor.cpp

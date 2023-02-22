@@ -42,7 +42,7 @@
 #ifndef EKF_ESTIMATOR_INTERFACE_H
 #define EKF_ESTIMATOR_INTERFACE_H
 
-#if defined(MODULE_NAME)
+#if defined(MODULE_NAME) && 0
 #include <px4_platform_common/log.h>
 # define ECL_INFO PX4_DEBUG
 # define ECL_WARN PX4_DEBUG
@@ -296,7 +296,6 @@ protected:
 	dragSample _drag_down_sampled{};	// down sampled drag specific force data (filter prediction rate -> observation rate)
 
 	extVisionSample _ev_sample_prev{};
-	magSample _mag_sample_prev{};
 
 	RangeFinderConsistencyCheck _rng_consistency_check;
 
