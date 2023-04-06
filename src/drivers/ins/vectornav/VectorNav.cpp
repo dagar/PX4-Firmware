@@ -209,6 +209,8 @@ void VectorNav::sensorCallback(VnUartPacket *packet)
 		const bool mode_tracking     = (mode == 0b10);
 		const bool mode_loss_gnss    = (mode == 0b11);
 
+		// TODO: GPS fix insStatus offset of 2
+
 
 		// mode_initializing
 		//  - pitch and roll are good (yaw is mag based)
@@ -250,6 +252,7 @@ void VectorNav::sensorCallback(VnUartPacket *packet)
 			local_position.evv = velocityUncertaintyEstimated;
 			local_position.xy_valid = true;
 			local_position.heading_good_for_control = mode_tracking;
+			// TODO: heading
 			local_position.timestamp = hrt_absolute_time();
 			_local_position_pub.publish(local_position);
 
@@ -261,6 +264,13 @@ void VectorNav::sensorCallback(VnUartPacket *packet)
 			global_position.lat = positionEstimatedLla.c[0];
 			global_position.lon = positionEstimatedLla.c[1];
 			global_position.alt = positionEstimatedLla.c[2];
+			global_position.alt_ellipsoid = global_position.alt;
+			global_position.eph = 0.f; // TODO
+			global_position.epv = 0.f; // TODO
+			global_position.terrain_alt = NAN;
+			global_position.terrain_alt_valid = false;
+			global_position.dead_reckoning =
+				false; // // TODO: GPS fix insStatus offset of 2 - IF mod eis 1 or 2 and fix is false then DEAD reckon,
 			global_position.timestamp = hrt_absolute_time();
 			_global_position_pub.publish(global_position);
 		}
@@ -282,14 +292,8 @@ void VectorNav::sensorCallback(VnUartPacket *packet)
 		(void)time_startup;
 
 		// GPSGROUP_UTC
-		// TimeUtc timeUtc;
-		// timeUtc.year = VnUartPacket_extractInt8(packet);
-		// timeUtc.month = VnUartPacket_extractUint8(packet);
-		// timeUtc.day = VnUartPacket_extractUint8(packet);
-		// timeUtc.hour = VnUartPacket_extractUint8(packet);
-		// timeUtc.min = VnUartPacket_extractUint8(packet);
-		// timeUtc.sec = VnUartPacket_extractUint8(packet);
-		// timeUtc.ms = VnUartPacket_extractUint16(packet);
+		TimeUtc timeUtc = VnUartPacket_extractTimeUtc(packet);
+		(void)timeUtc;
 
 		// GPSGROUP_NUMSATS
 		const uint8_t numSats = VnUartPacket_extractUint8(packet);
