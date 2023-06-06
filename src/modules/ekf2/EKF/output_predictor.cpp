@@ -178,11 +178,11 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 
 	// correct delta angle and delta velocity for bias offsets
 	// Apply corrections to the delta angle required to track the quaternion states at the EKF fusion time horizon
-	const Vector3f delta_angle_bias_scaled = _gyro_bias * delta_angle_dt;
-	const Vector3f delta_angle_corrected(delta_angle - delta_angle_bias_scaled + _delta_angle_corr);
+	const Vector3f delta_angle_bias = _gyro_bias * delta_angle_dt;
+	const Vector3f delta_angle_corrected(delta_angle - delta_angle_bias + _delta_angle_corr);
 
-	const Vector3f delta_vel_bias_scaled = _accel_bias * delta_velocity_dt;
-	const Vector3f delta_velocity_corrected(delta_velocity - delta_vel_bias_scaled);
+	const Vector3f delta_vel_bias = _accel_bias * delta_velocity_dt;
+	const Vector3f delta_velocity_corrected(delta_velocity - delta_vel_bias);
 
 	_output_new.time_us = time_us;
 	_output_vert_new.time_us = time_us;
@@ -240,8 +240,7 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 }
 
 void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
-		const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias,
-		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state)
+		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state, const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias)
 {
 	// calculate an average filter update time
 	if (_time_last_correct_states_us != 0) {

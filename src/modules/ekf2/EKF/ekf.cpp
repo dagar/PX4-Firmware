@@ -56,8 +56,8 @@ void Ekf::reset()
 
 	_state.vel.setZero();
 	_state.pos.setZero();
-	_state.delta_ang_bias.setZero();
-	_state.delta_vel_bias.setZero();
+	_state.gyro_bias.setZero();
+	_state.accel_bias.setZero();
 	_state.mag_I.setZero();
 	_state.mag_B.setZero();
 	_state.wind_vel.setZero();
@@ -80,7 +80,8 @@ void Ekf::reset()
 	_fault_status.value = 0;
 	_innov_check_fail_status.value = 0;
 
-	_prev_dvel_bias_var.zero();
+	_prev_gyro_bias_var.zero();
+	_prev_accel_bias_var.zero();
 
 	resetGpsDriftCheckFilters();
 
@@ -185,8 +186,7 @@ bool Ekf::update()
 		runTerrainEstimator(imu_sample_delayed);
 #endif // CONFIG_EKF2_RANGE_FINDER
 
-		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, getGyroBias(), getAccelBias(),
-							_state.quat_nominal, _state.vel, _state.pos);
+		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, _state.quat_nominal, _state.vel, _state.pos, _state.gyro_bias, _state.accel_bias);
 
 		return true;
 	}
@@ -253,8 +253,8 @@ bool Ekf::initialiseTilt()
 void Ekf::predictState(const imuSample &imu_delayed)
 {
 	// apply imu bias corrections
-	const Vector3f delta_ang_bias_scaled = getGyroBias() * imu_delayed.delta_ang_dt;
-	Vector3f corrected_delta_ang = imu_delayed.delta_ang - delta_ang_bias_scaled;
+	const Vector3f delta_ang_bias = getGyroBias() * imu_delayed.delta_ang_dt;
+	Vector3f corrected_delta_ang = imu_delayed.delta_ang - delta_ang_bias;
 
 	// subtract component of angular rate due to earth rotation
 	corrected_delta_ang -= _R_to_earth.transpose() * _earth_rate_NED * imu_delayed.delta_ang_dt;
@@ -266,8 +266,8 @@ void Ekf::predictState(const imuSample &imu_delayed)
 	_R_to_earth = Dcmf(_state.quat_nominal);
 
 	// Calculate an earth frame delta velocity
-	const Vector3f delta_vel_bias_scaled = getAccelBias() * imu_delayed.delta_vel_dt;
-	const Vector3f corrected_delta_vel = imu_delayed.delta_vel - delta_vel_bias_scaled;
+	const Vector3f delta_vel_bias = getAccelBias() * imu_delayed.delta_vel_dt;
+	const Vector3f corrected_delta_vel = imu_delayed.delta_vel - delta_vel_bias;
 	const Vector3f corrected_delta_vel_ef = _R_to_earth * corrected_delta_vel;
 
 	// save the previous value of velocity so we can use trapzoidal integration
