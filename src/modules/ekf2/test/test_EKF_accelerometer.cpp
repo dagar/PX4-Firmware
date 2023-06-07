@@ -80,8 +80,11 @@ void EkfAccelerometerTest::testBias(float bias, float duration, float tolerance)
 	_sensor_simulator._imu.setAccelData(Vector3f(0.f, 0.f, -CONSTANTS_ONE_G + bias));
 	_sensor_simulator.runSeconds(duration);
 	Vector3f estimated_bias = _ekf->getAccelBias();
+
+
+
 	EXPECT_TRUE(matrix::isEqual(estimated_bias, Vector3f(0.f, 0.f, bias),
-				    tolerance)) << "bias = " << bias << ", estimated = " << estimated_bias(2);
+				    tolerance)) << "bias = " << bias << ", estimated = " << estimated_bias(2) << " dt = " << _ekf->get_dt_ekf_avg();
 }
 
 TEST_F(EkfAccelerometerTest, biasEstimateZero)
