@@ -313,3 +313,10 @@ void Ekf::predictState(const imuSample &imu_delayed)
 	// Note fixed coefficients are used to save operations. The exact time constant is not important.
 	_yaw_rate_lpf_ef = 0.95f * _yaw_rate_lpf_ef + 0.05f * spin_del_ang_D / imu_delayed.delta_ang_dt;
 }
+
+void Ekf::updateParameters()
+{
+#if defined(CONFIG_EKF2_AUX_GLOBAL_POSITION) && defined(MODULE_NAME)
+	_aux_global_position.updateParameters();
+#endif // CONFIG_EKF2_AUX_GLOBAL_POSITION
+}
