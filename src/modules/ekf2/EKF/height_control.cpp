@@ -43,6 +43,10 @@ void Ekf::controlHeightFusion(const imuSample &imu_delayed)
 
 	updateGroundEffect();
 
+	if (_control_status.flags.vehicle_at_rest && !_control_status.flags.in_air) {
+
+	}
+
 	controlBaroHeightFusion();
 	controlGnssHeightFusion(_gps_sample_delayed);
 #if defined(CONFIG_EKF2_RANGE_FINDER)

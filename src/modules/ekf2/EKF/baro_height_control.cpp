@@ -45,7 +45,9 @@ void Ekf::controlBaroHeightFusion()
 	auto &aid_src = _aid_src_baro_hgt;
 	HeightBiasEstimator &bias_est = _baro_b_est;
 
-	bias_est.predict(_dt_ekf_avg);
+	if (_height_sensor_ref != HeightSensor::BARO) {
+		bias_est.predict(_dt_ekf_avg);
+	}
 
 	baroSample baro_sample;
 
@@ -101,9 +103,20 @@ void Ekf::controlBaroHeightFusion()
 		// update the bias estimator before updating the main filter but after
 		// using its current state to compute the vertical position innovation
 		if (measurement_valid) {
-			bias_est.setMaxStateNoise(sqrtf(measurement_var));
-			bias_est.setProcessNoiseSpectralDensity(_params.baro_bias_nsd);
-			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
+
+			if ((_params.height_sensor_ref == HeightSensor::BARO) && (_height_sensor_ref == HeightSensor::UNKNOWN)) {
+				_height_sensor_ref = HeightSensor::BARO;
+			}
+
+			// if (_height_sensor_ref == HeightSensor::UNKNOWN) {
+
+			// }
+
+			if (_height_sensor_ref != HeightSensor::BARO) {
+				bias_est.setMaxStateNoise(sqrtf(measurement_var));
+				bias_est.setProcessNoiseSpectralDensity(_params.baro_bias_nsd);
+				bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
+			}
 		}
 
 		// determine if we should use height aiding
@@ -151,7 +164,7 @@ void Ekf::controlBaroHeightFusion()
 
 		} else {
 			if (starting_conditions_passing) {
-				if (_params.height_sensor_ref == HeightSensor::BARO) {
+				if (_params.height_sensor_ref == HeightSensor::BARO && _height_sensor_ref != HeightSensor::ORIGIN) {
 					ECL_INFO("starting %s height fusion, resetting height", HGT_SRC_NAME);
 					_height_sensor_ref = HeightSensor::BARO;
 
@@ -165,7 +178,7 @@ void Ekf::controlBaroHeightFusion()
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;
-				bias_est.setFusionActive();
+
 				_control_status.flags.baro_hgt = true;
 			}
 		}
@@ -186,7 +199,6 @@ void Ekf::stopBaroHgtFusion()
 			_height_sensor_ref = HeightSensor::UNKNOWN;
 		}
 
-		_baro_b_est.setFusionInactive();
 		resetEstimatorAidStatus(_aid_src_baro_hgt);
 
 		_control_status.flags.baro_hgt = false;

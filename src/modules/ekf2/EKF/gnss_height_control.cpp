@@ -45,7 +45,9 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 	auto &aid_src = _aid_src_gnss_hgt;
 	HeightBiasEstimator &bias_est = _gps_hgt_b_est;
 
-	bias_est.predict(_dt_ekf_avg);
+	if (_height_sensor_ref != HeightSensor::GNSS) {
+		bias_est.predict(_dt_ekf_avg);
+	}
 
 	if (_gps_data_ready) {
 
@@ -152,7 +154,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;
-				bias_est.setFusionActive();
+
 				_control_status.flags.gps_hgt = true;
 			}
 		}
@@ -173,7 +175,6 @@ void Ekf::stopGpsHgtFusion()
 			_height_sensor_ref = HeightSensor::UNKNOWN;
 		}
 
-		_gps_hgt_b_est.setFusionInactive();
 		resetEstimatorAidStatus(_aid_src_gnss_hgt);
 
 		_control_status.flags.gps_hgt = false;

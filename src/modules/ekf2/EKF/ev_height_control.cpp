@@ -45,7 +45,9 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 
 	HeightBiasEstimator &bias_est = _ev_hgt_b_est;
 
-	bias_est.predict(_dt_ekf_avg);
+	if (_height_sensor_ref != HeightSensor::EV) {
+		bias_est.predict(_dt_ekf_avg);
+	}
 
 	// correct position for offset relative to IMU
 	const Vector3f pos_offset_body = _params.ev_pos_body - _params.imu_pos_body;
@@ -206,7 +208,7 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 			}
 
 			aid_src.time_last_fuse = _time_delayed_us;
-			bias_est.setFusionActive();
+
 			_control_status.flags.ev_hgt = true;
 		}
 	}
@@ -220,7 +222,6 @@ void Ekf::stopEvHgtFusion()
 			_height_sensor_ref = HeightSensor::UNKNOWN;
 		}
 
-		_ev_hgt_b_est.setFusionInactive();
 		resetEstimatorAidStatus(_aid_src_ev_hgt);
 
 		_control_status.flags.ev_hgt = false;

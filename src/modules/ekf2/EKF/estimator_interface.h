@@ -149,7 +149,17 @@ public:
 		_control_status.flags.in_air = in_air;
 	}
 
-	void set_vehicle_at_rest(bool at_rest) { _control_status.flags.vehicle_at_rest = at_rest; }
+	void set_vehicle_at_rest(bool at_rest)
+	{
+		if (!at_rest) {
+			_time_last_move_us = _time_delayed_us;
+
+		} else {
+			_time_last_at_rest_us = _time_delayed_us;
+		}
+
+		_control_status.flags.vehicle_at_rest = at_rest;
+	}
 
 	// return true if the attitude is usable
 	bool attitude_valid() const { return _control_status.flags.tilt_align; }
@@ -384,6 +394,9 @@ protected:
 	float _gps_horizontal_position_drift_rate_m_s{NAN}; // Horizontal position drift rate (m/s)
 	float _gps_vertical_position_drift_rate_m_s{NAN};   // Vertical position drift rate (m/s)
 	float _gps_filtered_horizontal_velocity_m_s{NAN};   // Filtered horizontal velocity (m/s)
+
+	uint64_t _time_last_at_rest_us{0};	///< last time we were at rest (uSec)
+	uint64_t _time_last_move_us{0};	///< last time we were last moving (uSec)
 
 	uint64_t _time_last_on_ground_us{0};	///< last time we were on the ground (uSec)
 	uint64_t _time_last_in_air{0};		///< last time we were in air (uSec)

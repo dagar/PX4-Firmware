@@ -94,7 +94,9 @@ void Ekf::controlRangeHeightFusion()
 	auto &aid_src = _aid_src_rng_hgt;
 	HeightBiasEstimator &bias_est = _rng_hgt_b_est;
 
-	bias_est.predict(_dt_ekf_avg);
+	if (_height_sensor_ref != HeightSensor::RNG) {
+		bias_est.predict(_dt_ekf_avg);
+	}
 
 	if (rng_data_ready && _range_sensor.getSampleAddress()) {
 
@@ -115,9 +117,12 @@ void Ekf::controlRangeHeightFusion()
 		// update the bias estimator before updating the main filter but after
 		// using its current state to compute the vertical position innovation
 		if (measurement_valid && _range_sensor.isDataHealthy()) {
-			bias_est.setMaxStateNoise(sqrtf(measurement_var));
-			bias_est.setProcessNoiseSpectralDensity(_params.rng_hgt_bias_nsd);
-			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
+
+			if (_height_sensor_ref != HeightSensor::RNG) {
+				bias_est.setMaxStateNoise(sqrtf(measurement_var));
+				bias_est.setProcessNoiseSpectralDensity(_params.rng_hgt_bias_nsd);
+				bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
+			}
 		}
 
 		// determine if we should use height aiding
@@ -189,7 +194,7 @@ void Ekf::controlRangeHeightFusion()
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;
-				bias_est.setFusionActive();
+
 				_control_status.flags.rng_hgt = true;
 			}
 		}
@@ -246,7 +251,6 @@ void Ekf::stopRngHgtFusion()
 			_height_sensor_ref = HeightSensor::UNKNOWN;
 		}
 
-		_rng_hgt_b_est.setFusionInactive();
 		resetEstimatorAidStatus(_aid_src_rng_hgt);
 
 		_control_status.flags.rng_hgt = false;

@@ -46,6 +46,17 @@ void Ekf::controlFakeHgtFusion()
 	const bool fake_hgt_data_ready = !isVerticalAidingActive()
 					 && isTimedOut(aid_src.time_last_fuse, (uint64_t)2e5); // Fuse fake height at a limited rate
 
+
+	if (_height_sensor_ref == HeightSensor::UNKNOWN) {
+		// run
+		//  _last_known_pos(2)
+	}
+
+	if (_height_sensor_ref == HeightSensor::ORIGIN) {
+		// run with height zero
+		//   _last_known_pos(2) = 0;
+	}
+
 	if (fake_hgt_data_ready) {
 
 		const float obs_var = sq(_params.pos_noaid_noise);
