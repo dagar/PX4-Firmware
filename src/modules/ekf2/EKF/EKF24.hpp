@@ -19,8 +19,37 @@ public:
 
 	static constexpr uint8_t kNumStates{24}; ///< number of EKF states
 
+	using Vector24f = matrix::Vector<float, kNumStates>;
+	using SquareMatrix24f = matrix::SquareMatrix<float, kNumStates>;
+
+	// Sets initial values for the covariance matrix
+	// Do not call before quaternion states have been initialised
+	void initialiseCovariance();
+	bool initialiseFilter(const imuSample &imu_init);
+
+	void reset();
+	void resetQuatCov();
+
+	// reset the quaternion states and covariances to the new yaw value, preserving the roll and pitch
+	// yaw : Euler yaw angle (rad)
+	// yaw_variance : yaw error variance (rad^2)
+	void resetQuatStateYaw(float yaw, float yaw_variance);
+
+	// Reset all IMU bias states and covariances to initial alignment values.
+	void resetImuBias();
+	void resetGyroBias();
+	void resetAccelBias();
+
+	void resetMagCov();
+	void clearMagCov();
+
+	void resetGyroBiasZCov();
 
 	bool update(const imuSample &imu_sample_delayed);
+
+
+
+
 
 
 	// get the state vector at the delayed time horizon
@@ -40,6 +69,22 @@ public:
 	}
 
 
+	const auto& P() const { return P; }
+
+	float getVariance(uint8_t index) { return P(index, index); }
+
+
+
+	// orientation (states 0, 1, 2, 3)
+	const Quatf& getQuaternion() const { return _state.quat_nominal; }
+
+	// velocity (states 4, 5, 6)
+	const Vector3f& getVelocity() const { return _state.vel; }
+	Vector3f getVelocityVariance() const { return Vector3f{P(4, 4), P(5, 5), P(6, 6)}; }
+
+	// position (states 7, 8, 9)
+	const Vector3f& getPosition() const { return _state.pos; }
+	Vector3f getPositionVariance() const { return Vector3f{P(7, 7), P(8, 8), P(9, 9)}; }
 
 	// gyro bias (states 10, 11, 12)
 	const Vector3f &getGyroBias() const { return _state.gyro_bias; } // get the gyroscope bias in rad/s
@@ -64,8 +109,22 @@ public:
 	}
 	float getMagBiasLimit() const { return 0.5f; } // 0.5 Gauss
 
+	// wind velocity (states 22, 23)
+	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
+	Vector2f getWindVelocityVariance() const { return P.slice<2, 2>(22, 22).diag(); }
 
 
+	bool measurementUpdate(Vector24f &K, float innovation_variance, float innovation);
+
+	// fuse single velocity and position measurement
+	bool fuseVelPosHeight(const float innov, const float innov_var, const int obs_index);
+
+
+
+
+
+	// rotate quaternion covariances into variances for an equivalent rotation vector
+	Vector3f calcRotVecVariances() const;
 
 
 	// TODO:
@@ -75,35 +134,33 @@ public:
 
 
 private:
-	using Vector24f = matrix::Vector<float, kNumStates>;
-	using SquareMatrix24f = matrix::SquareMatrix<float, kNumStates>;
+
 
 	using Matrix2f = matrix::SquareMatrix<float, 2>;
 
 	// return the square of two floating point numbers - used in auto coded sections
 	static constexpr float sq(float var) { return var * var; }
 
-	void reset();
-	bool initialiseFilter(const imuSample &imu_init);
+
 	bool initialiseTilt();
 
-	// Sets initial values for the covariance matrix
-	// Do not call before quaternion states have been initialised
-	void initialiseCovariance();
+
 
 	// initialise the quaternion covariances using rotation vector variances
 	// do not call before quaternion states are initialised
 	void initialiseQuatCovariances(Vector3f &rot_vec_var);
 
+	// uncorrelate quaternion states from other states
+	void uncorrelateQuatFromOtherStates();
+
 	// Increase the yaw error variance of the quaternions
 	// Argument is additional yaw variance in rad**2
 	void increaseQuatYawErrVariance(float yaw_variance);
 
-	void resetQuatCov();
-	void resetMagCov();
-
 	// save covariance data for re-use when auto-switching between heading and 3-axis fusion
 	void saveMagCovData();
+	// load and save mag field state covariance data for re-use
+	void loadMagCovData();
 
 	void predictCovariance(const imuSample &imu_delayed);
 	void predictState(const imuSample &imu_delayed);
@@ -111,7 +168,17 @@ private:
 	// constrain the ekf states
 	void constrainStates();
 
+	// if the covariance correction will result in a negative variance, then
+	// the covariance matrix is unhealthy and must be corrected
+	bool checkAndFixCovarianceUpdate(const SquareMatrix24f &KHP);
+
+	void fuse(const Vector24f &K, float innovation);
+
+	// limit the diagonal of the covariance matrix
+	// force symmetry when the argument is true
 	void fixCovarianceErrors(bool force_symmetry);
+
+	void clearInhibitedStateKalmanGains(Vector24f &K) const;
 
 	SquareMatrix24f P{};	///< state covariance matrix
 

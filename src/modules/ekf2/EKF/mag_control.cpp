@@ -242,7 +242,7 @@ bool Ekf::haglYawResetReq()
 		// and request a yaw reset if not already requested.
 #if defined(CONFIG_EKF2_RANGE_FINDER)
 		static constexpr float mag_anomalies_max_hagl = 1.5f;
-		const bool above_mag_anomalies = (getTerrainVPos() - _state.pos(2)) > mag_anomalies_max_hagl;
+		const bool above_mag_anomalies = (getTerrainVPos() - _ekf24.getPosition()(2)) > mag_anomalies_max_hagl;
 		return above_mag_anomalies;
 #else
 		return true;
@@ -314,7 +314,7 @@ bool Ekf::resetMagStates(const Vector3f &mag)
 		_state.mag_I = _R_to_earth * mag;
 	}
 
-	resetMagCov();
+	_ekf24.resetMagCov();
 
 	if (has_realigned_yaw) {
 		if (!mag_I_before_reset.longerThan(0.f)) {
@@ -635,7 +635,7 @@ void Ekf::stopMagFusion()
 		ECL_INFO("stopping all mag fusion");
 		stopMag3DFusion();
 		stopMagHdgFusion();
-		clearMagCov();
+		_ekf24.clearMagCov();
 	}
 }
 
@@ -680,8 +680,7 @@ void Ekf::startMag3DFusion()
 
 		stopMagHdgFusion();
 
-		zeroMagCov();
-		loadMagCovData();
+		_ekf24.loadMagCovData();
 		_control_status.flags.mag_3D = true;
 	}
 }

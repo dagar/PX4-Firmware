@@ -82,7 +82,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 		if (measurement_valid && gps_checks_passing && !gps_checks_failing) {
 			bias_est.setMaxStateNoise(sqrtf(measurement_var));
 			bias_est.setProcessNoiseSpectralDensity(_params.gps_hgt_bias_nsd);
-			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
+			bias_est.fuseBias(measurement - (-_ekf24.getPosition()(2)), measurement_var + P(9, 9));
 		}
 
 		// determine if we should use height aiding
@@ -112,7 +112,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 
 					_information_events.flags.reset_hgt_to_gps = true;
 					resetVerticalPositionTo(-(measurement - bias_est.getBias()), measurement_var);
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_ekf24.getPosition()(2) + measurement);
 
 					// reset vertical velocity
 					if (PX4_ISFINITE(gps_sample.vel(2)) && (_params.gnss_ctrl & GnssCtrl::VEL)) {
@@ -148,7 +148,7 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 
 				} else {
 					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_ekf24.getPosition()(2) + measurement);
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;

@@ -64,7 +64,7 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 	// Observation jacobian and Kalman gain vectors
 	SparseVector24f<0,1,2,3,16,17,18,19,20,21> Hfusion;
 	Vector24f H;
-	const Vector24f state_vector = getStateAtFusionHorizonAsVector();
+	const Vector24f state_vector = _ekf24.getStateAtFusionHorizonAsVector();
 	sym::ComputeMagInnovInnovVarAndHx(state_vector, P, mag, R_MAG, FLT_EPSILON, &mag_innov, &innov_var, &H);
 	Hfusion = H;
 
@@ -75,7 +75,8 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 		_fault_status.flags.bad_mag_x = true;
 
 		// we need to re-initialise covariances and abort this fusion step
-		resetMagRelatedCovariances();
+		_ekf24.resetQuatCov();
+		_ekf24.resetMagCov();
 		ECL_ERR("magX %s", numerical_error_covariance_reset_string);
 		return false;
 	}
@@ -88,7 +89,8 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 		_fault_status.flags.bad_mag_y = true;
 
 		// we need to re-initialise covariances and abort this fusion step
-		resetMagRelatedCovariances();
+		_ekf24.resetQuatCov();
+		_ekf24.resetMagCov();
 		ECL_ERR("magY %s", numerical_error_covariance_reset_string);
 		return false;
 	}
@@ -100,7 +102,8 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 		_fault_status.flags.bad_mag_z = true;
 
 		// we need to re-initialise covariances and abort this fusion step
-		resetMagRelatedCovariances();
+		_ekf24.resetQuatCov();
+		_ekf24.resetMagCov();
 		ECL_ERR("magZ %s", numerical_error_covariance_reset_string);
 		return false;
 	}
@@ -159,7 +162,8 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 				_fault_status.flags.bad_mag_y = true;
 
 				// we need to re-initialise covariances and abort this fusion step
-				resetMagRelatedCovariances();
+				_ekf24.resetQuatCov();
+				_ekf24.resetMagCov();
 				ECL_ERR("magY %s", numerical_error_covariance_reset_string);
 				return false;
 			}
@@ -183,7 +187,8 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 				_fault_status.flags.bad_mag_z = true;
 
 				// we need to re-initialise covariances and abort this fusion step
-				resetMagRelatedCovariances();
+				_ekf24.resetQuatCov();
+				_ekf24.resetMagCov();
 				ECL_ERR("magZ %s", numerical_error_covariance_reset_string);
 				return false;
 			}
@@ -201,7 +206,7 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 			}
 		}
 
-		if (measurementUpdate(Kfusion, aid_src_mag.innovation_variance[index], aid_src_mag.innovation[index])) {
+		if (_ekf24.measurementUpdate(Kfusion, aid_src_mag.innovation_variance[index], aid_src_mag.innovation[index])) {
 			fused[index] = true;
 			limitDeclination();
 
@@ -258,7 +263,7 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s& aid_src_status, const Vector24f &H_Y
 			_fault_status.flags.bad_hdg = true;
 
 			// we reinitialise the covariance matrix and abort this fusion step
-			initialiseCovariance();
+			_ekf24.initialiseCovariance()
 			ECL_ERR("yaw fusion numerical error - covariance reset");
 
 			return false;
@@ -296,7 +301,7 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s& aid_src_status, const Vector24f &H_Y
 
 				// also reset the yaw gyro variance to converge faster and avoid
 				// being stuck on a previous bad estimate
-				resetGyroBiasZCov();
+				_ekf24.resetGyroBiasZCov();
 
 			} else {
 				return false;
@@ -306,7 +311,7 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s& aid_src_status, const Vector24f &H_Y
 			_innov_check_fail_status.flags.reject_yaw = false;
 		}
 
-		if (measurementUpdate(Kfusion, aid_src_status.innovation_variance, aid_src_status.innovation)) {
+		if (_ekf24.measurementUpdate(Kfusion, aid_src_status.innovation_variance, aid_src_status.innovation)) {
 
 			_time_last_heading_fuse = _time_delayed_us;
 
@@ -330,10 +335,10 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s& aid_src_status, const Vector24f &H_Y
 void Ekf::computeYawInnovVarAndH(float variance, float &innovation_variance, Vector24f &H_YAW) const
 {
 	if (shouldUse321RotationSequence(_R_to_earth)) {
-		sym::ComputeYaw321InnovVarAndH(getStateAtFusionHorizonAsVector(), P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
+		sym::ComputeYaw321InnovVarAndH(_ekf24.getStateAtFusionHorizonAsVector(), P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
 
 	} else {
-		sym::ComputeYaw312InnovVarAndH(getStateAtFusionHorizonAsVector(), P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
+		sym::ComputeYaw312InnovVarAndH(_ekf24.getStateAtFusionHorizonAsVector(), P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
 	}
 }
 
@@ -346,7 +351,7 @@ bool Ekf::fuseDeclination(float decl_sigma)
 	float decl_pred;
 	float innovation_variance;
 
-	sym::ComputeMagDeclinationPredInnovVarAndH(getStateAtFusionHorizonAsVector(), P, R_DECL, FLT_EPSILON, &decl_pred, &innovation_variance, &H);
+	sym::ComputeMagDeclinationPredInnovVarAndH(_ekf24.getStateAtFusionHorizonAsVector(), P, R_DECL, FLT_EPSILON, &decl_pred, &innovation_variance, &H);
 
 	const float innovation = wrap_pi(decl_pred - getMagDeclination());
 
@@ -360,7 +365,7 @@ bool Ekf::fuseDeclination(float decl_sigma)
 	// Calculate the Kalman gains
 	Vector24f Kfusion = P * Hfusion / innovation_variance;
 
-	const bool is_fused = measurementUpdate(Kfusion, innovation_variance, innovation);
+	const bool is_fused = _ekf24.measurementUpdate(Kfusion, innovation_variance, innovation);
 
 	_fault_status.flags.bad_mag_decl = !is_fused;
 

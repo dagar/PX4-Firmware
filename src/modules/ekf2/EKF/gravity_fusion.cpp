@@ -62,7 +62,7 @@ void Ekf::controlGravityFusion(const imuSample &imu)
 	Vector3f innovation_variance;
 	Vector24f Kx, Ky, Kz; // Kalman gain vectors
 	sym::ComputeGravityInnovVarAndKAndH(
-		getStateAtFusionHorizonAsVector(), P, measurement, measurement_var, FLT_EPSILON,
+		_ekf24.getStateAtFusionHorizonAsVector(), P, measurement, measurement_var, FLT_EPSILON,
 		&innovation, &innovation_variance, &Kx, &Ky, &Kz);
 
 	// fill estimator aid source status
@@ -84,9 +84,9 @@ void Ekf::controlGravityFusion(const imuSample &imu)
 
 	if (_aid_src_gravity.fusion_enabled && !_aid_src_gravity.innovation_rejected) {
 		// perform fusion for each axis
-		_aid_src_gravity.fused = measurementUpdate(Kx, innovation_variance(0), innovation(0))
-					 && measurementUpdate(Ky, innovation_variance(1), innovation(1))
-					 && measurementUpdate(Kz, innovation_variance(2), innovation(2));
+		_aid_src_gravity.fused = _ekf24.measurementUpdate(Kx, innovation_variance(0), innovation(0))
+					 && _ekf24.measurementUpdate(Ky, innovation_variance(1), innovation(1))
+					 && _ekf24.measurementUpdate(Kz, innovation_variance(2), innovation(2));
 
 		if (_aid_src_gravity.fused) {
 			_aid_src_gravity.time_last_fuse = imu.time_us;

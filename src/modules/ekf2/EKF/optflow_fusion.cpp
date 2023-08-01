@@ -77,7 +77,7 @@ void Ekf::updateOptFlow(estimator_aid_source2d_s &aid_src)
 	aid_src.observation_variance[0] = R_LOS;
 	aid_src.observation_variance[1] = R_LOS;
 
-	const Vector24f state_vector = getStateAtFusionHorizonAsVector();
+	const Vector24f state_vector = _ekf24.getStateAtFusionHorizonAsVector();
 
 	Vector2f innov_var;
 	Vector24f H;
@@ -98,7 +98,7 @@ void Ekf::fuseOptFlow()
 	// a positive offset in earth frame leads to a smaller height above the ground.
 	float range = predictFlowRange();
 
-	const Vector24f state_vector = getStateAtFusionHorizonAsVector();
+	const Vector24f state_vector = _ekf24.getStateAtFusionHorizonAsVector();
 
 	Vector2f innov_var;
 	Vector24f H;
@@ -109,7 +109,7 @@ void Ekf::fuseOptFlow()
 	    || (_aid_src_optical_flow.innovation_variance[1] < R_LOS)) {
 		// we need to reinitialise the covariance matrix and abort this fusion step
 		ECL_ERR("Opt flow error - covariance reset");
-		initialiseCovariance();
+		_ekf24.initialiseCovariance()
 		return;
 	}
 
@@ -143,7 +143,7 @@ void Ekf::fuseOptFlow()
 			if (_aid_src_optical_flow.innovation_variance[1] < R_LOS) {
 				// we need to reinitialise the covariance matrix and abort this fusion step
 				ECL_ERR("Opt flow error - covariance reset");
-				initialiseCovariance();
+				_ekf24.initialiseCovariance()
 				return;
 			}
 		}
@@ -151,7 +151,7 @@ void Ekf::fuseOptFlow()
 		SparseVector24f<0,1,2,3,4,5,6> Hfusion(H);
 		Vector24f Kfusion = P * Hfusion / _aid_src_optical_flow.innovation_variance[index];
 
-		if (measurementUpdate(Kfusion, _aid_src_optical_flow.innovation_variance[index], _aid_src_optical_flow.innovation[index])) {
+		if (_ekf24.measurementUpdate(Kfusion, _aid_src_optical_flow.innovation_variance[index], _aid_src_optical_flow.innovation[index])) {
 			fused[index] = true;
 		}
 	}
@@ -175,7 +175,7 @@ float Ekf::predictFlowRange()
 
 	// calculate the height above the ground of the optical flow camera. Since earth frame is NED
 	// a positive offset in earth frame leads to a smaller height above the ground.
-	const float height_above_gnd_est = math::max(_terrain_vpos - _state.pos(2) - pos_offset_earth(2), fmaxf(_params.rng_gnd_clearance, 0.01f));
+	const float height_above_gnd_est = math::max(_terrain_vpos - _ekf24.getPosition()(2) - pos_offset_earth(2), fmaxf(_params.rng_gnd_clearance, 0.01f));
 
 	// calculate range from focal point to centre of image
 	return height_above_gnd_est / _R_to_earth(2, 2); // absolute distance to the frame region in view

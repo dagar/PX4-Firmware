@@ -264,7 +264,7 @@ public:
 	void getGravityInnovRatio(float &grav_innov_ratio) const { grav_innov_ratio = Vector3f(_aid_src_gravity.test_ratio).max(); }
 
 	// get the state vector at the delayed time horizon
-	matrix::Vector<float, 24> getStateAtFusionHorizonAsVector() const;
+	matrix::Vector<float, 24> getStateAtFusionHorizonAsVector() const { return _ekf24.getStateAtFusionHorizonAsVector(); }
 
 	// get the wind velocity in m/s
 	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
@@ -310,11 +310,6 @@ public:
 
 	// get the vehicle control limits required by the estimator to keep within sensor limitations
 	void get_ekf_ctrl_limits(float *vxy_max, float *vz_max, float *hagl_min, float *hagl_max) const;
-
-	// Reset all IMU bias states and covariances to initial alignment values.
-	void resetImuBias();
-	void resetGyroBias();
-	void resetAccelBias();
 
 	Vector3f getVelocityVariance() const { return P.slice<3, 3>(4, 4).diag(); };
 
@@ -443,7 +438,7 @@ public:
 	void get_ekf_soln_status(uint16_t *status) const;
 
 	// rotate quaternion covariances into variances for an equivalent rotation vector
-	Vector3f calcRotVecVariances() const;
+	Vector3f calcRotVecVariances() const { return _ekf24.calcRotVecVariances(); }
 
 	// set minimum continuous period without GPS fail required to mark a healthy GPS status
 	void set_min_required_gps_health_time(uint32_t time_us) { _min_gps_health_time_us = time_us; }
@@ -541,10 +536,6 @@ private:
 	StateResets _state_reset_status{};	///< reset event monitoring structure containing velocity, position, height and yaw reset information
 	StateResetCounts _state_reset_count_prev{};
 
-	Vector3f _ang_rate_delayed_raw{};	///< uncorrected angular rate vector at fusion time horizon (rad/sec)
-
-	stateSample _state{};		///< state struct of the ekf running at the delayed time horizon
-
 	bool _filter_initialised{false};	///< true when the EKF sttes and covariances been initialised
 
 	// booleans true when fresh sensor data is available at the fusion time horizon
@@ -565,10 +556,6 @@ private:
 
 	uint64_t _time_acc_bias_check{0};	///< last time the  accel bias check passed (uSec)
 
-	Vector3f _earth_rate_NED{};	///< earth rotation vector (NED) in rad/s
-
-	Dcmf _R_to_earth{};	///< transformation matrix from body frame to earth frame from last EKF prediction
-
 	// zero gyro update
 	Vector3f _zgup_delta_ang{};
 	float _zgup_delta_ang_dt{0.f};
@@ -586,8 +573,6 @@ private:
 	bool _mag_decl_cov_reset{false};	///< true after the fuseDeclination() function has been used to modify the earth field covariances after a magnetic field reset event.
 	bool _synthetic_mag_z_active{false};	///< true if we are generating synthetic magnetometer Z measurements
 	uint32_t _min_mag_health_time_us{1'000'000}; ///< magnetometer is marked as healthy only after this amount of time
-
-	SquareMatrix24f P{};	///< state covariance matrix
 
 #if defined(CONFIG_EKF2_DRAG_FUSION)
 	Vector2f _drag_innov{};		///< multirotor drag measurement innovation (m/sec**2)
@@ -692,11 +677,8 @@ private:
 	float _gps_alt_ref{NAN};		///< WGS-84 height (m)
 
 	// Variables used by the initial filter alignment
-	bool _is_first_imu_sample{true};
 	uint32_t _baro_counter{0};		///< number of baro samples read during initialisation
 	uint32_t _mag_counter{0};		///< number of magnetometer samples read during initialisation
-	AlphaFilter<Vector3f> _accel_lpf{0.1f};	///< filtered accelerometer measurement used to align tilt (m/s/s)
-	AlphaFilter<Vector3f> _gyro_lpf{0.1f};	///< filtered gyro measurement used for alignment excessive movement check (rad/sec)
 
 	// Variables used to perform in flight resets and switch between height sources
 	AlphaFilter<Vector3f> _mag_lpf{0.1f};	///< filtered magnetometer measurement for instant reset (Gauss)
@@ -706,21 +688,8 @@ private:
 	uint64_t _flt_mag_align_start_time{0};	///< time that inflight magnetic field alignment started (uSec)
 	uint64_t _time_last_mov_3d_mag_suitable{0};	///< last system time that sufficient movement to use 3-axis magnetometer fusion was detected (uSec)
 	uint64_t _time_last_mag_check_failing{0};
-	Vector3f _saved_mag_bf_variance {}; ///< magnetic field state variances that have been saved for use at the next initialisation (Gauss**2)
-	Matrix2f _saved_mag_ef_ne_covmat{}; ///< NE magnetic field state covariance sub-matrix saved for use at the next initialisation (Gauss**2)
-	float _saved_mag_ef_d_variance{};   ///< D magnetic field state variance saved for use at the next initialisation (Gauss**2)
 
 	gps_check_fail_status_u _gps_check_fail_status{};
-
-	// variables used to inhibit accel bias learning
-	bool _accel_bias_inhibit[3] {};		///< true when the accel bias learning is being inhibited for the specified axis
-	bool _gyro_bias_inhibit[3] {};		///< true when the gyro bias learning is being inhibited for the specified axis
-	Vector3f _accel_vec_filt{};		///< acceleration vector after application of a low pass filter (m/sec**2)
-	float _accel_magnitude_filt{0.0f};	///< acceleration magnitude after application of a decaying envelope filter (rad/sec)
-	float _ang_rate_magnitude_filt{0.0f};		///< angular rate magnitude after application of a decaying envelope filter (rad/sec)
-
-	Vector3f _prev_gyro_bias_var{};         ///< saved gyro XYZ bias variances
-	Vector3f _prev_accel_bias_var{};        ///< saved accel XYZ bias variances
 
 	// height sensor status
 	bool _baro_hgt_faulty{false};		///< true if baro data have been declared faulty TODO: move to fault flags
@@ -730,20 +699,6 @@ private:
 	uint64_t _time_bad_vert_accel{0};	///< last time a bad vertical accel was detected (uSec)
 	uint64_t _time_good_vert_accel{0};	///< last time a good vertical accel was detected (uSec)
 	uint16_t _clip_counter{0};		///< counter that increments when clipping ad decrements when not
-
-	float _height_rate_lpf{0.0f};
-
-	// initialise filter states of both the delayed ekf and the real time complementary filter
-	bool initialiseFilter(void);
-
-	// initialise ekf covariance matrix
-	void initialiseCovariance();
-
-	// predict ekf state
-	void predictState(const imuSample &imu_delayed);
-
-	// predict ekf covariance
-	void predictCovariance(const imuSample &imu_delayed);
 
 	// ekf sequential fusion of magnetometer measurements
 	bool fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bool update_all_states = true);
@@ -905,88 +860,6 @@ private:
 	// Return the magnetic declination in radians to be used by the alignment and fusion processing
 	float getMagDeclination();
 
-	void clearInhibitedStateKalmanGains(Vector24f &K) const
-	{
-		// gyro bias: states 10, 11, 12
-		for (unsigned i = 0; i < 3; i++) {
-			if (_gyro_bias_inhibit[i]) {
-				K(10 + i) = 0.f;
-			}
-		}
-
-		// accel bias: states 13, 14, 15
-		for (unsigned i = 0; i < 3; i++) {
-			if (_accel_bias_inhibit[i]) {
-				K(13 + i) = 0.f;
-			}
-		}
-
-		// mag I: states 16, 17, 18
-		if (!_control_status.flags.mag_3D) {
-			K(16) = 0.f;
-			K(17) = 0.f;
-			K(18) = 0.f;
-		}
-
-		// mag B: states 19, 20, 21
-		if (!_control_status.flags.mag_3D) {
-			K(19) = 0.f;
-			K(20) = 0.f;
-			K(21) = 0.f;
-		}
-
-		// wind: states 22, 23
-		if (!_control_status.flags.wind) {
-			K(22) = 0.f;
-			K(23) = 0.f;
-		}
-	}
-
-	bool measurementUpdate(Vector24f &K, float innovation_variance, float innovation)
-	{
-		clearInhibitedStateKalmanGains(K);
-
-		const Vector24f KS = K * innovation_variance;
-		SquareMatrix24f KHP;
-
-		for (unsigned row = 0; row < _k_num_states; row++) {
-			for (unsigned col = 0; col < _k_num_states; col++) {
-				// Instad of literally computing KHP, use an equvalent
-				// equation involving less mathematical operations
-				KHP(row, col) = KS(row) * K(col);
-			}
-		}
-
-		const bool is_healthy = checkAndFixCovarianceUpdate(KHP);
-
-		if (is_healthy) {
-			// apply the covariance corrections
-			P -= KHP;
-
-			fixCovarianceErrors(true);
-
-			// apply the state corrections
-			fuse(K, innovation);
-		}
-
-		return is_healthy;
-	}
-
-	// if the covariance correction will result in a negative variance, then
-	// the covariance matrix is unhealthy and must be corrected
-	bool checkAndFixCovarianceUpdate(const SquareMatrix24f &KHP);
-
-	// limit the diagonal of the covariance matrix
-	// force symmetry when the argument is true
-	void fixCovarianceErrors(bool force_symmetry);
-
-	// constrain the ekf states
-	void constrainStates();
-
-	// generic function which will perform a fusion step given a kalman gain K
-	// and a scalar innovation value
-	void fuse(const Vector24f &K, float innovation);
-
 	float compensateBaroForDynamicPressure(float baro_alt_uncompensated) const;
 
 	// calculate the earth rotation vector from a given latitude
@@ -1087,31 +960,9 @@ private:
 	// do not call before quaternion states are initialised
 	void initialiseQuatCovariances(Vector3f &rot_vec_var);
 
-	// perform a limited reset of the magnetic field related state covariances
-	void resetMagRelatedCovariances();
-
-	void resetQuatCov();
-	void zeroQuatCov();
-	void resetMagCov();
-
 	// perform a reset of the wind states and related covariances
 	void resetWind();
 	void resetWindToZero();
-
-	// Increase the yaw error variance of the quaternions
-	// Argument is additional yaw variance in rad**2
-	void increaseQuatYawErrVariance(float yaw_variance);
-
-	// load and save mag field state covariance data for re-use
-	void loadMagCovData();
-	void saveMagCovData();
-	void clearMagCov();
-	void zeroMagCov();
-
-	void resetGyroBiasZCov();
-
-	// uncorrelate quaternion states from other states
-	void uncorrelateQuatFromOtherStates();
 
 	// calculate a synthetic value for the magnetometer Z component, given the 3D magnetomter
 	// sensor measurement

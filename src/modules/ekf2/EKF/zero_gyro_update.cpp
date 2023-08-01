@@ -90,5 +90,5 @@ void Ekf::fuseDeltaAngBias(const float innov, const float innov_var, const int o
 		K(row) = P(row, state_index) / innov_var;
 	}
 
-	measurementUpdate(K, innov_var, innov);
+	_ekf24.measurementUpdate(K, innov_var, innov);
 }

@@ -252,6 +252,91 @@ void EKF24::resetQuatCov()
 	initialiseQuatCovariances(rot_vec_var);
 }
 
+void EKF24::resetQuatStateYaw(float yaw, float yaw_variance)
+{
+	// save a copy of the quaternion state for later use in calculating the amount of reset change
+	const Quatf quat_before_reset = _state.quat_nominal;
+
+	// update transformation matrix from body to world frame using the current estimate
+	// update the rotation matrix using the new yaw value
+	_R_to_earth = updateYawInRotMat(yaw, Dcmf(_state.quat_nominal));
+
+	// calculate the amount that the quaternion has changed by
+	const Quatf quat_after_reset(_R_to_earth);
+	const Quatf q_error((quat_after_reset * quat_before_reset.inversed()).normalized());
+
+	// update quaternion states
+	_state.quat_nominal = quat_after_reset;
+	uncorrelateQuatFromOtherStates();
+
+	// update the yaw angle variance
+	if (yaw_variance > FLT_EPSILON) {
+		increaseQuatYawErrVariance(yaw_variance);
+	}
+
+	_ekf24.resetQuatStateYaw(); // TODO: dagar
+
+	//_time_last_heading_fuse = _time_delayed_us;
+}
+
+void EKF24::uncorrelateQuatFromOtherStates()
+{
+	P.slice<kNumStates - 4, 4>(4, 0) = 0.f;
+	P.slice<4, kNumStates - 4>(0, 4) = 0.f;
+}
+
+Vector3f EKF24::calcRotVecVariances() const
+{
+	Vector3f rot_var_vec;
+	float q0, q1, q2, q3;
+
+	if (_state.quat_nominal(0) >= 0.0f) {
+		q0 = _state.quat_nominal(0);
+		q1 = _state.quat_nominal(1);
+		q2 = _state.quat_nominal(2);
+		q3 = _state.quat_nominal(3);
+
+	} else {
+		q0 = -_state.quat_nominal(0);
+		q1 = -_state.quat_nominal(1);
+		q2 = -_state.quat_nominal(2);
+		q3 = -_state.quat_nominal(3);
+	}
+	float t2 = q0*q0;
+	float t3 = acosf(q0);
+	float t4 = -t2+1.0f;
+	float t5 = t2-1.0f;
+	if ((t4 > 1e-9f) && (t5 < -1e-9f)) {
+		float t6 = 1.0f/t5;
+		float t7 = q1*t6*2.0f;
+		float t8 = 1.0f/powf(t4,1.5f);
+		float t9 = q0*q1*t3*t8*2.0f;
+		float t10 = t7+t9;
+		float t11 = 1.0f/sqrtf(t4);
+		float t12 = q2*t6*2.0f;
+		float t13 = q0*q2*t3*t8*2.0f;
+		float t14 = t12+t13;
+		float t15 = q3*t6*2.0f;
+		float t16 = q0*q3*t3*t8*2.0f;
+		float t17 = t15+t16;
+		rot_var_vec(0) = t10*(P(0,0)*t10+P(1,0)*t3*t11*2.0f)+t3*t11*(P(0,1)*t10+P(1,1)*t3*t11*2.0f)*2.0f;
+		rot_var_vec(1) = t14*(P(0,0)*t14+P(2,0)*t3*t11*2.0f)+t3*t11*(P(0,2)*t14+P(2,2)*t3*t11*2.0f)*2.0f;
+		rot_var_vec(2) = t17*(P(0,0)*t17+P(3,0)*t3*t11*2.0f)+t3*t11*(P(0,3)*t17+P(3,3)*t3*t11*2.0f)*2.0f;
+	} else {
+		rot_var_vec = 4.0f * P.slice<3,3>(1,1).diag();
+	}
+
+	return rot_var_vec;
+}
+
+void EKF24::clearMagCov()
+{
+	P.uncorrelateCovarianceSetVariance<3>(16, 0.f);
+	P.uncorrelateCovarianceSetVariance<3>(19, 0.f);
+
+	_mag_decl_cov_reset = false;
+}
+
 void EKF24::resetMagCov()
 {
 	// reset the corresponding rows and columns in the covariance matrix and
@@ -283,15 +368,35 @@ void EKF24::saveMagCovData()
 	_saved_mag_ef_d_variance = P(18, 18);
 }
 
+void EKF24::loadMagCovData()
+{
+	P.uncorrelateCovarianceSetVariance<3>(16, 0.f);
+	P.uncorrelateCovarianceSetVariance<3>(19, 0.f);
+
+	// re-instate variances for the XYZ body axis field
+	P(19, 19) = _saved_mag_bf_variance(0);
+	P(20, 20) = _saved_mag_bf_variance(1);
+	P(21, 21) = _saved_mag_bf_variance(2);
+
+	// re-instate the NE axis covariance sub-matrix
+	P.slice<2, 2>(16, 16) = _saved_mag_ef_ne_covmat;
+
+	// re-instate the D earth axis variance
+	P(18, 18) = _saved_mag_ef_d_variance;
+}
+
+void EKF24::resetGyroBiasZCov()
+{
+	const float init_gyro_bias_var = sq(_params.switch_on_gyro_bias);
+
+	P.uncorrelateCovarianceSetVariance<1>(12, init_gyro_bias_var);
+}
+
 bool EKF24::update(const imuSample& imu_sample_delayed)
 {
-
-
 	// perform state and covariance prediction for the main filter
 	predictCovariance(imu_sample_delayed);
 	predictState(imu_sample_delayed);
-
-
 
 	return false;
 }
@@ -526,6 +631,20 @@ void EKF24::predictCovariance(const imuSample &imu_delayed)
 	fixCovarianceErrors(false);
 }
 
+bool EKF24::checkAndFixCovarianceUpdate(const SquareMatrix24f &KHP)
+{
+	bool healthy = true;
+
+	for (int i = 0; i < kNumStates; i++) {
+		if (P(i, i) < KHP(i, i)) {
+			P.uncorrelateCovarianceSetVariance<1>(i, 0.0f);
+			healthy = false;
+		}
+	}
+
+	return healthy;
+}
+
 void EKF24::fixCovarianceErrors(bool force_symmetry)
 {
 	// NOTE: This limiting is a last resort and should not be relied on
@@ -729,6 +848,43 @@ void EKF24::fixCovarianceErrors(bool force_symmetry)
 
 }
 
+void EKF24::clearInhibitedStateKalmanGains(Vector24f &K) const
+{
+	// gyro bias: states 10, 11, 12
+	for (unsigned i = 0; i < 3; i++) {
+		if (_gyro_bias_inhibit[i]) {
+			K(10 + i) = 0.f;
+		}
+	}
+
+	// accel bias: states 13, 14, 15
+	for (unsigned i = 0; i < 3; i++) {
+		if (_accel_bias_inhibit[i]) {
+			K(13 + i) = 0.f;
+		}
+	}
+
+	// mag I: states 16, 17, 18
+	if (!_mag_states_enabled) {
+		K(16) = 0.f;
+		K(17) = 0.f;
+		K(18) = 0.f;
+	}
+
+	// mag B: states 19, 20, 21
+	if (!_mag_states_enabled) {
+		K(19) = 0.f;
+		K(20) = 0.f;
+		K(21) = 0.f;
+	}
+
+	// wind: states 22, 23
+	if (!_wind_states_enabled) {
+		K(22) = 0.f;
+		K(23) = 0.f;
+	}
+}
+
 void EKF24::predictState(const imuSample &imu_delayed)
 {
 	// apply imu bias corrections
@@ -808,4 +964,118 @@ void EKF24::constrainStates()
 	_state.mag_I = matrix::constrain(_state.mag_I, -1.0f, 1.0f);
 	_state.mag_B = matrix::constrain(_state.mag_B, -getMagBiasLimit(), getMagBiasLimit());
 	_state.wind_vel = matrix::constrain(_state.wind_vel, -100.0f, 100.0f);
+}
+
+void EKF24::fuse(const Vector24f &K, float innovation)
+{
+	_state.quat_nominal -= K.slice<4, 1>(0, 0) * innovation;
+	_state.quat_nominal.normalize();
+	_R_to_earth = Dcmf(_state.quat_nominal);
+
+	_state.vel        -= K.slice<3, 1>(4, 0)  * innovation;
+	_state.pos        -= K.slice<3, 1>(7, 0)  * innovation;
+	_state.gyro_bias  -= K.slice<3, 1>(10, 0) * innovation;
+	_state.accel_bias -= K.slice<3, 1>(13, 0) * innovation;
+	_state.mag_I      -= K.slice<3, 1>(16, 0) * innovation;
+	_state.mag_B      -= K.slice<3, 1>(19, 0) * innovation;
+	_state.wind_vel   -= K.slice<2, 1>(22, 0) * innovation;
+}
+
+bool EKF24::measurementUpdate(Vector24f &K, float innovation_variance, float innovation)
+{
+	clearInhibitedStateKalmanGains(K);
+
+	const Vector24f KS = K * innovation_variance;
+	SquareMatrix24f KHP;
+
+	for (unsigned row = 0; row < kNumStates; row++) {
+		for (unsigned col = 0; col < kNumStates; col++) {
+			// Instad of literally computing KHP, use an equvalent
+			// equation involving less mathematical operations
+			KHP(row, col) = KS(row) * K(col);
+		}
+	}
+
+	const bool is_healthy = checkAndFixCovarianceUpdate(KHP);
+
+	if (is_healthy) {
+		// apply the covariance corrections
+		P -= KHP;
+
+		fixCovarianceErrors(true);
+
+		// apply the state corrections
+		fuse(K, innovation);
+	}
+
+	return is_healthy;
+}
+
+bool EKF24::fuseVelPosHeight(const float innov, const float innov_var, const int obs_index)
+{
+	Vector24f Kfusion;  // Kalman gain vector for any single observation - sequential fusion is used.
+	const unsigned state_index = obs_index + 4;  // we start with vx and this is the 4. state
+
+	// calculate kalman gain K = PHS, where S = 1/innovation variance
+	for (int row = 0; row < kNumStates; row++) {
+		Kfusion(row) = P(row, state_index) / innov_var;
+	}
+
+	clearInhibitedStateKalmanGains(Kfusion);
+
+	SquareMatrix24f KHP;
+
+	for (unsigned row = 0; row < kNumStates; row++) {
+		for (unsigned column = 0; column < kNumStates; column++) {
+			KHP(row, column) = Kfusion(row) * P(state_index, column);
+		}
+	}
+
+	const bool healthy = checkAndFixCovarianceUpdate(KHP);
+
+	if (healthy) {
+		// apply the covariance corrections
+		P -= KHP;
+
+		fixCovarianceErrors(true);
+
+		// apply the state corrections
+		fuse(Kfusion, innov);
+
+		return true;
+	}
+
+	return false;
+}
+
+void EKF24::resetImuBias()
+{
+	resetGyroBias();
+	resetAccelBias();
+}
+
+void EKF24::resetGyroBias()
+{
+	// Zero the gyro bias states
+	_state.gyro_bias.zero();
+
+	// Zero the corresponding covariances and set
+	// variances to the values use for initial alignment
+	P.uncorrelateCovarianceSetVariance<3>(10, sq(_params.switch_on_gyro_bias));
+
+	// Set previous frame values
+	_prev_gyro_bias_var = P.slice<3, 3>(10, 10).diag();
+}
+
+void EKF24::resetAccelBias()
+{
+	// Zero the accel bias states
+	_state.accel_bias.zero();
+
+	// Zero the corresponding covariances and set
+	// variances to the values use for initial alignment
+	P.uncorrelateCovarianceSetVariance<3>(13, sq(_params.switch_on_accel_bias));
+
+	// Set previous frame values
+	_prev_accel_bias_var = P.slice<3, 3>(13, 13).diag();
 }

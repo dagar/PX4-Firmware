@@ -117,7 +117,7 @@ void Ekf::controlRangeHeightFusion()
 		if (measurement_valid && _range_sensor.isDataHealthy()) {
 			bias_est.setMaxStateNoise(sqrtf(measurement_var));
 			bias_est.setProcessNoiseSpectralDensity(_params.rng_hgt_bias_nsd);
-			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
+			bias_est.fuseBias(measurement - (-_ekf24.getPosition()(2)), measurement_var + P(9, 9));
 		}
 
 		// determine if we should use height aiding
@@ -145,7 +145,7 @@ void Ekf::controlRangeHeightFusion()
 
 					_information_events.flags.reset_hgt_to_rng = true;
 					resetVerticalPositionTo(-(measurement - bias_est.getBias()));
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_ekf24.getPosition()(2) + measurement);
 
 					// reset vertical velocity
 					resetVerticalVelocityToZero();
@@ -171,7 +171,7 @@ void Ekf::controlRangeHeightFusion()
 					// Range finder is used while hovering to stabilize the height estimate. Don't reset but use it as height reference.
 					ECL_INFO("starting conditional %s height fusion", HGT_SRC_NAME);
 					_height_sensor_ref = HeightSensor::RANGE;
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_ekf24.getPosition()(2) + measurement);
 
 				} else if ((_params.height_sensor_ref == HeightSensor::RANGE) && (_params.rng_ctrl != RngCtrl::CONDITIONAL)) {
 					// Range finder is the primary height source, the ground is now the datum used
@@ -185,7 +185,7 @@ void Ekf::controlRangeHeightFusion()
 
 				} else {
 					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_ekf24.getPosition()(2) + measurement);
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;
@@ -222,7 +222,7 @@ bool Ekf::isConditionalRangeAidSuitable()
 			is_hagl_stable = (hagl_test_ratio < 0.01f);
 		}
 
-		const float range_hagl = _terrain_vpos - _state.pos(2);
+		const float range_hagl = _terrain_vpos - _ekf24.getPosition()(2);
 
 		const bool is_in_range = (range_hagl < range_hagl_max);
 

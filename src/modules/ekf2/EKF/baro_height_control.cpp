@@ -70,7 +70,7 @@ void Ekf::controlBaroHeightFusion()
 
 			if (_baro_counter <= _obs_buffer_length) {
 				// Initialize the pressure offset (included in the baro bias)
-				bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+				bias_est.setBias(_ekf24.getPosition()(2) + _baro_lpf.getState());
 			}
 		}
 
@@ -103,7 +103,7 @@ void Ekf::controlBaroHeightFusion()
 		if (measurement_valid) {
 			bias_est.setMaxStateNoise(sqrtf(measurement_var));
 			bias_est.setProcessNoiseSpectralDensity(_params.baro_bias_nsd);
-			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(9, 9));
+			bias_est.fuseBias(measurement - (-_ekf24.getPosition()(2)), measurement_var + _ekf24.getVariance(9));
 		}
 
 		// determine if we should use height aiding
@@ -130,7 +130,7 @@ void Ekf::controlBaroHeightFusion()
 
 					_information_events.flags.reset_hgt_to_baro = true;
 					resetVerticalPositionTo(-(_baro_lpf.getState() - bias_est.getBias()), measurement_var);
-					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+					bias_est.setBias(_ekf24.getPosition()(2) + _baro_lpf.getState());
 
 					// reset vertical velocity
 					resetVerticalVelocityToZero();
@@ -157,11 +157,11 @@ void Ekf::controlBaroHeightFusion()
 
 					_information_events.flags.reset_hgt_to_baro = true;
 					resetVerticalPositionTo(-(_baro_lpf.getState() - bias_est.getBias()), measurement_var);
-					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+					bias_est.setBias(_ekf24.getPosition()(2) + _baro_lpf.getState());
 
 				} else {
 					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
-					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+					bias_est.setBias(_ekf24.getPosition()(2) + _baro_lpf.getState());
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;

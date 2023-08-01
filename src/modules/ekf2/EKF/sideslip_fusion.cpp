@@ -87,7 +87,7 @@ void Ekf::updateSideslip(estimator_aid_source1d_s &sideslip) const
 
 	float innov = 0.f;
 	float innov_var = 0.f;
-	sym::ComputeSideslipInnovAndInnovVar(getStateAtFusionHorizonAsVector(), P, R, FLT_EPSILON, &innov, &innov_var);
+	sym::ComputeSideslipInnovAndInnovVar(_ekf24.getStateAtFusionHorizonAsVector(), P, R, FLT_EPSILON, &innov, &innov_var);
 
 	sideslip.observation = 0.f;
 	sideslip.observation_variance = R;
@@ -123,7 +123,7 @@ void Ekf::fuseSideslip(estimator_aid_source1d_s &sideslip)
 			action_string = "wind";
 
 		} else {
-			initialiseCovariance();
+			_ekf24.initialiseCovariance()
 			_state.wind_vel.setZero();
 			action_string = "full";
 		}
@@ -138,7 +138,7 @@ void Ekf::fuseSideslip(estimator_aid_source1d_s &sideslip)
 	Vector24f H; // Observation jacobian
 	Vector24f K; // Kalman gain vector
 
-	sym::ComputeSideslipHAndK(getStateAtFusionHorizonAsVector(), P, sideslip.innovation_variance, FLT_EPSILON, &H, &K);
+	sym::ComputeSideslipHAndK(_ekf24.getStateAtFusionHorizonAsVector(), P, sideslip.innovation_variance, FLT_EPSILON, &H, &K);
 
 	if (update_wind_only) {
 		for (unsigned row = 0; row <= 21; row++) {
@@ -146,7 +146,7 @@ void Ekf::fuseSideslip(estimator_aid_source1d_s &sideslip)
 		}
 	}
 
-	const bool is_fused = measurementUpdate(K, sideslip.innovation_variance, sideslip.innovation);
+	const bool is_fused = _ekf24.measurementUpdate(K, sideslip.innovation_variance, sideslip.innovation);
 
 	sideslip.fused = is_fused;
 	_fault_status.flags.bad_sideslip = !is_fused;

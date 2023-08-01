@@ -50,10 +50,10 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector2f &ob
 
 	for (int i = 0; i < 2; i++) {
 		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
+		aid_src.innovation[i] = _ekf24.getVelocity()(i) - aid_src.observation[i];
 
 		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
-		aid_src.innovation_variance[i] = P(4 + i, 4 + i) + aid_src.observation_variance[i];
+		aid_src.innovation_variance[i] = _ekf24.getVariance(4 + i) + aid_src.observation_variance[i];
 	}
 
 	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
@@ -68,10 +68,10 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector3f &ob
 
 	for (int i = 0; i < 3; i++) {
 		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
+		aid_src.innovation[i] = _ekf24.getVelocity()(i) - aid_src.observation[i];
 
 		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
-		aid_src.innovation_variance[i] = P(4 + i, 4 + i) + aid_src.observation_variance[i];
+		aid_src.innovation_variance[i] = _ekf24.getVariance(4 + i) + aid_src.observation_variance[i];
 	}
 
 	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
@@ -93,10 +93,10 @@ void Ekf::updateVerticalPositionAidSrcStatus(const uint64_t &time_us, const floa
 	resetEstimatorAidStatus(aid_src);
 
 	aid_src.observation = obs;
-	aid_src.innovation = _state.pos(2) - aid_src.observation;
+	aid_src.innovation = _ekf24.getPosition()(2) - aid_src.observation;
 
 	aid_src.observation_variance = math::max(sq(0.01f), obs_var);
-	aid_src.innovation_variance = P(9, 9) + aid_src.observation_variance;
+	aid_src.innovation_variance = _ekf24.getPositionVariance()(2) + aid_src.observation_variance;
 
 	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
 
@@ -118,10 +118,10 @@ void Ekf::updateHorizontalPositionAidSrcStatus(const uint64_t &time_us, const Ve
 
 	for (int i = 0; i < 2; i++) {
 		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.pos(i) - aid_src.observation[i];
+		aid_src.innovation[i] = _ekf24.getPosition()(i) - aid_src.observation[i];
 
 		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
-		aid_src.innovation_variance[i] = P(7 + i, 7 + i) + aid_src.observation_variance[i];
+		aid_src.innovation_variance[i] = _ekf24.getVariance(7 + i) + aid_src.observation_variance[i];
 	}
 
 	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
@@ -192,41 +192,11 @@ void Ekf::fuseVerticalPosition(estimator_aid_source1d_s &aid_src)
 // Helper function that fuses a single velocity or position measurement
 bool Ekf::fuseVelPosHeight(const float innov, const float innov_var, const int obs_index)
 {
-	Vector24f Kfusion;  // Kalman gain vector for any single observation - sequential fusion is used.
-	const unsigned state_index = obs_index + 4;  // we start with vx and this is the 4. state
-
-	// calculate kalman gain K = PHS, where S = 1/innovation variance
-	for (int row = 0; row < _k_num_states; row++) {
-		Kfusion(row) = P(row, state_index) / innov_var;
-	}
-
-	clearInhibitedStateKalmanGains(Kfusion);
-
-	SquareMatrix24f KHP;
-
-	for (unsigned row = 0; row < _k_num_states; row++) {
-		for (unsigned column = 0; column < _k_num_states; column++) {
-			KHP(row, column) = Kfusion(row) * P(state_index, column);
-		}
-	}
-
-	const bool healthy = checkAndFixCovarianceUpdate(KHP);
+	const bool healthy = _ekf24.fuseVelPosHeight(innov, innov_var, obs_index);
 
 	setVelPosStatus(obs_index, healthy);
 
-	if (healthy) {
-		// apply the covariance corrections
-		P -= KHP;
-
-		fixCovarianceErrors(true);
-
-		// apply the state corrections
-		fuse(Kfusion, innov);
-
-		return true;
-	}
-
-	return false;
+	return healthy;
 }
 
 void Ekf::setVelPosStatus(const int index, const bool healthy)

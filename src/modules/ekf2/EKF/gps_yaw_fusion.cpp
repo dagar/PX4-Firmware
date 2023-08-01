@@ -65,7 +65,7 @@ void Ekf::updateGpsYaw(const gpsSample &gps_sample)
 
 		{
 		Vector24f H;
-		sym::ComputeGnssYawPredInnovVarAndH(getStateAtFusionHorizonAsVector(), P, _gps_yaw_offset, R_YAW, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
+		sym::ComputeGnssYawPredInnovVarAndH(_ekf24.getStateAtFusionHorizonAsVector(), P, _gps_yaw_offset, R_YAW, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
 		}
 
 		gnss_yaw.observation = measured_hdg;
@@ -99,7 +99,7 @@ void Ekf::fuseGpsYaw()
 
 	// Note: we recompute innov and innov_var because it doesn't cost much more than just computing H
 	// making a separate function just for H uses more flash space without reducing CPU load significantly
-	sym::ComputeGnssYawPredInnovVarAndH(getStateAtFusionHorizonAsVector(), P, _gps_yaw_offset, gnss_yaw.observation_variance, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
+	sym::ComputeGnssYawPredInnovVarAndH(_ekf24.getStateAtFusionHorizonAsVector(), P, _gps_yaw_offset, gnss_yaw.observation_variance, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
 	}
 
 	const SparseVector24f<0,1,2,3> Hfusion(H);
@@ -110,7 +110,7 @@ void Ekf::fuseGpsYaw()
 		_fault_status.flags.bad_hdg = true;
 
 		// we reinitialise the covariance matrix and abort this fusion step
-		initialiseCovariance();
+		_ekf24.initialiseCovariance()
 		ECL_ERR("GPS yaw numerical error - covariance reset");
 		return;
 	}
@@ -126,14 +126,14 @@ void Ekf::fuseGpsYaw()
 		// A constant large signed test ratio is a sign of wrong gyro bias
 		// Reset the yaw gyro variance to converge faster and avoid
 		// being stuck on a previous bad estimate
-		resetGyroBiasZCov();
+		_ekf24.resetGyroBiasZCov();
 	}
 
 	// calculate the Kalman gains
 	// only calculate gains for states we are using
 	Vector24f Kfusion = P * Hfusion / gnss_yaw.innovation_variance;
 
-	const bool is_fused = measurementUpdate(Kfusion, gnss_yaw.innovation_variance, gnss_yaw.innovation);
+	const bool is_fused = _ekf24.measurementUpdate(Kfusion, gnss_yaw.innovation_variance, gnss_yaw.innovation);
 	_fault_status.flags.bad_hdg = !is_fused;
 	gnss_yaw.fused = is_fused;
 

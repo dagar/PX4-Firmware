@@ -85,7 +85,7 @@ void Ekf::fuseDrag(const dragSample &drag_sample)
 				      _state.vel(2));
 	const Vector3f rel_wind_body = _state.quat_nominal.rotateVectorInverse(rel_wind_earth);
 	const float rel_wind_speed = rel_wind_body.norm();
-	const Vector24f state_vector_prev = getStateAtFusionHorizonAsVector();
+	const Vector24f state_vector_prev = _ekf24.getStateAtFusionHorizonAsVector();
 
 	Vector2f bcoef_inv;
 
@@ -144,7 +144,7 @@ void Ekf::fuseDrag(const dragSample &drag_sample)
 
 		// if the innovation consistency check fails then don't fuse the sample
 		if (_drag_test_ratio(axis_index) <= 1.0f) {
-			measurementUpdate(Kfusion, _drag_innov_var(axis_index), _drag_innov(axis_index));
+			_ekf24.measurementUpdate(Kfusion, _drag_innov_var(axis_index), _drag_innov(axis_index));
 		}
 	}
 }

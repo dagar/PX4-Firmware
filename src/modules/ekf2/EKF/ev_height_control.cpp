@@ -94,7 +94,7 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 	if (measurement_valid && quality_sufficient) {
 		bias_est.setMaxStateNoise(sqrtf(measurement_var));
 		bias_est.setProcessNoiseSpectralDensity(_params.ev_hgt_bias_nsd);
-		bias_est.fuseBias(measurement - _state.pos(2), measurement_var + P(9, 9));
+		bias_est.fuseBias(measurement - _ekf24.getPosition()(2), measurement_var + P(9, 9));
 	}
 
 	const bool continuing_conditions_passing = (_params.ev_ctrl & static_cast<int32_t>(EvCtrl::VPOS))
@@ -119,7 +119,7 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 						bias_est.reset();
 
 					} else {
-						bias_est.setBias(-_state.pos(2) + measurement);
+						bias_est.setBias(-_ekf24.getPosition()(2) + measurement);
 					}
 
 					aid_src.time_last_fuse = _time_delayed_us;
@@ -145,7 +145,7 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 				ECL_WARN("%s fusion reset required, all height sources failing", AID_SRC_NAME);
 				_information_events.flags.reset_hgt_to_ev = true;
 				resetVerticalPositionTo(measurement - bias_est.getBias(), measurement_var);
-				bias_est.setBias(-_state.pos(2) + measurement);
+				bias_est.setBias(-_ekf24.getPosition()(2) + measurement);
 
 				// reset vertical velocity
 				if (ev_sample.vel.isAllFinite() && (_params.ev_ctrl & static_cast<int32_t>(EvCtrl::VEL))) {
@@ -202,7 +202,7 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 
 			} else {
 				ECL_INFO("starting %s fusion", AID_SRC_NAME);
-				bias_est.setBias(-_state.pos(2) + measurement);
+				bias_est.setBias(-_ekf24.getPosition()(2) + measurement);
 			}
 
 			aid_src.time_last_fuse = _time_delayed_us;

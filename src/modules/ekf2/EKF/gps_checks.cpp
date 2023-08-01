@@ -79,7 +79,7 @@ bool Ekf::collect_gps(const gpsMessage &gps)
 
 		// Take the current GPS height and subtract the filter height above origin to estimate the GPS height of the origin
 		if (!PX4_ISFINITE(_gps_alt_ref)) {
-			_gps_alt_ref = 1e-3f * (float)gps.alt + _state.pos(2);
+			_gps_alt_ref = 1e-3f * (float)gps.alt + _ekf24.getPosition()(2);
 		}
 
 		_NED_origin_initialised = true;

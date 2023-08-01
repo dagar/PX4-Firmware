@@ -319,8 +319,6 @@ protected:
 	*/
 	uint8_t _imu_buffer_length{0};
 
-	float _dt_ekf_avg{0.010f}; ///< average update rate of the ekf in s
-
 	uint64_t _time_delayed_us{0}; // captures the imu sample on the delayed time horizon
 	uint64_t _time_latest_us{0}; // imu sample capturing the newest imu data
 
