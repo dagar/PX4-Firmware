@@ -174,7 +174,9 @@ bool Ekf::update()
 		// TODO: explicitly pop at desired time horizon
 		const imuSample imu_sample_delayed = _imu_buffer.get_oldest();
 
-		_ekf24.update();
+		if (_ekf24.update(imu_sample_delayed)) {
+
+		}
 
 		// perform state and covariance prediction for the main filter
 		predictCovariance(imu_sample_delayed);
