@@ -62,6 +62,9 @@
 #endif
 
 #include "common.h"
+
+#include "EKF24.hpp"
+
 #include "RingBuffer.h"
 #include "imu_down_sampler.hpp"
 #include "output_predictor.h"
@@ -295,6 +298,9 @@ protected:
 	virtual bool init(uint64_t timestamp) = 0;
 
 	parameters _params{};		// filter parameters
+
+
+	EKF24 _ekf24{};
 
 	/*
 	 OBS_BUFFER_LENGTH defines how many observations (non-IMU measurements) we can buffer

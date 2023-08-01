@@ -39,6 +39,7 @@ list(APPEND EKF_SRCS
 	covariance.cpp
 	ekf.cpp
 	ekf_helper.cpp
+	EKF24.cpp
 	EKFGSF_yaw.cpp
 	estimator_interface.cpp
 	fake_height_control.cpp

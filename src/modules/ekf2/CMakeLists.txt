@@ -72,6 +72,7 @@ list(APPEND EKF_SRCS
 	EKF/bias_estimator.cpp
 	EKF/control.cpp
 	EKF/covariance.cpp
+	EKF/EKF24.cpp
 	EKF/ekf.cpp
 	EKF/ekf_helper.cpp
 	EKF/EKFGSF_yaw.cpp
