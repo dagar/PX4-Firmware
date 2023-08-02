@@ -75,7 +75,7 @@ if("${CMAKE_SYSTEM}" MATCHES "Linux")
 		set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}_${DEB_ARCHITECTURE}")
 
 		set(CPACK_INSTALL_PREFIX @DEB_INSTALL_PREFIX@)
-		message ("==> CPACK_INSTALL_PREFIX = " ${CPACK_INSTALL_PREFIX})
+		#message ("==> CPACK_INSTALL_PREFIX = " ${CPACK_INSTALL_PREFIX})
 
 		################################################################################
 
