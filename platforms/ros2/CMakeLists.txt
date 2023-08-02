@@ -53,6 +53,25 @@ add_compile_options(
 
 include_directories(${PX4_BINARY_DIR})
 
+
+# file(STRINGS "${PX4_SOURCE_DIR}/src/modules/uxrce_dds_client/dds_topics.yaml" dds_topics_yaml)
+
+# foreach(file_ln ${dds_topics_yaml})
+
+# 	if((NOT ${file_ln} MATCHES "^#") AND (${file_ln} MATCHES ".*type:"))
+# 		separate_arguments(file_ln)
+# 		message(STATUS "file_ln: ${file_ln}")
+
+# 		foreach(line ${file_ln})
+# 			message(STATUS "line: ${line}")
+# 		endforeach()
+# 	endif()
+
+# 	#if(${file_ln} MATCHES ".*type:")
+# 		#message(STATUS "file_ln: ${file_ln}")
+# 	#endif()
+# endforeach()
+
 # relative path to msgs
 set(ros_msg_files)
 foreach(msg_file ${msg_files})
@@ -90,3 +109,6 @@ ament_export_dependencies(rosidl_default_runtime)
 # 	scripts/py_node.py
 # 	DESTINATION lib/${PROJECT_NAME}
 # )
+
+add_subdirectory(nodes/micro-xrce-dds-agent)
+add_subdirectory(nodes/px4_firmware_manager)
