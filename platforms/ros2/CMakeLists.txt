@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2022 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2022-2023 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -125,8 +125,28 @@ ament_export_dependencies(rosidl_default_runtime)
 # )
 
 
-
+# # Install our node and library
+# install(TARGETS my_node my_library
+#   ARCHIVE DESTINATION lib
+#   LIBRARY DESTINATION lib
+#   RUNTIME DESTINATION lib/${PACKAGE_NAME}
+# )
 
 add_subdirectory(nodes/micro-xrce-dds-agent)
 add_subdirectory(nodes/offboard_example)
+#add_subdirectory(nodes/px4)
 add_subdirectory(nodes/px4_firmware_manager)
+
+# install(
+# 	TARGETS
+# 		${PROJECT_NAME}
+# 	DESTINATION
+# 		lib/${PROJECT_NAME}
+# )
+
+install(
+	DIRECTORY
+		${PX4_SOURCE_DIR}/launch
+	DESTINATION
+		share/${PROJECT_NAME}
+)

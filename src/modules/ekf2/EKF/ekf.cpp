@@ -270,7 +270,7 @@ void Ekf::predictState(const imuSample &imu_delayed)
 	const Vector3f corrected_delta_vel = imu_delayed.delta_vel - delta_vel_bias_scaled;
 	const Vector3f corrected_delta_vel_ef = _R_to_earth * corrected_delta_vel;
 
-	// save the previous value of velocity so we can use trapzoidal integration
+	// save the previous value of velocity so we can use trapezoidal integration
 	const Vector3f vel_last = _state.vel;
 
 	// calculate the increment in velocity using the current orientation

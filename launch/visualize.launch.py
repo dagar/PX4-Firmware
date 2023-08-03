@@ -45,7 +45,7 @@ def generate_launch_description():
     package_dir = get_package_share_directory('px4_offboard')
     return LaunchDescription([
         Node(
-            package='px4_offboard',
+            package='px4',
             namespace='px4_offboard',
             executable='visualizer',
             name='visualizer'

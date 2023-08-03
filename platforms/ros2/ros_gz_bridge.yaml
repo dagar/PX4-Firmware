@@ -1,0 +1,8 @@
+
+  - topic_name: "imu"
+    ros_type_name: "sensor_msgs/msg/Imu"
+    gz_type_name: "gz.msgs.IMU"
+
+  - topic_name: "navsat"
+    ros_type_name: "sensor_msgs/msg/NavSatFix"
+    gz_type_name: "gz.msgs.NavSat"

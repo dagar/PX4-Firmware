@@ -139,7 +139,6 @@ elseif("${PX4_BOARD}" MATCHES "sitl")
 	# px4 dirs
 	install(
 		DIRECTORY
-			${PROJECT_SOURCE_DIR}/integrationtests
 			${PROJECT_SOURCE_DIR}/launch
 			${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
 		DESTINATION
@@ -168,7 +167,7 @@ elseif("${PX4_BOARD}" MATCHES "sitl")
 	# px4 Tools files
 	install(
 		PROGRAMS
-			${PROJECT_SOURCE_DIR}/Tools/simulation/gazebo-classic/setup_gazebo.bash
+			#${PROJECT_SOURCE_DIR}/Tools/simulation/gazebo-classic/setup_gazebo.bash
 			${PROJECT_SOURCE_DIR}/Tools/upload_log.py
 		DESTINATION
 			${PROJECT_NAME}/Tools
