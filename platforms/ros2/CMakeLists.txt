@@ -54,27 +54,53 @@ add_compile_options(
 include_directories(${PX4_BINARY_DIR})
 
 
-# file(STRINGS "${PX4_SOURCE_DIR}/src/modules/uxrce_dds_client/dds_topics.yaml" dds_topics_yaml)
+set(px4_dds_client_msg_files)
+file(STRINGS "${PX4_SOURCE_DIR}/src/modules/uxrce_dds_client/dds_topics.yaml" dds_topics_yaml)
 
-# foreach(file_ln ${dds_topics_yaml})
+foreach(file_ln ${dds_topics_yaml})
 
-# 	if((NOT ${file_ln} MATCHES "^#") AND (${file_ln} MATCHES ".*type:"))
-# 		separate_arguments(file_ln)
-# 		message(STATUS "file_ln: ${file_ln}")
+	if((NOT ${file_ln} MATCHES "^#") AND (${file_ln} MATCHES ".*type:"))
 
-# 		foreach(line ${file_ln})
-# 			message(STATUS "line: ${line}")
-# 		endforeach()
-# 	endif()
+		string(REPLACE " " ";" file_ln ${file_ln})
 
-# 	#if(${file_ln} MATCHES ".*type:")
-# 		#message(STATUS "file_ln: ${file_ln}")
-# 	#endif()
-# endforeach()
+		foreach(line ${file_ln})
+
+			if("${line}" MATCHES "^px4::msg::.*")
+				#message(STATUS "line: ${line}")
+
+				string(REPLACE "::" ";" type_split ${line})
+
+				#message(STATUS "type split: ${type_split}")
+
+				list(GET type_split 2 px4_msg_file)
+				#message(STATUS "px4_msg_file: ${px4_msg_file}")
+
+				if(EXISTS ${PX4_SOURCE_DIR}/msg/${px4_msg_file}.msg)
+					list(APPEND px4_dds_client_msg_files
+						"${PX4_SOURCE_DIR}/msg/${px4_msg_file}.msg"
+						)
+				endif()
+
+			endif()
+		endforeach()
+	endif()
+
+
+endforeach()
+
+# TODO: types within types
+list(APPEND px4_dds_client_msg_files
+	${PX4_SOURCE_DIR}/msg/TrajectoryBezier.msg
+	${PX4_SOURCE_DIR}/msg/TrajectoryWaypoint.msg
+)
+
+list(REMOVE_DUPLICATES px4_dds_client_msg_files)
+#message(STATUS "msg_files: ${px4_dds_client_msg_files}")
 
 # relative path to msgs
 set(ros_msg_files)
-foreach(msg_file ${msg_files})
+#foreach(msg_file ${msg_files}) # for full set of msgs
+foreach(msg_file ${px4_dds_client_msg_files})
 	file(RELATIVE_PATH relative_path ${CMAKE_CURRENT_SOURCE_DIR} ${msg_file})
 	list(APPEND ros_msg_files ${relative_path})
 endforeach()
