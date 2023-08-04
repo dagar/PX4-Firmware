@@ -726,7 +726,6 @@ private:
 	// imu fault status
 	uint64_t _time_bad_vert_accel{0};	///< last time a bad vertical accel was detected (uSec)
 	uint64_t _time_good_vert_accel{0};	///< last time a good vertical accel was detected (uSec)
-	uint16_t _clip_counter{0};		///< counter that increments when clipping ad decrements when not
 
 	float _height_rate_lpf{0.0f};
 
@@ -1052,7 +1051,7 @@ private:
 	void stopAuxVelFusion();
 #endif // CONFIG_EKF2_AUXVEL
 
-	void checkVerticalAccelerationHealth(const imuSample &imu_delayed);
+	void checkAccelerationHealth(const imuSample &imu_delayed);
 	Likelihood estimateInertialNavFallingLikelihood() const;
 
 	// control for combined height fusion mode (implemented for switching between baro and range height)
@@ -1139,6 +1138,8 @@ private:
 
 	HeightBiasEstimator _baro_b_est{HeightSensor::BARO, _height_sensor_ref};
 	HeightBiasEstimator _gps_hgt_b_est{HeightSensor::GNSS, _height_sensor_ref};
+
+	bool _imu_accel_clipping_NED[3]{}; // IMU sample delayed accel clipping in NED frame
 
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 	HeightBiasEstimator _ev_hgt_b_est{HeightSensor::EV, _height_sensor_ref};

@@ -518,7 +518,8 @@ union fault_status_u {
 		bool bad_pos_D         : 1; ///< 14 - true if fusion of the Down position has encountered a numerical error
 		bool bad_acc_bias      : 1; ///< 15 - true if bad delta velocity bias estimates have been detected
 		bool bad_acc_vertical  : 1; ///< 16 - true if bad vertical accelerometer data has been detected
-		bool bad_acc_clipping  : 1; ///< 17 - true if delta velocity data contains clipping (asymmetric railing)
+		bool bad_acc_clipping_vertical   : 1; ///< 17 - true if delta velocity data contains clipping (asymmetric railing)
+		bool bad_acc_clipping_horizontal : 1; ///< 18 - true if delta velocity data contains clipping (asymmetric railing)
 	} flags;
 	uint32_t value;
 };

@@ -114,7 +114,6 @@ void Ekf::reset()
 
 	_time_bad_vert_accel = 0;
 	_time_good_vert_accel = 0;
-	_clip_counter = 0;
 
 	resetEstimatorAidStatus(_aid_src_baro_hgt);
 #if defined(CONFIG_EKF2_AIRSPEED)
@@ -176,6 +175,9 @@ bool Ekf::update()
 		// get the oldest IMU data from the buffer
 		// TODO: explicitly pop at desired time horizon
 		const imuSample imu_sample_delayed = _imu_buffer.get_oldest();
+
+
+		checkAccelerationHealth(imu_delayed);
 
 		// perform state and covariance prediction for the main filter
 		predictCovariance(imu_sample_delayed);

@@ -58,6 +58,18 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector2f &ob
 
 	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
 
+	// special case if there is bad acceleration data, then don't reject measurement,
+	// but limit innovation to prevent spikes that could destabilise the filter
+	if (aid_src.innovation_rejected && isRecent(aid_src.time_last_fuse, 1e6)) {
+		for (int i = 0; i < 2; i++) {
+			if (_imu_accel_clipping_NED[i]) {
+				const float innov_limit = innov_gate * sqrtf(aid_src.innovation_variance[i]);
+				aid_src.innovation[i] = math::constrain(aid_src.innovation[i], -innov_limit, innov_limit);
+				aid_src.innovation_rejected = false;
+			}
+		}
+	}
+
 	aid_src.timestamp_sample = time_us;
 }
 
@@ -76,12 +88,16 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector3f &ob
 
 	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
 
-	// vz special case if there is bad vertical acceleration data, then don't reject measurement,
+	// special case if there is bad acceleration data, then don't reject measurement,
 	// but limit innovation to prevent spikes that could destabilise the filter
-	if (_fault_status.flags.bad_acc_vertical && aid_src.innovation_rejected) {
-		const float innov_limit = innov_gate * sqrtf(aid_src.innovation_variance[2]);
-		aid_src.innovation[2] = math::constrain(aid_src.innovation[2], -innov_limit, innov_limit);
-		aid_src.innovation_rejected = false;
+	if (aid_src.innovation_rejected && isRecent(aid_src.time_last_fuse, 1e6)) {
+		for (int i = 0; i < 3; i++) {
+			if (_imu_accel_clipping_NED[i]) {
+				const float innov_limit = innov_gate * sqrtf(aid_src.innovation_variance[i]);
+				aid_src.innovation[i] = math::constrain(aid_src.innovation[i], -innov_limit, innov_limit);
+				aid_src.innovation_rejected = false;
+			}
+		}
 	}
 
 	aid_src.timestamp_sample = time_us;
@@ -102,10 +118,12 @@ void Ekf::updateVerticalPositionAidSrcStatus(const uint64_t &time_us, const floa
 
 	// z special case if there is bad vertical acceleration data, then don't reject measurement,
 	// but limit innovation to prevent spikes that could destabilise the filter
-	if (_fault_status.flags.bad_acc_vertical && aid_src.innovation_rejected) {
-		const float innov_limit = innov_gate * sqrtf(aid_src.innovation_variance);
-		aid_src.innovation = math::constrain(aid_src.innovation, -innov_limit, innov_limit);
-		aid_src.innovation_rejected = false;
+	if (aid_src.innovation_rejected && isRecent(aid_src.time_last_fuse, 1e6)) {
+		if (_imu_accel_clipping_NED[2] || _fault_status.flags.bad_acc_vertical) {
+			const float innov_limit = innov_gate * sqrtf(aid_src.innovation_variance);
+			aid_src.innovation = math::constrain(aid_src.innovation, -innov_limit, innov_limit);
+			aid_src.innovation_rejected = false;
+		}
 	}
 
 	aid_src.timestamp_sample = time_us;
@@ -125,6 +143,19 @@ void Ekf::updateHorizontalPositionAidSrcStatus(const uint64_t &time_us, const Ve
 	}
 
 	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
+
+	// special case if there is bad acceleration data, then don't reject measurement,
+	// but limit innovation to prevent spikes that could destabilise the filter
+	if (aid_src.innovation_rejected && isRecent(aid_src.time_last_fuse, 1e6)) {
+
+		for (int i = 0; i < 2; i++) {
+			if (_imu_accel_clipping_NED[i]) {
+				const float innov_limit = innov_gate * sqrtf(aid_src.innovation_variance[i]);
+				aid_src.innovation[i] = math::constrain(aid_src.innovation[i], -innov_limit, innov_limit);
+				aid_src.innovation_rejected = false;
+			}
+		}
+	}
 
 	aid_src.timestamp_sample = time_us;
 }
@@ -181,12 +212,62 @@ void Ekf::fuseHorizontalPosition(estimator_aid_source2d_s &aid_src)
 void Ekf::fuseVerticalPosition(estimator_aid_source1d_s &aid_src)
 {
 	// z
-	if (aid_src.fusion_enabled && !aid_src.innovation_rejected) {
-		if (fuseVelPosHeight(aid_src.innovation, aid_src.innovation_variance, 5)) {
-			aid_src.fused = true;
-			aid_src.time_last_fuse = _time_delayed_us;
+	if (aid_src.fusion_enabled) {
+		if (!aid_src.innovation_rejected) {
+			if (fuseVelPosHeight(aid_src.innovation, aid_src.innovation_variance, 5)) {
+				aid_src.fused = true;
+				aid_src.time_last_fuse = _time_delayed_us;
+			}
+		} else {
+			const float innov_ratio = aid_src.innovation / sqrtf(aid_src.innovation_variance);
+
+			bool failed_min = innov_ratio > _params.vert_innov_test_min;
+			bool failed_lim = innov_ratio > _params.vert_innov_test_lim;
 		}
+
 	}
+
+	// filtered test ratio
+	// filtered innovation
+	// filtered innovation ratio
+
+
+	// 	_gnss_yaw_signed_test_ratio_lpf.update(matrix::sign(gnss_yaw.innovation) * gnss_yaw.test_ratio);
+
+
+	// _filter_state + _alpha * (sample - _filter_state)
+
+
+
+
+	// // Compute the check based on innovation ratio for all the sources
+	// for (unsigned i = 0; i < 6; i++) {
+	// 	if (checks[i].innov_var < FLT_EPSILON) {
+	// 		continue;
+	// 	}
+
+	// 	const float innov_ratio = checks[i].innov / sqrtf(checks[i].innov_var);
+	// 	checks[i].failed_min = innov_ratio > _params.vert_innov_test_min;
+	// 	checks[i].failed_lim = innov_ratio > _params.vert_innov_test_lim;
+	// }
+
+	// // Check all the sources agains each other
+	// for (unsigned i = 0; i < 6; i++) {
+	// 	if (checks[i].failed_lim) {
+	// 		// There is a chance that the inertial nav is falling if one source is failing the test
+	// 		likelihood_medium = true;
+	// 	}
+
+	// 	for (unsigned j = 0; j < 6; j++) {
+
+	// 		if ((checks[i].ref_type != checks[j].ref_type) && checks[i].failed_lim && checks[j].failed_min) {
+	// 			// There is a high chance that the inertial nav is failing if two sources are failing the test
+	// 			likelihood_high = true;
+	// 		}
+	// 	}
+	// }
+
+
 }
 
 // Helper function that fuses a single velocity or position measurement

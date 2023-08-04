@@ -39,8 +39,6 @@
 
 void Ekf::controlHeightFusion(const imuSample &imu_delayed)
 {
-	checkVerticalAccelerationHealth(imu_delayed);
-
 	updateGroundEffect();
 
 	controlBaroHeightFusion();
@@ -113,8 +111,34 @@ void Ekf::checkHeightSensorRefFallback()
 	}
 }
 
-void Ekf::checkVerticalAccelerationHealth(const imuSample &imu_delayed)
+void Ekf::checkAccelerationHealth(const imuSample &imu_delayed)
 {
+	// if there's accel clipping (asymmetric railing) then for convenience register in earth frame
+	if (imu_delayed.delta_vel_clipping[0] || imu_delayed.delta_vel_clipping[1] || imu_delayed.delta_vel_clipping[2]) {
+
+		// delta velocity clipping in body fixed frame
+		const Vector3f clipping_bf {
+			imu_delayed.delta_vel_clipping[0] ? 1.f : 0.f,
+			imu_delayed.delta_vel_clipping[1] ? 1.f : 0.f,
+			imu_delayed.delta_vel_clipping[2] ? 1.f : 0.f
+		};
+
+		// delta velocity clipping in earth frame
+		const Vector3f clipping_ef = _R_to_earth * clipping_bf;
+
+		bool clipping_N = fabsf(clipping_ef(0)) > 0.5f; // north
+		bool clipping_E = fabsf(clipping_ef(1)) > 0.5f; // east
+		bool clipping_D = fabsf(clipping_ef(2)) > 0.5f; // down
+
+		_fault_status.flags.bad_acc_clipping_horizontal = clipping_N || clipping_E;
+		_fault_status.flags.bad_acc_clipping_vertical = clipping_D;
+
+	} else {
+		_fault_status.flags.bad_acc_clipping_horizontal = false;
+		_fault_status.flags.bad_acc_clipping_vertical = false;
+	}
+
+
 	// Check for IMU accelerometer vibration induced clipping as evidenced by the vertical
 	// innovations being positive and not stale.
 	// Clipping usually causes the average accel reading to move towards zero which makes the INS
@@ -122,26 +146,11 @@ void Ekf::checkVerticalAccelerationHealth(const imuSample &imu_delayed)
 
 	Likelihood inertial_nav_falling_likelihood = estimateInertialNavFallingLikelihood();
 
-	// Check for more than 50% clipping affected IMU samples within the past 1 second
-	const uint16_t clip_count_limit = 1.f / _dt_ekf_avg;
-	const bool is_clipping = imu_delayed.delta_vel_clipping[0] ||
-				 imu_delayed.delta_vel_clipping[1] ||
-				 imu_delayed.delta_vel_clipping[2];
-
-	if (is_clipping && _clip_counter < clip_count_limit) {
-		_clip_counter++;
-
-	} else if (_clip_counter > 0) {
-		_clip_counter--;
-	}
-
-	_fault_status.flags.bad_acc_clipping = _clip_counter > clip_count_limit / 2;
-
-	const bool is_clipping_frequently = _clip_counter > 0;
-
 	// Do not require evidence of clipping if the likelihood of having the INS falling is high
-	const bool bad_vert_accel = (is_clipping_frequently && (inertial_nav_falling_likelihood == Likelihood::MEDIUM))
-				    || (inertial_nav_falling_likelihood == Likelihood::HIGH);
+	// const bool bad_vert_accel = (is_clipping_frequently && (inertial_nav_falling_likelihood == Likelihood::MEDIUM))
+	// 			    || (inertial_nav_falling_likelihood == Likelihood::HIGH);
+
+	const bool bad_vert_accel = (inertial_nav_falling_likelihood == Likelihood::HIGH);
 
 	if (bad_vert_accel) {
 		_time_bad_vert_accel = imu_delayed.time_us;

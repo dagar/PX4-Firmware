@@ -129,6 +129,20 @@ void Ekf::controlEvVelFusion(const extVisionSample &ev_sample, const bool common
 				   math::max(_params.ev_vel_innov_gate, 1.f), // innovation gate
 				   aid_src);
 
+	if (accel_clipping
+	&& _aid_src_gnss_vel.innovation_rejected
+	&& isRecent(_aid_src_gnss_vel.time_last_fuse, 1e6)
+	&& (gps_sample.sacc < _params.req_sacc)
+	) {
+		for (int i = 0; i < 3; i++) {
+			const float innov_limit = vel_innov_gate * sqrtf(_aid_src_gnss_vel.innovation_variance[i]);
+			_aid_src_gnss_vel.innovation[i] = math::constrain(_aid_src_gnss_vel.innovation[i], -innov_limit, innov_limit);
+		}
+		_aid_src_gnss_vel.innovation_rejected = false;
+	}
+
+
+
 	if (!measurement_valid) {
 		continuing_conditions_passing = false;
 	}

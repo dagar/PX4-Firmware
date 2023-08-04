@@ -82,6 +82,9 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 		const bool gps_checks_passing = isTimedOut(_last_gps_fail_us, (uint64_t)5e6);
 		const bool gps_checks_failing = isTimedOut(_last_gps_pass_us, (uint64_t)5e6);
 
+		const bool accel_clipping = imu_delayed.delta_vel_clipping[0] || imu_delayed.delta_vel_clipping[1] || imu_delayed.delta_vel_clipping[2];
+
+
 #if defined(CONFIG_EKF2_GNSS_YAW)
 		controlGpsYawFusion(gps_sample, gps_checks_passing, gps_checks_failing);
 #endif // CONFIG_EKF2_GNSS_YAW
@@ -90,12 +93,27 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 		const Vector3f velocity{gps_sample.vel};
 		const float vel_var = sq(math::max(gps_sample.sacc, _params.gps_vel_noise));
 		const Vector3f vel_obs_var(vel_var, vel_var, vel_var * sq(1.5f));
+		const float vel_innov_gate = math::max(_params.gps_vel_innov_gate, 1.f);
 		updateVelocityAidSrcStatus(gps_sample.time_us,
 					   velocity,                                                   // observation
 					   vel_obs_var,                                                // observation variance
-					   math::max(_params.gps_vel_innov_gate, 1.f),                 // innovation gate
+					   vel_innov_gate,                                             // innovation gate
 					   _aid_src_gnss_vel);
 		_aid_src_gnss_vel.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::VEL);
+
+		// if there is bad acceleration data then don't reject measurement, but limit innovation to prevent spikes that could destabilise the filter
+		if (accel_clipping
+		&& _aid_src_gnss_vel.innovation_rejected
+		&& isRecent(_aid_src_gnss_vel.time_last_fuse, 1e6)
+		&& (gps_sample.sacc < _params.req_sacc)
+		) {
+			for (int i = 0; i < 3; i++) {
+				const float innov_limit = vel_innov_gate * sqrtf(_aid_src_gnss_vel.innovation_variance[i]);
+				_aid_src_gnss_vel.innovation[i] = math::constrain(_aid_src_gnss_vel.innovation[i], -innov_limit, innov_limit);
+			}
+			_aid_src_gnss_vel.innovation_rejected = false;
+		}
+
 
 		// GNSS position
 		const Vector2f position{gps_sample.pos};
@@ -112,12 +130,23 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 
 		const float pos_var = sq(pos_noise);
 		const Vector2f pos_obs_var(pos_var, pos_var);
+		const float pos_innov_gate = math::max(_params.gps_pos_innov_gate, 1.f);
 		updateHorizontalPositionAidSrcStatus(gps_sample.time_us,
 						     position,                                   // observation
 						     pos_obs_var,                                // observation variance
-						     math::max(_params.gps_pos_innov_gate, 1.f), // innovation gate
+						     pos_innov_gate,                             // innovation gate
 						     _aid_src_gnss_pos);
 		_aid_src_gnss_pos.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::HPOS);
+
+		// if there is bad acceleration data then don't reject measurement, but limit innovation to prevent spikes that could destabilise the filter
+		if (accel_clipping && _aid_src_gnss_pos.fusion_enabled && _aid_src_gnss_pos.innovation_rejected) {
+			if (gps_sample.hacc < _params.req_hacc) {
+				for (int i = 0; i < 2; i++) {
+					const float innov_limit = pos_innov_gate * sqrtf(_aid_src_gnss_pos.innovation_variance[i]);
+					_aid_src_gnss_pos.innovation[i] = math::constrain(_aid_src_gnss_pos.innovation[i], -innov_limit, innov_limit);
+				}
+			}
+		}
 
 		// Determine if we should use GPS aiding for velocity and horizontal position
 		// To start using GPS we need angular alignment completed, the local NED origin set and GPS data that has not failed checks recently
