@@ -76,65 +76,72 @@ void OutputPredictor::reset()
 
 void OutputPredictor::resetQuaternion(const uint64_t time_delayed_us, const Quatf &new_quat)
 {
-	const outputSample &output_delayed = _output_buffer.get_oldest();
-	const Quatf quat_change{(new_quat * output_delayed.quat_nominal.inversed()).normalized()};
+	Quatf quat_change{1.f, 0.f, 0.f, 0.f};
+
+#if 0
+	// find the output observer state corresponding to the reset time
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
+
+			quat_change = (new_quat * _output_buffer[i].quat_nominal.inversed()).normalized();
+
+			break;
+		}
+	}
+#else
+	quat_change = (new_quat * _output_buffer.get_oldest().quat_nominal.inversed()).normalized();
+#endif
+
 	const Dcmf rot_change{quat_change};
 
 	// add the reset amount to the output observer buffered data
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].quat_nominal = (quat_change * _output_buffer[i].quat_nominal).normalized();
+		if (_output_buffer[i].time_us != 0) {
+			_output_buffer[i].quat_nominal = (quat_change * _output_buffer[i].quat_nominal).normalized();
 
-		// apply change to velocity
-		_output_buffer[i].vel = rot_change * _output_buffer[i].vel;
-		_output_buffer[i].vel_alternative = rot_change * _output_buffer[i].vel_alternative;
+			// apply change to velocity
+			_output_buffer[i].vel = rot_change * _output_buffer[i].vel;
+			_output_buffer[i].vel_alternative = rot_change * _output_buffer[i].vel_alternative;
+		}
 	}
 
 	// apply the change in attitude quaternion to our newest quaternion estimate
 	_output_new.quat_nominal = (quat_change * _output_new.quat_nominal).normalized();
 	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
 
-	// apply change to velocity
+	// apply change to latest velocity
 	_output_new.vel = rot_change * _output_new.vel;
 	_output_new.vel_alternative = rot_change * _output_new.vel_alternative;
 
+	// propagate position forward using the reset velocity
 	propagateVelocityUpdateToPosition();
 }
 
 void OutputPredictor::resetHorizontalVelocityTo(const uint64_t time_delayed_us, const Vector2f &new_horz_vel)
 {
-	// TODO: review time_us
+	Vector2f delta_vxy{0.f, 0.f}; // horizontal velocity
+	Vector2f delta_vxy_alt{0.f, 0.f}; // horizontal velocity (alternative)
 
-	if (_output_buffer.get_oldest().time_us != time_delayed_us) {
+	// find the output observer state corresponding to the reset time
+	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
+		if (_output_buffer[index].time_us == time_delayed_us) {
 
+			delta_vxy = new_horz_vel - _output_buffer[index].vel.xy();
+			delta_vxy_alt = new_horz_vel - _output_buffer[index].vel_alternative.xy();
 
-
-
-	}
-
-
-	const outputSample &output_delayed = _output_buffer.get_oldest();
-
-	// horizontal velocity
-	{
-		const Vector2f delta_vxy = new_horz_vel - Vector2f(output_delayed.vel.xy());
-
-		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].vel.xy() += delta_vxy;
+			break;
 		}
-
-		_output_new.vel.xy() += delta_vxy;
 	}
 
-	// horizontal velocity (alternative)
-	{
-		const Vector2f delta_vxy = new_horz_vel - Vector2f(output_delayed.vel_alternative.xy());
-
-		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].vel_alternative.xy() += delta_vxy;
-		}
-
-		_output_new.vel_alternative.xy() += delta_vxy;
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		_output_buffer[i].vel.xy() += delta_vxy;
+		_output_buffer[i].vel_alternative.xy() += delta_vxy_alt;
 	}
+
+	// apply change to latest velocity
+	_output_new.vel.xy() += delta_vxy;
+	_output_new.vel_alternative.xy() += delta_vxy_alt;
 
 	// propagate position forward using the reset velocity
 	propagateVelocityUpdateToPosition();
@@ -142,29 +149,29 @@ void OutputPredictor::resetHorizontalVelocityTo(const uint64_t time_delayed_us, 
 
 void OutputPredictor::resetVerticalVelocityTo(const uint64_t time_delayed_us, const float new_vert_vel)
 {
-	const outputSample &output_delayed = _output_buffer.get_oldest();
+	float delta_vz = 0.f; // vertical velocity
+	float delta_vz_alt = 0.f; // vertical velocity (alternative)
 
-	// vertical velocity
-	{
-		const float delta_z = new_vert_vel - output_delayed.vel(2);
+	// find the output observer state corresponding to the reset time
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
 
-		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].vel(2) += delta_z;
+			delta_vz = new_vert_vel - _output_buffer[i].vel(2);
+			delta_vz_alt = new_vert_vel - _output_buffer[i].vel_alternative(2);
+
+			break;
 		}
-
-		_output_new.vel(2) += delta_z;
 	}
 
-	// vertical velocity (alternative)
-	{
-		const float delta_z = new_vert_vel - output_delayed.vel_alternative(2);
-
-		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].vel_alternative(2) += delta_z;
-		}
-
-		_output_new.vel_alternative(2) += delta_z;
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		_output_buffer[i].vel(2) += delta_vz;
+		_output_buffer[i].vel_alternative(2) += delta_vz_alt;
 	}
+
+	// apply change to latest velocity
+	_output_new.vel(2) += delta_vz;
+	_output_new.vel_alternative(2) += delta_vz_alt;
 
 	// propagate vertical position forward using the reset velocity
 	propagateVelocityUpdateToPosition();
@@ -172,60 +179,72 @@ void OutputPredictor::resetVerticalVelocityTo(const uint64_t time_delayed_us, co
 
 void OutputPredictor::resetHorizontalPositionTo(const uint64_t time_delayed_us, const Vector2f &new_horz_pos)
 {
-	const outputSample &output_delayed = _output_buffer.get_oldest();
+	Vector2f delta_xy{0.f, 0.f}; // horizontal position
+	Vector2f delta_xy_alt{0.f, 0.f}; // horizontal position (alternative)
 
-	// horizontal position
-	{
-		const Vector2f delta_xy = new_horz_pos - output_delayed.pos.xy();
+	// find the output observer state corresponding to the reset time
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
 
-		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].pos.xy() += delta_xy;
+			delta_xy = new_horz_pos - _output_buffer[i].pos.xy();
+			delta_xy_alt = new_horz_pos - _output_buffer[i].vel_alternative_integ.xy();
+
+			break;
 		}
-
-		_output_new.pos.xy() += delta_xy;
 	}
 
-	// horizontal position (alternative)
-	{
-		const Vector2f delta_xy = new_horz_pos - output_delayed.vel_alternative_integ.xy();
-
-		for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-			_output_buffer[index].vel_alternative_integ.xy() += delta_xy;
-		}
-
-		_output_new.vel_alternative_integ.xy() += delta_xy;
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		_output_buffer[i].pos.xy() += delta_xy;
+		_output_buffer[i].vel_alternative_integ.xy() += delta_xy_alt;
 	}
+
+	// add the reset amount to the output observer vertical position state
+	_output_new.pos.xy() += delta_xy;
+	_output_new.vel_alternative_integ.xy() += delta_xy_alt;
 }
 
 void OutputPredictor::resetVerticalPositionTo(const uint64_t time_delayed_us, const float new_vert_pos)
 {
-	const outputSample &output_delayed = _output_buffer.get_oldest();
+	float delta_z = 0.f; // vertical position
+	float delta_z_alt = 0.f; // vertical position (alternative)
+
+#if 0
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
+
+			delta_z = new_vert_pos - _output_buffer[i].pos(2);
+			delta_z_alt = new_vert_pos - _output_buffer[i].vel_alternative_integ(2);
+
+			break;
+		}
+	}
+#else
+	delta_z = new_vert_pos - _output_buffer.get_oldest().pos(2);
+	delta_z_alt = new_vert_pos - _output_buffer.get_oldest().vel_alternative_integ(2);
+
+#endif
 
 	// vertical position
-	{
-		const float delta_z = new_vert_pos - output_delayed.pos(2);
-
+	if (fabsf(delta_z) > 0.f) {
 		// add the reset amount to the output observer buffered data
 		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 			_output_buffer[i].pos(2) += delta_z;
 		}
 
-		// apply the change in height / height rate to our newest height / height rate estimate
-		// which have already been taken out from the output buffer
+		// add the reset amount to the output observer vertical position state
 		_output_new.pos(2) += delta_z;
 	}
 
 	// vertical position (alternative)
-	{
-		const float delta_z = new_vert_pos - output_delayed.vel_alternative_integ(2);
-
+	if (fabsf(delta_z_alt) > 0.f) {
 		// add the reset amount to the output observer buffered data
 		for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-			_output_buffer[i].vel_alternative_integ(2) += delta_z;
+			_output_buffer[i].vel_alternative_integ(2) += delta_z_alt;
 		}
 
 		// add the reset amount to the output observer vertical position state
-		_output_new.vel_alternative_integ(2) += delta_z;
+		_output_new.vel_alternative_integ(2) += delta_z_alt;
 	}
 }
 
@@ -371,7 +390,6 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 			// apply the change in attitude quaternion to our newest quaternion estimate
 			_output_new.quat_nominal = (q_delta * _output_new.quat_nominal).normalized();
 
-
 			// apply change to velocity
 			_output_new.vel = rot_change * _output_new.vel;
 			_output_new.vel_alternative = rot_change * _output_new.vel_alternative;
@@ -386,10 +404,10 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 			output_delayed.vel_alternative = q_delta.rotateVectorInverse(output_delayed.vel_alternative);
 			const Vector3f vel_alternative_err = vel_state - output_delayed.vel_alternative;
 
-			for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
+			for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 				// a constant velocity correction is applied
-				_output_buffer[index].vel += vel_err;
-				_output_buffer[index].vel_alternative += vel_alternative_err;
+				_output_buffer[i].vel += vel_err;
+				_output_buffer[i].vel_alternative += vel_alternative_err;
 			}
 
 			// manually correct next oldest state
@@ -400,8 +418,9 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 			if ((next_oldest_state.time_us > output_delayed.time_us) && (next_oldest_state.dt > 0.f)) {
 
 				next_oldest_state.pos = pos_state + (vel_state + next_oldest_state.vel) * 0.5f * next_oldest_state.dt;
-				next_oldest_state.vel_alternative_integ = pos_state + (vel_state + next_oldest_state.vel_alternative) * 0.5f *
-						next_oldest_state.dt;
+
+				next_oldest_state.vel_alternative_integ = pos_state
+							+ (vel_state + next_oldest_state.vel_alternative) * 0.5f * next_oldest_state.dt;
 
 				propagateVelocityUpdateToPosition();
 			}
@@ -456,8 +475,7 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 			const Vector3f vel_err = vel_state - output_delayed.vel;
 			_output_tracking_error(1) = vel_err.norm();
 			// calculate a velocity correction that will be applied to the output state history
-			const float vel_gain = _dt_correct_states_avg / math::constrain(_vel_tau, _dt_correct_states_avg,
-					       10.f); // Complementary filter gains
+			const float vel_gain = _dt_correct_states_avg / math::constrain(_vel_tau, _dt_correct_states_avg, 10.f); // Complementary filter gains
 			_vel_err_integ += vel_err;
 			const Vector3f vel_correction = vel_err * vel_gain + _vel_err_integ * sq(vel_gain) * 0.1f;
 
@@ -470,10 +488,10 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 			_pos_err_integ += pos_err;
 			const Vector3f pos_correction = pos_err * pos_gain + _pos_err_integ * sq(pos_gain) * 0.1f;
 
-			for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
+			for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 				// a constant velocity correction is applied
-				_output_buffer[index].vel += vel_correction;
-				_output_buffer[index].pos += pos_correction;
+				_output_buffer[i].vel += vel_correction;
+				_output_buffer[i].pos += pos_correction;
 			}
 
 
@@ -492,13 +510,12 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 
 			// calculate a velocity correction that will be applied to the output state history
 			// using a PD feedback tuned to a 5% overshoot
-			const Vector3f vel_alternative_correction = vel_alternative_integ_err * pos_gain + vel_alternative_err * vel_gain *
-					1.1f;
+			const Vector3f vel_alternative_correction = vel_alternative_integ_err * pos_gain + vel_alternative_err * vel_gain * 1.1f;
 
-			for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
+			for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 				// a constant velocity correction is applied
-				_output_buffer[index].vel_alternative += vel_alternative_correction;
-				_output_buffer[index].vel_alternative_integ += vel_alternative_integ_err;
+				_output_buffer[i].vel_alternative += vel_alternative_correction;
+				_output_buffer[i].vel_alternative_integ += vel_alternative_integ_err;
 			}
 
 			// recompute position by integrating velocity
@@ -529,21 +546,25 @@ void OutputPredictor::propagateVelocityUpdateToPosition()
 		if ((next_state.time_us > current_state.time_us) && (next_state.dt > 0.f)) {
 			// position is propagated forward using the corrected velocity and a trapezoidal integrator
 			next_state.pos = current_state.pos + (current_state.vel + next_state.vel) * 0.5f * next_state.dt;
-			next_state.vel_alternative_integ = current_state.vel_alternative_integ + (current_state.vel_alternative +
-							   next_state.vel_alternative) * 0.5f * next_state.dt;
+
+			next_state.vel_alternative_integ = current_state.vel_alternative_integ
+				+ (current_state.vel_alternative + next_state.vel_alternative) * 0.5f * next_state.dt;
 		}
 
 		// advance the index
 		index = (index + 1) % size;
 	}
 
+
+
 	if ((_output_new.time_us > _output_buffer.get_newest().time_us) && (_output_new.dt > 0.f)) {
 		// position is propagated forward using the corrected velocity and a trapezoidal integrator
-		_output_new.pos = _output_buffer.get_newest().pos
-				  + (_output_buffer.get_newest().vel + _output_new.vel) * 0.5f * _output_new.dt;
+		const outputSample& newest = _output_buffer.get_newest();
 
-		_output_new.vel_alternative_integ = _output_buffer.get_newest().vel_alternative_integ +
-						    (_output_buffer.get_newest().vel_alternative + _output_new.vel_alternative) * 0.5f * _output_new.dt;
+		_output_new.pos = newest.pos + (newest.vel + _output_new.vel) * 0.5f * _output_new.dt;
+
+		_output_new.vel_alternative_integ = newest.vel_alternative_integ
+			+ (newest.vel_alternative + _output_new.vel_alternative) * 0.5f * _output_new.dt;
 
 	} else {
 		// update output state to corrected values
