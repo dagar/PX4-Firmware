@@ -78,7 +78,7 @@ void OutputPredictor::resetQuaternion(const uint64_t time_delayed_us, const Quat
 {
 	Quatf quat_change{1.f, 0.f, 0.f, 0.f};
 
-#if 0
+#if 1
 	// find the output observer state corresponding to the reset time
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 		if (_output_buffer[i].time_us == time_delayed_us) {
@@ -209,7 +209,7 @@ void OutputPredictor::resetVerticalPositionTo(const uint64_t time_delayed_us, co
 	float delta_z = 0.f; // vertical position
 	float delta_z_alt = 0.f; // vertical position (alternative)
 
-#if 0
+#if 1
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
 		if (_output_buffer[i].time_us == time_delayed_us) {
 
@@ -327,12 +327,12 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 {
 	const uint64_t time_latest_us = _time_last_update_states_us;
 
-	if (time_latest_us <= time_delayed_us) {
+	if (time_latest_us < time_delayed_us) {
 		return;
 	}
 
 	// store the INS states in a ring buffer with the same length and time coordinates as the IMU data buffer
-	if (_output_new.dt > 0.f) {
+	if ((_output_new.time_us != 0) && (_output_new.dt > 0.f)) {
 		_output_buffer.push(_output_new);
 		_output_new.dt = 0.0f; // reset time delta to zero for the next accumulation of full rate IMU data
 	}
@@ -345,21 +345,17 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 	if ((_time_last_correct_states_us != 0) && (time_delayed_us > _time_last_correct_states_us)) {
 		const float dt = math::constrain((time_delayed_us - _time_last_correct_states_us) * 1e-6f, 0.0001f, 0.03f);
 		_dt_correct_states_avg = 0.8f * _dt_correct_states_avg + 0.2f * dt;
-
-	} else {
-		if (!_output_filter_aligned) {
-			resetQuaternion(time_delayed_us, quat_state);
-			resetHorizontalVelocityTo(time_delayed_us, vel_state.xy());
-			resetVerticalVelocityTo(time_delayed_us, vel_state(2));
-			resetHorizontalPositionTo(time_delayed_us, pos_state.xy());
-			resetVerticalPositionTo(time_delayed_us, pos_state(2));
-		}
-
-		_time_last_correct_states_us = time_delayed_us;
-		return;
 	}
 
 	_time_last_correct_states_us = time_delayed_us;
+
+	if (!_output_filter_aligned) {
+		resetQuaternion(time_delayed_us, quat_state);
+		resetHorizontalVelocityTo(time_delayed_us, vel_state.xy());
+		resetVerticalVelocityTo(time_delayed_us, vel_state(2));
+		resetHorizontalPositionTo(time_delayed_us, pos_state.xy());
+		resetVerticalPositionTo(time_delayed_us, pos_state(2));
+	}
 
 	// get the oldest INS state data from the ring buffer
 	// this data will be at the EKF fusion time horizon
@@ -373,60 +369,11 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 
 		if (!_output_filter_aligned) {
 
-			// calculate the quaternion rotation delta from the EKF to output observer states at the EKF fusion time horizon
-			const Quatf q_delta((quat_state * output_delayed.quat_nominal.inversed()).normalized());
-			const Dcmf rot_change{q_delta};
-
-			// add the reset amount to the output observer buffered data
-			for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-
-				_output_buffer[i].quat_nominal = (q_delta * _output_buffer[i].quat_nominal).normalized();
-
-				// apply change to velocity
-				_output_buffer[i].vel = rot_change * _output_buffer[i].vel;
-				_output_buffer[i].vel_alternative = rot_change * _output_buffer[i].vel_alternative;
-			}
-
-			// apply the change in attitude quaternion to our newest quaternion estimate
-			_output_new.quat_nominal = (q_delta * _output_new.quat_nominal).normalized();
-
-			// apply change to velocity
-			_output_new.vel = rot_change * _output_new.vel;
-			_output_new.vel_alternative = rot_change * _output_new.vel_alternative;
-
-			propagateVelocityUpdateToPosition();
-
-
-			// calculate the velocity and position deltas between the output and EKF at the EKF fusion time horizon
-			output_delayed.vel = q_delta.rotateVectorInverse(output_delayed.vel);
-			const Vector3f vel_err = vel_state - output_delayed.vel;
-
-			output_delayed.vel_alternative = q_delta.rotateVectorInverse(output_delayed.vel_alternative);
-			const Vector3f vel_alternative_err = vel_state - output_delayed.vel_alternative;
-
-			for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-				// a constant velocity correction is applied
-				_output_buffer[i].vel += vel_err;
-				_output_buffer[i].vel_alternative += vel_alternative_err;
-			}
-
-			// manually correct next oldest state
-			//  position is propagated forward using the corrected velocity and a trapezoidal integrator
-			uint8_t index = _output_buffer.get_oldest_index();
-			outputSample &next_oldest_state = _output_buffer[index];
-
-			if ((next_oldest_state.time_us > output_delayed.time_us) && (next_oldest_state.dt > 0.f)) {
-
-				next_oldest_state.pos = pos_state + (vel_state + next_oldest_state.vel) * 0.5f * next_oldest_state.dt;
-
-				next_oldest_state.vel_alternative_integ = pos_state
-							+ (vel_state + next_oldest_state.vel_alternative) * 0.5f * next_oldest_state.dt;
-
-				propagateVelocityUpdateToPosition();
-			}
-
-			_output_new = _output_buffer.get_newest();
-			_output_new.dt = 0.0f;
+			resetQuaternion(time_delayed_us, quat_state);
+			resetHorizontalVelocityTo(time_delayed_us, vel_state.xy());
+			resetVerticalVelocityTo(time_delayed_us, vel_state(2));
+			resetHorizontalPositionTo(time_delayed_us, pos_state.xy());
+			resetVerticalPositionTo(time_delayed_us, pos_state(2));
 
 			// reset tracking error, integral, etc
 			_output_tracking_error.zero();
