@@ -209,6 +209,11 @@ void FlightModeManager::start_flight_task()
 			error = switchTask(FlightTaskIndex::ManualPositionSmoothVel);
 			break;
 
+		case 9:
+			// MPC_POS_MODE 9 => Drop for ALTCTL, Acceleration for POSCTL
+			error = switchTask(FlightTaskIndex::ManualAcceleration);
+			break;
+
 		case 4:
 		default:
 			if (_param_mpc_pos_mode.get() != 4) {
@@ -233,6 +238,10 @@ void FlightModeManager::start_flight_task()
 		switch (_param_mpc_pos_mode.get()) {
 		case 0:
 			error = switchTask(FlightTaskIndex::ManualAltitude);
+			break;
+
+		case 9:
+			error = switchTask(FlightTaskIndex::Drop);
 			break;
 
 		case 3:

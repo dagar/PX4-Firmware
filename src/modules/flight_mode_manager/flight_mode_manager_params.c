@@ -34,3 +34,51 @@
 /**
  * @file flight_mode_manager_params.c
  */
+
+/**
+ * Drop timeout
+ *
+ * @unit s
+ * @min 0
+ * @max 30
+ * @decimal 1
+ * @increment 0.1
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_DROP_LAUN_T, 3.f);
+
+/**
+ * Drop vertical velocity threshold (+Z)
+ *
+ * @unit m/s
+ * @min 1
+ * @max 30
+ * @decimal 1
+ * @increment 0.1
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_DROP_VZ_THR, 5.f);
+
+/**
+ * Drop vertical acceleration threshold (+Z)
+ *
+ * @unit m/s^2
+ * @min 0.1
+ * @max 9.81
+ * @decimal 1
+ * @increment 0.1
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_DROP_AZ_THR, 9.5f);
+
+/**
+ * Drop position hold timeout
+ *
+ * @unit s
+ * @min 0
+ * @max 30
+ * @decimal 1
+ * @increment 0.1
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_DROP_HOLD_T, 3.f);

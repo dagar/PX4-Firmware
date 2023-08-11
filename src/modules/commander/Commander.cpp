@@ -1729,8 +1729,29 @@ void Commander::run()
 		_actuator_armed.armed = isArmed();
 		_actuator_armed.prearmed = getPrearmState();
 		_actuator_armed.ready_to_arm = _vehicle_status.pre_flight_checks_pass || isArmed();
+
 		_actuator_armed.lockdown = ((_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_TERMINATION)
 					    || (_vehicle_status.hil_state == vehicle_status_s::HIL_STATE_ON));
+
+		// ALTCTL drop mode hacks until we have proper multi-stage arming
+		//  - force lockdown if in drop mode and we don't yet want takeoff
+		// TODO: this sucks, do better
+		if (_vehicle_status.NAVIGATION_STATE_ALTCTL) {
+			vehicle_constraints_s vehicle_constraints{};
+
+			if (_vehicle_constraints_sub.copy(&vehicle_constraints)) {
+				if ((hrt_elapsed_time(&vehicle_constraints.timestamp) < 1_s)) {
+					if (!vehicle_constraints.want_takeoff) {
+						_actuator_armed.lockdown = true;
+
+						// failure detector ignored
+						_vehicle_status.failure_detector_status = 0;
+					}
+				}
+			}
+		}
+
+
 		// _actuator_armed.manual_lockdown // action_request_s::ACTION_KILL
 		_actuator_armed.force_failsafe = (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_TERMINATION);
 		// _actuator_armed.in_esc_calibration_mode // VEHICLE_CMD_PREFLIGHT_CALIBRATION
@@ -1760,19 +1781,21 @@ void Commander::run()
 			_vehicle_status_pub.publish(_vehicle_status);
 
 			// failure_detector_status publish
-			failure_detector_status_s fd_status{};
-			fd_status.fd_roll = _failure_detector.getStatusFlags().roll;
-			fd_status.fd_pitch = _failure_detector.getStatusFlags().pitch;
-			fd_status.fd_alt = _failure_detector.getStatusFlags().alt;
-			fd_status.fd_ext = _failure_detector.getStatusFlags().ext;
-			fd_status.fd_arm_escs = _failure_detector.getStatusFlags().arm_escs;
-			fd_status.fd_battery = _failure_detector.getStatusFlags().battery;
-			fd_status.fd_imbalanced_prop = _failure_detector.getStatusFlags().imbalanced_prop;
-			fd_status.fd_motor = _failure_detector.getStatusFlags().motor;
-			fd_status.imbalanced_prop_metric = _failure_detector.getImbalancedPropMetric();
-			fd_status.motor_failure_mask = _failure_detector.getMotorFailures();
-			fd_status.timestamp = hrt_absolute_time();
-			_failure_detector_status_pub.publish(fd_status);
+			if (!_actuator_armed.lockdown) {
+				failure_detector_status_s fd_status{};
+				fd_status.fd_roll = _failure_detector.getStatusFlags().roll;
+				fd_status.fd_pitch = _failure_detector.getStatusFlags().pitch;
+				fd_status.fd_alt = _failure_detector.getStatusFlags().alt;
+				fd_status.fd_ext = _failure_detector.getStatusFlags().ext;
+				fd_status.fd_arm_escs = _failure_detector.getStatusFlags().arm_escs;
+				fd_status.fd_battery = _failure_detector.getStatusFlags().battery;
+				fd_status.fd_imbalanced_prop = _failure_detector.getStatusFlags().imbalanced_prop;
+				fd_status.fd_motor = _failure_detector.getStatusFlags().motor;
+				fd_status.imbalanced_prop_metric = _failure_detector.getImbalancedPropMetric();
+				fd_status.motor_failure_mask = _failure_detector.getMotorFailures();
+				fd_status.timestamp = hrt_absolute_time();
+				_failure_detector_status_pub.publish(fd_status);
+			}
 		}
 
 		checkWorkerThread();
@@ -2103,7 +2126,7 @@ void Commander::handleAutoDisarm()
 					disarm(arm_disarm_reason_t::auto_disarm_land);
 
 				} else {
-					disarm(arm_disarm_reason_t::auto_disarm_preflight);
+					//disarm(arm_disarm_reason_t::auto_disarm_preflight);
 				}
 			}
 		}
@@ -2114,7 +2137,7 @@ void Commander::handleAutoDisarm()
 		// auto disarm if locked down to avoid user confusion
 		//  skipped in HITL where lockdown is enabled for safety
 		if (_vehicle_status.hil_state != vehicle_status_s::HIL_STATE_ON) {
-			auto_disarm |= _actuator_armed.lockdown;
+			//auto_disarm |= _actuator_armed.lockdown;
 		}
 
 		_auto_disarm_killed.set_state_and_update(auto_disarm, hrt_absolute_time());

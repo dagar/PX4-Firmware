@@ -41,6 +41,7 @@ set(flight_tasks_all)
 list(APPEND flight_tasks_all
 	Auto
 	Descend
+	Drop
 	Failsafe
 	ManualAcceleration
 	ManualAltitude
