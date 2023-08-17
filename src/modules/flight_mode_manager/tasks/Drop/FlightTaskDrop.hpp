@@ -118,7 +118,8 @@ private:
 	float _reference_altitude{NAN}; /**< Altitude relative to ground. */
 	hrt_abstime _time_stamp_reference{0}; /**< time stamp when last reference update occured. */
 
-	PositionSmoothing _position_smoothing;
+	PositionSmoothing _position_smoothing{};
+	Vector3f _unsmoothed_velocity_setpoint{};
 
 	DEFINE_PARAMETERS_CUSTOM_PARENT(FlightTask,
 					(ParamFloat<px4::params::MPC_DROP_LAUN_T>) _param_mpc_drop_laun_t,

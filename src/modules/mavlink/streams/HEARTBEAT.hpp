@@ -99,6 +99,9 @@ private:
 				base_mode |= MAV_MODE_FLAG_AUTO_ENABLED | MAV_MODE_FLAG_STABILIZE_ENABLED | MAV_MODE_FLAG_GUIDED_ENABLED;
 			}
 
+			// ALTCTL drop state
+			// set GUIDED when in flying
+
 
 			// uint32_t custom_mode - A bitfield for use for autopilot-specific flags
 			union px4_custom_mode custom_mode {get_px4_custom_mode(vehicle_status.nav_state)};

@@ -180,7 +180,7 @@ bool FlightTaskDrop::update()
 	case DropState::DISARMED: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: disarmed\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: disarmed");
 			}
 
 			// DISARMED
@@ -203,7 +203,7 @@ bool FlightTaskDrop::update()
 	case DropState::ARMING: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: arming\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: arming");
 			}
 
 			// ARMING
@@ -225,7 +225,7 @@ bool FlightTaskDrop::update()
 				int64_t time_remaining_us = (int64_t)arm_timeout_us - elapsed_us;
 
 				if (elapsed_us > arm_timeout_us) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: drop launch armed. Throw the vehicle now\t");
+					mavlink_log_info(&_mavlink_log_pub, "Drop: drop launch armed. Throw the vehicle now");
 
 					_state = DropState::WAITING_FOR_DROP_DETECT;
 					_state_last_transition_time = hrt_absolute_time();
@@ -249,7 +249,7 @@ bool FlightTaskDrop::update()
 	case DropState::WAITING_FOR_DROP_DETECT: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: waiting for drop detect\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: waiting for drop detect");
 			}
 
 			if (actuator_armed.armed) {
@@ -275,7 +275,7 @@ bool FlightTaskDrop::update()
 				// filter both
 
 				if (drop_detected && !failsafe_flags.angular_velocity_invalid) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Drop detected! Vz:%.1f, Az:%.1f. Activating rate control\t",
+					mavlink_log_info(&_mavlink_log_pub, "Drop: Drop detected! Vz:%.1f, Az:%.1f. Activating rate control",
 							 (double)velocity(2), (double)acceleration(2));
 
 					_state = DropState::RATE_CONTROL_ENABLED;
@@ -292,7 +292,7 @@ bool FlightTaskDrop::update()
 	case DropState::RATE_CONTROL_ENABLED: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: rate control enabled\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: rate control enabled");
 			}
 
 
@@ -311,7 +311,7 @@ bool FlightTaskDrop::update()
 				}
 
 				if (!failsafe_flags.attitude_invalid) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating attitude control\t");
+					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating attitude control");
 					_state = DropState::ATTITUDE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
@@ -331,7 +331,7 @@ bool FlightTaskDrop::update()
 	case DropState::ATTITUDE_CONTROL_ENABLED: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: attitude control enabled\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: attitude control enabled");
 			}
 
 			if (actuator_armed.armed) {
@@ -349,7 +349,7 @@ bool FlightTaskDrop::update()
 				}
 
 				if (!failsafe_flags.local_altitude_invalid) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating height rate control\t");
+					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating height rate control");
 					_state = DropState::HEIGHT_RATE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
@@ -370,7 +370,7 @@ bool FlightTaskDrop::update()
 	case DropState::HEIGHT_RATE_CONTROL_ENABLED: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: height rate control enabled\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: height rate control enabled");
 			}
 
 			if (actuator_armed.armed) {
@@ -392,7 +392,7 @@ bool FlightTaskDrop::update()
 
 				// wait for full
 				if (!failsafe_flags.local_altitude_invalid) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control\t");
+					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control");
 					_state = DropState::ALTITUDE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
@@ -412,7 +412,7 @@ bool FlightTaskDrop::update()
 	case DropState::ALTITUDE_CONTROL_ENABLED: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: altitude control enabled\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: altitude control enabled");
 			}
 
 			if (actuator_armed.armed) {
@@ -435,7 +435,7 @@ bool FlightTaskDrop::update()
 				}
 
 				if (!failsafe_flags.local_velocity_invalid) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating velocity control\t");
+					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating velocity control");
 					_state = DropState::HORIZONTAL_VELOCITY_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
@@ -453,7 +453,7 @@ bool FlightTaskDrop::update()
 	case DropState::HORIZONTAL_VELOCITY_CONTROL_ENABLED: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: full velocity control enabled\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: full velocity control enabled");
 			}
 
 			if (actuator_armed.armed) {
@@ -487,7 +487,7 @@ bool FlightTaskDrop::update()
 	case DropState::POSITION_CONTROL_ENABLED: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: full position control enabled\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: full position control enabled");
 			}
 
 			if (actuator_armed.armed) {
@@ -510,11 +510,13 @@ bool FlightTaskDrop::update()
 				const hrt_abstime hold_timeout_us = math::constrain(_param_mpc_drop_hold_t.get(), 0.f, 3600.f) * 1e6f;
 
 				if (hrt_elapsed_time(&_state_last_transition_time) > hold_timeout_us) {
-					//mavlink_log_info(&_mavlink_log_pub, "Drop: complete, full flying\t");
+					//mavlink_log_info(&_mavlink_log_pub, "Drop: complete, full flying");
 					_state = DropState::FLYING;
 					_state_last_transition_time = hrt_absolute_time();
 
 					// require offboard position setpoint
+					_position_smoothing.forceSetPosition(_position);
+					_position_smoothing.forceSetVelocity(_velocity);
 				}
 
 			} else {
@@ -526,12 +528,12 @@ bool FlightTaskDrop::update()
 	case DropState::FLYING: {
 
 			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: flying!\t");
+				mavlink_log_info(&_mavlink_log_pub, "Drop: flying!");
 			}
 
 			if (actuator_armed.armed) {
 				if (_state_prev != _state) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: ready for OFFBOARD\t");
+					mavlink_log_info(&_mavlink_log_pub, "Drop: ready for OFFBOARD");
 
 					// latch position setpoint
 					_position_setpoint = _position;
@@ -573,51 +575,84 @@ bool FlightTaskDrop::update()
 
 					if (hrt_elapsed_time(&trajectory_setpoint.timestamp) < 1_s) {
 
-						//const Vector3f pos_sp = Vector3f{trajectory_setpoint.position};
-						//const Vector3f vel_sp = Vector3f{trajectory_setpoint.velocity};
-						//const Vector3f acc_sp = Vector3f{trajectory_setpoint.acceleration};
+						// update params of the position smoothing
+						_position_smoothing.setMaxAllowedHorizontalError(_param_mpc_xy_err_max.get());
+						_position_smoothing.setVerticalAcceptanceRadius(_param_nav_mc_alt_rad.get());
+						_position_smoothing.setCruiseSpeed(_param_mpc_xy_cruise.get());
+						_position_smoothing.setHorizontalTrajectoryGain(_param_mpc_xy_traj_p.get());
+						_position_smoothing.setTargetAcceptanceRadius(2.f);
 
-						// ocm.position = !matrix::Vector3f(setpoint.position).isAllNan();
-						// ocm.velocity = !matrix::Vector3f(setpoint.velocity).isAllNan();
-						// ocm.acceleration = !matrix::Vector3f(setpoint.acceleration).isAllNan();
+						// Update the constraints of the trajectories
+						_position_smoothing.setMaxAccelerationXY(_param_mpc_acc_hor.get()); // TODO : Should be computed using heading
+						_position_smoothing.setMaxVelocityXY(_param_mpc_xy_vel_max.get());
+						float max_jerk = _param_mpc_jerk_auto.get();
+						_position_smoothing.setMaxJerk({max_jerk, max_jerk, max_jerk}); // TODO : Should be computed using heading
 
-						// _position = Vector3f{trajectory_setpoint.position};
-						// _velocity = Vector3f{trajectory_setpoint.velocity};
-						// _acceleration = Vector3f{trajectory_setpoint.acceleration};
+						bool is_emergency_braking_active = false; // TODO
 
-						// _yaw = trajectory_setpoint.yaw;
-						// _yawspeed = trajectory_setpoint.yawspeed;
+						if (is_emergency_braking_active) {
+							// When initializing with large velocity, allow 1g of
+							// acceleration in 1s on all axes for fast braking
+							_position_smoothing.setMaxAcceleration({9.81f, 9.81f, 9.81f});
+							_position_smoothing.setMaxJerk({9.81f, 9.81f, 9.81f});
 
+							// If the current velocity is beyond the usual constraints, tell
+							// the controller to exceptionally increase its saturations to avoid
+							// cutting out the feedforward
+							_constraints.speed_down = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_down);
+							_constraints.speed_up = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_up);
 
-						//_updateTrajConstraints();
+						} else if (_unsmoothed_velocity_setpoint(2) < 0.f) { // up
+							float z_accel_constraint = _param_mpc_acc_up_max.get();
+							float z_vel_constraint = _param_mpc_z_v_auto_up.get();
 
-						//PositionSmoothing::PositionSmoothingSetpoints smoothed_setpoints;
-						// _position_smoothing.generateSetpoints(
-						// 	_position,
-						// 	_position_setpoint,
-						// 	_velocity_setpoint,
-						// 	_deltatime,
-						// 	force_zero_velocity_setpoint,
-						// 	smoothed_setpoints
-						// );
+							_position_smoothing.setMaxVelocityZ(z_vel_constraint);
+							_position_smoothing.setMaxAccelerationZ(z_accel_constraint);
 
-#if 0
+						} else { // down
+							_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_down_max.get());
+							_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
+						}
+
+						// Stretch the constraints of the velocity controller to leave some room for an additional
+						// correction required by the altitude/vertical position controller
+						_constraints.speed_down = math::max(_constraints.speed_down, 1.2f * _param_mpc_z_v_auto_dn.get());
+						_constraints.speed_up = math::max(_constraints.speed_up, 1.2f * _param_mpc_z_v_auto_up.get());
+						_constraints.want_takeoff = true;
+
+						bool force_zero_velocity_setpoint = false; // TODO
+
+						const Vector3f pos_sp = Vector3f{trajectory_setpoint.position};
+						const Vector3f vel_sp = Vector3f{trajectory_setpoint.velocity};
+
+						PositionSmoothing::PositionSmoothingSetpoints smoothed_setpoints{};
+
+						_position_smoothing.generateSetpoints(
+							_position,
+							pos_sp,
+							vel_sp,
+							_deltatime,
+							force_zero_velocity_setpoint,
+							smoothed_setpoints
+						);
+
 						_jerk_setpoint = smoothed_setpoints.jerk;
 						_acceleration_setpoint = smoothed_setpoints.acceleration;
 						_velocity_setpoint = smoothed_setpoints.velocity;
 						_position_setpoint = smoothed_setpoints.position;
 
-						_unsmoothed_velocity_setpoint = smoothed_setpoints.unsmoothed_velocity;
-						_want_takeoff = smoothed_setpoints.unsmoothed_velocity(2) < -0.3f;
+						_yaw = trajectory_setpoint.yaw;
+						//_yawspeed = trajectory_setpoint.yawspeed;
 
-#endif
+						_unsmoothed_velocity_setpoint = smoothed_setpoints.unsmoothed_velocity;
+						//_want_takeoff = true;
 					}
 				}
 
 #if 0
 
 				if (hrt_elapsed_time(&trajectory_setpoint.timestamp) > 10_s) {
-					mavlink_log_critical(&_mavlink_log_pub, "Drop: OFFBOARD timeout, HOLDING\t");
+					mavlink_log_critical(&_mavlink_log_pub, "Drop: OFFBOARD timeout, HOLDING");
 
 					// latch position setpoint
 					_position_setpoint = _position;
