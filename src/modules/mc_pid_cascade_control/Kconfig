@@ -1,0 +1,12 @@
+menuconfig MODULES_MC_PID_CASCADE_CONTROL
+	bool "mc_pid_cascade_control"
+	default n
+	---help---
+		Enable support for mc_pid_cascade_control
+
+menuconfig USER_MC_PID_CASCADE_CONTROL
+	bool "mc_pid_cascade_control running as userspace module"
+	default n
+	depends on BOARD_PROTECTED && MODULES_MC_PID_CASCADE_CONTROL
+	---help---
+		Put mc_pid_cascade_control in userspace memory
