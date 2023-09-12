@@ -80,39 +80,44 @@ void MulticopterPIDCasecadeControl::Run()
 		updateParams();
 	}
 
-	/* run controller on gyro changes */
-	vehicle_angular_velocity_s angular_velocity;
+	// const hrt_abstime now = angular_velocity.timestamp_sample;
 
-	if (_vehicle_angular_velocity_sub.update(&angular_velocity)) {
+	// // Guard against too small (< 0.125ms) and too large (> 20ms) dt's.
+	// const float dt = math::constrain(((now - _last_run) * 1e-6f), 0.000125f, 0.02f);
+	// _last_run = now;
 
-		const hrt_abstime now = angular_velocity.timestamp_sample;
+	/* check for updates in other topics */
 
-		// Guard against too small (< 0.125ms) and too large (> 20ms) dt's.
-		const float dt = math::constrain(((now - _last_run) * 1e-6f), 0.000125f, 0.02f);
-		_last_run = now;
+	if (_vehicle_land_detected_sub.updated()) {
+		vehicle_land_detected_s vehicle_land_detected;
 
-		const Vector3f rates{angular_velocity.xyz};
-		const Vector3f angular_accel{angular_velocity.xyz_derivative};
-
-		/* check for updates in other topics */
-		_vehicle_control_mode_sub.update(&_vehicle_control_mode);
-
-		if (_vehicle_land_detected_sub.updated()) {
-			vehicle_land_detected_s vehicle_land_detected;
-
-			if (_vehicle_land_detected_sub.copy(&vehicle_land_detected)) {
-				_landed = vehicle_land_detected.landed;
-				_maybe_landed = vehicle_land_detected.maybe_landed;
-			}
-		}
-
-		_vehicle_status_sub.update(&_vehicle_status);
-
-		// run the rate controller
-		if (_vehicle_control_mode.flag_control_rates_enabled) {
-
+		if (_vehicle_land_detected_sub.copy(&vehicle_land_detected)) {
+			_landed = vehicle_land_detected.landed;
+			_maybe_landed = vehicle_land_detected.maybe_landed;
 		}
 	}
+
+	_vehicle_status_sub.update(&_vehicle_status);
+	_vehicle_control_mode_sub.update(&_vehicle_control_mode);
+
+	// position/velocity control
+	if (_vehicle_control_mode.flag_control_velocity_enabled || _vehicle_control_mode.flag_control_altitude_enabled) {
+		//_position_control.update();
+	}
+
+	// attitude control
+	if (_vehicle_control_mode.flag_control_attitude_enabled) {
+		//_attitude_control.update();
+	}
+
+	// rate control
+	if (_vehicle_control_mode.flag_control_rates_enabled) {
+		//_rate_control.update();
+	}
+
+	// control allocation
+
+
 
 	perf_end(_loop_perf);
 }
