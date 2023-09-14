@@ -62,12 +62,12 @@
 
 using namespace time_literals;
 
-class MulticopterPIDCasecadeControl : public ModuleBase<MulticopterPIDCasecadeControl>, public ModuleParams,
+class MulticopterPIDCascadeControl : public ModuleBase<MulticopterPIDCascadeControl>, public ModuleParams,
 	public px4::WorkItem
 {
 public:
-	MulticopterPIDCasecadeControl();
-	~MulticopterPIDCasecadeControl() override;
+	MulticopterPIDCascadeControl();
+	~MulticopterPIDCascadeControl() override;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
@@ -82,6 +82,14 @@ public:
 
 private:
 	void Run() override;
+
+
+
+	RateControl _rate_control; ///< class for rate control calculations
+
+
+
+
 
 	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};

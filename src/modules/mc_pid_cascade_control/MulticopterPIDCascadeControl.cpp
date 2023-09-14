@@ -31,7 +31,7 @@
  *
  ****************************************************************************/
 
-#include "MulticopterPIDCasecadeControl.hpp"
+#include "MulticopterPIDCascadeControl.hpp"
 
 #include <drivers/drv_hrt.h>
 
@@ -39,19 +39,19 @@ using namespace matrix;
 using namespace time_literals;
 using math::radians;
 
-MulticopterPIDCasecadeControl::MulticopterPIDCasecadeControl() :
+MulticopterPIDCascadeControl::MulticopterPIDCascadeControl() :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl)
 {
 
 }
 
-MulticopterPIDCasecadeControl::~MulticopterPIDCasecadeControl()
+MulticopterPIDCascadeControl::~MulticopterPIDCascadeControl()
 {
 	perf_free(_loop_perf);
 }
 
-bool MulticopterPIDCasecadeControl::init()
+bool MulticopterPIDCascadeControl::init()
 {
 	if (!_vehicle_angular_velocity_sub.registerCallback()) {
 		PX4_ERR("callback registration failed");
@@ -61,7 +61,7 @@ bool MulticopterPIDCasecadeControl::init()
 	return true;
 }
 
-void MulticopterPIDCasecadeControl::Run()
+void MulticopterPIDCascadeControl::Run()
 {
 	if (should_exit()) {
 		_vehicle_angular_velocity_sub.unregisterCallback();
@@ -108,23 +108,105 @@ void MulticopterPIDCasecadeControl::Run()
 	// attitude control
 	if (_vehicle_control_mode.flag_control_attitude_enabled) {
 		//_attitude_control.update();
+
+
+		// _attitude_control.setAttitudeSetpoint(Quatf(vehicle_attitude_setpoint.q_d), vehicle_attitude_setpoint.yaw_sp_move_rate);
+
+		// Check for a heading reset
+		// if (_quat_reset_counter != v_att.quat_reset_counter) {
+
+		// }
+
+
+
 	}
 
 	// rate control
-	if (_vehicle_control_mode.flag_control_rates_enabled) {
-		//_rate_control.update();
-	}
+	vehicle_angular_velocity_s angular_velocity;
 
-	// control allocation
+	if (_vehicle_angular_velocity_sub.update(&angular_velocity) && _vehicle_control_mode.flag_control_rates_enabled) {
+
+		// attitude control
+		if (_vehicle_control_mode.flag_control_attitude_enabled) {
+
+			// position/velocity control
+			if (_vehicle_control_mode.flag_control_velocity_enabled || _vehicle_control_mode.flag_control_altitude_enabled) {
+				//_position_control.update(time_now_us, position);
+				//_velocity_control.update(time_now_us, velocity);
+
+				// thrust to attitude always
+				//ControlMath::thrustToAttitude(_thr_sp, _yaw_sp, attitude_setpoint);
+				//attitude_setpoint.yaw_sp_move_rate = _yawspeed_sp;
+
+
+
+			} else {
+				// otherwise get attitude setpoint and pass into attitude controller?
+			}
+
+			// run attitude controller
+			// Vector3f rates_sp = _attitude_control.update(q);
+
+			// pass rate setpoint into rate controller
+
+		} else {
+			// otherwise get rate setpoint and pass into rate controller
+		}
+
+
+
+
+
+
+		//_rate_control.update();
+
+
+		// TODO: send the unallocated value directly for better anti-windup
+		//_rate_control.setSaturationStatus(saturation_positive, saturation_negative);
+
+		// // run rate controller
+		// const Vector3f att_control = _rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+
+		// // publish rate controller status
+		// rate_ctrl_status_s rate_ctrl_status{};
+		// _rate_control.getRateControlStatus(rate_ctrl_status);
+		// rate_ctrl_status.timestamp = hrt_absolute_time();
+		// _controller_status_pub.publish(rate_ctrl_status);
+
+		// // publish thrust and torque setpoints
+		// vehicle_thrust_setpoint_s vehicle_thrust_setpoint{};
+		// vehicle_torque_setpoint_s vehicle_torque_setpoint{};
+
+		// _thrust_setpoint.copyTo(vehicle_thrust_setpoint.xyz);
+		// vehicle_torque_setpoint.xyz[0] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.f;
+		// vehicle_torque_setpoint.xyz[1] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.f;
+		// vehicle_torque_setpoint.xyz[2] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.f;
+
+
+		// TODO: control allocator directly
+
+
+		// vehicle_torque_setpoint_s vehicle_torque_setpoint;
+		// vehicle_thrust_setpoint_s vehicle_thrust_setpoint;
+
+		// _control_allocation[i]->setControlSetpoint(c[i]);
+
+		// // Do allocation
+		// _control_allocation[i]->allocate();
+
+
+		// Publish actuator setpoint and allocator status
+		//publish_actuator_controls();
+	}
 
 
 
 	perf_end(_loop_perf);
 }
 
-int MulticopterPIDCasecadeControl::task_spawn(int argc, char *argv[])
+int MulticopterPIDCascadeControl::task_spawn(int argc, char *argv[])
 {
-	MulticopterPIDCasecadeControl *instance = new MulticopterPIDCasecadeControl();
+	MulticopterPIDCascadeControl *instance = new MulticopterPIDCascadeControl();
 
 	if (instance) {
 		_object.store(instance);
@@ -145,12 +227,12 @@ int MulticopterPIDCasecadeControl::task_spawn(int argc, char *argv[])
 	return PX4_ERROR;
 }
 
-int MulticopterPIDCasecadeControl::custom_command(int argc, char *argv[])
+int MulticopterPIDCascadeControl::custom_command(int argc, char *argv[])
 {
 	return print_usage("unknown command");
 }
 
-int MulticopterPIDCasecadeControl::print_usage(const char *reason)
+int MulticopterPIDCascadeControl::print_usage(const char *reason)
 {
 	if (reason) {
 		PX4_WARN("%s\n", reason);
@@ -175,5 +257,5 @@ The controller has a PID loop for angular rate error.
 
 extern "C" __EXPORT int mc_pid_cascade_control_main(int argc, char *argv[])
 {
-	return MulticopterPIDCasecadeControl::main(argc, argv);
+	return MulticopterPIDCascadeControl::main(argc, argv);
 }

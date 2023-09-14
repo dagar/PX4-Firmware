@@ -38,8 +38,8 @@ px4_add_module(
 		${MAX_CUSTOM_OPT_LEVEL}
 		-Wno-error
 	SRCS
-		MulticopterPIDCasecadeControl.cpp
-		MulticopterPIDCasecadeControl.hpp
+		MulticopterPIDCascadeControl.cpp
+		MulticopterPIDCascadeControl.hpp
 	DEPENDS
 		circuit_breaker
 		mathlib
