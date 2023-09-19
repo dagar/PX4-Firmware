@@ -1736,11 +1736,13 @@ void Commander::run()
 		// ALTCTL drop mode hacks until we have proper multi-stage arming
 		//  - force lockdown if in drop mode and we don't yet want takeoff
 		// TODO: this sucks, do better
-		if (_vehicle_status.NAVIGATION_STATE_ALTCTL) {
+		if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL) {
 			vehicle_constraints_s vehicle_constraints{};
 
 			if (_vehicle_constraints_sub.copy(&vehicle_constraints)) {
-				if ((hrt_elapsed_time(&vehicle_constraints.timestamp) < 1_s)) {
+				if ((hrt_elapsed_time(&vehicle_constraints.timestamp) < 200_ms)
+				    && (vehicle_constraints.timestamp >= _vehicle_status.nav_state_timestamp)
+				   ) {
 					if (!vehicle_constraints.want_takeoff) {
 						_actuator_armed.lockdown = true;
 
@@ -1781,21 +1783,33 @@ void Commander::run()
 			_vehicle_status_pub.publish(_vehicle_status);
 
 			// failure_detector_status publish
-			if (!_actuator_armed.lockdown) {
-				failure_detector_status_s fd_status{};
-				fd_status.fd_roll = _failure_detector.getStatusFlags().roll;
-				fd_status.fd_pitch = _failure_detector.getStatusFlags().pitch;
-				fd_status.fd_alt = _failure_detector.getStatusFlags().alt;
-				fd_status.fd_ext = _failure_detector.getStatusFlags().ext;
-				fd_status.fd_arm_escs = _failure_detector.getStatusFlags().arm_escs;
-				fd_status.fd_battery = _failure_detector.getStatusFlags().battery;
-				fd_status.fd_imbalanced_prop = _failure_detector.getStatusFlags().imbalanced_prop;
-				fd_status.fd_motor = _failure_detector.getStatusFlags().motor;
-				fd_status.imbalanced_prop_metric = _failure_detector.getImbalancedPropMetric();
-				fd_status.motor_failure_mask = _failure_detector.getMotorFailures();
-				fd_status.timestamp = hrt_absolute_time();
-				_failure_detector_status_pub.publish(fd_status);
+			failure_detector_status_s fd_status{};
+			fd_status.fd_roll = _failure_detector.getStatusFlags().roll;
+			fd_status.fd_pitch = _failure_detector.getStatusFlags().pitch;
+			fd_status.fd_alt = _failure_detector.getStatusFlags().alt;
+			fd_status.fd_ext = _failure_detector.getStatusFlags().ext;
+			fd_status.fd_arm_escs = _failure_detector.getStatusFlags().arm_escs;
+			fd_status.fd_battery = _failure_detector.getStatusFlags().battery;
+			fd_status.fd_imbalanced_prop = _failure_detector.getStatusFlags().imbalanced_prop;
+			fd_status.fd_motor = _failure_detector.getStatusFlags().motor;
+			fd_status.imbalanced_prop_metric = _failure_detector.getImbalancedPropMetric();
+			fd_status.motor_failure_mask = _failure_detector.getMotorFailures();
+
+			if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL) {
+				fd_status.fd_roll = false;
+				fd_status.fd_pitch = false;
+				fd_status.fd_alt = false;
+				fd_status.fd_ext = false;
+				fd_status.fd_arm_escs = false;
+				fd_status.fd_battery = false;
+				fd_status.fd_imbalanced_prop = false;
+				fd_status.fd_motor = false;
+				fd_status.imbalanced_prop_metric = false;
+				fd_status.motor_failure_mask = 0;
 			}
+
+			fd_status.timestamp = hrt_absolute_time();
+			_failure_detector_status_pub.publish(fd_status);
 		}
 
 		checkWorkerThread();
