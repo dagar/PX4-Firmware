@@ -391,14 +391,17 @@ bool FlightTaskDrop::update()
 				}
 
 				// wait for full
-				if (!failsafe_flags.local_altitude_invalid) {
+				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 1.f)) {
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control");
 					_state = DropState::ALTITUDE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
 					_position_setpoint.setNaN();
+					_velocity_setpoint.setNaN();
 
-					_velocity_setpoint.zero();
+					// latch onto current height
+					_position_setpoint(2) = _position(2);
+
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
@@ -424,12 +427,12 @@ bool FlightTaskDrop::update()
 					_constraints.want_takeoff = true;
 
 					_position_setpoint.setNaN();
+					_velocity_setpoint.setNaN();
 
 					// latch onto current height
 					_position_setpoint(2) = _position(2);
 
 					// otherwise all zero
-					_velocity_setpoint.zero();
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
@@ -473,7 +476,7 @@ bool FlightTaskDrop::update()
 					_jerk_setpoint.zero();
 				}
 
-				if (position_valid && !failsafe_flags.local_position_invalid) {
+				if (position_valid && !failsafe_flags.local_position_invalid && (_velocity.length() < 5.f)) {
 					_state = DropState::POSITION_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 				}
