@@ -620,33 +620,37 @@ bool FlightTaskDrop::update()
 						_constraints.speed_up = math::max(_constraints.speed_up, 1.2f * _param_mpc_z_v_auto_up.get());
 						_constraints.want_takeoff = true;
 
-						bool force_zero_velocity_setpoint = false; // TODO
-
-						const Vector3f pos_sp = Vector3f{trajectory_setpoint.position};
-						const Vector3f vel_sp = Vector3f{trajectory_setpoint.velocity};
-
-						PositionSmoothing::PositionSmoothingSetpoints smoothed_setpoints{};
-
-						_position_smoothing.generateSetpoints(
-							_position,
-							pos_sp,
-							vel_sp,
-							_deltatime,
-							force_zero_velocity_setpoint,
-							smoothed_setpoints
-						);
-
-						_jerk_setpoint = smoothed_setpoints.jerk;
-						_acceleration_setpoint = smoothed_setpoints.acceleration;
-						_velocity_setpoint = smoothed_setpoints.velocity;
-						_position_setpoint = smoothed_setpoints.position;
+						_offboard_pos_sp_last = Vector3f{trajectory_setpoint.position};
+						_offboard_vel_sp_last = Vector3f{trajectory_setpoint.velocity};
 
 						_yaw = trajectory_setpoint.yaw;
 						//_yawspeed = trajectory_setpoint.yawspeed;
-
-						_unsmoothed_velocity_setpoint = smoothed_setpoints.unsmoothed_velocity;
-						//_want_takeoff = true;
 					}
+				}
+
+				if (_offboard_pos_sp_last.isAllFinite()) {
+
+					bool force_zero_velocity_setpoint = false; // TODO
+
+					PositionSmoothing::PositionSmoothingSetpoints smoothed_setpoints{};
+					//float dt = math::constrain((_time_stamp_current - _time_stamp_last) * 1e-6f, 0.001f, 1.f);
+					_position_smoothing.generateSetpoints(
+						_position,
+						_offboard_pos_sp_last,
+						_offboard_vel_sp_last,
+						_deltatime,
+						force_zero_velocity_setpoint,
+						smoothed_setpoints
+					);
+					_offboard_time_stamp_last = _time_stamp_current;
+
+					_jerk_setpoint = smoothed_setpoints.jerk;
+					_acceleration_setpoint = smoothed_setpoints.acceleration;
+					_velocity_setpoint = smoothed_setpoints.velocity;
+					_position_setpoint = smoothed_setpoints.position;
+
+					_unsmoothed_velocity_setpoint = smoothed_setpoints.unsmoothed_velocity;
+					//_want_takeoff = true;
 				}
 
 #if 0

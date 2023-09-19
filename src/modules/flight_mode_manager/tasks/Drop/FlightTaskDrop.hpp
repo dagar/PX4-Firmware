@@ -121,6 +121,11 @@ private:
 	PositionSmoothing _position_smoothing{};
 	Vector3f _unsmoothed_velocity_setpoint{};
 
+
+	Vector3f _offboard_pos_sp_last{NAN, NAN, NAN};
+	Vector3f _offboard_vel_sp_last{NAN, NAN, NAN};
+	uint64_t _offboard_time_stamp_last{0};
+
 	DEFINE_PARAMETERS_CUSTOM_PARENT(FlightTask,
 					(ParamFloat<px4::params::MPC_DROP_LAUN_T>) _param_mpc_drop_laun_t,
 					(ParamFloat<px4::params::MPC_DROP_VZ_THR>) _param_mpc_drop_vz_thr,
