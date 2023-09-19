@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2022 PX4. All rights reserved.
+ *   Copyright (c) 2022-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,9 +51,6 @@ public:
 
 	~OutputPredictor() = default;
 
-	// modify output filter to match the the EKF state at the fusion time horizon
-	void alignOutputFilter(const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state,
-			       const matrix::Vector3f &pos_state);
 	/*
 	* Implement a strapdown INS algorithm using the latest IMU data at the current time horizon.
 	* Buffer the INS states and calculate the difference with the EKF states at the delayed fusion time horizon.
@@ -64,19 +61,21 @@ public:
 	* “Recursive Attitude Estimation in the Presence of Multi-rate and Multi-delay Vector Measurements”
 	* A Khosravian, J Trumpf, R Mahony, T Hamel, Australian National University
 	*/
-	void calculateOutputStates(const uint64_t time_us, const matrix::Vector3f &delta_angle, const float delta_angle_dt,
+	bool calculateOutputStates(const uint64_t time_us,
+				   const matrix::Vector3f &delta_angle, const float delta_angle_dt,
 				   const matrix::Vector3f &delta_velocity, const float delta_velocity_dt);
 
-	void correctOutputStates(const uint64_t time_delayed_us,
-				 const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state, const matrix::Vector3f &pos_state, const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias);
+	bool correctOutputStates(const uint64_t time_delayed_us, const matrix::Quatf &quat_state,
+				 const matrix::Vector3f &vel_state, const matrix::Vector3f &pos_state,
+				 const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias);
 
-	void resetQuaternion(const matrix::Quatf &quat_change);
+	void resetQuaternion(const uint64_t time_delayed_us, const matrix::Quatf &new_quat);
 
-	void resetHorizontalVelocityTo(const matrix::Vector2f &delta_horz_vel);
-	void resetVerticalVelocityTo(float delta_vert_vel);
+	void resetHorizontalVelocityTo(const uint64_t time_delayed_us, const matrix::Vector2f &new_horz_vel);
+	void resetVerticalVelocityTo(const uint64_t time_delayed_us, const float new_vert_vel);
 
-	void resetHorizontalPositionTo(const matrix::Vector2f &delta_horz_pos);
-	void resetVerticalPositionTo(const float new_vert_pos, const float vert_pos_change);
+	void resetHorizontalPositionTo(const uint64_t time_delayed_us, const matrix::Vector2f &new_horz_pos);
+	void resetVerticalPositionTo(const uint64_t time_delayed_us, const float new_vert_pos);
 
 	void print_status();
 
@@ -118,6 +117,8 @@ public:
 	// return an array containing the output predictor angular, velocity and position tracking
 	// error magnitudes (rad), (m/sec), (m)
 	const matrix::Vector3f &getOutputTrackingError() const { return _output_tracking_error; }
+
+	bool aligned() const { return _output_filter_aligned; }
 
 	void set_imu_offset(const matrix::Vector3f &offset) { _imu_pos_body = offset; }
 	void set_pos_correction_tc(const float tau) { _pos_tau = tau; }
@@ -184,6 +185,8 @@ private:
 	matrix::Vector3f _pos_err_integ{};	///< integral of position tracking error (m.s)
 
 	matrix::Vector3f _output_tracking_error{}; ///< contains the magnitude of the angle, velocity and position track errors (rad, m/s, m)
+
+	bool _output_filter_aligned{false};
 
 	matrix::Vector3f _imu_pos_body{};                ///< xyz position of IMU in body frame (m)
 

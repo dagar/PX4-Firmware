@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2022 PX4. All rights reserved.
+ *   Copyright (c) 2022-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,121 +53,164 @@ void OutputPredictor::print_status()
 	       _output_vert_buffer.get_total_size());
 }
 
-void OutputPredictor::alignOutputFilter(const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state)
-{
-	const outputSample &output_delayed = _output_buffer.get_oldest();
-
-	// calculate the quaternion rotation delta from the EKF to output observer states at the EKF fusion time horizon
-	Quatf q_delta{quat_state * output_delayed.quat_nominal.inversed()};
-	q_delta.normalize();
-
-	// calculate the velocity and position deltas between the output and EKF at the EKF fusion time horizon
-	const Vector3f vel_delta = vel_state - output_delayed.vel;
-	const Vector3f pos_delta = pos_state - output_delayed.pos;
-
-	// loop through the output filter state history and add the deltas
-	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].quat_nominal = q_delta * _output_buffer[i].quat_nominal;
-		_output_buffer[i].quat_nominal.normalize();
-		_output_buffer[i].vel += vel_delta;
-		_output_buffer[i].pos += pos_delta;
-	}
-
-	_output_new = _output_buffer.get_newest();
-}
-
 void OutputPredictor::reset()
 {
-	// TODO: who resets the output buffer content?
-	_output_new = {};
-	_output_vert_new = {};
+	_output_buffer.reset();
+	_output_vert_buffer.reset();
 
-	_accel_bias.setZero();
-	_gyro_bias.setZero();
+	_accel_bias.zero();
+	_gyro_bias.zero();
 
 	_time_last_update_states_us = 0;
 	_time_last_correct_states_us = 0;
 
+	_output_new = {};
+	_output_vert_new = {};
+
 	_R_to_earth_now.setIdentity();
-	_vel_imu_rel_body_ned.setZero();
-	_vel_deriv.setZero();
+	_vel_imu_rel_body_ned.zero();
+	_vel_deriv.zero();
 
-	_delta_angle_corr.setZero();
+	_delta_angle_corr.zero();
+	_vel_err_integ.zero();
+	_pos_err_integ.zero();
 
-	_vel_err_integ.setZero();
-	_pos_err_integ.setZero();
+	_output_tracking_error.zero();
 
-	_output_tracking_error.setZero();
-
-	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-		_output_buffer[index] = {};
-	}
-
-	for (uint8_t index = 0; index < _output_vert_buffer.get_length(); index++) {
-		_output_vert_buffer[index] = {};
-	}
+	_output_filter_aligned = false;
 }
 
-void OutputPredictor::resetQuaternion(const Quatf &quat_change)
+void OutputPredictor::resetQuaternion(const uint64_t time_delayed_us, const Quatf &new_quat)
 {
+	Quatf quat_change{1.f, 0.f, 0.f, 0.f};
+
+	// find the output observer state corresponding to the reset time
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
+
+			quat_change = (new_quat * _output_buffer[i].quat_nominal.inversed()).normalized();
+			break;
+		}
+	}
+
 	// add the reset amount to the output observer buffered data
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].quat_nominal = quat_change * _output_buffer[i].quat_nominal;
+		_output_buffer[i].quat_nominal = (quat_change * _output_buffer[i].quat_nominal).normalized();
 	}
 
 	// apply the change in attitude quaternion to our newest quaternion estimate
-	// which was already taken out from the output buffer
-	_output_new.quat_nominal = quat_change * _output_new.quat_nominal;
+	_output_new.quat_nominal = (quat_change * _output_new.quat_nominal).normalized();
+	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
 }
 
-void OutputPredictor::resetHorizontalVelocityTo(const Vector2f &delta_horz_vel)
+void OutputPredictor::resetHorizontalVelocityTo(const uint64_t time_delayed_us, const Vector2f &new_horz_vel)
 {
+	Vector2f delta_vxy{0.f, 0.f}; // horizontal velocity
+
+	// find the output observer state corresponding to the reset time
 	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-		_output_buffer[index].vel.xy() += delta_horz_vel;
+		if (_output_buffer[index].time_us == time_delayed_us) {
+
+			delta_vxy = new_horz_vel - _output_buffer[index].vel.xy();
+
+			break;
+		}
 	}
-
-	_output_new.vel.xy() += delta_horz_vel;
-}
-
-void OutputPredictor::resetVerticalVelocityTo(float delta_vert_vel)
-{
-	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-		_output_buffer[index].vel(2) += delta_vert_vel;
-		_output_vert_buffer[index].vert_vel += delta_vert_vel;
-	}
-
-	_output_new.vel(2) += delta_vert_vel;
-	_output_vert_new.vert_vel += delta_vert_vel;
-}
-
-void OutputPredictor::resetHorizontalPositionTo(const Vector2f &delta_horz_pos)
-{
-	for (uint8_t index = 0; index < _output_buffer.get_length(); index++) {
-		_output_buffer[index].pos.xy() += delta_horz_pos;
-	}
-
-	_output_new.pos.xy() += delta_horz_pos;
-}
-
-void OutputPredictor::resetVerticalPositionTo(const float new_vert_pos, const float vert_pos_change)
-{
-	// apply the change in height / height rate to our newest height / height rate estimate
-	// which have already been taken out from the output buffer
-	_output_new.pos(2) += vert_pos_change;
 
 	// add the reset amount to the output observer buffered data
 	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
-		_output_buffer[i].pos(2) += vert_pos_change;
-		_output_vert_buffer[i].vert_vel_integ += vert_pos_change;
+		_output_buffer[i].vel.xy() += delta_vxy;
+	}
+
+	// apply change to latest velocity
+	_output_new.vel.xy() += delta_vxy;
+}
+
+void OutputPredictor::resetVerticalVelocityTo(const uint64_t time_delayed_us, const float new_vert_vel)
+{
+	float delta_vz = 0.f; // vertical velocity
+	float delta_vz_alt = 0.f; // vertical velocity (alternative)
+
+	// find the output observer state corresponding to the reset time
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
+
+			delta_vz = new_vert_vel - _output_buffer[i].vel(2);
+			delta_vz_alt = new_vert_vel - _output_vert_buffer[i].vert_vel;
+
+			break;
+		}
+	}
+
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		_output_buffer[i].vel(2) += delta_vz;
+		_output_vert_buffer[i].vert_vel += delta_vz_alt;
+	}
+
+	// apply change to latest velocity
+	_output_new.vel(2) += delta_vz;
+	_output_vert_new.vert_vel += delta_vz_alt;
+}
+
+void OutputPredictor::resetHorizontalPositionTo(const uint64_t time_delayed_us, const Vector2f &new_horz_pos)
+{
+	Vector2f delta_xy{0.f, 0.f}; // horizontal position
+
+	// find the output observer state corresponding to the reset time
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
+
+			delta_xy = new_horz_pos - _output_buffer[i].pos.xy();
+
+			break;
+		}
+	}
+
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		_output_buffer[i].pos.xy() += delta_xy;
 	}
 
 	// add the reset amount to the output observer vertical position state
-	_output_vert_new.vert_vel_integ = new_vert_pos;
+	_output_new.pos.xy() += delta_xy;
 }
 
-void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector3f &delta_angle,
+void OutputPredictor::resetVerticalPositionTo(const uint64_t time_delayed_us, const float new_vert_pos)
+{
+	float delta_z = 0.f; // vertical position
+	float delta_z_alt = 0.f; // vertical position (alternative)
+
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		if (_output_buffer[i].time_us == time_delayed_us) {
+
+			delta_z = new_vert_pos - _output_buffer[i].pos(2);
+			delta_z_alt = new_vert_pos - _output_vert_buffer[i].vert_vel_integ;
+
+			break;
+		}
+	}
+
+	// add the reset amount to the output observer buffered data
+	for (uint8_t i = 0; i < _output_buffer.get_length(); i++) {
+		_output_buffer[i].pos(2) += delta_z;
+		_output_vert_buffer[i].vert_vel_integ += delta_z_alt;
+	}
+
+	// add the reset amount to the output observer vertical position state
+	_output_new.pos(2) += delta_z;
+	_output_vert_new.vert_vel_integ += delta_z_alt;
+}
+
+bool OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector3f &delta_angle,
 		const float delta_angle_dt, const Vector3f &delta_velocity, const float delta_velocity_dt)
 {
+	if (time_us <= _time_last_update_states_us) {
+		printf("output predictor time_us <= _time_last_update_states_us, resetting\n");
+		reset();
+		return false;
+	}
+
 	// Use full rate IMU data at the current time horizon
 	if (_time_last_update_states_us != 0) {
 		const float dt = math::constrain((time_us - _time_last_update_states_us) * 1e-6f, 0.0001f, 0.03f);
@@ -190,12 +233,7 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 	const Quatf dq(AxisAnglef{delta_angle_corrected});
 
 	// rotate the previous INS quaternion by the delta quaternions
-	_output_new.quat_nominal = _output_new.quat_nominal * dq;
-
-	// the quaternions must always be normalised after modification
-	_output_new.quat_nominal.normalize();
-
-	// calculate the rotation matrix from body to earth frame
+	_output_new.quat_nominal = (_output_new.quat_nominal * dq).normalized();
 	_R_to_earth_now = Dcmf(_output_new.quat_nominal);
 
 	// rotate the delta velocity to earth frame
@@ -242,33 +280,78 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 	const Vector3f unbiased_delta_angle = delta_angle - delta_angle_bias_scaled;
 	const float spin_del_ang_D = unbiased_delta_angle.dot(Vector3f(_R_to_earth_now.row(2)));
 	_unaided_yaw = matrix::wrap_pi(_unaided_yaw + spin_del_ang_D);
+
+	return true;
 }
 
-void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
-		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state, const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias)
+bool OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
+		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state,
+		const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias)
 {
+	const uint64_t time_latest_us = _output_new.time_us;
+
+	if (time_latest_us < time_delayed_us) {
+		return false;
+	}
+
+	// store the INS states in a ring buffer with the same length and time coordinates as the IMU data buffer
+	if ((_output_new.time_us != 0) && (_output_vert_new.dt > 0.f)) {
+		_output_buffer.push(_output_new);
+		_output_vert_buffer.push(_output_vert_new);
+		_output_vert_new.dt = 0.0f; // reset time delta to zero for the next accumulation of full rate IMU data
+	}
+
+	// store IMU bias for calculateOutputStates
+	_gyro_bias = gyro_bias;
+	_accel_bias = accel_bias;
+
 	// calculate an average filter update time
-	if (_time_last_correct_states_us != 0) {
+	if ((_time_last_correct_states_us != 0) && (time_delayed_us > _time_last_correct_states_us)) {
 		const float dt = math::constrain((time_delayed_us - _time_last_correct_states_us) * 1e-6f, 0.0001f, 0.03f);
 		_dt_correct_states_avg = 0.8f * _dt_correct_states_avg + 0.2f * dt;
 	}
 
 	_time_last_correct_states_us = time_delayed_us;
 
-	// store IMU bias for calculateOutputStates
-	_gyro_bias = gyro_bias;
-	_accel_bias = accel_bias;
+	// get the output buffer state data at the EKF fusion time horizon
+	uint8_t index_delayed = _output_buffer.get_oldest_index();
+	uint8_t index = _output_buffer.get_oldest_index();
+	bool delayed_index_found = false;
 
-	// store the INS states in a ring buffer with the same length and time coordinates as the IMU data buffer
-	_output_buffer.push(_output_new);
-	_output_vert_buffer.push(_output_vert_new);
+	const uint8_t size = _output_buffer.get_length();
 
-	// get the oldest INS state data from the ring buffer
-	// this data will be at the EKF fusion time horizon
-	// TODO: there is no guarantee that data is at delayed fusion horizon
-	//       Shouldnt we use pop_first_older_than?
-	const outputSample &output_delayed = _output_buffer.get_oldest();
-	const outputVert &output_vert_delayed = _output_vert_buffer.get_oldest();
+	for (uint8_t counter = 0; counter < (size - 1); counter++) {
+		if (_output_buffer[index].time_us == time_delayed_us) {
+			index_delayed = index;
+			delayed_index_found = true;
+			break;
+		}
+
+		// advance the index
+		index = (index + 1) % size;
+	}
+
+	if (!_output_filter_aligned) {
+		if (delayed_index_found) {
+			resetQuaternion(time_delayed_us, quat_state);
+			resetHorizontalVelocityTo(time_delayed_us, vel_state.xy());
+			resetVerticalVelocityTo(time_delayed_us, vel_state(2));
+			resetHorizontalPositionTo(time_delayed_us, pos_state.xy());
+			resetVerticalPositionTo(time_delayed_us, pos_state(2));
+
+			_delta_angle_corr.zero();
+			_vel_err_integ.zero();
+			_pos_err_integ.zero();
+			_output_tracking_error.zero();
+
+			_output_filter_aligned = true;
+		}
+
+		return false;
+	}
+
+	const outputSample &output_delayed = _output_buffer[index_delayed];
+	const outputVert &output_vert_delayed = _output_vert_buffer[index_delayed];
 
 	// calculate the quaternion delta between the INS and EKF quaternions at the EKF fusion time horizon
 	const Quatf q_error((quat_state.inversed() * output_delayed.quat_nominal).normalized());
@@ -280,7 +363,6 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 
 	// calculate a gain that provides tight tracking of the estimator attitude states and
 	// adjust for changes in time delay to maintain consistent damping ratio of ~0.7
-	const uint64_t time_latest_us = _time_last_update_states_us;
 	const float time_delay = fmaxf((time_latest_us - time_delayed_us) * 1e-6f, _dt_update_states_avg);
 	const float att_gain = 0.5f * _dt_update_states_avg / time_delay;
 
@@ -326,6 +408,8 @@ void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
 	const Vector3f pos_correction = pos_err * pos_gain + _pos_err_integ * sq(pos_gain) * 0.1f;
 
 	applyCorrectionToOutputBuffer(vel_correction, pos_correction);
+
+	return true;
 }
 
 void OutputPredictor::applyCorrectionToVerticalOutputBuffer(float vert_vel_correction)

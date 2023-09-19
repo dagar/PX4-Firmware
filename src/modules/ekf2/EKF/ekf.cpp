@@ -170,11 +170,11 @@ void Ekf::reset()
 
 bool Ekf::update()
 {
-	if (!_filter_initialised) {
-		_filter_initialised = initialiseFilter();
+	bool updated = false;
 
-		if (!_filter_initialised) {
-			return false;
+	if (!_filter_initialised) {
+		if (initialiseFilter()) {
+			_filter_initialised = true;
 		}
 	}
 
@@ -186,24 +186,26 @@ bool Ekf::update()
 		// TODO: explicitly pop at desired time horizon
 		const imuSample imu_sample_delayed = _imu_buffer.get_oldest();
 
-		// perform state and covariance prediction for the main filter
-		predictCovariance(imu_sample_delayed);
-		predictState(imu_sample_delayed);
+		if (_filter_initialised) {
+			// perform state and covariance prediction for the main filter
+			predictCovariance(imu_sample_delayed);
+			predictState(imu_sample_delayed);
 
-		// control fusion of observation data
-		controlFusionModes(imu_sample_delayed);
+			// control fusion of observation data
+			controlFusionModes(imu_sample_delayed);
 
 #if defined(CONFIG_EKF2_TERRAIN)
-		// run a separate filter for terrain estimation
-		runTerrainEstimator(imu_sample_delayed);
+			// run a separate filter for terrain estimation
+			runTerrainEstimator(imu_sample_delayed);
 #endif // CONFIG_EKF2_TERRAIN
 
-		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, _state.quat_nominal, _state.vel, _state.pos, _state.gyro_bias, _state.accel_bias);
+			updated = true;
+		}
 
-		return true;
+		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, _state.quat_nominal, _state.vel, _state.pos, _state.gyro_bias, _state.accel_bias);
 	}
 
-	return false;
+	return updated;
 }
 
 bool Ekf::initialiseFilter()
@@ -237,9 +239,6 @@ bool Ekf::initialiseFilter()
 	// Initialise the terrain estimator
 	initHagl();
 #endif // CONFIG_EKF2_TERRAIN
-
-	// reset the output predictor state history to match the EKF initial values
-	_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
 
 	return true;
 }

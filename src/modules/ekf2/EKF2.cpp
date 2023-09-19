@@ -729,9 +729,15 @@ void EKF2::Run()
 		if (_ekf.update()) {
 			perf_set_elapsed(_ecl_ekf_update_full_perf, hrt_elapsed_time(&ekf_update_start));
 
-			PublishLocalPosition(now);
-			PublishOdometry(now, imu_sample_new);
-			PublishGlobalPosition(now);
+			if (_ekf.output_predictor().aligned()) {
+				// publish output predictor output
+				PublishLocalPosition(now);
+				PublishOdometry(now, imu_sample_new);
+				PublishGlobalPosition(now);
+			}
+
+			// publish other state output used by the system not dependent on output predictor
+			PublishSensorBias(now);
 			PublishWindEstimate(now);
 
 			// publish status/logging messages
@@ -763,7 +769,6 @@ void EKF2::Run()
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 			UpdateMagCalibration(now);
 #endif // CONFIG_EKF2_MAGNETOMETER
-			PublishSensorBias(now);
 
 			PublishAidSourceStatus(now);
 
