@@ -237,6 +237,7 @@ EKF2::~EKF2()
 	perf_free(_msg_missed_magnetometer_perf);
 #endif // CONFIG_EKF2_MAGNETOMETER
 	perf_free(_msg_missed_odometry_perf);
+	perf_free(_vehicle_visual_odometry_latency_perf);
 #if defined(CONFIG_EKF2_OPTICAL_FLOW)
 	perf_free(_msg_missed_optical_flow_perf);
 #endif // CONFIG_EKF2_OPTICAL_FLOW
@@ -396,6 +397,7 @@ int EKF2::print_status()
 	perf_print_counter(_msg_missed_magnetometer_perf);
 #endif // CONFIG_EKF2_MAGNETOMETER
 	perf_print_counter(_msg_missed_odometry_perf);
+	perf_print_counter(_vehicle_visual_odometry_latency_perf);
 #if defined(CONFIG_EKF2_OPTICAL_FLOW)
 	perf_print_counter(_msg_missed_optical_flow_perf);
 #endif // CONFIG_EKF2_OPTICAL_FLOW
@@ -2186,9 +2188,11 @@ bool EKF2::UpdateExtVisionSample(ekf2_timestamps_s &ekf2_timestamps)
 	if (_ev_odom_sub.update(&ev_odom)) {
 		if (_msg_missed_odometry_perf == nullptr) {
 			_msg_missed_odometry_perf = perf_alloc(PC_COUNT, MODULE_NAME": vehicle_visual_odometry messages missed");
+			_vehicle_visual_odometry_latency_perf = perf_alloc(PC_ELAPSED, MODULE_NAME": vehicle_visual_odometry latency");
 
 		} else if (_ev_odom_sub.get_last_generation() != last_generation + 1) {
 			perf_count(_msg_missed_odometry_perf);
+			perf_set_elapsed(_vehicle_visual_odometry_latency_perf, hrt_elapsed_time(&ev_odom.timestamp_sample));
 		}
 
 		extVisionSample ev_data{};

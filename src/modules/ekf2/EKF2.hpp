@@ -285,7 +285,10 @@ private:
 	perf_counter_t _ecl_ekf_update_full_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": ECL full update")};
 	perf_counter_t _msg_missed_imu_perf{perf_alloc(PC_COUNT, MODULE_NAME": IMU message missed")};
 	perf_counter_t _msg_missed_gps_perf{nullptr};
+
+
 	perf_counter_t _msg_missed_odometry_perf{nullptr};
+	perf_counter_t _vehicle_visual_odometry_latency_perf{nullptr};
 
 	InFlightCalibration _accel_cal{};
 	InFlightCalibration _gyro_cal{};
