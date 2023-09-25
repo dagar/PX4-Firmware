@@ -96,8 +96,7 @@ void Ekf::controlEvYawFusion(const extVisionSample &ev_sample, const bool common
 				if (quality_sufficient) {
 					ECL_INFO("reset to %s", AID_SRC_NAME);
 					//_information_events.flags.reset_yaw_to_vision = true; // TODO
-					resetQuatStateYaw(aid_src.observation, aid_src.observation_variance);
-					aid_src.time_last_fuse = _time_delayed_us;
+					resetYaw(aid_src);
 
 				} else {
 					// EV has reset, but quality isn't sufficient
@@ -120,8 +119,7 @@ void Ekf::controlEvYawFusion(const extVisionSample &ev_sample, const bool common
 					// Data seems good, attempt a reset
 					//_information_events.flags.reset_yaw_to_vision = true; // TODO
 					ECL_WARN("%s fusion failing, resetting", AID_SRC_NAME);
-					resetQuatStateYaw(aid_src.observation, aid_src.observation_variance);
-					aid_src.time_last_fuse = _time_delayed_us;
+					resetYaw(aid_src);
 
 					if (_control_status.flags.in_air) {
 						_nb_ev_yaw_reset_available--;
@@ -153,37 +151,35 @@ void Ekf::controlEvYawFusion(const extVisionSample &ev_sample, const bool common
 			// activate fusion
 			if (ev_sample.pos_frame == PositionFrame::LOCAL_FRAME_NED) {
 
-				if (_control_status.flags.yaw_align && fuseYaw(aid_src, H_YAW)) {
-					ECL_INFO("starting %s fusion", AID_SRC_NAME);
-
-				} else {
+				if (!_control_status.flags.yaw_align) {
 					// reset yaw to EV and set yaw_align
 					ECL_INFO("starting %s fusion, resetting state", AID_SRC_NAME);
-					resetQuatStateYaw(aid_src.observation, aid_src.observation_variance);
-					_control_status.flags.yaw_align = true;
-				}
+					resetYaw(aid_src);
 
-				aid_src.time_last_fuse = _time_delayed_us;
-				_information_events.flags.starting_vision_yaw_fusion = true;
-				_control_status.flags.ev_yaw = true;
+					_control_status.flags.yaw_align = true;
+					_control_status.flags.ev_yaw = true;
+
+				} else if (fuseYaw(aid_src, H_YAW)) {
+					ECL_INFO("starting %s fusion", AID_SRC_NAME);
+					_control_status.flags.ev_yaw = true;
+				}
 
 			} else if (ev_sample.pos_frame == PositionFrame::LOCAL_FRAME_FRD) {
 				// turn on fusion of external vision yaw measurements and disable all other heading fusion
 				stopGpsYawFusion();
 				stopGpsFusion();
 
-				ECL_INFO("starting %s fusion, resetting state", AID_SRC_NAME);
-
 				// reset yaw to EV
-				resetQuatStateYaw(aid_src.observation, aid_src.observation_variance);
-				aid_src.time_last_fuse = _time_delayed_us;
-
-				_information_events.flags.starting_vision_yaw_fusion = true;
-				_control_status.flags.yaw_align = false;
-				_control_status.flags.ev_yaw = true;
+				if (resetYaw(aid_src)) {
+					ECL_INFO("starting %s fusion, resetting state", AID_SRC_NAME);
+					
+					_control_status.flags.yaw_align = false;
+					_control_status.flags.ev_yaw = true;
+				}
 			}
 
 			if (_control_status.flags.ev_yaw) {
+				_information_events.flags.starting_vision_yaw_fusion = true;
 				_nb_ev_yaw_reset_available = 5;
 			}
 		}

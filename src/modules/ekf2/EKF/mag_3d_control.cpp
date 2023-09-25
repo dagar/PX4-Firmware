@@ -38,10 +38,37 @@
 
 #include "ekf.h"
 
+#include "python/ekf_derivation/generated/compute_mag_innov_innov_var_and_hx.h"
+
 void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_starting_conditions_passing,
 			     estimator_aid_source3d_s &aid_src)
 {
 	static constexpr const char *AID_SRC_NAME = "mag";
+
+	// XYZ Measurement uncertainty. Need to consider timing errors for fast rotations
+	const float R_MAG = math::max(sq(_params.mag_noise), sq(0.01f));
+
+	// calculate intermediate variables used for X axis innovation variance, observation Jacobians and Kalman gains
+	Vector3f mag_innov;
+	Vector3f innov_var;
+
+	// Observation jacobian and Kalman gain vectors
+	VectorState H;
+	const VectorState state_vector = getStateAtFusionHorizonAsVector();
+	sym::ComputeMagInnovInnovVarAndHx(state_vector, P, mag_sample.mag, R_MAG, FLT_EPSILON, &mag_innov, &innov_var, &H);
+
+	// do not use the synthesized measurement for the magnetomter Z component for 3D fusion
+	if (_control_status.flags.synthetic_mag_z) {
+		mag_innov(2) = 0.0f;
+	}
+
+	updateEstimatorAidStatus(aid_src,
+				 mag_sample.time_us,             // sample timestamp
+				 mag_sample.mag - _state.mag_B,  // observation
+				 Vector3f(R_MAG, R_MAG, R_MAG),  // observation variance
+				 mag_innov,                      // innovation
+				 innov_var,                      // innovation variance
+				 _params.mag_innov_gate);        // gate sigma
 
 	const bool wmm_updated = (_wmm_gps_time_last_set > aid_src.time_last_fuse);
 
@@ -102,14 +129,14 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 					// states for the first few observations.
 					fuseDeclination(0.02f);
 					_mag_decl_cov_reset = true;
-					fuseMag(mag_sample, aid_src, false);
+					fuseMag(mag_sample, aid_src, H, false);
 
 				} else {
 					// The normal sequence is to fuse the magnetometer data first before fusing
 					// declination angle at a higher uncertainty to allow some learning of
 					// declination angle over time.
 					const bool update_all_states = _control_status.flags.mag_3D;
-					fuseMag(mag_sample, aid_src, update_all_states);
+					fuseMag(mag_sample, aid_src, H, update_all_states);
 
 					if (_control_status.flags.mag_dec) {
 						fuseDeclination(0.5f);
@@ -178,7 +205,7 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 				_control_status.flags.mag = true;
 				_nb_mag_3d_reset_available = 2;
 
-			} else if (fuseMag(mag_sample, aid_src, false)) {
+			} else if (fuseMag(mag_sample, aid_src, H, false)) {
 				ECL_INFO("starting %s fusion", AID_SRC_NAME);
 
 				_control_status.flags.mag = true;

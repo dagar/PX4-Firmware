@@ -10,9 +10,12 @@ uint64 time_last_fuse
 float32 observation
 float32 observation_variance
 
-float32 innovation
-float32 innovation_variance
-float32 test_ratio
+float32 innovation           #
+float32 innovation_filtered
+float32 innovation_variance  #
+
+float32 test_ratio           # normalized innovation squared
+float32 test_ratio_filtered  # signed test ratio filtered
 
 bool innovation_rejected     # true if the observation has been rejected
 bool fused                   # true if the sample was successfully fused

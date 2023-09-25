@@ -53,7 +53,6 @@ void Ekf::controlFakeHgtFusion()
 
 		updateVerticalPositionAidSrcStatus(_time_delayed_us, _last_known_pos(2), obs_var, innov_gate, aid_src);
 
-
 		const bool continuing_conditions_passing = !isVerticalAidingActive();
 		const bool starting_conditions_passing = continuing_conditions_passing
 				&& _vertical_velocity_deadreckon_time_exceeded
@@ -71,6 +70,8 @@ void Ekf::controlFakeHgtFusion()
 
 				if (is_fusion_failing) {
 					resetFakeHgtFusion();
+					aid_src.time_last_fuse = _time_delayed_us;
+					ECL_INFO("fake height fusion failing, reset to last known (%.3f)", (double)_last_known_pos(2));
 				}
 
 			} else {
@@ -79,9 +80,11 @@ void Ekf::controlFakeHgtFusion()
 
 		} else {
 			if (starting_conditions_passing) {
-				ECL_INFO("start fake height fusion");
-				_control_status.flags.fake_hgt = true;
 				resetFakeHgtFusion();
+				ECL_INFO("start fake height, reset to last known (%.3f)", (double)_last_known_pos(2));
+				aid_src.time_last_fuse = _time_delayed_us;
+
+				_control_status.flags.fake_hgt = true;
 			}
 		}
 
@@ -92,20 +95,9 @@ void Ekf::controlFakeHgtFusion()
 
 void Ekf::resetFakeHgtFusion()
 {
-	ECL_INFO("reset fake height fusion");
 	_last_known_pos(2) = _state.pos(2);
-
-	resetVerticalVelocityToZero();
-	resetHeightToLastKnown();
-
-	_aid_src_fake_hgt.time_last_fuse = _time_delayed_us;
-}
-
-void Ekf::resetHeightToLastKnown()
-{
-	_information_events.flags.reset_pos_to_last_known = true;
-	ECL_INFO("reset height to last known (%.3f)", (double)_last_known_pos(2));
 	resetVerticalPositionTo(_last_known_pos(2), sq(_params.pos_noaid_noise));
+	resetVerticalVelocityToZero();
 }
 
 void Ekf::stopFakeHgtFusion()

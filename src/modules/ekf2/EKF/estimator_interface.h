@@ -348,11 +348,6 @@ protected:
 	// measurement samples capturing measurements on the delayed time horizon
 	gpsSample _gps_sample_delayed{};
 
-
-#if defined(CONFIG_EKF2_AIRSPEED)
-	airspeedSample _airspeed_sample_delayed{};
-#endif // CONFIG_EKF2_AIRSPEED
-
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 	extVisionSample _ev_sample_prev{};
 #endif // CONFIG_EKF2_EXTERNAL_VISION
@@ -390,7 +385,6 @@ protected:
 #if defined(CONFIG_EKF2_GNSS_YAW)
 	float _gps_yaw_offset{0.0f};	// Yaw offset angle for dual GPS antennas used for yaw estimation (radians).
 	// innovation consistency check monitoring ratios
-	AlphaFilter<float> _gnss_yaw_signed_test_ratio_lpf{0.1f}; // average signed test ratio used to detect a bias in the state
 	uint64_t _time_last_gps_yaw_buffer_push{0};
 #endif // CONFIG_EKF2_GNSS_YAW
 

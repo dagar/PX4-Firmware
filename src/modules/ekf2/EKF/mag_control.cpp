@@ -260,7 +260,7 @@ void Ekf::checkMagBiasObservability()
 
 void Ekf::checkMagHeadingConsistency()
 {
-	if (fabsf(_mag_heading_innov_lpf.getState()) < _params.mag_heading_noise) {
+	if (fabsf(_aid_src_mag_heading.innovation_filtered) < _params.mag_heading_noise) {
 		if (_yaw_angle_observable) {
 			// yaw angle must be observable to consider consistency
 			_control_status.flags.mag_heading_consistent = true;
@@ -370,9 +370,6 @@ void Ekf::resetMagHeading(const Vector3f &mag)
 	resetQuatStateYaw(yaw_new, yaw_new_variance);
 	_mag_heading_last_declination = declination;
 
-	_time_last_heading_fuse = _time_delayed_us;
-
-	_mag_heading_innov_lpf.reset(0.f);
 	_control_status.flags.mag_heading_consistent = true;
 }
 

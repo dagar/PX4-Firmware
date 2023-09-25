@@ -43,9 +43,11 @@ void Ekf::controlBaroHeightFusion()
 	static constexpr const char *HGT_SRC_NAME = "baro";
 
 	auto &aid_src = _aid_src_baro_hgt;
-	HeightBiasEstimator &bias_est = _baro_b_est;
+	BiasEstimator &bias_est = _baro_b_est;
 
-	bias_est.predict(_dt_ekf_avg);
+	if (_params.height_sensor_ref != HeightSensor::BARO) {
+		bias_est.predict(_dt_ekf_avg);
+	}
 
 	baroSample baro_sample;
 
@@ -59,7 +61,7 @@ void Ekf::controlBaroHeightFusion()
 
 		const float measurement_var = sq(_params.baro_noise);
 
-		const float innov_gate = fmaxf(_params.baro_innov_gate, 1.f);
+		const float innov_gate = math::max(_params.baro_innov_gate, 1.f);
 
 		const bool measurement_valid = PX4_ISFINITE(measurement) && PX4_ISFINITE(measurement_var);
 
@@ -73,18 +75,37 @@ void Ekf::controlBaroHeightFusion()
 				_baro_counter++;
 			}
 
+			// baro height mode update bias preflight
 			if (_baro_counter <= _obs_buffer_length) {
 				// Initialize the pressure offset (included in the baro bias)
 				bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
 			}
 		}
 
-		// vertical position innovation - baro measurement has opposite sign to earth z axis
-		updateVerticalPositionAidSrcStatus(baro_sample.time_us,
-						   -(measurement - bias_est.getBias()),
-						   measurement_var + bias_est.getBiasVar(),
-						   innov_gate,
-						   aid_src);
+		if (_params.height_sensor_ref == HeightSensor::BARO) {
+			// vertical position innovation - baro measurement has opposite sign to earth z axis
+			updateVerticalPositionAidSrcStatus(baro_sample.time_us,
+							   -(measurement - bias_est.getBias()),
+							   measurement_var,
+							   innov_gate,
+							   aid_src);
+
+		} else {
+			// vertical position innovation - baro measurement has opposite sign to earth z axis
+			updateVerticalPositionAidSrcStatus(baro_sample.time_us,
+							   -(measurement - bias_est.getBias()),
+							   measurement_var + bias_est.getBiasVar(),
+							   innov_gate,
+							   aid_src);
+
+			// update the bias estimator before updating the main filter but after
+			// using its current state to compute the vertical position innovation
+			if (measurement_valid) {
+				bias_est.setMaxStateNoise(sqrtf(measurement_var));
+				bias_est.setProcessNoiseSpectralDensity(_params.baro_bias_nsd);
+				bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(State::pos.idx + 2, State::pos.idx + 2));
+			}
+		}
 
 		// Compensate for positive static pressure transients (negative vertical position innovations)
 		// caused by rotor wash ground interaction by applying a temporary deadzone to baro innovations.
@@ -100,16 +121,13 @@ void Ekf::controlBaroHeightFusion()
 				} else {
 					aid_src.innovation = -deadzone_start;
 				}
+
+				// recompute test ratio
+				aid_src.test_ratio = sq(aid_src.innovation) / (sq(innov_gate) * aid_src.innovation_variance);
+				aid_src.innovation_rejected = (aid_src.test_ratio > 1.f);
 			}
 		}
 
-		// update the bias estimator before updating the main filter but after
-		// using its current state to compute the vertical position innovation
-		if (measurement_valid) {
-			bias_est.setMaxStateNoise(sqrtf(measurement_var));
-			bias_est.setProcessNoiseSpectralDensity(_params.baro_bias_nsd);
-			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(State::pos.idx + 2, State::pos.idx + 2));
-		}
 
 		// determine if we should use height aiding
 		const bool continuing_conditions_passing = (_params.baro_ctrl == 1)
@@ -131,12 +149,9 @@ void Ekf::controlBaroHeightFusion()
 					// All height sources are failing
 					ECL_WARN("%s height fusion reset required, all height sources failing", HGT_SRC_NAME);
 
-					_information_events.flags.reset_hgt_to_baro = true;
-
-					float reset_z = -(_baro_lpf.getState() - bias_est.getBias());
-					resetVerticalPositionTo(reset_z, measurement_var);
-					updateEstimatorAidStatusOnReset(aid_src, reset_z);
-					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+					if (resetVerticalPosition(aid_src)) {
+						_information_events.flags.reset_hgt_to_baro = true;
+					}
 
 					// reset vertical velocity
 					resetVerticalVelocityToZero();
@@ -156,27 +171,25 @@ void Ekf::controlBaroHeightFusion()
 		} else {
 			if (starting_conditions_passing) {
 				if (_params.height_sensor_ref == HeightSensor::BARO) {
-					ECL_INFO("starting %s height fusion, resetting height", HGT_SRC_NAME);
-					_height_sensor_ref = HeightSensor::BARO;
-
-					_information_events.flags.reset_hgt_to_baro = true;
-
-					float reset_z = -(_baro_lpf.getState() - bias_est.getBias());
-					resetVerticalPositionTo(reset_z, measurement_var);
-					updateEstimatorAidStatusOnReset(aid_src, reset_z);
-					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+					// TODO: use _baro_lpf.getState() 
+					// float reset_z = -(_baro_lpf.getState() - bias_est.getBias());
+					if (resetVerticalPosition(aid_src)) {
+						ECL_INFO("starting %s height fusion, resetting height", HGT_SRC_NAME);
+						_height_sensor_ref = HeightSensor::BARO;
+						_information_events.flags.reset_hgt_to_baro = true;
+						_control_status.flags.baro_hgt = true;
+					}
 
 				} else {
-					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
+					if (fuseVerticalPosition(aid_src)) {
+						ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
+						_control_status.flags.baro_hgt = true;
 
-					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
-
-					// TODO: fuseVerticalPosition(aid_src);
+					} else {
+						// not starting because vertical position fusion failed, reset bias to try again next time
+						bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+					}
 				}
-
-				bias_est.setFusionActive();
-
-				_control_status.flags.baro_hgt = true;
 			}
 		}
 
@@ -195,8 +208,6 @@ void Ekf::stopBaroHgtFusion()
 		if (_height_sensor_ref == HeightSensor::BARO) {
 			_height_sensor_ref = HeightSensor::UNKNOWN;
 		}
-
-		_baro_b_est.setFusionInactive();
 
 		_control_status.flags.baro_hgt = false;
 	}

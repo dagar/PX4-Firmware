@@ -48,30 +48,25 @@
 
 void Ekf::updateGpsYaw(const gpsSample &gps_sample)
 {
-	if (PX4_ISFINITE(gps_sample.yaw)) {
+	// calculate the observed yaw angle of antenna array, converting a from body to antenna yaw measurement
+	const float measured_hdg = wrap_pi(gps_sample.yaw + _gps_yaw_offset);
 
-		// calculate the observed yaw angle of antenna array, converting a from body to antenna yaw measurement
-		const float measured_hdg = wrap_pi(gps_sample.yaw + _gps_yaw_offset);
+	const float R_YAW = sq(fmaxf(gps_sample.yaw_acc, _params.gps_heading_noise));
 
-		const float R_YAW = sq(fmaxf(gps_sample.yaw_acc, _params.gps_heading_noise));
+	float heading_pred;
+	float heading_innov_var;
 
-		float heading_pred;
-		float heading_innov_var;
+	VectorState H;
+	sym::ComputeGnssYawPredInnovVarAndH(getStateAtFusionHorizonAsVector(), P, _gps_yaw_offset, R_YAW, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
 
-		{
-		VectorState H;
-		sym::ComputeGnssYawPredInnovVarAndH(getStateAtFusionHorizonAsVector(), P, _gps_yaw_offset, R_YAW, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
-		}
-
-		updateEstimatorAidStatus(_aid_src_gnss_yaw,
-			gps_sample.time_us,                   // sample timestamp
-			measured_hdg,                         // observation
-			R_YAW,                                // observation variance
-			wrap_pi(heading_pred - measured_hdg), // innovation
-			heading_innov_var,                    // innovation variance
-			_params.heading_innov_gate            // gate sigma
-		);
-	}
+	updateEstimatorAidStatus(_aid_src_gnss_yaw,
+		gps_sample.time_us,                   // sample timestamp
+		measured_hdg,                         // observation
+		R_YAW,                                // observation variance
+		wrap_pi(heading_pred - measured_hdg), // innovation
+		heading_innov_var,                    // innovation variance
+		_params.heading_innov_gate            // gate sigma
+	);
 }
 
 void Ekf::fuseGpsYaw()
@@ -110,9 +105,7 @@ void Ekf::fuseGpsYaw()
 	_fault_status.flags.bad_hdg = false;
 	_innov_check_fail_status.flags.reject_yaw = false;
 
-	_gnss_yaw_signed_test_ratio_lpf.update(matrix::sign(gnss_yaw.innovation) * gnss_yaw.test_ratio);
-
-	if ((fabsf(_gnss_yaw_signed_test_ratio_lpf.getState()) > 0.2f)
+	if ((fabsf(gnss_yaw.test_ratio_filtered) > 0.2f)
 		&& !_control_status.flags.in_air && isTimedOut(gnss_yaw.time_last_fuse, (uint64_t)1e6)) {
 
 		// A constant large signed test ratio is a sign of wrong gyro bias
@@ -135,7 +128,7 @@ void Ekf::fuseGpsYaw()
 	}
 }
 
-bool Ekf::resetYawToGps(const float gnss_yaw)
+bool Ekf::resetYawToGps(const float gnss_yaw, estimator_aid_source1d_s &aid_src)
 {
 	// define the predicted antenna array vector and rotate into earth frame
 	const Vector3f ant_vec_bf = {cosf(_gps_yaw_offset), sinf(_gps_yaw_offset), 0.0f};
@@ -149,11 +142,18 @@ bool Ekf::resetYawToGps(const float gnss_yaw)
 	// GPS yaw measurement is alreday compensated for antenna offset in the driver
 	const float measured_yaw = gnss_yaw;
 
-	const float yaw_variance = sq(fmaxf(_params.gps_heading_noise, 1.e-2f));
-	resetQuatStateYaw(measured_yaw, yaw_variance);
+	resetQuatStateYaw(measured_yaw, aid_src.observation_variance);
 
-	_aid_src_gnss_yaw.time_last_fuse = _time_delayed_us;
-	_gnss_yaw_signed_test_ratio_lpf.reset(0.f);
+	aid_src.innovation = 0.f;
+	aid_src.innovation_filtered = 0.f;
+
+	aid_src.test_ratio = 0.f;
+	aid_src.test_ratio_filtered = 0.f;
+
+	aid_src.time_last_fuse = _time_delayed_us;
+
+	aid_src.fused = true;
+	aid_src.innovation_rejected = true;
 
 	return true;
 }

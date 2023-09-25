@@ -62,19 +62,31 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 	const float measured_hdg = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + declination;
 
 	float obs_var = math::max(sq(_params.mag_heading_noise), sq(0.01f));
+
+	float innovation = 0.f;
 	float innov_var = 0.f;
 
 	VectorState H_YAW;
 	computeYawInnovVarAndH(obs_var, innov_var, H_YAW);
 
+	if (_control_status.flags.yaw_align) {
+		// mag heading
+		innovation = wrap_pi(getEulerYaw(_R_to_earth) - measured_hdg);
+
+	} else {
+		// mag heading delta (logging only)
+		innovation = wrap_pi(wrap_pi(getEulerYaw(_R_to_earth) - _mag_heading_pred_prev)
+				     - wrap_pi(measured_hdg - _mag_heading_prev));
+	}
+
 	updateEstimatorAidStatus(aid_src,
-		mag_sample.time_us,                                      // sample timestamp
-		measured_hdg,                                            // observation
-		obs_var,                                                 // observation variance
-		wrap_pi(getEulerYaw(_R_to_earth) - aid_src.observation), // innovation
-		innov_var,                                               // innovation variance
-		_params.heading_innov_gate                               // gate sigma
-		);
+				 mag_sample.time_us,                                      // sample timestamp
+				 measured_hdg,                                            // observation
+				 obs_var,                                                 // observation variance
+				 innovation,                                              // innovation
+				 innov_var,                                               // innovation variance
+				 _params.heading_innov_gate                               // gate sigma
+				);
 
 	// determine if we should use mag heading aiding
 	const bool mag_consistent_or_no_gnss = _control_status.flags.mag_heading_consistent || !_control_status.flags.gps;
@@ -83,7 +95,7 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 					      || (_params.mag_fusion_type == MagFuseType::AUTO && !_control_status.flags.mag_3D))
 					     && _control_status.flags.tilt_align
 					     && ((_control_status.flags.yaw_align && mag_consistent_or_no_gnss)
-					         || (!_control_status.flags.ev_yaw && !_control_status.flags.yaw_align))
+							     || (!_control_status.flags.ev_yaw && !_control_status.flags.yaw_align))
 					     && !_control_status.flags.mag_fault
 					     && !_control_status.flags.mag_field_disturbed
 					     && !_control_status.flags.ev_yaw
@@ -112,12 +124,9 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 					ECL_INFO("reset to %s", AID_SRC_NAME);
 				}
 
-				resetMagHeading(_mag_lpf.getState());
-				updateEstimatorAidStatusOnReset(aid_src, getEulerYaw(_R_to_earth));
+				resetMagHeading(_mag_lpf.getState(), aid_src);
 
 			} else {
-				computeYawInnovVarAndH(aid_src.observation_variance, aid_src.innovation_variance, H_YAW);
-
 				if ((aid_src.innovation_variance - aid_src.observation_variance) > sq(_params.mag_heading_noise / 2.f)) {
 					// Only fuse mag to constrain the yaw variance to a safe value
 					fuseYaw(aid_src, H_YAW);
@@ -135,8 +144,7 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 				if (_nb_mag_heading_reset_available > 0) {
 					// Data seems good, attempt a reset
 					ECL_WARN("%s fusion failing, resetting", AID_SRC_NAME);
-					resetMagHeading(_mag_lpf.getState());
-					updateEstimatorAidStatusOnReset(aid_src, getEulerYaw(_R_to_earth));
+					resetMagHeading(_mag_lpf.getState(), aid_src);
 
 					if (_control_status.flags.in_air) {
 						_nb_mag_heading_reset_available--;
@@ -167,21 +175,20 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 		if (starting_conditions_passing) {
 			// activate fusion
 			if (!_control_status.flags.yaw_align) {
-				ECL_INFO("starting %s fusion, resetting heading", AID_SRC_NAME);
 				// reset heading
-				resetMagHeading(_mag_lpf.getState());
-				updateEstimatorAidStatusOnReset(aid_src, getEulerYaw(_R_to_earth));
-
-				_control_status.flags.yaw_align = true;
-				_control_status.flags.mag_hdg = true;
-				_nb_mag_heading_reset_available = 1;
+				if (resetMagHeading(_mag_lpf.getState(), aid_src)) {
+					ECL_INFO("starting %s fusion, resetting heading", AID_SRC_NAME);
+					_control_status.flags.yaw_align = true;
+					_control_status.flags.mag_hdg = true;
+				}
 
 			} else if (fuseYaw(aid_src, H_YAW)) {
 				ECL_INFO("starting %s fusion", AID_SRC_NAME);
-				aid_src.time_last_fuse = _time_delayed_us;
-				aid_src.fused = true;
 
 				_control_status.flags.mag_hdg = true;
+			}
+
+			if (_control_status.flags.mag_hdg) {
 				_nb_mag_heading_reset_available = 1;
 			}
 		}
@@ -203,4 +210,28 @@ void Ekf::stopMagHdgFusion()
 
 		_fault_status.flags.bad_hdg = false;
 	}
+}
+
+bool Ekf::resetMagHeading(const Vector3f &mag, estimator_aid_source1d_s &aid_src)
+{
+	if (mag.isAllFinite() && mag.longerThan(0.1f)) {
+
+		resetMagHeading(mag);
+
+		// update aid_src_mag_heading
+		aid_src.timestamp_sample = _time_delayed_us;
+		aid_src.time_last_fuse = _time_delayed_us;
+
+		aid_src.observation = getEulerYaw(_R_to_earth);
+
+		aid_src.innovation = 0.f;
+		aid_src.test_ratio = 0.f;
+
+		aid_src.innovation_rejected = false;
+		aid_src.fused = true;
+
+		return true;
+	}
+
+	return false;
 }

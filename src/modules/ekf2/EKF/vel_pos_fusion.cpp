@@ -165,6 +165,15 @@ bool Ekf::resetVelocity(estimator_aid_source2d_s &aid_src)
 		aid_src.innovation[0] = 0.f;
 		aid_src.innovation[1] = 0.f;
 
+		aid_src.innovation_filtered[0] = 0.f;
+		aid_src.innovation_filtered[1] = 0.f;
+
+		aid_src.test_ratio[0] = 0.f;
+		aid_src.test_ratio[1] = 0.f;
+
+		aid_src.test_ratio_filtered[0] = 0.f;
+		aid_src.test_ratio_filtered[1] = 0.f;
+
 		aid_src.time_last_fuse = _time_delayed_us;
 
 		aid_src.innovation_rejected = false;
@@ -209,6 +218,18 @@ bool Ekf::resetVelocity(estimator_aid_source3d_s &aid_src)
 		aid_src.innovation[0] = 0.f;
 		aid_src.innovation[1] = 0.f;
 		aid_src.innovation[2] = 0.f;
+
+		aid_src.innovation_filtered[0] = 0.f;
+		aid_src.innovation_filtered[1] = 0.f;
+		aid_src.innovation_filtered[2] = 0.f;
+
+		aid_src.test_ratio[0] = 0.f;
+		aid_src.test_ratio[1] = 0.f;
+		aid_src.test_ratio[2] = 0.f;
+
+		aid_src.test_ratio_filtered[0] = 0.f;
+		aid_src.test_ratio_filtered[1] = 0.f;
+		aid_src.test_ratio_filtered[2] = 0.f;
 
 		aid_src.time_last_fuse = _time_delayed_us;
 
@@ -255,6 +276,15 @@ bool Ekf::resetHorizontalPosition(estimator_aid_source2d_s &aid_src)
 		aid_src.innovation[0] = 0.f;
 		aid_src.innovation[1] = 0.f;
 
+		aid_src.innovation_filtered[0] = 0.f;
+		aid_src.innovation_filtered[1] = 0.f;
+
+		aid_src.test_ratio[0] = 0.f;
+		aid_src.test_ratio[1] = 0.f;
+
+		aid_src.test_ratio_filtered[0] = 0.f;
+		aid_src.test_ratio_filtered[1] = 0.f;
+
 		aid_src.innovation_rejected = false;
 		aid_src.fused = true;
 
@@ -290,6 +320,10 @@ bool Ekf::resetVerticalPosition(estimator_aid_source1d_s &aid_src)
 		resetVerticalPositionTo(aid_src.observation, aid_src.observation_variance);
 
 		aid_src.innovation = 0.f;
+		aid_src.innovation_filtered = 0.f;
+
+		aid_src.test_ratio = 0.f;
+		aid_src.test_ratio_filtered = 0.f;
 
 		aid_src.time_last_fuse = _time_delayed_us;
 

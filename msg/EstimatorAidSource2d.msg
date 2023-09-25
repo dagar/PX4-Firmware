@@ -11,8 +11,11 @@ float32[2] observation
 float32[2] observation_variance
 
 float32[2] innovation
+float32[2] innovation_filtered
 float32[2] innovation_variance
-float32[2] test_ratio
+
+float32[2] test_ratio           # normalized innovation squared
+float32[2] test_ratio_filtered  # signed test ratio filtered
 
 bool innovation_rejected     # true if the observation has been rejected
 bool fused                   # true if the sample was successfully fused

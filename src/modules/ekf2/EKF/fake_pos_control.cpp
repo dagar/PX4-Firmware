@@ -77,7 +77,8 @@ void Ekf::controlFakePosFusion()
 
 				// always protect against extreme values that could result in a NaN
 				if ((aid_src.test_ratio[0] < sq(100.0f / innov_gate))
-				 && (aid_src.test_ratio[1] < sq(100.0f / innov_gate))) {
+				    && (aid_src.test_ratio[1] < sq(100.0f / innov_gate))) {
+
 					fuseHorizontalPosition(aid_src);
 				}
 
@@ -86,6 +87,7 @@ void Ekf::controlFakePosFusion()
 				if (is_fusion_failing) {
 					ECL_WARN("fake position fusion failing, resetting");
 					resetFakePosFusion();
+					aid_src.time_last_fuse = _time_delayed_us;
 				}
 
 			} else {
@@ -97,6 +99,7 @@ void Ekf::controlFakePosFusion()
 				ECL_INFO("start fake position fusion");
 				_control_status.flags.fake_pos = true;
 				resetFakePosFusion();
+				aid_src.time_last_fuse = _time_delayed_us;
 
 				if (_control_status.flags.tilt_align) {
 					// The fake position fusion is not started for initial alignement
@@ -113,13 +116,10 @@ void Ekf::controlFakePosFusion()
 
 void Ekf::resetFakePosFusion()
 {
-	ECL_INFO("reset fake position fusion");
 	_last_known_pos.xy() = _state.pos.xy();
 
 	resetHorizontalPositionToLastKnown();
 	resetHorizontalVelocityToZero();
-
-	_aid_src_fake_pos.time_last_fuse = _time_delayed_us;
 }
 
 void Ekf::stopFakePosFusion()

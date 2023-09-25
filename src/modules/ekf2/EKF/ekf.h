@@ -47,7 +47,6 @@
 
 #include "EKFGSF_yaw.h"
 #include "bias_estimator.hpp"
-#include "height_bias_estimator.hpp"
 #include "position_bias_estimator.hpp"
 #include "python/ekf_derivation/generated/state.h"
 
@@ -653,7 +652,7 @@ private:
 
 #if defined(CONFIG_EKF2_RANGE_FINDER)
 	estimator_aid_source1d_s _aid_src_rng_hgt{};
-	HeightBiasEstimator _rng_hgt_b_est{HeightSensor::RANGE, _height_sensor_ref};
+	BiasEstimator _rng_hgt_b_est{};
 #endif // CONFIG_EKF2_RANGE_FINDER
 
 #if defined(CONFIG_EKF2_OPTICAL_FLOW)
@@ -737,7 +736,7 @@ private:
 	AlphaFilter<float> _baro_lpf{0.1f};	///< filtered barometric height measurement (m)
 	uint32_t _baro_counter{0};		///< number of baro samples read during initialisation
 
-	HeightBiasEstimator _baro_b_est{HeightSensor::BARO, _height_sensor_ref};
+	BiasEstimator _baro_b_est{};
 
 	bool _baro_hgt_faulty{false};		///< true if baro data have been declared faulty TODO: move to fault flags
 #endif // CONFIG_EKF2_BAROMETER
@@ -750,7 +749,6 @@ private:
 	bool _mag_bias_observable{false};	///< true when there is enough rotation to make magnetometer bias errors observable
 	bool _yaw_angle_observable{false};	///< true when there is enough horizontal acceleration to make yaw observable
 	uint64_t _time_yaw_started{0};		///< last system time in usec that a yaw rotation manoeuvre was detected
-	AlphaFilter<float> _mag_heading_innov_lpf{0.1f};
 	float _mag_heading_last_declination{}; ///< last magnetic field declination used for heading fusion (rad)
 	bool _mag_decl_cov_reset{false};	///< true after the fuseDeclination() function has been used to modify the earth field covariances after a magnetic field reset event.
 	uint8_t _nb_mag_heading_reset_available{0};
@@ -807,6 +805,7 @@ private:
 
 	// update quaternion states and covariances using an innovation, observation variance and Jacobian vector
 	bool fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H_YAW);
+	bool resetYaw(estimator_aid_source1d_s &aid_src_status);
 	void computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const;
 
 #if defined(CONFIG_EKF2_GNSS_YAW)
@@ -817,7 +816,7 @@ private:
 
 	// reset the quaternions states using the yaw angle obtained from a dual antenna GPS unit
 	// return true if the reset was successful
-	bool resetYawToGps(const float gnss_yaw);
+	bool resetYawToGps(const float gnss_yaw, estimator_aid_source1d_s &aid_src_status);
 
 	void updateGpsYaw(const gpsSample &gps_sample);
 
@@ -826,7 +825,8 @@ private:
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	// ekf sequential fusion of magnetometer measurements
-	bool fuseMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src_mag, bool update_all_states = true);
+	bool fuseMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src_mag, VectorState& H, bool update_all_states = true);
+	bool resetMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src_mag);
 
 	// fuse magnetometer declination measurement
 	// argument passed in is the declination uncertainty in radians
@@ -841,15 +841,13 @@ private:
 	void controlAirDataFusion(const imuSample &imu_delayed);
 
 	void updateAirspeed(const airspeedSample &airspeed_sample, estimator_aid_source1d_s &aid_src) const;
-	void fuseAirspeed(const airspeedSample &airspeed_sample, estimator_aid_source1d_s &aid_src);
+	bool fuseAirspeed(estimator_aid_source1d_s &aid_src);
 
 	void stopAirspeedFusion();
 
 	// Reset the wind states using the current airspeed measurement, ground relative nav velocity, yaw angle and assumption of zero sideslip
-	void resetWindUsingAirspeed(const airspeedSample &airspeed_sample);
+	void resetWindUsingAirspeed(estimator_aid_source1d_s &aid_src);
 
-	// perform a limited reset of the wind state covariances
-	void resetWindCovarianceUsingAirspeed(const airspeedSample &airspeed_sample);
 #endif // CONFIG_EKF2_AIRSPEED
 
 #if defined(CONFIG_EKF2_SIDESLIP)
@@ -1113,6 +1111,8 @@ private:
 	static bool isMeasuredMatchingExpected(float measured, float expected, float gate);
 
 	void stopMagHdgFusion();
+	bool resetMagHeading(const Vector3f &mag, estimator_aid_source1d_s &aid_src);
+
 	void stopMagFusion();
 
 	// load and save mag field state covariance data for re-use
@@ -1130,7 +1130,6 @@ private:
 
 	void controlFakeHgtFusion();
 	void resetFakeHgtFusion();
-	void resetHeightToLastKnown();
 	void stopFakeHgtFusion();
 
 	void controlZeroVelocityUpdate();
@@ -1171,7 +1170,6 @@ private:
 	void resetMagCov();
 
 	// perform a reset of the wind states and related covariances
-	void resetWind();
 	void resetWindToZero();
 
 	void resetGyroBiasZCov();
@@ -1214,10 +1212,10 @@ private:
 	uint8_t _height_sensor_ref{HeightSensor::UNKNOWN};
 	uint8_t _position_sensor_ref{static_cast<uint8_t>(PositionSensor::GNSS)};
 
-	HeightBiasEstimator _gps_hgt_b_est{HeightSensor::GNSS, _height_sensor_ref};
+	BiasEstimator _gps_hgt_b_est{};
 
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
-	HeightBiasEstimator _ev_hgt_b_est{HeightSensor::EV, _height_sensor_ref};
+	BiasEstimator _ev_hgt_b_est{};
 	PositionBiasEstimator _ev_pos_b_est{static_cast<uint8_t>(PositionSensor::EV), _position_sensor_ref};
 	AlphaFilter<Quatf> _ev_q_error_filt{0.001f};
 	bool _ev_q_error_initialized{false};
@@ -1239,8 +1237,11 @@ private:
 		status.observation = observation;
 
 		status.innovation = 0.f;
+		status.innovation_filtered = 0.f;
 		status.innovation_variance = 0.f;
+
 		status.test_ratio = 0.f;
+		status.test_ratio_filtered = 0.f;
 
 		status.innovation_rejected = false;
 		status.fused = true;
@@ -1266,8 +1267,28 @@ private:
 
 			status.test_ratio = test_ratio;
 
+			// innovation_filtered and test_ratio_filtered
+			if ((status.timestamp_sample != 0) && PX4_ISFINITE(status.innovation_filtered) && PX4_ISFINITE(status.test_ratio_filtered)) {
+
+				const float dt_s = math::constrain((timestamp_sample - status.timestamp_sample) * 1e-6f, 0.001f, 1.f);
+
+				static constexpr float tau_inv = 1.f / 0.1f;
+				const float alpha = math::constrain(dt_s * tau_inv, 0.f, 1.f);
+
+				status.innovation_filtered += alpha * (innovation - status.innovation_filtered);
+				status.test_ratio_filtered += alpha * (matrix::sign(innovation) * test_ratio - status.test_ratio_filtered);
+
+			} else {
+				status.innovation_filtered = innovation;
+				status.test_ratio_filtered = test_ratio;
+			}
+
 		} else {
+			status.innovation_filtered = innovation;
+
 			status.test_ratio = INFINITY;
+			status.test_ratio_filtered = INFINITY;
+
 			innovation_rejected = true;
 		}
 
@@ -1276,8 +1297,6 @@ private:
 
 		status.innovation = innovation;
 		status.innovation_variance = innovation_variance;
-
-
 
 		// if any of the innovations are rejected, then the overall innovation is rejected
 		status.innovation_rejected = innovation_rejected;
@@ -1298,9 +1317,12 @@ private:
 			status.observation[i] = observation(i);
 
 			status.innovation[i] = 0.f;
+			status.innovation_filtered[i] = 0.f;
+
 			status.innovation_variance[i] = 0.f;
 
 			status.test_ratio[i] = 0.f;
+			status.test_ratio_filtered[i] = 0.f;
 		}
 
 		status.innovation_rejected = false;
@@ -1326,14 +1348,29 @@ private:
 					innovation_rejected = true;
 				}
 
+				// innovation_filtered and test_ratio_filtered
+				if ((status.timestamp_sample != 0) && PX4_ISFINITE(status.innovation_filtered[i]) && PX4_ISFINITE(status.test_ratio_filtered[i])) {
+					const float dt_s = math::constrain((timestamp_sample - status.timestamp_sample) * 1e-6f, 0.001f, 1.f);
+
+					static constexpr float tau_inv = 1.f / 0.1f;
+					const float alpha = math::constrain(dt_s * tau_inv, 0.f, 1.f);
+
+					status.innovation_filtered[i] += alpha * (innovation(i) - status.innovation_filtered[i]);
+					status.test_ratio_filtered[i] += alpha * (matrix::sign(innovation(i)) * test_ratio - status.test_ratio_filtered[i]);
+
+				} else {
+					status.innovation_filtered[i] = innovation(i);
+					status.test_ratio_filtered[i] = test_ratio;
+				}
+
 				status.test_ratio[i] = test_ratio;
 
-			} else if ((fabsf(innovation(i)) < FLT_EPSILON) && (fabsf(innovation_variance(i)) < FLT_EPSILON)) {
-
-				status.test_ratio[i] = 0.f;
-
 			} else {
+				status.innovation_filtered[i] = 0.f;
+
 				status.test_ratio[i] = INFINITY;
+				status.test_ratio_filtered[i] = INFINITY;
+
 				innovation_rejected = true;
 			}
 

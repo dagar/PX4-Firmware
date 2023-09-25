@@ -86,6 +86,7 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H
 			const float gate_sigma = math::max(_params.heading_innov_gate, 1.f);
 			const float gate_limit = sqrtf((sq(gate_sigma) * aid_src_status.innovation_variance));
 			aid_src_status.innovation = math::constrain(aid_src_status.innovation, -gate_limit, gate_limit);
+			aid_src_status.innovation_rejected = false;
 
 			// also reset the yaw gyro variance to converge faster and avoid
 			// being stuck on a previous bad estimate
@@ -99,7 +100,7 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H
 		_innov_check_fail_status.flags.reject_yaw = false;
 	}
 
-	if (measurementUpdate(Kfusion, aid_src_status.innovation_variance, aid_src_status.innovation)) {
+	if (!aid_src_status.innovation_rejected && measurementUpdate(Kfusion, aid_src_status.innovation_variance, aid_src_status.innovation)) {
 
 		_time_last_heading_fuse = _time_delayed_us;
 
@@ -114,6 +115,24 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H
 	// otherwise
 	_fault_status.flags.bad_hdg = true;
 	return false;
+}
+
+bool Ekf::resetYaw(estimator_aid_source1d_s &aid_src)
+{
+	resetQuatStateYaw(aid_src.observation, aid_src.observation_variance);
+
+	aid_src.innovation = 0.f;
+	aid_src.innovation_filtered = 0.f;
+
+	aid_src.test_ratio = 0.f;
+	aid_src.test_ratio_filtered = 0.f;
+
+	aid_src.time_last_fuse = _time_delayed_us;
+
+	aid_src.fused = true;
+	aid_src.innovation_rejected = true;
+
+	return true;
 }
 
 void Ekf::computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const

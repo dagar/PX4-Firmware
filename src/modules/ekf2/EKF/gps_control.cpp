@@ -321,11 +321,11 @@ void Ekf::controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passi
 		return;
 	}
 
-	updateGpsYaw(gps_sample);
-
 	const bool is_new_data_available = PX4_ISFINITE(gps_sample.yaw);
 
 	if (is_new_data_available) {
+
+		updateGpsYaw(gps_sample);
 
 		const bool continuing_conditions_passing = !gps_checks_failing;
 
@@ -349,9 +349,7 @@ void Ekf::controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passi
 				if (is_fusion_failing) {
 					if (_nb_gps_yaw_reset_available > 0) {
 						// Data seems good, attempt a reset
-						resetYawToGps(gps_sample.yaw);
-
-						if (_control_status.flags.in_air) {
+						if (resetYawToGps(gps_sample.yaw, _aid_src_gnss_yaw) && _control_status.flags.in_air) {
 							_nb_gps_yaw_reset_available--;
 						}
 
@@ -378,10 +376,8 @@ void Ekf::controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passi
 		} else {
 			if (starting_conditions_passing) {
 				// Try to activate GPS yaw fusion
-				if (resetYawToGps(gps_sample.yaw)) {
-					ECL_INFO("starting GPS yaw fusion");
-
-					_aid_src_gnss_yaw.time_last_fuse = _time_delayed_us;
+				if (resetYawToGps(gps_sample.yaw, _aid_src_gnss_yaw)) {
+					ECL_INFO("starting GPS yaw fusion, resetting yaw to %.1f (%.1f)", (double)getEulerYaw(_R_to_earth), (double)_aid_src_gnss_yaw.observation);
 					_control_status.flags.gps_yaw = true;
 					_control_status.flags.yaw_align = true;
 

@@ -1052,18 +1052,6 @@ void Ekf::resetGpsDriftCheckFilters()
 	_gps_filtered_horizontal_velocity_m_s = NAN;
 }
 
-void Ekf::resetWind()
-{
-#if defined(CONFIG_EKF2_AIRSPEED)
-	if (_control_status.flags.fuse_aspd && isRecent(_airspeed_sample_delayed.time_us, 1e6)) {
-		resetWindUsingAirspeed(_airspeed_sample_delayed);
-		return;
-	}
-#endif // CONFIG_EKF2_AIRSPEED
-
-	resetWindToZero();
-}
-
 void Ekf::resetWindToZero()
 {
 	ECL_INFO("reset wind to zero");

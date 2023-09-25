@@ -42,7 +42,6 @@
  */
 
 #include "ekf.h"
-#include "python/ekf_derivation/generated/compute_mag_innov_innov_var_and_hx.h"
 #include "python/ekf_derivation/generated/compute_mag_y_innov_var_and_h.h"
 #include "python/ekf_derivation/generated/compute_mag_z_innov_var_and_h.h"
 #include "python/ekf_derivation/generated/compute_yaw_321_innov_var_and_h.h"
@@ -51,50 +50,25 @@
 
 #include <mathlib/mathlib.h>
 
-bool Ekf::fuseMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src_mag, bool update_all_states)
+bool Ekf::fuseMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src_mag, VectorState &H, bool update_all_states)
 {
 	// XYZ Measurement uncertainty. Need to consider timing errors for fast rotations
-	const float R_MAG = math::max(sq(_params.mag_noise), sq(0.01f));
-
-	// calculate intermediate variables used for X axis innovation variance, observation Jacobians and Kalman gains
-	const char *numerical_error_covariance_reset_string = "numerical error - covariance reset";
-	Vector3f mag_innov;
-	Vector3f innov_var;
-
-	// Observation jacobian and Kalman gain vectors
-	SparseVectorState<0,1,2,3,16,17,18,19,20,21> Hfusion;
-	VectorState H;
-	const VectorState state_vector = getStateAtFusionHorizonAsVector();
-	sym::ComputeMagInnovInnovVarAndHx(state_vector, P, mag_sample.mag, R_MAG, FLT_EPSILON, &mag_innov, &innov_var, &H);
-	Hfusion = H;
-
-	// do not use the synthesized measurement for the magnetomter Z component for 3D fusion
-	if (_control_status.flags.synthetic_mag_z) {
-		mag_innov(2) = 0.0f;
-	}
-
-	innov_var.copyTo(aid_src_mag.innovation_variance);
-
-	updateEstimatorAidStatus(aid_src_mag,
-		mag_sample.time_us,             // sample timestamp
-		mag_sample.mag - _state.mag_B,  // observation
-		Vector3f(R_MAG, R_MAG, R_MAG),  // observation variance
-		mag_innov,                      // innovation
-		innov_var,                      // innovation variance
-		_params.mag_innov_gate);        // gate sigma
+	const float R_MAG = aid_src_mag.observation_variance[0];
 
 	// the innovation variance contribution from the state covariances is negative which means the covariance matrix is badly conditioned
-	_fault_status.flags.bad_mag_x = (innov_var(0) < R_MAG);
-	_fault_status.flags.bad_mag_y = (innov_var(1) < R_MAG);
-	_fault_status.flags.bad_mag_z = (innov_var(2) < R_MAG);
+	_fault_status.flags.bad_mag_x = (aid_src_mag.innovation_variance[0] < aid_src_mag.observation_variance[0]);
+	_fault_status.flags.bad_mag_y = (aid_src_mag.innovation_variance[1] < aid_src_mag.observation_variance[1]);
+	_fault_status.flags.bad_mag_z = (aid_src_mag.innovation_variance[2] < aid_src_mag.observation_variance[2]);
 
 	// Perform an innovation consistency check and report the result
 	_innov_check_fail_status.flags.reject_mag_x = (aid_src_mag.test_ratio[0] > 1.f);
 	_innov_check_fail_status.flags.reject_mag_y = (aid_src_mag.test_ratio[1] > 1.f);
 	_innov_check_fail_status.flags.reject_mag_z = (aid_src_mag.test_ratio[2] > 1.f);
 
+	const char *numerical_error_covariance_reset_string = "numerical error - covariance reset";
+
 	// check innovation variances for being badly conditioned
-	if (innov_var.min() < R_MAG) {
+	if (Vector3f(aid_src_mag.innovation_variance).min() < R_MAG) {
 		// we need to re-initialise covariances and abort this fusion step
 		if (update_all_states) {
 			resetQuatCov(_params.mag_heading_noise);
@@ -113,11 +87,16 @@ bool Ekf::fuseMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src
 
 	bool fused[3] {false, false, false};
 
+	const VectorState state_vector = getStateAtFusionHorizonAsVector();
+
 	// update the states and covariance using sequential fusion of the magnetometer components
 	for (uint8_t index = 0; index <= 2; index++) {
+		SparseVectorState<0,1,2,3,16,17,18,19,20,21> Hfusion;
+
 		// Calculate Kalman gains and observation jacobians
 		if (index == 0) {
 			// everything was already computed above
+			Hfusion = H;
 
 		} else if (index == 1) {
 			// recalculate innovation variance because state covariances have changed due to previous fusion (linearise using the same initial state for all axes)
@@ -210,6 +189,15 @@ bool Ekf::fuseMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src
 
 	aid_src_mag.fused = false;
 	return false;
+}
+
+bool Ekf::resetMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src_mag)
+{
+
+	// aid_src_mag.innovation[index] = _state.quat_nominal.rotateVectorInverse(_state.mag_I)(index) + _state.mag_B(index) - mag_sample.mag(index);
+
+
+	return true;
 }
 
 bool Ekf::fuseDeclination(float decl_sigma)
