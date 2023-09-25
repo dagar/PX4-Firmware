@@ -131,7 +131,6 @@ void Ekf::controlRangeHeightFusion()
 				&& _range_sensor.isRegularlySendingData();
 
 		if (_control_status.flags.rng_hgt) {
-			aid_src.fusion_enabled = true;
 
 			if (continuing_conditions_passing) {
 
@@ -252,7 +251,6 @@ void Ekf::stopRngHgtFusion()
 		}
 
 		_rng_hgt_b_est.setFusionInactive();
-		resetEstimatorAidStatus(_aid_src_rng_hgt);
 
 		_control_status.flags.rng_hgt = false;
 	}

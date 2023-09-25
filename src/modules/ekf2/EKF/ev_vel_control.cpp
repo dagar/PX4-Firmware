@@ -138,8 +138,6 @@ void Ekf::controlEvVelFusion(const extVisionSample &ev_sample, const bool common
 			&& ((Vector3f(aid_src.test_ratio).max() < 0.1f) || !isHorizontalAidingActive());
 
 	if (_control_status.flags.ev_vel) {
-		aid_src.fusion_enabled = true;
-
 		if (continuing_conditions_passing) {
 
 			if ((ev_reset && isOnlyActiveSourceOfHorizontalAiding(_control_status.flags.ev_vel)) || yaw_alignment_changed) {
@@ -147,8 +145,7 @@ void Ekf::controlEvVelFusion(const extVisionSample &ev_sample, const bool common
 				if (quality_sufficient) {
 					ECL_INFO("reset to %s", AID_SRC_NAME);
 					_information_events.flags.reset_vel_to_vision = true;
-					resetVelocityTo(measurement, measurement_var);
-					aid_src.time_last_fuse = _time_delayed_us;
+					resetVelocity(aid_src);
 
 				} else {
 					// EV has reset, but quality isn't sufficient
@@ -172,8 +169,7 @@ void Ekf::controlEvVelFusion(const extVisionSample &ev_sample, const bool common
 					// Data seems good, attempt a reset
 					_information_events.flags.reset_vel_to_vision = true;
 					ECL_WARN("%s fusion failing, resetting", AID_SRC_NAME);
-					resetVelocityTo(measurement, measurement_var);
-					aid_src.time_last_fuse = _time_delayed_us;
+					resetVelocity(aid_src);
 
 					if (_control_status.flags.in_air) {
 						_nb_ev_vel_reset_available--;
@@ -203,20 +199,20 @@ void Ekf::controlEvVelFusion(const extVisionSample &ev_sample, const bool common
 	} else {
 		if (starting_conditions_passing) {
 			// activate fusion, only reset if necessary
-			if (!isHorizontalAidingActive() || yaw_alignment_changed) {
+			if ((!isHorizontalAidingActive() || yaw_alignment_changed) && resetVelocity(aid_src)) {
 				ECL_INFO("starting %s fusion, resetting velocity to (%.3f, %.3f, %.3f)", AID_SRC_NAME, (double)measurement(0), (double)measurement(1), (double)measurement(2));
 				_information_events.flags.reset_vel_to_vision = true;
-				resetVelocityTo(measurement, measurement_var);
+				_control_status.flags.ev_vel = true;
 
-			} else {
+			} else if (fuseVelocity(aid_src)) {
 				ECL_INFO("starting %s fusion", AID_SRC_NAME);
+				_control_status.flags.ev_vel = true;
 			}
 
-			aid_src.time_last_fuse = _time_delayed_us;
-
-			_nb_ev_vel_reset_available = 5;
-			_information_events.flags.starting_vision_vel_fusion = true;
-			_control_status.flags.ev_vel = true;
+			if (_control_status.flags.ev_vel) {
+				_nb_ev_vel_reset_available = 5;
+				_information_events.flags.starting_vision_vel_fusion = true;
+			}
 		}
 	}
 }
@@ -224,7 +220,6 @@ void Ekf::controlEvVelFusion(const extVisionSample &ev_sample, const bool common
 void Ekf::stopEvVelFusion()
 {
 	if (_control_status.flags.ev_vel) {
-		resetEstimatorAidStatus(_aid_src_ev_vel);
 
 		_control_status.flags.ev_vel = false;
 	}

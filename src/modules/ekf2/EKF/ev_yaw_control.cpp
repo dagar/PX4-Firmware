@@ -43,11 +43,23 @@ void Ekf::controlEvYawFusion(const extVisionSample &ev_sample, const bool common
 {
 	static constexpr const char *AID_SRC_NAME = "EV yaw";
 
-	resetEstimatorAidStatus(aid_src);
-	aid_src.timestamp_sample = ev_sample.time_us;
-	aid_src.observation = getEulerYaw(ev_sample.quat);
-	aid_src.observation_variance = math::max(ev_sample.orientation_var(2), _params.ev_att_noise, sq(0.01f));
-	aid_src.innovation = wrap_pi(getEulerYaw(_R_to_earth) - aid_src.observation);
+	float obs = getEulerYaw(ev_sample.quat);
+	float obs_var = math::max(ev_sample.orientation_var(2), _params.ev_att_noise, sq(0.01f));
+
+	float innov = wrap_pi(getEulerYaw(_R_to_earth) - obs);
+	float innov_var = 0.f;
+
+	VectorState H_YAW;
+	computeYawInnovVarAndH(obs_var, innov_var, H_YAW);
+
+	updateEstimatorAidStatus(aid_src,
+		ev_sample.time_us,         // sample timestamp
+		obs,                       // observation
+		obs_var,                   // observation variance
+		innov,                     // innovation
+		innov_var,                 // innovation variance
+		_params.heading_innov_gate // gate sigma
+		);
 
 	if (ev_reset) {
 		_control_status.flags.ev_yaw_fault = false;
@@ -76,7 +88,6 @@ void Ekf::controlEvYawFusion(const extVisionSample &ev_sample, const bool common
 			&& isTimedOut(aid_src.time_last_fuse, (uint32_t)1e6);
 
 	if (_control_status.flags.ev_yaw) {
-		aid_src.fusion_enabled = true;
 
 		if (continuing_conditions_passing) {
 
@@ -96,7 +107,7 @@ void Ekf::controlEvYawFusion(const extVisionSample &ev_sample, const bool common
 				}
 
 			} else if (quality_sufficient) {
-				fuseYaw(aid_src);
+				fuseYaw(aid_src, H_YAW);
 
 			} else {
 				aid_src.innovation_rejected = true;
@@ -142,7 +153,7 @@ void Ekf::controlEvYawFusion(const extVisionSample &ev_sample, const bool common
 			// activate fusion
 			if (ev_sample.pos_frame == PositionFrame::LOCAL_FRAME_NED) {
 
-				if (_control_status.flags.yaw_align) {
+				if (_control_status.flags.yaw_align && fuseYaw(aid_src, H_YAW)) {
 					ECL_INFO("starting %s fusion", AID_SRC_NAME);
 
 				} else {
@@ -183,7 +194,6 @@ void Ekf::stopEvYawFusion()
 {
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 	if (_control_status.flags.ev_yaw) {
-		resetEstimatorAidStatus(_aid_src_ev_yaw);
 
 		_control_status.flags.ev_yaw = false;
 	}

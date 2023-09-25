@@ -50,11 +50,6 @@ void Ekf::updateGpsYaw(const gpsSample &gps_sample)
 {
 	if (PX4_ISFINITE(gps_sample.yaw)) {
 
-		auto &gnss_yaw = _aid_src_gnss_yaw;
-		resetEstimatorAidStatus(gnss_yaw);
-
-		// initially populate for estimator_aid_src_gnss_yaw logging
-
 		// calculate the observed yaw angle of antenna array, converting a from body to antenna yaw measurement
 		const float measured_hdg = wrap_pi(gps_sample.yaw + _gps_yaw_offset);
 
@@ -68,17 +63,14 @@ void Ekf::updateGpsYaw(const gpsSample &gps_sample)
 		sym::ComputeGnssYawPredInnovVarAndH(getStateAtFusionHorizonAsVector(), P, _gps_yaw_offset, R_YAW, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
 		}
 
-		gnss_yaw.observation = measured_hdg;
-		gnss_yaw.observation_variance = R_YAW;
-		gnss_yaw.innovation = wrap_pi(heading_pred - measured_hdg);
-		gnss_yaw.innovation_variance = heading_innov_var;
-
-		gnss_yaw.fusion_enabled = _control_status.flags.gps_yaw;
-
-		gnss_yaw.timestamp_sample = gps_sample.time_us;
-
-		const float innov_gate = math::max(_params.heading_innov_gate, 1.0f);
-		setEstimatorAidStatusTestRatio(gnss_yaw, innov_gate);
+		updateEstimatorAidStatus(_aid_src_gnss_yaw,
+			gps_sample.time_us,                   // sample timestamp
+			measured_hdg,                         // observation
+			R_YAW,                                // observation variance
+			wrap_pi(heading_pred - measured_hdg), // innovation
+			heading_innov_var,                    // innovation variance
+			_params.heading_innov_gate            // gate sigma
+		);
 	}
 }
 

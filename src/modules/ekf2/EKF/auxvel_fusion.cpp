@@ -40,12 +40,24 @@ void Ekf::controlAuxVelFusion()
 
 		if (_auxvel_buffer->pop_first_older_than(_time_delayed_us, &auxvel_sample_delayed)) {
 
-			resetEstimatorAidStatus(_aid_src_aux_vel);
+			Vector2f obs = auxvel_sample_delayed.vel;
+			Vector2f obs_var {
+				math::max(sq(0.01f), auxvel_sample_delayed.velVar(0)),
+				math::max(sq(0.01f), auxvel_sample_delayed.velVar(1))
+			};
 
-			updateVelocityAidSrcStatus(auxvel_sample_delayed.time_us, auxvel_sample_delayed.vel, auxvel_sample_delayed.velVar, fmaxf(_params.auxvel_gate, 1.f), _aid_src_aux_vel);
+			Vector2f innov = Vector2f(_state.vel.xy()) - auxvel_sample_delayed.vel;
+			Vector2f innov_var = P.slice<2, 2>(4, 4).diag() + obs_var;
+
+			updateEstimatorAidStatus(_aid_src_aux_vel,
+				auxvel_sample_delayed.time_us, // sample timestamp
+				obs,                           // observation
+				obs_var,                       // observation variance
+				innov,                         // innovation
+				innov_var,                     // innovation variance
+				_params.auxvel_gate);          // gate sigma
 
 			if (isHorizontalAidingActive()) {
-				_aid_src_aux_vel.fusion_enabled = true;
 				fuseVelocity(_aid_src_aux_vel);
 			}
 		}
@@ -56,5 +68,4 @@ void Ekf::stopAuxVelFusion()
 {
 	ECL_INFO("stopping aux vel fusion");
 	//_control_status.flags.aux_vel = false;
-	resetEstimatorAidStatus(_aid_src_aux_vel);
 }

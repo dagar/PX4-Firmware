@@ -46,37 +46,42 @@
 void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector2f &obs, const Vector2f &obs_var,
 				     const float innov_gate, estimator_aid_source2d_s &aid_src) const
 {
-	resetEstimatorAidStatus(aid_src);
+	Vector2f observation_variance {
+		math::max(sq(0.01f), obs_var(0)),
+		math::max(sq(0.01f), obs_var(1))
+	};
 
-	for (int i = 0; i < 2; i++) {
-		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
+	Vector2f innov = Vector2f(_state.vel.xy()) - obs;
+	Vector2f innov_var = P.slice<2, 2>(State::vel.idx, State::vel.idx).diag() + observation_variance;
 
-		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
-		const int state_index = State::vel.idx + i;
-		aid_src.innovation_variance[i] = P(state_index, state_index) + aid_src.observation_variance[i];
-	}
-
-	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
-
-	aid_src.timestamp_sample = time_us;
+	updateEstimatorAidStatus(aid_src,
+				 time_us,              // sample timestamp
+				 obs,                  // observation
+				 observation_variance, // observation variance
+				 innov,                // innovation
+				 innov_var,            // innovation variance
+				 innov_gate);          // gate sigma
 }
 
 void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector3f &obs, const Vector3f &obs_var,
 				     const float innov_gate, estimator_aid_source3d_s &aid_src) const
 {
-	resetEstimatorAidStatus(aid_src);
+	Vector3f observation_variance {
+		math::max(sq(0.01f), obs_var(0)),
+		math::max(sq(0.01f), obs_var(1)),
+		math::max(sq(0.01f), obs_var(2))
+	};
 
-	for (int i = 0; i < 3; i++) {
-		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
+	Vector3f innov = _state.vel - obs;
+	Vector3f innov_var = P.slice<3, 3>(State::vel.idx, State::vel.idx).diag() + observation_variance;
 
-		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
-		const int state_index = State::vel.idx + i;
-		aid_src.innovation_variance[i] = P(state_index, state_index) + aid_src.observation_variance[i];
-	}
-
-	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
+	updateEstimatorAidStatus(aid_src,
+				 time_us,              // sample timestamp
+				 obs,                  // observation
+				 observation_variance, // observation variance
+				 innov,                // innovation
+				 innov_var,            // innovation variance
+				 innov_gate);          // gate sigma
 
 	// vz special case if there is bad vertical acceleration data, then don't reject measurement,
 	// but limit innovation to prevent spikes that could destabilise the filter
@@ -85,22 +90,23 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector3f &ob
 		aid_src.innovation[2] = math::constrain(aid_src.innovation[2], -innov_limit, innov_limit);
 		aid_src.innovation_rejected = false;
 	}
-
-	aid_src.timestamp_sample = time_us;
 }
 
 void Ekf::updateVerticalPositionAidSrcStatus(const uint64_t &time_us, const float obs, const float obs_var,
 		const float innov_gate, estimator_aid_source1d_s &aid_src) const
 {
-	resetEstimatorAidStatus(aid_src);
+	float observation_variance = math::max(sq(0.01f), obs_var);
 
-	aid_src.observation = obs;
-	aid_src.innovation = _state.pos(2) - aid_src.observation;
+	float innov = _state.pos(2) - obs;
+	float innov_var = P(State::pos.idx+2, State::pos.idx+2) + observation_variance;
 
-	aid_src.observation_variance = math::max(sq(0.01f), obs_var);
-	aid_src.innovation_variance = P(State::pos.idx + 2, State::pos.idx + 2) + aid_src.observation_variance;
-
-	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
+	updateEstimatorAidStatus(aid_src,
+				 time_us,              // sample timestamp
+				 obs,                  // observation
+				 observation_variance, // observation variance
+				 innov,                // innovation
+				 innov_var,            // innovation variance
+				 innov_gate);          // gate sigma
 
 	// z special case if there is bad vertical acceleration data, then don't reject measurement,
 	// but limit innovation to prevent spikes that could destabilise the filter
@@ -109,87 +115,193 @@ void Ekf::updateVerticalPositionAidSrcStatus(const uint64_t &time_us, const floa
 		aid_src.innovation = math::constrain(aid_src.innovation, -innov_limit, innov_limit);
 		aid_src.innovation_rejected = false;
 	}
-
-	aid_src.timestamp_sample = time_us;
 }
 
 void Ekf::updateHorizontalPositionAidSrcStatus(const uint64_t &time_us, const Vector2f &obs, const Vector2f &obs_var,
 		const float innov_gate, estimator_aid_source2d_s &aid_src) const
 {
-	resetEstimatorAidStatus(aid_src);
+	Vector2f observation_variance {
+		math::max(sq(0.01f), obs_var(0)),
+		math::max(sq(0.01f), obs_var(1))
+	};
 
-	for (int i = 0; i < 2; i++) {
-		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.pos(i) - aid_src.observation[i];
+	Vector2f innov = Vector2f(_state.pos.xy()) - obs;
+	Vector2f innov_var = P.slice<2, 2>(State::pos.idx, State::pos.idx).diag() + observation_variance;
 
-		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
-		const int state_index = State::pos.idx + i;
-		aid_src.innovation_variance[i] = P(state_index, state_index) + aid_src.observation_variance[i];
-	}
-
-	setEstimatorAidStatusTestRatio(aid_src, innov_gate);
-
-	aid_src.timestamp_sample = time_us;
+	updateEstimatorAidStatus(aid_src,
+				 time_us,              // sample timestamp
+				 obs,                  // observation
+				 observation_variance, // observation variance
+				 innov,                // innovation
+				 innov_var,            // innovation variance
+				 innov_gate);          // gate sigma
 }
 
-void Ekf::fuseVelocity(estimator_aid_source2d_s &aid_src)
+bool Ekf::fuseVelocity(estimator_aid_source2d_s &aid_src)
 {
-	if (aid_src.fusion_enabled && !aid_src.innovation_rejected) {
-		// vx, vy
+	// fuse vx, vy
+	if (!aid_src.innovation_rejected) {
 		if (fuseVelPosHeight(aid_src.innovation[0], aid_src.innovation_variance[0], State::vel.idx)
 		    && fuseVelPosHeight(aid_src.innovation[1], aid_src.innovation_variance[1], State::vel.idx + 1)
 		   ) {
 			aid_src.fused = true;
 			aid_src.time_last_fuse = _time_delayed_us;
-
-		} else {
-			aid_src.fused = false;
+			return true;
 		}
 	}
+
+	aid_src.fused = false;
+	return false;
 }
 
-void Ekf::fuseVelocity(estimator_aid_source3d_s &aid_src)
+bool Ekf::resetVelocity(estimator_aid_source2d_s &aid_src)
 {
-	if (aid_src.fusion_enabled && !aid_src.innovation_rejected) {
-		// vx, vy, vz
-		if (fuseVelPosHeight(aid_src.innovation[0], aid_src.innovation_variance[0], State::vel.idx)
+	// reset vx, vy
+	if (PX4_ISFINITE(aid_src.observation[0]) && PX4_ISFINITE(aid_src.observation_variance[0])
+	    && PX4_ISFINITE(aid_src.observation[1]) && PX4_ISFINITE(aid_src.observation_variance[1])
+	   ) {
+		resetHorizontalVelocityTo(Vector2f(aid_src.observation), Vector2f(aid_src.observation_variance));
+
+		aid_src.innovation[0] = 0.f;
+		aid_src.innovation[1] = 0.f;
+
+		aid_src.time_last_fuse = _time_delayed_us;
+
+		aid_src.innovation_rejected = false;
+		aid_src.fused = true;
+
+		setVelPosStatus(State::vel.idx + 0, true);
+		setVelPosStatus(State::vel.idx + 1, true);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Ekf::fuseVelocity(estimator_aid_source3d_s &aid_src)
+{
+	// fuse vx, vy, vz
+	if (!aid_src.innovation_rejected) {
+		if (fuseVelPosHeight(aid_src.innovation[0], aid_src.innovation_variance[0], State::vel.idx + 0)
 		    && fuseVelPosHeight(aid_src.innovation[1], aid_src.innovation_variance[1], State::vel.idx + 1)
 		    && fuseVelPosHeight(aid_src.innovation[2], aid_src.innovation_variance[2], State::vel.idx + 2)
 		   ) {
 			aid_src.fused = true;
 			aid_src.time_last_fuse = _time_delayed_us;
-
-		} else {
-			aid_src.fused = false;
+			return true;
 		}
 	}
+
+	aid_src.fused = false;
+	return false;
 }
 
-void Ekf::fuseHorizontalPosition(estimator_aid_source2d_s &aid_src)
+bool Ekf::resetVelocity(estimator_aid_source3d_s &aid_src)
 {
-	// x & y
-	if (aid_src.fusion_enabled && !aid_src.innovation_rejected) {
+	// reset vx, vy, vz
+	if (PX4_ISFINITE(aid_src.observation[0]) && PX4_ISFINITE(aid_src.observation_variance[0])
+	    && PX4_ISFINITE(aid_src.observation[1]) && PX4_ISFINITE(aid_src.observation_variance[1])
+	    && PX4_ISFINITE(aid_src.observation[2]) && PX4_ISFINITE(aid_src.observation_variance[2])
+	   ) {
+		resetVelocityTo(Vector3f(aid_src.observation), Vector3f(aid_src.observation_variance));
+
+		aid_src.innovation[0] = 0.f;
+		aid_src.innovation[1] = 0.f;
+		aid_src.innovation[2] = 0.f;
+
+		aid_src.time_last_fuse = _time_delayed_us;
+
+		aid_src.innovation_rejected = false;
+		aid_src.fused = true;
+
+		setVelPosStatus(State::vel.idx + 0, true);
+		setVelPosStatus(State::vel.idx + 1, true);
+		setVelPosStatus(State::vel.idx + 2, true);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Ekf::fuseHorizontalPosition(estimator_aid_source2d_s &aid_src)
+{
+	// fuse x & y
+	if (!aid_src.innovation_rejected) {
 		if (fuseVelPosHeight(aid_src.innovation[0], aid_src.innovation_variance[0], State::pos.idx)
 		    && fuseVelPosHeight(aid_src.innovation[1], aid_src.innovation_variance[1], State::pos.idx + 1)
 		   ) {
 			aid_src.fused = true;
 			aid_src.time_last_fuse = _time_delayed_us;
-
-		} else {
-			aid_src.fused = false;
+			return true;
 		}
 	}
+
+	aid_src.fused = false;
+	return aid_src.fused;
 }
 
-void Ekf::fuseVerticalPosition(estimator_aid_source1d_s &aid_src)
+bool Ekf::resetHorizontalPosition(estimator_aid_source2d_s &aid_src)
 {
-	// z
-	if (aid_src.fusion_enabled && !aid_src.innovation_rejected) {
+	// reset x, y
+	if (PX4_ISFINITE(aid_src.observation[0]) && PX4_ISFINITE(aid_src.observation_variance[0])
+	    && PX4_ISFINITE(aid_src.observation[1]) && PX4_ISFINITE(aid_src.observation_variance[1])
+	   ) {
+		resetHorizontalPositionTo(Vector2f(aid_src.observation), Vector2f(aid_src.observation_variance));
+
+		aid_src.time_last_fuse = _time_delayed_us;
+
+		aid_src.innovation[0] = 0.f;
+		aid_src.innovation[1] = 0.f;
+
+		aid_src.innovation_rejected = false;
+		aid_src.fused = true;
+
+		setVelPosStatus(State::pos.idx + 0, true);
+		setVelPosStatus(State::pos.idx + 1, true);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Ekf::fuseVerticalPosition(estimator_aid_source1d_s &aid_src)
+{
+	// fuse z
+	if (!aid_src.innovation_rejected) {
 		if (fuseVelPosHeight(aid_src.innovation, aid_src.innovation_variance, State::pos.idx + 2)) {
 			aid_src.fused = true;
 			aid_src.time_last_fuse = _time_delayed_us;
+			return true;
 		}
 	}
+
+	aid_src.fused = false;
+	return false;
+}
+
+bool Ekf::resetVerticalPosition(estimator_aid_source1d_s &aid_src)
+{
+	// reset z
+	if (PX4_ISFINITE(aid_src.observation) && PX4_ISFINITE(aid_src.observation_variance)) {
+
+		resetVerticalPositionTo(aid_src.observation, aid_src.observation_variance);
+
+		aid_src.innovation = 0.f;
+
+		aid_src.time_last_fuse = _time_delayed_us;
+
+		aid_src.innovation_rejected = false;
+		aid_src.fused = true;
+
+		setVelPosStatus(State::pos.idx + 2, true);
+
+		return true;
+	}
+
+	return false;
 }
 
 // Helper function that fuses a single velocity or position measurement

@@ -175,8 +175,6 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, const bool common
 			&& continuing_conditions_passing;
 
 	if (_control_status.flags.ev_pos) {
-		aid_src.fusion_enabled = true;
-
 		if (continuing_conditions_passing) {
 			const bool bias_estimator_change = (bias_fusion_was_active != _ev_pos_b_est.fusionActive());
 			const bool reset = ev_reset || yaw_alignment_changed || bias_estimator_change;
@@ -296,8 +294,6 @@ void Ekf::updateEvPosFusion(const Vector2f &measurement, const Vector2f &measure
 void Ekf::stopEvPosFusion()
 {
 	if (_control_status.flags.ev_pos) {
-		resetEstimatorAidStatus(_aid_src_ev_pos);
-
 		_control_status.flags.ev_pos = false;
 	}
 }

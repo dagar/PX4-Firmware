@@ -76,10 +76,10 @@ void Ekf::controlFakePosFusion()
 			if (continuing_conditions_passing) {
 
 				// always protect against extreme values that could result in a NaN
-				aid_src.fusion_enabled = (aid_src.test_ratio[0] < sq(100.0f / innov_gate))
-							 && (aid_src.test_ratio[1] < sq(100.0f / innov_gate));
-
-				fuseHorizontalPosition(aid_src);
+				if ((aid_src.test_ratio[0] < sq(100.0f / innov_gate))
+				 && (aid_src.test_ratio[1] < sq(100.0f / innov_gate))) {
+					fuseHorizontalPosition(aid_src);
+				}
 
 				const bool is_fusion_failing = isTimedOut(aid_src.time_last_fuse, (uint64_t)4e5);
 
@@ -127,7 +127,5 @@ void Ekf::stopFakePosFusion()
 	if (_control_status.flags.fake_pos) {
 		ECL_INFO("stop fake position fusion");
 		_control_status.flags.fake_pos = false;
-
-		resetEstimatorAidStatus(_aid_src_fake_pos);
 	}
 }
