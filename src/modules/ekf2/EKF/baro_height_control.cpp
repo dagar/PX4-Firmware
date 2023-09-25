@@ -121,8 +121,6 @@ void Ekf::controlBaroHeightFusion()
 				&& isNewestSampleRecent(_time_last_baro_buffer_push, 2 * BARO_MAX_INTERVAL);
 
 		if (_control_status.flags.baro_hgt) {
-			aid_src.fusion_enabled = true;
-
 			if (continuing_conditions_passing) {
 
 				fuseVerticalPosition(aid_src);
@@ -134,13 +132,14 @@ void Ekf::controlBaroHeightFusion()
 					ECL_WARN("%s height fusion reset required, all height sources failing", HGT_SRC_NAME);
 
 					_information_events.flags.reset_hgt_to_baro = true;
-					resetVerticalPositionTo(-(_baro_lpf.getState() - bias_est.getBias()), measurement_var);
+
+					float reset_z = -(_baro_lpf.getState() - bias_est.getBias());
+					resetVerticalPositionTo(reset_z, measurement_var);
+					updateEstimatorAidStatusOnReset(aid_src, reset_z);
 					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
 
 					// reset vertical velocity
 					resetVerticalVelocityToZero();
-
-					aid_src.time_last_fuse = _time_delayed_us;
 
 				} else if (is_fusion_failing) {
 					// Some other height source is still working
@@ -161,16 +160,22 @@ void Ekf::controlBaroHeightFusion()
 					_height_sensor_ref = HeightSensor::BARO;
 
 					_information_events.flags.reset_hgt_to_baro = true;
-					resetVerticalPositionTo(-(_baro_lpf.getState() - bias_est.getBias()), measurement_var);
+
+					float reset_z = -(_baro_lpf.getState() - bias_est.getBias());
+					resetVerticalPositionTo(reset_z, measurement_var);
+					updateEstimatorAidStatusOnReset(aid_src, reset_z);
 					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
 
 				} else {
 					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
+
 					bias_est.setBias(_state.pos(2) + _baro_lpf.getState());
+
+					// TODO: fuseVerticalPosition(aid_src);
 				}
 
-				aid_src.time_last_fuse = _time_delayed_us;
 				bias_est.setFusionActive();
+
 				_control_status.flags.baro_hgt = true;
 			}
 		}
@@ -192,7 +197,6 @@ void Ekf::stopBaroHgtFusion()
 		}
 
 		_baro_b_est.setFusionInactive();
-		resetEstimatorAidStatus(_aid_src_baro_hgt);
 
 		_control_status.flags.baro_hgt = false;
 	}

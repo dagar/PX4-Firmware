@@ -50,9 +50,6 @@
 
 void Ekf::updateOptFlow(estimator_aid_source2d_s &aid_src)
 {
-	resetEstimatorAidStatus(aid_src);
-	aid_src.timestamp_sample = _flow_sample_delayed.time_us;
-
 	const Vector2f vel_body = predictFlowVelBody();
 	const float range = predictFlowRange();
 
@@ -66,32 +63,32 @@ void Ekf::updateOptFlow(estimator_aid_source2d_s &aid_src)
 	_flow_vel_body(1) =  opt_flow_rate(0) * range;
 	_flow_vel_ne = Vector2f(_R_to_earth * Vector3f(_flow_vel_body(0), _flow_vel_body(1), 0.f));
 
-	aid_src.observation[0] = opt_flow_rate(0); // flow around the X axis
-	aid_src.observation[1] = opt_flow_rate(1); // flow around the Y axis
-
-	aid_src.innovation[0] =  (vel_body(1) / range) - aid_src.observation[0];
-	aid_src.innovation[1] = (-vel_body(0) / range) - aid_src.observation[1];
+	Vector2f innovation{
+		(vel_body(1) / range) - opt_flow_rate(0),
+		(-vel_body(0) / range) - opt_flow_rate(1)
+	};
 
 	// calculate the optical flow observation variance
 	const float R_LOS = calcOptFlowMeasVar(_flow_sample_delayed);
-	aid_src.observation_variance[0] = R_LOS;
-	aid_src.observation_variance[1] = R_LOS;
 
 	const VectorState state_vector = getStateAtFusionHorizonAsVector();
 
 	Vector2f innov_var;
 	VectorState H;
 	sym::ComputeFlowXyInnovVarAndHx(state_vector, P, range, R_LOS, FLT_EPSILON, &innov_var, &H);
-	innov_var.copyTo(aid_src.innovation_variance);
 
 	// run the innovation consistency check and record result
-	setEstimatorAidStatusTestRatio(aid_src, math::max(_params.flow_innov_gate, 1.f));
+	updateEstimatorAidStatus(aid_src,
+		_flow_sample_delayed.time_us,  // sample timestamp
+		opt_flow_rate,                 // observation
+		Vector2f{R_LOS, R_LOS},        // observation variance
+		innovation,                    // innovation
+		innov_var,                     // innovation variance
+		_params.flow_innov_gate);      // gate sigma
 }
 
 void Ekf::fuseOptFlow()
 {
-	_aid_src_optical_flow.fusion_enabled = true;
-
 	const float R_LOS = _aid_src_optical_flow.observation_variance[0];
 
 	// calculate the height above the ground of the optical flow camera. Since earth frame is NED
@@ -103,18 +100,23 @@ void Ekf::fuseOptFlow()
 	Vector2f innov_var;
 	VectorState H;
 	sym::ComputeFlowXyInnovVarAndHx(state_vector, P, range, R_LOS, FLT_EPSILON, &innov_var, &H);
-	innov_var.copyTo(_aid_src_optical_flow.innovation_variance);
 
-	if ((_aid_src_optical_flow.innovation_variance[0] < R_LOS)
-	    || (_aid_src_optical_flow.innovation_variance[1] < R_LOS)) {
+	// TODO: do we recompute the filtered test ratio?
+
+	// updateEstimatorAidStatus(_aid_src_optical_flow,
+	// 	_flow_sample_delayed.time_us,  // sample timestamp
+	// 	opt_flow_rate,                 // observation
+	// 	Vector2f{R_LOS, R_LOS},        // observation variance
+	// 	innovation,                    // innovation
+	// 	innov_var,                     // innovation variance
+	// 	_params.flow_innov_gate);      // gate sigma
+
+	if ((innov_var(0) < R_LOS) || (innov_var(1) < R_LOS)) {
 		// we need to reinitialise the covariance matrix and abort this fusion step
 		ECL_ERR("Opt flow error - covariance reset");
 		initialiseCovariance();
 		return;
 	}
-
-	// run the innovation consistency check and record result
-	setEstimatorAidStatusTestRatio(_aid_src_optical_flow, math::max(_params.flow_innov_gate, 1.f));
 
 	_innov_check_fail_status.flags.reject_optflow_X = (_aid_src_optical_flow.test_ratio[0] > 1.f);
 	_innov_check_fail_status.flags.reject_optflow_Y = (_aid_src_optical_flow.test_ratio[1] > 1.f);

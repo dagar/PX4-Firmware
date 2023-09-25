@@ -43,8 +43,6 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 {
 	static constexpr const char *AID_SRC_NAME = "mag";
 
-	resetEstimatorAidStatus(aid_src);
-
 	const bool wmm_updated = (_wmm_gps_time_last_set > aid_src.time_last_fuse);
 
 	// determine if we should use mag fusion
@@ -88,15 +86,13 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 	_control_status.flags.mag_dec = (_control_status.flags.mag && (not_using_ne_aiding || mag_decl_user_selected));
 
 	if (_control_status.flags.mag) {
-		aid_src.timestamp_sample = mag_sample.time_us;
-		aid_src.fusion_enabled = true;
 
 		if (continuing_conditions_passing && _control_status.flags.yaw_align) {
 
 			if (mag_sample.reset || checkHaglYawResetReq()) {
 				ECL_INFO("reset to %s", AID_SRC_NAME);
 				resetMagStates(_mag_lpf.getState(), _control_status.flags.mag_hdg || _control_status.flags.mag_3D);
-				aid_src.time_last_fuse = _time_delayed_us;
+				updateEstimatorAidStatusOnReset(aid_src, _mag_lpf.getState() - _state.mag_B);
 
 			} else {
 				if (!_mag_decl_cov_reset) {
@@ -106,14 +102,14 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 					// states for the first few observations.
 					fuseDeclination(0.02f);
 					_mag_decl_cov_reset = true;
-					fuseMag(mag_sample.mag, aid_src, false);
+					fuseMag(mag_sample, aid_src, false);
 
 				} else {
 					// The normal sequence is to fuse the magnetometer data first before fusing
 					// declination angle at a higher uncertainty to allow some learning of
 					// declination angle over time.
 					const bool update_all_states = _control_status.flags.mag_3D;
-					fuseMag(mag_sample.mag, aid_src, update_all_states);
+					fuseMag(mag_sample, aid_src, update_all_states);
 
 					if (_control_status.flags.mag_dec) {
 						fuseDeclination(0.5f);
@@ -128,7 +124,7 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 					// Data seems good, attempt a reset (mag states only unless mag_3D currently active)
 					ECL_WARN("%s fusion failing, resetting", AID_SRC_NAME);
 					resetMagStates(_mag_lpf.getState(), _control_status.flags.mag_hdg || _control_status.flags.mag_3D);
-					aid_src.time_last_fuse = _time_delayed_us;
+					updateEstimatorAidStatusOnReset(aid_src, _mag_lpf.getState() - _state.mag_B);
 
 					if (_control_status.flags.in_air) {
 						_nb_mag_3d_reset_available--;
@@ -158,8 +154,6 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 	} else {
 		if (starting_conditions_passing) {
 
-			_control_status.flags.mag = true;
-
 			loadMagCovData();
 
 			// activate fusion, reset mag states and initialize variance if first init or in flight reset
@@ -175,23 +169,23 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 				bool reset_heading = !_control_status.flags.yaw_align;
 
 				resetMagStates(_mag_lpf.getState(), reset_heading);
+				updateEstimatorAidStatusOnReset(aid_src, _mag_lpf.getState() - _state.mag_B);
 
 				if (reset_heading) {
 					_control_status.flags.yaw_align = true;
 				}
 
-			} else {
+				_control_status.flags.mag = true;
+				_nb_mag_3d_reset_available = 2;
+
+			} else if (fuseMag(mag_sample, aid_src, false)) {
 				ECL_INFO("starting %s fusion", AID_SRC_NAME);
-				fuseMag(mag_sample.mag, aid_src, false);
+
+				_control_status.flags.mag = true;
+				_nb_mag_3d_reset_available = 2;
 			}
-
-			aid_src.time_last_fuse = _time_delayed_us;
-
-			_nb_mag_3d_reset_available = 2;
 		}
 	}
-
-	aid_src.fusion_enabled = _control_status.flags.mag;
 }
 
 void Ekf::stopMagFusion()

@@ -80,26 +80,19 @@ void Ekf::controlBetaFusion(const imuSample &imu_delayed)
 
 void Ekf::updateSideslip(estimator_aid_source1d_s &sideslip) const
 {
-	// reset flags
-	resetEstimatorAidStatus(sideslip);
-
 	const float R = sq(_params.beta_noise); // observation noise variance
 
 	float innov = 0.f;
 	float innov_var = 0.f;
 	sym::ComputeSideslipInnovAndInnovVar(getStateAtFusionHorizonAsVector(), P, R, FLT_EPSILON, &innov, &innov_var);
 
-	sideslip.observation = 0.f;
-	sideslip.observation_variance = R;
-	sideslip.innovation = innov;
-	sideslip.innovation_variance = innov_var;
-
-	sideslip.fusion_enabled = _control_status.flags.fuse_aspd;
-
-	sideslip.timestamp_sample = _time_delayed_us;
-
-	const float innov_gate = fmaxf(_params.beta_innov_gate, 1.f);
-	setEstimatorAidStatusTestRatio(sideslip, innov_gate);
+	updateEstimatorAidStatus(sideslip,
+		_time_delayed_us,              // sample timestamp
+		0.f,                           // observation
+		R,                             // observation variance
+		innov,                         // innovation
+		innov_var,                     // innovation variance
+		_params.beta_innov_gate);      // gate sigma
 }
 
 void Ekf::fuseSideslip(estimator_aid_source1d_s &sideslip)

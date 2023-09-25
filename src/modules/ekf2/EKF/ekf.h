@@ -806,7 +806,6 @@ private:
 	void predictCovariance(const imuSample &imu_delayed);
 
 	// update quaternion states and covariances using an innovation, observation variance and Jacobian vector
-	bool fuseYaw(estimator_aid_source1d_s &aid_src_status);
 	bool fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H_YAW);
 	void computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const;
 
@@ -827,7 +826,7 @@ private:
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	// ekf sequential fusion of magnetometer measurements
-	bool fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bool update_all_states = true);
+	bool fuseMag(const magSample &mag_sample, estimator_aid_source3d_s &aid_src_mag, bool update_all_states = true);
 
 	// fuse magnetometer declination measurement
 	// argument passed in is the declination uncertainty in radians
@@ -901,12 +900,18 @@ private:
 	void updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector3f &obs, const Vector3f &obs_var, const float innov_gate, estimator_aid_source3d_s &aid_src) const;
 
 	// horizontal and vertical position fusion
-	void fuseHorizontalPosition(estimator_aid_source2d_s &pos_aid_src);
-	void fuseVerticalPosition(estimator_aid_source1d_s &hgt_aid_src);
+	bool fuseHorizontalPosition(estimator_aid_source2d_s &pos_aid_src);
+	bool resetHorizontalPosition(estimator_aid_source2d_s &pos_aid_src);
+
+	bool fuseVerticalPosition(estimator_aid_source1d_s &hgt_aid_src);
+	bool resetVerticalPosition(estimator_aid_source1d_s &hgt_aid_src);
 
 	// 2d & 3d velocity fusion
-	void fuseVelocity(estimator_aid_source2d_s &vel_aid_src);
-	void fuseVelocity(estimator_aid_source3d_s &vel_aid_src);
+	bool fuseVelocity(estimator_aid_source2d_s &vel_aid_src);
+	bool resetVelocity(estimator_aid_source2d_s &vel_aid_src);
+
+	bool fuseVelocity(estimator_aid_source3d_s &vel_aid_src);
+	bool resetVelocity(estimator_aid_source3d_s &vel_aid_src);
 
 #if defined(CONFIG_EKF2_TERRAIN)
 	// terrain vertical position estimator
@@ -1225,90 +1230,127 @@ private:
 
 	void resetGpsDriftCheckFilters();
 
-	void resetEstimatorAidStatus(estimator_aid_source1d_s &status) const
+	void updateEstimatorAidStatusOnReset(estimator_aid_source1d_s &status, const float &observation) const
 	{
-		// only bother resetting if timestamp_sample is set
-		if (status.timestamp_sample != 0) {
-			status.timestamp_sample = 0;
+		// reset
+		status.timestamp_sample = _time_delayed_us;
+		status.time_last_fuse = _time_delayed_us;
 
-			// preserve status.time_last_fuse
+		status.observation = observation;
 
-			status.observation = 0;
-			status.observation_variance = 0;
+		status.innovation = 0.f;
+		status.innovation_variance = 0.f;
+		status.test_ratio = 0.f;
 
-			status.innovation = 0;
-			status.innovation_variance = 0;
-			status.test_ratio = INFINITY;
-
-			status.fusion_enabled = false;
-			status.innovation_rejected = true;
-			status.fused = false;
-		}
+		status.innovation_rejected = false;
+		status.fused = true;
 	}
 
-	template <typename T>
-	void resetEstimatorAidStatus(T &status) const
+	void updateEstimatorAidStatus(estimator_aid_source1d_s &status, const uint64_t &timestamp_sample,
+				      const float &observation, const float &observation_variance,
+				      const float &innovation, const float &innovation_variance,
+				      float innovation_gate = 1.f) const
 	{
-		// only bother resetting if timestamp_sample is set
-		if (status.timestamp_sample != 0) {
-			status.timestamp_sample = 0;
+		status.timestamp_sample = timestamp_sample;
 
-			// preserve status.time_last_fuse
+		innovation_gate = math::max(innovation_gate, 1.f);
+		bool innovation_rejected = false;
 
-			for (size_t i = 0; i < (sizeof(status.observation) / sizeof(status.observation[0])); i++) {
-				status.observation[i] = 0;
-				status.observation_variance[i] = 0;
+		if (PX4_ISFINITE(innovation) && PX4_ISFINITE(innovation_variance) && (innovation_variance > 0.f)) {
 
-				status.innovation[i] = 0;
-				status.innovation_variance[i] = 0;
-				status.test_ratio[i] = INFINITY;
+			const float test_ratio = sq(innovation) / (sq(innovation_gate) * innovation_variance);
+
+			if (test_ratio > 1.f) {
+				innovation_rejected = true;
 			}
 
-			status.fusion_enabled = false;
-			status.innovation_rejected = true;
-			status.fused = false;
-		}
-	}
-
-	void setEstimatorAidStatusTestRatio(estimator_aid_source1d_s &status, float innovation_gate) const
-	{
-		if (PX4_ISFINITE(status.innovation)
-		    && PX4_ISFINITE(status.innovation_variance)
-		    && (status.innovation_variance > 0.f)
-		   ) {
-			status.test_ratio = sq(status.innovation) / (sq(innovation_gate) * status.innovation_variance);
-			status.innovation_rejected = (status.test_ratio > 1.f);
+			status.test_ratio = test_ratio;
 
 		} else {
 			status.test_ratio = INFINITY;
-			status.innovation_rejected = true;
+			innovation_rejected = true;
 		}
+
+		status.observation = observation;
+		status.observation_variance = math::max(observation_variance, sq(0.001f));
+
+		status.innovation = innovation;
+		status.innovation_variance = innovation_variance;
+
+
+
+		// if any of the innovations are rejected, then the overall innovation is rejected
+		status.innovation_rejected = innovation_rejected;
+
+		// reset
+		status.fused = false;
 	}
 
-	template <typename T>
-	void setEstimatorAidStatusTestRatio(T &status, float innovation_gate) const
+	template <typename T, typename S>
+	void updateEstimatorAidStatusOnReset(T &status, const S &observation) const
 	{
+		// reset
+		status.timestamp_sample = _time_delayed_us;
+		status.time_last_fuse = _time_delayed_us;
+
+		for (size_t i = 0; i < (sizeof(status.observation) / sizeof(status.observation[0])); i++) {
+
+			status.observation[i] = observation(i);
+
+			status.innovation[i] = 0.f;
+			status.innovation_variance[i] = 0.f;
+
+			status.test_ratio[i] = 0.f;
+		}
+
+		status.innovation_rejected = false;
+		status.fused = true;
+	}
+
+	template <typename T, typename S>
+	void updateEstimatorAidStatus(T &status, const uint64_t &timestamp_sample,
+				      const S &observation, const S &observation_variance,
+				      const S &innovation, const S &innovation_variance,
+				      float innovation_gate = 1.f) const
+	{
+		innovation_gate = math::max(innovation_gate, 1.f);
 		bool innovation_rejected = false;
 
-		for (size_t i = 0; i < (sizeof(status.test_ratio) / sizeof(status.test_ratio[0])); i++) {
-			if (PX4_ISFINITE(status.innovation[i])
-			    && PX4_ISFINITE(status.innovation_variance[i])
-			    && (status.innovation_variance[i] > 0.f)
-			   ) {
-				status.test_ratio[i] = sq(status.innovation[i]) / (sq(innovation_gate) * status.innovation_variance[i]);
+		for (size_t i = 0; i < (sizeof(status.observation) / sizeof(status.observation[0])); i++) {
 
-				if (status.test_ratio[i] > 1.f) {
+			if (PX4_ISFINITE(innovation(i)) && PX4_ISFINITE(innovation_variance(i)) && (innovation_variance(i) > 0.f)) {
+
+				const float test_ratio = sq(innovation(i)) / (sq(innovation_gate) * innovation_variance(i));
+
+				if (test_ratio > 1.f) {
 					innovation_rejected = true;
 				}
+
+				status.test_ratio[i] = test_ratio;
+
+			} else if ((fabsf(innovation(i)) < FLT_EPSILON) && (fabsf(innovation_variance(i)) < FLT_EPSILON)) {
+
+				status.test_ratio[i] = 0.f;
 
 			} else {
 				status.test_ratio[i] = INFINITY;
 				innovation_rejected = true;
 			}
+
+			status.observation[i] = observation(i);
+			status.observation_variance[i] = observation_variance(i);
+
+			status.innovation[i] = innovation(i);
+			status.innovation_variance[i] = innovation_variance(i);
 		}
+
+		status.timestamp_sample = timestamp_sample;
 
 		// if any of the innovations are rejected, then the overall innovation is rejected
 		status.innovation_rejected = innovation_rejected;
+
+		// reset
+		status.fused = false;
 	}
 };
 

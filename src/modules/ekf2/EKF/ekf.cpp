@@ -120,52 +120,6 @@ void Ekf::reset()
 	_time_bad_vert_accel = 0;
 	_time_good_vert_accel = 0;
 	_clip_counter = 0;
-
-#if defined(CONFIG_EKF2_BAROMETER)
-	resetEstimatorAidStatus(_aid_src_baro_hgt);
-#endif // CONFIG_EKF2_BAROMETER
-#if defined(CONFIG_EKF2_AIRSPEED)
-	resetEstimatorAidStatus(_aid_src_airspeed);
-#endif // CONFIG_EKF2_AIRSPEED
-#if defined(CONFIG_EKF2_SIDESLIP)
-	resetEstimatorAidStatus(_aid_src_sideslip);
-#endif // CONFIG_EKF2_SIDESLIP
-
-	resetEstimatorAidStatus(_aid_src_fake_pos);
-	resetEstimatorAidStatus(_aid_src_fake_hgt);
-
-#if defined(CONFIG_EKF2_EXTERNAL_VISION)
-	resetEstimatorAidStatus(_aid_src_ev_hgt);
-	resetEstimatorAidStatus(_aid_src_ev_pos);
-	resetEstimatorAidStatus(_aid_src_ev_vel);
-	resetEstimatorAidStatus(_aid_src_ev_yaw);
-#endif // CONFIG_EKF2_EXTERNAL_VISION
-
-	resetEstimatorAidStatus(_aid_src_gnss_hgt);
-	resetEstimatorAidStatus(_aid_src_gnss_pos);
-	resetEstimatorAidStatus(_aid_src_gnss_vel);
-
-#if defined(CONFIG_EKF2_GNSS_YAW)
-	resetEstimatorAidStatus(_aid_src_gnss_yaw);
-#endif // CONFIG_EKF2_GNSS_YAW
-
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	resetEstimatorAidStatus(_aid_src_mag_heading);
-	resetEstimatorAidStatus(_aid_src_mag);
-#endif // CONFIG_EKF2_MAGNETOMETER
-
-#if defined(CONFIG_EKF2_AUXVEL)
-	resetEstimatorAidStatus(_aid_src_aux_vel);
-#endif // CONFIG_EKF2_AUXVEL
-
-#if defined(CONFIG_EKF2_OPTICAL_FLOW)
-	resetEstimatorAidStatus(_aid_src_optical_flow);
-	resetEstimatorAidStatus(_aid_src_terrain_optical_flow);
-#endif // CONFIG_EKF2_OPTICAL_FLOW
-
-#if defined(CONFIG_EKF2_RANGE_FINDER)
-	resetEstimatorAidStatus(_aid_src_rng_hgt);
-#endif // CONFIG_EKF2_RANGE_FINDER
 }
 
 bool Ekf::update()

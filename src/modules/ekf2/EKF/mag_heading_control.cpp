@@ -61,21 +61,20 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 	const float declination = getMagDeclination();
 	const float measured_hdg = -atan2f(mag_earth_pred(1), mag_earth_pred(0)) + declination;
 
-	resetEstimatorAidStatus(aid_src);
-	aid_src.observation = measured_hdg;
-	aid_src.observation_variance = math::max(sq(_params.mag_heading_noise), sq(0.01f));
+	float obs_var = math::max(sq(_params.mag_heading_noise), sq(0.01f));
+	float innov_var = 0.f;
 
-	if (_control_status.flags.yaw_align) {
-		// mag heading
-		aid_src.innovation = wrap_pi(getEulerYaw(_R_to_earth) - aid_src.observation);
-		_mag_heading_innov_lpf.update(aid_src.innovation);
+	VectorState H_YAW;
+	computeYawInnovVarAndH(obs_var, innov_var, H_YAW);
 
-	} else {
-		// mag heading delta (logging only)
-		aid_src.innovation = wrap_pi(wrap_pi(getEulerYaw(_R_to_earth) - _mag_heading_pred_prev)
-					     - wrap_pi(measured_hdg - _mag_heading_prev));
-		_mag_heading_innov_lpf.reset(0.f);
-	}
+	updateEstimatorAidStatus(aid_src,
+		mag_sample.time_us,                                      // sample timestamp
+		measured_hdg,                                            // observation
+		obs_var,                                                 // observation variance
+		wrap_pi(getEulerYaw(_R_to_earth) - aid_src.observation), // innovation
+		innov_var,                                               // innovation variance
+		_params.heading_innov_gate                               // gate sigma
+		);
 
 	// determine if we should use mag heading aiding
 	const bool mag_consistent_or_no_gnss = _control_status.flags.mag_heading_consistent || !_control_status.flags.gps;
@@ -97,8 +96,6 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 			&& isTimedOut(aid_src.time_last_fuse, 3e6);
 
 	if (_control_status.flags.mag_hdg) {
-		aid_src.fusion_enabled = true;
-		aid_src.timestamp_sample = mag_sample.time_us;
 
 		if (continuing_conditions_passing && _control_status.flags.yaw_align) {
 
@@ -116,10 +113,9 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 				}
 
 				resetMagHeading(_mag_lpf.getState());
-				aid_src.time_last_fuse = _time_delayed_us;
+				updateEstimatorAidStatusOnReset(aid_src, getEulerYaw(_R_to_earth));
 
 			} else {
-				VectorState H_YAW;
 				computeYawInnovVarAndH(aid_src.observation_variance, aid_src.innovation_variance, H_YAW);
 
 				if ((aid_src.innovation_variance - aid_src.observation_variance) > sq(_params.mag_heading_noise / 2.f)) {
@@ -140,7 +136,7 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 					// Data seems good, attempt a reset
 					ECL_WARN("%s fusion failing, resetting", AID_SRC_NAME);
 					resetMagHeading(_mag_lpf.getState());
-					aid_src.time_last_fuse = _time_delayed_us;
+					updateEstimatorAidStatusOnReset(aid_src, getEulerYaw(_R_to_earth));
 
 					if (_control_status.flags.in_air) {
 						_nb_mag_heading_reset_available--;
@@ -170,22 +166,26 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 	} else {
 		if (starting_conditions_passing) {
 			// activate fusion
-			ECL_INFO("starting %s fusion", AID_SRC_NAME);
-
 			if (!_control_status.flags.yaw_align) {
+				ECL_INFO("starting %s fusion, resetting heading", AID_SRC_NAME);
 				// reset heading
 				resetMagHeading(_mag_lpf.getState());
+				updateEstimatorAidStatusOnReset(aid_src, getEulerYaw(_R_to_earth));
+
 				_control_status.flags.yaw_align = true;
+				_control_status.flags.mag_hdg = true;
+				_nb_mag_heading_reset_available = 1;
+
+			} else if (fuseYaw(aid_src, H_YAW)) {
+				ECL_INFO("starting %s fusion", AID_SRC_NAME);
+				aid_src.time_last_fuse = _time_delayed_us;
+				aid_src.fused = true;
+
+				_control_status.flags.mag_hdg = true;
+				_nb_mag_heading_reset_available = 1;
 			}
-
-			_control_status.flags.mag_hdg = true;
-			aid_src.time_last_fuse = _time_delayed_us;
-
-			_nb_mag_heading_reset_available = 1;
 		}
 	}
-
-	aid_src.fusion_enabled = _control_status.flags.mag_hdg;
 
 	// record corresponding mag heading and yaw state for future mag heading delta heading innovation (logging only)
 	_mag_heading_prev = measured_hdg;
@@ -198,7 +198,6 @@ void Ekf::stopMagHdgFusion()
 {
 	if (_control_status.flags.mag_hdg) {
 		ECL_INFO("stopping mag heading fusion");
-		resetEstimatorAidStatus(_aid_src_mag_heading);
 
 		_control_status.flags.mag_hdg = false;
 

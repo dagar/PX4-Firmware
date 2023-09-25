@@ -55,7 +55,7 @@ void Ekf::controlGravityFusion(const imuSample &imu)
 
 	// get raw accelerometer reading at delayed horizon and expected measurement noise (gaussian)
 	const Vector3f measurement = imu.delta_vel / imu.delta_vel_dt - getAccelBias();
-	const float measurement_var = sq(_params.gravity_noise);
+	const float measurement_var = math::max(sq(_params.gravity_noise), sq(0.01f));
 
 	// calculate kalman gains and innovation variances
 	Vector3f innovation; // innovation of the last gravity fusion observation (m/s**2)
@@ -66,32 +66,25 @@ void Ekf::controlGravityFusion(const imuSample &imu)
 		&innovation, &innovation_variance, &Kx, &Ky, &Kz);
 
 	// fill estimator aid source status
-	resetEstimatorAidStatus(_aid_src_gravity);
-	_aid_src_gravity.timestamp_sample = imu.time_us;
-	measurement.copyTo(_aid_src_gravity.observation);
+	updateEstimatorAidStatus(_aid_src_gravity,
+		imu.time_us,                                                 // sample timestamp
+		measurement,                                                 // observation
+		Vector3f{measurement_var, measurement_var, measurement_var}, // observation variance
+		innovation,                                                  // innovation
+		innovation_variance                                          // innovation variance
+		);
 
-	for (auto &var : _aid_src_gravity.observation_variance) {
-		var = measurement_var;
-	}
+	if (_control_status.flags.gravity_vector) {
 
-	innovation.copyTo(_aid_src_gravity.innovation);
-	innovation_variance.copyTo(_aid_src_gravity.innovation_variance);
+		if (!_aid_src_gravity.innovation_rejected) {
+			// perform fusion for each axis
+			if (measurementUpdate(Kx, innovation_variance(0), innovation(0))
+				&& measurementUpdate(Ky, innovation_variance(1), innovation(1))
+				&& measurementUpdate(Kz, innovation_variance(2), innovation(2))) {
 
-	float innovation_gate = 1.f;
-	setEstimatorAidStatusTestRatio(_aid_src_gravity, innovation_gate);
-
-	_aid_src_gravity.fusion_enabled = _control_status.flags.gravity_vector;
-
-	const bool accel_clipping = imu.delta_vel_clipping[0] || imu.delta_vel_clipping[1] || imu.delta_vel_clipping[2];
-
-	if (_aid_src_gravity.fusion_enabled && !_aid_src_gravity.innovation_rejected && !accel_clipping) {
-		// perform fusion for each axis
-		_aid_src_gravity.fused = measurementUpdate(Kx, innovation_variance(0), innovation(0))
-					 && measurementUpdate(Ky, innovation_variance(1), innovation(1))
-					 && measurementUpdate(Kz, innovation_variance(2), innovation(2));
-
-		if (_aid_src_gravity.fused) {
-			_aid_src_gravity.time_last_fuse = imu.time_us;
+					_aid_src_gravity.fused = true;
+					_aid_src_gravity.time_last_fuse = imu.time_us;
+				}
 		}
 	}
 }

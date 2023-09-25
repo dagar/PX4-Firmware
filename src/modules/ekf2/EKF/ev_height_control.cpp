@@ -104,18 +104,15 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 			&& continuing_conditions_passing;
 
 	if (_control_status.flags.ev_hgt) {
-		aid_src.fusion_enabled = true;
-
 		if (continuing_conditions_passing) {
-
 			if (ev_reset) {
-
 				if (quality_sufficient) {
 					ECL_INFO("reset to %s", AID_SRC_NAME);
 
 					if (_height_sensor_ref == HeightSensor::EV) {
 						_information_events.flags.reset_hgt_to_ev = true;
 						resetVerticalPositionTo(measurement, measurement_var);
+						updateEstimatorAidStatusOnReset(aid_src, measurement);
 						bias_est.reset();
 
 					} else {
@@ -145,6 +142,7 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 				ECL_WARN("%s fusion reset required, all height sources failing", AID_SRC_NAME);
 				_information_events.flags.reset_hgt_to_ev = true;
 				resetVerticalPositionTo(measurement - bias_est.getBias(), measurement_var);
+				updateEstimatorAidStatusOnReset(aid_src, measurement - bias_est.getBias());
 				bias_est.setBias(-_state.pos(2) + measurement);
 
 				// reset vertical velocity
@@ -174,8 +172,6 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 					resetVerticalVelocityToZero();
 				}
 
-				aid_src.time_last_fuse = _time_delayed_us;
-
 			} else if (is_fusion_failing) {
 				// A reset did not fix the issue but all the starting checks are not passing
 				// This could be a temporary issue, stop the fusion without declaring the sensor faulty
@@ -196,6 +192,7 @@ void Ekf::controlEvHeightFusion(const extVisionSample &ev_sample, const bool com
 				ECL_INFO("starting %s fusion, resetting state", AID_SRC_NAME);
 				_information_events.flags.reset_hgt_to_ev = true;
 				resetVerticalPositionTo(measurement, measurement_var);
+				updateEstimatorAidStatusOnReset(aid_src, measurement);
 
 				_height_sensor_ref = HeightSensor::EV;
 				bias_est.reset();
@@ -221,7 +218,6 @@ void Ekf::stopEvHgtFusion()
 		}
 
 		_ev_hgt_b_est.setFusionInactive();
-		resetEstimatorAidStatus(_aid_src_ev_hgt);
 
 		_control_status.flags.ev_hgt = false;
 	}
