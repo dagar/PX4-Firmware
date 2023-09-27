@@ -42,8 +42,9 @@
 #include <float.h>
 #include <lib/geo/geo.h>
 #include <mathlib/mathlib.h>
+#include <matrix/math.hpp>
 
-float ECL_YawController::control_attitude(const float dt, const ECL_ControlData &ctl_data)
+float ECL_YawController::control_attitude_coordinated(const float dt, const ECL_ControlData &ctl_data)
 {
 	/* Do not calculate control signal with bad inputs */
 	if (!(PX4_ISFINITE(ctl_data.roll) &&
@@ -94,6 +95,29 @@ float ECL_YawController::control_attitude(const float dt, const ECL_ControlData 
 		PX4_WARN("yaw rate sepoint not finite");
 		_body_rate_setpoint = 0.0f;
 	}
+
+	return _body_rate_setpoint;
+}
+
+float ECL_YawController::control_attitude(const float dt, const ECL_ControlData &ctl_data)
+{
+	/* Do not calculate control signal with bad inputs */
+	if (!(PX4_ISFINITE(ctl_data.yaw_setpoint) &&
+	      PX4_ISFINITE(ctl_data.yaw))) {
+
+		return _body_rate_setpoint;
+	}
+
+	/* Calculate the error */
+	float yaw_error = matrix::wrap_pi(ctl_data.yaw_setpoint - ctl_data.yaw);
+
+	/*  Apply P controller: rate setpoint from current error and time constant */
+	_euler_rate_setpoint =  yaw_error / _tc;
+
+	/* Transform setpoint to body angular rates (jacobian) */
+	const float yaw_body_rate_setpoint_raw = -sinf(ctl_data.roll) * ctl_data.euler_pitch_rate_setpoint +
+			cosf(ctl_data.roll) * cosf(ctl_data.pitch) * _euler_rate_setpoint;
+	_body_rate_setpoint = math::constrain(yaw_body_rate_setpoint_raw, -_max_rate, _max_rate);
 
 	return _body_rate_setpoint;
 }

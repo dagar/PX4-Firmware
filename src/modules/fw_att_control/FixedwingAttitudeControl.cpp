@@ -343,7 +343,13 @@ void FixedwingAttitudeControl::Run()
 				if (PX4_ISFINITE(_att_sp.roll_body) && PX4_ISFINITE(_att_sp.pitch_body)) {
 					_roll_ctrl.control_attitude(dt, control_input);
 					_pitch_ctrl.control_attitude(dt, control_input);
-					_yaw_ctrl.control_attitude(dt, control_input);
+
+					if (_vcontrol_mode.flag_control_offboard_enabled && PX4_ISFINITE(_att_sp.yaw_body)) {
+						_yaw_ctrl.control_attitude(dt, control_input);
+
+					} else {
+						_yaw_ctrl.control_attitude_coordinated(dt, control_input);
+					}
 
 					if (wheel_control) {
 						_wheel_ctrl.control_attitude(dt, control_input);

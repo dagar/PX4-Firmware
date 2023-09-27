@@ -66,6 +66,7 @@ public:
 	 * @return Yaw body rate setpoint [rad/s]
 	 */
 	float control_attitude(const float dt, const ECL_ControlData &ctl_data) override;
+	float control_attitude_coordinated(const float dt, const ECL_ControlData &ctl_data);
 
 };
 
