@@ -132,6 +132,13 @@ void ADIS16507::RunImpl()
 		perf_count(_reset_perf);
 		// GLOB_CMD: software reset
 		RegisterWrite(Register::GLOB_CMD, GLOB_CMD_BIT::Software_reset);
+
+#if defined(SPI6_RESET)
+		SPI6_RESET(true);
+		px4_usleep(10);
+		SPI6_RESET(false);
+#endif
+
 		_reset_timestamp = now;
 		_failure_count = 0;
 		_state = STATE::WAIT_FOR_RESET;
