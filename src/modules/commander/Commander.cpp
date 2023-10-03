@@ -552,7 +552,9 @@ transition_result_t Commander::arm(arm_disarm_reason_t calling_reason, bool run_
 		if (_vehicle_control_mode.flag_control_manual_enabled) {
 
 			if (_vehicle_control_mode.flag_control_climb_rate_enabled &&
-			    !_failsafe_flags.manual_control_signal_lost && _is_throttle_above_center) {
+			    !_failsafe_flags.manual_control_signal_lost && _is_throttle_above_center
+			    && (_vehicle_status.nav_state != _vehicle_status.NAVIGATION_STATE_ALTCTL) // ALTCTL drop mode hack
+			   ) {
 
 				mavlink_log_critical(&_mavlink_log_pub, "Arming denied: throttle above center\t");
 				events::send(events::ID("commander_arm_denied_throttle_center"), {events::Log::Critical, events::LogInternal::Info},
