@@ -391,7 +391,8 @@ bool FlightTaskDrop::update()
 				}
 
 				// wait for full
-				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 1.f)) {
+				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 1.f) && (fabsf(acceleration(2)) < 1.f)) {
+
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control");
 					_state = DropState::ALTITUDE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
