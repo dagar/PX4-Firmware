@@ -144,6 +144,14 @@ MulticopterRateControl::Run()
 			}
 		}
 
+		if (_actuator_armed_sub.updated()) {
+			actuator_armed_s actuator_armed;
+
+			if (_actuator_armed_sub.copy(&actuator_armed)) {
+				_actuator_lockdown = actuator_armed.lockdown;
+			}
+		}
+
 		_vehicle_status_sub.update(&_vehicle_status);
 
 		// use rates setpoint topic
@@ -187,7 +195,8 @@ MulticopterRateControl::Run()
 		if (_vehicle_control_mode.flag_control_rates_enabled) {
 
 			// reset integral if disarmed
-			if (!_vehicle_control_mode.flag_armed || _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
+			if (!_vehicle_control_mode.flag_armed || _actuator_lockdown
+			    || _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
 				_rate_control.resetIntegral();
 			}
 
