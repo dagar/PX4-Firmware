@@ -267,8 +267,14 @@ bool FlightTaskDrop::update()
 
 				bool drop_detected = false;
 
-				drop_detected = velocity_valid && (velocity(2) > _param_mpc_drop_vz_thr.get())
-						&& acceleration_valid && (acceleration(2) > _param_mpc_drop_az_thr.get());
+				if (velocity_valid && acceleration_valid) {
+					drop_detected = (velocity(2) > _param_mpc_drop_vz_thr.get())
+							&& (acceleration(2) > _param_mpc_drop_az_thr.get());
+
+				} else if (acceleration_valid) {
+					// otherwise only require acceleration
+					drop_detected = (acceleration(2) > _param_mpc_drop_az_thr.get());
+				}
 
 				// configurable velocity
 				// configurable acceleration
