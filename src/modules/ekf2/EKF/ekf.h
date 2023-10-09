@@ -831,6 +831,8 @@ private:
 	bool fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H_YAW);
 	void computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const;
 
+	void updateIMUBiasInhibit(const imuSample &imu_delayed);
+
 #if defined(CONFIG_EKF2_GNSS_YAW)
 	void controlGpsYawFusion(const gpsSample &gps_sample, bool gps_checks_passing, bool gps_checks_failing);
 
