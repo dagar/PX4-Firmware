@@ -155,6 +155,14 @@ if(CONFIG_EKF2_TERRAIN)
 	list(APPEND EKF_SRCS EKF/terrain_estimator.cpp)
 endif()
 
+if(BUILD_TESTING)
+	add_subdirectory(EKF)
+	add_subdirectory(test)
+else()
+	add_subdirectory(EKF/ExtendedKalmanFilter)
+endif()
+
+
 px4_add_module(
 	MODULE modules__ekf2
 	MAIN ekf2
@@ -184,10 +192,7 @@ px4_add_module(
 		EKF2Utility
 		px4_work_queue
 		world_magnetic_model
+		ExtendedKalmanFilter
 	UNITY_BUILD
 	)
 
-if(BUILD_TESTING)
-	add_subdirectory(EKF)
-	add_subdirectory(test)
-endif()

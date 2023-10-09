@@ -198,6 +198,8 @@ bool Ekf::update()
 
 		updateIMUBiasInhibit(imu_sample_delayed);
 
+		_extended_kalman_filter.update(imu_sample_delayed);
+
 		// perform state and covariance prediction for the main filter
 		predictCovariance(imu_sample_delayed);
 		predictState(imu_sample_delayed);
@@ -237,6 +239,8 @@ bool Ekf::initialiseFilter()
 		_accel_lpf.update(imu_init.delta_vel / imu_init.delta_vel_dt);
 		_gyro_lpf.update(imu_init.delta_ang / imu_init.delta_ang_dt);
 	}
+
+	_extended_kalman_filter.init(_accel_lpf.getState());
 
 	if (!initialiseTilt()) {
 		return false;

@@ -43,6 +43,8 @@
 #ifndef EKF_EKF_H
 #define EKF_EKF_H
 
+#include "ExtendedKalmanFilter/ExtendedKalmanFilter.hpp"
+
 #include "estimator_interface.h"
 
 #include "EKFGSF_yaw.h"
@@ -571,6 +573,8 @@ public:
 #endif // CONFIG_EKF2_AUXVEL
 
 private:
+
+	ExtendedKalmanFilter _extended_kalman_filter{};
 
 	// set the internal states and status to their default value
 	void reset();

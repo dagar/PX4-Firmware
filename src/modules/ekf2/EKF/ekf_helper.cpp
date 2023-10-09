@@ -74,6 +74,8 @@ void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel, const Vector2f
 		P.uncorrelateCovarianceSetVariance<1>(State::vel.idx + 1, math::max(sq(0.01f), new_horz_vel_var(1)));
 	}
 
+	_extended_kalman_filter.resetHorizontalVelocityTo(new_horz_vel, new_horz_vel_var);
+
 	_output_predictor.resetHorizontalVelocityTo(delta_horz_vel);
 
 	// record the state change
@@ -99,6 +101,8 @@ void Ekf::resetVerticalVelocityTo(float new_vert_vel, float new_vert_vel_var)
 	if (PX4_ISFINITE(new_vert_vel_var)) {
 		P.uncorrelateCovarianceSetVariance<1>(State::vel.idx + 2, math::max(sq(0.01f), new_vert_vel_var));
 	}
+
+	_extended_kalman_filter.resetVerticalVelocityTo(new_vert_vel, new_vert_vel_var);
 
 	_output_predictor.resetVerticalVelocityTo(delta_vert_vel);
 
@@ -139,6 +143,8 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos, const Vector2f
 	if (PX4_ISFINITE(new_horz_pos_var(1))) {
 		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx + 1, math::max(sq(0.01f), new_horz_pos_var(1)));
 	}
+
+	_extended_kalman_filter.resetHorizontalPositionTo(new_horz_pos, new_horz_pos_var);
 
 	_output_predictor.resetHorizontalPositionTo(delta_horz_pos);
 

@@ -31,6 +31,8 @@
 #
 ############################################################################
 
+add_subdirectory(ExtendedKalmanFilter)
+
 set(EKF_SRCS)
 list(APPEND EKF_SRCS
 	bias_estimator.cpp
@@ -125,5 +127,5 @@ add_library(ecl_EKF
 )
 
 add_dependencies(ecl_EKF prebuild_targets)
-target_link_libraries(ecl_EKF PRIVATE geo world_magnetic_model)
+target_link_libraries(ecl_EKF PRIVATE geo world_magnetic_model ExtendedKalmanFilter)
 target_compile_options(ecl_EKF PRIVATE -fno-associative-math)
