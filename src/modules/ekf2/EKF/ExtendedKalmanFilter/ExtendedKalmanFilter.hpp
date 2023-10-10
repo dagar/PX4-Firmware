@@ -84,9 +84,8 @@ public:
 
 	void resetQuatCov(const Vector3f &euler_noise_ned);
 	// reset the quaternion states and covariances to the new yaw value, preserving the roll and pitch
-	// yaw : Euler yaw angle (rad)
-	// yaw_variance : yaw error variance (rad^2)
 	void resetQuatStateYaw(float yaw, float yaw_variance);
+	float getYawVar() const;
 
 	// velocity
 	bool fuseVelocity(const float innov, const float innov_var, const int axis);
@@ -104,29 +103,30 @@ public:
 	void resetGyroBias();
 	void resetGyroBiasCov();
 	void resetGyroBiasZCov();
+	void inhibitGyroBiasAxis(int axis);
+	void uninhibitGyroBiasAxis(int axis);
 
 	// accel bias
 	void resetAccelBias();
 	void resetAccelBiasCov();
+	void inhibitAccelBiasAxis(int axis);
+	void uninhibitAccelBiasAxis(int axis);
 
+#if defined(CONFIG_EKF2_MAGNETOMETER)
 	// mag
 	void resetMagCov();
+#endif // CONFIG_EKF2_MAGNETOMETER
 
+#if defined(CONFIG_EKF2_WIND)
 	// wind
 	void resetWind();
 	void resetWindToZero();
 	void resetWindCov();
-
+#endif // CONFIG_EKF2_WIND
 
 	bool measurementUpdate(VectorState &K, float innovation_variance, float innovation);
 
 
-
-
-	// rotate quaternion covariances into variances for an equivalent rotation vector
-	// calculate the variances for the rotation vector equivalent
-	Vector3f calcRotVecVariances() const;
-	float getYawVar() const;
 
 	bool gyro_bias_inhibited() const { return _gyro_bias_inhibit[0] || _gyro_bias_inhibit[1] || _gyro_bias_inhibit[2]; }
 	bool accel_bias_inhibited() const { return _accel_bias_inhibit[0] || _accel_bias_inhibit[1] || _accel_bias_inhibit[2]; }
@@ -209,10 +209,16 @@ private:
 	uint64_t _time_delayed_us{0}; // captures the imu sample on the delayed time horizon
 
 	uint64_t _time_last_yaw_fuse{0};
-	uint64_t _time_last_pos_xy_fuse{0};	///< time the last fusion of horizontal position measurements was performed (uSec)
-	uint64_t _time_last_pos_z_fuse{0};	///< time the last fusion of vertical position measurements was performed (uSec)
-	uint64_t _time_last_vel_xy_fuse{0};	///< time the last fusion of horizontal velocity measurements was performed (uSec)
-	uint64_t _time_last_vel_z_fuse{0};	///< time the last fusion of verticalvelocity measurements was performed (uSec)
+	uint64_t _time_last_pos_xy_fuse{0};     ///< time the last fusion of horizontal position measurements was performed (uSec)
+	uint64_t _time_last_pos_z_fuse{0};      ///< time the last fusion of vertical position measurements was performed (uSec)
+	uint64_t _time_last_vel_xy_fuse{0};     ///< time the last fusion of horizontal velocity measurements was performed (uSec)
+	uint64_t _time_last_vel_z_fuse{0};      ///< time the last fusion of verticalvelocity measurements was performed (uSec)
+#if defined(CONFIG_EKF2_MAGNETOMETER)
+	uint64_t _time_last_mag_fuse{0};        ///< time the last fusion of magnetometer measurements was performed (uSec)
+#endif // CONFIG_EKF2_MAGNETOMETER
+#if defined(CONFIG_EKF2_WIND)
+	uint64_t _time_last_wind_fuse{0};       ///< time the last fusion of wind measurements was performed (uSec)
+#endif // CONFIG_EKF2_WIND
 
 	// variables used to inhibit accel bias learning
 	bool _gyro_bias_inhibit[3] {};		///< true when the gyro bias learning is being inhibited for the specified axis

@@ -189,6 +189,8 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos, float new_vert_pos_v
 		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx + 2, math::max(sq(0.01f), new_vert_pos_var));
 	}
 
+	_extended_kalman_filter.resetVerticalPositionTo(new_vert_pos, new_vert_pos_var);
+
 	const float delta_z = new_vert_pos - old_vert_pos;
 
 	// apply the change in height / height rate to our newest height / height rate estimate
@@ -981,6 +983,8 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 	// restore covariance
 	resetQuatCov(rot_var_ned_before_reset);
 
+	_extended_kalman_filter.resetQuatStateYaw(yaw, yaw_variance);
+
 	// add the reset amount to the output observer buffered data
 	_output_predictor.resetQuaternion(q_error);
 
@@ -1124,6 +1128,13 @@ void Ekf::updateIMUBiasInhibit(const imuSample &imu_delayed)
 		const bool do_inhibit_axis = do_inhibit_all_gyro_axes || !is_bias_observable;
 
 		if (do_inhibit_axis) {
+			_extended_kalman_filter.inhibitGyroBiasAxis(index);
+
+		} else {
+			_extended_kalman_filter.uninhibitGyroBiasAxis(index);
+		}
+
+		if (do_inhibit_axis) {
 			// store the bias state variances to be reinstated later
 			if (!_gyro_bias_inhibit[index]) {
 				_prev_gyro_bias_var(index) = P(stateIndex, stateIndex);
@@ -1161,6 +1172,13 @@ void Ekf::updateIMUBiasInhibit(const imuSample &imu_delayed)
 		}
 
 		const bool do_inhibit_axis = do_inhibit_all_accel_axes || imu_delayed.delta_vel_clipping[index] || !is_bias_observable;
+
+		if (do_inhibit_axis) {
+			_extended_kalman_filter.inhibitAccelBiasAxis(index);
+
+		} else {
+			_extended_kalman_filter.uninhibitAccelBiasAxis(index);
+		}
 
 		if (do_inhibit_axis) {
 			// store the bias state variances to be reinstated later

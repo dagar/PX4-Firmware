@@ -195,6 +195,33 @@ void Ekf::fuseVerticalPosition(estimator_aid_source1d_s &aid_src)
 // Helper function that fuses a single velocity or position measurement
 bool Ekf::fuseVelPosHeight(const float innov, const float innov_var, const int state_index)
 {
+
+	switch (state_index) {
+	case State::vel.idx:
+		_extended_kalman_filter.fuseVelocity(innov, innov_var, 0);
+		break;
+
+	case State::vel.idx + 1:
+		_extended_kalman_filter.fuseVelocity(innov, innov_var, 1);
+		break;
+
+	case State::vel.idx + 2:
+		_extended_kalman_filter.fuseVelocity(innov, innov_var, 2);
+		break;
+
+	case State::pos.idx:
+		_extended_kalman_filter.fusePosition(innov, innov_var, 0);
+		break;
+
+	case State::pos.idx + 1:
+		_extended_kalman_filter.fusePosition(innov, innov_var, 1);
+		break;
+
+	case State::pos.idx + 2:
+		_extended_kalman_filter.fusePosition(innov, innov_var, 2);
+		break;
+	}
+
 	VectorState Kfusion;  // Kalman gain vector for any single observation - sequential fusion is used.
 
 	// calculate kalman gain K = PHS, where S = 1/innovation variance

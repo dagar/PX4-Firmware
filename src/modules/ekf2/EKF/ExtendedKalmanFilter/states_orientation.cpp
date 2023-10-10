@@ -15,13 +15,6 @@ void ExtendedKalmanFilter::resetQuatCov(const Vector3f &rot_var_ned)
 	resetStateCovariance<State::quat_nominal>(q_cov);
 }
 
-Vector3f ExtendedKalmanFilter::calcRotVecVariances() const
-{
-	Vector3f rot_var;
-	sym::QuatVarToRotVar(_state.vector(), P, FLT_EPSILON, &rot_var);
-	return rot_var;
-}
-
 float ExtendedKalmanFilter::getYawVar() const
 {
 	VectorState H_YAW;

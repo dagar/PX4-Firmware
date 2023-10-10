@@ -207,8 +207,12 @@ void ExtendedKalmanFilter::constrainStates()
 
 	_state.accel_bias = matrix::constrain(_state.accel_bias, -_params.acc_bias_lim, _params.acc_bias_lim);
 
+#if defined(CONFIG_EKF2_MAGNETOMETER)
 	_state.mag_I = matrix::constrain(_state.mag_I, -1.f, 1.f);
 	_state.mag_B = matrix::constrain(_state.mag_B, -_params.mag_bias_lim, _params.mag_bias_lim);
+#endif // CONFIG_EKF2_MAGNETOMETER
 
+#if defined(CONFIG_EKF2_WIND)
 	_state.wind_vel = matrix::constrain(_state.wind_vel, -100.f, 100.f);
+#endif // CONFIG_EKF2_WIND
 }

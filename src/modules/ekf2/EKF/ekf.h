@@ -1037,6 +1037,8 @@ private:
 	{
 		clearInhibitedStateKalmanGains(K);
 
+		_extended_kalman_filter.measurementUpdate(K, innovation_variance, innovation);
+
 		const VectorState KS = K * innovation_variance;
 		SquareMatrixState KHP;
 
