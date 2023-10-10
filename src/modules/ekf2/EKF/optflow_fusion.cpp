@@ -79,7 +79,9 @@ void Ekf::updateOptFlow(estimator_aid_source2d_s &aid_src)
 
 	Vector2f innov_var;
 	VectorState H;
-	sym::ComputeFlowXyInnovVarAndHx(_state.vector(), P, range, R_LOS, FLT_EPSILON, &innov_var, &H);
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState &state_vector = _extended_kalman_filter.state_vector();
+	sym::ComputeFlowXyInnovVarAndHx(state_vector, P, range, R_LOS, FLT_EPSILON, &innov_var, &H);
 	innov_var.copyTo(aid_src.innovation_variance);
 
 	// run the innovation consistency check and record result
@@ -94,10 +96,11 @@ void Ekf::fuseOptFlow()
 	// a positive offset in earth frame leads to a smaller height above the ground.
 	float range = predictFlowRange();
 
-	const VectorState state_vector = _state.vector();
+	const VectorState state_vector = state_vector;
 
 	Vector2f innov_var;
 	VectorState H;
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
 	sym::ComputeFlowXyInnovVarAndHx(state_vector, P, range, R_LOS, FLT_EPSILON, &innov_var, &H);
 	innov_var.copyTo(_aid_src_optical_flow.innovation_variance);
 
@@ -170,7 +173,7 @@ float Ekf::predictFlowRange()
 
 	// calculate the height above the ground of the optical flow camera. Since earth frame is NED
 	// a positive offset in earth frame leads to a smaller height above the ground.
-	const float height_above_gnd_est = math::max(_terrain_vpos - _state.pos(2) - pos_offset_earth(2), fmaxf(_params.rng_gnd_clearance, 0.01f));
+	const float height_above_gnd_est = math::max(_terrain_vpos - _extended_kalman_filter.state().pos(2) - pos_offset_earth(2), fmaxf(_params.rng_gnd_clearance, 0.01f));
 
 	// calculate range from focal point to centre of image
 	return height_above_gnd_est / _R_to_earth(2, 2); // absolute distance to the frame region in view
@@ -186,12 +189,11 @@ Vector2f Ekf::predictFlowVelBody()
 	const Vector3f vel_rel_imu_body = Vector3f(-(_flow_sample_delayed.gyro_xyz / _flow_sample_delayed.dt - _flow_gyro_bias)) % pos_offset_body;
 
 	// calculate the velocity of the sensor in the earth frame
-	const Vector3f vel_rel_earth = _state.vel + _R_to_earth * vel_rel_imu_body;
+	const Vector3f vel_rel_earth = _extended_kalman_filter.state().vel + _R_to_earth * vel_rel_imu_body;
 
 	// rotate into body frame
-	return _state.quat_nominal.rotateVectorInverse(vel_rel_earth).xy();
+	return _extended_kalman_filter.state().quat_nominal.rotateVectorInverse(vel_rel_earth).xy();
 }
-
 
 // calculate optical flow body angular rate compensation
 // returns false if bias corrected body rate data is unavailable

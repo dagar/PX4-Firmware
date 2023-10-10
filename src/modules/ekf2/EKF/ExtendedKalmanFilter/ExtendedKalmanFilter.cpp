@@ -50,6 +50,8 @@ bool ExtendedKalmanFilter::init(const Vector3f &accel)
 	// get initial tilt estimate from delta velocity vector, assuming vehicle is static
 	_state.quat_nominal = Quatf(accel, Vector3f(0.f, 0.f, -1.f));
 
+	_filter_initialised = true;
+
 	return true;
 }
 
@@ -149,7 +151,6 @@ bool ExtendedKalmanFilter::update(const imuSample &imu)
 
 	if (!_filter_initialised) {
 		if (init(imu.delta_vel / imu.delta_vel_dt)) {
-			_filter_initialised = true;
 			return true;
 		}
 

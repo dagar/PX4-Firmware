@@ -70,7 +70,6 @@ set(EKF_SRCS)
 list(APPEND EKF_SRCS
 	EKF/bias_estimator.cpp
 	EKF/control.cpp
-	EKF/covariance.cpp
 	EKF/ekf.cpp
 	EKF/ekf_helper.cpp
 	EKF/EKFGSF_yaw.cpp

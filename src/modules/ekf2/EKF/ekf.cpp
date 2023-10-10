@@ -57,19 +57,6 @@ void Ekf::reset()
 {
 	ECL_INFO("reset");
 
-	_state.quat_nominal.setIdentity();
-	_state.vel.setZero();
-	_state.pos.setZero();
-	_state.gyro_bias.setZero();
-	_state.accel_bias.setZero();
-
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	_state.mag_I.setZero();
-	_state.mag_B.setZero();
-#endif // CONFIG_EKF2_MAGNETOMETER
-
-	_state.wind_vel.setZero();
-
 #if defined(CONFIG_EKF2_RANGE_FINDER)
 	_range_sensor.setPitchOffset(_params.rng_sens_pitch);
 	_range_sensor.setCosMaxTilt(_params.range_cos_max_tilt);
@@ -198,11 +185,35 @@ bool Ekf::update()
 
 		updateIMUBiasInhibit(imu_sample_delayed);
 
+		// perform state and covariance prediction for the main filter
 		_extended_kalman_filter.update(imu_sample_delayed);
 
-		// perform state and covariance prediction for the main filter
-		predictCovariance(imu_sample_delayed);
-		predictState(imu_sample_delayed);
+
+		// some calculations elsewhere in code require a raw angular rate vector so calculate here to avoid duplication
+		// protect against possible small timesteps resulting from timing slip on previous frame that can drive spikes into the rate
+		// due to insufficient averaging
+		if (imu_delayed.delta_ang_dt > 0.25f * _dt_ekf_avg) {
+			_ang_rate_delayed_raw = imu_delayed.delta_ang / imu_delayed.delta_ang_dt;
+		}
+
+		// calculate a filtered horizontal acceleration with a 1 sec time constant
+		// this are used for manoeuvre detection elsewhere
+		const float alpha = 1.0f - imu_delayed.delta_vel_dt;
+		_accel_lpf_NE = _accel_lpf_NE * alpha + corrected_delta_vel_ef.xy();
+
+		// calculate a yaw change about the earth frame vertical
+		const float spin_del_ang_D = corrected_delta_ang.dot(Vector3f(_R_to_earth.row(2)));
+		_yaw_delta_ef += spin_del_ang_D;
+
+		// Calculate filtered yaw rate to be used by the magnetometer fusion type selection logic
+		// Note fixed coefficients are used to save operations. The exact time constant is not important.
+		_yaw_rate_lpf_ef = 0.95f * _yaw_rate_lpf_ef + 0.05f * spin_del_ang_D / imu_delayed.delta_ang_dt;
+
+		// Calculate low pass filtered height rate
+		float alpha_height_rate_lpf = 0.1f * imu_delayed.delta_vel_dt; // 10 seconds time constant
+		_height_rate_lpf = _height_rate_lpf * (1.0f - alpha_height_rate_lpf) + _extended_kalman_filter.state().vel(2) * alpha_height_rate_lpf;
+
+
 
 		// control fusion of observation data
 		controlFusionModes(imu_sample_delayed);
@@ -212,7 +223,7 @@ bool Ekf::update()
 		runTerrainEstimator(imu_sample_delayed);
 #endif // CONFIG_EKF2_TERRAIN
 
-		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, _state.quat_nominal, _state.vel, _state.pos, _state.gyro_bias, _state.accel_bias);
+		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, _extended_kalman_filter.state().quat_nominal, _extended_kalman_filter.state().vel, _extended_kalman_filter.state().pos, _extended_kalman_filter.state().gyro_bias, _extended_kalman_filter.state().accel_bias);
 
 		return true;
 	}
@@ -240,11 +251,19 @@ bool Ekf::initialiseFilter()
 		_gyro_lpf.update(imu_init.delta_ang / imu_init.delta_ang_dt);
 	}
 
-	_extended_kalman_filter.init(_accel_lpf.getState());
+	const float accel_norm = _accel_lpf.getState().norm();
+	const float gyro_norm = _gyro_lpf.getState().norm();
 
-	if (!initialiseTilt()) {
+	if (accel_norm < 0.8f * CONSTANTS_ONE_G ||
+	    accel_norm > 1.2f * CONSTANTS_ONE_G ||
+	    gyro_norm > math::radians(15.0f)) {
+
 		return false;
 	}
+
+	// get initial tilt estimate from delta velocity vector, assuming vehicle is static
+	_extended_kalman_filter.init(_accel_lpf.getState());
+	_R_to_earth = Dcmf(_extended_kalman_filter.getStateOrientation());
 
 	// initialise the state covariance matrix now we have starting values for all the states
 	initialiseCovariance();
@@ -255,86 +274,7 @@ bool Ekf::initialiseFilter()
 #endif // CONFIG_EKF2_TERRAIN
 
 	// reset the output predictor state history to match the EKF initial values
-	_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
+	_output_predictor.alignOutputFilter(_extended_kalman_filter.state().quat_nominal, _extended_kalman_filter.state().vel, _extended_kalman_filter.state().pos);
 
 	return true;
-}
-
-bool Ekf::initialiseTilt()
-{
-	const float accel_norm = _accel_lpf.getState().norm();
-	const float gyro_norm = _gyro_lpf.getState().norm();
-
-	if (accel_norm < 0.8f * CONSTANTS_ONE_G ||
-	    accel_norm > 1.2f * CONSTANTS_ONE_G ||
-	    gyro_norm > math::radians(15.0f)) {
-		return false;
-	}
-
-	// get initial tilt estimate from delta velocity vector, assuming vehicle is static
-	_state.quat_nominal = Quatf(_accel_lpf.getState(), Vector3f(0.f, 0.f, -1.f));
-	_R_to_earth = Dcmf(_state.quat_nominal);
-
-	return true;
-}
-
-void Ekf::predictState(const imuSample &imu_delayed)
-{
-	// apply imu bias corrections
-	const Vector3f delta_ang_bias_scaled = getGyroBias() * imu_delayed.delta_ang_dt;
-	Vector3f corrected_delta_ang = imu_delayed.delta_ang - delta_ang_bias_scaled;
-
-	// subtract component of angular rate due to earth rotation
-	corrected_delta_ang -= _R_to_earth.transpose() * _earth_rate_NED * imu_delayed.delta_ang_dt;
-
-	const Quatf dq(AxisAnglef{corrected_delta_ang});
-
-	// rotate the previous quaternion by the delta quaternion using a quaternion multiplication
-	_state.quat_nominal = (_state.quat_nominal * dq).normalized();
-	_R_to_earth = Dcmf(_state.quat_nominal);
-
-	// Calculate an earth frame delta velocity
-	const Vector3f delta_vel_bias_scaled = getAccelBias() * imu_delayed.delta_vel_dt;
-	const Vector3f corrected_delta_vel = imu_delayed.delta_vel - delta_vel_bias_scaled;
-	const Vector3f corrected_delta_vel_ef = _R_to_earth * corrected_delta_vel;
-
-	// save the previous value of velocity so we can use trapzoidal integration
-	const Vector3f vel_last = _state.vel;
-
-	// calculate the increment in velocity using the current orientation
-	_state.vel += corrected_delta_vel_ef;
-
-	// compensate for acceleration due to gravity
-	_state.vel(2) += CONSTANTS_ONE_G * imu_delayed.delta_vel_dt;
-
-	// predict position states via trapezoidal integration of velocity
-	_state.pos += (vel_last + _state.vel) * imu_delayed.delta_vel_dt * 0.5f;
-
-	constrainStates();
-
-
-	// some calculations elsewhere in code require a raw angular rate vector so calculate here to avoid duplication
-	// protect against possible small timesteps resulting from timing slip on previous frame that can drive spikes into the rate
-	// due to insufficient averaging
-	if (imu_delayed.delta_ang_dt > 0.25f * _dt_ekf_avg) {
-		_ang_rate_delayed_raw = imu_delayed.delta_ang / imu_delayed.delta_ang_dt;
-	}
-
-
-	// calculate a filtered horizontal acceleration with a 1 sec time constant
-	// this are used for manoeuvre detection elsewhere
-	const float alpha = 1.0f - imu_delayed.delta_vel_dt;
-	_accel_lpf_NE = _accel_lpf_NE * alpha + corrected_delta_vel_ef.xy();
-
-	// calculate a yaw change about the earth frame vertical
-	const float spin_del_ang_D = corrected_delta_ang.dot(Vector3f(_R_to_earth.row(2)));
-	_yaw_delta_ef += spin_del_ang_D;
-
-	// Calculate filtered yaw rate to be used by the magnetometer fusion type selection logic
-	// Note fixed coefficients are used to save operations. The exact time constant is not important.
-	_yaw_rate_lpf_ef = 0.95f * _yaw_rate_lpf_ef + 0.05f * spin_del_ang_D / imu_delayed.delta_ang_dt;
-
-	// Calculate low pass filtered height rate
-	float alpha_height_rate_lpf = 0.1f * imu_delayed.delta_vel_dt; // 10 seconds time constant
-	_height_rate_lpf = _height_rate_lpf * (1.0f - alpha_height_rate_lpf) + _state.vel(2) * alpha_height_rate_lpf;
 }

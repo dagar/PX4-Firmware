@@ -63,7 +63,8 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 
 	// Observation jacobian and Kalman gain vectors
 	VectorState H;
-	const VectorState state_vector = _state.vector();
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState state_vector = _extended_kalman_filter.state_vector();
 	sym::ComputeMagInnovInnovVarAndHx(state_vector, P, mag, R_MAG, FLT_EPSILON, &mag_innov, &innov_var, &H);
 
 	innov_var.copyTo(aid_src_mag.innovation_variance);
@@ -92,10 +93,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 
 		// we need to re-initialise covariances and abort this fusion step
 		if (update_all_states) {
-			resetQuatCov(_params.mag_heading_noise);
+			_extended_kalman_filter.resetQuatCov(_params.mag_heading_noise);
 		}
 
-		resetMagCov();
+		_extended_kalman_filter.resetMagCov();
 
 		ECL_ERR("magY %s", numerical_error_covariance_reset_string);
 		return false;
@@ -109,10 +110,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 
 		// we need to re-initialise covariances and abort this fusion step
 		if (update_all_states) {
-			resetQuatCov(_params.mag_heading_noise);
+			_extended_kalman_filter.resetQuatCov(_params.mag_heading_noise);
 		}
 
-		resetMagCov();
+		_extended_kalman_filter.resetMagCov();
 
 		ECL_ERR("magZ %s", numerical_error_covariance_reset_string);
 		return false;
@@ -126,7 +127,7 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 	}
 
 	for (int i = 0; i < 3; i++) {
-		aid_src_mag.observation[i] = mag(i) - _state.mag_B(i);
+		aid_src_mag.observation[i] = mag(i) - _extended_kalman_filter.state().mag_B(i);
 		aid_src_mag.observation_variance[i] = R_MAG;
 		aid_src_mag.innovation[i] = mag_innov(i);
 	}
@@ -162,7 +163,7 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 			sym::ComputeMagYInnovVarAndH(state_vector, P, R_MAG, FLT_EPSILON, &aid_src_mag.innovation_variance[index], &H);
 
 			// recalculate innovation using the updated state
-			aid_src_mag.innovation[index] = _state.quat_nominal.rotateVectorInverse(_state.mag_I)(index) + _state.mag_B(index) - mag(index);
+			aid_src_mag.innovation[index] = _extended_kalman_filter.state().quat_nominal.rotateVectorInverse(_extended_kalman_filter.state().mag_I)(index) + _extended_kalman_filter.state().mag_B(index) - mag(index);
 
 			if (aid_src_mag.innovation_variance[index] < R_MAG) {
 				// the innovation variance contribution from the state covariances is negative which means the covariance matrix is badly conditioned
@@ -190,7 +191,7 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 			sym::ComputeMagZInnovVarAndH(state_vector, P, R_MAG, FLT_EPSILON, &aid_src_mag.innovation_variance[index], &H);
 
 			// recalculate innovation using the updated state
-			aid_src_mag.innovation[index] = _state.quat_nominal.rotateVectorInverse(_state.mag_I)(index) + _state.mag_B(index) - mag(index);
+			aid_src_mag.innovation[index] = _extended_kalman_filter.state().quat_nominal.rotateVectorInverse(_extended_kalman_filter.state().mag_I)(index) + _extended_kalman_filter.state().mag_B(index) - mag(index);
 
 			if (aid_src_mag.innovation_variance[index] < R_MAG) {
 				// the innovation variance contribution from the state covariances is negative which means the covariance matrix is badly conditioned
@@ -262,7 +263,9 @@ bool Ekf::fuseDeclination(float decl_sigma)
 	float innovation_variance;
 
 	// TODO: review getMagDeclination() usage, use mag_I, _mag_declination_gps, or parameter?
-	sym::ComputeMagDeclinationPredInnovVarAndH(_state.vector(), P, R_DECL, FLT_EPSILON, &decl_pred, &innovation_variance, &H);
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState &state_vector = _extended_kalman_filter.state_vector();
+	sym::ComputeMagDeclinationPredInnovVarAndH(state_vector, P, R_DECL, FLT_EPSILON, &decl_pred, &innovation_variance, &H);
 
 	const float innovation = wrap_pi(decl_pred - getMagDeclination());
 
@@ -287,7 +290,7 @@ bool Ekf::fuseDeclination(float decl_sigma)
 
 void Ekf::limitDeclination()
 {
-	const Vector3f mag_I_before = _state.mag_I;
+	const Vector3f mag_I_before = _extended_kalman_filter.state().mag_I;
 
 	// get a reference value for the earth field declinaton and minimum plausible horizontal field strength
 	float decl_reference = NAN;
@@ -313,18 +316,18 @@ void Ekf::limitDeclination()
 	// do not allow the horizontal field length to collapse - this will make the declination fusion badly conditioned
 	// and can result in a reversal of the NE field states which the filter cannot recover from
 	// apply a circular limit
-	float h_field = sqrtf(_state.mag_I(0) * _state.mag_I(0) + _state.mag_I(1) * _state.mag_I(1));
+	float h_field = sqrtf(_extended_kalman_filter.state().mag_I(0) * _extended_kalman_filter.state().mag_I(0) + _extended_kalman_filter.state().mag_I(1) * _extended_kalman_filter.state().mag_I(1));
 
 	if (h_field < h_field_min) {
 		if (h_field > 0.001f * h_field_min) {
 			const float h_scaler = h_field_min / h_field;
-			_state.mag_I(0) *= h_scaler;
-			_state.mag_I(1) *= h_scaler;
+			_extended_kalman_filter.state().mag_I(0) *= h_scaler;
+			_extended_kalman_filter.state().mag_I(1) *= h_scaler;
 
 		} else {
 			// too small to scale radially so set to expected value
-			_state.mag_I(0) = 2.0f * h_field_min * cosf(decl_reference);
-			_state.mag_I(1) = 2.0f * h_field_min * sinf(decl_reference);
+			_extended_kalman_filter.state().mag_I(0) = 2.0f * h_field_min * cosf(decl_reference);
+			_extended_kalman_filter.state().mag_I(1) = 2.0f * h_field_min * sinf(decl_reference);
 		}
 
 		h_field = h_field_min;
@@ -334,21 +337,24 @@ void Ekf::limitDeclination()
 	constexpr float decl_tolerance = 0.5f;
 	const float decl_max = decl_reference + decl_tolerance;
 	const float decl_min = decl_reference - decl_tolerance;
-	const float decl_estimate = atan2f(_state.mag_I(1), _state.mag_I(0));
+	const float decl_estimate = atan2f(_extended_kalman_filter.state().mag_I(1), _extended_kalman_filter.state().mag_I(0));
 
 	if (decl_estimate > decl_max)  {
-		_state.mag_I(0) = h_field * cosf(decl_max);
-		_state.mag_I(1) = h_field * sinf(decl_max);
+		// TODO:
+		//_extended_kalman_filter.resetMagI();
+		_extended_kalman_filter.state().mag_I(0) = h_field * cosf(decl_max);
+		_extended_kalman_filter.state().mag_I(1) = h_field * sinf(decl_max);
 
 	} else if (decl_estimate < decl_min)  {
-		_state.mag_I(0) = h_field * cosf(decl_min);
-		_state.mag_I(1) = h_field * sinf(decl_min);
+		//_extended_kalman_filter.resetMagI();
+		_extended_kalman_filter.state().mag_I(0) = h_field * cosf(decl_min);
+		_extended_kalman_filter.state().mag_I(1) = h_field * sinf(decl_min);
 	}
 
-	if ((mag_I_before - _state.mag_I).longerThan(0.01f)) {
+	if ((mag_I_before - _extended_kalman_filter.state().mag_I).longerThan(0.01f)) {
 		ECL_DEBUG("declination limited mag I [%.3f, %.3f, %.3f] -> [%.3f, %.3f, %.3f] (decl: %.3f)",
 			  (double)mag_I_before(0), (double)mag_I_before(1), (double)mag_I_before(2),
-			  (double)_state.mag_I(0), (double)_state.mag_I(1), (double)_state.mag_I(2),
+			  (double)_extended_kalman_filter.state().mag_I(0), (double)_extended_kalman_filter.state().mag_I(1), (double)_extended_kalman_filter.state().mag_I(2),
 			  (double)decl_reference
 			 );
 	}

@@ -54,7 +54,7 @@ void Ekf::initHagl()
 #endif // CONFIG_EKF2_RANGE_FINDER
 
 	// assume a ground clearance
-	_terrain_vpos = _state.pos(2) + _params.rng_gnd_clearance;
+	_terrain_vpos = _extended_kalman_filter.state().pos(2) + _params.rng_gnd_clearance;
 
 	// use the ground clearance value as our uncertainty
 	_terrain_var = sq(_params.rng_gnd_clearance);
@@ -64,7 +64,7 @@ void Ekf::runTerrainEstimator(const imuSample &imu_delayed)
 {
 	// If we are on ground, store the local position and time to use as a reference
 	if (!_control_status.flags.in_air) {
-		_last_on_ground_posD = _state.pos(2);
+		_last_on_ground_posD = _extended_kalman_filter.state().pos(2);
 		_control_status.flags.rng_fault = false;
 	}
 
@@ -80,9 +80,9 @@ void Ekf::runTerrainEstimator(const imuSample &imu_delayed)
 
 	controlHaglFakeFusion();
 
-	// constrain _terrain_vpos to be a minimum of _params.rng_gnd_clearance larger than _state.pos(2)
-	if (_terrain_vpos - _state.pos(2) < _params.rng_gnd_clearance) {
-		_terrain_vpos = _params.rng_gnd_clearance + _state.pos(2);
+	// constrain _terrain_vpos to be a minimum of _params.rng_gnd_clearance larger than _extended_kalman_filter.state().pos(2)
+	if (_terrain_vpos - _extended_kalman_filter.state().pos(2) < _params.rng_gnd_clearance) {
+		_terrain_vpos = _params.rng_gnd_clearance + _extended_kalman_filter.state().pos(2);
 	}
 }
 
@@ -95,7 +95,7 @@ void Ekf::predictHagl(const imuSample &imu_delayed)
 
 	// process noise due to terrain gradient
 	_terrain_var += sq(imu_delayed.delta_vel_dt * _params.terrain_gradient)
-			* (sq(_state.vel(0)) + sq(_state.vel(1)));
+			* (sq(_extended_kalman_filter.state().vel(0)) + sq(_extended_kalman_filter.state().vel(1)));
 
 	// limit the variance to prevent it becoming badly conditioned
 	_terrain_var = math::constrain(_terrain_var, 0.0f, 1e4f);
@@ -187,7 +187,7 @@ float Ekf::getRngVar() const
 
 void Ekf::resetHaglRng()
 {
-	_terrain_vpos = _state.pos(2) + _range_sensor.getDistBottom();
+	_terrain_vpos = _extended_kalman_filter.state().pos(2) + _range_sensor.getDistBottom();
 	_terrain_var = getRngVar();
 	_terrain_vpos_reset_counter++;
 
@@ -214,7 +214,7 @@ void Ekf::updateHaglRng(estimator_aid_source1d_s &aid_src) const
 	const float meas_hagl = _range_sensor.getDistBottom();
 
 	// predict the hagl from the vehicle position and terrain height
-	const float pred_hagl = _terrain_vpos - _state.pos(2);
+	const float pred_hagl = _terrain_vpos - _extended_kalman_filter.state().pos(2);
 
 	// calculate the innovation
 	const float hagl_innov = pred_hagl - meas_hagl;
@@ -331,7 +331,7 @@ void Ekf::stopHaglFlowFusion()
 void Ekf::resetHaglFlow()
 {
 	// TODO: use the flow data
-	_terrain_vpos = fmaxf(0.0f, _state.pos(2));
+	_terrain_vpos = fmaxf(0.0f, _extended_kalman_filter.state().pos(2));
 	_terrain_var = 100.0f;
 	_terrain_vpos_reset_counter++;
 
@@ -351,7 +351,7 @@ void Ekf::fuseFlowForTerrain(estimator_aid_source2d_s &flow)
 	const float state = _terrain_vpos; // linearize both axes using the same state value
 	Vector2f innov_var;
 	float H;
-	sym::TerrEstComputeFlowXyInnovVarAndHx(state, _terrain_var, _state.quat_nominal, _state.vel, _state.pos(2), R_LOS, FLT_EPSILON, &innov_var, &H);
+	sym::TerrEstComputeFlowXyInnovVarAndHx(state, _terrain_var, _extended_kalman_filter.state().quat_nominal, _extended_kalman_filter.state().vel, _extended_kalman_filter.state().pos(2), R_LOS, FLT_EPSILON, &innov_var, &H);
 	innov_var.copyTo(flow.innovation_variance);
 
 	if ((flow.innovation_variance[0] < R_LOS)
@@ -380,7 +380,7 @@ void Ekf::fuseFlowForTerrain(estimator_aid_source2d_s &flow)
 
 		} else if (index == 1) {
 			// recalculate innovation variance because state covariances have changed due to previous fusion (linearise using the same initial state for all axes)
-			sym::TerrEstComputeFlowYInnovVarAndH(state, _terrain_var, _state.quat_nominal, _state.vel, _state.pos(2), R_LOS, FLT_EPSILON, &flow.innovation_variance[1], &H);
+			sym::TerrEstComputeFlowYInnovVarAndH(state, _terrain_var, _extended_kalman_filter.state().quat_nominal, _extended_kalman_filter.state().vel, _extended_kalman_filter.state().pos(2), R_LOS, FLT_EPSILON, &flow.innovation_variance[1], &H);
 
 			// recalculate the innovation using the updated state
 			const Vector2f vel_body = predictFlowVelBody();
@@ -399,7 +399,7 @@ void Ekf::fuseFlowForTerrain(estimator_aid_source2d_s &flow)
 
 		_terrain_vpos += Kfusion * flow.innovation[0];
 		// constrain terrain to minimum allowed value and predict height above ground
-		_terrain_vpos = fmaxf(_terrain_vpos, _params.rng_gnd_clearance + _state.pos(2));
+		_terrain_vpos = fmaxf(_terrain_vpos, _params.rng_gnd_clearance + _extended_kalman_filter.state().pos(2));
 
 		// guard against negative variance
 		_terrain_var = fmaxf(_terrain_var - Kfusion * H * _terrain_var, sq(0.01f));

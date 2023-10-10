@@ -189,7 +189,7 @@ void Ekf::controlOpticalFlowFusion(const imuSample &imu_delayed)
 				if (!_control_status.flags.in_air) {
 					ECL_INFO("reset position to zero");
 					resetHorizontalPositionTo(Vector2f(0.f, 0.f), 0.f);
-					_last_known_pos.xy() = _state.pos.xy();
+					_last_known_pos.xy() = _extended_kalman_filter.state().pos.xy();
 
 				} else {
 					_information_events.flags.reset_pos_to_last_known = true;
@@ -211,7 +211,7 @@ void Ekf::controlOpticalFlowFusion(const imuSample &imu_delayed)
 				// but use a relaxed time criteria to enable it to coast through bad range finder data
 				if (isRecent(_aid_src_terrain_range_finder.time_last_fuse, (uint64_t)10e6)) {
 					fuseOptFlow();
-					_last_known_pos.xy() = _state.pos.xy();
+					_last_known_pos.xy() = _extended_kalman_filter.state().pos.xy();
 				}
 
 				_flow_data_ready = false;

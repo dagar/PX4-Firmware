@@ -61,8 +61,11 @@ void Ekf::controlGravityFusion(const imuSample &imu)
 	Vector3f innovation; // innovation of the last gravity fusion observation (m/s**2)
 	Vector3f innovation_variance;
 	VectorState Kx, Ky, Kz; // Kalman gain vectors
+
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState &state_vector = _extended_kalman_filter.state_vector();
 	sym::ComputeGravityInnovVarAndKAndH(
-		_state.vector(), P, measurement, measurement_var, FLT_EPSILON,
+		state_vector, P, measurement, measurement_var, FLT_EPSILON,
 		&innovation, &innovation_variance, &Kx, &Ky, &Kz);
 
 	// fill estimator aid source status

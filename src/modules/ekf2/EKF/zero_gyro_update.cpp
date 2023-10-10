@@ -55,7 +55,7 @@ void Ekf::controlZeroGyroUpdate(const imuSample &imu_delayed)
 
 		if (zero_gyro_update_data_ready) {
 			Vector3f gyro_bias = _zgup_delta_ang / _zgup_delta_ang_dt;
-			Vector3f innovation = _state.gyro_bias - gyro_bias;
+			Vector3f innovation = _extended_kalman_filter.state().gyro_bias - gyro_bias;
 
 			const float obs_var = sq(math::constrain(_params.gyro_noise, 0.f, 1.f));
 

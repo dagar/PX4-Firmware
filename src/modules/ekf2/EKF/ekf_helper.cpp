@@ -63,16 +63,7 @@ void Ekf::resetVelocityTo(const Vector3f &new_vel, const Vector3f &new_vel_var)
 
 void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel, const Vector2f &new_horz_vel_var)
 {
-	const Vector2f delta_horz_vel = new_horz_vel - Vector2f(_state.vel);
-	_state.vel.xy() = new_horz_vel;
-
-	if (PX4_ISFINITE(new_horz_vel_var(0))) {
-		P.uncorrelateCovarianceSetVariance<1>(State::vel.idx, math::max(sq(0.01f), new_horz_vel_var(0)));
-	}
-
-	if (PX4_ISFINITE(new_horz_vel_var(1))) {
-		P.uncorrelateCovarianceSetVariance<1>(State::vel.idx + 1, math::max(sq(0.01f), new_horz_vel_var(1)));
-	}
+	const Vector2f delta_horz_vel = new_horz_vel - Vector2f(_extended_kalman_filter.state().vel);
 
 	_extended_kalman_filter.resetHorizontalVelocityTo(new_horz_vel, new_horz_vel_var);
 
@@ -95,12 +86,7 @@ void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel, const Vector2f
 
 void Ekf::resetVerticalVelocityTo(float new_vert_vel, float new_vert_vel_var)
 {
-	const float delta_vert_vel = new_vert_vel - _state.vel(2);
-	_state.vel(2) = new_vert_vel;
-
-	if (PX4_ISFINITE(new_vert_vel_var)) {
-		P.uncorrelateCovarianceSetVariance<1>(State::vel.idx + 2, math::max(sq(0.01f), new_vert_vel_var));
-	}
+	const float delta_vert_vel = new_vert_vel - _extended_kalman_filter.state().vel(2);
 
 	_extended_kalman_filter.resetVerticalVelocityTo(new_vert_vel, new_vert_vel_var);
 
@@ -133,16 +119,7 @@ void Ekf::resetHorizontalPositionToLastKnown()
 
 void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos, const Vector2f &new_horz_pos_var)
 {
-	const Vector2f delta_horz_pos{new_horz_pos - Vector2f{_state.pos}};
-	_state.pos.xy() = new_horz_pos;
-
-	if (PX4_ISFINITE(new_horz_pos_var(0))) {
-		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx, math::max(sq(0.01f), new_horz_pos_var(0)));
-	}
-
-	if (PX4_ISFINITE(new_horz_pos_var(1))) {
-		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx + 1, math::max(sq(0.01f), new_horz_pos_var(1)));
-	}
+	const Vector2f delta_horz_pos{new_horz_pos - Vector2f{_extended_kalman_filter.state().pos}};
 
 	_extended_kalman_filter.resetHorizontalPositionTo(new_horz_pos, new_horz_pos_var);
 
@@ -181,13 +158,7 @@ bool Ekf::isHeightResetRequired() const
 
 void Ekf::resetVerticalPositionTo(const float new_vert_pos, float new_vert_pos_var)
 {
-	const float old_vert_pos = _state.pos(2);
-	_state.pos(2) = new_vert_pos;
-
-	if (PX4_ISFINITE(new_vert_pos_var)) {
-		// the state variance is the same as the observation
-		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx + 2, math::max(sq(0.01f), new_vert_pos_var));
-	}
+	const float old_vert_pos = _extended_kalman_filter.state().pos(2);
 
 	_extended_kalman_filter.resetVerticalPositionTo(new_vert_pos, new_vert_pos_var);
 
@@ -235,26 +206,6 @@ void Ekf::resetVerticalVelocityToZero()
 	resetVerticalVelocityTo(0.0f, 10.f);
 }
 
-void Ekf::constrainStates()
-{
-	_state.quat_nominal = matrix::constrain(_state.quat_nominal, -1.0f, 1.0f);
-	_state.vel = matrix::constrain(_state.vel, -1000.0f, 1000.0f);
-	_state.pos = matrix::constrain(_state.pos, -1.e6f, 1.e6f);
-
-	const float gyro_bias_limit = getGyroBiasLimit();
-	_state.gyro_bias = matrix::constrain(_state.gyro_bias, -gyro_bias_limit, gyro_bias_limit);
-
-	const float accel_bias_limit = getAccelBiasLimit();
-	_state.accel_bias = matrix::constrain(_state.accel_bias, -accel_bias_limit, accel_bias_limit);
-
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	_state.mag_I = matrix::constrain(_state.mag_I, -1.0f, 1.0f);
-	_state.mag_B = matrix::constrain(_state.mag_B, -getMagBiasLimit(), getMagBiasLimit());
-#endif // CONFIG_EKF2_MAGNETOMETER
-
-	_state.wind_vel = matrix::constrain(_state.wind_vel, -100.0f, 100.0f);
-}
-
 #if defined(CONFIG_EKF2_BARO_COMPENSATION)
 float Ekf::compensateBaroForDynamicPressure(const float baro_alt_uncompensated) const
 {
@@ -265,13 +216,13 @@ float Ekf::compensateBaroForDynamicPressure(const float baro_alt_uncompensated) 
 
 		// Calculate airspeed in body frame
 		const Vector3f vel_imu_rel_body_ned = _R_to_earth * (_ang_rate_delayed_raw % _params.imu_pos_body);
-		const Vector3f velocity_earth = _state.vel - vel_imu_rel_body_ned;
+		const Vector3f velocity_earth = _extended_kalman_filter.state().vel - vel_imu_rel_body_ned;
 
-		const Vector3f wind_velocity_earth(_state.wind_vel(0), _state.wind_vel(1), 0.0f);
+		const Vector3f wind_velocity_earth(_extended_kalman_filter.state().wind_vel(0), _extended_kalman_filter.state().wind_vel(1), 0.0f);
 
 		const Vector3f airspeed_earth = velocity_earth - wind_velocity_earth;
 
-		const Vector3f airspeed_body = _state.quat_nominal.rotateVectorInverse(airspeed_earth);
+		const Vector3f airspeed_body = _extended_kalman_filter.state().quat_nominal.rotateVectorInverse(airspeed_earth);
 
 		const Vector3f K_pstatic_coef(
 			airspeed_body(0) >= 0.f ? _params.static_pressure_coef_xp : _params.static_pressure_coef_xn,
@@ -399,7 +350,7 @@ bool Ekf::setEkfGlobalOrigin(const double latitude, const double longitude, cons
 
 		// if we are already doing aiding, correct for the change in position since the EKF started navigating
 		if (_pos_ref.isInitialized() && isHorizontalAidingActive()) {
-			_pos_ref.reproject(_state.pos(0), _state.pos(1), current_lat, current_lon);
+			_pos_ref.reproject(_extended_kalman_filter.state().pos(0), _extended_kalman_filter.state().pos(1), current_lat, current_lon);
 			current_pos_available = true;
 		}
 
@@ -436,7 +387,7 @@ bool Ekf::setEkfGlobalOrigin(const double latitude, const double longitude, cons
 			// reset horizontal position
 			Vector2f position = _pos_ref.project(current_lat, current_lon);
 
-			if (Vector2f(position - Vector2f(_state.pos)).longerThan(MIN_RESET_DIST_M)) {
+			if (Vector2f(position - Vector2f(_extended_kalman_filter.state().pos)).longerThan(MIN_RESET_DIST_M)) {
 				resetHorizontalPositionTo(position);
 			}
 		}
@@ -444,7 +395,7 @@ bool Ekf::setEkfGlobalOrigin(const double latitude, const double longitude, cons
 		// reset vertical position (if there's any change)
 		if (fabsf(altitude - gps_alt_ref_prev) > MIN_RESET_DIST_M) {
 			// determine current z
-			float current_alt = -_state.pos(2) + gps_alt_ref_prev;
+			float current_alt = -_extended_kalman_filter.state().pos(2) + gps_alt_ref_prev;
 
 			const float gps_hgt_bias = _gps_hgt_b_est.getBias();
 			resetVerticalPositionTo(_gps_alt_ref - current_alt);
@@ -525,7 +476,7 @@ void Ekf::get_ekf_vel_accuracy(float *ekf_evh, float *ekf_evv) const
 #if defined(CONFIG_EKF2_OPTICAL_FLOW)
 		if (_control_status.flags.opt_flow) {
 			float gndclearance = math::max(_params.rng_gnd_clearance, 0.1f);
-			vel_err_conservative = math::max((_terrain_vpos - _state.pos(2)), gndclearance) * Vector2f(_aid_src_optical_flow.innovation).norm();
+			vel_err_conservative = math::max((_terrain_vpos - _extended_kalman_filter.state().pos(2)), gndclearance) * Vector2f(_aid_src_optical_flow.innovation).norm();
 		}
 #endif // CONFIG_EKF2_OPTICAL_FLOW
 
@@ -590,7 +541,7 @@ void Ekf::get_ekf_ctrl_limits(float *vxy_max, float *vz_max, float *hagl_min, fl
 		const float flow_hagl_min = fmaxf(rangefinder_hagl_min, _flow_min_distance);
 		const float flow_hagl_max = fminf(rangefinder_hagl_max, _flow_max_distance);
 
-		const float flow_constrained_height = math::constrain(_terrain_vpos - _state.pos(2), flow_hagl_min, flow_hagl_max);
+		const float flow_constrained_height = math::constrain(_terrain_vpos - _extended_kalman_filter.state().pos(2), flow_hagl_min, flow_hagl_max);
 
 		// Allow ground relative velocity to use 50% of available flow sensor range to allow for angular motion
 		const float flow_vxy_max = 0.5f * _flow_max_rate * flow_constrained_height;
@@ -612,38 +563,12 @@ void Ekf::resetImuBias()
 
 void Ekf::resetGyroBias()
 {
-	// Zero the gyro bias states
-	_state.gyro_bias.zero();
-
-	resetGyroBiasCov();
-}
-
-void Ekf::resetGyroBiasCov()
-{
-	// Zero the corresponding covariances and set
-	// variances to the values use for initial alignment
-	P.uncorrelateCovarianceSetVariance<State::gyro_bias.dof>(State::gyro_bias.idx, sq(_params.switch_on_gyro_bias));
-
-	// Set previous frame values
-	_prev_gyro_bias_var = getStateVariance<State::gyro_bias>();
+	_extended_kalman_filter.resetGyroBias();
 }
 
 void Ekf::resetAccelBias()
 {
-	// Zero the accel bias states
-	_state.accel_bias.zero();
-
-	resetAccelBiasCov();
-}
-
-void Ekf::resetAccelBiasCov()
-{
-	// Zero the corresponding covariances and set
-	// variances to the values use for initial alignment
-	P.uncorrelateCovarianceSetVariance<State::accel_bias.dof>(State::accel_bias.idx, sq(_params.switch_on_accel_bias));
-
-	// Set previous frame values
-	_prev_accel_bias_var = getStateVariance<State::accel_bias>();
+	_extended_kalman_filter.resetAccelBias();
 }
 
 // get EKF innovation consistency check status information comprising of:
@@ -819,30 +744,6 @@ void Ekf::get_ekf_soln_status(uint16_t *status) const
 	*status = soln_status.value;
 }
 
-void Ekf::fuse(const VectorState &K, float innovation)
-{
-	_state.quat_nominal -= K.slice<State::quat_nominal.dof, 1>(State::quat_nominal.idx, 0) * innovation;
-	_state.quat_nominal.normalize();
-	_R_to_earth = Dcmf(_state.quat_nominal);
-
-	_state.vel -= K.slice<State::vel.dof, 1>(State::vel.idx, 0) * innovation;
-	_state.pos -= K.slice<State::pos.dof, 1>(State::pos.idx, 0) * innovation;
-	_state.gyro_bias -= K.slice<State::gyro_bias.dof, 1>(State::gyro_bias.idx, 0) * innovation;
-	_state.accel_bias -= K.slice<State::accel_bias.dof, 1>(State::accel_bias.idx, 0) * innovation;
-
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	_state.mag_I -= K.slice<State::mag_I.dof, 1>(State::mag_I.idx, 0) * innovation;
-	_state.mag_B -= K.slice<State::mag_B.dof, 1>(State::mag_B.idx, 0) * innovation;
-#endif // CONFIG_EKF2_MAGNETOMETER
-
-	_state.wind_vel -= K.slice<State::wind_vel.dof, 1>(State::wind_vel.idx, 0) * innovation;
-}
-
-void Ekf::uncorrelateQuatFromOtherStates()
-{
-	P.uncorrelateCovarianceBlock<State::quat_nominal.dof>(State::quat_nominal.idx);
-}
-
 void Ekf::updateDeadReckoningStatus()
 {
 	updateHorizontalDeadReckoningstatus();
@@ -916,17 +817,11 @@ void Ekf::updateVerticalDeadReckoningStatus()
 Vector3f Ekf::calcRotVecVariances() const
 {
 	Vector3f rot_var;
-	sym::QuatVarToRotVar(_state.vector(), P, FLT_EPSILON, &rot_var);
+
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState &state_vector = _extended_kalman_filter.state_vector();
+	sym::QuatVarToRotVar(state_vector, P, FLT_EPSILON, &rot_var);
 	return rot_var;
-}
-
-float Ekf::getYawVar() const
-{
-	VectorState H_YAW;
-	float yaw_var = 0.f;
-	computeYawInnovVarAndH(0.f, yaw_var, H_YAW);
-
-	return yaw_var;
 }
 
 #if defined(CONFIG_EKF2_BAROMETER)
@@ -936,7 +831,7 @@ void Ekf::updateGroundEffect()
 #if defined(CONFIG_EKF2_TERRAIN)
 		if (isTerrainEstimateValid()) {
 			// automatically set ground effect if terrain is valid
-			float height = _terrain_vpos - _state.pos(2);
+			float height = _terrain_vpos - _extended_kalman_filter.state().pos(2);
 			_control_status.flags.gnd_effect = (height < _params.gnd_effect_max_hgt);
 
 		} else
@@ -957,33 +852,18 @@ void Ekf::updateGroundEffect()
 void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 {
 	// save a copy of the quaternion state for later use in calculating the amount of reset change
-	const Quatf quat_before_reset = _state.quat_nominal;
+	const Quatf quat_before_reset = _extended_kalman_filter.state().quat_nominal;
 
-	// save a copy of covariance in NED frame to restore it after the quat reset
-	const matrix::SquareMatrix3f rot_cov = diag(calcRotVecVariances());
-	Vector3f rot_var_ned_before_reset = matrix::SquareMatrix3f(_R_to_earth * rot_cov * _R_to_earth.T()).diag();
-
-	// update the yaw angle variance
-	if (PX4_ISFINITE(yaw_variance) && (yaw_variance > FLT_EPSILON)) {
-		rot_var_ned_before_reset(2) = yaw_variance;
-	}
+	_extended_kalman_filter.resetQuatStateYaw(yaw, yaw_variance);
 
 	// update transformation matrix from body to world frame using the current estimate
 	// update the rotation matrix using the new yaw value
-	_R_to_earth = updateYawInRotMat(yaw, Dcmf(_state.quat_nominal));
+	_R_to_earth = Dcmf(_extended_kalman_filter.state().quat_nominal);
 
 	// calculate the amount that the quaternion has changed by
 	const Quatf quat_after_reset(_R_to_earth);
 	const Quatf q_error((quat_after_reset * quat_before_reset.inversed()).normalized());
 
-	// update quaternion states
-	_state.quat_nominal = quat_after_reset;
-	uncorrelateQuatFromOtherStates();
-
-	// restore covariance
-	resetQuatCov(rot_var_ned_before_reset);
-
-	_extended_kalman_filter.resetQuatStateYaw(yaw, yaw_variance);
 
 	// add the reset amount to the output observer buffered data
 	_output_predictor.resetQuaternion(q_error);
@@ -1081,7 +961,7 @@ void Ekf::resetWindToZero()
 	ECL_INFO("reset wind to zero");
 
 	// If we don't have an airspeed measurement, then assume the wind is zero
-	_state.wind_vel.setZero();
+	_extended_kalman_filter.state().wind_vel.setZero();
 
 	resetWindCov();
 }

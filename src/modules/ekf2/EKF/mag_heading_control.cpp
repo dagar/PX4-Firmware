@@ -48,7 +48,7 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 	const Vector3f mag_bias_var = getMagBiasVariance();
 
 	if ((mag_bias_var.min() > 0.f) && (mag_bias_var.max() <= sq(_params.mag_noise))) {
-		mag_bias = _state.mag_B;
+		mag_bias = _extended_kalman_filter.state().mag_B;
 	}
 
 	// calculate mag heading
@@ -186,7 +186,7 @@ void Ekf::controlMagHeadingFusion(const magSample &mag_sample, const bool common
 
 	// record corresponding mag heading and yaw state for future mag heading delta heading innovation (logging only)
 	_mag_heading_prev = measured_hdg;
-	_mag_heading_pred_prev = getEulerYaw(_state.quat_nominal);
+	_mag_heading_pred_prev = getEulerYaw(_extended_kalman_filter.state().quat_nominal);
 
 	_mag_heading_last_declination = getMagDeclination();
 }

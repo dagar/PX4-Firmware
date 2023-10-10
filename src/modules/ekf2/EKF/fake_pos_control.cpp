@@ -115,7 +115,7 @@ void Ekf::controlFakePosFusion()
 void Ekf::resetFakePosFusion()
 {
 	ECL_INFO("reset fake position fusion");
-	_last_known_pos.xy() = _state.pos.xy();
+	_last_known_pos.xy() = _extended_kalman_filter.state().pos.xy();
 
 	resetHorizontalPositionToLastKnown();
 	resetHorizontalVelocityToZero();

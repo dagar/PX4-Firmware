@@ -75,14 +75,14 @@ bool Ekf::collect_gps(const gpsMessage &gps)
 			if (isHorizontalAidingActive()) {
 				double est_lat;
 				double est_lon;
-				_pos_ref.reproject(-_state.pos(0), -_state.pos(1), est_lat, est_lon);
+				_pos_ref.reproject(-_extended_kalman_filter.state().pos(0), -_extended_kalman_filter.state().pos(1), est_lat, est_lon);
 				_pos_ref.initReference(est_lat, est_lon, gps.time_usec);
 			}
 		}
 
 		// Take the current GPS height and subtract the filter height above origin to estimate the GPS height of the origin
 		if (!PX4_ISFINITE(_gps_alt_ref)) {
-			_gps_alt_ref = 1e-3f * (float)gps.alt + _state.pos(2);
+			_gps_alt_ref = 1e-3f * (float)gps.alt + _extended_kalman_filter.state().pos(2);
 		}
 
 		_NED_origin_initialised = true;
@@ -240,7 +240,7 @@ bool Ekf::gps_is_good(const gpsMessage &gps)
 
 	// Check  the filtered difference between GPS and EKF vertical velocity
 	const float vz_diff_limit = 10.0f * _params.req_vdrift;
-	const float vertVel = math::constrain(gps.vel_ned(2) - _state.vel(2), -vz_diff_limit, vz_diff_limit);
+	const float vertVel = math::constrain(gps.vel_ned(2) - _extended_kalman_filter.state().vel(2), -vz_diff_limit, vz_diff_limit);
 	_gps_velD_diff_filt = vertVel * filter_coef + _gps_velD_diff_filt * (1.0f - filter_coef);
 	_gps_check_fail_status.flags.vspeed = (fabsf(_gps_velD_diff_filt) > _params.req_vdrift);
 

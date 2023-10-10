@@ -77,8 +77,7 @@ void Ekf::controlMagFusion()
 			// sensor or calibration has changed, reset low pass filter (reset handled by controlMag3DFusion/controlMagHeadingFusion)
 			_control_status.flags.mag_fault = false;
 
-			_state.mag_B.zero();
-			resetMagCov();
+			_extended_kalman_filter.resetMagBias();
 
 			_mag_lpf.reset(mag_sample.mag);
 			_mag_counter = 1;
@@ -130,7 +129,7 @@ bool Ekf::checkHaglYawResetReq() const
 		// Check if height has increased sufficiently to be away from ground magnetic anomalies
 		// and request a yaw reset if not already requested.
 		static constexpr float mag_anomalies_max_hagl = 1.5f;
-		const bool above_mag_anomalies = (getTerrainVPos() - _state.pos(2)) > mag_anomalies_max_hagl;
+		const bool above_mag_anomalies = (getTerrainVPos() - _extended_kalman_filter.state().pos(2)) > mag_anomalies_max_hagl;
 		return above_mag_anomalies;
 	}
 #endif // CONFIG_EKF2_TERRAIN
@@ -141,8 +140,8 @@ bool Ekf::checkHaglYawResetReq() const
 void Ekf::resetMagStates(const Vector3f &mag, bool reset_heading)
 {
 	// reinit mag states
-	const Vector3f mag_I_before_reset = _state.mag_I;
-	const Vector3f mag_B_before_reset = _state.mag_B;
+	const Vector3f mag_I_before_reset = _extended_kalman_filter.state().mag_I;
+	const Vector3f mag_B_before_reset = _extended_kalman_filter.state().mag_B;
 
 	// reset covariances to default
 	resetMagCov();
@@ -160,21 +159,24 @@ void Ekf::resetMagStates(const Vector3f &mag, bool reset_heading)
 			const Dcmf R_to_body = R_to_earth.transpose();
 
 			// mag_B: reset using WMM and yaw estimator
-			_state.mag_B = mag - (R_to_body * mag_earth_pred);
+			const Vector3f mag_bias = mag - (R_to_body * mag_earth_pred);
+			_extended_kalman_filter.setMagBias(mag_bias);
 
 			ECL_INFO("resetMagStates using yaw estimator");
 
 		} else if (!reset_heading && _control_status.flags.yaw_align) {
 			// mag_B: reset using WMM
-			const Dcmf R_to_body = quatToInverseRotMat(_state.quat_nominal);
-			_state.mag_B = mag - (R_to_body * mag_earth_pred);
+			const Dcmf R_to_body = quatToInverseRotMat(_extended_kalman_filter.state().quat_nominal);
+			const Vector3f mag_bias = mag - (R_to_body * mag_earth_pred);
+			_extended_kalman_filter.setMagBias(mag_bias);
 
 		} else {
-			_state.mag_B.zero();
+			const Vector3f mag_bias{0.f, 0.f, 0.f};
+			_extended_kalman_filter.setMagBias(mag_bias);
 		}
 
 		// mag_I: reset, skipped if no change in state and variance good
-		_state.mag_I = mag_earth_pred;
+		_extended_kalman_filter.setMagEarth(mag_earth_pred);
 
 		if (reset_heading) {
 			resetMagHeading(mag);
@@ -185,7 +187,8 @@ void Ekf::resetMagStates(const Vector3f &mag, bool reset_heading)
 
 	} else {
 		// mag_B: reset
-		_state.mag_B.zero();
+		const Vector3f mag_bias{0.f, 0.f, 0.f};
+		_extended_kalman_filter.setMagBias(mag_bias);
 
 		// Use the magnetometer measurement to reset the field states
 		if (reset_heading) {
@@ -193,25 +196,26 @@ void Ekf::resetMagStates(const Vector3f &mag, bool reset_heading)
 		}
 
 		// mag_I: use the last magnetometer measurements to reset the field states
-		_state.mag_I = _R_to_earth * mag;
+		const Vector3f mag_I = _R_to_earth * mag;
+		_extended_kalman_filter.setMagEarth(mag_I);
 	}
 
 	if (!mag_I_before_reset.longerThan(0.f)) {
 		ECL_INFO("initializing mag I [%.3f, %.3f, %.3f], mag B [%.3f, %.3f, %.3f]",
-			 (double)_state.mag_I(0), (double)_state.mag_I(1), (double)_state.mag_I(2),
-			 (double)_state.mag_B(0), (double)_state.mag_B(1), (double)_state.mag_B(2)
+			 (double)_extended_kalman_filter.state().mag_I(0), (double)_extended_kalman_filter.state().mag_I(1), (double)_extended_kalman_filter.state().mag_I(2),
+			 (double)_extended_kalman_filter.state().mag_B(0), (double)_extended_kalman_filter.state().mag_B(1), (double)_extended_kalman_filter.state().mag_B(2)
 			);
 
 	} else {
 		ECL_INFO("resetting mag I [%.3f, %.3f, %.3f] -> [%.3f, %.3f, %.3f]",
 			 (double)mag_I_before_reset(0), (double)mag_I_before_reset(1), (double)mag_I_before_reset(2),
-			 (double)_state.mag_I(0), (double)_state.mag_I(1), (double)_state.mag_I(2)
+			 (double)_extended_kalman_filter.state().mag_I(0), (double)_extended_kalman_filter.state().mag_I(1), (double)_extended_kalman_filter.state().mag_I(2)
 			);
 
-		if (mag_B_before_reset.longerThan(0.f) || _state.mag_B.longerThan(0.f)) {
+		if (mag_B_before_reset.longerThan(0.f) || _extended_kalman_filter.state().mag_B.longerThan(0.f)) {
 			ECL_INFO("resetting mag B [%.3f, %.3f, %.3f] -> [%.3f, %.3f, %.3f]",
 				 (double)mag_B_before_reset(0), (double)mag_B_before_reset(1), (double)mag_B_before_reset(2),
-				 (double)_state.mag_B(0), (double)_state.mag_B(1), (double)_state.mag_B(2)
+				 (double)_extended_kalman_filter.state().mag_B(0), (double)_extended_kalman_filter.state().mag_B(1), (double)_extended_kalman_filter.state().mag_B(2)
 				);
 		}
 	}
@@ -346,7 +350,7 @@ void Ekf::resetMagHeading(const Vector3f &mag)
 	const Vector3f mag_bias_var = getMagBiasVariance();
 
 	if ((mag_bias_var.min() > 0.f) && (mag_bias_var.max() <= sq(_params.mag_noise))) {
-		mag_bias = _state.mag_B;
+		mag_bias = _extended_kalman_filter.state().mag_B;
 	}
 
 	// calculate mag heading
@@ -381,7 +385,7 @@ float Ekf::getMagDeclination()
 	// set source of magnetic declination for internal use
 	if (_control_status.flags.mag_aligned_in_flight) {
 		// Use value consistent with earth field state
-		return atan2f(_state.mag_I(1), _state.mag_I(0));
+		return atan2f(_extended_kalman_filter.state().mag_I(1), _extended_kalman_filter.state().mag_I(0));
 
 	} else if (_params.mag_declination_source & GeoDeclinationMask::USE_GEO_DECL) {
 		// use parameter value until GPS is available, then use value returned by geo library

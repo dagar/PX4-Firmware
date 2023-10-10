@@ -65,7 +65,9 @@ void Ekf::updateGpsYaw(const gpsSample &gps_sample)
 
 		{
 		VectorState H;
-		sym::ComputeGnssYawPredInnovVarAndH(_state.vector(), P, _gps_yaw_offset, R_YAW, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
+		const SquareMatrixState &P = _extended_kalman_filter.covariances();
+		const VectorState &state_vector = _extended_kalman_filter.state_vector();
+		sym::ComputeGnssYawPredInnovVarAndH(state_vector, P, _gps_yaw_offset, R_YAW, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
 		}
 
 		gnss_yaw.observation = measured_hdg;
@@ -97,7 +99,9 @@ void Ekf::fuseGpsYaw()
 
 	// Note: we recompute innov and innov_var because it doesn't cost much more than just computing H
 	// making a separate function just for H uses more flash space without reducing CPU load significantly
-	sym::ComputeGnssYawPredInnovVarAndH(_state.vector(), P, _gps_yaw_offset, gnss_yaw.observation_variance, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState &state_vector = _extended_kalman_filter.state_vector();
+	sym::ComputeGnssYawPredInnovVarAndH(state_vector, P, _gps_yaw_offset, gnss_yaw.observation_variance, FLT_EPSILON, &heading_pred, &heading_innov_var, &H);
 	}
 
 	// check if the innovation variance calculation is badly conditioned

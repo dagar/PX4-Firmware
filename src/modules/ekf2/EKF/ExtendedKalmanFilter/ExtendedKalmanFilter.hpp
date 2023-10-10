@@ -65,6 +65,12 @@ public:
 	~ExtendedKalmanFilter() = default;
 
 	bool init(const Vector3f &accel);
+
+	// initialise ekf covariance matrix
+	// Sets initial values for the covariance matrix
+	// Do not call before quaternion states have been initialised
+	void initialiseCovariance();
+
 	void reset();
 
 	bool update(const imuSample &imu);
@@ -77,7 +83,11 @@ public:
 
 	const matrix::SquareMatrix<float, State::size> &covariances() const { return P; }
 
+	const StateSample &state() const { return _state; }
+	const VectorState &state_vector() const { return _state.vector(); }
+
 	// orientation
+	const Quatf &getStateOrientation() const { return _state.quat_nominal; }
 	bool fuseYaw(const float obs_var, const float innov);
 	bool fuseYaw(const float innov, const float innov_var, const VectorState &H_YAW);
 	void computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const;
@@ -92,6 +102,20 @@ public:
 	void resetVelocityTo(const Vector3f &vel, const Vector3f &vel_var);
 	void resetHorizontalVelocityTo(const Vector2f &vel_xy, const Vector2f &vel_xy_var);
 	void resetVerticalVelocityTo(const float vel_z, const float vel_z_var);
+
+	struct CorrectionResult3
+	{
+		Vector3f innovation{};
+		Vector3f innovation_variance{};
+		Vector3f test_ratio{};
+		bool rejected[3]{};
+	};
+
+	CorrectionResult3 velocityCorrection(const Vector3f &observation, const Vector3f &observation_variance, float innovation_gate = 1.f);
+	bool velocityReset(const Vector3f& observation, const Vector3f& observation_variance);
+	bool velocityXYReset(const Vector2f& observation, const Vector2f& observation_variance);
+	bool velocityZReset(const float& observation, const float& observation_variance);
+
 
 	// position
 	bool fusePosition(const float innov, const float innov_var, const int axis);
@@ -114,7 +138,11 @@ public:
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	// mag
+	void resetMagBias();
 	void resetMagCov();
+
+	bool setMagEarth(const Vector3f &mag_earth_field);
+	bool setMagBias(const Vector3f &mag_bias);
 #endif // CONFIG_EKF2_MAGNETOMETER
 
 #if defined(CONFIG_EKF2_WIND)
@@ -170,11 +198,6 @@ private:
 	// return the square of two floating point numbers - used in auto coded sections
 	static constexpr float sq(float var) { return var * var; }
 
-	// initialise ekf covariance matrix
-	// Sets initial values for the covariance matrix
-	// Do not call before quaternion states have been initialised
-	void initialiseCovariance();
-
 	// predict
 	void predictCovariance(const imuSample &imu);
 	void predictState(const imuSample &imu);
@@ -214,10 +237,10 @@ private:
 	uint64_t _time_last_vel_xy_fuse{0};     ///< time the last fusion of horizontal velocity measurements was performed (uSec)
 	uint64_t _time_last_vel_z_fuse{0};      ///< time the last fusion of verticalvelocity measurements was performed (uSec)
 #if defined(CONFIG_EKF2_MAGNETOMETER)
-	uint64_t _time_last_mag_fuse{0};        ///< time the last fusion of magnetometer measurements was performed (uSec)
+	uint64_t _time_last_mag_fuse {0};       ///< time the last fusion of magnetometer measurements was performed (uSec)
 #endif // CONFIG_EKF2_MAGNETOMETER
 #if defined(CONFIG_EKF2_WIND)
-	uint64_t _time_last_wind_fuse{0};       ///< time the last fusion of wind measurements was performed (uSec)
+	uint64_t _time_last_wind_fuse {0};      ///< time the last fusion of wind measurements was performed (uSec)
 #endif // CONFIG_EKF2_WIND
 
 	// variables used to inhibit accel bias learning

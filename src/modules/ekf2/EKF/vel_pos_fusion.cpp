@@ -50,7 +50,7 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector2f &ob
 
 	for (int i = 0; i < 2; i++) {
 		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
+		aid_src.innovation[i] = _extended_kalman_filter.state().vel(i) - aid_src.observation[i];
 
 		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
 		const int state_index = State::vel.idx + i;
@@ -69,7 +69,7 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector3f &ob
 
 	for (int i = 0; i < 3; i++) {
 		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
+		aid_src.innovation[i] = _extended_kalman_filter.state().vel(i) - aid_src.observation[i];
 
 		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
 		const int state_index = State::vel.idx + i;
@@ -95,7 +95,7 @@ void Ekf::updateVerticalPositionAidSrcStatus(const uint64_t &time_us, const floa
 	resetEstimatorAidStatus(aid_src);
 
 	aid_src.observation = obs;
-	aid_src.innovation = _state.pos(2) - aid_src.observation;
+	aid_src.innovation = _extended_kalman_filter.state().pos(2) - aid_src.observation;
 
 	aid_src.observation_variance = math::max(sq(0.01f), obs_var);
 	aid_src.innovation_variance = P(State::pos.idx + 2, State::pos.idx + 2) + aid_src.observation_variance;
@@ -120,7 +120,7 @@ void Ekf::updateHorizontalPositionAidSrcStatus(const uint64_t &time_us, const Ve
 
 	for (int i = 0; i < 2; i++) {
 		aid_src.observation[i] = obs(i);
-		aid_src.innovation[i] = _state.pos(i) - aid_src.observation[i];
+		aid_src.innovation[i] = _extended_kalman_filter.state().pos(i) - aid_src.observation[i];
 
 		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
 		const int state_index = State::pos.idx + i;

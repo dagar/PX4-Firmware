@@ -37,7 +37,6 @@ set(EKF_SRCS)
 list(APPEND EKF_SRCS
 	bias_estimator.cpp
 	control.cpp
-	covariance.cpp
 	ekf.cpp
 	ekf_helper.cpp
 	EKFGSF_yaw.cpp

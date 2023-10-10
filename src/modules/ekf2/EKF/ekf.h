@@ -79,8 +79,6 @@ public:
 	// should be called every time new data is pushed into the filter
 	bool update();
 
-	static uint8_t getNumberOfStates() { return State::size; }
-
 	void getGpsVelPosInnov(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getGpsVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float &vpos) const;
 	void getGpsVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const;
@@ -320,11 +318,11 @@ public:
 	void getGravityInnovRatio(float &grav_innov_ratio) const { grav_innov_ratio = Vector3f(_aid_src_gravity.test_ratio).max(); }
 
 	// get the state vector at the delayed time horizon
-	const matrix::Vector<float, State::size> &getStateAtFusionHorizonAsVector() const { return _state.vector(); }
+	const matrix::Vector<float, State::size> &getStateAtFusionHorizonAsVector() const { return _extended_kalman_filter.state_vector(); }
 
 #if defined(CONFIG_EKF2_WIND)
 	// get the wind velocity in m/s
-	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
+	const Vector2f &getWindVelocity() const { return _extended_kalman_filter.state().wind_vel; };
 	Vector2f getWindVelocityVariance() const { return getStateVariance<State::wind_vel>(); }
 #endif // CONFIG_EKF2_WIND
 
@@ -425,19 +423,19 @@ public:
 	}
 
 	// gyro bias
-	const Vector3f &getGyroBias() const { return _state.gyro_bias; } // get the gyroscope bias in rad/s
+	const Vector3f &getGyroBias() const { return _extended_kalman_filter.state().gyro_bias; } // get the gyroscope bias in rad/s
 	Vector3f getGyroBiasVariance() const { return getStateVariance<State::gyro_bias>(); } // get the gyroscope bias variance in rad/s
 	float getGyroBiasLimit() const { return _params.gyro_bias_lim; }
 
 	// accel bias
-	const Vector3f &getAccelBias() const { return _state.accel_bias; } // get the accelerometer bias in m/s**2
+	const Vector3f &getAccelBias() const { return _extended_kalman_filter.state().accel_bias; } // get the accelerometer bias in m/s**2
 	Vector3f getAccelBiasVariance() const { return getStateVariance<State::accel_bias>(); } // get the accelerometer bias variance in m/s**2
 	float getAccelBiasLimit() const { return _params.acc_bias_lim; }
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
-	const Vector3f &getMagEarthField() const { return _state.mag_I; }
+	const Vector3f &getMagEarthField() const { return _extended_kalman_filter.state().mag_I; }
 
-	const Vector3f &getMagBias() const { return _state.mag_B; }
+	const Vector3f &getMagBias() const { return _extended_kalman_filter.state().mag_B; }
 	Vector3f getMagBiasVariance() const
 	{
 		if (_control_status.flags.mag) {
@@ -507,7 +505,6 @@ public:
 
 	// rotate quaternion covariances into variances for an equivalent rotation vector
 	Vector3f calcRotVecVariances() const;
-	float getYawVar() const;
 
 	// set minimum continuous period without GPS fail required to mark a healthy GPS status
 	void set_min_required_gps_health_time(uint32_t time_us) { _min_gps_health_time_us = time_us; }
@@ -579,8 +576,6 @@ private:
 	// set the internal states and status to their default value
 	void reset();
 
-	bool initialiseTilt();
-
 	// check if the EKF is dead reckoning horizontal velocity using inertial data only
 	void updateDeadReckoningStatus();
 	void updateHorizontalDeadReckoningstatus();
@@ -608,8 +603,6 @@ private:
 	StateResetCounts _state_reset_count_prev{};
 
 	Vector3f _ang_rate_delayed_raw{};	///< uncorrected angular rate vector at fusion time horizon (rad/sec)
-
-	StateSample _state{};		///< state struct of the ekf running at the delayed time horizon
 
 	bool _filter_initialised{false};	///< true when the EKF sttes and covariances been initialised
 
@@ -801,9 +794,6 @@ private:
 	float _accel_magnitude_filt{0.0f};	///< acceleration magnitude after application of a decaying envelope filter (rad/sec)
 	float _ang_rate_magnitude_filt{0.0f};		///< angular rate magnitude after application of a decaying envelope filter (rad/sec)
 
-	Vector3f _prev_gyro_bias_var{};         ///< saved gyro XYZ bias variances
-	Vector3f _prev_accel_bias_var{};        ///< saved accel XYZ bias variances
-
 	// height sensor status
 	bool _gps_intermittent{true};           ///< true if data into the buffer is intermittent
 
@@ -814,21 +804,6 @@ private:
 
 	// initialise filter states of both the delayed ekf and the real time complementary filter
 	bool initialiseFilter(void);
-
-	// initialise ekf covariance matrix
-	void initialiseCovariance();
-
-	// predict ekf state
-	void predictState(const imuSample &imu_delayed);
-
-	// predict ekf covariance
-	void predictCovariance(const imuSample &imu_delayed);
-
-	template <const IdxDof &S>
-	void resetStateCovariance(const matrix::SquareMatrix<float, S.dof> &cov) {
-		P.uncorrelateCovarianceSetVariance<S.dof>(S.idx, 0.0f);
-		P.slice<S.dof, S.dof>(S.idx, S.idx) = cov;
-	}
 
 	// update quaternion states and covariances using an innovation, observation variance and Jacobian vector
 	bool fuseYaw(estimator_aid_source1d_s &aid_src_status);
@@ -1203,9 +1178,6 @@ private:
 #endif // CONFIG_EKF2_WIND
 
 	void resetGyroBiasZCov();
-
-	// uncorrelate quaternion states from other states
-	void uncorrelateQuatFromOtherStates();
 
 	bool isTimedOut(uint64_t last_sensor_timestamp, uint64_t timeout_period) const
 	{

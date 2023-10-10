@@ -135,10 +135,13 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H
 
 void Ekf::computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const
 {
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState &state_vector = _extended_kalman_filter.state_vector();
+
 	if (shouldUse321RotationSequence(_R_to_earth)) {
-		sym::ComputeYaw321InnovVarAndH(_state.vector(), P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
+		sym::ComputeYaw321InnovVarAndH(state_vector, P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
 
 	} else {
-		sym::ComputeYaw312InnovVarAndH(_state.vector(), P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
+		sym::ComputeYaw312InnovVarAndH(state_vector, P, variance, FLT_EPSILON, &innovation_variance, &H_YAW);
 	}
 }

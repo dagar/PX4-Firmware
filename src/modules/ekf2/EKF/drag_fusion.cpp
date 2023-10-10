@@ -79,12 +79,14 @@ void Ekf::fuseDrag(const dragSample &drag_sample)
 	}
 
 	// calculate relative wind velocity in earth frame and rotate into body frame
-	const Vector3f rel_wind_earth(_state.vel(0) - _state.wind_vel(0),
-				      _state.vel(1) - _state.wind_vel(1),
-				      _state.vel(2));
-	const Vector3f rel_wind_body = _state.quat_nominal.rotateVectorInverse(rel_wind_earth);
+	const Vector3f rel_wind_earth(_extended_kalman_filter.state().vel(0) - _extended_kalman_filter.state().wind_vel(0),
+				      _extended_kalman_filter.state().vel(1) - _extended_kalman_filter.state().wind_vel(1),
+				      _extended_kalman_filter.state().vel(2));
+	const Vector3f rel_wind_body = _extended_kalman_filter.state().quat_nominal.rotateVectorInverse(rel_wind_earth);
 	const float rel_wind_speed = rel_wind_body.norm();
-	const VectorState state_vector_prev = _state.vector();
+
+	const SquareMatrixState &P = _extended_kalman_filter.covariances();
+	const VectorState state_vector_prev = _extended_kalman_filter.state_vector();
 
 	Vector2f bcoef_inv{0.f, 0.f};
 
@@ -114,7 +116,7 @@ void Ekf::fuseDrag(const dragSample &drag_sample)
 	// perform sequential fusion of XY specific forces
 	for (uint8_t axis_index = 0; axis_index < 2; axis_index++) {
 		// measured drag acceleration corrected for sensor bias
-		const float mea_acc = drag_sample.accelXY(axis_index) - _state.accel_bias(axis_index);
+		const float mea_acc = drag_sample.accelXY(axis_index) - _extended_kalman_filter.state().accel_bias(axis_index);
 
 		// Drag is modelled as an arbitrary combination of bluff body drag that proportional to
 		// equivalent airspeed squared, and rotor momentum drag that is proportional to true airspeed

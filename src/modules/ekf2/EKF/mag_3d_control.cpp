@@ -165,7 +165,7 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 			if (!_control_status.flags.yaw_align
 			    || wmm_updated
 			    || !_mag_decl_cov_reset
-			    || !_state.mag_I.longerThan(0.f)
+			    || !_extended_kalman_filter.state().mag_I.longerThan(0.f)
 			    || (getStateVariance<State::mag_I>().min() < sq(0.0001f))
 			    || (getStateVariance<State::mag_B>().min() < sq(0.0001f))
 			   ) {

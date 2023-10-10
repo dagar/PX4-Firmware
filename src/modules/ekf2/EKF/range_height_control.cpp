@@ -64,13 +64,13 @@ void Ekf::controlRangeHeightFusion()
 
 			if (_control_status.flags.in_air) {
 				const bool horizontal_motion = _control_status.flags.fixed_wing
-								|| (sq(_state.vel(0)) + sq(_state.vel(1)) > fmaxf(P.trace<2>(State::vel.idx), 0.1f));
+								|| (sq(_extended_kalman_filter.state().vel(0)) + sq(_extended_kalman_filter.state().vel(1)) > fmaxf(P.trace<2>(State::vel.idx), 0.1f));
 
 				const float dist_dependant_var = sq(_params.range_noise_scaler * _range_sensor.getDistBottom());
 				const float var = sq(_params.range_noise) + dist_dependant_var;
 
 				_rng_consistency_check.setGate(_params.range_kin_consistency_gate);
-				_rng_consistency_check.update(_range_sensor.getDistBottom(), math::max(var, 0.001f), _state.vel(2), P(State::vel.idx + 2, State::vel.idx + 2), horizontal_motion, _time_delayed_us);
+				_rng_consistency_check.update(_range_sensor.getDistBottom(), math::max(var, 0.001f), _extended_kalman_filter.state().vel(2), P(State::vel.idx + 2, State::vel.idx + 2), horizontal_motion, _time_delayed_us);
 			}
 
 		} else {
@@ -117,7 +117,7 @@ void Ekf::controlRangeHeightFusion()
 		if (measurement_valid && _range_sensor.isDataHealthy()) {
 			bias_est.setMaxStateNoise(sqrtf(measurement_var));
 			bias_est.setProcessNoiseSpectralDensity(_params.rng_hgt_bias_nsd);
-			bias_est.fuseBias(measurement - (-_state.pos(2)), measurement_var + P(State::pos.idx + 2, State::pos.idx + 2));
+			bias_est.fuseBias(measurement - (-_extended_kalman_filter.state().pos(2)), measurement_var + P(State::pos.idx + 2, State::pos.idx + 2));
 		}
 
 		// determine if we should use height aiding
@@ -143,7 +143,7 @@ void Ekf::controlRangeHeightFusion()
 
 					_information_events.flags.reset_hgt_to_rng = true;
 					resetVerticalPositionTo(-(measurement - bias_est.getBias()));
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_extended_kalman_filter.state().pos(2) + measurement);
 
 					// reset vertical velocity
 					resetVerticalVelocityToZero();
@@ -169,7 +169,7 @@ void Ekf::controlRangeHeightFusion()
 					// Range finder is used while hovering to stabilize the height estimate. Don't reset but use it as height reference.
 					ECL_INFO("starting conditional %s height fusion", HGT_SRC_NAME);
 					_height_sensor_ref = HeightSensor::RANGE;
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_extended_kalman_filter.state().pos(2) + measurement);
 
 				} else if ((_params.height_sensor_ref == HeightSensor::RANGE) && (_params.rng_ctrl != RngCtrl::CONDITIONAL)) {
 					// Range finder is the primary height source, the ground is now the datum used
@@ -183,7 +183,7 @@ void Ekf::controlRangeHeightFusion()
 
 				} else {
 					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
-					bias_est.setBias(_state.pos(2) + measurement);
+					bias_est.setBias(_extended_kalman_filter.state().pos(2) + measurement);
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;
@@ -224,14 +224,14 @@ bool Ekf::isConditionalRangeAidSuitable()
 			is_hagl_stable = (hagl_test_ratio < 0.01f);
 		}
 
-		const float range_hagl = _terrain_vpos - _state.pos(2);
+		const float range_hagl = _terrain_vpos - _extended_kalman_filter.state().pos(2);
 
 		const bool is_in_range = (range_hagl < range_hagl_max);
 
 		bool is_below_max_speed = true;
 
 		if (isHorizontalAidingActive()) {
-			is_below_max_speed = !_state.vel.xy().longerThan(max_vel_xy);
+			is_below_max_speed = !_extended_kalman_filter.state().vel.xy().longerThan(max_vel_xy);
 		}
 
 		return is_in_range && is_hagl_stable && is_below_max_speed;

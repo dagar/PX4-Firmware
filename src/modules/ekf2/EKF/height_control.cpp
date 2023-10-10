@@ -123,7 +123,7 @@ void Ekf::checkVerticalAccelerationBias(const imuSample &imu_delayed)
 	// Run additional checks to see if the delta velocity bias has hit limits in a direction that is clearly wrong
 	// calculate accel bias term aligned with the gravity vector
 	const float dVel_bias_lim = 0.9f * _params.acc_bias_lim * _dt_ekf_avg;
-	const Vector3f delta_vel_bias = _state.accel_bias * _dt_ekf_avg;
+	const Vector3f delta_vel_bias = _extended_kalman_filter.state().accel_bias * _dt_ekf_avg;
 	const float down_dvel_bias = delta_vel_bias.dot(Vector3f(_R_to_earth.row(2)));
 
 	// check that the vertical component of accel bias is consistent with both the vertical position and velocity innovation

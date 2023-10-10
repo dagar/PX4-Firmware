@@ -69,7 +69,7 @@ void Ekf::controlExternalVisionFusion()
 		}
 
 		// record corresponding yaw state for future EV delta heading innovation (logging only)
-		_ev_yaw_pred_prev = getEulerYaw(_state.quat_nominal);
+		_ev_yaw_pred_prev = getEulerYaw(_extended_kalman_filter.state().quat_nominal);
 
 	} else if ((_control_status.flags.ev_pos || _control_status.flags.ev_vel || _control_status.flags.ev_yaw
 		    || _control_status.flags.ev_hgt)
@@ -90,7 +90,7 @@ void Ekf::controlExternalVisionFusion()
 
 void Ekf::updateEvAttitudeErrorFilter(extVisionSample &ev_sample, bool ev_reset)
 {
-	const Quatf q_error((_state.quat_nominal * ev_sample.quat.inversed()).normalized());
+	const Quatf q_error((_extended_kalman_filter.state().quat_nominal * ev_sample.quat.inversed()).normalized());
 
 	if (!q_error.isAllFinite()) {
 		return;

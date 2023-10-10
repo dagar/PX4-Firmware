@@ -50,7 +50,7 @@ void Ekf::controlZeroVelocityUpdate()
 
 		if (continuing_conditions_passing) {
 			Vector3f vel_obs{0, 0, 0};
-			Vector3f innovation = _state.vel - vel_obs;
+			Vector3f innovation = _extended_kalman_filter.state().vel - vel_obs;
 
 			// Set a low variance initially for faster leveling and higher
 			// later to let the states follow the measurements

@@ -52,7 +52,7 @@ void Ekf::controlZeroInnovationHeadingUpdate()
 		const float obs_var = _control_status.flags.tilt_align ? 0.25f : 0.001f;
 
 		estimator_aid_source1d_s aid_src_status{};
-		aid_src_status.observation = getEulerYaw(_state.quat_nominal);
+		aid_src_status.observation = getEulerYaw(_extended_kalman_filter.state().quat_nominal);
 		aid_src_status.observation_variance = obs_var;
 		aid_src_status.innovation = 0.f;
 
