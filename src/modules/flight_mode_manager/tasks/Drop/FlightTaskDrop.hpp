@@ -130,6 +130,7 @@ private:
 					(ParamFloat<px4::params::MPC_DROP_LAUN_T>) _param_mpc_drop_laun_t,
 					(ParamFloat<px4::params::MPC_DROP_VZ_THR>) _param_mpc_drop_vz_thr,
 					(ParamFloat<px4::params::MPC_DROP_AZ_THR>) _param_mpc_drop_az_thr,
+					(ParamFloat<px4::params::MPC_DROP_AZ_MAX>) _param_mpc_drop_az_max,
 					(ParamFloat<px4::params::MPC_DROP_HOLD_T>) _param_mpc_drop_hold_t,
 
 					(ParamFloat<px4::params::MPC_XY_CRUISE>) _param_mpc_xy_cruise,

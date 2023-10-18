@@ -82,3 +82,15 @@ PARAM_DEFINE_FLOAT(MPC_DROP_AZ_THR, 9.5f);
  * @group Multicopter Position Control
  */
 PARAM_DEFINE_FLOAT(MPC_DROP_HOLD_T, 3.f);
+
+/**
+ * Drop vertical acceleration limit
+ *
+ * @unit m/s^2
+ * @min 1
+ * @max 60
+ * @decimal 1
+ * @increment 0.1
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_DROP_AZ_MAX, 10.f);

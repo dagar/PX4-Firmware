@@ -162,6 +162,28 @@ bool FlightTaskDrop::update()
 
 	const DropState state_prev = _state;
 
+	// update params of the position smoothing
+	_position_smoothing.setMaxAllowedHorizontalError(_param_mpc_xy_err_max.get());
+	_position_smoothing.setVerticalAcceptanceRadius(_param_nav_mc_alt_rad.get());
+	_position_smoothing.setCruiseSpeed(_param_mpc_xy_cruise.get());
+	_position_smoothing.setHorizontalTrajectoryGain(_param_mpc_xy_traj_p.get());
+	_position_smoothing.setTargetAcceptanceRadius(2.f);
+
+	// Update the constraints of the trajectories
+	_position_smoothing.setMaxAccelerationXY(_param_mpc_acc_hor.get()); // TODO : Should be computed using heading
+	_position_smoothing.setMaxVelocityXY(_param_mpc_xy_vel_max.get());
+	float max_jerk = _param_mpc_jerk_auto.get();
+	_position_smoothing.setMaxJerk({max_jerk, max_jerk, max_jerk}); // TODO : Should be computed using heading
+
+	if (_velocity_setpoint(2) < 0.f) { // up
+		_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_up.get());
+		_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_up_max.get());
+
+	} else { // down
+		_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_down_max.get());
+		_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
+	}
+
 	switch (_state) {
 	case DropState::UNKNOWN: {
 			//PX4_WARN("Drop: uninitialized");
@@ -361,7 +383,7 @@ bool FlightTaskDrop::update()
 
 					_position_setpoint.setNaN();
 					_velocity_setpoint.setNaN();
-					_velocity_setpoint(2) = 0.f;
+					_velocity_setpoint(2) = _velocity(2);
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
@@ -390,11 +412,17 @@ bool FlightTaskDrop::update()
 					_position_setpoint.setNaN();
 					_velocity_setpoint.setNaN();
 
-					_velocity_setpoint(2) = 0.f;
+					_velocity_setpoint(2) = _velocity(2);
 
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
+
+				const float dt = _deltatime;
+				const float dv_max = math::constrain(_param_mpc_drop_az_max.get() * dt, 0.001f, 10.f);
+
+				// move vz setpoint to 0, but no faster than MPC_DROP_AZ_MAX
+				_velocity_setpoint(2) = math::constrain(0.f, _velocity_setpoint(2) - dv_max, _velocity_setpoint(2) + dv_max);
 
 				// wait for full
 				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 1.f) && (fabsf(acceleration(2)) < 1.f)) {
@@ -449,7 +477,7 @@ bool FlightTaskDrop::update()
 					_state = DropState::HORIZONTAL_VELOCITY_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
-					_velocity_setpoint.zero();
+					_velocity_setpoint = _velocity;
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
@@ -475,13 +503,22 @@ bool FlightTaskDrop::update()
 					_constraints.want_takeoff = true;
 
 					// position still not active
-					//_position_setpoint.setNaN();
+					_position_setpoint.setNaN();
 
 					// otherwise all zero
-					_velocity_setpoint.zero();
+					_velocity_setpoint = _velocity;
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
+
+
+				const float dt = _deltatime;
+				const float dv_max = math::constrain(_param_mpc_acc_hor.get() * dt, 0.001f, 10.f);
+
+				// move vz setpoint to 0, but no faster than MPC_DROP_AZ_MAX
+				_velocity_setpoint(0) = math::constrain(0.f, _velocity_setpoint(0) - dv_max, _velocity_setpoint(0) + dv_max);
+				_velocity_setpoint(1) = math::constrain(0.f, _velocity_setpoint(1) - dv_max, _velocity_setpoint(1) + dv_max);
+				_velocity_setpoint(2) = math::constrain(0.f, _velocity_setpoint(2) - dv_max, _velocity_setpoint(2) + dv_max);
 
 				if (position_valid && !failsafe_flags.local_position_invalid && (_velocity.length() < 5.f)) {
 					_state = DropState::POSITION_CONTROL_ENABLED;
@@ -508,14 +545,41 @@ bool FlightTaskDrop::update()
 					_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
 					_constraints.want_takeoff = true;
 
-					// latch position setpoint
-					_position_setpoint = _position;
+					_offboard_pos_sp_last = _position;
 
-					// otherwise all zero
-					_velocity_setpoint.zero();
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
+					_position_smoothing.reset(Vector3f{}, _velocity, _position);
 				}
+
+				// When initializing with large velocity, allow 1g of
+				// acceleration in 1s on all axes for fast braking
+				_position_smoothing.setMaxAcceleration({9.81f, 9.81f, 9.81f});
+				_position_smoothing.setMaxJerk({9.81f, 9.81f, 9.81f});
+
+				// If the current velocity is beyond the usual constraints, tell
+				// the controller to exceptionally increase its saturations to avoid
+				// cutting out the feedforward
+				_constraints.speed_down = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_down);
+				_constraints.speed_up = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_up);
+				_constraints.want_takeoff = true;
+
+				bool force_zero_velocity_setpoint = false; // TODO
+
+				PositionSmoothing::PositionSmoothingSetpoints smoothed_setpoints{};
+
+				_position_smoothing.generateSetpoints(
+					_position,
+					_offboard_pos_sp_last,
+					{},
+					_deltatime,
+					force_zero_velocity_setpoint,
+					smoothed_setpoints
+				);
+				_offboard_time_stamp_last = _time_stamp_current;
+
+				_jerk_setpoint = smoothed_setpoints.jerk;
+				_acceleration_setpoint = smoothed_setpoints.acceleration;
+				_velocity_setpoint = smoothed_setpoints.velocity;
+				_position_setpoint = smoothed_setpoints.position;
 
 				const hrt_abstime hold_timeout_us = math::constrain(_param_mpc_drop_hold_t.get(), 0.f, 3600.f) * 1e6f;
 
@@ -553,29 +617,6 @@ bool FlightTaskDrop::update()
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 
-
-					// update params of the position smoothing
-					_position_smoothing.setMaxAllowedHorizontalError(_param_mpc_xy_err_max.get());
-					_position_smoothing.setVerticalAcceptanceRadius(_param_nav_mc_alt_rad.get());
-					_position_smoothing.setCruiseSpeed(_param_mpc_xy_cruise.get());
-					_position_smoothing.setHorizontalTrajectoryGain(_param_mpc_xy_traj_p.get());
-					_position_smoothing.setTargetAcceptanceRadius(2.f); // TODO:
-
-					// Update the constraints of the trajectories
-					_position_smoothing.setMaxAccelerationXY(_param_mpc_acc_hor.get()); // TODO : Should be computed using heading
-					_position_smoothing.setMaxVelocityXY(_param_mpc_xy_vel_max.get());
-					float max_jerk = _param_mpc_jerk_auto.get();
-					_position_smoothing.setMaxJerk({max_jerk, max_jerk, max_jerk}); // TODO : Should be computed using heading
-
-					if (_velocity_setpoint(2) < 0.f) { // up
-						_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_up.get());
-						_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_up_max.get());
-
-					} else { // down
-						_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_down_max.get());
-						_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
-					}
-
 					_position_smoothing.reset(Vector3f{}, _velocity, _position);
 				}
 
@@ -584,19 +625,6 @@ bool FlightTaskDrop::update()
 					const trajectory_setpoint_s &trajectory_setpoint = _offboard_trajectory_setpoint_sub.get();
 
 					if (hrt_elapsed_time(&trajectory_setpoint.timestamp) < 1_s) {
-
-						// update params of the position smoothing
-						_position_smoothing.setMaxAllowedHorizontalError(_param_mpc_xy_err_max.get());
-						_position_smoothing.setVerticalAcceptanceRadius(_param_nav_mc_alt_rad.get());
-						_position_smoothing.setCruiseSpeed(_param_mpc_xy_cruise.get());
-						_position_smoothing.setHorizontalTrajectoryGain(_param_mpc_xy_traj_p.get());
-						_position_smoothing.setTargetAcceptanceRadius(2.f);
-
-						// Update the constraints of the trajectories
-						_position_smoothing.setMaxAccelerationXY(_param_mpc_acc_hor.get()); // TODO : Should be computed using heading
-						_position_smoothing.setMaxVelocityXY(_param_mpc_xy_vel_max.get());
-						float max_jerk = _param_mpc_jerk_auto.get();
-						_position_smoothing.setMaxJerk({max_jerk, max_jerk, max_jerk}); // TODO : Should be computed using heading
 
 						bool is_emergency_braking_active = false; // TODO
 
@@ -643,7 +671,7 @@ bool FlightTaskDrop::update()
 					bool force_zero_velocity_setpoint = false; // TODO
 
 					PositionSmoothing::PositionSmoothingSetpoints smoothed_setpoints{};
-					//float dt = math::constrain((_time_stamp_current - _time_stamp_last) * 1e-6f, 0.001f, 1.f);
+
 					_position_smoothing.generateSetpoints(
 						_position,
 						_offboard_pos_sp_last,
