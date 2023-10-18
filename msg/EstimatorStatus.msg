@@ -91,20 +91,6 @@ float32 tas_test_ratio # ratio of the true airspeed innovation to the innovation
 float32 hagl_test_ratio # ratio of the height above ground innovation to the innovation test limit
 float32 beta_test_ratio # ratio of the synthetic sideslip innovation to the innovation test limit
 
-uint16 solution_status_flags # Bitmask indicating which filter kinematic state outputs are valid for flight control use.
-# 0 - True if the attitude estimate is good
-# 1 - True if the horizontal velocity estimate is good
-# 2 - True if the vertical velocity estimate is good
-# 3 - True if the horizontal position (relative) estimate is good
-# 4 - True if the horizontal position (absolute) estimate is good
-# 5 - True if the vertical position (absolute) estimate is good
-# 6 - True if the vertical position (above ground) estimate is good
-# 7 - True if the EKF is in a constant position mode and is not using external measurements (eg GPS or optical flow)
-# 8 - True if the EKF has sufficient data to enter a mode that will provide a (relative) position estimate
-# 9 - True if the EKF has sufficient data to enter a mode that will provide a (absolute) position estimate
-# 10 - True if the EKF has detected a GPS glitch
-# 11 - True if the EKF has detected bad accelerometer data
-
 uint8 reset_count_vel_ne # number of horizontal position reset events (allow to wrap if count exceeds 255)
 uint8 reset_count_vel_d  # number of vertical velocity reset events (allow to wrap if count exceeds 255)
 uint8 reset_count_pos_ne # number of horizontal position reset events (allow to wrap if count exceeds 255)

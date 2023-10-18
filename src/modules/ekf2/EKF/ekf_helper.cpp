@@ -710,52 +710,6 @@ void Ekf::get_innovation_test_status(uint16_t &status, float &mag, float &vel, f
 #endif // CONFIG_EKF2_SIDESLIP
 }
 
-// return a bitmask integer that describes which state estimates are valid
-void Ekf::get_ekf_soln_status(uint16_t *status) const
-{
-	ekf_solution_status_u soln_status{};
-	// TODO: Is this accurate enough?
-	soln_status.flags.attitude = _control_status.flags.tilt_align && _control_status.flags.yaw_align && (_fault_status.value == 0);
-	soln_status.flags.velocity_horiz = (isHorizontalAidingActive() || (_control_status.flags.fuse_beta && _control_status.flags.fuse_aspd)) && (_fault_status.value == 0);
-	soln_status.flags.velocity_vert = (_control_status.flags.baro_hgt || _control_status.flags.ev_hgt || _control_status.flags.gps_hgt || _control_status.flags.rng_hgt) && (_fault_status.value == 0);
-	soln_status.flags.pos_horiz_rel = (_control_status.flags.gps || _control_status.flags.ev_pos || _control_status.flags.opt_flow) && (_fault_status.value == 0);
-	soln_status.flags.pos_horiz_abs = (_control_status.flags.gps || _control_status.flags.ev_pos) && (_fault_status.value == 0);
-	soln_status.flags.pos_vert_abs = soln_status.flags.velocity_vert;
-#if defined(CONFIG_EKF2_TERRAIN)
-	soln_status.flags.pos_vert_agl = isTerrainEstimateValid();
-#endif // CONFIG_EKF2_TERRAIN
-	soln_status.flags.const_pos_mode = !soln_status.flags.velocity_horiz;
-	soln_status.flags.pred_pos_horiz_rel = soln_status.flags.pos_horiz_rel;
-	soln_status.flags.pred_pos_horiz_abs = soln_status.flags.pos_horiz_abs;
-
-	bool mag_innov_good = true;
-
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	if (_control_status.flags.mag_hdg) {
-		if (_aid_src_mag_heading.test_ratio < 1.f) {
-			mag_innov_good = false;
-		}
-
-	} else if (_control_status.flags.mag_3D) {
-		if (Vector3f(_aid_src_mag.test_ratio).max() < 1.f) {
-			mag_innov_good = false;
-		}
-	}
-#endif // CONFIG_EKF2_MAGNETOMETER
-
-#if defined(CONFIG_EKF2_GNSS)
-	const bool gps_vel_innov_bad = Vector3f(_aid_src_gnss_vel.test_ratio).max() > 1.f;
-	const bool gps_pos_innov_bad = Vector2f(_aid_src_gnss_pos.test_ratio).max() > 1.f;
-
-	soln_status.flags.gps_glitch = (gps_vel_innov_bad || gps_pos_innov_bad) && mag_innov_good;
-#else
-	(void)mag_innov_good;
-#endif // CONFIG_EKF2_GNSS
-
-	soln_status.flags.accel_error = _fault_status.flags.bad_acc_vertical;
-	*status = soln_status.value;
-}
-
 void Ekf::fuse(const VectorState &K, float innovation)
 {
 	_state.quat_nominal -= K.slice<State::quat_nominal.dof, 1>(State::quat_nominal.idx, 0) * innovation;

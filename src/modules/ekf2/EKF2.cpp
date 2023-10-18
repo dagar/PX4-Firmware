@@ -1983,7 +1983,6 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 	status.innovation_check_flags = (innov_check_flags_temp >> 1) | (innov_check_flags_temp & 0x1);
 
 	_ekf.get_ekf_lpos_accuracy(&status.pos_horiz_accuracy, &status.pos_vert_accuracy);
-	_ekf.get_ekf_soln_status(&status.solution_status_flags);
 
 	// reset counters
 	status.reset_count_vel_ne = _ekf.state_reset_status().reset_count.velNE;
