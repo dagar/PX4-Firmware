@@ -16,105 +16,119 @@ namespace sym {
  * Symbolic function: compute_flow_xy_innov_var_and_hx
  *
  * Args:
- *     state: Matrix24_1
- *     P: Matrix23_23
+ *     state: Matrix25_1
+ *     P: Matrix24_24
  *     distance: Scalar
  *     R: Scalar
  *     epsilon: Scalar
  *
  * Outputs:
  *     innov_var: Matrix21
- *     H: Matrix23_1
+ *     H: Matrix24_1
  */
 template <typename Scalar>
-void ComputeFlowXyInnovVarAndHx(const matrix::Matrix<Scalar, 24, 1>& state,
-                                const matrix::Matrix<Scalar, 23, 23>& P, const Scalar distance,
+void ComputeFlowXyInnovVarAndHx(const matrix::Matrix<Scalar, 25, 1>& state,
+                                const matrix::Matrix<Scalar, 24, 24>& P, const Scalar distance,
                                 const Scalar R, const Scalar epsilon,
                                 matrix::Matrix<Scalar, 2, 1>* const innov_var = nullptr,
-                                matrix::Matrix<Scalar, 23, 1>* const H = nullptr) {
-  // Total ops: 196
+                                matrix::Matrix<Scalar, 24, 1>* const H = nullptr) {
+  // Total ops: 253
 
   // Input arrays
 
-  // Intermediate terms (33)
-  const Scalar _tmp0 = std::pow(state(1, 0), Scalar(2));
-  const Scalar _tmp1 = std::pow(state(3, 0), Scalar(2));
-  const Scalar _tmp2 = 1 - 2 * _tmp1;
-  const Scalar _tmp3 =
+  // Intermediate terms (41)
+  const Scalar _tmp0 = 2 * state(2, 0);
+  const Scalar _tmp1 = _tmp0 * state(0, 0);
+  const Scalar _tmp2 = 2 * state(1, 0) * state(3, 0);
+  const Scalar _tmp3 = -_tmp2;
+  const Scalar _tmp4 = 2 * state(0, 0);
+  const Scalar _tmp5 = _tmp4 * state(3, 0);
+  const Scalar _tmp6 = -_tmp5;
+  const Scalar _tmp7 = _tmp0 * state(1, 0);
+  const Scalar _tmp8 = std::pow(state(3, 0), Scalar(2));
+  const Scalar _tmp9 = std::pow(state(1, 0), Scalar(2));
+  const Scalar _tmp10 = -_tmp9;
+  const Scalar _tmp11 = _tmp10 + _tmp8;
+  const Scalar _tmp12 = std::pow(state(0, 0), Scalar(2));
+  const Scalar _tmp13 = std::pow(state(2, 0), Scalar(2));
+  const Scalar _tmp14 = -_tmp12 + _tmp13;
+  const Scalar _tmp15 =
       Scalar(1.0) /
       (distance + epsilon * (2 * math::min<Scalar>(0, (((distance) > 0) - ((distance) < 0))) + 1));
-  const Scalar _tmp4 = _tmp3 * (-2 * _tmp0 + _tmp2);
-  const Scalar _tmp5 = 2 * state(2, 0);
-  const Scalar _tmp6 = _tmp5 * state(0, 0);
-  const Scalar _tmp7 = 2 * state(1, 0) * state(3, 0);
-  const Scalar _tmp8 = _tmp5 * state(3, 0);
-  const Scalar _tmp9 = 2 * state(0, 0);
-  const Scalar _tmp10 = _tmp9 * state(1, 0);
-  const Scalar _tmp11 = std::pow(state(2, 0), Scalar(2));
-  const Scalar _tmp12 = std::pow(state(0, 0), Scalar(2));
-  const Scalar _tmp13 = -_tmp0;
-  const Scalar _tmp14 = _tmp12 + _tmp13;
-  const Scalar _tmp15 = _tmp3 * (state(4, 0) * (_tmp6 + _tmp7) + state(5, 0) * (-_tmp10 + _tmp8) +
-                                 state(6, 0) * (_tmp1 - _tmp11 + _tmp14));
-  const Scalar _tmp16 = _tmp9 * state(3, 0);
-  const Scalar _tmp17 = -_tmp16;
-  const Scalar _tmp18 = _tmp5 * state(1, 0);
-  const Scalar _tmp19 = _tmp17 + _tmp18;
-  const Scalar _tmp20 = _tmp19 * _tmp3;
-  const Scalar _tmp21 = _tmp10 + _tmp8;
-  const Scalar _tmp22 = _tmp21 * _tmp3;
-  const Scalar _tmp23 = -_tmp7;
-  const Scalar _tmp24 = -_tmp12;
-  const Scalar _tmp25 = _tmp3 * (state(4, 0) * (_tmp1 + _tmp11 + _tmp13 + _tmp24) +
-                                 state(5, 0) * (_tmp17 - _tmp18) + state(6, 0) * (_tmp23 + _tmp6));
-  const Scalar _tmp26 = _tmp3 * (-2 * _tmp11 + _tmp2);
-  const Scalar _tmp27 = -_tmp6;
-  const Scalar _tmp28 = -_tmp1 + _tmp11;
-  const Scalar _tmp29 = _tmp3 * (state(4, 0) * (_tmp23 + _tmp27) + state(5, 0) * (_tmp10 - _tmp8) +
-                                 state(6, 0) * (_tmp0 + _tmp24 + _tmp28));
-  const Scalar _tmp30 =
-      _tmp3 * (_tmp19 * state(4, 0) + _tmp21 * state(6, 0) + state(5, 0) * (_tmp14 + _tmp28));
-  const Scalar _tmp31 = _tmp3 * (_tmp16 + _tmp18);
-  const Scalar _tmp32 = _tmp3 * (_tmp27 + _tmp7);
+  const Scalar _tmp16 = _tmp15 * state(24, 0);
+  const Scalar _tmp17 = _tmp16 * (state(4, 0) * (_tmp11 + _tmp14) + state(5, 0) * (_tmp6 - _tmp7) +
+                                  state(6, 0) * (_tmp1 + _tmp3));
+  const Scalar _tmp18 = 1 - 2 * _tmp8;
+  const Scalar _tmp19 = _tmp18 - 2 * _tmp9;
+  const Scalar _tmp20 = _tmp6 + _tmp7;
+  const Scalar _tmp21 = _tmp0 * state(3, 0);
+  const Scalar _tmp22 = _tmp4 * state(1, 0);
+  const Scalar _tmp23 = _tmp21 + _tmp22;
+  const Scalar _tmp24 = _tmp20 * state(4, 0) + _tmp23 * state(6, 0);
+  const Scalar _tmp25 = _tmp15 * (_tmp19 * state(5, 0) + _tmp24);
+  const Scalar _tmp26 = _tmp16 * _tmp19;
+  const Scalar _tmp27 = _tmp16 * (state(4, 0) * (_tmp1 + _tmp2) + state(5, 0) * (_tmp21 - _tmp22) +
+                                  state(6, 0) * (_tmp11 + _tmp12 - _tmp13));
+  const Scalar _tmp28 = _tmp16 * _tmp20;
+  const Scalar _tmp29 = _tmp16 * _tmp23;
+  const Scalar _tmp30 = -2 * _tmp13 + _tmp18;
+  const Scalar _tmp31 = _tmp16 * _tmp30;
+  const Scalar _tmp32 = -_tmp1;
+  const Scalar _tmp33 = -_tmp8;
+  const Scalar _tmp34 =
+      _tmp16 * (state(4, 0) * (_tmp3 + _tmp32) + state(5, 0) * (-_tmp21 + _tmp22) +
+                state(6, 0) * (_tmp14 + _tmp33 + _tmp9));
+  const Scalar _tmp35 = _tmp2 + _tmp32;
+  const Scalar _tmp36 = _tmp16 * _tmp35;
+  const Scalar _tmp37 = _tmp5 + _tmp7;
+  const Scalar _tmp38 = _tmp16 * _tmp37;
+  const Scalar _tmp39 = _tmp16 * (_tmp24 + state(5, 0) * (_tmp10 + _tmp12 + _tmp13 + _tmp33));
+  const Scalar _tmp40 =
+      _tmp15 * (_tmp30 * state(4, 0) + _tmp35 * state(6, 0) + _tmp37 * state(5, 0));
 
   // Output terms (2)
   if (innov_var != nullptr) {
     matrix::Matrix<Scalar, 2, 1>& _innov_var = (*innov_var);
 
     _innov_var(0, 0) = R +
-                       _tmp15 * (P(0, 0) * _tmp15 + P(2, 0) * _tmp25 + P(3, 0) * _tmp20 +
-                                 P(4, 0) * _tmp4 + P(5, 0) * _tmp22) +
-                       _tmp20 * (P(0, 3) * _tmp15 + P(2, 3) * _tmp25 + P(3, 3) * _tmp20 +
-                                 P(4, 3) * _tmp4 + P(5, 3) * _tmp22) +
-                       _tmp22 * (P(0, 5) * _tmp15 + P(2, 5) * _tmp25 + P(3, 5) * _tmp20 +
-                                 P(4, 5) * _tmp4 + P(5, 5) * _tmp22) +
-                       _tmp25 * (P(0, 2) * _tmp15 + P(2, 2) * _tmp25 + P(3, 2) * _tmp20 +
-                                 P(4, 2) * _tmp4 + P(5, 2) * _tmp22) +
-                       _tmp4 * (P(0, 4) * _tmp15 + P(2, 4) * _tmp25 + P(3, 4) * _tmp20 +
-                                P(4, 4) * _tmp4 + P(5, 4) * _tmp22);
+                       _tmp17 * (P(0, 2) * _tmp27 + P(2, 2) * _tmp17 + P(23, 2) * _tmp25 +
+                                 P(3, 2) * _tmp28 + P(4, 2) * _tmp26 + P(5, 2) * _tmp29) +
+                       _tmp25 * (P(0, 23) * _tmp27 + P(2, 23) * _tmp17 + P(23, 23) * _tmp25 +
+                                 P(3, 23) * _tmp28 + P(4, 23) * _tmp26 + P(5, 23) * _tmp29) +
+                       _tmp26 * (P(0, 4) * _tmp27 + P(2, 4) * _tmp17 + P(23, 4) * _tmp25 +
+                                 P(3, 4) * _tmp28 + P(4, 4) * _tmp26 + P(5, 4) * _tmp29) +
+                       _tmp27 * (P(0, 0) * _tmp27 + P(2, 0) * _tmp17 + P(23, 0) * _tmp25 +
+                                 P(3, 0) * _tmp28 + P(4, 0) * _tmp26 + P(5, 0) * _tmp29) +
+                       _tmp28 * (P(0, 3) * _tmp27 + P(2, 3) * _tmp17 + P(23, 3) * _tmp25 +
+                                 P(3, 3) * _tmp28 + P(4, 3) * _tmp26 + P(5, 3) * _tmp29) +
+                       _tmp29 * (P(0, 5) * _tmp27 + P(2, 5) * _tmp17 + P(23, 5) * _tmp25 +
+                                 P(3, 5) * _tmp28 + P(4, 5) * _tmp26 + P(5, 5) * _tmp29);
     _innov_var(1, 0) = R -
-                       _tmp26 * (-P(1, 3) * _tmp29 - P(2, 3) * _tmp30 - P(3, 3) * _tmp26 -
-                                 P(4, 3) * _tmp31 - P(5, 3) * _tmp32) -
-                       _tmp29 * (-P(1, 1) * _tmp29 - P(2, 1) * _tmp30 - P(3, 1) * _tmp26 -
-                                 P(4, 1) * _tmp31 - P(5, 1) * _tmp32) -
-                       _tmp30 * (-P(1, 2) * _tmp29 - P(2, 2) * _tmp30 - P(3, 2) * _tmp26 -
-                                 P(4, 2) * _tmp31 - P(5, 2) * _tmp32) -
-                       _tmp31 * (-P(1, 4) * _tmp29 - P(2, 4) * _tmp30 - P(3, 4) * _tmp26 -
-                                 P(4, 4) * _tmp31 - P(5, 4) * _tmp32) -
-                       _tmp32 * (-P(1, 5) * _tmp29 - P(2, 5) * _tmp30 - P(3, 5) * _tmp26 -
-                                 P(4, 5) * _tmp31 - P(5, 5) * _tmp32);
+                       _tmp31 * (-P(1, 3) * _tmp34 - P(2, 3) * _tmp39 - P(23, 3) * _tmp40 -
+                                 P(3, 3) * _tmp31 - P(4, 3) * _tmp38 - P(5, 3) * _tmp36) -
+                       _tmp34 * (-P(1, 1) * _tmp34 - P(2, 1) * _tmp39 - P(23, 1) * _tmp40 -
+                                 P(3, 1) * _tmp31 - P(4, 1) * _tmp38 - P(5, 1) * _tmp36) -
+                       _tmp36 * (-P(1, 5) * _tmp34 - P(2, 5) * _tmp39 - P(23, 5) * _tmp40 -
+                                 P(3, 5) * _tmp31 - P(4, 5) * _tmp38 - P(5, 5) * _tmp36) -
+                       _tmp38 * (-P(1, 4) * _tmp34 - P(2, 4) * _tmp39 - P(23, 4) * _tmp40 -
+                                 P(3, 4) * _tmp31 - P(4, 4) * _tmp38 - P(5, 4) * _tmp36) -
+                       _tmp39 * (-P(1, 2) * _tmp34 - P(2, 2) * _tmp39 - P(23, 2) * _tmp40 -
+                                 P(3, 2) * _tmp31 - P(4, 2) * _tmp38 - P(5, 2) * _tmp36) -
+                       _tmp40 * (-P(1, 23) * _tmp34 - P(2, 23) * _tmp39 - P(23, 23) * _tmp40 -
+                                 P(3, 23) * _tmp31 - P(4, 23) * _tmp38 - P(5, 23) * _tmp36);
   }
 
   if (H != nullptr) {
-    matrix::Matrix<Scalar, 23, 1>& _h = (*H);
+    matrix::Matrix<Scalar, 24, 1>& _h = (*H);
 
     _h.setZero();
 
-    _h(0, 0) = _tmp15;
-    _h(2, 0) = _tmp25;
-    _h(3, 0) = _tmp20;
-    _h(4, 0) = _tmp4;
-    _h(5, 0) = _tmp22;
+    _h(0, 0) = _tmp27;
+    _h(2, 0) = _tmp17;
+    _h(3, 0) = _tmp28;
+    _h(4, 0) = _tmp26;
+    _h(5, 0) = _tmp29;
+    _h(23, 0) = _tmp25;
   }
 }  // NOLINT(readability/fn_size)
 

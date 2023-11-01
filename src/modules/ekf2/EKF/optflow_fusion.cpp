@@ -69,8 +69,8 @@ void Ekf::updateOptFlow(estimator_aid_source2d_s &aid_src)
 	aid_src.observation[0] = opt_flow_rate(0); // flow around the X axis
 	aid_src.observation[1] = opt_flow_rate(1); // flow around the Y axis
 
-	aid_src.innovation[0] =  (vel_body(1) / range) - aid_src.observation[0];
-	aid_src.innovation[1] = (-vel_body(0) / range) - aid_src.observation[1];
+	aid_src.innovation[0] = _state.flow_scale * (vel_body(1) / range) - aid_src.observation[0];
+	aid_src.innovation[1] = _state.flow_scale * (-vel_body(0) / range) - aid_src.observation[1];
 
 	// calculate the optical flow observation variance
 	const float R_LOS = calcOptFlowMeasVar(_flow_sample_delayed);
@@ -134,7 +134,7 @@ void Ekf::fuseOptFlow()
 			// recalculate the innovation using the updated state
 			const Vector2f vel_body = predictFlowVelBody();
 			range = predictFlowRange();
-			_aid_src_optical_flow.innovation[1] = (-vel_body(0) / range) - _aid_src_optical_flow.observation[1];
+			_aid_src_optical_flow.innovation[1] = _state.flow_scale * (-vel_body(0) / range) - _aid_src_optical_flow.observation[1];
 
 			if (_aid_src_optical_flow.innovation_variance[1] < R_LOS) {
 				// we need to reinitialise the covariance matrix and abort this fusion step

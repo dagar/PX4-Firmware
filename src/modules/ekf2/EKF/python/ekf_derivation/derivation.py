@@ -62,7 +62,8 @@ State = Values(
     accel_bias = sf.V3(),
     mag_I = sf.V3(),
     mag_B = sf.V3(),
-    wind_vel = sf.V2()
+    wind_vel = sf.V2(),
+    flow_scale = sf.V1()
 )
 
 if args.disable_mag:
@@ -127,7 +128,8 @@ def predict_covariance(
         accel_bias = sf.V3.symbolic("delta_a_b"),
         mag_I = sf.V3.symbolic("mag_I"),
         mag_B = sf.V3.symbolic("mag_B"),
-        wind_vel = sf.V2.symbolic("wind_vel")
+        wind_vel = sf.V2.symbolic("wind_vel"),
+        flow_scale = sf.V1.symbolic("flow_scale")
     )
 
     if args.disable_mag:
@@ -473,6 +475,7 @@ def predict_opt_flow(state, distance, epsilon):
     flow_pred = sf.V2()
     flow_pred[0] =  rel_vel_sensor[1] / distance
     flow_pred[1] = -rel_vel_sensor[0] / distance
+    flow_pred *= state["flow_scale"]
     flow_pred = add_epsilon_sign(flow_pred, distance, epsilon)
 
     return flow_pred

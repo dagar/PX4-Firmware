@@ -16,21 +16,21 @@ namespace sym {
  * Symbolic function: compute_sideslip_h_and_k
  *
  * Args:
- *     state: Matrix24_1
- *     P: Matrix23_23
+ *     state: Matrix25_1
+ *     P: Matrix24_24
  *     innov_var: Scalar
  *     epsilon: Scalar
  *
  * Outputs:
- *     H: Matrix23_1
- *     K: Matrix23_1
+ *     H: Matrix24_1
+ *     K: Matrix24_1
  */
 template <typename Scalar>
-void ComputeSideslipHAndK(const matrix::Matrix<Scalar, 24, 1>& state,
-                          const matrix::Matrix<Scalar, 23, 23>& P, const Scalar innov_var,
-                          const Scalar epsilon, matrix::Matrix<Scalar, 23, 1>* const H = nullptr,
-                          matrix::Matrix<Scalar, 23, 1>* const K = nullptr) {
-  // Total ops: 469
+void ComputeSideslipHAndK(const matrix::Matrix<Scalar, 25, 1>& state,
+                          const matrix::Matrix<Scalar, 24, 24>& P, const Scalar innov_var,
+                          const Scalar epsilon, matrix::Matrix<Scalar, 24, 1>* const H = nullptr,
+                          matrix::Matrix<Scalar, 24, 1>* const K = nullptr) {
+  // Total ops: 485
 
   // Input arrays
 
@@ -42,20 +42,20 @@ void ComputeSideslipHAndK(const matrix::Matrix<Scalar, 24, 1>& state,
   const Scalar _tmp4 = -state(22, 0) + state(4, 0);
   const Scalar _tmp5 = 2 * state(0, 0);
   const Scalar _tmp6 = _tmp5 * state(3, 0);
-  const Scalar _tmp7 = 2 * state(2, 0);
-  const Scalar _tmp8 = _tmp7 * state(1, 0);
+  const Scalar _tmp7 = 2 * state(1, 0);
+  const Scalar _tmp8 = _tmp7 * state(2, 0);
   const Scalar _tmp9 = _tmp6 + _tmp8;
   const Scalar _tmp10 = -state(23, 0) + state(5, 0);
-  const Scalar _tmp11 = _tmp7 * state(0, 0);
+  const Scalar _tmp11 = _tmp5 * state(2, 0);
   const Scalar _tmp12 = -_tmp11;
-  const Scalar _tmp13 = 2 * state(1, 0) * state(3, 0);
+  const Scalar _tmp13 = _tmp7 * state(3, 0);
   const Scalar _tmp14 = _tmp12 + _tmp13;
   const Scalar _tmp15 = _tmp10 * _tmp9 + _tmp14 * state(6, 0) + _tmp3 * _tmp4;
   const Scalar _tmp16 =
       _tmp15 + epsilon * (2 * math::min<Scalar>(0, (((_tmp15) > 0) - ((_tmp15) < 0))) + 1);
   const Scalar _tmp17 = Scalar(1.0) / (_tmp16);
-  const Scalar _tmp18 = _tmp7 * state(3, 0);
-  const Scalar _tmp19 = _tmp5 * state(1, 0);
+  const Scalar _tmp18 = 2 * state(2, 0) * state(3, 0);
+  const Scalar _tmp19 = _tmp7 * state(0, 0);
   const Scalar _tmp20 = std::pow(state(0, 0), Scalar(2));
   const Scalar _tmp21 = std::pow(state(1, 0), Scalar(2));
   const Scalar _tmp22 = -_tmp21;
@@ -90,7 +90,7 @@ void ComputeSideslipHAndK(const matrix::Matrix<Scalar, 24, 1>& state,
 
   // Output terms (2)
   if (H != nullptr) {
-    matrix::Matrix<Scalar, 23, 1>& _h = (*H);
+    matrix::Matrix<Scalar, 24, 1>& _h = (*H);
 
     _h.setZero();
 
@@ -105,7 +105,7 @@ void ComputeSideslipHAndK(const matrix::Matrix<Scalar, 24, 1>& state,
   }
 
   if (K != nullptr) {
-    matrix::Matrix<Scalar, 23, 1>& _k = (*K);
+    matrix::Matrix<Scalar, 24, 1>& _k = (*K);
 
     _k(0, 0) =
         _tmp45 * (P(0, 0) * _tmp24 - P(0, 1) * _tmp34 + P(0, 2) * _tmp35 + P(0, 21) * _tmp43 +
@@ -176,6 +176,9 @@ void ComputeSideslipHAndK(const matrix::Matrix<Scalar, 24, 1>& state,
     _k(22, 0) =
         _tmp45 * (P(22, 0) * _tmp24 - P(22, 1) * _tmp34 + P(22, 2) * _tmp35 + P(22, 21) * _tmp43 +
                   P(22, 22) * _tmp44 + P(22, 3) * _tmp38 + P(22, 4) * _tmp41 + P(22, 5) * _tmp42);
+    _k(23, 0) =
+        _tmp45 * (P(23, 0) * _tmp24 - P(23, 1) * _tmp34 + P(23, 2) * _tmp35 + P(23, 21) * _tmp43 +
+                  P(23, 22) * _tmp44 + P(23, 3) * _tmp38 + P(23, 4) * _tmp41 + P(23, 5) * _tmp42);
   }
 }  // NOLINT(readability/fn_size)
 
