@@ -61,16 +61,18 @@ void Ekf::updateOptFlow(estimator_aid_source2d_s &aid_src)
 	// Note the sign convention used: A positive LOS rate is a RH rotation of the scene about that axis.
 	const Vector2f opt_flow_rate = _flow_compensated_XY_rad / _flow_sample_delayed.dt;
 
+	float scale = powf(range, _state.flow_range_scale_exp);
+
 	// compute the velocities in body and local frames from corrected optical flow measurement for logging only
-	_flow_vel_body(0) = -opt_flow_rate(1) * range;
-	_flow_vel_body(1) =  opt_flow_rate(0) * range;
+	_flow_vel_body(0) = scale * -opt_flow_rate(1) * range;
+	_flow_vel_body(1) = scale *  opt_flow_rate(0) * range;
 	_flow_vel_ne = Vector2f(_R_to_earth * Vector3f(_flow_vel_body(0), _flow_vel_body(1), 0.f));
 
 	aid_src.observation[0] = opt_flow_rate(0); // flow around the X axis
 	aid_src.observation[1] = opt_flow_rate(1); // flow around the Y axis
 
-	aid_src.innovation[0] = _state.flow_scale * (vel_body(1) / range) - aid_src.observation[0];
-	aid_src.innovation[1] = _state.flow_scale * (-vel_body(0) / range) - aid_src.observation[1];
+	aid_src.innovation[0] = scale * ( vel_body(1) / range) - aid_src.observation[0];
+	aid_src.innovation[1] = scale * (-vel_body(0) / range) - aid_src.observation[1];
 
 	// calculate the optical flow observation variance
 	const float R_LOS = calcOptFlowMeasVar(_flow_sample_delayed);
@@ -134,7 +136,7 @@ void Ekf::fuseOptFlow()
 			// recalculate the innovation using the updated state
 			const Vector2f vel_body = predictFlowVelBody();
 			range = predictFlowRange();
-			_aid_src_optical_flow.innovation[1] = _state.flow_scale * (-vel_body(0) / range) - _aid_src_optical_flow.observation[1];
+			_aid_src_optical_flow.innovation[1] = (-vel_body(0) / range) - _aid_src_optical_flow.observation[1];
 
 			if (_aid_src_optical_flow.innovation_variance[1] < R_LOS) {
 				// we need to reinitialise the covariance matrix and abort this fusion step

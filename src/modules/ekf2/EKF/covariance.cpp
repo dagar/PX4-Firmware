@@ -99,7 +99,8 @@ void Ekf::initialiseCovariance()
 #if defined(CONFIG_EKF2_WIND)
 	resetWindCov();
 #endif // CONFIG_EKF2_WIND
-	P(State::flow_scale.idx, State::flow_scale.idx) = sq(0.1f);
+
+	P(State::flow_range_scale_exp.idx, State::flow_range_scale_exp.idx) = sq(0.1f);
 }
 
 void Ekf::predictCovariance(const imuSample &imu_delayed)
@@ -209,7 +210,7 @@ void Ekf::predictCovariance(const imuSample &imu_delayed)
 
 	if (_control_status.flags.opt_flow) {
 		const float flow_scale_nsd = 0.1f;
-		P(State::flow_scale.idx, State::flow_scale.idx) += sq(flow_scale_nsd) * dt;
+		P(State::flow_range_scale_exp.idx, State::flow_range_scale_exp.idx) += sq(flow_scale_nsd) * dt;
 	}
 
 	// covariance matrix is symmetrical, so copy upper half to lower half

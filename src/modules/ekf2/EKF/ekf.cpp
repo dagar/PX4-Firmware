@@ -71,7 +71,8 @@ void Ekf::reset()
 #if defined(CONFIG_EKF2_WIND)
 	_state.wind_vel.setZero();
 #endif // CONFIG_EKF2_WIND
-	_state.flow_scale = 1.f;
+
+	_state.flow_range_scale_exp = 0.f;
 
 #if defined(CONFIG_EKF2_RANGE_FINDER)
 	_range_sensor.setPitchOffset(_params.rng_sens_pitch);

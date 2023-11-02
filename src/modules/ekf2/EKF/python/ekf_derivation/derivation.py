@@ -63,7 +63,7 @@ State = Values(
     mag_I = sf.V3(),
     mag_B = sf.V3(),
     wind_vel = sf.V2(),
-    flow_scale = sf.V1()
+    flow_range_scale_exp = sf.V1()
 )
 
 if args.disable_mag:
@@ -129,7 +129,7 @@ def predict_covariance(
         mag_I = sf.V3.symbolic("mag_I"),
         mag_B = sf.V3.symbolic("mag_B"),
         wind_vel = sf.V2.symbolic("wind_vel"),
-        flow_scale = sf.V1.symbolic("flow_scale")
+        flow_range_scale_exp = sf.V1.symbolic("flow_range_scale_exp")
     )
 
     if args.disable_mag:
@@ -473,9 +473,9 @@ def predict_opt_flow(state, distance, epsilon):
     # Divide by range to get predicted angular LOS rates relative to X and Y
     # axes. Note these are rates in a non-rotating sensor frame
     flow_pred = sf.V2()
-    flow_pred[0] =  rel_vel_sensor[1] / distance
-    flow_pred[1] = -rel_vel_sensor[0] / distance
-    flow_pred *= state["flow_scale"]
+    scale = distance ** state["flow_range_scale_exp"][0]
+    flow_pred[0] = scale *  rel_vel_sensor[1] / distance
+    flow_pred[1] = scale * -rel_vel_sensor[0] / distance
     flow_pred = add_epsilon_sign(flow_pred, distance, epsilon)
 
     return flow_pred
