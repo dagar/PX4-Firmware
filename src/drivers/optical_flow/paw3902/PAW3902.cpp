@@ -411,15 +411,8 @@ void PAW3902::RunImpl()
 						// rotate measurements in yaw from sensor frame to body frame
 						const matrix::Vector3f pixel_flow_rotated = _rotation * matrix::Vector3f{(float)delta_x_raw, (float)delta_y_raw, 0.f};
 
-						// datasheet provides 11.914 CPI (count per inch) scaling per meter of height
-						static constexpr float PIXART_RESOLUTION = 11.914f; // counts per inch (CPI) per meter (from surface)
-						static constexpr float INCHES_PER_METER = 39.3701f;
-
-						// CPI/m -> radians
-						static constexpr float SCALE = 1.f / (PIXART_RESOLUTION * INCHES_PER_METER);
-
-						sensor_optical_flow.pixel_flow[0] = pixel_flow_rotated(0) * SCALE;
-						sensor_optical_flow.pixel_flow[1] = pixel_flow_rotated(1) * SCALE;
+						sensor_optical_flow.pixel_flow[0] = pixel_flow_rotated(0) * _flow_cpi_to_radians_scale;
+						sensor_optical_flow.pixel_flow[1] = pixel_flow_rotated(1) * _flow_cpi_to_radians_scale;
 
 						sensor_optical_flow.quality = buffer.data.SQUAL;
 
@@ -522,6 +515,24 @@ bool PAW3902::Configure()
 		_scheduled_interval_us = SAMPLE_INTERVAL_MODE_2 / 2;
 		perf_count(_mode_change_super_low_light_perf);
 		break;
+	}
+
+	// Resolution register
+	const uint8_t resolution = RegisterRead(Register::Resolution);
+
+	// The maximum register value is 0xA8. The minimum register value is 0.
+	if (resolution <= 0xA8) {
+		PX4_INFO("0x%02hhX: 0x%02hhX", (uint8_t)Register::Resolution, resolution);
+
+		// CPI =  11.914 / height(m) * [(reg4E +1) * 50 / 8450].
+		// approximate resolution = ()
+		// _resolution_reg_value
+		const float CPI = PIXART_DEFAULT_RESOLUTION * (resolution + 1) * (50.f / 8450.f);
+
+		// CPI/m -> radians
+		_flow_cpi_to_radians_scale = 1.f / (CPI * INCHES_PER_METER);
+
+		PX4_INFO("CPI = %.5f, scale = %.6f", (double)CPI, (double)_flow_cpi_to_radians_scale);
 	}
 
 	EnableLed();

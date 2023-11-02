@@ -116,6 +116,12 @@ private:
 	hrt_abstime _last_publish{0};
 	hrt_abstime _last_motion{0};
 
+	// datasheet provides 11.914 CPI (count per inch) scaling per meter of height
+	static constexpr float PIXART_DEFAULT_RESOLUTION = 11.914f; // counts per inch (CPI) per meter (from surface)
+	static constexpr float INCHES_PER_METER = 39.3701f;
+
+	float _flow_cpi_to_radians_scale{1.f / (PIXART_DEFAULT_RESOLUTION * INCHES_PER_METER)};
+
 	int16_t _delta_x_raw_prev{0};
 	int16_t _delta_y_raw_prev{0};
 	uint16_t _shutter_prev{0};
