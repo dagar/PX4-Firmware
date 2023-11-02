@@ -2805,6 +2805,26 @@ void EKF2::UpdateSystemFlagsSample(ekf2_timestamps_s &ekf2_timestamps)
 
 		_ekf.setSystemFlagData(flags);
 	}
+
+// HACK
+#if defined(CONFIG_DRIVERS_UAVCANNODE)
+
+	{
+		if ((!_ekf.control_status_flags().in_air || _ekf.control_status_flags().vehicle_at_rest) && (hrt_absolute_time() > 3_s)) {
+			PX4_INFO("CAN node forcing in_air");
+			systemFlagUpdate flags{};
+			flags.time_us = hrt_absolute_time();
+			flags.at_rest = false;
+			flags.in_air = true;
+			flags.is_fixed_wing = false;
+			flags.gnd_effect = false;
+			_ekf.setSystemFlagData(flags);
+		}
+
+	}
+
+
+#endif // CONFIG_DRIVERS_UAVCANNODE
 }
 
 void EKF2::UpdateCalibration(const hrt_abstime &timestamp, InFlightCalibration &cal, const matrix::Vector3f &bias,

@@ -56,6 +56,8 @@ then
 fi
 unset BOARD_ARCH_RC_DEFAULTS
 
+uavcannode start
+
 #
 # Optional board defaults: rc.board_defaults
 #
@@ -114,5 +116,10 @@ param set-default SENS_MAG_RATE 100
 
 sensors start
 
-uavcannode start
+param set-default EKF2_BARO_CTRL 0
+param set-default EKF2_EV_CTRL 0
+param set-default EKF2_OF_CTRL 1
+param set-default EKF2_GPS_CTRL 0
+ekf2 start
+
 unset R
