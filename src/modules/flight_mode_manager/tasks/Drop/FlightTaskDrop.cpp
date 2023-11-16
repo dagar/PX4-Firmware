@@ -287,6 +287,11 @@ bool FlightTaskDrop::update()
 					_jerk_setpoint.setNaN();
 				}
 
+				// velocity setpoint track velocity to seed controller
+				if (velocity_valid) {
+					_velocity_setpoint = velocity;
+				}
+
 				bool drop_detected = false;
 
 				if (velocity_valid && acceleration_valid) {
@@ -328,8 +333,8 @@ bool FlightTaskDrop::update()
 
 				if (_state_prev != _state) {
 					// reset constraints
-					_constraints.speed_up = _param_mpc_z_vel_max_up.get();
-					_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
+					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
+					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
 
 					_position_setpoint.setNaN();
@@ -349,6 +354,9 @@ bool FlightTaskDrop::update()
 					_jerk_setpoint.zero();
 				}
 
+				// velocity setpoint track velocity to seed controller
+				_velocity_setpoint = _velocity;
+
 			} else {
 				_state = DropState::DISARMED;
 			}
@@ -366,8 +374,8 @@ bool FlightTaskDrop::update()
 
 				if (_state_prev != _state) {
 					// reset constraints
-					_constraints.speed_up = _param_mpc_z_vel_max_up.get();
-					_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
+					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
+					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
 
 					_position_setpoint.setNaN();
@@ -388,6 +396,9 @@ bool FlightTaskDrop::update()
 					_jerk_setpoint.zero();
 				}
 
+				// velocity setpoint track velocity to seed controller
+				_velocity_setpoint = _velocity;
+
 			} else {
 				_state = DropState::DISARMED;
 			}
@@ -405,13 +416,13 @@ bool FlightTaskDrop::update()
 
 				if (_state_prev != _state) {
 					// reset constraints
-					_constraints.speed_up = _param_mpc_z_vel_max_up.get();
-					_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
+					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
+					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
 
 					_position_setpoint.setNaN();
-					_velocity_setpoint.setNaN();
 
+					_velocity_setpoint.setNaN();
 					_velocity_setpoint(2) = _velocity(2);
 
 					_acceleration_setpoint.zero();
@@ -428,56 +439,13 @@ bool FlightTaskDrop::update()
 				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 1.f) && (fabsf(acceleration(2)) < 1.f)) {
 
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control");
-					_state = DropState::ALTITUDE_CONTROL_ENABLED;
+					_state = DropState::VELOCITY_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
 					_position_setpoint.setNaN();
-					_velocity_setpoint.setNaN();
-
-					// latch onto current height
-					_position_setpoint(2) = _position(2);
-
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
-				}
-
-			} else {
-				_state = DropState::DISARMED;
-			}
-		}
-		break;
-
-	case DropState::ALTITUDE_CONTROL_ENABLED: {
-
-			if (_state_prev != _state) {
-				mavlink_log_info(&_mavlink_log_pub, "Drop: altitude control enabled");
-			}
-
-			if (actuator_armed.armed) {
-
-				if (_state_prev != _state) {
-					// reset constraints
-					_constraints.speed_up = _param_mpc_z_vel_max_up.get();
-					_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
-					_constraints.want_takeoff = true;
-
-					_position_setpoint.setNaN();
-					_velocity_setpoint.setNaN();
-
-					// latch onto current height
-					_position_setpoint(2) = _position(2);
-
-					// otherwise all zero
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
-				}
-
-				if (!failsafe_flags.local_velocity_invalid) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating velocity control");
-					_state = DropState::HORIZONTAL_VELOCITY_CONTROL_ENABLED;
-					_state_last_transition_time = hrt_absolute_time();
 
 					_velocity_setpoint = _velocity;
+
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
@@ -488,7 +456,7 @@ bool FlightTaskDrop::update()
 		}
 		break;
 
-	case DropState::HORIZONTAL_VELOCITY_CONTROL_ENABLED: {
+	case DropState::VELOCITY_CONTROL_ENABLED: {
 
 			if (_state_prev != _state) {
 				mavlink_log_info(&_mavlink_log_pub, "Drop: full velocity control enabled");
@@ -498,15 +466,16 @@ bool FlightTaskDrop::update()
 
 				if (_state_prev != _state) {
 					// reset constraints
-					_constraints.speed_up = _param_mpc_z_vel_max_up.get();
-					_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
+					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
+					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
 
 					// position still not active
 					_position_setpoint.setNaN();
 
-					// otherwise all zero
 					_velocity_setpoint = _velocity;
+
+					// otherwise all zero
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
 				}
@@ -540,12 +509,10 @@ bool FlightTaskDrop::update()
 			if (actuator_armed.armed) {
 
 				if (_state_prev != _state) {
-					// reset constraints
-					_constraints.speed_up = _param_mpc_z_vel_max_up.get();
-					_constraints.speed_down = _param_mpc_z_vel_max_dn.get();
-					_constraints.want_takeoff = true;
-
+					// latch onto current position
 					_offboard_pos_sp_last = _position;
+					_offboard_vel_sp_last = {};
+					_offboard_time_stamp_last = _time_stamp_current;
 
 					_position_smoothing.reset(Vector3f{}, _velocity, _position);
 				}
@@ -574,7 +541,6 @@ bool FlightTaskDrop::update()
 					force_zero_velocity_setpoint,
 					smoothed_setpoints
 				);
-				_offboard_time_stamp_last = _time_stamp_current;
 
 				_jerk_setpoint = smoothed_setpoints.jerk;
 				_acceleration_setpoint = smoothed_setpoints.acceleration;
@@ -587,10 +553,6 @@ bool FlightTaskDrop::update()
 					//mavlink_log_info(&_mavlink_log_pub, "Drop: complete, full flying");
 					_state = DropState::FLYING;
 					_state_last_transition_time = hrt_absolute_time();
-
-					// require offboard position setpoint
-					_position_smoothing.forceSetPosition(_position);
-					_position_smoothing.forceSetVelocity(_velocity);
 				}
 
 			} else {
@@ -608,16 +570,6 @@ bool FlightTaskDrop::update()
 			if (actuator_armed.armed) {
 				if (_state_prev != _state) {
 					mavlink_log_info(&_mavlink_log_pub, "Drop: ready for OFFBOARD");
-
-					// latch position setpoint
-					_position_setpoint = _position;
-
-					// default all zero
-					_velocity_setpoint.zero();
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
-
-					_position_smoothing.reset(Vector3f{}, _velocity, _position);
 				}
 
 				if (_offboard_trajectory_setpoint_sub.update()) {
@@ -652,19 +604,30 @@ bool FlightTaskDrop::update()
 							_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
 						}
 
-						// Stretch the constraints of the velocity controller to leave some room for an additional
-						// correction required by the altitude/vertical position controller
-						_constraints.speed_down = math::max(_constraints.speed_down, 1.2f * _param_mpc_z_v_auto_dn.get());
-						_constraints.speed_up = math::max(_constraints.speed_up, 1.2f * _param_mpc_z_v_auto_up.get());
-						_constraints.want_takeoff = true;
-
 						_offboard_pos_sp_last = Vector3f{trajectory_setpoint.position};
 						_offboard_vel_sp_last = Vector3f{trajectory_setpoint.velocity};
 
 						_yaw = trajectory_setpoint.yaw;
 						//_yawspeed = trajectory_setpoint.yawspeed;
+
+						_offboard_time_stamp_last = _time_stamp_current;
 					}
+
+				} else if (hrt_elapsed_time(&_offboard_time_stamp_last) > 10_s) {
+
+					mavlink_log_critical(&_mavlink_log_pub, "Drop: OFFBOARD timeout, HOLDING");
+					// latch onto current position
+					_offboard_pos_sp_last = _position;
+					_offboard_vel_sp_last = {};
+
+					_offboard_time_stamp_last = _time_stamp_current;
 				}
+
+				// Stretch the constraints of the velocity controller to leave some room for an additional
+				// correction required by the altitude/vertical position controller
+				_constraints.speed_down = math::max(_constraints.speed_down, 1.2f * _param_mpc_z_v_auto_dn.get());
+				_constraints.speed_up = math::max(_constraints.speed_up, 1.2f * _param_mpc_z_v_auto_up.get());
+				_constraints.want_takeoff = true;
 
 				if (_offboard_pos_sp_last.isAllFinite()) {
 
@@ -680,7 +643,6 @@ bool FlightTaskDrop::update()
 						force_zero_velocity_setpoint,
 						smoothed_setpoints
 					);
-					_offboard_time_stamp_last = _time_stamp_current;
 
 					_jerk_setpoint = smoothed_setpoints.jerk;
 					_acceleration_setpoint = smoothed_setpoints.acceleration;
@@ -690,22 +652,6 @@ bool FlightTaskDrop::update()
 					_unsmoothed_velocity_setpoint = smoothed_setpoints.unsmoothed_velocity;
 					//_want_takeoff = true;
 				}
-
-#if 0
-
-				if (hrt_elapsed_time(&trajectory_setpoint.timestamp) > 10_s) {
-					mavlink_log_critical(&_mavlink_log_pub, "Drop: OFFBOARD timeout, HOLDING");
-
-					// latch position setpoint
-					_position_setpoint = _position;
-
-					// default all zero
-					_velocity_setpoint.zero();
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
-				}
-
-#endif
 
 			} else {
 				_state = DropState::DISARMED;

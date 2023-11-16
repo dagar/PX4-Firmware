@@ -97,10 +97,9 @@ private:
 		RATE_CONTROL_ENABLED                = 4,
 		ATTITUDE_CONTROL_ENABLED            = 5,
 		HEIGHT_RATE_CONTROL_ENABLED         = 6,
-		ALTITUDE_CONTROL_ENABLED            = 7,
-		HORIZONTAL_VELOCITY_CONTROL_ENABLED = 8,
-		POSITION_CONTROL_ENABLED            = 9,
-		FLYING                              = 10,
+		VELOCITY_CONTROL_ENABLED            = 7,
+		POSITION_CONTROL_ENABLED            = 8,
+		FLYING                              = 9,
 	};
 
 	DropState _state{DropState::UNKNOWN};
