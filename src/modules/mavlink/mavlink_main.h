@@ -131,7 +131,6 @@ public:
 	void request_stop()
 	{
 		_task_should_exit.store(true);
-		_receiver.request_stop();
 	}
 
 	/**
@@ -180,7 +179,7 @@ public:
 	void			check_events_enable() { _should_check_events.store(true); }
 	void			check_events_disable() { _should_check_events.store(false); }
 
-	int			get_uart_fd() const { return _uart_fd; }
+	int			get_fd() const { return _fd; }
 
 	/**
 	 * Get the MAVLink system id.
@@ -449,8 +448,6 @@ public:
 
 	Protocol 		get_protocol() const { return _protocol; }
 
-	int 			get_socket_fd() { return _socket_fd; };
-
 #if defined(MAVLINK_UDP)
 	unsigned short		get_network_port() { return _network_port; }
 
@@ -579,7 +576,7 @@ private:
 	bool			_ftp_on{false};
 	bool			_use_software_mav_throttling{false};
 
-	int			_uart_fd{-1};
+	int			_fd{-1};
 
 	int			_baudrate{57600};
 	int			_datarate{1000};		///< data rate for normal streams (attitude, position, etc.)
@@ -638,7 +635,6 @@ private:
 
 	const char 		*_interface_name{nullptr};
 
-	int			_socket_fd{-1};
 	Protocol		_protocol{Protocol::SERIAL};
 
 	radio_status_s		_rstatus {};
@@ -649,9 +645,6 @@ private:
 
 	pthread_mutex_t		_message_buffer_mutex{};
 	VariableLengthRingbuffer _message_buffer{};
-
-	pthread_mutex_t		_send_mutex {};
-	pthread_mutex_t         _radio_status_mutex {};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::MAV_SYS_ID>) _param_mav_sys_id,

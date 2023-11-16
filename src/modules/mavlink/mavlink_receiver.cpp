@@ -45,7 +45,6 @@
 #include <lib/systemlib/px4_macros.h>
 
 #include <math.h>
-#include <poll.h>
 
 #ifdef CONFIG_NET
 #include <net/if.h>
@@ -3075,215 +3074,164 @@ MavlinkReceiver::handle_message_gimbal_device_attitude_status(mavlink_message_t 
 void
 MavlinkReceiver::run()
 {
-	/* set thread name */
-	{
-		char thread_name[17];
-		snprintf(thread_name, sizeof(thread_name), "mavlink_rcv_if%d", _mavlink->get_instance_id());
-		px4_prctl(PR_SET_NAME, thread_name, px4_getpid());
+	uint8_t buf[1500];
+
+	// check for parameter updates
+	if (_parameter_update_sub.updated()) {
+		// clear update
+		parameter_update_s pupdate;
+		_parameter_update_sub.copy(&pupdate);
+
+		// update parameters from storage
+		updateParams();
 	}
-
-	// poll timeout in ms. Also defines the max update frequency of the mission & param manager, etc.
-	const int timeout = 10;
-
-#if defined(__PX4_POSIX)
-	/* 1500 is the Wifi MTU, so we make sure to fit a full packet */
-	uint8_t buf[1600 * 5];
-#elif defined(CONFIG_NET)
-	/* 1500 is the Wifi MTU, so we make sure to fit a full packet */
-	uint8_t buf[1000];
-#else
-	/* the serial port buffers internally as well, we just need to fit a small chunk */
-	uint8_t buf[64];
-#endif
-	mavlink_message_t msg;
-
-	struct pollfd fds[1] = {};
-
-	if (_mavlink->get_protocol() == Protocol::SERIAL) {
-		fds[0].fd = _mavlink->get_uart_fd();
-		fds[0].events = POLLIN;
-	}
-
-#if defined(MAVLINK_UDP)
-	struct sockaddr_in srcaddr = {};
-	socklen_t addrlen = sizeof(srcaddr);
-
-	if (_mavlink->get_protocol() == Protocol::UDP) {
-		fds[0].fd = _mavlink->get_socket_fd();
-		fds[0].events = POLLIN;
-	}
-
-#endif // MAVLINK_UDP
 
 	ssize_t nread = 0;
-	hrt_abstime last_send_update = 0;
 
-	while (!_mavlink->should_exit()) {
-
-		// check for parameter updates
-		if (_parameter_update_sub.updated()) {
-			// clear update
-			parameter_update_s pupdate;
-			_parameter_update_sub.copy(&pupdate);
-
-			// update parameters from storage
-			updateParams();
-		}
-
-		int ret = poll(&fds[0], 1, timeout);
-
-		if (ret > 0) {
-			if (_mavlink->get_protocol() == Protocol::SERIAL) {
-				/* non-blocking read. read may return negative values */
-				nread = ::read(fds[0].fd, buf, sizeof(buf));
-
-				if (nread == -1 && errno == ENOTCONN) { // Not connected (can happen for USB)
-					usleep(100000);
-				}
-			}
+	if (_mavlink->get_protocol() == Protocol::SERIAL) {
+		/* non-blocking read. read may return negative values */
+		nread = ::read(_mavlink->get_fd(), buf, sizeof(buf));
+	}
 
 #if defined(MAVLINK_UDP)
 
-			else if (_mavlink->get_protocol() == Protocol::UDP) {
-				if (fds[0].revents & POLLIN) {
-					nread = recvfrom(_mavlink->get_socket_fd(), buf, sizeof(buf), 0, (struct sockaddr *)&srcaddr, &addrlen);
-				}
+	else if (_mavlink->get_protocol() == Protocol::UDP) {
+		struct sockaddr_in srcaddr = {};
+		socklen_t addrlen = sizeof(srcaddr);
+		nread = recvfrom(_mavlink->get_fd(), buf, sizeof(buf), 0, (struct sockaddr *)&srcaddr, &addrlen);
 
-				struct sockaddr_in &srcaddr_last = _mavlink->get_client_source_address();
+		if (!_mavlink->get_client_source_initialized()) {
 
-				int localhost = (127 << 24) + 1;
+			struct sockaddr_in &srcaddr_last = _mavlink->get_client_source_address();
+			int localhost = (127 << 24) + 1;
 
-				if (!_mavlink->get_client_source_initialized()) {
+			// set the address either if localhost or if 3 seconds have passed
+			// this ensures that a GCS running on localhost can get a hold of
+			// the system within the first N seconds
+			hrt_abstime stime = _mavlink->get_start_time();
 
-					// set the address either if localhost or if 3 seconds have passed
-					// this ensures that a GCS running on localhost can get a hold of
-					// the system within the first N seconds
-					hrt_abstime stime = _mavlink->get_start_time();
+			if ((stime != 0 && (hrt_elapsed_time(&stime) > 3_s))
+			    || (srcaddr_last.sin_addr.s_addr == htonl(localhost))) {
 
-					if ((stime != 0 && (hrt_elapsed_time(&stime) > 3_s))
-					    || (srcaddr_last.sin_addr.s_addr == htonl(localhost))) {
+				srcaddr_last.sin_addr.s_addr = srcaddr.sin_addr.s_addr;
+				srcaddr_last.sin_port = srcaddr.sin_port;
 
-						srcaddr_last.sin_addr.s_addr = srcaddr.sin_addr.s_addr;
-						srcaddr_last.sin_port = srcaddr.sin_port;
+				_mavlink->set_client_source_initialized();
 
-						_mavlink->set_client_source_initialized();
-
-						PX4_INFO("partner IP: %s", inet_ntoa(srcaddr.sin_addr));
-					}
-				}
+				PX4_INFO("partner IP: %s", inet_ntoa(srcaddr.sin_addr));
 			}
+		}
 
-			// only start accepting messages on UDP once we're sure who we talk to
-			if (_mavlink->get_protocol() != Protocol::UDP || _mavlink->get_client_source_initialized()) {
+	}
+
+	// only start accepting messages on UDP once we're sure who we talk to
+	if (_mavlink->get_protocol() != Protocol::UDP || _mavlink->get_client_source_initialized()) {
 #endif // MAVLINK_UDP
 
-				/* if read failed, this loop won't execute */
-				for (ssize_t i = 0; i < nread; i++) {
-					if (mavlink_parse_char(_mavlink->get_channel(), buf[i], &msg, &_status)) {
+		/* if read failed, this loop won't execute */
+		mavlink_message_t msg;
 
-						/* check if we received version 2 and request a switch. */
-						if (!(_mavlink->get_status()->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
-							/* this will only switch to proto version 2 if allowed in settings */
-							_mavlink->set_proto_version(2);
-						}
+		for (ssize_t i = 0; i < nread; i++) {
+			if (mavlink_parse_char(_mavlink->get_channel(), buf[i], &msg, &_status)) {
 
-						/* handle generic messages and commands */
-						handle_message(&msg);
+				/* check if we received version 2 and request a switch. */
+				if (!(_mavlink->get_status()->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
+					/* this will only switch to proto version 2 if allowed in settings */
+					_mavlink->set_proto_version(2);
+				}
 
-						/* handle packet with mission manager */
-						_mission_manager.handle_message(&msg);
+				/* handle generic messages and commands */
+				handle_message(&msg);
 
-						/* handle packet with parameter component */
-						if (_mavlink->boot_complete()) {
-							// make sure mavlink app has booted before we start processing parameter sync
-							_parameters_manager.handle_message(&msg);
+				/* handle packet with mission manager */
+				_mission_manager.handle_message(&msg);
 
-						} else {
-							if (hrt_elapsed_time(&_mavlink->get_first_start_time()) > 20_s) {
-								PX4_ERR("system boot did not complete in 20 seconds");
-								_mavlink->set_boot_complete();
-							}
-						}
+				/* handle packet with parameter component */
+				if (_mavlink->boot_complete()) {
+					// make sure mavlink app has booted before we start processing parameter sync
+					_parameters_manager.handle_message(&msg);
 
-						if (_mavlink->ftp_enabled()) {
-							/* handle packet with ftp component */
-							_mavlink_ftp.handle_message(&msg);
-						}
-
-						/* handle packet with log component */
-						_mavlink_log_handler.handle_message(&msg);
-
-						/* handle packet with timesync component */
-						_mavlink_timesync.handle_message(&msg);
-
-						/* handle packet with parent object */
-						_mavlink->handle_message(&msg);
-
-						update_rx_stats(msg);
-
-						if (_message_statistics_enabled) {
-							update_message_statistics(msg);
-						}
+				} else {
+					if (hrt_elapsed_time(&_mavlink->get_first_start_time()) > 20_s) {
+						PX4_ERR("system boot did not complete in 20 seconds");
+						_mavlink->set_boot_complete();
 					}
 				}
 
-				/* count received bytes (nread will be -1 on read error) */
-				if (nread > 0) {
-					_mavlink->count_rxbytes(nread);
-
-					telemetry_status_s &tstatus = _mavlink->telemetry_status();
-					tstatus.rx_message_count = _total_received_counter;
-					tstatus.rx_message_lost_count = _total_lost_counter;
-					tstatus.rx_message_lost_rate = static_cast<float>(_total_lost_counter) / static_cast<float>(_total_received_counter);
-
-					if (_mavlink_status_last_buffer_overrun != _status.buffer_overrun) {
-						tstatus.rx_buffer_overruns++;
-						_mavlink_status_last_buffer_overrun = _status.buffer_overrun;
-					}
-
-					if (_mavlink_status_last_parse_error != _status.parse_error) {
-						tstatus.rx_parse_errors++;
-						_mavlink_status_last_parse_error = _status.parse_error;
-					}
-
-					if (_mavlink_status_last_packet_rx_drop_count != _status.packet_rx_drop_count) {
-						tstatus.rx_packet_drop_count++;
-						_mavlink_status_last_packet_rx_drop_count = _status.packet_rx_drop_count;
-					}
+				if (_mavlink->ftp_enabled()) {
+					/* handle packet with ftp component */
+					_mavlink_ftp.handle_message(&msg);
 				}
+
+				/* handle packet with log component */
+				_mavlink_log_handler.handle_message(&msg);
+
+				/* handle packet with timesync component */
+				_mavlink_timesync.handle_message(&msg);
+
+				/* handle packet with parent object */
+				_mavlink->handle_message(&msg);
+
+				update_rx_stats(msg);
+
+				if (_message_statistics_enabled) {
+					update_message_statistics(msg);
+				}
+			}
+		}
+
+		/* count received bytes (nread will be -1 on read error) */
+		if (nread > 0) {
+			_mavlink->count_rxbytes(nread);
+
+			telemetry_status_s &tstatus = _mavlink->telemetry_status();
+			tstatus.rx_message_count = _total_received_counter;
+			tstatus.rx_message_lost_count = _total_lost_counter;
+			tstatus.rx_message_lost_rate = static_cast<float>(_total_lost_counter) / static_cast<float>(_total_received_counter);
+
+			if (_mavlink_status_last_buffer_overrun != _status.buffer_overrun) {
+				tstatus.rx_buffer_overruns++;
+				_mavlink_status_last_buffer_overrun = _status.buffer_overrun;
+			}
+
+			if (_mavlink_status_last_parse_error != _status.parse_error) {
+				tstatus.rx_parse_errors++;
+				_mavlink_status_last_parse_error = _status.parse_error;
+			}
+
+			if (_mavlink_status_last_packet_rx_drop_count != _status.packet_rx_drop_count) {
+				tstatus.rx_packet_drop_count++;
+				_mavlink_status_last_packet_rx_drop_count = _status.packet_rx_drop_count;
+			}
+		}
 
 #if defined(MAVLINK_UDP)
-			}
+	}
 
 #endif // MAVLINK_UDP
 
-		} else if (ret == -1) {
-			usleep(10000);
+	const hrt_abstime t = hrt_absolute_time();
+
+	CheckHeartbeats(t);
+
+	if (t - _last_send_update > 10_ms) {
+		_mission_manager.check_active_mission();
+		_mission_manager.send();
+
+		if (_mavlink->get_mode() != Mavlink::MAVLINK_MODE::MAVLINK_MODE_IRIDIUM) {
+			_parameters_manager.send();
 		}
 
-		const hrt_abstime t = hrt_absolute_time();
-
-		CheckHeartbeats(t);
-
-		if (t - last_send_update > timeout * 1000) {
-			_mission_manager.check_active_mission();
-			_mission_manager.send();
-
-			if (_mavlink->get_mode() != Mavlink::MAVLINK_MODE::MAVLINK_MODE_IRIDIUM) {
-				_parameters_manager.send();
-			}
-
-			if (_mavlink->ftp_enabled()) {
-				_mavlink_ftp.send();
-			}
-
-			_mavlink_log_handler.send();
-			last_send_update = t;
+		if (_mavlink->ftp_enabled()) {
+			_mavlink_ftp.send();
 		}
 
-		if (_tune_publisher != nullptr) {
-			_tune_publisher->publish_next_tune(t);
-		}
+		_mavlink_log_handler.send();
+		_last_send_update = t;
+	}
+
+	if (_tune_publisher != nullptr) {
+		_tune_publisher->publish_next_tune(t);
 	}
 }
 
@@ -3468,40 +3416,9 @@ void MavlinkReceiver::print_detailed_rx_stats() const
 	}
 }
 
-void MavlinkReceiver::start()
-{
-	pthread_attr_t receiveloop_attr;
-	pthread_attr_init(&receiveloop_attr);
-
-	struct sched_param param;
-	(void)pthread_attr_getschedparam(&receiveloop_attr, &param);
-	param.sched_priority = SCHED_PRIORITY_MAX - 80;
-	(void)pthread_attr_setschedparam(&receiveloop_attr, &param);
-
-	pthread_attr_setstacksize(&receiveloop_attr,
-				  PX4_STACK_ADJUSTED(sizeof(MavlinkReceiver) + 2840 + MAVLINK_RECEIVER_NET_ADDED_STACK));
-
-	pthread_create(&_thread, &receiveloop_attr, MavlinkReceiver::start_trampoline, (void *)this);
-
-	pthread_attr_destroy(&receiveloop_attr);
-}
-
 void
 MavlinkReceiver::updateParams()
 {
 	// update parameters from storage
 	ModuleParams::updateParams();
-}
-
-void *MavlinkReceiver::start_trampoline(void *context)
-{
-	MavlinkReceiver *self = reinterpret_cast<MavlinkReceiver *>(context);
-	self->run();
-	return nullptr;
-}
-
-void MavlinkReceiver::stop()
-{
-	_should_exit.store(true);
-	pthread_join(_thread, nullptr);
 }

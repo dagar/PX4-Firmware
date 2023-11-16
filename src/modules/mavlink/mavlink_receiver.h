@@ -34,7 +34,7 @@
 /**
  * @file mavlink_receiver.h
  *
- * MAVLink receiver thread that converts the received MAVLink messages to the appropriate
+ * MAVLink receiver that converts the received MAVLink messages to the appropriate
  * uORB topic publications, to decouple the uORB message and MAVLink message.
  *
  * @author Lorenz Meier <lorenz@px4.io>
@@ -128,19 +128,13 @@ public:
 	MavlinkReceiver(Mavlink *parent);
 	~MavlinkReceiver() override;
 
-	void start();
-	void stop();
-
 	bool component_was_seen(int system_id, int component_id);
 	void enable_message_statistics() { _message_statistics_enabled = true; }
 	void print_detailed_rx_stats() const;
 
-	void request_stop() { _should_exit.store(true); }
-
-private:
-	static void *start_trampoline(void *context);
 	void run();
 
+private:
 	void acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result, uint8_t progress = 0);
 
 	/**
@@ -235,7 +229,7 @@ private:
 	void update_rx_stats(const mavlink_message_t &message);
 
 	px4::atomic_bool 	_should_exit{false};
-	pthread_t		_thread {};
+
 	/**
 	 * @brief Updates optical flow parameters.
 	 */
@@ -285,6 +279,8 @@ private:
 	uint8_t _mavlink_status_last_buffer_overrun{0};
 	uint8_t _mavlink_status_last_parse_error{0};
 	uint16_t _mavlink_status_last_packet_rx_drop_count{0};
+
+	hrt_abstime _last_send_update{0};
 
 	// ORB publications
 	uORB::Publication<airspeed_s>				_airspeed_pub{ORB_ID(airspeed)};

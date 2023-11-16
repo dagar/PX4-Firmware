@@ -40,12 +40,13 @@
  * @author Anton Babushkin <anton.babushkin@me.com>
  */
 
+#include <poll.h>
 #include <termios.h>
 
-#ifdef CONFIG_NET
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netutils/netlib.h>
+#if defined(CONFIG_NET)
+# include <arpa/inet.h>
+# include <netinet/in.h>
+# include <netutils/netlib.h>
 #endif
 
 #include <containers/LockGuard.hpp>
@@ -584,14 +585,14 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const FLOW_CON
 	}
 
 	/* open uart */
-	_uart_fd = ::open(uart_name, O_RDWR | O_NOCTTY);
+	_fd = ::open(uart_name, O_RDWR | O_NOCTTY);
 
 	/*
 	 * Return here in the iridium mode since the iridium driver does not
 	 * support the subsequent function calls.
 	*/
-	if (_uart_fd < 0 || _mode == MAVLINK_MODE_IRIDIUM) {
-		return _uart_fd;
+	if (_fd < 0 || _mode == MAVLINK_MODE_IRIDIUM) {
+		return _fd;
 	}
 
 	/* Try to set baud rate */
@@ -599,9 +600,9 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const FLOW_CON
 	int termios_state;
 
 	/* Initialize the uart config */
-	if ((termios_state = tcgetattr(_uart_fd, &uart_config)) < 0) {
+	if ((termios_state = tcgetattr(_fd, &uart_config)) < 0) {
 		PX4_ERR("ERR GET CONF %s: %d\n", uart_name, termios_state);
-		::close(_uart_fd);
+		::close(_fd);
 		return -1;
 	}
 
@@ -611,7 +612,7 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const FLOW_CON
 	/* Set baud rate */
 	if (cfsetispeed(&uart_config, speed) < 0 || cfsetospeed(&uart_config, speed) < 0) {
 		PX4_ERR("ERR SET BAUD %s: %d\n", uart_name, termios_state);
-		::close(_uart_fd);
+		::close(_fd);
 		return -1;
 	}
 
@@ -620,9 +621,9 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const FLOW_CON
 	cfmakeraw(&uart_config);
 #endif
 
-	if ((termios_state = tcsetattr(_uart_fd, TCSANOW, &uart_config)) < 0) {
+	if ((termios_state = tcsetattr(_fd, TCSANOW, &uart_config)) < 0) {
 		PX4_WARN("ERR SET CONF %s\n", uart_name);
-		::close(_uart_fd);
+		::close(_fd);
 		return -1;
 	}
 
@@ -631,7 +632,7 @@ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const FLOW_CON
 		PX4_WARN("hardware flow control not supported");
 	}
 
-	return _uart_fd;
+	return _fd;
 }
 
 int
@@ -639,17 +640,16 @@ Mavlink::setup_flow_control(enum FLOW_CONTROL_MODE mode)
 {
 	struct termios uart_config;
 
-	int ret = tcgetattr(_uart_fd, &uart_config);
+	int ret = tcgetattr(_fd, &uart_config);
 
 	if (mode != FLOW_CONTROL_OFF) {
 		uart_config.c_cflag |= CRTSCTS;
 
 	} else {
 		uart_config.c_cflag &= ~CRTSCTS;
-
 	}
 
-	ret = tcsetattr(_uart_fd, TCSANOW, &uart_config);
+	ret = tcsetattr(_fd, TCSANOW, &uart_config);
 
 	if (!ret) {
 		_flow_control_mode = mode;
@@ -711,7 +711,7 @@ Mavlink::get_free_tx_buf()
 	{
 
 #if defined(__PX4_NUTTX)
-		(void) ioctl(_uart_fd, FIONSPACE, (unsigned long)&buf_free);
+		(void) ioctl(_fd, FIONSPACE, (unsigned long)&buf_free);
 #else
 		// No FIONSPACE on Linux todo:use SIOCOUTQ  and queue size to emulate FIONSPACE
 		//Linux cp210x does not support TIOCOUTQ
@@ -737,7 +737,6 @@ Mavlink::get_free_tx_buf()
 
 void Mavlink::send_start(int length)
 {
-	pthread_mutex_lock(&_send_mutex);
 	_last_write_try_time = hrt_absolute_time();
 
 	// check if there is space in the buffer
@@ -758,7 +757,6 @@ void Mavlink::send_start(int length)
 void Mavlink::send_finish()
 {
 	if (_tx_buffer_low || (_buf_fill == 0)) {
-		pthread_mutex_unlock(&_send_mutex);
 		return;
 	}
 
@@ -766,7 +764,7 @@ void Mavlink::send_finish()
 
 	// send message to UART
 	if (get_protocol() == Protocol::SERIAL) {
-		ret = ::write(_uart_fd, _buf, _buf_fill);
+		ret = ::write(_fd, _buf, _buf_fill);
 	}
 
 #if defined(MAVLINK_UDP)
@@ -777,7 +775,7 @@ void Mavlink::send_finish()
 
 		if (_src_addr_initialized) {
 # endif // CONFIG_NET
-			ret = sendto(_socket_fd, _buf, _buf_fill, 0, (struct sockaddr *)&_src_addr, sizeof(_src_addr));
+			ret = sendto(_fd, _buf, _buf_fill, 0, (struct sockaddr *)&_src_addr, sizeof(_src_addr));
 # if defined(CONFIG_NET)
 		}
 
@@ -792,7 +790,7 @@ void Mavlink::send_finish()
 
 			if (_broadcast_address_found && _buf_fill > 0) {
 
-				int bret = sendto(_socket_fd, _buf, _buf_fill, 0, (struct sockaddr *)&_bcast_addr, sizeof(_bcast_addr));
+				int bret = sendto(_fd, _buf, _buf_fill, 0, (struct sockaddr *)&_bcast_addr, sizeof(_bcast_addr));
 
 				if (bret <= 0) {
 					if (!_broadcast_failed_warned) {
@@ -819,8 +817,6 @@ void Mavlink::send_finish()
 	}
 
 	_buf_fill = 0;
-
-	pthread_mutex_unlock(&_send_mutex);
 }
 
 void Mavlink::send_bytes(const uint8_t *buf, unsigned packet_len)
@@ -852,7 +848,7 @@ void Mavlink::find_broadcast_address()
 	ifconf.ifc_req = nullptr;
 	ifconf.ifc_len = 0;
 
-	ret = ioctl(_socket_fd, SIOCGIFCONF, &ifconf);
+	ret = ioctl(_fd, SIOCGIFCONF, &ifconf);
 
 	if (ret != 0) {
 		PX4_WARN("getting required buffer size failed");
@@ -873,7 +869,7 @@ void Mavlink::find_broadcast_address()
 
 	memset(ifconf.ifc_req, 0, ifconf.ifc_len);
 
-	ret = ioctl(_socket_fd, SIOCGIFCONF, &ifconf);
+	ret = ioctl(_fd, SIOCGIFCONF, &ifconf);
 
 	if (ret != 0) {
 		PX4_ERR("getting network config failed");
@@ -929,7 +925,7 @@ void Mavlink::find_broadcast_address()
 		}
 
 		if (!_broadcast_address_found) {
-			const struct in_addr netmask_addr = query_netmask_addr(_socket_fd, *cur_ifreq);
+			const struct in_addr netmask_addr = query_netmask_addr(_fd, *cur_ifreq);
 			const struct in_addr broadcast_addr = compute_broadcast_addr(sin_addr, netmask_addr);
 
 			if (_interface_name && strstr(cur_ifreq->ifr_name, _interface_name) == nullptr) { continue; }
@@ -954,7 +950,7 @@ void Mavlink::find_broadcast_address()
 
 		int broadcast_opt = 1;
 
-		if (setsockopt(_socket_fd, SOL_SOCKET, SO_BROADCAST, &broadcast_opt, sizeof(broadcast_opt)) < 0) {
+		if (setsockopt(_fd, SOL_SOCKET, SO_BROADCAST, &broadcast_opt, sizeof(broadcast_opt)) < 0) {
 			PX4_WARN("setting broadcast permission failed");
 		}
 
@@ -995,12 +991,12 @@ void Mavlink::init_udp()
 	_myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	_myaddr.sin_port = htons(_network_port);
 
-	if ((_socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		PX4_WARN("create socket failed: %s", strerror(errno));
 		return;
 	}
 
-	if (bind(_socket_fd, (struct sockaddr *)&_myaddr, sizeof(_myaddr)) < 0) {
+	if (bind(_fd, (struct sockaddr *)&_myaddr, sizeof(_myaddr)) < 0) {
 		PX4_WARN("bind failed: %s", strerror(errno));
 		return;
 	}
@@ -1308,8 +1304,6 @@ Mavlink::update_rate_mult()
 	float hardware_mult = 1.0f;
 	bool log_radio_timeout = false;
 
-	pthread_mutex_lock(&_radio_status_mutex);
-
 	// scale down if we have a TX err rate suggesting link congestion
 	if ((_tstatus.tx_error_rate_avg > 0.f) && !_radio_status_critical) {
 		hardware_mult = _tstatus.tx_rate_avg / (_tstatus.tx_rate_avg + _tstatus.tx_error_rate_avg);
@@ -1330,8 +1324,6 @@ Mavlink::update_rate_mult()
 		hardware_mult *= _radio_status_mult;
 	}
 
-	pthread_mutex_unlock(&_radio_status_mutex);
-
 	if (log_radio_timeout) {
 		PX4_ERR("instance %d: RADIO_STATUS timeout", _instance_id);
 	}
@@ -1346,7 +1338,6 @@ Mavlink::update_rate_mult()
 void
 Mavlink::update_radio_status(const radio_status_s &radio_status)
 {
-	pthread_mutex_lock(&_radio_status_mutex);
 	_rstatus = radio_status;
 	_radio_status_available = true;
 
@@ -1371,8 +1362,6 @@ Mavlink::update_radio_status(const radio_status_s &radio_status)
 		/* Constrain radio status multiplier between 1% and 100% to allow recovery */
 		_radio_status_mult = math::constrain(_radio_status_mult, 0.01f, 1.0f);
 	}
-
-	pthread_mutex_unlock(&_radio_status_mutex);
 }
 
 int
@@ -2147,8 +2136,6 @@ Mavlink::task_main(int argc, char *argv[])
 	}
 
 	pthread_mutex_init(&_message_buffer_mutex, nullptr);
-	pthread_mutex_init(&_send_mutex, nullptr);
-	pthread_mutex_init(&_radio_status_mutex, nullptr);
 
 	/* if we are passing on mavlink messages, we need to prepare a buffer for this instance */
 	if (get_forwarding_on()) {
@@ -2191,23 +2178,13 @@ Mavlink::task_main(int argc, char *argv[])
 	}
 
 	/* set main loop delay depending on data rate to minimize CPU overhead */
-	_main_loop_delay = (MAIN_LOOP_DELAY * 1000) / _datarate;
-
-	/* hard limit to 1000 Hz at max */
-	if (_main_loop_delay < MAVLINK_MIN_INTERVAL) {
-		_main_loop_delay = MAVLINK_MIN_INTERVAL;
-	}
-
-	/* hard limit to 100 Hz at least */
-	if (_main_loop_delay > MAVLINK_MAX_INTERVAL) {
-		_main_loop_delay = MAVLINK_MAX_INTERVAL;
-	}
+	_main_loop_delay = math::constrain((MAIN_LOOP_DELAY * 1000) / _datarate, MAVLINK_MIN_INTERVAL, MAVLINK_MAX_INTERVAL);
 
 	/* open the UART device after setting the instance, as it might block */
 	if (get_protocol() == Protocol::SERIAL) {
-		_uart_fd = mavlink_open_uart(_baudrate, _device_name, _flow_control);
+		_fd = mavlink_open_uart(_baudrate, _device_name, _flow_control);
 
-		if (_uart_fd < 0) {
+		if (_fd < 0) {
 			PX4_ERR("could not open %s", _device_name);
 			return PX4_ERROR;
 		}
@@ -2229,8 +2206,6 @@ Mavlink::task_main(int argc, char *argv[])
 		send_autopilot_capabilities();
 	}
 
-	_receiver.start();
-
 	uint16_t event_sequence_offset = 0; // offset to account for skipped events, not sent via MAVLink
 
 	_mavlink_start_time = hrt_absolute_time();
@@ -2239,7 +2214,47 @@ Mavlink::task_main(int argc, char *argv[])
 
 	while (!should_exit()) {
 		/* main loop */
-		px4_usleep(_main_loop_delay);
+
+		// TODO:
+
+
+		struct pollfd fds[1] = {};
+
+		if (get_protocol() == Protocol::SERIAL) {
+			fds[0].fd = get_fd();
+			fds[0].events = POLLIN;
+		}
+
+#if defined(MAVLINK_UDP)
+
+		if (get_protocol() == Protocol::UDP) {
+			fds[0].fd = get_fd();
+			fds[0].events = POLLIN;
+		}
+
+#endif // MAVLINK_UDP
+
+		// TODO:
+		//  perf
+		// last_send_update
+		// buffer sizing
+		//  rx _parameter_update_sub
+
+		// TODO: check avg TX data rate and sleep if necessary
+
+		int timeout_ms = _main_loop_delay / 1000;
+		int ret = poll(&fds[0], 1, timeout_ms);
+
+		if (ret < 0) {
+			PX4_ERR("poll error");
+		}
+
+		if (fds[0].revents & POLLIN) { // TODO: || timeout (10 Hz)
+			// TODO: check bytes available and sleep longer if necessary
+			_receiver.run();
+		}
+
+		px4_usleep(_main_loop_delay); // TODO:
 
 		if (!should_transmit()) {
 			check_requested_subscriptions();
@@ -2251,7 +2266,7 @@ Mavlink::task_main(int argc, char *argv[])
 
 		const hrt_abstime t = hrt_absolute_time();
 
-		update_rate_mult();
+		update_rate_mult(); // TODO: throttle this?
 
 		// check for parameter updates
 		if (_parameter_update_sub.updated()) {
@@ -2463,11 +2478,11 @@ Mavlink::task_main(int argc, char *argv[])
 					_mavlink_ulog->start_ack_received();
 				}
 
-				int ret = _mavlink_ulog->handle_update(get_channel());
+				int ulog_update_ret = _mavlink_ulog->handle_update(get_channel());
 
-				if (ret < 0) { //abort the streaming on error
-					if (ret != -1) {
-						PX4_WARN("mavlink ulog stream update failed, stopping (%i)", ret);
+				if (ulog_update_ret < 0) { //abort the streaming on error
+					if (ulog_update_ret != -1) {
+						PX4_WARN("mavlink ulog stream update failed, stopping (%i)", ulog_update_ret);
 					}
 
 					_mavlink_ulog->stop();
@@ -2548,24 +2563,21 @@ Mavlink::task_main(int argc, char *argv[])
 		perf_end(_loop_perf);
 	}
 
-	_receiver.stop();
-
 	delete _subscribe_to_stream;
 	_subscribe_to_stream = nullptr;
 
 	/* delete streams */
 	_streams.clear();
 
-	if (_uart_fd >= 0) {
-		/* discard all pending data, as close() might block otherwise on NuttX with flow control enabled */
-		tcflush(_uart_fd, TCIOFLUSH);
-		/* close UART */
-		::close(_uart_fd);
-	}
+	if (_fd >= 0) {
+		if (get_protocol() == Protocol::SERIAL) {
+			/* discard all pending data, as close() might block otherwise on NuttX with flow control enabled */
+			tcflush(_fd, TCIOFLUSH);
+		}
 
-	if (_socket_fd >= 0) {
-		close(_socket_fd);
-		_socket_fd = -1;
+		::close(_fd);
+
+		_fd = -1;
 	}
 
 	if (_mavlink_ulog) {
@@ -2573,8 +2585,6 @@ Mavlink::task_main(int argc, char *argv[])
 		_mavlink_ulog = nullptr;
 	}
 
-	pthread_mutex_destroy(&_send_mutex);
-	pthread_mutex_destroy(&_radio_status_mutex);
 	pthread_mutex_destroy(&_message_buffer_mutex);
 
 	PX4_INFO("exiting channel %i", (int)_channel);
@@ -2679,9 +2689,9 @@ void Mavlink::publish_telemetry_status()
 void Mavlink::configure_sik_radio()
 {
 	/* radio config check */
-	if (_uart_fd >= 0 && _param_sik_radio_id.get() != 0) {
+	if (_fd >= 0 && _param_sik_radio_id.get() != 0) {
 		/* request to configure radio and radio is present */
-		FILE *fs = fdopen(_uart_fd, "w");
+		FILE *fs = fdopen(_fd, "w");
 
 		if (fs) {
 			/* switch to AT command mode */
@@ -2719,7 +2729,7 @@ void Mavlink::configure_sik_radio()
 #endif
 
 		} else {
-			PX4_WARN("open fd %d failed", _uart_fd);
+			PX4_WARN("open fd %d failed", _fd);
 		}
 
 		/* reset param and save */
