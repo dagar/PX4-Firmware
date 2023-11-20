@@ -157,6 +157,13 @@ bool FlightTaskDrop::update()
 					&& (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s);
 	const bool velocity_valid = velocity.isAllFinite() && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
 				    && vehicle_local_position.v_xy_valid && vehicle_local_position.v_z_valid;
+
+	const bool velocity_xy_valid = Vector2f(velocity.xy()).isAllFinite()
+				       && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
+				       && vehicle_local_position.v_xy_valid;
+	const bool velocity_z_valid = PX4_ISFINITE(velocity(2)) && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
+				      && vehicle_local_position.v_z_valid;
+
 	const bool position_valid = position.isAllFinite() && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
 				    && vehicle_local_position.xy_valid && vehicle_local_position.z_valid;
 
@@ -259,9 +266,14 @@ bool FlightTaskDrop::update()
 				}
 
 				// velocity setpoint track velocity to seed controller
-				if (velocity_valid) {
-					_velocity_setpoint = _velocity;
+				if (velocity_xy_valid) {
+					_velocity_setpoint.xy() = _velocity.xy();
 				}
+
+				if (velocity_z_valid) {
+					_velocity_setpoint(2) = _velocity(2);
+				}
+
 
 				// mavlink log info countdown
 				//  beeps, lights
@@ -293,8 +305,12 @@ bool FlightTaskDrop::update()
 				}
 
 				// velocity setpoint track velocity to seed controller
-				if (velocity_valid) {
-					_velocity_setpoint = velocity;
+				if (velocity_xy_valid) {
+					_velocity_setpoint.xy() = _velocity.xy();
+				}
+
+				if (velocity_z_valid) {
+					_velocity_setpoint(2) = _velocity(2);
 				}
 
 				bool drop_detected = false;
@@ -360,8 +376,12 @@ bool FlightTaskDrop::update()
 				}
 
 				// velocity setpoint track velocity to seed controller
-				if (velocity_valid) {
-					_velocity_setpoint = _velocity;
+				if (velocity_xy_valid) {
+					_velocity_setpoint.xy() = _velocity.xy();
+				}
+
+				if (velocity_z_valid) {
+					_velocity_setpoint(2) = _velocity(2);
 				}
 
 			} else {
@@ -404,8 +424,12 @@ bool FlightTaskDrop::update()
 				}
 
 				// velocity setpoint track velocity to seed controller
-				if (velocity_valid) {
-					_velocity_setpoint = _velocity;
+				if (velocity_xy_valid) {
+					_velocity_setpoint.xy() = _velocity.xy();
+				}
+
+				if (velocity_z_valid) {
+					_velocity_setpoint(2) = _velocity(2);
 				}
 
 			} else {
