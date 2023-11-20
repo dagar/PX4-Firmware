@@ -55,6 +55,12 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_local_position.h>
 
+#include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/vehicle_attitude_setpoint.h>
+#include <uORB/topics/vehicle_rates_setpoint.h>
+
+#include <uORB/Publication.hpp>
+
 class FlightTaskDrop : public FlightTask
 {
 public:
@@ -77,6 +83,12 @@ private:
 	void _ekfResetHandlerHeading(float delta_psi) override;
 
 	void updateParams() override; /**< See ModuleParam class */
+
+	uORB::PublicationData<vehicle_rates_setpoint_s>     _vehicle_rates_setpoint_pub{ORB_ID(vehicle_rates_setpoint)};
+	uORB::PublicationData<vehicle_attitude_setpoint_s>  _vehicle_attitude_setpoint_pub{ORB_ID(vehicle_attitude_setpoint)};
+
+	uORB::SubscriptionData<vehicle_angular_velocity_s> _vehicle_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
+	uORB::SubscriptionData<vehicle_attitude_s> _vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
 
 	uORB::SubscriptionData<actuator_armed_s> _actuator_armed_sub{ORB_ID(actuator_armed)};
 

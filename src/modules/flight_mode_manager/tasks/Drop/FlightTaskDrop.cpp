@@ -125,6 +125,8 @@ bool FlightTaskDrop::updateInitialize()
 	_actuator_armed_sub.update();
 	_failsafe_flags_sub.update();
 	_home_position_sub.update();
+	_vehicle_angular_velocity_sub.update();
+	_vehicle_attitude_sub.update();
 	_vehicle_local_position_sub.update();
 	_vehicle_status_sub.update();
 
@@ -146,6 +148,12 @@ bool FlightTaskDrop::update()
 	_failsafe_flags_sub.update();
 	const failsafe_flags_s &failsafe_flags = _failsafe_flags_sub.get();
 
+	_vehicle_angular_velocity_sub.update();
+	const vehicle_angular_velocity_s &vehicle_angular_velocity = _vehicle_angular_velocity_sub.get();
+
+	_vehicle_attitude_sub.update();
+	const vehicle_attitude_s &vehicle_attitude = _vehicle_attitude_sub.get();
+
 	_vehicle_local_position_sub.update();
 	const vehicle_local_position_s &vehicle_local_position = _vehicle_local_position_sub.get();
 
@@ -161,8 +169,9 @@ bool FlightTaskDrop::update()
 	const bool velocity_xy_valid = Vector2f(velocity.xy()).isAllFinite()
 				       && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
 				       && vehicle_local_position.v_xy_valid;
-	const bool velocity_z_valid = PX4_ISFINITE(velocity(2)) && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
-				      && vehicle_local_position.v_z_valid;
+
+	// const bool velocity_z_valid = PX4_ISFINITE(velocity(2)) && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
+	// 			      && vehicle_local_position.v_z_valid;
 
 	const bool position_valid = position.isAllFinite() && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
 				    && vehicle_local_position.xy_valid && vehicle_local_position.z_valid;
@@ -239,13 +248,11 @@ bool FlightTaskDrop::update()
 			if (actuator_armed.armed) {
 
 				_constraints.want_takeoff = false;
-				_constraints.speed_up = 0.f;
-				_constraints.speed_down = 0.f;
 
 				_position_setpoint.setNaN();
 				_velocity_setpoint.setNaN();
-				_acceleration_setpoint.setNaN();
-				_jerk_setpoint.setNaN();
+				_acceleration_setpoint.zero();
+				_jerk_setpoint.zero();
 
 				const hrt_abstime arm_timeout_us = math::constrain(_param_mpc_drop_laun_t.get(), 0.f, 3600.f) * 1e6f;
 
@@ -265,16 +272,6 @@ bool FlightTaskDrop::update()
 					// 3..2..1
 				}
 
-				// velocity setpoint track velocity to seed controller
-				if (velocity_xy_valid) {
-					_velocity_setpoint.xy() = _velocity.xy();
-				}
-
-				if (velocity_z_valid) {
-					_velocity_setpoint(2) = _velocity(2);
-				}
-
-
 				// mavlink log info countdown
 				//  beeps, lights
 				// TODO: dshot tunes?
@@ -293,26 +290,6 @@ bool FlightTaskDrop::update()
 
 			if (actuator_armed.armed) {
 
-				if (_state_prev != _state) {
-					_constraints.want_takeoff = false;
-					_constraints.speed_up = 0.f;
-					_constraints.speed_down = 0.f;
-
-					_position_setpoint.setNaN();
-					_velocity_setpoint.setNaN();
-					_acceleration_setpoint.setNaN();
-					_jerk_setpoint.setNaN();
-				}
-
-				// velocity setpoint track velocity to seed controller
-				if (velocity_xy_valid) {
-					_velocity_setpoint.xy() = _velocity.xy();
-				}
-
-				if (velocity_z_valid) {
-					_velocity_setpoint(2) = _velocity(2);
-				}
-
 				bool drop_detected = false;
 
 				if (velocity_valid && acceleration_valid) {
@@ -329,11 +306,20 @@ bool FlightTaskDrop::update()
 				// filter both
 
 				if (drop_detected && !failsafe_flags.angular_velocity_invalid) {
+
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Drop detected! Vz:%.1f, Az:%.1f. Activating rate control",
 							 (double)velocity(2), (double)acceleration(2));
 
 					_state = DropState::RATE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
+
+					// publish initial vehicle_rates_setpoint
+					vehicle_rates_setpoint_s vehicle_rates_setpoint{};
+					vehicle_rates_setpoint.roll  = vehicle_angular_velocity.xyz[0];
+					vehicle_rates_setpoint.pitch = vehicle_angular_velocity.xyz[1];
+					vehicle_rates_setpoint.yaw   = vehicle_angular_velocity.xyz[2];
+					vehicle_rates_setpoint.timestamp = hrt_absolute_time();
+					_vehicle_rates_setpoint_pub.update(vehicle_rates_setpoint);
 				}
 
 			} else {
@@ -349,39 +335,46 @@ bool FlightTaskDrop::update()
 				mavlink_log_info(&_mavlink_log_pub, "Drop: rate control enabled");
 			}
 
-
 			if (actuator_armed.armed) {
 
 				if (_state_prev != _state) {
-					// reset constraints
-					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
-					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
-
-					_position_setpoint.setNaN();
-					_velocity_setpoint.setNaN();
-					_acceleration_setpoint.setNaN();
-					_jerk_setpoint.setNaN();
 				}
 
-				if (!failsafe_flags.attitude_invalid && !actuator_armed.lockdown) {
+				const float dt = _deltatime;
+				const float max_rate_rad_s = math::radians(100.f); // 100 deg/s max
+				const float dv_max = math::constrain(max_rate_rad_s * dt, 0.001f, 10.f);
+
+				// move setpoint to 0, but no faster than 100 deg/s
+				vehicle_rates_setpoint_s &rates_setpoint = _vehicle_rates_setpoint_pub.get();
+				rates_setpoint.roll  = math::constrain(0.f, rates_setpoint.roll  - dv_max, rates_setpoint.roll  + dv_max);
+				rates_setpoint.pitch = math::constrain(0.f, rates_setpoint.pitch - dv_max, rates_setpoint.pitch + dv_max);
+				rates_setpoint.yaw   = math::constrain(0.f, rates_setpoint.yaw   - dv_max, rates_setpoint.yaw   + dv_max);
+				rates_setpoint.thrust_body[2] = -0.1; // min throttle (10%)
+				rates_setpoint.timestamp = hrt_absolute_time();
+				_vehicle_rates_setpoint_pub.update();
+
+				if (!failsafe_flags.attitude_invalid && !actuator_armed.lockdown
+				    && !Vector3f(vehicle_angular_velocity.xyz).longerThan(max_rate_rad_s)
+				   ) {
+
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating attitude control");
 					_state = DropState::ATTITUDE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 
-					_position_setpoint.setNaN();
-					_velocity_setpoint.setNaN();
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
-				}
+					// publish initial vehicle_attitude_setpoint
+					vehicle_attitude_setpoint_s vehicle_attitude_setpoint{};
 
-				// velocity setpoint track velocity to seed controller
-				if (velocity_xy_valid) {
-					_velocity_setpoint.xy() = _velocity.xy();
-				}
+					const Quatf q{vehicle_attitude.q};
+					q.copyTo(vehicle_attitude_setpoint.q_d);
 
-				if (velocity_z_valid) {
-					_velocity_setpoint(2) = _velocity(2);
+					const Eulerf euler{q};
+					vehicle_attitude_setpoint.roll_body = euler(0);
+					vehicle_attitude_setpoint.pitch_body = euler(1);
+					vehicle_attitude_setpoint.yaw_body = euler(2);
+					vehicle_attitude_setpoint.thrust_body[2] = rates_setpoint.thrust_body[2];
+					vehicle_attitude_setpoint.timestamp = hrt_absolute_time();
+					_vehicle_attitude_setpoint_pub.update(vehicle_attitude_setpoint);
 				}
 
 			} else {
@@ -400,36 +393,51 @@ bool FlightTaskDrop::update()
 			if (actuator_armed.armed) {
 
 				if (_state_prev != _state) {
+					_constraints.want_takeoff = true;
+				}
+
+				vehicle_attitude_setpoint_s &attitude_setpoint = _vehicle_attitude_setpoint_pub.get();
+
+				const Eulerf euler{Quatf{vehicle_attitude.q}};
+				Eulerf euler_sp{Quatf{attitude_setpoint.q_d}};
+
+				// bring roll and pitch to 0
+				euler_sp(0) = 0.f; // TODO: slew
+				euler_sp(1) = 0.f; // TODO: slew
+				euler_sp(2) = euler(2); // match yaw
+
+				Quatf q_sp = euler_sp;
+				q_sp.copyTo(attitude_setpoint.q_d);
+
+				attitude_setpoint.roll_body = euler_sp(0);
+				attitude_setpoint.pitch_body = euler_sp(1);
+				attitude_setpoint.yaw_body = euler_sp(2);
+				attitude_setpoint.thrust_body[2] = -0.1; // min throttle (10%)
+				attitude_setpoint.timestamp = hrt_absolute_time();
+				_vehicle_attitude_setpoint_pub.update();
+
+				// roll and pitch within 10 degrees of level
+				if (!failsafe_flags.local_altitude_invalid
+				    && (fabsf(euler.phi()) < math::radians(10.f))
+				    && (fabsf(euler.theta()) < math::radians(10.f))
+				   ) {
+					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating height rate control");
+					_state = DropState::HEIGHT_RATE_CONTROL_ENABLED;
+					_state_last_transition_time = hrt_absolute_time();
+
 					// reset constraints
 					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
 					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
 
+					// publish initial trajectory setpoint
 					_position_setpoint.setNaN();
-					_velocity_setpoint.setNaN();
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
-				}
 
-				if (!failsafe_flags.local_altitude_invalid) {
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating height rate control");
-					_state = DropState::HEIGHT_RATE_CONTROL_ENABLED;
-					_state_last_transition_time = hrt_absolute_time();
-
-					_position_setpoint.setNaN();
 					_velocity_setpoint.setNaN();
 					_velocity_setpoint(2) = _velocity(2);
+
 					_acceleration_setpoint.zero();
 					_jerk_setpoint.zero();
-				}
-
-				// velocity setpoint track velocity to seed controller
-				if (velocity_xy_valid) {
-					_velocity_setpoint.xy() = _velocity.xy();
-				}
-
-				if (velocity_z_valid) {
-					_velocity_setpoint(2) = _velocity(2);
 				}
 
 			} else {
@@ -452,20 +460,22 @@ bool FlightTaskDrop::update()
 					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
 					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
-
-					_position_setpoint.setNaN();
-
-					_velocity_setpoint.setNaN();
-					_velocity_setpoint(2) = _velocity(2);
-
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
 				}
 
-				const float dt = _deltatime;
-				const float dv_max = math::constrain(_param_mpc_drop_az_max.get() * dt, 0.001f, 10.f);
+				_position_setpoint.setNaN();
+				_acceleration_setpoint.zero();
+				_jerk_setpoint.zero();
+
+				_velocity_setpoint(0) = NAN;
+				_velocity_setpoint(1) = NAN;
+
+				if (!PX4_ISFINITE(_velocity_setpoint(2))) {
+					_velocity_setpoint(2) = _velocity(2);
+				}
 
 				// move vz setpoint to 0, but no faster than MPC_DROP_AZ_MAX
+				const float dt = _deltatime;
+				const float dv_max = math::constrain(_param_mpc_drop_az_max.get() * dt, 0.001f, 10.f);
 				_velocity_setpoint(2) = math::constrain(0.f, _velocity_setpoint(2) - dv_max, _velocity_setpoint(2) + dv_max);
 
 				// wait for full
@@ -474,13 +484,6 @@ bool FlightTaskDrop::update()
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control");
 					_state = DropState::VELOCITY_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
-
-					_position_setpoint.setNaN();
-
-					_velocity_setpoint = _velocity;
-
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
 				}
 
 			} else {
@@ -502,17 +505,15 @@ bool FlightTaskDrop::update()
 					_constraints.speed_up = math::max(_param_mpc_z_vel_max_up.get(), fabsf(_velocity(2)));
 					_constraints.speed_down = math::max(_param_mpc_z_vel_max_dn.get(), fabsf(_velocity(2)));
 					_constraints.want_takeoff = true;
-
-					// position still not active
-					_position_setpoint.setNaN();
-
-					_velocity_setpoint = _velocity;
-
-					// otherwise all zero
-					_acceleration_setpoint.zero();
-					_jerk_setpoint.zero();
 				}
 
+				_position_setpoint.setNaN();
+				_acceleration_setpoint.zero();
+				_jerk_setpoint.zero();
+
+				if (!_velocity_setpoint.isAllFinite()) {
+					_velocity_setpoint = _velocity;
+				}
 
 				const float dt = _deltatime;
 				const float dv_max = math::constrain(_param_mpc_acc_hor.get() * dt, 0.001f, 10.f);
@@ -542,6 +543,8 @@ bool FlightTaskDrop::update()
 			if (actuator_armed.armed) {
 
 				if (_state_prev != _state) {
+					// initial trajectory setpoint (full position control)
+
 					// latch onto current position
 					_offboard_pos_sp_last = _position;
 					_offboard_vel_sp_last = {};
@@ -700,6 +703,8 @@ bool FlightTaskDrop::update()
 
 	_state_prev = state_prev;
 
+
+	_constraints.drop_state = (uint8_t)_state;
 
 
 	// FALLTHROUGH
