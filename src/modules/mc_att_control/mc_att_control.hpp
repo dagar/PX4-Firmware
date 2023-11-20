@@ -44,6 +44,7 @@
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
+#include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/autotune_attitude_control_status.h>
@@ -96,6 +97,7 @@ private:
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
+	uORB::Subscription _actuator_armed_sub{ORB_ID(actuator_armed)};
 	uORB::Subscription _autotune_attitude_control_status_sub{ORB_ID(autotune_attitude_control_status)};
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription _vehicle_attitude_setpoint_sub{ORB_ID(vehicle_attitude_setpoint)};
@@ -124,6 +126,7 @@ private:
 	hrt_abstime _last_run{0};
 	hrt_abstime _last_attitude_setpoint{0};
 
+	bool _actuator_lockdown{false};
 	bool _reset_yaw_sp{true};
 	bool _heading_good_for_control{true}; ///< initialized true to have heading lock when local position never published
 	bool _vehicle_type_rotary_wing{true};

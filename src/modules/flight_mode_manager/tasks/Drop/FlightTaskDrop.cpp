@@ -258,6 +258,11 @@ bool FlightTaskDrop::update()
 					// 3..2..1
 				}
 
+				// velocity setpoint track velocity to seed controller
+				if (velocity_valid) {
+					_velocity_setpoint = _velocity;
+				}
+
 				// mavlink log info countdown
 				//  beeps, lights
 				// TODO: dshot tunes?
@@ -343,7 +348,7 @@ bool FlightTaskDrop::update()
 					_jerk_setpoint.setNaN();
 				}
 
-				if (!failsafe_flags.attitude_invalid) {
+				if (!failsafe_flags.attitude_invalid && !actuator_armed.lockdown) {
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating attitude control");
 					_state = DropState::ATTITUDE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
@@ -355,7 +360,9 @@ bool FlightTaskDrop::update()
 				}
 
 				// velocity setpoint track velocity to seed controller
-				_velocity_setpoint = _velocity;
+				if (velocity_valid) {
+					_velocity_setpoint = _velocity;
+				}
 
 			} else {
 				_state = DropState::DISARMED;
@@ -397,7 +404,9 @@ bool FlightTaskDrop::update()
 				}
 
 				// velocity setpoint track velocity to seed controller
-				_velocity_setpoint = _velocity;
+				if (velocity_valid) {
+					_velocity_setpoint = _velocity;
+				}
 
 			} else {
 				_state = DropState::DISARMED;

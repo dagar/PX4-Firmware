@@ -210,6 +210,14 @@ MulticopterAttitudeControl::Run()
 		parameters_updated();
 	}
 
+	if (_actuator_armed_sub.updated()) {
+		actuator_armed_s actuator_armed;
+
+		if (_actuator_armed_sub.copy(&actuator_armed)) {
+			_actuator_lockdown = actuator_armed.lockdown;
+		}
+	}
+
 	// run controller on attitude updates
 	vehicle_attitude_s v_att;
 
@@ -297,6 +305,36 @@ MulticopterAttitudeControl::Run()
 				_man_roll_input_filter.reset(0.f);
 				_man_pitch_input_filter.reset(0.f);
 			}
+
+
+			// DROP mode during actuator lockdown
+			if (_actuator_lockdown && _vehicle_control_mode.flag_control_altitude_enabled) {
+
+				vehicle_attitude_setpoint_s attitude_setpoint{};
+
+				const Eulerf euler{q};
+
+				q.copyTo(attitude_setpoint.q_d);
+
+				attitude_setpoint.roll_body = euler(0);
+				attitude_setpoint.pitch_body = euler(1);
+				attitude_setpoint.yaw_body = euler(2);
+
+				attitude_setpoint.reset_integral = true;
+
+				attitude_setpoint.thrust_body[2] = 0.f;
+				attitude_setpoint.timestamp = hrt_absolute_time();
+
+				_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
+
+				// update attitude controller setpoint immediately
+				_attitude_control.setAttitudeSetpoint(q, 0.f);
+				_thrust_setpoint_body = Vector3f(attitude_setpoint.thrust_body);
+				_last_attitude_setpoint = attitude_setpoint.timestamp;
+
+				_man_yaw_sp = euler.psi(); // reset
+			}
+
 
 			Vector3f rates_sp = _attitude_control.update(q);
 
