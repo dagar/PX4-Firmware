@@ -357,15 +357,18 @@ bool FlightTaskDrop::update()
 				rates_setpoint.pitch = math::constrain(0.f, rates_setpoint.pitch - dv_max, rates_setpoint.pitch + dv_max);
 				rates_setpoint.yaw   = math::constrain(0.f, rates_setpoint.yaw   - dv_max, rates_setpoint.yaw   + dv_max);
 
-				rates_setpoint.thrust_body[2] = -0.1; // min throttle (10%)
+				// throttle ramp up to _param_mpc_thr_hover.get() over 5 seconds
+				const float thr_ramp_time_s = 5.f;
 
-				//const float dthrottle_max = math::constrain(max_rate_rad_s * dt, 0.001f, 10.f);
-				//rates_setpoint.thrust_body[2] = math::constrain(rates_setpoint.thrust_body[2] - 0.01f, -_param_mpc_thr_hover.get(), 0.f);
+				// portion of throttle added each iteration is dt / thr_ramp_time_s
+				const float thr_inc = math::constrain((dt / thr_ramp_time_s) * _param_mpc_thr_hover.get(), 0.00001f, 0.01f);
+
+				// ramp to MPC_THR_HOVER max
+				rates_setpoint.thrust_body[2] = math::constrain(rates_setpoint.thrust_body[2] - thr_inc,
+								-_param_mpc_thr_hover.get(), 0.f);
 
 				rates_setpoint.timestamp = hrt_absolute_time();
 				_vehicle_rates_setpoint_pub.update();
-
-				// TODO: ramp up throttle
 
 				if (!failsafe_flags.attitude_invalid && !actuator_armed.lockdown
 				    && !Vector3f(vehicle_angular_velocity.xyz).longerThan(max_rate_rad_s)
@@ -425,14 +428,27 @@ bool FlightTaskDrop::update()
 				attitude_setpoint.roll_body = euler_sp(0);
 				attitude_setpoint.pitch_body = euler_sp(1);
 				attitude_setpoint.yaw_body = euler_sp(2);
-				attitude_setpoint.thrust_body[2] = -0.1; // min throttle (10%)
+
+				// throttle ramp up to _param_mpc_thr_hover.get() over 5 seconds
+				const float thr_ramp_time_s = 5.f;
+
+				// portion of throttle added each iteration is dt / thr_ramp_time_s
+				const float dt = _deltatime;
+				const float thr_inc = math::constrain((dt / thr_ramp_time_s) * _param_mpc_thr_hover.get(), 0.00001f, 0.01f);
+
+				// ramp to MPC_THR_HOVER max
+				attitude_setpoint.thrust_body[2] = math::constrain(attitude_setpoint.thrust_body[2] - thr_inc,
+								   -_param_mpc_thr_hover.get(), 0.f);
+				//attitude_setpoint.thrust_body[2] = -0.1; // min throttle (10%)
+
 				attitude_setpoint.timestamp = hrt_absolute_time();
 				_vehicle_attitude_setpoint_pub.update();
 
-				// roll and pitch within 10 degrees of level
+				// roll and pitch within 5 degrees of level, and angular velocity below 10 deg/s
 				if (!failsafe_flags.local_altitude_invalid
-				    && (fabsf(euler.phi()) < math::radians(10.f))
-				    && (fabsf(euler.theta()) < math::radians(10.f))
+				    && (fabsf(euler.phi()) < math::radians(5.f))
+				    && (fabsf(euler.theta()) < math::radians(5.f))
+				    && !Vector3f(vehicle_angular_velocity.xyz).longerThan(math::radians(10.f))
 				   ) {
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating height rate control");
 					_state = DropState::HEIGHT_RATE_CONTROL_ENABLED;
