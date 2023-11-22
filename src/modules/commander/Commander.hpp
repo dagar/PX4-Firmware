@@ -281,6 +281,8 @@ private:
 	uORB::Subscription					_vtol_vehicle_status_sub{ORB_ID(vtol_vehicle_status)};
 	uORB::Subscription					_vehicle_constraints_sub{ORB_ID(vehicle_constraints)};
 
+	uint8_t _vehicle_constraints_drop_state_prev{0};
+
 	uORB::SubscriptionInterval				_parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::SubscriptionMultiArray<telemetry_status_s>	_telemetry_status_subs{ORB_ID::telemetry_status};

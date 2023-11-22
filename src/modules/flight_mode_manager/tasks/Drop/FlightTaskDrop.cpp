@@ -166,9 +166,9 @@ bool FlightTaskDrop::update()
 	const bool velocity_valid = velocity.isAllFinite() && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
 				    && vehicle_local_position.v_xy_valid && vehicle_local_position.v_z_valid;
 
-	const bool velocity_xy_valid = Vector2f(velocity.xy()).isAllFinite()
-				       && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
-				       && vehicle_local_position.v_xy_valid;
+	// const bool velocity_xy_valid = Vector2f(velocity.xy()).isAllFinite()
+	// 			       && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
+	// 			       && vehicle_local_position.v_xy_valid;
 
 	// const bool velocity_z_valid = PX4_ISFINITE(velocity(2)) && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
 	// 			      && vehicle_local_position.v_z_valid;
@@ -228,8 +228,11 @@ bool FlightTaskDrop::update()
 
 			_position_setpoint.setNaN();
 			_velocity_setpoint.setNaN();
-			_acceleration_setpoint.setNaN();
-			_jerk_setpoint.setNaN();
+			_acceleration_setpoint.zero();
+			_jerk_setpoint.zero();
+
+			_yaw_setpoint = NAN;
+			_yawspeed_setpoint = NAN;
 
 			if (actuator_armed.armed) {
 				_state = DropState::ARMING;
@@ -253,6 +256,9 @@ bool FlightTaskDrop::update()
 				_velocity_setpoint.setNaN();
 				_acceleration_setpoint.zero();
 				_jerk_setpoint.zero();
+
+				_yaw_setpoint = NAN;
+				_yawspeed_setpoint = NAN;
 
 				const hrt_abstime arm_timeout_us = math::constrain(_param_mpc_drop_laun_t.get(), 0.f, 3600.f) * 1e6f;
 
@@ -350,9 +356,16 @@ bool FlightTaskDrop::update()
 				rates_setpoint.roll  = math::constrain(0.f, rates_setpoint.roll  - dv_max, rates_setpoint.roll  + dv_max);
 				rates_setpoint.pitch = math::constrain(0.f, rates_setpoint.pitch - dv_max, rates_setpoint.pitch + dv_max);
 				rates_setpoint.yaw   = math::constrain(0.f, rates_setpoint.yaw   - dv_max, rates_setpoint.yaw   + dv_max);
+
 				rates_setpoint.thrust_body[2] = -0.1; // min throttle (10%)
+
+				//const float dthrottle_max = math::constrain(max_rate_rad_s * dt, 0.001f, 10.f);
+				//rates_setpoint.thrust_body[2] = math::constrain(rates_setpoint.thrust_body[2] - 0.01f, -_param_mpc_thr_hover.get(), 0.f);
+
 				rates_setpoint.timestamp = hrt_absolute_time();
 				_vehicle_rates_setpoint_pub.update();
+
+				// TODO: ramp up throttle
 
 				if (!failsafe_flags.attitude_invalid && !actuator_armed.lockdown
 				    && !Vector3f(vehicle_angular_velocity.xyz).longerThan(max_rate_rad_s)
@@ -478,8 +491,11 @@ bool FlightTaskDrop::update()
 				const float dv_max = math::constrain(_param_mpc_drop_az_max.get() * dt, 0.001f, 10.f);
 				_velocity_setpoint(2) = math::constrain(0.f, _velocity_setpoint(2) - dv_max, _velocity_setpoint(2) + dv_max);
 
+				_yaw_setpoint = _yaw;
+				_yawspeed_setpoint = NAN;
+
 				// wait for full
-				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 1.f) && (fabsf(acceleration(2)) < 1.f)) {
+				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 3.f) && (fabsf(acceleration(2)) < 1.f)) {
 
 					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control");
 					_state = DropState::VELOCITY_CONTROL_ENABLED;
@@ -523,6 +539,9 @@ bool FlightTaskDrop::update()
 				_velocity_setpoint(1) = math::constrain(0.f, _velocity_setpoint(1) - dv_max, _velocity_setpoint(1) + dv_max);
 				_velocity_setpoint(2) = math::constrain(0.f, _velocity_setpoint(2) - dv_max, _velocity_setpoint(2) + dv_max);
 
+				_yaw_setpoint = _yaw;
+				_yawspeed_setpoint = NAN;
+
 				if (position_valid && !failsafe_flags.local_position_invalid && (_velocity.length() < 5.f)) {
 					_state = DropState::POSITION_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
@@ -551,6 +570,9 @@ bool FlightTaskDrop::update()
 					_offboard_time_stamp_last = _time_stamp_current;
 
 					_position_smoothing.reset(Vector3f{}, _velocity, _position);
+
+					_yaw_setpoint = _yaw;
+					_yawspeed_setpoint = NAN;
 				}
 
 				// When initializing with large velocity, allow 1g of

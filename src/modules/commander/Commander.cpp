@@ -1857,7 +1857,10 @@ void Commander::run()
 						break;
 					}
 
-
+					if (vehicle_constraints.drop_state != _vehicle_constraints_drop_state_prev) {
+						_vehicle_constraints_drop_state_prev = vehicle_constraints.drop_state;
+						_status_changed = true;
+					}
 				}
 			}
 		}
