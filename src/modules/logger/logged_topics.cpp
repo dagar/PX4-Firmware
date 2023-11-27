@@ -116,7 +116,7 @@ void LoggedTopics::add_default_topics()
 	add_topic("vehicle_attitude_setpoint", 50);
 	add_topic("vehicle_command");
 	add_topic("vehicle_command_ack");
-	add_topic("vehicle_constraints", 1000);
+	add_topic("vehicle_constraints");
 	add_topic("vehicle_control_mode");
 	add_topic("vehicle_global_position", 200);
 	add_topic("vehicle_gps_position", 500);
