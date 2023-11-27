@@ -357,8 +357,8 @@ bool FlightTaskDrop::update()
 				rates_setpoint.pitch = math::constrain(0.f, rates_setpoint.pitch - dv_max, rates_setpoint.pitch + dv_max);
 				rates_setpoint.yaw   = math::constrain(0.f, rates_setpoint.yaw   - dv_max, rates_setpoint.yaw   + dv_max);
 
-				// throttle ramp up to _param_mpc_thr_hover.get() over 5 seconds
-				const float thr_ramp_time_s = 5.f;
+				// throttle ramp up to _param_mpc_thr_hover.get() over 3 seconds
+				const float thr_ramp_time_s = 3.f;
 
 				// portion of throttle added each iteration is dt / thr_ramp_time_s
 				const float thr_inc = math::constrain((dt / thr_ramp_time_s) * _param_mpc_thr_hover.get(), 0.00001f, 0.01f);
@@ -429,8 +429,8 @@ bool FlightTaskDrop::update()
 				attitude_setpoint.pitch_body = euler_sp(1);
 				attitude_setpoint.yaw_body = euler_sp(2);
 
-				// throttle ramp up to _param_mpc_thr_hover.get() over 5 seconds
-				const float thr_ramp_time_s = 5.f;
+				// throttle ramp up to _param_mpc_thr_hover.get() over 3 seconds
+				const float thr_ramp_time_s = 3.f;
 
 				// portion of throttle added each iteration is dt / thr_ramp_time_s
 				const float dt = _deltatime;
