@@ -1785,6 +1785,7 @@ void Commander::run()
 						break;
 
 					case vehicle_constraints_s::DROP_STATE_WAITING_FOR_DROP_DETECT: {
+							_vehicle_control_mode.flag_control_manual_enabled = false;
 							_vehicle_control_mode.flag_control_rates_enabled = false;
 							_vehicle_control_mode.flag_control_attitude_enabled = false;
 							_vehicle_control_mode.flag_control_altitude_enabled = false;
@@ -1796,6 +1797,7 @@ void Commander::run()
 						break;
 
 					case vehicle_constraints_s::DROP_STATE_RATE_CONTROL_ENABLED: {
+							_vehicle_control_mode.flag_control_manual_enabled = false;
 							_vehicle_control_mode.flag_control_rates_enabled = true;
 							_vehicle_control_mode.flag_control_attitude_enabled = false;
 							_vehicle_control_mode.flag_control_altitude_enabled = false;
@@ -1807,6 +1809,7 @@ void Commander::run()
 						break;
 
 					case vehicle_constraints_s::DROP_STATE_ATTITUDE_CONTROL_ENABLED: {
+							_vehicle_control_mode.flag_control_manual_enabled = false;
 							_vehicle_control_mode.flag_control_rates_enabled = true;
 							_vehicle_control_mode.flag_control_attitude_enabled = true;
 							_vehicle_control_mode.flag_control_altitude_enabled = false;
@@ -1818,6 +1821,7 @@ void Commander::run()
 						break;
 
 					case vehicle_constraints_s::DROP_STATE_HEIGHT_RATE_CONTROL_ENABLED: {
+							_vehicle_control_mode.flag_control_manual_enabled = false;
 							_vehicle_control_mode.flag_control_rates_enabled = true;
 							_vehicle_control_mode.flag_control_attitude_enabled = true;
 							_vehicle_control_mode.flag_control_altitude_enabled = true;
@@ -1829,6 +1833,7 @@ void Commander::run()
 						break;
 
 					case vehicle_constraints_s::DROP_STATE_VELOCITY_CONTROL_ENABLED: {
+							_vehicle_control_mode.flag_control_manual_enabled = false;
 							_vehicle_control_mode.flag_control_rates_enabled = true;
 							_vehicle_control_mode.flag_control_attitude_enabled = true;
 							_vehicle_control_mode.flag_control_altitude_enabled = true;
@@ -1843,6 +1848,7 @@ void Commander::run()
 
 					// FALLTHROUGH
 					case vehicle_constraints_s::DROP_STATE_FLYING: {
+							_vehicle_control_mode.flag_control_manual_enabled = false;
 							_vehicle_control_mode.flag_control_rates_enabled = true;
 							_vehicle_control_mode.flag_control_attitude_enabled = true;
 							_vehicle_control_mode.flag_control_altitude_enabled = true;
