@@ -558,7 +558,8 @@ bool FlightTaskDrop::update()
 				_yaw_setpoint = _yaw;
 				_yawspeed_setpoint = NAN;
 
-				if (position_valid && !failsafe_flags.local_position_invalid && (_velocity.length() < 5.f)) {
+				if (position_valid && !failsafe_flags.local_position_invalid && (_velocity.length() < 5.f)
+				    && (fabsf(_velocity(2)) < 1.f)) {
 					_state = DropState::POSITION_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 				}
@@ -591,10 +592,14 @@ bool FlightTaskDrop::update()
 					_yawspeed_setpoint = NAN;
 				}
 
-				// When initializing with large velocity, allow 1g of
-				// acceleration in 1s on all axes for fast braking
-				_position_smoothing.setMaxAcceleration({9.81f, 9.81f, 9.81f});
-				_position_smoothing.setMaxJerk({9.81f, 9.81f, 9.81f});
+				if (_velocity_setpoint(2) < 0.f) { // up
+					_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_up.get());
+					_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_up_max.get());
+
+				} else { // down
+					_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_down_max.get());
+					_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
+				}
 
 				// If the current velocity is beyond the usual constraints, tell
 				// the controller to exceptionally increase its saturations to avoid
