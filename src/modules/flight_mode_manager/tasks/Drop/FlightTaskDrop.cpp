@@ -681,8 +681,8 @@ bool FlightTaskDrop::update()
 						_offboard_pos_sp_last = Vector3f{trajectory_setpoint.position};
 						_offboard_vel_sp_last = Vector3f{trajectory_setpoint.velocity};
 
-						_yaw = trajectory_setpoint.yaw;
-						//_yawspeed = trajectory_setpoint.yawspeed;
+						_yaw_setpoint = trajectory_setpoint.yaw;
+						//_yawspeed_setpoint = trajectory_setpoint.yawspeed;
 
 						_offboard_time_stamp_last = _time_stamp_current;
 					}
