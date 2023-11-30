@@ -33,7 +33,7 @@
 
 #include "magnetometerCheck.hpp"
 
-#include <lib/sensor_calibration/Utilities.hpp>
+#include <lib/sensor/calibration/Utilities.hpp>
 
 using namespace time_literals;
 
@@ -68,11 +68,11 @@ void MagnetometerChecks::checkAndReport(const Context &context, Report &reporter
 				num_enabled_and_valid_calibration++;
 
 			} else {
-				int calibration_index = calibration::FindCurrentCalibrationIndex("MAG", mag_data.device_id);
+				int calibration_index = sensor::calibration::FindCurrentCalibrationIndex("MAG", mag_data.device_id);
 				is_calibration_valid = (calibration_index >= 0);
 
 				if (is_calibration_valid) {
-					int priority = calibration::GetCalibrationParamInt32("MAG", "PRIO", calibration_index);
+					int priority = sensor::calibration::GetCalibrationParamInt32("MAG", "PRIO", calibration_index);
 
 					if (priority > 0) {
 						++num_enabled_and_valid_calibration;
