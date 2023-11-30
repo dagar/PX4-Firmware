@@ -1751,14 +1751,17 @@ void Commander::run()
 				   ) {
 					if (!vehicle_constraints.want_takeoff) {
 						_actuator_armed.lockdown = true;
-
-						// failure detector ignored
-						_vehicle_status.failure_detector_status = 0;
 					}
 
 					switch (vehicle_constraints.drop_state) {
 					case vehicle_constraints_s::DROP_STATE_UNKNOWN: {
-							// do nothing
+							_vehicle_control_mode.flag_control_rates_enabled = false;
+							_vehicle_control_mode.flag_control_attitude_enabled = false;
+							_vehicle_control_mode.flag_control_altitude_enabled = false;
+							_vehicle_control_mode.flag_control_climb_rate_enabled = false;
+							_vehicle_control_mode.flag_control_position_enabled = false;
+							_vehicle_control_mode.flag_control_velocity_enabled = false;
+							_vehicle_control_mode.flag_multicopter_position_control_enabled = false;
 						}
 						break;
 
@@ -1917,20 +1920,6 @@ void Commander::run()
 			fd_status.fd_motor = _failure_detector.getStatusFlags().motor;
 			fd_status.imbalanced_prop_metric = _failure_detector.getImbalancedPropMetric();
 			fd_status.motor_failure_mask = _failure_detector.getMotorFailures();
-
-			if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL) {
-				fd_status.fd_roll = false;
-				fd_status.fd_pitch = false;
-				fd_status.fd_alt = false;
-				fd_status.fd_ext = false;
-				fd_status.fd_arm_escs = false;
-				fd_status.fd_battery = false;
-				fd_status.fd_imbalanced_prop = false;
-				fd_status.fd_motor = false;
-				fd_status.imbalanced_prop_metric = false;
-				fd_status.motor_failure_mask = 0;
-			}
-
 			fd_status.timestamp = hrt_absolute_time();
 			_failure_detector_status_pub.publish(fd_status);
 		}
