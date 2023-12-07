@@ -271,6 +271,8 @@ public:
 
 	}
 
+	bool data_valid() const { return _data_valid; }
+
 	// add item to list of work items to schedule on node update
 	bool register_callback(SubscriptionCallback *callback_sub);
 

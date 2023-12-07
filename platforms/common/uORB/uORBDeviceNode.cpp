@@ -344,7 +344,9 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle)
 	 * of subscribers and publishers. But we also do not have a leak since future
 	 * publishers reuse the same DeviceNode object.
 	 */
-	devnode->_advertised = false;
+	if (!devnode->data_valid() || (devnode->subscriber_count() <= 0)) {
+		devnode->_advertised = false;
+	}
 
 	return PX4_OK;
 }
