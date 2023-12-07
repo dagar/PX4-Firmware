@@ -40,6 +40,8 @@
 
 void Ekf::controlBaroHeightFusion()
 {
+	updateGroundEffect();
+
 	static constexpr const char *HGT_SRC_NAME = "baro";
 
 	auto &aid_src = _aid_src_baro_hgt;

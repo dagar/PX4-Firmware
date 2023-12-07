@@ -431,9 +431,6 @@ public:
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 
 #if defined(CONFIG_EKF2_GNSS)
-	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
-	bool collect_gps(const gpsMessage &gps) override;
-
 	// set minimum continuous period without GPS fail required to mark a healthy GPS status
 	void set_min_required_gps_health_time(uint32_t time_us) { _min_gps_health_time_us = time_us; }
 
@@ -636,9 +633,6 @@ private:
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 
 #if defined(CONFIG_EKF2_GNSS)
-	// booleans true when fresh sensor data is available at the fusion time horizon
-	bool _gps_data_ready{false};	///< true when new GPS data has fallen behind the fusion time horizon and is available to be fused
-
 	// variables used for the GPS quality checks
 	Vector3f _gps_pos_deriv_filt{};	///< GPS NED position derivative (m/sec)
 	Vector2f _gps_velNE_filt{};	///< filtered GPS North and East velocity (m/sec)
@@ -651,8 +645,6 @@ private:
 	bool _gps_checks_passed{false};		///> true when all active GPS checks have passed
 
 	gps_check_fail_status_u _gps_check_fail_status{};
-	// height sensor status
-	bool _gps_intermittent{true};           ///< true if data into the buffer is intermittent
 
 	HeightBiasEstimator _gps_hgt_b_est{HeightSensor::GNSS, _height_sensor_ref};
 
@@ -992,10 +984,19 @@ private:
 
 	bool shouldResetGpsFusion() const;
 
-	// return true id the GPS quality is good enough to set an origin and start aiding
-	bool gps_is_good(const gpsMessage &gps);
+	/*
+	* Return true if the GPS solution quality is adequate to set an origin for the EKF
+	* and start GPS aiding.
+	* All activated checks must pass for 10 seconds.
+	* Checks are activated using the EKF2_GPS_CHECK bitmask parameter
+	* Checks are adjusted using the EKF2_REQ_* parameters
+	*/
+	bool gps_is_good(const gpsSample &gps);
 
-	void controlGnssHeightFusion(const gpsSample &gps_sample);
+	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
+	bool collect_gps(const gpsSample &gps);
+
+	void controlGnssHeightFusion(const uint64_t &time_us, const float &gnss_hgt_obs, const float &gnss_hgt_obs_var);
 	void stopGpsHgtFusion();
 
 	void resetGpsDriftCheckFilters();
@@ -1005,11 +1006,11 @@ private:
 	void stopGpsYawFusion();
 
 	// fuse the yaw angle obtained from a dual antenna GPS unit
-	void fuseGpsYaw();
+	void fuseGpsYaw(const gpsSample &gps_sample);
 
 	// reset the quaternions states using the yaw angle obtained from a dual antenna GPS unit
 	// return true if the reset was successful
-	bool resetYawToGps(const float gnss_yaw);
+	bool resetYawToGps(const gpsSample &gps_sample);
 
 	void updateGpsYaw(const gpsSample &gps_sample);
 
@@ -1079,8 +1080,6 @@ private:
 	void checkVerticalAccelerationHealth(const imuSample &imu_delayed);
 	Likelihood estimateInertialNavFallingLikelihood() const;
 
-	// control for combined height fusion mode (implemented for switching between baro and range height)
-	void controlHeightFusion(const imuSample &imu_delayed);
 	void checkHeightSensorRefFallback();
 
 #if defined(CONFIG_EKF2_BAROMETER)

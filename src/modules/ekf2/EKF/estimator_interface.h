@@ -85,8 +85,7 @@ public:
 
 #if defined(CONFIG_EKF2_GNSS)
 	// ask estimator for sensor data collection decision and do any preprocessing if required, returns true if not defined
-	virtual bool collect_gps(const gpsMessage &gps) = 0;
-	void setGpsData(const gpsMessage &gps);
+	void setGpsData(const gpsSample &gps);
 
 	const gpsSample &get_gps_sample_delayed() const { return _gps_sample_delayed; }
 
@@ -403,7 +402,6 @@ protected:
 	float _gps_alt_prev{0.0f};	// height from the previous GPS message (m)
 
 # if defined(CONFIG_EKF2_GNSS_YAW)
-	float _gps_yaw_offset{0.0f};	// Yaw offset angle for dual GPS antennas used for yaw estimation (radians).
 	// innovation consistency check monitoring ratios
 	AlphaFilter<float> _gnss_yaw_signed_test_ratio_lpf{0.1f}; // average signed test ratio used to detect a bias in the state
 	uint64_t _time_last_gps_yaw_buffer_push{0};

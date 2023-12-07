@@ -102,6 +102,10 @@ void Ekf::controlFusionModes(const imuSample &imu_delayed)
 		}
 	}
 
+	checkVerticalAccelerationHealth(imu_delayed);
+
+	checkHeightSensorRefFallback();
+
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	// control use of observations for aiding
 	controlMagFusion();
@@ -110,6 +114,10 @@ void Ekf::controlFusionModes(const imuSample &imu_delayed)
 #if defined(CONFIG_EKF2_OPTICAL_FLOW)
 	controlOpticalFlowFusion(imu_delayed);
 #endif // CONFIG_EKF2_OPTICAL_FLOW
+
+#if defined(CONFIG_EKF2_BAROMETER)
+	controlBaroHeightFusion();
+#endif // CONFIG_EKF2_BAROMETER
 
 #if defined(CONFIG_EKF2_GNSS)
 	controlGpsFusion(imu_delayed);
@@ -131,7 +139,9 @@ void Ekf::controlFusionModes(const imuSample &imu_delayed)
 	controlDragFusion(imu_delayed);
 #endif // CONFIG_EKF2_DRAG_FUSION
 
-	controlHeightFusion(imu_delayed);
+#if defined(CONFIG_EKF2_RANGE_FINDER)
+	controlRangeHeightFusion();
+#endif // CONFIG_EKF2_RANGE_FINDER
 
 #if defined(CONFIG_EKF2_GRAVITY_FUSION)
 	controlGravityFusion(imu_delayed);
@@ -161,4 +171,6 @@ void Ekf::controlFusionModes(const imuSample &imu_delayed)
 
 	// check if we are no longer fusing measurements that directly constrain velocity drift
 	updateDeadReckoningStatus();
+
+	checkVerticalAccelerationBias(imu_delayed);
 }

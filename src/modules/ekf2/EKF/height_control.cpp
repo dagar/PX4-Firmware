@@ -37,28 +37,6 @@
 
 #include "ekf.h"
 
-void Ekf::controlHeightFusion(const imuSample &imu_delayed)
-{
-	checkVerticalAccelerationBias(imu_delayed);
-	checkVerticalAccelerationHealth(imu_delayed);
-
-#if defined(CONFIG_EKF2_BAROMETER)
-	updateGroundEffect();
-
-	controlBaroHeightFusion();
-#endif // CONFIG_EKF2_BAROMETER
-
-#if defined(CONFIG_EKF2_GNSS)
-	controlGnssHeightFusion(_gps_sample_delayed);
-#endif // CONFIG_EKF2_GNSS
-
-#if defined(CONFIG_EKF2_RANGE_FINDER)
-	controlRangeHeightFusion();
-#endif // CONFIG_EKF2_RANGE_FINDER
-
-	checkHeightSensorRefFallback();
-}
-
 void Ekf::checkHeightSensorRefFallback()
 {
 	if (_height_sensor_ref != HeightSensor::UNKNOWN) {
