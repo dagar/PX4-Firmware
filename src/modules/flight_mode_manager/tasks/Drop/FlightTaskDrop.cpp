@@ -412,14 +412,21 @@ bool FlightTaskDrop::update()
 					_constraints.want_takeoff = true;
 				}
 
+				const float dt = _deltatime;
+
 				vehicle_attitude_setpoint_s &attitude_setpoint = _vehicle_attitude_setpoint_pub.get();
 
 				const Eulerf euler{Quatf{vehicle_attitude.q}};
+
 				Eulerf euler_sp{Quatf{attitude_setpoint.q_d}};
+				const Eulerf euler_sp_prev{euler_sp};
+
+				const float max_rate_rad_s = math::radians(100.f); // 100 deg/s max
+				const float dv_max = math::constrain(max_rate_rad_s * dt, 0.001f, 1.f);
 
 				// bring roll and pitch to 0
-				euler_sp(0) = 0.f; // TODO: slew
-				euler_sp(1) = 0.f; // TODO: slew
+				euler_sp(0) = math::constrain(0.f, euler_sp_prev(0) - dv_max, euler_sp_prev(0) + dv_max);
+				euler_sp(1) = math::constrain(0.f, euler_sp_prev(1) - dv_max, euler_sp_prev(1) + dv_max);
 				euler_sp(2) = euler(2); // match yaw
 
 				Quatf q_sp = euler_sp;
@@ -433,7 +440,7 @@ bool FlightTaskDrop::update()
 				const float thr_ramp_time_s = 3.f;
 
 				// portion of throttle added each iteration is dt / thr_ramp_time_s
-				const float dt = _deltatime;
+
 				const float thr_inc = math::constrain((dt / thr_ramp_time_s) * _param_mpc_thr_hover.get(), 0.00001f, 0.01f);
 
 				// ramp to MPC_THR_HOVER max
