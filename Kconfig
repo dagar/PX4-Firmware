@@ -67,12 +67,6 @@ menu "Toolchain"
         help
             Enables Cmake Release for -O3 optimization
 
-    config BOARD_ROMFSROOT
-        string "ROMFSROOT"
-        default "px4fmu_common"
-        help
-            relative path to the ROMFS root directory
-
     config BOARD_ROOTFSDIR
         string "Root directory"
         depends on PLATFORM_POSIX
@@ -139,6 +133,20 @@ config BOARD_PROTECTED
     bool "Memory protection"
     help
         Enable memory protection via MPU/MMU
+
+menu "Read-only filesystem (ROMFS)"
+
+    config BOARD_ROMFSROOT
+    string "ROMFSROOT"
+    default "px4fmu_common"
+    help
+        relative path to the ROMFS root directory
+
+
+    source "ROMFS/Kconfig"
+    depends on CONFIG_BOARD_ROMFSROOT
+
+endmenu
 
 menu "Serial ports"
 

@@ -1,0 +1,5 @@
+menuconfig ROMFS_AIRFRAMES
+	bool "esc_battery"
+	default n
+	---help---
+		Enable support for esc_battery
