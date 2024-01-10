@@ -49,12 +49,10 @@ void Ekf::controlFakePosFusion()
 
 	if (fake_pos_data_ready) {
 
-		const float pos_noaid_var = sq(math::max(_params.pos_noaid_noise, 1.f));
-
 		Vector2f obs_var;
 
 		if (_control_status.flags.in_air && _control_status.flags.tilt_align) {
-			obs_var(0) = obs_var(1) = pos_noaid_var;
+			obs_var(0) = obs_var(1) = sq(fmaxf(_params.pos_noaid_noise, 1.f));
 
 		} else if (!_control_status.flags.in_air && _control_status.flags.vehicle_at_rest) {
 			// Accelerate tilt fine alignment by fusing more
@@ -73,9 +71,7 @@ void Ekf::controlFakePosFusion()
 		const bool continuing_conditions_passing = !isHorizontalAidingActive();
 
 		const bool starting_conditions_passing = continuing_conditions_passing
-				&& ((Vector3f(getStateVariance<State::pos>()).xy().max() > pos_noaid_var)
-					|| (getTiltVariance() > sq(math::radians(3.f)))
-					|| _control_status.flags.vehicle_at_rest)
+				&& ((getTiltVariance() > sq(math::radians(3.f))) || _control_status.flags.vehicle_at_rest)
 				&& _horizontal_deadreckon_time_exceeded;
 
 		if (_control_status.flags.fake_pos) {

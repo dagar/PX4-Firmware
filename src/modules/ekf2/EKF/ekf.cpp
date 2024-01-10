@@ -420,7 +420,7 @@ void Ekf::print_status()
 #endif // CONFIG_EKF2_MAGNETOMETER
 
 #if defined(CONFIG_EKF2_WIND)
-	printf("Wind velocity (%d-%d): [%.3f, %.3f] var: [%.1e, %.1e, %.1e]\n",
+	printf("Wind velocity (%d-%d): [%.3f, %.3f] var: [%.1e, %.1e]\n",
 	       State::wind_vel.idx, State::wind_vel.idx + State::wind_vel.dof - 1,
 	       (double)_state.wind_vel(0), (double)_state.wind_vel(1),
 	       (double)getStateVariance<State::wind_vel>()(0), (double)getStateVariance<State::wind_vel>()(1)
