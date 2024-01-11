@@ -199,6 +199,17 @@ bool Ekf::update()
 		float filter_update_s = 1e-6f * _params.filter_update_interval_us;
 		_dt_ekf_avg = 0.99f * _dt_ekf_avg + 0.01f * math::constrain(input, 0.5f * filter_update_s, 2.f * filter_update_s);
 
+		if (_accel_mean.variance().max() > _params.accel_noise) {
+			_accel_mean.reset();
+		}
+
+		if (_gyro_mean.variance().max() > _params.gyro_noise) {
+			_gyro_mean.reset();
+		}
+
+		_accel_mean.update(imu_sample_delayed.delta_vel / imu_sample_delayed.delta_vel_dt);
+		_gyro_mean.update(imu_sample_delayed.delta_ang / imu_sample_delayed.delta_ang_dt);
+
 		updateIMUBiasInhibit(imu_sample_delayed);
 
 		// perform state and covariance prediction for the main filter

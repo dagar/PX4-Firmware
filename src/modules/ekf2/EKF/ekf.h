@@ -55,6 +55,8 @@
 
 #include <ekf_derivation/generated/state.h>
 
+#include <lib/mathlib/math/WelfordMeanVector.hpp>
+
 #include <uORB/topics/estimator_aid_source1d.h>
 #include <uORB/topics/estimator_aid_source2d.h>
 #include <uORB/topics/estimator_aid_source3d.h>
@@ -675,6 +677,12 @@ private:
 	bool _is_first_imu_sample{true};
 	AlphaFilter<Vector3f> _accel_lpf{0.1f};	///< filtered accelerometer measurement used to align tilt (m/s/s)
 	AlphaFilter<Vector3f> _gyro_lpf{0.1f};	///< filtered gyro measurement used for alignment excessive movement check (rad/sec)
+
+
+	math::WelfordMeanVector<float, 3> _accel_mean{};
+	math::WelfordMeanVector<float, 3> _gyro_mean{};
+
+
 
 #if defined(CONFIG_EKF2_BAROMETER)
 	estimator_aid_source1d_s _aid_src_baro_hgt{};

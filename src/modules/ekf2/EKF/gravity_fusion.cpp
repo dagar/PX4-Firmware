@@ -52,8 +52,30 @@ void Ekf::controlGravityFusion(const imuSample &imu)
 
 	const float max_gravity_norm_error = 0.01f;
 
+
+
+	bool accelerating = (fabsf(gravity_norm_error) < max_gravity_norm_error);
+
+
+	if (((_accel_mean.count() % 100) == 0)) {
+		ECL_INFO("accel mean [%.3f, %.3f, %.3f], var:[%.1e, %.1e, %.1e] %d\n",
+			(double)_accel_mean.mean()(0), (double)_accel_mean.mean()(1), (double)_accel_mean.mean()(2),
+			(double)_accel_mean.variance()(0), (double)_accel_mean.variance()(1), (double)_accel_mean.variance()(2),
+			_accel_mean.count()
+		);
+
+		ECL_INFO("gyro mean [%.3f, %.3f, %.3f], var:[%.1e, %.1e, %.1e] %d\n",
+			(double)_gyro_mean.mean()(0), (double)_gyro_mean.mean()(1), (double)_gyro_mean.mean()(2),
+			(double)_gyro_mean.variance()(0), (double)_gyro_mean.variance()(1), (double)_gyro_mean.variance()(2),
+			_gyro_mean.count()
+		);
+	}
+
+
+
+
 	_control_status.flags.gravity_vector = (_params.imu_ctrl & static_cast<int32_t>(ImuCtrl::GravityVector))
-					       && ((fabsf(gravity_norm_error) > max_gravity_norm_error) || _control_status.flags.vehicle_at_rest)
+					       && (!accelerating || _control_status.flags.vehicle_at_rest)
 					       && !isHorizontalAidingActive();
 
 	// get raw accelerometer reading at delayed horizon and expected measurement noise (gaussian)

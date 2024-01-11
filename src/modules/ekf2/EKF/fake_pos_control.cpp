@@ -68,10 +68,10 @@ void Ekf::controlFakePosFusion()
 		updateHorizontalPositionAidSrcStatus(_time_delayed_us, Vector2f(_last_known_pos), obs_var, innov_gate, aid_src);
 
 
-		const bool continuing_conditions_passing = !isHorizontalAidingActive();
+		const bool continuing_conditions_passing = !isHorizontalAidingActive()
+				&& ((getTiltVariance() > sq(math::radians(3.f))) || _control_status.flags.vehicle_at_rest);
 
 		const bool starting_conditions_passing = continuing_conditions_passing
-				&& ((getTiltVariance() > sq(math::radians(3.f))) || _control_status.flags.vehicle_at_rest)
 				&& _horizontal_deadreckon_time_exceeded;
 
 		if (_control_status.flags.fake_pos) {
