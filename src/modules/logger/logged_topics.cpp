@@ -338,22 +338,25 @@ void LoggedTopics::add_debug_topics()
 
 void LoggedTopics::add_estimator_replay_topics()
 {
-	// for estimator replay (need to be at full rate)
-	add_topic("ekf2_timestamps");
-
 	// current EKF2 subscriptions
 	add_topic("airspeed");
-	add_topic("vehicle_optical_flow");
+	add_topic("airspeed_validated");
+	add_topic("landing_target_pose");
+	add_topic("parameter_update");
+	add_topic("sensor_airflow");
 	add_topic("sensor_combined");
 	add_topic("sensor_selection");
 	add_topic("vehicle_air_data");
+	add_topic("vehicle_command");
 	add_topic("vehicle_gps_position");
 	add_topic("vehicle_land_detected");
 	add_topic("vehicle_magnetometer");
+	add_topic("vehicle_optical_flow");
 	add_topic("vehicle_status");
 	add_topic("vehicle_visual_odometry");
 	add_topic("aux_global_position");
 	add_topic_multi("distance_sensor");
+	add_topic_multi("vehicle_imu");
 }
 
 void LoggedTopics::add_thermal_calibration_topics()

@@ -1294,24 +1294,83 @@ int Logger::get_log_file_name(LogType type, char *file_name, size_t file_name_si
 		time_ok = util::get_log_time(&tt, _param_sdlog_utc_offset.get() * 60, false);
 	}
 
-	const char *replay_suffix = "";
+	char *log_file_name = _file_name[(int)type].log_file_name;
 
-	if (_replay_file_name) {
-		replay_suffix = "_replayed";
-	}
 
 	const char *crypto_suffix = "";
 #if defined(PX4_CRYPTO)
-
 	if (_param_sdlog_crypto_algorithm.get() != 0) {
 		crypto_suffix = "c";
 	}
+#endif // PX4_CRYPTO
 
-#endif
+	const char *replay_suffix = "";
 
-	char *log_file_name = _file_name[(int)type].log_file_name;
+	if (_replay_file_name) {
 
-	if (time_ok) {
+		// TODO: check if replay file exists and is writable
+
+		// REPLAY_FILE + _replayedXX + .ulg
+
+		// LOG_DIR_LEN
+
+
+		// int n = strlen(log_dir);
+
+
+		// char log_file_name_time[16] = "";
+		// strftime(log_file_name_time, sizeof(log_file_name_time), "%H_%M_%S", &tt);
+
+
+
+
+		uint16_t replay_file_number = 100; // start with file log100
+
+		/* look for the next file that does not exist */
+		while (replay_file_number <= MAX_NO_LOGFILE) {
+			/* format log file path: e.g. /fs/microsd/log/sess001/log001.ulg */
+			//snprintf(log_file_name, sizeof(LogFileName::log_file_name), "log%03" PRIu16 "%.*s.ulg%s", replay_file_number, replay_suffix, crypto_suffix);
+
+
+
+			// drop replay file .ulg
+			snprintf(file_name, strlen(file_name), "%.*s", strlen(_replay_file_name) - strlen(".ulg"), _replay_file_name);
+
+			// add _replayedXX
+			//snprintf(file_name, file_name_size, "%s_replayed.ulg", _replay_file_name);
+
+			PX4_INFO("1 file_name: %s", file_name);
+
+			if (!util::file_exist(file_name)) {
+				break;
+			}
+
+			replay_file_number++;
+		}
+
+		if (replay_file_number > MAX_NO_LOGFILE) {
+			/* we should not end up here, either we have more than MAX_NO_LOGFILE, or another problem */
+			return -1;
+		}
+
+
+
+
+
+
+		// replay_suffix = "_replayed";
+
+
+		// PX4_INFO("file_name: %s, replay file_name: %s", file_name, _replay_file_name);
+
+
+		// snprintf(log_file_name, sizeof(LogFileName::log_file_name), "%s%s.ulg%s", log_file_name_time, replay_suffix,
+		// 	 crypto_suffix);
+
+
+		// snprintf(file_name + n, file_name_size - n, "/%s", log_file_name);
+
+	} else if (time_ok) {
 		int n = create_log_dir(type, &tt, file_name, file_name_size);
 
 		if (n < 0) {
