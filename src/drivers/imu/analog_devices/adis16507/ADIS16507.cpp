@@ -97,6 +97,12 @@ void ADIS16507::print_status()
 	perf_print_counter(_bad_transfer_perf);
 	perf_print_counter(_perf_crc_bad);
 	perf_print_counter(_drdy_missed_perf);
+
+	perf_print_counter(_drdy_interval_perf);
+	perf_print_counter(_run_interval_perf);
+	perf_print_counter(_timestamp_sample_perf);
+	perf_print_counter(_transfer_interval_perf);
+	perf_print_counter(_tranfer_elapsed_perf);
 }
 
 int ADIS16507::probe()
@@ -126,6 +132,8 @@ int ADIS16507::probe()
 void ADIS16507::RunImpl()
 {
 	const hrt_abstime now = hrt_absolute_time();
+
+	perf_count_interval(_run_interval_perf, now);
 
 	switch (_state) {
 	case STATE::RESET:
@@ -221,7 +229,7 @@ void ADIS16507::RunImpl()
 				// scheduled from interrupt if _drdy_timestamp_sample was set as expected
 				const hrt_abstime drdy_timestamp_sample = _drdy_timestamp_sample.fetch_and(0);
 
-				if ((now - drdy_timestamp_sample) < SAMPLE_INTERVAL_US) {
+				if ((now - drdy_timestamp_sample) < SAMPLE_INTERVAL_US * 1.5) {
 					timestamp_sample = drdy_timestamp_sample;
 
 				} else {
@@ -259,7 +267,12 @@ void ADIS16507::RunImpl()
 			buffer.cmd = static_cast<uint16_t>(Register::GLOB_CMD) << 8;
 			set_frequency(SPI_SPEED_BURST);
 
+			perf_count(_transfer_interval_perf);
+			perf_begin(_tranfer_elapsed_perf);
+
 			if (transferhword((uint16_t *)&buffer, (uint16_t *)&buffer, sizeof(buffer) / sizeof(uint16_t)) == PX4_OK) {
+
+				perf_end(_tranfer_elapsed_perf);
 
 				// Calculate checksum and compare
 
@@ -337,6 +350,10 @@ void ADIS16507::RunImpl()
 				//  Gyroscope (Z-Axis) 1.29 ms
 				const uint64_t gyro_group_delay_us = (1'510 + 1'510 + 1'290) / 3;
 				_px4_gyro.update(timestamp_sample - gyro_group_delay_us, gyro_x, gyro_y, gyro_z);
+
+
+
+				perf_count_interval(_timestamp_sample_perf, timestamp_sample);
 
 				success = true;
 
@@ -432,7 +449,9 @@ int ADIS16507::DataReadyInterruptCallback(int irq, void *context, void *arg)
 
 void ADIS16507::DataReady()
 {
-	_drdy_timestamp_sample.store(hrt_absolute_time());
+	const hrt_abstime now = hrt_absolute_time();
+	_drdy_timestamp_sample.store(now);
+	perf_count_interval(_drdy_interval_perf, now);
 	ScheduleNow();
 }
 

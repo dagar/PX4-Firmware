@@ -104,6 +104,13 @@ private:
 	perf_counter_t _perf_crc_bad{perf_counter_t(perf_alloc(PC_COUNT, MODULE_NAME": CRC16 bad"))};
 	perf_counter_t _drdy_missed_perf{nullptr};
 
+	perf_counter_t _drdy_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": drdy interval")};
+	perf_counter_t _run_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": run interval")};
+	perf_counter_t _timestamp_sample_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": timestamp_sample")};
+	perf_counter_t _transfer_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": transfer interval")};
+	perf_counter_t _tranfer_elapsed_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": transfer elapsed")};
+
+
 	hrt_abstime _reset_timestamp{0};
 	hrt_abstime _last_config_check_timestamp{0};
 	int _failure_count{0};
