@@ -79,7 +79,7 @@ void Ekf::updateOptFlow(estimator_aid_source2d_s &aid_src)
 
 	Vector2f innov_var;
 	VectorState H;
-	sym::ComputeFlowXyInnovVarAndHx(_state.vector(), P, range, R_LOS, FLT_EPSILON, &innov_var, &H);
+	sym::ComputeFlowXyInnovVarAndHx(_state.vector(), P, range, (ekf_float_t)R_LOS, (ekf_float_t)FLT_EPSILON, &innov_var, &H);
 	innov_var.copyTo(aid_src.innovation_variance);
 
 	// run the innovation consistency check and record result
@@ -98,7 +98,7 @@ void Ekf::fuseOptFlow()
 
 	Vector2f innov_var;
 	VectorState H;
-	sym::ComputeFlowXyInnovVarAndHx(state_vector, P, range, R_LOS, FLT_EPSILON, &innov_var, &H);
+	sym::ComputeFlowXyInnovVarAndHx(state_vector, P, range, (ekf_float_t)R_LOS, (ekf_float_t)FLT_EPSILON, &innov_var, &H);
 	innov_var.copyTo(_aid_src_optical_flow.innovation_variance);
 
 	if ((_aid_src_optical_flow.innovation_variance[0] < R_LOS)
@@ -129,7 +129,7 @@ void Ekf::fuseOptFlow()
 
 		} else if (index == 1) {
 			// recalculate innovation variance because state covariances have changed due to previous fusion (linearise using the same initial state for all axes)
-			sym::ComputeFlowYInnovVarAndH(state_vector, P, range, R_LOS, FLT_EPSILON, &_aid_src_optical_flow.innovation_variance[1], &H);
+			sym::ComputeFlowYInnovVarAndH(state_vector, P, range, (ekf_float_t)R_LOS, (ekf_float_t)FLT_EPSILON, &_aid_src_optical_flow.innovation_variance[1], &H);
 
 			// recalculate the innovation using the updated state
 			const Vector2f vel_body = predictFlowVelBody();

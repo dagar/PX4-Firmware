@@ -36,8 +36,8 @@
 
 #include "EKF/ekf.h"
 
-typedef matrix::Vector<float, State::size> VectorState;
-typedef matrix::SquareMatrix<float, State::size> SquareMatrixState;
+typedef matrix::Vector<ekf_float_t, State::size> VectorState;
+typedef matrix::SquareMatrix<ekf_float_t, State::size> SquareMatrixState;
 
 float randf();
 

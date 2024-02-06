@@ -40,15 +40,6 @@
 
 #include "common.h"
 
-using matrix::AxisAnglef;
-using matrix::Dcmf;
-using matrix::Eulerf;
-using matrix::Matrix3f;
-using matrix::Quatf;
-using matrix::Vector2f;
-using matrix::Vector3f;
-using matrix::wrap_pi;
-
 static constexpr uint8_t N_MODELS_EKFGSF = 5;
 
 using namespace estimator;
@@ -106,7 +97,7 @@ private:
 	float _true_airspeed{NAN};	// true airspeed used for centripetal accel compensation (m/s)
 
 	struct {
-		Dcmf R{matrix::eye<float, 3>()}; // matrix that rotates a vector from body to earth frame
+		Dcmf R{matrix::eye<ekf_float_t, 3>()}; // matrix that rotates a vector from body to earth frame
 		Vector3f gyro_bias{};            // gyro bias learned and used by the quaternion calculation
 	} _ahrs_ekf_gsf[N_MODELS_EKFGSF] {};
 
@@ -131,11 +122,11 @@ private:
 	// Declarations used by a bank of N_MODELS_EKFGSF EKFs
 
 	struct _ekf_gsf_struct {
-		matrix::Vector3f X{};                       // Vel North (m/s),  Vel East (m/s), yaw (rad)s
-		matrix::SquareMatrix<float, 3> P{};         // covariance matrix
-		matrix::SquareMatrix<float, 2> S_inverse{}; // inverse of the innovation covariance matrix
+		matrix::Vector3<ekf_float_t> X{};                       // Vel North (m/s),  Vel East (m/s), yaw (rad)s
+		matrix::SquareMatrix<ekf_float_t, 3> P{};         // covariance matrix
+		matrix::SquareMatrix<ekf_float_t, 2> S_inverse{}; // inverse of the innovation covariance matrix
 		float S_det_inverse{};                      // inverse of the innovation covariance matrix determinant
-		matrix::Vector2f innov{};                   // Velocity N,E innovation (m/s)
+		matrix::Vector2<ekf_float_t> innov{};                   // Velocity N,E innovation (m/s)
 	} _ekf_gsf[N_MODELS_EKFGSF] {};
 
 	bool _ekf_gsf_vel_fuse_started{}; // true when the EKF's have started fusing velocity data and the prediction and update processing is active

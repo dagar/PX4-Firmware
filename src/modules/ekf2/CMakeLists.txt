@@ -223,6 +223,7 @@ px4_add_module(
 		-fno-associative-math
 		#-DDEBUG_BUILD
 		#-O0
+		-Wno-double-promotion
 	INCLUDES
 		EKF
 		EKF/aid_sources

@@ -236,10 +236,10 @@ public:
 	const matrix::Quatf &getQuaternion() const { return _output_predictor.getQuaternion(); }
 	float getUnaidedYaw() const { return _output_predictor.getUnaidedYaw(); }
 	Vector3f getVelocity() const { return _output_predictor.getVelocity(); }
-	const Vector3f &getVelocityDerivative() const { return _output_predictor.getVelocityDerivative(); }
+	Vector3f getVelocityDerivative() const { return _output_predictor.getVelocityDerivative(); }
 	float getVerticalPositionDerivative() const { return _output_predictor.getVerticalPositionDerivative(); }
 	Vector3f getPosition() const { return _output_predictor.getPosition(); }
-	const Vector3f &getOutputTrackingError() const { return _output_predictor.getOutputTrackingError(); }
+	Vector3f getOutputTrackingError() const { return _output_predictor.getOutputTrackingError(); }
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	// Get the value of magnetic declination in degrees to be saved for use at the next startup

@@ -71,9 +71,8 @@ enum class Likelihood { LOW, MEDIUM, HIGH };
 class Ekf final : public EstimatorInterface
 {
 public:
-	typedef matrix::Vector<float, State::size> VectorState;
-	typedef matrix::SquareMatrix<float, State::size> SquareMatrixState;
-	typedef matrix::SquareMatrix<float, 2> Matrix2f;
+	typedef matrix::Vector<ekf_float_t, State::size> VectorState;
+	typedef matrix::SquareMatrix<ekf_float_t, State::size> SquareMatrixState;
 
 	Ekf()
 	{
@@ -154,7 +153,7 @@ public:
 		}
 
 		if (_control_status.flags.mag_3D) {
-			return Vector3f(_aid_src_mag.innovation).max();
+			return matrix::Vector3<float>(_aid_src_mag.innovation).max();
 		}
 #endif // CONFIG_EKF2_MAGNETOMETER
 
@@ -181,7 +180,7 @@ public:
 		}
 
 		if (_control_status.flags.mag_3D) {
-			return Vector3f(_aid_src_mag.innovation_variance).max();
+			return  matrix::Vector3<float>(_aid_src_mag.innovation_variance).max();
 		}
 #endif // CONFIG_EKF2_MAGNETOMETER
 
@@ -208,7 +207,7 @@ public:
 		}
 
 		if (_control_status.flags.mag_3D) {
-			return Vector3f(_aid_src_mag.test_ratio).max();
+			return  matrix::Vector3<float>(_aid_src_mag.test_ratio).max();
 		}
 #endif // CONFIG_EKF2_MAGNETOMETER
 
@@ -242,19 +241,19 @@ public:
 #endif // CONFIG_EKF2_WIND
 
 	template <const IdxDof &S>
-	matrix::Vector<float, S.dof>getStateVariance() const { return P.slice<S.dof, S.dof>(S.idx, S.idx).diag(); } // calling getStateCovariance().diag() uses more flash space
+	matrix::Vector<ekf_float_t, S.dof>getStateVariance() const { return P.slice<S.dof, S.dof>(S.idx, S.idx).diag(); } // calling getStateCovariance().diag() uses more flash space
 
 	template <const IdxDof &S>
-	matrix::SquareMatrix<float, S.dof>getStateCovariance() const { return P.slice<S.dof, S.dof>(S.idx, S.idx); }
+	matrix::SquareMatrix<ekf_float_t, S.dof>getStateCovariance() const { return P.slice<S.dof, S.dof>(S.idx, S.idx); }
 
 	// get the full covariance matrix
-	const matrix::SquareMatrix<float, State::size> &covariances() const { return P; }
+	const matrix::SquareMatrix<ekf_float_t, State::size> &covariances() const { return P; }
 	float stateCovariance(unsigned r, unsigned c) const { return P(r, c); }
 
 	// get the diagonal elements of the covariance matrix
-	matrix::Vector<float, State::size> covariances_diagonal() const { return P.diag(); }
+	matrix::Vector<ekf_float_t, State::size> covariances_diagonal() const { return P.diag(); }
 
-	matrix::Vector<float, State::quat_nominal.dof> getQuaternionVariance() const { return getStateVariance<State::quat_nominal>(); }
+	matrix::Vector<ekf_float_t, State::quat_nominal.dof> getQuaternionVariance() const { return getStateVariance<State::quat_nominal>(); }
 	matrix::Vector3f getRotVarNed() const;
 	float getYawVar() const;
 	float getTiltVariance() const;
@@ -331,21 +330,21 @@ public:
 	bool fuseVelPosHeight(const float innov, const float innov_var, const int state_index);
 
 	// gyro bias
-	const Vector3f &getGyroBias() const { return _state.gyro_bias; } // get the gyroscope bias in rad/s
-	Vector3f getGyroBiasVariance() const { return getStateVariance<State::gyro_bias>(); } // get the gyroscope bias variance in rad/s
+	const auto &getGyroBias() const { return _state.gyro_bias; } // get the gyroscope bias in rad/s
+	auto getGyroBiasVariance() const { return getStateVariance<State::gyro_bias>(); } // get the gyroscope bias variance in rad/s
 	float getGyroBiasLimit() const { return _params.gyro_bias_lim; }
 	float getGyroNoise() const { return _params.gyro_noise; }
 
 	// accel bias
-	const Vector3f &getAccelBias() const { return _state.accel_bias; } // get the accelerometer bias in m/s**2
-	Vector3f getAccelBiasVariance() const { return getStateVariance<State::accel_bias>(); } // get the accelerometer bias variance in m/s**2
+	const auto &getAccelBias() const { return _state.accel_bias; } // get the accelerometer bias in m/s**2
+	auto getAccelBiasVariance() const { return getStateVariance<State::accel_bias>(); } // get the accelerometer bias variance in m/s**2
 	float getAccelBiasLimit() const { return _params.acc_bias_lim; }
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
-	const Vector3f &getMagEarthField() const { return _state.mag_I; }
+	const auto &getMagEarthField() const { return _state.mag_I; }
 
-	const Vector3f &getMagBias() const { return _state.mag_B; }
-	Vector3f getMagBiasVariance() const { return getStateVariance<State::mag_B>(); } // get the mag bias variance in Gauss
+	const auto &getMagBias() const { return _state.mag_B; }
+	auto getMagBiasVariance() const { return getStateVariance<State::mag_B>(); } // get the mag bias variance in Gauss
 	float getMagBiasLimit() const { return 0.5f; } // 0.5 Gauss
 #endif // CONFIG_EKF2_MAGNETOMETER
 
@@ -374,7 +373,9 @@ public:
 	uint8_t get_posNE_reset_count() const { return _state_reset_status.reset_count.posNE; }
 	void get_posNE_reset(float delta[2], uint8_t *counter) const
 	{
-		_state_reset_status.posNE_change.copyTo(delta);
+		delta[0] = _state_reset_status.posNE_change(0);
+		delta[1] = _state_reset_status.posNE_change(1);
+
 		*counter = _state_reset_status.reset_count.posNE;
 	}
 
@@ -382,15 +383,21 @@ public:
 	uint8_t get_velNE_reset_count() const { return _state_reset_status.reset_count.velNE; }
 	void get_velNE_reset(float delta[2], uint8_t *counter) const
 	{
-		_state_reset_status.velNE_change.copyTo(delta);
+		delta[0] = _state_reset_status.velNE_change(0);
+		delta[1] = _state_reset_status.velNE_change(1);
+
 		*counter = _state_reset_status.reset_count.velNE;
 	}
 
 	// return the amount the quaternion has changed in the last reset and the number of reset events
 	uint8_t get_quat_reset_count() const { return _state_reset_status.reset_count.quat; }
-	void get_quat_reset(float delta_quat[4], uint8_t *counter) const
+	void get_quat_reset(float delta[4], uint8_t *counter) const
 	{
-		_state_reset_status.quat_change.copyTo(delta_quat);
+		delta[0] = _state_reset_status.quat_change(0);
+		delta[1] = _state_reset_status.quat_change(1);
+		delta[2] = _state_reset_status.quat_change(2);
+		delta[3] = _state_reset_status.quat_change(3);
+
 		*counter = _state_reset_status.reset_count.quat;
 	}
 
@@ -748,7 +755,7 @@ private:
 	void predictCovariance(const imuSample &imu_delayed);
 
 	template <const IdxDof &S>
-	void resetStateCovariance(const matrix::SquareMatrix<float, S.dof> &cov)
+	void resetStateCovariance(const matrix::SquareMatrix<ekf_float_t, S.dof> &cov)
 	{
 		P.uncorrelateCovarianceSetVariance<S.dof>(S.idx, 0.0f);
 		P.slice<S.dof, S.dof>(S.idx, S.idx) = cov;

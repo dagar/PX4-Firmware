@@ -45,24 +45,27 @@
 #include <cstdint>
 
 #include <matrix/math.hpp>
+#include <mathlib/math/Functions.hpp>
 #include <mathlib/math/Utilities.hpp>
 
 namespace estimator
 {
 
-using matrix::AxisAnglef;
-using matrix::Dcmf;
-using matrix::Eulerf;
-using matrix::Matrix3f;
-using matrix::Quatf;
-using matrix::Vector2f;
-using matrix::Vector3f;
+using ekf_float_t = double;
+
+using AxisAnglef = matrix::AxisAngle<ekf_float_t>;
+using Dcmf = matrix::Dcm<ekf_float_t>;
+using Eulerf = matrix::Euler<ekf_float_t>;
+using Matrix3f = matrix::SquareMatrix<ekf_float_t, 3>;
+using Quatf = matrix::Quaternion<ekf_float_t>;
+using Vector2f = matrix::Vector2<ekf_float_t>;
+using Vector3f = matrix::Vector3<ekf_float_t>;
 using matrix::wrap_pi;
 
 using math::Utilities::getEulerYaw;
 using math::Utilities::quatToInverseRotMat;
 using math::Utilities::shouldUse321RotationSequence;
-using math::Utilities::sq;
+using math::sq;
 using math::Utilities::updateYawInRotMat;
 
 // maximum sensor intervals in usec

@@ -10,17 +10,17 @@
 namespace estimator
 {
 struct StateSample {
-	matrix::Quaternion<float> quat_nominal{};
-	matrix::Vector3<float> vel{};
-	matrix::Vector3<float> pos{};
-	matrix::Vector3<float> gyro_bias{};
-	matrix::Vector3<float> accel_bias{};
-	matrix::Vector3<float> mag_I{};
-	matrix::Vector3<float> mag_B{};
-	matrix::Vector2<float> wind_vel{};
+	matrix::Quaternion<double> quat_nominal{};
+	matrix::Vector3<double> vel{};
+	matrix::Vector3<double> pos{};
+	matrix::Vector3<double> gyro_bias{};
+	matrix::Vector3<double> accel_bias{};
+	matrix::Vector3<double> mag_I{};
+	matrix::Vector3<double> mag_B{};
+	matrix::Vector2<double> wind_vel{};
 
-	matrix::Vector<float, 24> Data() const {
-		matrix::Vector<float, 24> state;
+	matrix::Vector<double, 24> Data() const {
+		matrix::Vector<double, 24> state;
 		state.slice<4, 1>(0, 0) = quat_nominal;
 		state.slice<3, 1>(4, 0) = vel;
 		state.slice<3, 1>(7, 0) = pos;
@@ -32,12 +32,12 @@ struct StateSample {
 		return state;
 	};
 
-	const matrix::Vector<float, 24>& vector() const {
-		return *reinterpret_cast<matrix::Vector<float, 24>*>(const_cast<float*>(reinterpret_cast<const float*>(&quat_nominal)));
+	const matrix::Vector<double, 24>& vector() const {
+		return *reinterpret_cast<matrix::Vector<double, 24>*>(const_cast<double*>(reinterpret_cast<const double*>(&quat_nominal)));
 	};
 
 };
-static_assert(sizeof(matrix::Vector<float, 24>) == sizeof(StateSample), "state vector doesn't match StateSample size");
+static_assert(sizeof(matrix::Vector<double, 24>) == sizeof(StateSample), "state vector doesn't match StateSample size");
 
 struct IdxDof { unsigned idx; unsigned dof; };
 namespace State {

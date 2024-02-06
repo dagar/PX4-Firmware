@@ -52,8 +52,8 @@ TEST(GnssYawFusionGenerated, SingularityPitch90)
 	float meas_pred;
 	float innov_var;
 	VectorState H;
-	sym::ComputeGnssYawPredInnovVarAndH(state.vector(), P, yaw_offset, R_YAW, FLT_EPSILON, &meas_pred,
-					    &innov_var, &H);
+	sym::ComputeGnssYawPredInnovVarAndH(state.vector(), P, yaw_offset, (ekf_float_t)R_YAW, (ekf_float_t)FLT_EPSILON,
+					    &meas_pred, &innov_var, &H);
 	VectorState K = P * H / innov_var;
 
 	// THEN: the arctan is singular, the attitude isn't observable, so the innovation variance
@@ -75,8 +75,8 @@ TEST(GnssYawFusionGenerated, SingularityRoll90)
 	float meas_pred;
 	float innov_var;
 	VectorState H;
-	sym::ComputeGnssYawPredInnovVarAndH(state.vector(), P, yaw_offset, R_YAW, FLT_EPSILON, &meas_pred,
-					    &innov_var, &H);
+	sym::ComputeGnssYawPredInnovVarAndH(state.vector(), P, yaw_offset, (ekf_float_t)R_YAW, (ekf_float_t)FLT_EPSILON,
+					    &meas_pred, &innov_var, &H);
 	VectorState K = P * H / innov_var;
 
 	// THEN: the arctan is singular, the attitude isn't observable, so the innovation variance

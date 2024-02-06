@@ -47,7 +47,7 @@ public:
 
 private:
 
-	matrix::Vector3f _zgup_delta_ang{};
+	matrix::Vector3<ekf_float_t> _zgup_delta_ang{};
 	float _zgup_delta_ang_dt{0.f};
 };
 

@@ -61,6 +61,17 @@ public:
 		return (*this).cross(b);
 	}
 
+
+	operator Vector2<double>() const
+	{
+		return Vector2<double>((double)(*this)(0), (double)(*this)(1));
+	}
+
+	operator Vector2<float>() const
+	{
+		return Vector2<float>((float)(*this)(0), (float)(*this)(1));
+	}
+
 };
 
 

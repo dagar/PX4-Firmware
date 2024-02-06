@@ -60,7 +60,7 @@ void EkfLogger::writeState()
 		}
 
 		if (_variance_logging_enabled) {
-			matrix::Vector<float, State::size> variance = _ekf->covariances_diagonal();
+			matrix::Vector<ekf_float_t, State::size> variance = _ekf->covariances_diagonal();
 
 			for (unsigned i = 0; i < State::size; i++) {
 				_file << "," << variance(i);

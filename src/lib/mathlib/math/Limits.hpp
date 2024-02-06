@@ -68,6 +68,9 @@ constexpr _Tp max(_Tp a, _Tp b)
 	return (a > b) ? a : b;
 }
 
+constexpr double max(float a, double b) { return ((double)a > b) ? (double)a : b; }
+constexpr double max(double a, float b) { return (a > (double)b) ? a : (double)b; }
+
 template<typename _Tp>
 constexpr _Tp max(_Tp a, _Tp b, _Tp c)
 {

@@ -60,6 +60,7 @@ void Ekf::controlAirDataFusion(const imuSample &imu_delayed)
 
 	if (_control_status.flags.fake_pos || (airspeed_timed_out && sideslip_timed_out && (_params.drag_ctrl == 0))) {
 		_control_status.flags.wind = false;
+		P.uncorrelateCovarianceSetVariance<State::wind_vel.dof>(State::wind_vel.idx, 0.f);
 	}
 
 #if defined(CONFIG_EKF2_GNSS)
@@ -149,7 +150,7 @@ void Ekf::updateAirspeed(const airspeedSample &airspeed_sample, estimator_aid_so
 
 	float innov = 0.f;
 	float innov_var = 0.f;
-	sym::ComputeAirspeedInnovAndInnovVar(_state.vector(), P, airspeed_sample.true_airspeed, R, FLT_EPSILON, &innov, &innov_var);
+	sym::ComputeAirspeedInnovAndInnovVar(_state.vector(), P, airspeed_sample.true_airspeed, (ekf_float_t)R, (ekf_float_t)FLT_EPSILON, &innov, &innov_var);
 
 	aid_src.observation = airspeed_sample.true_airspeed;
 	aid_src.observation_variance = R;
@@ -200,7 +201,7 @@ void Ekf::fuseAirspeed(const airspeedSample &airspeed_sample, estimator_aid_sour
 	VectorState H; // Observation jacobian
 	VectorState K; // Kalman gain vector
 
-	sym::ComputeAirspeedHAndK(_state.vector(), P, innov_var, FLT_EPSILON, &H, &K);
+	sym::ComputeAirspeedHAndK(_state.vector(), P, (ekf_float_t)innov_var, (ekf_float_t)FLT_EPSILON, &H, &K);
 
 	if (update_wind_only) {
 		const Vector2f K_wind = K.slice<State::wind_vel.dof, 1>(State::wind_vel.idx, 0);
@@ -238,7 +239,7 @@ void Ekf::resetWindUsingAirspeed(const airspeedSample &airspeed_sample)
 	const float euler_yaw = getEulerYaw(_R_to_earth);
 	const float airspeed_var = sq(math::constrain(_params.eas_noise, 0.5f, 5.0f) * math::constrain(airspeed_sample.eas2tas, 0.9f, 10.0f));
 
-	matrix::SquareMatrix<float, State::wind_vel.dof> P_wind;
+	matrix::SquareMatrix<ekf_float_t, State::wind_vel.dof> P_wind;
 	sym::ComputeWindInitAndCovFromAirspeed(_state.vel, euler_yaw, airspeed_sample.true_airspeed, getVelocityVariance(), getYawVar(), sideslip_var, airspeed_var, &_state.wind_vel, &P_wind);
 
 	resetStateCovariance<State::wind_vel>(P_wind);

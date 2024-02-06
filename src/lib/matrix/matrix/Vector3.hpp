@@ -96,6 +96,21 @@ public:
 		return (*this).cross(b);
 	}
 
+
+
+	operator Vector3<double>() const
+	{
+		return Vector3<double>((double)(*this)(0), (double)(*this)(1), (double)(*this)(2));
+	}
+
+	operator Vector3<float>() const
+	{
+		return Vector3<float>((float)(*this)(0), (float)(*this)(1), (float)(*this)(2));
+	}
+
+
+
+
 	ConstSlice<Type, 2, 1, 3, 1> xy() const
 	{
 		return {0, 0, this};

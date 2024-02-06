@@ -52,7 +52,7 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector2f &ob
 		aid_src.observation[i] = obs(i);
 		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
 
-		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
+		aid_src.observation_variance[i] = math::max(sq(0.01), obs_var(i));
 		const int state_index = State::vel.idx + i;
 		aid_src.innovation_variance[i] = P(state_index, state_index) + aid_src.observation_variance[i];
 	}
@@ -71,7 +71,7 @@ void Ekf::updateVelocityAidSrcStatus(const uint64_t &time_us, const Vector3f &ob
 		aid_src.observation[i] = obs(i);
 		aid_src.innovation[i] = _state.vel(i) - aid_src.observation[i];
 
-		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
+		aid_src.observation_variance[i] = math::max(sq(0.01), obs_var(i));
 		const int state_index = State::vel.idx + i;
 		aid_src.innovation_variance[i] = P(state_index, state_index) + aid_src.observation_variance[i];
 	}
@@ -122,7 +122,7 @@ void Ekf::updateHorizontalPositionAidSrcStatus(const uint64_t &time_us, const Ve
 		aid_src.observation[i] = obs(i);
 		aid_src.innovation[i] = _state.pos(i) - aid_src.observation[i];
 
-		aid_src.observation_variance[i] = math::max(sq(0.01f), obs_var(i));
+		aid_src.observation_variance[i] = math::max(sq(0.01), obs_var(i));
 		const int state_index = State::pos.idx + i;
 		aid_src.innovation_variance[i] = P(state_index, state_index) + aid_src.observation_variance[i];
 	}

@@ -355,8 +355,8 @@ void Ekf::fuseFlowForTerrain(estimator_aid_source2d_s &flow)
 
 	const float state = _terrain_vpos; // linearize both axes using the same state value
 	Vector2f innov_var;
-	float H;
-	sym::TerrEstComputeFlowXyInnovVarAndHx(state, _terrain_var, _state.quat_nominal, _state.vel, _state.pos(2), R_LOS, FLT_EPSILON, &innov_var, &H);
+	ekf_float_t H;
+	sym::TerrEstComputeFlowXyInnovVarAndHx(state, _terrain_var, _state.quat_nominal, _state.vel, _state.pos(2), (ekf_float_t)R_LOS, (ekf_float_t)FLT_EPSILON, &innov_var, &H);
 	innov_var.copyTo(flow.innovation_variance);
 
 	if ((flow.innovation_variance[0] < R_LOS)
@@ -385,7 +385,7 @@ void Ekf::fuseFlowForTerrain(estimator_aid_source2d_s &flow)
 
 		} else if (index == 1) {
 			// recalculate innovation variance because state covariances have changed due to previous fusion (linearise using the same initial state for all axes)
-			sym::TerrEstComputeFlowYInnovVarAndH(state, _terrain_var, _state.quat_nominal, _state.vel, _state.pos(2), R_LOS, FLT_EPSILON, &flow.innovation_variance[1], &H);
+			sym::TerrEstComputeFlowYInnovVarAndH(state, _terrain_var, _state.quat_nominal, _state.vel, _state.pos(2), (ekf_float_t)R_LOS, (ekf_float_t)FLT_EPSILON, &flow.innovation_variance[1], &H);
 
 			// recalculate the innovation using the updated state
 			const Vector2f vel_body = predictFlowVelBody();
