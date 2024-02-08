@@ -80,7 +80,8 @@ public:
 
 	bool runController(PositionControlStates states = {})
 	{
-		const bool ret = _position_control.update(states, _input_setpoint, .1f);
+		const bool ret = _position_control.setInputSetpoint(_input_setpoint) && _position_control.update(states, .1f);
+
 		_position_control.getLocalPositionSetpoint(_output_setpoint);
 
 		ControlMath::thrustToAttitude(Vector3f(_output_setpoint.thrust), 0.f, _attitude);
@@ -123,7 +124,9 @@ TEST_F(PositionControlBasicDirectionTest, PositionDirection)
 
 TEST_F(PositionControlBasicDirectionTest, VelocityDirection)
 {
+	_input_setpoint = PositionControl::empty_trajectory_setpoint;
 	Vector3f(.1f, .1f, -.1f).copyTo(_input_setpoint.velocity);
+
 	EXPECT_TRUE(runController());
 	checkDirection();
 }

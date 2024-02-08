@@ -395,7 +395,7 @@ void MulticopterPositionControl::Run()
 			if ((_setpoint.timestamp < _time_position_control_enabled)
 			    && (vehicle_local_position.timestamp_sample > _time_position_control_enabled)) {
 
-				_setpoint = generateFailsafeSetpoint(vehicle_local_position.timestamp_sample, states, false);
+				_setpoint = generateFailsafeSetpoint(vehicle_local_position.timestamp_sample, states);
 			}
 		}
 
@@ -494,6 +494,10 @@ void MulticopterPositionControl::Run()
 				math::min(speed_up, _param_mpc_z_vel_max_up.get()), // takeoff ramp starts with negative velocity limit
 				math::max(speed_down, 0.f));
 
+			if (_control.setInputSetpoint(_setpoint)) {
+				_setpoint = generateFailsafeSetpoint(vehicle_local_position.timestamp_sample, states, true);
+			}
+
 			// update states
 			if (!PX4_ISFINITE(_setpoint.position[2])
 			    && PX4_ISFINITE(_setpoint.velocity[2]) && (fabsf(_setpoint.velocity[2]) > FLT_EPSILON)
@@ -508,16 +512,16 @@ void MulticopterPositionControl::Run()
 			}
 
 			// Run position control
-			if (!_control.update(states, _setpoint, dt)) {
+			if (!_control.update(states, dt)) {
 				// Failsafe
-				_setpoint = generateFailsafeSetpoint(vehicle_local_position.timestamp_sample, states, true);
+				_setpoint = generateFailsafeSetpoint(vehicle_local_position.timestamp_sample, states);
 
 				// reset constraints
 				_vehicle_constraints = {0, NAN, NAN, false, {}};
 				_control.setVelocityLimits(_param_mpc_xy_vel_max.get(), _param_mpc_z_vel_max_up.get(), _param_mpc_z_vel_max_dn.get());
 
 				// run controller again with failsafe setpoint
-				_control.update(states, _setpoint, dt);
+				_control.update(states, dt);
 			}
 
 			// Publish internal position control setpoints

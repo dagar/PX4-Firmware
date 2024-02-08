@@ -133,12 +133,19 @@ public:
 	void updateHoverThrust(const float hover_thrust_new);
 
 	/**
+	 * Pass the desired setpoints
+	 * Note: NAN value means no feed forward/leave state uncontrolled if there's no higher order setpoint.
+	 * @param setpoint setpoints including feed-forwards to execute in update()
+	 */
+	bool setInputSetpoint(const trajectory_setpoint_s &setpoint);
+
+	/**
 	 * Apply P-position and PID-velocity controller that updates the member thrust setpoint.
 	 * @see _thr_sp
 	 * @param dt time in seconds since last iteration
 	 * @return true if update succeeded and output setpoint is executable, false if not
 	 */
-	bool update(const PositionControlStates &states, const trajectory_setpoint_s &setpoint, const float dt);
+	bool update(const PositionControlStates &states, const float dt);
 
 	/**
 	 * Set the integral term in xy to 0.
@@ -164,9 +171,6 @@ private:
 	static constexpr float HOVER_THRUST_MIN = 0.05f;
 	static constexpr float HOVER_THRUST_MAX = 0.9f;
 
-	bool _inputSetpointValid(const matrix::Vector3f &pos_sp, const matrix::Vector3f &vel_sp,
-				 const matrix::Vector3f &acc_sp) const;
-
 	///< Position proportional control
 	void _positionControl(const matrix::Vector3f &pos);
 
@@ -174,7 +178,7 @@ private:
 	void _velocityControl(const matrix::Vector3f &vel, const matrix::Vector3f &vel_dot, const float dt);
 
 	///< Acceleration setpoint processing
-	matrix::Vector3f _accelerationControl(const matrix::Vector3f &acc_sp) const;
+	void _accelerationControl(const matrix::Vector3f &acc_sp);
 
 	// Gains
 	matrix::Vector3f _gain_pos_p; ///< Position control proportional gain
@@ -198,9 +202,22 @@ private:
 
 	matrix::Vector3f _vel_int; /**< integral term of the velocity controller */
 
+	bool _pos_xy_active{false};
+	bool _vel_xy_active{false};
+
+	bool _pos_z_active{false};
+	bool _vel_z_active{false};
+
 	// Setpoints
 	matrix::Vector3f _pos_sp; /**< desired position */
+	matrix::Vector3f _vel_ff; /**< velocity feed-forward */
 	matrix::Vector3f _vel_sp; /**< desired velocity */
+	matrix::Vector3f _acc_ff; /**< acceleration feed-forward */
+
 	matrix::Vector3f _acc_sp; /**< desired acceleration */
 	matrix::Vector3f _thr_sp; /**< desired thrust */
+
+
+	matrix::Vector3f _vel_sp_out;
+	matrix::Vector3f _acc_sp_out;
 };
