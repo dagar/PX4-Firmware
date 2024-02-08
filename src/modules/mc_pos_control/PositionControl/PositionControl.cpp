@@ -152,6 +152,7 @@ bool PositionControl::setInputSetpoint(const trajectory_setpoint_s &setpoint)
 		_vel_z_active = true;
 		_vel_ff(2) = vel_sp_z_valid ? vel_sp(2) : 0.f;
 
+		_acc_sp(2) = 0.f;
 		_acc_ff(2) = acc_sp_z_valid ? acc_sp(2) : 0.f;
 
 	} else if (vel_sp_z_valid) {
@@ -163,6 +164,7 @@ bool PositionControl::setInputSetpoint(const trajectory_setpoint_s &setpoint)
 		_vel_sp(2) = vel_sp(2);
 		_vel_ff(2) = 0.f;
 
+		_acc_sp(2) = 0.f;
 		_acc_ff(2) = acc_sp_z_valid ? acc_sp(2) : 0.f;
 
 	} else if (acc_sp_z_valid) {
@@ -238,17 +240,17 @@ void PositionControl::_positionControl(const Vector3f &pos)
 
 void PositionControl::_velocityControl(const Vector3f &vel, const Vector3f &vel_dot, const float dt)
 {
-	Vector3f vel_sp;
+	Vector3f acc_sp{0.f, 0.f, 0.f};
 
 	if (_vel_xy_active) {
 		// Constrain horizontal velocity by prioritizing the velocity component along the
 		// the desired position setpoint over the feed-forward term.
-		vel_sp.xy() = ControlMath::constrainXY(_vel_sp.xy(), _vel_ff.xy(), _lim_vel_horizontal);
+		_vel_sp_out.xy() = ControlMath::constrainXY(_vel_sp.xy(), _vel_ff.xy(), _lim_vel_horizontal);
 	}
 
 	if (_vel_z_active) {
 		// Constrain velocity in z-direction.
-		vel_sp(2) = math::constrain(_vel_sp(2) + _vel_ff(2), -_lim_vel_up, _lim_vel_down);
+		_vel_sp_out(2) = math::constrain(_vel_sp(2) + _vel_ff(2), -_lim_vel_up, _lim_vel_down);
 
 		// Constrain vertical velocity integral
 		_vel_int(2) = math::constrain(_vel_int(2), -CONSTANTS_ONE_G, CONSTANTS_ONE_G);
@@ -256,24 +258,11 @@ void PositionControl::_velocityControl(const Vector3f &vel, const Vector3f &vel_
 
 
 	// PID velocity control
-	Vector3f vel_error = vel_sp - vel;
+	Vector3f vel_error = _vel_sp_out - vel;
 	Vector3f acc_sp = vel_error.emult(_gain_vel_p) + _vel_int - vel_dot.emult(_gain_vel_d);
 
-	//if (_vel_xy_active) {
-	// 	_acc_sp_out.xy() = acc_sp.xy() + _acc_ff.xy();
-
-	// } else {
-	// 	_acc_sp_out.xy() = _acc_sp.xy();
-	// }
-
-	// if (_vel_z_active) {
-	// 	_acc_sp_out(2) = acc_sp(2) + _acc_ff(2);
-
-	// } else {
-	// 	_acc_sp_out(2) = _acc_sp(2);
-	// }
-
-	_acc_sp_out = acc_sp;
+	_acc_sp_out.xy() = _vel_xy_active ? (acc_sp.xy() + _acc_ff.xy()) : _acc_sp.xy();
+	_acc_sp_out(2) = _vel_z_active ? (acc_sp(2) + _acc_ff(2)) : _acc_sp(2);
 
 	/**< desired thrust */
 	_accelerationControl(_acc_sp_out);
