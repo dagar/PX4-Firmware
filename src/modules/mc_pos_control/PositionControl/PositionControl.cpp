@@ -88,43 +88,47 @@ void PositionControl::updateHoverThrust(const float hover_thrust_new)
 		       + CONSTANTS_ONE_G - _acc_sp(2);
 }
 
-void PositionControl::setState(const PositionControlStates &states)
+bool PositionControl::update(const PositionControlStates &states, const trajectory_setpoint_s &setpoint, const float dt)
 {
-	_pos = states.position;
-	_vel = states.velocity;
-	_yaw = states.yaw;
-	_vel_dot = states.acceleration;
-}
+	// Note: NAN value means no feed forward/leave state uncontrolled if there's no higher order setpoint.
+	const Vector3f pos_sp{setpoint.position};
+	const Vector3f vel_sp{setpoint.velocity};
+	const Vector3f acc_sp{setpoint.acceleration};
 
-void PositionControl::setInputSetpoint(const trajectory_setpoint_s &setpoint)
-{
-	_pos_sp = Vector3f(setpoint.position);
-	_vel_sp = Vector3f(setpoint.velocity);
-	_acc_sp = Vector3f(setpoint.acceleration);
-	_yaw_sp = setpoint.yaw;
-	_yawspeed_sp = setpoint.yawspeed;
-}
+	bool valid = _inputSetpointValid(pos_sp, vel_sp, acc_sp);
 
-bool PositionControl::update(const float dt)
-{
-	bool valid = _inputValid();
+	// For each controlled state the estimate has to be valid
+	for (int i = 0; i <= 2; i++) {
+		if (PX4_ISFINITE(pos_sp(i))) {
+			valid = valid && PX4_ISFINITE(states.position(i));
+		}
 
-	if (valid) {
-		_positionControl();
-		_velocityControl(dt);
-
-		_yawspeed_sp = PX4_ISFINITE(_yawspeed_sp) ? _yawspeed_sp : 0.f;
-		_yaw_sp = PX4_ISFINITE(_yaw_sp) ? _yaw_sp : _yaw; // TODO: better way to disable yaw control
+		if (PX4_ISFINITE(vel_sp(i))) {
+			valid = valid && PX4_ISFINITE(states.velocity(i)) && PX4_ISFINITE(states.acceleration(i));
+		}
 	}
 
-	// There has to be a valid output acceleration and thrust setpoint otherwise something went wrong
-	return valid && _acc_sp.isAllFinite() && _thr_sp.isAllFinite();
+	if (valid) {
+		// position control
+		_pos_sp = pos_sp;
+		_vel_sp = vel_sp; // optional velocity feed-forward
+		_positionControl(states.position);
+
+		// velocity/acceleration control
+		_acc_sp = acc_sp; // optional acceleration feed-forward
+		_velocityControl(states.velocity, states.acceleration, dt);
+
+		// There has to be a valid output acceleration and thrust setpoint otherwise something went wrong
+		return _acc_sp.isAllFinite() && _thr_sp.isAllFinite();
+	}
+
+	return false;
 }
 
-void PositionControl::_positionControl()
+void PositionControl::_positionControl(const Vector3f &pos)
 {
 	// P-position controller
-	Vector3f vel_sp_position = (_pos_sp - _pos).emult(_gain_pos_p);
+	Vector3f vel_sp_position = (_pos_sp - pos).emult(_gain_pos_p);
 	// Position and feed-forward velocity setpoints or position states being NAN results in them not having an influence
 	ControlMath::addIfNotNanVector3f(_vel_sp, vel_sp_position);
 	// make sure there are no NAN elements for further reference while constraining
@@ -137,25 +141,20 @@ void PositionControl::_positionControl()
 	_vel_sp(2) = math::constrain(_vel_sp(2), -_lim_vel_up, _lim_vel_down);
 }
 
-void PositionControl::_velocityControl(const float dt)
+void PositionControl::_velocityControl(const Vector3f &vel, const Vector3f &vel_dot, const float dt)
 {
 	// Constrain vertical velocity integral
 	_vel_int(2) = math::constrain(_vel_int(2), -CONSTANTS_ONE_G, CONSTANTS_ONE_G);
 
 	// PID velocity control
-	Vector3f vel_error = _vel_sp - _vel;
-	Vector3f acc_sp_velocity = vel_error.emult(_gain_vel_p) + _vel_int - _vel_dot.emult(_gain_vel_d);
+	Vector3f vel_error = _vel_sp - vel;
+	Vector3f acc_sp_velocity = vel_error.emult(_gain_vel_p) + _vel_int - vel_dot.emult(_gain_vel_d);
 
 	// No control input from setpoints or corresponding states which are NAN
 	ControlMath::addIfNotNanVector3f(_acc_sp, acc_sp_velocity);
 
-	_accelerationControl();
-
-	// Integrator anti-windup in vertical direction
-	if ((_thr_sp(2) >= -_lim_thr_min && vel_error(2) >= 0.f) ||
-	    (_thr_sp(2) <= -_lim_thr_max && vel_error(2) <= 0.f)) {
-		vel_error(2) = 0.f;
-	}
+	/**< desired thrust */
+	_thr_sp = _accelerationControl(_acc_sp);
 
 	// Prioritize vertical control while keeping a horizontal margin
 	const Vector2f thrust_sp_xy(_thr_sp);
@@ -195,49 +194,46 @@ void PositionControl::_velocityControl(const float dt)
 					: acc_sp_xy;
 	vel_error.xy() = Vector2f(vel_error) - arw_gain * (acc_sp_xy - acc_limited_xy);
 
+	// Integrator anti-windup in vertical direction
+	if ((_thr_sp(2) >= -_lim_thr_min && vel_error(2) >= 0.f) ||
+	    (_thr_sp(2) <= -_lim_thr_max && vel_error(2) <= 0.f)) {
+
+		vel_error(2) = 0.f;
+	}
+
 	// Make sure integral doesn't get NAN
 	ControlMath::setZeroIfNanVector3f(vel_error);
 	// Update integral part of velocity control
 	_vel_int += vel_error.emult(_gain_vel_i) * dt;
 }
 
-void PositionControl::_accelerationControl()
+Vector3f PositionControl::_accelerationControl(const Vector3f &acc_sp) const
 {
 	// Assume standard acceleration due to gravity in vertical direction for attitude generation
-	Vector3f body_z = Vector3f(-_acc_sp(0), -_acc_sp(1), CONSTANTS_ONE_G).normalized();
+	Vector3f body_z = Vector3f(-acc_sp(0), -acc_sp(1), CONSTANTS_ONE_G).normalized();
 	ControlMath::limitTilt(body_z, Vector3f(0, 0, 1), _lim_tilt);
 	// Scale thrust assuming hover thrust produces standard gravity
-	float collective_thrust = _acc_sp(2) * (_hover_thrust / CONSTANTS_ONE_G) - _hover_thrust;
+	float collective_thrust = acc_sp(2) * (_hover_thrust / CONSTANTS_ONE_G) - _hover_thrust;
 	// Project thrust to planned body attitude
 	collective_thrust /= (Vector3f(0, 0, 1).dot(body_z));
 	collective_thrust = math::min(collective_thrust, -_lim_thr_min);
-	_thr_sp = body_z * collective_thrust;
+
+	return body_z * collective_thrust;
 }
 
-bool PositionControl::_inputValid()
+bool PositionControl::_inputSetpointValid(const Vector3f &pos_sp, const Vector3f &vel_sp, const Vector3f &acc_sp) const
 {
 	bool valid = true;
 
 	// Every axis x, y, z needs to have some setpoint
 	for (int i = 0; i <= 2; i++) {
-		valid = valid && (PX4_ISFINITE(_pos_sp(i)) || PX4_ISFINITE(_vel_sp(i)) || PX4_ISFINITE(_acc_sp(i)));
+		valid = valid && (PX4_ISFINITE(pos_sp(i)) || PX4_ISFINITE(vel_sp(i)) || PX4_ISFINITE(acc_sp(i)));
 	}
 
 	// x and y input setpoints always have to come in pairs
-	valid = valid && (PX4_ISFINITE(_pos_sp(0)) == PX4_ISFINITE(_pos_sp(1)));
-	valid = valid && (PX4_ISFINITE(_vel_sp(0)) == PX4_ISFINITE(_vel_sp(1)));
-	valid = valid && (PX4_ISFINITE(_acc_sp(0)) == PX4_ISFINITE(_acc_sp(1)));
-
-	// For each controlled state the estimate has to be valid
-	for (int i = 0; i <= 2; i++) {
-		if (PX4_ISFINITE(_pos_sp(i))) {
-			valid = valid && PX4_ISFINITE(_pos(i));
-		}
-
-		if (PX4_ISFINITE(_vel_sp(i))) {
-			valid = valid && PX4_ISFINITE(_vel(i)) && PX4_ISFINITE(_vel_dot(i));
-		}
-	}
+	valid = valid && (PX4_ISFINITE(pos_sp(0)) == PX4_ISFINITE(pos_sp(1)));
+	valid = valid && (PX4_ISFINITE(vel_sp(0)) == PX4_ISFINITE(vel_sp(1)));
+	valid = valid && (PX4_ISFINITE(acc_sp(0)) == PX4_ISFINITE(acc_sp(1)));
 
 	return valid;
 }
@@ -247,17 +243,9 @@ void PositionControl::getLocalPositionSetpoint(vehicle_local_position_setpoint_s
 	local_position_setpoint.x = _pos_sp(0);
 	local_position_setpoint.y = _pos_sp(1);
 	local_position_setpoint.z = _pos_sp(2);
-	local_position_setpoint.yaw = _yaw_sp;
-	local_position_setpoint.yawspeed = _yawspeed_sp;
 	local_position_setpoint.vx = _vel_sp(0);
 	local_position_setpoint.vy = _vel_sp(1);
 	local_position_setpoint.vz = _vel_sp(2);
 	_acc_sp.copyTo(local_position_setpoint.acceleration);
 	_thr_sp.copyTo(local_position_setpoint.thrust);
-}
-
-void PositionControl::getAttitudeSetpoint(vehicle_attitude_setpoint_s &attitude_setpoint) const
-{
-	ControlMath::thrustToAttitude(_thr_sp, _yaw_sp, attitude_setpoint);
-	attitude_setpoint.yaw_sp_move_rate = _yawspeed_sp;
 }

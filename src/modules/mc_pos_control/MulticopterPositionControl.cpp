@@ -324,8 +324,6 @@ PositionControlStates MulticopterPositionControl::set_vehicle_states(const vehic
 		_vel_z_deriv.reset();
 	}
 
-	states.yaw = vehicle_local_position.heading;
-
 	return states;
 }
 
@@ -384,7 +382,7 @@ void MulticopterPositionControl::Run()
 		// if a goto setpoint available this publishes a trajectory setpoint to go there
 		if (_goto_control.checkForSetpoint(vehicle_local_position.timestamp_sample,
 						   _vehicle_control_mode.flag_multicopter_position_control_enabled)) {
-			_goto_control.update(dt, states.position, states.yaw);
+			_goto_control.update(dt, states.position, vehicle_local_position.heading);
 		}
 
 		_trajectory_setpoint_sub.update(&_setpoint);
@@ -496,8 +494,6 @@ void MulticopterPositionControl::Run()
 				math::min(speed_up, _param_mpc_z_vel_max_up.get()), // takeoff ramp starts with negative velocity limit
 				math::max(speed_down, 0.f));
 
-			_control.setInputSetpoint(_setpoint);
-
 			// update states
 			if (!PX4_ISFINITE(_setpoint.position[2])
 			    && PX4_ISFINITE(_setpoint.velocity[2]) && (fabsf(_setpoint.velocity[2]) > FLT_EPSILON)
@@ -511,16 +507,17 @@ void MulticopterPositionControl::Run()
 				states.velocity(2) = vehicle_local_position.z_deriv * weighting + vehicle_local_position.vz * (1.f - weighting);
 			}
 
-			_control.setState(states);
-
 			// Run position control
-			if (!_control.update(dt)) {
+			if (!_control.update(states, _setpoint, dt)) {
 				// Failsafe
-				_vehicle_constraints = {0, NAN, NAN, false, {}}; // reset constraints
+				_setpoint = generateFailsafeSetpoint(vehicle_local_position.timestamp_sample, states, true);
 
-				_control.setInputSetpoint(generateFailsafeSetpoint(vehicle_local_position.timestamp_sample, states, true));
+				// reset constraints
+				_vehicle_constraints = {0, NAN, NAN, false, {}};
 				_control.setVelocityLimits(_param_mpc_xy_vel_max.get(), _param_mpc_z_vel_max_up.get(), _param_mpc_z_vel_max_dn.get());
-				_control.update(dt);
+
+				// run controller again with failsafe setpoint
+				_control.update(states, _setpoint, dt);
 			}
 
 			// Publish internal position control setpoints
@@ -528,12 +525,16 @@ void MulticopterPositionControl::Run()
 			// This message is used by other modules (such as Landdetector) to determine vehicle intention.
 			vehicle_local_position_setpoint_s local_pos_sp{};
 			_control.getLocalPositionSetpoint(local_pos_sp);
+			local_pos_sp.yaw = PX4_ISFINITE(_setpoint.yaw) ? _setpoint.yaw :
+					   vehicle_local_position.heading; // TODO: better way to disable yaw control
+			local_pos_sp.yawspeed = PX4_ISFINITE(_setpoint.yawspeed) ? _setpoint.yawspeed : 0.f;
 			local_pos_sp.timestamp = hrt_absolute_time();
 			_local_pos_sp_pub.publish(local_pos_sp);
 
 			// Publish attitude setpoint output
 			vehicle_attitude_setpoint_s attitude_setpoint{};
-			_control.getAttitudeSetpoint(attitude_setpoint);
+			ControlMath::thrustToAttitude(Vector3f(local_pos_sp.thrust), local_pos_sp.yaw, attitude_setpoint);
+			attitude_setpoint.yaw_sp_move_rate = local_pos_sp.yawspeed;
 			attitude_setpoint.timestamp = hrt_absolute_time();
 			_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
 

@@ -33,6 +33,7 @@
 
 #include <gtest/gtest.h>
 #include <PositionControl.hpp>
+#include "ControlMath.hpp"
 #include <px4_defines.h>
 
 using namespace matrix;
@@ -46,8 +47,6 @@ TEST(PositionControlTest, EmptySetpoint)
 	EXPECT_FLOAT_EQ(output_setpoint.x, 0.f);
 	EXPECT_FLOAT_EQ(output_setpoint.y, 0.f);
 	EXPECT_FLOAT_EQ(output_setpoint.z, 0.f);
-	EXPECT_FLOAT_EQ(output_setpoint.yaw, 0.f);
-	EXPECT_FLOAT_EQ(output_setpoint.yawspeed, 0.f);
 	EXPECT_FLOAT_EQ(output_setpoint.vx, 0.f);
 	EXPECT_FLOAT_EQ(output_setpoint.vy, 0.f);
 	EXPECT_FLOAT_EQ(output_setpoint.vz, 0.f);
@@ -55,15 +54,14 @@ TEST(PositionControlTest, EmptySetpoint)
 	EXPECT_EQ(Vector3f(output_setpoint.thrust), Vector3f(0, 0, 0));
 
 	vehicle_attitude_setpoint_s attitude{};
-	position_control.getAttitudeSetpoint(attitude);
+	ControlMath::thrustToAttitude(Vector3f(output_setpoint.thrust), 0.f, attitude);
+
 	EXPECT_FLOAT_EQ(attitude.roll_body, 0.f);
 	EXPECT_FLOAT_EQ(attitude.pitch_body, 0.f);
-	EXPECT_FLOAT_EQ(attitude.yaw_body, 0.f);
-	EXPECT_FLOAT_EQ(attitude.yaw_sp_move_rate, 0.f);
+
 	EXPECT_EQ(Quatf(attitude.q_d), Quatf(1.f, 0.f, 0.f, 0.f));
 	EXPECT_EQ(Vector3f(attitude.thrust_body), Vector3f(0.f, 0.f, 0.f));
 	EXPECT_EQ(attitude.reset_integral, false);
-	EXPECT_EQ(attitude.fw_control_yaw_wheel, false);
 }
 
 class PositionControlBasicTest : public ::testing::Test
@@ -80,12 +78,13 @@ public:
 		_position_control.setHoverThrust(.5f);
 	}
 
-	bool runController()
+	bool runController(PositionControlStates states = {})
 	{
-		_position_control.setInputSetpoint(_input_setpoint);
-		const bool ret = _position_control.update(.1f);
+		const bool ret = _position_control.update(states, _input_setpoint, .1f);
 		_position_control.getLocalPositionSetpoint(_output_setpoint);
-		_position_control.getAttitudeSetpoint(_attitude);
+
+		ControlMath::thrustToAttitude(Vector3f(_output_setpoint.thrust), 0.f, _attitude);
+
 		return ret;
 	}
 
@@ -321,23 +320,18 @@ TEST_F(PositionControlBasicTest, InvalidState)
 
 	PositionControlStates states{};
 	states.position(0) = NAN;
-	_position_control.setState(states);
-	EXPECT_FALSE(runController());
+	EXPECT_FALSE(runController(states));
 
 	states.velocity(0) = NAN;
-	_position_control.setState(states);
-	EXPECT_FALSE(runController());
+	EXPECT_FALSE(runController(states));
 
 	states.position(0) = 0.f;
-	_position_control.setState(states);
-	EXPECT_FALSE(runController());
+	EXPECT_FALSE(runController(states));
 
 	states.velocity(0) = 0.f;
 	states.acceleration(1) = NAN;
-	_position_control.setState(states);
-	EXPECT_FALSE(runController());
+	EXPECT_FALSE(runController(states));
 }
-
 
 TEST_F(PositionControlBasicTest, UpdateHoverThrust)
 {
