@@ -310,8 +310,8 @@ void Ekf::predictState(const imuSample &imu_delayed)
 	_state.pos += (vel_last + _state.vel) * imu_delayed.delta_vel_dt * 0.5f;
 
 	// constrain states
-	_state.vel = matrix::constrain(_state.vel, -1000.f, 1000.f);
-	_state.pos = matrix::constrain(_state.pos, -1.e6f, 1.e6f);
+	_state.vel = matrix::constrain(_state.vel, (ekf_float_t)-1000., (ekf_float_t)1000.);
+	_state.pos = matrix::constrain(_state.pos, (ekf_float_t)-1.e6, (ekf_float_t)1.e6);
 
 	// some calculations elsewhere in code require a raw angular rate vector so calculate here to avoid duplication
 	// protect against possible small timesteps resulting from timing slip on previous frame that can drive spikes into the rate
@@ -351,7 +351,8 @@ void Ekf::resetGlobalPosToExternalObservation(double lat_deg, double lon_deg, fl
 	const float dt = _time_delayed_us > timestamp_observation ? static_cast<float>(_time_delayed_us - timestamp_observation)
 			 * 1e-6f : -static_cast<float>(timestamp_observation - _time_delayed_us) * 1e-6f;
 
-	Vector2f pos_corrected = _pos_ref.project(lat_deg, lon_deg) + _state.vel.xy() * dt;
+	Vector2f vel_xy(_state.vel(0), _state.vel(1));
+	Vector2f pos_corrected = _pos_ref.project(lat_deg, lon_deg) + vel_xy * dt;
 
 	resetHorizontalPositionToExternal(pos_corrected, math::max(accuracy, FLT_EPSILON));
 }
