@@ -327,8 +327,8 @@ public:
 #endif
 	}
 
-	// fuse single velocity and position measurement
-	bool fuseVelPosHeight(const float innov, const float innov_var, const int state_index);
+	// fuse single direct state measurement (eg NED velocity, NED position, mag earth field, etc)
+	bool fuseDirectStateMeasurement(const float innov, const float innov_var, const int state_index);
 
 	// gyro bias
 	const Vector3f &getGyroBias() const { return _state.gyro_bias; } // get the gyroscope bias in rad/s

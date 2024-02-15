@@ -193,7 +193,10 @@ bool Ekf::fuseMag(const Vector3f &mag, estimator_aid_source3d_s &aid_src_mag, bo
 
 		if (measurementUpdate(Kfusion, aid_src_mag.innovation_variance[index], aid_src_mag.innovation[index])) {
 			fused[index] = true;
-			limitDeclination();
+
+			if (!_control_status.flags.gps) {
+				limitDeclination();
+			}
 
 		} else {
 			fused[index] = false;

@@ -114,7 +114,7 @@ void Ekf::controlMag3DFusion(const magSample &mag_sample, const bool common_star
 					const bool update_all_states = _control_status.flags.mag_3D;
 					fuseMag(mag_sample.mag, aid_src, update_all_states);
 
-					if (_control_status.flags.mag_dec) {
+					if (_control_status.flags.mag_dec && !_control_status.flags.gps) {
 						fuseDeclination(0.5f);
 					}
 				}
