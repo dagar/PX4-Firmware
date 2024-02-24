@@ -1242,16 +1242,21 @@ private:
 	bool _ev_q_error_initialized{false};
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 
-#if defined(CONFIG_EKF2_AIRSPEED2D)
-	Airspeed2D _airspeed2d{};
-#endif // CONFIG_EKF2_AIRSPEED2D
-
 	ZeroGyroUpdate _zero_gyro_update{};
 	ZeroVelocityUpdate _zero_velocity_update{};
 
-#if defined(CONFIG_EKF2_AUX_GLOBAL_POSITION) && defined(MODULE_NAME)
+#if defined(MODULE_NAME)
+
+# if defined(CONFIG_EKF2_AIRSPEED2D)
+	Airspeed2D _airspeed2d{};
+# endif // CONFIG_EKF2_AIRSPEED2D
+
+# if defined(CONFIG_EKF2_AUX_GLOBAL_POSITION)
 	AuxGlobalPosition _aux_global_position{};
-#endif // CONFIG_EKF2_AUX_GLOBAL_POSITION
+# endif // CONFIG_EKF2_AUX_GLOBAL_POSITION
+
+#endif // MODULE_NAME
+
 };
 
 #endif // !EKF_EKF_H

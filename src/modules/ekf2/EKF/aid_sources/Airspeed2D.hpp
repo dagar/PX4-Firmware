@@ -34,19 +34,17 @@
 #ifndef EKF_AIRSPEED2D_HPP
 #define EKF_AIRSPEED2D_HPP
 
+#if defined(CONFIG_EKF2_AIRSPEED2D) && defined(MODULE_NAME)
+
 #include "EstimatorAidSource.hpp"
 
 #include "../RingBuffer.h"
 
+#include <px4_platform_common/module_params.h>
+#include <uORB/PublicationMulti.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/estimator_aid_source2d.h>
-
-#if defined(MODULE_NAME)
-# include <px4_platform_common/module_params.h>
-# include <uORB/PublicationMulti.hpp>
-# include <uORB/Subscription.hpp>
-
-# include <uORB/topics/sensor_airflow.h>
-#endif // MODULE_NAME
+#include <uORB/topics/sensor_airflow.h>
 
 class Airspeed2D : public EstimatorAidSource, public ModuleParams
 {
@@ -69,7 +67,6 @@ private:
 
 	estimator_aid_source2d_s _aid_src{};
 
-#if defined(MODULE_NAME)
 	uORB::PublicationMulti<estimator_aid_source2d_s> _estimator_aid_src_airspeed2d_pub {ORB_ID(estimator_aid_src_airspeed2d)};
 	uORB::Subscription _sensor_airflow_sub{ORB_ID(sensor_airflow)};
 
@@ -80,8 +77,8 @@ private:
 		(ParamFloat<px4::params::EKF2_ASP2D_GATE>) _param_ekf2_asp2d_gate
 	)
 
-#endif // MODULE_NAME
-
 };
+
+#endif // CONFIG_EKF2_AIRSPEED2D && MODULE_NAME
 
 #endif // !EKF_AIRSPEED2D_HPP
