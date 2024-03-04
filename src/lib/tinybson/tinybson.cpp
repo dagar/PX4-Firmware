@@ -315,7 +315,7 @@ bson_decoder_next(bson_decoder_t decoder)
 	}
 
 	/* call the callback and pass its results back */
-	return decoder->callback(decoder, &decoder->node);
+	return decoder->callback(decoder, decoder->priv, &decoder->node);
 }
 
 int

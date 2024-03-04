@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2017 - 2020 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2017 - 2024 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -156,7 +156,7 @@ add_custom_target(parameters_header DEPENDS px4_parameters.hpp)
 
 set(SRCS)
 
-list(APPEND SRCS parameters.cpp atomic_transaction.cpp autosave.cpp)
+list(APPEND SRCS parameters.cpp atomic_transaction.cpp)
 
 if(BUILD_TESTING)
 	list(APPEND SRCS param_translation_unit_tests.cpp)
@@ -181,6 +181,8 @@ if(NOT "${PX4_BOARD}" MATCHES "px4_io")
 	add_library(parameters STATIC EXCLUDE_FROM_ALL
 		${SRCS}
 		px4_parameters.hpp
+		ParameterServer.cpp
+		ParameterServer.hpp
 	)
 
 	target_link_libraries(parameters PRIVATE perf tinybson px4_platform)
@@ -189,6 +191,8 @@ if(NOT "${PX4_BOARD}" MATCHES "px4_io")
 	target_compile_options(parameters
 		PRIVATE
 			#-DDEBUG_BUILD
+			#${MAX_CUSTOM_OPT_LEVEL}
+			-O0
 			-Wno-cast-align		# TODO: fix and enable
 			-Wno-sign-compare	# TODO: fix and enable
 	)
@@ -198,7 +202,7 @@ endif()
 add_dependencies(parameters prebuild_targets)
 
 if(${PX4_PLATFORM} STREQUAL "nuttx")
-	target_link_libraries(parameters PRIVATE flashparams)
+	#target_link_libraries(parameters PRIVATE flashparams)
 endif()
 
 if(${PX4_PLATFORM} STREQUAL "posix" OR ${PX4_PLATFORM} STREQUAL "ros2")
