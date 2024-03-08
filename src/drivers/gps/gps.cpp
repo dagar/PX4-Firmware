@@ -36,15 +36,6 @@
  * Driver for the GPS on a serial/spi port
  */
 
-#ifdef __PX4_NUTTX
-#include <nuttx/clock.h>
-#include <nuttx/arch.h>
-#endif
-
-#ifndef __PX4_QURT
-#include <poll.h>
-#endif
-
 #include <cstring>
 
 #include <drivers/drv_sensor.h>
@@ -78,9 +69,10 @@
 #endif // CONSTRAINED_FLASH
 #include "devices/src/ubx.h"
 
-#ifdef __PX4_LINUX
-#include <linux/spi/spidev.h>
-#endif /* __PX4_LINUX */
+#if defined(__PX4_LINUX)
+# include <linux/spi/spidev.h>
+# include <poll.h>
+#endif // __PX4_LINUX
 
 using namespace device;
 using namespace time_literals;
@@ -171,10 +163,13 @@ public:
 	void reset_if_scheduled();
 
 private:
-#ifdef __PX4_LINUX
+
+	Serial                           *_uart{nullptr};				///< UART interface to GPS
+
+#if defined(__PX4_LINUX)
 	int				_spi_fd {-1};					///< SPI interface to GPS
-#endif
-	Serial 			*_uart = nullptr;				///< UART interface to GPS
+#endif // __PX4_LINUX
+
 	unsigned			_baudrate{0};					///< current baudrate
 	const unsigned			_configured_baudrate{0};			///< configured baudrate (0=auto-detect)
 	char				_port[20] {};					///< device / serial port path
@@ -334,11 +329,12 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 		char c = _port[strlen(_port) - 1]; // last digit of path (eg /dev/ttyS2)
 		set_device_bus(c - 48); // sub 48 to convert char to integer
 
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 
 	} else if (_interface == GPSHelper::Interface::SPI) {
 		set_device_bus_type(device::Device::DeviceBusType::DeviceBusType_SPI);
-#endif
+#endif // __PX4_LINUX
+
 	}
 
 	if (_mode == gps_driver_mode_t::None) {
@@ -417,13 +413,13 @@ int GPS::callback(GPSCallbackType type, void *data1, int data2, void *user)
 			int ret = 0;
 
 			if (gps->_uart) {
-				ret = gps->_uart->write((void *) data1, (size_t) data2);
+				ret = gps->_uart->write((void *)data1, (size_t)data2);
 
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 
 			} else if (gps->_spi_fd >= 0) {
 				ret = ::write(gps->_spi_fd, data1, (size_t)data2);
-#endif
+#endif // __PX4_LINUX
 			}
 
 			return ret;
@@ -480,8 +476,8 @@ int GPS::pollOrRead(uint8_t *buf, size_t buf_length, int timeout)
 	if ((_interface == GPSHelper::Interface::UART) && (_uart)) {
 		ret = _uart->readAtLeast(buf, buf_length, character_count, timeout_adjusted);
 
-// SPI is only supported on LInux
 #if defined(__PX4_LINUX)
+		// SPI is only supported on Linux (spidev)
 
 	} else if ((_interface == GPSHelper::Interface::SPI) && (_spi_fd >= 0)) {
 
@@ -490,8 +486,6 @@ int GPS::pollOrRead(uint8_t *buf, size_t buf_length, int timeout)
 		//two pollings use different underlying mechanisms (at least under posix), which makes this
 		//impossible. Instead we limit the maximum polling interval and regularly check for new orb
 		//messages.
-		//FIXME: add a unified poll() API
-
 		pollfd fds[1];
 		fds[0].fd = _spi_fd;
 		fds[0].events = POLLIN;
@@ -515,16 +509,17 @@ int GPS::pollOrRead(uint8_t *buf, size_t buf_length, int timeout)
 
 				ret = ::read(_spi_fd, buf, buf_length);
 
-				if (ret > 0) {
-					_num_bytes_read += ret;
-				}
-
 			} else {
 				ret = -1;
 			}
 		}
 
-#endif
+#endif // __PX4_LINUX
+
+	}
+
+	if (ret > 0) {
+		_num_bytes_read += ret;
 	}
 
 	return ret;
@@ -599,14 +594,15 @@ bool GPS::injectData(uint8_t *data, size_t len)
 	size_t written = 0;
 
 	if ((_interface == GPSHelper::Interface::UART) && (_uart)) {
-		written = _uart->write((const void *) data, len);
+		written = _uart->write((const void *)data, len);
 
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 
 	} else if (_interface == GPSHelper::Interface::SPI) {
 		written = ::write(_spi_fd, data, len);
 		::fsync(_spi_fd);
-#endif
+#endif // __PX4_LINUX
+
 	}
 
 	return written == len;
@@ -619,12 +615,12 @@ int GPS::setBaudrate(unsigned baud)
 			return 0;
 		}
 
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 
 	} else if (_interface == GPSHelper::Interface::SPI) {
 		// Can't set the baudrate on a SPI port but just return a success
 		return 0;
-#endif
+#endif // __PX4_LINUX
 	}
 
 	return -1;
@@ -798,11 +794,11 @@ GPS::run()
 			}
 		}
 
-		if ((_interface == GPSHelper::Interface::UART) && (! _uart->isOpen())) {
+		if ((_interface == GPSHelper::Interface::UART) && (!_uart->isOpen())) {
 			// Configure the desired baudrate if one was specified by the user.
 			// Otherwise the default baudrate will be used.
 			if (_configured_baudrate) {
-				if (! _uart->setBaudrate(_configured_baudrate)) {
+				if (!_uart->setBaudrate(_configured_baudrate)) {
 					PX4_ERR("Error setting baudrate to %u on %s", _configured_baudrate, _port);
 					px4_sleep(1);
 					continue;
@@ -810,13 +806,13 @@ GPS::run()
 			}
 
 			// Open the UART. If this is successful then the UART is ready to use.
-			if (! _uart->open()) {
+			if (!_uart->open()) {
 				PX4_ERR("Error opening serial device  %s", _port);
 				px4_sleep(1);
 				continue;
 			}
 
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 
 		} else if ((_interface == GPSHelper::Interface::SPI) && (_spi_fd < 0)) {
 			_spi_fd = ::open(_port, O_RDWR | O_NOCTTY);
@@ -840,7 +836,8 @@ GPS::run()
 				PX4_ERR("SPI_IOC_RD_MAX_SPEED_HZ failed for %s (%d)", _port, errno);
 			}
 
-#endif /* __PX4_LINUX */
+#endif // __PX4_LINUX
+
 		}
 
 		switch (_mode) {
@@ -1030,16 +1027,17 @@ GPS::run()
 		}
 
 		if ((_interface == GPSHelper::Interface::UART) && (_uart)) {
-			(void) _uart->close();
+			(void)_uart->close();
 			delete _uart;
 			_uart = nullptr;
 
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 
 		} else if ((_interface == GPSHelper::Interface::SPI) && (_spi_fd >= 0)) {
 			::close(_spi_fd);
 			_spi_fd = -1;
-#endif
+#endif // __PX4_LINUX
+
 		}
 
 		if (_mode_auto) {
@@ -1460,10 +1458,10 @@ GPS *GPS::instantiate(int argc, char *argv[], Instance instance)
 		case 'i':
 			if (!strcmp(myoptarg, "uart")) {
 				interface = GPSHelper::Interface::UART;
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 			} else if (!strcmp(myoptarg, "spi")) {
 				interface = GPSHelper::Interface::SPI;
-#endif
+#endif // __PX4_LINUX
 			} else {
 				PX4_ERR("unknown interface: %s", myoptarg);
 				error_flag = true;
@@ -1473,10 +1471,10 @@ GPS *GPS::instantiate(int argc, char *argv[], Instance instance)
 		case 'j':
 			if (!strcmp(myoptarg, "uart")) {
 				interface_secondary = GPSHelper::Interface::UART;
-#ifdef __PX4_LINUX
+#if defined(__PX4_LINUX)
 			} else if (!strcmp(myoptarg, "spi")) {
 				interface_secondary = GPSHelper::Interface::SPI;
-#endif
+#endif // __PX4_LINUX
 			} else {
 				PX4_ERR("unknown interface for secondary: %s", myoptarg);
 				error_flag = true;

@@ -98,6 +98,7 @@ private:
 
 	bool validateBaudrate(uint32_t baudrate);
 	bool configure();
+
 };
 
 } // namespace device

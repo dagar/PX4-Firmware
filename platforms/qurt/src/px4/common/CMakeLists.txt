@@ -31,43 +31,40 @@
 #
 ############################################################################
 
-set(SRCS)
 
-if(NOT "${PX4_PLATFORM}" MATCHES "qurt" AND NOT "${PX4_PLATFORM}" MATCHES "ros2" AND NOT "${PX4_BOARD}" MATCHES "io-v2" AND NOT "${PX4_BOARD_LABEL}" MATCHES "bootloader")
-	list(APPEND SRCS
-		px4_log.cpp
-		px4_log_history.cpp
-	)
-endif()
+add_subdirectory(px4_daemon)
+add_subdirectory(lockstep_scheduler)
 
-add_library(px4_platform STATIC
-	board_common.c
-	board_identity.c
-	external_reset_lockout.cpp
-	i2c.cpp
-	i2c_spi_buses.cpp
-	module.cpp
-	px4_getopt.c
-	px4_cli.cpp
-	shutdown.cpp
-	spi.cpp
-	pab_manifest.c
-	serial.cpp
-	${SRCS}
+set(EXTRA_DEPENDS)
+
+add_library(px4_layer
+	px4_posix_impl.cpp
+	tasks.cpp
+	px4_sem.cpp
+	px4_init.cpp
+	lib_crc32.c
+	drv_hrt.cpp
+	cpuload.cpp
+	print_load.cpp
+	${PX4_SOURCE_DIR}/platforms/common/Serial.cpp
+	SerialImpl.cpp
 )
-target_link_libraries(px4_platform prebuild_targets px4_work_queue)
+target_compile_definitions(px4_layer PRIVATE MODULE_NAME="px4")
+target_compile_options(px4_layer PRIVATE -Wno-cast-align) # TODO: fix and enable
+target_link_libraries(px4_layer PRIVATE work_queue px4_work_queue)
+target_link_libraries(px4_layer PRIVATE px4_daemon drivers_board)
 
-if(NOT "${PX4_BOARD}" MATCHES "io-v2")
-	add_subdirectory(uORB)
+if(ENABLE_LOCKSTEP_SCHEDULER)
+	target_link_libraries(px4_layer PRIVATE lockstep_scheduler)
 endif()
 
-add_subdirectory(px4_work_queue)
-add_subdirectory(work_queue)
 
-if("${PX4_PLATFORM}" MATCHES "nuttx")
-	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/c_cpp_properties.json.nuttx.in ${PX4_SOURCE_DIR}/.vscode/c_cpp_properties.json @ONLY)
-else()
-	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/c_cpp_properties.json.in ${PX4_SOURCE_DIR}/.vscode/c_cpp_properties.json @ONLY)
+if(EXTRA_DEPENDS)
+	add_dependencies(px4_layer ${EXTRA_DEPENDS})
 endif()
 
-px4_add_unit_gtest(SRC board_identity_test.cpp LINKLIBS px4_platform)
+
+if(BUILD_TESTING)
+	add_subdirectory(test_stubs)
+	add_subdirectory(gtest_runner)
+endif()

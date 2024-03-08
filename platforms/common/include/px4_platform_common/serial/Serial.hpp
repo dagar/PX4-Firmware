@@ -33,9 +33,9 @@
 
 #pragma once
 
-#include <SerialImpl.hpp>
+#include <px4_platform_common/SerialImpl.hpp>
 
-#include <px4_platform_common/SerialCommon.hpp>
+#include "SerialCommon.hpp"
 
 using device::SerialConfig::ByteSize;
 using device::SerialConfig::Parity;

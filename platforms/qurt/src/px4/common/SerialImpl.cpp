@@ -31,7 +31,8 @@
  *
  ****************************************************************************/
 
-#include <SerialImpl.hpp>
+#include <px4_platform_common/SerialImpl.hpp>
+
 #include <string.h> // strncpy
 #include <px4_log.h>
 #include <drivers/device/qurt/uart.h>
@@ -92,7 +93,7 @@ bool SerialImpl::open()
 	_open = false;
 	_serial_fd = -1;
 
-	if (! validateBaudrate(_baudrate)) {
+	if (!validateBaudrate(_baudrate)) {
 		PX4_ERR("Invalid baudrate: %u", _baudrate);
 		return false;
 	}
@@ -182,9 +183,9 @@ ssize_t SerialImpl::readAtLeast(uint8_t *buffer, size_t buffer_size, size_t char
 	}
 
 	const hrt_abstime start_time_us = hrt_absolute_time();
-	int total_bytes_read = 0;
+	size_t total_bytes_read = 0;
 
-	while (total_bytes_read < (int) character_count) {
+	while (total_bytes_read < character_count) {
 
 		if (timeout_us > 0) {
 			const uint64_t elapsed_us = hrt_elapsed_time(&start_time_us);
@@ -263,7 +264,7 @@ uint32_t SerialImpl::getBaudrate() const
 
 bool SerialImpl::setBaudrate(uint32_t baudrate)
 {
-	if (! validateBaudrate(baudrate)) {
+	if (!validateBaudrate(baudrate)) {
 		PX4_ERR("Invalid baudrate: %u", baudrate);
 		return false;
 	}

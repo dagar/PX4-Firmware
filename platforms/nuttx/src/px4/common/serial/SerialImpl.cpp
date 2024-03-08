@@ -31,7 +31,8 @@
  *
  ****************************************************************************/
 
-#include <SerialImpl.hpp>
+#include <px4_platform_common/SerialImpl.hpp>
+
 #include <string.h> // strncpy
 #include <termios.h>
 #include <px4_log.h>
@@ -83,11 +84,11 @@ bool SerialImpl::validateBaudrate(uint32_t baudrate)
 
 bool SerialImpl::configure()
 {
-	/* process baud rate */
+	// process baud rate
 	int speed;
 
-	if (! validateBaudrate(_baudrate)) {
-		PX4_ERR("ERR: unknown baudrate: %lu", _baudrate);
+	if (!validateBaudrate(_baudrate)) {
+		PX4_ERR("unknown baudrate: %lu", _baudrate);
 		return false;
 	}
 
@@ -117,7 +118,7 @@ bool SerialImpl::configure()
 	case 921600: speed = B921600; break;
 
 	default:
-		PX4_ERR("ERR: unknown baudrate: %lu", _baudrate);
+		PX4_ERR("unknown baudrate: %lu", _baudrate);
 		return false;
 	}
 
@@ -127,7 +128,7 @@ bool SerialImpl::configure()
 
 	/* fill the struct for the new configuration */
 	if ((termios_state = tcgetattr(_serial_fd, &uart_config)) < 0) {
-		PX4_ERR("ERR: %d (tcgetattr)", termios_state);
+		PX4_ERR("%d (tcgetattr)", termios_state);
 		return false;
 	}
 
@@ -169,17 +170,17 @@ bool SerialImpl::configure()
 
 	/* set baud rate */
 	if ((termios_state = cfsetispeed(&uart_config, speed)) < 0) {
-		PX4_ERR("ERR: %d (cfsetispeed)", termios_state);
+		PX4_ERR("%d (cfsetispeed)", termios_state);
 		return false;
 	}
 
 	if ((termios_state = cfsetospeed(&uart_config, speed)) < 0) {
-		PX4_ERR("ERR: %d (cfsetospeed)", termios_state);
+		PX4_ERR("%d (cfsetospeed)", termios_state);
 		return false;
 	}
 
 	if ((termios_state = tcsetattr(_serial_fd, TCSANOW, &uart_config)) < 0) {
-		PX4_ERR("ERR: %d (tcsetattr)", termios_state);
+		PX4_ERR("%d (tcsetattr)", termios_state);
 		return false;
 	}
 
@@ -203,7 +204,7 @@ bool SerialImpl::open()
 	_serial_fd = serial_fd;
 
 	// Configure the serial port
-	if (! configure()) {
+	if (!configure()) {
 		PX4_ERR("failed to configure %s err: %d", _port, errno);
 		return false;
 	}
@@ -260,9 +261,9 @@ ssize_t SerialImpl::readAtLeast(uint8_t *buffer, size_t buffer_size, size_t char
 	}
 
 	const hrt_abstime start_time_us = hrt_absolute_time();
-	int total_bytes_read = 0;
+	size_t total_bytes_read = 0;
 
-	while ((total_bytes_read < (int) character_count) && (hrt_elapsed_time(&start_time_us) < timeout_us)) {
+	while ((total_bytes_read < character_count) && (hrt_elapsed_time(&start_time_us) < timeout_us)) {
 		// Poll for incoming UART data.
 		pollfd fds[1];
 		fds[0].fd = _serial_fd;
@@ -270,7 +271,9 @@ ssize_t SerialImpl::readAtLeast(uint8_t *buffer, size_t buffer_size, size_t char
 
 		hrt_abstime remaining_time = timeout_us - hrt_elapsed_time(&start_time_us);
 
-		if (remaining_time <= 0) { break; }
+		if (remaining_time <= 0) {
+			break;
+		}
 
 		int ret = poll(fds, sizeof(fds) / sizeof(fds[0]), remaining_time);
 
@@ -283,7 +286,7 @@ ssize_t SerialImpl::readAtLeast(uint8_t *buffer, size_t buffer_size, size_t char
 				}
 
 			} else {
-				PX4_ERR("Got a poll error");
+				PX4_ERR("serial (%s) poll error", _port);
 				return -1;
 			}
 		}
@@ -321,8 +324,8 @@ uint32_t SerialImpl::getBaudrate() const
 
 bool SerialImpl::setBaudrate(uint32_t baudrate)
 {
-	if (! validateBaudrate(baudrate)) {
-		PX4_ERR("ERR: invalid baudrate: %lu", baudrate);
+	if (!validateBaudrate(baudrate)) {
+		PX4_ERR("invalid baudrate: %lu", baudrate);
 		return false;
 	}
 
