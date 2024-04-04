@@ -114,8 +114,8 @@ endif()
 
 if(CONFIG_EKF2_OPTICAL_FLOW)
 	list(APPEND EKF_SRCS
-		optical_flow_control.cpp
-		optflow_fusion.cpp
+		aid_sources/optical_flow/optical_flow_control.cpp
+		aid_sources/optical_flow/optical_flow_fusion.cpp
 	)
 endif()
 
