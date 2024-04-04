@@ -100,7 +100,7 @@ if(CONFIG_EKF2_GNSS)
 endif()
 
 if(CONFIG_EKF2_GRAVITY_FUSION)
-	list(APPEND EKF_SRCS gravity_fusion.cpp)
+	list(APPEND EKF_SRCS aid_sources/gravity/gravity_fusion.cpp)
 endif()
 
 if(CONFIG_EKF2_MAGNETOMETER)
