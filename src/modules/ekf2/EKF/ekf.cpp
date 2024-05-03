@@ -43,19 +43,71 @@
 
 #include <mathlib/mathlib.h>
 
-bool Ekf::init(uint64_t timestamp)
-{
-	if (!_initialised) {
-		_initialised = initialise_interface(timestamp);
-		reset();
-	}
-
-	return _initialised;
-}
-
 void Ekf::reset()
 {
 	ECL_INFO("reset");
+
+	_time_delayed_us = 0;
+	_time_latest_us = 0;
+
+	_output_predictor.reset();
+
+	_imu_updated = false;
+	_NED_origin_initialised = false;
+
+	_is_first_imu_sample = true;
+	_imu_buffer.reset();
+	_imu_down_sampler.reset();
+
+	_accel_lpf.reset({});
+	_gyro_lpf.reset({});
+
+	_accel_bias_inhibit[0] = false;
+	_accel_bias_inhibit[1] = false;
+	_accel_bias_inhibit[2] = false;
+
+	_gyro_bias_inhibit[0] = false;
+	_gyro_bias_inhibit[1] = false;
+	_gyro_bias_inhibit[2] = false;
+
+	_accel_magnitude_filt = 0.f;
+	_ang_rate_magnitude_filt = 0.f;
+
+	_time_bad_vert_accel = 0;
+	_time_good_vert_accel = 0;
+	_clip_counter = 0;
+
+
+	_innov_check_fail_status.value = 0;
+	_fault_status.value = 0;
+
+	_control_status.value = 0;
+	_control_status.flags.in_air = true;
+	_control_status_prev.value = _control_status.value;
+
+	_warning_events.value = 0;
+	_information_events.value = 0;
+
+	_horizontal_deadreckon_time_exceeded = true;
+	_vertical_position_deadreckon_time_exceeded = true;
+	_vertical_velocity_deadreckon_time_exceeded = true;
+
+	_time_last_on_ground_us = 0;
+	_time_last_in_air = 0;
+	_time_last_gnd_effect_on = 0;
+
+	_pos_ref = {};
+	_gps_alt_ref = NAN;
+	_gpos_origin_eph = 0.f;
+	_gpos_origin_epv = 0.f;
+
+	_wmm_gps_time_last_checked = 0;
+	_wmm_gps_time_last_set = 0;
+
+	_state_reset_status = {};
+	_state_reset_count_prev = {};
+
+	_ang_rate_delayed_raw.zero();
 
 	_state.quat_nominal.setIdentity();
 	_state.vel.setZero();
@@ -72,32 +124,8 @@ void Ekf::reset()
 	_state.wind_vel.setZero();
 #endif // CONFIG_EKF2_WIND
 
-#if defined(CONFIG_EKF2_RANGE_FINDER)
-	_range_sensor.setPitchOffset(_params.rng_sens_pitch);
-	_range_sensor.setCosMaxTilt(_params.range_cos_max_tilt);
-	_range_sensor.setQualityHysteresis(_params.range_valid_quality_s);
-#endif // CONFIG_EKF2_RANGE_FINDER
+	_filter_initialised = false;
 
-	_control_status.value = 0;
-	_control_status_prev.value = 0;
-
-	_control_status.flags.in_air = true;
-	_control_status_prev.flags.in_air = true;
-
-	_ang_rate_delayed_raw.zero();
-
-	_fault_status.value = 0;
-	_innov_check_fail_status.value = 0;
-
-#if defined(CONFIG_EKF2_GNSS)
-	resetGpsDriftCheckFilters();
-	_gps_checks_passed = false;
-#endif // CONFIG_EKF2_GNSS
-	_gps_alt_ref = NAN;
-
-	_output_predictor.reset();
-
-	// Ekf private fields
 	_time_last_horizontal_aiding = 0;
 	_time_last_v_pos_aiding = 0;
 	_time_last_v_vel_aiding = 0;
@@ -109,77 +137,253 @@ void Ekf::reset()
 	_time_last_heading_fuse = 0;
 
 	_last_known_pos.setZero();
-
 	_time_acc_bias_check = 0;
 
-#if defined(CONFIG_EKF2_BAROMETER)
-	_baro_counter = 0;
-#endif // CONFIG_EKF2_BAROMETER
+	_earth_rate_NED = {};
 
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	_mag_counter = 0;
-#endif // CONFIG_EKF2_MAGNETOMETER
+	_R_to_earth.setIdentity();
 
-	_time_bad_vert_accel = 0;
-	_time_good_vert_accel = 0;
-	_clip_counter = 0;
+	_accel_lpf_NE.zero();
+	_height_rate_lpf = 0.f;
 
-#if defined(CONFIG_EKF2_BAROMETER)
-	resetEstimatorAidStatus(_aid_src_baro_hgt);
-#endif // CONFIG_EKF2_BAROMETER
+	P.setZero();
+
+
+	_height_sensor_ref = HeightSensor::UNKNOWN;
+
+
+
+	_aid_src_fake_pos = {};
+	_aid_src_fake_hgt = {};
+
+	if (_system_flag_buffer) {
+		_system_flag_buffer->reset();
+	}
+
+
 #if defined(CONFIG_EKF2_AIRSPEED)
-	resetEstimatorAidStatus(_aid_src_airspeed);
+	if (_airspeed_buffer) {
+		_airspeed_buffer->reset();
+	}
+	_aid_src_airspeed = {};
 #endif // CONFIG_EKF2_AIRSPEED
-#if defined(CONFIG_EKF2_SIDESLIP)
-	resetEstimatorAidStatus(_aid_src_sideslip);
-#endif // CONFIG_EKF2_SIDESLIP
 
-	resetEstimatorAidStatus(_aid_src_fake_pos);
-	resetEstimatorAidStatus(_aid_src_fake_hgt);
+
+#if defined(CONFIG_EKF2_AUX_GLOBAL_POSITION) && defined(MODULE_NAME)
+	//_aux_global_position.reset();
+#endif // CONFIG_EKF2_AUX_GLOBAL_POSITION
+
+
+#if defined(CONFIG_EKF2_AUXVEL)
+	if (_auxvel_buffer) {
+		_auxvel_buffer->reset();
+	}
+	_aid_src_aux_vel = {};
+#endif // CONFIG_EKF2_AUXVEL
+
+
+#if defined(CONFIG_EKF2_BAROMETER)
+	if (_baro_buffer) {
+		_baro_buffer->reset();
+	}
+	_time_last_baro_buffer_push = 0;
+	_aid_src_baro_hgt = {};
+	_baro_lpf.reset({});
+	_baro_counter = 0;
+
+	_baro_b_est.reset();
+
+	_baro_hgt_faulty = false;
+#endif // CONFIG_EKF2_BAROMETER
+
+
+#if defined(CONFIG_EKF2_DRAG_FUSION)
+	if (_drag_buffer) {
+		_drag_buffer->reset();
+	}
+	_drag_down_sampled = {};
+	_drag_sample_count = 0;
+	_drag_sample_time_dt = 0.f;
+	_aid_src_drag = {};
+#endif // CONFIG_EKF2_DRAG_FUSION
+
 
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
-	resetEstimatorAidStatus(_aid_src_ev_hgt);
-	resetEstimatorAidStatus(_aid_src_ev_pos);
-	resetEstimatorAidStatus(_aid_src_ev_vel);
-	resetEstimatorAidStatus(_aid_src_ev_yaw);
+	if (_ext_vision_buffer) {
+		_ext_vision_buffer->reset();
+	}
+	_time_last_ext_vision_buffer_push = 0;
+
+	_aid_src_ev_hgt = {};
+	_aid_src_ev_pos = {};
+	_aid_src_ev_vel = {};
+	_aid_src_ev_yaw = {};
+
+	_ev_hgt_b_est.reset();
+	_ev_pos_b_est.reset();
+	_ev_q_error_filt.reset({});
+	_ev_q_error_initialized = false;
+
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 
+
 #if defined(CONFIG_EKF2_GNSS)
-	resetEstimatorAidStatus(_aid_src_gnss_hgt);
-	resetEstimatorAidStatus(_aid_src_gnss_pos);
-	resetEstimatorAidStatus(_aid_src_gnss_vel);
+	if (_gps_buffer) {
+		_gps_buffer->reset();
+	}
+	_time_last_gps_buffer_push = 0;
+	_gps_sample_delayed = {};
+
+	resetGpsDriftCheckFilters();
+
+	_gps_pos_prev = {};
+	_gps_alt_prev = 0.f;
+
+	_gps_alt_ref = NAN;
+
+	_gps_data_ready = false;
+	_gps_pos_deriv_filt.zero();
+	_gps_velNE_filt.zero();
+
+	_last_gps_fail_us = 0;
+	_last_gps_pass_us = 0;
+
+	_gps_checks_passed = false;
+
+	_gps_check_fail_status.value = 0;
+
+	_gps_intermittent = true;
+
+	_gps_hgt_b_est.reset();
+
+	_aid_src_gnss_hgt = {};
+	_aid_src_gnss_pos = {};
+	_aid_src_gnss_vel = {};
 
 # if defined(CONFIG_EKF2_GNSS_YAW)
-	resetEstimatorAidStatus(_aid_src_gnss_yaw);
+	// innovation consistency check monitoring ratios
+	_gnss_yaw_signed_test_ratio_lpf.reset({});
+	_time_last_gps_yaw_buffer_push = 0.f;
+	_aid_src_gnss_yaw = {};
 # endif // CONFIG_EKF2_GNSS_YAW
 #endif // CONFIG_EKF2_GNSS
 
+
+#if defined(CONFIG_EKF2_GRAVITY_FUSION)
+	_aid_src_gravity = {};
+#endif // CONFIG_EKF2_GRAVITY_FUSION
+
+
 #if defined(CONFIG_EKF2_MAGNETOMETER)
-	resetEstimatorAidStatus(_aid_src_mag);
+	if (_mag_buffer) {
+		_mag_buffer->reset();
+	}
+	_time_last_mag_buffer_push = 0;
+
+	_mag_declination_gps = NAN;
+	_mag_inclination_gps = NAN;
+	_mag_strength_gps = NAN;
+
+	_mag_inclination = NAN;
+	_mag_strength = NAN;
+
+	_mag_lpf.reset({});
+	_mag_counter = 0;
+
+	_yaw_angle_observable = false;
+	_mag_decl_cov_reset = false;
+
+	_aid_src_mag = {};
+
+	_flt_mag_align_start_time = 0;
+	_time_last_mag_check_failing = 0;
 #endif // CONFIG_EKF2_MAGNETOMETER
 
-#if defined(CONFIG_EKF2_AUXVEL)
-	resetEstimatorAidStatus(_aid_src_aux_vel);
-#endif // CONFIG_EKF2_AUXVEL
 
 #if defined(CONFIG_EKF2_OPTICAL_FLOW)
+	if (_flow_buffer) {
+		_flow_buffer->reset();
+	}
+	_flow_sample_delayed = {};
 	resetEstimatorAidStatus(_aid_src_optical_flow);
-	resetEstimatorAidStatus(_aid_src_terrain_optical_flow);
+
+	_flow_gyro_bias.zero();
+	_flow_vel_body.zero();
+	_flow_vel_ne.zero();
+	_ref_body_rate.zero();
+
+	_flow_rate_compensated.zero();
+	_flow_data_ready = false;
 #endif // CONFIG_EKF2_OPTICAL_FLOW
 
+
 #if defined(CONFIG_EKF2_RANGE_FINDER)
-	resetEstimatorAidStatus(_aid_src_rng_hgt);
+	_range_sensor.setPitchOffset(_params.rng_sens_pitch);
+	_range_sensor.setCosMaxTilt(_params.range_cos_max_tilt);
+	_range_sensor.setQualityHysteresis(_params.range_valid_quality_s);
+
+	if (_range_buffer) {
+		_range_buffer->reset();
+	}
+	_time_last_range_buffer_push = 0;
+
+	_range_sensor = {};
+	_rng_consistency_check = {};
+
+	_aid_src_rng_hgt = {};
+
+	_rng_hgt_b_est.reset();
 #endif // CONFIG_EKF2_RANGE_FINDER
 
+
+#if defined(CONFIG_EKF2_SIDESLIP)
+	_aid_src_sideslip = {};
+#endif // CONFIG_EKF2_SIDESLIP
+
+
+#if defined(CONFIG_EKF2_TERRAIN)
+	_terrain_vpos = 0.f;
+	_terrain_var = 1e4f;
+	_terrain_vpos_reset_counter = 0;
+
+	_hagl_sensor_status = {};
+	_last_on_ground_posD = 0.f;
+
+# if defined(CONFIG_EKF2_RANGE_FINDER)
+	_aid_src_terrain_range_finder = {};
+	_time_last_healthy_rng_data = 0;
+# endif // CONFIG_EKF2_RANGE_FINDER
+
+# if defined(CONFIG_EKF2_OPTICAL_FLOW)
+	_aid_src_terrain_optical_flow = {};
+# endif // CONFIG_EKF2_OPTICAL_FLOW
+
+#endif // CONFIG_EKF2_TERRAIN
+
+	_zero_gyro_update.reset();
 	_zero_velocity_update.reset();
 }
 
 bool Ekf::update()
 {
 	if (!_filter_initialised) {
+
+		if (_time_delayed_us == 0) {
+			_time_delayed_us = _imu_buffer.get_oldest().time_us;
+		}
+
+		if (_time_latest_us == 0) {
+			_time_latest_us = _imu_buffer.get_newest().time_us;
+		}
+
+		if (!_initialised) {
+			_filter_initialised = false;
+			_initialised = initialise_interface();
+		}
+
 		_filter_initialised = initialiseFilter();
 
-		if (!_filter_initialised) {
+		if (!_initialised || !_filter_initialised) {
 			return false;
 		}
 	}

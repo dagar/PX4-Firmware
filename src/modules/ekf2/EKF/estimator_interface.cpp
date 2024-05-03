@@ -78,11 +78,6 @@ EstimatorInterface::~EstimatorInterface()
 // Accumulate imu data and store to buffer at desired rate
 void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 {
-	// TODO: resolve misplaced responsibility
-	if (!_initialised) {
-		_initialised = init(imu_sample.time_us);
-	}
-
 	_time_latest_us = imu_sample.time_us;
 
 	// the output observer always runs
@@ -514,34 +509,36 @@ void EstimatorInterface::setDragData(const imuSample &imu)
 }
 #endif // CONFIG_EKF2_DRAG_FUSION
 
-bool EstimatorInterface::initialise_interface(uint64_t timestamp)
+bool EstimatorInterface::initialise_interface()
 {
 	const float filter_update_period_ms = _params.filter_update_interval_us / 1000.f;
 
 	// calculate the IMU buffer length required to accomodate the maximum delay with some allowance for jitter
-	_imu_buffer_length = math::max(2, (int)ceilf(_params.delay_max_ms / filter_update_period_ms));
+	const uint8_t imu_buffer_length = math::max(2, (int)ceilf(_params.delay_max_ms / filter_update_period_ms));
 
 	// set the observation buffer length to handle the minimum time of arrival between observations in combination
 	// with the worst case delay from current time to ekf fusion time
 	// allow for worst case 50% extension of the ekf fusion time horizon delay due to timing jitter
 	const float ekf_delay_ms = _params.delay_max_ms * 1.5f;
-	_obs_buffer_length = roundf(ekf_delay_ms / filter_update_period_ms);
+	uint8_t obs_buffer_length = roundf(ekf_delay_ms / filter_update_period_ms);
 
 	// limit to be no longer than the IMU buffer (we can't process data faster than the EKF prediction rate)
-	_obs_buffer_length = math::min(_obs_buffer_length, _imu_buffer_length);
+	obs_buffer_length = math::min(obs_buffer_length, imu_buffer_length);
 
-	ECL_DEBUG("EKF max time delay %.1f ms, OBS length %d\n", (double)ekf_delay_ms, _obs_buffer_length);
+	if (!_initialised || (imu_buffer_length != _imu_buffer_length) || (obs_buffer_length != _obs_buffer_length)) {
+		ECL_DEBUG("EKF max time delay %.1f ms, OBS length %d\n", (double)ekf_delay_ms, obs_buffer_length);
 
-	if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_predictor.allocate(_imu_buffer_length)) {
+		if (!_imu_buffer.allocate(imu_buffer_length) || !_output_predictor.allocate(imu_buffer_length)) {
 
-		printBufferAllocationFailed("IMU and output");
-		return false;
+			printBufferAllocationFailed("IMU and output");
+			return false;
+		}
+
+		_imu_buffer_length = imu_buffer_length;
+		_obs_buffer_length = obs_buffer_length;
+
+		_initialised = true;
 	}
-
-	_time_delayed_us = timestamp;
-	_time_latest_us = timestamp;
-
-	_fault_status.value = 0;
 
 	return true;
 }

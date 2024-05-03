@@ -319,9 +319,9 @@ protected:
 	EstimatorInterface() = default;
 	virtual ~EstimatorInterface();
 
-	virtual bool init(uint64_t timestamp) = 0;
-
 	parameters _params{};		// filter parameters
+
+	static constexpr uint8_t kBufferLengthDefault = 12;
 
 	/*
 	 OBS_BUFFER_LENGTH defines how many observations (non-IMU measurements) we can buffer
@@ -330,7 +330,7 @@ protected:
 	 max freq (Hz) = (OBS_BUFFER_LENGTH - 1) / (IMU_BUFFER_LENGTH * FILTER_UPDATE_PERIOD_S)
 	 This can be adjusted to match the max sensor data rate plus some margin for jitter.
 	*/
-	uint8_t _obs_buffer_length{0};
+	uint8_t _obs_buffer_length{kBufferLengthDefault};
 
 	/*
 	IMU_BUFFER_LENGTH defines how many IMU samples we buffer which sets the time delay from current time to the
@@ -338,7 +338,7 @@ protected:
 	max sensor time offet (msec) =  IMU_BUFFER_LENGTH * FILTER_UPDATE_PERIOD_MS
 	This can be adjusted to a value that is FILTER_UPDATE_PERIOD_MS longer than the maximum observation time delay.
 	*/
-	uint8_t _imu_buffer_length{0};
+	uint8_t _imu_buffer_length{kBufferLengthDefault};
 
 	float _dt_ekf_avg{0.010f}; ///< average update rate of the ekf in s
 
@@ -421,7 +421,6 @@ protected:
 	uint64_t _time_last_in_air{0};		///< last time we were in air (uSec)
 
 	// data buffer instances
-	static constexpr uint8_t kBufferLengthDefault = 12;
 	RingBuffer<imuSample> _imu_buffer{kBufferLengthDefault};
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
@@ -451,8 +450,7 @@ protected:
 
 	fault_status_u _fault_status{};
 
-	// allocate data buffers and initialize interface variables
-	bool initialise_interface(uint64_t timestamp);
+	bool initialise_interface();
 
 	uint64_t _wmm_gps_time_last_checked{0};  // time WMM last checked
 	uint64_t _wmm_gps_time_last_set{0};      // time WMM last set

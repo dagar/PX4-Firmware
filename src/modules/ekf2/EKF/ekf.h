@@ -77,13 +77,11 @@ public:
 
 	Ekf()
 	{
+		_initialised = initialise_interface();
 		reset();
 	};
 
 	virtual ~Ekf() = default;
-
-	// initialise variables to sane values (also interface class)
-	bool init(uint64_t timestamp) override;
 
 	void print_status();
 
@@ -530,8 +528,6 @@ private:
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	static constexpr float kMagVarianceMin = 1e-6f;
 #endif // CONFIG_EKF2_MAGNETOMETER
-
-
 	struct StateResetCounts {
 		uint8_t velNE{0};	///< number of horizontal position reset events (allow to wrap if count exceeds 255)
 		uint8_t velD{0};	///< number of vertical velocity reset events (allow to wrap if count exceeds 255)
@@ -539,7 +535,6 @@ private:
 		uint8_t posD{0};	///< number of vertical position reset events (allow to wrap if count exceeds 255)
 		uint8_t quat{0};	///< number of quaternion reset events (allow to wrap if count exceeds 255)
 	};
-
 	struct StateResets {
 		Vector2f velNE_change;  ///< North East velocity change due to last reset (m)
 		float velD_change;	///< Down velocity change due to last reset (m/sec)
