@@ -33,7 +33,7 @@
 
 #include "ekf.h"
 
-#include <ekf_derivation/generated/compute_yaw_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_yaw_innov_var_and_h.h>
 
 #include <mathlib/mathlib.h>
 
@@ -64,7 +64,7 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H
 		_fault_status.flags.bad_hdg = true;
 
 		// we reinitialise the covariance matrix and abort this fusion step
-		initialiseCovariance();
+		_extended_kalman_filter.initialiseCovariance();
 		ECL_ERR("yaw fusion numerical error - covariance reset");
 
 		return false;
@@ -132,20 +132,12 @@ bool Ekf::fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H
 	return false;
 }
 
-void Ekf::computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const
-{
-	sym::ComputeYawInnovVarAndH(_state.vector(), P, variance, &innovation_variance, &H_YAW);
-}
-
 void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 {
 	// save a copy of the quaternion state for later use in calculating the amount of reset change
-	const Quatf quat_before_reset = _state.quat_nominal;
+	const Quatf quat_before_reset = _extended_kalman_filter.state().quat_nominal;
 
-	// update the yaw angle variance
-	if (PX4_ISFINITE(yaw_variance) && (yaw_variance > FLT_EPSILON)) {
-		P.uncorrelateCovarianceSetVariance<1>(2, yaw_variance);
-	}
+	_extended_kalman_filter.resetQuatStateYaw(yaw, yaw_variance);
 
 	// update transformation matrix from body to world frame using the current estimate
 	// update the rotation matrix using the new yaw value
@@ -154,9 +146,6 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 	// calculate the amount that the quaternion has changed by
 	const Quatf quat_after_reset(_R_to_earth);
 	const Quatf q_error((quat_after_reset * quat_before_reset.inversed()).normalized());
-
-	// update quaternion states
-	_state.quat_nominal = quat_after_reset;
 
 	// add the reset amount to the output observer buffered data
 	_output_predictor.resetQuaternion(q_error);
@@ -168,18 +157,6 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 		_ev_q_error_filt.reset(ev_q_error_updated);
 	}
 #endif // CONFIG_EKF2_EXTERNAL_VISION
-
-	// record the state change
-	if (_state_reset_status.reset_count.quat == _state_reset_count_prev.quat) {
-		_state_reset_status.quat_change = q_error;
-
-	} else {
-		// there's already a reset this update, accumulate total delta
-		_state_reset_status.quat_change = q_error * _state_reset_status.quat_change;
-		_state_reset_status.quat_change.normalize();
-	}
-
-	_state_reset_status.reset_count.quat++;
 
 	_time_last_heading_fuse = _time_delayed_us;
 }

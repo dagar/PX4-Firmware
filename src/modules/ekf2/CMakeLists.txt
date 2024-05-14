@@ -47,7 +47,7 @@ if((NOT CONFIG_EKF2_MAGNETOMETER) OR (NOT CONFIG_EKF2_WIND))
 	set(EKF2_SYMFORCE_GEN ON)
 endif()
 
-set(EKF_DERIVATION_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/EKF/python/ekf_derivation)
+set(EKF_DERIVATION_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/EKF/extended_kalman_filter/derivation)
 
 set(EKF_GENERATED_FILES ${EKF_DERIVATION_SRC_DIR}/generated/state.h)
 set(EKF_GENERATED_DERIVATION_INCLUDE_PATH "${EKF_DERIVATION_SRC_DIR}/..")
@@ -71,7 +71,7 @@ if(EKF2_SYMFORCE_GEN AND (${PYTHON_SYMFORCE_EXIT_CODE} EQUAL 0))
 	)
 
 	# generate to build directory
-	set(EKF_DERIVATION_DST_DIR ${CMAKE_CURRENT_BINARY_DIR}/ekf_derivation)
+	set(EKF_DERIVATION_DST_DIR ${CMAKE_CURRENT_BINARY_DIR}/extended_kalman_filter/derivation)
 	file(MAKE_DIRECTORY ${EKF_DERIVATION_DST_DIR})
 
 	set(EKF_GENERATED_FILES ${EKF_DERIVATION_DST_DIR}/generated/state.h)
@@ -251,6 +251,7 @@ px4_add_module(
 		params_selector.yaml
 
 	DEPENDS
+		extended_kalman_filter
 		geo
 		hysteresis
 		perf

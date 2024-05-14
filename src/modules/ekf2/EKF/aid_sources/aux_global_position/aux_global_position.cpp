@@ -37,7 +37,7 @@
 
 #if defined(CONFIG_EKF2_AUX_GLOBAL_POSITION) && defined(MODULE_NAME)
 
-void AuxGlobalPosition::update(Ekf &ekf, const estimator::imuSample &imu_delayed)
+void AuxGlobalPosition::update(Ekf &ekf, const imuSample &imu_delayed)
 {
 
 #if defined(MODULE_NAME)

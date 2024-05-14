@@ -61,6 +61,8 @@
 
 #endif
 
+#include "extended_kalman_filter/ExtendedKalmanFilter.hpp"
+
 #include "common.h"
 #include "RingBuffer.h"
 #include "imu_down_sampler/imu_down_sampler.hpp"

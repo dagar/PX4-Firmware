@@ -42,6 +42,7 @@
 #include <matrix/math.hpp>
 
 #include "../common.h"
+#include "../extended_kalman_filter/imuSample.hpp"
 
 using namespace estimator;
 

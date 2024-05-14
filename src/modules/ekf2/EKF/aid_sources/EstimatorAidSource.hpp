@@ -40,11 +40,7 @@
 
 // forward declarations
 class Ekf;
-
-namespace estimator
-{
 struct imuSample;
-};
 
 class EstimatorAidSource
 {
@@ -52,7 +48,7 @@ public:
 	EstimatorAidSource() = default;
 	virtual ~EstimatorAidSource() = default;
 
-	virtual bool update(Ekf &ekf, const estimator::imuSample &imu_delayed) = 0;
+	virtual bool update(Ekf &ekf, const imuSample &imu_delayed) = 0;
 
 	virtual void reset() = 0;
 

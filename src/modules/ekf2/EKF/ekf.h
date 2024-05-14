@@ -53,8 +53,6 @@
 #include "bias_estimator/height_bias_estimator.hpp"
 #include "bias_estimator/position_bias_estimator.hpp"
 
-#include <ekf_derivation/generated/state.h>
-
 #include <uORB/topics/estimator_aid_source1d.h>
 #include <uORB/topics/estimator_aid_source2d.h>
 #include <uORB/topics/estimator_aid_source3d.h>
@@ -71,10 +69,6 @@ enum class Likelihood { LOW, MEDIUM, HIGH };
 class Ekf final : public EstimatorInterface
 {
 public:
-	typedef matrix::Vector<float, State::size> VectorState;
-	typedef matrix::SquareMatrix<float, State::size> SquareMatrixState;
-	typedef matrix::SquareMatrix<float, 2> Matrix2f;
-
 	Ekf()
 	{
 		reset();
@@ -90,7 +84,7 @@ public:
 	// should be called every time new data is pushed into the filter
 	bool update();
 
-	const StateSample &state() const { return _state; }
+	const StateSample &state() const { return _extended_kalman_filter.state(); }
 
 #if defined(CONFIG_EKF2_BAROMETER)
 	const auto &aid_src_baro_hgt() const { return _aid_src_baro_hgt; }
@@ -225,31 +219,30 @@ public:
 
 #if defined(CONFIG_EKF2_WIND)
 	// get the wind velocity in m/s
-	const Vector2f &getWindVelocity() const { return _state.wind_vel; };
-	Vector2f getWindVelocityVariance() const { return getStateVariance<State::wind_vel>(); }
+	const Vector2f &getWindVelocity() const { return  _extended_kalman_filter.state().wind_vel; };
+	Vector2f getWindVelocityVariance() const { return _extended_kalman_filter.getStateVariance<State::wind_vel>(); }
 #endif // CONFIG_EKF2_WIND
 
 	template <const IdxDof &S>
-	matrix::Vector<float, S.dof>getStateVariance() const { return P.slice<S.dof, S.dof>(S.idx, S.idx).diag(); } // calling getStateCovariance().diag() uses more flash space
+	matrix::Vector<float, S.dof>getStateVariance() const { return _extended_kalman_filter.getStateVariance<S>(); }
 
 	template <const IdxDof &S>
-	matrix::SquareMatrix<float, S.dof>getStateCovariance() const { return P.slice<S.dof, S.dof>(S.idx, S.idx); }
+	matrix::SquareMatrix<float, S.dof>getStateCovariance() const { return _extended_kalman_filter.getStateCovariance<S>(); }
 
 	// get the full covariance matrix
-	const matrix::SquareMatrix<float, State::size> &covariances() const { return P; }
-	float stateCovariance(unsigned r, unsigned c) const { return P(r, c); }
+	const matrix::SquareMatrix<float, State::size> &covariances() const { return _extended_kalman_filter.covariances(); }
+	float stateCovariance(unsigned r, unsigned c) const { return _extended_kalman_filter.stateCovariance(r, c); }
 
 	// get the diagonal elements of the covariance matrix
 	matrix::Vector<float, State::size> covariances_diagonal() const { return P.diag(); }
 
-	matrix::Vector3f getRotVarBody() const;
-	matrix::Vector3f getRotVarNed() const;
-	float getYawVar() const;
-	float getTiltVariance() const;
+	matrix::Vector3f getRotVarBody() const { return _extended_kalman_filter.getRotVarBody(); }
+	matrix::Vector3f getRotVarNed() const { return _extended_kalman_filter.getRotVarNed(); }
+	float getYawVar() const { return _extended_kalman_filter.getYawVar(); }
+	float getTiltVariance() const { return _extended_kalman_filter.getTiltVariance(); }
 
-	Vector3f getVelocityVariance() const { return getStateVariance<State::vel>(); };
-
-	Vector3f getPositionVariance() const { return getStateVariance<State::pos>(); }
+	Vector3f getVelocityVariance() const { return _extended_kalman_filter.getStateVariance<State::vel>(); };
+	Vector3f getPositionVariance() const { return _extended_kalman_filter.getStateVariance<State::pos>(); }
 
 	// get the ekf WGS-84 origin position and height and the system time it was last set
 	// return true if the origin is valid
@@ -272,11 +265,8 @@ public:
 	// hagl_max : Maximum height above ground (meters). NaN when limiting is not needed.
 	void get_ekf_ctrl_limits(float *vxy_max, float *vz_max, float *hagl_min, float *hagl_max) const;
 
-	void resetGyroBias();
-	void resetGyroBiasCov();
-
-	void resetAccelBias();
-	void resetAccelBiasCov();
+	void resetGyroBias() { return _extended_kalman_filter.resetGyroBias(); }
+	void resetAccelBias() { return _extended_kalman_filter.resetAccelBias(); }
 
 	// return true if the global position estimate is valid
 	// return true if the origin is set we are not doing unconstrained free inertial navigation
@@ -316,25 +306,22 @@ public:
 #endif
 	}
 
-	// fuse single direct state measurement (eg NED velocity, NED position, mag earth field, etc)
-	bool fuseDirectStateMeasurement(const float innov, const float innov_var, const float R, const int state_index);
-
 	// gyro bias
-	const Vector3f &getGyroBias() const { return _state.gyro_bias; } // get the gyroscope bias in rad/s
-	Vector3f getGyroBiasVariance() const { return getStateVariance<State::gyro_bias>(); } // get the gyroscope bias variance in rad/s
+	const Vector3f &getGyroBias() const { return _extended_kalman_filter.state().gyro_bias; } // get the gyroscope bias in rad/s
+	Vector3f getGyroBiasVariance() const { return _extended_kalman_filter.getStateVariance<State::gyro_bias>(); } // get the gyroscope bias variance in rad/s
 	float getGyroBiasLimit() const { return _params.gyro_bias_lim; }
 	float getGyroNoise() const { return _params.gyro_noise; }
 
 	// accel bias
-	const Vector3f &getAccelBias() const { return _state.accel_bias; } // get the accelerometer bias in m/s**2
-	Vector3f getAccelBiasVariance() const { return getStateVariance<State::accel_bias>(); } // get the accelerometer bias variance in m/s**2
+	const Vector3f &getAccelBias() const { return _extended_kalman_filter.state().accel_bias; } // get the accelerometer bias in m/s**2
+	Vector3f getAccelBiasVariance() const { return _extended_kalman_filter.getStateVariance<State::accel_bias>(); } // get the accelerometer bias variance in m/s**2
 	float getAccelBiasLimit() const { return _params.acc_bias_lim; }
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	const Vector3f &getMagEarthField() const { return _state.mag_I; }
 
-	const Vector3f &getMagBias() const { return _state.mag_B; }
-	Vector3f getMagBiasVariance() const { return getStateVariance<State::mag_B>(); } // get the mag bias variance in Gauss
+	const Vector3f &getMagBias() const { return _extended_kalman_filter.state().mag_B; }
+	Vector3f getMagBiasVariance() const { return _extended_kalman_filter.getStateVariance<State::mag_B>(); } // get the mag bias variance in Gauss
 	float getMagBiasLimit() const { return 0.5f; } // 0.5 Gauss
 #endif // CONFIG_EKF2_MAGNETOMETER
 
@@ -456,56 +443,6 @@ public:
 	const auto &aid_src_aux_vel() const { return _aid_src_aux_vel; }
 #endif // CONFIG_EKF2_AUXVEL
 
-	bool measurementUpdate(VectorState &K, const VectorState &H, const float R, const float innovation)
-	{
-		clearInhibitedStateKalmanGains(K);
-
-#if false
-		// Matrix implementation of the Joseph stabilized covariance update
-		// This is extremely expensive to compute. Use for debugging purposes only.
-		auto A = matrix::eye<float, State::size>();
-		A -= K.multiplyByTranspose(H);
-		P = A * P;
-		P = P.multiplyByTranspose(A);
-
-		const VectorState KR = K * R;
-		P += KR.multiplyByTranspose(K);
-#else
-		// Efficient implementation of the Joseph stabilized covariance update
-		// Based on "G. J. Bierman. Factorization Methods for Discrete Sequential Estimation. Academic Press, Dover Publications, New York, 1977, 2006"
-		// P = (I - K * H) * P * (I - K * H).T   + K * R * K.T
-		//   =      P_temp     * (I - H.T * K.T) + K * R * K.T
-		//   =      P_temp - P_temp * H.T * K.T  + K * R * K.T
-
-		// Step 1: conventional update
-		// Compute P_temp and store it in P to avoid allocating more memory
-		// P is symmetric, so PH == H.T * P.T == H.T * P. Taking the row is faster as matrices are row-major
-		VectorState PH = P * H; // H is stored as a column vector. H is in fact H.T
-
-		for (unsigned i = 0; i < State::size; i++) {
-			for (unsigned j = 0; j < State::size; j++) {
-				P(i, j) -= K(i) * PH(j); // P is now not symmetrical if K is not optimal (e.g.: some gains have been zeroed)
-			}
-		}
-
-		// Step 2: stabilized update
-		PH = P * H; // H is stored as a column vector. H is in fact H.T
-
-		for (unsigned i = 0; i < State::size; i++) {
-			for (unsigned j = 0; j <= i; j++) {
-				P(i, j) = P(i, j) - PH(i) * K(j) + K(i) * R * K(j);
-				P(j, i) = P(i, j);
-			}
-		}
-#endif
-
-		constrainStateVariances();
-
-		// apply the state corrections
-		fuse(K, innovation);
-		return true;
-	}
-
 	void resetGlobalPosToExternalObservation(double lat_deg, double lon_deg, float accuracy, uint64_t timestamp_observation);
 
 	void updateParameters();
@@ -513,6 +450,8 @@ public:
 	friend class AuxGlobalPosition;
 
 private:
+
+	ExtendedKalmanFilter _extended_kalman_filter{};
 
 	// set the internal states and status to their default value
 	void reset();
@@ -524,38 +463,7 @@ private:
 	void updateHorizontalDeadReckoningstatus();
 	void updateVerticalDeadReckoningStatus();
 
-	static constexpr float kGyroBiasVarianceMin{1e-9f};
-	static constexpr float kAccelBiasVarianceMin{1e-9f};
-
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	static constexpr float kMagVarianceMin = 1e-6f;
-#endif // CONFIG_EKF2_MAGNETOMETER
-
-
-	struct StateResetCounts {
-		uint8_t velNE{0};	///< number of horizontal position reset events (allow to wrap if count exceeds 255)
-		uint8_t velD{0};	///< number of vertical velocity reset events (allow to wrap if count exceeds 255)
-		uint8_t posNE{0};	///< number of horizontal position reset events (allow to wrap if count exceeds 255)
-		uint8_t posD{0};	///< number of vertical position reset events (allow to wrap if count exceeds 255)
-		uint8_t quat{0};	///< number of quaternion reset events (allow to wrap if count exceeds 255)
-	};
-
-	struct StateResets {
-		Vector2f velNE_change;  ///< North East velocity change due to last reset (m)
-		float velD_change;	///< Down velocity change due to last reset (m/sec)
-		Vector2f posNE_change;	///< North, East position change due to last reset (m)
-		float posD_change;	///< Down position change due to last reset (m)
-		Quatf quat_change;	///< quaternion delta due to last reset - multiply pre-reset quaternion by this to get post-reset quaternion
-
-		StateResetCounts reset_count{};
-	};
-
-	StateResets _state_reset_status{};	///< reset event monitoring structure containing velocity, position, height and yaw reset information
-	StateResetCounts _state_reset_count_prev{};
-
 	Vector3f _ang_rate_delayed_raw{};	///< uncorrected angular rate vector at fusion time horizon (rad/sec)
-
-	StateSample _state{};		///< state struct of the ekf running at the delayed time horizon
 
 	bool _filter_initialised{false};	///< true when the EKF sttes and covariances been initialised
 
@@ -578,9 +486,6 @@ private:
 	Dcmf _R_to_earth{};	///< transformation matrix from body frame to earth frame from last EKF prediction
 
 	Vector2f _accel_lpf_NE{};			///< Low pass filtered horizontal earth frame acceleration (m/sec**2)
-	float _height_rate_lpf{0.0f};
-
-	SquareMatrixState P{};	///< state covariance matrix
 
 #if defined(CONFIG_EKF2_DRAG_FUSION)
 	estimator_aid_source2d_s _aid_src_drag{};
@@ -733,26 +638,9 @@ private:
 	// initialise filter states of both the delayed ekf and the real time complementary filter
 	bool initialiseFilter(void);
 
-	// initialise ekf covariance matrix
-	void initialiseCovariance();
-
-	// predict ekf state
-	void predictState(const imuSample &imu_delayed);
-
-	// predict ekf covariance
-	void predictCovariance(const imuSample &imu_delayed);
-
-	template <const IdxDof &S>
-	void resetStateCovariance(const matrix::SquareMatrix<float, S.dof> &cov)
-	{
-		P.uncorrelateCovarianceSetVariance<S.dof>(S.idx, 0.0f);
-		P.slice<S.dof, S.dof>(S.idx, S.idx) = cov;
-	}
-
 	// update quaternion states and covariances using an innovation, observation variance and Jacobian vector
 	bool fuseYaw(estimator_aid_source1d_s &aid_src_status);
 	bool fuseYaw(estimator_aid_source1d_s &aid_src_status, const VectorState &H_YAW);
-	void computeYawInnovVarAndH(float variance, float &innovation_variance, VectorState &H_YAW) const;
 
 	void updateIMUBiasInhibit(const imuSample &imu_delayed);
 
@@ -938,16 +826,6 @@ private:
 #endif // CONFIG_EKF2_WIND
 	}
 
-	// limit the diagonal of the covariance matrix
-	void constrainStateVariances();
-
-	void constrainStateVar(const IdxDof &state, float min, float max);
-	void constrainStateVarLimitRatio(const IdxDof &state, float min, float max, float max_ratio = 1.e6f);
-
-	// generic function which will perform a fusion step given a kalman gain K
-	// and a scalar innovation value
-	void fuse(const VectorState &K, float innovation);
-
 	// calculate the earth rotation vector from a given latitude
 	Vector3f calcEarthRateNED(float lat_rad) const;
 
@@ -1087,9 +965,6 @@ private:
 	// gravity fusion: heuristically enable / disable gravity fusion
 	void controlGravityFusion(const imuSample &imu_delayed);
 #endif // CONFIG_EKF2_GRAVITY_FUSION
-
-	void resetQuatCov(const float yaw_noise = NAN);
-	void resetQuatCov(const Vector3f &rot_var_ned);
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	void resetMagCov();

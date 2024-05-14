@@ -111,34 +111,16 @@ void Ekf::fuseVerticalPosition(estimator_aid_source1d_s &aid_src)
 
 void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos, const Vector2f &new_horz_pos_var)
 {
-	const Vector2f delta_horz_pos{new_horz_pos - Vector2f{_state.pos}};
-	_state.pos.xy() = new_horz_pos;
+	const Vector2f delta_horz_pos{new_horz_pos - Vector2f{_extended_kalman_filter.state().pos}};
 
-	if (PX4_ISFINITE(new_horz_pos_var(0))) {
-		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx, math::max(sq(0.01f), new_horz_pos_var(0)));
-	}
-
-	if (PX4_ISFINITE(new_horz_pos_var(1))) {
-		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx + 1, math::max(sq(0.01f), new_horz_pos_var(1)));
-	}
+	_extended_kalman_filter.resetHorizontalPositionTo(new_horz_pos, new_horz_pos_var);
 
 	_output_predictor.resetHorizontalPositionTo(delta_horz_pos);
 
-	// record the state change
-	if (_state_reset_status.reset_count.posNE == _state_reset_count_prev.posNE) {
-		_state_reset_status.posNE_change = delta_horz_pos;
-
-	} else {
-		// there's already a reset this update, accumulate total delta
-		_state_reset_status.posNE_change += delta_horz_pos;
-	}
-
-	_state_reset_status.reset_count.posNE++;
-
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
-	_ev_pos_b_est.setBias(_ev_pos_b_est.getBias() - _state_reset_status.posNE_change);
+	_ev_pos_b_est.setBias(_ev_pos_b_est.getBias() - delta_horz_pos);
 #endif // CONFIG_EKF2_EXTERNAL_VISION
-	//_gps_pos_b_est.setBias(_gps_pos_b_est.getBias() + _state_reset_status.posNE_change);
+	//_gps_pos_b_est.setBias(_gps_pos_b_est.getBias() + delta_horz_pos);
 
 	// Reset the timout timer
 	_time_last_hor_pos_fuse = _time_delayed_us;
@@ -146,30 +128,15 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos, const Vector2f
 
 void Ekf::resetVerticalPositionTo(const float new_vert_pos, float new_vert_pos_var)
 {
-	const float old_vert_pos = _state.pos(2);
-	_state.pos(2) = new_vert_pos;
+	const float old_vert_pos = _extended_kalman_filter.state().pos(2);
 
-	if (PX4_ISFINITE(new_vert_pos_var)) {
-		// the state variance is the same as the observation
-		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx + 2, math::max(sq(0.01f), new_vert_pos_var));
-	}
+	_extended_kalman_filter.resetVerticalPositionTo(new_vert_pos, new_vert_pos_var);
 
 	const float delta_z = new_vert_pos - old_vert_pos;
 
 	// apply the change in height / height rate to our newest height / height rate estimate
 	// which have already been taken out from the output buffer
 	_output_predictor.resetVerticalPositionTo(new_vert_pos, delta_z);
-
-	// record the state change
-	if (_state_reset_status.reset_count.posD == _state_reset_count_prev.posD) {
-		_state_reset_status.posD_change = delta_z;
-
-	} else {
-		// there's already a reset this update, accumulate total delta
-		_state_reset_status.posD_change += delta_z;
-	}
-
-	_state_reset_status.reset_count.posD++;
 
 #if defined(CONFIG_EKF2_BAROMETER)
 	_baro_b_est.setBias(_baro_b_est.getBias() + delta_z);

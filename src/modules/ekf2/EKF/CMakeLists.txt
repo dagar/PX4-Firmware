@@ -32,6 +32,7 @@
 ############################################################################
 
 add_subdirectory(bias_estimator)
+add_subdirectory(extended_kalman_filter)
 add_subdirectory(output_predictor)
 
 set(EKF_LIBS)
@@ -149,6 +150,7 @@ target_include_directories(ecl_EKF PUBLIC ${EKF_GENERATED_DERIVATION_INCLUDE_PAT
 target_link_libraries(ecl_EKF
 	PRIVATE
 		bias_estimator
+		extended_kalman_filter
 		geo
 		output_predictor
 		world_magnetic_model

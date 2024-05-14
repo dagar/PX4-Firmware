@@ -34,7 +34,7 @@
 /**
  * @file airspeed_fusion.cpp
  * airspeed fusion methods.
- * equations generated using EKF/python/ekf_derivation/main.py
+ * equations generated using EKF/extended_kalman_filter/main.py
  *
  * @author Carl Olsson <carlolsson.co@gmail.com>
  * @author Roman Bast <bapstroman@gmail.com>
@@ -44,9 +44,9 @@
 
 #include "ekf.h"
 
-#include <ekf_derivation/generated/compute_airspeed_h_and_k.h>
-#include <ekf_derivation/generated/compute_airspeed_innov_and_innov_var.h>
-#include <ekf_derivation/generated/compute_wind_init_and_cov_from_airspeed.h>
+#include <extended_kalman_filter/derivation/generated/compute_airspeed_h_and_k.h>
+#include <extended_kalman_filter/derivation/generated/compute_airspeed_innov_and_innov_var.h>
+#include <extended_kalman_filter/derivation/generated/compute_wind_init_and_cov_from_airspeed.h>
 
 #include <mathlib/mathlib.h>
 
@@ -182,7 +182,7 @@ void Ekf::fuseAirspeed(const airspeedSample &airspeed_sample, estimator_aid_sour
 			action_string = "wind";
 
 		} else {
-			initialiseCovariance();
+			_extended_kalman_filter.initialiseCovariance();
 			_state.wind_vel.setZero();
 			action_string = "full";
 		}
@@ -240,7 +240,7 @@ void Ekf::resetWindUsingAirspeed(const airspeedSample &airspeed_sample)
 	matrix::SquareMatrix<float, State::wind_vel.dof> P_wind;
 	sym::ComputeWindInitAndCovFromAirspeed(_state.vel, euler_yaw, airspeed_sample.true_airspeed, getVelocityVariance(), getYawVar(), sideslip_var, airspeed_var, &_state.wind_vel, &P_wind);
 
-	resetStateCovariance<State::wind_vel>(P_wind);
+	_extended_kalman_filter.resetStateCovariance<State::wind_vel>(P_wind);
 
 	ECL_INFO("reset wind using airspeed to (%.3f, %.3f)", (double)_state.wind_vel(0), (double)_state.wind_vel(1));
 

@@ -211,7 +211,7 @@ void Ekf::checkVerticalAccelerationBias(const imuSample &imu_delayed)
 	// the covariance matrix but preserve the variances (diagonals) to allow bias learning to continue
 	if (_fault_status.flags.bad_acc_bias && isTimedOut(_time_acc_bias_check, (uint64_t)7e6)) {
 
-		resetAccelBiasCov();
+		_extended_kalman_filter.resetAccelBiasCov();
 
 		_time_acc_bias_check = imu_delayed.time_us;
 

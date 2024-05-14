@@ -46,7 +46,7 @@ void ZeroGyroUpdate::reset()
 	_zgup_delta_ang_dt = 0.f;
 }
 
-bool ZeroGyroUpdate::update(Ekf &ekf, const estimator::imuSample &imu_delayed)
+bool ZeroGyroUpdate::update(Ekf &ekf, const imuSample &imu_delayed)
 {
 	// When at rest, fuse the gyro data as a direct observation of the gyro bias
 	if (ekf.control_status_flags().vehicle_at_rest) {

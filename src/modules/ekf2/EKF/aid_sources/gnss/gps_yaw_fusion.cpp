@@ -34,14 +34,14 @@
 /**
  * @file gps_yaw_fusion.cpp
  * Definition of functions required to use yaw obtained from GPS dual antenna measurements.
- * Equations generated using EKF/python/ekf_derivation/main.py
+ * Equations generated using EKF/extended_kalman_filter/main.py
  *
  * @author Paul Riseborough <p_riseborough@live.com.au>
  *
  */
 
 #include "ekf.h"
-#include <ekf_derivation/generated/compute_gnss_yaw_pred_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_gnss_yaw_pred_innov_var_and_h.h>
 
 #include <mathlib/mathlib.h>
 #include <cstdlib>
@@ -111,7 +111,7 @@ void Ekf::fuseGpsYaw(float antenna_yaw_offset)
 		_fault_status.flags.bad_hdg = true;
 
 		// we reinitialise the covariance matrix and abort this fusion step
-		initialiseCovariance();
+		_extended_kalman_filter.initialiseCovariance();
 		ECL_ERR("GPS yaw numerical error - covariance reset");
 		return;
 	}

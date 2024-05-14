@@ -35,7 +35,7 @@
 #include "EKF/ekf.h"
 #include "test_helper/comparison_helper.h"
 
-#include "../EKF/python/ekf_derivation/generated/compute_gnss_yaw_pred_innov_var_and_h.h"
+#include "../EKF/extended_kalman_filter/derivation/generated/compute_gnss_yaw_pred_innov_var_and_h.h"
 
 using namespace matrix;
 

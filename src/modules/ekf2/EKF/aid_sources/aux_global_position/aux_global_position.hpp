@@ -67,7 +67,7 @@ public:
 
 	~AuxGlobalPosition() = default;
 
-	void update(Ekf &ekf, const estimator::imuSample &imu_delayed);
+	void update(Ekf &ekf, const imuSample &imu_delayed);
 
 	void updateParameters()
 	{

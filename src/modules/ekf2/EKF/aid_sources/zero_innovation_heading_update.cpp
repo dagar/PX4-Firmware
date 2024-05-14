@@ -58,7 +58,7 @@ void Ekf::controlZeroInnovationHeadingUpdate()
 
 		VectorState H_YAW;
 
-		computeYawInnovVarAndH(obs_var, aid_src_status.innovation_variance, H_YAW);
+		_extended_kalman_filter.computeYawInnovVarAndH(obs_var, aid_src_status.innovation_variance, H_YAW);
 
 		if (!_control_status.flags.tilt_align || (aid_src_status.innovation_variance - obs_var) > sq(_params.mag_heading_noise)) {
 			// The yaw variance is too large, fuse fake measurement

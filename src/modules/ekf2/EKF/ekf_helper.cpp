@@ -290,7 +290,7 @@ void Ekf::resetGyroBias()
 	// Zero the gyro bias states
 	_state.gyro_bias.zero();
 
-	resetGyroBiasCov();
+	_extended_kalman_filter.resetGyroBiasCov()
 }
 
 void Ekf::resetAccelBias()
@@ -298,7 +298,7 @@ void Ekf::resetAccelBias()
 	// Zero the accel bias states
 	_state.accel_bias.zero();
 
-	resetAccelBiasCov();
+	_extended_kalman_filter.resetAccelBiasCov();
 }
 
 void Ekf::get_innovation_test_status(uint16_t &status, float &mag, float &vel, float &pos, float &hgt, float &tas,
@@ -468,44 +468,6 @@ void Ekf::get_ekf_soln_status(uint16_t *status) const
 	*status = soln_status.value;
 }
 
-void Ekf::fuse(const VectorState &K, float innovation)
-{
-	// quat_nominal
-	Quatf delta_quat(matrix::AxisAnglef(K.slice<State::quat_nominal.dof, 1>(State::quat_nominal.idx, 0) * (-1.f * innovation)));
-	_state.quat_nominal = delta_quat * _state.quat_nominal;
-	_state.quat_nominal.normalize();
-	_R_to_earth = Dcmf(_state.quat_nominal);
-
-	// vel
-	_state.vel = matrix::constrain(_state.vel - K.slice<State::vel.dof, 1>(State::vel.idx, 0) * innovation, -1.e3f, 1.e3f);
-
-	// pos
-	_state.pos = matrix::constrain(_state.pos - K.slice<State::pos.dof, 1>(State::pos.idx, 0) * innovation, -1.e6f, 1.e6f);
-
-	// gyro_bias
-	_state.gyro_bias = matrix::constrain(_state.gyro_bias - K.slice<State::gyro_bias.dof, 1>(State::gyro_bias.idx, 0) * innovation,
-					-getGyroBiasLimit(), getGyroBiasLimit());
-
-	// accel_bias
-	_state.accel_bias = matrix::constrain(_state.accel_bias - K.slice<State::accel_bias.dof, 1>(State::accel_bias.idx, 0) * innovation,
-					-getAccelBiasLimit(), getAccelBiasLimit());
-
-#if defined(CONFIG_EKF2_MAGNETOMETER)
-	// mag_I, mag_B
-	if (_control_status.flags.mag) {
-		_state.mag_I = matrix::constrain(_state.mag_I - K.slice<State::mag_I.dof, 1>(State::mag_I.idx, 0) * innovation, -1.f, 1.f);
-		_state.mag_B = matrix::constrain(_state.mag_B - K.slice<State::mag_B.dof, 1>(State::mag_B.idx, 0) * innovation, -getMagBiasLimit(), getMagBiasLimit());
-	}
-#endif // CONFIG_EKF2_MAGNETOMETER
-
-#if defined(CONFIG_EKF2_WIND)
-	// wind_vel
-	if (_control_status.flags.wind) {
-		_state.wind_vel = matrix::constrain(_state.wind_vel - K.slice<State::wind_vel.dof, 1>(State::wind_vel.idx, 0) * innovation, -1.e2f, 1.e2f);
-	}
-#endif // CONFIG_EKF2_WIND
-}
-
 void Ekf::updateDeadReckoningStatus()
 {
 	updateHorizontalDeadReckoningstatus();
@@ -573,29 +535,6 @@ void Ekf::updateVerticalDeadReckoningStatus()
 
 		_vertical_velocity_deadreckon_time_exceeded = true;
 	}
-}
-
-Vector3f Ekf::getRotVarBody() const
-{
-	const matrix::SquareMatrix3f rot_cov_body = getStateCovariance<State::quat_nominal>();
-	return matrix::SquareMatrix3f(_R_to_earth.T() * rot_cov_body * _R_to_earth).diag();
-}
-
-Vector3f Ekf::getRotVarNed() const
-{
-	const matrix::SquareMatrix3f rot_cov_ned = getStateCovariance<State::quat_nominal>();
-	return rot_cov_ned.diag();
-}
-
-float Ekf::getYawVar() const
-{
-	return getRotVarNed()(2);
-}
-
-float Ekf::getTiltVariance() const
-{
-	const Vector3f rot_var_ned = getRotVarNed();
-	return rot_var_ned(0) + rot_var_ned(1);
 }
 
 #if defined(CONFIG_EKF2_BAROMETER)
@@ -699,64 +638,4 @@ void Ekf::updateIMUBiasInhibit(const imuSample &imu_delayed)
 
 		_accel_bias_inhibit[index] = do_inhibit_all_accel_axes || imu_delayed.delta_vel_clipping[index] || !is_bias_observable;
 	}
-}
-
-bool Ekf::fuseDirectStateMeasurement(const float innov, const float innov_var, const float R, const int state_index)
-{
-	VectorState K;  // Kalman gain vector for any single observation - sequential fusion is used.
-
-	// calculate kalman gain K = PHS, where S = 1/innovation variance
-	for (int row = 0; row < State::size; row++) {
-		K(row) = P(row, state_index) / innov_var;
-	}
-
-	clearInhibitedStateKalmanGains(K);
-
-#if false
-	// Matrix implementation of the Joseph stabilized covariance update
-	// This is extremely expensive to compute. Use for debugging purposes only.
-	auto A = matrix::eye<float, State::size>();
-	VectorState H;
-	H(state_index) = 1.f;
-	A -= K.multiplyByTranspose(H);
-	P = A * P;
-	P = P.multiplyByTranspose(A);
-
-	const VectorState KR = K * R;
-	P += KR.multiplyByTranspose(K);
-#else
-	// Efficient implementation of the Joseph stabilized covariance update
-	// Based on "G. J. Bierman. Factorization Methods for Discrete Sequential Estimation. Academic Press, Dover Publications, New York, 1977, 2006"
-	// P = (I - K * H) * P * (I - K * H).T   + K * R * K.T
-	//   =      P_temp     * (I - H.T * K.T) + K * R * K.T
-	//   =      P_temp - P_temp * H.T * K.T  + K * R * K.T
-
-	// Step 1: conventional update
-	// Compute P_temp and store it in P to avoid allocating more memory
-	// P is symmetric, so PH == H.T * P.T == H.T * P. Taking the row is faster as matrices are row-major
-	VectorState PH = P.row(state_index);
-
-	for (unsigned i = 0; i < State::size; i++) {
-		for (unsigned j = 0; j < State::size; j++) {
-			P(i, j) -= K(i) * PH(j); // P is now not symmetric if K is not optimal (e.g.: some gains have been zeroed)
-		}
-	}
-
-	// Step 2: stabilized update
-	// P (or "P_temp") is not symmetric so we must take the column
-	PH = P.col(state_index);
-
-	for (unsigned i = 0; i < State::size; i++) {
-		for (unsigned j = 0; j <= i; j++) {
-			P(i, j) = P(i, j) - PH(i) * K(j) + K(i) * R * K(j);
-			P(j, i) = P(i, j);
-		}
-	}
-#endif
-
-	constrainStateVariances();
-
-	// apply the state corrections
-	fuse(K, innov);
-	return true;
 }
