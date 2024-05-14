@@ -43,7 +43,7 @@ public:
 	virtual ~ZeroGyroUpdate() = default;
 
 	void reset() override;
-	bool update(Ekf &ekf, const estimator::imuSample &imu_delayed) override;
+	bool update(Ekf &ekf, const imuSample &imu_delayed) override;
 
 private:
 

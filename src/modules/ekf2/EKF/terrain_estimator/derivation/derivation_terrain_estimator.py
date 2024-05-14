@@ -40,7 +40,7 @@ import symforce.symbolic as sf
 
 # generate_px4_function from derivation_utils in EKF/ekf_derivation/utils
 import os, sys
-derivation_utils_dir = os.path.dirname(os.path.abspath(__file__)) + "/../../python/ekf_derivation/utils"
+derivation_utils_dir = os.path.dirname(os.path.abspath(__file__)) + "/../../extended_kalman_filter/utils"
 sys.path.append(derivation_utils_dir)
 import derivation_utils
 

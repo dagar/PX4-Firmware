@@ -34,7 +34,7 @@
 /**
  * @file heading_fusion.cpp
  * Magnetometer fusion methods.
- * Equations generated using EKF/python/ekf_derivation/main.py
+ * Equations generated using EKF/extended_kalman_filter/main.py
  *
  * @author Roman Bast <bapstroman@gmail.com>
  * @author Paul Riseborough <p_riseborough@live.com.au>
@@ -43,11 +43,11 @@
 
 #include "ekf.h"
 
-#include <ekf_derivation/generated/compute_mag_innov_innov_var_and_hx.h>
-#include <ekf_derivation/generated/compute_mag_y_innov_var_and_h.h>
-#include <ekf_derivation/generated/compute_mag_z_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_innov_innov_var_and_hx.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_y_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_z_innov_var_and_h.h>
 
-#include <ekf_derivation/generated/compute_mag_declination_pred_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_declination_pred_innov_var_and_h.h>
 
 #include <mathlib/mathlib.h>
 

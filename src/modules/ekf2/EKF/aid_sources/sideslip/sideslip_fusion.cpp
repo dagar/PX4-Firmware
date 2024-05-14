@@ -34,7 +34,7 @@
 /**
  * @file sideslip_fusion.cpp
  * sideslip fusion methods.
- * equations generated using EKF/python/ekf_derivation/main.py
+ * equations generated using EKF/extended_kalman_filter/main.py
  *
  * @author Carl Olsson <carlolsson.co@gmail.com>
  * @author Paul Riseborough <p_riseborough@live.com.au>
@@ -42,8 +42,8 @@
  */
 
 #include "ekf.h"
-#include <ekf_derivation/generated/compute_sideslip_innov_and_innov_var.h>
-#include <ekf_derivation/generated/compute_sideslip_h_and_k.h>
+#include <extended_kalman_filter/derivation/generated/compute_sideslip_innov_and_innov_var.h>
+#include <extended_kalman_filter/derivation/generated/compute_sideslip_h_and_k.h>
 
 #include <mathlib/mathlib.h>
 

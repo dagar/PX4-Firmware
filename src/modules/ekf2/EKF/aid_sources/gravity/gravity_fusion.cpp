@@ -40,9 +40,9 @@
  */
 
 #include "ekf.h"
-#include <ekf_derivation/generated/compute_gravity_xyz_innov_var_and_hx.h>
-#include <ekf_derivation/generated/compute_gravity_y_innov_var_and_h.h>
-#include <ekf_derivation/generated/compute_gravity_z_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_gravity_xyz_innov_var_and_hx.h>
+#include <extended_kalman_filter/derivation/generated/compute_gravity_y_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_gravity_z_innov_var_and_h.h>
 
 #include <mathlib/mathlib.h>
 

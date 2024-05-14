@@ -34,7 +34,7 @@
 /**
  * @file airspeed_fusion.cpp
  * airspeed fusion methods.
- * equations generated using EKF/python/ekf_derivation/main.py
+ * equations generated using EKF/extended_kalman_filter/main.py
  *
  * @author Carl Olsson <carlolsson.co@gmail.com>
  * @author Roman Bast <bapstroman@gmail.com>
@@ -44,9 +44,9 @@
 
 #include "ekf.h"
 
-#include <ekf_derivation/generated/compute_airspeed_h_and_k.h>
-#include <ekf_derivation/generated/compute_airspeed_innov_and_innov_var.h>
-#include <ekf_derivation/generated/compute_wind_init_and_cov_from_airspeed.h>
+#include <extended_kalman_filter/derivation/generated/compute_airspeed_h_and_k.h>
+#include <extended_kalman_filter/derivation/generated/compute_airspeed_innov_and_innov_var.h>
+#include <extended_kalman_filter/derivation/generated/compute_wind_init_and_cov_from_airspeed.h>
 
 #include <mathlib/mathlib.h>
 

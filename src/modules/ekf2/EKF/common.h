@@ -158,15 +158,6 @@ enum class MagCheckMask : uint8_t {
 	FORCE_WMM   = (1 << 2)
 };
 
-struct imuSample {
-	uint64_t    time_us{};                ///< timestamp of the measurement (uSec)
-	Vector3f    delta_ang{};              ///< delta angle in body frame (integrated gyro measurements) (rad)
-	Vector3f    delta_vel{};              ///< delta velocity in body frame (integrated accelerometer measurements) (m/sec)
-	float       delta_ang_dt{};           ///< delta angle integration period (sec)
-	float       delta_vel_dt{};           ///< delta velocity integration period (sec)
-	bool        delta_vel_clipping[3] {}; ///< true (per axis) if this sample contained any accelerometer clipping
-};
-
 struct gnssSample {
 	uint64_t    time_us{};    ///< timestamp of the measurement (uSec)
 	double      lat{};        ///< latitude (degrees)

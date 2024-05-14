@@ -176,6 +176,7 @@ void Ekf::reset()
 
 bool Ekf::update()
 {
+
 	if (!_filter_initialised) {
 		_filter_initialised = initialiseFilter();
 
@@ -191,6 +192,8 @@ bool Ekf::update()
 		// get the oldest IMU data from the buffer
 		// TODO: explicitly pop at desired time horizon
 		const imuSample imu_sample_delayed = _imu_buffer.get_oldest();
+
+		_extended_kalman_filter.update(imu_sample_delayed);
 
 		// calculate an average filter update time
 		//  filter and limit input between -50% and +100% of nominal value

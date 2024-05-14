@@ -5,10 +5,10 @@
 #ifndef EKF_STATE_H
 #define EKF_STATE_H
 
+#include <cstdint>
+
 #include <matrix/math.hpp>
 
-namespace estimator
-{
 struct StateSample {
 	matrix::Quaternion<float> quat_nominal{};
 	matrix::Vector3<float> vel{};
@@ -51,5 +51,4 @@ namespace State {
 	static constexpr IdxDof wind_vel{21, 2};
 	static constexpr uint8_t size{23};
 };
-}
 #endif // !EKF_STATE_H

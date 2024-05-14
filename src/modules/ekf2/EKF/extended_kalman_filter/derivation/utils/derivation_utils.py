@@ -152,15 +152,14 @@ def generate_px4_state(state, tangent_state_index):
               "// --------------------------------------------------\n",
               "\n#ifndef EKF_STATE_H",
               "\n#define EKF_STATE_H\n\n",
-              "#include <matrix/math.hpp>\n\n",
-              "namespace estimator\n{\n"]
+              "#include <cstdint>\n\n",
+              "#include <matrix/math.hpp>\n\n"]
     f.writelines(header)
 
     f.write(build_state_struct(state))
     f.write("\n")
     f.write(build_tangent_state_struct(state, tangent_state_index))
 
-    f.write("}\n") # namespace estimator
     f.write("#endif // !EKF_STATE_H\n")
     f.close()
     print(f"  |- {filename}")
