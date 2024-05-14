@@ -50,8 +50,8 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, const bool common
 					     && PX4_ISFINITE(ev_sample.pos(0))
 					     && PX4_ISFINITE(ev_sample.pos(1));
 
-	const bool ev_yaw_available = (_params.ev_ctrl & static_cast<int32_t>(EvCtrl::YAW))
-				      && ev_sample.quat.isAllFinite();
+	const bool ev_q_available = (_params.ev_ctrl & static_cast<int32_t>(EvCtrl::YAW))
+				    && ev_sample.quat.isAllFinite();
 
 	const bool yaw_alignment_changed = (!_control_status_prev.flags.ev_yaw && _control_status.flags.ev_yaw)
 					   || (_control_status_prev.flags.yaw_align != _control_status.flags.yaw_align);
@@ -89,9 +89,9 @@ void Ekf::controlEvPosFusion(const extVisionSample &ev_sample, const bool common
 		break;
 
 	case PositionFrame::LOCAL_FRAME_FRD:
-		if (ev_yaw_available && !_control_status.flags.ev_yaw) {
+		if (ev_q_available && !_control_status.flags.ev_yaw) {
 			// rotate EV to the EKF reference frame
-			const Dcmf R_ev_to_ekf = Dcmf(_ev_q_error_filt.getState());
+			const Dcmf R_ev_to_ekf(_ev_q_error_filt.getState());
 
 			pos = R_ev_to_ekf * ev_sample.pos - pos_offset_earth;
 			pos_cov = R_ev_to_ekf * matrix::diag(ev_sample.position_var) * R_ev_to_ekf.transpose();
