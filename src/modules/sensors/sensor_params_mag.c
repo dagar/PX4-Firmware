@@ -127,3 +127,53 @@ PARAM_DEFINE_INT32(SENS_MAG_MODE, 1);
  * @group Sensors
  */
 PARAM_DEFINE_INT32(SENS_MAG_AUTOCAL, 1);
+
+/**
+ * Magnetometer filter a1
+ *
+ * @min 0
+ * @max 1
+ * @group Sensors
+ *
+ */
+PARAM_DEFINE_FLOAT(MAG_FLT_A1, 0);
+
+/**
+ * Magnetometer filter a2
+ *
+ * @min 0
+ * @max 1
+ * @group Sensors
+ *
+ */
+PARAM_DEFINE_FLOAT(MAG_FLT_A2, 0);
+
+/**
+ * Magnetometer filter b0
+ *
+ * @min 0
+ * @max 1
+ * @group Sensors
+ *
+ */
+PARAM_DEFINE_FLOAT(MAG_FLT_B0, 1);
+
+/**
+ * Magnetometer filter b1
+ *
+ * @min 0
+ * @max 1
+ * @group Sensors
+ *
+ */
+PARAM_DEFINE_FLOAT(MAG_FLT_B1, 0);
+
+/**
+ * Magnetometer filter b2
+ *
+ * @min 0
+ * @max 1
+ * @group Sensors
+ *
+ */
+PARAM_DEFINE_FLOAT(MAG_FLT_B2, 0);

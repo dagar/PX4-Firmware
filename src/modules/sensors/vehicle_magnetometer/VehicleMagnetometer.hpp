@@ -38,6 +38,7 @@
 #include <lib/sensor_calibration/Magnetometer.hpp>
 #include <lib/conversion/rotation.h>
 #include <lib/mathlib/math/Limits.hpp>
+#include <lib/mathlib/math/filter/BiquadDirectFormI.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
 #include <lib/systemlib/mavlink_log.h>
@@ -175,13 +176,21 @@ private:
 
 	bool _armed{false};
 
+	math::BiquadDirectFormI<matrix::Vector3f> _biquad_filter[MAX_SENSOR_COUNT] {};
+
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::CAL_MAG_COMP_TYP>) _param_mag_comp_typ,
 		(ParamBool<px4::params::SENS_MAG_MODE>) _param_sens_mag_mode,
 		(ParamFloat<px4::params::SENS_MAG_RATE>) _param_sens_mag_rate,
 		(ParamBool<px4::params::SENS_MAG_AUTOCAL>) _param_sens_mag_autocal,
 		(ParamInt<px4::params::CAL_MAG_SIDES>) _param_cal_mag_sides,
-		(ParamInt<px4::params::SENS_MAG_SIDES>) _param_sens_mag_sides
+		(ParamInt<px4::params::SENS_MAG_SIDES>) _param_sens_mag_sides,
+
+		(ParamFloat<px4::params::MAG_FLT_A1>) _param_mag_flt_a1,
+		(ParamFloat<px4::params::MAG_FLT_A2>) _param_mag_flt_a2,
+		(ParamFloat<px4::params::MAG_FLT_B0>) _param_mag_flt_b0,
+		(ParamFloat<px4::params::MAG_FLT_B1>) _param_mag_flt_b1,
+		(ParamFloat<px4::params::MAG_FLT_B2>) _param_mag_flt_b2
 	)
 };
 }; // namespace sensors

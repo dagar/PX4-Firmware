@@ -104,6 +104,14 @@ bool VehicleMagnetometer::ParametersUpdate(bool force)
 
 		updateParams();
 
+		// custom biquad filter coefficients
+		float a[2] {_param_mag_flt_a1.get(), _param_mag_flt_a2.get()};
+		float b[3] {_param_mag_flt_b0.get(), _param_mag_flt_b1.get(), _param_mag_flt_b2.get()};
+
+		for (auto &filter : _biquad_filter) {
+			filter.setCoefficients(a, b);
+		}
+
 		// Legacy QGC support: CAL_MAG_SIDES required to display the correct UI
 		// Force it to be a copy of the new SENS_MAG_SIDES
 		if (_param_cal_mag_sides.get() != _param_sens_mag_sides.get()) {
@@ -498,6 +506,8 @@ void VehicleMagnetometer::Run()
 					_data_sum[uorb_index] += vect;
 					_data_sum_count[uorb_index]++;
 
+					_biquad_filter[uorb_index].apply(vect);
+
 					_last_data[uorb_index] = vect;
 
 					updated[uorb_index] = true;
@@ -551,7 +561,8 @@ void VehicleMagnetometer::Run()
 					}
 
 					if (publish) {
-						const Vector3f magnetometer_data = _data_sum[instance] / _data_sum_count[instance];
+						//const Vector3f magnetometer_data = _data_sum[instance] / _data_sum_count[instance];
+						const Vector3f magnetometer_data = _biquad_filter[instance].getState();
 
 						// populate vehicle_magnetometer and publish
 						vehicle_magnetometer_s out{};
