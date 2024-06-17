@@ -69,19 +69,6 @@ uint32 filter_fault_flags	# Bitmask to indicate EKF internal faults
 
 float32 pos_horiz_accuracy # 1-Sigma estimated horizontal position accuracy relative to the estimators origin (m)
 float32 pos_vert_accuracy # 1-Sigma estimated vertical position accuracy relative to the estimators origin (m)
-uint16 innovation_check_flags # Bitmask to indicate pass/fail status of innovation consistency checks
-# 0 - true if velocity observations have been rejected
-# 1 - true if horizontal position observations have been rejected
-# 2 - true if true if vertical position observations have been rejected
-# 3 - true if the X magnetometer observation has been rejected
-# 4 - true if the Y magnetometer observation has been rejected
-# 5 - true if the Z magnetometer observation has been rejected
-# 6 - true if the yaw observation has been rejected
-# 7 - true if the airspeed observation has been rejected
-# 8 - true if the synthetic sideslip observation has been rejected
-# 9 - true if the height above ground observation has been rejected
-# 10 - true if the X optical flow observation has been rejected
-# 11 - true if the Y optical flow observation has been rejected
 
 float32 mag_test_ratio # ratio of the largest magnetometer innovation component to the innovation test limit
 float32 vel_test_ratio # ratio of the largest velocity innovation component to the innovation test limit
