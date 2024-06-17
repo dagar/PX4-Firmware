@@ -31,8 +31,6 @@
 #
 #############################################################################
 
-add_subdirectory(Utility)
-
 option(EKF2_SYMFORCE_GEN "ekf2 generate symforce output" OFF)
 
 # Symforce code generation TODO:fixme
@@ -253,7 +251,6 @@ px4_add_module(
 		geo
 		hysteresis
 		perf
-		EKF2Utility
 		px4_work_queue
 		world_magnetic_model
 
