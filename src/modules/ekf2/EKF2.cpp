@@ -1323,43 +1323,6 @@ void EKF2::PublishInnovations(const hrt_abstime &timestamp)
 
 	innovations.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 	_estimator_innovations_pub.publish(innovations);
-
-	// calculate noise filtered velocity innovations which are used for pre-flight checking
-	if (_ekf.control_status_prev_flags().in_air != _ekf.control_status_flags().in_air) {
-		// fully reset on takeoff or landing
-		_preflt_checker.reset();
-	}
-
-	if (!_ekf.control_status_flags().in_air) {
-		// TODO: move to run before publications
-		_preflt_checker.setUsingGpsAiding(_ekf.control_status_flags().gps);
-#if defined(CONFIG_EKF2_OPTICAL_FLOW)
-		_preflt_checker.setUsingFlowAiding(_ekf.control_status_flags().opt_flow);
-#endif // CONFIG_EKF2_OPTICAL_FLOW
-
-#if defined(CONFIG_EKF2_TERRAIN) && defined(CONFIG_EKF2_OPTICAL_FLOW)
-		// set dist bottom to scale flow innovation
-		const float dist_bottom = _ekf.getTerrainVertPos() - _ekf.getPosition()(2);
-		_preflt_checker.setDistBottom(dist_bottom);
-#endif // CONFIG_EKF2_TERRAIN && CONFIG_EKF2_OPTICAL_FLOW
-
-#if defined(CONFIG_EKF2_EXTERNAL_VISION)
-		_preflt_checker.setUsingEvPosAiding(_ekf.control_status_flags().ev_pos);
-		_preflt_checker.setUsingEvVelAiding(_ekf.control_status_flags().ev_vel);
-		_preflt_checker.setUsingEvHgtAiding(_ekf.control_status_flags().ev_hgt);
-#endif // CONFIG_EKF2_EXTERNAL_VISION
-#if defined(CONFIG_EKF2_BAROMETER)
-		_preflt_checker.setUsingBaroHgtAiding(_ekf.control_status_flags().baro_hgt);
-#endif // CONFIG_EKF2_BAROMETER
-		_preflt_checker.setUsingGpsHgtAiding(_ekf.control_status_flags().gps_hgt);
-#if defined(CONFIG_EKF2_RANGE_FINDER)
-		_preflt_checker.setUsingRngHgtAiding(_ekf.control_status_flags().rng_hgt);
-#endif // CONFIG_EKF2_RANGE_FINDER
-
-		_preflt_checker.setVehicleCanObserveHeadingInFlight(_ekf.control_status_flags().fixed_wing);
-
-		_preflt_checker.update(_ekf.get_dt_ekf_avg(), innovations);
-	}
 }
 
 void EKF2::PublishInnovationTestRatios(const hrt_abstime &timestamp)
@@ -1822,10 +1785,20 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 
 	status.time_slip = _last_time_slip_us * 1e-6f;
 
-	status.pre_flt_fail_innov_heading = _preflt_checker.hasHeadingFailed();
-	status.pre_flt_fail_innov_vel_horiz = _preflt_checker.hasHorizVelFailed();
-	status.pre_flt_fail_innov_vel_vert = _preflt_checker.hasVertVelFailed();
-	status.pre_flt_fail_innov_height = _preflt_checker.hasHeightFailed();
+
+	// lpos.xy_valid = _ekf.local_position_is_valid();
+	// lpos.v_xy_valid = _ekf.local_position_is_valid();
+
+	// // TODO: some modules (e.g.: mc_pos_control) don't handle v_z_valid != z_valid properly
+	// lpos.z_valid = _ekf.isLocalVerticalPositionValid() || _ekf.isLocalVerticalVelocityValid();
+	// lpos.v_z_valid = _ekf.isLocalVerticalVelocityValid() || _ekf.isLocalVerticalPositionValid();
+
+
+	status.pre_flt_fail_innov_heading = (_ekf.getHeadingInnovationTestRatio() > 0.5f);
+	status.pre_flt_fail_innov_vel_horiz = (_ekf.getHorizontalVelocityInnovationTestRatio() > 0.5f);
+	status.pre_flt_fail_innov_vel_vert = (_ekf.getVerticalVelocityInnovationTestRatio() > 0.5f);
+	status.pre_flt_fail_innov_height = (_ekf.getVerticalPositionInnovationTestRatio() > 0.5f);
+
 	status.pre_flt_fail_mag_field_disturbed = _ekf.control_status_flags().mag_field_disturbed;
 
 	status.accel_device_id = _device_id_accel;
