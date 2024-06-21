@@ -33,7 +33,7 @@
 
 #include "ekf.h"
 
-void Ekf::controlGnssVerticalVelocityFusion(const gnssSample &gnss_sample,
+void Ekf::controlGNSSVerticalVelocityFusion(const gnssSample &gnss_sample,
 		const bool common_starting_conditions_passing, bool reset)
 {
 	static constexpr const char *AID_SRC_NAME = "GNSS vertical velocity";
@@ -42,8 +42,7 @@ void Ekf::controlGnssVerticalVelocityFusion(const gnssSample &gnss_sample,
 
 	// determine if we should use GNSS vertical velocity aiding
 	const bool continuing_conditions_passing = (_params.gnss_ctrl & static_cast<int32_t>(GnssCtrl::VEL))
-			&& PX4_ISFINITE(gnss_sample.vel(2))
-			&& _control_status.flags.tilt_align;
+			&& PX4_ISFINITE(gnss_sample.vel(2));
 
 	const bool quality_good = (gnss_sample.sacc < _params.req_sacc);
 

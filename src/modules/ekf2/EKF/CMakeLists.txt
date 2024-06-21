@@ -92,14 +92,15 @@ if(CONFIG_EKF2_GNSS)
 	list(APPEND EKF_SRCS
 		aid_sources/gnss/gnss_height_control.cpp
 		aid_sources/gnss/gps_checks.cpp
-		aid_sources/gnss/gps_control.cpp
+		aid_sources/gnss/gnss_control.cpp
 		aid_sources/gnss/gnss_position.cpp
 		aid_sources/gnss/gnss_velocity_xy.cpp
 		aid_sources/gnss/gnss_velocity_z.cpp
+		aid_sources/gnss/gnss_yaw_estimator.cpp
 	)
 
 	if(CONFIG_EKF2_GNSS_YAW)
-		list(APPEND EKF_SRCS aid_sources/gnss/gps_yaw_fusion.cpp)
+		list(APPEND EKF_SRCS aid_sources/gnss/gnss_yaw.cpp)
 	endif()
 
 	add_subdirectory(yaw_estimator)

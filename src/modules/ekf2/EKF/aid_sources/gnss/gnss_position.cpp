@@ -33,7 +33,7 @@
 
 #include "ekf.h"
 
-void Ekf::controlGnssHorizontalPositionFusion(const gnssSample &gnss_sample,
+void Ekf::controlGNSSHorizontalPositionFusion(const gnssSample &gnss_sample,
 		const bool common_starting_conditions_passing, bool reset)
 {
 	static constexpr const char *AID_SRC_NAME = "GNSS horizontal position";

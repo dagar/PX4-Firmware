@@ -652,8 +652,6 @@ private:
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 
 #if defined(CONFIG_EKF2_GNSS)
-	bool _gps_data_ready{false};	///< true when new GPS data has fallen behind the fusion time horizon and is available to be fused
-
 	// variables used for the GPS quality checks
 	Vector3f _gps_pos_deriv_filt{};	///< GPS NED position derivative (m/sec)
 	Vector2f _gps_velNE_filt{};	///< filtered GPS North and East velocity (m/sec)
@@ -665,8 +663,6 @@ private:
 	bool _gps_checks_passed{false};		///> true when all active GPS checks have passed
 
 	gps_check_fail_status_u _gps_check_fail_status{};
-	// height sensor status
-	bool _gps_intermittent{true};           ///< true if data into the buffer is intermittent
 
 	HeightBiasEstimator _gps_hgt_b_est{HeightSensor::GNSS, _height_sensor_ref};
 
@@ -970,12 +966,13 @@ private:
 #if defined(CONFIG_EKF2_GNSS)
 	// control fusion of GPS observations
 	void controlGpsFusion(const imuSample &imu_delayed);
-	void controlGnssHorizontalVelocityFusion(const imuSample &imu_delayed, const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
-	void controlGnssVerticalVelocityFusion(const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
-	void controlGnssHorizontalPositionFusion(const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
+	void controlGNSSHorizontalVelocityFusion(const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
+	void controlGNSSVerticalVelocityFusion(const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
+	void controlGNSSHorizontalPositionFusion(const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
+
+	void updateGNSSYawEstimator(const gnssSample &gnss_sample);
 
 	void stopGpsFusion();
-	void stopGnssHorizontalVelocityFusion();
 
 	bool tryYawEmergencyReset();
 
@@ -986,23 +983,16 @@ private:
 	*/
 	bool runGnssChecks(const gnssSample &gps);
 
-	void controlGnssHeightFusion(const gnssSample &gps_sample);
+	void controlGNSSHeightFusion(const gnssSample &gnss_sample);
 	void stopGpsHgtFusion();
 
 	void resetGpsDriftCheckFilters();
 
 # if defined(CONFIG_EKF2_GNSS_YAW)
-	void controlGpsYawFusion(const gnssSample &gps_sample);
-	void stopGpsYawFusion();
+	void controlGNSSYawFusion(const gnssSample &gnss_sample);
 
 	// fuse the yaw angle obtained from a dual antenna GPS unit
-	void fuseGpsYaw(float antenna_yaw_offset);
-
-	// reset the quaternions states using the yaw angle obtained from a dual antenna GPS unit
-	// return true if the reset was successful
-	bool resetYawToGps(float gnss_yaw, float gnss_yaw_offset);
-
-	void updateGpsYaw(const gnssSample &gps_sample);
+	bool fuseGpsYaw(const VectorState& H, estimator_aid_source1d_s &aid_src, float antenna_yaw_offset);
 
 # endif // CONFIG_EKF2_GNSS_YAW
 

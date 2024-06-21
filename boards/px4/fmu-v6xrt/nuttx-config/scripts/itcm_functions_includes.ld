@@ -364,7 +364,7 @@
 *(.text.poll)
 *(.text._ZN14FlightTaskAutoD1Ev)
 *(.text._ZN4uORB10DeviceNode22get_initial_generationEv)
-*(.text._ZN3Ekf23controlGnssHeightFusionERKN9estimator9gpsSampleE)
+*(.text._ZN3Ekf23controlGNSSHeightFusionERKN9estimator9gpsSampleE)
 *(.text._ZN3Ekf40updateOnGroundMotionForOpticalFlowChecksEv)
 *(.text._ZN6matrix6MatrixIfLj3ELj1EEC1Ev)
 *(.text._ZN14ZeroGyroUpdate6updateER3EkfRKN9estimator9imuSampleE)
