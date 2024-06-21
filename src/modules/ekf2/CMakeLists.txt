@@ -169,9 +169,12 @@ endif()
 
 if(CONFIG_EKF2_GNSS)
 	list(APPEND EKF_SRCS
-		EKF/aid_sources/gnss/gnss_height_control.cpp
 		EKF/aid_sources/gnss/gps_checks.cpp
 		EKF/aid_sources/gnss/gps_control.cpp
+		EKF/aid_sources/gnss/gnss_position.cpp
+		EKF/aid_sources/gnss/gnss_height_control.cpp
+		EKF/aid_sources/gnss/gnss_velocity_xy.cpp
+		EKF/aid_sources/gnss/gnss_velocity_z.cpp
 	)
 
 	if(CONFIG_EKF2_GNSS_YAW)

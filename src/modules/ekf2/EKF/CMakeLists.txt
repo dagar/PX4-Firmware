@@ -93,6 +93,9 @@ if(CONFIG_EKF2_GNSS)
 		aid_sources/gnss/gnss_height_control.cpp
 		aid_sources/gnss/gps_checks.cpp
 		aid_sources/gnss/gps_control.cpp
+		aid_sources/gnss/gnss_position.cpp
+		aid_sources/gnss/gnss_velocity_xy.cpp
+		aid_sources/gnss/gnss_velocity_z.cpp
 	)
 
 	if(CONFIG_EKF2_GNSS_YAW)

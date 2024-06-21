@@ -254,9 +254,9 @@ TEST_F(EkfBasicsTest, reset_ekf_global_origin_gps_initialized)
 
 	EXPECT_NEAR(_ekf->aid_src_baro_hgt().test_ratio, 0.f, 0.05f);
 
-	EXPECT_NEAR(_ekf->aid_src_gnss_vel().test_ratio[0], 0.f, 0.02f);
-	EXPECT_NEAR(_ekf->aid_src_gnss_vel().test_ratio[1], 0.f, 0.02f);
-	EXPECT_NEAR(_ekf->aid_src_gnss_vel().test_ratio[2], 0.f, 0.02f);
+	EXPECT_NEAR(_ekf->aid_src_gnss_vel_xy().test_ratio[0], 0.f, 0.02f);
+	EXPECT_NEAR(_ekf->aid_src_gnss_vel_xy().test_ratio[1], 0.f, 0.02f);
+	EXPECT_NEAR(_ekf->aid_src_gnss_vel_z().test_ratio, 0.f, 0.02f);
 }
 
 TEST_F(EkfBasicsTest, reset_ekf_global_origin_gps_uninitialized)
@@ -292,9 +292,9 @@ TEST_F(EkfBasicsTest, reset_ekf_global_origin_gps_uninitialized)
 	EXPECT_NEAR(_ekf->aid_src_gnss_pos().test_ratio[1], 0.f, 0.05f);
 	EXPECT_NEAR(_ekf->aid_src_gnss_hgt().test_ratio, 0.f, 0.05f);
 
-	EXPECT_NEAR(_ekf->aid_src_gnss_vel().test_ratio[0], 0.f, 0.02f);
-	EXPECT_NEAR(_ekf->aid_src_gnss_vel().test_ratio[1], 0.f, 0.02f);
-	EXPECT_NEAR(_ekf->aid_src_gnss_vel().test_ratio[2], 0.f, 0.02f);
+	EXPECT_NEAR(_ekf->aid_src_gnss_vel_xy().test_ratio[0], 0.f, 0.02f);
+	EXPECT_NEAR(_ekf->aid_src_gnss_vel_xy().test_ratio[1], 0.f, 0.02f);
+	EXPECT_NEAR(_ekf->aid_src_gnss_vel_z().test_ratio, 0.f, 0.02f);
 }
 
 TEST_F(EkfBasicsTest, global_position_from_local_ev)

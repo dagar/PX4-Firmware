@@ -52,6 +52,24 @@ bool Ekf::fuseHorizontalVelocity(estimator_aid_source2d_s &aid_src)
 	return aid_src.fused;
 }
 
+bool Ekf::fuseVerticalVelocity(estimator_aid_source1d_s &aid_src)
+{
+	// vx, vy
+	if (!aid_src.innovation_rejected
+	    && fuseDirectStateMeasurement(aid_src.innovation, aid_src.innovation_variance, aid_src.observation_variance, State::vel.idx + 2)
+	   ) {
+		aid_src.fused = true;
+		aid_src.time_last_fuse = _time_delayed_us;
+
+		_time_last_ver_vel_fuse = _time_delayed_us;
+
+	} else {
+		aid_src.fused = false;
+	}
+
+	return aid_src.fused;
+}
+
 bool Ekf::fuseVelocity(estimator_aid_source3d_s &aid_src)
 {
 	// vx, vy, vz

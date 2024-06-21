@@ -301,7 +301,8 @@ bool EKF2::multi_init(int imu, int mag)
 	}
 
 	if (_param_ekf2_gps_ctrl.get() & static_cast<int32_t>(GnssCtrl::VEL)) {
-		_estimator_aid_src_gnss_vel_pub.advertise();
+		_estimator_aid_src_gnss_vel_xy_pub.advertise();
+		_estimator_aid_src_gnss_vel_z_pub.advertise();
 	}
 
 # if defined(CONFIG_EKF2_GNSS_YAW)
@@ -903,7 +904,8 @@ void EKF2::PublishAidSourceStatus(const hrt_abstime &timestamp)
 	// GNSS hgt/pos/vel/yaw
 	PublishAidSourceStatus(_ekf.aid_src_gnss_hgt(), _status_gnss_hgt_pub_last, _estimator_aid_src_gnss_hgt_pub);
 	PublishAidSourceStatus(_ekf.aid_src_gnss_pos(), _status_gnss_pos_pub_last, _estimator_aid_src_gnss_pos_pub);
-	PublishAidSourceStatus(_ekf.aid_src_gnss_vel(), _status_gnss_vel_pub_last, _estimator_aid_src_gnss_vel_pub);
+	PublishAidSourceStatus(_ekf.aid_src_gnss_vel_xy(), _status_gnss_vel_xy_pub_last, _estimator_aid_src_gnss_vel_xy_pub);
+	PublishAidSourceStatus(_ekf.aid_src_gnss_vel_z(),  _status_gnss_vel_z_pub_last, _estimator_aid_src_gnss_vel_z_pub);
 # if defined(CONFIG_EKF2_GNSS_YAW)
 	PublishAidSourceStatus(_ekf.aid_src_gnss_yaw(), _status_gnss_yaw_pub_last, _estimator_aid_src_gnss_yaw_pub);
 # endif // CONFIG_EKF2_GNSS_YAW
@@ -1236,9 +1238,9 @@ void EKF2::PublishInnovations(const hrt_abstime &timestamp)
 
 #if defined(CONFIG_EKF2_GNSS)
 	// GPS
-	innovations.gps_hvel[0] = _ekf.aid_src_gnss_vel().innovation[0];
-	innovations.gps_hvel[1] = _ekf.aid_src_gnss_vel().innovation[1];
-	innovations.gps_vvel    = _ekf.aid_src_gnss_vel().innovation[2];
+	innovations.gps_hvel[0] = _ekf.aid_src_gnss_vel_xy().innovation[0];
+	innovations.gps_hvel[1] = _ekf.aid_src_gnss_vel_xy().innovation[1];
+	innovations.gps_vvel    = _ekf.aid_src_gnss_vel_z().innovation;
 	innovations.gps_hpos[0] = _ekf.aid_src_gnss_pos().innovation[0];
 	innovations.gps_hpos[1] = _ekf.aid_src_gnss_pos().innovation[1];
 	innovations.gps_vpos    = _ekf.aid_src_gnss_hgt().innovation;
@@ -1370,9 +1372,9 @@ void EKF2::PublishInnovationTestRatios(const hrt_abstime &timestamp)
 
 #if defined(CONFIG_EKF2_GNSS)
 	// GPS
-	test_ratios.gps_hvel[0] = _ekf.aid_src_gnss_vel().test_ratio[0];
-	test_ratios.gps_hvel[1] = _ekf.aid_src_gnss_vel().test_ratio[1];
-	test_ratios.gps_vvel    = _ekf.aid_src_gnss_vel().test_ratio[2];
+	test_ratios.gps_hvel[0] = _ekf.aid_src_gnss_vel_xy().test_ratio[0];
+	test_ratios.gps_hvel[1] = _ekf.aid_src_gnss_vel_xy().test_ratio[1];
+	test_ratios.gps_vvel    = _ekf.aid_src_gnss_vel_z().test_ratio;
 	test_ratios.gps_hpos[0] = _ekf.aid_src_gnss_pos().test_ratio[0];
 	test_ratios.gps_hpos[1] = _ekf.aid_src_gnss_pos().test_ratio[1];
 	test_ratios.gps_vpos    = _ekf.aid_src_gnss_hgt().test_ratio;
@@ -1467,9 +1469,9 @@ void EKF2::PublishInnovationVariances(const hrt_abstime &timestamp)
 
 #if defined(CONFIG_EKF2_GNSS)
 	// GPS
-	variances.gps_hvel[0] = _ekf.aid_src_gnss_vel().innovation_variance[0];
-	variances.gps_hvel[1] = _ekf.aid_src_gnss_vel().innovation_variance[1];
-	variances.gps_vvel    = _ekf.aid_src_gnss_vel().innovation_variance[2];
+	variances.gps_hvel[0] = _ekf.aid_src_gnss_vel_xy().innovation_variance[0];
+	variances.gps_hvel[1] = _ekf.aid_src_gnss_vel_xy().innovation_variance[1];
+	variances.gps_vvel    = _ekf.aid_src_gnss_vel_z().innovation_variance;
 	variances.gps_hpos[0] = _ekf.aid_src_gnss_pos().innovation_variance[0];
 	variances.gps_hpos[1] = _ekf.aid_src_gnss_pos().innovation_variance[1];
 	variances.gps_vpos    = _ekf.aid_src_gnss_hgt().innovation_variance;
@@ -2394,15 +2396,12 @@ void EKF2::UpdateGpsSample(ekf2_timestamps_s &ekf2_timestamps)
 
 	if (_vehicle_gps_position_sub.update(&vehicle_gps_position)) {
 
-		Vector3f vel_ned;
+		Vector3f vel_ned{NAN, NAN, NAN};
 
 		if (vehicle_gps_position.vel_ned_valid) {
 			vel_ned = Vector3f(vehicle_gps_position.vel_n_m_s,
 					   vehicle_gps_position.vel_e_m_s,
 					   vehicle_gps_position.vel_d_m_s);
-
-		} else {
-			return; //TODO: change and set to NAN
 		}
 
 		gnssSample gnss_sample{

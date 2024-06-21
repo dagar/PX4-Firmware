@@ -336,8 +336,8 @@ float Ekf::getVelocityInnovationTestRatio() const
 
 #if defined(CONFIG_EKF2_GNSS)
 	if (_control_status.flags.gps) {
-		for (int i = 0; i < 3; i++) {
-			test_ratio = math::max(test_ratio, fabsf(_aid_src_gnss_vel.test_ratio_filtered[i]));
+		for (int i = 0; i < 2; i++) {
+			test_ratio = math::max(test_ratio, fabsf(_aid_src_gnss_vel_xy.test_ratio_filtered[i]));
 		}
 	}
 #endif // CONFIG_EKF2_GNSS
@@ -521,7 +521,7 @@ void Ekf::get_ekf_soln_status(uint16_t *status) const
 #endif // CONFIG_EKF2_MAGNETOMETER
 
 #if defined(CONFIG_EKF2_GNSS)
-	const bool gps_vel_innov_bad = Vector3f(_aid_src_gnss_vel.test_ratio).max() > 1.f;
+	const bool gps_vel_innov_bad = Vector2f(_aid_src_gnss_vel_xy.test_ratio).max() > 1.f;
 	const bool gps_pos_innov_bad = Vector2f(_aid_src_gnss_pos.test_ratio).max() > 1.f;
 
 	soln_status.flags.gps_glitch = (gps_vel_innov_bad || gps_pos_innov_bad) && mag_innov_good;
@@ -579,7 +579,9 @@ void Ekf::updateDeadReckoningStatus()
 
 void Ekf::updateHorizontalDeadReckoningstatus()
 {
-	const bool velPosAiding = (_control_status.flags.gps || _control_status.flags.ev_pos || _control_status.flags.ev_vel || _control_status.flags.aux_gpos)
+	const bool velPosAiding = (_control_status.flags.gps || _control_status.flags.gnss_vel_xy
+				|| _control_status.flags.ev_pos || _control_status.flags.ev_vel
+				|| _control_status.flags.aux_gpos)
 				  && (isRecent(_time_last_hor_pos_fuse, _params.no_aid_timeout_max)
 				      || isRecent(_time_last_hor_vel_fuse, _params.no_aid_timeout_max));
 

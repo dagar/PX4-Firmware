@@ -48,10 +48,6 @@ void Ekf::controlHeightFusion(const imuSample &imu_delayed)
 	controlBaroHeightFusion();
 #endif // CONFIG_EKF2_BAROMETER
 
-#if defined(CONFIG_EKF2_GNSS)
-	controlGnssHeightFusion(_gps_sample_delayed);
-#endif // CONFIG_EKF2_GNSS
-
 #if defined(CONFIG_EKF2_RANGE_FINDER)
 	controlRangeHeightFusion();
 #endif // CONFIG_EKF2_RANGE_FINDER
@@ -147,8 +143,8 @@ void Ekf::checkVerticalAccelerationBias(const imuSample &imu_delayed)
 
 #if defined(CONFIG_EKF2_GNSS)
 
-		if (_control_status.flags.gps) {
-			if (down_dvel_bias * _aid_src_gnss_vel.innovation[2] < 0.f) {
+		if (_control_status.flags.gnss_vel_z) {
+			if (down_dvel_bias * _aid_src_gnss_vel_z.innovation < 0.f) {
 				bad_vz = true;
 			}
 		}
@@ -294,8 +290,8 @@ Likelihood Ekf::estimateInertialNavFallingLikelihood() const
 		checks[1] = {ReferenceType::GNSS, _aid_src_gnss_hgt.innovation, _aid_src_gnss_hgt.innovation_variance};
 	}
 
-	if (_control_status.flags.gps) {
-		checks[2] = {ReferenceType::GNSS, _aid_src_gnss_vel.innovation[2], _aid_src_gnss_vel.innovation_variance[2]};
+	if (_control_status.flags.gnss_vel_z) {
+		checks[2] = {ReferenceType::GNSS, _aid_src_gnss_vel_z.innovation, _aid_src_gnss_vel_z.innovation_variance};
 	}
 #endif // CONFIG_EKF2_GNSS
 

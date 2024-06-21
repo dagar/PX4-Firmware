@@ -436,7 +436,8 @@ public:
 
 	const auto &aid_src_gnss_hgt() const { return _aid_src_gnss_hgt; }
 	const auto &aid_src_gnss_pos() const { return _aid_src_gnss_pos; }
-	const auto &aid_src_gnss_vel() const { return _aid_src_gnss_vel; }
+	const auto &aid_src_gnss_vel_xy() const { return _aid_src_gnss_vel_xy; }
+	const auto &aid_src_gnss_vel_z() const { return _aid_src_gnss_vel_z; }
 
 # if defined(CONFIG_EKF2_GNSS_YAW)
 	const auto &aid_src_gnss_yaw() const { return _aid_src_gnss_yaw; }
@@ -671,7 +672,9 @@ private:
 
 	estimator_aid_source1d_s _aid_src_gnss_hgt{};
 	estimator_aid_source2d_s _aid_src_gnss_pos{};
-	estimator_aid_source3d_s _aid_src_gnss_vel{};
+
+	estimator_aid_source2d_s _aid_src_gnss_vel_xy{};
+	estimator_aid_source1d_s _aid_src_gnss_vel_z{};
 
 # if defined(CONFIG_EKF2_GNSS_YAW)
 	estimator_aid_source1d_s _aid_src_gnss_yaw{};
@@ -823,9 +826,10 @@ private:
 	bool fuseHorizontalPosition(estimator_aid_source2d_s &pos_aid_src);
 	bool fuseVerticalPosition(estimator_aid_source1d_s &hgt_aid_src);
 
-	// 2d & 3d velocity fusion
-	bool fuseHorizontalVelocity(estimator_aid_source2d_s &vel_aid_src);
-	bool fuseVelocity(estimator_aid_source3d_s &vel_aid_src);
+	// velocity fusion
+	bool fuseHorizontalVelocity(estimator_aid_source2d_s &aid_src);
+	bool fuseVerticalVelocity(estimator_aid_source1d_s &aid_src);
+	bool fuseVelocity(estimator_aid_source3d_s &aid_src);
 
 #if defined(CONFIG_EKF2_TERRAIN)
 	// terrain vertical position estimator
@@ -966,14 +970,14 @@ private:
 #if defined(CONFIG_EKF2_GNSS)
 	// control fusion of GPS observations
 	void controlGpsFusion(const imuSample &imu_delayed);
+	void controlGnssHorizontalVelocityFusion(const imuSample &imu_delayed, const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
+	void controlGnssVerticalVelocityFusion(const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
+	void controlGnssHorizontalPositionFusion(const gnssSample &gnss_sample, const bool common_starting_conditions_passing, bool reset = false);
+
 	void stopGpsFusion();
-	void updateGnssVel(const gnssSample &gnss_sample, estimator_aid_source3d_s &aid_src);
-	void updateGnssPos(const gnssSample &gnss_sample, estimator_aid_source2d_s &aid_src);
-	void controlGnssYawEstimator(estimator_aid_source3d_s &aid_src_vel);
+	void stopGnssHorizontalVelocityFusion();
+
 	bool tryYawEmergencyReset();
-	void resetVelocityToGnss(estimator_aid_source3d_s &aid_src);
-	void resetHorizontalPositionToGnss(estimator_aid_source2d_s &aid_src);
-	bool shouldResetGpsFusion() const;
 
 	/*
 	 * Return true if the GPS solution quality is adequate.

@@ -560,6 +560,7 @@ bool EstimatorInterface::isOtherSourceOfHorizontalAidingThan(const bool aiding_f
 int EstimatorInterface::getNumberOfActiveHorizontalAidingSources() const
 {
 	return int(_control_status.flags.gps)
+	       + int(_control_status.flags.gnss_vel_xy)
 	       + int(_control_status.flags.opt_flow)
 	       + int(_control_status.flags.ev_pos)
 	       + int(_control_status.flags.ev_vel)
@@ -610,7 +611,7 @@ bool EstimatorInterface::isVerticalVelocityAidingActive() const
 
 int EstimatorInterface::getNumberOfActiveVerticalVelocityAidingSources() const
 {
-	return int(_control_status.flags.gps)
+	return int(_control_status.flags.gnss_vel_z)
 	       + int(_control_status.flags.ev_vel);
 }
 

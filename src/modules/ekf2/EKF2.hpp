@@ -465,7 +465,8 @@ private:
 
 	hrt_abstime _status_gnss_hgt_pub_last{0};
 	hrt_abstime _status_gnss_pos_pub_last{0};
-	hrt_abstime _status_gnss_vel_pub_last{0};
+	hrt_abstime _status_gnss_vel_xy_pub_last{0};
+	hrt_abstime _status_gnss_vel_z_pub_last{0};
 
 	float _last_gnss_hgt_bias_published{};
 
@@ -475,7 +476,8 @@ private:
 	uORB::PublicationMulti<estimator_gps_status_s> _estimator_gps_status_pub{ORB_ID(estimator_gps_status)};
 	uORB::PublicationMulti<estimator_aid_source1d_s> _estimator_aid_src_gnss_hgt_pub{ORB_ID(estimator_aid_src_gnss_hgt)};
 	uORB::PublicationMulti<estimator_aid_source2d_s> _estimator_aid_src_gnss_pos_pub{ORB_ID(estimator_aid_src_gnss_pos)};
-	uORB::PublicationMulti<estimator_aid_source3d_s> _estimator_aid_src_gnss_vel_pub{ORB_ID(estimator_aid_src_gnss_vel)};
+	uORB::PublicationMulti<estimator_aid_source2d_s> _estimator_aid_src_gnss_vel_xy_pub{ORB_ID(estimator_aid_src_gnss_vel_xy)};
+	uORB::PublicationMulti<estimator_aid_source1d_s> _estimator_aid_src_gnss_vel_z_pub{ORB_ID(estimator_aid_src_gnss_vel_z)};
 
 	uORB::PublicationMulti<yaw_estimator_status_s> _yaw_est_pub{ORB_ID(yaw_estimator_status)};
 
