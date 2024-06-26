@@ -604,8 +604,6 @@ private:
 	Vector3f _ref_body_rate{};
 
 	Vector2f _flow_rate_compensated{}; ///< measured angular rate of the image about the X and Y body axes after removal of body rotation (rad/s), RH rotation is positive
-
-	bool _flow_data_ready{false};	///< true when the leading edge of the optical flow integration period has fallen behind the fusion time horizon
 #endif // CONFIG_EKF2_OPTICAL_FLOW
 
 #if defined(CONFIG_EKF2_AIRSPEED)
@@ -836,24 +834,17 @@ private:
 #if defined(CONFIG_EKF2_OPTICAL_FLOW)
 	// control fusion of optical flow observations
 	void controlOpticalFlowFusion(const imuSample &imu_delayed);
-	void startFlowFusion();
-	void resetFlowFusion();
 	void stopFlowFusion();
 
-	void updateOnGroundMotionForOpticalFlowChecks();
-	void resetOnGroundMotionForOpticalFlowChecks();
-
-	// calculate the measurement variance for the optical flow sensor
+	// calculate the measurement variance for the optical flow sensor (rad/sec)^2
 	float calcOptFlowMeasVar(const flowSample &flow_sample);
 
-	// calculate optical flow body angular rate compensation
-	void calcOptFlowBodyRateComp(const imuSample &imu_delayed);
+	Vector2f predictFlow(const Vector3f &flow_gyro) const;
+	float predictFlowRange() const;
+	Vector2f predictFlowVelBody(const Vector3f &flow_gyro) const;
 
 	// fuse optical flow line of sight rate measurements
-	void updateOptFlow(estimator_aid_source2d_s &aid_src);
-	void fuseOptFlow(bool update_terrain);
-	float predictFlowRange();
-	Vector2f predictFlowVelBody();
+	bool fuseOptFlow(VectorState &H, const flowSample &flow_sample, bool update_terrain);
 #endif // CONFIG_EKF2_OPTICAL_FLOW
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
