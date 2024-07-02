@@ -84,6 +84,7 @@ if(CONFIG_EKF2_EXTERNAL_VISION)
 		aid_sources/external_vision/ev_height_control.cpp
 		aid_sources/external_vision/ev_pos_control.cpp
 		aid_sources/external_vision/ev_vel_control.cpp
+		aid_sources/external_vision/ev_vel_body_control.cpp
 		aid_sources/external_vision/ev_yaw_control.cpp
 	)
 endif()

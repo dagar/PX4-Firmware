@@ -582,7 +582,7 @@ union filter_control_status_u {
 		uint64_t ev_yaw_fault            : 1; ///< 36 - true when the EV heading has been declared faulty and is no longer being used
 		uint64_t mag_heading_consistent  : 1; ///< 37 - true when the heading obtained from mag data is declared consistent with the filter
 		uint64_t aux_gpos                : 1;
-
+		uint64_t ev_vel_body             : 1; ///< 39 - true when body fixed frame velocity data fusion from external vision measurements is intended
 	} flags;
 	uint64_t value;
 };
