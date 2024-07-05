@@ -291,20 +291,11 @@ public:
 	}
 
 	// return true if the local position estimate is valid
-	bool local_position_is_valid() const
-	{
-		return (!_horizontal_deadreckon_time_exceeded && !_control_status.flags.fake_pos);
-	}
+	bool local_position_is_valid() const { return !_horizontal_deadreckon_time_exceeded; }
 
-	bool isLocalVerticalPositionValid() const
-	{
-		return !_vertical_position_deadreckon_time_exceeded && !_control_status.flags.fake_hgt;
-	}
+	bool isLocalVerticalPositionValid() const { return !_vertical_deadreckon_time_exceeded; }
 
-	bool isLocalVerticalVelocityValid() const
-	{
-		return !_vertical_velocity_deadreckon_time_exceeded && !_control_status.flags.fake_hgt;
-	}
+	bool isLocalVerticalVelocityValid() const { return !_vertical_deadreckon_time_exceeded; }
 
 	bool isYawFinalAlignComplete() const
 	{
@@ -538,8 +529,6 @@ private:
 
 	// check if the EKF is dead reckoning horizontal velocity using inertial data only
 	void updateDeadReckoningStatus();
-	void updateHorizontalDeadReckoningstatus();
-	void updateVerticalDeadReckoningStatus();
 
 	static constexpr float kGyroBiasVarianceMin{1e-9f};
 	static constexpr float kAccelBiasVarianceMin{1e-9f};
@@ -575,10 +564,6 @@ private:
 	StateSample _state{};		///< state struct of the ekf running at the delayed time horizon
 
 	bool _filter_initialised{false};	///< true when the EKF sttes and covariances been initialised
-
-	uint64_t _time_last_horizontal_aiding{0}; ///< amount of time we have been doing inertial only deadreckoning (uSec)
-	uint64_t _time_last_v_pos_aiding{0};
-	uint64_t _time_last_v_vel_aiding{0};
 
 	uint64_t _time_last_hor_pos_fuse{0};	///< time the last fusion of horizontal position measurements was performed (uSec)
 	uint64_t _time_last_hgt_fuse{0};	///< time the last fusion of vertical position measurements was performed (uSec)

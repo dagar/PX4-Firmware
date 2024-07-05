@@ -409,8 +409,7 @@ protected:
 	innovation_fault_status_u _innov_check_fail_status{};
 
 	bool _horizontal_deadreckon_time_exceeded{true};
-	bool _vertical_position_deadreckon_time_exceeded{true};
-	bool _vertical_velocity_deadreckon_time_exceeded{true};
+	bool _vertical_deadreckon_time_exceeded{true};
 
 	uint64_t _time_last_on_ground_us{0};	///< last time we were on the ground (uSec)
 	uint64_t _time_last_in_air{0};		///< last time we were in air (uSec)

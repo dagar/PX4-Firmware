@@ -51,7 +51,8 @@ bool Ekf::isHeightResetRequired() const
 	const bool continuous_bad_accel_hgt = isTimedOut(_time_good_vert_accel, (uint64_t)_params.bad_acc_reset_delay_us);
 
 	// check if height has been inertial deadreckoning for too long
-	const bool hgt_fusion_timeout = isTimedOut(_time_last_hgt_fuse, _params.hgt_fusion_timeout_max);
+	const bool hgt_fusion_timeout = isTimedOut(_time_last_hgt_fuse, _params.hgt_fusion_timeout_max)
+					&& (_state_reset_status.reset_count.posD == _state_reset_count_prev.posD);
 
 	return (continuous_bad_accel_hgt || hgt_fusion_timeout);
 }
@@ -651,122 +652,19 @@ void Ekf::fuse(const VectorState &K, float innovation)
 
 void Ekf::updateDeadReckoningStatus()
 {
-	updateHorizontalDeadReckoningstatus();
-	updateVerticalDeadReckoningStatus();
-}
+	const uint64_t deadreckon_timeout = math::max((uint64_t)_params.valid_timeout_max,
+					    (uint64_t)_params.no_aid_timeout_max);
 
-void Ekf::updateHorizontalDeadReckoningstatus()
-{
-	bool inertial_dead_reckoning = true;
-	bool aiding_expected_in_air = false;
+	const uint64_t time_last_horizontal_aiding = math::max(_time_last_hor_vel_fuse, _time_last_hor_pos_fuse);
+	const uint64_t time_last_vertical_aiding   = math::max(_time_last_ver_vel_fuse, _time_last_hgt_fuse);
 
-	// velocity aiding active
-	if ((_control_status.flags.gps || _control_status.flags.ev_vel)
-	    && isRecent(_time_last_hor_vel_fuse, _params.no_aid_timeout_max)
-	   ) {
-		inertial_dead_reckoning = false;
-	}
+	_horizontal_deadreckon_time_exceeded = isTimedOut(time_last_horizontal_aiding, deadreckon_timeout);
+	_vertical_deadreckon_time_exceeded   = isTimedOut(time_last_vertical_aiding,   deadreckon_timeout);
 
-	// position aiding active
-	if ((_control_status.flags.gps || _control_status.flags.ev_pos || _control_status.flags.aux_gpos)
-	    && isRecent(_time_last_hor_pos_fuse, _params.no_aid_timeout_max)
-	   ) {
-		inertial_dead_reckoning = false;
-	}
 
-#if defined(CONFIG_EKF2_OPTICAL_FLOW)
-
-	// optical flow active
-	if (_control_status.flags.opt_flow
-	    && isRecent(_aid_src_optical_flow.time_last_fuse, _params.no_aid_timeout_max)
-	   ) {
-		inertial_dead_reckoning = false;
-
-	} else {
-		if (!_control_status.flags.in_air && (_params.flow_ctrl == 1)
-		    && isRecent(_aid_src_optical_flow.timestamp_sample, _params.no_aid_timeout_max)
-		   ) {
-			// currently landed, but optical flow aiding should be possible once in air
-			aiding_expected_in_air = true;
-		}
-	}
-
-#endif // CONFIG_EKF2_OPTICAL_FLOW
-
-#if defined(CONFIG_EKF2_AIRSPEED)
-
-	// air data aiding active
-	if ((_control_status.flags.fuse_aspd && isRecent(_aid_src_airspeed.time_last_fuse, _params.no_aid_timeout_max))
-	    && (_control_status.flags.fuse_beta && isRecent(_aid_src_sideslip.time_last_fuse, _params.no_aid_timeout_max))
-	   ) {
-		// wind_dead_reckoning: no other aiding but air data
-		_control_status.flags.wind_dead_reckoning = inertial_dead_reckoning;
-
-		// air data aiding is active, we're not inertial dead reckoning
-		inertial_dead_reckoning = false;
-
-	} else {
-		_control_status.flags.wind_dead_reckoning = false;
-
-		if (!_control_status.flags.in_air && _control_status.flags.fixed_wing
-		    && (_params.beta_fusion_enabled == 1)
-		    && (_params.arsp_thr > 0.f) && isRecent(_aid_src_airspeed.timestamp_sample, _params.no_aid_timeout_max)
-		   ) {
-			// currently landed, but air data aiding should be possible once in air
-			aiding_expected_in_air = true;
-		}
-	}
-
-#endif // CONFIG_EKF2_AIRSPEED
-
-	// zero velocity update
-	if (isRecent(_zero_velocity_update.time_last_fuse(), _params.no_aid_timeout_max)) {
-		// only respect as a valid aiding source now if we expect to have another valid source once in air
-		if (aiding_expected_in_air) {
-			inertial_dead_reckoning = false;
-		}
-	}
-
-	if (inertial_dead_reckoning) {
-		if (isTimedOut(_time_last_horizontal_aiding, (uint64_t)_params.valid_timeout_max)) {
-			// deadreckon time exceeded
-			if (!_horizontal_deadreckon_time_exceeded) {
-				ECL_WARN("horizontal dead reckon time exceeded");
-				_horizontal_deadreckon_time_exceeded = true;
-			}
-		}
-
-	} else {
-		if (_time_delayed_us > _params.no_aid_timeout_max) {
-			_time_last_horizontal_aiding = _time_delayed_us - _params.no_aid_timeout_max;
-		}
-
-		_horizontal_deadreckon_time_exceeded = false;
-
-	}
-
-	_control_status.flags.inertial_dead_reckoning = inertial_dead_reckoning;
-}
-
-void Ekf::updateVerticalDeadReckoningStatus()
-{
-	if (isVerticalPositionAidingActive()) {
-		_time_last_v_pos_aiding = _time_last_hgt_fuse;
-		_vertical_position_deadreckon_time_exceeded = false;
-
-	} else if (isTimedOut(_time_last_v_pos_aiding, (uint64_t)_params.valid_timeout_max)) {
-		_vertical_position_deadreckon_time_exceeded = true;
-	}
-
-	if (isVerticalVelocityAidingActive()) {
-		_time_last_v_vel_aiding = _time_last_ver_vel_fuse;
-		_vertical_velocity_deadreckon_time_exceeded = false;
-
-	} else if (isTimedOut(_time_last_v_vel_aiding, (uint64_t)_params.valid_timeout_max)
-		   && _vertical_position_deadreckon_time_exceeded) {
-
-		_vertical_velocity_deadreckon_time_exceeded = true;
-	}
+	_control_status.flags.inertial_dead_reckoning = !isHorizontalAidingActive()
+			|| isTimedOut(time_last_horizontal_aiding, _params.no_aid_timeout_max);
+	_control_status.flags.wind_dead_reckoning = isOnlyActiveSourceOfHorizontalAiding(_control_status.flags.fuse_aspd);
 }
 
 Vector3f Ekf::getRotVarBody() const
@@ -887,11 +785,11 @@ void Ekf::updateIMUBiasInhibit(const imuSample &imu_delayed)
 		if (_control_status.flags.vehicle_at_rest) {
 			is_bias_observable = true;
 
-		} else if (_control_status.flags.fake_hgt) {
+		} else if (!isHorizontalAidingActive() && !isVerticalAidingActive()) {
 			is_bias_observable = false;
 
-		} else if (_control_status.flags.fake_pos) {
-			// when using fake position (but not fake height) only consider an accel bias observable if aligned with the gravity vector
+		} else if (!isHorizontalAidingActive()) {
+			// only consider an accel bias observable if aligned with the gravity vector
 			is_bias_observable = (fabsf(_R_to_earth(2, index)) > 0.966f); // cos 15 degrees ~= 0.966
 		}
 

@@ -122,26 +122,29 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 					fuseHorizontalPosition(_aid_src_gnss_pos);
 				}
 
-				bool do_vel_pos_reset = shouldResetGpsFusion();
+				const bool vel_failing = gnss_vel_enabled && isTimedOut(_aid_src_gnss_vel.time_last_fuse, _params.no_aid_timeout_max);
+				const bool pos_failing = gnss_pos_enabled && isTimedOut(_aid_src_gnss_pos.time_last_fuse, _params.no_aid_timeout_max);
 
-				if (_control_status.flags.in_air
-				    && isYawFailure()
-				    && isTimedOut(_time_last_hor_vel_fuse, _params.EKFGSF_reset_delay)
-				    && (_time_last_hor_vel_fuse > _time_last_on_ground_us)) {
-					do_vel_pos_reset = tryYawEmergencyReset();
-				}
+				if (vel_failing || pos_failing) {
 
-				if (do_vel_pos_reset) {
-					ECL_WARN("GPS fusion timeout, resetting");
-				}
+					bool do_vel_pos_reset = shouldResetGpsFusion();
 
-				if (gnss_vel_enabled) {
+					if (isYawFailure()
+					    && isTimedOut(_aid_src_gnss_vel.time_last_fuse, _params.EKFGSF_reset_delay)
+					    && (_aid_src_gnss_vel.time_last_fuse > _time_last_on_ground_us)) {
+						do_vel_pos_reset = tryYawEmergencyReset();
+					}
+
 					if (do_vel_pos_reset) {
-						resetVelocityToGnss(_aid_src_gnss_vel);
+						ECL_WARN("GPS fusion timeout, resetting velocity / position");
 
-					} else if (isHeightResetRequired()) {
-						// reset vertical velocity if height is failing
-						resetVerticalVelocityTo(_aid_src_gnss_vel.observation[2], _aid_src_gnss_vel.observation_variance[2]);
+						if (gnss_vel_enabled) {
+							resetVelocityToGnss(_aid_src_gnss_vel);
+						}
+
+						if (gnss_pos_enabled) {
+							resetHorizontalPositionToGnss(_aid_src_gnss_pos);
+						}
 					}
 				}
 

@@ -123,9 +123,6 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos, const Vector2f
 	_ev_pos_b_est.setBias(_ev_pos_b_est.getBias() - _state_reset_status.posNE_change);
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 	//_gps_pos_b_est.setBias(_gps_pos_b_est.getBias() + _state_reset_status.posNE_change);
-
-	// Reset the timout timer
-	_time_last_hor_pos_fuse = _time_delayed_us;
 }
 
 void Ekf::resetVerticalPositionTo(const float new_vert_pos, float new_vert_pos_var)
@@ -179,9 +176,6 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos, float new_vert_pos_v
 
 	_state_reset_status.reset_count.hagl++;
 #endif // CONFIG_EKF2_TERRAIN
-
-	// Reset the timout timer
-	_time_last_hgt_fuse = _time_delayed_us;
 }
 
 void Ekf::resetHorizontalPositionToLastKnown()

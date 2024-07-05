@@ -103,9 +103,6 @@ void Ekf::resetHorizontalVelocityTo(const Vector2f &new_horz_vel, const Vector2f
 	}
 
 	_state_reset_status.reset_count.velNE++;
-
-	// Reset the timout timer
-	_time_last_hor_vel_fuse = _time_delayed_us;
 }
 
 void Ekf::resetVerticalVelocityTo(float new_vert_vel, float new_vert_vel_var)
@@ -129,9 +126,6 @@ void Ekf::resetVerticalVelocityTo(float new_vert_vel, float new_vert_vel_var)
 	}
 
 	_state_reset_status.reset_count.velD++;
-
-	// Reset the timout timer
-	_time_last_ver_vel_fuse = _time_delayed_us;
 }
 
 void Ekf::resetHorizontalVelocityToZero()

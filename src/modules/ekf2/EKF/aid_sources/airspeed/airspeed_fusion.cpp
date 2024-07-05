@@ -58,7 +58,7 @@ void Ekf::controlAirDataFusion(const imuSample &imu_delayed)
 	const bool airspeed_timed_out = isTimedOut(_aid_src_airspeed.time_last_fuse, (uint64_t)10e6);
 	const bool sideslip_timed_out = isTimedOut(_aid_src_sideslip.time_last_fuse, (uint64_t)10e6);
 
-	if (_control_status.flags.fake_pos || (airspeed_timed_out && sideslip_timed_out && (_params.drag_ctrl == 0))) {
+	if (!isHorizontalAidingActive() || (airspeed_timed_out && sideslip_timed_out && (_params.drag_ctrl == 0))) {
 		_control_status.flags.wind = false;
 	}
 
@@ -93,8 +93,7 @@ void Ekf::controlAirDataFusion(const imuSample &imu_delayed)
 			_aid_src_airspeed.innovation_rejected; // TODO: remove this redundant flag
 
 		const bool continuing_conditions_passing = _control_status.flags.in_air
-				&& _control_status.flags.fixed_wing
-				&& !_control_status.flags.fake_pos;
+				&& _control_status.flags.fixed_wing;
 
 		const bool is_airspeed_significant = airspeed_sample.true_airspeed > _params.arsp_thr;
 		const bool is_airspeed_consistent = (_aid_src_airspeed.test_ratio > 0.f && _aid_src_airspeed.test_ratio < 1.f);
@@ -171,7 +170,7 @@ void Ekf::fuseAirspeed(const airspeedSample &airspeed_sample, estimator_aid_sour
 	}
 
 	// determine if we need the airspeed fusion to correct states other than wind
-	const bool update_wind_only = !_control_status.flags.wind_dead_reckoning;
+	const bool update_wind_only = isOtherSourceOfHorizontalAidingThan(_control_status.flags.fuse_aspd);
 
 	const float innov_var = aid_src.innovation_variance;
 

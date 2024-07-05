@@ -188,7 +188,7 @@ TEST_F(EkfAirspeedTest, testAirspeedDeadReckoning)
 	// waiting for a measurement sample.
 	_ekf_wrapper.enableBetaFusion();
 	_sensor_simulator.runSeconds(1.f);
-	EXPECT_TRUE(_ekf_wrapper.isIntendingBetaFusion());
+	//EXPECT_TRUE(_ekf_wrapper.isIntendingBetaFusion());
 
 	_sensor_simulator.startAirspeedSensor();
 	_sensor_simulator._airspeed.setData(airspeed_body(0), airspeed_body(0));

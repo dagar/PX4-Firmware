@@ -100,10 +100,6 @@ void Ekf::reset()
 
 	_output_predictor.reset();
 
-	// Ekf private fields
-	_time_last_horizontal_aiding = 0;
-	_time_last_v_pos_aiding = 0;
-	_time_last_v_vel_aiding = 0;
 
 	_time_last_hor_pos_fuse = 0;
 	_time_last_hgt_fuse = 0;
