@@ -1080,16 +1080,7 @@ void EKF2::PublishEventFlags(const hrt_abstime &timestamp)
 		_filter_information_event_changes++;
 	}
 
-	// warning events
-	uint32_t warning_events = _ekf.warning_event_status().value;
-	bool warning_event_updated = false;
-
-	if (warning_events != 0) {
-		warning_event_updated = true;
-		_filter_warning_event_changes++;
-	}
-
-	if (information_event_updated || warning_event_updated) {
+	if (information_event_updated) {
 		estimator_event_flags_s event_flags{};
 		event_flags.timestamp_sample = _ekf.time_delayed_us();
 
@@ -1111,20 +1102,6 @@ void EKF2::PublishEventFlags(const hrt_abstime &timestamp)
 		event_flags.reset_hgt_to_gps                    = _ekf.information_event_flags().reset_hgt_to_gps;
 		event_flags.reset_hgt_to_rng                    = _ekf.information_event_flags().reset_hgt_to_rng;
 		event_flags.reset_hgt_to_ev                     = _ekf.information_event_flags().reset_hgt_to_ev;
-
-		event_flags.warning_event_changes               = _filter_warning_event_changes;
-		event_flags.gps_quality_poor                    = _ekf.warning_event_flags().gps_quality_poor;
-		event_flags.gps_fusion_timout                   = _ekf.warning_event_flags().gps_fusion_timout;
-		event_flags.gps_data_stopped                    = _ekf.warning_event_flags().gps_data_stopped;
-		event_flags.gps_data_stopped_using_alternate    = _ekf.warning_event_flags().gps_data_stopped_using_alternate;
-		event_flags.height_sensor_timeout               = _ekf.warning_event_flags().height_sensor_timeout;
-		event_flags.stopping_navigation                 = _ekf.warning_event_flags().stopping_mag_use;
-		event_flags.invalid_accel_bias_cov_reset        = _ekf.warning_event_flags().invalid_accel_bias_cov_reset;
-		event_flags.bad_yaw_using_gps_course            = _ekf.warning_event_flags().bad_yaw_using_gps_course;
-		event_flags.stopping_mag_use                    = _ekf.warning_event_flags().stopping_mag_use;
-		event_flags.vision_data_stopped                 = _ekf.warning_event_flags().vision_data_stopped;
-		event_flags.emergency_yaw_reset_mag_stopped     = _ekf.warning_event_flags().emergency_yaw_reset_mag_stopped;
-		event_flags.emergency_yaw_reset_gps_yaw_stopped = _ekf.warning_event_flags().emergency_yaw_reset_gps_yaw_stopped;
 
 		event_flags.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
 		_estimator_event_flags_pub.update(event_flags);

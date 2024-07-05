@@ -216,7 +216,6 @@ void Ekf::checkVerticalAccelerationBias(const imuSample &imu_delayed)
 		_time_acc_bias_check = imu_delayed.time_us;
 
 		_fault_status.flags.bad_acc_bias = false;
-		_warning_events.flags.invalid_accel_bias_cov_reset = true;
 		ECL_WARN("invalid accel bias - covariance reset");
 	}
 }
@@ -270,6 +269,9 @@ void Ekf::checkVerticalAccelerationHealth(const imuSample &imu_delayed)
 
 	// declare a bad vertical acceleration measurement and make the declaration persist
 	// for a minimum of BADACC_PROBATION seconds
+	static constexpr uint64_t BADACC_PROBATION =
+		10e6; ///< Period of time that accel data declared bad must continuously pass checks to be declared good again (uSec)
+
 	if (_fault_status.flags.bad_acc_vertical) {
 		_fault_status.flags.bad_acc_vertical = isRecent(_time_bad_vert_accel, BADACC_PROBATION);
 

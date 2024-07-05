@@ -38,6 +38,9 @@
 
 #include "ekf.h"
 
+// Maximum allowable time interval between pressure altitude measurements (uSec)
+static constexpr uint64_t BARO_MAX_INTERVAL{200e3};
+
 void Ekf::controlBaroHeightFusion()
 {
 	static constexpr const char *HGT_SRC_NAME = "baro";
