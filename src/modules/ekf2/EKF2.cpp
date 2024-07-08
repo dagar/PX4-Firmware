@@ -419,6 +419,8 @@ int EKF2::print_status(bool verbose)
 	perf_print_counter(_ekf_update_perf);
 	perf_print_counter(_msg_missed_imu_perf);
 
+	_output_predictor.print_status();
+
 	if (verbose) {
 #if defined(CONFIG_EKF2_VERBOSE_STATUS)
 		_ekf.print_status();
@@ -458,9 +460,9 @@ void EKF2::Run()
 		const matrix::Vector3f imu_pos_body(_param_ekf2_imu_pos_x.get(),
 						    _param_ekf2_imu_pos_y.get(),
 						    _param_ekf2_imu_pos_z.get());
-		_ekf.output_predictor().set_imu_offset(imu_pos_body);
-		_ekf.output_predictor().set_pos_correction_tc(_param_ekf2_tau_pos.get());
-		_ekf.output_predictor().set_vel_correction_tc(_param_ekf2_tau_vel.get());
+		_output_predictor.set_imu_offset(imu_pos_body);
+		_output_predictor.set_pos_correction_tc(_param_ekf2_tau_pos.get());
+		_output_predictor.set_vel_correction_tc(_param_ekf2_tau_vel.get());
 
 #if defined(CONFIG_EKF2_AIRSPEED)
 		// The airspeed scale factor correcton is only available via parameter as used by the airspeed module
@@ -711,6 +713,13 @@ void EKF2::Run()
 
 		// push imu data into estimator
 		_ekf.setIMUData(imu_sample_new);
+
+		// the output observer always runs
+		//  || !_output_predictor.allocate(_imu_buffer_length)
+		_output_predictor.calculateOutputStates(imu_sample_new.time_us,
+							imu_sample_new.delta_ang, imu_sample_new.delta_ang_dt,
+							imu_sample_new.delta_vel, imu_sample_new.delta_vel_dt);
+
 		PublishAttitude(now); // publish attitude immediately (uses quaternion from output predictor)
 
 		// integrate time to monitor time slippage
@@ -765,6 +774,25 @@ void EKF2::Run()
 
 		if (_ekf.update()) {
 			perf_set_elapsed(_ekf_update_perf, hrt_elapsed_time(&ekf_update_start));
+
+
+			// reset the output predictor state history to match the EKF initial values
+			//_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
+
+
+			// 	_output_predictor.resetHorizontalPositionTo(delta_horz_pos);
+			//	_output_predictor.resetHorizontalVelocityTo(delta_horz_vel);
+			// apply the change in height / height rate to our newest height / height rate estimate
+			// which have already been taken out from the output buffer
+			//_output_predictor.resetVerticalPositionTo(new_vert_pos, delta_z);
+			// _output_predictor.resetVerticalVelocityTo(delta_vert_vel);
+
+			// // add the reset amount to the output observer buffered data
+			// _output_predictor.resetQuaternion(q_error);
+
+			// TODO: ekf delayed time?
+			_output_predictor.correctOutputStates(ekf_update_start, _ekf.state().quat_nominal, _ekf.state().vel, _ekf.state().pos,
+							      _ekf.state().gyro_bias, _ekf.state().accel_bias);
 
 			PublishLocalPosition(now);
 			PublishOdometry(now, imu_sample_new);
@@ -1000,7 +1028,7 @@ void EKF2::PublishAttitude(const hrt_abstime &timestamp)
 		// generate vehicle attitude quaternion data
 		vehicle_attitude_s att;
 		att.timestamp_sample = timestamp;
-		_ekf.getQuaternion().copyTo(att.q);
+		_output_predictor.getQuaternion().copyTo(att.q);
 
 		_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
 		att.timestamp = _replay_mode ? timestamp : hrt_absolute_time();
@@ -1172,7 +1200,7 @@ void EKF2::PublishEventFlags(const hrt_abstime &timestamp)
 void EKF2::PublishGlobalPosition(const hrt_abstime &timestamp)
 {
 	if (_ekf.global_position_is_valid()) {
-		const Vector3f position{_ekf.getPosition()};
+		const Vector3f position{_output_predictor.getPosition()};
 
 		// generate and publish global position data
 		vehicle_global_position_s global_pos{};
@@ -1585,22 +1613,22 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 	lpos.timestamp_sample = timestamp;
 
 	// Position of body origin in local NED frame
-	const Vector3f position{_ekf.getPosition()};
+	const Vector3f position{_output_predictor.getPosition()};
 	lpos.x = position(0);
 	lpos.y = position(1);
 	lpos.z = position(2);
 
 	// Velocity of body origin in local NED frame (m/s)
-	const Vector3f velocity{_ekf.getVelocity()};
+	const Vector3f velocity{_output_predictor.getVelocity()};
 	lpos.vx = velocity(0);
 	lpos.vy = velocity(1);
 	lpos.vz = velocity(2);
 
 	// vertical position time derivative (m/s)
-	lpos.z_deriv = _ekf.getVerticalPositionDerivative();
+	lpos.z_deriv = _output_predictor.getVerticalPositionDerivative();
 
 	// Acceleration of body origin in local frame
-	const Vector3f vel_deriv{_ekf.getVelocityDerivative()};
+	const Vector3f vel_deriv{_output_predictor.getVelocityDerivative()};
 	lpos.ax = vel_deriv(0);
 	lpos.ay = vel_deriv(1);
 	lpos.az = vel_deriv(2);
@@ -1633,8 +1661,8 @@ void EKF2::PublishLocalPosition(const hrt_abstime &timestamp)
 	Quatf delta_q_reset;
 	_ekf.get_quat_reset(&delta_q_reset(0), &lpos.heading_reset_counter);
 
-	lpos.heading = Eulerf(_ekf.getQuaternion()).psi();
-	lpos.unaided_heading = _ekf.getUnaidedYaw();
+	lpos.heading = Eulerf(_output_predictor.getQuaternion()).psi();
+	lpos.unaided_heading = _output_predictor.getUnaidedYaw();
 	lpos.heading_var = _ekf.getYawVar();
 	lpos.delta_heading = Eulerf(delta_q_reset).psi();
 	lpos.heading_good_for_control = _ekf.isYawFinalAlignComplete();
@@ -1692,14 +1720,14 @@ void EKF2::PublishOdometry(const hrt_abstime &timestamp, const imuSample &imu_sa
 
 	// position
 	odom.pose_frame = vehicle_odometry_s::POSE_FRAME_NED;
-	_ekf.getPosition().copyTo(odom.position);
+	_output_predictor.getPosition().copyTo(odom.position);
 
 	// orientation quaternion
-	_ekf.getQuaternion().copyTo(odom.q);
+	_output_predictor.getQuaternion().copyTo(odom.q);
 
 	// velocity
 	odom.velocity_frame = vehicle_odometry_s::VELOCITY_FRAME_NED;
-	_ekf.getVelocity().copyTo(odom.velocity);
+	_output_predictor.getVelocity().copyTo(odom.velocity);
 
 	// angular_velocity
 	const Vector3f rates{imu_sample.delta_ang / imu_sample.delta_ang_dt};
@@ -1813,7 +1841,7 @@ void EKF2::PublishStatus(const hrt_abstime &timestamp)
 	estimator_status_s status{};
 	status.timestamp_sample = _ekf.time_delayed_us();
 
-	_ekf.getOutputTrackingError().copyTo(status.output_tracking_error);
+	_output_predictor.getOutputTrackingError().copyTo(status.output_tracking_error);
 
 #if defined(CONFIG_EKF2_GNSS)
 	// only report enabled GPS check failures (the param indexes are shifted by 1 bit, because they don't include

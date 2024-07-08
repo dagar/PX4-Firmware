@@ -31,6 +31,7 @@
 #
 #############################################################################
 
+add_subdirectory(output_predictor)
 add_subdirectory(Utility)
 
 option(EKF2_SYMFORCE_GEN "ekf2 generate symforce output" OFF)

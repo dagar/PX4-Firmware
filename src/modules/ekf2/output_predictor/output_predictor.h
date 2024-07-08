@@ -36,7 +36,7 @@
 
 #include <matrix/math.hpp>
 
-#include "../RingBuffer.h"
+#include "../EKF/RingBuffer.h"
 
 #include <lib/geo/geo.h>
 
@@ -67,7 +67,8 @@ public:
 				   const matrix::Vector3f &delta_velocity, const float delta_velocity_dt);
 
 	void correctOutputStates(const uint64_t time_delayed_us,
-				 const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state, const matrix::Vector3f &pos_state, const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias);
+				 const matrix::Quatf &quat_state, const matrix::Vector3f &vel_state, const matrix::Vector3f &pos_state,
+				 const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias);
 
 	void resetQuaternion(const matrix::Quatf &quat_change);
 

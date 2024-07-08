@@ -85,9 +85,6 @@ void EstimatorInterface::setIMUData(const imuSample &imu_sample)
 
 	_time_latest_us = imu_sample.time_us;
 
-	// the output observer always runs
-	_output_predictor.calculateOutputStates(imu_sample.time_us, imu_sample.delta_ang, imu_sample.delta_ang_dt, imu_sample.delta_vel, imu_sample.delta_vel_dt);
-
 	// accumulate and down-sample imu data and push to the buffer when new downsampled data becomes available
 	if (_imu_down_sampler.update(imu_sample)) {
 
@@ -532,7 +529,7 @@ bool EstimatorInterface::initialise_interface(uint64_t timestamp)
 
 	ECL_DEBUG("EKF max time delay %.1f ms, OBS length %d\n", (double)ekf_delay_ms, _obs_buffer_length);
 
-	if (!_imu_buffer.allocate(_imu_buffer_length) || !_output_predictor.allocate(_imu_buffer_length)) {
+	if (!_imu_buffer.allocate(_imu_buffer_length)) {
 
 		printBufferAllocationFailed("IMU and output");
 		return false;

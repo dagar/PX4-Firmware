@@ -103,8 +103,6 @@ void Ekf::resetHorizontalPositionTo(const Vector2f &new_horz_pos, const Vector2f
 		P.uncorrelateCovarianceSetVariance<1>(State::pos.idx + 1, math::max(sq(0.01f), new_horz_pos_var(1)));
 	}
 
-	_output_predictor.resetHorizontalPositionTo(delta_horz_pos);
-
 	// record the state change
 	if (_state_reset_status.reset_count.posNE == _state_reset_count_prev.posNE) {
 		_state_reset_status.posNE_change = delta_horz_pos;
@@ -136,10 +134,6 @@ void Ekf::resetVerticalPositionTo(const float new_vert_pos, float new_vert_pos_v
 	}
 
 	const float delta_z = new_vert_pos - old_vert_pos;
-
-	// apply the change in height / height rate to our newest height / height rate estimate
-	// which have already been taken out from the output buffer
-	_output_predictor.resetVerticalPositionTo(new_vert_pos, delta_z);
 
 	// record the state change
 	if (_state_reset_status.reset_count.posD == _state_reset_count_prev.posD) {

@@ -100,8 +100,6 @@ void Ekf::reset()
 #endif // CONFIG_EKF2_GNSS
 	_gps_alt_ref = NAN;
 
-	_output_predictor.reset();
-
 	// Ekf private fields
 	_time_last_horizontal_aiding = 0;
 	_time_last_v_pos_aiding = 0;
@@ -168,8 +166,6 @@ bool Ekf::update()
 		// control fusion of observation data
 		controlFusionModes(imu_sample_delayed);
 
-		_output_predictor.correctOutputStates(imu_sample_delayed.time_us, _state.quat_nominal, _state.vel, _state.pos, _state.gyro_bias, _state.accel_bias);
-
 		return true;
 	}
 
@@ -202,9 +198,6 @@ bool Ekf::initialiseFilter()
 
 	// initialise the state covariance matrix now we have starting values for all the states
 	initialiseCovariance();
-
-	// reset the output predictor state history to match the EKF initial values
-	_output_predictor.alignOutputFilter(_state.quat_nominal, _state.vel, _state.pos);
 
 	return true;
 }
@@ -471,6 +464,4 @@ void Ekf::print_status()
 	printRingBuffer("range buffer", _range_buffer);
 #endif // CONFIG_EKF2_RANGE_FINDER
 
-
-	_output_predictor.print_status();
 }

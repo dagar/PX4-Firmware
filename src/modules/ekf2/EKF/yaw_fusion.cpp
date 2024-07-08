@@ -141,9 +141,6 @@ void Ekf::resetQuatStateYaw(float yaw, float yaw_variance)
 	// update quaternion states
 	_state.quat_nominal = quat_after_reset;
 
-	// add the reset amount to the output observer buffered data
-	_output_predictor.resetQuaternion(q_error);
-
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 	// update EV attitude error filter
 	if (_ev_q_error_initialized) {

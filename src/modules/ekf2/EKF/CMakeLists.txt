@@ -32,7 +32,6 @@
 ############################################################################
 
 add_subdirectory(bias_estimator)
-add_subdirectory(output_predictor)
 
 set(EKF_LIBS)
 set(EKF_SRCS)
@@ -150,7 +149,6 @@ target_link_libraries(ecl_EKF
 	PRIVATE
 		bias_estimator
 		geo
-		output_predictor
 		world_magnetic_model
 		${EKF_LIBS}
 )

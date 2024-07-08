@@ -64,7 +64,6 @@
 #include "common.h"
 #include "RingBuffer.h"
 #include "imu_down_sampler/imu_down_sampler.hpp"
-#include "output_predictor/output_predictor.h"
 
 #if defined(CONFIG_EKF2_RANGE_FINDER)
 # include "aid_sources/range_finder/range_finder_consistency_check.hpp"
@@ -72,6 +71,7 @@
 #endif // CONFIG_EKF2_RANGE_FINDER
 
 #include <lib/atmosphere/atmosphere.h>
+#include <lib/geo/geo.h>
 #include <matrix/math.hpp>
 #include <mathlib/mathlib.h>
 #include <mathlib/math/filter/AlphaFilter.hpp>
@@ -233,14 +233,6 @@ public:
 	bool isVerticalVelocityAidingActive() const;
 	int getNumberOfActiveVerticalVelocityAidingSources() const;
 
-	const matrix::Quatf &getQuaternion() const { return _output_predictor.getQuaternion(); }
-	float getUnaidedYaw() const { return _output_predictor.getUnaidedYaw(); }
-	Vector3f getVelocity() const { return _output_predictor.getVelocity(); }
-	const Vector3f &getVelocityDerivative() const { return _output_predictor.getVelocityDerivative(); }
-	float getVerticalPositionDerivative() const { return _output_predictor.getVerticalPositionDerivative(); }
-	Vector3f getPosition() const { return _output_predictor.getPosition(); }
-	const Vector3f &getOutputTrackingError() const { return _output_predictor.getOutputTrackingError(); }
-
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	// Get the value of magnetic declination in degrees to be saved for use at the next startup
 	// Returns true when the declination can be saved
@@ -312,8 +304,6 @@ public:
 	const MapProjection &global_origin() const { return _pos_ref; }
 	float getEkfGlobalOriginAltitude() const { return PX4_ISFINITE(_gps_alt_ref) ? _gps_alt_ref : 0.f; }
 
-	OutputPredictor &output_predictor() { return _output_predictor; };
-
 protected:
 
 	EstimatorInterface() = default;
@@ -344,8 +334,6 @@ protected:
 
 	uint64_t _time_delayed_us{0}; // captures the imu sample on the delayed time horizon
 	uint64_t _time_latest_us{0}; // imu sample capturing the newest imu data
-
-	OutputPredictor _output_predictor{};
 
 #if defined(CONFIG_EKF2_AIRSPEED)
 	airspeedSample _airspeed_sample_delayed{};

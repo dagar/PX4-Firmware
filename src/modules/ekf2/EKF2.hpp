@@ -41,6 +41,7 @@
 #ifndef EKF2_HPP
 #define EKF2_HPP
 
+#include "output_predictor/output_predictor.h"
 #include "EKF/ekf.h"
 #include "Utility/PreFlightChecker.hpp"
 
@@ -272,6 +273,8 @@ private:
 	int _instance{0};
 
 	px4::atomic_bool _task_should_exit{false};
+
+	OutputPredictor _output_predictor{};
 
 	// time slip monitoring
 	uint64_t _integrated_time_us = 0;	///< integral of gyro delta time from start (uSec)

@@ -44,8 +44,8 @@ void OutputPredictor::print_status()
 	printf("[output predictor] IMU dt: %.6f, EKF dt: %.6f\n",
 	       (double)_dt_update_states_avg, (double)_dt_correct_states_avg);
 
-	const matrix::Quatf q_att = _output_buffer.get_newest().quat_nominal;
-	const matrix::Eulerf euler = q_att;
+	const Quatf q_att = _output_buffer.get_newest().quat_nominal;
+	const Eulerf euler = q_att;
 
 	printf("[output predictor] orientation: [%.4f, %.4f, %.4f, %.4f] (Euler [%.3f, %.3f, %.3f])\n",
 	       (double)q_att(0), (double)q_att(1), (double)q_att(2), (double)q_att(3),
@@ -261,7 +261,8 @@ void OutputPredictor::calculateOutputStates(const uint64_t time_us, const Vector
 }
 
 void OutputPredictor::correctOutputStates(const uint64_t time_delayed_us,
-		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state, const matrix::Vector3f &gyro_bias, const matrix::Vector3f &accel_bias)
+		const Quatf &quat_state, const Vector3f &vel_state, const Vector3f &pos_state,
+		const Vector3f &gyro_bias, const Vector3f &accel_bias)
 {
 	// calculate an average filter update time
 	if (_time_last_correct_states_us != 0) {
@@ -365,7 +366,8 @@ void OutputPredictor::applyCorrectionToVerticalOutputBuffer(float vert_vel_corre
 		next_state.vert_vel += vert_vel_correction;
 
 		// position is propagated forward using the corrected velocity and a trapezoidal integrator
-		next_state.vert_vel_integ = current_state.vert_vel_integ + (current_state.vert_vel + next_state.vert_vel) * 0.5f * next_state.dt;
+		next_state.vert_vel_integ = current_state.vert_vel_integ
+					    + (current_state.vert_vel + next_state.vert_vel) * 0.5f * next_state.dt;
 
 		// advance the index
 		index = (index + 1) % size;
