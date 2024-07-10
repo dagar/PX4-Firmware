@@ -180,8 +180,10 @@ void Ekf::controlRangeHaglFusion()
 					_information_events.flags.reset_hgt_to_rng = true;
 					resetVerticalPositionTo(-(aid_src.observation - _state.terrain));
 
-					// reset vertical velocity
-					resetVerticalVelocityToZero();
+					// reset vertical velocity if no valid sources available
+					if (!isVerticalVelocityAidingActive()) {
+						resetVerticalVelocityToZero();
+					}
 
 					aid_src.time_last_fuse = _time_delayed_us;
 
