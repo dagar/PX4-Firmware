@@ -273,6 +273,180 @@ void Ekf::predictState(const imuSample &imu_delayed)
 	_height_rate_lpf = _height_rate_lpf * (1.0f - alpha_height_rate_lpf) + _state.vel(2) * alpha_height_rate_lpf;
 }
 
+// #define FULL_JOSEPH_COMPARE
+
+bool Ekf::fuseDirectStateMeasurement(const unsigned state_index, const float R, const float innovation,
+				     const float innovation_variance)
+{
+	if (innovation_variance < R) {
+		// variance calculation is badly conditioned
+		return false;
+	}
+
+	VectorState K;  // Kalman gain vector for any single observation - sequential fusion is used.
+
+	// calculate kalman gain K = PHS, where S = 1/innovation variance
+	for (int row = 0; row < State::size; row++) {
+		K(row) = P(row, state_index) / innovation_variance;
+	}
+
+	clearInhibitedStateKalmanGains(K);
+
+#if defined(FULL_JOSEPH_COMPARE)
+	VectorState H;
+	H(state_index) = 1.f;
+	const auto P_compare = JosephStabilizedCovarianceUpdate(K, H, P, R);
+#endif // FULL_JOSEPH_COMPARE
+
+	// Efficient implementation of the Joseph stabilized covariance update
+	// Based on "G. J. Bierman. Factorization Methods for Discrete Sequential Estimation. Academic Press, Dover Publications, New York, 1977, 2006"
+	// P = (I - K * H) * P * (I - K * H).T   + K * R * K.T
+	//   =      P_temp     * (I - H.T * K.T) + K * R * K.T
+	//   =      P_temp - P_temp * H.T * K.T  + K * R * K.T
+
+	// Step 1: conventional update
+	// Compute P_temp and store it in P to avoid allocating more memory
+	// P is symmetric, so PH == H.T * P.T == H.T * P. Taking the row is faster as matrices are row-major
+	VectorState PH = P.row(state_index);
+
+	for (unsigned i = 0; i < State::size; i++) {
+		for (unsigned j = 0; j < State::size; j++) {
+			P(i, j) -= K(i) * PH(j); // P is now not symmetric if K is not optimal (e.g.: some gains have been zeroed)
+		}
+	}
+
+	// Step 2: stabilized update
+	// P (or "P_temp") is not symmetric so we must take the column
+	PH = P.col(state_index);
+
+	for (unsigned i = 0; i < State::size; i++) {
+		for (unsigned j = 0; j <= i; j++) {
+			P(i, j) = P(i, j) - PH(i) * K(j) + K(i) * R * K(j);
+			P(j, i) = P(i, j);
+		}
+	}
+
+#if defined(FULL_JOSEPH_COMPARE)
+	CompareCovarianceMatrices(P_compare);
+#endif // FULL_JOSEPH_COMPARE
+
+	constrainStateVariances();
+
+	// apply the state corrections
+	fuse(K, innovation);
+	return true;
+}
+
+bool Ekf::fuseMeasurement(const VectorState &H, const float R, const float innovation, const float innovation_variance)
+{
+	if (innovation_variance < R) {
+		// variance calculation is badly conditioned
+		return false;
+	}
+
+	// calculate the Kalman gains
+	// only calculate gains for states we are using
+	VectorState K = P * H / innovation_variance;
+
+	return fuseMeasurement(K, H, R, innovation);
+}
+
+bool Ekf::fuseMeasurement(VectorState &K, const VectorState &H, const float R, const float innovation)
+{
+	clearInhibitedStateKalmanGains(K);
+
+#if defined(FULL_JOSEPH_COMPARE)
+	const auto P_compare = JosephStabilizedCovarianceUpdate(K, H, P, R);
+#endif
+
+	// Efficient implementation of the Joseph stabilized covariance update
+	// Based on "G. J. Bierman. Factorization Methods for Discrete Sequential Estimation. Academic Press, Dover Publications, New York, 1977, 2006"
+	// P = (I - K * H) * P * (I - K * H).T   + K * R * K.T
+	//   =      P_temp     * (I - H.T * K.T) + K * R * K.T
+	//   =      P_temp - P_temp * H.T * K.T  + K * R * K.T
+
+	// Step 1: conventional update
+	// Compute P_temp and store it in P to avoid allocating more memory
+	// P is symmetric, so PH == H.T * P.T == H.T * P. Taking the row is faster as matrices are row-major
+	VectorState PH = P * H; // H is stored as a column vector. H is in fact H.T
+
+	for (unsigned i = 0; i < State::size; i++) {
+		for (unsigned j = 0; j < State::size; j++) {
+			P(i, j) -= K(i) * PH(j); // P is now not symmetrical if K is not optimal (e.g.: some gains have been zeroed)
+		}
+	}
+
+	// Step 2: stabilized update
+	PH = P * H; // H is stored as a column vector. H is in fact H.T
+
+	for (unsigned i = 0; i < State::size; i++) {
+		for (unsigned j = 0; j <= i; j++) {
+			P(i, j) = P(i, j) - PH(i) * K(j) + K(i) * R * K(j);
+			P(j, i) = P(i, j);
+		}
+	}
+
+#if defined(FULL_JOSEPH_COMPARE)
+	CompareCovarianceMatrices(P_compare);
+#endif // FULL_JOSEPH_COMPARE
+
+	constrainStateVariances();
+
+	// apply the state corrections
+	fuse(K, innovation);
+	return true;
+}
+
+Ekf::SquareMatrixState Ekf::JosephStabilizedCovarianceUpdate(const VectorState &K, const VectorState &H,
+		const SquareMatrixState &P_in, const float R) const
+{
+	SquareMatrixState P_ = P_in;
+
+	// Matrix implementation of the Joseph stabilized covariance update
+	// This is extremely expensive to compute. Use for debugging purposes only.
+	const auto A = matrix::eye<float, State::size>() - K.multiplyByTranspose(H);
+	P_ = A * P_;
+	P_ = P_.multiplyByTranspose(A);
+
+	const VectorState KR = K * R;
+	P_ += KR.multiplyByTranspose(K);
+
+	return P_;
+}
+
+bool Ekf::CompareCovarianceMatrices(const SquareMatrixState &P_compare) const
+{
+	// compare covariance matrices and print any differences
+	bool compare_failed = false;
+	const float epsilon = 1e-4f;
+
+	for (unsigned i = 0; i < State::size; i++) {
+		for (unsigned j = 0; j < State::size; j++) {
+			if (fabsf(P(i, j) - P_compare(i, j)) > epsilon) {
+				ECL_WARN("Joseph comparison failed: (%d, %d) %.6f != %.6f", i, j, (double)P(i, j), (double)P_compare(i, j));
+				compare_failed = true;
+			}
+		}
+	}
+
+	if (compare_failed) {
+		// printf("P:\n");
+		// P.print();
+
+		// printf("P (Joseph stabilized covariance update):\n");
+		// P_compare.print();
+
+		printf("P difference:\n");
+		(P - P_compare).print(epsilon);
+
+		assert(false);
+
+		return false;
+	}
+
+	return true;
+}
+
 bool Ekf::resetGlobalPosToExternalObservation(double lat_deg, double lon_deg, float accuracy,
 		uint64_t timestamp_observation)
 {
@@ -301,10 +475,10 @@ bool Ekf::resetGlobalPosToExternalObservation(double lat_deg, double lon_deg, fl
 		pos_corrected += _state.vel.xy() * dt_s;
 	}
 
-	const float obs_var = math::max(sq(accuracy), sq(0.01f));
+	const float R = math::max(sq(accuracy), sq(0.01f));
 
 	const Vector2f innov = Vector2f(_state.pos.xy()) - pos_corrected;
-	const Vector2f innov_var = Vector2f(getStateVariance<State::pos>()) + obs_var;
+	const Vector2f innov_var = Vector2f(getStateVariance<State::pos>()) + R;
 
 	const float sq_gate = sq(5.f); // magic hardcoded gate
 	const Vector2f test_ratio{sq(innov(0)) / (sq_gate * innov_var(0)),
@@ -318,13 +492,13 @@ bool Ekf::resetGlobalPosToExternalObservation(double lat_deg, double lon_deg, fl
 		ECL_INFO("reset position to external observation");
 		_information_events.flags.reset_pos_to_ext_obs = true;
 
-		resetHorizontalPositionTo(pos_corrected, obs_var);
+		resetHorizontalPositionTo(pos_corrected, R);
 		_last_known_pos.xy() = _state.pos.xy();
 		return true;
 
 	} else {
-		if (fuseDirectStateMeasurement(innov(0), innov_var(0), obs_var, State::pos.idx + 0)
-		    && fuseDirectStateMeasurement(innov(1), innov_var(1), obs_var, State::pos.idx + 1)
+		if (fuseDirectStateMeasurement(State::pos.idx + 0, R, innov(0), innov_var(0))
+		    && fuseDirectStateMeasurement(State::pos.idx + 1, R, innov(1), innov_var(1))
 		   ) {
 			ECL_INFO("fused external observation as position measurement");
 			_time_last_hor_pos_fuse = _time_delayed_us;
