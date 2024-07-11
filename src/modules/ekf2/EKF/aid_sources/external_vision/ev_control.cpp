@@ -43,6 +43,11 @@ void Ekf::controlExternalVisionFusion()
 	_ev_pos_b_est.predict(_dt_ekf_avg);
 	_ev_hgt_b_est.predict(_dt_ekf_avg);
 
+	// reset ev_q_error_filt
+	if (_state_reset_status.reset_count.quat != _state_reset_count_prev.quat) {
+		_ev_q_error_initialized = false;
+	}
+
 	// Check for new external vision data
 	extVisionSample ev_sample;
 

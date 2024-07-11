@@ -229,12 +229,15 @@ TEST_F(EkfExternalVisionTest, visionVarianceCheck)
 TEST_F(EkfExternalVisionTest, visionAlignment)
 {
 	_sensor_simulator.runSeconds(_tilt_align_time);
-	// GIVEN: Drone is pointing north, and we use mag (ROTATE_EV)
+	// GIVEN: Drone is pointing north, and we use mag
 	//        Heading of drone in EKF frame is 0°
 
 	// WHEN: Vision frame is rotate +90°. The reported heading is -90°
 	Quatf externalVisionFrameOffset(Eulerf(0.0f, 0.0f, math::radians(90.0f)));
 	_sensor_simulator._vio.setOrientation(externalVisionFrameOffset.inversed());
+
+	// setVelocityFrameToBody()
+	//_sensor_simulator._vio
 
 	// Simulate high uncertainty on vision x axis which is in this case
 	// the y EKF frame axis
@@ -249,7 +252,8 @@ TEST_F(EkfExternalVisionTest, visionAlignment)
 
 	// THEN: velocity uncertainty in y should be bigger
 	const Vector3f velVar_new = _ekf->getVelocityVariance();
-	EXPECT_TRUE(velVar_new(1) > velVar_new(0));
+
+	EXPECT_GT(velVar_new(1), velVar_new(0));
 
 	// THEN: the frame offset should be estimated correctly
 	// Quatf estimatedExternalVisionFrameOffset = _ekf->getVisionAlignmentQuaternion();

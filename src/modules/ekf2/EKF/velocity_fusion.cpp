@@ -33,6 +33,29 @@
 
 #include "ekf.h"
 
+#include <ekf_derivation/generated/compute_body_vel_xyz_innov_var.h>
+#include <ekf_derivation/generated/compute_body_vel_hx.h>
+#include <ekf_derivation/generated/compute_body_vel_hy.h>
+#include <ekf_derivation/generated/compute_body_vel_hz.h>
+
+void Ekf::updateBodyVelocityAidStatus(estimator_aid_source3d_s &aid_src, const uint64_t &time_us,
+				      const Vector3f &measurement, const Vector3f &measurement_variance, const float innovation_gate) const
+{
+	const Vector3f innovation = (_R_to_earth.transpose() * _state.vel) - measurement;
+
+	Vector3f innovation_variance;
+	sym::ComputeBodyVelXyzInnovVar(_state.vector(), P, measurement_variance,
+				       &innovation_variance);
+
+	updateAidSourceStatus(aid_src,
+			      time_us,              // sample timestamp
+			      measurement,          // measurement
+			      measurement_variance, // measurement variance
+			      innovation,           // innovation
+			      innovation_variance,  // innovation variance
+			      innovation_gate);     // innovation gate
+}
+
 bool Ekf::fuseHorizontalVelocity(estimator_aid_source2d_s &aid_src)
 {
 	// vx, vy
@@ -73,6 +96,63 @@ bool Ekf::fuseVelocity(estimator_aid_source3d_s &aid_src)
 
 	} else {
 		aid_src.fused = false;
+	}
+
+	return aid_src.fused;
+}
+
+bool Ekf::fuseBodyVelocity(estimator_aid_source3d_s &aid_src)
+{
+	if (aid_src.innovation_rejected) {
+		aid_src.fused = false;
+		return false;
+	}
+
+	bool fused[3] {false, false, false};
+	const auto state_vector = _state.vector();
+
+	for (uint8_t index = 0; index <= 2; index++) {
+		VectorState H;
+
+		if (index == 0) {
+			sym::ComputeBodyVelHx(state_vector, &H);
+
+		} else if (index == 1) {
+			sym::ComputeBodyVelHy(state_vector, &H);
+
+			// recalculate innovation using the updated state
+			aid_src.innovation[1] = (_R_to_earth.transpose() * _state.vel - Vector3f(aid_src.observation))(1, 0);
+
+			// recalculate innovation variance because state covariances have changed due to previous fusion (linearise using the same initial state for all axes)
+			aid_src.innovation_variance[1] = (H.T() * P * H)(0, 0) + aid_src.observation_variance[1];
+
+		} else if (index == 2) {
+			sym::ComputeBodyVelHz(state_vector, &H);
+
+			// recalculate innovation using the updated state
+			aid_src.innovation[2] = (_R_to_earth.transpose() * _state.vel - Vector3f(aid_src.observation))(2, 0);
+
+			// recalculate innovation variance because state covariances have changed due to previous fusion (linearise using the same initial state for all axes)
+			aid_src.innovation_variance[2] = (H.T() * P * H)(0, 0) + aid_src.observation_variance[2];
+		}
+
+		if (aid_src.innovation_variance[index] < aid_src.observation_variance[index]) {
+			ECL_ERR("body velocity numerical error covariance reset");
+			resetQuatCov();
+			P.uncorrelateCovarianceSetVariance<State::vel.dof>(State::vel.idx, Vector3f(aid_src.observation_variance));
+			return false;
+		}
+
+		VectorState Kfusion = P * H / aid_src.innovation_variance[index];
+		fused[index] = measurementUpdate(Kfusion, H, aid_src.observation_variance[index], aid_src.innovation[index]);
+	}
+
+	if (fused[0] && fused[1] && fused[2]) {
+		aid_src.fused = true;
+		aid_src.time_last_fuse = _time_delayed_us;
+
+		_time_last_hor_vel_fuse = _time_delayed_us;
+		_time_last_ver_vel_fuse = _time_delayed_us;
 	}
 
 	return aid_src.fused;
@@ -155,4 +235,15 @@ void Ekf::resetVelocityTo(const Vector3f &new_vel, const Vector3f &new_vel_var)
 {
 	resetHorizontalVelocityTo(Vector2f(new_vel), Vector2f(new_vel_var(0), new_vel_var(1)));
 	resetVerticalVelocityTo(new_vel(2), new_vel_var(2));
+}
+
+void Ekf::resetBodyVelocityTo(const Vector3f &new_vel, const Vector3f &new_vel_var)
+{
+	// rotate body velocity into EKF frame
+	const Vector3f velocity = _R_to_earth * new_vel;
+
+	const matrix::SquareMatrix<float, 3> R_cov = _R_to_earth * matrix::diag(new_vel_var) * _R_to_earth.transpose();
+	const Vector3f velocity_var = R_cov.diag();
+
+	resetVelocityTo(velocity, velocity_var);
 }

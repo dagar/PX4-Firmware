@@ -790,6 +790,7 @@ private:
 #endif // CONFIG_EKF2_DRAG_FUSION
 
 	void resetVelocityTo(const Vector3f &vel, const Vector3f &new_vel_var);
+	void resetBodyVelocityTo(const Vector3f &new_vel, const Vector3f &new_vel_var);
 
 	void resetHorizontalVelocityTo(const Vector2f &new_horz_vel, const Vector2f &new_horz_vel_var);
 	void resetHorizontalVelocityTo(const Vector2f &new_horz_vel, float vel_var) { resetHorizontalVelocityTo(new_horz_vel, Vector2f(vel_var, vel_var)); }
@@ -817,6 +818,9 @@ private:
 	// horizontal and vertical position fusion
 	bool fuseHorizontalPosition(estimator_aid_source2d_s &pos_aid_src);
 	bool fuseVerticalPosition(estimator_aid_source1d_s &hgt_aid_src);
+
+	void updateBodyVelocityAidStatus(estimator_aid_source3d_s &aid_src, const uint64_t &time_us,
+					 const Vector3f &measurement, const Vector3f &measurement_variance, const float innovation_gate = 1.f) const;
 
 	// 2d & 3d velocity fusion
 	bool fuseHorizontalVelocity(estimator_aid_source2d_s &vel_aid_src);
@@ -942,12 +946,21 @@ private:
 				   const bool ev_reset, const bool quality_sufficient, estimator_aid_source1d_s &aid_src);
 	void controlEvPosFusion(const extVisionSample &ev_sample, const bool common_starting_conditions_passing,
 				const bool ev_reset, const bool quality_sufficient, estimator_aid_source2d_s &aid_src);
+
 	void controlEvVelFusion(const extVisionSample &ev_sample, const bool common_starting_conditions_passing,
 				const bool ev_reset, const bool quality_sufficient, estimator_aid_source3d_s &aid_src);
+	void controlEvVelBodyFusion(const uint64_t &timestamp_sample, const Vector3f &measurement,
+				    const Vector3f measurement_var,
+				    const bool common_starting_conditions_passing, const bool ev_reset, const bool quality_sufficient,
+				    estimator_aid_source3d_s &aid_src);
+	void controlEvVelWorldFusion(const uint64_t &timestamp_sample, const Vector3f &measurement,
+				     const Vector3f measurement_var,
+				     const bool common_starting_conditions_passing, const bool ev_reset, const bool quality_sufficient,
+				     estimator_aid_source3d_s &aid_src);
+
 	void controlEvYawFusion(const extVisionSample &ev_sample, const bool common_starting_conditions_passing,
 				const bool ev_reset, const bool quality_sufficient, estimator_aid_source1d_s &aid_src);
 	void resetVelocityToEV(const Vector3f &measurement, const Vector3f &measurement_var, const VelocityFrame &vel_frame);
-	Vector3f rotateVarianceToEkf(const Vector3f &measurement_var);
 
 	void startEvPosFusion(const Vector2f &measurement, const Vector2f &measurement_var, estimator_aid_source2d_s &aid_src);
 	void updateEvPosFusion(const Vector2f &measurement, const Vector2f &measurement_var, bool quality_sufficient,
@@ -956,12 +969,8 @@ private:
 	void stopEvHgtFusion();
 	void stopEvVelFusion();
 	void stopEvYawFusion();
-	bool fuseEvVelocity(estimator_aid_source3d_s &aid_src, const extVisionSample &ev_sample);
-	void fuseBodyVelocity(estimator_aid_source1d_s &aid_src, float &innov_var, VectorState &H)
-	{
-		VectorState Kfusion = P * H / innov_var;
-		aid_src.fused = measurementUpdate(Kfusion, H, aid_src.observation_variance, aid_src.innovation);
-	}
+	bool fuseBodyVelocity(estimator_aid_source3d_s &aid_src);
+
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 
 #if defined(CONFIG_EKF2_GNSS)

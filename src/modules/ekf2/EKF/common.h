@@ -221,17 +221,17 @@ struct flowSample {
 
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 struct extVisionSample {
-	uint64_t    time_us{};     ///< timestamp of the measurement (uSec)
-	Vector3f    pos{};         ///< XYZ position in external vision's local reference frame (m) - Z must be aligned with down axis
-	Vector3f    vel{};         ///< FRD velocity in reference frame defined in vel_frame variable (m/sec) - Z must be aligned with down axis
-	Quatf       quat{};        ///< quaternion defining rotation from body to earth frame
+	uint64_t    time_us{};         ///< timestamp of the measurement (uSec)
+	Vector3f    pos{};             ///< XYZ position in external vision's local reference frame (m) - Z must be aligned with down axis
+	Vector3f    vel{};             ///< velocity in reference frame defined in vel_frame variable (m/sec)
+	Quatf       quat{};            ///< quaternion defining rotation from world to body frame
 	Vector3f    position_var{};    ///< XYZ position variances (m**2)
 	Vector3f    velocity_var{};    ///< XYZ velocity variances ((m/sec)**2)
 	Vector3f    orientation_var{}; ///< orientation variance (rad**2)
 	PositionFrame pos_frame = PositionFrame::LOCAL_FRAME_FRD;
 	VelocityFrame vel_frame = VelocityFrame::BODY_FRAME_FRD;
 	uint8_t     reset_counter{};
-	int8_t     quality{};     ///< quality indicator between 0 and 100
+	int8_t      quality{};         ///< quality indicator between 0 and 100
 };
 #endif // CONFIG_EKF2_EXTERNAL_VISION
 
