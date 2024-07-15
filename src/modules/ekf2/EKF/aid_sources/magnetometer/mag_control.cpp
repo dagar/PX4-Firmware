@@ -39,7 +39,7 @@
 #include "ekf.h"
 #include <mathlib/mathlib.h>
 
-#include <ekf_derivation/generated/compute_mag_innov_innov_var_and_hx.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_innov_innov_var_and_hx.h>
 
 void Ekf::controlMagFusion(const imuSample &imu_sample)
 {

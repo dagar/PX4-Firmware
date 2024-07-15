@@ -37,9 +37,9 @@
  */
 
 #include "ekf.h"
-#include <ekf_derivation/generated/compute_ev_body_vel_hx.h>
-#include <ekf_derivation/generated/compute_ev_body_vel_hy.h>
-#include <ekf_derivation/generated/compute_ev_body_vel_hz.h>
+#include <extended_kalman_filter/derivation/generated/compute_ev_body_vel_hx.h>
+#include <extended_kalman_filter/derivation/generated/compute_ev_body_vel_hy.h>
+#include <extended_kalman_filter/derivation/generated/compute_ev_body_vel_hz.h>
 
 void Ekf::controlEvVelFusion(const imuSample &imu_sample, const extVisionSample &ev_sample,
 			     const bool common_starting_conditions_passing, const bool ev_reset, const bool quality_sufficient,

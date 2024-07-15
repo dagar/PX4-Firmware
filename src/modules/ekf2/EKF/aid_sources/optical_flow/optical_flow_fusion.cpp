@@ -39,8 +39,8 @@
 
 #include <mathlib/mathlib.h>
 #include <float.h>
-#include <ekf_derivation/generated/compute_flow_xy_innov_var_and_hx.h>
-#include <ekf_derivation/generated/compute_flow_y_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_flow_xy_innov_var_and_hx.h>
+#include <extended_kalman_filter/derivation/generated/compute_flow_y_innov_var_and_h.h>
 
 bool Ekf::fuseOptFlow(VectorState &H, const bool update_terrain)
 {

@@ -43,10 +43,10 @@
 
 #include "ekf.h"
 
-#include <ekf_derivation/generated/compute_mag_y_innov_var_and_h.h>
-#include <ekf_derivation/generated/compute_mag_z_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_y_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_z_innov_var_and_h.h>
 
-#include <ekf_derivation/generated/compute_mag_declination_pred_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_mag_declination_pred_innov_var_and_h.h>
 
 #include <mathlib/mathlib.h>
 

@@ -42,8 +42,8 @@
  */
 
 #include "ekf.h"
-#include <ekf_derivation/generated/compute_sideslip_innov_and_innov_var.h>
-#include <ekf_derivation/generated/compute_sideslip_h_and_k.h>
+#include <extended_kalman_filter/derivation/generated/compute_sideslip_innov_and_innov_var.h>
+#include <extended_kalman_filter/derivation/generated/compute_sideslip_h_and_k.h>
 
 #include <mathlib/mathlib.h>
 

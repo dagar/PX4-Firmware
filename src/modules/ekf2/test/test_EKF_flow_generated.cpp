@@ -36,8 +36,8 @@
 #include "EKF/ekf.h"
 #include "test_helper/comparison_helper.h"
 
-#include "../EKF/python/ekf_derivation/generated/compute_flow_xy_innov_var_and_hx.h"
-#include "../EKF/python/ekf_derivation/generated/compute_flow_y_innov_var_and_h.h"
+#include "../EKF/extended_kalman_filter/derivation/generated/compute_flow_xy_innov_var_and_hx.h"
+#include "../EKF/extended_kalman_filter/derivation/generated/compute_flow_y_innov_var_and_h.h"
 
 using namespace matrix;
 

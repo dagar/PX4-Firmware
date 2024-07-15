@@ -53,8 +53,6 @@
 #include "bias_estimator/height_bias_estimator.hpp"
 #include "bias_estimator/position_bias_estimator.hpp"
 
-#include <ekf_derivation/generated/state.h>
-
 #include <uORB/topics/estimator_aid_source1d.h>
 #include <uORB/topics/estimator_aid_source2d.h>
 #include <uORB/topics/estimator_aid_source3d.h>
@@ -530,6 +528,8 @@ public:
 	friend class AuxGlobalPosition;
 
 private:
+
+	ExtendedKalmanFilter _extended_kalman_filter{};
 
 	// set the internal states and status to their default value
 	void reset();

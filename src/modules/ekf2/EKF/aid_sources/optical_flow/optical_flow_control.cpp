@@ -38,7 +38,7 @@
 
 #include "ekf.h"
 
-#include <ekf_derivation/generated/compute_flow_xy_innov_var_and_hx.h>
+#include <extended_kalman_filter/derivation/generated/compute_flow_xy_innov_var_and_hx.h>
 
 void Ekf::controlOpticalFlowFusion(const imuSample &imu_delayed)
 {

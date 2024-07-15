@@ -37,7 +37,8 @@
  */
 
 #include "ekf.h"
-#include "ekf_derivation/generated/compute_hagl_innov_var.h"
+
+#include <extended_kalman_filter/derivation/generated/compute_hagl_innov_var.h>
 
 void Ekf::controlRangeHaglFusion(const imuSample &imu_sample)
 {

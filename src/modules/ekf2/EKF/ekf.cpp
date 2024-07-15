@@ -163,6 +163,10 @@ bool Ekf::update()
 		predictCovariance(imu_sample_delayed);
 		predictState(imu_sample_delayed);
 
+		_extended_kalman_filter.update(imu_sample_delayed.time_us,
+					       imu_sample_delayed.delta_ang, imu_sample_delayed.delta_ang_dt,
+					       imu_sample_delayed.delta_vel, imu_sample_delayed.delta_vel_dt);
+
 		// control fusion of observation data
 		controlFusionModes(imu_sample_delayed);
 
@@ -218,6 +222,8 @@ bool Ekf::initialiseTilt()
 	    gyro_norm > math::radians(15.0f)) {
 		return false;
 	}
+
+	// _extended_kalman_filter.initializeTilt(_accel_lpf.getState());
 
 	// get initial tilt estimate from delta velocity vector, assuming vehicle is static
 	_state.quat_nominal = Quatf(_accel_lpf.getState(), Vector3f(0.f, 0.f, -1.f));

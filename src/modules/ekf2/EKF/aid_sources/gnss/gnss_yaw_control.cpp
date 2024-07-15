@@ -43,7 +43,7 @@
 #include <mathlib/mathlib.h>
 #include <cstdlib>
 
-#include <ekf_derivation/generated/compute_gnss_yaw_pred_innov_var_and_h.h>
+#include <extended_kalman_filter/derivation/generated/compute_gnss_yaw_pred_innov_var_and_h.h>
 
 void Ekf::controlGnssYawFusion(const gnssSample &gnss_sample)
 {

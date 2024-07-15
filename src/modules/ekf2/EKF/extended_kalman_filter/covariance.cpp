@@ -1,96 +1,25 @@
-/****************************************************************************
- *
- *   Copyright (c) 2015-2023 PX4 Development Team. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- ****************************************************************************/
+#include "ExtendedKalmanFilter.hpp"
 
-/**
- * @file covariance.cpp
- * Contains functions for initialising, predicting and updating the state
- * covariance matrix
- * equations generated using EKF/python/ekf_derivation/main.py
- *
- * @author Roman Bast <bastroman@gmail.com>
- *
- */
+#include "derivation/generated/predict_covariance.h"
 
-#include "ekf.h"
+using matrix::AxisAnglef;
+using matrix::Dcmf;
+using matrix::Quatf;
+using matrix::Vector3f;
 
-#include <math.h>
-#include <mathlib/mathlib.h>
-
-#include <extended_kalman_filter/derivation/generated/predict_covariance.h>
-
-// Sets initial values for the covariance matrix
-// Do not call before quaternion states have been initialised
-void Ekf::initialiseCovariance()
+void ExtendedKalmanFilter::initialiseCovariance()
 {
 	P.zero();
 
-	resetQuatCov(0.f); // Start with no initial uncertainty to improve fine leveling through zero vel/pos fusion
+	// Start with no initial uncertainty to improve fine leveling through zero vel/pos fusion
+	resetQuatCov(0.f);
 
 	// velocity
-#if defined(CONFIG_EKF2_GNSS)
-	const float vel_var = sq(fmaxf(_params.gps_vel_noise, 0.01f));
-#else
 	const float vel_var = sq(0.5f);
-#endif
-	P.uncorrelateCovarianceSetVariance<State::vel.dof>(State::vel.idx, Vector3f(vel_var, vel_var, sq(1.5f) * vel_var));
+	P.uncorrelateCovarianceSetVariance<State::vel.dof>(State::vel.idx, Vector3f(vel_var, vel_var, vel_var));
 
 	// position
-#if defined(CONFIG_EKF2_BAROMETER)
-	float z_pos_var = sq(fmaxf(_params.baro_noise, 0.01f));
-#else
-	float z_pos_var = sq(1.f);
-#endif // CONFIG_EKF2_BAROMETER
-
-#if defined(CONFIG_EKF2_GNSS)
-	const float xy_pos_var = sq(fmaxf(_params.gps_pos_noise, 0.01f));
-
-	if (_control_status.flags.gps_hgt) {
-		z_pos_var = sq(fmaxf(1.5f * _params.gps_pos_noise, 0.01f));
-	}
-
-#else
-	const float xy_pos_var = sq(fmaxf(_params.pos_noaid_noise, 0.01f));
-#endif
-
-#if defined(CONFIG_EKF2_RANGE_FINDER)
-
-	if (_control_status.flags.rng_hgt) {
-		z_pos_var = sq(fmaxf(_params.range_noise, 0.01f));
-	}
-
-#endif // CONFIG_EKF2_RANGE_FINDER
-
-	P.uncorrelateCovarianceSetVariance<State::pos.dof>(State::pos.idx, Vector3f(xy_pos_var, xy_pos_var, z_pos_var));
+	P.uncorrelateCovarianceSetVariance<State::pos.dof>(State::pos.idx, Vector3f(10.f, 10.f, 1.f));
 
 	resetGyroBiasCov();
 
@@ -110,10 +39,12 @@ void Ekf::initialiseCovariance()
 #endif // CONFIG_EKF2_TERRAIN
 }
 
-void Ekf::predictCovariance(const imuSample &imu_delayed)
+void ExtendedKalmanFilter::predictCovariance(const uint64_t time_us,
+		const matrix::Vector3f &delta_angle, const float delta_angle_dt,
+		const matrix::Vector3f &delta_velocity, const float delta_velocity_dt)
 {
 	// predict the covariance
-	const float dt = 0.5f * (imu_delayed.delta_vel_dt + imu_delayed.delta_ang_dt);
+	const float dt = 0.5f * (delta_velocity_dt + delta_angle_dt);
 
 	// gyro noise variance
 	float gyro_noise = math::constrain(_params.gyro_noise, 0.f, 1.f);
@@ -121,22 +52,22 @@ void Ekf::predictCovariance(const imuSample &imu_delayed)
 
 	// accel noise variance
 	float accel_noise = math::constrain(_params.accel_noise, 0.f, 1.f);
-	Vector3f accel_var;
+	Vector3f accel_var{sq(accel_noise), sq(accel_noise), sq(accel_noise)};
 
-	for (unsigned i = 0; i < 3; i++) {
-		if (_fault_status.flags.bad_acc_vertical || imu_delayed.delta_vel_clipping[i]) {
-			// Increase accelerometer process noise if bad accel data is detected
-			accel_var(i) = sq(BADACC_BIAS_PNOISE);
+	// for (unsigned i = 0; i < 3; i++) {
+	// 	if (_fault_status.flags.bad_acc_vertical || imu_sample.delta_vel_clipping[i]) {
+	// 		// Increase accelerometer process noise if bad accel data is detected
+	// 		accel_var(i) = sq(BADACC_BIAS_PNOISE);
 
-		} else {
-			accel_var(i) = sq(accel_noise);
-		}
-	}
+	// 	} else {
+	// 		accel_var(i) = sq(accel_noise);
+	// 	}
+	// }
 
 	// calculate variances and upper diagonal covariances for quaternion, velocity, position and gyro bias states
 	P = sym::PredictCovariance(_state.vector(), P,
-				   imu_delayed.delta_vel / imu_delayed.delta_vel_dt, accel_var,
-				   imu_delayed.delta_ang / imu_delayed.delta_ang_dt, gyro_var,
+				   delta_velocity / delta_velocity_dt, accel_var,
+				   delta_angle / delta_angle_dt, gyro_var,
 				   dt);
 
 	// Construct the process noise variance diagonal for those states with a stationary process model
@@ -201,7 +132,7 @@ void Ekf::predictCovariance(const imuSample &imu_delayed)
 
 #if defined(CONFIG_EKF2_WIND)
 
-	if (_control_status.flags.wind) {
+	if (_wind_enabled) {
 		// wind vel: add process noise
 		float wind_vel_nsd_scaled = math::constrain(_params.wind_vel_nsd, 0.f,
 					    1.f) * (1.f + _params.wind_vel_nsd_scaler * fabsf(_height_rate_lpf));
@@ -217,14 +148,13 @@ void Ekf::predictCovariance(const imuSample &imu_delayed)
 
 #if defined(CONFIG_EKF2_TERRAIN)
 
-	if (_height_sensor_ref != HeightSensor::RANGE) {
+	if (_terrain_enabled) {
 		// predict the state variance growth where the state is the vertical position of the terrain underneath the vehicle
 		// process noise due to errors in vehicle height estimate
-		float terrain_process_noise = sq(imu_delayed.delta_vel_dt * _params.terrain_p_noise);
+		float terrain_process_noise = sq(delta_velocity_dt * _params.terrain_p_noise);
 
 		// process noise due to terrain gradient
-		terrain_process_noise += sq(imu_delayed.delta_vel_dt * _params.terrain_gradient) * (sq(_state.vel(0)) + sq(_state.vel(
-						 1)));
+		terrain_process_noise += sq(delta_velocity_dt * _params.terrain_gradient) * (sq(_state.vel(0)) + sq(_state.vel(1)));
 		P(State::terrain.idx, State::terrain.idx) += terrain_process_noise;
 	}
 
@@ -240,7 +170,7 @@ void Ekf::predictCovariance(const imuSample &imu_delayed)
 	constrainStateVariances();
 }
 
-void Ekf::constrainStateVariances()
+void ExtendedKalmanFilter::constrainStateVariances()
 {
 	// NOTE: This limiting is a last resort and should not be relied on
 	// TODO: Split covariance prediction into separate F*P*transpose(F) and Q contributions
@@ -254,36 +184,43 @@ void Ekf::constrainStateVariances()
 	constrainStateVarLimitRatio(State::gyro_bias, kGyroBiasVarianceMin, 1.f);
 	constrainStateVarLimitRatio(State::accel_bias, kAccelBiasVarianceMin, 1.f);
 
+
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 
-	if (_control_status.flags.mag) {
+	if (_mag_enabled) {
 		constrainStateVarLimitRatio(State::mag_I, kMagVarianceMin, 1.f);
 		constrainStateVarLimitRatio(State::mag_B, kMagVarianceMin, 1.f);
 	}
 
 #endif // CONFIG_EKF2_MAGNETOMETER
 
+
 #if defined(CONFIG_EKF2_WIND)
 
-	if (_control_status.flags.wind) {
+	if (_wind_enabled) {
 		constrainStateVarLimitRatio(State::wind_vel, 1e-6f, 1e6f);
 	}
 
 #endif // CONFIG_EKF2_WIND
 
+
 #if defined(CONFIG_EKF2_TERRAIN)
-	constrainStateVarLimitRatio(State::terrain, 0.f, 1e4f);
+
+	if (_terrain_enabled) {
+		constrainStateVarLimitRatio(State::terrain, 0.f, 1e4f);
+	}
+
 #endif // CONFIG_EKF2_TERRAIN
 }
 
-void Ekf::constrainStateVar(const IdxDof &state, float min, float max)
+void ExtendedKalmanFilter::constrainStateVar(const IdxDof &state, float min, float max)
 {
 	for (unsigned i = state.idx; i < (state.idx + state.dof); i++) {
 		P(i, i) = math::constrain(P(i, i), min, max);
 	}
 }
 
-void Ekf::constrainStateVarLimitRatio(const IdxDof &state, float min, float max, float max_ratio)
+void ExtendedKalmanFilter::constrainStateVarLimitRatio(const IdxDof &state, float min, float max, float max_ratio)
 {
 	// the ratio of a max and min variance must not exceed max_ratio
 	float state_var_max = 0.f;
@@ -302,7 +239,7 @@ void Ekf::constrainStateVarLimitRatio(const IdxDof &state, float min, float max,
 	}
 }
 
-void Ekf::resetQuatCov(const float yaw_noise)
+void ExtendedKalmanFilter::resetQuatCov(const float yaw_noise)
 {
 	const float tilt_var = sq(math::max(_params.initial_tilt_err, 0.01f));
 	float yaw_var = sq(0.01f);
@@ -316,24 +253,24 @@ void Ekf::resetQuatCov(const float yaw_noise)
 	resetQuatCov(Vector3f(tilt_var, tilt_var, yaw_var));
 }
 
-void Ekf::resetQuatCov(const Vector3f &rot_var_ned)
+void ExtendedKalmanFilter::resetQuatCov(const Vector3f &rot_var_ned)
 {
 	P.uncorrelateCovarianceSetVariance<State::quat_nominal.dof>(State::quat_nominal.idx, rot_var_ned);
 }
 
-void Ekf::resetGyroBiasCov()
+void ExtendedKalmanFilter::resetGyroBiasCov()
 {
 	// Zero the corresponding covariances and set
 	// variances to the values use for initial alignment
 	P.uncorrelateCovarianceSetVariance<State::gyro_bias.dof>(State::gyro_bias.idx, sq(_params.switch_on_gyro_bias));
 }
 
-void Ekf::resetGyroBiasZCov()
+void ExtendedKalmanFilter::resetGyroBiasZCov()
 {
 	P.uncorrelateCovarianceSetVariance<1>(State::gyro_bias.idx + 2, sq(_params.switch_on_gyro_bias));
 }
 
-void Ekf::resetAccelBiasCov()
+void ExtendedKalmanFilter::resetAccelBiasCov()
 {
 	// Zero the corresponding covariances and set
 	// variances to the values use for initial alignment
@@ -341,9 +278,9 @@ void Ekf::resetAccelBiasCov()
 }
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
-void Ekf::resetMagCov()
+void ExtendedKalmanFilter::resetMagCov()
 {
-	ECL_INFO("reset mag covariance");
+	//ECL_INFO("reset mag covariance");
 
 	P.uncorrelateCovarianceSetVariance<State::mag_I.dof>(State::mag_I.idx, sq(_params.mag_noise));
 	P.uncorrelateCovarianceSetVariance<State::mag_B.dof>(State::mag_B.idx, sq(_params.mag_noise));
@@ -351,7 +288,7 @@ void Ekf::resetMagCov()
 #endif // CONFIG_EKF2_MAGNETOMETER
 
 #if defined(CONFIG_EKF2_WIND)
-void Ekf::resetWindCov()
+void ExtendedKalmanFilter::resetWindCov()
 {
 	// start with a small initial uncertainty to improve the initial estimate
 	P.uncorrelateCovarianceSetVariance<State::wind_vel.dof>(State::wind_vel.idx, sq(_params.initial_wind_uncertainty));
