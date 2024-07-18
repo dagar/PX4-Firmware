@@ -123,10 +123,6 @@
 #define HRT_TIMER_CHANNEL       1  /* use capture/compare channel 3 */
 
 
-/* RC Serial port */
-#define RC_SERIAL_PORT          "/dev/ttyS4"
-#define BOARD_SUPPORTS_RC_SERIAL_PORT_OUTPUT
-
 /* SD Card */
 #define SDIO_SLOTNO             0  /* Only one slot */
 #define SDIO_MINOR              0

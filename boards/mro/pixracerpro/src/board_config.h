@@ -116,10 +116,6 @@
 #define HRT_PPM_CHANNEL         /* T3C3 */  3  /* use capture/compare channel 3 */
 #define GPIO_PPM_IN             /* PB0 T3C3 */ GPIO_TIM3_CH3IN_1
 
-/* RC Serial port */
-#define RC_SERIAL_PORT          "/dev/ttyS4"
-#define BOARD_SUPPORTS_RC_SERIAL_PORT_OUTPUT
-
 #define GPIO_RSSI_IN            /* PC1  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN1)
 
 /* Power switch controls ******************************************************/

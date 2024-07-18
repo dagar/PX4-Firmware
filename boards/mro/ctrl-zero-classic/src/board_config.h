@@ -126,9 +126,6 @@
 #define HRT_PPM_CHANNEL         /* T3C2 */  2  /* use capture/compare channel 2 */
 #define GPIO_PPM_IN             /* PC7 T3C2 */ GPIO_TIM3_CH2IN_3
 
-/* RC Serial port */
-#define RC_SERIAL_PORT          "/dev/ttyS5"
-
 #define GPIO_RSSI_IN            /* PC0  */ (GPIO_INPUT|GPIO_PULLUP|GPIO_PORTC|GPIO_PIN0)
 
 /* Safety Switch: Enable the FMU to control it if there is no px4io fixme:This should be BOARD_SAFETY_LED(__ontrue) */
