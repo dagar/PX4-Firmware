@@ -127,30 +127,51 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 
 				if (vel_failing || pos_failing) {
 
-					bool do_vel_pos_reset = shouldResetGpsFusion();
+					// We are relying on aiding to constrain drift so after a specified time with no aiding we need to do something
+					bool has_horizontal_aiding_timed_out = isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
+									       && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max);
+
+					const bool is_reset_required = has_horizontal_aiding_timed_out
+								       || (gnss_pos_enabled && isTimedOut(_time_last_hor_pos_fuse, 2 * _params.reset_timeout_max));
+
+					const bool is_inflight_nav_failure = _control_status.flags.in_air
+									     && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
+									     && isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
+									     && (_time_last_hor_vel_fuse > _time_last_on_ground_us)
+									     && (_time_last_hor_pos_fuse > _time_last_on_ground_us);
+
+					bool do_vel_pos_reset = (is_reset_required || is_inflight_nav_failure);
 
 					if (isYawFailure()
 					    && isTimedOut(_aid_src_gnss_vel.time_last_fuse, _params.EKFGSF_reset_delay)
 					    && (_aid_src_gnss_vel.time_last_fuse > _time_last_on_ground_us)) {
-						do_vel_pos_reset = tryYawEmergencyReset();
+
+						if (tryYawEmergencyReset()) {
+							do_vel_pos_reset = true;
+						}
 					}
 
 					if (do_vel_pos_reset) {
-						ECL_WARN("GPS fusion timeout, resetting velocity / position");
+						ECL_WARN("GPS fusion timeout, resetting");
+					}
 
-						if (gnss_vel_enabled) {
+					if (gnss_vel_enabled) {
+						if (do_vel_pos_reset) {
 							resetVelocityToGnss(_aid_src_gnss_vel);
-						}
 
-						if (gnss_pos_enabled) {
+						} else if (isHeightResetRequired()) {
+							// reset vertical velocity if height is failing
+							resetVerticalVelocityTo(_aid_src_gnss_vel.observation[2], _aid_src_gnss_vel.observation_variance[2]);
+						}
+					}
+
+					if (gnss_pos_enabled) {
+						if (do_vel_pos_reset) {
 							resetHorizontalPositionToGnss(_aid_src_gnss_pos);
 						}
 					}
 				}
 
-				if (gnss_pos_enabled && do_vel_pos_reset) {
-					resetHorizontalPositionToGnss(_aid_src_gnss_pos);
-				}
 
 			} else {
 				stopGpsFusion();
@@ -323,38 +344,6 @@ void Ekf::resetHorizontalPositionToGnss(estimator_aid_source2d_s &aid_src)
 	_gpos_origin_eph = 0.f; // The uncertainty of the global origin is now contained in the local position uncertainty
 
 	resetAidSourceStatusZeroInnovation(aid_src);
-}
-
-bool Ekf::shouldResetGpsFusion() const
-{
-	/* We are relying on aiding to constrain drift so after a specified time
-	 * with no aiding we need to do something
-	 */
-	bool has_horizontal_aiding_timed_out = isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
-					       && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max);
-
-#if defined(CONFIG_EKF2_OPTICAL_FLOW)
-
-	if (has_horizontal_aiding_timed_out) {
-		// horizontal aiding hasn't timed out if optical flow still active
-		if (_control_status.flags.opt_flow && isRecent(_aid_src_optical_flow.time_last_fuse, _params.reset_timeout_max)) {
-			has_horizontal_aiding_timed_out = false;
-		}
-	}
-
-#endif // CONFIG_EKF2_OPTICAL_FLOW
-
-	const bool is_reset_required = has_horizontal_aiding_timed_out
-				       || (isTimedOut(_time_last_hor_pos_fuse, 2 * _params.reset_timeout_max)
-					   && (_params.gnss_ctrl & static_cast<int32_t>(GnssCtrl::HPOS)));
-
-	const bool is_inflight_nav_failure = _control_status.flags.in_air
-					     && isTimedOut(_time_last_hor_vel_fuse, _params.reset_timeout_max)
-					     && isTimedOut(_time_last_hor_pos_fuse, _params.reset_timeout_max)
-					     && (_time_last_hor_vel_fuse > _time_last_on_ground_us)
-					     && (_time_last_hor_pos_fuse > _time_last_on_ground_us);
-
-	return (is_reset_required || is_inflight_nav_failure);
 }
 
 void Ekf::stopGpsFusion()

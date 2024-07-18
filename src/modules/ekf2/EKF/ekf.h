@@ -966,7 +966,6 @@ private:
 	bool tryYawEmergencyReset();
 	void resetVelocityToGnss(estimator_aid_source3d_s &aid_src);
 	void resetHorizontalPositionToGnss(estimator_aid_source2d_s &aid_src);
-	bool shouldResetGpsFusion() const;
 
 	/*
 	 * Return true if the GPS solution quality is adequate.

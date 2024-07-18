@@ -47,7 +47,7 @@ void Ekf::controlDragFusion(const imuSample &imu_delayed)
 {
 	if ((_params.drag_ctrl > 0) && _drag_buffer) {
 
-		if (!_control_status.flags.wind && isHorizontalAidingActive() && _control_status.flags.in_air) {
+		if (!_control_status.flags.wind && !_control_status.flags.fake_pos && _control_status.flags.in_air) {
 			// reset the wind states and covariances when starting drag accel fusion
 			_control_status.flags.wind = true;
 			resetWindToZero();
@@ -155,7 +155,7 @@ void Ekf::fuseDrag(const dragSample &drag_sample)
 
 		const float test_ratio = sq(innovation(axis_index)) / (sq(innov_gate) * innovation_variance(axis_index));
 
-		if (_control_status.flags.in_air && _control_status.flags.wind
+		if (_control_status.flags.in_air && _control_status.flags.wind && !_control_status.flags.fake_pos
 		    && PX4_ISFINITE(innovation_variance(axis_index)) && PX4_ISFINITE(innovation(axis_index))
 		    && (test_ratio < 1.f)
 		   ) {

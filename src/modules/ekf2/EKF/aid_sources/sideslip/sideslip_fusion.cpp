@@ -52,7 +52,7 @@ void Ekf::controlBetaFusion(const imuSample &imu_delayed)
 	_control_status.flags.fuse_beta = _params.beta_fusion_enabled
 					  && _control_status.flags.fixed_wing
 					  && _control_status.flags.in_air
-					  && (isHorizontalAidingActive() || !_horizontal_deadreckon_time_exceeded);
+					  && !_control_status.flags.fake_pos;
 
 	if (_control_status.flags.fuse_beta) {
 

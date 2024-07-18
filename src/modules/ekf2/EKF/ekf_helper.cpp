@@ -652,8 +652,7 @@ void Ekf::fuse(const VectorState &K, float innovation)
 
 void Ekf::updateDeadReckoningStatus()
 {
-	const uint64_t deadreckon_timeout = math::max((uint64_t)_params.valid_timeout_max,
-					    (uint64_t)_params.no_aid_timeout_max);
+	const uint64_t deadreckon_timeout = _params.valid_timeout_max;
 
 	const uint64_t time_last_horizontal_aiding = math::max(_time_last_hor_vel_fuse, _time_last_hor_pos_fuse);
 	const uint64_t time_last_vertical_aiding   = math::max(_time_last_ver_vel_fuse, _time_last_hgt_fuse);
@@ -785,11 +784,11 @@ void Ekf::updateIMUBiasInhibit(const imuSample &imu_delayed)
 		if (_control_status.flags.vehicle_at_rest) {
 			is_bias_observable = true;
 
-		} else if (!isHorizontalAidingActive() && !isVerticalAidingActive()) {
+		} else if (_control_status.flags.fake_hgt) {
 			is_bias_observable = false;
 
-		} else if (!isHorizontalAidingActive()) {
-			// only consider an accel bias observable if aligned with the gravity vector
+		} else if (_control_status.flags.fake_pos) {
+			// when using fake position (but not fake height) only consider an accel bias observable if aligned with the gravity vector
 			is_bias_observable = (fabsf(_R_to_earth(2, index)) > 0.966f); // cos 15 degrees ~= 0.966
 		}
 
