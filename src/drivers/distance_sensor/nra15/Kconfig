@@ -1,0 +1,5 @@
+menuconfig DRIVERS_DISTANCE_SENSOR_NRA15
+	bool "nra15"
+	default n
+	---help---
+		Enable support for Nanorader NRA15

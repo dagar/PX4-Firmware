@@ -1,0 +1,6 @@
+module_name: Nanorader NRA15 Rangefinder
+serial_config:
+    - command: nra15 start -d ${SERIAL_DEV}
+      port_config_param:
+        name: SENS_NRA15_CFG
+        group: Sensors
