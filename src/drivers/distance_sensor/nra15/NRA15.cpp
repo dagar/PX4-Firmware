@@ -350,7 +350,7 @@ void NRA15::Run()
 		perf_end(_sample_perf);
 
 		tcflush(_fd, TCIFLUSH);
-		ScheduleDelayed(10_ms);
+		ScheduleDelayed(20_ms);
 		return;// ret;
 
 	} else if (ret > 0) {
@@ -359,7 +359,7 @@ void NRA15::Run()
 
 	} else {
 		// no bytes to read
-		ScheduleDelayed(50_ms);
+		ScheduleDelayed(20_ms);
 		return;// ret;
 	}
 
@@ -404,7 +404,7 @@ void NRA15::Run()
 
 	perf_end(_sample_perf);
 
-	ScheduleDelayed(100_ms);
+	ScheduleDelayed(20_ms);
 }
 
 bool NRA15::ParseBuffer(const uint8_t *buf, const size_t len)
@@ -416,10 +416,10 @@ bool NRA15::ParseBuffer(const uint8_t *buf, const size_t len)
 	   ) {
 		// found header byte
 
-		uint16_t msg_id = (buf[2] << 8) + (buf[3]);
+		uint16_t msg_id = (buf[2]) + (buf[3] << 8);
 
 		// Target Info
-		if (msg_id == 0x70C) {
+		if (buf[2] == 0x0C && buf[3] == 0x07) {
 
 			// NoOfTarget
 
@@ -431,15 +431,68 @@ bool NRA15::ParseBuffer(const uint8_t *buf, const size_t len)
 			//uint8_t *payload = &buf[4];// 4 - 11
 
 
+			uint8_t index = buf[4]; // Target ID
+
+			uint8_t rcs = buf[5]; // The section of radar reflection
 			uint8_t range_h = buf[6]; // bits 16..23
 			uint8_t range_l = buf[7];
 
-			uint16_t range = (buf[6] << 8) + buf[7];
-
+			uint16_t range = (range_h << 8) + range_l;
 			float distance_m = range * 0.01; // 0.01m resolution
 
-			_px4_rangefinder.update(timestamp_sample, distance_m);
 
+			uint8_t snr = buf[11] - 127;
+
+			//_px4_rangefinder.update(timestamp_sample, distance_m);
+
+
+
+			// uint8_t vel_rel_h = VrelH; // bits 40..42
+			// uint8_t vel_rel_l = VrelL; // bits 48..55
+
+
+
+
+			distance_sensor_s distance_sensor{};
+
+
+
+
+
+			device::Device::DeviceId device_id;
+			device_id.devid_s.devtype = DRV_DIST_DEVTYPE_NRA15;
+			device_id.devid_s.bus_type = device::Device::DeviceBusType_SERIAL;
+
+			uint8_t bus_num = atoi(&_port[strlen(_port) - 1]); // Assuming '/dev/ttySx'
+
+			if (bus_num < 10) {
+				device_id.devid_s.bus = bus_num;
+			}
+
+			device_id.devid_s.address = index;
+
+			distance_sensor.device_id = device_id.devid;
+			distance_sensor.type = distance_sensor_s::MAV_DISTANCE_SENSOR_RADAR;
+
+			distance_sensor.orientation = distance_sensor_s::ROTATION_DOWNWARD_FACING;
+
+			distance_sensor.signal_quality = snr;
+
+			distance_sensor.current_distance = distance_m;
+
+
+
+			distance_sensor.timestamp = hrt_absolute_time();
+
+			if (index >= 0 && index <= 7) {
+				_distance_sensor_pubs[index].publish(distance_sensor);
+
+			} else {
+				PX4_ERR("invalid index %d", index);
+			}
+
+		} else {
+			PX4_INFO("msg_id: 0x%04X", msg_id);
 		}
 
 		return true;
@@ -454,4 +507,17 @@ void NRA15::print_info()
 	printf("Using port '%s'\n", _port);
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
+
+	PX4_INFO_RAW("bytes read %d\n", _bytes_read);
+	PX4_INFO_RAW("bytes written %d\n", _bytes_written);
+
+	perf_print_counter(_poll_timeout_perf);
+	perf_print_counter(_poll_error_perf);
+	perf_print_counter(_read_error_perf);
+	perf_print_counter(_write_error_perf);
+	perf_print_counter(_checksum_good_perf);
+	perf_print_counter(_checksum_bad_perf);
+
+
+	_print_debug.store(true);
 }
