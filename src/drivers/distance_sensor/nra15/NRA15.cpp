@@ -152,6 +152,8 @@ NRA15::init()
 		uart_config.c_cc[VMIN] = 1;
 		uart_config.c_cc[VTIME] = 1;
 
+		ret = tcsetattr(_fd, TCSANOW, &uart_config);
+
 		if (_fd < 0) {
 			PX4_ERR("FAIL: laser fd");
 			ret = -1;
@@ -268,55 +270,6 @@ void NRA15::Run()
 
 	perf_begin(_sample_perf);
 
-
-	// Baud rate: 115200 (8 data bits, 1 stop bit, no parity, no hardware flow control) (other baud rates available upon request)
-	// Transmission rate: these messages are sent at a rate of 4Hz (approximately)
-	// Endianness: all fields are big endian
-
-	// The following table shows the format of the Lightfish sensor data messages.
-	// NOTE: any invalid data will be set to all 1s (ex. 0xFF, 0xFFFF) – ex. in the case of no GPS fix / no IMU data available / etc.
-
-	// uint16 msg ID        Always 0xAB00
-	// uint16 msg_length    Number of message bytes after CRC
-	// uint32 crc           CRC-32 of message payload (bytes 8-N) (polynomial 0xEDB88320 , starting value 0xFFFFFFFF ) *
-	// uint16 imu_heading   Degrees: 0-360
-	// int32  GPS_lat       Millionths of degrees
-	// int32  GPS_lon       Millionths of degrees
-	// uint16 GPS_SOG       Tenths of meters per second
-	// uint16 GPS_time      Milliseconds since epoch (1970)
-	// int32  GPS_alt       Tenths of meters
-	// int32  GPS_unused    placeholder
-	// uint8  GPS_hdop
-	// uint8  GPS_fix
-	// int8   motor_percent
-	// int8   rudder_percent
-	// uint16 speed_water
-
-
-	//const uint16_t total_size = 56;
-
-
-	// 56 bytes @ 4 Hz?
-	// debugging tools, print to console, etc
-
-
-	// publish
-	//  - sensor_gps
-	// - motor percentage?
-
-
-
-
-	// 56 bytes
-
-
-
-
-	// test data
-	//  0xAB0000308EF7F176005901F4ECFFF903369A0000FFFF00000190794363D0000001E07FFFFFFFFFFF000000000002006C0003005AFFFFFFFF
-
-
-
 	// clear buffer if last read was too long ago
 	int64_t read_elapsed = hrt_elapsed_time(&_last_read);
 
@@ -329,6 +282,16 @@ void NRA15::Run()
 	int bytes_available = 0;
 	{
 		int retval = ::ioctl(_fd, FIONREAD, &bytes_available);
+
+
+		if (retval == 0) {
+			if (bytes_available < 3) {
+				// not enough data
+				perf_end(_sample_perf);
+				ScheduleDelayed(20_ms);
+				return;
+			}
+		}
 	}
 
 
@@ -368,14 +331,67 @@ void NRA15::Run()
 
 
 	if (_print_debug.load()) {
-		fprintf(stderr, "\nread %d bytes: |%s| %d\n", ret, readbuf, _linebuf_index);
-		// //fprintf(stderr, "|%.*s| (%d bytes total)\n", sizeof(_linebuf), _linebuf, _linebuf_index);
+		//fprintf(stderr, "\nread %d bytes: |%.*s| ", ret, ret, readbuf);
+		fprintf(stderr, "read %d bytes: ", ret, ret, readbuf);
 
-		for (int c = 0; c <= _linebuf_index; c++) {
-			fprintf(stderr, "%c", _linebuf[c]);
+		for (int i = 0; i < ret; i++) {
+			fprintf(stderr, "0x%02X ", readbuf[i]);
 		}
 
 		fprintf(stderr, "\n");
+
+
+		// //fprintf(stderr, "|%.*s| (%d bytes total)\n", sizeof(_linebuf), _linebuf, _linebuf_index);
+
+
+		// for (int c = 0; c < ret; c++) {
+		// 	fprintf(stderr, "%X ", readbuf[c]);
+		// }
+
+		// fprintf(stderr, "\n");
+
+		// for (int c = 0; c <= _linebuf_index; c++) {
+		// 	fprintf(stderr, "%c", _linebuf[c]);
+		// }
+
+		if (_print_debug.load()) {
+			fprintf(stderr, "full buffer %d bytes\n", _linebuf_index);
+
+			for (int c = 0; c < _linebuf_index; c++) {
+				fprintf(stderr, "%X ", _linebuf[c]);
+			}
+
+			fprintf(stderr, "\n");
+		}
+	}
+
+
+	if (readbuf[0] == 0x48 && readlen >= 3) {
+
+
+		//fprintf(stderr, "\n");
+
+		uint8_t data_l = readbuf[1];
+		uint8_t data_h = readbuf[2];
+
+		float distance_m = static_cast<float>((data_h << 8) + data_l) * 0.01f;
+
+		float distance_alt = static_cast<float>((data_h & 0x7F) * 128 + (data_l & 0x7F)) * 0.025f;
+
+
+		if (_print_debug.load()) {
+			fprintf(stderr, "read %d bytes: ", ret, ret, readbuf);
+
+			for (int i = 0; i < ret; i++) {
+				fprintf(stderr, "0x%02X ", readbuf[i]);
+			}
+
+			fprintf(stderr, " distance: %.3f (0x%02X 0x%02X) (alt: %.3f)\n", distance_m, data_l, data_h, distance_alt);
+		}
+
+		_px4_rangefinder.update(timestamp_sample, distance_m);
+
+		_linebuf_index -= 3;
 	}
 
 
@@ -404,7 +420,7 @@ void NRA15::Run()
 
 	perf_end(_sample_perf);
 
-	ScheduleDelayed(20_ms);
+	ScheduleNow();
 }
 
 bool NRA15::ParseBuffer(const uint8_t *buf, const size_t len)
