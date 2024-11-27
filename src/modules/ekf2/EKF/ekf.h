@@ -78,14 +78,14 @@ public:
 	Ekf()
 	{
 		reset();
+		initialise_interface();
 	};
 
-	virtual ~Ekf() = default;
-
-	// initialise variables to sane values (also interface class)
-	bool init(uint64_t timestamp) override;
+	~Ekf() = default;
 
 	void print_status();
+
+	void reset();
 
 	// should be called every time new data is pushed into the filter
 	bool update();
@@ -430,10 +430,7 @@ private:
 	friend class EvVelLocalFrameNed;
 	friend class EvVelLocalFrameFrd;
 
-	// set the internal states and status to their default value
-	void reset();
-
-	bool initialiseTilt(const Vector3f &accel, const Vector3f &gyro);
+	bool initialiseTilt(const Vector3f &accel);
 
 	// check if the EKF is dead reckoning horizontal velocity using inertial data only
 	void updateDeadReckoningStatus();

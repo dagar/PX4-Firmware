@@ -316,9 +316,7 @@ public:
 protected:
 
 	EstimatorInterface() = default;
-	virtual ~EstimatorInterface();
-
-	virtual bool init(uint64_t timestamp) = 0;
+	~EstimatorInterface();
 
 	parameters _params{};		// filter parameters
 
@@ -381,7 +379,6 @@ protected:
 	float _air_density{atmosphere::kAirDensitySeaLevelStandardAtmos};		// air density (kg/m**3)
 
 	bool _imu_updated{false};      // true if the ekf should update (completed downsampling process)
-	bool _initialised{false};      // true if the ekf interface instance (data buffering) is initialized
 
 	// Variables used to publish the WGS-84 location of the EKF local NED origin
 	MapProjection _pos_ref{}; // Contains WGS-84 position latitude and longitude of the EKF origin
@@ -454,7 +451,7 @@ protected:
 	fault_status_u _fault_status{};
 
 	// allocate data buffers and initialize interface variables
-	bool initialise_interface(uint64_t timestamp);
+	bool initialise_interface();
 
 #if defined(CONFIG_EKF2_MAGNETOMETER)
 	uint64_t _wmm_mag_time_last_checked {0}; // time WMM update last checked by mag control
