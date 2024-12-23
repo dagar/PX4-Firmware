@@ -34,13 +34,15 @@
 #pragma once
 
 /*   Helper classes  */
-#include "failure_detector/FailureDetector.hpp"
 #include "failsafe/failsafe.h"
-#include "Safety.hpp"
-#include "worker_thread.hpp"
+#include "failure_detector/FailureDetector.hpp"
 #include "HealthAndArmingChecks/HealthAndArmingChecks.hpp"
 #include "HomePosition.hpp"
+#include "ModeManagement.hpp"
+#include "MulticopterThrowLaunch/MulticopterThrowLaunch.hpp"
+#include "Safety.hpp"
 #include "UserModeIntention.hpp"
+#include "worker_thread.hpp"
 
 #include <lib/controllib/blocks.hpp>
 #include <lib/hysteresis/hysteresis.h>
@@ -81,7 +83,6 @@
 #include <uORB/topics/vehicle_constraints.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
-#include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 
 using math::constrain;
@@ -125,6 +126,7 @@ public:
 
 private:
 	bool isArmed() const { return (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED); }
+	static ModeChangeSource getSourceFromCommand(const vehicle_command_s &cmd);
 
 	void answer_command(const vehicle_command_s &cmd, uint8_t result);
 
@@ -175,6 +177,10 @@ private:
 
 	void safetyButtonUpdate();
 
+	bool isThrowLaunchInProgress() const;
+
+	void throwLaunchUpdate();
+
 	void vtolStatusUpdate();
 
 	void updateTunes();
@@ -190,6 +196,13 @@ private:
 	void updateParameters();
 
 	void checkAndInformReadyForTakeoff();
+
+	void handleCommandsFromModeExecutors();
+
+	void modeManagementUpdate();
+
+	static void onFailsafeNotifyUserTrampoline(void *arg);
+	void onFailsafeNotifyUser();
 
 	enum class PrearmedMode {
 		DISABLED = 0,
@@ -211,12 +224,19 @@ private:
 	FailsafeBase		&_failsafe{_failsafe_instance};
 	FailureDetector		_failure_detector{this};
 	HealthAndArmingChecks	_health_and_arming_checks{this, _vehicle_status};
+	MulticopterThrowLaunch  _multicopter_throw_launch{this};
 	Safety			_safety{};
-	UserModeIntention	_user_mode_intention{this, _vehicle_status, _health_and_arming_checks};
 	WorkerThread 		_worker_thread{};
+	ModeManagement  	_mode_management{
+#ifndef CONSTRAINED_FLASH
+		_health_and_arming_checks.externalChecks()
+#endif
+	};
+	UserModeIntention	_user_mode_intention {this, _vehicle_status, _health_and_arming_checks, &_mode_management};
 
 	const failsafe_flags_s &_failsafe_flags{_health_and_arming_checks.failsafeFlags()};
 	HomePosition 		_home_position{_failsafe_flags};
+	config_overrides_s   _config_overrides{};
 
 
 	Hysteresis _auto_disarm_landed{false};
@@ -230,8 +250,9 @@ private:
 
 	hrt_abstime _last_print_mode_reject_time{0};	///< To remember when last notification was sent
 
-	hrt_abstime _high_latency_datalink_heartbeat{0};
+	hrt_abstime _high_latency_datalink_timestamp{0};
 	hrt_abstime _high_latency_datalink_lost{0};
+	hrt_abstime _high_latency_datalink_regained{0};
 
 	hrt_abstime _boot_timestamp{0};
 	hrt_abstime _last_disarmed_timestamp{0};
@@ -277,6 +298,7 @@ private:
 	uORB::Subscription					_manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription					_system_power_sub{ORB_ID(system_power)};
 	uORB::Subscription					_vehicle_command_sub{ORB_ID(vehicle_command)};
+	uORB::Subscription					_vehicle_command_mode_executor_sub{ORB_ID(vehicle_command_mode_executor)};
 	uORB::Subscription					_vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 	uORB::Subscription					_vtol_vehicle_status_sub{ORB_ID(vtol_vehicle_status)};
 	uORB::Subscription					_vehicle_constraints_sub{ORB_ID(vehicle_constraints)};
@@ -299,6 +321,7 @@ private:
 	uORB::Publication<actuator_test_s>			_actuator_test_pub{ORB_ID(actuator_test)};
 	uORB::Publication<failure_detector_status_s>		_failure_detector_status_pub{ORB_ID(failure_detector_status)};
 	uORB::Publication<vehicle_command_ack_s>		_vehicle_command_ack_pub{ORB_ID(vehicle_command_ack)};
+	uORB::Publication<vehicle_command_s>			_vehicle_command_pub{ORB_ID(vehicle_command)};
 	uORB::Publication<vehicle_control_mode_s>		_vehicle_control_mode_pub{ORB_ID(vehicle_control_mode)};
 	uORB::Publication<vehicle_status_s>			_vehicle_status_pub{ORB_ID(vehicle_status)};
 
@@ -308,15 +331,14 @@ private:
 	perf_counter_t _preflight_check_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": preflight check")};
 
 	// optional parameters
-	param_t _param_mav_comp_id{PARAM_INVALID};
-	param_t _param_mav_sys_id{PARAM_INVALID};
 	param_t _param_mav_type{PARAM_INVALID};
 	param_t _param_rc_map_fltmode{PARAM_INVALID};
 
 	DEFINE_PARAMETERS(
 
 		(ParamFloat<px4::params::COM_DISARM_LAND>)  _param_com_disarm_land,
-		(ParamFloat<px4::params::COM_DISARM_PRFLT>) _param_com_disarm_preflight,
+		(ParamFloat<px4::params::COM_DISARM_PRFLT>) _param_com_disarm_prflt,
+		(ParamBool<px4::params::COM_DISARM_MAN>)    _param_com_disarm_man,
 		(ParamInt<px4::params::COM_DL_LOSS_T>)      _param_com_dl_loss_t,
 		(ParamInt<px4::params::COM_HLDL_LOSS_T>)    _param_com_hldl_loss_t,
 		(ParamInt<px4::params::COM_HLDL_REG_T>)     _param_com_hldl_reg_t,
@@ -330,8 +352,8 @@ private:
 		(ParamFloat<px4::params::COM_OBC_LOSS_T>)   _param_com_obc_loss_t,
 		(ParamInt<px4::params::COM_PREARM_MODE>)    _param_com_prearm_mode,
 		(ParamInt<px4::params::COM_RC_OVERRIDE>)    _param_com_rc_override,
-		(ParamInt<px4::params::COM_FLIGHT_UUID>)    _param_flight_uuid,
-		(ParamInt<px4::params::COM_TAKEOFF_ACT>)    _param_takeoff_finished_action,
+		(ParamInt<px4::params::COM_FLIGHT_UUID>)    _param_com_flight_uuid,
+		(ParamInt<px4::params::COM_TAKEOFF_ACT>)    _param_com_takeoff_act,
 		(ParamFloat<px4::params::COM_CPU_MAX>)      _param_com_cpu_max
 	)
 };

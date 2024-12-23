@@ -84,18 +84,17 @@ PARAM_DEFINE_INT32(SYS_AUTOCONFIG, 0);
 PARAM_DEFINE_INT32(SYS_HITL, 0);
 
 /**
- * Set multicopter estimator group
+ * Parameter version
  *
- * Set the group of estimators used for multicopters and VTOLs
+ * This is used internally only: an airframe configuration might set an expected
+ * parameter version value via PARAM_DEFAULTS_VER. This is checked on bootup
+ * against SYS_PARAM_VER, and if they do not match, parameters are reset and
+ * reloaded from the airframe configuration.
  *
- * @value 1 local_position_estimator, attitude_estimator_q (unsupported)
- * @value 2 ekf2 (recommended)
- * @value 3 Q attitude estimator (no position)
- *
- * @reboot_required true
+ * @min 0
  * @group System
  */
-PARAM_DEFINE_INT32(SYS_MC_EST_GROUP, 2);
+PARAM_DEFINE_INT32(SYS_PARAM_VER, 1);
 
 /**
  * Enable auto start of rate gyro thermal calibration at the next power up.
@@ -217,13 +216,24 @@ PARAM_DEFINE_INT32(SYS_HAS_MAG, 1);
 PARAM_DEFINE_INT32(SYS_HAS_BARO, 1);
 
 /**
- * Control the number of distance sensors on the vehicle
+ * Control if the vehicle has an airspeed sensor
  *
- * If set to the number of distance sensors, the preflight check will check
- * for their presence and valid data publication. Disable with 0 if no distance
- * sensor present or to disable the preflight check.
+ * Set this to 0 if the board has no airspeed sensor.
+ * If set to 0, the preflight checks will not check for the presence of an
+ * airspeed sensor.
  *
- * @reboot_required true
+ * @group System
+ * @min 0
+ * @max 1
+ */
+PARAM_DEFINE_INT32(SYS_HAS_NUM_ASPD, 0);
+
+/**
+ * Number of distance sensors to check being available
+ *
+ * The preflight check will fail if fewer than this number of distance sensors with valid data is present.
+ *
+ * Disable the check with 0.
  *
  * @group System
  * @min 0

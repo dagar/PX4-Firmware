@@ -48,3 +48,15 @@
  * @value 7 SF/LW30/d
  */
 PARAM_DEFINE_INT32(SENS_EN_SF1XX, 0);
+
+/**
+ * Lightware SF1xx/SF20/LW20 Operation Mode
+ *
+ * @value 0 Disabled
+ * @value 1 Enabled
+ * @value 2 Enabled in VTOL MC mode, listen to request from system in FW mode
+ *
+ * @min 0
+ * @max 2
+ */
+PARAM_DEFINE_INT32(SF1XX_MODE, 1);

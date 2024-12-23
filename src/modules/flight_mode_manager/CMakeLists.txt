@@ -44,10 +44,10 @@ list(APPEND flight_tasks_all
 	Drop
 	Failsafe
 	ManualAcceleration
+	ManualAccelerationSlow
 	ManualAltitude
 	ManualAltitudeSmoothVel
 	ManualPosition
-	ManualPositionSmoothVel
 	Transition
 )
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2012-2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2023 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,6 +60,7 @@
 
 #include <containers/List.hpp>
 #include <parameters/param.h>
+#include <lib/variable_length_ringbuffer/VariableLengthRingbuffer.hpp>
 #include <perf/perf_counter.h>
 #include <px4_platform_common/cli.h>
 #include <px4_platform_common/px4_config.h>
@@ -171,7 +172,7 @@ public:
 
 	static bool		serial_instance_exists(const char *device_name, Mavlink *self);
 
-	static bool		component_was_seen(int system_id, int component_id, Mavlink *self = nullptr);
+	static bool		component_was_seen(int system_id, int component_id, Mavlink &self);
 
 	static void		forward_message(const mavlink_message_t *msg, Mavlink *self);
 
@@ -419,11 +420,6 @@ public:
 	bool			get_wait_to_transmit() { return _wait_to_transmit; }
 	bool			should_transmit() { return (_transmitting_enabled && (!_wait_to_transmit || (_wait_to_transmit && _received_messages))); }
 
-	bool			message_buffer_write(const void *ptr, int size);
-
-	void			lockMessageBufferMutex(void) { pthread_mutex_lock(&_message_buffer_mutex); }
-	void			unlockMessageBufferMutex(void) { pthread_mutex_unlock(&_message_buffer_mutex); }
-
 	/**
 	 * Count transmitted bytes
 	 */
@@ -588,6 +584,7 @@ private:
 	int			_baudrate{57600};
 	int			_datarate{1000};		///< data rate for normal streams (attitude, position, etc.)
 	float			_rate_mult{1.0f};
+	float			_high_latency_freq{0.015f};	///< frequency of HIGH_LATENCY2 stream
 
 	bool			_radio_status_available{false};
 	bool			_radio_status_critical{false};
@@ -599,8 +596,6 @@ private:
 	 * to len - 1, the end of the param list.
 	 */
 	unsigned int		_mavlink_param_queue_index{0};
-
-	bool			_mavlink_link_termination_allowed{false};
 
 	char			*_subscribe_to_stream{nullptr};
 	float			_subscribe_to_stream_rate{0.0f};  ///< rate of stream to subscribe to (0=disable, -1=unlimited, -2=default)
@@ -651,16 +646,9 @@ private:
 
 	ping_statistics_s	_ping_stats {};
 
-	struct mavlink_message_buffer {
-		int write_ptr;
-		int read_ptr;
-		int size;
-		char *data;
-	};
+	pthread_mutex_t		_message_buffer_mutex{};
+	VariableLengthRingbuffer _message_buffer{};
 
-	mavlink_message_buffer	_message_buffer {};
-
-	pthread_mutex_t		_message_buffer_mutex {};
 	pthread_mutex_t		_send_mutex {};
 	pthread_mutex_t         _radio_status_mutex {};
 
@@ -682,6 +670,7 @@ private:
 	perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": tx run elapsed")};                      /**< loop performance counter */
 	perf_counter_t _loop_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": tx run interval")};           /**< loop interval performance counter */
 	perf_counter_t _send_byte_error_perf{perf_alloc(PC_COUNT, MODULE_NAME": send_bytes error")};           /**< send bytes error count */
+	perf_counter_t _forwarding_error_perf{perf_alloc(PC_COUNT, MODULE_NAME": forwarding error")};           /**< forwarding messages error count */
 
 	void			mavlink_update_parameters();
 
@@ -711,23 +700,17 @@ private:
 	 */
 	int configure_streams_to_default(const char *configure_single_stream = nullptr);
 
-	int message_buffer_init(int size);
-
-	void message_buffer_destroy();
-
-	int message_buffer_count();
-
-	int message_buffer_is_empty() const { return (_message_buffer.read_ptr == _message_buffer.write_ptr); }
-
-	int message_buffer_get_ptr(void **ptr, bool *is_part);
-
-	void message_buffer_mark_read(int n) { _message_buffer.read_ptr = (_message_buffer.read_ptr + n) % _message_buffer.size; }
-
 	void pass_message(const mavlink_message_t *msg);
 
 	void publish_telemetry_status();
 
 	void check_requested_subscriptions();
+
+	void handleCommands();
+
+	void handleAndGetCurrentCommandAck();
+
+	void handleStatus();
 
 	/**
 	 * Reconfigure a SiK radio if requested by MAV_SIK_RADIO_ID

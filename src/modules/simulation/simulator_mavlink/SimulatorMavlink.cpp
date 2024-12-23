@@ -326,11 +326,22 @@ void SimulatorMavlink::update_sensors(const hrt_abstime &time, const mavlink_hil
 	}
 
 	// differential pressure
-	if ((sensors.fields_updated & SensorSource::DIFF_PRESS) == SensorSource::DIFF_PRESS && !_airspeed_blocked) {
+	if ((sensors.fields_updated & SensorSource::DIFF_PRESS) == SensorSource::DIFF_PRESS && !_airspeed_disconnected) {
+
+		const float blockage_fraction = 0.7; // defines max blockage (fully ramped)
+		const float airspeed_blockage_rampup_time = 1_s; // time it takes to go max blockage, linear ramp
+
+		float airspeed_blockage_scale = 1.f;
+
+		if (_airspeed_blocked_timestamp > 0) {
+			airspeed_blockage_scale = math::constrain(1.f - (hrt_absolute_time() - _airspeed_blocked_timestamp) /
+						  airspeed_blockage_rampup_time, 1.f - blockage_fraction, 1.f);
+		}
+
 		differential_pressure_s report{};
 		report.timestamp_sample = time;
 		report.device_id = 1377548; // 1377548: DRV_DIFF_PRESS_DEVTYPE_SIM, BUS: 1, ADDR: 5, TYPE: SIMULATION
-		report.differential_pressure_pa = sensors.diff_pressure * 100.f; // hPa to Pa;
+		report.differential_pressure_pa = sensors.diff_pressure * 100.f * airspeed_blockage_scale; // hPa to Pa;
 		report.temperature = _sensors_temperature;
 		report.timestamp = hrt_absolute_time();
 		_differential_pressure_pub.publish(report);
@@ -377,14 +388,12 @@ void SimulatorMavlink::handle_message(const mavlink_message_t *msg)
 		break;
 
 	case MAVLINK_MSG_ID_RAW_RPM:
-		mavlink_raw_rpm_t rpm;
-		mavlink_msg_raw_rpm_decode(msg, &rpm);
-		rpm_s rpmmsg{};
-		rpmmsg.timestamp = hrt_absolute_time();
-		rpmmsg.indicated_frequency_rpm = rpm.frequency;
-		rpmmsg.estimated_accurancy_rpm = 0;
-
-		_rpm_pub.publish(rpmmsg);
+		mavlink_raw_rpm_t rpm_mavlink;
+		mavlink_msg_raw_rpm_decode(msg, &rpm_mavlink);
+		rpm_s rpm_uorb{};
+		rpm_uorb.timestamp = hrt_absolute_time();
+		rpm_uorb.rpm_estimate = rpm_mavlink.frequency;
+		_rpm_pub.publish(rpm_uorb);
 		break;
 	}
 }
@@ -569,7 +578,7 @@ void SimulatorMavlink::handle_message_hil_state_quaternion(const mavlink_message
 		double lon = hil_state.lon * 1e-7;
 
 		if (!_global_local_proj_ref.isInitialized()) {
-			_global_local_proj_ref.initReference(lat, lon);
+			_global_local_proj_ref.initReference(lat, lon, timestamp);
 			_global_local_alt0 = hil_state.alt / 1000.f;
 		}
 
@@ -1431,12 +1440,18 @@ void SimulatorMavlink::check_failure_injections()
 			if (failure_type == vehicle_command_s::FAILURE_TYPE_OFF) {
 				PX4_WARN("CMD_INJECT_FAILURE, airspeed off");
 				supported = true;
-				_airspeed_blocked = true;
+				_airspeed_disconnected = true;
+
+			} else if (failure_type == vehicle_command_s::FAILURE_TYPE_WRONG) {
+				PX4_WARN("CMD_INJECT_FAILURE, airspeed wrong (simulate pitot blockage)");
+				supported = true;
+				_airspeed_blocked_timestamp = hrt_absolute_time();
 
 			} else if (failure_type == vehicle_command_s::FAILURE_TYPE_OK) {
 				PX4_INFO("CMD_INJECT_FAILURE, airspeed ok");
 				supported = true;
-				_airspeed_blocked = false;
+				_airspeed_disconnected = false;
+				_airspeed_blocked_timestamp = 0;
 			}
 
 		} else if (failure_unit == vehicle_command_s::FAILURE_UNIT_SENSOR_VIO) {

@@ -155,10 +155,12 @@ class Px4Runner(Runner):
                  debugger: str, verbose: bool, build_dir: str):
         super().__init__(log_dir, model, case, verbose)
         self.name = "px4"
-        self.cmd = os.path.join(workspace_dir, build_dir, "bin/px4")
         self.cwd = os.path.join(workspace_dir, build_dir,
                                 "tmp_mavsdk_tests/rootfs")
+        self.cmd = "nice"
         self.args = [
+                "--20",
+                os.path.join(workspace_dir, build_dir, "bin/px4"),
                 os.path.join(workspace_dir, build_dir, "etc"),
                 "-s",
                 "etc/init.d-posix/rcS",
@@ -221,7 +223,8 @@ class GzserverRunner(Runner):
                  case: str,
                  speed_factor: float,
                  verbose: bool,
-                 build_dir: str):
+                 build_dir: str,
+                 world_name: str):
         super().__init__(log_dir, model, case, verbose)
         self.name = "gzserver"
         self.cwd = workspace_dir
@@ -234,7 +237,7 @@ class GzserverRunner(Runner):
         self.args = ["-o0", "-e0", "gzserver", "--verbose",
                      os.path.join(workspace_dir,
                                   PX4_GAZEBO_WORLDS,
-                                  "empty.world")]
+                                  world_name)]
 
     def has_started_ok(self) -> bool:
         # Wait until gzerver has started and connected to gazebo master.
@@ -328,8 +331,10 @@ class GzclientRunner(Runner):
         self.env = dict(os.environ, **{
             "GAZEBO_MODEL_PATH":
                 os.path.join(workspace_dir, PX4_GAZEBO_MODELS)})
-        self.cmd = "gzclient"
-        self.args = ["--verbose"]
+        self.cmd = "nice"
+        self.args = ["--19",
+                     "gzclient",
+                     "--verbose"]
 
 
 class TestRunner(Runner):
@@ -346,7 +351,7 @@ class TestRunner(Runner):
         self.name = "mavsdk_tests"
         self.cwd = workspace_dir
         self.cmd = "nice"
-        self.args = ["-5",
+        self.args = ["--18",
                      os.path.join(
                          workspace_dir,
                          build_dir,

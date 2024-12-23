@@ -1,6 +1,6 @@
 ############################################################################
 #
-# Copyright (c) 2017 - 2022 PX4 Development Team. All rights reserved.
+# Copyright (c) 2017 - 2024 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -113,11 +113,19 @@ include(px4_parse_function_args)
 include(px4_git)
 
 execute_process(
-	COMMAND git describe --exclude ext/* --always --tags
+	COMMAND git describe --exclude ext/* --tags --match "v[0-9]*"
 	OUTPUT_VARIABLE PX4_GIT_TAG
 	OUTPUT_STRIP_TRAILING_WHITESPACE
+	RESULTS_VARIABLE GIT_DESCRIBE_RESULT
 	WORKING_DIRECTORY ${PX4_SOURCE_DIR}
 	)
+
+# if proper git tag unavilable default to v0.0.0
+if(NOT ${GIT_DESCRIBE_RESULT} MATCHES "0")
+	set(PX4_GIT_TAG "v0.0.0")
+endif()
+
+message(STATUS "PX4_GIT_TAG: ${PX4_GIT_TAG}")
 
 # git describe to X.Y.Z version
 string(REPLACE "." ";" VERSION_LIST ${PX4_GIT_TAG})
@@ -132,7 +140,9 @@ list(GET VERSION_LIST 2 PX4_VERSION_PATCH)
 string(REPLACE "-" ";" PX4_VERSION_PATCH ${PX4_VERSION_PATCH})
 list(GET PX4_VERSION_PATCH 0 PX4_VERSION_PATCH)
 
-message(STATUS "PX4 version: ${PX4_GIT_TAG} (${PX4_VERSION_MAJOR}.${PX4_VERSION_MINOR}.${PX4_VERSION_PATCH})")
+# # Capture only the hash part after 'g'
+string(REGEX MATCH "g([a-f0-9]+)$" GIT_HASH "${PX4_GIT_TAG}")
+set(PX4_GIT_HASH ${CMAKE_MATCH_1})
 
 define_property(GLOBAL PROPERTY PX4_MODULE_LIBRARIES
                  BRIEF_DOCS "PX4 module libs"
@@ -148,6 +158,7 @@ define_property(GLOBAL PROPERTY PX4_MODULE_PATHS
                  BRIEF_DOCS "PX4 module paths"
                  FULL_DOCS "List of paths to all PX4 modules"
                  )
+
 define_property(GLOBAL PROPERTY PX4_SRC_FILES
                  BRIEF_DOCS "src files from all PX4 modules & libs"
                  FULL_DOCS "SRC files from px4_add_{module,library}"
@@ -397,8 +408,15 @@ include(px4_add_gtest)
 if(BUILD_TESTING)
 	include(gtest)
 
+	# Ensure there's no -R without any filter expression since that trips newer ctest versions
+	if(TESTFILTER)
+		set(TESTFILTERARG "-R")
+	else()
+		set(TESTFILTERARG "")
+	endif()
+
 	add_custom_target(test_results
-			COMMAND GTEST_COLOR=1 ${CMAKE_CTEST_COMMAND} --output-on-failure -T Test -R ${TESTFILTER} USES_TERMINAL
+			COMMAND GTEST_COLOR=1 ${CMAKE_CTEST_COMMAND} --output-on-failure -T Test ${TESTFILTERARG} ${TESTFILTER}
 			DEPENDS
 				px4
 				examples__dyn_hello
@@ -414,6 +432,8 @@ endif()
 #
 add_library(parameters_interface INTERFACE)
 add_library(kernel_parameters_interface INTERFACE)
+add_library(events_interface INTERFACE)
+add_library(kernel_events_interface INTERFACE)
 
 include(px4_add_library)
 add_subdirectory(src/lib EXCLUDE_FROM_ALL)
@@ -440,8 +460,11 @@ add_subdirectory(src/lib/parameters EXCLUDE_FROM_ALL)
 if(${PX4_PLATFORM} STREQUAL "nuttx" AND NOT CONFIG_BUILD_FLAT)
 	target_link_libraries(parameters_interface INTERFACE usr_parameters)
 	target_link_libraries(kernel_parameters_interface INTERFACE parameters)
+	target_link_libraries(events_interface INTERFACE usr_events)
+	target_link_libraries(kernel_events_interface INTERFACE events)
 else()
 	target_link_libraries(parameters_interface INTERFACE parameters)
+	target_link_libraries(events_interface INTERFACE events)
 endif()
 
 # firmware added last to generate the builtin for included modules
@@ -479,7 +502,7 @@ include(package)
 
 # install python requirements using configured python
 add_custom_target(install_python_requirements
-	COMMAND ${PYTHON_EXECUTABLE} -m pip install --requirement ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
+	COMMAND ${PYTHON_EXECUTABLE} -m pip install --break-system-packages --requirement ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	DEPENDS ${PX4_SOURCE_DIR}/Tools/setup/requirements.txt
 	USES_TERMINAL
 )

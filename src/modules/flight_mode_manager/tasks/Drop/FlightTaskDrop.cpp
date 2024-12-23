@@ -189,7 +189,7 @@ bool FlightTaskDrop::update()
 	_position_smoothing.setMaxAccelerationXY(_param_mpc_acc_hor.get()); // TODO : Should be computed using heading
 	_position_smoothing.setMaxVelocityXY(_param_mpc_xy_vel_max.get());
 	float max_jerk = _param_mpc_jerk_auto.get();
-	_position_smoothing.setMaxJerk({max_jerk, max_jerk, max_jerk}); // TODO : Should be computed using heading
+	_position_smoothing.setMaxJerk(max_jerk); // TODO : Should be computed using heading
 
 	if (_velocity_setpoint(2) < 0.f) { // up
 		_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_up.get());
@@ -385,9 +385,9 @@ bool FlightTaskDrop::update()
 					q.copyTo(vehicle_attitude_setpoint.q_d);
 
 					const Eulerf euler{q};
-					vehicle_attitude_setpoint.roll_body = euler(0);
-					vehicle_attitude_setpoint.pitch_body = euler(1);
-					vehicle_attitude_setpoint.yaw_body = euler(2);
+					// vehicle_attitude_setpoint.roll_body = euler(0);
+					// vehicle_attitude_setpoint.pitch_body = euler(1);
+					// vehicle_attitude_setpoint.yaw_body = euler(2);
 					vehicle_attitude_setpoint.thrust_body[2] = rates_setpoint.thrust_body[2];
 					vehicle_attitude_setpoint.timestamp = hrt_absolute_time();
 					_vehicle_attitude_setpoint_pub.update(vehicle_attitude_setpoint);
@@ -432,9 +432,9 @@ bool FlightTaskDrop::update()
 				Quatf q_sp = euler_sp;
 				q_sp.copyTo(attitude_setpoint.q_d);
 
-				attitude_setpoint.roll_body = euler_sp(0);
-				attitude_setpoint.pitch_body = euler_sp(1);
-				attitude_setpoint.yaw_body = euler_sp(2);
+				// attitude_setpoint.roll_body = euler_sp(0);
+				// attitude_setpoint.pitch_body = euler_sp(1);
+				// attitude_setpoint.yaw_body = euler_sp(2);
 
 				// throttle ramp up to _param_mpc_thr_hover.get() over 3 seconds
 				const float thr_ramp_time_s = 3.f;
@@ -670,7 +670,7 @@ bool FlightTaskDrop::update()
 							// When initializing with large velocity, allow 1g of
 							// acceleration in 1s on all axes for fast braking
 							_position_smoothing.setMaxAcceleration({9.81f, 9.81f, 9.81f});
-							_position_smoothing.setMaxJerk({9.81f, 9.81f, 9.81f});
+							_position_smoothing.setMaxJerk(9.81f);
 
 							// If the current velocity is beyond the usual constraints, tell
 							// the controller to exceptionally increase its saturations to avoid

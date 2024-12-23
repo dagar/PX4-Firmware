@@ -57,7 +57,7 @@ static const FunctionProvider all_function_providers[] = {
 	{OutputFunction::Constant_Max, &FunctionConstantMax::allocate},
 	{OutputFunction::Motor1, OutputFunction::MotorMax, &FunctionMotors::allocate},
 	{OutputFunction::Servo1, OutputFunction::ServoMax, &FunctionServos::allocate},
-	{OutputFunction::Offboard_Actuator_Set1, OutputFunction::Offboard_Actuator_Set6, &FunctionActuatorSet::allocate},
+	{OutputFunction::Peripheral_via_Actuator_Set1, OutputFunction::Peripheral_via_Actuator_Set6, &FunctionActuatorSet::allocate},
 	{OutputFunction::Landing_Gear, &FunctionLandingGear::allocate},
 	{OutputFunction::Landing_Gear_Wheel, &FunctionLandingGearWheel::allocate},
 	{OutputFunction::Parachute, &FunctionParachute::allocate},
@@ -67,7 +67,7 @@ static const FunctionProvider all_function_providers[] = {
 };
 
 MixingOutput::MixingOutput(const char *param_prefix, uint8_t max_num_outputs, OutputModuleInterface &interface,
-			   SchedulingPolicy scheduling_policy, bool support_esc_calibration, bool ramp_up) :
+			   SchedulingPolicy scheduling_policy, bool support_esc_calibration, bool ramp_up, const uint8_t instance_start) :
 	ModuleParams(&interface),
 	_output_ramp_up(ramp_up),
 	_scheduling_policy(scheduling_policy),
@@ -87,7 +87,7 @@ MixingOutput::MixingOutput(const char *param_prefix, uint8_t max_num_outputs, Ou
 
 	px4_sem_init(&_lock, 0, 1);
 
-	initParamHandles();
+	initParamHandles(instance_start);
 
 	for (unsigned i = 0; i < MAX_ACTUATORS; i++) {
 		_failsafe_value[i] = UINT16_MAX;
@@ -108,20 +108,20 @@ MixingOutput::~MixingOutput()
 	_outputs_pub.unadvertise();
 }
 
-void MixingOutput::initParamHandles()
+void MixingOutput::initParamHandles(const uint8_t instance_start)
 {
 	char param_name[17];
 
 	for (unsigned i = 0; i < _max_num_outputs; ++i) {
-		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "FUNC", i + 1);
+		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "FUNC", i + instance_start);
 		_param_handles[i].function = param_find(param_name);
-		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "DIS", i + 1);
+		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "DIS", i + instance_start);
 		_param_handles[i].disarmed = param_find(param_name);
-		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "MIN", i + 1);
+		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "MIN", i + instance_start);
 		_param_handles[i].min = param_find(param_name);
-		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "MAX", i + 1);
+		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "MAX", i + instance_start);
 		_param_handles[i].max = param_find(param_name);
-		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "FAIL", i + 1);
+		snprintf(param_name, sizeof(param_name), "%s_%s%d", _param_prefix, "FAIL", i + instance_start);
 		_param_handles[i].failsafe = param_find(param_name);
 	}
 
@@ -455,13 +455,16 @@ bool MixingOutput::update()
 		}
 	}
 
-	if (!all_disabled) {
+	// Send output if any function mapped or one last disabling sample
+	if (!all_disabled || !_was_all_disabled) {
 		if (!_armed.armed && !_armed.manual_lockdown) {
 			_actuator_test.overrideValues(outputs, _max_num_outputs);
 		}
 
 		limitAndUpdateOutputs(outputs, has_updates);
 	}
+
+	_was_all_disabled = all_disabled;
 
 	return true;
 }
@@ -528,10 +531,10 @@ uint16_t MixingOutput::output_limit_calc_single(int i, float value) const
 		value = -1.f * value;
 	}
 
-	uint16_t effective_output = value * (_max_value[i] - _min_value[i]) / 2 + (_max_value[i] + _min_value[i]) / 2;
+	const float output = math::interpolate(value, -1.f, 1.f,
+					       static_cast<float>(_min_value[i]), static_cast<float>(_max_value[i]));
 
-	// last line of defense against invalid inputs
-	return math::constrain(effective_output, _min_value[i], _max_value[i]);
+	return math::constrain(lroundf(output), 0L, static_cast<long>(UINT16_MAX));
 }
 
 void

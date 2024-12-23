@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <fstream>
 #include <map>
 #include <vector>
@@ -220,6 +221,23 @@ protected:
 
 private:
 	std::set<std::string> _overridden_params;
+
+	struct ParameterChangeEvent {
+		uint64_t timestamp;
+		std::string parameter_name;
+		double parameter_value;
+
+		// Comparison operator such that sorting is done by timestamp
+		bool operator<(const ParameterChangeEvent &other) const
+		{
+			return timestamp < other.timestamp;
+		}
+	};
+
+	std::set<std::string> _dynamic_parameters;
+	std::vector<ParameterChangeEvent> _dynamic_parameter_schedule;
+	size_t _next_param_change;
+
 	std::map<std::string, std::string> _file_formats; ///< all formats we read from the file
 
 	uint64_t _file_start_time;
@@ -244,7 +262,9 @@ private:
 
 	///file parsing methods. They return false, when further parsing should be aborted.
 	bool readFormat(std::ifstream &file, uint16_t msg_size);
-	bool readAndAddSubscription(std::ifstream &file, uint16_t msg_size);
+
+	enum class ReadAndAndAddSubResult : uint8_t { kSuccess, kIgnoringMsg, kFailure };
+	ReadAndAndAddSubResult readAndAddSubscription(std::ifstream &file, uint16_t msg_size);
 	bool readFlagBits(std::ifstream &file, uint16_t msg_size);
 
 	/**
@@ -275,9 +295,11 @@ private:
 	/** get the size of a type that can be an array */
 	static size_t sizeOfFullType(const std::string &type_name_full);
 
+	void setParameter(const std::string &parameter_name, const double parameter_value);
 	void setUserParams(const char *filename);
+	void readDynamicParams(const char *filename);
 
-	std::string parseOrbFields(const std::string &fields);
+	std::string getOrbFields(const orb_metadata *meta);
 
 	static char *_replay_file;
 };

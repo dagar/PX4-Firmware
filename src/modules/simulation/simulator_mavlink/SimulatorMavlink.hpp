@@ -34,7 +34,7 @@
 
 
 /**
- * @file simulator.h
+ * @file SimulatorMavlink.hpp
  *
  * This module interfaces via MAVLink to a software in the loop simulator (SITL)
  * such as jMAVSim or Gazebo.
@@ -294,7 +294,8 @@ private:
 	bool _mag_stuck[MAG_COUNT_MAX] {};
 
 	bool _gps_blocked{false};
-	bool _airspeed_blocked{false};
+	bool _airspeed_disconnected{false};
+	hrt_abstime _airspeed_blocked_timestamp{0};
 	bool _vio_blocked{false};
 
 	float _last_magx[MAG_COUNT_MAX] {};

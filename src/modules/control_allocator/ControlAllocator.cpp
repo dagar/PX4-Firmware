@@ -239,7 +239,7 @@ ControlAllocator::update_effectiveness_source()
 			break;
 
 		case EffectivenessSource::ROVER_DIFFERENTIAL:
-			tmp = new ActuatorEffectivenessRoverDifferential();
+			// rover_differential_control does allocation and publishes directly to actuator_motors topic
 			break;
 
 		case EffectivenessSource::FIXED_WING:
@@ -264,6 +264,10 @@ ControlAllocator::update_effectiveness_source()
 
 		case EffectivenessSource::HELICOPTER_TAIL_SERVO:
 			tmp = new ActuatorEffectivenessHelicopter(this, ActuatorType::SERVOS);
+			break;
+
+		case EffectivenessSource::HELICOPTER_COAXIAL:
+			tmp = new ActuatorEffectivenessHelicopterCoaxial(this);
 			break;
 
 		default:
@@ -359,6 +363,14 @@ ControlAllocator::Run()
 		}
 	}
 
+	{
+		vehicle_control_mode_s vehicle_control_mode;
+
+		if (_vehicle_control_mode_sub.update(&vehicle_control_mode)) {
+			_publish_controls = vehicle_control_mode.flag_control_allocation_enabled;
+		}
+	}
+
 	// Guard against too small (< 0.2ms) and too large (> 20ms) dt's.
 	const hrt_abstime now = hrt_absolute_time();
 	const float dt = math::constrain(((now - _last_run) / 1e6f), 0.0002f, 0.02f);
@@ -381,7 +393,7 @@ ControlAllocator::Run()
 	if (_vehicle_thrust_setpoint_sub.update(&vehicle_thrust_setpoint)) {
 		_thrust_sp = matrix::Vector3f(vehicle_thrust_setpoint.xyz);
 
-		if (dt > 5_ms) {
+		if (dt > 0.005f) {
 			do_update = true;
 			_timestamp_sample = vehicle_thrust_setpoint.timestamp_sample;
 		}
@@ -641,6 +653,10 @@ ControlAllocator::publish_control_allocator_status(int matrix_index)
 void
 ControlAllocator::publish_actuator_controls()
 {
+	if (!_publish_controls) {
+		return;
+	}
+
 	actuator_motors_s actuator_motors;
 	actuator_motors.timestamp = hrt_absolute_time();
 	actuator_motors.timestamp_sample = _timestamp_sample;

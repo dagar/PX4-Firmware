@@ -128,10 +128,15 @@ public:
 
 	bool isArmed() const { return _status.arming_state == vehicle_status_s::ARMING_STATE_ARMED; }
 
+	bool isArmingRequest() const { return _is_arming_request; }
+
+	void setIsArmingRequest(bool is_arming_request) { _is_arming_request = is_arming_request; }
+
 	const vehicle_status_s &status() const { return _status; }
 
 private:
 	const vehicle_status_s &_status;
+	bool _is_arming_request{false};	// true if we currently have an arming request
 };
 
 
@@ -249,8 +254,8 @@ public:
 	void clearArmingBits(NavModes modes);
 
 	/**
-	 * Clear can_run bits for certain modes. This will prevent mode switching and trigger failsafe if the
-	 * mode is being run.
+	 * Clear can_run bits for certain modes. This will prevent mode switching.
+	 * For failsafe use the mode requirements instead, which then will clear the can_run bits.
 	 * @param modes affected modes
 	 */
 	void clearCanRunBits(NavModes modes);
@@ -259,6 +264,8 @@ public:
 	const ArmingCheckResults &armingCheckResults() const { return _results[_current_result].arming_checks; }
 
 	bool modePreventsArming(uint8_t nav_state) const { return _failsafe_flags.mode_req_prevent_arming & (1u << nav_state); }
+
+	bool addExternalEvent(const event_s &event, NavModes modes);
 private:
 
 	/**
@@ -307,6 +314,7 @@ private:
 	NavModes getModeGroup(uint8_t nav_state) const;
 
 	friend class HealthAndArmingChecks;
+	friend class ExternalChecks;
 	FRIEND_TEST(ReporterTest, basic_no_checks);
 	FRIEND_TEST(ReporterTest, basic_fail_all_modes);
 	FRIEND_TEST(ReporterTest, arming_checks_mode_category);
@@ -329,7 +337,12 @@ private:
 	 */
 	bool finalize();
 
-	bool report(bool is_armed, bool force);
+	bool report(bool force);
+
+	/**
+	 * Send out any unreported changes if there are any
+	 */
+	bool reportIfUnreportedDifferences();
 
 	const hrt_abstime _min_reporting_interval;
 
@@ -373,7 +386,7 @@ bool Report::addEvent(uint32_t event_id, const events::LogLevels &log_levels, co
 		      Args... args)
 {
 	constexpr unsigned args_size = events::util::sizeofArguments(modes, args...);
-	static_assert(args_size <= sizeof(events::EventType::arguments), "Too many arguments");
+	static_assert(args_size <= sizeof(event_s::arguments), "Too many arguments");
 	unsigned total_size = sizeof(EventBufferHeader) + args_size;
 
 	if (total_size > sizeof(_event_buffer) - _next_buffer_idx) {

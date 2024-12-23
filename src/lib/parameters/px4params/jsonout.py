@@ -140,10 +140,9 @@ class JsonOutput():
 
 
         #Json string output.
-        self.output = json.dumps(all_json, indent=2, sort_keys=True)
+        self.output = json.dumps(all_json, sort_keys=True)
 
 
     def Save(self, filename):
         with codecs.open(filename, 'w', 'utf-8') as f:
             f.write(self.output)
-

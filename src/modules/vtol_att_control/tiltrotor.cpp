@@ -43,7 +43,6 @@
 #include "vtol_att_control_main.h"
 
 using namespace matrix;
-using namespace time_literals;
 
 #define FRONTTRANS_THR_MIN 0.25f
 #define BACKTRANS_THROTTLE_DOWNRAMP_DUR_S 0.5f
@@ -182,44 +181,8 @@ void Tiltrotor::update_mc_state()
 {
 	VtolType::update_mc_state();
 
-	/*Motor spin up: define the first second after arming as motor spin up time, during which
-	* the tilt is set to the value of VT_TILT_SPINUP. This allows the user to set a spin up
-	* tilt angle in case the propellers don't spin up smoothly in full upright (MC mode) position.
-	*/
-
-	const int spin_up_duration_p1 = 1000_ms; // duration of 1st phase of spinup (at fixed tilt)
-	const int spin_up_duration_p2 = 700_ms; // duration of 2nd phase of spinup (transition from spinup tilt to mc tilt)
-
-	// reset this timestamp while disarmed
-	if (!_v_control_mode->flag_armed) {
-		_last_timestamp_disarmed = hrt_absolute_time();
-		_tilt_motors_for_startup = _param_vt_tilt_spinup.get() > 0.01f; // spinup phase only required if spinup tilt > 0
-
-	} else if (_tilt_motors_for_startup) {
-		// leave motors tilted forward after arming to allow them to spin up easier
-		if (hrt_absolute_time() - _last_timestamp_disarmed > (spin_up_duration_p1 + spin_up_duration_p2)) {
-			_tilt_motors_for_startup = false;
-		}
-	}
-
-	if (_tilt_motors_for_startup) {
-		if (hrt_absolute_time() - _last_timestamp_disarmed < spin_up_duration_p1) {
-			_tilt_control = _param_vt_tilt_spinup.get();
-
-		} else {
-			// duration phase 2: begin to adapt tilt to multicopter tilt
-			float delta_tilt = (_param_vt_tilt_mc.get() - _param_vt_tilt_spinup.get());
-			_tilt_control = _param_vt_tilt_spinup.get() + delta_tilt / spin_up_duration_p2 * (hrt_absolute_time() -
-					(_last_timestamp_disarmed + spin_up_duration_p1));
-		}
-
-		_mc_yaw_weight = 0.0f; //disable yaw control during spinup
-
-	} else {
-		// normal operation
-		_tilt_control = VtolType::pusher_assist() + _param_vt_tilt_mc.get();
-		_mc_yaw_weight = 1.0f;
-	}
+	_tilt_control = VtolType::pusher_assist() + _param_vt_tilt_mc.get();
+	_mc_yaw_weight = 1.0f;
 }
 
 void Tiltrotor::update_fw_state()
@@ -240,6 +203,11 @@ void Tiltrotor::update_transition_state()
 
 	const hrt_abstime now = hrt_absolute_time();
 
+	const Eulerf attitude_setpoint_euler(Quatf(_v_att_sp->q_d));
+	float roll_body = attitude_setpoint_euler.phi();
+	float pitch_body = attitude_setpoint_euler.theta();
+	float yaw_body = attitude_setpoint_euler.psi();
+
 	// we get attitude setpoint from a multirotor flighttask if altitude is controlled.
 	// in any other case the fixed wing attitude controller publishes attitude setpoint from manual stick input.
 	if (_v_control_mode->flag_control_climb_rate_enabled) {
@@ -249,7 +217,7 @@ void Tiltrotor::update_transition_state()
 		}
 
 		memcpy(_v_att_sp, _mc_virtual_att_sp, sizeof(vehicle_attitude_setpoint_s));
-		_v_att_sp->roll_body = _fw_virtual_att_sp->roll_body;
+		roll_body = Eulerf(Quatf(_fw_virtual_att_sp->q_d)).phi();
 		_thrust_transition = -_mc_virtual_att_sp->thrust_body[2];
 
 	} else {
@@ -280,20 +248,17 @@ void Tiltrotor::update_transition_state()
 		_mc_roll_weight = 1.0f;
 		_mc_yaw_weight = 1.0f;
 
-		if (!_param_fw_arsp_mode.get()  && PX4_ISFINITE(_airspeed_validated->calibrated_airspeed_m_s) &&
-		    _airspeed_validated->calibrated_airspeed_m_s >= _param_vt_arsp_blend.get()) {
-			const float weight = 1.0f - (_airspeed_validated->calibrated_airspeed_m_s - _param_vt_arsp_blend.get()) /
-					     (_param_vt_arsp_trans.get()  - _param_vt_arsp_blend.get());
-			_mc_roll_weight = weight;
-			_mc_yaw_weight = weight;
+		if (_param_fw_use_airspd.get()  && PX4_ISFINITE(_airspeed_validated->calibrated_airspeed_m_s) &&
+		    _airspeed_validated->calibrated_airspeed_m_s >= getBlendAirspeed()) {
+			_mc_roll_weight = 1.0f - (_airspeed_validated->calibrated_airspeed_m_s - getBlendAirspeed()) /
+					  (getTransitionAirspeed()  - getBlendAirspeed());
 		}
 
 		// without airspeed do timed weight changes
-		if ((_param_fw_arsp_mode.get() || !PX4_ISFINITE(_airspeed_validated->calibrated_airspeed_m_s)) &&
+		if ((!_param_fw_use_airspd.get() || !PX4_ISFINITE(_airspeed_validated->calibrated_airspeed_m_s)) &&
 		    _time_since_trans_start > getMinimumFrontTransitionTime()) {
 			_mc_roll_weight = 1.0f - (_time_since_trans_start - getMinimumFrontTransitionTime()) /
 					  (getOpenLoopFrontTransitionTime() - getMinimumFrontTransitionTime());
-			_mc_yaw_weight = _mc_roll_weight;
 		}
 
 		// add minimum throttle for front transition
@@ -330,7 +295,7 @@ void Tiltrotor::update_transition_state()
 
 		// control backtransition deceleration using pitch.
 		if (_v_control_mode->flag_control_climb_rate_enabled) {
-			_v_att_sp->pitch_body = update_and_get_backtransition_pitch_sp();
+			pitch_body = Eulerf(Quatf(_mc_virtual_att_sp->q_d)).theta();
 		}
 
 		if (_time_since_trans_start < BACKTRANS_THROTTLE_DOWNRAMP_DUR_S) {
@@ -361,7 +326,7 @@ void Tiltrotor::update_transition_state()
 
 	_v_att_sp->thrust_body[2] = -_thrust_transition;
 
-	const Quatf q_sp(Eulerf(_v_att_sp->roll_body, _v_att_sp->pitch_body, _v_att_sp->yaw_body));
+	const Quatf q_sp(Eulerf(roll_body, pitch_body, yaw_body));
 	q_sp.copyTo(_v_att_sp->q_d);
 
 	_mc_roll_weight = math::constrain(_mc_roll_weight, 0.0f, 1.0f);

@@ -42,9 +42,11 @@
 #include <px4_platform_common/posix.h>
 #include <px4_platform_common/crypto.h>
 #include <px4_platform_common/log.h>
-#ifdef __PX4_NUTTX
-#include <systemlib/hardfault_log.h>
-#endif /* __PX4_NUTTX */
+
+#if defined(__PX4_NUTTX)
+# include <malloc.h>
+# include <systemlib/hardfault_log.h>
+#endif // __PX4_NUTTX
 
 using namespace time_literals;
 
@@ -60,11 +62,13 @@ LogWriterFile::LogWriterFile(size_t buffer_size)
 	//We always write larger chunks (orb messages) to the buffer, so the buffer
 	//needs to be larger than the minimum write chunk (300 is somewhat arbitrary)
 	{
-		math::max(buffer_size, _min_write_chunk + 300),
+		buffer_size,
+		_min_write_chunk + 300,
 		perf_alloc(PC_ELAPSED, "logger_sd_write"), perf_alloc(PC_ELAPSED, "logger_sd_fsync")},
 
 	{
 		300, // buffer size for the mission log (can be kept fairly small)
+		1,
 		perf_alloc(PC_ELAPSED, "logger_sd_write_mission"), perf_alloc(PC_ELAPSED, "logger_sd_fsync_mission")}
 }
 {
@@ -148,28 +152,7 @@ bool LogWriterFile::init_logfile_encryption(const char *filename)
 	rsa_crypto.close();
 
 	// Write the encrypted key to the disk
-
-	// Allocate a buffer for filename
-	size_t fnlen = strlen(filename);
-	char *tmp_buf = (char *)malloc(fnlen + 1);
-
-	if (!tmp_buf) {
-		PX4_ERR("out of memory");
-		free(key);
-		return false;
-	}
-
-	// Copy the original logfile name, and append 'k' to the filename
-
-	memcpy(tmp_buf, filename, fnlen + 1);
-	tmp_buf[fnlen - 1] = 'k';
-	tmp_buf[fnlen] = 0;
-
-	int key_fd = ::open((const char *)tmp_buf, O_CREAT | O_WRONLY, PX4_O_MODE_666);
-
-	// The file name is no longer needed, free it
-	free(tmp_buf);
-	tmp_buf = nullptr;
+	int key_fd = ::open((const char *)filename, O_CREAT | O_WRONLY | O_DIRECT | O_SYNC, PX4_O_MODE_666);
 
 	if (key_fd < 0) {
 		PX4_ERR("Can't open key file, errno: %d", errno);
@@ -177,9 +160,9 @@ bool LogWriterFile::init_logfile_encryption(const char *filename)
 		return false;
 	}
 
-	// write the header to the key exchange file
+	// write the header to the combined key exchange & cipherdata file
 	struct ulog_key_header_s keyfile_header = {
-		.magic = {'U', 'L', 'o', 'g', 'K', 'e', 'y'},
+		.magic = {'U', 'L', 'o', 'g', 'E', 'n', 'c'},
 		.hdr_ver = 1,
 		.timestamp = hrt_absolute_time(),
 		.exchange_algorithm = CRYPTO_RSA_OAEP,
@@ -590,9 +573,12 @@ const char *log_type_str(LogType type)
 	return "unknown";
 }
 
-LogWriterFile::LogFileBuffer::LogFileBuffer(size_t log_buffer_size, perf_counter_t perf_write,
-		perf_counter_t perf_fsync)
-	: _buffer_size(log_buffer_size), _perf_write(perf_write), _perf_fsync(perf_fsync)
+LogWriterFile::LogFileBuffer::LogFileBuffer(size_t log_buffer_desired_size, size_t log_buffer_min_size,
+		perf_counter_t perf_write, perf_counter_t perf_fsync) :
+	_buffer_size(log_buffer_desired_size),
+	_buffer_size_min(log_buffer_min_size),
+	_perf_write(perf_write),
+	_perf_fsync(perf_fsync)
 {
 }
 
@@ -651,7 +637,11 @@ size_t LogWriterFile::LogFileBuffer::get_read_ptr(void **ptr, bool *is_part)
 
 bool LogWriterFile::LogFileBuffer::start_log(const char *filename)
 {
+#if defined(PX4_CRYPTO)
+	_fd = ::open(filename, O_APPEND | O_WRONLY, PX4_O_MODE_666);
+#else
 	_fd = ::open(filename, O_CREAT | O_WRONLY, PX4_O_MODE_666);
+#endif
 	_had_write_error.store(false);
 
 	if (_fd < 0) {
@@ -660,6 +650,25 @@ bool LogWriterFile::LogFileBuffer::start_log(const char *filename)
 	}
 
 	if (_buffer == nullptr) {
+		_buffer_size = math::max(_buffer_size, _buffer_size_min);
+
+#if defined(__PX4_NUTTX)
+		struct mallinfo alloc_info = mallinfo();
+
+		// reduced to largest available free chunk, but leave at least 1 kB available
+		static constexpr ssize_t one_kb = 1024;
+		const ssize_t reduced_buffer_size = math::max((alloc_info.mxordblk - one_kb) / one_kb * one_kb,
+						    (ssize_t)_buffer_size_min);
+
+		if ((reduced_buffer_size > 0) && ((ssize_t)_buffer_size > reduced_buffer_size)) {
+			PX4_WARN("requested buffer size %dB limited to available %dB (available plus 1 kB margin)",
+				 _buffer_size, reduced_buffer_size);
+
+			_buffer_size = reduced_buffer_size;
+		}
+
+#endif // __PX4_NUTTX
+
 		_buffer = (uint8_t *) px4_cache_aligned_alloc(_buffer_size);
 
 		if (_buffer == nullptr) {
