@@ -163,8 +163,39 @@ bool FlightTaskDrop::update()
 
 	const bool acceleration_valid = acceleration.isAllFinite()
 					&& (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s);
-	const bool velocity_valid = velocity.isAllFinite() && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
-				    && vehicle_local_position.v_xy_valid && vehicle_local_position.v_z_valid;
+	// const bool velocity_valid = velocity.isAllFinite() && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
+	// 			    && vehicle_local_position.v_xy_valid && vehicle_local_position.v_z_valid;
+
+	// horizontal velocity LPF
+	if (PX4_ISFINITE(velocity(0)) && PX4_ISFINITE(velocity(1))
+	    && vehicle_local_position.v_xy_valid
+	   ) {
+
+		_velocity_xy_lpf.update(velocity.xy());
+
+	} else {
+		_velocity_xy_lpf.reset(velocity.xy());
+	}
+
+	// vertical velocity LPF
+	if (PX4_ISFINITE(velocity(2))
+	    && vehicle_local_position.v_z_valid
+	   ) {
+		_velocity_z_lpf.update(velocity(2));
+
+	} else {
+		_velocity_z_lpf.reset(velocity(2));
+	}
+
+	if (acceleration.isAllFinite()) {
+		_acceleration_lpf.update(acceleration);
+
+	} else {
+		_acceleration_lpf.reset(acceleration);
+	}
+
+	const bool vz_valid = PX4_ISFINITE(velocity(2)) && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
+			      && vehicle_local_position.v_z_valid;
 
 	// const bool velocity_xy_valid = Vector2f(velocity.xy()).isAllFinite()
 	// 			       && (hrt_elapsed_time(&vehicle_local_position.timestamp) < 1_s)
@@ -298,13 +329,14 @@ bool FlightTaskDrop::update()
 
 				bool drop_detected = false;
 
-				if (velocity_valid && acceleration_valid) {
-					drop_detected = (velocity(2) > _param_mpc_drop_vz_thr.get())
-							&& (acceleration(2) > _param_mpc_drop_az_thr.get());
+				if (vz_valid && acceleration_valid) {
+					drop_detected = (_velocity_z_lpf.getState() > _param_mpc_drop_vz_thr.get())
+							&& (_acceleration_lpf.getState()(2) > _param_mpc_drop_az_thr.get());
 
 				} else if (acceleration_valid) {
 					// otherwise only require acceleration
-					drop_detected = (acceleration(2) > _param_mpc_drop_az_thr.get());
+					drop_detected = (_acceleration_lpf.getState()(2) > _param_mpc_drop_az_thr.get())
+							&& (_acceleration_lpf.getState()(2) > 0.9f * CONSTANTS_ONE_G);
 				}
 
 				// configurable velocity
