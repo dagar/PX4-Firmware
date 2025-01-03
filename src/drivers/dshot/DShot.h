@@ -171,6 +171,9 @@ private:
 
 	Command _current_command{};
 
+	hrt_abstime _last_beep1_time{0};
+	hrt_abstime _last_beep2_time{0};
+
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 	uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};
 	uORB::Publication<vehicle_command_ack_s> _command_ack_pub{ORB_ID(vehicle_command_ack)};

@@ -583,6 +583,31 @@ void DShot::Run()
 		}
 	}
 
+	// beep if armed, but in lockdown (eg waiting to launch)
+	if (!_current_command.valid()
+	    && _mixing_output.armed().armed
+	    && _mixing_output.armed().lockdown
+	   ) {
+		if (hrt_elapsed_time(&_last_beep1_time) >= 1000_ms) {
+			// play beacon 1
+			_current_command.command = DShot_cmd_beacon1;
+			_current_command.num_repetitions = 1;
+			_current_command.motor_mask = 0xFF;
+			_current_command.save = false;
+
+			_last_beep1_time = hrt_absolute_time();
+
+		} else if (hrt_elapsed_time(&_last_beep1_time) >= 300_ms) {
+			// play beacon 2
+			_current_command.command = DShot_cmd_beacon2;
+			_current_command.num_repetitions = 1;
+			_current_command.motor_mask = 0xFF;
+			_current_command.save = false;
+
+			_last_beep2_time = hrt_absolute_time();
+		}
+	}
+
 	handle_vehicle_commands();
 
 	if (!_mixing_output.armed().armed) {
