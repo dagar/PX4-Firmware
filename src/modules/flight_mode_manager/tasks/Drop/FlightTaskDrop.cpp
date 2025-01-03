@@ -87,10 +87,10 @@ bool FlightTaskDrop::activate(const trajectory_setpoint_s &last_setpoint)
 	//_is_emergency_braking_active = false;
 
 
-	// assume 10 ms interval (100 Hz), use time constant 0.1
-	_velocity_xy_lpf.setParameters(0.01f, 0.1f);
-	_velocity_z_lpf.setParameters(0.01f, 0.1f);
-	_acceleration_lpf.setParameters(0.01f, 0.1f);
+	// assume 10 ms interval (100 Hz)
+	_velocity_xy_lpf.setParameters(0.01f, kFilterTimeConstant);
+	_velocity_z_lpf.setParameters(0.01f, kFilterTimeConstant);
+	_acceleration_lpf.setParameters(0.01f, kFilterTimeConstant);
 
 	_velocity_xy_lpf.reset({});
 	_velocity_z_lpf.reset({});

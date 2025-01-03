@@ -117,10 +117,13 @@ private:
 	DropState _state{DropState::UNKNOWN};
 	DropState _state_prev{DropState::UNKNOWN};
 
-	AlphaFilter<matrix::Vector2f> _velocity_xy_lpf{0.1f};
-	AlphaFilter<float> _velocity_z_lpf{0.1f};
 
-	AlphaFilter<matrix::Vector3f> _acceleration_lpf{0.1f};
+	static constexpr float kFilterTimeConstant = 0.01f; // Tc 0.01 ~= 15.9 Hz cutoff
+
+	AlphaFilter<matrix::Vector2f> _velocity_xy_lpf{kFilterTimeConstant};
+	AlphaFilter<float> _velocity_z_lpf{kFilterTimeConstant};
+
+	AlphaFilter<matrix::Vector3f> _acceleration_lpf{kFilterTimeConstant};
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 	hrt_abstime _state_last_transition_time{0};
