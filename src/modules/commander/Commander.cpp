@@ -1901,13 +1901,26 @@ void Commander::run()
 					    || (_vehicle_status.hil_state == vehicle_status_s::HIL_STATE_ON)
 					    || _multicopter_throw_launch.isThrowLaunchInProgress());
 
-		if (_vehicle_constraints_sub.updated()) {
+		// ALTCTL drop mode hacks until we have proper multi-stage arming
+		//  - force lockdown if in drop mode and we don't yet want takeoff
+		// TODO: this sucks, do better
+		if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL
+		    && _vehicle_constraints_sub.updated()
+		   ) {
 			vehicle_constraints_s vehicle_constraints{};
 
 			if (_vehicle_constraints_sub.copy(&vehicle_constraints)) {
-				if (vehicle_constraints.drop_state != _vehicle_constraints_drop_state_prev) {
-					_vehicle_constraints_drop_state_prev = vehicle_constraints.drop_state;
-					_status_changed = true;
+				if ((hrt_elapsed_time(&vehicle_constraints.timestamp) < 200_ms)
+				    && (vehicle_constraints.timestamp >= _vehicle_status.nav_state_timestamp)
+				   ) {
+					if (!vehicle_constraints.want_takeoff) {
+						_actuator_armed.lockdown = true;
+					}
+
+					if (vehicle_constraints.drop_state != _vehicle_constraints_drop_state_prev) {
+						_vehicle_constraints_drop_state_prev = vehicle_constraints.drop_state;
+						_status_changed = true;
+					}
 				}
 			}
 		}
@@ -2614,9 +2627,6 @@ void Commander::updateControlMode()
 			if ((hrt_elapsed_time(&vehicle_constraints.timestamp) < 200_ms)
 			    && (vehicle_constraints.timestamp >= _vehicle_status.nav_state_timestamp)
 			   ) {
-				if (!vehicle_constraints.want_takeoff) {
-					_actuator_armed.lockdown = true;
-				}
 
 				switch (vehicle_constraints.drop_state) {
 				case vehicle_constraints_s::DROP_STATE_UNKNOWN: {
@@ -2729,11 +2739,6 @@ void Commander::updateControlMode()
 
 				default:
 					break;
-				}
-
-				if (vehicle_constraints.drop_state != _vehicle_constraints_drop_state_prev) {
-					_vehicle_constraints_drop_state_prev = vehicle_constraints.drop_state;
-					_status_changed = true;
 				}
 			}
 		}
