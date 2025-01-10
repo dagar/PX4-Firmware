@@ -1904,9 +1904,7 @@ void Commander::run()
 		// ALTCTL drop mode hacks until we have proper multi-stage arming
 		//  - force lockdown if in drop mode and we don't yet want takeoff
 		// TODO: this sucks, do better
-		if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL
-		    && _vehicle_constraints_sub.updated()
-		   ) {
+		if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL) {
 			vehicle_constraints_s vehicle_constraints{};
 
 			if (_vehicle_constraints_sub.copy(&vehicle_constraints)) {
