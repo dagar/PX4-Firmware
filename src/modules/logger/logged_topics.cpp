@@ -171,13 +171,17 @@ void LoggedTopics::add_default_topics()
 	}
 
 	// important EKF topics (higher rate)
-	add_optional_topic("estimator_selector_status", 10);
-	add_optional_topic_multi("estimator_event_flags", 10);
-	add_optional_topic_multi("estimator_optical_flow_vel", 200);
-	add_optional_topic_multi("estimator_sensor_bias", 1000);
-	add_optional_topic_multi("estimator_status", 200);
-	add_optional_topic_multi("estimator_status_flags", 10);
+	add_optional_topic("estimator_selector_status", 1);
+	add_optional_topic_multi("estimator_event_flags", 1);
+	add_optional_topic_multi("estimator_optical_flow_vel", 10);
+	add_optional_topic_multi("estimator_sensor_bias", 1);
+	add_optional_topic_multi("estimator_status", 20);
+	add_optional_topic_multi("estimator_status_flags", 1);
 	add_optional_topic_multi("yaw_estimator_status", 1000);
+
+	add_topic_multi("estimator_local_position", 10, 3);
+	add_topic_multi("estimator_status_flags", 10, 3);
+	add_topic_multi("estimator_states", 10, 3);
 
 	// log all raw sensors at minimal rate (at least 1 Hz)
 	add_topic_multi("battery_status", 200, 2);
