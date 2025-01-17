@@ -587,6 +587,7 @@ void EstimatorChecks::checkEstimatorStatusFlags(const Context &context, Report &
 		}
 	}
 
+#if 0
 	const hrt_abstime now = hrt_absolute_time();
 
 	/* Check estimator status for signs of bad yaw induced post takeoff navigation failure
@@ -604,8 +605,6 @@ void EstimatorChecks::checkEstimatorStatusFlags(const Context &context, Report &
 			_nav_test_passed = false;
 
 		} else {
-#if 0
-
 			if (!_nav_test_passed) {
 				// Both test ratios need to pass/fail together to change the nav test status
 				const bool innovation_pass = (estimator_status.vel_test_ratio < 1.f) && (estimator_status.pos_test_ratio < 1.f)
@@ -646,10 +645,10 @@ void EstimatorChecks::checkEstimatorStatusFlags(const Context &context, Report &
 					}
 				}
 			}
-
-#endif // no nav test
 		}
 	}
+
+#endif // no nav test
 }
 
 void EstimatorChecks::checkGps(const Context &context, Report &reporter, const sensor_gps_s &vehicle_gps_position) const
