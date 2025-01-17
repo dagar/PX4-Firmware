@@ -94,3 +94,17 @@ PARAM_DEFINE_FLOAT(MPC_DROP_HOLD_T, 3.f);
  * @group Multicopter Position Control
  */
 PARAM_DEFINE_FLOAT(MPC_DROP_AZ_MAX, 10.f);
+
+/**
+ * Max angular velocity
+ *
+ * Max angular velocity during rate control and attitude control initialization
+ *
+ * @unit deg/s
+ * @min 0.0
+ * @max 1800.0
+ * @decimal 1
+ * @increment 5
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_DROP_ANGVEL, 220.0f);

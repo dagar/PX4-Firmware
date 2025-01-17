@@ -149,6 +149,7 @@ private:
 					(ParamFloat<px4::params::MPC_DROP_AZ_THR>) _param_mpc_drop_az_thr,
 					(ParamFloat<px4::params::MPC_DROP_AZ_MAX>) _param_mpc_drop_az_max,
 					(ParamFloat<px4::params::MPC_DROP_HOLD_T>) _param_mpc_drop_hold_t,
+					(ParamFloat<px4::params::MPC_DROP_ANGVEL>) _param_mpc_drop_angvel,
 
 					(ParamFloat<px4::params::MPC_THR_HOVER>)    _param_mpc_thr_hover,
 

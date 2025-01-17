@@ -390,10 +390,10 @@ bool FlightTaskDrop::update()
 				}
 
 				const float dt = _deltatime;
-				const float max_rate_rad_s = math::radians(100.f); // 100 deg/s max
+				const float max_rate_rad_s = math::radians(_param_mpc_drop_angvel.get()); // 220 deg/s default
 				const float dv_max = math::constrain(max_rate_rad_s * dt, 0.001f, 10.f);
 
-				// move setpoint to 0, but no faster than 100 deg/s
+				// move setpoint to 0, but no faster than MPC_DROP_ANGVEL (220 deg/s default)
 				vehicle_rates_setpoint_s &rates_setpoint = _vehicle_rates_setpoint_pub.get();
 				rates_setpoint.roll  = math::constrain(0.f, rates_setpoint.roll  - dv_max, rates_setpoint.roll  + dv_max);
 				rates_setpoint.pitch = math::constrain(0.f, rates_setpoint.pitch - dv_max, rates_setpoint.pitch + dv_max);
@@ -463,7 +463,7 @@ bool FlightTaskDrop::update()
 				Eulerf euler_sp{Quatf{attitude_setpoint.q_d}};
 				const Eulerf euler_sp_prev{euler_sp};
 
-				const float max_rate_rad_s = math::radians(100.f); // 100 deg/s max
+				const float max_rate_rad_s = math::radians(_param_mpc_drop_angvel.get()); // 220 deg/s default
 				const float dv_max = math::constrain(max_rate_rad_s * dt, 0.001f, 1.f);
 
 				// bring roll and pitch to 0
