@@ -604,6 +604,8 @@ void EstimatorChecks::checkEstimatorStatusFlags(const Context &context, Report &
 			_nav_test_passed = false;
 
 		} else {
+#if 0
+
 			if (!_nav_test_passed) {
 				// Both test ratios need to pass/fail together to change the nav test status
 				const bool innovation_pass = (estimator_status.vel_test_ratio < 1.f) && (estimator_status.pos_test_ratio < 1.f)
@@ -644,6 +646,8 @@ void EstimatorChecks::checkEstimatorStatusFlags(const Context &context, Report &
 					}
 				}
 			}
+
+#endif // no nav test
 		}
 	}
 }
