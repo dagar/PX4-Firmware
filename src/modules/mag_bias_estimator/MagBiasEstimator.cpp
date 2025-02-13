@@ -71,7 +71,9 @@ int MagBiasEstimator::task_spawn(int argc, char *argv[])
 
 void MagBiasEstimator::start()
 {
-	ScheduleOnInterval(20_ms); // 50 Hz
+	_vehicle_angular_velocity_sub.set_interval_us(1000000 / 100); // 100 Hz
+	_vehicle_angular_velocity_sub.registerCallback();
+	ScheduleNow();
 }
 
 void MagBiasEstimator::Run()
@@ -94,11 +96,12 @@ void MagBiasEstimator::Run()
 				}
 
 				if (_arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
+					_vehicle_angular_velocity_sub.unregisterCallback();
 					ScheduleOnInterval(1_s);
 
 				} else {
-					// restore 50 Hz scheduling
-					ScheduleOnInterval(20_ms);
+					// restore callback scheduling
+					_vehicle_angular_velocity_sub.registerCallback();
 				}
 			}
 
@@ -157,11 +160,9 @@ void MagBiasEstimator::Run()
 		bool updated = false;
 
 		for (int mag_index = 0; mag_index < MAX_SENSOR_COUNT; mag_index++) {
-			int sensor_mag_updates = 0;
 			sensor_mag_s sensor_mag;
 
-			while ((sensor_mag_updates < sensor_mag_s::ORB_QUEUE_LENGTH) && _sensor_mag_subs[mag_index].update(&sensor_mag)) {
-				sensor_mag_updates++;
+			if (_sensor_mag_subs[mag_index].update(&sensor_mag)) {
 				updated = true;
 
 				// apply existing mag calibration

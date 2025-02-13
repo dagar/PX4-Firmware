@@ -289,6 +289,10 @@ void LoggedTopics::add_debug_topics()
 	add_topic("mag_worker_data");
 	add_topic("sensor_preflight_mag", 500);
 	add_topic("actuator_test", 500);
+
+	add_topic_multi("magnetometer_bias_estimate", 0, 2);
+	add_topic_multi("sensor_mag", 0, 2);
+	add_topic_multi("vehicle_magnetometer", 0, 2);
 }
 
 void LoggedTopics::add_estimator_replay_topics()
