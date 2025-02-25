@@ -215,9 +215,9 @@ bool Ekf::initialiseTilt()
 	const float accel_norm = _accel_lpf.getState().norm();
 	const float gyro_norm = _gyro_lpf.getState().norm();
 
-	if (accel_norm < 0.8f * CONSTANTS_ONE_G ||
-	    accel_norm > 1.2f * CONSTANTS_ONE_G ||
-	    gyro_norm > math::radians(15.0f)) {
+	if (accel_norm < 0.5f * CONSTANTS_ONE_G ||
+	    accel_norm > 1.5f * CONSTANTS_ONE_G ||
+	    gyro_norm > math::radians(30.0f)) {
 		return false;
 	}
 
