@@ -559,42 +559,44 @@ transition_result_t Commander::arm(arm_disarm_reason_t calling_reason, bool run_
 		run_preflight_checks = false;
 	}
 
-	if (run_preflight_checks
-	    && (_vehicle_status.nav_state != _vehicle_status.NAVIGATION_STATE_ALTCTL) // ALTCTL drop mode hack
-	   ) {
-		if (_vehicle_control_mode.flag_control_manual_enabled) {
+	if (run_preflight_checks) {
 
-			if (_vehicle_control_mode.flag_control_climb_rate_enabled &&
-			    !_failsafe_flags.manual_control_signal_lost && _is_throttle_above_center
-			   ) {
+		if (_vehicle_status.nav_state != _vehicle_status.NAVIGATION_STATE_ALTCTL) { // ALTCTL drop mode hack
 
-				mavlink_log_critical(&_mavlink_log_pub, "Arming denied: throttle above center\t");
-				events::send(events::ID("commander_arm_denied_throttle_center"), {events::Log::Critical, events::LogInternal::Info},
-					     "Arming denied: throttle above center");
+			if (_vehicle_control_mode.flag_control_manual_enabled) {
+
+				if (_vehicle_control_mode.flag_control_climb_rate_enabled &&
+				    !_failsafe_flags.manual_control_signal_lost && _is_throttle_above_center
+				   ) {
+
+					mavlink_log_critical(&_mavlink_log_pub, "Arming denied: throttle above center\t");
+					events::send(events::ID("commander_arm_denied_throttle_center"), {events::Log::Critical, events::LogInternal::Info},
+						     "Arming denied: throttle above center");
+					tune_negative(true);
+					return TRANSITION_DENIED;
+				}
+
+				if (!_vehicle_control_mode.flag_control_climb_rate_enabled &&
+				    !_failsafe_flags.manual_control_signal_lost && !_is_throttle_low
+				    && _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROVER) {
+
+					mavlink_log_critical(&_mavlink_log_pub, "Arming denied: high throttle\t");
+					events::send(events::ID("commander_arm_denied_throttle_high"), {events::Log::Critical, events::LogInternal::Info},
+						     "Arming denied: high throttle");
+					tune_negative(true);
+					return TRANSITION_DENIED;
+				}
+
+			} else if (calling_reason == arm_disarm_reason_t::stick_gesture
+				   || calling_reason == arm_disarm_reason_t::rc_switch
+				   || calling_reason == arm_disarm_reason_t::rc_button) {
+
+				mavlink_log_critical(&_mavlink_log_pub, "Arming denied: switch to manual mode first\t");
+				events::send(events::ID("commander_arm_denied_not_manual"), {events::Log::Critical, events::LogInternal::Info},
+					     "Arming denied: switch to manual mode first");
 				tune_negative(true);
 				return TRANSITION_DENIED;
 			}
-
-			if (!_vehicle_control_mode.flag_control_climb_rate_enabled &&
-			    !_failsafe_flags.manual_control_signal_lost && !_is_throttle_low
-			    && _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROVER) {
-
-				mavlink_log_critical(&_mavlink_log_pub, "Arming denied: high throttle\t");
-				events::send(events::ID("commander_arm_denied_throttle_high"), {events::Log::Critical, events::LogInternal::Info},
-					     "Arming denied: high throttle");
-				tune_negative(true);
-				return TRANSITION_DENIED;
-			}
-
-		} else if (calling_reason == arm_disarm_reason_t::stick_gesture
-			   || calling_reason == arm_disarm_reason_t::rc_switch
-			   || calling_reason == arm_disarm_reason_t::rc_button) {
-
-			mavlink_log_critical(&_mavlink_log_pub, "Arming denied: switch to manual mode first\t");
-			events::send(events::ID("commander_arm_denied_not_manual"), {events::Log::Critical, events::LogInternal::Info},
-				     "Arming denied: switch to manual mode first");
-			tune_negative(true);
-			return TRANSITION_DENIED;
 		}
 
 		_health_and_arming_checks.update(false, true);
