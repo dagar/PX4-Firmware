@@ -70,9 +70,9 @@ void Ekf::controlFusionModes(const imuSample &imu_delayed)
 	// monitor the tilt alignment
 	if (!_control_status.flags.tilt_align) {
 		// whilst we are aligning the tilt, monitor the variances
-		// Once the tilt variances have reduced to equivalent of 3 deg uncertainty
+		// Once the tilt variances have reduced to equivalent of 6 deg uncertainty
 		// and declare the tilt alignment complete
-		if (getTiltVariance() < sq(math::radians(3.f))) {
+		if (getTiltVariance() < sq(math::radians(6.f))) {
 			_control_status.flags.tilt_align = true;
 
 			// send alignment status message to the console
