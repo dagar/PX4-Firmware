@@ -559,10 +559,10 @@ bool FlightTaskDrop::update()
 				_yaw_setpoint = _yaw;
 				_yawspeed_setpoint = NAN;
 
-				// wait for full
-				if (!failsafe_flags.local_altitude_invalid && (fabsf(_velocity(2)) < 3.f) && (fabsf(acceleration(2)) < 1.f)) {
+				// wait for full valid velocity
+				if (!failsafe_flags.local_velocity_invalid && (fabsf(_velocity(2)) < 3.f) && (fabsf(acceleration(2)) < 1.f)) {
 
-					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating altitude control");
+					mavlink_log_info(&_mavlink_log_pub, "Drop: Activating velocity control");
 					_state = DropState::VELOCITY_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 				}
