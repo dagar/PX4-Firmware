@@ -171,6 +171,7 @@ void Ekf::controlBaroHeightFusion(const imuSample &imu_sample)
 				} else {
 					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
 					bias_est.setBias(-_gpos.altitude() + _baro_lpf.getState());
+					resetAidSourceStatusZeroInnovation(aid_src);
 				}
 
 				aid_src.time_last_fuse = imu_sample.time_us;

@@ -144,6 +144,7 @@ void Ekf::controlGnssHeightFusion(const gnssSample &gps_sample)
 				} else {
 					ECL_INFO("starting %s height fusion", HGT_SRC_NAME);
 					bias_est.setBias(-_gpos.altitude() + measurement);
+					resetAidSourceStatusZeroInnovation(aid_src);
 				}
 
 				aid_src.time_last_fuse = _time_delayed_us;
