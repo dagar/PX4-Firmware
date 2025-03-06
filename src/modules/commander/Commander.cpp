@@ -2631,7 +2631,7 @@ void Commander::updateControlMode()
 
 				switch (vehicle_constraints.drop_state) {
 				case vehicle_constraints_s::DROP_STATE_UNKNOWN: {
-						_vehicle_control_mode.flag_control_rates_enabled = false;
+						_vehicle_control_mode.flag_control_rates_enabled = true;
 						_vehicle_control_mode.flag_control_attitude_enabled = false;
 						_vehicle_control_mode.flag_control_altitude_enabled = false;
 						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
@@ -2642,7 +2642,7 @@ void Commander::updateControlMode()
 					break;
 
 				case vehicle_constraints_s::DROP_STATE_DISARMED: {
-						_vehicle_control_mode.flag_control_rates_enabled = false;
+						_vehicle_control_mode.flag_control_rates_enabled = true;
 						_vehicle_control_mode.flag_control_attitude_enabled = false;
 						_vehicle_control_mode.flag_control_altitude_enabled = false;
 						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
@@ -2653,7 +2653,7 @@ void Commander::updateControlMode()
 					break;
 
 				case vehicle_constraints_s::DROP_STATE_ARMING: {
-						_vehicle_control_mode.flag_control_rates_enabled = false;
+						_vehicle_control_mode.flag_control_rates_enabled = true;
 						_vehicle_control_mode.flag_control_attitude_enabled = false;
 						_vehicle_control_mode.flag_control_altitude_enabled = false;
 						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
@@ -2665,7 +2665,7 @@ void Commander::updateControlMode()
 
 				case vehicle_constraints_s::DROP_STATE_WAITING_FOR_DROP_DETECT: {
 						_vehicle_control_mode.flag_control_manual_enabled = false;
-						_vehicle_control_mode.flag_control_rates_enabled = false;
+						_vehicle_control_mode.flag_control_rates_enabled = true;
 						_vehicle_control_mode.flag_control_attitude_enabled = false;
 						_vehicle_control_mode.flag_control_altitude_enabled = false;
 						_vehicle_control_mode.flag_control_climb_rate_enabled = false;

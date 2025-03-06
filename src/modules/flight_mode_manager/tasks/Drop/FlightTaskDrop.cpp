@@ -241,6 +241,7 @@ bool FlightTaskDrop::update()
 		_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
 	}
 
+
 	switch (_state) {
 	case DropState::UNKNOWN: {
 			//PX4_WARN("Drop: uninitialized");
@@ -360,14 +361,6 @@ bool FlightTaskDrop::update()
 
 					_state = DropState::RATE_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
-
-					// publish initial vehicle_rates_setpoint
-					vehicle_rates_setpoint_s vehicle_rates_setpoint{};
-					vehicle_rates_setpoint.roll  = vehicle_angular_velocity.xyz[0];
-					vehicle_rates_setpoint.pitch = vehicle_angular_velocity.xyz[1];
-					vehicle_rates_setpoint.yaw   = vehicle_angular_velocity.xyz[2];
-					vehicle_rates_setpoint.timestamp = hrt_absolute_time();
-					_vehicle_rates_setpoint_pub.update(vehicle_rates_setpoint);
 				}
 
 			} else {
@@ -798,6 +791,16 @@ bool FlightTaskDrop::update()
 
 	_constraints.drop_state = (uint8_t)_state;
 
+	// publish empty rate setpoint (match RPY) with 0 thrust before controllers are normally active
+	if (_state <= DropState::WAITING_FOR_DROP_DETECT) {
+		vehicle_rates_setpoint_s vehicle_rates_setpoint{};
+		vehicle_rates_setpoint.roll  = vehicle_angular_velocity.xyz[0];
+		vehicle_rates_setpoint.pitch = vehicle_angular_velocity.xyz[1];
+		vehicle_rates_setpoint.yaw   = vehicle_angular_velocity.xyz[2];
+		vehicle_rates_setpoint.reset_integral = true;
+		vehicle_rates_setpoint.timestamp = hrt_absolute_time();
+		_vehicle_rates_setpoint_pub.update(vehicle_rates_setpoint);
+	}
 
 	// FALLTHROUGH
 	// case WaypointType::takeoff:

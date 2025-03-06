@@ -58,6 +58,8 @@
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
+#include <uORB/topics/vehicle_thrust_setpoint.h>
+#include <uORB/topics/vehicle_torque_setpoint.h>
 
 #include <uORB/Publication.hpp>
 
@@ -84,6 +86,8 @@ private:
 
 	void updateParams() override; /**< See ModuleParam class */
 
+	uORB::Publication<vehicle_torque_setpoint_s> _vehicle_torque_setpoint_pub{ORB_ID(vehicle_torque_setpoint)};
+	uORB::Publication<vehicle_thrust_setpoint_s> _vehicle_thrust_setpoint_pub{ORB_ID(vehicle_thrust_setpoint)};
 	uORB::PublicationData<vehicle_rates_setpoint_s>     _vehicle_rates_setpoint_pub{ORB_ID(vehicle_rates_setpoint)};
 	uORB::PublicationData<vehicle_attitude_setpoint_s>  _vehicle_attitude_setpoint_pub{ORB_ID(vehicle_attitude_setpoint)};
 
