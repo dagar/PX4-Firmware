@@ -325,7 +325,7 @@ bool MixingOutput::updateSubscriptions(bool allow_wq_switch)
 			if (_subscription_callback->registerCallback()) {
 				PX4_DEBUG("Scheduling via callback");
 				_has_backup_schedule = true;
-				_interface.ScheduleDelayed(50_ms);
+				_interface.ScheduleDelayed(10_ms);
 
 			} else {
 				PX4_ERR("registerCallback failed, scheduling at fixed rate");
