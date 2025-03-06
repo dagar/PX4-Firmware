@@ -426,7 +426,7 @@ bool MixingOutput::update()
 	}
 
 	if (_has_backup_schedule) {
-		_interface.ScheduleDelayed(50_ms);
+		_interface.ScheduleDelayed(10_ms);
 	}
 
 	// check for actuator test
