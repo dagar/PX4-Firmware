@@ -1127,22 +1127,20 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 		}
 
 		if (ocm.position || ocm.velocity || ocm.acceleration) {
-			// publish offboard_control_mode
-			ocm.timestamp = hrt_absolute_time();
-			_offboard_control_mode_pub.publish(ocm);
-
 			vehicle_status_s vehicle_status{};
 			_vehicle_status_sub.copy(&vehicle_status);
 
-			setpoint.timestamp = hrt_absolute_time();
+			// publish offboard_control_mode
+			if (vehicle_status.nav_state != vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
+				// flighttask drop hack
+				ocm.timestamp = hrt_absolute_time();
+				_offboard_control_mode_pub.publish(ocm);
+			}
 
 			if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
 				// only publish setpoint once in OFFBOARD
-				_trajectory_setpoint_pub.publish(setpoint);
-
-			} else if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_ALTCTL) {
-				// drop mode hack
-				// TODO: fix
+				setpoint.timestamp = hrt_absolute_time();
+				//_trajectory_setpoint_pub.publish(setpoint);
 				_offboard_trajectory_setpoint_pub.publish(setpoint);
 			}
 
@@ -1255,22 +1253,20 @@ MavlinkReceiver::handle_message_set_position_target_global_int(mavlink_message_t
 		}
 
 		if (ocm.position || ocm.velocity || ocm.acceleration) {
-			// publish offboard_control_mode
-			ocm.timestamp = hrt_absolute_time();
-			_offboard_control_mode_pub.publish(ocm);
-
 			vehicle_status_s vehicle_status{};
 			_vehicle_status_sub.copy(&vehicle_status);
 
-			setpoint.timestamp = hrt_absolute_time();
+			// publish offboard_control_mode
+			if (vehicle_status.nav_state != vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
+				// flighttask drop hack
+				ocm.timestamp = hrt_absolute_time();
+				_offboard_control_mode_pub.publish(ocm);
+			}
 
 			if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
 				// only publish setpoint once in OFFBOARD
-				_trajectory_setpoint_pub.publish(setpoint);
-
-			} else if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_ALTCTL) {
-				// drop mode hack
-				// TODO: fix
+				setpoint.timestamp = hrt_absolute_time();
+				//_trajectory_setpoint_pub.publish(setpoint);
 				_offboard_trajectory_setpoint_pub.publish(setpoint);
 			}
 		}

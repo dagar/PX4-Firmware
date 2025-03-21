@@ -791,6 +791,25 @@ bool FlightTaskDrop::update()
 
 	_constraints.drop_state = (uint8_t)_state;
 
+	{
+		// publish offboard_control_mode
+		offboard_control_mode_s ocm{};
+		ocm.body_rate = true;
+
+		if (_state >= DropState::ATTITUDE_CONTROL_ENABLED) {
+			ocm.attitude = true;
+		}
+
+		if (_state >= DropState::HEIGHT_RATE_CONTROL_ENABLED) {
+			ocm.acceleration = true;
+			ocm.velocity = true;
+			ocm.position = true;
+		}
+
+		ocm.timestamp = hrt_absolute_time();
+		_offboard_control_mode_pub.publish(ocm);
+	}
+
 	// publish empty rate setpoint (match RPY) with 0 thrust before controllers are normally active
 	if (_state <= DropState::WAITING_FOR_DROP_DETECT) {
 		vehicle_rates_setpoint_s vehicle_rates_setpoint{};

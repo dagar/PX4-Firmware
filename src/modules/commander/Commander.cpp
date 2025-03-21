@@ -561,7 +561,7 @@ transition_result_t Commander::arm(arm_disarm_reason_t calling_reason, bool run_
 
 	if (run_preflight_checks) {
 
-		if (_vehicle_status.nav_state != _vehicle_status.NAVIGATION_STATE_ALTCTL) { // ALTCTL drop mode hack
+		if (_vehicle_status.nav_state != _vehicle_status.NAVIGATION_STATE_OFFBOARD) { // OFFBOARD drop mode hack
 
 			if (_vehicle_control_mode.flag_control_manual_enabled) {
 
@@ -1906,7 +1906,7 @@ void Commander::run()
 		// ALTCTL drop mode hacks until we have proper multi-stage arming
 		//  - force lockdown if in drop mode and we don't yet want takeoff
 		// TODO: this sucks, do better
-		if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL) {
+		if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_OFFBOARD) {
 			vehicle_constraints_s vehicle_constraints{};
 
 			if (_vehicle_constraints_sub.copy(&vehicle_constraints)) {
@@ -2616,135 +2616,6 @@ void Commander::updateControlMode()
 		    || _vehicle_control_mode.flag_control_position_enabled
 		    || _vehicle_control_mode.flag_control_velocity_enabled
 		    || _vehicle_control_mode.flag_control_acceleration_enabled);
-
-
-	// ALTCTL drop mode hacks until we have proper multi-stage arming
-	//  - force lockdown if in drop mode and we don't yet want takeoff
-	// TODO: this sucks, do better
-	if (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_ALTCTL) {
-		vehicle_constraints_s vehicle_constraints{};
-
-		if (_vehicle_constraints_sub.copy(&vehicle_constraints)) {
-			if ((hrt_elapsed_time(&vehicle_constraints.timestamp) < 200_ms)
-			    && (vehicle_constraints.timestamp >= _vehicle_status.nav_state_timestamp)
-			   ) {
-
-				switch (vehicle_constraints.drop_state) {
-				case vehicle_constraints_s::DROP_STATE_UNKNOWN: {
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = false;
-						_vehicle_control_mode.flag_control_altitude_enabled = false;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_control_velocity_enabled = false;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = false;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_DISARMED: {
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = false;
-						_vehicle_control_mode.flag_control_altitude_enabled = false;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_control_velocity_enabled = false;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = false;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_ARMING: {
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = false;
-						_vehicle_control_mode.flag_control_altitude_enabled = false;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_control_velocity_enabled = false;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = false;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_WAITING_FOR_DROP_DETECT: {
-						_vehicle_control_mode.flag_control_manual_enabled = false;
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = false;
-						_vehicle_control_mode.flag_control_altitude_enabled = false;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_control_velocity_enabled = false;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = false;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_RATE_CONTROL_ENABLED: {
-						_vehicle_control_mode.flag_control_manual_enabled = false;
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = false;
-						_vehicle_control_mode.flag_control_altitude_enabled = false;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_control_velocity_enabled = false;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = false;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_ATTITUDE_CONTROL_ENABLED: {
-						_vehicle_control_mode.flag_control_manual_enabled = false;
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = true;
-						_vehicle_control_mode.flag_control_altitude_enabled = false;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = false;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_control_velocity_enabled = false;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = false;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_HEIGHT_RATE_CONTROL_ENABLED: {
-						_vehicle_control_mode.flag_control_manual_enabled = false;
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = true;
-						_vehicle_control_mode.flag_control_altitude_enabled = true;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = true;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_control_velocity_enabled = true;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = true;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_VELOCITY_CONTROL_ENABLED: {
-						_vehicle_control_mode.flag_control_manual_enabled = false;
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = true;
-						_vehicle_control_mode.flag_control_altitude_enabled = true;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = true;
-						_vehicle_control_mode.flag_control_velocity_enabled = true;
-						_vehicle_control_mode.flag_control_position_enabled = false;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = true;
-					}
-					break;
-
-				case vehicle_constraints_s::DROP_STATE_POSITION_CONTROL_ENABLED:
-
-				// FALLTHROUGH
-				case vehicle_constraints_s::DROP_STATE_FLYING: {
-						_vehicle_control_mode.flag_control_manual_enabled = false;
-						_vehicle_control_mode.flag_control_rates_enabled = true;
-						_vehicle_control_mode.flag_control_attitude_enabled = true;
-						_vehicle_control_mode.flag_control_altitude_enabled = true;
-						_vehicle_control_mode.flag_control_climb_rate_enabled = true;
-						_vehicle_control_mode.flag_control_velocity_enabled = true;
-						_vehicle_control_mode.flag_control_position_enabled = true;
-						_vehicle_control_mode.flag_multicopter_position_control_enabled = true;
-					}
-					break;
-
-				default:
-					break;
-				}
-			}
-		}
-	}
-
 	_vehicle_control_mode.timestamp = hrt_absolute_time();
 	_vehicle_control_mode_pub.publish(_vehicle_control_mode);
 }

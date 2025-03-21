@@ -203,6 +203,14 @@ void FlightModeManager::start_flight_task()
 		task_failure = error != FlightTaskError::NoError;
 	}
 
+	// FlightTaskDrop (OFFBOARD)
+	if (_vehicle_status_sub.get().nav_state == vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
+		found_some_task = true;
+		FlightTaskError error = switchTask(FlightTaskIndex::Drop);
+		task_failure = (error != FlightTaskError::NoError);
+		matching_task_running = matching_task_running && !task_failure;
+	}
+
 	// Manual position control
 	if ((_vehicle_status_sub.get().nav_state == vehicle_status_s::NAVIGATION_STATE_POSCTL) || task_failure) {
 		found_some_task = true;
@@ -211,11 +219,6 @@ void FlightModeManager::start_flight_task()
 		switch (_param_mpc_pos_mode.get()) {
 		case 0:
 			error = switchTask(FlightTaskIndex::ManualPosition);
-			break;
-
-		case 9:
-			// MPC_POS_MODE 9 => Drop for ALTCTL, Acceleration for POSCTL
-			error = switchTask(FlightTaskIndex::ManualAcceleration);
 			break;
 
 		case 4:
@@ -242,10 +245,6 @@ void FlightModeManager::start_flight_task()
 		switch (_param_mpc_pos_mode.get()) {
 		case 0:
 			error = switchTask(FlightTaskIndex::ManualAltitude);
-			break;
-
-		case 9:
-			error = switchTask(FlightTaskIndex::Drop);
 			break;
 
 		case 3:
