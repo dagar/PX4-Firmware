@@ -206,6 +206,7 @@ void LoggedTopics::add_default_topics()
 	add_topic_multi("vehicle_torque_setpoint", 20, 2);
 
 	add_topic("drop_status", 100);
+	add_topic("offboard_trajectory_setpoint", 100);
 
 	// SYS_HITL: default ground truth logging for simulation
 	int32_t sys_hitl = 0;

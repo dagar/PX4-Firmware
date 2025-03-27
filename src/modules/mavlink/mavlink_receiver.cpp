@@ -1263,12 +1263,9 @@ MavlinkReceiver::handle_message_set_position_target_global_int(mavlink_message_t
 				_offboard_control_mode_pub.publish(ocm);
 			}
 
-			if (vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_OFFBOARD) {
-				// only publish setpoint once in OFFBOARD
-				setpoint.timestamp = hrt_absolute_time();
-				//_trajectory_setpoint_pub.publish(setpoint);
-				_offboard_trajectory_setpoint_pub.publish(setpoint);
-			}
+			setpoint.timestamp = hrt_absolute_time();
+			//_trajectory_setpoint_pub.publish(setpoint); // flighttask drop hack
+			_offboard_trajectory_setpoint_pub.publish(setpoint);
 		}
 	}
 }
