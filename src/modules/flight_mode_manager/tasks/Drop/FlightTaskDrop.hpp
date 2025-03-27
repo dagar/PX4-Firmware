@@ -63,6 +63,8 @@
 
 #include <uORB/topics/offboard_control_mode.h>
 
+#include <uORB/topics/drop_status.h>
+
 #include <uORB/Publication.hpp>
 
 class FlightTaskDrop : public FlightTask
@@ -92,6 +94,8 @@ private:
 	uORB::Publication<vehicle_thrust_setpoint_s> _vehicle_thrust_setpoint_pub{ORB_ID(vehicle_thrust_setpoint)};
 	uORB::PublicationData<vehicle_rates_setpoint_s>     _vehicle_rates_setpoint_pub{ORB_ID(vehicle_rates_setpoint)};
 	uORB::PublicationData<vehicle_attitude_setpoint_s>  _vehicle_attitude_setpoint_pub{ORB_ID(vehicle_attitude_setpoint)};
+
+	uORB::Publication<drop_status_s> _drop_status_pub{ORB_ID(drop_status)};
 
 	uORB::Publication<offboard_control_mode_s> _offboard_control_mode_pub{ORB_ID(offboard_control_mode)};
 

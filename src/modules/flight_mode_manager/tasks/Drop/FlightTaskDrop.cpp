@@ -96,6 +96,20 @@ bool FlightTaskDrop::activate(const trajectory_setpoint_s &last_setpoint)
 	_velocity_z_lpf.reset({});
 	_acceleration_lpf.reset({});
 
+
+	_actuator_armed_sub.update();
+
+	if (_actuator_armed_sub.get().armed) {
+
+		uORB::SubscriptionData<drop_status_s> drop_status_sub(ORB_ID(drop_status));
+		drop_status_sub.update();
+
+		if (drop_status_sub.get().timestamp != 0) {
+			_state = (DropState)drop_status_sub.get().drop_state;
+			mavlink_log_info(&_mavlink_log_pub, "Drop: resuming drop state %d", (int)_state);
+		}
+	}
+
 	return ret;
 }
 
@@ -604,6 +618,11 @@ bool FlightTaskDrop::update()
 				    && (fabsf(_velocity(2)) < 1.f)) {
 					_state = DropState::POSITION_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
+
+				} else if (failsafe_flags.local_velocity_invalid) {
+					mavlink_log_info(&_mavlink_log_pub, "Drop: velocity invalid, switching back to height rate");
+					_state = DropState::HEIGHT_RATE_CONTROL_ENABLED;
+					_state_last_transition_time = hrt_absolute_time();
 				}
 
 			} else {
@@ -670,9 +689,14 @@ bool FlightTaskDrop::update()
 
 				const hrt_abstime hold_timeout_us = math::constrain(_param_mpc_drop_hold_t.get(), 0.f, 3600.f) * 1e6f;
 
-				if (hrt_elapsed_time(&_state_last_transition_time) > hold_timeout_us) {
+				if (!failsafe_flags.global_position_invalid && hrt_elapsed_time(&_state_last_transition_time) > hold_timeout_us) {
 					//mavlink_log_info(&_mavlink_log_pub, "Drop: complete, full flying");
 					_state = DropState::FLYING;
+					_state_last_transition_time = hrt_absolute_time();
+
+				} else if (failsafe_flags.local_position_invalid) {
+					mavlink_log_info(&_mavlink_log_pub, "Drop: position invalid, switching back to velocity");
+					_state = DropState::VELOCITY_CONTROL_ENABLED;
 					_state_last_transition_time = hrt_absolute_time();
 				}
 
@@ -802,6 +826,9 @@ bool FlightTaskDrop::update()
 
 		if (_state >= DropState::HEIGHT_RATE_CONTROL_ENABLED) {
 			ocm.acceleration = true;
+		}
+
+		if (_state >= DropState::FLYING) {
 			ocm.velocity = true;
 			ocm.position = true;
 		}
@@ -820,6 +847,18 @@ bool FlightTaskDrop::update()
 		vehicle_rates_setpoint.timestamp = hrt_absolute_time();
 		_vehicle_rates_setpoint_pub.update(vehicle_rates_setpoint);
 	}
+
+	// publish drop status
+	drop_status_s drop_status{};
+
+	drop_status.drop_state = (uint8_t)_state;
+
+	drop_status.speed_down = _constraints.speed_down;
+	drop_status.speed_up = _constraints.speed_up;
+	drop_status.want_takeoff = _constraints.want_takeoff;
+
+	drop_status.timestamp = hrt_absolute_time();
+	_drop_status_pub.publish(drop_status);
 
 	// FALLTHROUGH
 	// case WaypointType::takeoff:
