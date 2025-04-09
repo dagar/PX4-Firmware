@@ -113,16 +113,17 @@ void ManualControl::processInput(hrt_abstime now)
 			    && PX4_ISFINITE(manual_control_input.aux1)
 			    && (fabsf(manual_control_input.aux1) > 0.f)
 			   ) {
-				// aux1 enabled if ~= 1.f, otherwise disabled
-				if (manual_control_input.aux1 < 0.5f) {
-					// invalidate current RC input
-					manual_control_input.valid = false;
-
-				} else {
+				// aux1 enabled if = 1 (>0.5), otherwise disabled
+				if (manual_control_input.aux1 > 0.5f) {
 					// otherwise invalidate existing selected setpoint (so RC is chosen)
 					if (manual_control_input.valid) {
+						// invalidate previously selected setpoint to reset selection
 						_selector.setpoint().valid = false;
 					}
+
+				} else if (manual_control_input.aux1 < 0.5f) {
+					// invalidate current RC input
+					manual_control_input.valid = false;
 				}
 			}
 
