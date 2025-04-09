@@ -103,7 +103,31 @@ void ManualControl::processInput(hrt_abstime now)
 		manual_control_setpoint_s manual_control_input;
 
 		if (_manual_control_input_subs[i].update(&manual_control_input)) {
+
+			//
+			// COM_RC_IN_MODE 2
+			//
+			if ((_param_com_rc_in_mode.get() == 2)
+			    && (manual_control_input.data_source == manual_control_setpoint_s::SOURCE_RC)
+			    && manual_control_input.valid
+			    && PX4_ISFINITE(manual_control_input.aux1)
+			    && (fabsf(manual_control_input.aux1) > 0.f)
+			   ) {
+				// aux1 enabled if ~= 1.f, otherwise disabled
+				if (manual_control_input.aux1 < 0.5f) {
+					// invalidate current RC input
+					manual_control_input.valid = false;
+
+				} else {
+					// otherwise invalidate existing selected setpoint (so RC is chosen)
+					if (manual_control_input.valid) {
+						_selector.setpoint().valid = false;
+					}
+				}
+			}
+
 			_selector.updateWithNewInputSample(now, manual_control_input, i);
+
 		}
 	}
 
@@ -167,6 +191,12 @@ void ManualControl::processSwitches(hrt_abstime &now)
 {
 	manual_control_switches_s switches;
 	const bool switches_updated = _manual_control_switches_sub.update(&switches);
+
+	if (switches_updated) {
+
+		//_selector.setRcInMode(_param_com_rc_in_mode.get());
+
+	}
 
 	// Only use switches if the currently valid source is RC as well
 	if (_selector.setpoint().valid
