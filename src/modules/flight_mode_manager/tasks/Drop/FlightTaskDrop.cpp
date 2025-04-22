@@ -59,6 +59,9 @@ bool FlightTaskDrop::activate(const trajectory_setpoint_s &last_setpoint)
 	_velocity_setpoint = _velocity;
 	_position_setpoint = _position;
 
+	_offboard_pos_sp_last = _position;
+	_offboard_vel_sp_last = {};
+
 	Vector3f vel_prev{last_setpoint.velocity};
 	Vector3f pos_prev{last_setpoint.position};
 	Vector3f accel_prev{last_setpoint.acceleration};
@@ -717,37 +720,38 @@ bool FlightTaskDrop::update()
 					mavlink_log_info(&_mavlink_log_pub, "Drop: ready for OFFBOARD");
 				}
 
-				if (_offboard_trajectory_setpoint_sub.update()) {
+				bool is_emergency_braking_active = false; // TODO
 
+				if (is_emergency_braking_active) {
+					// When initializing with large velocity, allow 1g of
+					// acceleration in 1s on all axes for fast braking
+					_position_smoothing.setMaxAcceleration({9.81f, 9.81f, 9.81f});
+					_position_smoothing.setMaxJerk(9.81f);
+
+					// If the current velocity is beyond the usual constraints, tell
+					// the controller to exceptionally increase its saturations to avoid
+					// cutting out the feedforward
+					_constraints.speed_down = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_down);
+					_constraints.speed_up = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_up);
+
+				} else if (_unsmoothed_velocity_setpoint(2) < 0.f) { // up
+					float z_accel_constraint = _param_mpc_acc_up_max.get();
+					float z_vel_constraint = _param_mpc_z_v_auto_up.get();
+
+					_position_smoothing.setMaxVelocityZ(z_vel_constraint);
+					_position_smoothing.setMaxAccelerationZ(z_accel_constraint);
+
+				} else { // down
+					_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_down_max.get());
+					_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
+				}
+
+				if (_offboard_trajectory_setpoint_sub.update()
+				    || ((_offboard_trajectory_setpoint_sub.get().timestamp != 0) && (hrt_elapsed_time(&_offboard_time_stamp_last) < 500_ms))
+				   ) {
 					const trajectory_setpoint_s &trajectory_setpoint = _offboard_trajectory_setpoint_sub.get();
 
 					if (hrt_elapsed_time(&trajectory_setpoint.timestamp) < 1_s) {
-
-						bool is_emergency_braking_active = false; // TODO
-
-						if (is_emergency_braking_active) {
-							// When initializing with large velocity, allow 1g of
-							// acceleration in 1s on all axes for fast braking
-							_position_smoothing.setMaxAcceleration({9.81f, 9.81f, 9.81f});
-							_position_smoothing.setMaxJerk(9.81f);
-
-							// If the current velocity is beyond the usual constraints, tell
-							// the controller to exceptionally increase its saturations to avoid
-							// cutting out the feedforward
-							_constraints.speed_down = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_down);
-							_constraints.speed_up = math::max(fabsf(_position_smoothing.getCurrentVelocityZ()), _constraints.speed_up);
-
-						} else if (_unsmoothed_velocity_setpoint(2) < 0.f) { // up
-							float z_accel_constraint = _param_mpc_acc_up_max.get();
-							float z_vel_constraint = _param_mpc_z_v_auto_up.get();
-
-							_position_smoothing.setMaxVelocityZ(z_vel_constraint);
-							_position_smoothing.setMaxAccelerationZ(z_accel_constraint);
-
-						} else { // down
-							_position_smoothing.setMaxAccelerationZ(_param_mpc_acc_down_max.get());
-							_position_smoothing.setMaxVelocityZ(_param_mpc_z_v_auto_dn.get());
-						}
 
 						_offboard_pos_sp_last = Vector3f{trajectory_setpoint.position};
 						_offboard_vel_sp_last = Vector3f{trajectory_setpoint.velocity};
@@ -758,7 +762,7 @@ bool FlightTaskDrop::update()
 						_offboard_time_stamp_last = _time_stamp_current;
 					}
 
-				} else if (hrt_elapsed_time(&_offboard_time_stamp_last) > 10_s) {
+				} else if ((hrt_elapsed_time(&_offboard_time_stamp_last) > 10_s)) {
 
 					mavlink_log_critical(&_mavlink_log_pub, "Drop: OFFBOARD timeout, HOLDING");
 					// latch onto current position
@@ -774,7 +778,7 @@ bool FlightTaskDrop::update()
 				_constraints.speed_up = math::max(_constraints.speed_up, 1.2f * _param_mpc_z_v_auto_up.get());
 				_constraints.want_takeoff = true;
 
-				if (_offboard_pos_sp_last.isAllFinite()) {
+				if (_offboard_pos_sp_last.isAllFinite() && (_offboard_vel_sp_last.length() > FLT_EPSILON)) {
 
 					bool force_zero_velocity_setpoint = false; // TODO
 
@@ -796,6 +800,12 @@ bool FlightTaskDrop::update()
 
 					_unsmoothed_velocity_setpoint = smoothed_setpoints.unsmoothed_velocity;
 					//_want_takeoff = true;
+
+				} else {
+					_position_setpoint.setNaN();
+					_velocity_setpoint.zero();
+					_acceleration_setpoint.zero();
+					_jerk_setpoint.zero();
 				}
 
 			} else {
