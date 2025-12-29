@@ -338,16 +338,16 @@ void VtolType::check_quadchute_condition()
 
 		// fixed-wing maximum pitch angle
 		if (_param_vt_fw_qc_p.get() > 0) {
-
-			if (fabsf(euler.theta()) > fabsf(math::radians(static_cast<float>(_param_vt_fw_qc_p.get())))) {
+			// Parameter is positive, so radians conversion is always positive - no need for fabsf()
+			if (fabsf(euler.theta()) > math::radians(static_cast<float>(_param_vt_fw_qc_p.get()))) {
 				_attc->quadchute(VtolAttitudeControl::QuadchuteReason::MaximumPitchExceeded);
 			}
 		}
 
 		// fixed-wing maximum roll angle
 		if (_param_vt_fw_qc_r.get() > 0) {
-
-			if (fabsf(euler.phi()) > fabsf(math::radians(static_cast<float>(_param_vt_fw_qc_r.get())))) {
+			// Parameter is positive, so radians conversion is always positive - no need for fabsf()
+			if (fabsf(euler.phi()) > math::radians(static_cast<float>(_param_vt_fw_qc_r.get()))) {
 				_attc->quadchute(VtolAttitudeControl::QuadchuteReason::MaximumRollExceeded);
 			}
 		}

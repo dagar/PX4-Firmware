@@ -176,7 +176,9 @@ void PositionControl::_velocityControl(const float dt)
 
 	// Saturate thrust in horizontal direction
 	if (thrust_sp_xy_norm > thrust_max_xy) {
-		_thr_sp.xy() = thrust_sp_xy / thrust_sp_xy_norm * thrust_max_xy;
+		// Use reciprocal multiplication instead of division for better performance
+		const float thrust_sp_xy_norm_inv = 1.0f / thrust_sp_xy_norm;
+		_thr_sp.xy() = thrust_sp_xy * (thrust_sp_xy_norm_inv * thrust_max_xy);
 	}
 
 	// Use tracking Anti-Windup for horizontal direction: during saturation, the integrator is used to unsaturate the output

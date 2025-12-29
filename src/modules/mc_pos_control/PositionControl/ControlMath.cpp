@@ -124,16 +124,24 @@ Vector2f constrainXY(const Vector2f &v0, const Vector2f &v1, const float &max)
 	if (Vector2f(v0 + v1).norm() <= max) {
 		// vector does not exceed maximum magnitude
 		return v0 + v1;
+	}
 
-	} else if (v0.length() >= max) {
+	// Cache v0 length and squared length to avoid redundant calculations
+	const float v0_len_sq = v0.dot(v0);
+	const float v0_len = sqrtf(v0_len_sq);
+
+	if (v0_len >= max) {
 		// the magnitude along v0, which has priority, already exceeds maximum.
 		return v0.normalized() * max;
+	}
 
-	} else if (fabsf(Vector2f(v1 - v0).norm()) < 0.001f) {
+	// Use norm_squared for threshold check to avoid sqrt
+	if ((v1 - v0).norm_squared() < 1e-6f) {
 		// the two vectors are equal
 		return v0.normalized() * max;
+	}
 
-	} else if (v0.length() < 0.001f) {
+	if (v0_len_sq < 1e-6f) {
 		// the first vector is 0.
 		return v1.normalized() * max;
 
@@ -177,7 +185,7 @@ Vector2f constrainXY(const Vector2f &v0, const Vector2f &v1, const float &max)
 		// 	- (max - ||v||) always larger than zero, otherwise it never entered this if-statement
 		Vector2f u1 = v1.normalized();
 		float m = u1.dot(v0);
-		float c = v0.dot(v0) - max * max;
+		float c = v0_len_sq - max * max;
 		float s = -m + sqrtf(m * m - c);
 		return v0 + u1 * s;
 	}
@@ -189,7 +197,8 @@ bool cross_sphere_line(const Vector3f &sphere_c, const float sphere_r,
 	// project center of sphere on line  normalized AB
 	Vector3f ab_norm = line_b - line_a;
 
-	if (ab_norm.length() < 0.01f) {
+	// Use norm_squared for threshold check to avoid sqrt
+	if (ab_norm.norm_squared() < 1e-4f) {
 		return true;
 	}
 

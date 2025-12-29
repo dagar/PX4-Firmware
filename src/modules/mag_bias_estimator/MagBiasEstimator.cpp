@@ -206,11 +206,15 @@ void MagBiasEstimator::Run()
 						_time_valid[mag_index] = 0;
 
 					} else {
+						// Pre-compute absolute values to avoid redundant calculations
+						const float abs_bias_rate_0 = fabsf(bias_rate(0));
+						const float abs_bias_rate_1 = fabsf(bias_rate(1));
+						const float abs_bias_rate_2 = fabsf(bias_rate(2));
 
 						Vector3f fitness{
-							fabsf(angular_velocity(0)) / fmaxf(fabsf(bias_rate(1)) + fabsf(bias_rate(2)), 0.02f),
-							fabsf(angular_velocity(1)) / fmaxf(fabsf(bias_rate(0)) + fabsf(bias_rate(2)), 0.02f),
-							fabsf(angular_velocity(2)) / fmaxf(fabsf(bias_rate(0)) + fabsf(bias_rate(1)), 0.02f)
+							fabsf(angular_velocity(0)) / fmaxf(abs_bias_rate_1 + abs_bias_rate_2, 0.02f),
+							fabsf(angular_velocity(1)) / fmaxf(abs_bias_rate_0 + abs_bias_rate_2, 0.02f),
+							fabsf(angular_velocity(2)) / fmaxf(abs_bias_rate_0 + abs_bias_rate_1, 0.02f)
 						};
 
 						const bool bias_significant = bias.longerThan(0.04f);
